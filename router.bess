@@ -30,7 +30,9 @@ PortInc(port=sgi_dpdk.name) -> sgi_bpf::BPF()
 s1u_ip = "1.1.1.10"
 s1u_bpf:0 -> Sink()
 s1u_bpf:1 -> PortOut(port=s1u.name)
+# TODO - add a TEID and UE IP check
 s1u_bpf:2 -> GenericDecap(bytes=50) -> EtherEncap() -> s1u_ipfwd::IPLookup()
+
 # Separate out traffic
 #   1: ARP for me
 #   2: Any traffic destined to me
@@ -39,6 +41,8 @@ filter2 = {"priority": -2, "filter": "udp dst port 2152 and dst host {}".format(
 s1u_bpf.clear()
 s1u_bpf.add(filters=[filter1, filter2])
 
+# Add routes and update src/dst MAC accordingly
+# TODO - make this dynamic using pyroute2
 s1u_ipfwd.add(prefix='0.0.0.0', prefix_len=0, gate=0)
 s1u_ipfwd:0 \
     -> Update(fields=[{'offset': 0, 'size': 6, 'value': 0x1234567890ab},
@@ -53,6 +57,7 @@ sgi_ip = "2.2.2.10"
 sgi_bpf:0 -> Sink()
 sgi_bpf:1 -> PortOut(port=sgi.name)
 sgi_bpf:2 -> GenericDecap(bytes=14) -> ue_dstip::ExactMatch(fields=[{'offset':16, 'num_bytes':4}])
+
 # Separate out traffic
 #   1: ARP for me
 #   2: Any traffic NOT destined to me
@@ -64,20 +69,25 @@ sgi_bpf.add(filters=[filter1, filter2])
 ue_dstip:0 -> Sink()
 ue_dstip.set_default_gate(gate=0)
 
-# GTPencap -> UDPencap -> IPencap -> EtherEncap -> L4checksum -> ipchecksum ->
+# Match dst IP UE and encap it with specific TIED and Outer IP src s1u and dst enb
+# GTPencap -> UDPencap -> IPencap -> EtherEncap -> L4checksum -> ipchecksum
+# TODO - make this dynamic using PFCP or CPDP messages
 ue_dstip:1 \
     -> SetMetadata(attrs=[
+        {'name': 'ip_src', 'size': 4, 'value_bin': aton(s1u_ip)},
+        {'name': 'ip_dst', 'size': 4, 'value_bin': '\x02\x0a\x0b\x0c'},
+        {'name': 'ip_proto', 'size': 1, 'value_bin': '\x11'}]) \
+    -> SetMetadata(attrs=[
         {'name': 'ether_src', 'size': 6, 'value_bin': '\x02\x01\x02\x03\x04\x05'},
-        {'name': 'ether_dst', 'size': 6, 'value_bin': '\x02\x0a\x0b\x0c\x0d\x0e'},
-        {'name': 'ether_type', 'size': 2, 'value_bin': '\x08\x00'}]) \
-    -> GenericEncap(fields=[
+        {'name': 'ether_dst', 'size': 6, 'value_bin': '\x02\x0a\x0b\x0c\x0d\x0e'}]) \
+    -> GTPencap::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x020000000001}},
         {'size': 6, 'value': {'value_int': 0x0619deadbeef}},
         {'size': 2, 'attribute': 'ether_type'}]) \
-    -> GenericEncap(fields=[
+    -> UDPencap::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x020000000001}},
         {'size': 6, 'value': {'value_int': 0x0619deadbeef}},
         {'size': 2, 'attribute': 'ether_type'}]) \
-    -> IPEncap() -> EtherEncap() -> L4Checksum() -> IPChecksum()
+    -> IPEncap() -> EtherEncap() -> L4Checksum() -> IPChecksum() -> merge_s1u
 ue_dstip.add(fields=[{'value_bin': aton('12.34.56.78')}], gate=1)
 
