@@ -1,3 +1,8 @@
+import socket
+
+def aton(ip):
+    return socket.inet_aton(ip)
+
 #====================================================
 #       Port Setup
 #====================================================
@@ -47,15 +52,32 @@ s1u_ipfwd:0 \
 sgi_ip = "2.2.2.10"
 sgi_bpf:0 -> Sink()
 sgi_bpf:1 -> PortOut(port=sgi.name)
-sgi_bpf:2 -> sgi_ipfwd::IPLookup()
+sgi_bpf:2 -> GenericDecap(bytes=14) -> ue_dstip::ExactMatch(fields=[{'offset':16, 'num_bytes':4}])
 # Separate out traffic
 #   1: ARP for me
 #   2: Any traffic NOT destined to me
 filter1 = {"priority": -1, "filter": "arp host {}".format(sgi_ip), "gate": 1}
-filter2 = {"priority": -2, "filter": "not dst host {}".format(sgi_ip), "gate": 2}
+filter2 = {"priority": -2, "filter": "ip and not dst host {}".format(sgi_ip), "gate": 2}
 sgi_bpf.clear()
 sgi_bpf.add(filters=[filter1, filter2])
 
-sgi_ipfwd.add(prefix='0.0.0.0', prefix_len=0, gate=0)
-sgi_ipfwd:0 -> Sink()
+ue_dstip:0 -> Sink()
+ue_dstip.set_default_gate(gate=0)
+
+# GTPencap -> UDPencap -> IPencap -> EtherEncap -> L4checksum -> ipchecksum ->
+ue_dstip:1 \
+    -> SetMetadata(attrs=[
+        {'name': 'ether_src', 'size': 6, 'value_bin': '\x02\x01\x02\x03\x04\x05'},
+        {'name': 'ether_dst', 'size': 6, 'value_bin': '\x02\x0a\x0b\x0c\x0d\x0e'},
+        {'name': 'ether_type', 'size': 2, 'value_bin': '\x08\x00'}]) \
+    -> GenericEncap(fields=[
+        {'size': 6, 'value': {'value_int': 0x020000000001}},
+        {'size': 6, 'value': {'value_int': 0x0619deadbeef}},
+        {'size': 2, 'attribute': 'ether_type'}]) \
+    -> GenericEncap(fields=[
+        {'size': 6, 'value': {'value_int': 0x020000000001}},
+        {'size': 6, 'value': {'value_int': 0x0619deadbeef}},
+        {'size': 2, 'attribute': 'ether_type'}]) \
+    -> IPEncap() -> EtherEncap() -> L4Checksum() -> IPChecksum()
+ue_dstip.add(fields=[{'value_bin': aton('12.34.56.78')}], gate=1)
 
