@@ -1,0 +1,51 @@
+s1u = PMDPort(name="s1u", vdev="net_af_packet0,iface=s1u")
+sgi = PMDPort(name="sgi", vdev="net_af_packet1,iface=sgi")
+
+s1u_dpdk = PMDPort(name="s1u_dpdk", port_id=0)
+sgi_dpdk = PMDPort(name="sgi_dpdk", port_id=1)
+
+#====================================================
+
+s1u_ip = "1.1.1.10"
+s1u_bpf = BPF()
+s1u_bpf:0 -> Sink()
+s1u_bpf:1 -> s1u_ipfwd::IPLookup()
+s1u_bpf:2 -> PortOut(port=s1u.name)
+# Separate out traffic
+#   1: ARP for me
+#   2: Any traffic NOT destined to me
+filter1 = {"priority": -1, "filter": "arp host {}".format(s1u_ip), "gate": 1}
+filter2 = {"priority": -2, "filter": "not dst host {}".format(s1u_ip), "gate": 2}
+s1u_bpf.clear()
+s1u_bpf.add(filters=[filter1, filter2])
+
+PortInc(port=s1u_dpdk.name) -> s1u_bpf
+
+s1u_ipfwd.add(prefix='0.0.0.0', prefix_len=0, gate=0)
+s1u_ipfwd:0 -> Sink()
+
+merge_s1u::Merge() -> PortOut(port=s1u_dpdk.name)
+PortInc(port=s1u) -> merge_s1u
+#====================================================
+
+sgi_ip = "2.2.2.10"
+sgi_bpf = BPF()
+sgi_bpf:0 -> Sink()
+sgi_bpf:1 -> sgi_ipfwd::IPLookup()
+sgi_bpf:2 -> PortOut(port=sgi.name)
+# Separate out traffic
+#   1: ARP for me
+#   2: Any traffic NOT destined to me
+filter1 = {"priority": -1, "filter": "arp host {}".format(sgi_ip), "gate": 1}
+filter2 = {"priority": -2, "filter": "not dst host {}".format(sgi_ip), "gate": 2}
+sgi_bpf.clear()
+sgi_bpf.add(filters=[filter1, filter2])
+
+PortInc(port=sgi_dpdk.name) -> sgi_bpf
+
+sgi_ipfwd.add(prefix='0.0.0.0', prefix_len=0, gate=0)
+sgi_ipfwd:0 -> Sink()
+
+merge_sgi::Merge() -> PortOut(port=sgi_dpdk.name)
+PortInc(port=sgi) -> merge_sgi
+
