@@ -9,13 +9,13 @@ sgi_dpdk = PMDPort(name="sgi_dpdk", port_id=1)
 s1u_ip = "1.1.1.10"
 s1u_bpf = BPF()
 s1u_bpf:0 -> Sink()
-s1u_bpf:1 -> s1u_ipfwd::IPLookup()
-s1u_bpf:2 -> PortOut(port=s1u.name)
+s1u_bpf:1 -> PortOut(port=s1u.name)
+s1u_bpf:2 -> GenericDecap(bytes=50) -> EtherEncap() -> s1u_ipfwd::IPLookup()
 # Separate out traffic
 #   1: ARP for me
-#   2: Any traffic NOT destined to me
+#   2: Any traffic destined to me
 filter1 = {"priority": -1, "filter": "arp host {}".format(s1u_ip), "gate": 1}
-filter2 = {"priority": -2, "filter": "not dst host {}".format(s1u_ip), "gate": 2}
+filter2 = {"priority": -2, "filter": "udp dst port 2152 and dst host {}".format(s1u_ip), "gate": 2}
 s1u_bpf.clear()
 s1u_bpf.add(filters=[filter1, filter2])
 
@@ -31,8 +31,8 @@ PortInc(port=s1u) -> merge_s1u
 sgi_ip = "2.2.2.10"
 sgi_bpf = BPF()
 sgi_bpf:0 -> Sink()
-sgi_bpf:1 -> sgi_ipfwd::IPLookup()
-sgi_bpf:2 -> PortOut(port=sgi.name)
+sgi_bpf:1 -> PortOut(port=sgi.name)
+sgi_bpf:2 -> sgi_ipfwd::IPLookup()
 # Separate out traffic
 #   1: ARP for me
 #   2: Any traffic NOT destined to me
