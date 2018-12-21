@@ -1,3 +1,5 @@
+#vim: syntax=py
+
 import socket
 
 def aton(ip):
@@ -6,6 +8,9 @@ def aton(ip):
 #====================================================
 #       Port Setup
 #====================================================
+
+s1u_ip = "1.1.1.10"
+sgi_ip = "2.2.2.10"
 
 s1u = PMDPort(name="s1u", vdev="net_af_packet0,iface=s1u")
 sgi = PMDPort(name="sgi", vdev="net_af_packet1,iface=sgi")
@@ -17,17 +22,39 @@ sgi_dpdk = PMDPort(name="sgi_dpdk", port_id=1)
 #       Misc Setup
 #====================================================
 
-PortInc(port=s1u) -> merge_s1u::Merge() -> PortOut(port=s1u_dpdk.name)
-PortInc(port=sgi) -> merge_sgi::Merge() -> PortOut(port=sgi_dpdk.name)
+merge_s1u::Merge() -> PortOut(port=s1u_dpdk.name)
+merge_sgi::Merge() -> PortOut(port=sgi_dpdk.name)
+
+# PortInc(port=s1u) -> merge_s1u
+# PortInc(port=sgi) -> merge_sgi
 
 PortInc(port=s1u_dpdk.name) -> s1u_bpf::BPF()
 PortInc(port=sgi_dpdk.name) -> sgi_bpf::BPF()
 
 #====================================================
+#       Test Setup
+#====================================================
+
+PortInc(port=s1u) -> Sink()
+PortInc(port=sgi) -> Sink()
+
+import scapy.all as scapy
+
+eth_header = scapy.Ether(src='4a:2a:e8:fe:c5:84', dst='ff:ff:ff:ff:ff:ff')
+arp_header = scapy.ARP(op=1, pdst=s1u_ip, psrc='1.1.1.11')
+pkt = eth_header/arp_header
+packets = [str(pkt)]
+arpsrc::Source() -> Rewrite(templates=packets) -> s1u_bpf
+bess.add_tc('packet_limit',
+            policy='rate_limit',
+            resource='packet',
+            limit={'packet': 1})
+arpsrc.attach_task(parent='packet_limit')
+
+#====================================================
 #       Uplink Pipeline
 #====================================================
 
-s1u_ip = "1.1.1.10"
 s1u_bpf:0 -> Sink()
 s1u_bpf:1 -> PortOut(port=s1u.name)
 # TODO - add a TEID and UE IP check
@@ -53,7 +80,6 @@ s1u_ipfwd:0 \
 #       Downlink Pipeline
 #====================================================
 
-sgi_ip = "2.2.2.10"
 sgi_bpf:0 -> Sink()
 sgi_bpf:1 -> PortOut(port=sgi.name)
 sgi_bpf:2 -> GenericDecap(bytes=14) -> ue_dstip::ExactMatch(fields=[{'offset':16, 'num_bytes':4}])
