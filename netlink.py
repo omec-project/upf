@@ -1,10 +1,13 @@
-from pyroute2 import IPDB
 import pprint
-import sys
 import signal
+import sys
 from enum import Enum
 
+from pyroute2 import IPDB
+
 # http://fos.tech/posts/pyroute2-linux-networking-made-easy/
+
+
 class NetlinkEvents(Enum):
     # A new neighbor has appeared
     RTM_NEWNEIGH = 'RTM_NEWNEIGH'
@@ -23,18 +26,22 @@ class NetlinkEvents(Enum):
     # A route has been removed from the routing table
     RTM_DELROUTE = 'RTM_DELROUTE'
 
+
 ipdb = IPDB()
 pp = pprint.PrettyPrinter(indent=3)
 
+
 def new_event_callback(ipdb, netlink_message, action):
-    if 1: #action == NetlinkEvents.RTM_NEWADDR.name:
+    if True:  # action == NetlinkEvents.RTM_NEWADDR.name:
         print action
         pp.pprint(netlink_message)
         print 100*'-'
 
+
 if __name__ == "__main__":
 
     event_callback = ipdb.register_callback(new_event_callback)
+
     def cleanup(*args):
         ipdb.unregister_callback(event_callback)
         sys.exit()
@@ -42,4 +49,3 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, cleanup)
     signal.signal(signal.SIGTERM, cleanup)
     signal.pause()
-
