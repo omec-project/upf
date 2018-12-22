@@ -32,26 +32,6 @@ PortInc(port=s1u_dpdk.name) -> s1u_bpf::BPF()
 PortInc(port=sgi_dpdk.name) -> sgi_bpf::BPF()
 
 #====================================================
-#       Test Setup
-#====================================================
-
-PortInc(port=s1u) -> Sink()
-PortInc(port=sgi) -> Sink()
-
-import scapy.all as scapy
-
-eth_header = scapy.Ether(src='4a:2a:e8:fe:c5:84', dst='ff:ff:ff:ff:ff:ff')
-arp_header = scapy.ARP(op=1, pdst=s1u_ip, psrc='1.1.1.11')
-pkt = eth_header/arp_header
-packets = [str(pkt)]
-arpsrc::Source() -> Rewrite(templates=packets) -> s1u_bpf
-bess.add_tc('packet_limit',
-            policy='rate_limit',
-            resource='packet',
-            limit={'packet': 1})
-arpsrc.attach_task(parent='packet_limit')
-
-#====================================================
 #       Uplink Pipeline
 #====================================================
 
@@ -117,3 +97,34 @@ ue_dstip:1 \
     -> IPEncap() -> EtherEncap() -> L4Checksum() -> IPChecksum() -> merge_s1u
 ue_dstip.add(fields=[{'value_bin': aton('12.34.56.78')}], gate=1)
 
+#====================================================
+#       Test Setup
+#====================================================
+
+PortInc(port=s1u) -> Sink()
+PortInc(port=sgi) -> Sink()
+
+import scapy.all as scapy
+
+eth_header = scapy.Ether(src='02:00:00:00:00:01', dst='ff:ff:ff:ff:ff:ff')
+arp_header = scapy.ARP(op=1, pdst=s1u_ip, psrc='1.1.1.11')
+pkt = eth_header/arp_header
+packets = [str(pkt)]
+s1u_arpsrc::Source() -> Rewrite(templates=packets) -> s1u_bpf
+bess.add_tc('s1u_arp_pps',
+            policy='rate_limit',
+            resource='packet',
+            limit={'packet': 1})
+s1u_arpsrc.attach_task(parent='s1u_arp_pps')
+
+
+eth_header = scapy.Ether(src='02:00:00:00:00:02', dst='ff:ff:ff:ff:ff:ff')
+arp_header = scapy.ARP(op=1, pdst=sgi_ip, psrc='2.2.2.11')
+pkt = eth_header/arp_header
+packets = [str(pkt)]
+sgi_arpsrc::Source() -> Rewrite(templates=packets) -> sgi_bpf
+bess.add_tc('sgi_arp_pps',
+            policy='rate_limit',
+            resource='packet',
+            limit={'packet': 1})
+sgi_arpsrc.attach_task(parent='sgi_arp_pps')
