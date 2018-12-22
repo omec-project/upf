@@ -22,23 +22,23 @@ sgi_dpdk = PMDPort(name="sgi_dpdk", port_id=1)
 #       Misc Setup
 #====================================================
 
-merge_s1u::Merge() -> PortOut(port=s1u_dpdk.name)
-merge_sgi::Merge() -> PortOut(port=sgi_dpdk.name)
+merge_s1u::Merge() -> s1u_dpdk_out::PortOut(port=s1u_dpdk.name)
+merge_sgi::Merge() -> sgi_dpdk_out::PortOut(port=sgi_dpdk.name)
 
-# PortInc(port=s1u) -> merge_s1u
-# PortInc(port=sgi) -> merge_sgi
+# s1u_in::PortInc(port=s1u) -> merge_s1u
+# sgi_in::PortInc(port=sgi) -> merge_sgi
 
-PortInc(port=s1u_dpdk.name) -> s1u_bpf::BPF()
-PortInc(port=sgi_dpdk.name) -> sgi_bpf::BPF()
+s1u_dpdk_in::PortInc(port=s1u_dpdk.name) -> s1u_bpf::BPF()
+sgi_dpdk_in::PortInc(port=sgi_dpdk.name) -> sgi_bpf::BPF()
 
 #====================================================
 #       Uplink Pipeline
 #====================================================
 
 s1u_bpf:0 -> Sink()
-s1u_bpf:1 -> PortOut(port=s1u.name)
+s1u_bpf:1 -> s1u_out::PortOut(port=s1u.name)
 # TODO - add a TEID and UE IP check
-s1u_bpf:2 -> GenericDecap(bytes=50) -> EtherEncap() -> s1u_ipfwd::IPLookup()
+s1u_bpf:2 -> GetPDU::GenericDecap(bytes=50) -> DummyEth::EtherEncap() -> s1u_ipfwd::IPLookup()
 
 # Separate out traffic
 #   1: ARP for me
@@ -52,7 +52,7 @@ s1u_bpf.add(filters=[filter1, filter2])
 # TODO - make this dynamic using pyroute2
 s1u_ipfwd.add(prefix='0.0.0.0', prefix_len=0, gate=0)
 s1u_ipfwd:0 \
-    -> Update(fields=[{'offset': 0, 'size': 6, 'value': 0x1234567890ab},
+    -> nh_2_2_2_254::Update(fields=[{'offset': 0, 'size': 6, 'value': 0x1234567890ab},
                       {'offset': 6, 'size': 6, 'value': 0x1234567890ab}]) \
     -> merge_sgi
 
@@ -61,7 +61,7 @@ s1u_ipfwd:0 \
 #====================================================
 
 sgi_bpf:0 -> Sink()
-sgi_bpf:1 -> PortOut(port=sgi.name)
+sgi_bpf:1 -> sgi_out::PortOut(port=sgi.name)
 sgi_bpf:2 -> GenericDecap(bytes=14) -> ue_dstip::ExactMatch(fields=[{'offset':16, 'num_bytes':4}])
 
 # Separate out traffic
@@ -79,14 +79,14 @@ ue_dstip.set_default_gate(gate=0)
 # GTPencap -> UDPencap -> IPencap -> EtherEncap -> L4checksum -> ipchecksum
 # TODO - make this dynamic using PFCP or CPDP messages
 ue_dstip:1 \
-    -> SetMetadata(attrs=[
+    -> IPMeta::SetMetadata(attrs=[
         {'name': 'ip_src', 'size': 4, 'value_bin': aton(s1u_ip)},
         {'name': 'ip_dst', 'size': 4, 'value_bin': '\x02\x0a\x0b\x0c'},
         {'name': 'ip_proto', 'size': 1, 'value_bin': '\x11'}]) \
-    -> SetMetadata(attrs=[
+    -> EtherMeta::SetMetadata(attrs=[
         {'name': 'ether_src', 'size': 6, 'value_bin': '\x02\x01\x02\x03\x04\x05'},
         {'name': 'ether_dst', 'size': 6, 'value_bin': '\x02\x0a\x0b\x0c\x0d\x0e'}]) \
-    -> GTPencap::GenericEncap(fields=[
+    -> GTPUencap::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x020000000001}},
         {'size': 6, 'value': {'value_int': 0x0619deadbeef}},
         {'size': 2, 'attribute': 'ether_type'}]) \
@@ -101,8 +101,8 @@ ue_dstip.add(fields=[{'value_bin': aton('12.34.56.78')}], gate=1)
 #       Test Setup
 #====================================================
 
-PortInc(port=s1u) -> Sink()
-PortInc(port=sgi) -> Sink()
+s1u_in::PortInc(port=s1u) -> Sink()
+sgi_in::PortInc(port=sgi) -> Sink()
 
 import scapy.all as scapy
 
