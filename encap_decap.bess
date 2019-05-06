@@ -31,6 +31,8 @@ intf_dpdk_in_sgi::PortInc(port=intf_dpdk1.name) \
   -> GetPDU_s1u::GenericDecap(bytes=14) \
   -> gep::GtpuEncap() \
   -> geencap::GenericEncap(fields=[{'size': 6, 'value': {'value_int': en_s1u_mac}}, {'size': 6, 'value': {'value_int': s1u_mac}}, {'size': 2, 'value': {'value_int': 0x0800}}]) \
+  -> l4c::L4Checksum() \
+  -> ipc::IPChecksum() \
   -> intf_dpdk_out_s1u::PortOut(port=intf_dpdk0.name)
 ######################################################################################################
 # Reduce burst size to 8 pkts/batch
