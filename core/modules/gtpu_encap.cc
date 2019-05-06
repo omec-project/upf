@@ -29,6 +29,8 @@ GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 	int cnt = batch->cnt();
 	for (int i = 0; i < cnt; i++) {
 		bess::Packet *p = batch->pkts()[i];
+		/* assuming that this module comes right after EthernetDecap */
+		/* pkt_len can be used as the length of IP datagram */
 		uint16_t pkt_len = p->total_len();
 		struct ipv4_hdr *iph = p->head_data<struct ipv4_hdr *>();
 		uint32_t daddr = iph->dst_addr;
@@ -51,7 +53,7 @@ GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 				   << "." << ((daddr >> 16) & 0xFF) << "."
 				   << ((daddr >> 24) & 0xFF) << std::endl;
 			/* XXX - TODO: Open up a new gate and redirect bad traffic to Sink */
-			bess::Packet::Free(p);
+			DropPacket(ctx, p);
 			continue;
 		}
 
@@ -78,6 +80,7 @@ GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 		udph->dst_port = htons(UDP_PORT_GTPU);
 		udph->dgram_len = htons(pkt_len + sizeof(struct gtpu_hdr) +
 					sizeof(struct udp_hdr));
+		/* calculated by L4Checksum module in line */
 		udph->dgram_cksum = 0;
 
 		/* setting outer IP header */
@@ -95,8 +98,9 @@ GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 		iph->dst_addr = htonl(data->ul_s1_info.enb_addr.u.ipv4_addr);
 
 		/* calculate outer IP checksum with bess util func() */
-		bess::utils::Ipv4 *ip = reinterpret_cast<bess::utils::Ipv4 *>(iph);
-		iph->hdr_checksum = CalculateIpv4Checksum(*ip);
+		/* handled by IPChecksum module in line */
+		/* bess::utils::Ipv4 *ip = reinterpret_cast<bess::utils::Ipv4 *>(iph); */
+		/* iph->hdr_checksum = CalculateIpv4Checksum(*ip);*/
 
 #ifdef DEBUG
 		std::map<uint64_t, void *>::iterator it;
@@ -163,13 +167,16 @@ GtpuEncap::dp_session_create(struct session_info *entry, int index)
 	(void)index;
 #endif
 	/* allocate memory for session info */
-	data = (struct session_info *)calloc(sizeof(struct session_info), 1); 
+	data = (struct session_info *)rte_calloc("session_info",
+						 sizeof(struct session_info),
+						 1,
+						 0); 
 	if (data == NULL) {
 		std::cerr << "Failed to allocate memory for session info!" << std::endl;
 		return -1;
 	}
 
-	while (session_map.Insert(entry->ue_addr.u.ipv4_addr, (uint64_t)data) == NULL) {
+	if (session_map.Insert(entry->ue_addr.u.ipv4_addr, (uint64_t)data) == NULL) {
 		std::cerr << "Failed to insert session info with " << index << " sess_id "
 			  << entry->sess_id << std::endl;
 	}
