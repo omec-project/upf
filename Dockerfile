@@ -5,7 +5,7 @@ ARG BESS_COMMIT=master
 RUN apt-get update && apt-get install -y wget unzip ca-certificates git
 RUN wget -qO bess.zip https://github.com/NetSys/bess/archive/${BESS_COMMIT}.zip && unzip bess.zip
 WORKDIR bess-${BESS_COMMIT}
-COPY core/modules/ ./core/modules/
+COPY core/modules/ core/modules/
 RUN ./build.py bess && cp bin/bessd /bin
 RUN mkdir -p /opt/bess && cp -r bessctl pybess /opt/bess
 
@@ -14,7 +14,7 @@ FROM python:2.7-slim as pip
 RUN apt-get update && apt-get install -y gcc
 RUN pip install --no-cache-dir psutil
 
-# Stage bess: creates the runtime image of BESS sidecar
+# Stage bess: creates the runtime image of BESS
 FROM python:2.7-slim as bess
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \

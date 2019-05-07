@@ -2,10 +2,10 @@
 
 ## Pre-reqs
 
-To follow instructions, install
+To follow instructions, you need
 
 * Docker CE >= 17.06
-* 2 DPDK compatiable interfaces bound to VFIO and update their iommu_group id in `setup.sh`
+* 2 DPDK compatiable interfaces bound to VFIO with their iommu_group id updated in `setup.sh`
 
 ## Init
 
