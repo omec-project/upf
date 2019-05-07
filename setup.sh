@@ -2,6 +2,7 @@
 
 docker build -t krsna1729/spgwu .
 
+docker stop bess
 docker rm -f bess
 
 docker run --name bess -itd --cap-add NET_ADMIN \
