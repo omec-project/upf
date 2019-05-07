@@ -1,0 +1,138 @@
+# vim: syntax=py
+
+import sys
+def exit(code, msg):
+    print(msg)
+    sys.exit(code)
+
+import os
+def get_env(varname):
+    try:
+        var = os.environ[varname]
+    except KeyError:
+        exit(1, 'Empty env var {}'.format(varname))
+    else:
+        return var
+
+from pyroute2 import IPDB
+ipdb = IPDB()
+
+def ips_by_interface(name):
+    return [ipobj[0] for ipobj in ipdb.interfaces[name]['ipaddr'].ipv4]
+
+def mac_by_interface(name):
+    return ipdb.interfaces[name]['address']
+
+def mac_by_interface_hex(name):
+    return int(ipdb.interfaces[name]['address'].replace(':', ''), 16)
+
+def peer_by_interface(name):
+    try:
+        peer_idx = ipdb.interfaces[name]['link']
+        peer_name = ipdb.interfaces[peer_idx]['ifname']
+    except:
+        exit(2, 'veth interface {} does not exist'.format(name))
+    else:
+        return peer_name
+
+import socket
+def aton(ip):
+    return socket.inet_aton(ip)
+
+# ====================================================
+#       Core Setup
+# ====================================================
+
+import psutil
+bess.add_worker(wid=0, core=int(psutil.Process().cpu_affinity()[0]))
+
+# ====================================================
+#       Port Setup
+# ====================================================
+
+def setup_port(ifname, idx):
+    peer = peer_by_interface(ifname)
+    print('Setting up port {}'.format(ifname))
+
+    # Initialize PMDPort for kernel and DPDK
+    intf_kern = PMDPort(name="{}_kern".format(ifname), vdev="net_af_packet{},iface={}".format(idx,peer))
+    intf_dpdk = PMDPort(name="{}_dpdk".format(ifname), port_id=idx)
+
+    # Initialize port in/out module for kernel and DPDK
+    intf_kern_pi = __bess_module__("{}_kern_pi".format(ifname), 'PortInc', port=intf_kern.name)
+    intf_kern_po = __bess_module__("{}_kern_po".format(ifname), 'PortOut', port=intf_kern.name)
+    intf_dpdk_pi = __bess_module__("{}_dpdk_pi".format(ifname), 'PortInc', port=intf_dpdk.name)
+    intf_dpdk_po = __bess_module__("{}_dpdk_po".format(ifname), 'PortOut', port=intf_dpdk.name)
+
+    # Initialize BPF to classify incoming traffic to go to kernel or pipeline
+    intf_dpdk_bpf = __bess_module__("{}_dpdk_bpf".format(ifname), 'BPF')
+
+    # host_ip_filter: tcpdump -i foo 'dst host 198.19.0.1 or 198.18.0.1' -d
+    ips = ips_by_interface(ifname)
+    host_ip_filter = {"priority": -100,
+                "filter": "dst host " + " or ".join(str(x) for x in ips), "gate": 100}
+    intf_dpdk_bpf.clear()
+    intf_dpdk_bpf.add(filters=[host_ip_filter])
+
+    # Default drop when no matches
+    intf_dpdk_pi -> intf_dpdk_bpf:0 -> Sink()
+
+    # Direct control traffic from DPDK to kernel
+    intf_dpdk_bpf:100 -> intf_kern_po
+
+    # Direct control traffic from kernel to DPDK
+    intf_kern_pi -> intf_dpdk_po
+
+S1U = "s1u"
+SGI = "sgi"
+setup_port(S1U, 0)
+setup_port(SGI, 1)
+
+# ====================================================
+#       Uplink Pipeline
+# ====================================================
+
+as_sgi_mac=0x6805ca31fa7b
+
+sgi_routes::IPLookup()
+sgi_routes.add(prefix='0.0.0.0', prefix_len=0, gate=0)
+
+# Setting filter to detect gtpu traffic
+gtpu_filter = {"priority": -1, "filter": "udp dst port 2152 and dst host " + " or ".join(str(x) for x in ips_by_interface(S1U)), "gate": 1}
+s1u_dpdk_bpf.add(filters=[gtpu_filter])
+
+s1u_dpdk_bpf:1 -> GetPDU_sgi::GenericDecap(bytes=50) \
+    -> sgi_ether_encap::GenericEncap(fields=[
+        {'size': 6, 'value': {'value_int': 0x0}},
+        {'size': 6, 'value': {'value_int': mac_by_interface_hex(SGI)}},
+        {'size': 2, 'value': {'value_int': 0x0800}}]) \
+    -> sgi_routes:0 \
+    -> sgi_default_route::Update(fields=[{'offset': 0, 'size': 6, 'value': as_sgi_mac}]) \
+    -> sgi_dpdk_po
+
+# ====================================================
+#       Downlink Pipeline
+# ====================================================
+
+en_s1u_mac=0x6805ca31fa7a
+ue_cidr = "16.0.0.0/24"
+
+s1u_routes::IPLookup()
+s1u_routes.add(prefix='0.0.0.0', prefix_len=0, gate=0)
+
+# Setting filter to detect UE subnet
+ue_filter = {"priority": -1, "filter": "ip dst net {}".format(ue_cidr), "gate": 1}
+sgi_dpdk_bpf.add(filters=[ue_filter])
+
+# TODO: Add gtp encap to the chain
+sgi_dpdk_bpf:1 \
+    -> GenericDecap(bytes=14) \
+    -> s1u_ether_encap::GenericEncap(fields=[
+        {'size': 6, 'value': {'value_int': 0x0}},
+        {'size': 6, 'value': {'value_int': mac_by_interface_hex(S1U)}},
+        {'size': 2, 'value': {'value_int': 0x0800}}]) \
+    -> L4Checksum() \
+    -> IPChecksum() \
+    -> s1u_routes:0 \
+    -> s1u_default_route::Update(fields=[{'offset': 0, 'size': 6, 'value': en_s1u_mac}]) \
+    -> s1u_dpdk_po

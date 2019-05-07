@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bess
+  annotations:
+      k8s.v1.cni.cncf.io/networks: '[
+            { "name": "sriov-net-dpdk", "interface": "foo" }
+    ]'
+spec:
+  containers:
+  - name: net-tools
+    image: busybox
+    command: ["sleep", "86400"]
+  - name: bess
+    image: krsna1729/bess-router
+    stdin: true
+    tty: true
+    env:
+    - name: IFNAME
+      value: foo
+    args:
+      - -grpc-url=0.0.0.0:10514
+    livenessProbe:
+      tcpSocket:
+        port: 10514
+      initialDelaySeconds: 15
+      periodSeconds: 20
+    lifecycle:
+      postStart:
+        exec:
+          command: ["bash", "-c", "until /opt/bess/bessctl/bessctl daemon reset -- run file /conf/router.bess -- show pipeline; do sleep 2; done;"]
+    securityContext:
+      capabilities:
+        add:
+          - IPC_LOCK # AF_PACKET vdev uses mmap
+    resources:
+      limits:
+        hugepages-1Gi: 2Gi
+        cpu: 2
+        memory: 256Mi
+        intel.com/sriov_vfio: '1'
+    volumeMounts:
+    - name: bess-conf
+      mountPath: /conf
+    - name: hugepages
+      mountPath: /dev/hugepages
+  volumes:
+  - name: bess-conf
+    configMap:
+      name: router
+  - name: hugepages
+    emptyDir:
+      medium: HugePages

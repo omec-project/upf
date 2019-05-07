@@ -1,3 +1,4 @@
-docker exec bess /opt/bessctl/bessctl/bessctl daemon reset
-docker exec bess /opt/bessctl/bessctl/bessctl run file /router/router.bess
-docker exec bess /opt/bessctl/bessctl/bessctl show pipeline | tee dp-pipe.txt
+#!/bin/bash
+BESSCTL="/opt/bess/bessctl/bessctl"
+docker exec bess $BESSCTL daemon reset -- run file /conf/spgwu.bess
+docker exec bess $BESSCTL show pipeline | tee pipeline.txt
