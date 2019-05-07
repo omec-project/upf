@@ -126,7 +126,6 @@ s1u_routes.add(prefix='0.0.0.0', prefix_len=0, gate=0)
 ue_filter = {"priority": -1, "filter": "ip dst net {}".format(ue_cidr), "gate": 1}
 sgi_dpdk_bpf.add(filters=[ue_filter])
 
-# TODO: Add gtp encap to the chain
 sgi_dpdk_bpf:1 \
     -> GenericDecap(bytes=14) \
     -> gtpu_encap::GtpuEncap() \
