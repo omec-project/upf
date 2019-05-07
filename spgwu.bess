@@ -48,6 +48,14 @@ def setup_port(ifname, idx):
     # Direct control traffic from kernel to DPDK
     intf_kern_pi -> intf_dpdk_po
 
+    # Limit scheduling slow path RX to 1000 times/second
+    tc = "{}_kern_pi_sched_limit".format(ifname)
+    bess.add_tc(tc,
+            policy='rate_limit',
+            resource='count',
+            limit={'count': 1000})
+    intf_kern_pi.attach_task(parent=tc)
+
 S1U = "s1u"
 SGI = "sgi"
 setup_port(S1U, 0)
