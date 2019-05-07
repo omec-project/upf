@@ -13,12 +13,13 @@ bess.add_worker(wid=0, core=int(psutil.Process().cpu_affinity()[0]))
 #       Port Setup
 # ====================================================
 
+
 def setup_port(ifname, idx):
     peer = peer_by_interface(ifname)
     print('Setting up port {}'.format(ifname))
 
     # Initialize PMDPort for kernel and DPDK
-    vdev = "net_af_packet{},iface={}".format(idx,peer)
+    vdev = "net_af_packet{},iface={}".format(idx, peer)
     intf_kern = PMDPort(name="{}_kern".format(ifname), vdev=vdev)
     intf_dpdk = PMDPort(name="{}_dpdk".format(ifname), port_id=idx)
 
@@ -35,7 +36,7 @@ def setup_port(ifname, idx):
     HostGate = 100
     ips = ips_by_interface(ifname)
     host_ip_filter = {"priority": -HostGate, "filter": "dst host "
-                        + " or ".join(str(x) for x in ips), "gate": HostGate}
+                      + " or ".join(str(x) for x in ips), "gate": HostGate}
     intf_dpdk_bpf.clear()
     intf_dpdk_bpf.add(filters=[host_ip_filter])
 
@@ -51,10 +52,11 @@ def setup_port(ifname, idx):
     # Limit scheduling slow path RX to 1000 times/second
     tc = "{}_kern_pi_sched_limit".format(ifname)
     bess.add_tc(tc,
-            policy='rate_limit',
-            resource='count',
-            limit={'count': 1000})
+                policy='rate_limit',
+                resource='count',
+                limit={'count': 1000})
     intf_kern_pi.attach_task(parent=tc)
+
 
 S1U = "s1u"
 SGI = "sgi"
@@ -65,7 +67,7 @@ setup_port(SGI, 1)
 #       Uplink Pipeline
 # ====================================================
 
-as_sgi_mac=0x6805ca31fa7b
+as_sgi_mac = 0x6805ca31fa7b
 
 # TODO: Handle routes for directly connected vs. via next hop differently
 sgi_routes::IPLookup()
@@ -74,7 +76,7 @@ sgi_routes.add(prefix='0.0.0.0', prefix_len=0, gate=0)
 # Setting filter to detect gtpu traffic
 GTPUGate = 1
 gtpu_filter = {"priority": -GTPUGate, "filter": "udp dst port 2152" + " and dst host "
-                + " or ".join(str(x) for x in ips_by_interface(S1U)), "gate": GTPUGate}
+               + " or ".join(str(x) for x in ips_by_interface(S1U)), "gate": GTPUGate}
 s1u_dpdk_bpf.add(filters=[gtpu_filter])
 
 s1u_dpdk_bpf:GTPUGate -> GetPDU_sgi::GenericDecap(bytes=50) \
@@ -90,7 +92,7 @@ s1u_dpdk_bpf:GTPUGate -> GetPDU_sgi::GenericDecap(bytes=50) \
 #       Downlink Pipeline
 # ====================================================
 
-en_s1u_mac=0x6805ca31fa7a
+en_s1u_mac = 0x6805ca31fa7a
 ue_cidr = "16.0.0.0/24"
 
 # TODO: Handle routes for directly connected vs. via next hop differently
@@ -99,7 +101,8 @@ s1u_routes.add(prefix='0.0.0.0', prefix_len=0, gate=0)
 
 # Setting filter to detect UE subnet
 UEGate = 1
-ue_filter = {"priority": -UEGate, "filter": "ip dst net {}".format(ue_cidr), "gate": UEGate}
+ue_filter = {"priority": -UEGate,
+             "filter": "ip dst net {}".format(ue_cidr), "gate": UEGate}
 sgi_dpdk_bpf.add(filters=[ue_filter])
 
 sgi_dpdk_bpf:UEGate \
