@@ -9,7 +9,7 @@ COPY core/modules/ ./core/modules/
 RUN ./build.py bess && cp bin/bessd /bin
 RUN mkdir -p /opt/bess && cp -r bessctl pybess /opt/bess
 
-
+# Stage pip: compile psutil
 FROM python:2.7-slim as pip
 RUN apt-get update && apt-get install -y gcc
 RUN pip install --no-cache-dir psutil
@@ -27,9 +27,9 @@ RUN apt-get update && \
         protobuf \
         pyroute2 \
         scapy
+COPY --from=pip /usr/local/lib/python2.7/site-packages/psutil /usr/local/lib/python2.7/site-packages/psutil
 COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin
-COPY --from=pip /usr/local/lib/python2.7/site-packages/psutil /usr/local/lib/python2.7/site-packages/psutil
 WORKDIR /opt/bess/bessctl
 COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
