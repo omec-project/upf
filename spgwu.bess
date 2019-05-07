@@ -55,7 +55,8 @@ def setup_port(ifname, idx):
     print('Setting up port {}'.format(ifname))
 
     # Initialize PMDPort for kernel and DPDK
-    intf_kern = PMDPort(name="{}_kern".format(ifname), vdev="net_af_packet{},iface={}".format(idx,peer))
+    vdev = "net_af_packet{},iface={}".format(idx,peer)
+    intf_kern = PMDPort(name="{}_kern".format(ifname), vdev=vdev)
     intf_dpdk = PMDPort(name="{}_dpdk".format(ifname), port_id=idx)
 
     # Initialize port in/out module for kernel and DPDK
@@ -69,8 +70,8 @@ def setup_port(ifname, idx):
 
     # host_ip_filter: tcpdump -i foo 'dst host 198.19.0.1 or 198.18.0.1' -d
     ips = ips_by_interface(ifname)
-    host_ip_filter = {"priority": -100,
-                "filter": "dst host " + " or ".join(str(x) for x in ips), "gate": 100}
+    host_ip_filter = {"priority": -100, "filter": "dst host "
+                        + " or ".join(str(x) for x in ips), "gate": 100}
     intf_dpdk_bpf.clear()
     intf_dpdk_bpf.add(filters=[host_ip_filter])
 
@@ -98,7 +99,8 @@ sgi_routes::IPLookup()
 sgi_routes.add(prefix='0.0.0.0', prefix_len=0, gate=0)
 
 # Setting filter to detect gtpu traffic
-gtpu_filter = {"priority": -1, "filter": "udp dst port 2152 and dst host " + " or ".join(str(x) for x in ips_by_interface(S1U)), "gate": 1}
+gtpu_filter = {"priority": -1, "filter": "udp dst port 2152" + " and dst host "
+                + " or ".join(str(x) for x in ips_by_interface(S1U)), "gate": 1}
 s1u_dpdk_bpf.add(filters=[gtpu_filter])
 
 s1u_dpdk_bpf:1 -> GetPDU_sgi::GenericDecap(bytes=50) \
