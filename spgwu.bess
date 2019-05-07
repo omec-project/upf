@@ -24,7 +24,7 @@ def mac_by_interface(name):
     return ipdb.interfaces[name]['address']
 
 def mac_by_interface_hex(name):
-    return int(ipdb.interfaces[name]['address'].replace(':', ''), 16)
+    return int(mac_by_interface(name).replace(':', ''), 16)
 
 def peer_by_interface(name):
     try:
