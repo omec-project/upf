@@ -5,7 +5,7 @@
 To follow instructions, you need
 
 * Docker CE >= 17.06
-* 2 DPDK compatiable interfaces bound to VFIO with their iommu_group id updated in `setup.sh`
+* Update the `--devices` line in `setup.sh` with device files of 2 DPDK bound devices
 
 ## Init
 

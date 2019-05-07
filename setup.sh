@@ -2,9 +2,9 @@
 
 docker build -t krsna1729/spgwu .
 
-docker stop bess
+docker rm -f bess
 
-docker run --name bess -itd --rm --cap-add NET_ADMIN \
+docker run --name bess -itd --cap-add NET_ADMIN \
 --cpuset-cpus=12-13 \
 --device=/dev/vfio/48 --device=/dev/vfio/82 --device=/dev/vfio/vfio \
 --ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
@@ -22,3 +22,5 @@ ip addr add 198.18.0.1/30 dev s1u;
 ip addr add 198.19.0.1/30 dev sgi;
 ip route;
 "
+
+docker logs bess
