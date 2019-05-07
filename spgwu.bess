@@ -95,6 +95,7 @@ setup_port(SGI, 1)
 
 as_sgi_mac=0x6805ca31fa7b
 
+# TODO: Handle routes for directly connected vs. via next hop differently
 sgi_routes::IPLookup()
 sgi_routes.add(prefix='0.0.0.0', prefix_len=0, gate=0)
 
@@ -119,6 +120,7 @@ s1u_dpdk_bpf:1 -> GetPDU_sgi::GenericDecap(bytes=50) \
 en_s1u_mac=0x6805ca31fa7a
 ue_cidr = "16.0.0.0/24"
 
+# TODO: Handle routes for directly connected vs. via next hop differently
 s1u_routes::IPLookup()
 s1u_routes.add(prefix='0.0.0.0', prefix_len=0, gate=0)
 
