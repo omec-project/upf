@@ -129,6 +129,7 @@ sgi_dpdk_bpf.add(filters=[ue_filter])
 # TODO: Add gtp encap to the chain
 sgi_dpdk_bpf:1 \
     -> GenericDecap(bytes=14) \
+    -> gtpu_encap::GtpuEncap() \
     -> s1u_ether_encap::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac_by_interface_hex(S1U)}},

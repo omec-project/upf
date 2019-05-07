@@ -1,5 +1,7 @@
 #!/bin/bash
 
+docker build -t krsna1729/spgwu .
+
 docker stop bess
 
 docker run --name bess -itd --rm --cap-add NET_ADMIN \
@@ -7,7 +9,7 @@ docker run --name bess -itd --rm --cap-add NET_ADMIN \
 --device=/dev/vfio/48 --device=/dev/vfio/82 --device=/dev/vfio/vfio \
 --ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
 -v $(pwd):/conf \
-krsna1729/bess-router
+krsna1729/spgwu
 
 docker exec bess bash -c "
 ip link add s1u type veth peer name s1u-vdev;
