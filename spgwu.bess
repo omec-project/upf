@@ -3,11 +3,36 @@
 from utils import *
 
 # ====================================================
+#       Parameters
+# ====================================================
+
+
+s1u_rtr_mac = "68:05:ca:31:fa:7a"
+sgi_rtr_mac = "68:05:ca:31:fa:7b"
+
+ue_net = "16.0.0.0"
+ue_mask = "255.255.255.0"
+
+enb_net = "11.1.1.0"
+enb_mask = "255.255.255.0"
+
+# ====================================================
+#       Validate
+# ====================================================
+
+
+if validate_subnet('{}/{}'.format(ue_net, ue_mask)) is False:
+    exit(1, 'Invalid UE subnet')
+
+if validate_subnet('{}/{}'.format(ue_net, ue_mask)) is False:
+    exit(1, 'Invalid eNB subnet')
+
+# ====================================================
 #       Core Setup
 # ====================================================
 
-import psutil
-bess.add_worker(wid=0, core=int(psutil.Process().cpu_affinity()[0]))
+
+bess.add_worker(wid=0, core=int(get_process_affinity()[0]))
 
 # ====================================================
 #       Port Setup
@@ -67,33 +92,41 @@ setup_port(SGI, 1)
 #       Uplink Pipeline
 # ====================================================
 
-as_sgi_mac = 0x6805ca31fa7b
 
 # TODO: Handle routes for directly connected vs. via next hop differently
 sgi_routes::IPLookup()
 sgi_routes.add(prefix='0.0.0.0', prefix_len=0, gate=0)
 
 # Setting filter to detect gtpu traffic
+# src net 11.1.1.0 mask 255.255.255.0           # check eNB subnet
+# and dst host 11.1.1.1                         # check S/PGWU IP
+# and udp dst port 2152                         # check GTPU port
+# and (udp[28:4] & 0xffffff00) = 0x10000000     # check UE subnet
 GTPUGate = 1
-gtpu_filter = {"priority": -GTPUGate, "filter": "udp dst port 2152" + " and dst host "
-               + " or ".join(str(x) for x in ips_by_interface(S1U)), "gate": GTPUGate}
-s1u_dpdk_bpf.add(filters=[gtpu_filter])
+check_enb_subnet = "src net {} mask {}".format(enb_net, enb_mask)
+check_spgwu_ip = " and dst host " + \
+    " or ".join(str(x) for x in ips_by_interface(S1U))
+check_gtpu_port = " and udp dst port 2152"
+check_ue_subnet = " and (udp[28:4] & 0x{}) = 0x{}".format(
+    ip2hex(ue_mask), ip2hex(ue_net))
+
+uplink_filter = {"priority": -GTPUGate, "filter": check_enb_subnet +
+               check_spgwu_ip + check_gtpu_port + check_ue_subnet, "gate": GTPUGate}
+s1u_dpdk_bpf.add(filters=[uplink_filter])
 
 s1u_dpdk_bpf:GTPUGate -> GetPDU_sgi::GenericDecap(bytes=50) \
     -> sgi_ether_encap::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
-        {'size': 6, 'value': {'value_int': mac_by_interface_hex(SGI)}},
+        {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(SGI))}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
     -> sgi_routes:0 \
-    -> sgi_default_route::Update(fields=[{'offset': 0, 'size': 6, 'value': as_sgi_mac}]) \
+    -> sgi_default_route::Update(fields=[{'offset': 0, 'size': 6, 'value': mac2hex(sgi_rtr_mac)}]) \
     -> sgi_dpdk_po
 
 # ====================================================
 #       Downlink Pipeline
 # ====================================================
 
-en_s1u_mac = 0x6805ca31fa7a
-ue_cidr = "16.0.0.0/24"
 
 # TODO: Handle routes for directly connected vs. via next hop differently
 s1u_routes::IPLookup()
@@ -102,7 +135,7 @@ s1u_routes.add(prefix='0.0.0.0', prefix_len=0, gate=0)
 # Setting filter to detect UE subnet
 UEGate = 1
 ue_filter = {"priority": -UEGate,
-             "filter": "ip dst net {}".format(ue_cidr), "gate": UEGate}
+             "filter": "ip dst net {} mask {}".format(ue_net, ue_mask), "gate": UEGate}
 sgi_dpdk_bpf.add(filters=[ue_filter])
 
 sgi_dpdk_bpf:UEGate \
@@ -110,10 +143,10 @@ sgi_dpdk_bpf:UEGate \
     -> gtpu_encap::GtpuEncap() \
     -> s1u_ether_encap::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
-        {'size': 6, 'value': {'value_int': mac_by_interface_hex(S1U)}},
+        {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(S1U))}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
     -> L4Checksum() \
     -> IPChecksum() \
     -> s1u_routes:0 \
-    -> s1u_default_route::Update(fields=[{'offset': 0, 'size': 6, 'value': en_s1u_mac}]) \
+    -> s1u_default_route::Update(fields=[{'offset': 0, 'size': 6, 'value': mac2hex(s1u_rtr_mac)}]) \
     -> s1u_dpdk_po

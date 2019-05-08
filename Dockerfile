@@ -24,6 +24,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* && \
     pip install --no-cache-dir \
         grpcio \
+        iptools \
         protobuf \
         pyroute2 \
         scapy

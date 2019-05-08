@@ -2,6 +2,8 @@ import os
 import socket
 import sys
 
+import iptools
+import psutil
 from pyroute2 import IPDB
 
 
@@ -29,8 +31,8 @@ def mac_by_interface(name):
     return ipdb.interfaces[name]['address']
 
 
-def mac_by_interface_hex(name):
-    return int(mac_by_interface(name).replace(':', ''), 16)
+def mac2hex(mac):
+    return int(mac.replace(':', ''), 16)
 
 
 def peer_by_interface(name):
@@ -46,3 +48,15 @@ def peer_by_interface(name):
 
 def aton(ip):
     return socket.inet_aton(ip)
+
+
+def validate_subnet(subnet):
+    return iptools.ipv4.validate_subnet(subnet)
+
+
+def ip2hex(subnet):
+    return iptools.ipv4.ip2hex(subnet)
+
+
+def get_process_affinity():
+    return psutil.Process().cpu_affinity()
