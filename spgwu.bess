@@ -7,6 +7,9 @@ from utils import *
 # ====================================================
 
 
+s1u_ifname = "s1u"
+sgi_ifname = "sgi"
+
 s1u_rtr_mac = "68:05:ca:31:fa:7a"
 sgi_rtr_mac = "68:05:ca:31:fa:7b"
 
@@ -83,10 +86,8 @@ def setup_port(ifname, idx):
     intf_kern_pi.attach_task(parent=tc)
 
 
-S1U = "s1u"
-SGI = "sgi"
-setup_port(S1U, 0)
-setup_port(SGI, 1)
+setup_port(s1u_ifname, 0)
+setup_port(sgi_ifname, 1)
 
 # ====================================================
 #       Uplink Pipeline
@@ -105,7 +106,7 @@ sgi_routes.add(prefix='0.0.0.0', prefix_len=0, gate=0)
 GTPUGate = 1
 check_enb_subnet = "src net {} mask {}".format(enb_net, enb_mask)
 check_spgwu_ip = " and dst host " + \
-    " or ".join(str(x) for x in ips_by_interface(S1U))
+    " or ".join(str(x) for x in ips_by_interface(s1u_ifname))
 check_gtpu_port = " and udp dst port 2152"
 check_ue_subnet = " and (udp[28:4] & 0x{}) = 0x{}".format(
     ip2hex(ue_mask), ip2hex(ue_net))
@@ -117,7 +118,7 @@ s1u_dpdk_bpf.add(filters=[uplink_filter])
 s1u_dpdk_bpf:GTPUGate -> GetPDU_sgi::GenericDecap(bytes=50) \
     -> sgi_ether_encap::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
-        {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(SGI))}},
+        {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(sgi_ifname))}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
     -> sgi_routes:0 \
     -> sgi_default_route::Update(fields=[{'offset': 0, 'size': 6, 'value': mac2hex(sgi_rtr_mac)}]) \
@@ -140,10 +141,10 @@ sgi_dpdk_bpf.add(filters=[ue_filter])
 
 sgi_dpdk_bpf:UEGate \
     -> GenericDecap(bytes=14) \
-    -> gtpu_encap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(S1U)[0])) \
+    -> gtpu_encap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0])) \
     -> s1u_ether_encap::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
-        {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(S1U))}},
+        {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(s1u_ifname))}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
     -> L4Checksum() \
     -> IPChecksum() \
