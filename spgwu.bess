@@ -140,7 +140,7 @@ sgi_dpdk_bpf.add(filters=[ue_filter])
 
 sgi_dpdk_bpf:UEGate \
     -> GenericDecap(bytes=14) \
-    -> gtpu_encap::GtpuEncap() \
+    -> gtpu_encap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(S1U)[0])) \
     -> s1u_ether_encap::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(S1U))}},
@@ -150,3 +150,31 @@ sgi_dpdk_bpf:UEGate \
     -> s1u_routes:0 \
     -> s1u_default_route::Update(fields=[{'offset': 0, 'size': 6, 'value': mac2hex(s1u_rtr_mac)}]) \
     -> s1u_dpdk_po
+
+# ====================================================
+#       SIM_TEST
+# ====================================================
+
+
+def sim_test():
+    start_teid = 0xf0000000
+    start_ue_ip = 0x10000001
+    start_enb_ip = 0x0b010165
+    max_sessions = 50000
+    NG4T_MAX_UE_RAN = 500000
+    NG4T_MAX_ENB_RAN = 80
+
+    for i in range(max_sessions):
+
+        # NG4T-based formula to calculate enodeB IP address against a given UE IP address
+        # il_trafficgen also uses the same scheme
+        # See SimuCPEnbv4Teid(...) in ngic code for more details
+        ue_of_ran = i % NG4T_MAX_UE_RAN
+        ran = i / NG4T_MAX_UE_RAN
+        enb_of_ran = ue_of_ran % NG4T_MAX_ENB_RAN
+        enb_idx = ran * NG4T_MAX_ENB_RAN + enb_of_ran
+
+        gtpu_encap.add(teid=start_teid+i, ueaddr=start_ue_ip+i, enodeb_ip=start_enb_ip+enb_idx)
+
+# Uncomment the following to test with il_trafficgen
+#sim_test()

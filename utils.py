@@ -58,5 +58,9 @@ def ip2hex(subnet):
     return iptools.ipv4.ip2hex(subnet)
 
 
+def ip2long(ip):
+    return iptools.ipv4.ip2long(ip)
+
+
 def get_process_affinity():
     return psutil.Process().cpu_affinity()
