@@ -6,6 +6,7 @@ To follow instructions, you need
 
 * Docker CE >= 17.06
 * Update the `--devices` line in `setup.sh` with device files of 2 DPDK bound devices
+* Hugepages mounted at `/dev/hugepages` or updated location in `setup.sh`
 
 ## Init
 
@@ -23,10 +24,11 @@ To init the pipeline or reflect changes to `spgwu.bess`
 
 ## Operate Pipeline
 
-Control program is WIP to dynamically configure
+Control program(s) under development to dynamically configure
 
 * Routes
 * Neighbors
+
 * UE Session Info
 
 ## Observe
