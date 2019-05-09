@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y wget unzip ca-certificates git
 RUN wget -qO bess.zip https://github.com/NetSys/bess/archive/${BESS_COMMIT}.zip && unzip bess.zip
 WORKDIR bess-${BESS_COMMIT}
 COPY core/modules/ core/modules/
-COPY protobuf/module_msg.proto protobuf/module_msg.proto
+COPY protobuf/ protobuf/
 RUN ./build.py bess && cp bin/bessd /bin
 RUN mkdir -p /opt/bess && cp -r bessctl pybess /opt/bess
 
