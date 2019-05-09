@@ -34,5 +34,4 @@ COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin
 WORKDIR /opt/bess/bessctl
 COPY entrypoint.sh /entrypoint.sh
-COPY utils.py /opt/bess/bessctl/
 ENTRYPOINT ["/entrypoint.sh"]
