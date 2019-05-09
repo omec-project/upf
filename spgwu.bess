@@ -27,7 +27,7 @@ enb_mask = "255.255.255.0"
 if validate_subnet('{}/{}'.format(ue_net, ue_mask)) is False:
     exit(1, 'Invalid UE subnet')
 
-if validate_subnet('{}/{}'.format(ue_net, ue_mask)) is False:
+if validate_subnet('{}/{}'.format(enb_net, enb_mask)) is False:
     exit(1, 'Invalid eNB subnet')
 
 # ====================================================
