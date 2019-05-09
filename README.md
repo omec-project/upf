@@ -28,7 +28,6 @@ Control program(s) under development to dynamically configure
 
 * Routes
 * Neighbors
-
 * UE Session Info
 
 ## Observe
