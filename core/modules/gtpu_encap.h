@@ -145,14 +145,11 @@ class GtpuEncap final : public Module {
 
 	CommandResponse Init(const bess::pb::GtpuEncapArg &arg);
 	CommandResponse AddSessionRecord(const bess::pb::GtpuEncapAddSessionRecordArg &arg);
+	CommandResponse ShowRecords(const bess::pb::EmptyArg &);
 	void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
 	
  private:
-	int EmulateSessionIds();
-	uint32_t SimuCPEnbv4Teid(int ue_idx, int max_ue_ran, int max_enb_ran,
-				 uint32_t *teid, uint32_t *enb_idx);
 	int dp_session_create(struct session_info *entry);
-	inline void GenerateTEID(uint32_t *teid);
 	bess::utils::CuckooMap<uint32_t, uint64_t> session_map;
 	uint32_t s1u_sgw_ip;	/* S1U IP address */
 };

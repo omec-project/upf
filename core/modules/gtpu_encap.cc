@@ -18,7 +18,10 @@
 const Commands GtpuEncap::cmds = {
 	{"add", "GtpuEncapAddSessionRecordArg",
 	 MODULE_CMD_FUNC(&GtpuEncap::AddSessionRecord),
-	 Command::THREAD_UNSAFE}
+	 Command::THREAD_UNSAFE},
+	{"show_records", "EmptyArg",
+	 MODULE_CMD_FUNC(&GtpuEncap::ShowRecords),
+	 Command::THREAD_UNSAFE}	
 };
 /*----------------------------------------------------------------------------------*/
 CommandResponse
@@ -58,6 +61,20 @@ GtpuEncap::AddSessionRecord(const bess::pb::GtpuEncapAddSessionRecordArg &arg)
 			  << ToIpv4Address(be32_t(ueaddr)) << std::endl;
 		return CommandFailure(ENOMEM, "Failed to insert session record");
 	}
+	return CommandSuccess();
+}
+/*----------------------------------------------------------------------------------*/
+CommandResponse
+GtpuEncap::ShowRecords(const bess::pb::EmptyArg &)
+{
+	using bess::utils::be32_t;
+	using bess::utils::ToIpv4Address;
+	for (auto it = session_map.begin(); it != session_map.end(); it++) {
+		uint32_t key = it->first;
+		std::cerr << "IP Address: " << ToIpv4Address(be32_t(key))
+			  << ", Data: " << it->second << std::endl;
+	}
+
 	return CommandSuccess();
 }
 /*----------------------------------------------------------------------------------*/
@@ -136,14 +153,6 @@ GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 		iph->hdr_checksum = 0;
 		iph->src_addr = htonl(data->ul_s1_info.sgw_addr.u.ipv4_addr);
 		iph->dst_addr = htonl(data->ul_s1_info.enb_addr.u.ipv4_addr);
-
-#ifdef DEBUG
-		for (auto it = session_map.begin(); it != session_map.end(); it++) {
-			uint32_t key = it->first;
-			DLOG(INFO) << "IP Address: " << ToIpv4Address(be32_t(key))
-				   << ", Data: " << it->second << std::endl;
-		}
-#endif
 	}
 
 	/* run next module in line */
