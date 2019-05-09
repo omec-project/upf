@@ -10,6 +10,9 @@ from utils import *
 s1u_ifname = "s1u"
 sgi_ifname = "sgi"
 
+s1u_port_id = 0
+sgi_port_id = 1
+
 s1u_rtr_mac = "68:05:ca:31:fa:7a"
 sgi_rtr_mac = "68:05:ca:31:fa:7b"
 
@@ -86,8 +89,8 @@ def setup_port(ifname, idx):
     intf_kern_pi.attach_task(parent=tc)
 
 
-setup_port(s1u_ifname, 0)
-setup_port(sgi_ifname, 1)
+setup_port(s1u_ifname, s1u_port_id)
+setup_port(sgi_ifname, sgi_port_id)
 
 # ====================================================
 #       Uplink Pipeline
