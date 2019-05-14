@@ -19,6 +19,9 @@ const Commands GtpuEncap::cmds = {
 	{"add", "GtpuEncapAddSessionRecordArg",
 	 MODULE_CMD_FUNC(&GtpuEncap::AddSessionRecord),
 	 Command::THREAD_UNSAFE},
+	{"remove", "GtpuEncapRemoveSessionRecordArg",
+	 MODULE_CMD_FUNC(&GtpuEncap::RemoveSessionRecord),
+	 Command::THREAD_UNSAFE},
 	{"show_records", "EmptyArg",
 	 MODULE_CMD_FUNC(&GtpuEncap::ShowRecords),
 	 Command::THREAD_UNSAFE}	
@@ -65,10 +68,32 @@ GtpuEncap::AddSessionRecord(const bess::pb::GtpuEncapAddSessionRecordArg &arg)
 }
 /*----------------------------------------------------------------------------------*/
 CommandResponse
+GtpuEncap::RemoveSessionRecord(const bess::pb::GtpuEncapRemoveSessionRecordArg &arg)
+{
+	using bess::utils::be32_t;
+	using bess::utils::ToIpv4Address;
+
+	uint32_t key = arg.ueaddr();
+
+	if (key == 0)
+		return CommandFailure(EINVAL, "Invalid UE address");
+
+	DLOG(INFO) << "IP Address: " << ToIpv4Address(be32_t(key)) << std::endl;
+
+	/* now remove the record */
+	if (session_map.Remove(key) == false)
+		return CommandFailure(EINVAL, "Failed to remove UE address");
+
+	return CommandSuccess();
+}
+/*----------------------------------------------------------------------------------*/
+CommandResponse
 GtpuEncap::ShowRecords(const bess::pb::EmptyArg &)
 {
 	using bess::utils::be32_t;
 	using bess::utils::ToIpv4Address;
+
+	std::cerr << "Showing records now" << std::endl;
 	for (auto it = session_map.begin(); it != session_map.end(); it++) {
 		uint32_t key = it->first;
 		std::cerr << "IP Address: " << ToIpv4Address(be32_t(key))

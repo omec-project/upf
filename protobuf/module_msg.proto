@@ -994,7 +994,7 @@ message GtpuEncapArg {
 
 /**
  * The GtpuEncap module has a command `add(...)` which takes two
- * paramters.  This function accepts the teid, and UE IP address, and creates
+ * parameters.  This function accepts the teid, and UE IP address, and creates
  * a session record.
  * Example use in bessctl: `gencap.add(teid=0xf0000000, ueaddr=0x10000001)`
  */
@@ -1002,6 +1002,16 @@ message GtpuEncapAddSessionRecordArg {
   uint32 teid = 1; /// tunnel endpoint identifier
   uint32 ueaddr = 2; /// ip address of UE
   uint32 enodeb_ip = 3; /// enodeb ip address
+}
+
+/**
+ * The GtpuEncap module has a command `remove(...)` which takes one
+ * parameter.  This function accepts the teid, and removes the
+ * respective session record.
+ * Example use in bessctl: `gencap.remove(teid=0xf0000000)`
+ */
+message GtpuEncapRemoveSessionRecordArg {
+  uint32 ueaddr = 1; /// ip address of UE
 }
 
 /**
