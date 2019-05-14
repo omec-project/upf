@@ -80,6 +80,17 @@ GtpuEncap::RemoveSessionRecord(const bess::pb::GtpuEncapRemoveSessionRecordArg &
 
 	DLOG(INFO) << "IP Address: " << ToIpv4Address(be32_t(key)) << std::endl;
 
+	/* retrieve session info */
+	std::pair<uint32_t, uint64_t> *value = session_map.Find(key);
+	struct session_info *data = (value == NULL) ? (struct session_info *)value :
+		(struct session_info *)value->second;
+
+	if (data == NULL)
+		return CommandFailure(EINVAL, "The given address does not exist");
+
+	/* free session_info */
+	rte_free(data);
+
 	/* now remove the record */
 	if (session_map.Remove(key) == false)
 		return CommandFailure(EINVAL, "Failed to remove UE address");
