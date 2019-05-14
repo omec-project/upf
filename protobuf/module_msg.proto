@@ -1006,9 +1006,9 @@ message GtpuEncapAddSessionRecordArg {
 
 /**
  * The GtpuEncap module has a command `remove(...)` which takes one
- * parameter.  This function accepts the teid, and removes the
+ * parameter.  This function accepts the ueaddr, and removes the
  * respective session record.
- * Example use in bessctl: `gencap.remove(teid=0xf0000000)`
+ * Example use in bessctl: `gencap.remove(ueaddr=0x10000001)`
  */
 message GtpuEncapRemoveSessionRecordArg {
   uint32 ueaddr = 1; /// ip address of UE
