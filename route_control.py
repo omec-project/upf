@@ -14,22 +14,22 @@ def route_control():
         # Retrieve ip address and netmask prefix for s1u
         s1u_addr_block = netifaces.ifaddresses('s1u')
         s1u_addr = s1u_addr_block[netifaces.AF_INET][0]['addr']
-        print(s1u_addr)
+        #print(s1u_addr)
         s1u_netmask = s1u_addr_block[netifaces.AF_INET][0]['netmask']
-        print(s1u_netmask)
-        print(iptools.ipv4.netmask2prefix(s1u_netmask))
+        #print(s1u_netmask)
+        #print(iptools.ipv4.netmask2prefix(s1u_netmask))
         s1u_subnet = iptools.ipv4.subnet2block(s1u_addr + '/' + s1u_netmask)
-        print(s1u_subnet[0])
+        #print(s1u_subnet[0])
 
         # Retrieve ip address and netmask prefix for sgi
         sgi_addr_block = netifaces.ifaddresses('sgi')
         sgi_addr = sgi_addr_block[netifaces.AF_INET][0]['addr']
-        print(sgi_addr)
+        #print(sgi_addr)
         sgi_netmask = sgi_addr_block[netifaces.AF_INET][0]['netmask']
-        print(sgi_netmask)
-        print(iptools.ipv4.netmask2prefix(sgi_netmask))
+        #print(sgi_netmask)
+        #print(iptools.ipv4.netmask2prefix(sgi_netmask))
         sgi_subnet = iptools.ipv4.subnet2block(sgi_addr + '/' + sgi_netmask)
-        print(sgi_subnet[0])
+        #print(sgi_subnet[0])
 
         # Connect to BESS (assuming host=localhost, port=10514 (default))
         bess = BESS()

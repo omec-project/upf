@@ -36,4 +36,5 @@ VOLUME /conf
 ENV PYTHONPATH="/conf:/opt/bess/pybess"
 WORKDIR /opt/bess/bessctl
 COPY entrypoint.sh /entrypoint.sh
+COPY route_control.py /opt/bess/
 ENTRYPOINT ["/entrypoint.sh"]
