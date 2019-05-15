@@ -33,7 +33,7 @@ COPY --from=pip /usr/local/lib/python2.7/site-packages/psutil /usr/local/lib/pyt
 COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin
 VOLUME /conf
-ENV PYTHONPATH="/conf:/opt/bess"
+ENV PYTHONPATH="/conf:/opt/bess/pybess"
 WORKDIR /opt/bess/bessctl
 COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
