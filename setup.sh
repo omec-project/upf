@@ -9,7 +9,7 @@ docker run --name bess -itd --cap-add NET_ADMIN \
 --cpuset-cpus=12-13 \
 --device=/dev/vfio/48 --device=/dev/vfio/82 --device=/dev/vfio/vfio \
 --ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
--v $(pwd)/conf:/conf \
+-v "$PWD/conf":/conf \
 krsna1729/spgwu
 
 docker exec bess bash -c "
