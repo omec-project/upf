@@ -32,8 +32,9 @@ RUN apt-get update && \
 COPY --from=pip /usr/local/lib/python2.7/site-packages/psutil /usr/local/lib/python2.7/site-packages/psutil
 COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin
+RUN ln -s /opt/bess/bessctl/bessctl /bin
 VOLUME /conf
-ENV PYTHONPATH="/conf:/opt/bess/pybess"
+ENV PYTHONPATH="/conf:/opt/bess"
 WORKDIR /opt/bess/bessctl
 COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
