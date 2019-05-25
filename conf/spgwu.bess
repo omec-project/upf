@@ -1,5 +1,7 @@
 # vim: syntax=py
 
+# for sleep()
+import time
 from utils import *
 
 # ====================================================
@@ -99,7 +101,6 @@ setup_port(sgi_ifname, sgi_port_id)
 
 # TODO: Handle routes for directly connected vs. via next hop differently
 sgi_routes::IPLookup()
-sgi_routes.add(prefix='0.0.0.0', prefix_len=0, gate=0)
 
 # Setting filter to detect gtpu traffic
 # src net 11.1.1.0 mask 255.255.255.0           # check eNB subnet
@@ -123,9 +124,10 @@ s1u_dpdk_bpf:GTPUGate -> GetPDU_sgi::GenericDecap(bytes=50) \
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(sgi_ifname))}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
-    -> sgi_routes:0 \
-    -> sgi_default_route::Update(fields=[{'offset': 0, 'size': 6, 'value': mac2hex(sgi_rtr_mac)}]) \
-    -> sgi_dpdk_po
+
+#    -> sgi_routes:0 \
+#    -> sgi_default_route::Update(fields=[{'offset': 0, 'size': 6, 'value': mac2hex(sgi_rtr_mac)}]) \
+#    -> sgi_dpdk_po
 
 # ====================================================
 #       Downlink Pipeline
@@ -134,7 +136,6 @@ s1u_dpdk_bpf:GTPUGate -> GetPDU_sgi::GenericDecap(bytes=50) \
 
 # TODO: Handle routes for directly connected vs. via next hop differently
 s1u_routes::IPLookup()
-s1u_routes.add(prefix='0.0.0.0', prefix_len=0, gate=0)
 
 # Setting filter to detect UE subnet
 UEGate = 1
@@ -149,21 +150,22 @@ sgi_dpdk_bpf:UEGate \
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(s1u_ifname))}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
-    -> L4Checksum() \
-    -> IPChecksum() \
-    -> s1u_routes:0 \
-    -> s1u_default_route::Update(fields=[{'offset': 0, 'size': 6, 'value': mac2hex(s1u_rtr_mac)}]) \
-    -> s1u_dpdk_po
+    -> l4c::L4Checksum() \
+    -> l3c::IPChecksum()
+
+#    -> s1u_routes:0 \
+#    -> s1u_default_route::Update(fields=[{'offset': 0, 'size': 6, 'value': mac2hex(s1u_rtr_mac)}]) \
+#    -> s1u_dpdk_po
 
 # ====================================================
 #       SIM_TEST
 # ====================================================
 
 
-def sim_test():
+def sim_start_test():
     start_teid = 0xf0000000
     start_ue_ip = 0x10000001
-    start_enb_ip = 0x0b010165
+    start_enb_ip = 0x0b010181
     max_sessions = 50000
     NG4T_MAX_UE_RAN = 500000
     NG4T_MAX_ENB_RAN = 80
@@ -180,5 +182,15 @@ def sim_test():
 
         gtpu_encap.add(teid=start_teid+i, ueaddr=start_ue_ip+i, enodeb_ip=start_enb_ip+enb_idx)
 
-# Uncomment the following to test with il_trafficgen
-#sim_test()
+def sim_end_test():
+    start_ue_ip = 0x10000001
+    max_sessions = 50000
+
+    for i in range(max_sessions):
+        gtpu_encap.remove(ueaddr=start_ue_ip+i)
+
+    gtpu_encap.show_records()
+# Uncomment the following line to test with il_trafficgen
+sim_start_test()
+#time.sleep(30)
+#sim_end_test()

@@ -21,6 +21,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         libgraph-easy-perl \
         iproute2 \
+	net-tools \
         tcpdump && \
     rm -rf /var/lib/apt/lists/* && \
     pip install --no-cache-dir \
@@ -28,6 +29,7 @@ RUN apt-get update && \
         iptools \
         protobuf \
         pyroute2 \
+	arpreq \
         scapy
 COPY --from=pip /usr/local/lib/python2.7/site-packages/psutil /usr/local/lib/python2.7/site-packages/psutil
 COPY --from=bess-build /opt/bess /opt/bess
@@ -37,4 +39,5 @@ VOLUME /conf
 ENV PYTHONPATH="/conf:/opt/bess"
 WORKDIR /opt/bess/bessctl
 COPY entrypoint.sh /entrypoint.sh
+#COPY route_control.py /opt/bess/
 ENTRYPOINT ["/entrypoint.sh"]
