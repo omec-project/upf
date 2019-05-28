@@ -2,6 +2,8 @@
 
 # for sleep()
 import time
+# for shell commands
+import os
 from utils import *
 
 # ====================================================
@@ -124,8 +126,7 @@ s1u_dpdk_bpf:GTPUGate -> GetPDU_sgi::GenericDecap(bytes=50) \
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(sgi_ifname))}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
-
-#    -> sgi_routes:0 \
+    -> sgi_routes \
 #    -> sgi_default_route::Update(fields=[{'offset': 0, 'size': 6, 'value': mac2hex(sgi_rtr_mac)}]) \
 #    -> sgi_dpdk_po
 
@@ -150,10 +151,9 @@ sgi_dpdk_bpf:UEGate \
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(s1u_ifname))}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
-    -> l4c::L4Checksum() \
-    -> l3c::IPChecksum()
-
-#    -> s1u_routes:0 \
+    -> L4Checksum() \
+    -> IPChecksum() \
+    -> s1u_routes
 #    -> s1u_default_route::Update(fields=[{'offset': 0, 'size': 6, 'value': mac2hex(s1u_rtr_mac)}]) \
 #    -> s1u_dpdk_po
 
@@ -190,7 +190,16 @@ def sim_end_test():
         gtpu_encap.remove(ueaddr=start_ue_ip+i)
 
     gtpu_encap.show_records()
-# Uncomment the following line to test with il_trafficgen
-sim_start_test()
+
+### Uncomment the following lines to test with il_trafficgen ###
+# First add route table entries (change IP addresses accordingly)
+#os.system('ip route add 13.1.1.128/25 via 13.1.1.2')
+#os.system('ip route add 11.1.1.128/25 via 11.1.1.2')
+# Next add static arp table entries (change IP/MAC addresses accordingly)
+#os.system('arp -s 13.1.1.2 68:05:ca:31:fa:7b')
+#os.system('arp -s 11.1.1.2 68:05:ca:31:fa:7a')
+# Start the test
+#sim_start_test()
+# Wait for 30 seconds before deleting the session info entries (optional)
 #time.sleep(30)
 #sim_end_test()

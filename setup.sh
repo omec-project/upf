@@ -21,11 +21,7 @@ ip link set sgi up;
 ip link set sgi-vdev up;
 ip addr add 198.18.0.1/30 dev s1u;
 ip addr add 198.19.0.1/30 dev sgi;
-ip route add 13.1.1.128/25 via 198.18.0.2
-ip route add 11.1.1.128/25 via 198.19.0.2
 ip route;
-arp -s 198.18.0.2 68:05:ca:31:fa:7b
-arp -s 198.19.0.2 68:05:ca:31:fa:7a
 "
 
 docker logs bess

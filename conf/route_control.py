@@ -21,77 +21,36 @@ except ImportError:
 def mac2hex(mac):
     return int(mac.replace(':', ''), 16)
 
-def add_s1u_route_entry(server, gateway_mac, prefix, prefix_len):
-    print('Adding entry for S1U')
+def link_modules(server, module, next_module):
+    print('Linking %s module' % next_module)
     print(' ')
-    # Pass s1u routing entry to bessd's s1u_routes module
-    response = server.run_module_command('s1u_routes',
+    # Connect module to next_module
+    response = server.connect_modules(module, next_module)
+    if response.error.code != 0:
+        print('Error connecting module %s to %s' % (module, next_module))
+
+def link_route_module(server, module, next_module, gateway_mac, prefix, prefix_len):
+    print('Adding route entry for %s' % module)
+    print(' ')
+    # Pass routing entry to bessd's route module
+    response = server.run_module_command(module,
                                          'add',
                                          'IPLookupCommandAddArg',
                                          {'prefix': prefix,
                                           'prefix_len': int(prefix_len),
                                           'gate': 0})
     if response.error.code != 0:
-        print('Error inserting s1u_routes')
-                    
-    # Connect s1u_routes module to l3c
-    response = server.connect_modules('l3c', 's1u_routes')
-    if response.error.code != 0:
-        print('Error connecting module s1u_routes with l3c')
-
+        print('Error inserting route entry for %s' % module)
                     
     # Create Update module
     response = server.create_module('Update',
-                                    's1u_dst_mac',
+                                    next_module,
                                     {'fields': [{'offset': 0, 'size': 6, 'value': gateway_mac}]})
     if response.error.code != 0:
-        print('Error creating module s1u_dst_mac')
+        print('Error creating module %s' % next_module)
             
-    # Connect Update module to s1u_routes
-    response = server.connect_modules('s1u_routes', 's1u_dst_mac', 0, 0)
-    if response.error.code != 0:
-        print('Error connecting module s1u_routes with s1u_dst_mac')
-
-    # Connect s1u_dpdk_po to update module
-    response = server.connect_modules('s1u_dst_mac', 's1u_dpdk_po')
-    if response.error.code != 0:
-        print('Error connecting module s1u_dst_mac to s1u_dpdk_po')
-
-def add_sgi_route_entry(server, gateway_mac, prefix, prefix_len):
-    print('Adding entry for SGI')
-    print(' ')
-    # Pass sgi routing entry to bessd's sgi_routes module
-    response = server.run_module_command('sgi_routes',
-                                         'add',
-                                         'IPLookupCommandAddArg',
-                                         {'prefix': prefix,
-                                          'prefix_len': int(prefix_len),
-                                          'gate': 0})
-    if response.error.code != 0:
-        print('Error inserting sgi_route')
-
-    # Connect sgi_routes module to sgi_ether_encap
-    response = server.connect_modules('sgi_ether_encap', 'sgi_routes')
-    if response.error.code != 0:
-        print('Error connecting module sgi_routes with sgi_ether_encap')
-
-                    
-    # Create Update module
-    response = server.create_module('Update',
-                                    'sgi_dst_mac',
-                                    {'fields': [{'offset': 0, 'size': 6, 'value': gateway_mac}]})
-    if response.error.code != 0:
-        print('Error creating module sgi_dst_mac')
-            
-    # Connect Update module to s1u_routes
-    response = server.connect_modules('sgi_routes', 'sgi_dst_mac', 0, 0)
-    if response.error.code != 0:
-        print('Error connecting module sgi_routes with sgi_dst_mac')
-                
-    # Connect sgi_dpdk_po to update module
-    response = server.connect_modules('sgi_dst_mac', 'sgi_dpdk_po')
-    if response.error.code != 0:
-        print('Error connecting module sgi_dst_mac to sgi_dpdk_po')
+    # Connect Update module to route module
+    link_modules(server, module, next_module)
 
 def main():
     ipdb = IPDB()
@@ -115,9 +74,11 @@ def main():
             # Get MAC address of the the gateway
             gateway_mac = mac2hex(arpreq.arpreq(i['gateway']))
             if iface == S1UDEV:
-                add_s1u_route_entry(bess, gateway_mac, prefix, prefix_len)
+                link_route_module(bess, "s1u_routes", "s1u_dst_mac", gateway_mac, prefix, prefix_len)
+                link_modules(bess, "s1u_dst_mac", "s1u_dpdk_po")
             if iface == SGIDEV:
-                add_sgi_route_entry(bess, gateway_mac, prefix, prefix_len)
+                link_route_module(bess, "sgi_routes", "sgi_dst_mac", gateway_mac, prefix, prefix_len)
+                link_modules(bess, "sgi_dst_mac", "sgi_dpdk_po")
 
     # Now resume bessd operations
     bess.resume_all()
