@@ -29,7 +29,7 @@ def link_modules(server, module, next_module):
     if response.error.code != 0:
         print('Error connecting module %s to %s' % (module, next_module))
 
-def link_route_module(server, module, next_module, gateway_mac, prefix, prefix_len):
+def link_route_module(server, module, last_module, gateway_mac, prefix, prefix_len):
     print('Adding route entry for %s' % module)
     print(' ')
     # Pass routing entry to bessd's route module
@@ -41,16 +41,21 @@ def link_route_module(server, module, next_module, gateway_mac, prefix, prefix_l
                                           'gate': 0})
     if response.error.code != 0:
         print('Error inserting route entry for %s' % module)
+        return
                     
     # Create Update module
     response = server.create_module('Update',
-                                    next_module,
+                                    module + '_EthMac_' + str(gateway_mac),
                                     {'fields': [{'offset': 0, 'size': 6, 'value': gateway_mac}]})
     if response.error.code != 0:
         print('Error creating module %s' % next_module)
+        return
             
     # Connect Update module to route module
-    link_modules(server, module, next_module)
+    link_modules(server, module, module + '_EthMac_' + str(gateway_mac))
+
+    # Connect Update module to dpdk_out module
+    link_modules(server, module + '_EthMac_' + str(gateway_mac), last_module)
 
 def main():
     ipdb = IPDB()
@@ -74,11 +79,9 @@ def main():
             # Get MAC address of the the gateway
             gateway_mac = mac2hex(arpreq.arpreq(i['gateway']))
             if iface == S1UDEV:
-                link_route_module(bess, "s1u_routes", "s1u_dst_mac", gateway_mac, prefix, prefix_len)
-                link_modules(bess, "s1u_dst_mac", "s1u_dpdk_po")
+                link_route_module(bess, "s1u_routes", "s1u_dpdk_po", gateway_mac, prefix, prefix_len)
             if iface == SGIDEV:
-                link_route_module(bess, "sgi_routes", "sgi_dst_mac", gateway_mac, prefix, prefix_len)
-                link_modules(bess, "sgi_dst_mac", "sgi_dpdk_po")
+                link_route_module(bess, "sgi_routes", "sgi_dpdk_po", gateway_mac, prefix, prefix_len)
 
     # Now resume bessd operations
     bess.resume_all()
