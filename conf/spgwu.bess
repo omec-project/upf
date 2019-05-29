@@ -192,12 +192,6 @@ def sim_end_test():
     gtpu_encap.show_records()
 
 ### Uncomment the following lines to test with il_trafficgen ###
-# First add route table entries (change IP addresses accordingly)
-#os.system('ip route add 13.1.1.128/25 via 13.1.1.2')
-#os.system('ip route add 11.1.1.128/25 via 11.1.1.2')
-# Next add static arp table entries (change IP/MAC addresses accordingly)
-#os.system('arp -s 13.1.1.2 68:05:ca:31:fa:7b')
-#os.system('arp -s 11.1.1.2 68:05:ca:31:fa:7a')
 # Start the test
 #sim_start_test()
 # Wait for 30 seconds before deleting the session info entries (optional)
