@@ -22,6 +22,7 @@ RUN apt-get update && \
         libgraph-easy-perl \
         iproute2 \
 	net-tools \
+	inetutils-ping \
         tcpdump && \
     rm -rf /var/lib/apt/lists/* && \
     pip install --no-cache-dir \

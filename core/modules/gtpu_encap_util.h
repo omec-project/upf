@@ -33,7 +33,7 @@ GtpuEncap::dp_session_create(struct session_info *entry)
 		return -1;
 	}
 
-	if (session_map.Insert(entry->ue_addr.u.ipv4_addr, (uint64_t)data) == NULL) {
+	if (session_map.Insert(entry->sess_id, (uint64_t)data) == NULL) {
 		std::cerr << "Failed to insert session info with " << " sess_id "
 			  << entry->sess_id << std::endl;
 	}

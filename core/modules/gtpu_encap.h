@@ -29,7 +29,7 @@
  * set session id from the combination of
  * unique UE id and Bearer id
  */
-#define SESS_ID(ue_id, br_id)		(((uint64_t)(ue_id) << 4) | (0xf & (br_id)))
+#define SESS_ID(x, y)			(((uint64_t)(y) << 32) | (0xffffffff & (x)))
 #define UE_SESS_ID(x)			(x>>4)
 /**
  * get bearer id
@@ -136,7 +136,7 @@ typedef struct gtpu_hdr {
 /*----------------------------------------------------------------------------------*/
 class GtpuEncap final : public Module {
  public:
-	GtpuEncap() {
+	GtpuEncap() : session_map(InitNumBucket, InitNumSubs) {
 		max_allowed_workers_ = Worker::kMaxWorkers;
 	}
 	
@@ -151,8 +151,16 @@ class GtpuEncap final : public Module {
 	
  private:
 	int dp_session_create(struct session_info *entry);
-	bess::utils::CuckooMap<uint32_t, uint64_t> session_map;
+	bess::utils::CuckooMap<uint64_t, uint64_t> session_map;
 	uint32_t s1u_sgw_ip;	/* S1U IP address */
+	/**
+	 * Number of cuckoo map buckets to hold sub info
+	 */
+	static const int InitNumBucket = 4;
+	/**
+	 * Number of possible subscribers
+	 */
+	static const int InitNumSubs = 100000;
 };
 /*----------------------------------------------------------------------------------*/
 #endif  // BESS_MODULES_GTPUENCAP_H_
