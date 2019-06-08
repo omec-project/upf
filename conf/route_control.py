@@ -32,6 +32,8 @@ class RouteEntry:
         self.iface = ' '
         self.prefix = ' '
         self.prefix_len = ' '
+    def __str__(self):
+        return '{neigh: %s, local_ip: %s, iface: %s, ip-range: %s/%s}' % (self.neighbor_ip, self.local_ip, self.iface, self.prefix, self.prefix_len)
 
 # for holding unresolved ARP queries
 dict = {}
@@ -113,11 +115,7 @@ def probe_addr(local_ip, neighbor_ip, iface,
     item.prefix = prefix
     item.prefix_len = prefix_len
     dict[item.neighbor_ip] = item
-    print('Adding entry ' + item.neighbor_ip + ' in dict')
-    #print(item.local_ip)
-    #print(item.iface)
-    #print(item.prefix)
-    #print(item.prefix_len)
+    print('Adding entry ' + str(item) + ' in arp probe table')
     #print(src_mac)
 
     # Probe ARP request by sending ping
