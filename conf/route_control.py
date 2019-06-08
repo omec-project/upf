@@ -4,11 +4,11 @@ BESSD_HOST = 'localhost'
 BESSD_PORT = '10514'
 S1UDEV = 's1u'
 SGIDEV = 'sgi'
-# for retrieving arp records
-import arpreq
 # for retrieving route entries
 import iptools
 from pyroute2 import IPDB
+# for retrieving neighbor info
+from pyroute2 import IPRoute
 # for pkt generation
 from scapy.all import *
 # for signal handling
@@ -52,6 +52,21 @@ def send_arp(neighbor_ip, src_mac, iface):
     sendp(pkt, iface=iface)
 
 
+def fetch_mac(dip):
+    ip = ''
+    _mac = ''
+    ipr = IPRoute()
+    neighbors = ipr.get_neighbours(dst=dip)
+    for i in range(len(neighbors)):
+        for att in neighbors[i]['attrs']:
+            if 'NDA_DST' in att and dip == att[1]:
+                ip = att[1]
+                print('Setting ip as ' + ip)
+            if 'NDA_LLADDR' in att:
+                _mac = att[1]
+                return _mac
+
+
 def link_modules(server, module, next_module):
     print('Linking %s module' % next_module)
     # Connect module to next_module
@@ -88,8 +103,8 @@ def link_route_module(server, module, last_module, gateway_mac, prefix, prefix_l
     link_modules(server, module + '_EthMac_' + str(gateway_mac), last_module)
 
 
-def probe_addr_and_insert_module(local_ip, neighbor_ip, iface,
-                                 prefix, prefix_len, src_mac):
+def probe_addr(local_ip, neighbor_ip, iface,
+               prefix, prefix_len, src_mac):
     # Store entry if entry does not exist in ARP cache
     item = RouteEntry()
     item.neighbor_ip = neighbor_ip
@@ -127,7 +142,7 @@ def netlink_event_listener(ipdb, netlink_message, action):
             if 'RTA_GATEWAY' in att:
                 # Fetch gateway MAC address
                 neighbor_ip = att[1]
-                _mac = arpreq.arpreq(att[1])
+                _mac = fetch_mac(att[1])
                 if not _mac:
                     gateway_mac = 0
                 else:
@@ -143,8 +158,8 @@ def netlink_event_listener(ipdb, netlink_message, action):
         if gateway_mac == 0:
             for ipv4 in ipdb.interfaces[iface].ipaddr.ipv4:
                 local_ip = ipv4[0]
-                probe_addr_and_insert_module(local_ip, neighbor_ip, iface,
-                                             prefix, prefix_len, ipdb.interfaces[iface].address)
+                probe_addr(local_ip, neighbor_ip, iface,
+                           prefix, prefix_len, ipdb.interfaces[iface].address)
 
         else:	# if gateway_mac is set
             # Pause bessd to avoid race condition (and potential crashes)
@@ -203,18 +218,16 @@ def main():
             # Get prefix length
             prefix_len = i['dst'].split('/')[1]
             # Get MAC address of the the gateway
-            _mac = arpreq.arpreq(i['gateway'])
+            _mac = fetch_mac(i['gateway'])
             if _mac:
                 gateway_mac = mac2hex(_mac)
-                if iface == S1UDEV:
-                    link_route_module(bess, iface + "_routes", iface + "_dpdk_po", gateway_mac, prefix, prefix_len)
-                if iface == SGIDEV:
+                if iface in [S1UDEV, SGIDEV]:
                     link_route_module(bess, iface + "_routes", iface + "_dpdk_po", gateway_mac, prefix, prefix_len)
             else:
                 for ipv4 in ipdb.interfaces[int(i['oif'])].ipaddr.ipv4:
                     local_ip = ipv4[0]
-                    probe_addr_and_insert_module(local_ip, i['gateway'], iface,
-                                                 prefix, prefix_len, ipdb.interfaces[iface].address)
+                    probe_addr(local_ip, i['gateway'], iface,
+                               prefix, prefix_len, ipdb.interfaces[iface].address)
 
     # Now resume bessd operations
     bess.resume_all()

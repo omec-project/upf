@@ -22,7 +22,7 @@ RUN apt-get update && \
         libgraph-easy-perl \
         iproute2 \
 	net-tools \
-	inetutils-ping \
+	iputils-ping \
         tcpdump && \
     rm -rf /var/lib/apt/lists/* && \
     pip install --no-cache-dir \
@@ -30,7 +30,6 @@ RUN apt-get update && \
         iptools \
         protobuf \
         pyroute2 \
-	arpreq \
         scapy
 COPY --from=pip /usr/local/lib/python2.7/site-packages/psutil /usr/local/lib/python2.7/site-packages/psutil
 COPY --from=bess-build /opt/bess /opt/bess
