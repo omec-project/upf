@@ -21,7 +21,6 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         libgraph-easy-perl \
         iproute2 \
-	net-tools \
 	iputils-ping \
         tcpdump && \
     rm -rf /var/lib/apt/lists/* && \

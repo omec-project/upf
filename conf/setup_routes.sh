@@ -13,8 +13,8 @@ DEST_SGI_IP_RANGE=13.1.1.128/25
 #nohup /conf/route_control.py -i $S1UDEV $SGIDEV &
 
 # First add static arp table entries (change IP/MAC addresses accordingly)
-arp -s $DEST_SGI_IP $DEST_SGI_MAC
-arp -s $DEST_S1U_IP $DEST_S1U_MAC
+ip neighbor add $DEST_SGI_IP lladdr $DEST_SGI_MAC dev $SGIDEV
+ip neighbor add $DEST_S1U_IP lladdr $DEST_S1U_MAC dev $S1UDEV
 
 # Next add route table entries (change IP addresses accordingly)
 ip route add $DEST_SGI_IP_RANGE via $DEST_SGI_IP
