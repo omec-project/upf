@@ -2,8 +2,7 @@
 
 BESSD_HOST = 'localhost'
 BESSD_PORT = '10514'
-S1UDEV = 's1u'
-SGIDEV = 'sgi'
+
 # for retrieving route entries
 import iptools
 from pyroute2 import IPDB
@@ -13,6 +12,8 @@ from pyroute2 import IPRoute
 from scapy.all import *
 # for signal handling
 import signal
+# for command-line arg passing
+import argparse
 
 
 try:
@@ -33,10 +34,14 @@ class RouteEntry:
         self.prefix = ' '
         self.prefix_len = ' '
     def __str__(self):
-        return '{neigh: %s, local_ip: %s, iface: %s, ip-range: %s/%s}' % (self.neighbor_ip, self.local_ip, self.iface, self.prefix, self.prefix_len)
+        return ('{neigh: %s, local_ip: %s, iface: %s, ip-range: %s/%s}' %
+                (self.neighbor_ip, self.local_ip, self.iface, self.prefix, self.prefix_len))
 
 # for holding unresolved ARP queries
 dict = {}
+
+# for holding command-line arguments
+args = {}
 
 
 def mac2hex(mac):
@@ -149,6 +154,10 @@ def netlink_event_listener(ipdb, netlink_message, action):
                 # Fetch interface name
                 iface = ipdb.interfaces[int(att[1])].ifname
 
+        # if iface is not in the interfaces list, then quit early
+        if not iface in args.i:
+            return
+
         # Fetch prefix_len
         prefix_len = msg['dst_len']
 
@@ -201,7 +210,7 @@ def main():
     ipdb = IPDB()
 
     # Connect to BESS (assuming host=localhost, port=10514 (default))
-    bess.connect(grpc_url=BESSD_HOST + ':' + BESSD_PORT)
+    bess.connect(grpc_url=args.ip + ':' + args.port)
 
     # Pause bessd to avoid race condition (and potential crashes)
     bess.pause_all()
@@ -217,15 +226,15 @@ def main():
             prefix_len = i['dst'].split('/')[1]
             # Get MAC address of the the gateway
             _mac = fetch_mac(i['gateway'])
-            if _mac:
-                gateway_mac = mac2hex(_mac)
-                if iface in [S1UDEV, SGIDEV]:
+            if iface in args.i:
+                if _mac:
+                    gateway_mac = mac2hex(_mac)
                     link_route_module(bess, iface + "_routes", iface + "_dpdk_po", gateway_mac, prefix, prefix_len)
-            else:
-                for ipv4 in ipdb.interfaces[int(i['oif'])].ipaddr.ipv4:
-                    local_ip = ipv4[0]
-                    probe_addr(local_ip, i['gateway'], iface,
-                               prefix, prefix_len, ipdb.interfaces[iface].address)
+                else:
+                    for ipv4 in ipdb.interfaces[int(i['oif'])].ipaddr.ipv4:
+                        local_ip = ipv4[0]
+                        probe_addr(local_ip, i['gateway'], iface,
+                                   prefix, prefix_len, ipdb.interfaces[iface].address)
 
     # Now resume bessd operations
     bess.resume_all()
@@ -242,5 +251,15 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description='Basic IPv4 Routing Controller')
+    parser.add_argument('-i', type=str, nargs='+', help='interface(s) to control')
+    parser.add_argument('--ip', type=str, default=BESSD_HOST, help='BESSD address')
+    parser.add_argument('--port', type=str, default=BESSD_PORT, help='BESSD port')
 
+    args = parser.parse_args()
+
+    if args.i:
+        main()
+    # if interface list is empty, print help menu and quit
+    else:
+        print(parser.print_help())
