@@ -56,8 +56,9 @@ GtpuEncap::AddSessionRecord(const bess::pb::GtpuEncapAddSessionRecordArg &arg)
 	sess.ul_s1_info.sgw_addr.u.ipv4_addr = s1u_sgw_ip;
 	sess.dl_s1_info.sgw_addr.u.ipv4_addr = s1u_sgw_ip;
 	sess.ul_s1_info.enb_addr.u.ipv4_addr = enodeb_ip;
-	
-	sess.sess_id = SESS_ID(sess.ue_addr.u.ipv4_addr, DEFAULT_BEARER);
+
+	/* htonl conversion over here will be cheaper than ntohl in the DP pipeline */
+	sess.sess_id = SESS_ID(htonl(sess.ue_addr.u.ipv4_addr), DEFAULT_BEARER);
 
 	if (dp_session_create(&sess) < 0) {
 		std::cerr << "Failed to insert entry for ueaddr: "
@@ -137,7 +138,7 @@ GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 			   << std::endl;
 
 		/* retrieve session info */
-		uint64_t sess_id = SESS_ID(ntohl(daddr), DEFAULT_BEARER);
+		uint64_t sess_id = SESS_ID(daddr, DEFAULT_BEARER);
 		std::pair<uint64_t, uint64_t> *result = session_map.Find(sess_id);
 		struct session_info *data = (result == NULL) ? (struct session_info *)result :
 			(struct session_info *)result->second;
