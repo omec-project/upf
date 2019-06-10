@@ -99,17 +99,17 @@ def link_route_module(server, module, last_module, gateway_mac, iprange, prefix_
                     
     # Create Update module
     response = server.create_module('Update',
-                                    module + '_EthMac_' + str(gateway_mac),
+                                    module + '_EthMac_' + str(hex(gateway_mac)),
                                     {'fields': [{'offset': 0, 'size': 6, 'value': gateway_mac}]})
     if response.error.code != 0:
         print('Error creating module %s' % next_module)
         return
             
     # Connect Update module to route module
-    link_modules(server, module, module + '_EthMac_' + str(gateway_mac))
+    link_modules(server, module, module + '_EthMac_' + str(hex(gateway_mac)))
 
     # Connect Update module to dpdk_out module
-    link_modules(server, module + '_EthMac_' + str(gateway_mac), last_module)
+    link_modules(server, module + '_EthMac_' + str(hex(gateway_mac)), last_module)
 
 
 def probe_addr(local_ip, neighbor_ip, iface,
@@ -172,7 +172,7 @@ def netlink_event_listener(ipdb, netlink_message, action):
                            iprange, prefix_len, ipdb.interfaces[iface].address)
 
         else:	# if gateway_mac is set
-            print('Linking module ' + iface + '_routes' + ' with ' + iface + '_dpdk_po ' + _mac + ' iprange: ' + iprange + '/' + str(prefix_len))
+            print('Linking module ' + iface + '_routes' + ' with ' + iface + '_dpdk_po ' + str(_mac) + ' iprange: ' + iprange + '/' + str(prefix_len))
             # Pause bessd to avoid race condition (and potential crashes)
             bess.pause_all()
 
@@ -184,7 +184,7 @@ def netlink_event_listener(ipdb, netlink_message, action):
     if action == 'RTM_NEWNEIGH':
         for att in msg['attrs']:
             if 'NDA_DST' in att:
-                # ('NDA_DST', iprange)
+                # ('NDA_DST', neighbor_ip)
                 neighbor_ip = att[1]
             if 'NDA_LLADDR' in att:
                 # ('NDA_LLADDR', neighbor_mac)
@@ -193,7 +193,7 @@ def netlink_event_listener(ipdb, netlink_message, action):
         item = arpcache.get(neighbor_ip)
         if item:
             print('Found an item with key ' + item.neighbor_ip)
-            print('Linking module ' + item.iface + '_routes' + ' with ' + item.iface + '_dpdk_po ' + gateway_mac + ' iprange: ' + item.iprange + '/' + str(item.prefix_len))
+            print('Linking module ' + item.iface + '_routes' + ' with ' + item.iface + '_dpdk_po ' + str(gateway_mac) + ' iprange: ' + item.iprange + '/' + str(item.prefix_len))
 
             # Pause bessd to avoid race condition (and potential crashes)
             bess.pause_all()
@@ -229,7 +229,7 @@ def main():
             if iface in args.i:
                 if _mac:
                     gateway_mac = mac2hex(_mac)
-                    print('Linking module ' + iface + '_routes' + ' with ' + iface + '_dpdk_po ' + _mac + ' iprange: ' + iprange + '/' + str(prefix_len))
+                    print('Linking module ' + iface + '_routes' + ' with ' + iface + '_dpdk_po ' + str(_mac) + ' iprange: ' + iprange + '/' + str(prefix_len))
                     link_route_module(bess, iface + "_routes", iface + "_dpdk_po", gateway_mac, iprange, prefix_len)
                 else:
                     for ipv4 in ipdb.interfaces[int(i['oif'])].ipaddr.ipv4:
