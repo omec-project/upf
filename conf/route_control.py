@@ -31,11 +31,11 @@ class RouteEntry:
         self.neighbor_ip = ' '
         self.local_ip = ' '
         self.iface = ' '
-        self.prefix = ' '
+        self.iprange = ' '
         self.prefix_len = ' '
     def __str__(self):
         return ('{neigh: %s, local_ip: %s, iface: %s, ip-range: %s/%s}' %
-                (self.neighbor_ip, self.local_ip, self.iface, self.prefix, self.prefix_len))
+                (self.neighbor_ip, self.local_ip, self.iface, self.iprange, self.prefix_len))
 
 # for holding unresolved ARP queries
 dict = {}
@@ -67,9 +67,11 @@ def fetch_mac(dip):
     for i in range(len(neighbors)):
         for att in neighbors[i]['attrs']:
             if 'NDA_DST' in att and dip == att[1]:
+                # ('NDA_DST', dip)
                 ip = att[1]
                 print('Setting ip as ' + ip)
             if 'NDA_LLADDR' in att:
+                # ('NDA_LLADDR', _mac)
                 _mac = att[1]
                 return _mac
 
@@ -82,13 +84,13 @@ def link_modules(server, module, next_module):
         print('Error connecting module %s to %s' % (module, next_module))
 
 
-def link_route_module(server, module, last_module, gateway_mac, prefix, prefix_len):
+def link_route_module(server, module, last_module, gateway_mac, iprange, prefix_len):
     print('Adding route entry for %s' % module)
     # Pass routing entry to bessd's route module
     response = server.run_module_command(module,
                                          'add',
                                          'IPLookupCommandAddArg',
-                                         {'prefix': prefix,
+                                         {'prefix': iprange,
                                           'prefix_len': int(prefix_len),
                                           'gate': 0})
     if response.error.code != 0:
@@ -111,17 +113,16 @@ def link_route_module(server, module, last_module, gateway_mac, prefix, prefix_l
 
 
 def probe_addr(local_ip, neighbor_ip, iface,
-               prefix, prefix_len, src_mac):
+               iprange, prefix_len, src_mac):
     # Store entry if entry does not exist in ARP cache
     item = RouteEntry()
     item.neighbor_ip = neighbor_ip
     item.local_ip = local_ip
     item.iface = iface
-    item.prefix = prefix
+    item.iprange = iprange
     item.prefix_len = prefix_len
     dict[item.neighbor_ip] = item
     print('Adding entry ' + str(item) + ' in arp probe table')
-    #print(src_mac)
 
     # Probe ARP request by sending ping
     send_ping(item.neighbor_ip)
@@ -137,13 +138,14 @@ def netlink_event_listener(ipdb, netlink_message, action):
     msg = netlink_message
 
     if action == 'RTM_NEWROUTE':
-        #print(action)
         for att in msg['attrs']:
             if 'RTA_DST' in att:
                 # Fetch IP range
-                prefix = att[1]
+                # ('RTA_DST', iprange)
+                iprange = att[1]
             if 'RTA_GATEWAY' in att:
                 # Fetch gateway MAC address
+                # ('RTA_GATEWAY', _mac)
                 neighbor_ip = att[1]
                 _mac = fetch_mac(att[1])
                 if not _mac:
@@ -152,6 +154,7 @@ def netlink_event_listener(ipdb, netlink_message, action):
                     gateway_mac = mac2hex(_mac)
             if 'RTA_OIF' in att:
                 # Fetch interface name
+                # ('RTA_OIF', iface)
                 iface = ipdb.interfaces[int(att[1])].ifname
 
         # if iface is not in the interfaces list, then quit early
@@ -166,44 +169,40 @@ def netlink_event_listener(ipdb, netlink_message, action):
             for ipv4 in ipdb.interfaces[iface].ipaddr.ipv4:
                 local_ip = ipv4[0]
                 probe_addr(local_ip, neighbor_ip, iface,
-                           prefix, prefix_len, ipdb.interfaces[iface].address)
+                           iprange, prefix_len, ipdb.interfaces[iface].address)
 
         else:	# if gateway_mac is set
             # Pause bessd to avoid race condition (and potential crashes)
             bess.pause_all()
 
-            link_route_module(bess, iface + "_routes", iface + "_dpdk_po", gateway_mac, prefix, prefix_len)
+            link_route_module(bess, iface + "_routes", iface + "_dpdk_po", gateway_mac, iprange, prefix_len)
 
             # Now resume bessd operations
             bess.resume_all()
 
     if action == 'RTM_NEWNEIGH':
-        #print(action)
-        #print(msg)
         for att in msg['attrs']:
-            #print(att)
             if 'NDA_DST' in att:
-                prefix = att[1]
-                #print('prefix is ' + prefix)
+                # ('NDA_DST', iprange)
+                iprange = att[1]
             if 'NDA_LLADDR' in att:
+                # ('NDA_LLADDR', neighbor_mac)
                 gateway_mac = att[1]
-                #print('mac is ' + gateway_mac)
-        item = dict.get(prefix)
+
+        item = dict.get(iprange)
         if item:
             print('Found an item with key ' + item.neighbor_ip)
             print('Linking module ' + item.iface + '_routes' + ' with ' + item.iface + '_dpdk_po ' + gateway_mac)
-            #print("Prefix len: " + str(item.prefix_len))
-            #print("Prefix: " + item.prefix)
 
             # Pause bessd to avoid race condition (and potential crashes)
             bess.pause_all()
 
-            link_route_module(bess, item.iface + "_routes", item.iface + "_dpdk_po", mac2hex(gateway_mac), item.prefix, str(item.prefix_len))
+            link_route_module(bess, item.iface + "_routes", item.iface + "_dpdk_po", mac2hex(gateway_mac), item.iprange, str(item.prefix_len))
 
             # Now resume bessd operations
             bess.resume_all()
 
-            del dict[prefix]
+            del dict[iprange]
 
 
 def main():
@@ -220,8 +219,8 @@ def main():
         if iptools.ipv4.validate_cidr(i['dst']) and i['gateway']:
             # Get interface name
             iface = ipdb.interfaces[int(i['oif'])].ifname
-            # Get prefix
-            prefix = i['dst'].split('/')[0]
+            # Get iprange
+            iprange = i['dst'].split('/')[0]
             # Get prefix length
             prefix_len = i['dst'].split('/')[1]
             # Get MAC address of the the gateway
@@ -229,12 +228,12 @@ def main():
             if iface in args.i:
                 if _mac:
                     gateway_mac = mac2hex(_mac)
-                    link_route_module(bess, iface + "_routes", iface + "_dpdk_po", gateway_mac, prefix, prefix_len)
+                    link_route_module(bess, iface + "_routes", iface + "_dpdk_po", gateway_mac, iprange, prefix_len)
                 else:
                     for ipv4 in ipdb.interfaces[int(i['oif'])].ipaddr.ipv4:
                         local_ip = ipv4[0]
                         probe_addr(local_ip, i['gateway'], iface,
-                                   prefix, prefix_len, ipdb.interfaces[iface].address)
+                                   iprange, prefix_len, ipdb.interfaces[iface].address)
 
     # Now resume bessd operations
     bess.resume_all()
