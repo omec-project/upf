@@ -27,14 +27,20 @@
 #define DEFAULT_BEARER			5
 /**
  * set session id from the combination of
- * unique UE id and Bearer id
+ * unique UE addr and Bearer id
  */
-#define SESS_ID(x, y)			(((uint64_t)(y) << 32) | (0xffffffff & (x)))
-#define UE_SESS_ID(x)			(x>>4)
+#define SESS_ID(ue_addr, br_id)		(((uint64_t)(br_id) << 32) | (0xffffffff & (ue_addr)))
+				      /* [0] 28 bits | [bearer-id] 4 bits | [ue-addr] 32 bits */
+#if 0
 /**
  * get bearer id
  */
-#define UE_BEAR_ID(x)			(x & 0xf)
+#define UE_BEAR_ID(x)			(x>>32)
+/**
+ * get session id
+ */
+#define UE_SESS_ID(x)			(x & 0xffffffff)
+#endif
 /*----------------------------------------------------------------------------------*/
 /**
  * XXX - TODO: Clean up struct declarations. Remove redundant fields
