@@ -1,9 +1,5 @@
 # vim: syntax=py
 
-# for sleep()
-import time
-# for shell commands
-import os
 from utils import *
 
 # ====================================================
@@ -16,9 +12,6 @@ sgi_ifname = "sgi"
 
 s1u_port_id = 0
 sgi_port_id = 1
-
-s1u_rtr_mac = "68:05:ca:31:fa:7a"
-sgi_rtr_mac = "68:05:ca:31:fa:7b"
 
 ue_net = "16.0.0.0"
 ue_mask = "255.255.255.0"
@@ -161,6 +154,7 @@ sgi_dpdk_bpf:UEGate \
 #       SIM_TEST
 # ====================================================
 
+import time
 
 def sim_start_test():
     start_teid = 0xf0000000
