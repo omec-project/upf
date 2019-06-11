@@ -35,3 +35,12 @@ ip route
 "
 
 docker logs bess
+
+docker stop bess-routectl
+docker rm -f bess-routectl
+
+docker run --name bess-routectl -itd \
+-v "$PWD/conf":/conf \
+--net container:bess \
+--entrypoint /conf/route_control.py \
+krsna1729/spgwu -i "${ifaces[@]}"
