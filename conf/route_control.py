@@ -140,6 +140,7 @@ def netlink_event_listener(ipdb, netlink_message, action):
     msg = netlink_message
 
     if action == 'RTM_NEWROUTE':
+        iface = {}
         for att in msg['attrs']:
             if 'RTA_DST' in att:
                 # Fetch IP range

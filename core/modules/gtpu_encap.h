@@ -165,6 +165,7 @@ class GtpuEncap final : public Module {
 	static const int InitNumBucket = 4;
 	/**
 	 * Number of possible subscribers
+	 * TODO - XXX: Pass InitNumSubs as a config option in Init() function
 	 */
 	static const int InitNumSubs = 100000;
 };
