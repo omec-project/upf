@@ -86,6 +86,8 @@ def link_modules(server, module, next_module):
 
 def link_route_module(server, module, last_module, gateway_mac, iprange, prefix_len):
     print('Adding route entry for %s' % module)
+
+    gateway_mac_str = '{:x}'.format(gateway_mac)
     # Pass routing entry to bessd's route module
     response = server.run_module_command(module,
                                          'add',
@@ -99,17 +101,17 @@ def link_route_module(server, module, last_module, gateway_mac, iprange, prefix_
                     
     # Create Update module
     response = server.create_module('Update',
-                                    module + '_EthMac_' + str(hex(gateway_mac)),
+                                    module + '_EthMac_' + gateway_mac_str,
                                     {'fields': [{'offset': 0, 'size': 6, 'value': gateway_mac}]})
     if response.error.code != 0:
         print('Error creating module %s' % next_module)
         return
             
     # Connect Update module to route module
-    link_modules(server, module, module + '_EthMac_' + str(hex(gateway_mac)))
+    link_modules(server, module, module + '_EthMac_' + gateway_mac_str)
 
     # Connect Update module to dpdk_out module
-    link_modules(server, module + '_EthMac_' + str(hex(gateway_mac)), last_module)
+    link_modules(server, module + '_EthMac_' + gateway_mac_str, last_module)
 
 
 def probe_addr(local_ip, neighbor_ip, iface,
