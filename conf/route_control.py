@@ -41,7 +41,7 @@ args = {}
 
 # for interacting with kernel
 ipdb = IPDB()
-
+ipr = IPRoute()
 
 def mac2hex(mac):
     return int(mac.replace(':', ''), 16)
@@ -61,7 +61,6 @@ def send_arp(neighbor_ip, src_mac, iface):
 def fetch_mac(dip):
     ip = ''
     _mac = ''
-    ipr = IPRoute()
     neighbors = ipr.get_neighbours(dst=dip)
     for i in range(len(neighbors)):
         for att in neighbors[i]['attrs']:
@@ -87,15 +86,26 @@ def link_route_module(server, route_module, last_module, gateway_mac, iprange, p
     print('Adding route entry ' + iprange + '/' + str(prefix_len) + ' for %s' % route_module)
 
     gateway_mac_str = '{:x}'.format(gateway_mac)
-    # Pass routing entry to bessd's route module
-    response = server.run_module_command(route_module,
-                                         'add',
-                                         'IPLookupCommandAddArg',
-                                         {'prefix': iprange,
-                                          'prefix_len': int(prefix_len),
-                                          'gate': 0})
-    if response.error.code != 0:
-        print('Error inserting route entry for %s' % route_module)
+    _try = 0
+    trial_limit = 5
+    insert_success = 0
+    while _try < trial_limit and insert_success == 0:
+        # Pass routing entry to bessd's route module
+        response = server.run_module_command(route_module,
+                                             'add',
+                                             'IPLookupCommandAddArg',
+                                             {'prefix': iprange,
+                                              'prefix_len': int(prefix_len),
+                                              'gate': 0})
+        if response.error.code != 0:
+            print('Error inserting route entry for %s. Retrying...' % route_module)
+            ++_try
+            time.sleep(1)
+        else:
+            insert_success = 1
+
+    if insert_success == 0:
+        print('Addition failed! %s module may not exist' % route_module)
         return
 
     # Create Update module
@@ -223,7 +233,6 @@ def netlink_event_listener(ipdb, netlink_message, action):
 
 
 def boostrap_routes():
-
     _try = 0
     trial_limit = 5
     # Connect to BESS (assuming host=localhost, port=10514 (default))
@@ -240,7 +249,6 @@ def boostrap_routes():
     else:
         print('Done.')
 
-    ipr = IPRoute()
     routes = ipr.get_routes()
     for i in routes:
         if i['event'] == 'RTM_NEWROUTE':
