@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
-import os
+from os import system
 import signal
 import sys
 
@@ -49,7 +49,7 @@ def mac2hex(mac):
 
 
 def send_ping(neighbor_ip):
-    os.system('ping -c 1 ' + neighbor_ip)
+    os.system('ping -c 1 ' + neighbor_ip + ' > /dev/null')
 
 
 def send_arp(neighbor_ip, src_mac, iface):
@@ -85,7 +85,7 @@ def link_modules(server, module, next_module):
 
 
 def link_route_module(server, route_module, last_module, gateway_mac, iprange, prefix_len):
-    print('Adding route entry for %s' % route_module)
+    print('Adding route entry ' + iprange + '/' + str(prefix_len) + ' for %s' % route_module)
 
     gateway_mac_str = '{:x}'.format(gateway_mac)
     # Pass routing entry to bessd's route module
@@ -177,7 +177,7 @@ def netlink_event_listener(ipdb, netlink_message, action):
 
         else:  # if gateway_mac is set
             print('Linking module ' + iface + '_routes' + ' with ' + iface +
-                  '_dpdk_po ' + str(_mac) + ' iprange: ' + iprange + '/' + str(prefix_len))
+                  '_dpdk_po (Dest MAC: ' + str(_mac) + ').')
             # Pause bessd to avoid race condition (and potential crashes)
             bess.pause_all()
 
@@ -198,9 +198,8 @@ def netlink_event_listener(ipdb, netlink_message, action):
 
         item = arpcache.get(neighbor_ip)
         if item:
-            print('Found an item with key ' + item.neighbor_ip)
-            print('Linking module ' + item.iface + '_routes' + ' with ' + item.iface + '_dpdk_po ' +
-                  str(gateway_mac) + ' iprange: ' + item.iprange + '/' + str(item.prefix_len))
+            print('Linking module ' + item.iface + '_routes' + ' with ' + item.iface + '_dpdk_po (Dest MAC: ' +
+                  str(gateway_mac) + ').')
 
             # Pause bessd to avoid race condition (and potential crashes)
             bess.pause_all()
@@ -219,7 +218,9 @@ def boostrap_routes():
     # Connect to BESS (assuming host=localhost, port=10514 (default))
     if not bess.is_connected():
         bess.disconnect()
+        print('Connecting to BESS daemon...'),
         bess.connect(grpc_url=args.ip + ':' + args.port)
+        print('Done.')
 
     # Pause bessd to avoid race condition (and potential crashes)
     bess.pause_all()
@@ -239,7 +240,7 @@ def boostrap_routes():
                 if _mac:
                     gateway_mac = mac2hex(_mac)
                     print('Linking module ' + iface + '_routes' + ' with ' + iface +
-                          '_dpdk_po ' + str(_mac) + ' iprange: ' + iprange + '/' + str(prefix_len))
+                          '_dpdk_po (Dest MAC: ' + str(_mac) + ').')
                     link_route_module(
                         bess, iface + "_routes", iface + "_dpdk_po", gateway_mac, iprange, prefix_len)
                 else:
@@ -260,7 +261,9 @@ def reconfigure(number, frame):
 
 def main():
     boostrap_routes()
+    print('Registering netlink event listener callback...'),
     event_callback = ipdb.register_callback(netlink_event_listener)
+    print('Done.')
 
     def cleanup(number, frame):
         ipdb.unregister_callback(event_callback)
