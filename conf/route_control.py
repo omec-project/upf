@@ -2,6 +2,7 @@
 
 import argparse
 from os import system
+import time
 import signal
 import sys
 
@@ -215,11 +216,20 @@ def netlink_event_listener(ipdb, netlink_message, action):
 
 def boostrap_routes():
 
+    _try = 0
+    trial_limit = 5
     # Connect to BESS (assuming host=localhost, port=10514 (default))
-    if not bess.is_connected():
+    while not bess.is_connected() and _try < trial_limit:
         bess.disconnect()
+        time.sleep(1)
         print('Connecting to BESS daemon...'),
         bess.connect(grpc_url=args.ip + ':' + args.port)
+        ++_try
+
+    if not bess.is_connected():
+        print('BESS connection failure.')
+        sys.exit()
+    else:
         print('Done.')
 
     # Pause bessd to avoid race condition (and potential crashes)
