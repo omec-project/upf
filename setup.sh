@@ -19,7 +19,7 @@ docker run --name bess -itd --cap-add NET_ADMIN \
 -v "$PWD/conf":/conf \
 krsna1729/spgwu
 
-for (( i=0; i<$len; i++ ))
+for (( i=0; i<len; i++ ))
 do
 docker exec bess bash -c "
 ip link add ${ifaces[$i]} type veth peer name ${ifaces[$i]}-vdev;
@@ -41,6 +41,6 @@ docker rm -f bess-routectl
 
 docker run --name bess-routectl -itd \
 -v "$PWD/conf":/conf \
---net container:bess \
+--net container:bess --pid container:bess \
 --entrypoint /conf/route_control.py \
 krsna1729/spgwu -i "${ifaces[@]}"

@@ -1,20 +1,15 @@
 #!/usr/bin/env python
 
-BESSD_HOST = 'localhost'
-BESSD_PORT = '10514'
+import argparse
+import os
+import signal
+import sys
 
 # for retrieving route entries
 import iptools
-from pyroute2 import IPDB
 # for retrieving neighbor info
-from pyroute2 import IPRoute
-# for pkt generation
+from pyroute2 import IPDB, IPRoute
 from scapy.all import *
-# for signal handling
-import signal
-# for command-line arg passing
-import argparse
-
 
 try:
     from pybess.bess import *
@@ -33,15 +28,20 @@ class RouteEntry:
         self.iface = ' '
         self.iprange = ' '
         self.prefix_len = ' '
+
     def __str__(self):
         return ('{neigh: %s, local_ip: %s, iface: %s, ip-range: %s/%s}' %
                 (self.neighbor_ip, self.local_ip, self.iface, self.iprange, self.prefix_len))
+
 
 # for holding unresolved ARP queries
 arpcache = {}
 
 # for holding command-line arguments
 args = {}
+
+# for interacting with kernel
+ipdb = IPDB()
 
 
 def mac2hex(mac):
@@ -53,7 +53,7 @@ def send_ping(neighbor_ip):
 
 
 def send_arp(neighbor_ip, src_mac, iface):
-    pkt=Ether(dst="ff:ff:ff:ff:ff:ff")/ARP(pdst=neighbor_ip, hwsrc=src_mac)
+    pkt = Ether(dst="ff:ff:ff:ff:ff:ff")/ARP(pdst=neighbor_ip, hwsrc=src_mac)
     pkt.show()
     hexdump(pkt)
     sendp(pkt, iface=iface)
@@ -84,34 +84,35 @@ def link_modules(server, module, next_module):
         print('Error connecting module %s to %s' % (module, next_module))
 
 
-def link_route_module(server, module, last_module, gateway_mac, iprange, prefix_len):
-    print('Adding route entry for %s' % module)
+def link_route_module(server, route_module, last_module, gateway_mac, iprange, prefix_len):
+    print('Adding route entry for %s' % route_module)
 
     gateway_mac_str = '{:x}'.format(gateway_mac)
     # Pass routing entry to bessd's route module
-    response = server.run_module_command(module,
+    response = server.run_module_command(route_module,
                                          'add',
                                          'IPLookupCommandAddArg',
                                          {'prefix': iprange,
                                           'prefix_len': int(prefix_len),
                                           'gate': 0})
     if response.error.code != 0:
-        print('Error inserting route entry for %s' % module)
+        print('Error inserting route entry for %s' % route_module)
         return
-                    
+
     # Create Update module
+    update_module = route_module + '_EthMac_' + gateway_mac_str
     response = server.create_module('Update',
-                                    module + '_EthMac_' + gateway_mac_str,
+                                    update_module,
                                     {'fields': [{'offset': 0, 'size': 6, 'value': gateway_mac}]})
     if response.error.code != 0:
-        print('Error creating module %s' % next_module)
+        print('Error creating Update module %s' % update_module)
         return
-            
+
     # Connect Update module to route module
-    link_modules(server, module, module + '_EthMac_' + gateway_mac_str)
+    link_modules(server, route_module, update_module)
 
     # Connect Update module to dpdk_out module
-    link_modules(server, module + '_EthMac_' + gateway_mac_str, last_module)
+    link_modules(server, update_module, last_module)
 
 
 def probe_addr(local_ip, neighbor_ip, iface,
@@ -174,12 +175,14 @@ def netlink_event_listener(ipdb, netlink_message, action):
                 probe_addr(local_ip, neighbor_ip, iface,
                            iprange, prefix_len, ipdb.interfaces[iface].address)
 
-        else:	# if gateway_mac is set
-            print('Linking module ' + iface + '_routes' + ' with ' + iface + '_dpdk_po ' + str(_mac) + ' iprange: ' + iprange + '/' + str(prefix_len))
+        else:  # if gateway_mac is set
+            print('Linking module ' + iface + '_routes' + ' with ' + iface +
+                  '_dpdk_po ' + str(_mac) + ' iprange: ' + iprange + '/' + str(prefix_len))
             # Pause bessd to avoid race condition (and potential crashes)
             bess.pause_all()
 
-            link_route_module(bess, iface + "_routes", iface + "_dpdk_po", gateway_mac, iprange, prefix_len)
+            link_route_module(bess, iface + "_routes", iface +
+                              "_dpdk_po", gateway_mac, iprange, prefix_len)
 
             # Now resume bessd operations
             bess.resume_all()
@@ -196,12 +199,14 @@ def netlink_event_listener(ipdb, netlink_message, action):
         item = arpcache.get(neighbor_ip)
         if item:
             print('Found an item with key ' + item.neighbor_ip)
-            print('Linking module ' + item.iface + '_routes' + ' with ' + item.iface + '_dpdk_po ' + str(gateway_mac) + ' iprange: ' + item.iprange + '/' + str(item.prefix_len))
+            print('Linking module ' + item.iface + '_routes' + ' with ' + item.iface + '_dpdk_po ' +
+                  str(gateway_mac) + ' iprange: ' + item.iprange + '/' + str(item.prefix_len))
 
             # Pause bessd to avoid race condition (and potential crashes)
             bess.pause_all()
 
-            link_route_module(bess, item.iface + "_routes", item.iface + "_dpdk_po", mac2hex(gateway_mac), item.iprange, str(item.prefix_len))
+            link_route_module(bess, item.iface + "_routes", item.iface + "_dpdk_po",
+                              mac2hex(gateway_mac), item.iprange, str(item.prefix_len))
 
             # Now resume bessd operations
             bess.resume_all()
@@ -209,11 +214,12 @@ def netlink_event_listener(ipdb, netlink_message, action):
             del arpcache[neighbor_ip]
 
 
-def main():
-    ipdb = IPDB()
+def boostrap_routes():
 
     # Connect to BESS (assuming host=localhost, port=10514 (default))
-    bess.connect(grpc_url=args.ip + ':' + args.port)
+    if not bess.is_connected():
+        bess.disconnect()
+        bess.connect(grpc_url=args.ip + ':' + args.port)
 
     # Pause bessd to avoid race condition (and potential crashes)
     bess.pause_all()
@@ -232,8 +238,10 @@ def main():
             if iface in args.i:
                 if _mac:
                     gateway_mac = mac2hex(_mac)
-                    print('Linking module ' + iface + '_routes' + ' with ' + iface + '_dpdk_po ' + str(_mac) + ' iprange: ' + iprange + '/' + str(prefix_len))
-                    link_route_module(bess, iface + "_routes", iface + "_dpdk_po", gateway_mac, iprange, prefix_len)
+                    print('Linking module ' + iface + '_routes' + ' with ' + iface +
+                          '_dpdk_po ' + str(_mac) + ' iprange: ' + iprange + '/' + str(prefix_len))
+                    link_route_module(
+                        bess, iface + "_routes", iface + "_dpdk_po", gateway_mac, iprange, prefix_len)
                 else:
                     for ipv4 in ipdb.interfaces[int(i['oif'])].ipaddr.ipv4:
                         local_ip = ipv4[0]
@@ -243,22 +251,36 @@ def main():
     # Now resume bessd operations
     bess.resume_all()
 
+
+def reconfigure(number, frame):
+    print('Received: {} Reloading routes'.format(number))
+    boostrap_routes()
+    signal.pause()
+
+
+def main():
+    boostrap_routes()
     event_callback = ipdb.register_callback(netlink_event_listener)
 
-    def cleanup(*args):
-        ipdb.unregister_callback(netlink_event_listener)
+    def cleanup(number, frame):
+        ipdb.unregister_callback(event_callback)
+        print('Received: {} Exiting'.format(number))
         sys.exit()
 
+    signal.signal(signal.SIGHUP, reconfigure)
     signal.signal(signal.SIGINT, cleanup)
     signal.signal(signal.SIGTERM, cleanup)
     signal.pause()
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Basic IPv4 Routing Controller')
-    parser.add_argument('-i', type=str, nargs='+', help='interface(s) to control')
-    parser.add_argument('--ip', type=str, default=BESSD_HOST, help='BESSD address')
-    parser.add_argument('--port', type=str, default=BESSD_PORT, help='BESSD port')
+    parser = argparse.ArgumentParser(
+        description='Basic IPv4 Routing Controller')
+    parser.add_argument('-i', type=str, nargs='+',
+                        help='interface(s) to control')
+    parser.add_argument(
+        '--ip', type=str, default='localhost', help='BESSD address')
+    parser.add_argument('--port', type=str, default='10514', help='BESSD port')
 
     args = parser.parse_args()
 
