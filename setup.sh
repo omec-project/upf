@@ -9,8 +9,8 @@ len=${#ifaces[@]}
 
 docker build -t krsna1729/spgwu .
 
-docker stop bess
-docker rm -f bess
+docker stop bess bess-routectl bess-web
+docker rm -f bess bess-routectl bess-web
 
 docker run --name bess -itd --cap-add NET_ADMIN \
 --cpuset-cpus=12-13 \
@@ -36,9 +36,6 @@ ip route
 
 docker logs bess
 
-docker stop bess-routectl
-docker rm -f bess-routectl
-
 sleep 10
 
 docker run --name bess-routectl -itd \
@@ -46,3 +43,8 @@ docker run --name bess-routectl -itd \
 --net container:bess --pid container:bess \
 --entrypoint /conf/route_control.py \
 krsna1729/spgwu -i "${ifaces[@]}"
+
+docker run --name bess-web -d \
+--net container:bess \
+--entrypoint bessctl \
+krsna1729/spgwu http 0.0.0.0
