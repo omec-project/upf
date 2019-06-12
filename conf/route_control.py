@@ -73,24 +73,14 @@ def link_route_module(server, route_module, last_module, gateway_mac, iprange, p
 
     gateway_mac_str = '{:x}'.format(gateway_mac)
 
-    retries = 5
-    while retries > 0:
-        try:
-            # Pass routing entry to bessd's route module
-            response = server.run_module_command(route_module,
-                                                 'add',
-                                                 'IPLookupCommandAddArg',
-                                                 {'prefix': iprange,
-                                                  'prefix_len': int(prefix_len),
-                                                  'gate': 0})
-            if response.error.code == 0:
-                break
-        except response.error.code != 0:
-            print('Error inserting route entry for %s. Retrying...' % route_module)
-            retries -= 1
-            time.sleep(1)
-
-    if retries == 0:
+    # Pass routing entry to bessd's route module
+    response = server.run_module_command(route_module,
+                                         'add',
+                                         'IPLookupCommandAddArg',
+                                         {'prefix': iprange,
+                                          'prefix_len': int(prefix_len),
+                                          'gate': 0})
+    if response.error.code != 0:
         print('Addition failed! %s module may not exist' % route_module)
         return
 
@@ -219,18 +209,16 @@ def boostrap_routes():
     # Connect to BESS (assuming host=localhost, port=10514 (default))
     while retries > 0:
         try:
-            bess.disconnect()
-            bess.connect(grpc_url=args.ip + ':' + args.port)
-            if bess.is_connected():
-                break
-        except not bess_is_connected():
-            print('Error connecting to BESS daemon. Retrying...')
+            if not bess.is_connected():
+                bess.connect(grpc_url=args.ip + ':' + args.port)
+            break
+        except BESS.RPCError:
+            print('Error connecting to BESS daemon. Retrying in 1 sec...')
             retries -= 1
             time.sleep(1)
     
     if retries == 0:
-        print('BESS connection failure.')
-        sys.exit()
+        raise Exception('BESS connection failure.')
     else:
         print('Done.')
 
