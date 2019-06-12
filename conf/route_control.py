@@ -204,6 +204,12 @@ def netlink_event_listener(ipdb, netlink_message, action):
 
 
 def boostrap_routes():
+    routes = ipr.get_routes()
+    for i in routes:
+        if i['event'] == 'RTM_NEWROUTE':
+            parse_new_route(i)
+
+def connect_bessd():
     print('Connecting to BESS daemon...'),
     retries = 5
     # Connect to BESS (assuming host=localhost, port=10514 (default))
@@ -220,12 +226,7 @@ def boostrap_routes():
     if retries == 0:
         raise Exception('BESS connection failure.')
     else:
-        print('Done.')
-
-    routes = ipr.get_routes()
-    for i in routes:
-        if i['event'] == 'RTM_NEWROUTE':
-            parse_new_route(i)
+        print('Done.')    
 
 
 def reconfigure(number, frame):
@@ -249,6 +250,9 @@ def main():
     ipr = IPRoute()
     # for bess client
     bess = BESS()
+
+    # connect to bessd
+    connect_bessd()
 
     # program current routes
     boostrap_routes()
