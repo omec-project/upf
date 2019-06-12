@@ -39,6 +39,8 @@ docker logs bess
 docker stop bess-routectl
 docker rm -f bess-routectl
 
+sleep 10
+
 docker run --name bess-routectl -itd \
 -v "$PWD/conf":/conf \
 --net container:bess --pid container:bess \
