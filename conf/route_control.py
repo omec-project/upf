@@ -35,7 +35,7 @@ def mac2hex(mac):
 
 
 def send_ping(neighbor_ip):
-    os.system('ping -c 1 ' + neighbor_ip + ' > /dev/null')
+    system('ping -c 1 ' + neighbor_ip + ' > /dev/null')
 
 
 def send_arp(neighbor_ip, src_mac, iface):
@@ -54,7 +54,6 @@ def fetch_mac(dip):
             if 'NDA_DST' in att and dip == att[1]:
                 # ('NDA_DST', dip)
                 ip = att[1]
-                print('Setting ip as ' + ip)
             if 'NDA_LLADDR' in att:
                 # ('NDA_LLADDR', _mac)
                 _mac = att[1]
@@ -73,25 +72,25 @@ def link_route_module(server, route_module, last_module, gateway_mac, iprange, p
     print('Adding route entry ' + iprange + '/' + str(prefix_len) + ' for %s' % route_module)
 
     gateway_mac_str = '{:x}'.format(gateway_mac)
-    _try = 0
-    trial_limit = 5
-    insert_success = 0
-    while _try < trial_limit and insert_success == 0:
-        # Pass routing entry to bessd's route module
-        response = server.run_module_command(route_module,
-                                             'add',
-                                             'IPLookupCommandAddArg',
-                                             {'prefix': iprange,
-                                              'prefix_len': int(prefix_len),
-                                              'gate': 0})
-        if response.error.code != 0:
-            print('Error inserting route entry for %s. Retrying...' % route_module)
-            ++_try
-            time.sleep(1)
-        else:
-            insert_success = 1
 
-    if insert_success == 0:
+    retries = 5
+    while retries > 0:
+        try:
+            # Pass routing entry to bessd's route module
+            response = server.run_module_command(route_module,
+                                                 'add',
+                                                 'IPLookupCommandAddArg',
+                                                 {'prefix': iprange,
+                                                  'prefix_len': int(prefix_len),
+                                                  'gate': 0})
+            if response.error.code == 0:
+                break
+        except response.error.code != 0:
+            print('Error inserting route entry for %s. Retrying...' % route_module)
+            retries -= 1
+            time.sleep(1)
+
+    if retries == 0:
         print('Addition failed! %s module may not exist' % route_module)
         return
 
@@ -220,17 +219,21 @@ def netlink_event_listener(ipdb, netlink_message, action):
 
 
 def boostrap_routes():
-    _try = 0
-    trial_limit = 5
+    print('Connecting to BESS daemon...'),
+    retries = 5
     # Connect to BESS (assuming host=localhost, port=10514 (default))
-    while not bess.is_connected() and _try < trial_limit:
-        bess.disconnect()
-        time.sleep(1)
-        print('Connecting to BESS daemon...'),
-        bess.connect(grpc_url=args.ip + ':' + args.port)
-        ++_try
-
-    if not bess.is_connected():
+    while retries > 0:
+        try:
+            bess.disconnect()
+            bess.connect(grpc_url=args.ip + ':' + args.port)
+            if bess.is_connected():
+                break
+        except not bess_is_connected():
+            print('Error connecting to BESS daemon. Retrying...')
+            retries -= 1
+            time.sleep(1)
+    
+    if retries == 0:
         print('BESS connection failure.')
         sys.exit()
     else:
@@ -255,11 +258,12 @@ def cleanup(number, frame):
 
 
 def main():
-    global arpcache, ipdb, event_callback, bess
+    global arpcache, ipdb, event_callback, bess, ipr
     # for holding unresolved ARP queries
     arpcache = {}
     # for interacting with kernel
     ipdb = IPDB()
+    ipr = IPRoute()
     # for bess client
     bess = BESS()
 
