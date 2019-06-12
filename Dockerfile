@@ -26,6 +26,7 @@ RUN apt-get update && \
         tcpdump && \
     rm -rf /var/lib/apt/lists/* && \
     pip install --no-cache-dir \
+        flask \
         grpcio \
         iptools \
         protobuf \
