@@ -18,9 +18,6 @@ except ImportError:
     raise
 
 
-bess = BESS()
-
-
 class RouteEntry:
     def __init__(self):
         self.neighbor_ip = ' '
@@ -32,16 +29,6 @@ class RouteEntry:
     def __str__(self):
         return ('{neigh: %s, local_ip: %s, iface: %s, ip-range: %s/%s}' %
                 (self.neighbor_ip, self.local_ip, self.iface, self.iprange, self.prefix_len))
-
-
-# for holding unresolved ARP queries
-arpcache = {}
-
-# for holding command-line arguments
-args = {}
-
-# for interacting with kernel
-ipdb = IPDB()
 
 
 def mac2hex(mac):
@@ -258,14 +245,25 @@ def reconfigure(number, frame):
     signal.pause()
 
 
-def main():
-    boostrap_routes()
-    event_callback = ipdb.register_callback(netlink_event_listener)
+def cleanup(number, frame):
+    ipdb.unregister_callback(event_callback)
+    print('Received: {} Exiting'.format(number))
+    sys.exit()
 
-    def cleanup(number, frame):
-        ipdb.unregister_callback(event_callback)
-        print('Received: {} Exiting'.format(number))
-        sys.exit()
+
+def main():
+    global arpcache, ipdb, event_callback, bess
+    # for holding unresolved ARP queries
+    arpcache = {}
+    # for interacting with kernel
+    ipdb = IPDB()
+    # for bess client
+    bess = BESS()
+
+    # program current routes
+    boostrap_routes()
+    # listen for netlink events
+    event_callback = ipdb.register_callback(netlink_event_listener)
 
     signal.signal(signal.SIGHUP, reconfigure)
     signal.signal(signal.SIGINT, cleanup)
@@ -282,6 +280,8 @@ if __name__ == '__main__':
         '--ip', type=str, default='localhost', help='BESSD address')
     parser.add_argument('--port', type=str, default='10514', help='BESSD port')
 
+    # for holding command-line arguments
+    global args
     args = parser.parse_args()
 
     if args.i:
