@@ -17,13 +17,13 @@ except ImportError:
     raise
 
 
-class RouteEntry:
-    def __init__(self):
-        self.neighbor_ip = ' '
-        self.local_ip = ' '
-        self.iface = ' '
-        self.iprange = ' '
-        self.prefix_len = ' '
+class NeighborEntry:
+    def __init__(self, neighbor_ip = None, local_ip = None, iface = None, iprange = None, prefix_len = None):
+        self.neighbor_ip = neighbor_ip
+        self.local_ip = local_ip
+        self.iface = iface
+        self.iprange = iprange
+        self.prefix_len = prefix_len
 
     def __str__(self):
         return ('{neigh: %s, local_ip: %s, iface: %s, ip-range: %s/%s}' %
@@ -110,15 +110,8 @@ def link_route_module(server, route_module, last_module, gateway_mac, iprange, p
     link_modules(server, update_module, last_module)
 
 
-def probe_addr(local_ip, neighbor_ip, iface,
-               iprange, prefix_len, src_mac):
+def probe_addr(item, src_mac):
     # Store entry if entry does not exist in ARP cache
-    item = RouteEntry()
-    item.neighbor_ip = neighbor_ip
-    item.local_ip = local_ip
-    item.iface = iface
-    item.iprange = iprange
-    item.prefix_len = prefix_len
     arpcache[item.neighbor_ip] = item
     print('Adding entry ' + str(item) + ' in arp probe table')
 
@@ -130,53 +123,54 @@ def probe_addr(local_ip, neighbor_ip, iface,
 
 
 def parse_new_route(msg):
-    iface = {}
-    iprange = {}
-    gateway_mac = {}
-    neighbor_ip = {}
+    item = NeighborEntry()
     for att in msg['attrs']:
         if 'RTA_DST' in att:
             # Fetch IP range
             # ('RTA_DST', iprange)
-            iprange = att[1]
+            item.iprange = att[1]
         if 'RTA_GATEWAY' in att:
             # Fetch gateway MAC address
             # ('RTA_GATEWAY', neighbor_ip)
-            neighbor_ip = att[1]
+            item.neighbor_ip = att[1]
             _mac = fetch_mac(att[1])
             if not _mac:
-                gateway_mac = 0
+                item.gateway_mac = 0
             else:
-                gateway_mac = mac2hex(_mac)
+                item.gateway_mac = mac2hex(_mac)
         if 'RTA_OIF' in att:
             # Fetch interface name
             # ('RTA_OIF', iface)
-            iface = ipdb.interfaces[int(att[1])].ifname
+            item.iface = ipdb.interfaces[int(att[1])].ifname
 
-    if not iface in args.i or not iprange or not neighbor_ip:
+    if not item.iface in args.i or not item.iprange or not item.neighbor_ip:
+        del item
         return
 
     # Fetch prefix_len
-    prefix_len = msg['dst_len']
+    item.prefix_len = msg['dst_len']
 
     # if mac is 0, send ARP request
-    if gateway_mac == 0:
-        for ipv4 in ipdb.interfaces[iface].ipaddr.ipv4:
-            local_ip = ipv4[0]
-            probe_addr(local_ip, neighbor_ip, iface,
-                       iprange, prefix_len, ipdb.interfaces[iface].address)
+    if item.gateway_mac == 0:
+        for ipv4 in ipdb.interfaces[item.iface].ipaddr.ipv4:
+            item.local_ip = ipv4[0]
+            print('Adding entry ' + str(item.iface) + ' in arp probe table')
+            probe_addr(item, ipdb.interfaces[item.iface].address)
 
     else:  # if gateway_mac is set
-        print('Linking module ' + iface + '_routes' + ' with ' + iface +
+        print('Linking module ' + item.iface + '_routes' + ' with ' + item.iface +
               '_dpdk_po (Dest MAC: ' + str(_mac) + ').')
         # Pause bessd to avoid race condition (and potential crashes)
         bess.pause_all()
 
-        link_route_module(bess, iface + "_routes", iface +
-                          "_dpdk_po", gateway_mac, iprange, prefix_len)
+        link_route_module(bess, item.iface + "_routes", item.iface +
+                          "_dpdk_po", item.gateway_mac, item.iprange,
+                          item.prefix_len)
 
         # Now resume bessd operations
         bess.resume_all()
+
+        del item
 
 
 def parse_new_neighbor(msg):
@@ -203,6 +197,7 @@ def parse_new_neighbor(msg):
         bess.resume_all()
 
         del arpcache[neighbor_ip]
+        del item
 
 
 # TODO - XXX: What if route is deleted. Need to add logic to de-link chained modules
