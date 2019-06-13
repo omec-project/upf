@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import argparse
-#from os import system
 import time
 import signal
 import sys
@@ -38,7 +37,6 @@ def mac2hex(mac):
 
 
 def send_ping(neighbor_ip):
-    #system('ping -c 1 ' + neighbor_ip + ' > /dev/null')
     send(IP(dst=neighbor_ip)/ICMP())
 
 
@@ -165,15 +163,20 @@ def del_route_entry(server, item):
             return
 
         print('Route entry ' + iprange + '/' + str(prefix_len) + ' deleted from ' + route_module)
+
+        # Decrementing route count for the registered neighbor
         neighbor_exists.route_count -= 1
+
+        # If route count is 0, then delete the whole module
         if neighbor_exists.route_count == 0:
             update_module = route_module + '_EthMac_' + neighbor_exists.macstr
-            # if route count is 0, then delete the whole module
             response = server.destroy_module(update_module)
             if response.error.code != 0:
                 print('Error deleting the Update module %s' % update_module)
                 sys.exit()
             print('Module ' + update_module + ' destroyed')
+
+            # Delete entry from the neighbor cache
             del neighborcache[item.neighbor_ip]
             print('Deleting item from neighborcache')
             del neighbor_exists
