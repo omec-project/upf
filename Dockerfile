@@ -19,6 +19,7 @@ RUN pip install --no-cache-dir psutil
 FROM python:2.7-slim as bess
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+    	git \
         libgraph-easy-perl \
         iproute2 \
 	iputils-ping \
@@ -31,7 +32,7 @@ RUN apt-get update && \
         iptools \
         protobuf \
         pyroute2 \
-        scapy
+        https://github.com/secdev/scapy/archive/b65e795c62accd383e1bb6b17cd9f7a9143ae117.zip
 COPY --from=pip /usr/local/lib/python2.7/site-packages/psutil /usr/local/lib/python2.7/site-packages/psutil
 COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin
