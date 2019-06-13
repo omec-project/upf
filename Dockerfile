@@ -19,7 +19,6 @@ RUN pip install --no-cache-dir psutil
 FROM python:2.7-slim as bess
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    	git \
         libgraph-easy-perl \
         iproute2 \
 	iputils-ping \
