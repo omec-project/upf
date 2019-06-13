@@ -14,27 +14,32 @@ To follow instructions, you need
 To run BESS daemon with custom NGIC modules' code
 
 ```bash
-./setup.sh
+./docker_setup.sh
 ```
 
 To init the pipeline or reflect changes to `spgwu.bess`
 
 ```bash
-./reload.sh
+docker exec bess /conf/reload.sh
+docker exec bess bessctl show pipeline > pipeline.txt
 ```
 
 ## Operate Pipeline
 
-Control program(s) under development to dynamically configure
+Control program(s) to dynamically configure BESS modules
 
-* Routes
-* Neighbors
-* UE Session Info
+| Functionality | Controller |
+|---------------|------------|
+| Routes | [route_control.py](conf/route_control.py) |
+| UE sessions | Static trafficgen only in `spgwu.bess` |
 
 ## Observe
+
+To view the pipeline, open [http://[hostip]:8000](http://[hostip]:8000)
+in a browser
 
 To drop into BESS shell
 
 ```bash
-docker exec -it bess ./bessctl
+docker exec -it bess bessctl
 ```
