@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
 import argparse
-import time
 import signal
 import sys
+import time
 
 # for retrieving neighbor info
 from pyroute2 import IPDB, IPRoute
-# for sending ARP/ICMP pkts
+
 from scapy.all import *
 
 try:
@@ -18,6 +18,7 @@ except ImportError:
 
 
 MAX_RETRIES = 5
+SLEEP_S = 2
 
 
 class NeighborEntry:
@@ -74,7 +75,7 @@ def link_modules(server, module, next_module):
         except:
             print('Error connecting module ' + module +
                   ' with ' + next_module + '. Retrying in 1 sec...')
-            time.sleep(1)
+            time.sleep(SLEEP_S)
         else:
             break
     else:
@@ -88,9 +89,11 @@ def link_route_module(server, gateway_mac, item):
     route_module = item.iface + '_routes'
     last_module = item.iface + '_dpdk_po'
     gateway_mac_str = '{:x}'.format(gateway_mac)
-    print('Adding route entry ' + iprange + '/' + str(prefix_len) + ' for %s' % route_module)
+    print('Adding route entry ' + iprange + '/' +
+          str(prefix_len) + ' for %s' % route_module)
 
-    print('Trying to retrieve neighbor entry ' + item.neighbor_ip + ' from neighbor cache')
+    print('Trying to retrieve neighbor entry ' +
+          item.neighbor_ip + ' from neighbor cache')
     neighbor_exists = neighborcache.get(item.neighbor_ip)
 
     # How many gates does this module have?
@@ -106,7 +109,7 @@ def link_route_module(server, gateway_mac, item):
         # Need to create a new Update module,
         # so get gate_idx from gate count
         gate_idx = modgatecnt[route_module]
-    
+
     # Pass routing entry to bessd's route module
     for i in range(MAX_RETRIES):
         try:
@@ -118,9 +121,9 @@ def link_route_module(server, gateway_mac, item):
                                        'gate': gate_idx})
         except:
             print('Error adding route entry ' + iprange + '/' +
-                  str(prefix_len) + ' in ' +  route_module +
+                  str(prefix_len) + ' in ' + route_module +
                   '. Retrying in 1 sec...')
-            time.sleep(1)
+            time.sleep(SLEEP_S)
         else:
             break
     else:
@@ -140,11 +143,12 @@ def link_route_module(server, gateway_mac, item):
             except:
                 print('Error creating update module ' + update_module +
                       '. Retrying in 1 sec...')
-                time.sleep(1)
+                time.sleep(SLEEP_S)
             else:
                 break
         else:
-            raise Exception('BESS module ' + update_module + ' creation failure.')
+            raise Exception('BESS module ' + update_module +
+                            ' creation failure.')
 
         print('Update module created')
 
@@ -192,13 +196,14 @@ def del_route_entry(server, item):
             except:
                 print('Error while deleting route entry for ' + route_module +
                       '. Retrying in 1 sec...')
-                time.sleep(1)
+                time.sleep(SLEEP_S)
             else:
                 break
         else:
             raise Exception('Route entry deletion failure.')
 
-        print('Route entry ' + iprange + '/' + str(prefix_len) + ' deleted from ' + route_module)
+        print('Route entry ' + iprange + '/' +
+              str(prefix_len) + ' deleted from ' + route_module)
 
         # Decrementing route count for the registered neighbor
         neighbor_exists.route_count -= 1
@@ -212,11 +217,12 @@ def del_route_entry(server, item):
                 except:
                     print('Error destroying module ' + update_module +
                           '. Retrying in 1 sec...')
-                    time.sleep(1)
+                    time.sleep(SLEEP_S)
                 else:
                     break
             else:
-                raise Exception('Module ' + update_module + ' deletion failure.')
+                raise Exception('Module ' + update_module +
+                                ' deletion failure.')
 
             print('Module ' + update_module + ' destroyed')
 
@@ -351,7 +357,7 @@ def parse_del_route(msg):
 
     # Delete item
     del item
-        
+
 
 def netlink_event_listener(ipdb, netlink_message, action):
 
@@ -374,6 +380,7 @@ def bootstrap_routes():
         if i['event'] == 'RTM_NEWROUTE':
             parse_new_route(i)
 
+
 def connect_bessd():
     print('Connecting to BESS daemon...'),
     # Connect to BESS (assuming host=localhost, port=10514 (default))
@@ -383,7 +390,7 @@ def connect_bessd():
                 bess.connect(grpc_url=args.ip + ':' + args.port)
         except BESS.RPCError:
             print('Error connecting to BESS daemon. Retrying in 1 sec...')
-            time.sleep(1)
+            time.sleep(SLEEP_S)
         else:
             break
     else:

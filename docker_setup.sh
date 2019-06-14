@@ -8,7 +8,7 @@ docker rm -f bess bess-routectl bess-web
 
 docker build -t krsna1729/spgwu .
 
-docker run --name bess -itd --restart unless-stopped \
+docker run --name bess -td --restart unless-stopped \
 	--cap-add NET_ADMIN \
 	--cpuset-cpus=12-13 \
 	--device=/dev/vfio/48 --device=/dev/vfio/82 --device=/dev/vfio/vfio \
@@ -19,9 +19,8 @@ docker run --name bess -itd --restart unless-stopped \
 
 docker exec bess /conf/setup.sh
 docker logs bess
-sleep 10
 
-docker run --name bess-routectl -d --restart unless-stopped \
+docker run --name bess-routectl -td --restart unless-stopped \
 	-v "$PWD/conf":/conf \
 	--net container:bess --pid container:bess \
 	--entrypoint /conf/route_control.py \
