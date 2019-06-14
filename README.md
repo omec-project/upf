@@ -5,9 +5,9 @@
 To follow instructions, you need
 
 * Docker CE >= 17.06
-* Update the `--devices` line in `setup.sh` with device files of 2 DPDK bound devices
-* Hugepages mounted at `/dev/hugepages` or updated location in `setup.sh`
-* Update `conf/setup_trafficgen_routes.sh` and `conf/spgwu.bess` to run iltrafficgen tests
+* Update the `--devices` line in [`docker_setup.sh`](docker_setup.sh) with device files of 2 DPDK bound devices
+* Hugepages mounted at `/dev/hugepages` or updated location in [`docker_setup.sh`](docker_setup.sh)
+* Update `conf/setup.sh` and `conf/spgwu.bess` to run iltrafficgen tests
 
 ## Init
 

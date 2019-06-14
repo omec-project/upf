@@ -29,5 +29,9 @@ function setup_mirror_links() {
 	done
 }
 
+(return 2>/dev/null) && echo "Sourced" && return
+
+# Setup slow path to kernel
 setup_mirror_links
-setup_trafficgen_routes
+# Setup routes and neighbors for il_trafficgen test
+#setup_trafficgen_routes
