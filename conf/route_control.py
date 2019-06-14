@@ -117,7 +117,8 @@ def link_route_module(server, gateway_mac, item):
                                        'prefix_len': int(prefix_len),
                                        'gate': gate_idx})
         except:
-            print('Error adding route entry in ' + route_module +
+            print('Error adding route entry ' + iprange + '/' +
+                  str(prefix_len) + ' in ' +  route_module +
                   '. Retrying in 1 sec...')
             time.sleep(1)
         else:
