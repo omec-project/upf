@@ -31,16 +31,14 @@
  */
 #define SESS_ID(ue_addr, br_id)		(((uint64_t)(br_id) << 32) | (0xffffffff & (ue_addr)))
 				      /* [0] 28 bits | [bearer-id] 4 bits | [ue-addr] 32 bits */
-#if 0
 /**
  * get bearer id
  */
 #define UE_BEAR_ID(x)			(x>>32)
 /**
- * get session id
+ * get ue_addr
  */
-#define UE_SESS_ID(x)			(x & 0xffffffff)
-#endif
+#define UE_ADDR(x)			(x & 0xffffffff)
 /*----------------------------------------------------------------------------------*/
 /**
  * XXX - TODO: Clean up struct declarations. Remove redundant fields
