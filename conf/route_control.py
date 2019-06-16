@@ -478,7 +478,7 @@ def main():
     connect_bessd()
 
     # program current routes
-    bootstrap_routes()
+    #bootstrap_routes()
 
     # listen for netlink events
     print('Registering netlink event listener callback...'),
