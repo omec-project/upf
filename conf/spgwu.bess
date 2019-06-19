@@ -1,4 +1,5 @@
 # vim: syntax=py
+# -*- mode: python -*-
 
 from utils import *
 
