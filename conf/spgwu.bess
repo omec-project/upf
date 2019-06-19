@@ -1,6 +1,8 @@
 # vim: syntax=py
 # -*- mode: python -*-
 
+# for errnos
+import errno
 from utils import *
 
 # ====================================================
@@ -10,6 +12,8 @@ from utils import *
 
 conf_file = get_env('CONF_FILE', '/conf/spgwu.json')
 conf = get_json_conf(conf_file, False)
+ports = {}
+
 
 # ====================================================
 #       Validate
@@ -37,8 +41,8 @@ if mode not in supported_modes:
 #       Core Setup
 # ====================================================
 
-
 bess.add_worker(wid=0, core=int(get_process_affinity()[0]))
+
 
 # ====================================================
 #       Port Setup
@@ -46,6 +50,24 @@ bess.add_worker(wid=0, core=int(get_process_affinity()[0]))
 
 
 MAX_GATES = 8192
+
+def scan_ports():
+    idx = 0
+    while True:
+        try:
+            intf = PMDPort(name="Port {}".format(idx), port_id=idx)
+            if intf:
+                # Need to declare mac so that we don't lose key during destroy_port
+                mac = intf.mac_addr
+                ports[mac] = idx
+                bess.destroy_port(intf.name)
+        except bess.Error as e:
+            if e.code == errno.ENODEV:
+                break
+            else:
+                raise
+        idx += 1
+
 
 def init_fastpath(ifname, **kwargs):
     # Initialize PMDPort and RX/TX modules
@@ -72,7 +94,10 @@ def setup_port(ifname, idx, mode):
 
     elif mode == 'dpdk':
         # Initialize DPDK fastpath
-        kwargs = {"port_id" : idx}
+        intf_fastp_idx = ports.get(mac_by_interface(ifname))
+        if intf_fastp_idx is None:
+            raise Exception('Registered port for {} not detected!'.format(ifname))
+        kwargs = {"port_id" : intf_fastp_idx}
         intf_fastp_pi, intf_fastp_po, intf_fastp_bpf = init_fastpath(ifname, **kwargs)
 
         # Initialize kernel slowpath port and RX/TX modules
@@ -110,11 +135,12 @@ def setup_port(ifname, idx, mode):
 
 interfaces = ["s1u", "sgi"]
 done = []
-for i, interface in enumerate(interfaces):
+if mode == 'dpdk':
+    scan_ports()
+for idx, interface in enumerate(interfaces):
     ifname = conf[interface]["ifname"]
     if ifname in done:
         continue
-    idx = conf[interface]["dpdk"]["portid"] if mode is "dpdk" else i
     setup_port(ifname, idx, mode)
     done.append(ifname)
 
