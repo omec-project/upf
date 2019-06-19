@@ -29,6 +29,42 @@ const Commands GtpuEncap::cmds = {
 	 Command::THREAD_UNSAFE}	
 };
 /*----------------------------------------------------------------------------------*/
+// Template for generating UDP packets without data
+struct[[gnu::packed]] PacketTemplate {
+	struct ipv4_hdr iph;
+	struct udp_hdr udph;
+	struct gtpu_hdr gtph;
+
+	PacketTemplate() {
+		gtph.version = GTPU_VERSION;
+		gtph.pt = GTP_PROTOCOL_TYPE_GTP;
+		gtph.spare = 0;
+		gtph.ex = 0;
+		gtph.seq = 0;
+		gtph.pdn = 0;
+		gtph.type = GTP_GPDU;
+		gtph.length = 0;	// to fill in
+		gtph.teid = 0;		// to fill in
+		udph.src_port = htons(UDP_PORT_GTPU);
+		udph.dst_port = htons(UDP_PORT_GTPU);
+		udph.dgram_len = 0;	// to fill in
+		/* calculated by L4Checksum module in line */
+		udph.dgram_cksum = 0;
+		iph.version_ihl = IPVERSION << 4 | sizeof(struct ipv4_hdr) / IPV4_IHL_MULTIPLIER;
+		iph.type_of_service = 0;
+		iph.total_length = 0;	// to fill in
+		iph.packet_id = 0x513;
+		iph.fragment_offset = 0;
+		iph.time_to_live = 64;
+		iph.next_proto_id = IPPROTO_UDP;
+		/* calculated by IPChecksum module in line */
+		iph.hdr_checksum = 0;
+		iph.src_addr = 0;	// to fill in
+		iph.dst_addr = 0;	// to fill in
+	}
+};
+static PacketTemplate outer_ip_template;
+/*----------------------------------------------------------------------------------*/
 int
 GtpuEncap::dp_session_create(struct session_info *entry)
 {
@@ -212,39 +248,26 @@ GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 		char *new_p = static_cast<char *>(p->prepend(sizeof(struct udp_hdr) +
 							     sizeof(struct gtpu_hdr) +
 							     sizeof(struct ipv4_hdr)));
-		/* setting GTPU header */
+		/* setting GTPU pointer */
 		struct gtpu_hdr *gtph = (struct gtpu_hdr *)(new_p + sizeof(struct ipv4_hdr)
 							    + sizeof(struct udp_hdr));
-		gtph->version = GTPU_VERSION;
-		gtph->pt = GTP_PROTOCOL_TYPE_GTP;
-		gtph->spare = 0;
-		gtph->ex = 0;
-		gtph->seq = 0;
-		gtph->pdn = 0;
-		gtph->type = GTP_GPDU;
+
+		/* copying template content */
+		bess::utils::Copy(new_p, &outer_ip_template, sizeof(outer_ip_template));
+
+		/* setting gtpu header */
 		gtph->length = htons(pkt_len);
 		gtph->teid = htonl(data->ul_s1_info.sgw_teid);
 
 		/* setting outer UDP header */
 		struct udp_hdr *udph = (struct udp_hdr *)(new_p + sizeof(struct ipv4_hdr));
-		udph->src_port = htons(UDP_PORT_GTPU);
-		udph->dst_port = htons(UDP_PORT_GTPU);
 		udph->dgram_len = htons(pkt_len + sizeof(struct gtpu_hdr) +
 					sizeof(struct udp_hdr));
-		/* calculated by L4Checksum module in line */
-		udph->dgram_cksum = 0;
 
 		/* setting outer IP header */
 		iph = (struct ipv4_hdr *)(new_p);
-		iph->version_ihl = IPVERSION << 4 | sizeof(struct ipv4_hdr) / IPV4_IHL_MULTIPLIER;
-		iph->type_of_service = 0;
 		iph->total_length = htons(pkt_len + sizeof(struct gtpu_hdr) +
 					  sizeof(struct udp_hdr) + sizeof(struct ipv4_hdr));
-		iph->packet_id = 0x513;
-		iph->fragment_offset = 0;
-		iph->time_to_live = 64;
-		iph->next_proto_id = IPPROTO_UDP;
-		iph->hdr_checksum = 0;
 		iph->src_addr = htonl(data->ul_s1_info.sgw_addr.u.ipv4_addr);
 		iph->dst_addr = htonl(data->ul_s1_info.enb_addr.u.ipv4_addr);
 	}
