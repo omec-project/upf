@@ -43,52 +43,63 @@ bess.add_worker(wid=0, core=int(get_process_affinity()[0]))
 # ====================================================
 
 
-def setup_port(ifname, idx):
-    peer = peer_by_interface(ifname)
+def setup_port(ifname, idx, mode):
     print('Setting up port {}'.format(ifname))
+    if mode == 'afpkt':
+        # Initialize PMDPort
+        vdev = "net_af_packet{},iface={}".format(idx, ifname)
+        intf_fastp = PMDPort(name="{}_fastp".format(ifname), vdev=vdev)
+    elif mode == 'dpdk':
+        peer = peer_by_interface(ifname)
+        # Initialize PMDPort for kernel and DPDK
+        vdev = "net_af_packet{},iface={}".format(idx, peer)
+        # Initialize port in/out module for kernel and DPDK
+        intf_slowp = PMDPort(name="{}_slowp".format(ifname), vdev=vdev)
+        intf_fastp = PMDPort(name="{}_fastp".format(ifname), port_id=idx)
+        intf_slowp_pi = __bess_module__("{}_slowp_pi".format(ifname), 'PortInc', port=intf_slowp.name)
+        intf_slowp_po = __bess_module__("{}_slowp_po".format(ifname), 'PortOut', port=intf_slowp.name)
+    else:
+        raise Exception('Invalid mode selected.')
 
-    # Initialize PMDPort for kernel and DPDK
-    vdev = "net_af_packet{},iface={}".format(idx, peer)
-    intf_kern = PMDPort(name="{}_kern".format(ifname), vdev=vdev)
-    intf_dpdk = PMDPort(name="{}_dpdk".format(ifname), port_id=idx)
-
-    # Initialize port in/out module for kernel and DPDK
-    intf_kern_pi = __bess_module__("{}_kern_pi".format(ifname), 'PortInc', port=intf_kern.name)
-    intf_kern_po = __bess_module__("{}_kern_po".format(ifname), 'PortOut', port=intf_kern.name)
-    intf_dpdk_pi = __bess_module__("{}_dpdk_pi".format(ifname), 'PortInc', port=intf_dpdk.name)
-    intf_dpdk_po = __bess_module__("{}_dpdk_po".format(ifname), 'PortOut', port=intf_dpdk.name)
+    intf_fastp_pi = __bess_module__("{}_fastp_pi".format(ifname), 'PortInc', port=intf_fastp.name)
+    intf_fastp_po = __bess_module__("{}_fastp_po".format(ifname), 'PortOut', port=intf_fastp.name)
 
     # Initialize BPF to classify incoming traffic to go to kernel or pipeline
-    intf_dpdk_bpf = __bess_module__("{}_dpdk_bpf".format(ifname), 'BPF')
+    intf_fastp_bpf = __bess_module__("{}_fastp_bpf".format(ifname), 'BPF')
+    intf_fastp_bpf.clear()
+
+    # Default drop when no matches
+    intf_fastp_pi -> intf_fastp_bpf:0 -> Sink()
+
+    # That's all; if the mode is 'af_packet'
+    if mode == 'afpkt':
+        return
 
     # host_ip_filter: tcpdump -i foo 'dst host 198.19.0.1 or 198.18.0.1' -d
     HostGate = 100
     ips = ips_by_interface(ifname)
     host_ip_filter = {"priority": -HostGate, "filter": "dst host "
                       + " or ".join(str(x) for x in ips), "gate": HostGate}
-    intf_dpdk_bpf.clear()
-    intf_dpdk_bpf.add(filters=[host_ip_filter])
 
-    # Default drop when no matches
-    intf_dpdk_pi -> intf_dpdk_bpf:0 -> Sink()
+    intf_fastp_bpf.add(filters=[host_ip_filter])
 
     # Direct control traffic from DPDK to kernel
-    intf_dpdk_bpf:HostGate -> intf_kern_po
+    intf_fastp_bpf:HostGate -> intf_slowp_po
 
     # Direct control traffic from kernel to DPDK
-    intf_kern_pi -> intf_dpdk_po
+    intf_slowp_pi -> intf_fastp_po
 
     # Limit scheduling slow path RX to 1000 times/second
-    tc = "{}_kern_pi_sched_limit".format(ifname)
+    tc = "{}_slowp_pi_sched_limit".format(ifname)
     bess.add_tc(tc,
                 policy='rate_limit',
                 resource='count',
                 limit={'count': 1000})
-    intf_kern_pi.attach_task(parent=tc)
+    intf_slowp_pi.attach_task(parent=tc)
 
 
-setup_port(s1u_ifname, s1u_port_id)
-setup_port(sgi_ifname, sgi_port_id)
+setup_port(s1u_ifname, s1u_port_id, get_env('mode'))
+setup_port(sgi_ifname, sgi_port_id, get_env('mode'))
 
 # ====================================================
 #       Uplink Pipeline
@@ -113,16 +124,16 @@ check_ue_subnet = " and (udp[28:4] & 0x{}) = 0x{}".format(
 
 uplink_filter = {"priority": -GTPUGate, "filter": check_enb_subnet +
                check_spgwu_ip + check_gtpu_port + check_ue_subnet, "gate": GTPUGate}
-s1u_dpdk_bpf.add(filters=[uplink_filter])
+s1u_fastp_bpf.add(filters=[uplink_filter])
 
-s1u_dpdk_bpf:GTPUGate -> GetPDU_sgi::GenericDecap(bytes=50) \
+s1u_fastp_bpf:GTPUGate -> GetPDU_sgi::GenericDecap(bytes=50) \
     -> sgi_ether_encap::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(sgi_ifname))}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
     -> sgi_routes \
 #    -> sgi_default_route::Update(fields=[{'offset': 0, 'size': 6, 'value': mac2hex(sgi_rtr_mac)}]) \
-#    -> sgi_dpdk_po
+#    -> sgi_fastp_po
 
 # ====================================================
 #       Downlink Pipeline
@@ -136,9 +147,9 @@ s1u_routes::IPLookup()
 UEGate = 1
 ue_filter = {"priority": -UEGate,
              "filter": "ip dst net {} mask {}".format(ue_net, ue_mask), "gate": UEGate}
-sgi_dpdk_bpf.add(filters=[ue_filter])
+sgi_fastp_bpf.add(filters=[ue_filter])
 
-sgi_dpdk_bpf:UEGate \
+sgi_fastp_bpf:UEGate \
     -> GenericDecap(bytes=14) \
     -> gtpu_encap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0])) \
     -> s1u_ether_encap::GenericEncap(fields=[
@@ -149,7 +160,7 @@ sgi_dpdk_bpf:UEGate \
     -> IPChecksum() \
     -> s1u_routes
 #    -> s1u_default_route::Update(fields=[{'offset': 0, 'size': 6, 'value': mac2hex(s1u_rtr_mac)}]) \
-#    -> s1u_dpdk_po
+#    -> s1u_fastp_po
 
 # ====================================================
 #       SIM_TEST

@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 
 # Update as per test environment
+mode="dpdk" #"afpkt"
+orig_ifaces=("eth1" "eth2")
 ifaces=("s1u" "sgi")
+macvlan=("enp24s0f0" "enp24s0f1")
 ipaddrs=(198.18.0.1/30 198.19.0.1/30)
 macaddrs=(3c:fd:fe:b4:41:90 3c:fd:fe:b4:41:91)
 nhipaddrs=(198.18.0.2 198.19.0.2)
@@ -29,9 +32,22 @@ function setup_mirror_links() {
 	done
 }
 
+function rename_ifaces() {
+	for ((i = 0; i < len; i++)); do
+		ip link set ${orig_ifaces[$i]} down
+		ip link set ${orig_ifaces[$i]} name ${ifaces[$i]} up
+	done
+}
+
 (return 2>/dev/null) && echo "Sourced" && return
 
-# Setup slow path to kernel
-setup_mirror_links
+case $mode in
+    # Rename ifaces
+    ("afpkt") rename_ifaces ;;
+    # Setup slow path to kernel
+    ("dpdk") setup_mirror_links ;;
+    (*) echo "mode var not set. Set it to either \"dpdk\" or \"afpkt\"."
+	exit ;;
+esac
 # Setup routes and neighbors for il_trafficgen test
 #setup_trafficgen_routes

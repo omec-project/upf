@@ -101,7 +101,7 @@ def link_route_module(server, gateway_mac, item):
     iprange = item.iprange
     prefix_len = item.prefix_len
     route_module = item.iface + '_routes'
-    last_module = item.iface + '_dpdk_po'
+    last_module = item.iface + '_fastp_po'
     gateway_mac_str = '{:x}'.format(gateway_mac)
     print('Adding route entry {}/{} for {}'.format(iprange, prefix_len,
                                                    route_module))
@@ -219,7 +219,7 @@ def del_route_entry(server, item):
     iprange = item.iprange
     prefix_len = item.prefix_len
     route_module = item.iface + '_routes'
-    last_module = item.iface + '_dpdk_po'
+    last_module = item.iface + '_fastp_po'
 
     neighbor_exists = neighborcache.get(item.neighbor_ip)
     if neighbor_exists:
@@ -336,7 +336,7 @@ def parse_new_route(msg):
         probe_addr(item, ipdb.interfaces[item.iface].address)
 
     else:  # if gateway_mac is set
-        print('Linking module {}_routes with {}_dpdk_po (Dest MAC: {})'.format(
+        print('Linking module {}_routes with {}_fastp_po (Dest MAC: {})'.format(
             item.iface, item.iface, _mac))
 
         link_route_module(bess, gateway_mac, item)
@@ -353,7 +353,7 @@ def parse_new_neighbor(msg):
 
     item = arpcache.get(neighbor_ip)
     if item:
-        print('Linking module {}_routes with {}_dpdk_po (Dest MAC: {})'.format(
+        print('Linking module {}_routes with {}_fastp_po (Dest MAC: {})'.format(
             item.iface, item.iface, gateway_mac))
 
         # Add route entry, and add item in the registered neighbor cache
