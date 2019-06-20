@@ -23,6 +23,7 @@ RUN apt-get update && \
         iproute2 \
 	iputils-ping \
         procps \
+	iptables \
         tcpdump && \
     rm -rf /var/lib/apt/lists/* && \
     pip install --no-cache-dir \

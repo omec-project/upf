@@ -20,7 +20,7 @@ To run BESS daemon with custom NGIC modules' code
 To init the pipeline or reflect changes to `spgwu.bess`
 
 ```bash
-docker exec bess /conf/reload.sh
+docker exec -e mode="dpdk" bess /conf/reload.sh
 docker exec bess bessctl show pipeline > pipeline.txt
 ```
 

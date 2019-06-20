@@ -43,11 +43,16 @@ function rename_ifaces() {
 
 case $mode in
     # Rename ifaces
-    ("afpkt") rename_ifaces ;;
+    ("afpkt") rename_ifaces
+	      # Make sure that kernel does not send back icmp dest unreachable msg(s)
+	      iptables -I OUTPUT -p icmp --icmp-type destination-unreachable -j DROP
+	      ;;
     # Setup slow path to kernel
     ("dpdk") setup_mirror_links ;;
     (*) echo "mode var not set. Set it to either \"dpdk\" or \"afpkt\"."
-	exit ;;
+	exit
+	;;
 esac
+
 # Setup routes and neighbors for il_trafficgen test
 #setup_trafficgen_routes
