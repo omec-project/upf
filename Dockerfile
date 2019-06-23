@@ -37,7 +37,9 @@ RUN apt-get update && \
 # nefelinetworks/bess_build (ubuntu:bionic) and python:2.7-slim (debian:stretch)
 # Should go away one python moves to buster
 RUN echo "deb http://http.us.debian.org/debian testing main non-free contrib" > /etc/apt/sources.list.d/testing.list && \
-    apt-get update && apt-get -t testing -y install libc6
+    apt-get update && \
+    apt-get -t testing -y install --no-install-recommends \
+        libc6
 COPY --from=pip /usr/local/lib/python2.7/site-packages/psutil /usr/local/lib/python2.7/site-packages/psutil
 COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin
