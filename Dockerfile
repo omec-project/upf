@@ -45,5 +45,4 @@ RUN ln -s /opt/bess/bessctl/bessctl /bin
 VOLUME /conf
 ENV PYTHONPATH="/conf:/opt/bess"
 WORKDIR /opt/bess/bessctl
-COPY entrypoint.sh /entrypoint.sh
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["bessd", "-f"]
