@@ -40,7 +40,7 @@ function run_bess_dpdk() {
 docker stop bess bess-routectl bess-web
 docker rm -f bess bess-routectl bess-web
 
-docker build -t krsna1729/spgwu .
+docker build --pull -t krsna1729/spgwu .
 
 case $mode in
     ("dpdk") echo "Running bessd with dpdk"
