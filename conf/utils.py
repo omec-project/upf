@@ -1,4 +1,5 @@
 import os
+import signal
 import socket
 import sys
 
@@ -11,6 +12,18 @@ from pyroute2 import IPDB
 def exit(code, msg):
     print(msg)
     sys.exit(code)
+
+
+def getpid(process_name):
+    for proc in psutil.process_iter(attrs=['pid', 'name']):
+        if process_name == proc.info['name']:
+            return proc.info['pid']
+
+
+def getpythonpid(process_name):
+    for proc in psutil.process_iter(attrs=['pid', 'cmdline']):
+        if process_name in proc.info['cmdline'][1] and 'python' in proc.info['cmdline'][0]:
+            return proc.info['pid']
 
 
 def get_json_conf(path, dump):
