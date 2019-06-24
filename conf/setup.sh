@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Update as per test environment
-mode="dpdk" #"afpkt"
+mode="dpdk" #"af_packet"
 orig_ifaces=("eth1" "eth2")
 ifaces=("s1u" "sgi")
 macvlan=("enp24s0f0" "enp24s0f1")
@@ -43,13 +43,13 @@ function rename_ifaces() {
 
 case $mode in
     # Rename ifaces
-    ("afpkt") rename_ifaces
+    ("af_packet") rename_ifaces
 	      # Make sure that kernel does not send back icmp dest unreachable msg(s)
 	      iptables -I OUTPUT -p icmp --icmp-type destination-unreachable -j DROP
 	      ;;
     # Setup slow path to kernel
     ("dpdk") setup_mirror_links ;;
-    (*) echo "mode var not set. Set it to either \"dpdk\" or \"afpkt\"."
+    (*) echo "mode var not set. Set it to either \"dpdk\" or \"af_packet\"."
 	exit
 	;;
 esac

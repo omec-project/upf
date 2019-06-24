@@ -7,7 +7,7 @@ To follow instructions, you need
 * Docker CE >= 17.06
 * Update the `--devices` line in [`docker_setup.sh`](docker_setup.sh) with device files of 2 DPDK bound devices
 * Hugepages mounted at `/dev/hugepages` or updated location in [`docker_setup.sh`](docker_setup.sh)
-* Update `conf/setup.sh` and `conf/spgwu.bess` to run iltrafficgen tests
+* Update [`conf/setup.sh`](conf/setup.sh) and [`conf/spgwu.bess`](conf/spgwu.bess) to run iltrafficgen tests
 
 ## Init
 
@@ -17,10 +17,11 @@ To run BESS daemon with custom NGIC modules' code
 ./docker_setup.sh
 ```
 
-To init the pipeline or reflect changes to `spgwu.bess`
+To init the pipeline or reflect changes to [`conf/spgwu.bess`](conf/spgwu.bess)
+or [`conf/spgwu.json`](conf/spgwu.json)
 
 ```bash
-docker exec -e mode="dpdk" bess /conf/reload.sh
+docker exec bess /conf/reload.sh
 docker exec bess bessctl show pipeline > pipeline.txt
 ```
 

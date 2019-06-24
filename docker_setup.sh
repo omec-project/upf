@@ -14,7 +14,7 @@ function setup_docker_net() {
 	done
 }
 
-function run_bess_afpkt() {
+function run_bess_af_packet() {
 	docker create --name bess -t --restart unless-stopped \
 		--cap-add NET_ADMIN \
 		--cpuset-cpus=12-13 \
@@ -27,7 +27,7 @@ function run_bess_afpkt() {
 }
 
 function run_bess_dpdk() {
-	docker run --env mode --name bess -td --restart unless-stopped \
+	docker run --name bess -td --restart unless-stopped \
 		--cap-add NET_ADMIN \
 		--cpuset-cpus=12-13 \
 		--device=/dev/vfio/48 --device=/dev/vfio/82 --device=/dev/vfio/vfio \
@@ -45,8 +45,8 @@ docker build --pull -t krsna1729/spgwu .
 case $mode in
     ("dpdk") echo "Running bessd with dpdk"
 	     run_bess_dpdk ;;
-    ("afpkt") echo "Running bessd with af_packet"
-	      run_bess_afpkt ;;
+    ("af_packet") echo "Running bessd with af_packet"
+	      run_bess_af_packet ;;
     (*) echo "Control can never come here"
 	exit ;;
 esac
@@ -54,13 +54,13 @@ esac
 docker exec bess /conf/setup.sh
 docker logs bess
 
-docker run --env mode --name bess-routectl -td --restart unless-stopped \
+docker run --name bess-routectl -td --restart unless-stopped \
 	-v "$PWD/conf":/conf \
 	--net container:bess --pid container:bess \
 	--entrypoint /conf/route_control.py \
 	krsna1729/spgwu -i "${ifaces[@]}"
 
-docker run --env mode --name bess-web -d --restart unless-stopped \
+docker run --name bess-web -d --restart unless-stopped \
 	--net container:bess \
 	--entrypoint bessctl \
 	krsna1729/spgwu http 0.0.0.0 $gui_port
