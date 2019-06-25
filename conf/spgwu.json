@@ -3,15 +3,9 @@
     "enb_cidr": "11.1.1.0/24",
     "mode": "dpdk",
     "s1u": {
-        "ifname": "s1u",
-        "dpdk": {
-            "portid": "0"
-        }
+        "ifname": "s1u"
     },
     "sgi": {
-        "ifname": "sgi",
-        "dpdk": {
-            "portid": "1"
-        }
+        "ifname": "sgi"
     }
 }
