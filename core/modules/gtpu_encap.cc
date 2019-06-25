@@ -17,6 +17,8 @@
 /* for ToIpv4Address() */
 #include "utils/ip.h"
 /*----------------------------------------------------------------------------------*/
+enum {DEFAULT_GATE = 0, FORWARD_GATE};
+/*----------------------------------------------------------------------------------*/
 const Commands GtpuEncap::cmds = {
 	{"add", "GtpuEncapAddSessionRecordArg",
 	 MODULE_CMD_FUNC(&GtpuEncap::AddSessionRecord),
@@ -239,8 +241,7 @@ GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 			DLOG(INFO) << "Could not find teid for IP address: "
 				   << ToIpv4Address(be32_t(daddr))
 				   << std::endl;
-			/* XXX - TODO: Open up a new gate and redirect bad traffic to Sink */
-			DropPacket(ctx, p);
+			EmitPacket(ctx, p, DEFAULT_GATE);
 			continue;
 		}
 
@@ -270,10 +271,8 @@ GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 					  sizeof(struct udp_hdr) + sizeof(struct ipv4_hdr));
 		iph->src_addr = htonl(data->ul_s1_info.sgw_addr.u.ipv4_addr);
 		iph->dst_addr = htonl(data->ul_s1_info.enb_addr.u.ipv4_addr);
+		EmitPacket(ctx, p, FORWARD_GATE);
 	}
-
-	/* run next module in line */
-	RunNextModule(ctx, batch);
 }
 /*----------------------------------------------------------------------------------*/
 /**

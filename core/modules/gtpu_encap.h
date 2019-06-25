@@ -144,7 +144,8 @@ class GtpuEncap final : public Module {
 		max_allowed_workers_ = Worker::kMaxWorkers;
 	}
 	
-	//static const gate_idx_t kNumOGates = 0;
+	/* Gates: (0) Default, (1) Forward */
+	static const gate_idx_t kNumOGates = 2;
 	static const Commands cmds;
 
 	CommandResponse Init(const bess::pb::GtpuEncapArg &arg);
