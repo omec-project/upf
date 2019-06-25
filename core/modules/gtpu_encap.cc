@@ -287,7 +287,14 @@ GtpuEncap::Init(const bess::pb::GtpuEncapArg &arg) {
 	if (s1u_sgw_ip == 0)
 		return CommandFailure(EINVAL,
 				      "Invalid S1U SGW IP address!");
-	      
+
+	InitNumSubs = arg.num_subscribers();
+	if (InitNumSubs == 0)
+		return CommandFailure(EINVAL,
+				      "Invalid number of subscribers!");
+
+	session_map = bess::utils::CuckooMap<uint64_t, uint64_t>(InitNumBucket, InitNumSubs);
+
 	return CommandSuccess();
 }
 /*----------------------------------------------------------------------------------*/

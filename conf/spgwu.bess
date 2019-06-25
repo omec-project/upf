@@ -185,6 +185,9 @@ s1u_fastp_bpf:GTPUGate -> GetPDU_sgi::GenericDecap(bytes=50) \
 # ====================================================
 
 
+# Maximum number of sessions to manage
+max_sessions = conf["max_sessions"]
+
 # TODO: Handle routes for directly connected vs. via next hop differently
 s1u_routes::IPLookup()
 
@@ -196,7 +199,7 @@ sgi_fastp_bpf.add(filters=[ue_filter])
 
 sgi_fastp_bpf:UEGate \
     -> GenericDecap(bytes=14) \
-    -> gtpu_encap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0])):1 \
+    -> gtpu_encap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0]), num_subscribers=max_sessions):1 \
     -> s1u_ether_encap::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(s1u_ifname))}},
@@ -218,7 +221,6 @@ def sim_start_test():
     start_teid = 0xf0000000
     start_ue_ip = 0x10000001
     start_enb_ip = 0x0b010181
-    max_sessions = 50000
     NG4T_MAX_UE_RAN = 500000
     NG4T_MAX_ENB_RAN = 80
 
@@ -236,7 +238,6 @@ def sim_start_test():
 
 def sim_end_test():
     start_ue_ip = 0x10000001
-    max_sessions = 50000
 
     for i in range(max_sessions):
         gtpu_encap.remove(ueaddr=start_ue_ip+i)
@@ -251,5 +252,7 @@ def sim_end_test():
 #sim_end_test()
 
 # Finally send SIGHUP to route_control daemon on reload
+# TODO: behavior is unspecified if route_control.py pid is not found
 route_control_pid = getpythonpid('route_control.py')
-os.kill(route_control_pid, signal.SIGHUP)
+if route_control_pid:
+    os.kill(route_control_pid, signal.SIGHUP)

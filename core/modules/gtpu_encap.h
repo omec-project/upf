@@ -6,7 +6,6 @@
 #include "../pb/module_msg.pb.h"
 #include "utils/cuckoo_map.h"
 /*----------------------------------------------------------------------------------*/
-/* TODO - XXX: Cleanup macros. Get them from bess python file */
 #define IPV6_ADDR_LEN			16
 #define MAX_DNS_SPON_ID_LEN		16
 
@@ -140,7 +139,7 @@ typedef struct gtpu_hdr {
 /*----------------------------------------------------------------------------------*/
 class GtpuEncap final : public Module {
  public:
-	GtpuEncap() : session_map(InitNumBucket, InitNumSubs) {
+	GtpuEncap() {
 		max_allowed_workers_ = Worker::kMaxWorkers;
 	}
 	
@@ -164,9 +163,8 @@ class GtpuEncap final : public Module {
 	static const int InitNumBucket = 4;
 	/**
 	 * Number of possible subscribers
-	 * TODO - XXX: Pass InitNumSubs as a config option in Init() function
 	 */
-	static const int InitNumSubs = 100000;
+	int InitNumSubs;
 };
 /*----------------------------------------------------------------------------------*/
 #endif  // BESS_MODULES_GTPUENCAP_H_
