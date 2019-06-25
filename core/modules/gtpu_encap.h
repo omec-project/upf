@@ -40,9 +40,6 @@
 #define UE_ADDR(x)			(x & 0xffffffff)
 /*----------------------------------------------------------------------------------*/
 /**
- * XXX - TODO: Clean up struct declarations. Remove redundant fields
- */
-/**
  * Select IPv4 or IPv6
  */
 enum iptype {

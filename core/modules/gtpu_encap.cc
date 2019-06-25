@@ -209,9 +209,6 @@ GtpuEncap::ShowRecords(const bess::pb::EmptyArg &)
 	return CommandSuccess();
 }
 /*----------------------------------------------------------------------------------*/
-/**
- * XXX - TODO: Use Bess-based pkt classes instead of rte-based structs
- */
 void
 GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 {
@@ -274,10 +271,6 @@ GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 		EmitPacket(ctx, p, FORWARD_GATE);
 	}
 }
-/*----------------------------------------------------------------------------------*/
-/**
- * XXX - TODO: Write a deinit function that cleans up all dynamically created units
- */
 /*----------------------------------------------------------------------------------*/
 CommandResponse
 GtpuEncap::Init(const bess::pb::GtpuEncapArg &arg) {

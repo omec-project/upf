@@ -65,7 +65,7 @@ def fetch_mac(dip):
                 return _mac
 
 
-def link_modules(server, module, next_module):
+def link_modules(server, module, next_module, ogate = 0, igate = 0):
     print('Linking {} module'.format(next_module))
 
     # Pause bess first
@@ -73,7 +73,7 @@ def link_modules(server, module, next_module):
     # Connect module to next_module
     for _ in range(MAX_RETRIES):
         try:
-            server.connect_modules(module, next_module)
+            server.connect_modules(module, next_module, ogate, igate)
         except BESS.Error as e:
             bess.resume_all()
             if e.code == errno.EBUSY:
@@ -82,19 +82,19 @@ def link_modules(server, module, next_module):
                 return  #raise
         except Exception as e:
             print(
-                'Error connecting module {} with {}: {}. Retrying in {} secs...'
-                .format(module, next_module, e, SLEEP_S))
+                'Error connecting module {}:{}->{}:{}: {}. Retrying in {} secs...'
+                .format(module, ogate, igate, next_module, e, SLEEP_S))
             time.sleep(SLEEP_S)
         else:
             bess.resume_all()
             break
     else:
         bess.resume_all()
-        print('BESS module connection ({}, {}) failure.'.format(
-            module, next_module))
+        print('BESS module connection ({}:{}->{}:{}) failure.'.format(
+            module, ogate, igate, next_module))
         return
-        #raise Exception('BESS module connection ({}, {}) failure.'.
-        #                format(module, next_module))
+        #raise Exception('BESS module connection ({}:{}->{}:{}) failure.'.
+        #                format(module, ogate, igate, next_module))
 
 
 def link_route_module(server, gateway_mac, item):
@@ -189,10 +189,10 @@ def link_route_module(server, gateway_mac, item):
         print('Update module created')
 
         # Connect Update module to route module
-        link_modules(server, route_module, update_module)
+        link_modules(server, route_module, update_module, gate_idx, 0)
 
         # Connect Update module to dpdk_out module
-        link_modules(server, update_module, last_module)
+        link_modules(server, update_module, last_module, 0, 0)
 
         # Add a new neighbor in neighbor cache
         neighborcache[item.neighbor_ip] = item
