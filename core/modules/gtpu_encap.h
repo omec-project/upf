@@ -145,6 +145,7 @@ class GtpuEncap final : public Module {
 	static const Commands cmds;
 
 	CommandResponse Init(const bess::pb::GtpuEncapArg &arg);
+	void DeInit() override;
 	CommandResponse AddSessionRecord(const bess::pb::GtpuEncapAddSessionRecordArg &arg);
 	CommandResponse RemoveSessionRecord(const bess::pb::GtpuEncapRemoveSessionRecordArg &arg);
 	CommandResponse ShowRecords(const bess::pb::EmptyArg &);

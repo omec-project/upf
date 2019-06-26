@@ -272,6 +272,25 @@ GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 	}
 }
 /*----------------------------------------------------------------------------------*/
+void
+GtpuEncap::DeInit()
+{
+	using bess::utils::be32_t;
+	using bess::utils::ToIpv4Address;
+
+	for (auto it = session_map.begin(); it != session_map.end(); it++) {
+		uint64_t key = it->first;
+		struct session_info *data = (struct session_info *)it->second;
+		if (data != NULL)
+			rte_free(data);
+		if (session_map.Remove(key) == false) {
+			uint32_t ip = UE_ADDR(key);
+			std::cerr << "Failed to remove record with UE address: "
+				  << ToIpv4Address(be32_t(ip)) << std::endl;
+		}
+	}
+}
+/*----------------------------------------------------------------------------------*/
 CommandResponse
 GtpuEncap::Init(const bess::pb::GtpuEncapArg &arg) {
 
