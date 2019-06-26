@@ -29,13 +29,6 @@ for cidr in cidrs:
     if validate_cidr(cidr) is False:
         exit(1, 'Invalid {}'.format(cidr))
 
-# Fast-path mode
-supported_modes = ["dpdk", "af_packet"]
-mode = conf["mode"]
-
-if mode not in supported_modes:
-    exit(1, "unsupported mode {} chosen".format(mode))
-
 
 # ====================================================
 #       Core Setup
@@ -67,6 +60,19 @@ def scan_ports():
             else:
                 raise
         idx += 1
+    return True if ports else False
+
+
+def detect_mode(ifname):
+    # default case
+    mode = "unselected"
+
+    try:
+        peer_by_interface(ifname)
+        mode = "dpdk"
+    except:
+        mode = "af_packet"
+    return mode
 
 
 def init_fastpath(ifname, **kwargs):
@@ -84,8 +90,9 @@ def init_fastpath(ifname, **kwargs):
     return intf_fastp_pi, intf_fastp_po, intf_fastp_bpf
 
 
-def setup_port(ifname, idx, mode):
+def setup_port(ifname, idx):
     print('Setting up port {}'.format(ifname))
+    mode = detect_mode(ifname)
 
     if mode == 'af_packet':
         # Initialize kernel fastpath
@@ -93,6 +100,10 @@ def setup_port(ifname, idx, mode):
         intf_fastp_pi, intf_fastp_po, intf_fastp_bpf = init_fastpath(ifname, **kwargs)
 
     elif mode == 'dpdk':
+        # if port list is empty, scan for ports first
+        if not ports and scan_ports() == False:
+            print('Registered ports do not exist.')
+            sys.exit()
         # Initialize DPDK fastpath
         intf_fastp_idx = ports.get(mac_by_interface(ifname))
         if intf_fastp_idx is None:
@@ -101,47 +112,47 @@ def setup_port(ifname, idx, mode):
         intf_fastp_pi, intf_fastp_po, intf_fastp_bpf = init_fastpath(ifname, **kwargs)
 
         # Initialize kernel slowpath port and RX/TX modules
-        peer = peer_by_interface(ifname)
-        vdev = "net_af_packet{},iface={}".format(idx, peer)
-        intf_slowp = PMDPort(name="{}_slowp".format(ifname), vdev=vdev)
-        intf_slowp_pi = __bess_module__("{}_slowp_pi".format(ifname), 'PortInc', port=intf_slowp.name)
-        intf_slowp_po = __bess_module__("{}_slowp_po".format(ifname), 'PortOut', port=intf_slowp.name)
+        try:
+            peer = peer_by_interface(ifname)
+            vdev = "net_af_packet{},iface={}".format(idx, peer)
+            intf_slowp = PMDPort(name="{}_slowp".format(ifname), vdev=vdev)
+            intf_slowp_pi = __bess_module__("{}_slowp_pi".format(ifname), 'PortInc', port=intf_slowp.name)
+            intf_slowp_po = __bess_module__("{}_slowp_po".format(ifname), 'PortOut', port=intf_slowp.name)
 
-        # host_ip_filter: tcpdump -i foo 'dst host 198.19.0.1 or 198.18.0.1' -d
-        HostGate = MAX_GATES - 1
-        ips = ips_by_interface(ifname)
-        host_ip_filter = {"priority": -HostGate, "filter": "dst host "
-                        + " or ".join(str(x) for x in ips), "gate": HostGate}
+            # host_ip_filter: tcpdump -i foo 'dst host 198.19.0.1 or 198.18.0.1' -d
+            HostGate = MAX_GATES - 1
+            ips = ips_by_interface(ifname)
+            host_ip_filter = {"priority": -HostGate, "filter": "dst host "
+                              + " or ".join(str(x) for x in ips), "gate": HostGate}
 
-        intf_fastp_bpf.add(filters=[host_ip_filter])
+            intf_fastp_bpf.add(filters=[host_ip_filter])
 
-        # Direct control traffic from DPDK to kernel
-        intf_fastp_bpf:HostGate -> intf_slowp_po
+            # Direct control traffic from DPDK to kernel
+            intf_fastp_bpf:HostGate -> intf_slowp_po
 
-        # Direct control traffic from kernel to DPDK
-        intf_slowp_pi -> intf_fastp_po
+            # Direct control traffic from kernel to DPDK
+            intf_slowp_pi -> intf_fastp_po
 
-        # Limit scheduling slow path RX to 1000 times/second
-        tc = "{}_slowp_pi_sched_limit".format(ifname)
-        bess.add_tc(tc,
-                    policy='rate_limit',
-                    resource='count',
-                    limit={'count': 1000})
-        intf_slowp_pi.attach_task(parent=tc)
-
+            # Limit scheduling slow path RX to 1000 times/second
+            tc = "{}_slowp_pi_sched_limit".format(ifname)
+            bess.add_tc(tc,
+                        policy='rate_limit',
+                        resource='count',
+                        limit={'count': 1000})
+            intf_slowp_pi.attach_task(parent=tc)
+        except Exception as e:
+            print('Mirror veth interface: {} misconfigured: {}'.format(ifname, e))
     else:
         raise Exception('Invalid mode selected.')
 
 
 interfaces = ["s1u", "sgi"]
 done = []
-if mode == 'dpdk':
-    scan_ports()
 for idx, interface in enumerate(interfaces):
     ifname = conf[interface]["ifname"]
     if ifname in done:
         continue
-    setup_port(ifname, idx, mode)
+    setup_port(ifname, idx)
     done.append(ifname)
 
 # ====================================================

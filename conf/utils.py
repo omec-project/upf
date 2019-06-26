@@ -64,7 +64,7 @@ def peer_by_interface(name):
         peer_idx = ipdb.interfaces[name]['link']
         peer_name = ipdb.interfaces[peer_idx]['ifname']
     except:
-        exit(2, 'veth interface {} does not exist'.format(name))
+        raise Exception('veth interface {} does not exist'.format(name))
     else:
         return peer_name
 
