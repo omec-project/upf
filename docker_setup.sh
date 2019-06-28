@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -e
 gui_port=8000
 
 source conf/setup.sh
@@ -30,15 +31,15 @@ function run_bess_dpdk() {
 	docker run --name bess -td --restart unless-stopped \
 		--cap-add NET_ADMIN \
 		--cpuset-cpus=12-13 \
-		--device=/dev/vfio/48 --device=/dev/vfio/82 --device=/dev/vfio/vfio \
+		--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio \
 		--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
 		-v "$PWD/conf":/conf \
 		-p $gui_port:$gui_port \
 		krsna1729/spgwu
 }
 
-docker stop bess bess-routectl bess-web
-docker rm -f bess bess-routectl bess-web
+docker stop bess bess-routectl bess-web || true
+docker rm -f bess bess-routectl bess-web || true
 
 docker build --pull -t krsna1729/spgwu .
 
