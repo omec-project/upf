@@ -1,12 +1,63 @@
 # Multi-stage Dockerfile
 # Stage bess-build: builds bess with its dependencies
 FROM nefelinetworks/bess_build AS bess-build
+RUN apt-get update \
+    && apt-get -y install --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        libelf-dev \
+        libnuma-dev \
+        pkg-config \
+        unzip \
+        wget
+# libbpf
+#ARG LIBBPF_COMMIT=master
+#RUN wget -qO libbpf.zip https://github.com/libbpf/libbpf/archive/${LIBBPF_COMMIT}.zip && unzip libbpf.zip
+#RUN cd libbpf-${LIBBPF_COMMIT}/src \
+#    && BUILD_STATIC_ONLY=y make install \
+#    && cp ../include/uapi/linux/if_xdp.h /usr/include/linux
+ARG LINUX_VER=5.1.15
+RUN wget -qO linux.tar.xz https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-${LINUX_VER}.tar.xz
+RUN mkdir linux \
+    && tar -xf linux.tar.xz -C linux --strip-components 1 \
+    && cp linux/include/uapi/linux/if_xdp.h /usr/include/linux \
+    && cd linux/tools/lib/bpf/ \
+    && make install_lib \
+    && make install_headers \
+    && ldconfig
+
+# dpdk
+ENV DPDK_VER=19.05
+ENV DPDK_DIR="/dpdk"
+ENV RTE_TARGET='x86_64-native-linuxapp-gcc'
+RUN wget -qO dpdk.tar.xz https://fast.dpdk.org/rel/dpdk-${DPDK_VER}.tar.xz
+RUN mkdir -p ${DPDK_DIR} \
+    && tar -xf dpdk.tar.xz -C ${DPDK_DIR} --strip-components 1 \
+    && cd ${DPDK_DIR} \
+    && sed -ri 's,(IGB_UIO=).*,\1n,' config/common_linux* \
+    && sed -ri 's,(KNI_KMOD=).*,\1n,' config/common_linux* \
+    && sed -ri 's,(LIBRTE_BPF=).*,\1n,' config/common_base \
+    && sed -ri 's,(AF_XDP=).*,\1y,' config/common_base \
+    && make config T=x86_64-native-linuxapp-gcc \
+    && make -j $CPUS EXTRA_CFLAGS="-g -w -fPIC"
+
+# Workaround for compiler error on including in bess
+WORKDIR ${DPDK_DIR}
+COPY 0001-void-pointer-to-rte_pci_device-pointer-cast.patch .
+RUN patch -p1 < 0001-void-pointer-to-rte_pci_device-pointer-cast.patch \
+    && make -j $CPUS EXTRA_CFLAGS="-g -w -fPIC"
+
+WORKDIR /
 ARG BESS_COMMIT=master
 RUN apt-get update && apt-get install -y wget unzip ca-certificates git
 RUN wget -qO bess.zip https://github.com/NetSys/bess/archive/${BESS_COMMIT}.zip && unzip bess.zip
 WORKDIR bess-${BESS_COMMIT}
 COPY core/modules/ core/modules/
 COPY protobuf/ protobuf/
+RUN cp -a ${DPDK_DIR} deps/dpdk-17.11
+COPY 0001-DPDK-19.05.patch 0001-include-libbpf.patch ./
+RUN patch -p1 < 0001-DPDK-19.05.patch
+RUN patch -p1 < 0001-include-libbpf.patch
 RUN ./build.py bess && cp bin/bessd /bin
 RUN mkdir -p /opt/bess && cp -r bessctl pybess /opt/bess
 

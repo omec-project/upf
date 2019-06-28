@@ -1,0 +1,26 @@
+From bdb47bac27e3d6f682e73aab2faa2537224ec7e7 Mon Sep 17 00:00:00 2001
+From: Saikrishna Edupuganti <saikrishna.edupuganti@intel.com>
+Date: Fri, 28 Jun 2019 03:36:20 +0000
+Subject: [PATCH] void pointer to rte_pci_device pointer cast
+
+Signed-off-by: Saikrishna Edupuganti <saikrishna.edupuganti@intel.com>
+---
+ lib/librte_ethdev/rte_ethdev_pci.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/lib/librte_ethdev/rte_ethdev_pci.h b/lib/librte_ethdev/rte_ethdev_pci.h
+index 23257e986..a32531184 100644
+--- a/lib/librte_ethdev/rte_ethdev_pci.h
++++ b/lib/librte_ethdev/rte_ethdev_pci.h
+@@ -72,7 +72,7 @@ rte_eth_copy_pci_info(struct rte_eth_dev *eth_dev,
+ 
+ static inline int
+ eth_dev_pci_specific_init(struct rte_eth_dev *eth_dev, void *bus_device) {
+-	struct rte_pci_device *pci_dev = bus_device;
++	struct rte_pci_device *pci_dev = (struct rte_pci_device *)bus_device;
+ 
+ 	if (!pci_dev)
+ 		return -ENODEV;
+-- 
+2.17.1
+

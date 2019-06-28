@@ -17,7 +17,7 @@ function setup_docker_net() {
 
 function run_bess_af_packet() {
 	docker create --name bess -t --restart unless-stopped \
-		--cap-add NET_ADMIN \
+		--cap-add NET_ADMIN --privileged \
 		--cpuset-cpus=12-13 \
 		--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
 		-v "$PWD/conf":/conf \
@@ -29,7 +29,7 @@ function run_bess_af_packet() {
 
 function run_bess_dpdk() {
 	docker run --name bess -td --restart unless-stopped \
-		--cap-add NET_ADMIN \
+		--cap-add NET_ADMIN --privileged \
 		--cpuset-cpus=12-13 \
 		--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio \
 		--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
