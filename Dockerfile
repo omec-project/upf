@@ -41,10 +41,10 @@ RUN mkdir -p ${DPDK_DIR} \
     && make config T=x86_64-native-linuxapp-gcc \
     && make -j $CPUS EXTRA_CFLAGS="-g -w -fPIC"
 
-# Workaround for compiler error on including in bess
+# Workaround for compiler error on including DPDK in bess
 WORKDIR ${DPDK_DIR}
-COPY 0001-void-pointer-to-rte_pci_device-pointer-cast.patch .
-RUN patch -p1 < 0001-void-pointer-to-rte_pci_device-pointer-cast.patch \
+COPY patches/dpdk patches
+RUN cat patches/* | patch -p1 \
     && make -j $CPUS EXTRA_CFLAGS="-g -w -fPIC"
 
 WORKDIR /
@@ -55,9 +55,8 @@ WORKDIR bess-${BESS_COMMIT}
 COPY core/modules/ core/modules/
 COPY protobuf/ protobuf/
 RUN cp -a ${DPDK_DIR} deps/dpdk-17.11
-COPY 0001-DPDK-19.05.patch 0001-include-libbpf.patch ./
-RUN patch -p1 < 0001-DPDK-19.05.patch
-RUN patch -p1 < 0001-include-libbpf.patch
+COPY patches/bess patches
+RUN cat patches/* | patch -p1
 RUN ./build.py bess && cp bin/bessd /bin
 RUN mkdir -p /opt/bess && cp -r bessctl pybess /opt/bess
 
