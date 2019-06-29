@@ -75,7 +75,7 @@ def detect_mode(ifname):
     return mode
 
 
-def init_fastpath(ifname, **kwargs):
+def init_fastpath(ifname, tc, **kwargs):
     # Initialize PMDPort and RX/TX modules
     intf_fastp = PMDPort(name="{}_fastp".format(ifname), **kwargs)
     intf_fastp_pi = __bess_module__("{}_fastp_pi".format(ifname), 'PortInc', port=intf_fastp.name)
@@ -87,17 +87,21 @@ def init_fastpath(ifname, **kwargs):
 
     # Default drop when no matches
     intf_fastp_pi -> intf_fastp_bpf:0 -> Sink()
+
+    # Attach fastpath to fast TC
+    intf_fastp_pi.attach_task(tc)
+
     return intf_fastp_pi, intf_fastp_po, intf_fastp_bpf
 
 
-def setup_port(ifname, idx):
+def setup_port(ifname, idx, fastTC, slowTC):
     print('Setting up port {}'.format(ifname))
     mode = detect_mode(ifname)
 
     if mode == 'af_packet':
         # Initialize kernel fastpath
         kwargs = {"vdev" : "net_af_packet{},iface={}".format(idx, ifname)}
-        intf_fastp_pi, intf_fastp_po, intf_fastp_bpf = init_fastpath(ifname, **kwargs)
+        intf_fastp_pi, intf_fastp_po, intf_fastp_bpf = init_fastpath(ifname, fastTC, **kwargs)
 
     elif mode == 'dpdk':
         # if port list is empty, scan for ports first
@@ -109,7 +113,7 @@ def setup_port(ifname, idx):
         if intf_fastp_idx is None:
             raise Exception('Registered port for {} not detected!'.format(ifname))
         kwargs = {"port_id" : intf_fastp_idx}
-        intf_fastp_pi, intf_fastp_po, intf_fastp_bpf = init_fastpath(ifname, **kwargs)
+        intf_fastp_pi, intf_fastp_po, intf_fastp_bpf = init_fastpath(ifname, fastTC, **kwargs)
 
         # Initialize kernel slowpath port and RX/TX modules
         try:
@@ -118,6 +122,7 @@ def setup_port(ifname, idx):
             intf_slowp = PMDPort(name="{}_slowp".format(ifname), vdev=vdev)
             intf_slowp_pi = __bess_module__("{}_slowp_pi".format(ifname), 'PortInc', port=intf_slowp.name)
             intf_slowp_po = __bess_module__("{}_slowp_po".format(ifname), 'PortOut', port=intf_slowp.name)
+            q_slowp_po = __bess_module__("{}_q_slowp_po".format(ifname), 'Queue')
 
             # host_ip_filter: tcpdump -i foo 'dst host 198.19.0.1 or 198.18.0.1' -d
             HostGate = MAX_GATES - 1
@@ -128,18 +133,19 @@ def setup_port(ifname, idx):
             intf_fastp_bpf.add(filters=[host_ip_filter])
 
             # Direct control traffic from DPDK to kernel
-            intf_fastp_bpf:HostGate -> intf_slowp_po
+            intf_fastp_bpf:HostGate -> q_slowp_po -> intf_slowp_po
 
             # Direct control traffic from kernel to DPDK
             intf_slowp_pi -> intf_fastp_po
 
-            # Limit scheduling slow path RX to 1000 times/second
-            tc = "{}_slowp_pi_sched_limit".format(ifname)
-            bess.add_tc(tc,
+            # Limit scheduling slow path RX/TX to 1000 times/second each
+            for mod in intf_slowp_pi, q_slowp_po:
+                bess.add_tc(mod.name,
+                        parent=slowTC,
                         policy='rate_limit',
                         resource='count',
                         limit={'count': 1000})
-            intf_slowp_pi.attach_task(parent=tc)
+                mod.attach_task(mod.name)
         except Exception as e:
             print('Mirror veth interface: {} misconfigured: {}'.format(ifname, e))
     else:
@@ -148,11 +154,13 @@ def setup_port(ifname, idx):
 
 interfaces = ["s1u", "sgi"]
 done = []
+bess.add_tc('fast', policy='round_robin', wid=0)
+bess.add_tc('slow', policy='round_robin', wid=0)
 for idx, interface in enumerate(interfaces):
     ifname = conf[interface]["ifname"]
     if ifname in done:
         continue
-    setup_port(ifname, idx)
+    setup_port(ifname, idx, 'fast', 'slow')
     done.append(ifname)
 
 # ====================================================
