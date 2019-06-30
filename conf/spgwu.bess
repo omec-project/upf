@@ -6,43 +6,12 @@ import errno
 from utils import *
 
 # ====================================================
-#       Parameters
-# ====================================================
-
-
-conf_file = get_env('CONF_FILE', '/conf/spgwu.json')
-conf = get_json_conf(conf_file, False)
-ports = {}
-
-
-# ====================================================
-#       Validate
-# ====================================================
-
-
-# CIDRs
-enb_cidr = conf["enb_cidr"]
-ue_cidr = conf["ue_cidr"]
-
-cidrs = [enb_cidr, ue_cidr]
-for cidr in cidrs:
-    if validate_cidr(cidr) is False:
-        exit(1, 'Invalid {}'.format(cidr))
-
-
-# ====================================================
-#       Core Setup
-# ====================================================
-
-bess.add_worker(wid=0, core=int(get_process_affinity()[0]))
-
-
-# ====================================================
-#       Port Setup
+#       Port Helpers
 # ====================================================
 
 
 MAX_GATES = 8192
+ports = {}
 
 def scan_ports():
     idx = 0
@@ -77,12 +46,12 @@ def detect_mode(ifname):
 
 def init_fastpath(ifname, tc, **kwargs):
     # Initialize PMDPort and RX/TX modules
-    intf_fastp = PMDPort(name="{}_fastp".format(ifname), **kwargs)
-    intf_fastp_pi = __bess_module__("{}_fastp_pi".format(ifname), 'PortInc', port=intf_fastp.name)
-    intf_fastp_po = __bess_module__("{}_fastp_po".format(ifname), 'PortOut', port=intf_fastp.name)
+    intf_fastp = PMDPort(name="{}Fast".format(ifname), **kwargs)
+    intf_fastp_pi = __bess_module__("{}FastPI".format(ifname), 'PortInc', port=intf_fastp.name)
+    intf_fastp_po = __bess_module__("{}FastPO".format(ifname), 'PortOut', port=intf_fastp.name)
 
     # Initialize BPF to classify incoming traffic to go to kernel and/or pipeline
-    intf_fastp_bpf = __bess_module__("{}_fastp_bpf".format(ifname), 'BPF')
+    intf_fastp_bpf = __bess_module__("{}FastBPF".format(ifname), 'BPF')
     intf_fastp_bpf.clear()
 
     # Default drop when no matches
@@ -119,10 +88,10 @@ def setup_port(ifname, idx, fastTC, slowTC):
         try:
             peer = peer_by_interface(ifname)
             vdev = "net_af_packet{},iface={}".format(idx, peer)
-            intf_slowp = PMDPort(name="{}_slowp".format(ifname), vdev=vdev)
-            intf_slowp_pi = __bess_module__("{}_slowp_pi".format(ifname), 'PortInc', port=intf_slowp.name)
-            intf_slowp_po = __bess_module__("{}_slowp_po".format(ifname), 'PortOut', port=intf_slowp.name)
-            q_slowp_po = __bess_module__("{}_q_slowp_po".format(ifname), 'Queue')
+            intf_slowp = PMDPort(name="{}Slow".format(ifname), vdev=vdev)
+            intf_slowp_pi = __bess_module__("{}SlowPI".format(ifname), 'PortInc', port=intf_slowp.name)
+            intf_slowp_po = __bess_module__("{}SlowPO".format(ifname), 'PortOut', port=intf_slowp.name)
+            q_slowp_po = __bess_module__("{}QSlowPO".format(ifname), 'Queue')
 
             # host_ip_filter: tcpdump -i foo 'dst host 198.19.0.1 or 198.18.0.1' -d
             HostGate = MAX_GATES - 1
@@ -152,6 +121,40 @@ def setup_port(ifname, idx, fastTC, slowTC):
         raise Exception('Invalid mode selected.')
 
 
+# ====================================================
+#       Parameters
+# ====================================================
+
+
+conf_file = get_env('CONF_FILE', '/conf/spgwu.json')
+conf = get_json_conf(conf_file, False)
+
+# ====================================================
+#       Validate
+# ====================================================
+
+
+# CIDRs
+enb_cidr = conf["enb_cidr"]
+ue_cidr = conf["ue_cidr"]
+
+cidrs = [enb_cidr, ue_cidr]
+for cidr in cidrs:
+    if validate_cidr(cidr) is False:
+        exit(1, 'Invalid {}'.format(cidr))
+
+# ====================================================
+#       Core Setup
+# ====================================================
+
+
+bess.add_worker(wid=0, core=int(get_process_affinity()[0]))
+
+# ====================================================
+#       Port Setup
+# ====================================================
+
+
 interfaces = ["s1u", "sgi"]
 done = []
 bess.add_tc('fast', policy='round_robin', wid=0)
@@ -172,9 +175,9 @@ s1u_ifname = conf["s1u"]["ifname"]
 sgi_ifname = conf["sgi"]["ifname"]
 
 # TODO: Handle routes for directly connected vs. via next hop differently
-sgi_routes::IPLookup()
+sgiRoutes::IPLookup()
 # Adding default route
-sgi_routes.add(prefix='0.0.0.0', prefix_len=0, gate=MAX_GATES-1)
+sgiRoutes.add(prefix='0.0.0.0', prefix_len=0, gate=MAX_GATES-1)
 
 # Setting filter to detect gtpu traffic
 # src net 11.1.1.0 mask 255.255.255.0           # check eNB subnet
@@ -191,14 +194,14 @@ check_ue_subnet = " and (udp[28:4] & 0x{}) = 0x{}".format(
 
 uplink_filter = {"priority": -GTPUGate, "filter": check_enb_subnet +
                check_spgwu_ip + check_gtpu_port + check_ue_subnet, "gate": GTPUGate}
-s1u_fastp_bpf.add(filters=[uplink_filter])
+s1uFastBPF.add(filters=[uplink_filter])
 
-s1u_fastp_bpf:GTPUGate -> GetPDU_sgi::GenericDecap(bytes=50) \
-    -> sgi_ether_encap::GenericEncap(fields=[
+s1uFastBPF:GTPUGate -> GTPUDecap::GenericDecap(bytes=50) \
+    -> SGIEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(sgi_ifname))}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
-    -> sgi_routes:(MAX_GATES-1) -> Sink()
+    -> sgiRoutes:(MAX_GATES-1) -> Sink()
 
 
 # ====================================================
@@ -210,29 +213,29 @@ s1u_fastp_bpf:GTPUGate -> GetPDU_sgi::GenericDecap(bytes=50) \
 max_sessions = conf["max_sessions"]
 
 # TODO: Handle routes for directly connected vs. via next hop differently
-s1u_routes::IPLookup()
+s1uRoutes::IPLookup()
 # Adding default route
-s1u_routes.add(prefix='0.0.0.0', prefix_len=0, gate=MAX_GATES-1)
+s1uRoutes.add(prefix='0.0.0.0', prefix_len=0, gate=MAX_GATES-1)
 
 # Setting filter to detect UE subnet
 UEGate = 1
 ue_filter = {"priority": -UEGate,
              "filter": "ip dst net {}".format(ue_cidr), "gate": UEGate}
-sgi_fastp_bpf.add(filters=[ue_filter])
+sgiFastBPF.add(filters=[ue_filter])
 
-sgi_fastp_bpf:UEGate \
-    -> GenericDecap(bytes=14) \
-    -> gtpu_encap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0]), num_subscribers=max_sessions):1 \
-    -> s1u_ether_encap::GenericEncap(fields=[
+sgiFastBPF:UEGate \
+    -> EtherTrim::GenericDecap(bytes=14) \
+    -> GTPUEncap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0]), num_subscribers=max_sessions):1 \
+    -> S1UEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(s1u_ifname))}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
-    -> L4Checksum() \
-    -> IPChecksum() \
-    -> s1u_routes:(MAX_GATES-1) -> Sink()
+    -> OuterUDPCsum::L4Checksum() \
+    -> OuterIPCsum::IPChecksum() \
+    -> s1uRoutes:(MAX_GATES-1) -> Sink()
 
 # Drop unknown packets
-gtpu_encap:0 -> Sink()
+GTPUEncap:0 -> Sink()
 
 # ====================================================
 #       SIM_TEST
@@ -257,15 +260,15 @@ def sim_start_test():
         enb_of_ran = ue_of_ran % NG4T_MAX_ENB_RAN
         enb_idx = ran * NG4T_MAX_ENB_RAN + enb_of_ran
 
-        gtpu_encap.add(teid=start_teid+i, ueaddr=start_ue_ip+i, enodeb_ip=start_enb_ip+enb_idx)
+        GTPUEncap.add(teid=start_teid+i, ueaddr=start_ue_ip+i, enodeb_ip=start_enb_ip+enb_idx)
 
 def sim_end_test():
     start_ue_ip = 0x10000001
 
     for i in range(max_sessions):
-        gtpu_encap.remove(ueaddr=start_ue_ip+i)
+        GTPUEncap.remove(ueaddr=start_ue_ip+i)
 
-    gtpu_encap.show_records()
+    GTPUEncap.show_records()
 
 ### Uncomment the following lines to test with il_trafficgen ###
 # Start the test
