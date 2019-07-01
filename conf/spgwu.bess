@@ -44,7 +44,7 @@ def detect_mode(ifname):
     return mode
 
 
-def init_fastpath(ifname, tc, **kwargs):
+def init_fastpath(ifname, wid, **kwargs):
     # Initialize PMDPort and RX/TX modules
     intf_fastp = PMDPort(name="{}Fast".format(ifname), **kwargs)
     intf_fastp_pi = __bess_module__("{}FastPI".format(ifname), 'PortInc', port=intf_fastp.name)
@@ -57,20 +57,21 @@ def init_fastpath(ifname, tc, **kwargs):
     # Default drop when no matches
     intf_fastp_pi -> intf_fastp_bpf:0 -> Sink()
 
-    # Attach fastpath to fast TC
-    intf_fastp_pi.attach_task(tc)
+    # Attach fastpath to worker's root TC
+    intf_fastp_pi.attach_task(wid=wid)
 
     return intf_fastp_pi, intf_fastp_po, intf_fastp_bpf
 
 
-def setup_port(ifname, idx, fastTC, slowTC):
-    print('Setting up port {}'.format(ifname))
+def setup_port(ifname, idx, workers):
+    wid = idx % workers
+    print('Setting up port {} on worker {}'.format(ifname,wid))
     mode = detect_mode(ifname)
 
     if mode == 'af_packet':
         # Initialize kernel fastpath
-        kwargs = {"vdev" : "net_af_packet{},iface={}".format(idx, ifname)}
-        intf_fastp_pi, intf_fastp_po, intf_fastp_bpf = init_fastpath(ifname, fastTC, **kwargs)
+        kwargs = {"vdev" : "net_af_packet{},iface={}".format(idx, ifname), "num_out_q": workers}
+        intf_fastp_pi, intf_fastp_po, intf_fastp_bpf = init_fastpath(ifname, wid, **kwargs)
 
     elif mode == 'dpdk':
         # if port list is empty, scan for ports first
@@ -81,8 +82,8 @@ def setup_port(ifname, idx, fastTC, slowTC):
         intf_fastp_idx = ports.get(mac_by_interface(ifname))
         if intf_fastp_idx is None:
             raise Exception('Registered port for {} not detected!'.format(ifname))
-        kwargs = {"port_id" : intf_fastp_idx}
-        intf_fastp_pi, intf_fastp_po, intf_fastp_bpf = init_fastpath(ifname, fastTC, **kwargs)
+        kwargs = {"port_id" : intf_fastp_idx, "num_out_q": workers}
+        intf_fastp_pi, intf_fastp_po, intf_fastp_bpf = init_fastpath(ifname, wid, **kwargs)
 
         # Initialize kernel slowpath port and RX/TX modules
         try:
@@ -107,10 +108,18 @@ def setup_port(ifname, idx, fastTC, slowTC):
             # Direct control traffic from kernel to DPDK
             intf_slowp_pi -> intf_fastp_po
 
+            tc = 'slow{}'.format(wid)
+            try:
+                bess.add_tc(tc, policy='round_robin', wid=wid)
+            except Exception as e:
+                if e.errmsg == "Name '{}' already exists".format(tc):
+                    pass
+                else:
+                    raise e
             # Limit scheduling slow path RX/TX to 1000 times/second each
             for mod in intf_slowp_pi, q_slowp_po:
                 bess.add_tc(mod.name,
-                        parent=slowTC,
+                        parent=tc,
                         policy='rate_limit',
                         resource='count',
                         limit={'count': 1000})
@@ -148,7 +157,11 @@ for cidr in cidrs:
 # ====================================================
 
 
-bess.add_worker(wid=0, core=int(get_process_affinity()[0]))
+# Initialize workers
+workers = conf["workers"]
+cores = get_process_affinity()
+for wid in xrange(workers):
+    bess.add_worker(wid=wid, core=int(cores[wid % len(cores)]))
 
 # ====================================================
 #       Port Setup
@@ -157,13 +170,11 @@ bess.add_worker(wid=0, core=int(get_process_affinity()[0]))
 
 interfaces = ["s1u", "sgi"]
 done = []
-bess.add_tc('fast', policy='round_robin', wid=0)
-bess.add_tc('slow', policy='round_robin', wid=0)
 for idx, interface in enumerate(interfaces):
     ifname = conf[interface]["ifname"]
     if ifname in done:
         continue
-    setup_port(ifname, idx, 'fast', 'slow')
+    setup_port(ifname, idx, workers)
     done.append(ifname)
 
 # ====================================================

@@ -7,5 +7,6 @@
     },
     "sgi": {
         "ifname": "sgi"
-    }
+    },
+    "workers": 1
 }
