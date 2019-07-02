@@ -1,22 +1,22 @@
 /* for gtpu_encap decls */
 #include "gtpu_encap.h"
-/* for rte_eth */
-#include <rte_ether.h>
-/* for rte ipv4 */
-#include <rte_ip.h>
-/* for rte udp */
-#include <rte_udp.h>
 /* for rte_zmalloc() */
 #include <rte_malloc.h>
 /* for IPVERSION */
 #include <netinet/ip.h>
-/* gtpu sim util funcs */
-//#include "gtpu_encap_util.h"
 /* for be32_t */
-#include "../utils/endian.h"
+#include "utils/endian.h"
 /* for ToIpv4Address() */
 #include "utils/ip.h"
+/* for udp header */
+#include "utils/udp.h"
 /*----------------------------------------------------------------------------------*/
+using bess::utils::Ipv4;
+using bess::utils::Udp;
+using bess::utils::be32_t;
+using bess::utils::be16_t;
+using bess::utils::ToIpv4Address;
+
 enum {DEFAULT_GATE = 0, FORWARD_GATE};
 /*----------------------------------------------------------------------------------*/
 const Commands GtpuEncap::cmds = {
@@ -33,8 +33,8 @@ const Commands GtpuEncap::cmds = {
 /*----------------------------------------------------------------------------------*/
 // Template for generating UDP packets without data
 struct[[gnu::packed]] PacketTemplate {
-	struct ipv4_hdr iph;
-	struct udp_hdr udph;
+	Ipv4 iph;
+	Udp udph;
 	struct gtpu_hdr gtph;
 
 	PacketTemplate() {
@@ -45,24 +45,25 @@ struct[[gnu::packed]] PacketTemplate {
 		gtph.seq = 0;
 		gtph.pdn = 0;
 		gtph.type = GTP_GPDU;
-		gtph.length = 0;	// to fill in
-		gtph.teid = 0;		// to fill in
-		udph.src_port = htons(UDP_PORT_GTPU);
-		udph.dst_port = htons(UDP_PORT_GTPU);
-		udph.dgram_len = 0;	// to fill in
+		gtph.length = 0;			// to fill in
+		gtph.teid = 0;				// to fill in
+		udph.src_port = (be16_t)UDP_PORT_GTPU;
+		udph.dst_port = (be16_t)UDP_PORT_GTPU;
+		udph.length = (be16_t)0;		// to fill in
 		/* calculated by L4Checksum module in line */
-		udph.dgram_cksum = 0;
-		iph.version_ihl = IPVERSION << 4 | sizeof(struct ipv4_hdr) / IPV4_IHL_MULTIPLIER;
+		udph.checksum = 0;
+		iph.version = IPVERSION;
+		iph.header_length = (sizeof(Ipv4) >> 2);
 		iph.type_of_service = 0;
-		iph.total_length = 0;	// to fill in
-		iph.packet_id = 0x513;
-		iph.fragment_offset = 0;
-		iph.time_to_live = 64;
-		iph.next_proto_id = IPPROTO_UDP;
+		iph.length = (be16_t)0;			// to fill in
+		iph.id = (be16_t)0x513;
+		iph.fragment_offset = (be16_t)0;
+		iph.ttl = 64;
+		iph.protocol = IPPROTO_UDP;
 		/* calculated by IPChecksum module in line */
-		iph.hdr_checksum = 0;
-		iph.src_addr = 0;	// to fill in
-		iph.dst_addr = 0;	// to fill in
+		iph.checksum = 0;
+		iph.src = (be32_t)0;			// to fill in
+		iph.dst = (be32_t)0;			// to fill in
 	}
 };
 static PacketTemplate outer_ip_template;
@@ -70,9 +71,6 @@ static PacketTemplate outer_ip_template;
 int
 GtpuEncap::dp_session_create(struct session_info *entry)
 {
-	using bess::utils::be32_t;
-	using bess::utils::ToIpv4Address;
-
 	struct session_info *data;
 #if 0
 	struct ue_session_info *ue_data;
@@ -121,9 +119,6 @@ GtpuEncap::dp_session_create(struct session_info *entry)
 CommandResponse
 GtpuEncap::AddSessionRecord(const bess::pb::GtpuEncapAddSessionRecordArg &arg)
 {
-	using bess::utils::be32_t;
-	using bess::utils::ToIpv4Address;
-
 	uint32_t teid = arg.teid();
 	uint32_t ueaddr = arg.ueaddr();
 	uint32_t enodeb_ip = arg.enodeb_ip();
@@ -161,9 +156,6 @@ GtpuEncap::AddSessionRecord(const bess::pb::GtpuEncapAddSessionRecordArg &arg)
 CommandResponse
 GtpuEncap::RemoveSessionRecord(const bess::pb::GtpuEncapRemoveSessionRecordArg &arg)
 {
-	using bess::utils::be32_t;
-	using bess::utils::ToIpv4Address;
-
 	uint32_t ip = arg.ueaddr();
 	uint64_t key;
 
@@ -195,9 +187,6 @@ GtpuEncap::RemoveSessionRecord(const bess::pb::GtpuEncapRemoveSessionRecordArg &
 CommandResponse
 GtpuEncap::ShowRecords(const bess::pb::EmptyArg &)
 {
-	using bess::utils::be32_t;
-	using bess::utils::ToIpv4Address;
-
 	std::cerr << "Showing records now" << std::endl;
 	for (auto it = session_map.begin(); it != session_map.end(); it++) {
 		uint64_t key = it->first;
@@ -212,43 +201,40 @@ GtpuEncap::ShowRecords(const bess::pb::EmptyArg &)
 void
 GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 {
-	using bess::utils::be32_t;
-	using bess::utils::ToIpv4Address;
-
 	int cnt = batch->cnt();
 	for (int i = 0; i < cnt; i++) {
 		bess::Packet *p = batch->pkts()[i];
 		/* assuming that this module comes right after EthernetDecap */
 		/* pkt_len can be used as the length of IP datagram */
 		uint16_t pkt_len = p->total_len();
-		struct ipv4_hdr *iph = p->head_data<struct ipv4_hdr *>();
-		uint32_t daddr = iph->dst_addr;
-		uint32_t saddr = iph->src_addr;
-		DLOG(INFO) << "ip->saddr: " << ToIpv4Address(be32_t(saddr))
-			   << ", ip->daddr: " << ToIpv4Address(be32_t(daddr))
+		Ipv4 *iph = p->head_data<Ipv4 *>();
+		be32_t daddr = iph->dst;
+		be32_t saddr = iph->src;
+		DLOG(INFO) << "ip->saddr: " << ToIpv4Address(saddr)
+			   << ", ip->daddr: " << ToIpv4Address(daddr)
 			   << std::endl;
 
 		/* retrieve session info */
-		uint64_t sess_id = SESS_ID(ntohl(daddr), DEFAULT_BEARER);
+		uint64_t sess_id = SESS_ID(daddr.value(), DEFAULT_BEARER);
 		std::pair<uint64_t, uint64_t> *result = session_map.Find(sess_id);
 		struct session_info *data = (result == NULL) ? (struct session_info *)result :
 			(struct session_info *)result->second;
 
 		if (data == NULL) {
 			DLOG(INFO) << "Could not find teid for IP address: "
-				   << ToIpv4Address(be32_t(daddr))
+				   << ToIpv4Address(daddr)
 				   << std::endl;
 			EmitPacket(ctx, p, DEFAULT_GATE);
 			continue;
 		}
 
 		/* pre-allocate space for encaped header(s) */
-		char *new_p = static_cast<char *>(p->prepend(sizeof(struct udp_hdr) +
+		char *new_p = static_cast<char *>(p->prepend(sizeof(Udp) +
 							     sizeof(struct gtpu_hdr) +
-							     sizeof(struct ipv4_hdr)));
+							     sizeof(Ipv4)));
 		/* setting GTPU pointer */
-		struct gtpu_hdr *gtph = (struct gtpu_hdr *)(new_p + sizeof(struct ipv4_hdr)
-							    + sizeof(struct udp_hdr));
+		struct gtpu_hdr *gtph = (struct gtpu_hdr *)(new_p + sizeof(Ipv4) +
+							    sizeof(Udp));
 
 		/* copying template content */
 		bess::utils::Copy(new_p, &outer_ip_template, sizeof(outer_ip_template));
@@ -258,16 +244,16 @@ GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 		gtph->teid = htonl(data->ul_s1_info.sgw_teid);
 
 		/* setting outer UDP header */
-		struct udp_hdr *udph = (struct udp_hdr *)(new_p + sizeof(struct ipv4_hdr));
-		udph->dgram_len = htons(pkt_len + sizeof(struct gtpu_hdr) +
-					sizeof(struct udp_hdr));
+		Udp *udph = (Udp *)(new_p + sizeof(Ipv4));
+		udph->length = (be16_t)(pkt_len + sizeof(struct gtpu_hdr) +
+					sizeof(Udp));
 
 		/* setting outer IP header */
-		iph = (struct ipv4_hdr *)(new_p);
-		iph->total_length = htons(pkt_len + sizeof(struct gtpu_hdr) +
-					  sizeof(struct udp_hdr) + sizeof(struct ipv4_hdr));
-		iph->src_addr = htonl(data->ul_s1_info.sgw_addr.u.ipv4_addr);
-		iph->dst_addr = htonl(data->ul_s1_info.enb_addr.u.ipv4_addr);
+		iph = (Ipv4 *)(new_p);
+		iph->length = (be16_t)(pkt_len + sizeof(struct gtpu_hdr) +
+				       sizeof(Udp) + sizeof(Ipv4));
+		iph->src = (be32_t)(data->ul_s1_info.sgw_addr.u.ipv4_addr);
+		iph->dst = (be32_t)(data->ul_s1_info.enb_addr.u.ipv4_addr);
 		EmitPacket(ctx, p, FORWARD_GATE);
 	}
 }
@@ -275,9 +261,6 @@ GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 void
 GtpuEncap::DeInit()
 {
-	using bess::utils::be32_t;
-	using bess::utils::ToIpv4Address;
-
 	for (auto it = session_map.begin(); it != session_map.end(); it++) {
 		uint64_t key = it->first;
 		struct session_info *data = (struct session_info *)it->second;
