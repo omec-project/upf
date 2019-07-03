@@ -5,9 +5,10 @@
 To follow instructions, you need
 
 * Docker CE >= 17.06
-* Update the `--devices` line in [`docker_setup.sh`](docker_setup.sh) with device files of 2 DPDK bound devices
 * Hugepages mounted at `/dev/hugepages` or updated location in [`docker_setup.sh`](docker_setup.sh)
-* Update [`conf/setup.sh`](conf/setup.sh) and [`conf/spgwu.bess`](conf/spgwu.bess) to run iltrafficgen tests
+* Update mode for devices: `dpdk`, `af_xdp`, `af_packet` in [`docker_setup.sh`](docker_setup.sh),
+    along with device details
+* Update [`docker_setup.sh`](docker_setup.sh) and [`conf/spgwu.bess`](conf/spgwu.bess) to run iltrafficgen tests
 
 ## Init
 
