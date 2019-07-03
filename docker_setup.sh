@@ -1,41 +1,49 @@
 #!/usr/bin/env bash
 set -e
 gui_port=8000
+# Update as per test environment
+mode="dpdk" #"af_packet"
+ifaces=("s1u" "sgi")
+af_ifaces=("ens803f2" "ens803f3")
+ipaddrs=(198.18.0.1/30 198.19.0.1/30)
+macaddrs=(68:05:ca:33:2e:20 68:05:ca:33:2e:21)
+nhipaddrs=(198.18.0.2 198.19.0.2)
+nhmacaddrs=(68:05:ca:31:fa:7a 68:05:ca:31:fa:7b)
+routes=("11.1.1.128/27 11.1.1.160/27 11.1.1.192/27 11.1.1.224/27" "13.1.1.128/27 13.1.1.160/27 13.1.1.192/27 13.1.1.224/27")
+len=${#ifaces[@]}
 
-source conf/setup.sh
-
-function setup_docker_net() {
+function setup_trafficgen_routes() {
 	for ((i = 0; i < len; i++)); do
-		docker network rm ${ifaces[$i]}-net
-		docker network create -d macvlan \
-			--subnet=${ipaddrs[$i]} \
-			--gateway=${nhipaddrs[$i]} \
-			-o parent=${macvlan[$i]} ${ifaces[$i]}-net
-		docker network connect ${ifaces[$i]}-net bess
+		sudo ip netns exec bess ip neighbor add ${nhipaddrs[$i]} lladdr ${nhmacaddrs[$i]} dev ${ifaces[$i]}
+		routelist=${routes[$i]}
+		for route in $(echo $routelist); do
+			sudo ip netns exec bess ip route add $route via ${nhipaddrs[$i]}
+		done
 	done
 }
 
-function run_bess_af_packet() {
-	docker create --name bess -t --restart unless-stopped \
-		--cap-add NET_ADMIN \
-		--cpuset-cpus=12-13 \
-		--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
-		-v "$PWD/conf":/conf \
-		-p $gui_port:$gui_port \
-		krsna1729/spgwu
-	setup_docker_net
-	docker start bess
+function setup_mirror_links() {
+	for ((i = 0; i < len; i++)); do
+		sudo ip netns exec bess ip link add ${ifaces[$i]} type veth peer name ${ifaces[$i]}-vdev
+		sudo ip netns exec bess ip link set ${ifaces[$i]} up
+		sudo ip netns exec bess ip link set ${ifaces[$i]}-vdev up
+		sudo ip netns exec bess ip addr add ${ipaddrs[$i]} dev ${ifaces[$i]}
+		sudo ip netns exec bess ip link set dev ${ifaces[$i]} address ${macaddrs[$i]}
+	done
 }
 
-function run_bess_dpdk() {
-	docker run --name bess -td --restart unless-stopped \
-		--cap-add NET_ADMIN \
-		--cpuset-cpus=12-13 \
-		--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio \
-		--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
-		-v "$PWD/conf":/conf \
-		-p $gui_port:$gui_port \
-		krsna1729/spgwu
+function move_ifaces() {
+	for ((i = 0; i < len; i++)); do
+		sudo ip link set ${ifaces[$i]} netns bess up
+		sudo ip netns exec bess ip addr add ${ipaddrs[$i]} dev ${ifaces[$i]}
+	done
+}
+
+function rename_ifaces() {
+	for ((i = 0; i < len; i++)); do
+		sudo ip link set ${af_ifaces[$i]} down
+		sudo ip link set ${af_ifaces[$i]} name ${ifaces[$i]} up
+	done
 }
 
 docker stop bess bess-routectl bess-web || true
@@ -43,16 +51,38 @@ docker rm -f bess bess-routectl bess-web || true
 
 docker build --pull -t krsna1729/spgwu .
 
+DEVICES=${DEVICES:-'--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio'}
+if [ ! "$mode" == 'dpdk' ]; then
+	DEVICES=''
+fi
+
+docker run --name bess -td --restart unless-stopped \
+	--cap-add NET_ADMIN \
+	--cpuset-cpus=12-13 \
+	$DEVICES \
+	--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
+	-v "$PWD/conf":/conf \
+	-p $gui_port:$gui_port \
+	krsna1729/spgwu
+
+sudo rm -rf /var/run/netns
+sudo mkdir -p /var/run/netns
+pid=$(docker inspect --format='{{.State.Pid}}' bess)
+sudo ln -sfT /proc/$pid/ns/net /var/run/netns/bess
+
 case $mode in
-    ("dpdk") echo "Running bessd with dpdk"
-	     run_bess_dpdk ;;
-    ("af_packet") echo "Running bessd with af_packet"
-	      run_bess_af_packet ;;
-    (*) echo "Control can never come here"
-	exit ;;
+"dpdk") setup_mirror_links ;;
+*)
+	rename_ifaces || true
+	move_ifaces
+	# Make sure that kernel does not send back icmp dest unreachable msg(s)
+	sudo ip netns exec bess iptables -I OUTPUT -p icmp --icmp-type destination-unreachable -j DROP
+	;;
 esac
 
-docker exec bess /conf/setup.sh
+# Setup trafficgen routes
+setup_trafficgen_routes
+
 docker logs bess
 
 docker run --name bess-routectl -td --restart unless-stopped \
