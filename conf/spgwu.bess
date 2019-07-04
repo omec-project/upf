@@ -3,7 +3,7 @@
 
 # for errnos
 import errno
-from utils import *
+from conf.utils import *
 
 # ====================================================
 #       Port Helpers
@@ -113,7 +113,7 @@ class Port:
                 qspo = __bess_module__("{}QSlowPO".format(name), 'Queue')
 
                 # host_ip_filter: tcpdump -i foo 'dst host 198.19.0.1 or 198.18.0.1' -d
-                HostGate = MAX_GATES - 1
+                HostGate = self.bpf_gate()
                 ips = ips_by_interface(name)
                 host_ip_filter = {"priority": -HostGate, "filter": "dst host "
                                 + " or ".join(str(x) for x in ips), "gate": HostGate}
@@ -153,7 +153,7 @@ class Port:
 # ====================================================
 
 
-conf_file = get_env('CONF_FILE', '/conf/spgwu.json')
+conf_file = get_env('CONF_FILE', 'conf/spgwu.json')
 conf = get_json_conf(conf_file, False)
 
 # ====================================================

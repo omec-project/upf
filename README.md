@@ -22,7 +22,7 @@ To init the pipeline or reflect changes to [`conf/spgwu.bess`](conf/spgwu.bess)
 or [`conf/spgwu.json`](conf/spgwu.json)
 
 ```bash
-docker exec bess /conf/reload.sh
+docker exec bess bessctl run spgwu
 docker exec bess bessctl show pipeline > pipeline.txt
 ```
 

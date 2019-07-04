@@ -94,7 +94,6 @@ COPY --from=pip /usr/local/lib/python2.7/site-packages/psutil /usr/local/lib/pyt
 COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin
 RUN ln -s /opt/bess/bessctl/bessctl /bin
-VOLUME /conf
-ENV PYTHONPATH="/conf:/opt/bess"
+ENV PYTHONPATH="/opt/bess"
 WORKDIR /opt/bess/bessctl
 ENTRYPOINT ["bessd", "-f"]

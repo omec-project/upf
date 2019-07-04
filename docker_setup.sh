@@ -58,7 +58,7 @@ docker run --name bess -td --restart unless-stopped \
 	--cpuset-cpus=12-13 \
 	--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
 	$DEVICES \
-	-v "$PWD/conf":/conf \
+	-v "$PWD/conf":/opt/bess/bessctl/conf \
 	-p $gui_port:$gui_port \
 	krsna1729/spgwu
 
@@ -83,9 +83,9 @@ setup_trafficgen_routes
 docker logs bess
 
 docker run --name bess-routectl -td --restart unless-stopped \
-	-v "$PWD/conf":/conf \
+	-v "$PWD/conf/route_control.py":/route_control.py \
 	--net container:bess --pid container:bess \
-	--entrypoint /conf/route_control.py \
+	--entrypoint /route_control.py \
 	krsna1729/spgwu -i "${ifaces[@]}"
 
 docker run --name bess-web -d --restart unless-stopped \
