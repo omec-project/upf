@@ -1,8 +1,8 @@
 # Multi-stage Dockerfile
 # Stage bess-build: builds bess with its dependencies
 FROM nefelinetworks/bess_build AS bess-build
-RUN apt-get update \
-    && apt-get -y install --no-install-recommends \
+RUN apt-get update && \
+    apt-get -y install --no-install-recommends \
         build-essential \
         ca-certificates \
         libelf-dev \
@@ -10,42 +10,37 @@ RUN apt-get update \
         pkg-config \
         unzip \
         wget
-# libbpf
-#ARG LIBBPF_COMMIT=master
-#RUN wget -qO libbpf.zip https://github.com/libbpf/libbpf/archive/${LIBBPF_COMMIT}.zip && unzip libbpf.zip
-#RUN cd libbpf-${LIBBPF_COMMIT}/src \
-#    && BUILD_STATIC_ONLY=y make install \
-#    && cp ../include/uapi/linux/if_xdp.h /usr/include/linux
+
 ARG LINUX_VER=5.1.15
 RUN wget -qO linux.tar.xz https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-${LINUX_VER}.tar.xz
-RUN mkdir linux \
-    && tar -xf linux.tar.xz -C linux --strip-components 1 \
-    && cp linux/include/uapi/linux/if_xdp.h /usr/include/linux \
-    && cd linux/tools/lib/bpf/ \
-    && make install_lib \
-    && make install_headers \
-    && ldconfig
+RUN mkdir linux && \
+    tar -xf linux.tar.xz -C linux --strip-components 1 && \
+    cp linux/include/uapi/linux/if_xdp.h /usr/include/linux && \
+    cd linux/tools/lib/bpf/ && \
+    make install_lib && \
+    make install_headers && \
+    ldconfig
 
 # dpdk
 ENV DPDK_VER=19.05
 ENV DPDK_DIR="/dpdk"
 ENV RTE_TARGET='x86_64-native-linuxapp-gcc'
 RUN wget -qO dpdk.tar.xz https://fast.dpdk.org/rel/dpdk-${DPDK_VER}.tar.xz
-RUN mkdir -p ${DPDK_DIR} \
-    && tar -xf dpdk.tar.xz -C ${DPDK_DIR} --strip-components 1 \
-    && cd ${DPDK_DIR} \
-    && sed -ri 's,(IGB_UIO=).*,\1n,' config/common_linux* \
-    && sed -ri 's,(KNI_KMOD=).*,\1n,' config/common_linux* \
-    && sed -ri 's,(LIBRTE_BPF=).*,\1n,' config/common_base \
-    && sed -ri 's,(AF_XDP=).*,\1y,' config/common_base \
-    && make config T=x86_64-native-linuxapp-gcc \
-    && make -j $CPUS EXTRA_CFLAGS="-g -w -fPIC"
+RUN mkdir -p ${DPDK_DIR} && \
+    tar -xf dpdk.tar.xz -C ${DPDK_DIR} --strip-components 1 && \
+    cd ${DPDK_DIR} && \
+    sed -ri 's,(IGB_UIO=).*,\1n,' config/common_linux* && \
+    sed -ri 's,(KNI_KMOD=).*,\1n,' config/common_linux* && \
+    sed -ri 's,(LIBRTE_BPF=).*,\1n,' config/common_base && \
+    sed -ri 's,(AF_XDP=).*,\1y,' config/common_base && \
+    make config T=x86_64-native-linuxapp-gcc && \
+    make -j $CPUS EXTRA_CFLAGS="-g -w -fPIC"
 
 # Workaround for compiler error on including DPDK in bess
 WORKDIR ${DPDK_DIR}
 COPY patches/dpdk patches
-RUN cat patches/* | patch -p1 \
-    && make -j $CPUS EXTRA_CFLAGS="-g -w -fPIC"
+RUN cat patches/* | patch -p1 && \
+    make -j $CPUS EXTRA_CFLAGS="-g -w -fPIC"
 
 WORKDIR /
 ARG BESS_COMMIT=master
