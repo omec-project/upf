@@ -14,35 +14,35 @@ len=${#ifaces[@]}
 
 function setup_trafficgen_routes() {
 	for ((i = 0; i < len; i++)); do
-		sudo ip netns exec bess ip neighbor add ${nhipaddrs[$i]} lladdr ${nhmacaddrs[$i]} dev ${ifaces[$i]}
+		sudo ip netns exec bess ip neighbor add "${nhipaddrs[$i]}" lladdr "${nhmacaddrs[$i]}" dev "${ifaces[$i]}"
 		routelist=${routes[$i]}
-		for route in $(echo $routelist); do
-			sudo ip netns exec bess ip route add $route via ${nhipaddrs[$i]}
+		for route in $routelist; do
+			sudo ip netns exec bess ip route add "$route" via "${nhipaddrs[$i]}"
 		done
 	done
 }
 
 function setup_mirror_links() {
 	for ((i = 0; i < len; i++)); do
-		sudo ip netns exec bess ip link add ${ifaces[$i]} type veth peer name ${ifaces[$i]}-vdev
-		sudo ip netns exec bess ip link set ${ifaces[$i]} up
-		sudo ip netns exec bess ip link set ${ifaces[$i]}-vdev up
-		sudo ip netns exec bess ip addr add ${ipaddrs[$i]} dev ${ifaces[$i]}
-		sudo ip netns exec bess ip link set dev ${ifaces[$i]} address ${macaddrs[$i]}
+		sudo ip netns exec bess ip link add "${ifaces[$i]}" type veth peer name "${ifaces[$i]}"-vdev
+		sudo ip netns exec bess ip link set "${ifaces[$i]}" up
+		sudo ip netns exec bess ip link set "${ifaces[$i]}-vdev" up
+		sudo ip netns exec bess ip addr add "${ipaddrs[$i]}" dev "${ifaces[$i]}"
+		sudo ip netns exec bess ip link set dev "${ifaces[$i]}" address "${macaddrs[$i]}"
 	done
 }
 
 function move_ifaces() {
 	for ((i = 0; i < len; i++)); do
-		sudo ip link set ${ifaces[$i]} netns bess up
-		sudo ip netns exec bess ip addr add ${ipaddrs[$i]} dev ${ifaces[$i]}
+		sudo ip link set "${ifaces[$i]}" netns bess up
+		sudo ip netns exec bess ip addr add "${ipaddrs[$i]}" dev "${ifaces[$i]}"
 	done
 }
 
 function rename_ifaces() {
 	for ((i = 0; i < len; i++)); do
-		sudo ip link set ${af_ifaces[$i]} down
-		sudo ip link set ${af_ifaces[$i]} name ${ifaces[$i]} up
+		sudo ip link set "${af_ifaces[$i]}" down
+		sudo ip link set "${af_ifaces[$i]}" name "${ifaces[$i]}" up
 	done
 }
 
@@ -51,16 +51,13 @@ docker rm -f bess bess-routectl bess-web || true
 
 docker build --pull -t krsna1729/spgwu .
 
-DEVICES=${DEVICES:-'--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio'}
-if [ ! "$mode" == 'dpdk' ]; then
-	DEVICES=''
-fi
+[ "$mode" == 'dpdk' ] && DEVICES=${DEVICES:-'--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio'} || DEVICES=''
 
 docker run --name bess -td --restart unless-stopped \
 	--cap-add NET_ADMIN \
 	--cpuset-cpus=12-13 \
-	$DEVICES \
 	--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
+	$DEVICES \
 	-v "$PWD/conf":/conf \
 	-p $gui_port:$gui_port \
 	krsna1729/spgwu
@@ -68,7 +65,7 @@ docker run --name bess -td --restart unless-stopped \
 sudo rm -rf /var/run/netns
 sudo mkdir -p /var/run/netns
 pid=$(docker inspect --format='{{.State.Pid}}' bess)
-sudo ln -sfT /proc/$pid/ns/net /var/run/netns/bess
+sudo ln -sfT /proc/"$pid"/ns/net /var/run/netns/bess
 
 case $mode in
 "dpdk") setup_mirror_links ;;
