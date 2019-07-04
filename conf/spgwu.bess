@@ -11,9 +11,10 @@ from utils import *
 
 
 MAX_GATES = 8192
-ports = {}
+dpdk_ports = {}
 
-def scan_ports():
+
+def scan_dpdk_ports():
     idx = 0
     while True:
         try:
@@ -21,7 +22,7 @@ def scan_ports():
             if intf:
                 # Need to declare mac so that we don't lose key during destroy_port
                 mac = intf.mac_addr
-                ports[mac] = idx
+                dpdk_ports[mac] = idx
                 bess.destroy_port(intf.name)
         except bess.Error as e:
             if e.code == errno.ENODEV:
@@ -29,105 +30,122 @@ def scan_ports():
             else:
                 raise
         idx += 1
-    return True if ports else False
+    return True if dpdk_ports else False
 
 
-def detect_mode(ifname):
-    # default case
-    mode = "unselected"
+class Port:
+    def __init__(self, name):
+        self.name = name
+        self.wid = None
+        self.fpi = None
+        self.fpo = None
+        self.bpf = None
+        self.bpfgate = 0
+        self.routes_table = None
 
-    try:
-        peer_by_interface(ifname)
-        mode = "dpdk"
-    except:
-        mode = "af_packet"
-    return mode
+    def bpf_gate(self):
+        self.bpfgate += 1
+        return self.bpfgate
 
+    def detect_mode(self):
+        # default case
+        mode = "unselected"
 
-def init_fastpath(ifname, wid, **kwargs):
-    # Initialize PMDPort and RX/TX modules
-    intf_fastp = PMDPort(name="{}Fast".format(ifname), **kwargs)
-    intf_fastp_pi = __bess_module__("{}FastPI".format(ifname), 'PortInc', port=intf_fastp.name)
-    intf_fastp_po = __bess_module__("{}FastPO".format(ifname), 'PortOut', port=intf_fastp.name)
-
-    # Initialize BPF to classify incoming traffic to go to kernel and/or pipeline
-    intf_fastp_bpf = __bess_module__("{}FastBPF".format(ifname), 'BPF')
-    intf_fastp_bpf.clear()
-
-    # Default drop when no matches
-    intf_fastp_pi -> intf_fastp_bpf:0 -> Sink()
-
-    # Attach fastpath to worker's root TC
-    intf_fastp_pi.attach_task(wid=wid)
-
-    return intf_fastp_pi, intf_fastp_po, intf_fastp_bpf
-
-
-def setup_port(ifname, idx, workers):
-    wid = idx % workers
-    print('Setting up port {} on worker {}'.format(ifname,wid))
-    mode = detect_mode(ifname)
-
-    if mode == 'af_packet':
-        # Initialize kernel fastpath
-        kwargs = {"vdev" : "net_af_packet{},iface={}".format(idx, ifname), "num_out_q": workers}
-        intf_fastp_pi, intf_fastp_po, intf_fastp_bpf = init_fastpath(ifname, wid, **kwargs)
-
-    elif mode == 'dpdk':
-        # if port list is empty, scan for ports first
-        if not ports and scan_ports() == False:
-            print('Registered ports do not exist.')
-            sys.exit()
-        # Initialize DPDK fastpath
-        intf_fastp_idx = ports.get(mac_by_interface(ifname))
-        if intf_fastp_idx is None:
-            raise Exception('Registered port for {} not detected!'.format(ifname))
-        kwargs = {"port_id" : intf_fastp_idx, "num_out_q": workers}
-        intf_fastp_pi, intf_fastp_po, intf_fastp_bpf = init_fastpath(ifname, wid, **kwargs)
-
-        # Initialize kernel slowpath port and RX/TX modules
         try:
-            peer = peer_by_interface(ifname)
-            vdev = "net_af_packet{},iface={}".format(idx, peer)
-            intf_slowp = PMDPort(name="{}Slow".format(ifname), vdev=vdev)
-            intf_slowp_pi = __bess_module__("{}SlowPI".format(ifname), 'PortInc', port=intf_slowp.name)
-            intf_slowp_po = __bess_module__("{}SlowPO".format(ifname), 'PortOut', port=intf_slowp.name)
-            q_slowp_po = __bess_module__("{}QSlowPO".format(ifname), 'Queue')
+            peer_by_interface(self.name)
+            mode = "dpdk"
+        except:
+            mode = "af_packet"
+        return mode
 
-            # host_ip_filter: tcpdump -i foo 'dst host 198.19.0.1 or 198.18.0.1' -d
-            HostGate = MAX_GATES - 1
-            ips = ips_by_interface(ifname)
-            host_ip_filter = {"priority": -HostGate, "filter": "dst host "
-                              + " or ".join(str(x) for x in ips), "gate": HostGate}
+    def init_fastpath(self, **kwargs):
+        # Initialize PMDPort and RX/TX modules
+        name = self.name
+        fast = PMDPort(name="{}Fast".format(name), **kwargs)
+        self.fpi = __bess_module__("{}FastPI".format(name), 'PortInc', port=fast.name)
+        self.fpo = __bess_module__("{}FastPO".format(name), 'PortOut', port=fast.name)
 
-            intf_fastp_bpf.add(filters=[host_ip_filter])
+        # Initialize BPF to classify incoming traffic to go to kernel and/or pipeline
+        self.bpf = __bess_module__("{}FastBPF".format(name), 'BPF')
+        self.bpf.clear()
 
-            # Direct control traffic from DPDK to kernel
-            intf_fastp_bpf:HostGate -> q_slowp_po -> intf_slowp_po
+        # Default drop when no matches
+        self.fpi -> self.bpf:0 -> Sink()
 
-            # Direct control traffic from kernel to DPDK
-            intf_slowp_pi -> intf_fastp_po
+        # Attach fastpath to worker's root TC
+        self.fpi.attach_task(wid=self.wid)
 
-            tc = 'slow{}'.format(wid)
+    def setup_port(self, idx, workers):
+        # Pick the worker handling this port
+        self.wid = idx % workers
+
+        name = self.name
+        wid = self.wid
+        print('Setting up port {} on worker {}'.format(name,wid))
+
+        # Detect the mode of this interface - DPDK/AF_XDP/AF_PACKET
+        mode = self.detect_mode()
+
+        if mode == 'af_packet':
+            # Initialize kernel fastpath
+            kwargs = {"vdev" : "net_af_packet{},iface={}".format(idx, name), "num_out_q": workers}
+            self.init_fastpath(**kwargs)
+
+        elif mode == 'dpdk':
+            # if port list is empty, scan for dpdk_ports first
+            if not dpdk_ports and scan_dpdk_ports() == False:
+                print('Registered dpdk ports do not exist.')
+                sys.exit()
+            # Initialize DPDK fastpath
+            fidx = dpdk_ports.get(mac_by_interface(name))
+            if fidx is None:
+                raise Exception('Registered port for {} not detected!'.format(name))
+            kwargs = {"port_id" : fidx, "num_out_q": workers}
+            self.init_fastpath( **kwargs)
+
+            # Initialize kernel slowpath port and RX/TX modules
             try:
-                bess.add_tc(tc, policy='round_robin', wid=wid)
+                peer = peer_by_interface(name)
+                vdev = "net_af_packet{},iface={}".format(idx, peer)
+                slow = PMDPort(name="{}Slow".format(name), vdev=vdev)
+                spi = __bess_module__("{}SlowPI".format(name), 'PortInc', port=slow.name)
+                spo = __bess_module__("{}SlowPO".format(name), 'PortOut', port=slow.name)
+                qspo = __bess_module__("{}QSlowPO".format(name), 'Queue')
+
+                # host_ip_filter: tcpdump -i foo 'dst host 198.19.0.1 or 198.18.0.1' -d
+                HostGate = MAX_GATES - 1
+                ips = ips_by_interface(name)
+                host_ip_filter = {"priority": -HostGate, "filter": "dst host "
+                                + " or ".join(str(x) for x in ips), "gate": HostGate}
+
+                self.bpf.add(filters=[host_ip_filter])
+
+                # Direct control traffic from DPDK to kernel
+                self.bpf:HostGate -> qspo -> spo
+
+                # Direct control traffic from kernel to DPDK
+                spi -> self.fpo
+
+                tc = 'slow{}'.format(wid)
+                try:
+                    bess.add_tc(tc, policy='round_robin', wid=wid)
+                except Exception as e:
+                    if e.errmsg == "Name '{}' already exists".format(tc):
+                        pass
+                    else:
+                        raise e
+                # Limit scheduling slow path RX/TX to 1000 times/second each
+                for mod in spi, qspo:
+                    bess.add_tc(mod.name,
+                            parent=tc,
+                            policy='rate_limit',
+                            resource='count',
+                            limit={'count': 1000})
+                    mod.attach_task(mod.name)
             except Exception as e:
-                if e.errmsg == "Name '{}' already exists".format(tc):
-                    pass
-                else:
-                    raise e
-            # Limit scheduling slow path RX/TX to 1000 times/second each
-            for mod in intf_slowp_pi, q_slowp_po:
-                bess.add_tc(mod.name,
-                        parent=tc,
-                        policy='rate_limit',
-                        resource='count',
-                        limit={'count': 1000})
-                mod.attach_task(mod.name)
-        except Exception as e:
-            print('Mirror veth interface: {} misconfigured: {}'.format(ifname, e))
-    else:
-        raise Exception('Invalid mode selected.')
+                print('Mirror veth interface: {} misconfigured: {}'.format(name, e))
+        else:
+            raise Exception('Invalid mode selected.')
 
 
 # ====================================================
@@ -169,13 +187,13 @@ for wid in xrange(workers):
 
 
 interfaces = ["s1u", "sgi"]
-done = []
+ports = {}
 for idx, interface in enumerate(interfaces):
-    ifname = conf[interface]["ifname"]
-    if ifname in done:
+    port = Port(conf[interface]["ifname"])
+    if port.name in ports:
         continue
-    setup_port(ifname, idx, workers)
-    done.append(ifname)
+    port.setup_port(idx, workers)
+    ports[port.name] = port
 
 # ====================================================
 #       Uplink Pipeline
@@ -195,7 +213,8 @@ sgiRoutes.add(prefix='0.0.0.0', prefix_len=0, gate=MAX_GATES-1)
 # and dst host 11.1.1.1                         # check S/PGWU IP
 # and udp dst port 2152                         # check GTPU port
 # and (udp[28:4] & 0xffffff00) = 0x10000000     # check UE subnet
-GTPUGate = 1
+s1uFastBPF = ports[s1u_ifname].bpf
+GTPUGate = ports[s1u_ifname].bpf_gate()
 check_enb_subnet = "src net {} ".format(enb_cidr)
 check_spgwu_ip = " and dst host " + \
     " or ".join(str(x) for x in ips_by_interface(s1u_ifname))
@@ -229,7 +248,8 @@ s1uRoutes::IPLookup()
 s1uRoutes.add(prefix='0.0.0.0', prefix_len=0, gate=MAX_GATES-1)
 
 # Setting filter to detect UE subnet
-UEGate = 1
+sgiFastBPF = ports[sgi_ifname].bpf
+UEGate = ports[sgi_ifname].bpf_gate()
 ue_filter = {"priority": -UEGate,
              "filter": "ip dst net {}".format(ue_cidr), "gate": UEGate}
 sgiFastBPF.add(filters=[ue_filter])
