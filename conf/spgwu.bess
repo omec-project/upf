@@ -44,8 +44,11 @@ class Port:
         self.routes_table = None
 
     def bpf_gate(self):
-        self.bpfgate += 1
-        return self.bpfgate
+        if self.bpfgate < MAX_GATES - 1:
+            self.bpfgate += 1
+            return self.bpfgate
+        else:
+            raise 'Port {}: Out of BPF gates to allocate'.format(self.name)
 
     def detect_mode(self):
         # default case
