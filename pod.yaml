@@ -8,16 +8,20 @@ metadata:
             { "name": "sgi-net", "interface": "sgi" }
     ]'
 spec:
+  # Reqd. if working with Linux bound devices so that kernel does not reply to GTP-U packets
+  #initContainers:
+  #- name: iptables
+  #  image: krsna1729/spgwu
+  #  command: [ "sh", "-xec"]
+  #  securityContext:
+  #    capabilities:
+  #      add:
+  #        - NET_ADMIN
+  #  args:
+  #  - iptables -I OUTPUT -p icmp --icmp-type port-unreachable -j DROP;
   containers:
-  - name: net-tools
-    image: busybox
-    command: ["sleep", "86400"]
-    resources:
-      limits:
-        cpu: 100m
-        memory: 128Mi
   - name: bess
-    image: krsna1729/bess-router
+    image: krsna1729/spgwu
     stdin: true
     tty: true
     args:
@@ -30,7 +34,7 @@ spec:
     lifecycle:
       postStart:
         exec:
-          command: ["bash", "-c", "until /opt/bess/bessctl/bessctl daemon reset -- run file /conf/spgwu.bess -- show pipeline; do sleep 2; done;"]
+          command: ["sh", "-c", "until bessctl run spgwu; do sleep 2; done;"]
     securityContext:
       capabilities:
         add:

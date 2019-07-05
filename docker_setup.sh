@@ -73,7 +73,7 @@ case $mode in
 	rename_ifaces || true
 	move_ifaces
 	# Make sure that kernel does not send back icmp dest unreachable msg(s)
-	sudo ip netns exec bess iptables -I OUTPUT -p icmp --icmp-type destination-unreachable -j DROP
+	sudo ip netns exec bess iptables -I OUTPUT -p icmp --icmp-type port-unreachable -j DROP
 	;;
 esac
 
