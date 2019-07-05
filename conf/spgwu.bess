@@ -48,7 +48,7 @@ class Port:
             self.bpfgate += 1
             return self.bpfgate
         else:
-            raise 'Port {}: Out of BPF gates to allocate'.format(self.name)
+            raise Exception('Port {}: Out of BPF gates to allocate'.format(self.name))
 
     def detect_mode(self):
         # default case
