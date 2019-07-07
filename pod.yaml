@@ -8,7 +8,8 @@ metadata:
             { "name": "sgi-net", "interface": "sgi" }
     ]'
 spec:
-  # Reqd. if working with Linux bound devices so that kernel does not reply to GTP-U packets
+  shareProcessNamespace: true
+  # Reqd. if working with AF_PACKET so that kernel does not reply to GTP-U packets
   #initContainers:
   #- name: iptables
   #  image: krsna1729/spgwu
@@ -50,10 +51,36 @@ spec:
       mountPath: /conf
     - name: hugepages
       mountPath: /dev/hugepages
+  - name: bess-routectl
+    image: krsna1729/spgwu
+    command: ["/route_control.py"]
+    args:
+    - -i
+    - s1u
+    - sgi
+    resources:
+      limits:
+        cpu: 256m
+        memory: 128Mi
+    volumeMounts:
+    - name: bess-conf
+      mountPath: /route_control.py
+      subpath: route_control.py
+  - name: bess-web
+    image: krsna1729/spgwu
+    command: ["bessctl"]
+    args:
+    - http
+    - 0.0.0.0
+    - '8000'
+    resources:
+      limits:
+        cpu: 256m
+        memory: 128Mi
   volumes:
   - name: bess-conf
     configMap:
-      name: router
+      name: spgwu-conf
   - name: hugepages
     emptyDir:
       medium: HugePages
