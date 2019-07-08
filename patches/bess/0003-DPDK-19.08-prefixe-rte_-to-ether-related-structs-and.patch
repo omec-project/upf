@@ -1,0 +1,46 @@
+From b5509016f2953a8654c225158aa104c4a9e9f1cf Mon Sep 17 00:00:00 2001
+From: Saikrishna Edupuganti <saikrishna.edupuganti@intel.com>
+Date: Mon, 8 Jul 2019 20:06:40 +0000
+Subject: [PATCH] DPDK 19.08 prefixe rte_ to ether related structs and methods
+
+Signed-off-by: Saikrishna Edupuganti <saikrishna.edupuganti@intel.com>
+---
+ core/drivers/pmd.cc | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/core/drivers/pmd.cc b/core/drivers/pmd.cc
+index a2cfe87f..f931d243 100644
+--- a/core/drivers/pmd.cc
++++ b/core/drivers/pmd.cc
+@@ -110,7 +110,7 @@ void PMDPort::InitDriver() {
+ #endif
+ 
+     numa_node = rte_eth_dev_socket_id(static_cast<int>(i));
+-    rte_eth_macaddr_get(i, reinterpret_cast<ether_addr *>(lladdr.bytes));
++    rte_eth_macaddr_get(i, reinterpret_cast<rte_ether_addr *>(lladdr.bytes));
+ 
+     LOG(INFO) << "DPDK port_id " << static_cast<int>(i) << " ("
+               << dev_info.driver_name << ")   RXQ " << dev_info.max_rx_queues
+@@ -395,7 +395,7 @@ CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
+       numa_node == -1 ? UNCONSTRAINED_SOCKET : (1ull << numa_node);
+ 
+   rte_eth_macaddr_get(dpdk_port_id_,
+-                      reinterpret_cast<ether_addr *>(conf_.mac_addr.bytes));
++                      reinterpret_cast<rte_ether_addr *>(conf_.mac_addr.bytes));
+ 
+   // Reset hardware stat counters, as they may still contain previous data
+   CollectStats(true);
+@@ -417,8 +417,8 @@ int PMDPort::UpdateConf(const Conf &conf) {
+   }
+ 
+   if (conf_.mac_addr != conf.mac_addr && !conf.mac_addr.IsZero()) {
+-    ether_addr tmp;
+-    ether_addr_copy(reinterpret_cast<const ether_addr *>(&conf.mac_addr.bytes),
++    rte_ether_addr tmp;
++    rte_ether_addr_copy(reinterpret_cast<const rte_ether_addr *>(&conf.mac_addr.bytes),
+                     &tmp);
+     int ret = rte_eth_dev_default_mac_addr_set(dpdk_port_id_, &tmp);
+     if (ret == 0) {
+-- 
+2.17.1
+

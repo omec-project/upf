@@ -23,7 +23,7 @@ RUN mkdir linux && \
     ldconfig
 
 # dpdk
-ENV DPDK_VER='master'
+ARG DPDK_VER='master'
 ENV DPDK_DIR="/dpdk"
 ENV RTE_TARGET='x86_64-native-linuxapp-gcc'
 RUN git clone -b $DPDK_VER -q --depth 1 http://dpdk.org/git/dpdk $DPDK_DIR 2>&1
