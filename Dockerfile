@@ -66,9 +66,9 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         libgraph-easy-perl \
         iproute2 \
+        iptables \
 	iputils-ping \
         procps \
-	iptables \
         tcpdump && \
     rm -rf /var/lib/apt/lists/* && \
     pip install --no-cache-dir \
@@ -84,7 +84,8 @@ RUN apt-get update && \
 RUN echo "deb http://http.us.debian.org/debian testing main non-free contrib" > /etc/apt/sources.list.d/testing.list && \
     apt-get update && \
     apt-get -t testing -y install --no-install-recommends \
-        libc6
+        libc6 && \
+    rm -rf /var/lib/apt/lists/*
 COPY --from=pip /usr/local/lib/python2.7/site-packages/psutil /usr/local/lib/python2.7/site-packages/psutil
 COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin
