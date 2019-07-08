@@ -10,6 +10,9 @@
 #include "utils/ip.h"
 /* for udp header */
 #include "utils/udp.h"
+#ifdef RTE_HASH
+#include <rte_jhash.h>
+#endif
 /*----------------------------------------------------------------------------------*/
 using bess::utils::Ipv4;
 using bess::utils::Udp;
@@ -22,13 +25,25 @@ enum {DEFAULT_GATE = 0, FORWARD_GATE};
 const Commands GtpuEncap::cmds = {
 	{"add", "GtpuEncapAddSessionRecordArg",
 	 MODULE_CMD_FUNC(&GtpuEncap::AddSessionRecord),
-	 Command::THREAD_UNSAFE},
+#ifdef RTE_HASH
+	 Command::THREAD_SAFE},
+#else
+         Command::THREAD_UNSAFE},
+#endif
 	{"remove", "GtpuEncapRemoveSessionRecordArg",
 	 MODULE_CMD_FUNC(&GtpuEncap::RemoveSessionRecord),
-	 Command::THREAD_UNSAFE},
+#ifdef RTE_HASH
+	 Command::THREAD_SAFE},
+#else
+         Command::THREAD_UNSAFE},
+#endif
 	{"show_records", "EmptyArg",
 	 MODULE_CMD_FUNC(&GtpuEncap::ShowRecords),
-	 Command::THREAD_UNSAFE}	
+#ifdef RTE_HASH
+	 Command::THREAD_SAFE}
+#else
+         Command::THREAD_UNSAFE}
+#endif
 };
 /*----------------------------------------------------------------------------------*/
 // Template for generating UDP packets without data
@@ -90,12 +105,17 @@ GtpuEncap::dp_session_create(struct session_info *entry)
 		std::cerr << "Failed to allocate memory for session info!" << std::endl;
 		return -1;
 	}
-
+#ifndef RTE_HASH
 	if (session_map.Insert(entry->sess_id, (uint64_t)data) == NULL) {
 		std::cerr << "Failed to insert session info with " << " sess_id "
 			  << entry->sess_id << std::endl;
 	}
-
+#else
+	if (rte_hash_add_key_data(session_map, &entry->sess_id, data) < 0) {
+               std::cerr << "Failed to insert session info with " << " sess_id "
+                         << entry->sess_id << std::endl;
+	}
+#endif
 	/* copy session info to the entry */
 	data->ue_addr = entry->ue_addr;
 	data->ul_s1_info = entry->ul_s1_info;
@@ -142,9 +162,11 @@ GtpuEncap::AddSessionRecord(const bess::pb::GtpuEncapAddSessionRecordArg &arg)
 	sess.ul_s1_info.sgw_addr.u.ipv4_addr = s1u_sgw_ip;
 	sess.dl_s1_info.sgw_addr.u.ipv4_addr = s1u_sgw_ip;
 	sess.ul_s1_info.enb_addr.u.ipv4_addr = enodeb_ip;
-
-	sess.sess_id = SESS_ID(/*htonl*/(sess.ue_addr.u.ipv4_addr), DEFAULT_BEARER);
-
+#ifdef RTE_HASH
+	sess.sess_id = SESS_ID(htonl(sess.ue_addr.u.ipv4_addr), DEFAULT_BEARER);
+#else
+	sess.sess_id = SESS_ID(sess.ue_addr.u.ipv4_addr, DEFAULT_BEARER);
+#endif
 	if (dp_session_create(&sess) < 0) {
 		std::cerr << "Failed to insert entry for ueaddr: "
 			  << ToIpv4Address(be32_t(ueaddr)) << std::endl;
@@ -163,9 +185,13 @@ GtpuEncap::RemoveSessionRecord(const bess::pb::GtpuEncapRemoveSessionRecordArg &
 		return CommandFailure(EINVAL, "Invalid UE address");
 
 	DLOG(INFO) << "IP Address: " << ToIpv4Address(be32_t(ip)) << std::endl;
-
+#ifdef RTE_HASH
+	key = SESS_ID(htonl(ip), DEFAULT_BEARER);
+#else
 	key = SESS_ID(ip, DEFAULT_BEARER);
-	
+#endif
+
+#ifndef RTE_HASH
 	/* retrieve session info */
 	std::pair<uint64_t, uint64_t> *value = session_map.Find(/*htonl*/(key));
 	struct session_info *data = (value == NULL) ? (struct session_info *)value :
@@ -180,7 +206,18 @@ GtpuEncap::RemoveSessionRecord(const bess::pb::GtpuEncapRemoveSessionRecordArg &
 	/* now remove the record */
 	if (session_map.Remove(key) == false)
 		return CommandFailure(EINVAL, "Failed to remove UE address");
+#else
+	struct session_info *data;
+	if (rte_hash_lookup_data(session_map, &key, (void **)&data) < 0)
+		return CommandFailure(EINVAL, "The given address does not exist");
 
+	/* free session_info */
+	rte_free(data);
+
+	/* now remove the record */
+	if (rte_hash_del_key(session_map, &key) < 0)
+		return CommandFailure(EINVAL, "Failed to remove UE address");
+#endif
 	return CommandSuccess();
 }
 /*----------------------------------------------------------------------------------*/
@@ -188,15 +225,119 @@ CommandResponse
 GtpuEncap::ShowRecords(const bess::pb::EmptyArg &)
 {
 	std::cerr << "Showing records now" << std::endl;
+#ifndef RTE_HASH
 	for (auto it = session_map.begin(); it != session_map.end(); it++) {
 		uint64_t key = it->first;
 		uint32_t ip = UE_ADDR(key);
 		std::cerr << "IP Address: " << ToIpv4Address(be32_t(ip))
 			  << ", Data: " << it->second << std::endl;
 	}
-
+#else
+	uint32_t next = 0;;
+	uint64_t *key;
+	void *_data;
+	int rc;
+	do {
+		rc = rte_hash_iterate(session_map, (const void **)&key, &_data, &next);
+		if (rc >= 0) {
+			uint32_t ip = UE_ADDR(*key);
+			struct session_info *data = (struct session_info *)_data;
+			std::cerr << "IP Address: " << ToIpv4Address(be32_t(ip))
+				  << ", Data: " << data << std::endl;
+		}
+	} while (rc >= 0);
+#endif
 	return CommandSuccess();
 }
+/*----------------------------------------------------------------------------------*/
+#ifdef RTE_HASH
+void
+GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
+{
+	int cnt = batch->cnt();
+	int hits = 0;
+	uint64_t key[bess::PacketBatch::kMaxBurst];
+	void *key_ptr[bess::PacketBatch::kMaxBurst];
+	struct session_info *data[bess::PacketBatch::kMaxBurst];
+	uint64_t hit_mask = 0ULL;
+
+	for (int i = 0; i < cnt; i++) {
+		bess::Packet *p = batch->pkts()[i];
+		/* assuming that this module comes right after EthernetDecap */
+		/* pkt_len can be used as the length of IP datagram */
+		Ipv4 *iph = p->head_data<Ipv4 *>();
+		be32_t daddr = iph->dst;
+		be32_t saddr = iph->src;
+		DLOG(INFO) << "ip->saddr: " << ToIpv4Address(saddr)
+			   << ", ip->daddr: " << ToIpv4Address(daddr)
+			   << std::endl;
+		key[i] = SESS_ID(daddr.raw_value(), DEFAULT_BEARER);
+		key_ptr[i] = &key[i];
+	}
+
+	if ((hits = rte_hash_lookup_bulk_data(session_map,
+					      (const void **)&key_ptr,
+					      cnt,
+					      &hit_mask,
+					      (void **)data)) < 0) {
+		DLOG(INFO) << "Failed to look-up" << std::endl;
+		/* Since default module is sink, the packets go right in the dump */
+		/* RunNextModule() sends batch to DEFAULT GATE */
+		RunNextModule(ctx, batch);
+		return;
+	}
+
+	DLOG(INFO) << "rte_hash_lookup_bulk_data output: (cnts: "
+		   << cnt << ", hits: " << hits << ", hit_mask: " << hit_mask
+		   << ")" << std::endl;
+
+	for (int i = 0, j = 0; i < cnt && j < hits; i++) {
+		bess::Packet *p = batch->pkts()[i];
+		if (!ISSET_BIT(hit_mask, i)) {
+			EmitPacket(ctx, p, DEFAULT_GATE);
+			DLOG(INFO) << "Fetch failed for ip->daddr: "
+				   << ToIpv4Address(be32_t(UE_ADDR(key[i])))
+				   << std::endl;
+			continue;
+		}
+
+		/* assuming that this module comes right after EthernetDecap */
+		/* pkt_len can be used as the length of IP datagram */
+		uint16_t pkt_len = p->total_len();
+		Ipv4 *iph = p->head_data<Ipv4 *>();
+
+		/* pre-allocate space for encaped header(s) */
+		char *new_p = static_cast<char *>(p->prepend(sizeof(Udp) +
+							     sizeof(struct gtpu_hdr) +
+							     sizeof(Ipv4)));
+		/* setting GTPU pointer */
+		struct gtpu_hdr *gtph = (struct gtpu_hdr *)(new_p + sizeof(Ipv4) +
+							    sizeof(Udp));
+
+		/* copying template content */
+		bess::utils::Copy(new_p, &outer_ip_template, sizeof(outer_ip_template));
+
+		/* setting gtpu header */
+		gtph->length = htons(pkt_len);
+		gtph->teid = htonl(data[i]->ul_s1_info.sgw_teid);
+
+		/* setting outer UDP header */
+		Udp *udph = (Udp *)(new_p + sizeof(Ipv4));
+		udph->length = (be16_t)(pkt_len + sizeof(struct gtpu_hdr) +
+					sizeof(Udp));
+
+		/* setting outer IP header */
+		iph = (Ipv4 *)(new_p);
+		iph->length = (be16_t)(pkt_len + sizeof(struct gtpu_hdr) +
+				       sizeof(Udp) + sizeof(Ipv4));
+		iph->src = (be32_t)(data[i]->ul_s1_info.sgw_addr.u.ipv4_addr);
+		iph->dst = (be32_t)(data[i]->ul_s1_info.enb_addr.u.ipv4_addr);
+		EmitPacket(ctx, p, FORWARD_GATE);
+		/* increment hit idx */
+		j++;
+	}
+}
+#else /* !RTE_HASH */
 /*----------------------------------------------------------------------------------*/
 void
 GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
@@ -257,10 +398,12 @@ GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 		EmitPacket(ctx, p, FORWARD_GATE);
 	}
 }
+#endif /* RTE_HASH */
 /*----------------------------------------------------------------------------------*/
 void
 GtpuEncap::DeInit()
 {
+#ifndef RTE_HASH
 	for (auto it = session_map.begin(); it != session_map.end(); it++) {
 		uint64_t key = it->first;
 		struct session_info *data = (struct session_info *)it->second;
@@ -272,6 +415,31 @@ GtpuEncap::DeInit()
 				  << ToIpv4Address(be32_t(ip)) << std::endl;
 		}
 	}
+#else
+	uint32_t next = 0;
+	uint64_t *key;
+	void *_data;
+	int rc;
+	do {
+		rc = rte_hash_iterate(session_map, (const void **)&key, &_data, &next);
+		if (rc >= 0) {
+			struct session_info *data = (struct session_info *)_data;
+			/* now remove the record */
+			if (rte_hash_del_key(session_map, key) < 0) {
+				uint32_t ip = UE_ADDR(*key);
+				std::cerr << "Failed to remove record with UE address: "
+					  << ToIpv4Address(be32_t(ip)) << std::endl;
+			}
+			if (data != NULL)
+				rte_free(data);
+			/* resetting back to NULL */
+			next = 0;
+		}
+	} while (rc >= 0);
+
+	/* finally free the hash table */
+	rte_hash_free(session_map);
+#endif
 }
 /*----------------------------------------------------------------------------------*/
 CommandResponse
@@ -287,8 +455,29 @@ GtpuEncap::Init(const bess::pb::GtpuEncapArg &arg) {
 	if (InitNumSubs == 0)
 		return CommandFailure(EINVAL,
 				      "Invalid number of subscribers!");
-
+#ifndef RTE_HASH
 	session_map = bess::utils::CuckooMap<uint64_t, uint64_t>(InitNumBucket, InitNumSubs);
+#else
+	std::string hashtable_name = "session_map" + this->name();
+	std::cerr << "Creating rte_hash: " << hashtable_name << std::endl;
+
+	struct rte_hash_parameters session_map_params = {
+		.name                   = hashtable_name.c_str(),
+		.entries                = (unsigned int)InitNumSubs,
+		.reserved               = 0,
+		.key_len                = sizeof(uint64_t),
+		.hash_func              = rte_jhash,
+		.hash_func_init_val     = 0,
+		.socket_id              = (int)rte_socket_id(),
+		.extra_flag             = RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY
+	};
+
+	session_map = rte_hash_create(&session_map_params);
+	if (session_map == NULL)
+		return CommandFailure(ENOMEM,
+				      "Unable to create rte_hash table: %s\n",
+				      "session_map");
+#endif
 
 	return CommandSuccess();
 }

@@ -44,7 +44,7 @@ class Port:
         self.routes_table = None
 
     def bpf_gate(self):
-        if self.bpfgate < MAX_GATES - 1:
+        if self.bpfgate < MAX_GATES - 2:
             self.bpfgate += 1
             return self.bpfgate
         else:
@@ -116,7 +116,8 @@ class Port:
                 qspo = __bess_module__("{}QSlowPO".format(name), 'Queue')
 
                 # host_ip_filter: tcpdump -i foo 'dst host 198.19.0.1 or 198.18.0.1' -d
-                HostGate = self.bpf_gate()
+                # Should always be set to lowest priority
+                HostGate = MAX_GATES - 1
                 ips = ips_by_interface(name)
                 host_ip_filter = {"priority": -HostGate, "filter": "dst host "
                                 + " or ".join(str(x) for x in ips), "gate": HostGate}

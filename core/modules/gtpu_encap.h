@@ -1,11 +1,25 @@
 #ifndef BESS_MODULES_GTPUENCAP_H_
 #define BESS_MODULES_GTPUENCAP_H_
 /*----------------------------------------------------------------------------------*/
+#define RTE_HASH			1
+#ifndef RTE_HASH
 #include <map>
+#else
+#include <rte_hash.h>
+#endif
 #include "../module.h"
 #include "../pb/module_msg.pb.h"
+#ifndef RTE_HASH
 #include "utils/cuckoo_map.h"
+#endif
 /*----------------------------------------------------------------------------------*/
+#ifdef RTE_HASH
+/**
+ * check if nth bit is set.
+ */
+#define ISSET_BIT(mask, n)  (((mask) & (1LLU << (n))) ? 1 : 0)
+#endif /* !RTE_HASH */
+
 #define IPV6_ADDR_LEN			16
 #define MAX_DNS_SPON_ID_LEN		16
 
@@ -153,7 +167,11 @@ class GtpuEncap final : public Module {
 	
  private:
 	int dp_session_create(struct session_info *entry);
+#ifndef RTE_HASH
 	bess::utils::CuckooMap<uint64_t, uint64_t> session_map;
+#else
+	struct rte_hash *session_map;
+#endif
 	uint32_t s1u_sgw_ip;	/* S1U IP address */
 	/**
 	 * Number of cuckoo map buckets to hold sub info
