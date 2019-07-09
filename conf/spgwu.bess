@@ -58,7 +58,7 @@ class Port:
             peer_by_interface(self.name)
             mode = "dpdk"
         except:
-            mode = "af_packet"
+            mode = "linux"
         return mode
 
     def init_fastpath(self, **kwargs):
@@ -89,10 +89,16 @@ class Port:
         # Detect the mode of this interface - DPDK/AF_XDP/AF_PACKET
         mode = self.detect_mode()
 
-        if mode == 'af_packet':
-            # Initialize kernel fastpath
-            kwargs = {"vdev" : "net_af_packet{},iface={}".format(idx, name), "num_out_q": workers}
-            self.init_fastpath(**kwargs)
+        if mode == 'linux':
+            try:
+                # Initialize kernel fastpath
+                kwargs = {"vdev" : "net_af_xdp{},iface={},start_queue=0,queue_count={},pmd_zero_copy=1"
+                          .format(idx, name, workers), "num_out_q": workers}
+                self.init_fastpath(**kwargs)
+            except:
+                print('Failed to create AF_XDP socket for {}. Creating AF_PACKET socket instead.'.format(name))
+                kwargs = {"vdev" : "net_af_packet{},iface={}".format(idx, name), "num_out_q": workers}
+                self.init_fastpath(**kwargs)
 
         elif mode == 'dpdk':
             # if port list is empty, scan for dpdk_ports first

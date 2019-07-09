@@ -2,7 +2,7 @@
 set -e
 gui_port=8000
 # Update as per test environment
-mode="dpdk" #"af_packet"
+mode="dpdk" #"linux"
 ifaces=("s1u" "sgi")
 af_ifaces=("ens803f2" "ens803f3")
 ipaddrs=(198.18.0.1/30 198.19.0.1/30)
@@ -52,11 +52,13 @@ docker rm -f bess bess-routectl bess-web || true
 docker build --pull -t krsna1729/spgwu .
 
 [ "$mode" == 'dpdk' ] && DEVICES=${DEVICES:-'--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio'} || DEVICES=''
+[ "$mode" == 'linux' ] && NEED_PRIV=${NEED_PRIV:-'--privileged'} || NEED_PRIV=''
 
 docker run --name bess -td --restart unless-stopped \
 	--cap-add NET_ADMIN \
 	--cpuset-cpus=12-13 \
 	--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
+	$NEED_PRIV \
 	$DEVICES \
 	-v "$PWD/conf":/opt/bess/bessctl/conf \
 	-p $gui_port:$gui_port \
