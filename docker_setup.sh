@@ -2,7 +2,7 @@
 set -e
 gui_port=8000
 # Update as per test environment
-mode="dpdk" #"linux"
+mode="dpdk" # "af_xdp" "af_packet"
 ifaces=("s1u" "sgi")
 af_ifaces=("ens803f2" "ens803f3")
 ipaddrs=(198.18.0.1/30 198.19.0.1/30)
@@ -48,23 +48,22 @@ function rename_ifaces() {
 
 docker stop bess bess-routectl bess-web || true
 docker rm -f bess bess-routectl bess-web || true
+sudo rm -rf /var/run/netns
 
 docker build --pull -t krsna1729/spgwu .
 
 [ "$mode" == 'dpdk' ] && DEVICES=${DEVICES:-'--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio'} || DEVICES=''
-[ "$mode" == 'linux' ] && NEED_PRIV=${NEED_PRIV:-'--privileged'} || NEED_PRIV=''
+[ "$mode" == 'af_xdp' ] && PRIVS='--privileged' || PRIVS='--cap-add NET_ADMIN'
 
 docker run --name bess -td --restart unless-stopped \
-	--cap-add NET_ADMIN \
 	--cpuset-cpus=12-13 \
 	--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
-	$NEED_PRIV \
-	$DEVICES \
 	-v "$PWD/conf":/opt/bess/bessctl/conf \
 	-p $gui_port:$gui_port \
+	$PRIVS \
+	$DEVICES \
 	krsna1729/spgwu
 
-sudo rm -rf /var/run/netns
 sudo mkdir -p /var/run/netns
 pid=$(docker inspect --format='{{.State.Pid}}' bess)
 sudo ln -sfT /proc/"$pid"/ns/net /var/run/netns/bess

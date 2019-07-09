@@ -6,7 +6,7 @@ To follow instructions, you need
 
 * Docker CE >= 17.06
 * Hugepages mounted at `/dev/hugepages` or updated location in [`docker_setup.sh`](docker_setup.sh)
-* Update mode for devices: `dpdk`, `linux`( try `af_xdp` fallback to `af_packet`) in [`docker_setup.sh`](docker_setup.sh),
+* Update mode for devices: `dpdk`, `af_xdp` or `af_packet` in [`docker_setup.sh`](docker_setup.sh),
     along with device details
 * Update [`docker_setup.sh`](docker_setup.sh) and [`conf/spgwu.bess`](conf/spgwu.bess) to run iltrafficgen tests
 
