@@ -48,7 +48,7 @@ function rename_ifaces() {
 
 docker stop bess bess-routectl bess-web || true
 docker rm -f bess bess-routectl bess-web || true
-sudo rm -rf /var/run/netns
+sudo rm -rf /var/run/netns/bess
 
 docker build --pull -t krsna1729/spgwu .
 
@@ -65,8 +65,8 @@ docker run --name bess -td --restart unless-stopped \
 	krsna1729/spgwu
 
 sudo mkdir -p /var/run/netns
-pid=$(docker inspect --format='{{.State.Pid}}' bess)
-sudo ln -sfT /proc/"$pid"/ns/net /var/run/netns/bess
+sandbox=$(docker inspect --format='{{.NetworkSettings.SandboxKey}}' bess)
+sudo ln -s "$sandbox" /var/run/netns/bess
 
 case $mode in
 "dpdk") setup_mirror_links ;;
