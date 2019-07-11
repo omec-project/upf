@@ -3,8 +3,7 @@ set -e
 gui_port=8000
 # Update as per test environment
 mode="dpdk" # "af_xdp" "af_packet"
-ifaces=("s1u" "sgi")
-af_ifaces=("ens803f2" "ens803f3")
+ifaces=("ens803f2" "ens803f3")
 ipaddrs=(198.18.0.1/30 198.19.0.1/30)
 macaddrs=(68:05:ca:33:2e:20 68:05:ca:33:2e:21)
 nhipaddrs=(198.18.0.2 198.19.0.2)
@@ -39,13 +38,6 @@ function move_ifaces() {
 	done
 }
 
-function rename_ifaces() {
-	for ((i = 0; i < len; i++)); do
-		sudo ip link set "${af_ifaces[$i]}" down
-		sudo ip link set "${af_ifaces[$i]}" name "${ifaces[$i]}" up
-	done
-}
-
 docker stop bess bess-routectl bess-web || true
 docker rm -f bess bess-routectl bess-web || true
 sudo rm -rf /var/run/netns/bess
@@ -71,7 +63,6 @@ sudo ln -s "$sandbox" /var/run/netns/bess
 case $mode in
 "dpdk") setup_mirror_links ;;
 *)
-	rename_ifaces || true
 	move_ifaces
 	# Make sure that kernel does not send back icmp dest unreachable msg(s)
 	sudo ip netns exec bess iptables -I OUTPUT -p icmp --icmp-type port-unreachable -j DROP

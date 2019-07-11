@@ -3,10 +3,10 @@
     "enb_cidr": "11.1.1.128/25",
     "max_sessions": 50000,
     "s1u": {
-        "ifname": "s1u"
+        "ifname": "ens803f2"
     },
     "sgi": {
-        "ifname": "sgi"
+        "ifname": "ens803f3"
     },
     "workers": 1
 }
