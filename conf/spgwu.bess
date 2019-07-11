@@ -75,6 +75,13 @@ class Port:
         # Default drop when no matches
         self.fpi -> self.bpf:0 -> Sink()
 
+        # Initialize route module
+        self.rtr = __bess_module__("{}Routes".format(name), 'IPLookup')
+
+        # Default route goes to Sink
+        self.rtr.add(prefix='0.0.0.0', prefix_len=0, gate=MAX_GATES-1)
+        self.rtr:(MAX_GATES-1) -> Sink()
+
         # Attach fastpath to worker's root TC
         self.fpi.attach_task(wid=self.wid)
 
@@ -213,11 +220,6 @@ for idx, interface in enumerate(interfaces):
 s1u_ifname = conf["s1u"]["ifname"]
 sgi_ifname = conf["sgi"]["ifname"]
 
-# TODO: Handle routes for directly connected vs. via next hop differently
-sgiRoutes::IPLookup()
-# Adding default route
-sgiRoutes.add(prefix='0.0.0.0', prefix_len=0, gate=MAX_GATES-1)
-
 # Setting filter to detect gtpu traffic
 # src net 11.1.1.0 mask 255.255.255.0           # check eNB subnet
 # and dst host 11.1.1.1                         # check S/PGWU IP
@@ -236,12 +238,14 @@ uplink_filter = {"priority": -GTPUGate, "filter": check_enb_subnet +
                check_spgwu_ip + check_gtpu_port + check_ue_subnet, "gate": GTPUGate}
 s1uFastBPF.add(filters=[uplink_filter])
 
+sgiRoutes = ports[sgi_ifname].rtr
+
 s1uFastBPF:GTPUGate -> GTPUDecap::GenericDecap(bytes=50) \
     -> SGIEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(sgi_ifname))}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
-    -> sgiRoutes:(MAX_GATES-1) -> Sink()
+    -> sgiRoutes
 
 
 # ====================================================
@@ -252,17 +256,14 @@ s1uFastBPF:GTPUGate -> GTPUDecap::GenericDecap(bytes=50) \
 # Maximum number of sessions to manage
 max_sessions = conf["max_sessions"]
 
-# TODO: Handle routes for directly connected vs. via next hop differently
-s1uRoutes::IPLookup()
-# Adding default route
-s1uRoutes.add(prefix='0.0.0.0', prefix_len=0, gate=MAX_GATES-1)
-
 # Setting filter to detect UE subnet
 sgiFastBPF = ports[sgi_ifname].bpf
 UEGate = ports[sgi_ifname].bpf_gate()
 ue_filter = {"priority": -UEGate,
              "filter": "ip dst net {}".format(ue_cidr), "gate": UEGate}
 sgiFastBPF.add(filters=[ue_filter])
+
+s1uRoutes = ports[s1u_ifname].rtr
 
 sgiFastBPF:UEGate \
     -> EtherTrim::GenericDecap(bytes=14) \
@@ -273,7 +274,7 @@ sgiFastBPF:UEGate \
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
     -> OuterUDPCsum::L4Checksum() \
     -> OuterIPCsum::IPChecksum() \
-    -> s1uRoutes:(MAX_GATES-1) -> Sink()
+    -> s1uRoutes
 
 # Drop unknown packets
 GTPUEncap:0 -> Sink()
@@ -313,7 +314,7 @@ def sim_end_test():
 
 ### Uncomment the following lines to test with il_trafficgen ###
 # Start the test
-#sim_start_test()
+sim_start_test()
 # Wait for 30 seconds before deleting the session info entries (optional)
 #time.sleep(30)
 #sim_end_test()
