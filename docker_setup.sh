@@ -9,11 +9,12 @@ macaddrs=(68:05:ca:33:2e:20 68:05:ca:33:2e:21)
 nhipaddrs=(198.18.0.2 198.19.0.2)
 nhmacaddrs=(68:05:ca:31:fa:7a 68:05:ca:31:fa:7b)
 routes=("11.1.1.128/27 11.1.1.160/27 11.1.1.192/27 11.1.1.224/27" "13.1.1.128/27 13.1.1.160/27 13.1.1.192/27 13.1.1.224/27")
-len=${#ifaces[@]}
+num_ifaces=${#ifaces[@]}
+num_ipaddrs=${#ipaddrs[@]}
 
 function setup_trafficgen_routes() {
-	for ((i = 0; i < len; i++)); do
-		sudo ip netns exec bess ip neighbor add "${nhipaddrs[$i]}" lladdr "${nhmacaddrs[$i]}" dev "${ifaces[$i]}"
+	for ((i = 0; i < num_ipaddrs; i++)); do
+		sudo ip netns exec bess ip neighbor add "${nhipaddrs[$i]}" lladdr "${nhmacaddrs[$i]}" dev "${ifaces[$i%num_ifaces]}"
 		routelist=${routes[$i]}
 		for route in $routelist; do
 			sudo ip netns exec bess ip route add "$route" via "${nhipaddrs[$i]}"
@@ -21,21 +22,27 @@ function setup_trafficgen_routes() {
 	done
 }
 
-function setup_mirror_links() {
-	for ((i = 0; i < len; i++)); do
-		sudo ip netns exec bess ip link add "${ifaces[$i]}" type veth peer name "${ifaces[$i]}"-vdev
-		sudo ip netns exec bess ip link set "${ifaces[$i]}" up
-		sudo ip netns exec bess ip link set "${ifaces[$i]}-vdev" up
-		sudo ip netns exec bess ip addr add "${ipaddrs[$i]}" dev "${ifaces[$i]}"
-		sudo ip netns exec bess ip link set dev "${ifaces[$i]}" address "${macaddrs[$i]}"
+function setup_addrs(){
+	for ((i = 0; i < num_ipaddrs; i++)); do
+		sudo ip netns exec bess ip addr add "${ipaddrs[$i]}" dev "${ifaces[$i%$num_ifaces]}"
 	done
 }
 
-function move_ifaces() {
-	for ((i = 0; i < len; i++)); do
-		sudo ip link set "${ifaces[$i]}" netns bess up
-		sudo ip netns exec bess ip addr add "${ipaddrs[$i]}" dev "${ifaces[$i]}"
+function setup_mirror_links() {
+	for ((i = 0; i < num_ifaces; i++)); do
+		sudo ip netns exec bess ip link add "${ifaces[$i]}" type veth peer name "${ifaces[$i]}"-vdev
+		sudo ip netns exec bess ip link set "${ifaces[$i]}" up
+		sudo ip netns exec bess ip link set "${ifaces[$i]}-vdev" up
+		sudo ip netns exec bess ip link set dev "${ifaces[$i]}" address "${macaddrs[$i]}"
 	done
+	setup_addrs
+}
+
+function move_ifaces() {
+	for ((i = 0; i < num_ifaces; i++)); do
+		sudo ip link set "${ifaces[$i]}" netns bess up
+	done
+	setup_addrs
 }
 
 docker stop bess bess-routectl bess-web || true
