@@ -983,6 +983,18 @@ message SourceArg {
 }
 
 /**
+ * The GtpuEcho module processes the GTPv1 echo packet and prepares
+ * corresponding IP packet containing GTP echo response. It assumes
+ * Recovery IE is always zero.
+ *
+ * __Input Gates__: 1
+ * __Output Gates__: 1
+ */
+message GtpuEchoArg {
+  uint32 s1u_sgw_ip = 1; /// IP address of S1U interface
+}
+
+/**
  * The GtpuEncap module encapsulates an IP packet for tunnelling purposes 
  *
  * __Input Gates__: 1

@@ -10,12 +10,15 @@
 #include "utils/ip.h"
 /* for udp header */
 #include "utils/udp.h"
+/* for gtp header */
+#include "utils/gtp.h"
 #ifdef RTE_HASH
 #include <rte_jhash.h>
 #endif
 /*----------------------------------------------------------------------------------*/
 using bess::utils::Ipv4;
 using bess::utils::Udp;
+using bess::utils::Gtpv1;
 using bess::utils::be32_t;
 using bess::utils::be16_t;
 using bess::utils::ToIpv4Address;
@@ -50,7 +53,7 @@ const Commands GtpuEncap::cmds = {
 struct[[gnu::packed]] PacketTemplate {
 	Ipv4 iph;
 	Udp udph;
-	struct gtpu_hdr gtph;
+	Gtpv1 gtph;
 
 	PacketTemplate() {
 		gtph.version = GTPU_VERSION;
@@ -60,8 +63,8 @@ struct[[gnu::packed]] PacketTemplate {
 		gtph.seq = 0;
 		gtph.pdn = 0;
 		gtph.type = GTP_GPDU;
-		gtph.length = 0;			// to fill in
-		gtph.teid = 0;				// to fill in
+		gtph.length = (be16_t)0;		// to fill in
+		gtph.teid = (be32_t)0;			// to fill in
 		udph.src_port = (be16_t)UDP_PORT_GTPU;
 		udph.dst_port = (be16_t)UDP_PORT_GTPU;
 		udph.length = (be16_t)0;		// to fill in
@@ -308,27 +311,27 @@ GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 
 		/* pre-allocate space for encaped header(s) */
 		char *new_p = static_cast<char *>(p->prepend(sizeof(Udp) +
-							     sizeof(struct gtpu_hdr) +
+							     sizeof(Gtpv1) +
 							     sizeof(Ipv4)));
 		/* setting GTPU pointer */
-		struct gtpu_hdr *gtph = (struct gtpu_hdr *)(new_p + sizeof(Ipv4) +
-							    sizeof(Udp));
+		Gtpv1 *gtph = (Gtpv1 *)(new_p + sizeof(Ipv4) +
+					sizeof(Udp));
 
 		/* copying template content */
 		bess::utils::Copy(new_p, &outer_ip_template, sizeof(outer_ip_template));
 
 		/* setting gtpu header */
-		gtph->length = htons(pkt_len);
-		gtph->teid = htonl(data[i]->ul_s1_info.sgw_teid);
+		gtph->length = (be16_t)(pkt_len);
+		gtph->teid = (be32_t)(data[i]->ul_s1_info.sgw_teid);
 
 		/* setting outer UDP header */
 		Udp *udph = (Udp *)(new_p + sizeof(Ipv4));
-		udph->length = (be16_t)(pkt_len + sizeof(struct gtpu_hdr) +
+		udph->length = (be16_t)(pkt_len + sizeof(Gtpv1) +
 					sizeof(Udp));
 
 		/* setting outer IP header */
 		iph = (Ipv4 *)(new_p);
-		iph->length = (be16_t)(pkt_len + sizeof(struct gtpu_hdr) +
+		iph->length = (be16_t)(pkt_len + sizeof(Gtpv1) +
 				       sizeof(Udp) + sizeof(Ipv4));
 		iph->src = (be32_t)(data[i]->ul_s1_info.sgw_addr.u.ipv4_addr);
 		iph->dst = (be32_t)(data[i]->ul_s1_info.enb_addr.u.ipv4_addr);
@@ -371,27 +374,27 @@ GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 
 		/* pre-allocate space for encaped header(s) */
 		char *new_p = static_cast<char *>(p->prepend(sizeof(Udp) +
-							     sizeof(struct gtpu_hdr) +
+							     sizeof(Gtpv1) +
 							     sizeof(Ipv4)));
 		/* setting GTPU pointer */
-		struct gtpu_hdr *gtph = (struct gtpu_hdr *)(new_p + sizeof(Ipv4) +
-							    sizeof(Udp));
+		Gtpv1 *gtph = (Gtpv1 *)(new_p + sizeof(Ipv4) +
+						  sizeof(Udp));
 
 		/* copying template content */
 		bess::utils::Copy(new_p, &outer_ip_template, sizeof(outer_ip_template));
 
 		/* setting gtpu header */
-		gtph->length = htons(pkt_len);
-		gtph->teid = htonl(data->ul_s1_info.sgw_teid);
+		gtph->length = (be16_t)(pkt_len);
+		gtph->teid = (be32_t)(data->ul_s1_info.sgw_teid);
 
 		/* setting outer UDP header */
 		Udp *udph = (Udp *)(new_p + sizeof(Ipv4));
-		udph->length = (be16_t)(pkt_len + sizeof(struct gtpu_hdr) +
+		udph->length = (be16_t)(pkt_len + sizeof(Gtpv1) +
 					sizeof(Udp));
 
 		/* setting outer IP header */
 		iph = (Ipv4 *)(new_p);
-		iph->length = (be16_t)(pkt_len + sizeof(struct gtpu_hdr) +
+		iph->length = (be16_t)(pkt_len + sizeof(Gtpv1) +
 				       sizeof(Udp) + sizeof(Ipv4));
 		iph->src = (be32_t)(data->ul_s1_info.sgw_addr.u.ipv4_addr);
 		iph->dst = (be32_t)(data->ul_s1_info.enb_addr.u.ipv4_addr);

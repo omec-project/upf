@@ -132,22 +132,6 @@ typedef struct session_info {
 								 */
 } session_info;
 /*----------------------------------------------------------------------------------*/
-/**
- * GTPU header without seq
- */
-typedef struct gtpu_hdr {
-	uint8_t pdn:1,					/* N-PDU number */
-		seq:1,					/* Sequence number */
-		ex:1,					/* Extension header */
-		spare:1,				/* Reserved field */
-		pt:1,					/* Protocol type */
-		version:3;				/* Version */
-	
-	uint8_t type;					/* Message type */
-	uint16_t length;				/* Message length */
-	uint32_t teid;					/* Tunnel endpoint identifier */
-} gtpu_hdr;
-/*----------------------------------------------------------------------------------*/
 class GtpuEncap final : public Module {
  public:
 	GtpuEncap() {

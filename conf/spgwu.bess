@@ -212,46 +212,14 @@ for idx, interface in enumerate(interfaces):
     port.setup_port(idx, workers)
     ports[port.name] = port
 
-# ====================================================
-#       Uplink Pipeline
-# ====================================================
-
-
 s1u_ifname = conf["s1u"]["ifname"]
 sgi_ifname = conf["sgi"]["ifname"]
-
-# Setting filter to detect gtpu traffic
-# src net 11.1.1.0 mask 255.255.255.0           # check eNB subnet
-# and dst host 11.1.1.1                         # check S/PGWU IP
-# and udp dst port 2152                         # check GTPU port
-# and (udp[28:4] & 0xffffff00) = 0x10000000     # check UE subnet
-s1uFastBPF = ports[s1u_ifname].bpf
-GTPUGate = ports[s1u_ifname].bpf_gate()
-check_enb_subnet = "src net {} ".format(enb_cidr)
-check_spgwu_ip = " and dst host " + \
-    " or ".join(str(x) for x in ips_by_interface(s1u_ifname))
-check_gtpu_port = " and udp dst port 2152"
-check_ue_subnet = " and (udp[28:4] & 0x{}) = 0x{}".format(
-    cidr2mask(ue_cidr), ip2hex(cidr2block(ue_cidr)[0]))
-
-uplink_filter = {"priority": -GTPUGate, "filter": check_enb_subnet +
-               check_spgwu_ip + check_gtpu_port + check_ue_subnet, "gate": GTPUGate}
-s1uFastBPF.add(filters=[uplink_filter])
-
-sgiRoutes = ports[sgi_ifname].rtr
-
-s1uFastBPF:GTPUGate -> GTPUDecap::GenericDecap(bytes=50) \
-    -> SGIEtherAdd::GenericEncap(fields=[
-        {'size': 6, 'value': {'value_int': 0x0}},
-        {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(sgi_ifname))}},
-        {'size': 2, 'value': {'value_int': 0x0800}}]) \
-    -> sgiRoutes
-
 
 # ====================================================
 #       Downlink Pipeline
 # ====================================================
 
+s1uRoutes = ports[s1u_ifname].rtr
 
 # Maximum number of sessions to manage
 max_sessions = conf["max_sessions"]
@@ -262,8 +230,6 @@ UEGate = ports[sgi_ifname].bpf_gate()
 ue_filter = {"priority": -UEGate,
              "filter": "ip dst net {}".format(ue_cidr), "gate": UEGate}
 sgiFastBPF.add(filters=[ue_filter])
-
-s1uRoutes = ports[s1u_ifname].rtr
 
 sgiFastBPF:UEGate \
     -> EtherTrim::GenericDecap(bytes=14) \
@@ -278,6 +244,54 @@ sgiFastBPF:UEGate \
 
 # Drop unknown packets
 GTPUEncap:0 -> Sink()
+
+
+# ====================================================
+#       Uplink Pipeline
+# ====================================================
+
+
+# Setting filter to detect gtpu traffic
+# src net 11.1.1.0 mask 255.255.255.0           # check eNB subnet
+# and dst host 11.1.1.1                         # check S/PGWU IP
+# and udp dst port 2152                         # check GTPU port
+# and (udp[28:4] & 0xffffff00) = 0x10000000     # check UE subnet
+s1uFastBPF = ports[s1u_ifname].bpf
+check_enb_subnet = "src net {} ".format(enb_cidr)
+check_spgwu_ip = " and dst host " + \
+    " or ".join(str(x) for x in ips_by_interface(s1u_ifname))
+check_gtpu_port = " and udp dst port 2152"
+check_ue_subnet = " and (udp[28:4] & 0x{}) = 0x{}".format(
+    cidr2mask(ue_cidr), ip2hex(cidr2block(ue_cidr)[0]))
+check_gtpu_msg_echo = " and udp[9] = 0x1"
+
+GTPUEchoGate = ports[s1u_ifname].bpf_gate()
+uplink_echo_filter = {"priority": -GTPUEchoGate, "filter": check_enb_subnet +
+                      check_spgwu_ip + check_gtpu_port +
+                      check_gtpu_msg_echo, "gate": GTPUEchoGate}
+s1uFastBPF.add(filters=[uplink_echo_filter])
+
+GTPUGate = ports[s1u_ifname].bpf_gate()
+uplink_filter = {"priority": -GTPUGate, "filter": check_enb_subnet +
+               check_spgwu_ip + check_gtpu_port + check_ue_subnet, "gate": GTPUGate}
+s1uFastBPF.add(filters=[uplink_filter])
+
+sgiRoutes = ports[sgi_ifname].rtr
+
+s1uFastBPF:GTPUGate -> GTPUDecap::GenericDecap(bytes=50) \
+    -> SGIEtherAdd::GenericEncap(fields=[
+        {'size': 6, 'value': {'value_int': 0x0}},
+        {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(sgi_ifname))}},
+        {'size': 2, 'value': {'value_int': 0x0800}}]) \
+    -> sgiRoutes
+
+s1uFastBPF:GTPUEchoGate \
+	-> GTPUEcho::GtpuEcho(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0])):1 \
+        -> EthSwap::MACSwap() \
+        -> 1:OuterUDPCsum
+
+GTPUEcho:0 -> Sink()
+
 
 # ====================================================
 #       SIM_TEST

@@ -47,6 +47,7 @@ RUN apt-get update && apt-get install -y wget unzip ca-certificates git
 RUN wget -qO bess.zip https://github.com/NetSys/bess/archive/${BESS_COMMIT}.zip && unzip bess.zip
 WORKDIR bess-${BESS_COMMIT}
 COPY core/modules/ core/modules/
+COPY core/utils/ core/utils/
 COPY protobuf/ protobuf/
 RUN cp -a ${DPDK_DIR} deps/dpdk-17.11
 COPY patches/bess patches
