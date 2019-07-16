@@ -18,6 +18,25 @@ namespace utils {
 		be16_t  length;					/* Message length */
 		be32_t  teid;					/* Tunnel endpoint identifier */
 		/* The options start here. */
+
+		size_t header_length() const {
+			const Gtpv1 *gtph = this;
+			const uint8_t *pktptr = (const uint8_t *)this;
+			size_t len = sizeof(Gtpv1);
+
+			if (gtph->seq)
+				len += 2;
+			if (gtph->pdn)
+				len += 1;
+			if (gtph->ex) {
+				len += 1;
+				/* Probe till the last extension header */
+				/* calculate total len of gtp header (with options) */
+				while (pktptr[len - 1])
+					len += (pktptr[len] << 2);
+			}
+			return len;
+		}
 	};
 }  // namespace utils
 }  // namespace bess

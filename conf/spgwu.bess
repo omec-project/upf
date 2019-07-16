@@ -278,7 +278,7 @@ s1uFastBPF.add(filters=[uplink_filter])
 
 sgiRoutes = ports[sgi_ifname].rtr
 
-s1uFastBPF:GTPUGate -> GTPUDecap::GenericDecap(bytes=50) \
+s1uFastBPF:GTPUGate -> EtherDecapTrim::GenericDecap(bytes=14) -> GTPUDecap::GtpuDecap(ename="GTPUEncap"):1 \
     -> SGIEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(sgi_ifname))}},
@@ -290,7 +290,9 @@ s1uFastBPF:GTPUEchoGate \
         -> EthSwap::MACSwap() \
         -> 1:OuterUDPCsum
 
+# Drop unknown packets
 GTPUEcho:0 -> Sink()
+GTPUDecap:0 -> Sink()
 
 
 # ====================================================

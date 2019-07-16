@@ -995,6 +995,16 @@ message GtpuEchoArg {
 }
 
 /**
+ * The GtpuDecap module trims the GTPU header from the Ethernet frame
+ *
+ * __Input Gates__: 1
+ * __Output Gates__: 2
+ */
+message GtpuDecapArg {
+  string ename = 1; /// name of gtpencap module
+}
+
+/**
  * The GtpuEncap module encapsulates an IP packet for tunnelling purposes 
  *
  * __Input Gates__: 1
