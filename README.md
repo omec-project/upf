@@ -5,6 +5,7 @@
 To follow instructions, you need
 
 * Docker CE >= 17.06
+* Linux kernel version >= 4.15
 * Hugepages mounted at `/dev/hugepages` or updated location in [`docker_setup.sh`](docker_setup.sh)
 * Update mode for devices: `dpdk`, `af_xdp` or `af_packet` in [`docker_setup.sh`](docker_setup.sh),
     along with device details
