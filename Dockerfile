@@ -78,14 +78,6 @@ RUN apt-get update && \
         protobuf \
         pyroute2 \
         https://github.com/secdev/scapy/archive/b65e795c62accd383e1bb6b17cd9f7a9143ae117.zip
-# Workaround for mismatch in GLIBC version in
-# nefelinetworks/bess_build (ubuntu:bionic) and python:2.7-slim (debian:stretch)
-# Should go away one python moves to buster
-RUN echo "deb http://http.us.debian.org/debian testing main non-free contrib" > /etc/apt/sources.list.d/testing.list && \
-    apt-get update && \
-    apt-get -t testing -y install --no-install-recommends \
-        libc6 && \
-    rm -rf /var/lib/apt/lists/*
 COPY --from=pip /usr/local/lib/python2.7/site-packages/psutil /usr/local/lib/python2.7/site-packages/psutil
 COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin
