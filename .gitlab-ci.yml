@@ -3,6 +3,9 @@ image: docker:latest
 services:
   - docker:dind
 
+variables:
+  CI_REGISTRY_IMAGE: "krsna1729/spgwu"
+
 build-master:
   stage: build
   script:
