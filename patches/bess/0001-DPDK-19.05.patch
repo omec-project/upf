@@ -153,13 +153,13 @@ index 3ed68315..a2cfe87f 100644
    int ret = rte_eth_dev_attach(name, &port_id);
 +#else
 +  char vdev_name[RTE_ETH_NAME_MAX_LEN] = "";
-+  char vdev_args[RTE_ETH_NAME_MAX_LEN] = "";
++  char vdev_args[RTE_ETH_NAME_MAX_LEN<<2] = ""; char sep=',';
 +  std::vector <std::string> tokens;
 +  std::stringstream check(vdev);
 +  std::string intermediate;
 +
-+  while (getline(check, intermediate, ','))
-+      tokens.push_back(intermediate);
++  while (getline(check, intermediate, sep)) {
++      tokens.push_back(intermediate); sep = '\n';}
 +  for (unsigned int i = 0; i < tokens.size(); i++) {
 +     if (i == 0)
 +       strcpy(vdev_name, tokens[i].c_str());

@@ -98,13 +98,14 @@ class Port:
 
         if mode == 'linux':
             try:
-                # Initialize kernel fastpath
-                kwargs = {"vdev" : "net_af_xdp{},iface={},start_queue=0,queue_count={},pmd_zero_copy=1"
-                          .format(idx, name, workers), "num_out_q": workers}
+                # Initialize kernel fastpath.
+                # AF_XDP requires that num_rx_qs == num_tx_qs
+                kwargs = {"vdev" : "net_af_xdp{},iface={},start_queue=0,queue_count={}"
+                          .format(idx, name, workers), "num_out_q": workers, "num_inc_q": workers}
                 self.init_fastpath(**kwargs)
             except:
                 print('Failed to create AF_XDP socket for {}. Creating AF_PACKET socket instead.'.format(name))
-                kwargs = {"vdev" : "net_af_packet{},iface={}".format(idx, name), "num_out_q": workers}
+                kwargs = {"vdev" : "net_af_packet{},iface={},qpairs={}".format(idx, name, workers), "num_out_q": workers}
                 self.init_fastpath(**kwargs)
 
         elif mode == 'dpdk':
