@@ -12,6 +12,8 @@ RUN apt-get update && \
         unzip \
         wget
 
+ARG MAKEFLAGS
+
 ARG LINUX_VER=5.1.15
 RUN wget -qO linux.tar.xz https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-${LINUX_VER}.tar.xz
 RUN mkdir linux && \
@@ -33,13 +35,13 @@ RUN cd ${DPDK_DIR} && \
     sed -ri 's,(LIBRTE_BPF=).*,\1n,' config/common_base && \
     sed -ri 's,(AF_XDP=).*,\1y,' config/common_base && \
     make config T=x86_64-native-linuxapp-gcc && \
-    make -j $CPUS EXTRA_CFLAGS="-g -w -fPIC"
+    make $MAKEFLAGS EXTRA_CFLAGS="-g -w -fPIC"
 
 # Workaround for compiler error on including DPDK in bess
 WORKDIR ${DPDK_DIR}
 COPY patches/dpdk patches
 RUN cat patches/* | patch -p1 && \
-    make -j $CPUS EXTRA_CFLAGS="-g -w -fPIC"
+    make $MAKEFLAGS EXTRA_CFLAGS="-g -w -fPIC"
 
 WORKDIR /
 ARG BESS_COMMIT=master

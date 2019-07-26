@@ -49,7 +49,8 @@ docker stop bess bess-routectl bess-web || true
 docker rm -f bess bess-routectl bess-web || true
 sudo rm -rf /var/run/netns/bess
 
-docker build --pull -t krsna1729/spgwu .
+MAKEFLAGS=${MAKEFLAGS:-"-j20"}
+docker build --pull --build-arg "MAKEFLAGS=$MAKEFLAGS" -t krsna1729/spgwu .
 
 [ "$mode" == 'dpdk' ] && DEVICES=${DEVICES:-'--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio'} || DEVICES=''
 [ "$mode" == 'af_xdp' ] && PRIVS='--privileged' || PRIVS='--cap-add NET_ADMIN'
