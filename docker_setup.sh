@@ -45,12 +45,13 @@ function move_ifaces() {
 	setup_addrs
 }
 
-docker stop bess bess-routectl bess-web || true
-docker rm -f bess bess-routectl bess-web || true
+docker stop bess bess-routectl bess-web bess-cpiface || true
+docker rm -f bess bess-routectl bess-web bess-cpiface || true
 sudo rm -rf /var/run/netns/bess
 
 MAKEFLAGS=${MAKEFLAGS:-"-j20"}
-docker build --pull --build-arg "MAKEFLAGS=$MAKEFLAGS" -t krsna1729/spgwu .
+docker build --pull --build-arg "MAKEFLAGS=$MAKEFLAGS" --target=bess -t spgwu .
+docker build --pull --build-arg="MAKEFLAGS=$MAKEFLAGS" --target=cpiface -t cpiface .
 
 [ "$mode" == 'dpdk' ] && DEVICES=${DEVICES:-'--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio'} || DEVICES=''
 [ "$mode" == 'af_xdp' ] && PRIVS='--privileged' || PRIVS='--cap-add NET_ADMIN'
@@ -62,7 +63,7 @@ docker run --name bess -td --restart unless-stopped \
 	-p $gui_port:$gui_port \
 	$PRIVS \
 	$DEVICES \
-	krsna1729/spgwu
+	spgwu
 
 sudo mkdir -p /var/run/netns
 sandbox=$(docker inspect --format='{{.NetworkSettings.SandboxKey}}' bess)
@@ -86,9 +87,14 @@ docker run --name bess-routectl -td --restart unless-stopped \
 	-v "$PWD/conf/route_control.py":/route_control.py \
 	--net container:bess --pid container:bess \
 	--entrypoint /route_control.py \
-	krsna1729/spgwu -i "${ifaces[@]}"
+	spgwu -i "${ifaces[@]}"
 
 docker run --name bess-web -d --restart unless-stopped \
 	--net container:bess \
 	--entrypoint bessctl \
-	krsna1729/spgwu http 0.0.0.0 $gui_port
+	spgwu http 0.0.0.0 $gui_port
+
+docker run --name bess-cpiface -td --restart unless-stopped \
+       --net container:bess \
+       --entrypoint zmq-cpiface \
+       cpiface

@@ -56,6 +56,7 @@ COPY patches/bess patches
 RUN cat patches/* | patch -p1
 RUN ./build.py bess && cp bin/bessd /bin
 RUN mkdir -p /opt/bess && cp -r bessctl pybess /opt/bess
+RUN cp -a protobuf /protobuf
 
 # Stage pip: compile psutil
 FROM python:2.7-slim as pip
@@ -87,3 +88,37 @@ RUN ln -s /opt/bess/bessctl/bessctl /bin
 ENV PYTHONPATH="/opt/bess"
 WORKDIR /opt/bess/bessctl
 ENTRYPOINT ["bessd", "-f"]
+
+# Compile cpiface
+FROM ubuntu:18.04 as cpiface-build
+ARG MAKEFLAGS
+RUN apt-get update && apt-get install -y build-essential autoconf libtool pkg-config libgflags-dev libgtest-dev clang libc++-dev automake git libzmq3-dev libgoogle-glog-dev && \
+    cd /opt && \
+    git clone -q https://github.com/grpc/grpc.git && \
+    cd grpc && \
+    git checkout 216fa1cab3a42edb2e6274b67338351aade99a51 && \
+    git submodule update --init && \
+    make ${MAKEFLAGS} && \
+    echo "/opt/grpc/libs/opt" > /etc/ld.so.conf.d/grpc.conf && \
+    ldconfig
+ENV PATH=$PATH:/opt/grpc/bins/opt/:/opt/grpc/bins/opt/protobuf
+COPY cpiface /cpiface
+COPY --from=bess-build /protobuf /protobuf
+# Copying explicitly since symlinks don't work
+COPY core/utils/gtp_common.h /cpiface
+RUN cd /cpiface && \
+    make PBDIR=/protobuf && \
+    cp zmq-cpiface /bin/
+
+# Stage cpiface: creates runtime image of cpiface
+FROM ubuntu:18.04 as cpiface
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libzmq5 \
+	libgoogle-glog0v5 && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY --from=cpiface-build /opt/grpc/libs/opt /opt/grpc/libs/opt
+RUN echo "/opt/grpc/libs/opt" > /etc/ld.so.conf.d/grpc.conf && \
+    ldconfig
+COPY --from=cpiface-build /bin/zmq-cpiface /bin
