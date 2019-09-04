@@ -96,12 +96,7 @@ class Port:
         self.bpf.clear()
 
         # Default drop when no matches
-        if max_ip_defrag_flows is not None:
-            ipdefrag = __bess_module__("{}Defrag".format(name), 'IPDefrag', num_flows=max_ip_defrag_flows, numa=0)
-            self.fpi -> ipdefrag:1 -> self.bpf:0 -> Sink()
-            ipdefrag:0 -> Sink()
-        else:
-            self.fpi -> self.bpf:0 -> Sink()
+        self.fpi -> self.bpf:0 -> Sink()
 
         # Initialize route module
         self.rtr = __bess_module__("{}Routes".format(name), 'IPLookup')
@@ -171,6 +166,12 @@ class Port:
 
                 # Direct control traffic from kernel to DPDK
                 spi -> self.fpo
+
+                # Direct fast path traffic to Frag module
+                merge = __bess_module__("{}Merge".format(name), 'Merge')
+                frag = __bess_module__("{}IP4Frag".format(name), 'IPFrag')
+                merge -> frag:1 -> self.fpo
+                frag:0 -> Sink()
 
                 tc = 'slow{}'.format(wid)
                 try:
@@ -260,7 +261,7 @@ ue_filter = {"priority": -UEGate,
              "filter": "ip dst net {}".format(ue_cidr), "gate": UEGate}
 sgiFastBPF.add(filters=[ue_filter])
 
-sgiFastBPF:UEGate \
+sgiFastBPF:UEGate -> sgiIP4Defrag::IPDefrag(num_flows=max_ip_defrag_flows, numa=0):1 \
     -> EtherTrim::GenericDecap(bytes=14) \
     -> GTPUEncap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0]), num_subscribers=max_sessions):1 \
     -> S1UEtherAdd::GenericEncap(fields=[
@@ -273,7 +274,7 @@ sgiFastBPF:UEGate \
 
 # Drop unknown packets
 GTPUEncap:0 -> Sink()
-
+sgiIP4Defrag:0 -> Sink()
 
 # ====================================================
 #       Uplink Pipeline
@@ -307,7 +308,8 @@ s1uFastBPF.add(filters=[uplink_filter])
 
 sgiRoutes = ports[sgi_ifname].rtr
 
-s1uFastBPF:GTPUGate -> EtherDecapTrim::GenericDecap(bytes=14) -> GTPUDecap::GtpuDecap(ename="GTPUEncap"):1 \
+s1uFastBPF:GTPUGate -> s1uIP4Defrag::IPDefrag(num_flows=max_ip_defrag_flows, numa=0):1 \
+    -> EtherDecapTrim::GenericDecap(bytes=14) -> GTPUDecap::GtpuDecap(ename="GTPUEncap"):1 \
     -> SGIEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(sgi_ifname))}},
@@ -322,7 +324,7 @@ s1uFastBPF:GTPUEchoGate \
 # Drop unknown packets
 GTPUEcho:0 -> Sink()
 GTPUDecap:0 -> Sink()
-
+s1uIP4Defrag:0 -> Sink()
 
 # ====================================================
 #       SIM_TEST
