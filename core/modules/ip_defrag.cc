@@ -103,9 +103,6 @@ CommandResponse IPDefrag::Init(const bess::pb::IPDefragArg &arg) {
 
   numa = arg.numa();
 
-  if (numa < 0)
-    return CommandFailure(EINVAL, "Invalid value for NUMA id!");
-
   defrag_cycles = (rte_get_tsc_hz() + MS_PER_S - 1) / MS_PER_S * num_flows;
 
   cur_tsc = 0;
