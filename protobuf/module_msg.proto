@@ -1017,14 +1017,15 @@ message GtpuEncapArg {
 
 /**
  * The GtpuEncap module has a command `add(...)` which takes two
- * parameters.  This function accepts the teid, and UE IP address, and creates
+ * parameters.  This function accepts the teids, and UE IP address, and creates
  * a session record.
- * Example use in bessctl: `gencap.add(teid=0xf0000000, ueaddr=0x10000001)`
+ * Example use in bessctl: `gencap.add(teid=0xf0000000, eteid=..., ueaddr=0x10000001, enodeb_ip=...)`
  */
 message GtpuEncapAddSessionRecordArg {
-  uint32 teid = 1; /// tunnel endpoint identifier
-  uint32 ueaddr = 2; /// ip address of UE
-  uint32 enodeb_ip = 3; /// enodeb ip address
+  uint32 teid = 1; /// sgw tunnel endpoint identifier
+  uint32 eteid = 2; /// enodeb tunnel endpoint identifier
+  uint32 ueaddr = 3; /// ip address of UE
+  uint32 enodeb_ip = 4; /// enodeb ip address
 }
 
 /**

@@ -124,12 +124,15 @@ CommandResponse
 GtpuEncap::AddSessionRecord(const bess::pb::GtpuEncapAddSessionRecordArg &arg)
 {
 	uint32_t teid = arg.teid();
+	uint32_t eteid = arg.eteid();
 	uint32_t ueaddr = arg.ueaddr();
 	uint32_t enodeb_ip = arg.enodeb_ip();
 	struct session_info sess;
 
 	if (teid == 0)
 		return CommandFailure(EINVAL, "Invalid TEID value");
+	if (eteid == 0)
+		return CommandFailure(EINVAL, "Invalid enodeb TEID value");
 	if (ueaddr == 0)
 		return CommandFailure(EINVAL, "Invalid UE address");
 	if (enodeb_ip == 0)
@@ -144,6 +147,7 @@ GtpuEncap::AddSessionRecord(const bess::pb::GtpuEncapAddSessionRecordArg &arg)
 	sess.ue_addr.u.ipv4_addr = ueaddr;
 	sess.ul_s1_info.sgw_teid = teid;
 	sess.ul_s1_info.sgw_addr.u.ipv4_addr = s1u_sgw_ip;
+	sess.dl_s1_info.enb_teid = eteid;
 	sess.dl_s1_info.sgw_addr.u.ipv4_addr = s1u_sgw_ip;
 	sess.ul_s1_info.enb_addr.u.ipv4_addr = enodeb_ip;
 	sess.sess_id = SESS_ID(htonl(sess.ue_addr.u.ipv4_addr), DEFAULT_BEARER);
@@ -273,7 +277,7 @@ GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 
 		/* setting gtpu header */
 		gtph->length = (be16_t)(pkt_len);
-		gtph->teid = (be32_t)(data[i]->ul_s1_info.sgw_teid);
+		gtph->teid = (be32_t)(data[i]->dl_s1_info.enb_teid);
 
 		/* setting outer UDP header */
 		Udp *udph = (Udp *)(new_p + sizeof(Ipv4));

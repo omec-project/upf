@@ -175,7 +175,7 @@ main(int argc, char **argv)
 					<< ")" << std::endl;
 				resp.op_id = rbuf.sess_entry.op_id;
 				resp.dp_id.id = DPN_ID;
-				resp.mtype = DPN_CREATE_RESP;
+				resp.mtype = DPN_RESPONSE;
 				resp.sess_id = rbuf.sess_entry.sess_id;
 				zmq_sess_map[SESS_ID(rbuf.sess_entry.ue_addr.u.ipv4_addr, DEFAULT_BEARER)] = true;
 				break;
@@ -189,7 +189,7 @@ main(int argc, char **argv)
 					<< ")" << std::endl;
 				resp.op_id = rbuf.sess_entry.op_id;
 				resp.dp_id.id = DPN_ID;
-				resp.mtype = DPN_MODIFY_RESP;
+				resp.mtype = DPN_RESPONSE;
 				resp.sess_id = rbuf.sess_entry.sess_id;
 				if (zmq_sess_map.find(SESS_ID(rbuf.sess_entry.ue_addr.u.ipv4_addr, DEFAULT_BEARER)) ==
 				    zmq_sess_map.end()) {
@@ -202,6 +202,7 @@ main(int argc, char **argv)
 								 + std::to_string(args.bessd_port),
 								 InsecureChannelCredentials()));
 				b.runAddCommand(rbuf.sess_entry.ul_s1_info.sgw_teid,
+						rbuf.sess_entry.dl_s1_info.enb_teid,
 						rbuf.sess_entry.ue_addr.u.ipv4_addr,
 						rbuf.sess_entry.ul_s1_info.enb_addr.u.ipv4_addr,
 						args.encapmod);
@@ -209,11 +210,18 @@ main(int argc, char **argv)
 				break;
 			case MSG_SESS_DEL:
 				VLOG(1) << "Got a session delete request" << std::endl;
+				VLOG(1) << "UEADDR: " << rbuf.sess_entry.ue_addr
+					<< ", ENODEADDR: " << rbuf.sess_entry.ul_s1_info.enb_addr
+					<< ", sgw_teid: " << (rbuf.sess_entry.ul_s1_info.sgw_teid)
+					<< ", enb_teid: " << ntohl(rbuf.sess_entry.dl_s1_info.enb_teid)
+					<< " (" << ntohl(rbuf.sess_entry.dl_s1_info.enb_teid)
+					<< ")" << std::endl;
 				resp.op_id = rbuf.sess_entry.op_id;
 				resp.dp_id.id = DPN_ID;
-				resp.mtype = DPN_DELETE_RESP;
+				resp.mtype = DPN_RESPONSE;
 				resp.sess_id = rbuf.sess_entry.sess_id;
-				if (zmq_sess_map.find(SESS_ID(rbuf.sess_entry.ue_addr.u.ipv4_addr, DEFAULT_BEARER)) ==
+				/* why is the ue ip address stored in reverse endian order just in delete message? */
+				if (zmq_sess_map.find(SESS_ID(ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr), DEFAULT_BEARER)) ==
 				    zmq_sess_map.end()) {
 					VLOG(1) << "No record found!" << std::endl;
 					break;
@@ -224,7 +232,7 @@ main(int argc, char **argv)
 								 + std::to_string(args.bessd_port),
 								 InsecureChannelCredentials()));
 				b.runRemoveCommand(rbuf.sess_entry.ue_addr.u.ipv4_addr, args.encapmod);
-				std::map<std::uint64_t, bool>::iterator it = zmq_sess_map.find(SESS_ID(rbuf.sess_entry.ue_addr.u.ipv4_addr,
+				std::map<std::uint64_t, bool>::iterator it = zmq_sess_map.find(SESS_ID(ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),
 														   DEFAULT_BEARER));
 				zmq_sess_map.erase(it);
 				}
@@ -239,6 +247,8 @@ main(int argc, char **argv)
 					  << strerror(errno)
 					  << std::endl;
 				break;
+			} else {
+				VLOG(1) << "Sending back response block" << std::endl;
 			}
 		}
 	}

@@ -4,7 +4,6 @@
 #include <grpcpp/channel.h>
 #include <grpcpp/create_channel.h>
 #include <glog/logging.h>
-#include <gflags/gflags.h>
 #include "service.grpc.pb.h"
 #include "module_msg.pb.h"
 #include "gtp_common.h"
@@ -34,10 +33,11 @@ private:
 	bess::pb::CommandResponse cre;
 public:
 	BessClient(std::shared_ptr<Channel> channel) : stub_(bess::pb::BESSControl::NewStub(channel)), crt() {}
-		void runAddCommand(const uint32_t teid, const uint32_t ueaddr,
+		void runAddCommand(const uint32_t teid, const uint32_t eteid, const uint32_t ueaddr,
 				   const uint32_t enode_ip, const char *modname) {
 		bess::pb::GtpuEncapAddSessionRecordArg *geasra = new bess::pb::GtpuEncapAddSessionRecordArg();
 		geasra->set_teid(teid);
+		geasra->set_eteid(eteid);
 		geasra->set_ueaddr(ueaddr);
 		geasra->set_enodeb_ip(enode_ip);
 		::google::protobuf::Any *any = new ::google::protobuf::Any();

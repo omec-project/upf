@@ -39,6 +39,7 @@ enum {
 };
 
 enum {
+	DPN_RESPONSE	=	4,
 	DPN_CREATE_RESP = 	10,
 	DPN_MODIFY_RESP,
 	DPN_DELETE_RESP
