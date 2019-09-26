@@ -26,30 +26,6 @@ using bess::utils::ToIpv4Address;
 
 enum {DEFAULT_GATE = 0, FORWARD_GATE};
 /*----------------------------------------------------------------------------------*/
-//#define USE_IN_FILE_VERSION		1
-#if USE_IN_FILE_VERSION
-size_t
-GetGtpuHeaderSize(uint8_t *pktptr)
-{
-	Gtpv1 *gtph= (Gtpv1 *)pktptr;
-	size_t len = sizeof(Gtpv1);
-
-	if (gtph->seq)
-		len += 2;
-	if (gtph->pdn)
-		len += 1;
-	if (gtph->ex) {
-		len += 1;
-		/* Probe till the last extension header */
-		/* calculate total len of gtp header (with options) */
-		while (pktptr[len - 1])
-			len += (pktptr[len] << 2);
-	}
-
-	return len;
-}
-#endif
-/*----------------------------------------------------------------------------------*/
 void
 GtpuDecap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 {
@@ -66,16 +42,10 @@ GtpuDecap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 		/* pkt_len can be used as the length of IP datagram */
 		/* Trim iph->ihl<<2 + sizeof(Udp) + size of Gtpv1 header */
 		Ipv4 *iph = p->head_data<Ipv4 *>();
-#if USE_IN_FILE_VERSION
-		batch->pkts()[i]->adj((iph->header_length<<2) + sizeof(Udp) +
-				      GetGtpuHeaderSize((uint8_t *)iph +
-							(iph->header_length<<2) + sizeof(Udp)));
-#else
 		Gtpv1 *gtph = (Gtpv1 *)((uint8_t *)iph + (iph->header_length<<2) + sizeof(Udp));
 		batch->pkts()[i]->adj((iph->header_length<<2) +
 				      sizeof(Udp) +
 				      gtph->header_length());
-#endif
 
 		iph = p->head_data<Ipv4 *>();
 		be32_t daddr = iph->dst;

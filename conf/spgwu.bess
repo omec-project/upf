@@ -7,6 +7,24 @@
 import errno
 from conf.utils import *
 
+
+# ====================================================
+#       Parameters
+# ====================================================
+
+
+conf_file = get_env('CONF_FILE', 'conf/spgwu.json')
+conf = get_json_conf(conf_file, False)
+
+# Maximum number of flows to manage ip frags for re-assembly
+max_ip_frag_flows = None
+try:
+    max_ip_frag_flows = int(conf["max_ip_frag_flows"])
+except ValueError:
+    print('Invalid value for max_ip_frag_flows. Not installing IPDefrag module.')
+except KeyError:
+    print('max_ip_frag_flows value not set. Not installing IPDefrag module.')
+
 # ====================================================
 #       Port Helpers
 # ====================================================
@@ -75,7 +93,12 @@ class Port:
         self.bpf.clear()
 
         # Default drop when no matches
-        self.fpi -> self.bpf:0 -> Sink()
+        if max_ip_frag_flows is not None:
+            ipdefrag = __bess_module__("{}Defrag".format(name), 'IPDefrag', num_flows=max_ip_frag_flows, numa=0)
+            self.fpi -> ipdefrag:1 -> self.bpf:0 -> Sink()
+            ipdefrag:0 -> Sink()
+        else:
+            self.fpi -> self.bpf:0 -> Sink()
 
         # Initialize route module
         self.rtr = __bess_module__("{}Routes".format(name), 'IPLookup')
@@ -169,14 +192,6 @@ class Port:
 
 
 # ====================================================
-#       Parameters
-# ====================================================
-
-
-conf_file = get_env('CONF_FILE', 'conf/spgwu.json')
-conf = get_json_conf(conf_file, False)
-
-# ====================================================
 #       Validate
 # ====================================================
 
@@ -196,10 +211,11 @@ for cidr in cidrs:
 
 
 # Initialize workers
+workers = 1
 try:
     workers = int(conf["workers"])
 except ValueError:
-    print('Invalid workers value!')
+    print('Invalid workers value! Re-setting # of workers to 1.')
 
 cores = get_process_affinity()
 for wid in xrange(workers):
@@ -283,7 +299,7 @@ s1uFastBPF.add(filters=[uplink_echo_filter])
 
 GTPUGate = ports[s1u_ifname].bpf_gate()
 uplink_filter = {"priority": -GTPUGate, "filter": check_enb_subnet +
-               check_spgwu_ip + check_gtpu_port + check_ue_subnet, "gate": GTPUGate}
+               check_spgwu_ip + check_gtpu_port, "gate": GTPUGate}
 s1uFastBPF.add(filters=[uplink_filter])
 
 sgiRoutes = ports[sgi_ifname].rtr
