@@ -33,6 +33,8 @@ RUN cd ${DPDK_DIR} && \
     sed -ri 's,(IGB_UIO=).*,\1n,' config/common_linux* && \
     sed -ri 's,(KNI_KMOD=).*,\1n,' config/common_linux* && \
     sed -ri 's,(LIBRTE_BPF=).*,\1n,' config/common_base && \
+    sed -ri 's,(LIBRTE_PMD_PCAP=).*,\1y,' config/common_base && \
+    sed -ri 's,(PORT_PCAP=).*,\1y,' config/common_base && \
     sed -ri 's,(AF_XDP=).*,\1y,' config/common_base && \
     make config T=x86_64-native-linuxapp-gcc && \
     make $MAKEFLAGS EXTRA_CFLAGS="-g -w -fPIC"
