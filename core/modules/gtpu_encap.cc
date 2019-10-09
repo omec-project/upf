@@ -178,7 +178,8 @@ GtpuEncap::RemoveSessionRecord(const bess::pb::GtpuEncapRemoveSessionRecordArg &
 		return CommandFailure(EINVAL, "The given address does not exist");
 
 	/* free session_info */
-	rte_free(data);
+	if (data != NULL)
+		rte_free(data);
 
 	/* now remove the record */
 	if (rte_hash_del_key(session_map, &key) < 0)
@@ -322,6 +323,7 @@ GtpuEncap::DeInit()
 
 	/* finally free the hash table */
 	rte_hash_free(session_map);
+	session_map = NULL;
 }
 /*----------------------------------------------------------------------------------*/
 CommandResponse

@@ -19,7 +19,7 @@ class GtpuDecap final : public Module {
 	void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
 
  private:
-	struct rte_hash *session_map;
+	struct rte_hash *session_map = NULL;
 };
 /*----------------------------------------------------------------------------------*/
 #endif  // BESS_MODULES_GTPUDECAP_H_

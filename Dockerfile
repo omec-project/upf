@@ -54,7 +54,7 @@ COPY protobuf/ protobuf/
 RUN cp -a ${DPDK_DIR} deps/dpdk-17.11
 COPY patches/bess patches
 RUN cat patches/* | patch -p1
-RUN ./build.py bess && cp bin/bessd /bin
+RUN CXXARCHFLAGS="-march=native -Werror=format-truncation -Warray-bounds -fbounds-check -fno-strict-overflow -fno-delete-null-pointer-checks -fwrapv" ./build.py bess && cp bin/bessd /bin
 RUN mkdir -p /opt/bess && cp -r bessctl pybess /opt/bess
 RUN cp -a protobuf /protobuf
 
@@ -71,7 +71,6 @@ RUN apt-get update && \
         iproute2 \
         iptables \
 	iputils-ping \
-        procps \
         tcpdump && \
     rm -rf /var/lib/apt/lists/* && \
     pip install --no-cache-dir \
