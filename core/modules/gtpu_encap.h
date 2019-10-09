@@ -38,14 +38,14 @@ class GtpuEncap final : public Module {
  private:
 	int dp_session_create(struct session_info *entry);
 
-	struct rte_hash *session_map;
+	struct rte_hash *session_map = NULL;
 
-	uint32_t s1u_sgw_ip;	/* S1U IP address */
+	uint32_t s1u_sgw_ip = 0;	/* S1U IP address */
 
 	/**
 	 * Number of possible subscribers
 	 */
-	int InitNumSubs;
+	int InitNumSubs = 0;
 };
 /*----------------------------------------------------------------------------------*/
 #endif  // BESS_MODULES_GTPUENCAP_H_

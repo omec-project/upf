@@ -42,7 +42,7 @@ class GtpuEcho final : public Module {
 
  private:
 	bool process_echo_request(bess::Packet *p);
-	uint32_t s1u_sgw_ip;	/* S1U IP address */
+	uint32_t s1u_sgw_ip = 0;	/* S1U IP address */
 };
 /*----------------------------------------------------------------------------------*/
 #endif  // BESS_MODULES_GTPUECHO_H_

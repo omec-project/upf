@@ -162,9 +162,9 @@ index 3ed68315..a2cfe87f 100644
 +      tokens.push_back(intermediate); sep = '\n';}
 +  for (unsigned int i = 0; i < tokens.size(); i++) {
 +     if (i == 0)
-+       strcpy(vdev_name, tokens[i].c_str());
++       snprintf(vdev_name, RTE_ETH_NAME_MAX_LEN, "%s", tokens[i].c_str());
 +     else if (i == 1)
-+       strcpy(vdev_args, tokens[i].c_str());
++       snprintf(vdev_args, (RTE_ETH_NAME_MAX_LEN<<2), "%s", tokens[i].c_str());
 +  }
 +  tokens.clear();
 +

@@ -319,7 +319,7 @@ def sim_start_test():
         enb_of_ran = ue_of_ran % NG4T_MAX_ENB_RAN
         enb_idx = ran * NG4T_MAX_ENB_RAN + enb_of_ran
 
-        GTPUEncap.add(teid=start_teid+i, eteid=0, ueaddr=start_ue_ip+i, enodeb_ip=start_enb_ip+enb_idx)
+        GTPUEncap.add(teid=start_teid+i, eteid=i+1, ueaddr=start_ue_ip+i, enodeb_ip=start_enb_ip+enb_idx)
 
 def sim_end_test():
     start_ue_ip = 0x10000001
