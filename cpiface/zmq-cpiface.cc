@@ -45,6 +45,7 @@ struct Args {
 		};
 		do {
 			int option_index = 0;
+			uint32_t val = 0;
 
 			c = getopt_long(argc, argv, "B:b:Z:s:r:M:", long_options,
 					&option_index);
@@ -57,28 +58,31 @@ struct Args {
 				strncpy(bessd_ip, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
 				break;
 			case 'b':
-				bessd_port = (uint16_t)strtoul(optarg, NULL, 10);
-				if (bessd_port == ULONG_MAX) {
+				val = strtoul(optarg, NULL, 10);
+				if (val == ULONG_MAX && errno == ERANGE) {
 					std::cerr << "Failed to parse bessd_port" << std::endl;
 					exit(EXIT_FAILURE);
 				}
+				bessd_port = (uint16_t)(val & 0x0000FFFF);
 				break;
 			case 'Z':
 				strncpy(zmqd_ip, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
 				break;
 			case 's':
-				zmqd_send_port = (uint16_t)strtoul(optarg, NULL, 10);
-				if (zmqd_send_port == ULONG_MAX) {
+				val = strtoul(optarg, NULL, 10);
+				if (val == ULONG_MAX && errno == ERANGE) {
 					std::cerr << "Failed to parse zmqd_send_port" << std::endl;
 					exit(EXIT_FAILURE);
 				}
+				zmqd_send_port = (uint16_t)(val & 0x0000FFFF);
 				break;
 			case 'r':
-				zmqd_recv_port = (uint16_t)strtoul(optarg, NULL, 10);
-				if (zmqd_recv_port == ULONG_MAX) {
+				val = strtoul(optarg, NULL, 10);
+				if (val == ULONG_MAX && errno == ERANGE) {
 					std::cerr << "Failed to parse zmqd_recv_port" << std::endl;
 					exit(EXIT_FAILURE);
 				}
+				zmqd_recv_port = (uint16_t)(val & 0x0000FFFF);
 				break;
 			case 'M':
 				strncpy(encapmod, optarg, MIN(strlen(optarg), MODULE_NAME_LEN - 1));
@@ -109,6 +113,7 @@ main(int argc, char **argv)
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
 
 	std::map<uint64_t, bool> zmq_sess_map;
+
 	context1 = zmq_ctx_new();
 	context2 = zmq_ctx_new();
 	receiver = zmq_socket(context1, ZMQ_PULL);
@@ -176,8 +181,8 @@ main(int argc, char **argv)
 				resp.op_id = rbuf.sess_entry.op_id;
 				resp.dp_id.id = DPN_ID;
 				resp.mtype = DPN_RESPONSE;
-				resp.sess_id = rbuf.sess_entry.sess_id;
 				zmq_sess_map[SESS_ID(rbuf.sess_entry.ue_addr.u.ipv4_addr, DEFAULT_BEARER)] = true;
+				resp.sess_id = rbuf.sess_entry.sess_id;
 				break;
 			case MSG_SESS_MOD:
 				VLOG(1) << "Got a session modify request, ";

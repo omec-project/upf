@@ -268,6 +268,13 @@ GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 		char *new_p = static_cast<char *>(p->prepend(sizeof(Udp) +
 							     sizeof(Gtpv1) +
 							     sizeof(Ipv4)));
+		if (new_p == NULL) {
+			/* failed to prepend header space for encaped packet */
+			EmitPacket(ctx, p, DEFAULT_GATE);
+			DLOG(INFO) << "prepend() failed!" << std::endl;
+			continue;
+		}
+
 		/* setting GTPU pointer */
 		Gtpv1 *gtph = (Gtpv1 *)(new_p + sizeof(Ipv4) +
 					sizeof(Udp));
