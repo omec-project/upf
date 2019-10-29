@@ -2,7 +2,7 @@
 
 ## Pre-reqs
 
-To follow instructions, you need
+You need the following dependencies.
 
 * Docker CE >= 17.06
 * Linux kernel version >= 4.15 for Docker; >= 4.19 for AF_XDP
@@ -10,17 +10,20 @@ To follow instructions, you need
 * Update mode for devices: `dpdk`, `af_xdp` or `af_packet` in [`docker_setup.sh`](docker_setup.sh),
     along with device details
 * Update [`docker_setup.sh`](docker_setup.sh) and [`conf/spgwu.bess`](conf/spgwu.bess) to run iltrafficgen tests
+* ZMQ streamers from ngic-rtc. Set IP address of `docker0` interface in `interface.cfg`, e.g. `zmq_cp_ip=172.17.0.1` & `zmq_dp_ip=172.17.0.1`.
 
 ## Init
 
-To run BESS daemon with custom NGIC modules' code
+To run BESS daemon with NGIC modules' code:
 
 ```bash
 ./docker_setup.sh
 ```
 
-To init the pipeline or reflect changes to [`conf/spgwu.bess`](conf/spgwu.bess)
-or [`conf/spgwu.json`](conf/spgwu.json)
+To update the pipeline, reflect changes to [`conf/spgwu.bess`](conf/spgwu.bess)
+and/or [`conf/spgwu.json`](conf/spgwu.json)
+
+To install the pipeline, do:
 
 ```bash
 docker exec bess bessctl run spgwu
@@ -35,6 +38,7 @@ Control program(s) to dynamically configure BESS modules
 |---------------|------------|
 | Routes | [route_control.py](conf/route_control.py) |
 | UE sessions | Static trafficgen only in `spgwu.bess` |
+| CP communication | [zmq-cpiface.cc](cpiface/zmq-cpiface.cc) |
 
 ## Observe
 
