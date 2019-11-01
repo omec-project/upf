@@ -1,12 +1,22 @@
 {
+    "": "UE IP range",
     "ue_cidr": "16.0.0.0/16",
+
+    "": "eNodeB IP range",
     "enb_cidr": "11.1.1.128/25",
+
+    "": "max UE sessions",
     "max_sessions": 50000,
+
+    "": "Gateway interfaces",
     "s1u": {
         "ifname": "ens803f2"
     },
+
     "sgi": {
         "ifname": "ens803f3"
     },
+
+    "": "Number of worker threads. Default: use 1 thread to run both (uplink/downlink) pipelines",
     "workers": 1
 }
