@@ -1,3 +1,7 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * Copyright(c) 2019 Intel Corporation
+ */
 #ifndef BESS_UTILS_GTP_H_
 #define BESS_UTILS_GTP_H_
 /*----------------------------------------------------------------------------------*/

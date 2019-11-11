@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2019 Intel Corporation
+
 # Multi-stage Dockerfile
 # Stage bess-build: builds bess with its dependencies
 FROM nefelinetworks/bess_build AS bess-build

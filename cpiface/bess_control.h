@@ -1,3 +1,7 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * Copyright(c) 2019 Intel Corporation
+ */
 #ifndef __BESS_CONTROL_H__
 #define __BESS_CONTROL_H__
 /*--------------------------------------------------------------------------------*/
