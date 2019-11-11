@@ -1,3 +1,8 @@
+<!--
+SPDX-License-Identifier: Apache-2.0
+Copyright(c) 2019 Intel Corporation
+-->
+
 # UPF-EPC - Overview
 UPF-EPC is a revised version of [ngic-rtc](https://github.com/omec-project/ngic-rtc)'s [dp](https://github.com/omec-project/ngic-rtc/dp). 
 It works seamlessly with all NFs available in the omec-project's EPC. Like ngic-rtc's dp, it communicates with [cp](https://github.com/omec-project/ngic-rtc/cp) and

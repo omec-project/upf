@@ -1,3 +1,7 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * Copyright(c) 2019 Intel Corporation
+ */
 #ifndef __GTP_COMMON_H__
 #define __GTP_COMMON_H__
 /*----------------------------------------------------------------------------------*/

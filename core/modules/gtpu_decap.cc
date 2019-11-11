@@ -1,3 +1,7 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * Copyright(c) 2019 Intel Corporation
+ */
 /* for gtpu_decap decls */
 #include "gtpu_decap.h"
 /* for rte_zmalloc() */

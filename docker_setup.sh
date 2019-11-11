@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+# Copyright(c) 2019 Intel Corporation
+
 set -e
 # TCP port of bess-web monitor
 gui_port=8000

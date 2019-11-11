@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright(c) 2019 Intel Corporation
+
 CXX ?= g++
 CXXFLAGS ?= -g -O3 -std=c++17 -Werror -Wall -Wcast-align
 TARGET ?= zmq-cpiface
