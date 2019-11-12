@@ -24,8 +24,8 @@ namespace utils {
 			const uint8_t *pktptr = (const uint8_t *)this;
 			size_t len = sizeof(Gtpv1);
 
-			if (gtph->seq)
-				len += 2;
+			if (gtph->seq)			/* TODO: Sequence # len set to 4B; verify this! */
+				len += 4;		/* See section 9.3 of 3GPP TS 29.060 (Release 13) */
 			if (gtph->pdn)
 				len += 1;
 			if (gtph->ex) {
