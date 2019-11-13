@@ -17,7 +17,7 @@
 /**
  * ZMQ stuff
  */
-void *receiver;
+void 	*receiver;
 void *sender;
 void *context1;
 void *context2;
