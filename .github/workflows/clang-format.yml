@@ -9,19 +9,25 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - name: clang
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Dependencies
       run: |
         sudo apt-get -y install jq clang-format-8
-        sudo snap install hub --classic
-        
+        sudo cp $(which clang-format-8) /bin/clang-format
+
+        wget https://github.com/github/hub/releases/download/v2.13.0/hub-linux-amd64-2.13.0.tgz
+        tar xzf hub-linux-amd64-2.13.0.tgz
+        sudo cp hub-linux-amd64-2.13.0/bin/hub /bin
+
         hub pr checkout $(jq -r ".number" "$GITHUB_EVENT_PATH")
-        
+    - name: Format
+      run: |
         SRC=$(git ls-tree --full-tree -r HEAD | grep -e "\.\(c\|h\|hpp\|cpp\)\$" | cut -f 2)
         wget https://raw.githubusercontent.com/NetSys/bess/master/core/.clang-format
         clang-format -i $SRC
-        
+    - name: Commit and push
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |        
         git config --global user.email "actions@github"
         git config --global user.name "Github Actions"        
         git commit -a -m "Apply clang-format" || {echo "nothing to commit"; exit 0}
