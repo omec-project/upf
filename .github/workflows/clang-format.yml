@@ -8,18 +8,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v1
-    - name: Clang format
+    - name: Setup
       run: |
-        sudo apt-get install -y clang-format-8
         wget https://raw.githubusercontent.com/NetSys/bess/master/core/.clang-format
-        SRC=$(git ls-tree --full-tree -r HEAD | grep -e "\.\(c\|h\|hpp\|cpp\)\$" | cut -f 2)
-        clang-format-8 -style=file -i $SRC
-        rm .clang-format
-    - name: Update pull request
-      uses: gr2m/create-or-update-pull-request-action@v1.x
+    - name: Clang Code Formatter
+      uses: krsna1729/clang-format-action
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        branch: testing-1
-        commit-message: "Apply clang-format"
