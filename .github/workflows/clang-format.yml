@@ -9,10 +9,20 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - name: Setup
-      run: |
-        wget https://raw.githubusercontent.com/NetSys/bess/master/core/.clang-format
-    - name: Clang Code Formatter
-      uses: krsna1729/clang-format-action@master
+    - name: clang
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        sudo apt-get -y install jq clang-format-8
+        
+        hub pr checkout $(jq -r ".number" "$GITHUB_EVENT_PATH")
+        
+        SRC=$(git ls-tree --full-tree -r HEAD | grep -e "\.\(c\|h\|hpp\|cpp\)\$" | cut -f 2)
+        wget https://raw.githubusercontent.com/NetSys/bess/master/core/.clang-format
+        clang-format -i $SRC
+        
+        git config --global user.email "actions@github"
+        git config --global user.name "Github Actions"        
+        git commit -a -m "Apply clang-format" || {echo "nothing to commit"; exit 0}
+        
+        hub push
