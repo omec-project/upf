@@ -114,7 +114,7 @@ IPDefrag::Init(const bess::pb::IPDefragArg &arg) {
 		return CommandFailure(EINVAL,
 				      "Invalid value for NUMA id!");
 
-	frag_cycles = (rte_get_tsc_hz() + MS_PER_S - 1)
+	defrag_cycles = (rte_get_tsc_hz() + MS_PER_S - 1)
 		/ MS_PER_S * num_flows;
 
 	cur_tsc = 0;
@@ -122,7 +122,7 @@ IPDefrag::Init(const bess::pb::IPDefragArg &arg) {
 	ift = rte_ip_frag_table_create(num_flows,
 				       IP_FRAG_TBL_BUCKET_ENTRIES,
 				       num_flows * IP_FRAG_TBL_BUCKET_ENTRIES,
-				       frag_cycles,
+				       defrag_cycles,
 				       numa);
 	if (ift == NULL) {
 		std::cerr << "Could not allocate memory for reassembly table "
@@ -130,7 +130,7 @@ IPDefrag::Init(const bess::pb::IPDefragArg &arg) {
 		ift = rte_ip_frag_table_create(num_flows,
 					       IP_FRAG_TBL_BUCKET_ENTRIES,
 					       num_flows * IP_FRAG_TBL_BUCKET_ENTRIES,
-					       frag_cycles,
+					       defrag_cycles,
 					       SOCKET_ID_ANY);
 		if (ift == NULL)
 			return CommandFailure(ENOMEM,
