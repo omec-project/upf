@@ -21,46 +21,46 @@ TMUX2=2:0.0
 ILTRAFFICGEN_PATH=~/il_trafficgen/pktgen
 
 function SET_VAL() {
-    sed_cmd="s/$1=/$1=$2\#/g"
-    sed -i -e $sed_cmd ${ILTRAFFICGEN_PATH}/autotest/user_input.cfg
+	sed_cmd="s/$1=/$1=$2\#/g"
+	sed -i -e $sed_cmd ${ILTRAFFICGEN_PATH}/autotest/user_input.cfg
 }
 
 for ((i = 0; i < num_entries; i++)); do
-    for ((j = 0; j < num_subs; j++)); do
-	SET_VAL "pps" "${PPS[$i]}"
-	SET_VAL "pkt_size" "${PKTSIZE[$i]}"
-	SET_VAL "flows" "${SUBS[$j]}"
+	for ((j = 0; j < num_subs; j++)); do
+		SET_VAL "pps" "${PPS[$i]}"
+		SET_VAL "pkt_size" "${PKTSIZE[$i]}"
+		SET_VAL "flows" "${SUBS[$j]}"
 
-	source ${ILTRAFFICGEN_PATH}/autotest/user_input.cfg
+		source ${ILTRAFFICGEN_PATH}/autotest/user_input.cfg
 
-	sudo rm -rf ${ILTRAFFICGEN_PATH}/autotest/log/*
+		sudo rm -rf ${ILTRAFFICGEN_PATH}/autotest/log/*
 
-	# Spawn processes
-	tmux send-keys -t $TMUX1 './il_nperf.sh -g' Enter &
-	sleep $INIT_TIME
-	tmux send-keys -t $TMUX2 './il_nperf.sh -r' Enter &
-	sleep $INIT_TIME
+		# Spawn processes
+		tmux send-keys -t $TMUX1 './il_nperf.sh -g' Enter &
+		sleep $INIT_TIME
+		tmux send-keys -t $TMUX2 './il_nperf.sh -r' Enter &
+		sleep $INIT_TIME
 
-	# Start pktgen
-	tmux send-keys -t $TMUX2 'start 0' &
-	tmux send-keys -t $TMUX1 'start 0' &
-	tmux send-keys -t $TMUX2 ' ' Enter &
-	tmux send-keys -t $TMUX1 ' ' Enter &
-	tmux send-keys -t $TMUX2 ' ' Enter &
-	tmux send-keys -t $TMUX1 ' ' Enter &
-	sleep $TEST_DURATION
+		# Start pktgen
+		tmux send-keys -t $TMUX2 'start 0' &
+		tmux send-keys -t $TMUX1 'start 0' &
+		tmux send-keys -t $TMUX2 ' ' Enter &
+		tmux send-keys -t $TMUX1 ' ' Enter &
+		tmux send-keys -t $TMUX2 ' ' Enter &
+		tmux send-keys -t $TMUX1 ' ' Enter &
+		sleep $TEST_DURATION
 
-	# Quit processes
-	tmux send-keys -t $TMUX1 'quit' &
-	tmux send-keys -t $TMUX1 ' ' Enter &
-	tmux send-keys -t $TMUX2 'quit' &
-	tmux send-keys -t $TMUX2 ' ' Enter &
-	sleep $DEINIT_TIME
+		# Quit processes
+		tmux send-keys -t $TMUX1 'quit' &
+		tmux send-keys -t $TMUX1 ' ' Enter &
+		tmux send-keys -t $TMUX2 'quit' &
+		tmux send-keys -t $TMUX2 ' ' Enter &
+		sleep $DEINIT_TIME
 
-	tmux send-keys -t $TMUX1 ' ' Enter &
-	tmux send-keys -t $TMUX2 ' ' Enter &
+		tmux send-keys -t $TMUX1 ' ' Enter &
+		tmux send-keys -t $TMUX2 ' ' Enter &
 
-	sudo mv ${ILTRAFFICGEN_PATH}/autotest/log/* ${ILTRAFFICGEN_PATH}/autotest/trial_${SUBS[$j]}_${PPS[$i]}_${PKTSIZE[$i]}.log
-	cp ${ILTRAFFICGEN_PATH}/autotest/user_input.cfg.bk ${ILTRAFFICGEN_PATH}/autotest/user_input.cfg
-    done
+		sudo mv ${ILTRAFFICGEN_PATH}/autotest/log/* ${ILTRAFFICGEN_PATH}/autotest/trial_${SUBS[$j]}_${PPS[$i]}_${PKTSIZE[$i]}.log
+		cp ${ILTRAFFICGEN_PATH}/autotest/user_input.cfg.bk ${ILTRAFFICGEN_PATH}/autotest/user_input.cfg
+	done
 done

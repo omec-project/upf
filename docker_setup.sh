@@ -45,14 +45,13 @@ nhmacaddrs=(68:05:ca:31:fa:7a 68:05:ca:31:fa:7b)
 # In the order of ("{r-s1u}" "{r-sgi}")
 routes=("11.1.1.128/27 11.1.1.160/27 11.1.1.192/27 11.1.1.224/27" "13.1.1.128/27 13.1.1.160/27 13.1.1.192/27 13.1.1.224/27")
 
-
 num_ifaces=${#ifaces[@]}
 num_ipaddrs=${#ipaddrs[@]}
 
 # Set up static route and neighbor table entries of the SPGW
 function setup_trafficgen_routes() {
 	for ((i = 0; i < num_ipaddrs; i++)); do
-		sudo ip netns exec bess ip neighbor add "${nhipaddrs[$i]}" lladdr "${nhmacaddrs[$i]}" dev "${ifaces[$i%num_ifaces]}"
+		sudo ip netns exec bess ip neighbor add "${nhipaddrs[$i]}" lladdr "${nhmacaddrs[$i]}" dev "${ifaces[$i % num_ifaces]}"
 		routelist=${routes[$i]}
 		for route in $routelist; do
 			sudo ip netns exec bess ip route add "$route" via "${nhipaddrs[$i]}"
@@ -61,9 +60,9 @@ function setup_trafficgen_routes() {
 }
 
 # Assign IP address(es) of gateway interface(s) within the network namespace
-function setup_addrs(){
+function setup_addrs() {
 	for ((i = 0; i < num_ipaddrs; i++)); do
-		sudo ip netns exec bess ip addr add "${ipaddrs[$i]}" dev "${ifaces[$i%$num_ifaces]}"
+		sudo ip netns exec bess ip addr add "${ipaddrs[$i]}" dev "${ifaces[$i % $num_ifaces]}"
 	done
 }
 
@@ -146,6 +145,6 @@ docker run --name bess-web -d --restart unless-stopped \
 
 # Run bess-cpiface
 docker run --name bess-cpiface -td --restart unless-stopped \
-       --net container:bess \
-       --entrypoint zmq-cpiface \
-       cpiface
+	--net container:bess \
+	--entrypoint zmq-cpiface \
+	cpiface

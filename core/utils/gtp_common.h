@@ -171,8 +171,8 @@ struct ipcan_dp_bearer_cdr {
                                                * the bearer relates to*/
   char sponsor_id[MAX_DNS_SPON_ID_LEN];       /* to identify the 3rd party
                                                * organization       (the sponsor)
-                                               * willing to       pay for the       operator's
-                                               * charge*/
+                                               * willing to       pay for the
+                                               * operator's       charge*/
   struct service_data_list service_data_list; /* List of service*/
   uint32_t rating_group;                      /* rating group of this bearer*/
   uint64_t vol_threshold;                     /* volume threshold in MBytes*/
