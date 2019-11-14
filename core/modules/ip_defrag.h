@@ -28,7 +28,7 @@ class IPDefrag final : public Module {
 	struct rte_ip_frag_tbl *ift = NULL;	/* hold frags for reassembly */
 	struct rte_ip_frag_death_row ifdr;	/* for retiring outdated frags (internal bookkeeping) */
 	uint64_t cur_tsc;			/* for calculating retiring time */
-	uint64_t frag_cycles;
+	uint64_t defrag_cycles;
 
 	/**
 	 * Max number of flows to maintain

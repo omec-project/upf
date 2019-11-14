@@ -17,13 +17,13 @@ conf_file = get_env('CONF_FILE', 'conf/spgwu.json')
 conf = get_json_conf(conf_file, False)
 
 # Maximum number of flows to manage ip frags for re-assembly
-max_ip_frag_flows = None
+max_ip_defrag_flows = None
 try:
-    max_ip_frag_flows = int(conf["max_ip_frag_flows"])
+    max_ip_defrag_flows = int(conf["max_ip_defrag_flows"])
 except ValueError:
-    print('Invalid value for max_ip_frag_flows. Not installing IPDefrag module.')
+    print('Invalid value for max_ip_defrag_flows. Not installing IPDefrag module.')
 except KeyError:
-    print('max_ip_frag_flows value not set. Not installing IPDefrag module.')
+    print('max_ip_defrag_flows value not set. Not installing IPDefrag module.')
 
 # ====================================================
 #       Port Helpers
@@ -93,8 +93,8 @@ class Port:
         self.bpf.clear()
 
         # Default drop when no matches
-        if max_ip_frag_flows is not None:
-            ipdefrag = __bess_module__("{}Defrag".format(name), 'IPDefrag', num_flows=max_ip_frag_flows, numa=0)
+        if max_ip_defrag_flows is not None:
+            ipdefrag = __bess_module__("{}Defrag".format(name), 'IPDefrag', num_flows=max_ip_defrag_flows, numa=0)
             self.fpi -> ipdefrag:1 -> self.bpf:0 -> Sink()
             ipdefrag:0 -> Sink()
         else:
