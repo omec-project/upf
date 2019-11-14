@@ -23,6 +23,11 @@ jobs:
         wget https://raw.githubusercontent.com/NetSys/bess/master/core/.clang-format
         clang-format -style=file -i $SRC
         rm .clang-format
+    - name: Shell Format
+      run: |
+        wget -qO shfmt https://github.com/mvdan/sh/releases/download/v2.6.4/shfmt_v2.6.4_linux_amd64
+        chmod +x shfmt && sudo mv /bin
+        shfmt -w -l .
     - name: Commit and push
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -30,4 +35,4 @@ jobs:
         git remote set-url origin https://x-access-token:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git
         git config --global user.email "actions@github"
         git config --global user.name "Github Actions"
-        hub commit -a -m "Apply clang-format" && hub push || echo "Nothing to commit"
+        hub commit -a -m "Apply formatting" && hub push || echo "Nothing to commit"
