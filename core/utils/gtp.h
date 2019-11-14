@@ -10,40 +10,40 @@
 namespace bess {
 namespace utils {
 
-	struct[[gnu::packed]] Gtpv1 {
-		uint8_t pdn:1,					/* N-PDU number */
-			seq:1,					/* Sequence number */
-			ex:1,					/* Extension header */
-			spare:1,				/* Reserved field */
-			pt:1,					/* Protocol type */
-			version:3;				/* Version */
+struct [[gnu::packed]] Gtpv1 {
+  uint8_t pdn : 1, /* N-PDU number */
+      seq : 1,     /* Sequence number */
+      ex : 1,      /* Extension header */
+      spare : 1,   /* Reserved field */
+      pt : 1,      /* Protocol type */
+      version : 3; /* Version */
 
-		uint8_t type;					/* Message type */
-		be16_t  length;					/* Message length */
-		be32_t  teid;					/* Tunnel endpoint identifier */
-		/* The options start here. */
+  uint8_t type;  /* Message type */
+  be16_t length; /* Message length */
+  be32_t teid;   /* Tunnel endpoint identifier */
+  /* The options start here. */
 
-		size_t header_length() const {
-			const Gtpv1 *gtph = this;
-			const uint8_t *pktptr = (const uint8_t *)this;
-			size_t len = sizeof(Gtpv1);
+  size_t header_length() const {
+    const Gtpv1 *gtph = this;
+    const uint8_t *pktptr = (const uint8_t *)this;
+    size_t len = sizeof(Gtpv1);
 
-			if (gtph->seq)			/* TODO: Sequence # len set to 4B; verify this! */
-				len += 4;		/* See section 9.3 of 3GPP TS 29.060 (Release 13) */
-			if (gtph->pdn)
-				len += 1;
-			if (gtph->ex) {
-				len += 1;
-				/* Probe till the last extension header */
-				/* calculate total len of gtp header (with options) */
-				while (pktptr[len - 1])
-					len += (pktptr[len] << 2);
-			}
-			return len;
-		}
-	};
+    if (gtph->seq) /* TODO: Sequence # len set to 4B; verify this! */
+      len += 4;    /* See section 9.3 of 3GPP TS 29.060 (Release 13) */
+    if (gtph->pdn)
+      len += 1;
+    if (gtph->ex) {
+      len += 1;
+      /* Probe till the last extension header */
+      /* calculate total len of gtp header (with options) */
+      while (pktptr[len - 1])
+        len += (pktptr[len] << 2);
+    }
+    return len;
+  }
+};
 }  // namespace utils
 }  // namespace bess
-		
+
 /*----------------------------------------------------------------------------------*/
 #endif /* BESS_UTILS_GTP_H_ */
