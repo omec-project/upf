@@ -4,6 +4,9 @@
  */
 #ifndef __GTP_COMMON_H__
 #define __GTP_COMMON_H__
+
+#include <cstdint>
+#include <time.h>
 /*----------------------------------------------------------------------------------*/
 #define DPN_ID 12345
 /**
