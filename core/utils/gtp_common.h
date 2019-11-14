@@ -156,20 +156,19 @@ struct chrg_data_vol {
  * IP-CAN Bearer Charging Data Records
  */
 struct ipcan_dp_bearer_cdr {
-  uint32_t charging_id;            /* Bearer Charging id*/
-  uint32_t pdn_conn_charging_id;   /* PDN connection charging id*/
-  struct tm record_open_time;      /* Record time*/
-  uint64_t duration_time;          /* duration (sec)*/
-  uint8_t record_closure_cause;    /* Record closure cause*/
-  uint64_t record_seq_number;      /* Sequence no.*/
-  uint8_t charging_behavior_index; /* Charging index*/
-  uint32_t service_id;             /* to identify the service
-                                    * or the service component
-                                    * the bearer relates to*/
-  char
-      sponsor_id[MAX_DNS_SPON_ID_LEN]; /* to identify the 3rd party organization
-                                        * (the sponsor) willing to pay for the
-                                        * operator's charge*/
+  uint32_t charging_id;                       /* Bearer Charging id*/
+  uint32_t pdn_conn_charging_id;              /* PDN connection charging id*/
+  struct tm record_open_time;                 /* Record time*/
+  uint64_t duration_time;                     /* duration (sec)*/
+  uint8_t record_closure_cause;               /* Record closure cause*/
+  uint64_t record_seq_number;                 /* Sequence no.*/
+  uint8_t charging_behavior_index;            /* Charging index*/
+  uint32_t service_id;                        /* to identify the service
+                                               * or the service component
+                                               * the bearer relates to*/
+  char sponsor_id[MAX_DNS_SPON_ID_LEN];       /* to identify the 3rd party
+                                               * organization       (the sponsor) willing to
+                                               * pay for the       operator's charge*/
   struct service_data_list service_data_list; /* List of service*/
   uint32_t rating_group;                      /* rating group of this bearer*/
   uint64_t vol_threshold;                     /* volume threshold in MBytes*/
