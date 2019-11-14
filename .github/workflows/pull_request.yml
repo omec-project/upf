@@ -6,7 +6,17 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+
+      # Checkout and build
     - uses: actions/checkout@v1
+    - name: Build the Docker image
+      env:
+        MAKEFLAGS: "-j4"
+      run: |
+        docker build --pull --build-arg="MAKEFLAGS=$MAKEFLAGS" --target=bess -t spgwu .
+        docker build --pull --build-arg="MAKEFLAGS=$MAKEFLAGS" --target=cpiface -t cpiface .
+
+    # Format the code
     - uses: geertvdc/setup-hub@master
     - name: Dependencies
       run: |
@@ -28,6 +38,14 @@ jobs:
         wget -qO shfmt https://github.com/mvdan/sh/releases/download/v2.6.4/shfmt_v2.6.4_linux_amd64
         chmod +x shfmt && sudo mv shfmt /bin
         shfmt -w -l .
+
+    # Build again and commit
+    - name: Build the Docker image (after format)
+      env:
+        MAKEFLAGS: "-j4"
+      run: |
+        docker build --pull --build-arg="MAKEFLAGS=$MAKEFLAGS" --target=bess -t spgwu .
+        docker build --pull --build-arg="MAKEFLAGS=$MAKEFLAGS" --target=cpiface -t cpiface .
     - name: Commit and push
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
