@@ -53,10 +53,11 @@ reading from file /tmp/tmpUBTGau, link-type EN10MB (Ethernet)
 * Monitoring/Debugging capabilties using *(i)* tcpdump on individual BESS modules, *(ii)* visualization web interface, and *(iii)* command line shell interface for displaying statistics *etc*.
 * Static IP routing
 * Dynamic IP routing
+* Support for IPv4 datagrams reassembly
 
 ### In Progress
 * Billing and Charging
-* Support for IP packets fragmentation and reassembly
+* Support for IP packets fragmentation
 
 ### Pending
 * PCC (Policy Control and Charging) rules configuration.
