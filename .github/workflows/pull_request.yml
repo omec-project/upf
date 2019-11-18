@@ -12,6 +12,7 @@ jobs:
     - name: Build the Docker image
       env:
         MAKEFLAGS: "-j4"
+        DOCKER_BUILDKIT: 1
       run: |
         docker build --pull --build-arg="MAKEFLAGS=$MAKEFLAGS" --target=bess -t spgwu .
         docker build --pull --build-arg="MAKEFLAGS=$MAKEFLAGS" --target=cpiface -t cpiface .
@@ -47,6 +48,7 @@ jobs:
     - name: Build the Docker image (after format)
       env:
         MAKEFLAGS: "-j4"
+        DOCKER_BUILDKIT: 1
       run: |
         docker build --pull --build-arg="MAKEFLAGS=$MAKEFLAGS" --target=bess -t spgwu .
         docker build --pull --build-arg="MAKEFLAGS=$MAKEFLAGS" --target=cpiface -t cpiface .
