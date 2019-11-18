@@ -25,7 +25,7 @@ jobs:
         sudo cp $(which clang-format-8) /bin/clang-format
         wget -q -O- \
           https://github.com/github/hub/releases/download/v$HUB_VER/hub-linux-amd64-$HUB_VER.tgz | \
-          sudo tar xz --strip-components=1 --wildcards '*/bin/hub' -C /bin
+          sudo tar xz --strip-components=2 --wildcards '*/bin/hub' && sudo mv hub /bin/hub
     - name: Checkout PR
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
