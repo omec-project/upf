@@ -12,16 +12,21 @@ jobs:
     - name: Build the Docker image
       env:
         MAKEFLAGS: "-j4"
+        DOCKER_BUILDKIT: 1
       run: |
         docker build --pull --build-arg="MAKEFLAGS=$MAKEFLAGS" --target=bess -t spgwu .
         docker build --pull --build-arg="MAKEFLAGS=$MAKEFLAGS" --target=cpiface -t cpiface .
 
     # Format the code
-    - uses: geertvdc/setup-hub@master
     - name: Dependencies
+      env:
+        HUB_VER: 2.13.0
       run: |
         sudo apt-get -y install jq clang-format-8
         sudo cp $(which clang-format-8) /bin/clang-format
+        wget -q -O- \
+          https://github.com/github/hub/releases/download/v$HUB_VER/hub-linux-amd64-$HUB_VER.tgz | \
+          sudo tar xz --strip-components=2 --wildcards '*/bin/hub' && sudo mv hub /bin/hub
     - name: Checkout PR
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -43,6 +48,7 @@ jobs:
     - name: Build the Docker image (after format)
       env:
         MAKEFLAGS: "-j4"
+        DOCKER_BUILDKIT: 1
       run: |
         docker build --pull --build-arg="MAKEFLAGS=$MAKEFLAGS" --target=bess -t spgwu .
         docker build --pull --build-arg="MAKEFLAGS=$MAKEFLAGS" --target=cpiface -t cpiface .
