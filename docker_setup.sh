@@ -95,9 +95,10 @@ docker rm -f bess bess-routectl bess-web bess-cpiface || true
 sudo rm -rf /var/run/netns/bess
 
 # Build
-MAKEFLAGS=${MAKEFLAGS:-"-j20"}
+: "${MAKEFLAGS:=-j20}"
+: "${DOCKER_BUILDKIT:=1}"
 docker build --pull --build-arg "MAKEFLAGS=$MAKEFLAGS" --target=bess -t spgwu .
-docker build --pull --build-arg="MAKEFLAGS=$MAKEFLAGS" --target=cpiface -t cpiface .
+docker build --pull --build-arg "MAKEFLAGS=$MAKEFLAGS" --target=cpiface -t cpiface .
 
 [ "$mode" == 'dpdk' ] && DEVICES=${DEVICES:-'--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio'} || DEVICES=''
 [ "$mode" == 'af_xdp' ] && PRIVS='--privileged' || PRIVS='--cap-add NET_ADMIN'
