@@ -16,18 +16,26 @@ You need the following dependencies.
     along with device details
 * Update [`docker_setup.sh`](docker_setup.sh) and [`conf/spgwu.bess`](conf/spgwu.bess) to run iltrafficgen tests
 
->`docker_setup.sh` is a quick start guide to set up UPF-EPC for evaluation. 
+>`docker_setup.sh` is a quick start guide to set up UPF-EPC for evaluation.
 
 ## Init
 
 ### ZMQ Streamer
-UPF-EPC communicates with the CP via [ZMQ streamer](https://github.com/omec-project/ngic-rtc/blob/master/dev_scripts/start-ZMQ_Streamer.sh). Please adjust 
+
+UPF-EPC communicates with the CP via [ZMQ streamer](https://github.com/omec-project/ngic-rtc/blob/master/dev_scripts/start-ZMQ_Streamer.sh). Please adjust
 [`interface.cfg`](https://github.com/omec-project/ngic-rtc/blob/master/config/interface.cfg) so that both `zmq_cp_ip` and `zmq_dp_ip` are set to `docker0`'s IP address.
 
 ### CP
-Please refer to [INSTALL.md](https://github.com/omec-project/ngic-rtc/blob/master/INSTALL.MD) to get CP running. 
+
+Please refer to [INSTALL.md](https://github.com/omec-project/ngic-rtc/blob/master/INSTALL.MD) to get CP running.
 
 ### DP
+
+| VAR            | DEFAULT    | NOTES                                              |
+|----------------|------------|----------------------------------------------------|
+| MAKEFLAGS      | -j$(nproc) | Customize if build fails due to memory exhaustion  |
+| DOCKER_BUIDKIT |          1 | Turn off to try legacy builder on older Docker ver |
+
 To run BESS daemon with NGIC modules' code:
 
 ```bash
@@ -55,6 +63,7 @@ Control program(s) to dynamically configure BESS modules
 | CP communication | [zmq-cpiface.cc](cpiface/zmq-cpiface.cc) |
 
 ## Testing
+
 UPF-EPC has been tested against 2 microbenchmark applications (on an Intel Xeon Platinum 8170 @ 2.10GHz)
 
 ### [il_trafficgen](https://github.com/omec-project/il_trafficgen)
@@ -64,6 +73,7 @@ UPF-EPC has been tested against 2 microbenchmark applications (on an Intel Xeon 
 * 1 default bearer per session
 
 ### Spirent Landslide 17.5.0 GA testcases
+
 * Tested with up to 10K subscribers
 * 64B Ethernet frame size
 * 1 default bearer per session

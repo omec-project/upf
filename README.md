@@ -4,7 +4,8 @@ Copyright(c) 2019 Intel Corporation
 -->
 
 # UPF-EPC - Overview
-UPF-EPC is a revised version of [ngic-rtc](https://github.com/omec-project/ngic-rtc)'s [dp](https://github.com/omec-project/ngic-rtc/dp). 
+
+UPF-EPC is a revised version of [ngic-rtc](https://github.com/omec-project/ngic-rtc)'s [dp](https://github.com/omec-project/ngic-rtc/dp).
 It works seamlessly with all NFs available in the omec-project's EPC. Like ngic-rtc's dp, it communicates with [cp](https://github.com/omec-project/ngic-rtc/cp) and
 conforms to Control User Plane Separated (CUPS) architecture. The prototype is based on the 3GPP TS23501 specifications of EPC and functions as a co-located Service
 and Packet Gateway (SPGW-U).
@@ -17,9 +18,9 @@ each module represents a graphical node. The revised dataplane is not just more 
 
 BESS tools are available out-of-the-box for debugging and/or monitoring; *e.g.*:
 
-
 * Run `tcpdump` on arbitrary dataplane pipeline module
-```
+
+```bash
 localhost:10514 $ tcpdump s1uFastBPF
   Running: tcpdump -r /tmp/tmpYUlLw8
 reading from file /tmp/tmpYUlLw8, link-type EN10MB (Ethernet)
@@ -43,10 +44,10 @@ reading from file /tmp/tmpUBTGau, link-type EN10MB (Ethernet)
 <img src="https://ibin.co/50MaB2FZdlsz.png">
 <!--![](docs/images/bess_snip2.png)-->
 
-
 ## Feature List
 
 ### Complete
+
 * IPv4 support
 * S1-U, S11, SGi interfacing
 * Single & Multi-port support
@@ -56,10 +57,12 @@ reading from file /tmp/tmpUBTGau, link-type EN10MB (Ethernet)
 * Support for IPv4 datagrams reassembly
 
 ### In Progress
+
 * Billing and Charging
 * Support for IP packets fragmentation
 
 ### Pending
+
 * PCC (Policy Control and Charging) rules configuration.
 * ADC (Application Detection and control) rules configuration.
 * Packet Filters for Service Data Flow (SDF) configuration.
@@ -69,4 +72,5 @@ reading from file /tmp/tmpUBTGau, link-type EN10MB (Ethernet)
 * S5/S8 interfacing
 
 ## Installation
+
 Please see [INSTALL.md](INSTALL.md) for details on how to set up CP and UPF-EPC.
