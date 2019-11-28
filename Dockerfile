@@ -29,22 +29,21 @@ RUN cd $LIBBPF_DIR && \
 ARG DPDK_URL='http://dpdk.org/git/dpdk'
 ARG DPDK_VER='v19.08'
 ENV DPDK_DIR="/dpdk"
-RUN git clone -b $DPDK_VER -q --depth 1 $DPDK_URL $DPDK_DIR 2>&1
+RUN git clone -b $DPDK_VER -q --depth 1 $DPDK_URL $DPDK_DIR
+
+# Workaround for compiler error on including DPDK in bess
+WORKDIR $DPDK_DIR
+COPY patches/dpdk patches
+RUN cat patches/* | patch -p1
+
 ARG RTE_TARGET='x86_64-native-linuxapp-gcc'
-RUN cd $DPDK_DIR && \
-    sed -ri 's,(IGB_UIO=).*,\1n,' config/common_linux* && \
+RUN sed -ri 's,(IGB_UIO=).*,\1n,' config/common_linux* && \
     sed -ri 's,(KNI_KMOD=).*,\1n,' config/common_linux* && \
     sed -ri 's,(LIBRTE_BPF=).*,\1n,' config/common_base && \
     sed -ri 's,(LIBRTE_PMD_PCAP=).*,\1y,' config/common_base && \
     sed -ri 's,(PORT_PCAP=).*,\1y,' config/common_base && \
     sed -ri 's,(AF_XDP=).*,\1y,' config/common_base && \
     make config T=$RTE_TARGET && \
-    make $MAKEFLAGS EXTRA_CFLAGS="-g -w -fPIC"
-
-# Workaround for compiler error on including DPDK in bess
-WORKDIR $DPDK_DIR
-COPY patches/dpdk patches
-RUN cat patches/* | patch -p1 && \
     make $MAKEFLAGS EXTRA_CFLAGS="-g -w -fPIC"
 
 WORKDIR /
@@ -75,7 +74,7 @@ RUN apt-get update && \
         libgraph-easy-perl \
         iproute2 \
         iptables \
-	iputils-ping \
+        iputils-ping \
         tcpdump && \
     rm -rf /var/lib/apt/lists/* && \
     pip install --no-cache-dir \
@@ -130,8 +129,8 @@ RUN cd /cpiface && \
 FROM ubuntu:18.04 as cpiface
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        libzmq5 \
-	libgoogle-glog0v5 && \
+        libgoogle-glog0v5 \
+        libzmq5 && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=cpiface-build /opt/grpc/libs/opt /opt/grpc/libs/opt
