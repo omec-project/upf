@@ -4,7 +4,9 @@
 # Multi-stage Dockerfile
 # Stage bess-build: builds bess with its dependencies
 FROM nefelinetworks/bess_build AS bess-build
-RUN apt-get update && \
+RUN echo "deb-src http://archive.ubuntu.com/ubuntu/ bionic main restricted universe multiverse" >>/etc/apt/sources.list && \
+    apt-get update && \
+    apt-get -y build-dep libelf-dev && \
     apt-get -y install --no-install-recommends \
         build-essential \
         ca-certificates \
@@ -17,48 +19,43 @@ RUN apt-get update && \
 
 ARG MAKEFLAGS
 
-ARG LINUX_VER=5.4
-RUN wget -qO linux.tar.xz https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-${LINUX_VER}.tar.xz
-RUN mkdir linux && \
-    tar -xf linux.tar.xz -C linux --strip-components 1 && \
-    cp linux/include/uapi/linux/if_xdp.h /usr/include/linux && \
-    cd linux/tools/lib/bpf/ && \
-    make $MAKEFLAGS install_lib && \
-    make $MAKEFLAGS install_headers && \
-    ldconfig
+ENV LIBBPF_DIR="/libbpf"
+RUN git clone https://github.com/libbpf/libbpf.git $LIBBPF_DIR
+RUN cd $LIBBPF_DIR && \
+    make $MAKEFLAGS -C src install && \
+    cp include/uapi/linux/if_xdp.h /usr/include/linux
 
 # dpdk
 ARG DPDK_URL='http://dpdk.org/git/dpdk'
 ARG DPDK_VER='v19.08'
 ENV DPDK_DIR="/dpdk"
-ENV RTE_TARGET='x86_64-native-linuxapp-gcc'
 RUN git clone -b $DPDK_VER -q --depth 1 $DPDK_URL $DPDK_DIR 2>&1
-RUN cd ${DPDK_DIR} && \
+ARG RTE_TARGET='x86_64-native-linuxapp-gcc'
+RUN cd $DPDK_DIR && \
     sed -ri 's,(IGB_UIO=).*,\1n,' config/common_linux* && \
     sed -ri 's,(KNI_KMOD=).*,\1n,' config/common_linux* && \
     sed -ri 's,(LIBRTE_BPF=).*,\1n,' config/common_base && \
     sed -ri 's,(LIBRTE_PMD_PCAP=).*,\1y,' config/common_base && \
     sed -ri 's,(PORT_PCAP=).*,\1y,' config/common_base && \
     sed -ri 's,(AF_XDP=).*,\1y,' config/common_base && \
-    make config T=x86_64-native-linuxapp-gcc && \
+    make config T=$RTE_TARGET && \
     make $MAKEFLAGS EXTRA_CFLAGS="-g -w -fPIC"
 
 # Workaround for compiler error on including DPDK in bess
-WORKDIR ${DPDK_DIR}
+WORKDIR $DPDK_DIR
 COPY patches/dpdk patches
 RUN cat patches/* | patch -p1 && \
     make $MAKEFLAGS EXTRA_CFLAGS="-g -w -fPIC"
 
 WORKDIR /
 ARG BESS_COMMIT=master
-RUN apt-get update && apt-get install -y wget unzip ca-certificates git
-RUN wget -qO bess.zip https://github.com/NetSys/bess/archive/${BESS_COMMIT}.zip && unzip bess.zip
-WORKDIR bess-${BESS_COMMIT}
+RUN wget -qO bess.zip https://github.com/NetSys/bess/archive/$BESS_COMMIT.zip && unzip bess.zip
+WORKDIR bess-$BESS_COMMIT
 COPY core/modules/ core/modules/
 COPY core/utils/ core/utils/
 COPY protobuf/ protobuf/
 COPY patches/bess patches
-RUN cp -a ${DPDK_DIR} deps/dpdk-17.11 && \
+RUN cp -a $DPDK_DIR deps/dpdk-17.11 && \
     cat patches/* | patch -p1
 RUN CXXARCHFLAGS="-march=native -Werror=format-truncation -Warray-bounds -fbounds-check -fno-strict-overflow -fno-delete-null-pointer-checks -fwrapv" ./build.py bess && \
     cp bin/bessd /bin && \
