@@ -49,7 +49,7 @@ reading from file /tmp/tmpUBTGau, link-type EN10MB (Ethernet)
 ### Complete
 
 * IPv4 support
-* S1-U, S11, SGi interfacing
+* S1-U, SGi interfacing
 * Single & Multi-port support
 * Monitoring/Debugging capabilties using *(i)* tcpdump on individual BESS modules, *(ii)* visualization web interface, and *(iii)* command line shell interface for displaying statistics *etc*.
 * Static IP routing
