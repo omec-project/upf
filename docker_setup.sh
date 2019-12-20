@@ -112,7 +112,8 @@ fi
 
 # Run pause
 docker run --name pause -td --restart unless-stopped \
-	-p $gui_port:$gui_port \
+       -p $gui_port:$gui_port \
+        --hostname `hostname` \
 	k8s.gcr.io/pause
 
 # Run bessd
