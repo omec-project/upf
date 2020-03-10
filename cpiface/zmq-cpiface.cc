@@ -185,7 +185,7 @@ int main(int argc, char **argv) {
 
   // Build message
   if (inet_aton(args.zmqd_ip, &args.rmb.upf_comm_ip) == 0) {
-    std::cerr << "Invalid address: " << args.zmqd_nb_ip << std::endl;
+    std::cerr << "Invalid address: " << args.zmqd_ip << std::endl;
     return EXIT_FAILURE;
   }
   // set S1U IP address
