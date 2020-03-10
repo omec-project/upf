@@ -65,12 +65,13 @@ struct Args {
 	{"zmqd_nb_port", required_argument, NULL, 'n'},
 	{"s1u_sgw_ip", required_argument, NULL, 'u'},
         {"encapmod", required_argument, NULL, 'M'},
+	{"hostname", required_argument, NULL, 'h'},
         {0, 0, 0, 0}};
     do {
       int option_index = 0;
       uint32_t val = 0;
 
-      c = getopt_long(argc, argv, "B:b:Z:s:r:M:N:n:u:", long_options, &option_index);
+      c = getopt_long(argc, argv, "B:b:Z:s:r:M:N:n:u:h:", long_options, &option_index);
 
       if (c == -1)
         break;
@@ -123,6 +124,9 @@ struct Args {
         case 'u':
 	  strncpy(s1u_sgw_ip, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
 	  break;
+      case 'h':
+	      strncpy(rmb.hostname, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
+	      break;
         default:
           std::cerr << "Unknown argument - " << argv[optind] << std::endl;
           exit(EXIT_FAILURE);
@@ -190,7 +194,8 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
   // retrieve hostname
-  if (gethostname(args.rmb.hostname, sizeof(args.rmb.hostname)) == -1) {
+  if (!strcmp(args.rmb.hostname, "") &&
+      gethostname(args.rmb.hostname, sizeof(args.rmb.hostname)) == -1) {
     std::cerr << "Unable to retreive hostname of DP!" << std::endl;
     return EXIT_FAILURE;
   }
