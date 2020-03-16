@@ -166,20 +166,25 @@ void IPLookup::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 #else /* RTE_VERSION >= 19.11 */
   Ethernet *eth;
   Ipv4 *ip;
-  uint32_t ip_raw[cnt];
+  int ret;
+  uint32_t ip_list[cnt];
   uint64_t next_hops[cnt];
-  (void)(default_gate);
+
   for (i = 0; i < cnt; i++) {
     eth = batch->pkts()[i]->head_data<Ethernet *>();
     ip = (Ipv4 *)(eth + 1);
-    ip_raw[i] = ip->dst.raw_value();
+    ip_list[i] = ip->dst.value();
   }
 
-  rte_fib_lookup_bulk(lpm_, ip_raw, next_hops, cnt);
+  ret = rte_fib_lookup_bulk(lpm_, ip_list, next_hops, cnt);
 
-  for (i = 0; i < cnt; i++) {
-    EmitPacket(ctx, batch->pkts()[i], next_hops[i]);
-  }
+  if (ret != 0)
+    RunNextModule(ctx, batch);
+  else
+    for (i = 0; i < cnt; i++) {
+      EmitPacket(ctx, batch->pkts()[i], (next_hops[i] == DROP_GATE) ? default_gate_ : next_hops[i]);
+    }
+  USED(default_gate);
 #endif
 }
 
@@ -237,7 +242,8 @@ CommandResponse IPLookup::CommandAdd(
 #if RTE_VERSION < RTE_VERSION_NUM(19, 11, 0, 0)
     int ret = rte_lpm_add(lpm_, net_addr.value(), prefix_len, gate);
 #else
-    int ret = rte_fib_add(lpm_, net_addr.value(), prefix_len, gate);
+    uint64_t next_hop = (uint64_t)gate;
+    int ret = rte_fib_add(lpm_, net_addr.value(), prefix_len, next_hop);
 #endif
     if (ret) {
       return CommandFailure(-ret, "rpm_lpm_add() failed");
