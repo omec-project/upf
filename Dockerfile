@@ -46,7 +46,7 @@ RUN sed -ri 's,(IGB_UIO=).*,\1n,' config/common_linux* && \
     sed -ri 's,(PORT_PCAP=).*,\1y,' config/common_base && \
     sed -ri 's,(AF_XDP=).*,\1y,' config/common_base && \
     make config T=x86_64-native-linuxapp-gcc && \
-    make $MAKEFLAGS RTE_MACHINE=$RTE_MACHINE EXTRA_CFLAGS="-g -w -fPIC"
+    make $MAKEFLAGS RTE_MACHINE=$RTE_MACHINE EXTRA_CFLAGS="-g -w -fPIC -DALLOW_EXPERIMENTAL_API"
 
 WORKDIR /
 ARG BESS_COMMIT=master
