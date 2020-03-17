@@ -26,9 +26,11 @@ def getpid(process_name):
 
 def getpythonpid(process_name):
     for proc in psutil.process_iter(attrs=['pid', 'cmdline']):
+        if len(proc.info['cmdline']) < 2:
+            continue
         if process_name in proc.info['cmdline'][1] and 'python' in proc.info['cmdline'][0]:
             return proc.info['pid']
-
+    return
 
 def get_json_conf(path, dump):
     conf = json.loads(open(path).read())
