@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
+# Copyright 2020-present Open Networking Foundation
 # Copyright (c) 2019 Intel Corporation
 
 # Multi-stage Dockerfile
@@ -50,6 +51,7 @@ RUN sed -ri 's,(IGB_UIO=).*,\1n,' config/common_linux* && \
 
 WORKDIR /
 ARG BESS_COMMIT=master
+ARG MARCH=native
 RUN apt-get update && apt-get install -y wget unzip ca-certificates git
 RUN wget -qO bess.zip https://github.com/NetSys/bess/archive/${BESS_COMMIT}.zip && unzip bess.zip
 WORKDIR bess-${BESS_COMMIT}
@@ -59,7 +61,7 @@ COPY protobuf/ protobuf/
 COPY patches/bess patches
 RUN cp -a ${DPDK_DIR} deps/dpdk-19.11 && \
     cat patches/* | patch -p1
-RUN CXXARCHFLAGS="-march=native -Werror=format-truncation -Warray-bounds -fbounds-check -fno-strict-overflow -fno-delete-null-pointer-checks -fwrapv" ./build.py bess && \
+RUN CXXARCHFLAGS="-march=$MARCH -Werror=format-truncation -Warray-bounds -fbounds-check -fno-strict-overflow -fno-delete-null-pointer-checks -fwrapv" ./build.py bess && \
     cp bin/bessd /bin && \
     mkdir -p /opt/bess && \
     cp -r bessctl pybess /opt/bess && \

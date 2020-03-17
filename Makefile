@@ -13,8 +13,8 @@ DOCKER_BUILDKIT          := 1
 # Note that we set the target platform of Docker images to Haswell
 # so that the images work on any platforms with Haswell CPUs or newer.
 # To get the best performance optimization to your target platform,
-# please build images on the target machine with RTE_MACHINE='native'.
-DOCKER_BUILD_ARGS        ?= --build-arg MAKEFLAGS=-j$(shell nproc) --build-arg RTE_MACHINE='hsw'
+# please build images on the target machine with RTE_MACHINE='native' and MARCH='native'.
+DOCKER_BUILD_ARGS        ?= --build-arg MAKEFLAGS=-j$(shell nproc) --build-arg RTE_MACHINE='hsw' --build-arg MARCH='core-avx2'
 
 ## Docker labels. Only set ref and commit date if committed
 DOCKER_LABEL_VCS_URL     ?= $(shell git remote get-url $(shell git remote))

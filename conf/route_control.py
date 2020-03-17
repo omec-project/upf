@@ -305,6 +305,12 @@ def probe_addr(item, src_mac):
 
 def parse_new_route(msg):
     item = NeighborEntry()
+    # Fetch prefix_len
+    item.prefix_len = msg['dst_len']
+    # Default route
+    if item.prefix_len is 0:
+        item.iprange = '0.0.0.0'
+
     for att in msg['attrs']:
         if 'RTA_DST' in att:
             # Fetch IP range
@@ -328,9 +334,6 @@ def parse_new_route(msg):
         # Neighbor info is invalid
         del item
         return
-
-    # Fetch prefix_len
-    item.prefix_len = msg['dst_len']
 
     # if mac is 0, send ARP request
     if gateway_mac == 0:

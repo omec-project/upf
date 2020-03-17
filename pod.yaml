@@ -21,12 +21,30 @@ spec:
   #  args:
   #  - iptables -I OUTPUT -p icmp --icmp-type port-unreachable -j DROP;
   containers:
+  - name: bess-routectl
+    image: krsna1729/spgwu
+    command: ["/route_control.py"]
+    args:
+    - -i
+    - s1u
+    - sgi
+    env:
+    - name: PYTHONUNBUFFERED
+      value: "1"
+    resources:
+      limits:
+        cpu: 256m
+        memory: 128Mi
+    volumeMounts:
+    - name: bess-conf
+      mountPath: /route_control.py
+      subpath: route_control.py
   - name: bess
     image: krsna1729/spgwu
     stdin: true
     tty: true
     args:
-      - -grpc-url=0.0.0.0:10514
+    - -grpc-url=0.0.0.0:10514
     livenessProbe:
       tcpSocket:
         port: 10514
@@ -37,9 +55,12 @@ spec:
         exec:
           command: ["sh", "-c", "until bessctl run spgwu; do sleep 2; done;"]
     securityContext:
+      # TODO: fix DPDK port detection issue and remove priviledged
+      privileged: true
       capabilities:
         add:
-          - IPC_LOCK # AF_PACKET vdev uses mmap
+        - NET_ADMIN # To add routes post-startup
+        - IPC_LOCK # AF_PACKET vdev uses mmap
     resources:
       limits:
         hugepages-1Gi: 2Gi
@@ -51,21 +72,6 @@ spec:
       mountPath: /conf
     - name: hugepages
       mountPath: /dev/hugepages
-  - name: bess-routectl
-    image: krsna1729/spgwu
-    command: ["/route_control.py"]
-    args:
-    - -i
-    - s1u
-    - sgi
-    resources:
-      limits:
-        cpu: 256m
-        memory: 128Mi
-    volumeMounts:
-    - name: bess-conf
-      mountPath: /route_control.py
-      subpath: route_control.py
   - name: bess-web
     image: krsna1729/spgwu
     command: ["bessctl"]
@@ -73,6 +79,16 @@ spec:
     - http
     - 0.0.0.0
     - '8000'
+    resources:
+      limits:
+        cpu: 256m
+        memory: 128Mi
+  - name: cpiface
+    image: krsna1729/cpiface
+    command: ["zmq-cpiface"]
+    env:
+    - name: GLOG_v
+      value: "1"
     resources:
       limits:
         cpu: 256m

@@ -50,6 +50,9 @@ def scan_dpdk_ports():
             else:
                 raise
         idx += 1
+        # RTE_MAX_ETHPORTS is 32 and we need 2 for vdevs
+        if idx == 30:
+          break
     return True if dpdk_ports else False
 
 
