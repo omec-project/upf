@@ -30,14 +30,12 @@ RUN mkdir linux && \
 
 # dpdk
 ARG DPDK_URL='http://dpdk.org/git/dpdk'
-ARG DPDK_VER='v19.08'
+ARG DPDK_VER='v19.11'
 ENV DPDK_DIR="/dpdk"
 RUN git clone -b $DPDK_VER -q --depth 1 $DPDK_URL $DPDK_DIR
 
-# Workaround for compiler error on including DPDK in bess
+# Customizing DPDK install
 WORKDIR $DPDK_DIR
-COPY patches/dpdk patches
-RUN cat patches/* | patch -p1
 
 ARG RTE_TARGET='x86_64-native-linuxapp-gcc'
 ARG RTE_MACHINE=native
@@ -59,7 +57,7 @@ COPY core/modules/ core/modules/
 COPY core/utils/ core/utils/
 COPY protobuf/ protobuf/
 COPY patches/bess patches
-RUN cp -a ${DPDK_DIR} deps/dpdk-17.11 && \
+RUN cp -a ${DPDK_DIR} deps/dpdk-19.11 && \
     cat patches/* | patch -p1
 RUN CXXARCHFLAGS="-march=native -Werror=format-truncation -Warray-bounds -fbounds-check -fno-strict-overflow -fno-delete-null-pointer-checks -fwrapv" ./build.py bess && \
     cp bin/bessd /bin && \
@@ -95,7 +93,7 @@ COPY --from=bess-build /bin/bessd /bin
 RUN ln -s /opt/bess/bessctl/bessctl /bin
 ENV PYTHONPATH="/opt/bess"
 WORKDIR /opt/bess/bessctl
-ENTRYPOINT ["bessd", "-f"]
+ENTRYPOINT ["bessd", "-f", "-m", "0"]
 
 # Compile cpiface
 FROM ubuntu:18.04 as cpiface-build

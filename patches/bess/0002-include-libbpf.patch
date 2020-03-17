@@ -17,7 +17,7 @@ index 804ff9e7..8ce084c3 100644
  # We always want these libraries to be dynamically linked even when the
  # user requests a static build.
 -ALWAYS_DYN_LIBS := -lpthread -ldl
-+ALWAYS_DYN_LIBS := -lpthread -ldl -lelf
++ALWAYS_DYN_LIBS := -lpthread -ldl -lelf -lz
  # These libraries are not supported by pkg-config.
 -ALWAYS_LIBS := -lpcap -lgflags -lnuma
 +ALWAYS_LIBS := -lpcap -lgflags -lnuma -lbpf
