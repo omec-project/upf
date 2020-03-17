@@ -93,7 +93,7 @@ COPY --from=bess-build /bin/bessd /bin
 RUN ln -s /opt/bess/bessctl/bessctl /bin
 ENV PYTHONPATH="/opt/bess"
 WORKDIR /opt/bess/bessctl
-ENTRYPOINT ["bessd", "-f", "-m", "0"]
+ENTRYPOINT ["bessd", "-f"]
 
 # Compile cpiface
 FROM ubuntu:18.04 as cpiface-build
