@@ -18,15 +18,12 @@ RUN apt-get update && \
 
 ARG MAKEFLAGS
 
-# linux ver should match target machine's kernel
-ARG LINUX_VER=5.4.30
-RUN wget -qO linux.tar.xz https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-${LINUX_VER}.tar.xz
-RUN mkdir linux && \
-    tar -xf linux.tar.xz -C linux --strip-components 1 && \
-    cp linux/include/uapi/linux/if_xdp.h /usr/include/linux && \
-    cd linux/tools/lib/bpf/ && \
-    make $MAKEFLAGS install_lib && \
-    make $MAKEFLAGS install_headers && \
+ARG LIBBPF_VER=b91f53ec5f1aba2a9d01dc00c4434063abd921e8
+RUN wget -qO libbpf.zip https://github.com/libbpf/libbpf/archive/${LIBBPF_VER}.zip && unzip libbpf.zip
+WORKDIR libbpf-${LIBBPF_VER}
+RUN cp include/uapi/linux/if_xdp.h /usr/include/linux && \
+    cd src && \
+    make install && \
     ldconfig
 
 # dpdk
