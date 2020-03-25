@@ -32,6 +32,10 @@ except KeyError:
 
 MAX_GATES = 8192
 dpdk_ports = {}
+# Enable MEASURE = 1 to retreive telemetry data
+# See this link for details:
+## https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py
+MEASURE = 0
 
 
 def scan_dpdk_ports():
@@ -98,8 +102,10 @@ class Port:
         # Reassemble IP4 fragments (if needed)
         defrag = __bess_module__("{}IP4Defrag".format(name), 'IPDefrag', num_flows=max_ip_defrag_flows, numa=0)
         # Default drop when no matches
-        self.fpi -> defrag:1 -> self.bpf:0 -> Sink()
-        defrag:0 -> Sink()
+        if MEASURE == 1:
+            self.fpi -> Timestamp() -> self.bpf:0 -> Sink()
+        else:
+            self.fpi -> self.bpf:0 -> Sink()
 
         # Initialize route module
         self.rtr = __bess_module__("{}Routes".format(name), 'IPLookup')
@@ -173,7 +179,10 @@ class Port:
                 # Direct fast path traffic to Frag module
                 merge = __bess_module__("{}Merge".format(name), 'Merge')
                 frag = __bess_module__("{}IP4Frag".format(name), 'IPFrag')
-                merge -> frag:1 -> self.fpo
+                if MEASURE == 1:
+                    merge -> frag:1 -> Measure(latency_ns_resolution=1, latency_ns_max=100000) -> self.fpo
+                else:
+                    merge -> frag:1 ->self.fpo
                 frag:0 -> Sink()
 
                 tc = 'slow{}'.format(wid)

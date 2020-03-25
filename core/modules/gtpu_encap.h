@@ -37,6 +37,7 @@ class GtpuEncap final : public Module {
   CommandResponse RemoveSessionRecord(
       const bess::pb::GtpuEncapRemoveSessionRecordArg &arg);
   CommandResponse ShowRecords(const bess::pb::EmptyArg &);
+  CommandResponse ShowCount(const bess::pb::EmptyArg &);
   void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
 
  private:
