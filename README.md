@@ -55,11 +55,11 @@ reading from file /tmp/tmpUBTGau, link-type EN10MB (Ethernet)
 * Static IP routing
 * Dynamic IP routing
 * Support for IPv4 datagrams reassembly
+* Support for IP packets fragmentation
 
 ### In Progress
 
 * Billing and Charging
-* Support for IP packets fragmentation
 
 ### Pending
 
