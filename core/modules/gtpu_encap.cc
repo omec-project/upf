@@ -33,6 +33,8 @@ const Commands GtpuEncap::cmds = {
     {"remove", "GtpuEncapRemoveSessionRecordArg",
      MODULE_CMD_FUNC(&GtpuEncap::RemoveSessionRecord), Command::THREAD_SAFE},
     {"show_records", "EmptyArg", MODULE_CMD_FUNC(&GtpuEncap::ShowRecords),
+     Command::THREAD_SAFE},
+    {"show_count", "EmptyArg", MODULE_CMD_FUNC(&GtpuEncap::ShowCount),
      Command::THREAD_SAFE}};
 /*----------------------------------------------------------------------------------*/
 // Template for generating UDP packets without data
@@ -199,6 +201,11 @@ CommandResponse GtpuEncap::ShowRecords(const bess::pb::EmptyArg &) {
     }
   } while (rc >= 0);
 
+  return CommandSuccess();
+}
+/*----------------------------------------------------------------------------------*/
+CommandResponse GtpuEncap::ShowCount(const bess::pb::EmptyArg &) {
+  std::cerr << "# of records: " << rte_hash_count(session_map) << std::endl;
   return CommandSuccess();
 }
 /*----------------------------------------------------------------------------------*/
