@@ -95,8 +95,11 @@ class Port:
         self.bpf = __bess_module__("{}FastBPF".format(name), 'BPF')
         self.bpf.clear()
 
+        # Reassemble IP4 fragments (if needed)
+        defrag = __bess_module__("{}IP4Defrag".format(name), 'IPDefrag', num_flows=max_ip_defrag_flows, numa=0)
         # Default drop when no matches
-        self.fpi -> self.bpf:0 -> Sink()
+        self.fpi -> defrag:1 -> self.bpf:0 -> Sink()
+        defrag:0 -> Sink()
 
         # Initialize route module
         self.rtr = __bess_module__("{}Routes".format(name), 'IPLookup')
@@ -261,7 +264,7 @@ ue_filter = {"priority": -UEGate,
              "filter": "ip dst net {}".format(ue_cidr), "gate": UEGate}
 sgiFastBPF.add(filters=[ue_filter])
 
-sgiFastBPF:UEGate -> sgiIP4Defrag::IPDefrag(num_flows=max_ip_defrag_flows, numa=0):1 \
+sgiFastBPF:UEGate \
     -> EtherTrim::GenericDecap(bytes=14) \
     -> GTPUEncap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0]), num_subscribers=max_sessions):1 \
     -> S1UEtherAdd::GenericEncap(fields=[
@@ -274,7 +277,6 @@ sgiFastBPF:UEGate -> sgiIP4Defrag::IPDefrag(num_flows=max_ip_defrag_flows, numa=
 
 # Drop unknown packets
 GTPUEncap:0 -> Sink()
-sgiIP4Defrag:0 -> Sink()
 
 # ====================================================
 #       Uplink Pipeline
@@ -308,7 +310,7 @@ s1uFastBPF.add(filters=[uplink_filter])
 
 sgiRoutes = ports[sgi_ifname].rtr
 
-s1uFastBPF:GTPUGate -> s1uIP4Defrag::IPDefrag(num_flows=max_ip_defrag_flows, numa=0):1 \
+s1uFastBPF:GTPUGate \
     -> EtherDecapTrim::GenericDecap(bytes=14) -> GTPUDecap::GtpuDecap(ename="GTPUEncap"):1 \
     -> SGIEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
@@ -324,7 +326,6 @@ s1uFastBPF:GTPUEchoGate \
 # Drop unknown packets
 GTPUEcho:0 -> Sink()
 GTPUDecap:0 -> Sink()
-s1uIP4Defrag:0 -> Sink()
 
 # ====================================================
 #       SIM_TEST

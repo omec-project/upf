@@ -65,9 +65,11 @@ bess::Packet *IPDefrag::IPReassemble(Context *ctx, bess::Packet *p) {
       }
     }
   }
-  /* Reset checksum. This will be computed by a later module in line (if needed)
+  /*
+   * Reset checksum. This will be computed by a later module in line (if needed)
+   * COMMENTING THIS OUT AS IP CHECKSUM IS NOT COMPUTED OTHERWISE DOWN THE PIPELINE
    */
-  iph->checksum = 0;
+  //iph->checksum = 0;
 
   return p;
 }
