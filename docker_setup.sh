@@ -98,7 +98,7 @@ sudo rm -rf /var/run/netns/bess
 ./scripts/build.sh
 
 [ "$mode" == 'dpdk' ] && DEVICES=${DEVICES:-'--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio'} || DEVICES=''
-[ "$mode" == 'af_xdp' ] && PRIVS='--privileged' || PRIVS='--cap-add NET_ADMIN'
+[ "$mode" == 'af_xdp' ] && PRIVS='--privileged' || PRIVS='--cap-add SYS_NICE --cap-add NET_ADMIN'
 
 # Run bessd
 docker run --name bess -td --restart unless-stopped \

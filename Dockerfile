@@ -31,7 +31,7 @@ RUN mkdir linux && \
 
 # dpdk
 ARG DPDK_URL='http://dpdk.org/git/dpdk-stable'
-ARG DPDK_VER='v19.11'
+ARG DPDK_VER='v19.11.1'
 ENV DPDK_DIR="/dpdk"
 RUN git clone -b $DPDK_VER -q --depth 1 $DPDK_URL $DPDK_DIR
 
@@ -59,7 +59,7 @@ COPY core/modules/ core/modules/
 COPY core/utils/ core/utils/
 COPY protobuf/ protobuf/
 COPY patches/bess patches
-RUN cp -a ${DPDK_DIR} deps/dpdk-19.11 && \
+RUN cp -a ${DPDK_DIR} deps/dpdk-19.11.1 && \
     cat patches/* | patch -p1
 RUN CXXARCHFLAGS="-march=$MARCH -Werror=format-truncation -Warray-bounds -fbounds-check -fno-strict-overflow -fno-delete-null-pointer-checks -fwrapv" ./build.py bess && \
     cp bin/bessd /bin && \
