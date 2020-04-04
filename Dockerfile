@@ -19,7 +19,7 @@ RUN apt-get update && \
 ARG MAKEFLAGS
 
 # linux ver should match target machine's kernel
-ARG LINUX_VER=5.1.15
+ARG LINUX_VER=5.4.30
 RUN wget -qO linux.tar.xz https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-${LINUX_VER}.tar.xz
 RUN mkdir linux && \
     tar -xf linux.tar.xz -C linux --strip-components 1 && \
