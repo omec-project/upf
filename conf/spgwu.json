@@ -8,10 +8,13 @@
     "": "max UE sessions",
     "max_sessions": 50000,
 
-    "": "max IP frag table entries (for IPv4 reassembly)",
-    "max_ip_defrag_flows": 1000,
+    "": "max IP frag table entries (for IPv4 reassembly). Update the line below to `\"max_ip_defrag_flows\": 5000` to enable",
+    "": "max_ip_defrag_flows: 1000",
 
-    "": "Gateway interfaces",    
+    "": "Update the line below to `\"ip_frag_flows\": 1` to enable",
+    "": "ip_frag_flows: 1",
+
+    "": "Gateway interfaces",
     "s1u": {
         "ifname": "ens803f2"
     },
