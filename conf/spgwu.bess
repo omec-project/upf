@@ -16,14 +16,24 @@ from conf.utils import *
 conf_file = get_env('CONF_FILE', 'conf/spgwu.json')
 conf = get_json_conf(conf_file, False)
 
-# Maximum number of flows to manage ip frags for re-assembly
+# Maximum number of flows to manage ip4 frags for re-assembly
 max_ip_defrag_flows = None
 try:
     max_ip_defrag_flows = int(conf["max_ip_defrag_flows"])
 except ValueError:
-    print('Invalid value for max_ip_defrag_flows. Not installing IPDefrag module.')
+    print('Invalid value for max_ip_defrag_flows. Not installing IP4Defrag module.')
 except KeyError:
-    print('max_ip_defrag_flows value not set. Not installing IPDefrag module.')
+    print('max_ip_defrag_flows value not set. Not installing IP4Defrag module.')
+
+# Enable ip4 fragmentation
+ip_frag_flows = None
+try:
+    ip_frag_flows = int(conf["ip_frag_flows"])
+except ValueError:
+    print('Invalid value for ip_frag_flows. Not installing IP4Frag module.')
+except KeyError:
+    print('ip_frag_flows value not set. Not installing IP4Frag module.')
+
 
 # ====================================================
 #       Port Helpers
@@ -178,12 +188,18 @@ class Port:
 
                 # Direct fast path traffic to Frag module
                 merge = __bess_module__("{}Merge".format(name), 'Merge')
-                frag = __bess_module__("{}IP4Frag".format(name), 'IPFrag')
-                if MEASURE == 1:
-                    merge -> frag:1 -> Measure(latency_ns_resolution=1, latency_ns_max=100000) -> self.fpo
+                if ip_frag_flows is not None:
+                    frag = __bess_module__("{}IP4Frag".format(name), 'IPFrag')
+                    if MEASURE == 1:
+                        merge -> frag:1 -> Measure(latency_ns_resolution=1, latency_ns_max=100000) -> self.fpo
+                    else:
+                        merge -> frag:1 -> self.fpo
+                    frag:0 -> Sink()
                 else:
-                    merge -> frag:1 ->self.fpo
-                frag:0 -> Sink()
+                    if MEASURE == 1:
+                        merge -> Measure(latency_ns_resolution=1, latency_ns_max=100000) -> self.fpo
+                    else:
+                        merge -> self.fpo
 
                 tc = 'slow{}'.format(wid)
                 try:
@@ -273,9 +289,13 @@ ue_filter = {"priority": -UEGate,
              "filter": "ip dst net {}".format(ue_cidr), "gate": UEGate}
 sgiFastBPF.add(filters=[ue_filter])
 
-sgiFastBPF:UEGate \
-    -> EtherTrim::GenericDecap(bytes=14) \
-    -> GTPUEncap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0]), num_subscribers=max_sessions):1 \
+# Append sgiIP4Defrag module (if enabled)
+if max_ip_defrag_flows is not None:
+    sgiFastBPF:UEGate -> sgiIP4Defrag::IPDefrag(num_flows=max_ip_defrag_flows, numa=0):1 -> EtherTrim::GenericDecap(bytes=14)
+else:
+    sgiFastBPF:UEGate -> EtherTrim::GenericDecap(bytes=14)
+
+EtherTrim -> GTPUEncap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0]), num_subscribers=max_sessions):1 \
     -> S1UEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(s1u_ifname))}},
@@ -286,6 +306,9 @@ sgiFastBPF:UEGate \
 
 # Drop unknown packets
 GTPUEncap:0 -> Sink()
+if max_ip_defrag_flows is not None:
+    sgiIP4Defrag:0 -> Sink()
+
 
 # ====================================================
 #       Uplink Pipeline
@@ -319,8 +342,13 @@ s1uFastBPF.add(filters=[uplink_filter])
 
 sgiRoutes = ports[sgi_ifname].rtr
 
-s1uFastBPF:GTPUGate \
-    -> EtherDecapTrim::GenericDecap(bytes=14) -> GTPUDecap::GtpuDecap(ename="GTPUEncap"):1 \
+# Append s1uIP4Defrag module (if enabled)
+if max_ip_defrag_flows is not None:
+    s1uFastBPF:GTPUGate -> s1uIP4Defrag::IPDefrag(num_flows=max_ip_defrag_flows, numa=0):1 -> EtherDecapTrim::GenericDecap(bytes=14)
+else:
+    s1uFastBPF:GTPUGate -> EtherDecapTrim::GenericDecap(bytes=14)
+
+EtherDecapTrim -> GTPUDecap::GtpuDecap(ename="GTPUEncap"):1 \
     -> SGIEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(sgi_ifname))}},
@@ -335,6 +363,9 @@ s1uFastBPF:GTPUEchoGate \
 # Drop unknown packets
 GTPUEcho:0 -> Sink()
 GTPUDecap:0 -> Sink()
+if max_ip_defrag_flows is not None:
+    s1uIP4Defrag:0 -> Sink()
+
 
 # ====================================================
 #       SIM_TEST
