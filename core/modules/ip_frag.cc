@@ -20,8 +20,10 @@ using bess::utils::ToIpv4Address;
 enum {DEFAULT_GATE = 0, FORWARD_GATE};
 /*----------------------------------------------------------------------------------*/
 /**
- * Returns NULL if packet is fragmented and needs more for reassembly.
- * Returns Packet ptr if the packet is unfragmented, or is freshly reassembled.
+ * Returns NULL under two conditions: (1) if the packet failed to fragment due to e.g.,
+ * DF bit on and IP4 datagram size > MTU, or (2) if the packet successfully fragmented
+ * (new mbufs created) and the original IP4 datagram needs to be freed up.
+ * Returns Packet ptr if the packet size < MTU
  */
 bess::Packet *
 IPFrag::FragmentPkt(Context *ctx, bess::Packet *p)
@@ -38,6 +40,12 @@ IPFrag::FragmentPkt(Context *ctx, bess::Packet *p)
 		struct rte_mbuf *frag_tbl[BATCH_SIZE];
 		unsigned char *orig_ip_payload;
 		uint16_t orig_data_offset;
+
+		/* if the datagram is saying not to fragment (DF), we drop the packet */
+		if ((iph->fragment_offset & RTE_IPV4_HDR_DF_FLAG) == RTE_IPV4_HDR_DF_FLAG) {
+			EmitPacket(ctx, p, DEFAULT_GATE);
+			return NULL;
+		}
 
 		/* retrieve Ethernet header */
 		rte_memcpy(&ethh_copy, ethh, sizeof(struct rte_ether_hdr));
@@ -119,6 +127,9 @@ IPFrag::FragmentPkt(Context *ctx, bess::Packet *p)
 			}
 			for (int i = 0; i < res; i++)
 				EmitPacket(ctx, (bess::Packet *)frag_tbl[i], FORWARD_GATE);
+
+			/* free original mbuf */
+			DropPacket(ctx, p);
 
 			/* all fragments successfully forwarded. Return NULL */
 			return NULL;
