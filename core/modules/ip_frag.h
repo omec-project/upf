@@ -5,6 +5,8 @@
 #include <rte_ip_frag.h>
 /* for ipv4 header */
 #include <rte_ip.h>
+/* for RTE_ETHER macros */
+#include "rte_ether.h"
 #include "../module.h"
 #include "../pb/module_msg.pb.h"
 /*----------------------------------------------------------------------------------*/
@@ -47,14 +49,17 @@ class IPFrag final : public Module {
 
 	/* Gates: (0) Default, (1) Forward */
 	static const gate_idx_t kNumOGates = 2;
+	static const Commands cmds;
 
-	CommandResponse Init(const bess::pb::EmptyArg &arg);
+	CommandResponse Init(const bess::pb::IPFragArg &arg);
 	void DeInit() override;
 	void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
+	CommandResponse GetEthMTU(const bess::pb::EmptyArg &);
 
  private:
 	bess::Packet *FragmentPkt(Context *ctx, bess::Packet *p);
 	bess::DpdkPacketPool *indirect_pktmbuf_pool = NULL;
+	int eth_mtu = RTE_ETHER_MAX_LEN;
 };
 /*----------------------------------------------------------------------------------*/
 #endif  // BESS_MODULES_IPFRAG_H_
