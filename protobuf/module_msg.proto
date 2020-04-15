@@ -652,7 +652,7 @@ message MACSwapArg {
  */
 message MeasureArg {
   // int64 warmup = 1; /// removed: instead of warmup delay, user should Clear()
-  uint64 offset = 2; /// Where to store the current time within the packet, offset in bytes.
+  int64 offset = 2; /// Where to store the current time within the packet, offset in bytes.
   double jitter_sample_prob = 3; /// How often the module should sample packets for inter-packet arrival measurements (to measure jitter).
   uint64 latency_ns_max = 4; /// maximum latency expected, in ns (default 0.1 s)
   uint32 latency_ns_resolution = 5; /// resolution, in ns (default 100)
@@ -1008,6 +1008,17 @@ message IPDefragArg {
 }
 
 /**
+ * The IPDFrag module scans the IP datagram and checks whether
+ * it needs to be fragmented.
+ *
+ * __Input Gates__: 1
+ * __Output Gates__: 1
+ */
+message IPFragArg {
+  int32 mtu = 1; /// full Ethernet frame size (including CRC) for encapsulated ipv4 frag datagrams
+}
+
+/**
  * The GtpuDecap module trims the GTPU header from the Ethernet frame
  *
  * __Input Gates__: 1
@@ -1077,7 +1088,7 @@ message SplitArg {
  * __Output Gates__: 1
  */
 message TimestampArg {
-  uint64 offset = 1;
+  int64 offset = 1;
 }
 
 /**

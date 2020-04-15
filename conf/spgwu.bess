@@ -26,13 +26,22 @@ except KeyError:
     print('max_ip_defrag_flows value not set. Not installing IP4Defrag module.')
 
 # Enable ip4 fragmentation
-ip_frag_flows = None
+ip_frag_with_eth_mtu = None
 try:
-    ip_frag_flows = int(conf["ip_frag_flows"])
+    ip_frag_with_eth_mtu = int(conf["ip_frag_with_eth_mtu"])
 except ValueError:
-    print('Invalid value for ip_frag_flows. Not installing IP4Frag module.')
+    print('Invalid value for ip_frag_with_eth_mtu. Not installing IP4Frag module.')
 except KeyError:
-    print('ip_frag_flows value not set. Not installing IP4Frag module.')
+    print('ip_frag_with_eth_mtu value not set. Not installing IP4Frag module.')
+
+# See this link for details:
+## https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py
+measure = bool(conf["measure"])
+IPHDRSZ=20
+UDPHDRSZ=8
+GTPHDRSZ=8
+MEASUREHDRSZ=12
+MEASURE_OFFSET=(IPHDRSZ + UDPHDRSZ + GTPHDRSZ + MEASUREHDRSZ)
 
 
 # ====================================================
@@ -42,10 +51,6 @@ except KeyError:
 
 MAX_GATES = 8192
 dpdk_ports = {}
-# Enable MEASURE = 1 to retreive telemetry data
-# See this link for details:
-## https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py
-MEASURE = bool(int($MEASURE!'0'))
 
 
 def scan_dpdk_ports():
@@ -71,7 +76,7 @@ def scan_dpdk_ports():
 
 
 class Port:
-    def __init__(self, name, nat, ext_addr):
+    def __init__(self, name, ext_addr, offset1, offset2):
         self.name = name
         self.wid = None
         self.fpi = None
@@ -79,8 +84,10 @@ class Port:
         self.bpf = None
         self.bpfgate = 0
         self.routes_table = None
-        self.nat = nat
+        self.nat = None
         self.ext_addr = ext_addr
+        self.msr_off1 = offset1
+        self.msr_off2 = offset2
 
     def bpf_gate(self):
         if self.bpfgate < MAX_GATES - 2:
@@ -111,11 +118,9 @@ class Port:
         self.bpf = __bess_module__("{}FastBPF".format(name), 'BPF')
         self.bpf.clear()
 
-        # Reassemble IP4 fragments (if needed)
-        defrag = __bess_module__("{}IP4Defrag".format(name), 'IPDefrag', num_flows=max_ip_defrag_flows, numa=0)
         # Default drop when no matches
-        if MEASURE == 1:
-            self.fpi -> Timestamp() -> self.bpf:0 -> Sink()
+        if measure:
+            self.fpi -> Timestamp(offset=-(self.msr_off1)) -> self.bpf:0 -> Sink()
         else:
             self.fpi -> self.bpf:0 -> Sink()
 
@@ -190,30 +195,30 @@ class Port:
 
                 # Direct fast path traffic to Frag module
                 merge = __bess_module__("{}Merge".format(name), 'Merge')
-                if ip_frag_flows is not None:
-                    frag = __bess_module__("{}IP4Frag".format(name), 'IPFrag')
-                    if MEASURE == 1:
-                        if self.nat is not None:
-                            merge -> 0:self.nat:1 -> frag:1 -> Measure(latency_ns_resolution=1, latency_ns_max=100000) -> self.fpo
-                        else:
-                            merge -> frag:1 -> Measure(latency_ns_resolution=1, latency_ns_max=100000) -> self.fpo
-                    else:
-                        if self.nat is not None:
-                            merge -> 0:self.nat:1 -> frag:1 -> self.fpo
-                        else:
-                            merge -> frag:1 -> self.fpo
+
+                out = self.fpo
+
+                # Attach frag module (if enabled)
+                if ip_frag_with_eth_mtu is not None:
+                    frag = __bess_module__("{}IP4Frag".format(name), 'IPFrag', mtu=ip_frag_with_eth_mtu)
+                    frag:1 -> out
                     frag:0 -> Sink()
-                else:
-                    if MEASURE == 1:
-                        if self.nat is not None:
-                            merge -> 0:self.nat:1 -> Measure(latency_ns_resolution=1, latency_ns_max=100000) -> self.fpo
-                        else:
-                            merge -> Measure(latency_ns_resolution=1, latency_ns_max=100000) -> self.fpo
-                    else:
-                        if self.nat is not None:
-                            merge -> 0:self.nat:1 -> self.fpo
-                        else:
-                            merge -> self.fpo
+                    out = frag
+
+                # Attach telemeric module (if enabled)
+                if measure:
+                    m = Measure(latency_ns_resolution=1, latency_ns_max=100000, offset=-(self.msr_off2))
+                    m -> out
+                    out = m
+
+                # Attach nat module (if enabled)
+                if self.ext_addr is not None:
+                    self.nat = __bess_module__("{}NAT".format(conf[interface]["ifname"]), 'NAT', ext_addrs=[{'ext_addr': ext_addr}])
+                    self.nat:1 -> out
+                    out = self.nat
+
+                # Attach Merge module to the 'outlist' of modules
+                merge -> out
 
                 tc = 'slow{}'.format(wid)
                 try:
@@ -278,14 +283,20 @@ ports = {}
 for idx, interface in enumerate(interfaces):
     try:
         ext_addr = conf[interface]["ip_masquerade"]
-        if ext_addr is not None:
-#            nat::NAT(ext_addrs=[{'ext_addr': useNAT}])
-            nat = __bess_module__("{}NAT".format(conf[interface]["ifname"]), 'NAT', ext_addrs=[{'ext_addr': ext_addr}])
     except KeyError:
-        nat = None
         ext_addr = None
 
-    port = Port(conf[interface]["ifname"], nat, ext_addr)
+    offset1 = None
+    offset2 = None
+    if measure:
+        if interface == "s1u":
+            offset1 = MEASUREHDRSZ
+            offset2 = MEASURE_OFFSET
+        if interface == 'sgi':
+            offset1 = MEASURE_OFFSET
+            offset2 = MEASUREHDRSZ
+
+    port = Port(conf[interface]["ifname"], ext_addr, offset1, offset2)
     if port.name in ports:
         continue
     port.setup_port(idx, workers)
@@ -318,20 +329,24 @@ else:
                  "filter": "ip dst net {}".format(ue_cidr), "gate": UEGate}
 sgiFastBPF.add(filters=[ue_filter])
 
+_in = sgiFastBPF
+gate = UEGate
+# Append nat module (if enabled)
 if ports[sgi_ifname].nat is not None:
-    # Append sgiIP4Defrag module (if enabled)
-    if max_ip_defrag_flows is not None:
-        sgiFastBPF:UEGate -> 1:ports[sgi_ifname].nat:0 -> sgiIP4Defrag::IPDefrag(num_flows=max_ip_defrag_flows, numa=0):1 -> EtherTrim::GenericDecap(bytes=14)
-    else:
-        sgiFastBPF:UEGate -> 1:ports[sgi_ifname].nat:0 -> EtherTrim::GenericDecap(bytes=14)
-else:
-    # Append sgiIP4Defrag module (if enabled)
-    if max_ip_defrag_flows is not None:
-        sgiFastBPF:UEGate -> sgiIP4Defrag::IPDefrag(num_flows=max_ip_defrag_flows, numa=0):1 -> EtherTrim::GenericDecap(bytes=14)
-    else:
-        sgiFastBPF:UEGate -> EtherTrim::GenericDecap(bytes=14)
+    _in:gate -> 1:ports[sgi_ifname].nat
+    _in = ports[sgi_ifname].nat
+    gate = 0
 
-EtherTrim -> GTPUEncap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0]), num_subscribers=max_sessions):1 \
+# Append sgiIP4Defrag module (if enabled)
+if max_ip_defrag_flows is not None:
+    _in:gate -> sgiIP4Defrag::IPDefrag(num_flows=max_ip_defrag_flows, numa=0)
+    _in = sgiIP4Defrag
+    gate = 1
+    # Drop pkts that are unable to be fragmented
+    sgiIP4Defrag:0 -> Sink()
+
+_in:gate -> EtherTrim::GenericDecap(bytes=14) \
+    -> GTPUEncap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0]), num_subscribers=max_sessions):1 \
     -> S1UEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(s1u_ifname))}},
@@ -342,8 +357,7 @@ EtherTrim -> GTPUEncap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname
 
 # Drop unknown packets
 GTPUEncap:0 -> Sink()
-if max_ip_defrag_flows is not None:
-    sgiIP4Defrag:0 -> Sink()
+
 
 
 # ====================================================
@@ -381,6 +395,8 @@ sgiRoutes = ports[sgi_ifname].rtr
 # Append s1uIP4Defrag module (if enabled)
 if max_ip_defrag_flows is not None:
     s1uFastBPF:GTPUGate -> s1uIP4Defrag::IPDefrag(num_flows=max_ip_defrag_flows, numa=0):1 -> EtherDecapTrim::GenericDecap(bytes=14)
+    # Drop pkts that are unable to be fragmented
+    s1uIP4Defrag:0 -> Sink()
 else:
     s1uFastBPF:GTPUGate -> EtherDecapTrim::GenericDecap(bytes=14)
 
@@ -399,8 +415,7 @@ s1uFastBPF:GTPUEchoGate \
 # Drop unknown packets
 GTPUEcho:0 -> Sink()
 GTPUDecap:0 -> Sink()
-if max_ip_defrag_flows is not None:
-    s1uIP4Defrag:0 -> Sink()
+
 
 
 # ====================================================

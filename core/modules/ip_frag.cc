@@ -2,8 +2,6 @@
 #include "ip_frag.h"
 /* for rte_zmalloc() */
 #include <rte_malloc.h>
-/* for RTE_ETHER macros */
-#include "rte_ether.h"
 /* for be32_t */
 #include "utils/endian.h"
 /* for ToIpv4Address() */
@@ -19,6 +17,10 @@ using bess::utils::ToIpv4Address;
 
 enum {DEFAULT_GATE = 0, FORWARD_GATE};
 /*----------------------------------------------------------------------------------*/
+const Commands IPFrag::cmds = {
+    {"get_eth_mtu", "EmptyArg", MODULE_CMD_FUNC(&IPFrag::GetEthMTU),
+     Command::THREAD_SAFE}};
+/*----------------------------------------------------------------------------------*/
 /**
  * Returns NULL under two conditions: (1) if the packet failed to fragment due to e.g.,
  * DF bit on and IP4 datagram size > MTU, or (2) if the packet successfully fragmented
@@ -33,7 +35,7 @@ IPFrag::FragmentPkt(Context *ctx, bess::Packet *p)
 	struct rte_mbuf *m = (struct rte_mbuf *)p;
 
 	if (RTE_ETH_IS_IPV4_HDR(m->packet_type) &&
-	    unlikely((RTE_ETHER_MAX_LEN - RTE_ETHER_CRC_LEN) < p->total_len())) {
+	    unlikely((eth_mtu - RTE_ETHER_CRC_LEN) < p->total_len())) {
 		volatile int32_t res;
 		struct rte_ether_hdr ethh_copy;
 		int32_t j;
@@ -62,7 +64,7 @@ IPFrag::FragmentPkt(Context *ctx, bess::Packet *p)
 		res = rte_ipv4_fragment_packet(m,
 					       &frag_tbl[0],
 					       BATCH_SIZE,
-					       RTE_ETHER_MAX_LEN - RTE_ETHER_CRC_LEN - RTE_ETHER_HDR_LEN,
+					       eth_mtu - RTE_ETHER_CRC_LEN - RTE_ETHER_HDR_LEN,
 					       m->pool,
 					       indirect_pktmbuf_pool->pool());
 
@@ -150,6 +152,11 @@ IPFrag::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 	}
 }
 /*----------------------------------------------------------------------------------*/
+CommandResponse IPFrag::GetEthMTU(const bess::pb::EmptyArg &) {
+	std::cerr << "Ethernet MTU Size: " << eth_mtu << std::endl;
+	return CommandSuccess();
+}
+/*----------------------------------------------------------------------------------*/
 void
 IPFrag::DeInit()
 {
@@ -161,9 +168,13 @@ IPFrag::DeInit()
 }
 /*----------------------------------------------------------------------------------*/
 CommandResponse
-IPFrag::Init(const bess::pb::EmptyArg &) {
+IPFrag::Init(const bess::pb::IPFragArg &arg) {
 
+	eth_mtu = arg.mtu();
 	std::string pool_name = this->name() + "_indirect_mbuf_pool";
+
+	if (eth_mtu <= RTE_ETHER_MIN_LEN)
+		return CommandFailure(EINVAL, "Invalid MTU size!");
 
 	indirect_pktmbuf_pool = new bess::DpdkPacketPool();
 	if (indirect_pktmbuf_pool == NULL)
