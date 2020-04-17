@@ -32,6 +32,7 @@ def getpythonpid(process_name):
             return proc.info['pid']
     return
 
+
 def get_json_conf(path, dump):
     conf = json.loads(open(path).read())
     if dump:
@@ -53,6 +54,11 @@ def get_env(varname, default=None):
 def ips_by_interface(name):
     ipdb = IPDB()
     return [ipobj[0] for ipobj in ipdb.interfaces[name]['ipaddr'].ipv4]
+
+
+def alias_by_interface(name):
+    ipdb = IPDB()
+    return ipdb.interfaces[name]['ifalias']
 
 
 def mac_by_interface(name):
