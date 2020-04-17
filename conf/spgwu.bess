@@ -151,16 +151,29 @@ class Port:
                 self.init_fastpath(**kwargs)
 
         elif mode == 'dpdk':
-            # if port list is empty, scan for dpdk_ports first
-            if not dpdk_ports and scan_dpdk_ports() == False:
-                print('Registered dpdk ports do not exist.')
-                sys.exit()
-            # Initialize DPDK fastpath
-            fidx = dpdk_ports.get(mac_by_interface(name))
-            if fidx is None:
-                raise Exception('Registered port for {} not detected!'.format(name))
-            kwargs = {"port_id" : fidx, "num_out_q": workers}
-            self.init_fastpath( **kwargs)
+            kwargs = None
+            pci = alias_by_interface(name)
+            if pci is not None:
+                kwargs = {"pci": pci, "num_out_q": workers}
+                try:
+                    self.init_fastpath(**kwargs)
+                except:
+                    kwargs = None
+                    print('Unable to initialize {} fastpath using alias {},\
+                        falling back to scan'.format(name, pci))
+            if kwargs is None:
+                # Fallback to scanning ports
+                # if port list is empty, scan for dpdk_ports first
+                if not dpdk_ports and scan_dpdk_ports() == False:
+                    print('Registered dpdk ports do not exist.')
+                    sys.exit()
+                # Initialize DPDK fastpath
+                fidx = dpdk_ports.get(mac_by_interface(name))
+                if fidx is None:
+                    raise Exception(
+                        'Registered port for {} not detected!'.format(name))
+                kwargs = {"port_id": fidx, "num_out_q": workers}
+                self.init_fastpath(**kwargs)
 
             # Initialize kernel slowpath port and RX/TX modules
             try:
