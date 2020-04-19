@@ -56,6 +56,7 @@ reading from file /tmp/tmpUBTGau, link-type EN10MB (Ethernet)
 * Dynamic IP routing
 * Support for IPv4 datagrams reassembly
 * Support for IP packets fragmentation
+* Support for UE IP NAT
 
 ### In Progress
 

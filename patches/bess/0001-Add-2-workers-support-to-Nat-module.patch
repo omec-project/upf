@@ -1,0 +1,25 @@
+From fc91a830e221c306d1bc8aa96bade4617eae1fed Mon Sep 17 00:00:00 2001
+From: Muhammad Asim Jamshed <muhammad.jamshed@intel.com>
+Date: Wed, 22 Apr 2020 12:55:37 -0700
+Subject: [PATCH] Add 2 workers support to Nat module.
+
+Signed-off-by: Muhammad Asim Jamshed <muhammad.jamshed@intel.com>
+---
+ core/modules/nat.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/core/modules/nat.h b/core/modules/nat.h
+index ff29dbf5..4ec594de 100644
+--- a/core/modules/nat.h
++++ b/core/modules/nat.h
+@@ -133,6 +133,7 @@ struct PortRange {
+ // igate/ogate 1: reverse dir
+ class NAT final : public Module {
+  public:
++  NAT() { max_allowed_workers_ = 2; }
+   enum Direction {
+     kForward = 0,  // internal -> external
+     kReverse = 1,  // external -> internal
+-- 
+2.25.1
+

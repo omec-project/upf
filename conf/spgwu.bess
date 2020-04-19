@@ -37,11 +37,6 @@ except KeyError:
 # See this link for details:
 ## https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py
 measure = bool(conf["measure"])
-IPHDRSZ=20
-UDPHDRSZ=8
-GTPHDRSZ=8
-MEASUREHDRSZ=12
-MEASURE_OFFSET=(IPHDRSZ + UDPHDRSZ + GTPHDRSZ + MEASUREHDRSZ)
 
 
 # ====================================================
@@ -76,7 +71,7 @@ def scan_dpdk_ports():
 
 
 class Port:
-    def __init__(self, name, ext_addr, offset1, offset2):
+    def __init__(self, name, ext_addrs):
         self.name = name
         self.wid = None
         self.fpi = None
@@ -85,9 +80,7 @@ class Port:
         self.bpfgate = 0
         self.routes_table = None
         self.nat = None
-        self.ext_addr = ext_addr
-        self.msr_off1 = offset1
-        self.msr_off2 = offset2
+        self.ext_addrs = ext_addrs
 
     def bpf_gate(self):
         if self.bpfgate < MAX_GATES - 2:
@@ -120,7 +113,7 @@ class Port:
 
         # Default drop when no matches
         if measure:
-            self.fpi -> Timestamp(offset=-(self.msr_off1)) -> self.bpf:0 -> Sink()
+            self.fpi -> Timestamp() -> self.bpf:0 -> Sink()
         else:
             self.fpi -> self.bpf:0 -> Sink()
 
@@ -207,13 +200,23 @@ class Port:
 
                 # Attach telemeric module (if enabled)
                 if measure:
-                    m = Measure(latency_ns_resolution=1, latency_ns_max=100000, offset=-(self.msr_off2))
+                    m = Measure()
                     m -> out
                     out = m
 
                 # Attach nat module (if enabled)
-                if self.ext_addr is not None:
-                    self.nat = __bess_module__("{}NAT".format(conf[interface]["ifname"]), 'NAT', ext_addrs=[{'ext_addr': ext_addr}])
+                if self.ext_addrs is not None:
+                    # Tokenize the string
+                    addrs = self.ext_addrs.split(' or ')
+                    # Make a list of ext_addr
+                    nat_list = list()
+                    for addr in addrs:
+                        nat_dict = dict()
+                        nat_dict['ext_addr'] = addr
+                        nat_list.append(nat_dict)
+
+                    # Create the NAT module
+                    self.nat = __bess_module__("{}NAT".format(conf[interface]["ifname"]), 'NAT', ext_addrs=nat_list)
                     self.nat:1 -> out
                     out = self.nat
 
@@ -282,21 +285,11 @@ ports = {}
 
 for idx, interface in enumerate(interfaces):
     try:
-        ext_addr = conf[interface]["ip_masquerade"]
+        ext_addrs = conf[interface]["ip_masquerade"]
     except KeyError:
-        ext_addr = None
+        ext_addrs = None
 
-    offset1 = None
-    offset2 = None
-    if measure:
-        if interface == "s1u":
-            offset1 = MEASUREHDRSZ
-            offset2 = MEASURE_OFFSET
-        if interface == 'sgi':
-            offset1 = MEASURE_OFFSET
-            offset2 = MEASUREHDRSZ
-
-    port = Port(conf[interface]["ifname"], ext_addr, offset1, offset2)
+    port = Port(conf[interface]["ifname"], ext_addrs)
     if port.name in ports:
         continue
     port.setup_port(idx, workers)
@@ -323,7 +316,7 @@ sgiFastBPF = ports[sgi_ifname].bpf
 UEGate = ports[sgi_ifname].bpf_gate()
 if ports[sgi_ifname].nat is not None:
     ue_filter = {"priority": -UEGate,
-                 "filter": "ip dst {}".format(ports[sgi_ifname].ext_addr), "gate": UEGate}
+                 "filter": "ip dst {}".format(ports[sgi_ifname].ext_addrs), "gate": UEGate}
 else:
     ue_filter = {"priority": -UEGate,
                  "filter": "ip dst net {}".format(ue_cidr), "gate": UEGate}

@@ -16,6 +16,8 @@
 #include "utils/udp.h"
 /* for gtp header */
 #include "utils/gtp.h"
+/* for GetDesc() */
+#include "utils/format.h"
 #include <rte_jhash.h>
 /*----------------------------------------------------------------------------------*/
 using bess::utils::be32_t;
@@ -94,6 +96,10 @@ CommandResponse GtpuDecap::Init(const bess::pb::GtpuDecapArg &arg) {
     return CommandFailure(ENOMEM, "Unable to find rte_hash table: %s\n",
                           "session_map");
   return CommandSuccess();
+}
+/*----------------------------------------------------------------------------------*/
+std::string GtpuDecap::GetDesc() const {
+  return bess::utils::Format("%zu sessions", (size_t)rte_hash_count(session_map));
 }
 /*----------------------------------------------------------------------------------*/
 ADD_MODULE(GtpuDecap, "gtpu_decap", "first version of gtpu decap module")

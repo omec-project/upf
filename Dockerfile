@@ -57,7 +57,6 @@ RUN wget -qO bess.zip https://github.com/NetSys/bess/archive/${BESS_COMMIT}.zip 
 WORKDIR bess-${BESS_COMMIT}
 COPY core/modules/ core/modules/
 COPY core/utils/ core/utils/
-COPY protobuf/ protobuf/
 COPY patches/bess patches
 RUN cp -a ${DPDK_DIR} deps/dpdk-19.11.1 && \
     cat patches/* | patch -p1

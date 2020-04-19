@@ -39,6 +39,8 @@ class GtpuEncap final : public Module {
   CommandResponse ShowRecords(const bess::pb::EmptyArg &);
   CommandResponse ShowCount(const bess::pb::EmptyArg &);
   void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
+  // returns the number of active UE sessions
+  std::string GetDesc() const override;
 
  private:
   int dp_session_create(struct session_info *entry);

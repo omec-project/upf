@@ -153,8 +153,10 @@ IPFrag::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
 }
 /*----------------------------------------------------------------------------------*/
 CommandResponse IPFrag::GetEthMTU(const bess::pb::EmptyArg &) {
-	std::cerr << "Ethernet MTU Size: " << eth_mtu << std::endl;
-	return CommandSuccess();
+	bess::pb::IPFragArg arg;
+	arg.set_mtu(eth_mtu);
+	DLOG(INFO) << "Ethernet MTU Size: " << eth_mtu << std::endl;
+	return CommandSuccess(arg);
 }
 /*----------------------------------------------------------------------------------*/
 void
