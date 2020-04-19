@@ -16,6 +16,8 @@
 #include "utils/udp.h"
 /* for gtp header */
 #include "utils/gtp.h"
+/* for GetDesc() */
+#include "utils/format.h"
 #include <rte_jhash.h>
 /*----------------------------------------------------------------------------------*/
 using bess::utils::be16_t;
@@ -154,6 +156,7 @@ CommandResponse GtpuEncap::AddSessionRecord(
               << ToIpv4Address(be32_t(ueaddr)) << std::endl;
     return CommandFailure(ENOMEM, "Failed to insert session record");
   }
+
   return CommandSuccess();
 }
 /*----------------------------------------------------------------------------------*/
@@ -205,8 +208,11 @@ CommandResponse GtpuEncap::ShowRecords(const bess::pb::EmptyArg &) {
 }
 /*----------------------------------------------------------------------------------*/
 CommandResponse GtpuEncap::ShowCount(const bess::pb::EmptyArg &) {
-  std::cerr << "# of records: " << rte_hash_count(session_map) << std::endl;
-  return CommandSuccess();
+	bess::pb::GtpuEncapArg arg;
+	arg.set_s1u_sgw_ip(0);
+	arg.set_num_subscribers(rte_hash_count(session_map));
+	DLOG(INFO) << "# of records: " << rte_hash_count(session_map) << std::endl;
+	return CommandSuccess(arg);
 }
 /*----------------------------------------------------------------------------------*/
 void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
@@ -347,6 +353,10 @@ CommandResponse GtpuEncap::Init(const bess::pb::GtpuEncapArg &arg) {
     return CommandFailure(ENOMEM, "Unable to create rte_hash table: %s\n",
                           "session_map");
   return CommandSuccess();
+}
+/*----------------------------------------------------------------------------------*/
+std::string GtpuEncap::GetDesc() const {
+  return bess::utils::Format("%zu sessions", (size_t)rte_hash_count(session_map));
 }
 /*----------------------------------------------------------------------------------*/
 ADD_MODULE(GtpuEncap, "gtpu_encap", "first version of gtpu encap module")

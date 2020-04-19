@@ -242,7 +242,7 @@ int main(int argc, char **argv) {
             BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
-            b.runRemoveCommand(rbuf.sess_entry.ue_addr.u.ipv4_addr,
+            b.runRemoveCommand(ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),
                                args.encapmod);
             std::map<std::uint64_t, bool>::iterator it = zmq_sess_map.find(
                 SESS_ID(ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),

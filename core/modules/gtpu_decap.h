@@ -19,6 +19,8 @@ class GtpuDecap final : public Module {
 
   CommandResponse Init(const bess::pb::GtpuDecapArg &arg);
   void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
+  // returns the number of active UE sessions
+  std::string GetDesc() const override;
 
  private:
   struct rte_hash *session_map = NULL;
