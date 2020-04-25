@@ -341,8 +341,13 @@ else:
                  "filter": "ip dst net {}".format(ue_cidr), "gate": UEGate}
 sgiFastBPF.add(filters=[ue_filter])
 
-_in = sgiFastBPF
-gate = UEGate
+# Verify IP/UDP Checksum
+sgiFastBPF:UEGate -> sgiRxIPCksum::IPChecksum(verify=True) -> sgiRxUDPCksum::L4Checksum(verify=True)
+_in = sgiRxUDPCksum
+gate = 0
+sgiRxIPCksum:1 -> Sink()
+sgiRxUDPCksum:1 -> Sink()
+
 # Append nat module (if enabled)
 if ports[sgi_ifname].nat is not None:
     _in:gate -> 1:ports[sgi_ifname].nat
@@ -369,6 +374,8 @@ _in:gate -> EtherTrim::GenericDecap(bytes=14) \
 
 # Drop unknown packets
 GTPUEncap:0 -> Sink()
+OuterIPCsum:1 -> Sink()
+OuterUDPCsum:1 -> Sink()
 
 
 
@@ -404,13 +411,18 @@ s1uFastBPF.add(filters=[uplink_filter])
 
 sgiRoutes = ports[sgi_ifname].rtr
 
+# Verify IP Checksum
+s1uFastBPF:GTPUGate -> s1uRxIPCksum::IPChecksum(verify=True) -> s1uRxUDPCksum::L4Checksum(verify=True)
+s1uRxIPCksum:1 -> Sink()
+s1uRxUDPCksum:1 -> Sink()
+
 # Append s1uIP4Defrag module (if enabled)
 if max_ip_defrag_flows is not None:
-    s1uFastBPF:GTPUGate -> s1uIP4Defrag::IPDefrag(num_flows=max_ip_defrag_flows, numa=0):1 -> EtherDecapTrim::GenericDecap(bytes=14)
+    s1uRxUDPCksum:0 -> s1uIP4Defrag::IPDefrag(num_flows=max_ip_defrag_flows, numa=0):1 -> EtherDecapTrim::GenericDecap(bytes=14)
     # Drop pkts that are unable to be fragmented
     s1uIP4Defrag:0 -> Sink()
 else:
-    s1uFastBPF:GTPUGate -> EtherDecapTrim::GenericDecap(bytes=14)
+    s1uRxUDPCksum:0 -> EtherDecapTrim::GenericDecap(bytes=14)
 
 EtherDecapTrim -> GTPUDecap::GtpuDecap(ename="GTPUEncap"):1 \
     -> SGIEtherAdd::GenericEncap(fields=[
@@ -420,6 +432,8 @@ EtherDecapTrim -> GTPUDecap::GtpuDecap(ename="GTPUEncap"):1 \
     -> sgiRoutes
 
 s1uFastBPF:GTPUEchoGate \
+    	-> gtpRxIPCksum::IPChecksum(verify=True) \
+        -> gtpRxUDPCksum::L4Checksum(verify=True) \
 	-> GTPUEcho::GtpuEcho(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0])):1 \
         -> EthSwap::MACSwap() \
         -> 1:OuterUDPCsum
@@ -427,7 +441,8 @@ s1uFastBPF:GTPUEchoGate \
 # Drop unknown packets
 GTPUEcho:0 -> Sink()
 GTPUDecap:0 -> Sink()
-
+gtpRxIPCksum:1 -> Sink()
+gtpRxUDPCksum:1 -> Sink()
 
 
 # ====================================================
