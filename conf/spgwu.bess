@@ -36,7 +36,13 @@ except KeyError:
 
 # See this link for details:
 ## https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py
-measure = bool(conf["measure"])
+measure = False
+try:
+    measure = bool(conf["measure"])
+except ValueError:
+    print('Invalid value for measure. Not installing Measure module.')
+except KeyError:
+    print('measure value not set. Not installing Measure module.')
 
 
 # ====================================================
