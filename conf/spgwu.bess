@@ -36,13 +36,15 @@ except KeyError:
 
 # See this link for details:
 ## https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py
+## TODO:XXX KEEP MEASURE FALSE FOR THE TIME BEING. METADATA IS SET TO 0. THIS
+## COULD CLASH WITH TIMESTAMP'S METADATA
 measure = False
-try:
-    measure = bool(conf["measure"])
-except ValueError:
-    print('Invalid value for measure. Not installing Measure module.')
-except KeyError:
-    print('measure value not set. Not installing Measure module.')
+#try:
+#    measure = bool(conf["measure"])
+#except ValueError:
+#    print('Invalid value for measure. Not installing Measure module.')
+#except KeyError:
+#    print('measure value not set. Not installing Measure module.')
 
 # Detect mode. Default is dpdk
 mode = None
@@ -125,7 +127,10 @@ class Port:
         if measure:
             self.fpi -> Timestamp() -> self.bpf:0 -> Sink()
         else:
-            self.fpi -> self.bpf:0 -> Sink()
+            parser = __bess_module__("{}GTPParse".format(name), 'GtpuParser')
+            self.fpi -> parser:1 -> self.bpf:0 -> Sink()
+            parser:0 -> Sink()
+
 
         # Initialize route module
         self.rtr = __bess_module__("{}Routes".format(name), 'IPLookup')
