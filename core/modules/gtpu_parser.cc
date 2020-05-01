@@ -4,8 +4,6 @@
  */
 /* for GTP parser */
 #include "gtpu_parser.h"
-/* for EpcMetadata */
-//#include "../utils/gtp_common.h"
 /* for ethernet header  */
 #include "utils/ether.h"
 /* for ip header  */
@@ -16,16 +14,12 @@
 #include "utils/tcp.h"
 /* for gtp header */
 #include "utils/gtp.h"
-/* for endian types */
-//#include "utils/endian.h"
 /*----------------------------------------------------------------------------------*/
 using bess::utils::Ethernet;
 using bess::utils::Ipv4;
 using bess::utils::Udp;
 using bess::utils::Tcp;
 using bess::utils::Gtpv1;
-//using bess::utils::be16_t;
-//using bess::utils::be32_t;
 
 enum {DEFAULT_GATE=0, FORWARD_GATE};
 const unsigned short UDP_PORT_GTPU = 2152;

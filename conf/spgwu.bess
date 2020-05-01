@@ -127,6 +127,7 @@ class Port:
         if measure:
             self.fpi -> Timestamp() -> self.bpf:0 -> Sink()
         else:
+            # Attach GTP parsing module
             parser = __bess_module__("{}GTPParse".format(name), 'GtpuParser')
             self.fpi -> parser:1 -> self.bpf:0 -> Sink()
             parser:0 -> Sink()
@@ -363,8 +364,19 @@ else:
                  "filter": "ip dst net {}".format(ue_cidr), "gate": UEGate}
 sgiFastBPF.add(filters=[ue_filter])
 
+# Verify that destination MAC address matches that with sgi interface
+# Exact match on desstination MAC address of the interface
+em_d = __bess_module__("{}MACDstMatch".format(sgi_ifname), 'ExactMatch',
+                       fields=[{'offset':0, 'num_bytes':6}])
+macstr_d = mac_by_interface(sgi_ifname)
+em_d.add(fields=[{'value_int': mac2hex(macstr_d)}], gate=0)
+# Drop all pkts that fail match
+em_d:1 -> Sink()
+# All matches go to gate 1
+em_d.set_default_gate(gate=1)
+
 # Verify IP/UDP Checksum
-sgiFastBPF:UEGate -> sgiRxIPCksum::IPChecksum(verify=True) -> sgiRxUDPCksum::L4Checksum(verify=True)
+sgiFastBPF:UEGate -> em_d:0 -> sgiRxIPCksum::IPChecksum(verify=True) -> sgiRxUDPCksum::L4Checksum(verify=True)
 _in = sgiRxUDPCksum
 gate = 0
 sgiRxIPCksum:1 -> Sink()
@@ -433,8 +445,19 @@ s1uFastBPF.add(filters=[uplink_filter])
 
 sgiRoutes = ports[sgi_ifname].rtr
 
+# Verify that destination MAC address matches that with s1u interface
+# Exact match on desstination MAC address of the interface
+em_u = __bess_module__("{}MACDstMatch".format(s1u_ifname), 'ExactMatch',
+                       fields=[{'offset':0, 'num_bytes':6}])
+macstr_u = mac_by_interface(s1u_ifname)
+em_u.add(fields=[{'value_int': mac2hex(macstr_u)}], gate=0)
+# Drop all pkts that fail match
+em_u:1 -> Sink()
+# All matches go to gate 1
+em_u.set_default_gate(gate=1)
+
 # Verify IP Checksum
-s1uFastBPF:GTPUGate -> s1uRxIPCksum::IPChecksum(verify=True) -> s1uRxUDPCksum::L4Checksum(verify=True)
+s1uFastBPF:GTPUGate -> em_u:0 -> s1uRxIPCksum::IPChecksum(verify=True) -> s1uRxUDPCksum::L4Checksum(verify=True)
 s1uRxIPCksum:1 -> Sink()
 s1uRxUDPCksum:1 -> Sink()
 
