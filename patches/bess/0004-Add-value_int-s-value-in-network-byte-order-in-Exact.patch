@@ -1,0 +1,35 @@
+From 68803c42c1d21cd80984d9cadcecf7454f6c784f Mon Sep 17 00:00:00 2001
+From: Muhammad Asim Jamshed <muhammad.jamshed@intel.com>
+Date: Mon, 4 May 2020 11:17:15 -0700
+Subject: [PATCH] Add value_int's value in network byte order in ExactMatch
+ module.
+
+Signed-off-by: Muhammad Asim Jamshed <muhammad.jamshed@intel.com>
+---
+ core/modules/exact_match.cc | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/core/modules/exact_match.cc b/core/modules/exact_match.cc
+index 072a0333..8275314c 100644
+--- a/core/modules/exact_match.cc
++++ b/core/modules/exact_match.cc
+@@ -261,7 +261,15 @@ void ExactMatch::RuleFieldsFromPb(
+       rule->push_back(std::vector<uint8_t>(f_obj.begin(), f_obj.end()));
+     } else {
+       rule->emplace_back();
+-      uint64_t rule64 = current.value_int();
++      uint64_t rule64 = 0;
++      if (table_.get_field(i).attr_id < 0) {
++	if (!bess::utils::uint64_to_bin(&rule64, current.value_int(),
++					field_size, 1)) {
++	  std::cerr << "idx " << i << ": not a correct" << field_size << "-byte value\n";
++	  return;
++	}
++      } else
++	  rule64 = current.value_int();
+       for (int j = 0; j < field_size; j++) {
+         rule->back().push_back(rule64 & 0xFFULL);
+         rule64 >>= 8;
+-- 
+2.25.1
+
