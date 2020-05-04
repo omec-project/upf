@@ -321,6 +321,11 @@ for wid in xrange(workers):
 #       Port Setup
 # ====================================================
 
+Uplink = 1
+Downlink = 2
+
+Access = 1
+Core = 2
 
 interfaces = ["s1u", "sgi"]
 ports = {}
@@ -404,6 +409,8 @@ _in:gate -> EtherTrim::GenericDecap(bytes=14) \
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
     -> OuterUDPCsum::L4Checksum() \
     -> OuterIPCsum::IPChecksum() \
+    -> SetMetadata(attrs=[{'name': 'iface_type', 'size': 1, 'value_int': Core}, \
+                          {'name': 'direction', 'size': 1, 'value_int': Downlink}]) \
     -> s1uRoutes
 
 # Drop unknown packets
@@ -474,6 +481,8 @@ EtherDecapTrim -> GTPUDecap::GtpuDecap(ename="GTPUEncap"):1 \
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(sgi_ifname))}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
+    -> SetMetadata(attrs=[{'name': 'iface_type', 'size': 1, 'value_int': Access}, \
+                          {'name': 'direction', 'size': 1, 'value_int': Uplink}]) \
     -> sgiRoutes
 
 s1uFastBPF:GTPUEchoGate \
