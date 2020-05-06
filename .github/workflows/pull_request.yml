@@ -10,6 +10,8 @@ jobs:
       # Checkout and build
     - uses: actions/checkout@v1
     - name: Build the Docker image
+      env:
+        MAKEFLAGS: -j1
       run: |
         ./scripts/build.sh
 
@@ -42,6 +44,8 @@ jobs:
 
     # Build again and commit
     - name: Build the Docker image (after format)
+      env:
+        MAKEFLAGS: -j1
       run: |
         ./scripts/build.sh
     - name: Commit and push
