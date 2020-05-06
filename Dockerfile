@@ -129,6 +129,8 @@ COPY core/utils/gtp_common.h /cpiface
 RUN cd /cpiface && \
     make $MAKEFLAGS PBDIR=/protobuf && \
     cp zmq-cpiface /bin/
+RUN mkdir -p /grpc-libs && \
+    cp /opt/grpc/libs/opt/libgrpc.so /opt/grpc/libs/opt/libgrpc++.* /grpc-libs
 
 # Stage cpiface: creates runtime image of cpiface
 FROM ubuntu:18.04 as cpiface
@@ -138,7 +140,7 @@ RUN apt-get update && \
         libzmq5 && \
     rm -rf /var/lib/apt/lists/*
 
-COPY --from=cpiface-build /opt/grpc/libs/opt /opt/grpc/libs/opt
-RUN echo "/opt/grpc/libs/opt" > /etc/ld.so.conf.d/grpc.conf && \
+COPY --from=cpiface-build /grpc-libs /grpc-libs
+RUN echo "/grpc-libs" > /etc/ld.so.conf.d/grpc.conf && \
     ldconfig
 COPY --from=cpiface-build /bin/zmq-cpiface /bin
