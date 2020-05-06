@@ -1,6 +1,6 @@
-From eff6c9fc1642fdbfa323287c96b3602c2c5e6fef Mon Sep 17 00:00:00 2001
-From: Saikrishna <saikrishna.edupuganti@intel.com>
-Date: Wed, 31 Jul 2019 07:04:32 -0700
+From 50737d2b9acab47cc0d581c6f89a3b62bd70a126 Mon Sep 17 00:00:00 2001
+From: Muhammad Asim Jamshed <muhammad.jamshed@intel.com>
+Date: Tue, 5 May 2020 23:11:29 -0700
 Subject: [PATCH] Expose PMDPort socket memory allocation
 
 This now allows to control socket from which memory for port's queue
@@ -10,55 +10,38 @@ p = PMDPort(pci='0000:4b:00.0', socket_id=0)
 
 Signed-off-by: Saikrishna Edupuganti <saikrishna.edupuganti@intel.com>
 ---
- core/drivers/pmd.cc           | 21 +++++++++++----------
+ core/drivers/pmd.cc           | 12 +++++++++---
  protobuf/ports/port_msg.proto |  3 +++
- 2 files changed, 14 insertions(+), 10 deletions(-)
+ 2 files changed, 12 insertions(+), 3 deletions(-)
 
 diff --git a/core/drivers/pmd.cc b/core/drivers/pmd.cc
-index 4ee34e0d..aea83b27 100644
+index a47cdd28..68b299cf 100644
 --- a/core/drivers/pmd.cc
 +++ b/core/drivers/pmd.cc
-@@ -345,11 +345,18 @@ CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
+@@ -250,10 +250,15 @@ CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
+     return CommandFailure(-ret, "rte_eth_dev_configure() failed");
    }
-   rte_eth_promiscuous_enable(ret_port_id);
  
+-  int sid = rte_eth_dev_socket_id(ret_port_id);
 +  int sid = arg.socket_case() == bess::pb::PMDPortArg::kSocketId ?
-+              arg.socket_id() : rte_eth_dev_socket_id(ret_port_id);
-+  LOG(INFO) << "Initializing Port:" << ret_port_id << " with memory from socket " << sid;
-+  /* if socket_id is invalid, set to 0 */
-+  if (sid < 0 || sid > RTE_MAX_NUMA_NODES) {
++	  arg.socket_id() : rte_eth_dev_socket_id(ret_port_id);
++  /* if soocket_id is invalid, set to 0 */
+   if (sid < 0 || sid > RTE_MAX_NUMA_NODES) {
+-    sid = 0;  // if socket_id is invalid, set to 0
++    LOG(WARNING) << "Invalid socket, falling back... ";
 +    sid = 0;
-+    LOG(WARNING) << "Initializing Port:" << ret_port_id << " with memory from socket " << sid;
-+  }
-+
-   // NOTE: As of DPDK 17.02, TX queues should be initialized first.
-   // Otherwise the DPDK virtio PMD will crash in rte_eth_rx_burst() later.
-   for (i = 0; i < num_txq; i++) {
--    int sid = 0; /* XXX */
--
-     ret = rte_eth_tx_queue_setup(ret_port_id, i, queue_size[PACKET_DIR_OUT],
-                                  sid, &eth_txconf);
-     if (ret != 0) {
-@@ -358,13 +365,6 @@ CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
    }
++  LOG(INFO) << "Initializing Port:" << ret_port_id
++	    << " with memory from socket " << sid;
  
-   for (i = 0; i < num_rxq; i++) {
--    int sid = rte_eth_dev_socket_id(ret_port_id);
--
--    /* if socket_id is invalid, set to 0 */
--    if (sid < 0 || sid > RTE_MAX_NUMA_NODES) {
--      sid = 0;
--    }
--
-     ret = rte_eth_rx_queue_setup(ret_port_id, i, queue_size[PACKET_DIR_INC],
-                                  sid, &eth_rxconf,
-                                  bess::PacketPool::GetDefaultPool(sid)->pool());
-@@ -390,7 +390,8 @@ CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
+   eth_rxconf = dev_info.default_rxconf;
+   eth_rxconf.rx_drop_en = 1;
+@@ -293,7 +298,8 @@ CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
    }
    dpdk_port_id_ = ret_port_id;
  
--  numa_node = rte_eth_dev_socket_id(static_cast<int>(ret_port_id));
-+  numa_node = arg.socket_case() == bess::pb::PMDPortArg::kSocketId ?
+-  int numa_node = rte_eth_dev_socket_id(static_cast<int>(ret_port_id));
++  int numa_node = arg.socket_case() == bess::pb::PMDPortArg::kSocketId ?
 +              sid : rte_eth_dev_socket_id(ret_port_id);
    node_placement_ =
        numa_node == -1 ? UNCONSTRAINED_SOCKET : (1ull << numa_node);
@@ -78,5 +61,5 @@ index ff6e65ed..1e8b6af8 100644
  
  message UnixSocketPortArg {
 -- 
-2.17.2
+2.25.1
 
