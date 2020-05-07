@@ -44,6 +44,13 @@ except ValueError:
 except KeyError:
     print('measure value not set. Not installing Measure module.')
 
+# Detect mode. Default is dpdk
+mode = None
+try:
+    mode = conf["mode"]
+except KeyError:
+    print('Autodetecting network driver')
+
 
 # ====================================================
 #       Port Helpers
@@ -96,14 +103,11 @@ class Port:
             raise Exception('Port {}: Out of BPF gates to allocate'.format(self.name))
 
     def detect_mode(self):
-        # default case
-        mode = "unselected"
-
         try:
             peer_by_interface(self.name)
-            mode = "dpdk"
+            mode = 'dpdk'
         except:
-            mode = "linux"
+            mode = 'linux'
         return mode
 
     def init_fastpath(self, **kwargs):
@@ -142,9 +146,11 @@ class Port:
         print('Setting up port {} on worker {}'.format(name,wid))
 
         # Detect the mode of this interface - DPDK/AF_XDP/AF_PACKET
-        mode = self.detect_mode()
+        global mode
+        if mode is None:
+            mode = self.detect_mode()
 
-        if mode == 'linux':
+        if mode in ['af_xdp', 'linux']:
             try:
                 # Initialize kernel fastpath.
                 # AF_XDP requires that num_rx_qs == num_tx_qs
@@ -152,9 +158,21 @@ class Port:
                           .format(idx, name, workers), "num_out_q": workers, "num_inc_q": workers}
                 self.init_fastpath(**kwargs)
             except:
-                print('Failed to create AF_XDP socket for {}. Creating AF_PACKET socket instead.'.format(name))
+                if mode == 'linux':
+                    print('Failed to create AF_XDP socket for {}. Retrying with AF_PACKET socket...'.format(name))
+                    mode = 'af_packet'
+                else:
+                    print('Failed to create AF_XDP socket for {}. Exiting...'.format(name))
+                    sys.exit()
+
+        if mode == 'af_packet':
+            try:
+                # Initialize kernel fastpath
                 kwargs = {"vdev" : "net_af_packet{},iface={},qpairs={}".format(idx, name, workers), "num_out_q": workers}
                 self.init_fastpath(**kwargs)
+            except:
+                print('Failed to create AF_PACKET socket for {}. Exiting...'.format(name))
+                sys.exit()
 
         elif mode == 'dpdk':
             kwargs = None
@@ -205,43 +223,6 @@ class Port:
                 # Direct control traffic from kernel to DPDK
                 spi -> self.fpo
 
-                # Direct fast path traffic to Frag module
-                merge = __bess_module__("{}Merge".format(name), 'Merge')
-
-                out = self.fpo
-
-                # Attach frag module (if enabled)
-                if ip_frag_with_eth_mtu is not None:
-                    frag = __bess_module__("{}IP4Frag".format(name), 'IPFrag', mtu=ip_frag_with_eth_mtu)
-                    frag:1 -> out
-                    frag:0 -> Sink()
-                    out = frag
-
-                # Attach telemeric module (if enabled)
-                if measure:
-                    m = Measure()
-                    m -> out
-                    out = m
-
-                # Attach nat module (if enabled)
-                if self.ext_addrs is not None:
-                    # Tokenize the string
-                    addrs = self.ext_addrs.split(' or ')
-                    # Make a list of ext_addr
-                    nat_list = list()
-                    for addr in addrs:
-                        nat_dict = dict()
-                        nat_dict['ext_addr'] = addr
-                        nat_list.append(nat_dict)
-
-                    # Create the NAT module
-                    self.nat = __bess_module__("{}NAT".format(conf[interface]["ifname"]), 'NAT', ext_addrs=nat_list)
-                    self.nat:1 -> out
-                    out = self.nat
-
-                # Attach Merge module to the 'outlist' of modules
-                merge -> out
-
                 tc = 'slow{}'.format(wid)
                 try:
                     bess.add_tc(tc, policy='round_robin', wid=wid)
@@ -262,6 +243,42 @@ class Port:
                 print('Mirror veth interface: {} misconfigured: {}'.format(name, e))
         else:
             raise Exception('Invalid mode selected.')
+        # Direct fast path traffic to Frag module
+        merge = __bess_module__("{}Merge".format(name), 'Merge')
+
+        out = self.fpo
+
+        # Attach frag module (if enabled)
+        if ip_frag_with_eth_mtu is not None:
+            frag = __bess_module__("{}IP4Frag".format(name), 'IPFrag', mtu=ip_frag_with_eth_mtu)
+            frag:1 -> out
+            frag:0 -> Sink()
+            out = frag
+
+        # Attach telemeric module (if enabled)
+        if measure:
+            m = Measure()
+            m -> out
+            out = m
+
+        # Attach nat module (if enabled)
+        if self.ext_addrs is not None:
+            # Tokenize the string
+            addrs = self.ext_addrs.split(' or ')
+            # Make a list of ext_addr
+            nat_list = list()
+            for addr in addrs:
+                nat_dict = dict()
+                nat_dict['ext_addr'] = addr
+                nat_list.append(nat_dict)
+
+                # Create the NAT module
+                self.nat = __bess_module__("{}NAT".format(conf[interface]["ifname"]), 'NAT', ext_addrs=nat_list)
+                self.nat:1 -> out
+                out = self.nat
+
+        # Attach Merge module to the 'outlist' of modules
+        merge -> out
 
 
 # ====================================================

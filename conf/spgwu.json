@@ -1,4 +1,8 @@
 {
+    "": "Vdev support. Enable `\"mode\": \"af_xdp\"` to enable AF_XDP mode, or `\"mode\": \"af_packet\"` to enable AF_PACKET mode",
+    "": "mode: af_xdp",
+    "": "mode: af_packet",
+
     "": "UE IP range",
     "ue_cidr": "16.0.0.0/16",
 
