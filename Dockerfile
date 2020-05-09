@@ -51,6 +51,7 @@ RUN ./install_ntf.sh
 
 # Build and copy artifacts
 COPY core/ core/
+COPY protobuf/ protobuf/
 COPY build_bess.sh .
 RUN ./build_bess.sh && \
     cp bin/bessd /bin && \
