@@ -64,15 +64,15 @@ RUN CXXARCHFLAGS="-march=$MARCH -Werror=format-truncation -Warray-bounds -fbound
     cp bin/bessd /bin && \
     mkdir -p /opt/bess && \
     cp -r bessctl pybess /opt/bess && \
-    cp -a protobuf /protobuf
+    cp -a core/pb /pb
 
 # Stage pip: compile psutil
-FROM python:2.7-slim as pip
+FROM python:2.7-slim AS pip
 RUN apt-get update && apt-get install -y gcc
 RUN pip install --no-cache-dir psutil
 
 # Stage bess: creates the runtime image of BESS
-FROM python:2.7-slim as bess
+FROM python:2.7-slim AS bess
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         libgraph-easy-perl \
@@ -97,50 +97,22 @@ ENV PYTHONPATH="/opt/bess"
 WORKDIR /opt/bess/bessctl
 ENTRYPOINT ["bessd", "-f"]
 
-# Compile cpiface
-FROM ubuntu:18.04 as cpiface-build
-RUN apt-get update && apt-get install -y \
-        autoconf \
-        automake \
-        clang \
-        build-essential \
-        git \
-        libc++-dev \
-        libgflags-dev \
-        libgoogle-glog-dev \
-        libgtest-dev \
-        libtool \
-        libzmq3-dev \
-        pkg-config
-ARG MAKEFLAGS
-RUN cd /opt && \
-    git clone -q https://github.com/grpc/grpc.git && \
-    cd grpc && \
-    git checkout 216fa1cab3a42edb2e6274b67338351aade99a51 && \
-    git submodule update --init && \
-    make $MAKEFLAGS && \
-    echo "/opt/grpc/libs/opt" > /etc/ld.so.conf.d/grpc.conf && \
-    ldconfig
-ENV PATH=$PATH:/opt/grpc/bins/opt/:/opt/grpc/bins/opt/protobuf
-COPY cpiface /cpiface
-COPY --from=bess-build /protobuf /protobuf
+FROM nefelinetworks/bess_build  AS cpiface-build
+RUN apt-get update -y && apt-get install -y libzmq3-dev
+WORKDIR /cpiface
+COPY cpiface .
+COPY --from=bess-build /pb pb
 # Copying explicitly since symlinks don't work
-COPY core/utils/gtp_common.h /cpiface
-RUN cd /cpiface && \
-    make $MAKEFLAGS PBDIR=/protobuf && \
-    cp zmq-cpiface /bin/
-RUN mkdir -p /grpc-libs && \
-    cp /opt/grpc/libs/opt/libgrpc.so /opt/grpc/libs/opt/libgrpc++.* /grpc-libs
+COPY core/utils/gtp_common.h .
+RUN make $MAKEFLAGS && \
+    cp zmq-cpiface /bin
 
 # Stage cpiface: creates runtime image of cpiface
-FROM ubuntu:18.04 as cpiface
+FROM ubuntu:bionic AS cpiface
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         libgoogle-glog0v5 \
         libzmq5 && \
     rm -rf /var/lib/apt/lists/*
 
-COPY --from=cpiface-build /grpc-libs /grpc-libs
-RUN echo "/grpc-libs" > /etc/ld.so.conf.d/grpc.conf && \
-    ldconfig
 COPY --from=cpiface-build /bin/zmq-cpiface /bin

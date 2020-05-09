@@ -9,8 +9,8 @@
 #include "module_msg.pb.h"
 #include "service.grpc.pb.h"
 #include <glog/logging.h>
-#include <grpcpp/channel.h>
-#include <grpcpp/create_channel.h>
+#include <grpc++/channel.h>
+#include <grpc++/create_channel.h>
 /*--------------------------------------------------------------------------------*/
 using namespace grpc;
 /*--------------------------------------------------------------------------------*/
