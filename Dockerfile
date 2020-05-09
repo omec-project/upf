@@ -58,6 +58,7 @@ RUN wget -qO bess.zip https://github.com/NetSys/bess/archive/${BESS_COMMIT}.zip 
 WORKDIR bess-${BESS_COMMIT}
 COPY core/ core/
 COPY patches/bess patches
+COPY protobuf/ protobuf/
 RUN cp -a ${DPDK_DIR} deps/dpdk-19.11.1 && \
     cat patches/* | patch -p1
 RUN ./build.py --plugin sample_plugin bess && \
