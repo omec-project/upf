@@ -95,7 +95,7 @@ docker rm -f bess bess-routectl bess-web bess-cpiface || true
 sudo rm -rf /var/run/netns/bess
 
 # Build
-./scripts/build.sh
+make docker-build
 
 [ "$mode" == 'dpdk' ] && DEVICES=${DEVICES:-'--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio'} || DEVICES=''
 [ "$mode" == 'af_xdp' ] && PRIVS='--privileged' || PRIVS='--cap-add SYS_NICE --cap-add NET_ADMIN'
@@ -108,7 +108,7 @@ docker run --name bess -td --restart unless-stopped \
 	-p $gui_port:$gui_port \
 	$PRIVS \
 	$DEVICES \
-	spgwu
+	upf-epc-bess:"$(<VERSION)"
 
 sudo mkdir -p /var/run/netns
 sandbox=$(docker inspect --format='{{.NetworkSettings.SandboxKey}}' bess)
@@ -133,16 +133,16 @@ docker run --name bess-routectl -td --restart unless-stopped \
 	-v "$PWD/conf/route_control.py":/route_control.py \
 	--net container:bess --pid container:bess \
 	--entrypoint /route_control.py \
-	spgwu -i "${ifaces[@]}"
+	upf-epc-bess:"$(<VERSION)" -i "${ifaces[@]}"
 
 # Run bess-web
 docker run --name bess-web -d --restart unless-stopped \
 	--net container:bess \
 	--entrypoint bessctl \
-	spgwu http 0.0.0.0 $gui_port
+	upf-epc-bess:"$(<VERSION)" http 0.0.0.0 $gui_port
 
 # Run bess-cpiface
 docker run --name bess-cpiface -td --restart unless-stopped \
 	--net container:bess \
 	--entrypoint zmq-cpiface \
-	cpiface
+	upf-epc-cpiface:"$(<VERSION)"
