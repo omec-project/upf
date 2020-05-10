@@ -38,29 +38,27 @@ RUN git clone -b $DPDK_VER -q --depth 1 $DPDK_URL $DPDK_DIR
 # Customizing DPDK install
 WORKDIR $DPDK_DIR
 
+ARG CPU=native
 ARG RTE_TARGET='x86_64-native-linuxapp-gcc'
-ARG RTE_MACHINE=native
 RUN sed -ri 's,(IGB_UIO=).*,\1n,' config/common_linux* && \
     sed -ri 's,(KNI_KMOD=).*,\1n,' config/common_linux* && \
     sed -ri 's,(LIBRTE_BPF=).*,\1n,' config/common_base && \
     sed -ri 's,(LIBRTE_PMD_PCAP=).*,\1y,' config/common_base && \
     sed -ri 's,(PORT_PCAP=).*,\1y,' config/common_base && \
     sed -ri 's,(AF_XDP=).*,\1y,' config/common_base && \
-    make config T=x86_64-native-linuxapp-gcc && \
-    make $MAKEFLAGS RTE_MACHINE=$RTE_MACHINE EXTRA_CFLAGS="-g -w -fPIC -DALLOW_EXPERIMENTAL_API"
+    make config T=$RTE_TARGET && \
+    make $MAKEFLAGS RTE_MACHINE=hsw EXTRA_CFLAGS="-march=$CPU -g -w -fPIC -DALLOW_EXPERIMENTAL_API"
 
 WORKDIR /
 ARG BESS_COMMIT=master
-ARG MARCH=native
 RUN apt-get update && apt-get install -y wget unzip ca-certificates git
 RUN wget -qO bess.zip https://github.com/NetSys/bess/archive/${BESS_COMMIT}.zip && unzip bess.zip
 WORKDIR bess-${BESS_COMMIT}
-COPY core/modules/ core/modules/
-COPY core/utils/ core/utils/
+COPY core/ core/
 COPY patches/bess patches
 RUN cp -a ${DPDK_DIR} deps/dpdk-19.11.1 && \
     cat patches/* | patch -p1
-RUN CXXARCHFLAGS="-march=$MARCH -Werror=format-truncation -Warray-bounds -fbounds-check -fno-strict-overflow -fno-delete-null-pointer-checks -fwrapv" ./build.py bess && \
+RUN ./build.py bess && \
     cp bin/bessd /bin && \
     mkdir -p /opt/bess && \
     cp -r bessctl pybess /opt/bess && \
@@ -98,6 +96,7 @@ WORKDIR /opt/bess/bessctl
 ENTRYPOINT ["bessd", "-f"]
 
 FROM nefelinetworks/bess_build  AS cpiface-build
+ARG CPU=native
 RUN apt-get update -y && apt-get install -y libzmq3-dev
 WORKDIR /cpiface
 COPY cpiface .
@@ -116,3 +115,9 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=cpiface-build /bin/zmq-cpiface /bin
+
+
+# Stage binaries: dummy stage for collecting binaries
+FROM scratch as binaries
+COPY --from=bess /bin/bessd /
+COPY --from=cpiface /bin/zmq-cpiface /

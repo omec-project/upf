@@ -2,7 +2,8 @@
 # Copyright(c) 2019 Intel Corporation
 
 CXX ?= g++
-CXXFLAGS ?= -g -O3 -std=c++17 -Werror -Wall -Wcast-align
+CPU ?= native
+CXXFLAGS ?= -march=$(CPU) -g -O3 -std=c++17 -Werror -Wall -Wcast-align
 TARGET ?= zmq-cpiface
 PBDIR ?= ./pb
 GRPC_LIBS = -l:libprotobuf.a -l:libgrpc++.a -l:libgrpc_unsecure.a -l:libcares.a -lpthread -lz
