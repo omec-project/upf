@@ -99,7 +99,8 @@ CommandResponse GtpuDecap::Init(const bess::pb::GtpuDecapArg &arg) {
 }
 /*----------------------------------------------------------------------------------*/
 std::string GtpuDecap::GetDesc() const {
-  return bess::utils::Format("%zu sessions", (size_t)rte_hash_count(session_map));
+  return bess::utils::Format("%zu sessions",
+                             (size_t)rte_hash_count(session_map));
 }
 /*----------------------------------------------------------------------------------*/
 ADD_MODULE(GtpuDecap, "gtpu_decap", "first version of gtpu decap module")
