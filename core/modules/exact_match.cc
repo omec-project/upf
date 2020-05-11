@@ -249,6 +249,38 @@ CommandResponse ExactMatch::SetRuntimeConfig(
   return CommandSuccess();
 }
 
+void ExactMatch::setValues(bess::Packet *pkt, ExactMatchRuleFields &action)
+{
+  size_t num_values_ = table_.num_values();
+  ExactMatchField *values_ = table_.getVals();
+
+  for (size_t i = 0; i < num_values_; i++) {
+    int pos = values_[i].pos;
+    uint64_t mask = values_[i].mask;
+    size_t sz = values_[i].size;
+    uint8_t *data = pkt->head_data<uint8_t *>() + pos;
+
+    if (values_[i].attr_id < 0) {
+      std::cerr << "pos: " << (int)pos << ", sz: " << sz << ", mask: " << std::hex << mask << std::endl;
+      size_t o = 0;
+      for (auto l = action.begin(); l != action.end(); l++) {
+	int k = 0;
+	for (auto j = action.at(o).begin(); j != action.at(o).end(); j++) {
+	  if (i == o) {
+	    std::cerr << "o = " << o << std::endl;
+	    std::cerr << "\t" << k << ": " << (int)(*j) << " (0x" << std::hex << (int)(*j) << ")" << std::endl;
+	    data[k] = *j;
+	    k++;
+	  }
+	}
+	o++;
+      }
+    } else {
+       /* set attributes here */
+    }
+  }
+}
+
 void ExactMatch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   gate_idx_t default_gate;
   ExactMatchKey keys[bess::PacketBatch::kMaxBurst] __ymm_aligned;
@@ -271,6 +303,10 @@ void ExactMatch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   for (int i = 0; i < cnt; i++) {
     bess::Packet *pkt = batch->pkts()[i];
     TargetTuple res = table_.Find(keys[i], default_tuple);
+    if (res.gate != default_gate) {
+      /* setting respecive values */
+      setValues(pkt, res.action);
+    }
     gate_idx_t g = res.gate;
     EmitPacket(ctx, pkt, g);
   }
@@ -306,6 +342,7 @@ void ExactMatch::RuleFieldsFromPb(
       }
       for (int j = 0; j < field_size; j++) {
         rule->back().push_back(rule64 & 0xFFULL);
+	DLOG(INFO) << "Pushed " << std::hex << (rule64 & 0xFFULL) << " to rule." << std::endl;
         rule64 >>= 8;
       }
     }

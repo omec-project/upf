@@ -334,6 +334,7 @@ class ExactMatchTable {
   }
 
   size_t num_fields() const { return num_fields_; }
+  size_t num_values() const { return num_values_; }
 
   // Returns the ith field.
   const ExactMatchField &get_field(size_t i) const { return fields_[i]; }
@@ -341,6 +342,8 @@ class ExactMatchTable {
   typename EmTable::iterator begin() { return table_.begin(); }
 
   typename EmTable::iterator end() { return table_.end(); }
+
+  ExactMatchField *getVals() {return values_;};
 
  private:
   Error MakeError(int code, const std::string &msg = "") {
