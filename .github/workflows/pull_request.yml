@@ -16,7 +16,6 @@ jobs:
     # Format the code
     - name: Dependencies
       run: |
-        sudo apt-get -y install jq clang-format-9
         sudo cp $(which clang-format-9) /bin/clang-format
     - name: Checkout PR
       env:
