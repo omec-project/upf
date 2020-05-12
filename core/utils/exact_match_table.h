@@ -487,7 +487,7 @@ class ExactMatchTable {
 
     if (mt_attr_name.length() > 0) {
       v->attr_id = m->AddMetadataAttr(mt_attr_name, v->size,
-                                      metadata::Attribute::AccessMode::kRead);
+                                      metadata::Attribute::AccessMode::kUpdate);
       if (v->attr_id < 0) {
         return MakeError(-v->attr_id,
                          Format("idx %d: add_metadata_attr() failed", idx));
