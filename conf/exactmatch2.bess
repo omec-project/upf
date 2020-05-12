@@ -52,11 +52,11 @@ def gen_packet(proto, src_ip, dst_ip):
     return bytes(pkt)
 
 packets = [gen_packet(scapy.UDP, '172.16.100.1', '10.0.0.1'),
-           #gen_packet(scapy.UDP, '172.12.55.99', '12.34.56.78'),
-           #gen_packet(scapy.UDP, '172.12.55.99', '10.0.0.1'),
-           #gen_packet(scapy.UDP, '172.16.100.1', '12.34.56.78'),
+           gen_packet(scapy.UDP, '172.12.55.99', '12.34.56.78'),
+           gen_packet(scapy.UDP, '172.12.55.99', '10.0.0.1'),
+           gen_packet(scapy.UDP, '172.16.100.1', '12.34.56.78'),
            #gen_packet(scapy.TCP, '172.12.55.99', '12.34.56.78'),
-           #gen_packet(scapy.UDP, '192.168.1.123', '12.34.56.78'),
+           gen_packet(scapy.UDP, '192.168.1.123', '12.34.56.78'),
           ]
 
 # L4 protocol and source/destination IP addresses
