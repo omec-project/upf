@@ -259,16 +259,17 @@ void ExactMatch::setValues(bess::Packet *pkt, ExactMatchRuleFields &action)
     uint64_t mask = values_[i].mask;
     size_t sz = values_[i].size;
     uint8_t *data = pkt->head_data<uint8_t *>() + pos;
+    int attr_id = values_[i].attr_id;
 
     if (values_[i].attr_id < 0) {
-      std::cerr << "pos: " << (int)pos << ", sz: " << sz << ", mask: " << std::hex << mask << std::endl;
+      DLOG(INFO) << "pos: " << (int)pos << ", sz: " << sz << ", mask: " << std::hex << mask << std::endl;
       size_t o = 0;
       for (auto l = action.begin(); l != action.end(); l++) {
 	int k = 0;
 	for (auto j = action.at(o).begin(); j != action.at(o).end(); j++) {
 	  if (i == o) {
-	    std::cerr << "o = " << o << std::endl;
-	    std::cerr << "\t" << k << ": " << (int)(*j) << " (0x" << std::hex << (int)(*j) << ")" << std::endl;
+	    DLOG(INFO) << "o = " << o << std::endl;
+	    DLOG(INFO) << "\t" << k << ": " << (int)(*j) << " (0x" << std::hex << (int)(*j) << ")" << std::endl;
 	    data[k] = *j;
 	    k++;
 	  }
@@ -277,6 +278,20 @@ void ExactMatch::setValues(bess::Packet *pkt, ExactMatchRuleFields &action)
       }
     } else {
        /* set attributes here */
+      DLOG(INFO) << "pos: " << (int)pos << ", sz: " << sz << ", mask: " << std::hex << mask << std::endl;
+      size_t o = 0;
+      for (auto l = action.begin(); l != action.end(); l++) {
+	int k = 0;
+	for (auto j = action.at(o).begin(); j != action.at(o).end(); j++) {
+	  if (i == o) {
+	    DLOG(INFO) << "o = " << o << std::endl;
+	    DLOG(INFO) << "\t" << k << ": " << (int)(*j) << " (0x" << std::hex << (int)(*j) << ")" << std::endl;
+	    set_attr<uint8_t>(this, attr_id, pkt, *j);
+	    k++;
+	  }
+	}
+	o++;
+      }
     }
   }
 }
