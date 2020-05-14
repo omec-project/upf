@@ -220,14 +220,17 @@ Error ExactMatch::AddRule(const bess::pb::ExactMatchCommandAddArg &arg) {
 
   ExactMatchRuleFields rule;
   ExactMatchRuleFields action;
+  //Error err;
   RuleFieldsFromPb(arg.fields(), &rule);
   if (arg.values_size() != 0)
 	  RuleFieldsFromPb(arg.values(), &action);
 
-  TargetTuple t = {
-    .gate = gate,
-    .action = action,
-  };
+  TargetTuple t;
+  t.gate = gate;
+  t.action = action;
+
+  //if ((err = table_.CreateValue(t.action, action)).first != 0)
+  //   return err;
 
   return table_.AddRule(t, rule);
 }
@@ -253,16 +256,19 @@ void ExactMatch::setValues(bess::Packet *pkt, ExactMatchRuleFields &action)
 {
   size_t num_values_ = table_.num_values();
   ExactMatchField *values_ = table_.getVals();
+  (void)values_;
+  (void)pkt;
+  (void)action;
 
   for (size_t i = 0; i < num_values_; i++) {
-    int pos = values_[i].pos;
+    int off = values_[i].offset;
     uint64_t mask = values_[i].mask;
     size_t sz = values_[i].size;
-    uint8_t *data = pkt->head_data<uint8_t *>() + pos;
+    uint8_t *data = pkt->head_data<uint8_t *>() + off;
     int attr_id = values_[i].attr_id;
 
     if (values_[i].attr_id < 0) {
-      DLOG(INFO) << "pos: " << (int)pos << ", sz: " << sz << ", mask: " << std::hex << mask << std::endl;
+      DLOG(INFO) << "off: " << (int)off << ", sz: " << sz << ", mask: " << std::hex << mask << std::endl;
       size_t o = 0;
       for (auto l = action.begin(); l != action.end(); l++) {
 	int k = 0;
@@ -277,19 +283,26 @@ void ExactMatch::setValues(bess::Packet *pkt, ExactMatchRuleFields &action)
 	o++;
       }
     } else {
-       /* set attributes here */
-      DLOG(INFO) << "pos: " << (int)pos << ", sz: " << sz << ", mask: " << std::hex << mask << std::endl;
+      /* set attributes here */
+      DLOG(INFO) << "off: " << (int)off << ", sz: " << sz << ", mask: " << std::hex << mask << std::endl;
       size_t o = 0;
       for (auto l = action.begin(); l != action.end(); l++) {
 	int k = 0;
+	typedef struct {
+	  uint8_t bytes[bess::metadata::kMetadataAttrMaxSize];
+	} value_t;
+	value_t buf;
 	for (auto j = action.at(o).begin(); j != action.at(o).end(); j++) {
 	  if (i == o) {
 	    DLOG(INFO) << "o = " << o << std::endl;
 	    DLOG(INFO) << "\t" << k << ": " << (int)(*j) << " (0x" << std::hex << (int)(*j) << ")" << std::endl;
-	    set_attr<uint8_t>(this, attr_id, pkt, *j);
+	    buf.bytes[k] = *j;
 	    k++;
 	  }
 	}
+	//(void)buf;
+	//(void)attr_id;
+	set_attr<value_t>(this, attr_id, pkt, buf);
 	o++;
       }
     }
