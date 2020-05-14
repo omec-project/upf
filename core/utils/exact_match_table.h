@@ -160,9 +160,13 @@ class ExactMatchTable {
 
   ExactMatchTable()
       : raw_key_size_(),
-        total_key_size_(),
+	total_key_size_(),
+	raw_value_size_(),
+	total_value_size_(),
         num_fields_(),
+	num_values_(),
         fields_(),
+	values_(),
         table_() {}
 
   // Add a new rule.
@@ -186,6 +190,20 @@ class ExactMatchTable {
 
     table_.Insert(key, val, ExactMatchKeyHash(total_key_size_),
                   ExactMatchKeyEq(total_key_size_));
+
+    return MakeError(0);
+  }
+
+  Error CreateValue(ExactMatchKey &v, const ExactMatchRuleFields &values) {
+    Error err;
+
+    if (values.size() == 0) {
+      return MakeError(EINVAL, "rule has no values");
+    }
+
+    if ((err = gather_value(values, &v)).first != 0) {
+      return err;
+    }
 
     return MakeError(0);
   }
@@ -379,6 +397,33 @@ class ExactMatchTable {
     return MakeError(0);
   }
 
+  Error gather_value(const ExactMatchRuleFields &fields, ExactMatchKey *key) {
+    if (fields.size() != num_values_) {
+      return MakeError(EINVAL, Format("rule should have %zu fields (has %zu)",
+                                      num_values_, fields.size()));
+    }
+
+    *key = {};
+
+    for (size_t i = 0; i < fields.size(); i++) {
+      int field_size = fields_[i].size;
+      int field_pos = fields_[i].pos;
+
+      const std::vector<uint8_t> &f_obj = fields[i];
+
+      if (static_cast<size_t>(field_size) != f_obj.size()) {
+        return MakeError(
+            EINVAL, Format("rule field %zu should have size %d (has %zu)", i,
+                           field_size, f_obj.size()));
+      }
+
+      memcpy(reinterpret_cast<uint8_t *>(key) + field_pos, f_obj.data(),
+             field_size);
+    }
+
+    return MakeError(0);
+  }
+
   // Helper for public MakeKey functions
   void DoMakeKeys(ExactMatchKey *keys, const void **bufs, size_t n) const {
     // Initialize the padding with zero.  NB: if total_key_size_ is 0,
@@ -486,7 +531,7 @@ class ExactMatchTable {
     }
 
     if (mt_attr_name.length() > 0) {
-      v->attr_id = m->AddMetadataAttr(mt_attr_name, v->size,
+      v->attr_id = m->AddMetadataAttr(mt_attr_name, bess::metadata::kMetadataAttrMaxSize,
                                       metadata::Attribute::AccessMode::kUpdate);
       if (v->attr_id < 0) {
         return MakeError(-v->attr_id,
@@ -519,6 +564,9 @@ class ExactMatchTable {
 
     num_values_++;
 
+    v->pos = raw_value_size_;
+    raw_value_size_ += v->size;
+    total_value_size_ = align_ceil(raw_value_size_, sizeof(uint64_t));
     return MakeError(0);
   }
 
@@ -527,6 +575,12 @@ class ExactMatchTable {
 
   // aligned total key size
   size_t total_key_size_;
+
+  // unaligend key size, used as an accumulator for calls to AddField()
+  size_t raw_value_size_;
+
+  // aligned total key size
+  size_t total_value_size_;
 
   size_t num_fields_;
   size_t num_values_;

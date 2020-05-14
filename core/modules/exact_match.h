@@ -49,6 +49,7 @@ typedef struct TargetTuple
 {
   gate_idx_t gate;
   ExactMatchRuleFields action;
+  //ExactMatchKey action;
 } TargetTuple;
 
 class ExactMatch final : public Module {
