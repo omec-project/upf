@@ -30,6 +30,7 @@ docker-build:
 		DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build --pull $(DOCKER_BUILD_ARGS) \
 			--target $$target \
 			--tag ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}upf-epc-$$target:${DOCKER_TAG} \
+			--cache-from ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}upf-epc-$$target:${DOCKER_TAG} \
 			--build-arg org_label_schema_version="${VERSION}" \
 			--build-arg org_label_schema_vcs_url="${DOCKER_LABEL_VCS_URL}" \
 			--build-arg org_label_schema_vcs_ref="${DOCKER_LABEL_VCS_REF}" \

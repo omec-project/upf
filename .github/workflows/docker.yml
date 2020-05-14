@@ -1,0 +1,20 @@
+name: Docker image
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    env:
+      DOCKER_REGISTRY: "docker.pkg.github.com/omec-project/"
+      DOCKER_REPOSITORY: "upf-epc"
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout and build
+    - uses: actions/checkout@v1
+    - name: Build and push Docker image
+      run: |
+        make docker-build
+        make docker-push
