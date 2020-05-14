@@ -33,6 +33,10 @@ import socket
 
 src_mac='02:1e:67:9f:4d:ae'
 dst_mac='06:16:3e:1b:72:32'
+nh_mac1='30:31:32:33:34:35'
+nh_mac2='40:41:42:43:44:45'
+nh_mac3='50:51:52:53:54:55'
+nh_mac4='60:61:62:63:64:65'
 
 def aton(ip):
     return socket.inet_aton(ip)
@@ -53,7 +57,6 @@ packets = [gen_packet(scapy.UDP, '172.16.100.1', '10.0.0.1'),
            gen_packet(scapy.UDP, '172.12.55.99', '12.34.56.78'),
            gen_packet(scapy.UDP, '172.12.55.99', '10.0.0.1'),
            gen_packet(scapy.UDP, '172.16.100.1', '12.34.56.78'),
-           gen_packet(scapy.TCP, '172.12.55.99', '12.34.56.78'),
            gen_packet(scapy.UDP, '192.168.1.123', '12.34.56.78'),
           ]
 
@@ -61,21 +64,26 @@ packets = [gen_packet(scapy.UDP, '172.16.100.1', '10.0.0.1'),
 em::ExactMatch(fields=[{'offset':0, 'num_bytes':6},
                        {'offset':23, 'num_bytes':1},
                        {'offset':26, 'num_bytes':4},
-                       {'offset':30, 'num_bytes':4}])
+                       {'offset':30, 'num_bytes':4},
+                       {'attr_name':'foo', 'num_bytes':2}],
+               values=[{'offset':0, 'num_bytes':6},
+                       {'attr_name':'bar', 'num_bytes':5}])
 
-Source() -> Rewrite(templates=packets) -> em
+Source() -> Rewrite(templates=packets) -> SetMetadata(attrs=[{'name': 'foo', 'size': 2, 'value_int':0x3344}]) -> em
 
 em:0 -> Sink()
 em:1 -> Sink()
 em:2 -> Sink()
+em:3 -> Sink()
+em:4 -> Sink()
 em:5 -> Sink()   # used as default gate
 
-em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_int':17}, {'value_bin':aton('172.16.100.1')}, {'value_bin':aton('10.0.0.1')}], gate=0)
-em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_int':6}, {'value_bin':aton('172.12.55.99')}, {'value_bin':aton('12.34.56.78')}], gate=1)
-em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_int':17}, {'value_bin':aton('172.12.55.99')}, {'value_bin':aton('12.34.56.78')}], gate=2)
+em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_int':17}, {'value_bin':aton('172.16.100.1')}, {'value_bin':aton('10.0.0.1')}, {'value_int': 0x4433}], gate=0, values=[{'value_int': mac2hex(nh_mac1)}, {'value_int': 30}])
+em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_int':17}, {'value_bin':aton('172.12.55.99')}, {'value_bin':aton('12.34.56.78')}, {'value_int': 0x4433}], gate=1, values=[{'value_int': mac2hex(nh_mac2)}, {'value_int': 29}])
+em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_int':17}, {'value_bin':aton('172.12.55.99')}, {'value_bin':aton('10.0.0.1')}, {'value_int': 0x4433}], gate=2, values=[{'value_int': mac2hex(nh_mac3)}, {'value_int': 28}])
 
 # delete test
-em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_bin':chr(17)}, {'value_bin':aton('192.168.1.123')}, {'value_bin':aton('12.34.56.78')}], gate=3)
-em.delete(fields=[{'value_int': mac2hex(dst_mac)}, {'value_bin':chr(17)}, {'value_bin':aton('192.168.1.123')}, {'value_bin':aton('12.34.56.78')}])
+em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_bin':chr(17)}, {'value_bin':aton('192.168.1.123')}, {'value_bin':aton('12.34.56.78')}, {'value_int': 0x4433}], gate=3, values=[{'value_int': mac2hex(nh_mac4)}, {'value_int': 27}])
+em.delete(fields=[{'value_int': mac2hex(dst_mac)}, {'value_bin':chr(17)}, {'value_bin':aton('192.168.1.123')}, {'value_bin':aton('12.34.56.78')}, {'value_int': 0x4433}])
 
 em.set_default_gate(gate=5)
