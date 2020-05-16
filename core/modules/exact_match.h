@@ -46,12 +46,16 @@ using bess::utils::ExactMatchTable;
 using bess::utils::Error;
 
 #define KEY_MODE_RETRIEVAL	1
+typedef enum {FIELD_TYPE = 0, VALUE_TYPE} Type;
 
-class TargetTuple
+class ExactMatch;
+class ValueTuple
 {
+ friend class ExactMatch;
  public:
- TargetTuple(): gate(), action() {}
+ ValueTuple(): gate(), action() {}
 
+ private:
   gate_idx_t gate;
 #ifdef KEY_MODE_RETRIEVAL
   ExactMatchKey action;
@@ -87,8 +91,7 @@ class ExactMatch final : public Module {
 
  private:
   CommandResponse AddFieldOne(const bess::pb::Field &field,
-                              const bess::pb::FieldData &f_mask,
-			      int idx, int type);
+                              const bess::pb::FieldData &mask, int idx, Type t);
   void RuleFieldsFromPb(const RepeatedPtrField<bess::pb::FieldData> &fields,
                         bess::utils::ExactMatchRuleFields *rule);
   Error AddRule(const bess::pb::ExactMatchCommandAddArg &arg);
@@ -101,7 +104,7 @@ class ExactMatch final : public Module {
   gate_idx_t default_gate_;
   bool empty_masks_;  // mainly for GetInitialArg
 
-  ExactMatchTable<TargetTuple> table_;
+  ExactMatchTable<ValueTuple> table_;
 };
 
 #endif  // BESS_MODULES_EXACTMATCH_H_

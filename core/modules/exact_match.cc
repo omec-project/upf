@@ -61,8 +61,7 @@ const Commands ExactMatch::cmds = {
 
 CommandResponse ExactMatch::AddFieldOne(const bess::pb::Field &field,
                                         const bess::pb::FieldData &mask,
-                                        int idx,
-					int type) {
+                                        int idx, Type t) {
   int size = field.num_bytes();
   uint64_t mask64 = 0;
 
@@ -75,13 +74,13 @@ CommandResponse ExactMatch::AddFieldOne(const bess::pb::Field &field,
 
   Error ret;
   if (field.position_case() == bess::pb::Field::kAttrName) {
-    ret = (type == 0) ? table_.AddField(this, field.attr_name(), size, mask64, idx) :
+    ret = (t == FIELD_TYPE) ? table_.AddField(this, field.attr_name(), size, mask64, idx) :
 	    table_.AddValue(this, field.attr_name(), size, mask64, idx);
     if (ret.first) {
       return CommandFailure(ret.first, "%s", ret.second.c_str());
     }
   } else if (field.position_case() == bess::pb::Field::kOffset) {
-      ret = (type == 0) ? table_.AddField(field.offset(), size, mask64, idx) :
+      ret = (t == FIELD_TYPE) ? table_.AddField(field.offset(), size, mask64, idx) :
 	      table_.AddValue(field.offset(), size, mask64, idx);
     if (ret.first) {
       return CommandFailure(ret.first, "%s", ret.second.c_str());
@@ -107,9 +106,9 @@ CommandResponse ExactMatch::Init(const bess::pb::ExactMatchArg &arg) {
 
     if (empty_masks_) {
       bess::pb::FieldData emptymask;
-      err = AddFieldOne(arg.fields(i), emptymask, i, 0);
+      err = AddFieldOne(arg.fields(i), emptymask, i, FIELD_TYPE);
     } else {
-      err = AddFieldOne(arg.fields(i), arg.masks(i), i, 0);
+      err = AddFieldOne(arg.fields(i), arg.masks(i), i, FIELD_TYPE);
     }
 
     if (err.error().code() != 0) {
@@ -123,9 +122,9 @@ CommandResponse ExactMatch::Init(const bess::pb::ExactMatchArg &arg) {
 
     if (empty_masks_) {
       bess::pb::FieldData emptymask;
-      err = AddFieldOne(arg.values(i), emptymask, i, 1);
+      err = AddFieldOne(arg.values(i), emptymask, i, VALUE_TYPE);
     } else {
-      err = AddFieldOne(arg.values(i), arg.masksv(i), i, 1);
+      err = AddFieldOne(arg.values(i), arg.masksv(i), i, VALUE_TYPE);
     }
 
     if (err.error().code() != 0) {
@@ -221,19 +220,21 @@ Error ExactMatch::AddRule(const bess::pb::ExactMatchCommandAddArg &arg) {
   ExactMatchRuleFields rule;
   ExactMatchRuleFields action;
   Error err;
+  ValueTuple t;
+
   RuleFieldsFromPb(arg.fields(), &rule);
-  if (arg.values_size() != 0)
+  if (arg.values_size() != 0) {
     RuleFieldsFromPb(arg.values(), &action);
 
-  TargetTuple t;
-  t.gate = gate;
 #ifdef KEY_MODE_RETRIEVAL
-  if ((err = table_.CreateValue(t.action, action)).first != 0)
-    return err;
+    if ((err = table_.CreateValue(t.action, action)).first != 0)
+      return err;
 #else
-  t.action = action;
+    t.action = action;
 #endif
+  }
 
+  t.gate = gate;
   return table_.AddRule(t, rule);
 }
 
@@ -259,11 +260,6 @@ void ExactMatch::setValues(bess::Packet *pkt, ExactMatchKey &action)
 {
   size_t num_values_ = table_.num_values();
   ExactMatchField *values_ = table_.getVals();
-
-  (void)pkt;
-  (void)action;
-  (void)num_values_;
-  (void)values_;
 
   for (size_t i = 0; i < num_values_; i++) {
     int value_size = values_[i].size;
@@ -291,9 +287,6 @@ void ExactMatch::setValues(bess::Packet *pkt, ExactMatchRuleFields &action)
 {
   size_t num_values_ = table_.num_values();
   ExactMatchField *values_ = table_.getVals();
-  (void)values_;
-  (void)pkt;
-  (void)action;
 
   for (size_t i = 0; i < num_values_; i++) {
     int off = values_[i].offset;
@@ -335,8 +328,6 @@ void ExactMatch::setValues(bess::Packet *pkt, ExactMatchRuleFields &action)
 	    k++;
 	  }
 	}
-	//(void)buf;
-	//(void)attr_id;
 	set_attr<value_t>(this, attr_id, pkt, buf);
 	o++;
       }
@@ -361,12 +352,12 @@ void ExactMatch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   table_.MakeKeys(batch, buffer_fn, keys);
 
   int cnt = batch->cnt();
-  TargetTuple default_tuple;
+  ValueTuple default_tuple;
   default_tuple.gate = default_gate;
 
   for (int i = 0; i < cnt; i++) {
     bess::Packet *pkt = batch->pkts()[i];
-    TargetTuple res;
+    ValueTuple res;
     res = table_.Find(keys[i], default_tuple);
     if (res.gate != default_gate) {
       /* setting respecive values */
@@ -375,8 +366,6 @@ void ExactMatch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     gate_idx_t g = res.gate;
     EmitPacket(ctx, pkt, g);
   }
-
-  (void)default_tuple;
 }
 
 std::string ExactMatch::GetDesc() const {

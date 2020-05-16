@@ -82,17 +82,9 @@ em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_int':17}, {'value_bin':a
 em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_int':17}, {'value_bin':aton('172.12.55.99')}, {'value_bin':aton('12.34.56.78')}, {'value_int': 0x4433}], gate=1, values=[{'value_int': mac2hex(nh_mac2)}, {'value_int': 29}])
 em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_int':17}, {'value_bin':aton('172.12.55.99')}, {'value_bin':aton('10.0.0.1')}, {'value_int': 0x4433}], gate=2, values=[{'value_int': mac2hex(nh_mac3)}, {'value_int': 28}])
 
-#em.add(fields=[{'value_int': mac2hex(dst_mac)}], gate=0)
-
-#em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_int':17}, {'value_bin':aton('172.16.100.1')}, {'value_bin':aton('10.0.0.1')}, {'value_int': 0x4433}], gate=0)
-#em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_int':17}, {'value_bin':aton('172.12.55.99')}, {'value_bin':aton('12.34.56.78')}, {'value_int': 0x4433}], gate=1)
-#em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_int':17}, {'value_bin':aton('172.12.55.99')}, {'value_bin':aton('10.0.0.1')}, {'value_int': 0x4433}], gate=2)
 
 # delete test
 em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_bin':chr(17)}, {'value_bin':aton('192.168.1.123')}, {'value_bin':aton('12.34.56.78')}, {'value_int': 0x4433}], gate=3, values=[{'value_int': mac2hex(nh_mac4)}, {'value_int': 27}])
 em.delete(fields=[{'value_int': mac2hex(dst_mac)}, {'value_bin':chr(17)}, {'value_bin':aton('192.168.1.123')}, {'value_bin':aton('12.34.56.78')}, {'value_int': 0x4433}])
-
-#em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_bin':chr(17)}, {'value_bin':aton('192.168.1.123')}, {'value_bin':aton('12.34.56.78')}, {'value_int': 0x4433}], gate=3)
-#em.delete(fields=[{'value_int': mac2hex(dst_mac)}, {'value_bin':chr(17)}, {'value_bin':aton('192.168.1.123')}, {'value_bin':aton('12.34.56.78')}, {'value_int': 0x4433}])
 
 em.set_default_gate(gate=5)
