@@ -36,13 +36,15 @@ except KeyError:
 
 # See this link for details:
 ## https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py
+## TODO:XXX KEEP MEASURE FALSE FOR THE TIME BEING. METADATA IS SET TO 0. THIS
+## COULD CLASH WITH TIMESTAMP'S METADATA
 measure = False
-try:
-    measure = bool(conf["measure"])
-except ValueError:
-    print('Invalid value for measure. Not installing Measure module.')
-except KeyError:
-    print('measure value not set. Not installing Measure module.')
+#try:
+#    measure = bool(conf["measure"])
+#except ValueError:
+#    print('Invalid value for measure. Not installing Measure module.')
+#except KeyError:
+#    print('measure value not set. Not installing Measure module.')
 
 # Detect mode. Default is dpdk
 mode = None
@@ -125,7 +127,11 @@ class Port:
         if measure:
             self.fpi -> Timestamp() -> self.bpf:0 -> Sink()
         else:
-            self.fpi -> self.bpf:0 -> Sink()
+            # Attach GTP parsing module
+            parser = __bess_module__("{}GTPParse".format(name), 'GtpuParser')
+            self.fpi -> parser:1 -> self.bpf:0 -> Sink()
+            parser:0 -> Sink()
+
 
         # Initialize route module
         self.rtr = __bess_module__("{}Routes".format(name), 'IPLookup')
@@ -272,10 +278,10 @@ class Port:
                 nat_dict['ext_addr'] = addr
                 nat_list.append(nat_dict)
 
-            # Create the NAT module
-            self.nat = __bess_module__("{}NAT".format(conf[interface]["ifname"]), 'NAT', ext_addrs=nat_list)
-            self.nat:1 -> out
-            out = self.nat
+                # Create the NAT module
+                self.nat = __bess_module__("{}NAT".format(conf[interface]["ifname"]), 'NAT', ext_addrs=nat_list)
+                self.nat:1 -> out
+                out = self.nat
 
         # Attach Merge module to the 'outlist' of modules
         merge -> out
@@ -315,6 +321,11 @@ for wid in xrange(workers):
 #       Port Setup
 # ====================================================
 
+Uplink = 1
+Downlink = 2
+
+Access = 1
+Core = 2
 
 interfaces = ["s1u", "sgi"]
 ports = {}
@@ -358,8 +369,19 @@ else:
                  "filter": "ip dst net {}".format(ue_cidr), "gate": UEGate}
 sgiFastBPF.add(filters=[ue_filter])
 
+# Verify that destination MAC address matches that with sgi interface
+# Exact match on desstination MAC address of the interface
+em_d = __bess_module__("{}MACDstMatch".format(sgi_ifname), 'ExactMatch',
+                       fields=[{'offset':0, 'num_bytes':6}])
+macstr_d = mac_by_interface(sgi_ifname)
+em_d.add(fields=[{'value_int': mac2hex(macstr_d)}], gate=0)
+# Drop all pkts that fail match
+em_d:1 -> Sink()
+# All matches go to gate 1
+em_d.set_default_gate(gate=1)
+
 # Verify IP/UDP Checksum
-sgiFastBPF:UEGate -> sgiRxIPCksum::IPChecksum(verify=True) -> sgiRxUDPCksum::L4Checksum(verify=True)
+sgiFastBPF:UEGate -> em_d:0 -> sgiRxIPCksum::IPChecksum(verify=True) -> sgiRxUDPCksum::L4Checksum(verify=True)
 _in = sgiRxUDPCksum
 gate = 0
 sgiRxIPCksum:1 -> Sink()
@@ -387,6 +409,8 @@ _in:gate -> EtherTrim::GenericDecap(bytes=14) \
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
     -> OuterUDPCsum::L4Checksum() \
     -> OuterIPCsum::IPChecksum() \
+    -> SetMetadata(attrs=[{'name': 'iface_type', 'size': 1, 'value_int': Core}, \
+                          {'name': 'direction', 'size': 1, 'value_int': Downlink}]) \
     -> s1uRoutes
 
 # Drop unknown packets
@@ -428,8 +452,19 @@ s1uFastBPF.add(filters=[uplink_filter])
 
 sgiRoutes = ports[sgi_ifname].rtr
 
+# Verify that destination MAC address matches that with s1u interface
+# Exact match on desstination MAC address of the interface
+em_u = __bess_module__("{}MACDstMatch".format(s1u_ifname), 'ExactMatch',
+                       fields=[{'offset':0, 'num_bytes':6}])
+macstr_u = mac_by_interface(s1u_ifname)
+em_u.add(fields=[{'value_int': mac2hex(macstr_u)}], gate=0)
+# Drop all pkts that fail match
+em_u:1 -> Sink()
+# All matches go to gate 1
+em_u.set_default_gate(gate=1)
+
 # Verify IP Checksum
-s1uFastBPF:GTPUGate -> s1uRxIPCksum::IPChecksum(verify=True) -> s1uRxUDPCksum::L4Checksum(verify=True)
+s1uFastBPF:GTPUGate -> em_u:0 -> s1uRxIPCksum::IPChecksum(verify=True) -> s1uRxUDPCksum::L4Checksum(verify=True)
 s1uRxIPCksum:1 -> Sink()
 s1uRxUDPCksum:1 -> Sink()
 
@@ -446,6 +481,8 @@ EtherDecapTrim -> GTPUDecap::GtpuDecap(ename="GTPUEncap"):1 \
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(sgi_ifname))}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
+    -> SetMetadata(attrs=[{'name': 'iface_type', 'size': 1, 'value_int': Access}, \
+                          {'name': 'direction', 'size': 1, 'value_int': Uplink}]) \
     -> sgiRoutes
 
 s1uFastBPF:GTPUEchoGate \
