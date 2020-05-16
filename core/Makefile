@@ -175,7 +175,7 @@ ifdef COVERAGE
 else ifdef DEBUG
   CXXFLAGS += -O0
 else
-  CXXFLAGS += -O0 -DDEBUG
+  CXXFLAGS += -O3 -g -DNDEBUG -march=native
 endif
 
 # Unless we explicitly specify a default goal, the first target in the
@@ -316,7 +316,6 @@ GTEST_DIR := /usr/src/gtest
 .PHONY: all clean tags cscope tests benchmarks protobuf check_plugins_exist
 
 all: $(EXEC) modules tests benchmarks check_plugins_exist
-	echo "$$(CXXFLAGS)" "$$(DEPFLAGS)"
 
 clean:
 	rm -rf $(EXEC) .deps/*.d .deps/*/*.d *_test */*_test *_bench */*_bench \
