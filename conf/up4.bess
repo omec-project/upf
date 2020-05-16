@@ -36,13 +36,15 @@ except KeyError:
 
 # See this link for details:
 ## https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py
+## TODO:XXX KEEP MEASURE FALSE FOR THE TIME BEING. METADATA IS SET TO 0. THIS
+## COULD CLASH WITH TIMESTAMP'S METADATA
 measure = False
-try:
-    measure = bool(conf["measure"])
-except ValueError:
-    print('Invalid value for measure. Not installing Measure module.')
-except KeyError:
-    print('measure value not set. Not installing Measure module.')
+#try:
+#    measure = bool(conf["measure"])
+#except ValueError:
+#    print('Invalid value for measure. Not installing Measure module.')
+#except KeyError:
+#    print('measure value not set. Not installing Measure module.')
 
 # Detect mode. Default is dpdk
 mode = None
@@ -51,14 +53,6 @@ try:
 except KeyError:
     print('Autodetecting network driver')
 
-
-enable_ntf = False
-try:
-    enable_ntf = bool(conf["enable_ntf"])
-except ValueError:
-    print('Invalid value for enable_ntf. Disabling Network Token Functions.')
-except KeyError:
-    print('enable_ntf value not set. Disabling Network Token Functions.')
 
 # ====================================================
 #       Port Helpers
@@ -133,7 +127,11 @@ class Port:
         if measure:
             self.fpi -> Timestamp() -> self.bpf:0 -> Sink()
         else:
-            self.fpi -> self.bpf:0 -> Sink()
+            # Attach GTP parsing module
+            parser = __bess_module__("{}GTPParse".format(name), 'GtpuParser')
+            self.fpi -> parser:1 -> self.bpf:0 -> Sink()
+            parser:0 -> Sink()
+
 
         # Initialize route module
         self.rtr = __bess_module__("{}Routes".format(name), 'IPLookup')
@@ -157,9 +155,6 @@ class Port:
         global mode
         if mode is None:
             mode = self.detect_mode()
-
-        if mode not in ['af_xdp', 'linux', 'dpdk', 'af_packet']:
-            raise Exception('Invalid mode: {} selected.'.format(mode))
 
         if mode in ['af_xdp', 'linux']:
             try:
@@ -185,7 +180,7 @@ class Port:
                 print('Failed to create AF_PACKET socket for {}. Exiting...'.format(name))
                 sys.exit()
 
-        if mode == 'dpdk':
+        elif mode == 'dpdk':
             kwargs = None
             pci = alias_by_interface(name)
             if pci is not None:
@@ -252,7 +247,8 @@ class Port:
                     mod.attach_task(mod.name)
             except Exception as e:
                 print('Mirror veth interface: {} misconfigured: {}'.format(name, e))
-
+        else:
+            raise Exception('Invalid mode selected.')
         # Direct fast path traffic to Frag module
         merge = __bess_module__("{}Merge".format(name), 'Merge')
 
@@ -282,10 +278,10 @@ class Port:
                 nat_dict['ext_addr'] = addr
                 nat_list.append(nat_dict)
 
-            # Create the NAT module
-            self.nat = __bess_module__("{}NAT".format(conf[interface]["ifname"]), 'NAT', ext_addrs=nat_list)
-            self.nat:1 -> out
-            out = self.nat
+                # Create the NAT module
+                self.nat = __bess_module__("{}NAT".format(conf[interface]["ifname"]), 'NAT', ext_addrs=nat_list)
+                self.nat:1 -> out
+                out = self.nat
 
         # Attach Merge module to the 'outlist' of modules
         merge -> out
@@ -325,6 +321,11 @@ for wid in xrange(workers):
 #       Port Setup
 # ====================================================
 
+Uplink = 1
+Downlink = 2
+
+Access = 1
+Core = 2
 
 interfaces = ["s1u", "sgi"]
 ports = {}
@@ -343,21 +344,6 @@ for idx, interface in enumerate(interfaces):
 
 s1u_ifname = conf["s1u"]["ifname"]
 sgi_ifname = conf["sgi"]["ifname"]
-
-
-# ====================================================
-#       Network Token Functions Setup
-# ====================================================
-
-ntf = None
-if enable_ntf:
-    ntf = NTF()
-    # TODO: Populate these tables by talking to the NTE
-    ntf.table_create(dpid=1, max_entries=5)
-    ntf.entry_create(dpid=1, entry_id=1, dscp=1, token={
-      'app_id': 0x10001,
-      'encryption_key': '{"alg":"A128CBC-HS256","k":"Qr_XwDGctna3SlR88rEJYt6Zm100SASYeJWSJihDnsA","key_ops":["encrypt","decrypt"],"kty":"oct"}'
-    })
 
 
 # ====================================================
@@ -383,8 +369,19 @@ else:
                  "filter": "ip dst net {}".format(ue_cidr), "gate": UEGate}
 sgiFastBPF.add(filters=[ue_filter])
 
+# Verify that destination MAC address matches that with sgi interface
+# Exact match on desstination MAC address of the interface
+em_d = __bess_module__("{}MACDstMatch".format(sgi_ifname), 'ExactMatch',
+                       fields=[{'offset':0, 'num_bytes':6}])
+macstr_d = mac_by_interface(sgi_ifname)
+em_d.add(fields=[{'value_int': mac2hex(macstr_d)}], gate=0)
+# Drop all pkts that fail match
+em_d:1 -> Sink()
+# All matches go to gate 1
+em_d.set_default_gate(gate=1)
+
 # Verify IP/UDP Checksum
-sgiFastBPF:UEGate -> sgiRxIPCksum::IPChecksum(verify=True) -> sgiRxUDPCksum::L4Checksum(verify=True)
+sgiFastBPF:UEGate -> em_d:0 -> sgiRxIPCksum::IPChecksum(verify=True) -> sgiRxUDPCksum::L4Checksum(verify=True)
 _in = sgiRxUDPCksum
 gate = 0
 sgiRxIPCksum:1 -> Sink()
@@ -404,22 +401,17 @@ if max_ip_defrag_flows is not None:
     # Drop pkts that are unable to be fragmented
     sgiIP4Defrag:0 -> Sink()
 
-_in:gate -> EtherTrim::GenericDecap(bytes=14)
-
-GTPUEncap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0]), num_subscribers=max_sessions):1 \
+_in:gate -> EtherTrim::GenericDecap(bytes=14) \
+    -> GTPUEncap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0]), num_subscribers=max_sessions):1 \
     -> S1UEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(s1u_ifname))}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
     -> OuterUDPCsum::L4Checksum() \
     -> OuterIPCsum::IPChecksum() \
+    -> SetMetadata(attrs=[{'name': 'iface_type', 'size': 1, 'value_int': Core}, \
+                          {'name': 'direction', 'size': 1, 'value_int': Downlink}]) \
     -> s1uRoutes
-
-_in = EtherTrim
-if enable_ntf:
-    _in -> 1:ntf
-    _in = ntf
-_in:0 -> GTPUEncap
 
 # Drop unknown packets
 GTPUEncap:0 -> Sink()
@@ -460,8 +452,19 @@ s1uFastBPF.add(filters=[uplink_filter])
 
 sgiRoutes = ports[sgi_ifname].rtr
 
+# Verify that destination MAC address matches that with s1u interface
+# Exact match on desstination MAC address of the interface
+em_u = __bess_module__("{}MACDstMatch".format(s1u_ifname), 'ExactMatch',
+                       fields=[{'offset':0, 'num_bytes':6}])
+macstr_u = mac_by_interface(s1u_ifname)
+em_u.add(fields=[{'value_int': mac2hex(macstr_u)}], gate=0)
+# Drop all pkts that fail match
+em_u:1 -> Sink()
+# All matches go to gate 1
+em_u.set_default_gate(gate=1)
+
 # Verify IP Checksum
-s1uFastBPF:GTPUGate -> s1uRxIPCksum::IPChecksum(verify=True) -> s1uRxUDPCksum::L4Checksum(verify=True)
+s1uFastBPF:GTPUGate -> em_u:0 -> s1uRxIPCksum::IPChecksum(verify=True) -> s1uRxUDPCksum::L4Checksum(verify=True)
 s1uRxIPCksum:1 -> Sink()
 s1uRxUDPCksum:1 -> Sink()
 
@@ -473,24 +476,19 @@ if max_ip_defrag_flows is not None:
 else:
     s1uRxUDPCksum:0 -> EtherDecapTrim::GenericDecap(bytes=14)
 
-EtherDecapTrim -> GTPUDecap::GtpuDecap(ename="GTPUEncap")
-
-SGIEtherAdd::GenericEncap(fields=[
+EtherDecapTrim -> GTPUDecap::GtpuDecap(ename="GTPUEncap"):1 \
+    -> SGIEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(sgi_ifname))}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
+    -> SetMetadata(attrs=[{'name': 'iface_type', 'size': 1, 'value_int': Access}, \
+                          {'name': 'direction', 'size': 1, 'value_int': Uplink}]) \
     -> sgiRoutes
 
-_in = GTPUDecap
-if enable_ntf:
-    _in:1 -> 0:ntf
-    _in = ntf
-_in:1 -> SGIEtherAdd
-
 s1uFastBPF:GTPUEchoGate \
-        -> gtpRxIPCksum::IPChecksum(verify=True) \
+    	-> gtpRxIPCksum::IPChecksum(verify=True) \
         -> gtpRxUDPCksum::L4Checksum(verify=True) \
-        -> GTPUEcho::GtpuEcho(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0])):1 \
+	-> GTPUEcho::GtpuEcho(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0])):1 \
         -> EthSwap::MACSwap() \
         -> 1:OuterUDPCsum
 
