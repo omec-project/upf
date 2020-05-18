@@ -269,7 +269,7 @@ void ExactMatch::setValues(bess::Packet *pkt, ExactMatchKey &action)
     uint64_t mask = values_[i].mask;
     uint8_t *data = pkt->head_data<uint8_t *>() + value_off;
 
-    std::cerr << "off: " << (int)value_off << ", sz: " << value_size << ", mask: " << std::hex << mask << std::endl;
+    DLOG(INFO) << "off: " << (int)value_off << ", sz: " << value_size << ", mask: " << std::hex << mask << std::endl;
     if (value_attr_id < 0) { /* if it is offset-based */
       memcpy(data, reinterpret_cast<uint8_t *>(&action) + value_pos, value_size);
     } else { /* if it is attribute-based */
