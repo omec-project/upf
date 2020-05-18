@@ -378,6 +378,7 @@ message WildcardMatchCommandAddArg {
   int64 priority = 2; ///If a packet matches multiple rules, the rule with higher priority will be applied. If priorities are equal behavior is undefined.
   repeated FieldData values = 3; /// The values to check for in each field.
   repeated FieldData masks = 4; /// The bitmask for each field -- set `0x0` to ignore the field altogether.
+  repeated FieldData valuesv = 5; /// The values to check for in each fieldv.
 }
 
 /**
@@ -1226,6 +1227,7 @@ message VXLANEncapArg {
  */
 message WildcardMatchArg {
   repeated Field fields = 1; /// A list of WildcardMatch fields.
+  repeated Field values = 2; /// A list of WildcardMatch values.
 }
 
 /**
