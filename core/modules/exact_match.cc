@@ -222,19 +222,22 @@ Error ExactMatch::AddRule(const bess::pb::ExactMatchCommandAddArg &arg) {
   Error err;
   ValueTuple t;
 
+  /* set gate */
+  t.gate = gate;
   RuleFieldsFromPb(arg.fields(), &rule);
-  if (arg.values_size() != 0) {
+  /* check whether values match with the the table's */
+  if (arg.values_size() != (ssize_t)table_.num_values())
+    return std::make_pair(EINVAL,
+			  bess::utils::Format("rule has incorrect number of values. Need %d, has %d",
+					      (int)table_.num_values(), arg.values_size()));
+  /* check if values are non-zero */
+  if (arg.values_size() > 0) {
     RuleFieldsFromPb(arg.values(), &action);
 
-#ifdef KEY_MODE_RETRIEVAL
     if ((err = table_.CreateValue(t.action, action)).first != 0)
       return err;
-#else
-    t.action = action;
-#endif
   }
 
-  t.gate = gate;
   return table_.AddRule(t, rule);
 }
 
@@ -255,7 +258,6 @@ CommandResponse ExactMatch::SetRuntimeConfig(
   return CommandSuccess();
 }
 
-#ifdef KEY_MODE_RETRIEVAL
 void ExactMatch::setValues(bess::Packet *pkt, ExactMatchKey &action)
 {
   size_t num_values_ = table_.num_values();
@@ -282,59 +284,6 @@ void ExactMatch::setValues(bess::Packet *pkt, ExactMatchKey &action)
     }
   }
 }
-#else
-void ExactMatch::setValues(bess::Packet *pkt, ExactMatchRuleFields &action)
-{
-  size_t num_values_ = table_.num_values();
-  ExactMatchField *values_ = table_.getVals();
-
-  for (size_t i = 0; i < num_values_; i++) {
-    int off = values_[i].offset;
-    uint64_t mask = values_[i].mask;
-    size_t sz = values_[i].size;
-    uint8_t *data = pkt->head_data<uint8_t *>() + off;
-    int attr_id = values_[i].attr_id;
-
-    if (values_[i].attr_id < 0) {
-      std::cerr << "off: " << (int)off << ", sz: " << sz << ", mask: " << std::hex << mask << std::endl;
-      size_t o = 0;
-      for (auto l = action.begin(); l != action.end(); l++) {
-	int k = 0;
-	for (auto j = action.at(o).begin(); j != action.at(o).end(); j++) {
-	  if (i == o) {
-	    std::cerr << "o = " << o << std::endl;
-	    std::cerr << "\t" << k << ": " << (int)(*j) << " (0x" << std::hex << (int)(*j) << ")" << std::endl;
-	    data[k] = *j;
-	    k++;
-	  }
-	}
-	o++;
-      }
-    } else {
-      /* set attributes here */
-      std::cerr << "off: " << (int)off << ", sz: " << sz << ", mask: " << std::hex << mask << std::endl;
-      size_t o = 0;
-      for (auto l = action.begin(); l != action.end(); l++) {
-	int k = 0;
-	typedef struct {
-	  uint8_t bytes[bess::metadata::kMetadataAttrMaxSize];
-	} value_t;
-	value_t buf;
-	for (auto j = action.at(o).begin(); j != action.at(o).end(); j++) {
-	  if (i == o) {
-	    std::cerr << "o = " << o << std::endl;
-	    std::cerr << "\t" << k << ": " << (int)(*j) << " (0x" << std::hex << (int)(*j) << ")" << std::endl;
-	    buf.bytes[k] = *j;
-	    k++;
-	  }
-	}
-	set_attr<value_t>(this, attr_id, pkt, buf);
-	o++;
-      }
-    }
-  }
-}
-#endif
 
 void ExactMatch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   gate_idx_t default_gate;
