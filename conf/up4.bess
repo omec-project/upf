@@ -401,7 +401,8 @@ if max_ip_defrag_flows is not None:
     # Drop pkts that are unable to be fragmented
     sgiIP4Defrag:0 -> Sink()
 
-_in:gate -> EtherTrim::GenericDecap(bytes=14) \
+_in:gate -> ueLookup::WildcardMatch(fields=[{'offset':30, 'num_bytes':4}], values=[{'attr_name':'direction', 'num_bytes':1}]) \
+    -> EtherTrim::GenericDecap(bytes=14) \
     -> GTPUEncap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0]), num_subscribers=max_sessions):1 \
     -> S1UEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
@@ -409,8 +410,6 @@ _in:gate -> EtherTrim::GenericDecap(bytes=14) \
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
     -> OuterUDPCsum::L4Checksum() \
     -> OuterIPCsum::IPChecksum() \
-    -> SetMetadata(attrs=[{'name': 'iface_type', 'size': 1, 'value_int': Core}, \
-                          {'name': 'direction', 'size': 1, 'value_int': Downlink}]) \
     -> s1uRoutes
 
 # Drop unknown packets
@@ -418,6 +417,12 @@ GTPUEncap:0 -> Sink()
 OuterIPCsum:1 -> Sink()
 OuterUDPCsum:1 -> Sink()
 
+# Add ueLookup rules
+ueLookup:1 -> Sink() # Used as default gate
+ueLookup.set_default_gate(gate=1)
+#print(cidr2netmask(ue_cidr)[0])
+#print(cidr2netmask(ue_cidr)[1])
+ueLookup.add(values=[{'value_bin':atoh(cidr2netmask(ue_cidr)[0])}], gate=0, masks=[{'value_bin':atoh(cidr2netmask(ue_cidr)[1])}], valuesv=[{'value_int':Downlink}], priority=0)
 
 
 # ====================================================
@@ -481,8 +486,6 @@ EtherDecapTrim -> GTPUDecap::GtpuDecap(ename="GTPUEncap"):1 \
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(sgi_ifname))}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
-    -> SetMetadata(attrs=[{'name': 'iface_type', 'size': 1, 'value_int': Access}, \
-                          {'name': 'direction', 'size': 1, 'value_int': Uplink}]) \
     -> sgiRoutes
 
 s1uFastBPF:GTPUEchoGate \
