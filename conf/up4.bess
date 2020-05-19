@@ -401,7 +401,23 @@ if max_ip_defrag_flows is not None:
 
 #_in:gate -> ueLookup::IPLookup() -> SetMetadata(attrs=[{'name': 'direction', 'size': 1, 'value_int': Downlink}, \
 #                                                       {'name': 'iface', 'size': 1, 'value_int': Core}]) \
-_in:gate -> ueLookup::WildcardMatch(fields=[{'offset':30, 'num_bytes':4}], values=[{'attr_name':'direction', 'num_bytes':1}, {'attr_name':'iface', 'num_bytes':1}]) \
+_in:gate -> ueLookup::WildcardMatch(fields=[{'offset':30, 'num_bytes':4}], \
+                                    values=[{'attr_name':'direction', 'num_bytes':1}, \
+                                            {'attr_name':'src_iface', 'num_bytes':1}]) \
+    -> PDRLookup::WildcardMatch(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
+                                        {'attr_name':'tunnel_ipv4_dst', 'num_bytes':4}, \
+                                        {'attr_name':'teid', 'num_bytes':4}, \
+                                        {'offset':30, 'num_bytes':4}, \
+                                        {'offset':26, 'num_bytes':4}, \
+                                        {'offset':36, 'num_bytes':2}, \
+                                        {'offset':32, 'num_bytes':2}, \
+                                        {'offset':23, 'num_bytes':1}], \
+                                values=[{'attr_name':'pdr_id', 'num_bytes':4},
+                                        {'attr_name':'fseid', 'num_bytes':4},
+                                        {'attr_name':'ctr_id', 'num_bytes':4},
+                                        {'attr_name':'far_id', 'num_bytes':4},
+                                        {'attr_name':'needs_gtpu_decap', 'num_bytes':1}]) \
+    -> PreQoSCounter::Counter() \
     -> EtherTrim::GenericDecap(bytes=14) \
     -> GTPUEncap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0]), num_subscribers=max_sessions):1 \
     -> S1UEtherAdd::GenericEncap(fields=[
@@ -426,6 +442,9 @@ ueLookup.add(values=[{'value_bin':atoh(cidr2netmask(ue_cidr)[0])}], gate=0, \
 #ueLookup.add(prefix='0.0.0.0', prefix_len=0, gate=0)
 #ueLookup.add(prefix=cidr2netmask(ue_cidr)[0], prefix_len=ue_cidr.split('/'), gate=0)
 #ueLookup:MAX_GATES-1 -> Sink()
+
+# Set default PDRLookup gate
+PDRLookup.set_default_gate(gate=0)
 
 
 # ====================================================

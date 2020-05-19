@@ -47,7 +47,7 @@
 #include "endian.h"
 #include "format.h"
 
-#define MAX_FIELDS 8
+#define MAX_FIELDS 16
 #define MAX_FIELD_SIZE 8
 
 static_assert(MAX_FIELD_SIZE <= sizeof(uint64_t),
