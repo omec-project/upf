@@ -1091,6 +1091,26 @@ message GtpuEncapRemoveSessionRecordArg {
 }
 
 /**
+ * The Counter module has a command `add(...)` which takes one
+ * parameters.  This function accepts the counter id of a
+ * session record.
+ * Example use in bessctl: `counter.add(ctr_id=0x1)`
+ */
+message CounterAddArg {
+  uint32 ctr_id = 1; /// counter id
+}
+
+/**
+ * The Counter module has a command `remove(...)` which takes one
+ * parameter.  This function accepts ctr_id, and removes the
+ * respective counter.
+ * Example use in bessctl: `counter.remove(ctr_id=0x1)`
+ */
+message CounterRemoveArg {
+  uint32 ctr_id = 1; /// counter id
+}
+
+/**
  * The Split module is a basic classifier which directs packets out a gate
  * based on data in the packet (e.g., if the read in value is 3, the packet
  * is directed out output gate 3).
