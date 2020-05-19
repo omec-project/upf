@@ -42,8 +42,8 @@
 using bess::utils::HashResult;
 using bess::utils::CuckooMap;
 
-#define MAX_TUPLES 8
-#define MAX_FIELDS 8
+#define MAX_TUPLES 16
+#define MAX_FIELDS 16
 #define MAX_FIELD_SIZE 8
 static_assert(MAX_FIELD_SIZE <= sizeof(uint64_t),
               "field cannot be larger than 8 bytes");
