@@ -129,7 +129,7 @@ class Port:
         else:
             # Attach GTP parsing module
             parser = __bess_module__("{}GTPParse".format(name), 'GtpuParser')
-            self.fpi -> parser:1 -> self.bpf:0 -> Sink()
+            self.fpi -> parser:1 -> self.bpf:0
             parser:0 -> Sink()
 
 
@@ -278,10 +278,10 @@ class Port:
                 nat_dict['ext_addr'] = addr
                 nat_list.append(nat_dict)
 
-                # Create the NAT module
-                self.nat = __bess_module__("{}NAT".format(conf[interface]["ifname"]), 'NAT', ext_addrs=nat_list)
-                self.nat:1 -> out
-                out = self.nat
+            # Create the NAT module
+            self.nat = __bess_module__("{}NAT".format(conf[interface]["ifname"]), 'NAT', ext_addrs=nat_list)
+            self.nat:1 -> out
+            out = self.nat
 
         # Attach Merge module to the 'outlist' of modules
         merge -> out
@@ -360,14 +360,12 @@ except ValueError:
 
 # Setting filter to detect UE subnet
 sgiFastBPF = ports[sgi_ifname].bpf
-UEGate = ports[sgi_ifname].bpf_gate()
+UEGate = 0
 if ports[sgi_ifname].nat is not None:
+    UEGate = ports[sgi_ifname].bpf_gate()
     ue_filter = {"priority": -UEGate,
                  "filter": "ip dst {}".format(ports[sgi_ifname].ext_addrs), "gate": UEGate}
-else:
-    ue_filter = {"priority": -UEGate,
-                 "filter": "ip dst net {}".format(ue_cidr), "gate": UEGate}
-sgiFastBPF.add(filters=[ue_filter])
+    sgiFastBPF.add(filters=[ue_filter])
 
 # Verify that destination MAC address matches that with sgi interface
 # Exact match on desstination MAC address of the interface
@@ -381,8 +379,8 @@ em_d:1 -> Sink()
 em_d.set_default_gate(gate=1)
 
 # Verify IP/UDP Checksum
-sgiFastBPF:UEGate -> em_d:0 -> sgiRxIPCksum::IPChecksum(verify=True) -> sgiRxUDPCksum::L4Checksum(verify=True)
-_in = sgiRxUDPCksum
+sgiFastBPF:UEGate -> sgiRxIPCksum::IPChecksum(verify=True) -> sgiRxUDPCksum::L4Checksum(verify=True) -> em_d
+_in = em_d
 gate = 0
 sgiRxIPCksum:1 -> Sink()
 sgiRxUDPCksum:1 -> Sink()
@@ -401,7 +399,9 @@ if max_ip_defrag_flows is not None:
     # Drop pkts that are unable to be fragmented
     sgiIP4Defrag:0 -> Sink()
 
-_in:gate -> ueLookup::WildcardMatch(fields=[{'offset':30, 'num_bytes':4}], values=[{'attr_name':'direction', 'num_bytes':1}]) \
+#_in:gate -> ueLookup::IPLookup() -> SetMetadata(attrs=[{'name': 'direction', 'size': 1, 'value_int': Downlink}, \
+#                                                       {'name': 'iface', 'size': 1, 'value_int': Core}]) \
+_in:gate -> ueLookup::WildcardMatch(fields=[{'offset':30, 'num_bytes':4}], values=[{'attr_name':'direction', 'num_bytes':1}, {'attr_name':'iface', 'num_bytes':1}]) \
     -> EtherTrim::GenericDecap(bytes=14) \
     -> GTPUEncap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0]), num_subscribers=max_sessions):1 \
     -> S1UEtherAdd::GenericEncap(fields=[
@@ -420,9 +420,12 @@ OuterUDPCsum:1 -> Sink()
 # Add ueLookup rules
 ueLookup:1 -> Sink() # Used as default gate
 ueLookup.set_default_gate(gate=1)
-#print(cidr2netmask(ue_cidr)[0])
-#print(cidr2netmask(ue_cidr)[1])
-ueLookup.add(values=[{'value_bin':atoh(cidr2netmask(ue_cidr)[0])}], gate=0, masks=[{'value_bin':atoh(cidr2netmask(ue_cidr)[1])}], valuesv=[{'value_int':Downlink}], priority=0)
+ueLookup.add(values=[{'value_bin':atoh(cidr2netmask(ue_cidr)[0])}], gate=0, \
+             masks=[{'value_bin':atoh(cidr2netmask(ue_cidr)[1])}], \
+             valuesv=[{'value_int':Downlink}, {'value_int':Core}], priority=0)
+#ueLookup.add(prefix='0.0.0.0', prefix_len=0, gate=0)
+#ueLookup.add(prefix=cidr2netmask(ue_cidr)[0], prefix_len=ue_cidr.split('/'), gate=0)
+#ueLookup:MAX_GATES-1 -> Sink()
 
 
 # ====================================================
