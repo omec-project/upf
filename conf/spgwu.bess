@@ -272,10 +272,10 @@ class Port:
                 nat_dict['ext_addr'] = addr
                 nat_list.append(nat_dict)
 
-                # Create the NAT module
-                self.nat = __bess_module__("{}NAT".format(conf[interface]["ifname"]), 'NAT', ext_addrs=nat_list)
-                self.nat:1 -> out
-                out = self.nat
+            # Create the NAT module
+            self.nat = __bess_module__("{}NAT".format(conf[interface]["ifname"]), 'NAT', ext_addrs=nat_list)
+            self.nat:1 -> out
+            out = self.nat
 
         # Attach Merge module to the 'outlist' of modules
         merge -> out
