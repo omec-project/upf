@@ -47,7 +47,7 @@ RUN sed -ri 's,(IGB_UIO=).*,\1n,' config/common_linux* && \
     sed -ri 's,(PORT_PCAP=).*,\1y,' config/common_base && \
     sed -ri 's,(AF_XDP=).*,\1y,' config/common_base && \
     make config T=$RTE_TARGET && \
-    make $MAKEFLAGS RTE_MACHINE=hsw EXTRA_CFLAGS="-march=$CPU -g -w -fPIC -DALLOW_EXPERIMENTAL_API"
+    make $MAKEFLAGS EXTRA_CFLAGS="-march=$CPU -g -w -fPIC -DALLOW_EXPERIMENTAL_API"
 
 WORKDIR /
 ARG BESS_COMMIT=master
