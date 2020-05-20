@@ -10,6 +10,7 @@ GRPC_LIBS = -l:libprotobuf.a -l:libgrpc++.a -l:libgrpc_unsecure.a -l:libcares.a 
 SRCS := zmq-cpiface.cc
 
 all:
+	$(info   CXXFLAGS is $(CXXFLAGS))
 	$(CXX) $(CXXFLAGS) $(SRCS) -I$(PBDIR) $(PBDIR)/*.pb.o -o $(TARGET) $(GRPC_LIBS) -lzmq -lglog
 
 clean:
