@@ -399,11 +399,10 @@ if max_ip_defrag_flows is not None:
     # Drop pkts that are unable to be fragmented
     sgiIP4Defrag:0 -> Sink()
 
-#_in:gate -> ueLookup::IPLookup() -> SetMetadata(attrs=[{'name': 'direction', 'size': 1, 'value_int': Downlink}, \
-#                                                       {'name': 'iface', 'size': 1, 'value_int': Core}]) \
-_in:gate -> ueLookup::WildcardMatch(fields=[{'offset':30, 'num_bytes':4}], \
-                                    values=[{'attr_name':'direction', 'num_bytes':1}, \
-                                            {'attr_name':'src_iface', 'num_bytes':1}]) \
+_in:gate -> ueLookup::IPLookup() -> SetMetadata(attrs=[{'name':'direction', 'size':1, 'value_int':Downlink}, \
+                                                       {'name':'src_iface', 'size':1, 'value_int':Core}, \
+                                                       {'name':'tunnel_ipv4_dst', 'size':4, 'value_int':0xFFFFFFFF}, \
+                                                       {'name':'teid','size': 4,'value_int':0xFFFFFFFF}]) \
     -> PDRLookup::WildcardMatch(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
                                         {'attr_name':'tunnel_ipv4_dst', 'num_bytes':4}, \
                                         {'attr_name':'teid', 'num_bytes':4}, \
@@ -434,17 +433,13 @@ OuterIPCsum:1 -> Sink()
 OuterUDPCsum:1 -> Sink()
 
 # Add ueLookup rules
-ueLookup:1 -> Sink() # Used as default gate
-ueLookup.set_default_gate(gate=1)
-ueLookup.add(values=[{'value_bin':atoh(cidr2netmask(ue_cidr)[0])}], gate=0, \
-             masks=[{'value_bin':atoh(cidr2netmask(ue_cidr)[1])}], \
-             valuesv=[{'value_int':Downlink}, {'value_int':Core}], priority=0)
-#ueLookup.add(prefix='0.0.0.0', prefix_len=0, gate=0)
-#ueLookup.add(prefix=cidr2netmask(ue_cidr)[0], prefix_len=ue_cidr.split('/'), gate=0)
-#ueLookup:MAX_GATES-1 -> Sink()
+ueLookup.add(prefix='0.0.0.0', prefix_len=0, gate=MAX_GATES-1)
+ueLookup.add(prefix=cidr2netmask(ue_cidr)[0], prefix_len=(int)(ue_cidr.split('/')[1]), gate=0)
+ueLookup:MAX_GATES-1 -> Sink()
 
 # Set default PDRLookup gate
 PDRLookup.set_default_gate(gate=0)
+#PDRLookup:0 -> Sink()
 
 
 # ====================================================
