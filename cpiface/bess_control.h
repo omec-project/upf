@@ -26,6 +26,8 @@ using namespace grpc;
 #define ENCAPMOD "GTPUEncap"
 #define ENCAPADDMETHOD "add"
 #define ENCAPREMMETHOD "remove"
+#define PDRLOOKUPMOD "PDRLookup"
+#define PDRADDMETHOD "add"
 #define MODULE_NAME_LEN 128
 #define HOSTNAME_LEN 256
 /*--------------------------------------------------------------------------------*/
@@ -88,6 +90,126 @@ class BessClient {
     }
 
     delete rsra;
+
+    /* `any' freed up by ModuleCommand() */
+  }
+
+  void runAddPDRCommand(const uint32_t enodeip, const uint32_t teid,
+			const uint32_t ueaddr, const uint32_t inetip,
+			const uint16_t ueport, const uint16_t inetport,
+			const uint8_t protoid, const char *modname) {
+    bess::pb::WildcardMatchCommandAddArg *wmcaa =
+        new bess::pb::WildcardMatchCommandAddArg();
+    wmcaa->set_gate(1);
+    wmcaa->set_priority(1);
+
+    /* SET VALUES */
+    /* set src_iface value */
+    bess::pb::FieldData *src_iface = wmcaa->add_values();
+    /* Access = 1, Core = 2 */
+    src_iface->set_value_int(2);
+
+    /* set tunnel_ipv4_dst */
+    bess::pb::FieldData *tunnel_ipv4_dst = wmcaa->add_values();
+    tunnel_ipv4_dst->set_value_int(enodeip);
+
+    /* set teid */
+    bess::pb::FieldData *_teid = wmcaa->add_values();
+    _teid->set_value_int(teid);
+
+    /* set dst ip */
+    bess::pb::FieldData *dst_ip = wmcaa->add_values();
+    dst_ip->set_value_int(ueaddr);
+
+    /* set src ip */
+    bess::pb::FieldData *src_ip = wmcaa->add_values();
+    src_ip->set_value_int(inetip);
+
+    /* set dst l4 port */
+    bess::pb::FieldData *l4_dstport = wmcaa->add_values();
+    l4_dstport->set_value_int(ueport);
+
+    /* set src l4 port */
+    bess::pb::FieldData *l4_srcport = wmcaa->add_values();
+    l4_srcport->set_value_int(inetport);
+
+    /* set proto id */
+    bess::pb::FieldData *_protoid = wmcaa->add_values();
+    _protoid->set_value_int(protoid);
+
+
+    /* SET MASKS */
+    /* set src_iface value */
+    src_iface = wmcaa->add_masks();
+    /* Access = 0xFF, Core = 0xFF */
+    src_iface->set_value_int(0xFF);
+
+    /* set tunnel_ipv4_dst - Setting it to 0 for the time being */
+    tunnel_ipv4_dst = wmcaa->add_masks();
+    tunnel_ipv4_dst->set_value_int(0x00u);
+
+    /* set teid - Setting it to 0 for the time being */
+    _teid = wmcaa->add_masks();
+    _teid->set_value_int(0x00u);
+
+    /* set dst ip */
+    dst_ip = wmcaa->add_masks();
+    dst_ip->set_value_int(0xFFFFFFFFu);
+
+    /* set src ip */
+    src_ip = wmcaa->add_masks();
+    src_ip->set_value_int(0x0000);
+
+    /* set dst l4 port */
+    l4_dstport = wmcaa->add_masks();
+    l4_dstport->set_value_int(0x0000);
+
+    /* set src l4 port */
+    l4_srcport = wmcaa->add_masks();
+    l4_srcport->set_value_int(0x0000);
+
+    /* set proto id */
+    _protoid = wmcaa->add_masks();
+    _protoid->set_value_int(0x00);
+
+
+    /* SET VALUESV */
+    /* set pdr_id, set to 0 for the time being */
+    bess::pb::FieldData *_void = wmcaa->add_valuesv();
+    _void->set_value_int(0x0u);
+
+    /* set fseid, set to 0 for the time being */
+    _void = wmcaa->add_valuesv();
+    _void->set_value_int(0x0u);
+
+    /* set ctr_id, set to 0 for the time being */
+    _void = wmcaa->add_valuesv();
+    _void->set_value_int(0x0u);
+
+    /* set far_id, set to 0 for the time being */
+    _void = wmcaa->add_valuesv();
+    _void->set_value_int(0x0u);
+
+    /* set needs_gtpu_decap, set to 0 for the time being */
+    _void = wmcaa->add_valuesv();
+    _void->set_value_int(0x00);
+
+    ::google::protobuf::Any *any = new ::google::protobuf::Any();
+    any->PackFrom(*wmcaa);
+    crt.set_name(modname);
+    crt.set_cmd(PDRADDMETHOD);
+    crt.set_allocated_arg(any);
+    Status status = stub_->ModuleCommand(&context, crt, &cre);
+    // Act upon its status.
+    if (status.ok()) {
+      std::cout << "runAddPDRCommand RPC successfully executed." << std::endl;
+    } else {
+      std::cout << status.error_code() << ": " << status.error_message()
+                << std::endl;
+      std::cout << "runAddPDRCommand RPC failed." << std::endl;
+    }
+
+    delete wmcaa;
 
     /* `any' freed up by ModuleCommand() */
   }
