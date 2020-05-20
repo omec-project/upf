@@ -37,7 +37,7 @@
 #include "../utils/format.h"
 
 using bess::metadata::Attribute;
-enum {FieldType = 0, ValueType};
+enum { FieldType = 0, ValueType };
 
 // dst = src & mask. len must be a multiple of sizeof(uint64_t)
 static inline void mask(wm_hkey_t *dst, const wm_hkey_t &src,
@@ -89,8 +89,10 @@ CommandResponse WildcardMatch::AddFieldOne(const bess::pb::Field &field,
     }
   } else if (field.position_case() == bess::pb::Field::kAttrName) {
     const char *attr = field.attr_name().c_str();
-    f->attr_id = (type == 0) ? AddMetadataAttr(attr, f->size, Attribute::AccessMode::kRead) :
-	    AddMetadataAttr(attr, f->size, Attribute::AccessMode::kWrite);
+    f->attr_id =
+        (type == 0)
+            ? AddMetadataAttr(attr, f->size, Attribute::AccessMode::kRead)
+            : AddMetadataAttr(attr, f->size, Attribute::AccessMode::kWrite);
     if (f->attr_id < 0) {
       return CommandFailure(-f->attr_id, "add_metadata_attr() failed");
     }
@@ -157,10 +159,9 @@ CommandResponse WildcardMatch::Init(const bess::pb::WildcardMatchArg &arg) {
 
 inline gate_idx_t WildcardMatch::LookupEntry(const wm_hkey_t &key,
                                              gate_idx_t def_gate,
-					     bess::Packet *pkt) {
+                                             bess::Packet *pkt) {
   struct WmData result = {
-      .priority = INT_MIN, .ogate = def_gate, .keyv = {{0}}
-  };
+      .priority = INT_MIN, .ogate = def_gate, .keyv = {{0}}};
 
   for (auto &tuple : tuples_) {
     const auto &ht = tuple.ht;
@@ -186,16 +187,19 @@ inline gate_idx_t WildcardMatch::LookupEntry(const wm_hkey_t &key,
       int value_attr_id = values_[i].attr_id;
       uint8_t *data = pkt->head_data<uint8_t *>() + value_off;
 
-      DLOG(INFO) << "off: " << (int)value_off << ", sz: " << value_size << std::endl;
+      DLOG(INFO) << "off: " << (int)value_off << ", sz: " << value_size
+                 << std::endl;
       if (value_attr_id < 0) { /* if it is offset-based */
-	memcpy(data, reinterpret_cast<uint8_t *>(&result.keyv) + value_pos, value_size);
+        memcpy(data, reinterpret_cast<uint8_t *>(&result.keyv) + value_pos,
+               value_size);
       } else { /* if it is attribute-based */
-	typedef struct {
-	  uint8_t bytes[bess::metadata::kMetadataAttrMaxSize];
-	} value_t;
-	value_t buf;
-	memcpy(buf.bytes, reinterpret_cast<uint8_t *>(&result.keyv) + value_pos, value_size);
-	set_attr<value_t>(this, value_attr_id, pkt, buf);
+        typedef struct {
+          uint8_t bytes[bess::metadata::kMetadataAttrMaxSize];
+        } value_t;
+        value_t buf;
+        memcpy(buf.bytes, reinterpret_cast<uint8_t *>(&result.keyv) + value_pos,
+               value_size);
+        set_attr<value_t>(this, value_attr_id, pkt, buf);
       }
     }
   }
@@ -283,12 +287,18 @@ CommandResponse WildcardMatch::ExtractKeyMask(const T &arg, wm_hkey_t *key,
                                       true)) {
         return CommandFailure(EINVAL, "idx %zu: not a correct %d-byte value", i,
                               field_size);
-      } else {std::cerr << "key value: " << valuedata.value_int() << ", size is " << field_size << std::endl;}
+      } else {
+        std::cerr << "key value: " << valuedata.value_int() << ", size is "
+                  << field_size << std::endl;
+      }
     } else if (valuedata.encoding_case() == bess::pb::FieldData::kValueBin) {
       bess::utils::Copy(reinterpret_cast<uint8_t *>(&v),
                         valuedata.value_bin().c_str(),
                         valuedata.value_bin().size());
-      {std::cerr << "key value: " << valuedata.value_bin().c_str() << ", size is " << valuedata.value_bin().size() << std::endl;}
+      {
+        std::cerr << "key value: " << valuedata.value_bin().c_str()
+                  << ", size is " << valuedata.value_bin().size() << std::endl;
+      }
     }
 
     bess::pb::FieldData maskdata = arg.masks(i);
@@ -297,12 +307,18 @@ CommandResponse WildcardMatch::ExtractKeyMask(const T &arg, wm_hkey_t *key,
                                       true)) {
         return CommandFailure(EINVAL, "idx %zu: not a correct %d-byte mask", i,
                               field_size);
-      } else {std::cerr << "key maskdata: " << maskdata.value_int() << ", size is " << field_size << std::endl;}
+      } else {
+        std::cerr << "key maskdata: " << maskdata.value_int() << ", size is "
+                  << field_size << std::endl;
+      }
     } else if (maskdata.encoding_case() == bess::pb::FieldData::kValueBin) {
       bess::utils::Copy(reinterpret_cast<uint8_t *>(&m),
                         maskdata.value_bin().c_str(),
                         maskdata.value_bin().size());
-      {std::cerr << "key maskdata: " << maskdata.value_bin().c_str() << ", size is " << maskdata.value_bin().size() << std::endl;}
+      {
+        std::cerr << "key maskdata: " << maskdata.value_bin().c_str()
+                  << ", size is " << maskdata.value_bin().size() << std::endl;
+      }
     }
 
     if (v & ~m) {
@@ -343,12 +359,18 @@ CommandResponse WildcardMatch::ExtractValue(const T &arg, wm_hkey_t *keyv) {
                                       true)) {
         return CommandFailure(EINVAL, "idx %zu: not a correct %d-byte value", i,
                               value_size);
-      } else {std::cerr << "value data: " << valuedata.value_int() << ", size is " << value_size << std::endl;}
+      } else {
+        std::cerr << "value data: " << valuedata.value_int() << ", size is "
+                  << value_size << std::endl;
+      }
     } else if (valuedata.encoding_case() == bess::pb::FieldData::kValueBin) {
       bess::utils::Copy(reinterpret_cast<uint8_t *>(&v),
                         valuedata.value_bin().c_str(),
                         valuedata.value_bin().size());
-      {std::cerr << "value data: " << valuedata.value_bin().c_str() << ", size is " << valuedata.value_bin().size() << std::endl;}
+      {
+        std::cerr << "value data: " << valuedata.value_bin().c_str()
+                  << ", size is " << valuedata.value_bin().size() << std::endl;
+      }
     }
 
     if (!v) {
@@ -422,7 +444,9 @@ CommandResponse WildcardMatch::CommandAdd(
 
   if (!is_valid_gate(gate)) {
     return CommandFailure(EINVAL, "Invalid gate: %hu", gate);
-  } else { std::cerr << "Gate is " << gate << std::endl; }
+  } else {
+    std::cerr << "Gate is " << gate << std::endl;
+  }
 
   err = ExtractValue(arg, &data.keyv);
   if (err.error().code() != 0) {
@@ -432,7 +456,7 @@ CommandResponse WildcardMatch::CommandAdd(
   data.priority = priority;
   data.ogate = gate;
 
-  {std::cerr << "priority: " << priority << std::endl;}
+  { std::cerr << "priority: " << priority << std::endl; }
 
   int idx = FindTuple(&mask);
   if (idx < 0) {

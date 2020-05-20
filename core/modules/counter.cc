@@ -31,61 +31,54 @@
 #include "counter.h"
 /*----------------------------------------------------------------------------------*/
 const Commands Counter::cmds = {
-    {"add", "CounterAddArg",
-     MODULE_CMD_FUNC(&Counter::AddCounter), Command::THREAD_SAFE},
-    {"remove", "CounterRemoveArg",
-     MODULE_CMD_FUNC(&Counter::RemoveCounter), Command::THREAD_SAFE}
-};
+    {"add", "CounterAddArg", MODULE_CMD_FUNC(&Counter::AddCounter),
+     Command::THREAD_SAFE},
+    {"remove", "CounterRemoveArg", MODULE_CMD_FUNC(&Counter::RemoveCounter),
+     Command::THREAD_SAFE}};
 /*----------------------------------------------------------------------------------*/
-CommandResponse
-Counter::AddCounter(const bess::pb::CounterAddArg &arg)
-{
-	uint32_t ctr_id = arg.ctr_id();
+CommandResponse Counter::AddCounter(const bess::pb::CounterAddArg &arg) {
+  uint32_t ctr_id = arg.ctr_id();
 
-	if (list.find(ctr_id) != list.end()) {
-		SessionStats s = { .pkt_count = 0, .byte_count = 0 };
-		list[ctr_id] = s;
-	} else
-		return CommandFailure(EINVAL, "Unable to add ctr");
-	return CommandSuccess();
+  if (list.find(ctr_id) != list.end()) {
+    SessionStats s = {.pkt_count = 0, .byte_count = 0};
+    list[ctr_id] = s;
+  } else
+    return CommandFailure(EINVAL, "Unable to add ctr");
+  return CommandSuccess();
 }
 /*----------------------------------------------------------------------------------*/
-CommandResponse
-Counter::RemoveCounter(const bess::pb::CounterRemoveArg &arg)
-{
-	uint32_t ctr_id = arg.ctr_id();
+CommandResponse Counter::RemoveCounter(const bess::pb::CounterRemoveArg &arg) {
+  uint32_t ctr_id = arg.ctr_id();
 
-	if (list.find(ctr_id) != list.end()) {
-		list.erase(ctr_id);
-	} else {
-		return CommandFailure(EINVAL, "Unable to remove ctr");
-	}
-	return CommandSuccess();
+  if (list.find(ctr_id) != list.end()) {
+    list.erase(ctr_id);
+  } else {
+    return CommandFailure(EINVAL, "Unable to remove ctr");
+  }
+  return CommandSuccess();
 }
 /*----------------------------------------------------------------------------------*/
-CommandResponse
-Counter::Init(const bess::pb::EmptyArg &) {
-	using AccessMode = bess::metadata::Attribute::AccessMode;
-	attr_id = AddMetadataAttr("ctr_id", sizeof(uint32_t), AccessMode::kRead);
+CommandResponse Counter::Init(const bess::pb::EmptyArg &) {
+  using AccessMode = bess::metadata::Attribute::AccessMode;
+  attr_id = AddMetadataAttr("ctr_id", sizeof(uint32_t), AccessMode::kRead);
 
-	return CommandSuccess();
+  return CommandSuccess();
 }
 /*----------------------------------------------------------------------------------*/
-void
-Counter::ProcessBatch(Context *ctx, bess::PacketBatch *batch)
-{
-	int cnt = batch->cnt();
+void Counter::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
+  int cnt = batch->cnt();
 
-	for (int i = 0; i < cnt; i++) {
-		int ctr_id = get_attr<uint32_t>(this, attr_id, batch->pkts()[i]);
-		// check if ctr_id is present
-		if (list.find(ctr_id) != list.end()) {
-			list[ctr_id].pkt_count += 1;
-			list[ctr_id].byte_count += batch->pkts()[i]->total_len();
-		}
-	}
+  for (int i = 0; i < cnt; i++) {
+    int ctr_id = get_attr<uint32_t>(this, attr_id, batch->pkts()[i]);
+    // check if ctr_id is present
+    if (list.find(ctr_id) != list.end()) {
+      list[ctr_id].pkt_count += 1;
+      list[ctr_id].byte_count += batch->pkts()[i]->total_len();
+    }
+  }
 
-	RunNextModule(ctx, batch);
+  RunNextModule(ctx, batch);
 }
 /*----------------------------------------------------------------------------------*/
-ADD_MODULE(Counter, "counter", "Counts the number of packets/bytes in the UP4 pipeline")
+ADD_MODULE(Counter, "counter",
+           "Counts the number of packets/bytes in the UP4 pipeline")

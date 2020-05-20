@@ -14,23 +14,22 @@ using bess::utils::be32_t;
 /**
  * EPC Metadata
  */
-typedef struct EpcMetadata
-{
-	be16_t l4_sport;
-	be16_t l4_dport;
-	be16_t inner_l4_sport;
-	be16_t inner_l4_dport;
-	be32_t teid;
+typedef struct EpcMetadata {
+  be16_t l4_sport;
+  be16_t l4_dport;
+  be16_t inner_l4_sport;
+  be16_t inner_l4_dport;
+  be32_t teid;
 } EpcMetadata;
 /*----------------------------------------------------------------------------------*/
 class GtpuParser final : public Module {
  public:
-	GtpuParser() { max_allowed_workers_ = Worker::kMaxWorkers; }
+  GtpuParser() { max_allowed_workers_ = Worker::kMaxWorkers; }
 
-	/* Gates: (0) Default, (1) Forward */
-	static const gate_idx_t kNumOGates = 2;
-	CommandResponse Init(const bess::pb::EmptyArg &);
-	void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
+  /* Gates: (0) Default, (1) Forward */
+  static const gate_idx_t kNumOGates = 2;
+  CommandResponse Init(const bess::pb::EmptyArg &);
+  void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
 };
 /*----------------------------------------------------------------------------------*/
-#endif // BESS_MODULES_GTPUPARSER_H_
+#endif  // BESS_MODULES_GTPUPARSER_H_

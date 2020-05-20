@@ -38,21 +38,21 @@
 #include "../pb/module_msg.pb.h"
 #include "../utils/exact_match_table.h"
 
-using google::protobuf::RepeatedPtrField;
+using bess::utils::Error;
 using bess::utils::ExactMatchField;
 using bess::utils::ExactMatchKey;
 using bess::utils::ExactMatchRuleFields;
 using bess::utils::ExactMatchTable;
-using bess::utils::Error;
+using google::protobuf::RepeatedPtrField;
 
-typedef enum {FIELD_TYPE = 0, VALUE_TYPE} Type;
+typedef enum { FIELD_TYPE = 0, VALUE_TYPE } Type;
 
 class ExactMatch;
-class ValueTuple
-{
- friend class ExactMatch;
+class ValueTuple {
+  friend class ExactMatch;
+
  public:
- ValueTuple(): gate(), action() {}
+  ValueTuple() : gate(), action() {}
 
  private:
   gate_idx_t gate;
