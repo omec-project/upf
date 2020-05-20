@@ -96,6 +96,7 @@ WORKDIR /opt/bess/bessctl
 ENTRYPOINT ["bessd", "-f"]
 
 FROM nefelinetworks/bess_build  AS cpiface-build
+ARG MAKEFLAGS
 ARG CPU=native
 RUN apt-get update -y && apt-get install -y libzmq3-dev
 WORKDIR /cpiface

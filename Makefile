@@ -6,15 +6,16 @@ VERSION                  ?= $(shell cat ./VERSION)
 
 # Note that we set the target platform of Docker images to native
 # For a more portable image set CPU=haswell
-CPU ?= native
+CPU                      ?= native
 
 ## Docker related
 DOCKER_REGISTRY          ?=
 DOCKER_REPOSITORY        ?=
 DOCKER_TAG               ?= ${VERSION}
 DOCKER_IMAGENAME         := ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}${PROJECT_NAME}:${DOCKER_TAG}
-DOCKER_BUILDKIT          := 1
-DOCKER_BUILD_ARGS        ?= --build-arg MAKEFLAGS=-j$(shell nproc) --build-arg CPU=$(CPU) --build-arg BUILDKIT_INLINE_CACHE=1
+DOCKER_BUILDKIT          ?= 1
+BUILDKIT_INLINE_CACHE    ?= 1
+DOCKER_BUILD_ARGS        ?= --build-arg MAKEFLAGS=-j$(shell nproc) --build-arg CPU --build-arg BUILDKIT_INLINE_CACHE
 
 ## Docker labels. Only set ref and commit date if committed
 DOCKER_LABEL_VCS_URL     ?= $(shell git remote get-url $(shell git remote))
