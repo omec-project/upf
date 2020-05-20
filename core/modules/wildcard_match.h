@@ -39,8 +39,8 @@
 #include "../pb/module_msg.pb.h"
 #include "../utils/cuckoo_map.h"
 
-using bess::utils::HashResult;
 using bess::utils::CuckooMap;
+using bess::utils::HashResult;
 
 #define MAX_TUPLES 16
 #define MAX_FIELDS 16
@@ -136,7 +136,13 @@ class WildcardMatch final : public Module {
   static const Commands cmds;
 
   WildcardMatch()
-      : Module(), default_gate_(), total_key_size_(), total_value_size_(), fields_(), values_(), tuples_() {
+      : Module(),
+        default_gate_(),
+        total_key_size_(),
+        total_value_size_(),
+        fields_(),
+        values_(),
+        tuples_() {
     max_allowed_workers_ = Worker::kMaxWorkers;
   }
 
@@ -162,9 +168,11 @@ class WildcardMatch final : public Module {
     wm_hkey_t mask;
   };
 
-  gate_idx_t LookupEntry(const wm_hkey_t &key, gate_idx_t def_gate, bess::Packet *pkt);
+  gate_idx_t LookupEntry(const wm_hkey_t &key, gate_idx_t def_gate,
+                         bess::Packet *pkt);
 
-  CommandResponse AddFieldOne(const bess::pb::Field &field, struct WmField *f, uint8_t type);
+  CommandResponse AddFieldOne(const bess::pb::Field &field, struct WmField *f,
+                              uint8_t type);
 
   template <typename T>
   CommandResponse ExtractKeyMask(const T &arg, wm_hkey_t *key, wm_hkey_t *mask);
@@ -179,7 +187,7 @@ class WildcardMatch final : public Module {
 
   gate_idx_t default_gate_;
 
-  size_t total_key_size_; /* a multiple of sizeof(uint64_t) */
+  size_t total_key_size_;   /* a multiple of sizeof(uint64_t) */
   size_t total_value_size_; /* a multiple of sizeof(uint64_t) */
 
   // TODO(melvinw): this can be refactored to use ExactMatchTable

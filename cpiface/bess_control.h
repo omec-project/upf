@@ -95,9 +95,9 @@ class BessClient {
   }
 
   void runAddPDRCommand(const uint32_t enodeip, const uint32_t teid,
-			const uint32_t ueaddr, const uint32_t inetip,
-			const uint16_t ueport, const uint16_t inetport,
-			const uint8_t protoid, const char *modname) {
+                        const uint32_t ueaddr, const uint32_t inetip,
+                        const uint16_t ueport, const uint16_t inetport,
+                        const uint8_t protoid, const char *modname) {
     bess::pb::WildcardMatchCommandAddArg *wmcaa =
         new bess::pb::WildcardMatchCommandAddArg();
     wmcaa->set_gate(1);
@@ -137,7 +137,6 @@ class BessClient {
     bess::pb::FieldData *_protoid = wmcaa->add_values();
     _protoid->set_value_int(protoid);
 
-
     /* SET MASKS */
     /* set src_iface value */
     src_iface = wmcaa->add_masks();
@@ -171,7 +170,6 @@ class BessClient {
     /* set proto id */
     _protoid = wmcaa->add_masks();
     _protoid->set_value_int(0x00);
-
 
     /* SET VALUESV */
     /* set pdr_id, set to 0 for the time being */
