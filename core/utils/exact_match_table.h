@@ -160,13 +160,13 @@ class ExactMatchTable {
 
   ExactMatchTable()
       : raw_key_size_(),
-	total_key_size_(),
-	raw_value_size_(),
-	total_value_size_(),
+        total_key_size_(),
+        raw_value_size_(),
+        total_value_size_(),
         num_fields_(),
-	num_values_(),
+        num_values_(),
         fields_(),
-	values_(),
+        values_(),
         table_() {}
 
   // Add a new rule.
@@ -361,7 +361,7 @@ class ExactMatchTable {
 
   typename EmTable::iterator end() { return table_.end(); }
 
-  ExactMatchField *getVals() {return values_;};
+  ExactMatchField *getVals() { return values_; };
 
  private:
   Error MakeError(int code, const std::string &msg = "") {
@@ -531,8 +531,9 @@ class ExactMatchTable {
     }
 
     if (mt_attr_name.length() > 0) {
-      v->attr_id = m->AddMetadataAttr(mt_attr_name, bess::metadata::kMetadataAttrMaxSize,
-                                      metadata::Attribute::AccessMode::kWrite);
+      v->attr_id =
+          m->AddMetadataAttr(mt_attr_name, bess::metadata::kMetadataAttrMaxSize,
+                             metadata::Attribute::AccessMode::kWrite);
       if (v->attr_id < 0) {
         return MakeError(-v->attr_id,
                          Format("idx %d: add_metadata_attr() failed", idx));
@@ -590,7 +591,7 @@ class ExactMatchTable {
   EmTable table_;
 };
 
-}  // namespace bess
 }  // namespace utils
+}  // namespace bess
 
 #endif  // BESS_UTILS_EXACT_MATCH_TABLE_H_

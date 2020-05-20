@@ -74,14 +74,16 @@ CommandResponse ExactMatch::AddFieldOne(const bess::pb::Field &field,
 
   Error ret;
   if (field.position_case() == bess::pb::Field::kAttrName) {
-    ret = (t == FIELD_TYPE) ? table_.AddField(this, field.attr_name(), size, mask64, idx) :
-	    table_.AddValue(this, field.attr_name(), size, mask64, idx);
+    ret = (t == FIELD_TYPE)
+              ? table_.AddField(this, field.attr_name(), size, mask64, idx)
+              : table_.AddValue(this, field.attr_name(), size, mask64, idx);
     if (ret.first) {
       return CommandFailure(ret.first, "%s", ret.second.c_str());
     }
   } else if (field.position_case() == bess::pb::Field::kOffset) {
-      ret = (t == FIELD_TYPE) ? table_.AddField(field.offset(), size, mask64, idx) :
-	      table_.AddValue(field.offset(), size, mask64, idx);
+    ret = (t == FIELD_TYPE)
+              ? table_.AddField(field.offset(), size, mask64, idx)
+              : table_.AddValue(field.offset(), size, mask64, idx);
     if (ret.first) {
       return CommandFailure(ret.first, "%s", ret.second.c_str());
     }
@@ -227,9 +229,10 @@ Error ExactMatch::AddRule(const bess::pb::ExactMatchCommandAddArg &arg) {
   RuleFieldsFromPb(arg.fields(), &rule);
   /* check whether values match with the the table's */
   if (arg.values_size() != (ssize_t)table_.num_values())
-    return std::make_pair(EINVAL,
-			  bess::utils::Format("rule has incorrect number of values. Need %d, has %d",
-					      (int)table_.num_values(), arg.values_size()));
+    return std::make_pair(
+        EINVAL, bess::utils::Format(
+                    "rule has incorrect number of values. Need %d, has %d",
+                    (int)table_.num_values(), arg.values_size()));
   /* check if values are non-zero */
   if (arg.values_size() > 0) {
     RuleFieldsFromPb(arg.values(), &action);
@@ -258,8 +261,7 @@ CommandResponse ExactMatch::SetRuntimeConfig(
   return CommandSuccess();
 }
 
-void ExactMatch::setValues(bess::Packet *pkt, ExactMatchKey &action)
-{
+void ExactMatch::setValues(bess::Packet *pkt, ExactMatchKey &action) {
   size_t num_values_ = table_.num_values();
   ExactMatchField *values_ = table_.getVals();
 
@@ -271,15 +273,18 @@ void ExactMatch::setValues(bess::Packet *pkt, ExactMatchKey &action)
     uint64_t mask = values_[i].mask;
     uint8_t *data = pkt->head_data<uint8_t *>() + value_off;
 
-    DLOG(INFO) << "off: " << (int)value_off << ", sz: " << value_size << ", mask: " << std::hex << mask << std::endl;
+    DLOG(INFO) << "off: " << (int)value_off << ", sz: " << value_size
+               << ", mask: " << std::hex << mask << std::endl;
     if (value_attr_id < 0) { /* if it is offset-based */
-      memcpy(data, reinterpret_cast<uint8_t *>(&action) + value_pos, value_size);
+      memcpy(data, reinterpret_cast<uint8_t *>(&action) + value_pos,
+             value_size);
     } else { /* if it is attribute-based */
       typedef struct {
-	uint8_t bytes[bess::metadata::kMetadataAttrMaxSize];
+        uint8_t bytes[bess::metadata::kMetadataAttrMaxSize];
       } value_t;
       value_t buf;
-      memcpy(buf.bytes, reinterpret_cast<uint8_t *>(&action) + value_pos, value_size);
+      memcpy(buf.bytes, reinterpret_cast<uint8_t *>(&action) + value_pos,
+             value_size);
       set_attr<value_t>(this, value_attr_id, pkt, buf);
     }
   }
@@ -337,17 +342,19 @@ void ExactMatch::RuleFieldsFromPb(
       rule->emplace_back();
       uint64_t rule64 = 0;
       if (table_.get_field(i).attr_id < 0) {
-	if (!bess::utils::uint64_to_bin(&rule64, current.value_int(),
-					field_size, 1)) {
-	  std::cerr << "idx " << i << ": not a correct" << field_size << "-byte value\n";
-	  return;
-	}
+        if (!bess::utils::uint64_to_bin(&rule64, current.value_int(),
+                                        field_size, 1)) {
+          std::cerr << "idx " << i << ": not a correct" << field_size
+                    << "-byte value\n";
+          return;
+        }
       } else {
-	  rule64 = current.value_int();
+        rule64 = current.value_int();
       }
       for (int j = 0; j < field_size; j++) {
         rule->back().push_back(rule64 & 0xFFULL);
-	DLOG(INFO) << "Pushed " << std::hex << (rule64 & 0xFFULL) << " to rule." << std::endl;
+        DLOG(INFO) << "Pushed " << std::hex << (rule64 & 0xFFULL) << " to rule."
+                   << std::endl;
         rule64 >>= 8;
       }
     }

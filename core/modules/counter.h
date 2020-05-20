@@ -36,24 +36,23 @@
 //#include "../pb/module_msg.pb.h"
 
 struct SessionStats {
-	int pkt_count;
-	int byte_count;
+  int pkt_count;
+  int byte_count;
 };
 
 class Counter final : public Module {
  public:
- 	Counter() : list() {}
+  Counter() : list() {}
 
-	static const Commands cmds;
-	CommandResponse AddCounter(
-        const bess::pb::CounterAddArg &arg);
-	CommandResponse RemoveCounter(
-        const bess::pb::CounterRemoveArg &arg);
-	CommandResponse Init(const bess::pb::EmptyArg &arg);
-	void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
+  static const Commands cmds;
+  CommandResponse AddCounter(const bess::pb::CounterAddArg &arg);
+  CommandResponse RemoveCounter(const bess::pb::CounterRemoveArg &arg);
+  CommandResponse Init(const bess::pb::EmptyArg &arg);
+  void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
+
  private:
-	std::map<int, SessionStats> list;
-	int attr_id;
+  std::map<int, SessionStats> list;
+  int attr_id;
 };
 
 #endif  // BESS_MODULES_COUNTER_H_
