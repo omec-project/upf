@@ -6,7 +6,7 @@ jobs:
   build:
     env:
       DOCKER_REGISTRY: "docker.pkg.github.com/omec-project/"
-      DOCKER_REPOSITORY: "upf-epc"
+      DOCKER_REPOSITORY: "upf-epc/"
     runs-on: ubuntu-latest
     steps:
 
@@ -33,7 +33,7 @@ jobs:
         rm .clang-format
     - name: Shell Format
       run: |
-        wget -qO shfmt https://github.com/mvdan/sh/releases/download/v2.6.4/shfmt_v2.6.4_linux_amd64
+        wget -qO shfmt https://github.com/mvdan/sh/releases/download/v3.1.1/shfmt_v3.1.1_linux_amd64
         chmod +x shfmt && sudo mv shfmt /bin
         shfmt -w -l .
 
