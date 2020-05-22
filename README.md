@@ -14,7 +14,7 @@ The dataplane is built on top of [Berkeley Extensible Software Switch](https://g
 pipeline is represented by a BESS-based module. As a result, the pipeline built using BESS can visually be interpreted as a directed acyclic graph, where
 each module represents a graphical node. The revised dataplane is not just more flexible to use but also configurable and operator-friendly.
 
-*Please see the ONFConnect 2019 [talk](https://www.youtube.com/watch?v=fqJGWcwcOxE) for more details.*
+*Please see the ONFConnect 2019 [talk](https://www.youtube.com/watch?v=fqJGWcwcOxE) for more details. You can also see demo videos [here](https://www.youtube.com/watch?v=KxK64jalKHw) and [here](https://youtu.be/rWnZuJeUWi4).*
 
 BESS tools are available out-of-the-box for debugging and/or monitoring; *e.g.*:
 
