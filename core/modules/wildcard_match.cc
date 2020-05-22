@@ -64,9 +64,9 @@ const Commands WildcardMatch::cmds = {
     {"set_runtime_config", "WildcardMatchConfig",
      MODULE_CMD_FUNC(&WildcardMatch::SetRuntimeConfig), Command::THREAD_UNSAFE},
     {"add", "WildcardMatchCommandAddArg",
-     MODULE_CMD_FUNC(&WildcardMatch::CommandAdd), Command::THREAD_UNSAFE},
+     MODULE_CMD_FUNC(&WildcardMatch::CommandAdd), Command::THREAD_SAFE},
     {"delete", "WildcardMatchCommandDeleteArg",
-     MODULE_CMD_FUNC(&WildcardMatch::CommandDelete), Command::THREAD_UNSAFE},
+     MODULE_CMD_FUNC(&WildcardMatch::CommandDelete), Command::THREAD_SAFE},
     {"clear", "EmptyArg", MODULE_CMD_FUNC(&WildcardMatch::CommandClear),
      Command::THREAD_UNSAFE},
     {"set_default_gate", "WildcardMatchCommandSetDefaultGateArg",
@@ -287,18 +287,11 @@ CommandResponse WildcardMatch::ExtractKeyMask(const T &arg, wm_hkey_t *key,
                                       true)) {
         return CommandFailure(EINVAL, "idx %zu: not a correct %d-byte value", i,
                               field_size);
-      } else {
-        std::cerr << "key value: " << valuedata.value_int() << ", size is "
-                  << field_size << std::endl;
       }
     } else if (valuedata.encoding_case() == bess::pb::FieldData::kValueBin) {
       bess::utils::Copy(reinterpret_cast<uint8_t *>(&v),
                         valuedata.value_bin().c_str(),
                         valuedata.value_bin().size());
-      {
-        std::cerr << "key value: " << valuedata.value_bin().c_str()
-                  << ", size is " << valuedata.value_bin().size() << std::endl;
-      }
     }
 
     bess::pb::FieldData maskdata = arg.masks(i);
@@ -307,18 +300,11 @@ CommandResponse WildcardMatch::ExtractKeyMask(const T &arg, wm_hkey_t *key,
                                       true)) {
         return CommandFailure(EINVAL, "idx %zu: not a correct %d-byte mask", i,
                               field_size);
-      } else {
-        std::cerr << "key maskdata: " << maskdata.value_int() << ", size is "
-                  << field_size << std::endl;
       }
     } else if (maskdata.encoding_case() == bess::pb::FieldData::kValueBin) {
       bess::utils::Copy(reinterpret_cast<uint8_t *>(&m),
                         maskdata.value_bin().c_str(),
                         maskdata.value_bin().size());
-      {
-        std::cerr << "key maskdata: " << maskdata.value_bin().c_str()
-                  << ", size is " << maskdata.value_bin().size() << std::endl;
-      }
     }
 
     if (v & ~m) {
@@ -359,25 +345,11 @@ CommandResponse WildcardMatch::ExtractValue(const T &arg, wm_hkey_t *keyv) {
                                       true)) {
         return CommandFailure(EINVAL, "idx %zu: not a correct %d-byte value", i,
                               value_size);
-      } else {
-        std::cerr << "value data: " << valuedata.value_int() << ", size is "
-                  << value_size << std::endl;
       }
     } else if (valuedata.encoding_case() == bess::pb::FieldData::kValueBin) {
       bess::utils::Copy(reinterpret_cast<uint8_t *>(&v),
                         valuedata.value_bin().c_str(),
                         valuedata.value_bin().size());
-      {
-        std::cerr << "value data: " << valuedata.value_bin().c_str()
-                  << ", size is " << valuedata.value_bin().size() << std::endl;
-      }
-    }
-
-    if (!v) {
-      return CommandFailure(EINVAL,
-                            "idx %zu: invalid "
-                            "value 0x%0*" PRIx64 "",
-                            i, value_size * 2, v);
     }
 
     // Use memcpy, not utils::Copy, to workaround the false positive warning
@@ -444,8 +416,6 @@ CommandResponse WildcardMatch::CommandAdd(
 
   if (!is_valid_gate(gate)) {
     return CommandFailure(EINVAL, "Invalid gate: %hu", gate);
-  } else {
-    std::cerr << "Gate is " << gate << std::endl;
   }
 
   err = ExtractValue(arg, &data.keyv);
@@ -455,8 +425,6 @@ CommandResponse WildcardMatch::CommandAdd(
 
   data.priority = priority;
   data.ogate = gate;
-
-  { std::cerr << "priority: " << priority << std::endl; }
 
   int idx = FindTuple(&mask);
   if (idx < 0) {

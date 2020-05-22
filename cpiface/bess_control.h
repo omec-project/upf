@@ -19,6 +19,7 @@ using namespace grpc;
  */
 #define BESSD_IP "localhost"
 #define BESSD_PORT 10514u
+enum src_iface_type {Access = 1, Core};
 
 /**
  * Module decls
@@ -94,10 +95,11 @@ class BessClient {
     /* `any' freed up by ModuleCommand() */
   }
 
-  void runAddPDRCommand(const uint32_t enodeip, const uint32_t teid,
-                        const uint32_t ueaddr, const uint32_t inetip,
-                        const uint16_t ueport, const uint16_t inetport,
-                        const uint8_t protoid, const char *modname) {
+  void runAddPDRCommand(const enum src_iface_type sit, const uint32_t enodeip,
+			const uint32_t teid, const uint32_t ueaddr,
+			const uint32_t inetip, const uint16_t ueport,
+			const uint16_t inetport, const uint8_t protoid,
+			const char *modname) {
     bess::pb::WildcardMatchCommandAddArg *wmcaa =
         new bess::pb::WildcardMatchCommandAddArg();
     wmcaa->set_gate(1);
@@ -107,7 +109,7 @@ class BessClient {
     /* set src_iface value */
     bess::pb::FieldData *src_iface = wmcaa->add_values();
     /* Access = 1, Core = 2 */
-    src_iface->set_value_int(2);
+    src_iface->set_value_int(sit);
 
     /* set tunnel_ipv4_dst */
     bess::pb::FieldData *tunnel_ipv4_dst = wmcaa->add_values();
