@@ -1111,6 +1111,16 @@ message CounterRemoveArg {
 }
 
 /**
+ * The Counter module counts the number of packets and bytes it passes
+ *
+ * __Input Gates__: 1
+ * __Output Gates__: 1
+*/
+message CounterArg {
+  string name_id = 1; /// Name of the counter_id
+}
+
+/**
  * The Split module is a basic classifier which directs packets out a gate
  * based on data in the packet (e.g., if the read in value is 3, the packet
  * is directed out output gate 3).
