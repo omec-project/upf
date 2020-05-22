@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - test-docker-ci
 
 jobs:
   build:
@@ -14,6 +15,12 @@ jobs:
     steps:
     # Checkout and build
     - uses: actions/checkout@v1
+    - name: Docker login GH packages
+      env:
+        USERNAME: ${{ github.actor }}
+        PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        docker login https://docker.pkg.github.com -u $USERNAME -p $PASSWORD
     - name: Build and push Docker image
       run: |
         make docker-build
