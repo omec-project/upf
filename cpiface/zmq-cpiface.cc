@@ -46,6 +46,7 @@ struct Args {
   uint16_t zmqd_recv_port = ZMQ_RECV_PORT;
   uint16_t zmqd_nb_port = ZMQ_NB_PORT;
   char encapmod[MODULE_NAME_LEN] = ENCAPMOD;
+  char pdrlookup[MODULE_NAME_LEN] = PDRLOOKUPMOD;
 
   struct RegMsgBundle {
     struct in_addr upf_comm_ip;
@@ -66,6 +67,7 @@ struct Args {
         {"s1u_sgw_ip", required_argument, NULL, 'u'},
         {"encapmod", required_argument, NULL, 'M'},
         {"hostname", required_argument, NULL, 'h'},
+	{"pdrlookup", required_argument, NULL, 'P'},
         {0, 0, 0, 0}};
     do {
       int option_index = 0;
@@ -73,7 +75,6 @@ struct Args {
 
       c = getopt_long(argc, argv, "B:b:Z:s:r:M:N:n:u:h:", long_options,
                       &option_index);
-
       if (c == -1)
         break;
 
@@ -128,7 +129,10 @@ struct Args {
         case 'h':
           strncpy(rmb.hostname, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
           break;
-        default:
+      	case 'P':
+	  strncpy(pdrlookup, optarg, MIN(strlen(optarg), MODULE_NAME_LEN - 1));
+	  break;
+      	default:
           std::cerr << "Unknown argument - " << argv[optind] << std::endl;
           exit(EXIT_FAILURE);
           break;
@@ -382,6 +386,19 @@ int main(int argc, char **argv) {
                             rbuf.sess_entry.ul_s1_info.enb_addr.u.ipv4_addr,
                             args.encapmod);
           }
+	  {
+	    BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
+				       std::to_string(args.bessd_port),
+				       InsecureChannelCredentials()));
+	    b.runAddPDRCommand(Core, /*rbuf.sess_entry.ul_s1_info.enb_addr.u.ipv4_addr*/0,
+			       /*rbuf.sess_entry.ul_s1_info.sgw_teid*/0,
+			       rbuf.sess_entry.ue_addr.u.ipv4_addr,
+			       0,
+			       0,
+			       0,
+			       0,
+			       args.pdrlookup);
+	  }
           break;
         case MSG_SESS_DEL:
           VLOG(1) << "Got a session delete request" << std::endl;
