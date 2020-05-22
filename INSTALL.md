@@ -9,7 +9,7 @@ Copyright(c) 2019 Intel Corporation
 
 You need the following dependencies.
 
-* Docker CE >= 17.06
+* Docker CE >= 19.03
 * Linux kernel version >= 4.15 for Docker; >= 4.19 for AF_XDP
 * Hugepages mounted at `/dev/hugepages` or updated location in [`docker_setup.sh`](docker_setup.sh)
 * Update mode for devices: `dpdk`, `af_xdp` or `af_packet` in [`docker_setup.sh`](docker_setup.sh),
@@ -48,8 +48,8 @@ and/or [`conf/spgwu.json`](conf/spgwu.json)
 To install the pipeline, do:
 
 ```bash
-docker exec bess bessctl run spgwu
-docker exec bess bessctl show pipeline > pipeline.txt
+docker exec bess ./bessctl run spgwu
+docker exec bess ./bessctl show pipeline > pipeline.txt
 ```
 
 ## Operate DP Pipeline
