@@ -58,9 +58,13 @@ CommandResponse Counter::RemoveCounter(const bess::pb::CounterRemoveArg &arg) {
   return CommandSuccess();
 }
 /*----------------------------------------------------------------------------------*/
-CommandResponse Counter::Init(const bess::pb::EmptyArg &) {
+CommandResponse Counter::Init(const bess::pb::CounterArg &arg) {
+
+  std::string name_id = arg.name_id();
+  if (name_id == "")
+    return CommandFailure(EINVAL, "Invalid counter idx name");
   using AccessMode = bess::metadata::Attribute::AccessMode;
-  attr_id = AddMetadataAttr("ctr_id", sizeof(uint32_t), AccessMode::kRead);
+  attr_id = AddMetadataAttr(name_id, sizeof(uint32_t), AccessMode::kRead);
 
   return CommandSuccess();
 }

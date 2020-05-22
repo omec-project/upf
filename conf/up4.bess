@@ -415,8 +415,8 @@ _in:gate -> ueLookup::IPLookup() -> SetMetadata(attrs=[{'name':'direction', 'siz
                                         {'attr_name':'fseid', 'num_bytes':4},
                                         {'attr_name':'ctr_id', 'num_bytes':4},
                                         {'attr_name':'far_id', 'num_bytes':4},
-                                        {'attr_name':'needs_gtpu_decap', 'num_bytes':1}]) \
-    -> PreQoSCounter::Counter() \
+                                        {'attr_name':'needs_gtpu_decap', 'num_bytes':1}]):1 \
+    -> PreQoSCounter::Counter(name_id='ctr_id') \
     -> EtherTrim::GenericDecap(bytes=14) \
     -> GTPUEncap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0]), num_subscribers=max_sessions):1 \
     -> S1UEtherAdd::GenericEncap(fields=[
@@ -439,7 +439,7 @@ ueLookup:MAX_GATES-1 -> Sink()
 
 # Set default PDRLookup gate
 PDRLookup.set_default_gate(gate=0)
-#PDRLookup:0 -> Sink()
+PDRLookup:0 -> Sink()
 
 
 # ====================================================

@@ -47,7 +47,7 @@ class Counter final : public Module {
   static const Commands cmds;
   CommandResponse AddCounter(const bess::pb::CounterAddArg &arg);
   CommandResponse RemoveCounter(const bess::pb::CounterRemoveArg &arg);
-  CommandResponse Init(const bess::pb::EmptyArg &arg);
+  CommandResponse Init(const bess::pb::CounterArg &arg);
   void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
 
  private:
