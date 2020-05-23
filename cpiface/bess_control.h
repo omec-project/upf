@@ -29,6 +29,9 @@ enum src_iface_type {Access = 1, Core};
 #define ENCAPREMMETHOD "remove"
 #define PDRLOOKUPMOD "PDRLookup"
 #define PDRADDMETHOD "add"
+#define PREQOSCOUNTERMOD "PreQoSCounter"
+#define COUNTERADDMETHOD "add"
+#define COUNTERDELMETHOD "remove"
 #define MODULE_NAME_LEN 128
 #define HOSTNAME_LEN 256
 /*--------------------------------------------------------------------------------*/
@@ -184,7 +187,7 @@ class BessClient {
 
     /* set ctr_id, set to 0 for the time being */
     _void = wmcaa->add_valuesv();
-    _void->set_value_int(0x0u);
+    _void->set_value_int(ueaddr);
 
     /* set far_id, set to 0 for the time being */
     _void = wmcaa->add_valuesv();
@@ -202,7 +205,7 @@ class BessClient {
     Status status = stub_->ModuleCommand(&context, crt, &cre);
     // Act upon its status.
     if (status.ok()) {
-      std::cout << "runAddPDRCommand RPC successfully executed." << std::endl;
+      VLOG(1) << "runAddPDRCommand RPC successfully executed." << std::endl;
     } else {
       std::cout << status.error_code() << ": " << status.error_message()
                 << std::endl;
@@ -210,6 +213,56 @@ class BessClient {
     }
 
     delete wmcaa;
+
+    /* `any' freed up by ModuleCommand() */
+  }
+
+  void runAddCounterCommand(const uint32_t ctr_id,
+			    const char *modname) {
+    bess::pb::CounterAddArg *caa =
+        new bess::pb::CounterAddArg();
+    caa->set_ctr_id(ctr_id);
+    ::google::protobuf::Any *any = new ::google::protobuf::Any();
+    any->PackFrom(*caa);
+    crt.set_name(modname);
+    crt.set_cmd(COUNTERADDMETHOD);
+    crt.set_allocated_arg(any);
+    Status status = stub_->ModuleCommand(&context, crt, &cre);
+    // Act upon its status.
+    if (status.ok()) {
+      VLOG(1) << "runAddCommand RPC successfully executed." << std::endl;
+    } else {
+      std::cout << status.error_code() << ": " << status.error_message()
+                << std::endl;
+      std::cout << "runAddCommand RPC failed." << std::endl;
+    }
+
+    delete caa;
+
+    /* `any' freed up by ModuleCommand() */
+  }
+
+  void runDelCounterCommand(const uint32_t ctr_id,
+			    const char *modname) {
+    bess::pb::CounterRemoveArg *cra =
+        new bess::pb::CounterRemoveArg();
+    cra->set_ctr_id(ctr_id);
+    ::google::protobuf::Any *any = new ::google::protobuf::Any();
+    any->PackFrom(*cra);
+    crt.set_name(modname);
+    crt.set_cmd(COUNTERDELMETHOD);
+    crt.set_allocated_arg(any);
+    Status status = stub_->ModuleCommand(&context, crt, &cre);
+    // Act upon its status.
+    if (status.ok()) {
+      VLOG(1) << "runAddCommand RPC successfully executed." << std::endl;
+    } else {
+      std::cout << status.error_code() << ": " << status.error_message()
+                << std::endl;
+      std::cout << "runAddCommand RPC failed." << std::endl;
+    }
+
+    delete cra;
 
     /* `any' freed up by ModuleCommand() */
   }
