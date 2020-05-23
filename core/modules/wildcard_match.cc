@@ -90,7 +90,7 @@ CommandResponse WildcardMatch::AddFieldOne(const bess::pb::Field &field,
   } else if (field.position_case() == bess::pb::Field::kAttrName) {
     const char *attr = field.attr_name().c_str();
     f->attr_id =
-        (type == 0)
+        (type == FieldType)
             ? AddMetadataAttr(attr, f->size, Attribute::AccessMode::kRead)
             : AddMetadataAttr(attr, f->size, Attribute::AccessMode::kWrite);
     if (f->attr_id < 0) {

@@ -42,7 +42,7 @@ struct SessionStats {
 
 class Counter final : public Module {
  public:
-  Counter() : list() {}
+  Counter() : counters() {}
 
   static const Commands cmds;
   CommandResponse AddCounter(const bess::pb::CounterAddArg &arg);
@@ -51,7 +51,8 @@ class Counter final : public Module {
   void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
 
  private:
-  std::map<int, SessionStats> list;
+  std::map<uint32_t, SessionStats> counters;
+  std::string name_id;
   int attr_id;
 };
 
