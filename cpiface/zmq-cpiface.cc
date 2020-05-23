@@ -43,6 +43,7 @@ struct Args {
   uint16_t zmqd_nb_port = ZMQ_NB_PORT;
   char encapmod[MODULE_NAME_LEN] = ENCAPMOD;
   char pdrlookup[MODULE_NAME_LEN] = PDRLOOKUPMOD;
+  char preqoscounter[MODULE_NAME_LEN] = PREQOSCOUNTERMOD;
 
   struct RegMsgBundle {
     struct in_addr upf_comm_ip;
@@ -64,12 +65,13 @@ struct Args {
         {"encapmod", required_argument, NULL, 'M'},
         {"hostname", required_argument, NULL, 'h'},
 	{"pdrlookup", required_argument, NULL, 'P'},
+	{"preqoscounter", required_argument, NULL, 'c'},
         {0, 0, 0, 0}};
     do {
       int option_index = 0;
       uint32_t val = 0;
 
-      c = getopt_long(argc, argv, "B:b:Z:s:r:M:N:n:u:h:", long_options,
+      c = getopt_long(argc, argv, "B:b:Z:s:r:M:N:n:u:h:P:", long_options,
                       &option_index);
       if (c == -1)
         break;
@@ -86,6 +88,9 @@ struct Args {
           }
           bessd_port = (uint16_t)(val & 0x0000FFFF);
           break;
+        case 'c':
+	  strncpy(preqoscounter, optarg, MIN(strlen(optarg), MODULE_NAME_LEN - 1));
+	  break;
         case 'Z':
           strncpy(zmqd_ip, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
           break;
@@ -309,7 +314,7 @@ int main(int argc, char **argv) {
             break;
           }
           {
-            // Create BessClient
+            // Add GTP Session
             BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
@@ -320,6 +325,7 @@ int main(int argc, char **argv) {
                             args.encapmod);
           }
 	  {
+	    // Add PDR
 	    BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
 				       std::to_string(args.bessd_port),
 				       InsecureChannelCredentials()));
@@ -331,6 +337,14 @@ int main(int argc, char **argv) {
 			       0,
 			       0,
 			       args.pdrlookup);
+	  }
+	  {
+	    // Add Counter
+	    BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
+				       std::to_string(args.bessd_port),
+				       InsecureChannelCredentials()));
+	    b.runAddCounterCommand(rbuf.sess_entry.ue_addr.u.ipv4_addr,
+				   args.preqoscounter);
 	  }
           break;
         case MSG_SESS_DEL:
@@ -366,6 +380,14 @@ int main(int argc, char **argv) {
                         DEFAULT_BEARER));
             zmq_sess_map.erase(it);
           }
+	  {
+            // Delete Counter
+	    BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
+				       std::to_string(args.bessd_port),
+				       InsecureChannelCredentials()));
+	    b.runDelCounterCommand(ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),
+				   args.preqoscounter);
+	  }
           break;
         default:
           VLOG(1) << "Got a request with mtype: " << mtype << std::endl;
