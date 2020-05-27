@@ -53,8 +53,9 @@ CommandResponse Counter::RemoveCounter(const bess::pb::CounterRemoveArg &arg) {
   uint32_t ctr_id = ntohl(arg.ctr_id());
 
   if (counters.find(ctr_id) != counters.end()) {
-    std::cerr << this->name() << "[" << ctr_id << "]: " << counters[ctr_id].pkt_count
-	      << ", " << counters[ctr_id].byte_count << std::endl;
+    std::cerr << this->name() << "[" << ctr_id
+              << "]: " << counters[ctr_id].pkt_count << ", "
+              << counters[ctr_id].byte_count << std::endl;
     counters.erase(ctr_id);
   } else {
     return CommandFailure(EINVAL, "Unable to remove ctr");
@@ -63,7 +64,6 @@ CommandResponse Counter::RemoveCounter(const bess::pb::CounterRemoveArg &arg) {
 }
 /*----------------------------------------------------------------------------------*/
 CommandResponse Counter::Init(const bess::pb::CounterArg &arg) {
-
   name_id = arg.name_id();
   if (name_id == "")
     return CommandFailure(EINVAL, "Invalid counter idx name");

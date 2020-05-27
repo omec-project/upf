@@ -281,13 +281,17 @@ void ExactMatch::setValues(bess::Packet *pkt, ExactMatchKey &action) {
       typedef struct {
         uint8_t bytes[bess::metadata::kMetadataAttrMaxSize];
       } value_t;
-      void *mt_ptr = _ptr_attr_with_offset<value_t>(attr_offset(value_attr_id), pkt);
-      bess::utils::CopySmall(mt_ptr,
-			     reinterpret_cast<uint8_t *>(((uint8_t *)(&action)) + value_pos),
-			     value_size);
-      DLOG(INFO) << "Setting value " << std::hex << *(reinterpret_cast<uint64_t *>(mt_ptr))
-		 << " for attr_id: " << value_attr_id << " of size: " << value_size
-		 << " at value_pos: " << value_pos << ", Mask: " << mask << std::endl;
+      void *mt_ptr =
+          _ptr_attr_with_offset<value_t>(attr_offset(value_attr_id), pkt);
+      bess::utils::CopySmall(
+          mt_ptr,
+          reinterpret_cast<uint8_t *>(((uint8_t *)(&action)) + value_pos),
+          value_size);
+      DLOG(INFO) << "Setting value " << std::hex
+                 << *(reinterpret_cast<uint64_t *>(mt_ptr))
+                 << " for attr_id: " << value_attr_id
+                 << " of size: " << value_size << " at value_pos: " << value_pos
+                 << ", Mask: " << mask << std::endl;
     }
   }
 }
@@ -331,14 +335,13 @@ std::string ExactMatch::GetDesc() const {
 
 void ExactMatch::RuleFieldsFromPb(
     const RepeatedPtrField<bess::pb::FieldData> &fields,
-    bess::utils::ExactMatchRuleFields *rule,
-    Type type) {
+    bess::utils::ExactMatchRuleFields *rule, Type type) {
   for (auto i = 0; i < fields.size(); i++) {
-	  (void)type;
-    int field_size = (type == FIELD_TYPE) ? table_.get_field(i).size :
-	    table_.get_value(i).size;
-    int attr_id = (type == FIELD_TYPE) ? table_.get_field(i).attr_id :
-	    table_.get_value(i).attr_id;
+    (void)type;
+    int field_size = (type == FIELD_TYPE) ? table_.get_field(i).size
+                                          : table_.get_value(i).size;
+    int attr_id = (type == FIELD_TYPE) ? table_.get_field(i).attr_id
+                                       : table_.get_value(i).attr_id;
 
     bess::pb::FieldData current = fields.Get(i);
     if (current.encoding_case() == bess::pb::FieldData::kValueBin) {
@@ -355,11 +358,11 @@ void ExactMatch::RuleFieldsFromPb(
           return;
         }
       } else {
-	rule64 = current.value_int();
+        rule64 = current.value_int();
       }
       for (int j = 0; j < field_size; j++) {
         rule->back().push_back(rule64 & 0xFFULL);
-	DLOG(INFO) << "Pushed " << std::hex << (rule64 & 0xFFULL) << " to rule."
+        DLOG(INFO) << "Pushed " << std::hex << (rule64 & 0xFFULL) << " to rule."
                    << std::endl;
         rule64 >>= 8;
       }
