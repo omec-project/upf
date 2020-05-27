@@ -53,7 +53,7 @@ CommandResponse Counter::RemoveCounter(const bess::pb::CounterRemoveArg &arg) {
   uint32_t ctr_id = ntohl(arg.ctr_id());
 
   if (counters.find(ctr_id) != counters.end()) {
-    std::cerr << "counters[" << ctr_id << "]: " << counters[ctr_id].pkt_count
+    std::cerr << this->name() << "[" << ctr_id << "]: " << counters[ctr_id].pkt_count
 	      << ", " << counters[ctr_id].byte_count << std::endl;
     counters.erase(ctr_id);
   } else {
@@ -77,7 +77,7 @@ void Counter::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   int cnt = batch->cnt();
 
   for (int i = 0; i < cnt; i++) {
-    uint32_t ctr_id = get_attr<uint32_t>(this, attr_id, batch->pkts()[i]);
+    uint32_t ctr_id = htonl(get_attr<uint32_t>(this, attr_id, batch->pkts()[i]));
     // check if ctr_id is present
     if (counters.find(ctr_id) != counters.end()) {
       SessionStats s = counters[ctr_id];

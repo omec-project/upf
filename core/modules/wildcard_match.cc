@@ -197,9 +197,16 @@ inline gate_idx_t WildcardMatch::LookupEntry(const wm_hkey_t &key,
           uint8_t bytes[bess::metadata::kMetadataAttrMaxSize];
         } value_t;
         value_t buf;
-        memcpy(buf.bytes, reinterpret_cast<uint8_t *>(&result.keyv) + value_pos,
-               value_size);
-        set_attr<value_t>(this, value_attr_id, pkt, buf);
+	memset(&buf, 0, sizeof(buf));
+
+	void *mt_ptr = _ptr_attr_with_offset<value_t>(attr_offset(value_attr_id), pkt);
+	bess::utils::uint64_to_bin(buf.bytes, *(uint64_t *)(((uint8_t *)&result.keyv) + value_pos), value_size, true);
+	bess::utils::CopySmall(mt_ptr,
+			       buf.bytes,
+			       value_size);
+	DLOG(INFO) << "Setting value " << std::hex << *(reinterpret_cast<uint64_t *>(mt_ptr))
+		   << " for attr_id: " << value_attr_id << " of size: " << value_size
+		   << " at value_pos: " << value_pos << std::endl;
       }
     }
   }
@@ -384,11 +391,11 @@ int WildcardMatch::AddTuple(wm_hkey_t *mask) {
   return int(tuples_.size() - 1);
 }
 
-int WildcardMatch::DelEntry(int idx, wm_hkey_t *key) {
+bool WildcardMatch::DelEntry(int idx, wm_hkey_t *key) {
   struct WmTuple &tuple = tuples_[idx];
-  int ret =
+  bool ret =
       tuple.ht.Remove(*key, wm_hash(total_key_size_), wm_eq(total_key_size_));
-  if (ret) {
+  if (!ret) {
     return ret;
   }
 
@@ -396,7 +403,7 @@ int WildcardMatch::DelEntry(int idx, wm_hkey_t *key) {
     tuples_.erase(tuples_.begin() + idx);
   }
 
-  return 0;
+  return true;
 }
 
 CommandResponse WildcardMatch::CommandAdd(
@@ -459,7 +466,7 @@ CommandResponse WildcardMatch::CommandDelete(
   }
 
   int ret = DelEntry(idx, &key);
-  if (ret < 0) {
+  if (!ret) {
     return CommandFailure(-ret, "failed to delete a rule");
   }
 

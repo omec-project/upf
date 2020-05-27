@@ -29,7 +29,11 @@ enum src_iface_type {Access = 1, Core};
 #define ENCAPREMMETHOD "remove"
 #define PDRLOOKUPMOD "PDRLookup"
 #define PDRADDMETHOD "add"
-#define PREQOSCOUNTERMOD "PreQoSCounter"
+#define PDRDELMETHOD "delete"
+#define FARLOOKUPMOD "FARLookup"
+#define FARADDMETHOD "add"
+#define FARDELMETHOD "delete"
+#define QOSCOUNTERMOD "QoSCounter"
 #define COUNTERADDMETHOD "add"
 #define COUNTERDELMETHOD "remove"
 #define MODULE_NAME_LEN 128
@@ -102,6 +106,8 @@ class BessClient {
 			const uint32_t teid, const uint32_t ueaddr,
 			const uint32_t inetip, const uint16_t ueport,
 			const uint16_t inetport, const uint8_t protoid,
+			const uint32_t pdr_id, const uint32_t fseid,
+			const uint32_t far_id, const uint8_t need_decap,
 			const char *modname) {
     bess::pb::WildcardMatchCommandAddArg *wmcaa =
         new bess::pb::WildcardMatchCommandAddArg();
@@ -179,11 +185,11 @@ class BessClient {
     /* SET VALUESV */
     /* set pdr_id, set to 0 for the time being */
     bess::pb::FieldData *_void = wmcaa->add_valuesv();
-    _void->set_value_int(0x0u);
+    _void->set_value_int(pdr_id);
 
     /* set fseid, set to 0 for the time being */
     _void = wmcaa->add_valuesv();
-    _void->set_value_int(0x0u);
+    _void->set_value_int(fseid);
 
     /* set ctr_id, set to 0 for the time being */
     _void = wmcaa->add_valuesv();
@@ -191,11 +197,11 @@ class BessClient {
 
     /* set far_id, set to 0 for the time being */
     _void = wmcaa->add_valuesv();
-    _void->set_value_int(0x0u);
+    _void->set_value_int(far_id);
 
     /* set needs_gtpu_decap, set to 0 for the time being */
     _void = wmcaa->add_valuesv();
-    _void->set_value_int(0x00);
+    _void->set_value_int(need_decap);
 
     ::google::protobuf::Any *any = new ::google::protobuf::Any();
     any->PackFrom(*wmcaa);
@@ -213,6 +219,210 @@ class BessClient {
     }
 
     delete wmcaa;
+
+    /* `any' freed up by ModuleCommand() */
+  }
+
+  void runDelPDRCommand(const enum src_iface_type sit, const uint32_t enodeip,
+			const uint32_t teid, const uint32_t ueaddr,
+			const uint32_t inetip, const uint16_t ueport,
+			const uint16_t inetport, const uint8_t protoid,
+			const char *modname) {
+    bess::pb::WildcardMatchCommandDeleteArg *wmcda =
+        new bess::pb::WildcardMatchCommandDeleteArg();
+
+    /* SET VALUES */
+    /* set src_iface value */
+    bess::pb::FieldData *src_iface = wmcda->add_values();
+    /* Access = 1, Core = 2 */
+    src_iface->set_value_int(sit);
+
+    /* set tunnel_ipv4_dst */
+    bess::pb::FieldData *tunnel_ipv4_dst = wmcda->add_values();
+    tunnel_ipv4_dst->set_value_int(enodeip);
+
+    /* set teid */
+    bess::pb::FieldData *_teid = wmcda->add_values();
+    _teid->set_value_int(teid);
+
+    /* set dst ip */
+    bess::pb::FieldData *dst_ip = wmcda->add_values();
+    dst_ip->set_value_int(ueaddr);
+
+    /* set src ip */
+    bess::pb::FieldData *src_ip = wmcda->add_values();
+    src_ip->set_value_int(inetip);
+
+    /* set dst l4 port */
+    bess::pb::FieldData *l4_dstport = wmcda->add_values();
+    l4_dstport->set_value_int(ueport);
+
+    /* set src l4 port */
+    bess::pb::FieldData *l4_srcport = wmcda->add_values();
+    l4_srcport->set_value_int(inetport);
+
+    /* set proto id */
+    bess::pb::FieldData *_protoid = wmcda->add_values();
+    _protoid->set_value_int(protoid);
+
+    /* SET MASKS */
+    /* set src_iface value */
+    src_iface = wmcda->add_masks();
+    /* Access = 0xFF, Core = 0xFF */
+    src_iface->set_value_int(0xFF);
+
+    /* set tunnel_ipv4_dst - Setting it to 0 for the time being */
+    tunnel_ipv4_dst = wmcda->add_masks();
+    tunnel_ipv4_dst->set_value_int(0x00u);
+
+    /* set teid - Setting it to 0 for the time being */
+    _teid = wmcda->add_masks();
+    _teid->set_value_int(0x00u);
+
+    /* set dst ip */
+    dst_ip = wmcda->add_masks();
+    dst_ip->set_value_int(0xFFFFFFFFu);
+
+    /* set src ip */
+    src_ip = wmcda->add_masks();
+    src_ip->set_value_int(0x0000);
+
+    /* set dst l4 port */
+    l4_dstport = wmcda->add_masks();
+    l4_dstport->set_value_int(0x0000);
+
+    /* set src l4 port */
+    l4_srcport = wmcda->add_masks();
+    l4_srcport->set_value_int(0x0000);
+
+    /* set proto id */
+    _protoid = wmcda->add_masks();
+    _protoid->set_value_int(0x00);
+
+    ::google::protobuf::Any *any = new ::google::protobuf::Any();
+    any->PackFrom(*wmcda);
+    crt.set_name(modname);
+    crt.set_cmd(PDRDELMETHOD);
+    crt.set_allocated_arg(any);
+    Status status = stub_->ModuleCommand(&context, crt, &cre);
+    // Act upon its status.
+    if (status.ok()) {
+      VLOG(1) << "runDelPDRCommand RPC successfully executed." << std::endl;
+    } else {
+      std::cout << status.error_code() << ": " << status.error_message()
+                << std::endl;
+      std::cout << "runDelPDRCommand RPC failed." << std::endl;
+    }
+
+    delete wmcda;
+
+    /* `any' freed up by ModuleCommand() */
+  }
+
+  void runAddFARCommand(const uint32_t far_id, const uint32_t fseid,
+			const uint8_t tunnel, const uint8_t drop,
+			const uint8_t notify_cp, const uint16_t tuntype,
+			const uint32_t tun_src_ip, const uint32_t tun_dst_ip,
+			const uint32_t teid, const uint16_t tun_port,
+			const char *modname) {
+    bess::pb::ExactMatchCommandAddArg *emcaa =
+        new bess::pb::ExactMatchCommandAddArg();
+    emcaa->set_gate(1);
+
+    /* SET FIELDS */
+    /* set far_id value */
+    bess::pb::FieldData *_far_id = emcaa->add_fields();
+    _far_id->set_value_int(far_id);
+
+    /* set fseid */
+    bess::pb::FieldData *_fseid = emcaa->add_fields();
+    _fseid->set_value_int(fseid);
+
+
+    /* SET VALUES */
+    /* set tunnel action */
+    bess::pb::FieldData *_tunnel = emcaa->add_values();
+    _tunnel->set_value_int(tunnel);
+
+    /* set drop action */
+    bess::pb::FieldData *_drop = emcaa->add_values();
+    _drop->set_value_int(drop);
+
+    /* set notify_cp */
+    bess::pb::FieldData *_notify_cp = emcaa->add_values();
+    _notify_cp->set_value_int(notify_cp);
+
+    /* set tuntype */
+    bess::pb::FieldData *_tuntype = emcaa->add_values();
+    _tuntype->set_value_int(tuntype);
+
+    /* set tun_src_ip */
+    bess::pb::FieldData *_tun_src_ip = emcaa->add_values();
+    _tun_src_ip->set_value_int(tun_src_ip);
+
+    /* set tun_dst_ip */
+    bess::pb::FieldData *_tun_dst_ip = emcaa->add_values();
+    _tun_dst_ip->set_value_int(tun_dst_ip);
+
+    /* set teid */
+    bess::pb::FieldData *_teid = emcaa->add_values();
+    _teid->set_value_int(teid);
+
+    /* set tun_port */
+    bess::pb::FieldData *_tun_port = emcaa->add_values();
+    _tun_port->set_value_int(tun_port);
+
+
+    ::google::protobuf::Any *any = new ::google::protobuf::Any();
+    any->PackFrom(*emcaa);
+    crt.set_name(modname);
+    crt.set_cmd(FARADDMETHOD);
+    crt.set_allocated_arg(any);
+    Status status = stub_->ModuleCommand(&context, crt, &cre);
+    // Act upon its status.
+    if (status.ok()) {
+      VLOG(1) << "runAddFARCommand RPC successfully executed." << std::endl;
+    } else {
+      std::cout << status.error_code() << ": " << status.error_message()
+                << std::endl;
+      std::cout << "runAddFARCommand RPC failed." << std::endl;
+    }
+
+    delete emcaa;
+
+    /* `any' freed up by ModuleCommand() */
+  }
+
+  void runDelFARCommand(const uint32_t far_id, const uint32_t fseid,
+			const char *modname) {
+    bess::pb::ExactMatchCommandDeleteArg *emcda =
+        new bess::pb::ExactMatchCommandDeleteArg();
+
+    /* SET FIELDS */
+    /* set far_id value */
+    bess::pb::FieldData *_far_id = emcda->add_fields();
+    _far_id->set_value_int(far_id);
+
+    /* set fseid */
+    bess::pb::FieldData *_fseid = emcda->add_fields();
+    _fseid->set_value_int(fseid);
+
+    ::google::protobuf::Any *any = new ::google::protobuf::Any();
+    any->PackFrom(*emcda);
+    crt.set_name(modname);
+    crt.set_cmd(FARDELMETHOD);
+    crt.set_allocated_arg(any);
+    Status status = stub_->ModuleCommand(&context, crt, &cre);
+    // Act upon its status.
+    if (status.ok()) {
+      VLOG(1) << "runDelFARCommand RPC successfully executed." << std::endl;
+    } else {
+      std::cout << status.error_code() << ": " << status.error_message()
+                << std::endl;
+      std::cout << "runDelFARCommand RPC failed." << std::endl;
+    }
+
+    delete emcda;
 
     /* `any' freed up by ModuleCommand() */
   }
