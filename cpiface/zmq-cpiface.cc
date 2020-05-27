@@ -22,6 +22,7 @@
 #define ZMQ_NB_IP "172.17.0.1"
 #define ZMQ_NB_PORT 1111
 #define S1U_SGW_IP "11.1.1.1"
+#define UDP_PORT_GTPU 2152
 /*--------------------------------------------------------------------------------*/
 /**
  * ZMQ stuff
@@ -360,11 +361,11 @@ int main(int argc, char **argv) {
 				     0, /* nees dropping */
 				     0, /* notify cp */
 				     1, /* tunnel out type */
-				     (uint32_t)(inet_addr(S1U_SGW_IP)),
+				     ntohl((uint32_t)(inet_addr(S1U_SGW_IP))),
 				     rbuf.sess_entry.ul_s1_info.enb_addr.u.ipv4_addr,
 				     /*rbuf.sess_entry.ul_s1_info.sgw_teid,*/
 				     rbuf.sess_entry.dl_s1_info.enb_teid,
-				     htons(2152),
+				     UDP_PORT_GTPU,
 				     args.farlookup);
 	  }
 	  {
@@ -372,7 +373,7 @@ int main(int argc, char **argv) {
 	    BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
 				       std::to_string(args.bessd_port),
 				       InsecureChannelCredentials()));
-	    b.runAddCounterCommand(rbuf.sess_entry.ue_addr.u.ipv4_addr,
+	    b.runAddCounterCommand(ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),
 				   (("Pre" + std::string(args.qoscounter)).c_str()));
 	  }
 	  {
@@ -380,7 +381,7 @@ int main(int argc, char **argv) {
 	    BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
 				       std::to_string(args.bessd_port),
 				       InsecureChannelCredentials()));
-	    b.runAddCounterCommand(rbuf.sess_entry.ue_addr.u.ipv4_addr,
+	    b.runAddCounterCommand(ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),
 				   (("Post" + std::string(args.qoscounter)).c_str()));
 	  }
           break;
@@ -445,7 +446,7 @@ int main(int argc, char **argv) {
 	    BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
 				       std::to_string(args.bessd_port),
 				       InsecureChannelCredentials()));
-	    b.runDelCounterCommand(ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),
+	    b.runDelCounterCommand(rbuf.sess_entry.ue_addr.u.ipv4_addr,
 				   (("Pre" + std::string(args.qoscounter)).c_str()));
 	  }
 	  {
@@ -453,7 +454,7 @@ int main(int argc, char **argv) {
 	    BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
 				       std::to_string(args.bessd_port),
 				       InsecureChannelCredentials()));
-	    b.runDelCounterCommand(ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),
+	    b.runDelCounterCommand(rbuf.sess_entry.ue_addr.u.ipv4_addr,
 				   (("Post" + std::string(args.qoscounter)).c_str()));
 	  }
           break;
