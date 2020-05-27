@@ -94,8 +94,7 @@ void Counter::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 }
 /*----------------------------------------------------------------------------------*/
 std::string Counter::GetDesc() const {
-  return bess::utils::Format("%zu sessions",
-			     (size_t)counters.size());
+  return bess::utils::Format("%zu sessions", (size_t)counters.size());
 }
 /*----------------------------------------------------------------------------------*/
 ADD_MODULE(Counter, "counter",
