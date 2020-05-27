@@ -217,6 +217,8 @@ CommandResponse GtpuEncap::ShowCount(const bess::pb::EmptyArg &) {
 /*----------------------------------------------------------------------------------*/
 void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   int cnt = batch->cnt();
+  int hits = cnt;
+#if 0
   int hits = 0;
   uint64_t key[bess::PacketBatch::kMaxBurst];
   void *key_ptr[bess::PacketBatch::kMaxBurst];
@@ -248,15 +250,43 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   DLOG(INFO) << "rte_hash_lookup_bulk_data output: (cnts: " << cnt
              << ", hits: " << hits << ", hit_mask: " << hit_mask << ")"
              << std::endl;
+#endif
 
   for (int i = 0, j = 0; i < cnt && j < hits; i++) {
     bess::Packet *p = batch->pkts()[i];
+#if 0
     if (!ISSET_BIT(hit_mask, i)) {
       EmitPacket(ctx, p, DEFAULT_GATE);
       DLOG(INFO) << "Fetch failed for ip->daddr: "
                  << ToIpv4Address(be32_t(UE_ADDR(key[i]))) << std::endl;
       continue;
     }
+#endif
+
+    /* check attributes' values now */
+    uint32_t at_tout_sip;
+    bess::metadata::mt_offset_t off = attr_offset(tout_sip_attr);
+    at_tout_sip = get_attr_with_offset<uint32_t>(off, p);
+
+    uint32_t at_tout_dip;
+    off = attr_offset(tout_dip_attr);
+    at_tout_dip = get_attr_with_offset<uint32_t>(off, p);
+
+    uint32_t at_tout_teid;
+    off = attr_offset(tout_teid);
+    at_tout_teid = get_attr_with_offset<uint32_t>(off, p);
+
+    uint16_t at_tout_uport;
+    off = attr_offset(tout_uport);
+    at_tout_uport = get_attr_with_offset<uint16_t>(off, p);
+
+#if 0
+    /* checking values now */
+    std::cerr << "Tunnel out sip: " << ntohl(at_tout_sip) << ", real: " << data[i]->ul_s1_info.sgw_addr.u.ipv4_addr << std::endl;
+    std::cerr << "Tunnel out dip: " << (at_tout_dip) << ", real: " << data[i]->ul_s1_info.enb_addr.u.ipv4_addr << std::endl;
+    std::cerr << "Tunnel out teid: " << (at_tout_teid) << ", real: " << data[i]->dl_s1_info.enb_teid << std::endl;
+    std::cerr << "Tunnel out udp port: " << ntohs(at_tout_uport) << ", real: " << UDP_PORT_GTPU << std::endl;
+#endif
 
     /* assuming that this module comes right after EthernetDecap */
     /* pkt_len can be used as the length of IP datagram */
@@ -281,18 +311,28 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 
     /* setting gtpu header */
     gtph->length = (be16_t)(pkt_len);
+#if 0
     gtph->teid = (be32_t)(data[i]->dl_s1_info.enb_teid);
+#else
+    gtph->teid = (be32_t)(at_tout_teid);
+#endif
 
     /* setting outer UDP header */
     Udp *udph = (Udp *)(new_p + sizeof(Ipv4));
     udph->length = (be16_t)(pkt_len + sizeof(Gtpv1) + sizeof(Udp));
+    udph->src_port = udph->dst_port = (be16_t)(ntohs(at_tout_uport));
 
     /* setting outer IP header */
     iph = (Ipv4 *)(new_p);
     iph->length =
         (be16_t)(pkt_len + sizeof(Gtpv1) + sizeof(Udp) + sizeof(Ipv4));
+#if 0
     iph->src = (be32_t)(data[i]->ul_s1_info.sgw_addr.u.ipv4_addr);
     iph->dst = (be32_t)(data[i]->ul_s1_info.enb_addr.u.ipv4_addr);
+#else
+    iph->src = (be32_t)(ntohl(at_tout_sip));
+    iph->dst = (be32_t)(at_tout_dip);
+#endif
     EmitPacket(ctx, p, FORWARD_GATE);
     /* increment hit idx */
     j++;
@@ -352,6 +392,17 @@ CommandResponse GtpuEncap::Init(const bess::pb::GtpuEncapArg &arg) {
   if (session_map == NULL)
     return CommandFailure(ENOMEM, "Unable to create rte_hash table: %s\n",
                           "session_map");
+
+  using AccessMode = bess::metadata::Attribute::AccessMode;
+  tout_sip_attr = AddMetadataAttr("tunnel_out_src_ip4addr", sizeof(uint32_t), AccessMode::kRead);
+  std::cerr << "tout_sip_attr: " << tout_sip_attr << std::endl;
+  tout_dip_attr = AddMetadataAttr("tunnel_out_dst_ip4addr", sizeof(uint32_t), AccessMode::kRead);
+  std::cerr << "tout_dip_attr: " << tout_dip_attr << std::endl;
+  tout_teid = AddMetadataAttr("tunnel_out_teid", sizeof(uint32_t), AccessMode::kRead);
+  std::cerr << "tout_teid: " << tout_teid << std::endl;
+  tout_uport = AddMetadataAttr("tunnel_out_udp_port", sizeof(uint16_t), AccessMode::kRead);
+  std::cerr << "tout_uport: " << tout_uport << std::endl;
+
   return CommandSuccess();
 }
 /*----------------------------------------------------------------------------------*/

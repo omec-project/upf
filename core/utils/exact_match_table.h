@@ -69,7 +69,7 @@ using Error = std::pair<int, std::string>;
 // hand. Use ExactMatchTable::MakeKey() and ExactMatchTable::MakeKeys() to
 // create a key.
 struct ExactMatchKey {
-  uint64_t u64_arr[MAX_FIELDS];
+  uint64_t u64_arr[MAX_FIELDS * MAX_FIELD_SIZE];
 };
 
 // Equality operator for two ExactMatchKeys
@@ -357,6 +357,9 @@ class ExactMatchTable {
   // Returns the ith field.
   const ExactMatchField &get_field(size_t i) const { return fields_[i]; }
 
+  // Returns the ith value.
+  const ExactMatchField &get_value(size_t i) const { return values_[i]; }
+
   typename EmTable::iterator begin() { return table_.begin(); }
 
   typename EmTable::iterator end() { return table_.end(); }
@@ -406,8 +409,8 @@ class ExactMatchTable {
     *key = {};
 
     for (size_t i = 0; i < fields.size(); i++) {
-      int field_size = fields_[i].size;
-      int field_pos = fields_[i].pos;
+      int field_size = values_[i].size;
+      int field_pos = values_[i].pos;
 
       const std::vector<uint8_t> &f_obj = fields[i];
 
@@ -532,7 +535,7 @@ class ExactMatchTable {
 
     if (mt_attr_name.length() > 0) {
       v->attr_id =
-          m->AddMetadataAttr(mt_attr_name, bess::metadata::kMetadataAttrMaxSize,
+          m->AddMetadataAttr(mt_attr_name, v->size,
                              metadata::Attribute::AccessMode::kWrite);
       if (v->attr_id < 0) {
         return MakeError(-v->attr_id,

@@ -50,9 +50,9 @@ const Commands ExactMatch::cmds = {
     {"set_runtime_config", "ExactMatchConfig",
      MODULE_CMD_FUNC(&ExactMatch::SetRuntimeConfig), Command::THREAD_UNSAFE},
     {"add", "ExactMatchCommandAddArg", MODULE_CMD_FUNC(&ExactMatch::CommandAdd),
-     Command::THREAD_UNSAFE},
+     Command::THREAD_SAFE},
     {"delete", "ExactMatchCommandDeleteArg",
-     MODULE_CMD_FUNC(&ExactMatch::CommandDelete), Command::THREAD_UNSAFE},
+     MODULE_CMD_FUNC(&ExactMatch::CommandDelete), Command::THREAD_SAFE},
     {"clear", "EmptyArg", MODULE_CMD_FUNC(&ExactMatch::CommandClear),
      Command::THREAD_UNSAFE},
     {"set_default_gate", "ExactMatchCommandSetDefaultGateArg",
@@ -224,9 +224,11 @@ Error ExactMatch::AddRule(const bess::pb::ExactMatchCommandAddArg &arg) {
   Error err;
   ValueTuple t;
 
+  /* clear value tuple  */
+  memset(&t, 0, sizeof(t));
   /* set gate */
   t.gate = gate;
-  RuleFieldsFromPb(arg.fields(), &rule);
+  RuleFieldsFromPb(arg.fields(), &rule, FIELD_TYPE);
   /* check whether values match with the the table's */
   if (arg.values_size() != (ssize_t)table_.num_values())
     return std::make_pair(
@@ -235,7 +237,7 @@ Error ExactMatch::AddRule(const bess::pb::ExactMatchCommandAddArg &arg) {
                     (int)table_.num_values(), arg.values_size()));
   /* check if values are non-zero */
   if (arg.values_size() > 0) {
-    RuleFieldsFromPb(arg.values(), &action);
+    RuleFieldsFromPb(arg.values(), &action, VALUE_TYPE);
 
     if ((err = table_.CreateValue(t.action, action)).first != 0)
       return err;
@@ -263,18 +265,15 @@ CommandResponse ExactMatch::SetRuntimeConfig(
 
 void ExactMatch::setValues(bess::Packet *pkt, ExactMatchKey &action) {
   size_t num_values_ = table_.num_values();
-  ExactMatchField *values_ = table_.getVals();
 
   for (size_t i = 0; i < num_values_; i++) {
-    int value_size = values_[i].size;
-    int value_pos = values_[i].pos;
-    int value_off = values_[i].offset;
-    int value_attr_id = values_[i].attr_id;
-    uint64_t mask = values_[i].mask;
+    int value_size = table_.get_value(i).size;
+    int value_pos = table_.get_value(i).pos;
+    int value_off = table_.get_value(i).offset;
+    int value_attr_id = table_.get_value(i).attr_id;
+    uint64_t mask = table_.get_value(i).mask;
     uint8_t *data = pkt->head_data<uint8_t *>() + value_off;
 
-    DLOG(INFO) << "off: " << (int)value_off << ", sz: " << value_size
-               << ", mask: " << std::hex << mask << std::endl;
     if (value_attr_id < 0) { /* if it is offset-based */
       memcpy(data, reinterpret_cast<uint8_t *>(&action) + value_pos,
              value_size);
@@ -282,10 +281,13 @@ void ExactMatch::setValues(bess::Packet *pkt, ExactMatchKey &action) {
       typedef struct {
         uint8_t bytes[bess::metadata::kMetadataAttrMaxSize];
       } value_t;
-      value_t buf;
-      memcpy(buf.bytes, reinterpret_cast<uint8_t *>(&action) + value_pos,
-             value_size);
-      set_attr<value_t>(this, value_attr_id, pkt, buf);
+      void *mt_ptr = _ptr_attr_with_offset<value_t>(attr_offset(value_attr_id), pkt);
+      bess::utils::CopySmall(mt_ptr,
+			     reinterpret_cast<uint8_t *>(((uint8_t *)(&action)) + value_pos),
+			     value_size);
+      DLOG(INFO) << "Setting value " << std::hex << *(reinterpret_cast<uint64_t *>(mt_ptr))
+		 << " for attr_id: " << value_attr_id << " of size: " << value_size
+		 << " at value_pos: " << value_pos << ", Mask: " << mask << std::endl;
     }
   }
 }
@@ -329,19 +331,23 @@ std::string ExactMatch::GetDesc() const {
 
 void ExactMatch::RuleFieldsFromPb(
     const RepeatedPtrField<bess::pb::FieldData> &fields,
-    bess::utils::ExactMatchRuleFields *rule) {
+    bess::utils::ExactMatchRuleFields *rule,
+    Type type) {
   for (auto i = 0; i < fields.size(); i++) {
-    int field_size = table_.get_field(i).size;
+	  (void)type;
+    int field_size = (type == FIELD_TYPE) ? table_.get_field(i).size :
+	    table_.get_value(i).size;
+    int attr_id = (type == FIELD_TYPE) ? table_.get_field(i).attr_id :
+	    table_.get_value(i).attr_id;
 
     bess::pb::FieldData current = fields.Get(i);
-
     if (current.encoding_case() == bess::pb::FieldData::kValueBin) {
       const std::string &f_obj = fields.Get(i).value_bin();
       rule->push_back(std::vector<uint8_t>(f_obj.begin(), f_obj.end()));
     } else {
       rule->emplace_back();
       uint64_t rule64 = 0;
-      if (table_.get_field(i).attr_id < 0) {
+      if (attr_id < 0) {
         if (!bess::utils::uint64_to_bin(&rule64, current.value_int(),
                                         field_size, 1)) {
           std::cerr << "idx " << i << ": not a correct" << field_size
@@ -349,11 +355,11 @@ void ExactMatch::RuleFieldsFromPb(
           return;
         }
       } else {
-        rule64 = current.value_int();
+	rule64 = current.value_int();
       }
       for (int j = 0; j < field_size; j++) {
         rule->back().push_back(rule64 & 0xFFULL);
-        DLOG(INFO) << "Pushed " << std::hex << (rule64 & 0xFFULL) << " to rule."
+	DLOG(INFO) << "Pushed " << std::hex << (rule64 & 0xFFULL) << " to rule."
                    << std::endl;
         rule64 >>= 8;
       }
@@ -380,7 +386,7 @@ CommandResponse ExactMatch::CommandDelete(
   }
 
   ExactMatchRuleFields rule;
-  RuleFieldsFromPb(arg.fields(), &rule);
+  RuleFieldsFromPb(arg.fields(), &rule, FIELD_TYPE);
 
   Error ret = table_.DeleteRule(rule);
   if (ret.first) {
