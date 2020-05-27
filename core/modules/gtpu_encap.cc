@@ -229,10 +229,16 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 
 #if DEBUG
     /* checking values now */
-    std::cerr << "Tunnel out sip: " << at_tout_sip << ", real: " << data[i]->ul_s1_info.sgw_addr.u.ipv4_addr << std::endl;
-    std::cerr << "Tunnel out dip: " << (at_tout_dip) << ", real: " << data[i]->ul_s1_info.enb_addr.u.ipv4_addr << std::endl;
-    std::cerr << "Tunnel out teid: " << (at_tout_teid) << ", real: " << data[i]->dl_s1_info.enb_teid << std::endl;
-    std::cerr << "Tunnel out udp port: " << at_tout_uport << ", real: " << UDP_PORT_GTPU << std::endl;
+    std::cerr << "Tunnel out sip: " << at_tout_sip
+              << ", real: " << data[i]->ul_s1_info.sgw_addr.u.ipv4_addr
+              << std::endl;
+    std::cerr << "Tunnel out dip: " << (at_tout_dip)
+              << ", real: " << data[i]->ul_s1_info.enb_addr.u.ipv4_addr
+              << std::endl;
+    std::cerr << "Tunnel out teid: " << (at_tout_teid)
+              << ", real: " << data[i]->dl_s1_info.enb_teid << std::endl;
+    std::cerr << "Tunnel out udp port: " << at_tout_uport
+              << ", real: " << UDP_PORT_GTPU << std::endl;
 #endif
 
     /* assuming that this module comes right after EthernetDecap */
@@ -330,13 +336,17 @@ CommandResponse GtpuEncap::Init(const bess::pb::GtpuEncapArg &arg) {
                           "session_map");
 
   using AccessMode = bess::metadata::Attribute::AccessMode;
-  tout_sip_attr = AddMetadataAttr("tunnel_out_src_ip4addr", sizeof(uint32_t), AccessMode::kRead);
+  tout_sip_attr = AddMetadataAttr("tunnel_out_src_ip4addr", sizeof(uint32_t),
+                                  AccessMode::kRead);
   std::cerr << "tout_sip_attr: " << tout_sip_attr << std::endl;
-  tout_dip_attr = AddMetadataAttr("tunnel_out_dst_ip4addr", sizeof(uint32_t), AccessMode::kRead);
+  tout_dip_attr = AddMetadataAttr("tunnel_out_dst_ip4addr", sizeof(uint32_t),
+                                  AccessMode::kRead);
   std::cerr << "tout_dip_attr: " << tout_dip_attr << std::endl;
-  tout_teid = AddMetadataAttr("tunnel_out_teid", sizeof(uint32_t), AccessMode::kRead);
+  tout_teid =
+      AddMetadataAttr("tunnel_out_teid", sizeof(uint32_t), AccessMode::kRead);
   std::cerr << "tout_teid: " << tout_teid << std::endl;
-  tout_uport = AddMetadataAttr("tunnel_out_udp_port", sizeof(uint16_t), AccessMode::kRead);
+  tout_uport = AddMetadataAttr("tunnel_out_udp_port", sizeof(uint16_t),
+                               AccessMode::kRead);
   std::cerr << "tout_uport: " << tout_uport << std::endl;
 
   return CommandSuccess();
