@@ -128,10 +128,6 @@ class Port:
             self.fpi -> Timestamp() -> self.bpf:0 -> Sink()
         else:
             self.fpi -> self.bpf:0 -> Sink()
-            # Attach GTP parsing module
-            #parser = __bess_module__("{}GTPParse".format(name), 'GtpuParser')
-            #self.fpi -> parser:1 -> self.bpf:0
-            #parser:0 -> Sink()
 
         # Initialize route module
         self.rtr = __bess_module__("{}Routes".format(name), 'IPLookup')
