@@ -65,13 +65,16 @@ pkts = [gen_packet('172.16.100.1', 80),
 wm::WildcardMatch(fields=[{'offset':30, 'num_bytes':4},
                           {'offset':36, 'num_bytes':2},
                           {'attr_name':'in_port', 'num_bytes':2}],
-                  values=[{'offset':6, 'num_bytes':6}])
+                  values=[{'offset':6, 'num_bytes':6},
+                          {'attr_name':'out_port1', 'num_bytes':2},
+                          {'attr_name':'out_port2', 'num_bytes':2}
+                  ])
 
 # locally emulate two input ports
-Source() -> SetMetadata(attrs=[{'name': 'in_port', 'size': 2, 'value_int': 1}]) -> Rewrite(templates=pkts) -> wm
+Source() -> SetMetadata(attrs=[{'name': 'in_port1', 'size': 2, 'value_int': 1}, {'name': 'in_port2', 'size':2, 'value_int':5}]) -> Rewrite(templates=pkts) -> before::Dump(interval=1) -> wm
 Source() -> SetMetadata(attrs=[{'name': 'in_port', 'size': 2, 'value_int': 2}]) -> Rewrite(templates=pkts) -> wm
 
-wm:0 -> Sink()
+wm:0 -> after::Dump(interval=1) -> Sink()
 wm:1 -> Sink()
 wm:2 -> Sink()
 wm:3 -> Sink()
@@ -82,37 +85,37 @@ wm.set_default_gate(gate=5)
 # 172.16.100.1/32, port 80, in_port 1
 wm.add(values=[{'value_bin':atoh('172.16.100.1')},  {'value_int':80}, {'value_int': 1}], gate=0,
         masks=[{'value_bin':atoh('255.255.255.255')}, {'value_int':0xffff}, {'value_int':0xffff}],
-       valuesv=[{'value_int':mac2hex(nh_mac0)}],
+       valuesv=[{'value_int':mac2hex(nh_mac0)},{'value_int':0x2233},{'value_int':0x4455}],
        priority=3)
 
 # 172.12.55.99/32, in_port 2
 wm.add(values=[{'value_bin':atoh('172.12.55.99')}, {'value_int': 0}, {'value_int':  2}], gate=1,
         masks=[{'value_bin':atoh('255.255.255.255')}, {'value_int': 0}, {'value_int':0xffff }],
-       valuesv=[{'value_int':mac2hex(nh_mac1)}],
+       valuesv=[{'value_int':mac2hex(nh_mac1)},{'value_int':0x2233},{'value_int':0x4455}],
        priority=1)
 
 # 172.12.55.3/32, in_port 1 (w/ the same wildcard pattern as the previous one)
 wm.add(values=[{'value_bin':atoh('172.12.55.3')},{'value_int': 0},  {'value_int':1} ], gate=2,
         masks=[{'value_bin':atoh('255.255.255.255')},{'value_int':0x0000},{'value_int': 0xffff}],
-       valuesv=[{'value_int':mac2hex(nh_mac2)}],
+       valuesv=[{'value_int':mac2hex(nh_mac2)},{'value_int':0x2233},{'value_int':0x4455}],
        priority=0)
 
 # 172.0.0.0/8, port <= 1023
 wm.add(values=[{'value_bin':atoh('172.0.0.0')},{'value_int':0},{'value_int':0}], gate=2,
         masks=[{'value_bin':atoh('255.0.0.0')},{'value_int': 0xfc00},{'value_int':0x0000}],
-       valuesv=[{'value_int':mac2hex(nh_mac3)}],
+       valuesv=[{'value_int':mac2hex(nh_mac3)},{'value_int':0x2233},{'value_int':0x4455}],
        priority=2)
 
 # port 80
 wm.add(values=[{'value_bin':atoh('0.0.0.0')}, {'value_int': 80}, {'value_int': 0}], gate=3,
     masks=[{'value_bin':atoh('0.0.0.0')},{'value_int':0xffff},{'value_int':0x0000}],
-       valuesv=[{'value_int':mac2hex(nh_mac4)}],
+       valuesv=[{'value_int':mac2hex(nh_mac4)},{'value_int':0x2233},{'value_int':0x4455}],
        priority=0)
 
 # delete test
 wm.add(values=[{'value_bin':atoh('172.12.55.0')},{'value_int':0},{'value_int':0}], gate=0,
     masks=[{'value_bin':atoh('255.255.255.0')},{'value_int': 0x0000},{'value_int':0x0000}],
-       valuesv=[{'value_int':mac2hex(nh_mac5)}],
+       valuesv=[{'value_int':mac2hex(nh_mac5)},{'value_int':0x2233},{'value_int':0x4455}],
        priority=4)
 wm.delete(values=[{'value_bin':atoh('172.12.55.0')},{'value_int': 0},{'value_int':  0}],
     masks=[{'value_bin':atoh('255.255.255.0')}, {'value_int':0x0000},{'value_int': 0x0000}  ])

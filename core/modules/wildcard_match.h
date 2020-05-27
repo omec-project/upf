@@ -67,7 +67,7 @@ struct WmField {
 };
 
 struct wm_hkey_t {
-  uint64_t u64_arr[MAX_FIELDS];
+  uint64_t u64_arr[MAX_FIELDS * MAX_FIELD_SIZE];
 };
 
 struct WmData {
@@ -181,7 +181,7 @@ class WildcardMatch final : public Module {
 
   int FindTuple(wm_hkey_t *mask);
   int AddTuple(wm_hkey_t *mask);
-  int DelEntry(int idx, wm_hkey_t *key);
+  bool DelEntry(int idx, wm_hkey_t *key);
 
   void Clear();
 
