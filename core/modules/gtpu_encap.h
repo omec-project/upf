@@ -48,6 +48,10 @@ class GtpuEncap final : public Module {
   struct rte_hash *session_map = NULL;
 
   uint32_t s1u_sgw_ip = 0; /* S1U IP address */
+  int tout_sip_attr = -1;
+  int tout_dip_attr = -1;
+  int tout_teid = -1;
+  int tout_uport = -1;
 
   /**
    * Number of possible subscribers

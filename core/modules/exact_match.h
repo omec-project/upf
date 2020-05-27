@@ -88,7 +88,7 @@ class ExactMatch final : public Module {
   CommandResponse AddFieldOne(const bess::pb::Field &field,
                               const bess::pb::FieldData &mask, int idx, Type t);
   void RuleFieldsFromPb(const RepeatedPtrField<bess::pb::FieldData> &fields,
-                        bess::utils::ExactMatchRuleFields *rule);
+                        bess::utils::ExactMatchRuleFields *rule, Type type);
   Error AddRule(const bess::pb::ExactMatchCommandAddArg &arg);
   void setValues(bess::Packet *pkt, ExactMatchKey &action);
 

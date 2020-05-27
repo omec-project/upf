@@ -43,7 +43,8 @@ struct Args {
   uint16_t zmqd_nb_port = ZMQ_NB_PORT;
   char encapmod[MODULE_NAME_LEN] = ENCAPMOD;
   char pdrlookup[MODULE_NAME_LEN] = PDRLOOKUPMOD;
-  char preqoscounter[MODULE_NAME_LEN] = PREQOSCOUNTERMOD;
+  char farlookup[MODULE_NAME_LEN] = FARLOOKUPMOD;
+  char qoscounter[MODULE_NAME_LEN] = QOSCOUNTERMOD;
 
   struct RegMsgBundle {
     struct in_addr upf_comm_ip;
@@ -68,14 +69,15 @@ struct Args {
 	{"s1u_sgw_ip", required_argument, NULL, 'u'},
         {"encapmod", required_argument, NULL, 'M'},
 	{"pdrlookup", required_argument, NULL, 'P'},
-	{"preqoscounter", required_argument, NULL, 'c'},
+	{"farlookup", required_argument, NULL, 'F'},
+	{"qoscounter", required_argument, NULL, 'c'},
 	{"hostname", required_argument, NULL, 'h'},
         {0, 0, 0, 0}};
     do {
       int option_index = 0;
       uint32_t val = 0;
 
-      c = getopt_long(argc, argv, "B:b:Z:s:r:c:M:P:N:n:u:h:", long_options, &option_index);
+      c = getopt_long(argc, argv, "B:b:Z:s:r:c:M:P:F:N:n:u:h:", long_options, &option_index);
 
       if (c == -1)
         break;
@@ -93,8 +95,11 @@ struct Args {
           bessd_port = (uint16_t)(val & 0x0000FFFF);
           break;
         case 'c':
-          strncpy(preqoscounter, optarg, MIN(strlen(optarg), MODULE_NAME_LEN - 1));
+          strncpy(qoscounter, optarg, MIN(strlen(optarg), MODULE_NAME_LEN - 1));
 	  break;
+        case 'F':
+          strncpy(farlookup, optarg, MIN(strlen(optarg), MODULE_NAME_LEN - 1));
+          break;
         case 'Z':
           strncpy(zmqd_ip, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
           break;
@@ -331,19 +336,49 @@ int main(int argc, char **argv) {
 	    b.runAddPDRCommand(Core, /*rbuf.sess_entry.ul_s1_info.enb_addr.u.ipv4_addr*/0,
 			       /*rbuf.sess_entry.ul_s1_info.sgw_teid*/0,
 			       rbuf.sess_entry.ue_addr.u.ipv4_addr,
-			       0,
-			       0,
-			       0,
-			       0,
+			       0, /* inet ip */
+			       0, /* ueport */
+			       0, /* inet port */
+			       0, /* proto-id */
+			       0, /* pdr id */
+			       0, /* fseid */
+			       0, /* far id */
+			       0, /* need decap */
 			       args.pdrlookup);
 	  }
 	  {
-	    // Add Counter
+	    // Add FAR
+	    BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
+				       std::to_string(args.bessd_port),
+				       InsecureChannelCredentials()));
+	    b.runAddFARCommand(0, /* far id*/
+			       0, /* fseid */
+			       1, /* needs tunnelling */
+			       0, /* nees dropping */
+			       0, /* notify cp */
+			       1, /* tunnel out type */
+			       (uint32_t)(inet_addr(S1U_SGW_IP)),
+			       rbuf.sess_entry.ul_s1_info.enb_addr.u.ipv4_addr,
+			       /*rbuf.sess_entry.ul_s1_info.sgw_teid,*/
+			       rbuf.sess_entry.dl_s1_info.enb_teid,
+			       htons(2152),
+			       args.farlookup);
+	  }
+	  {
+	    // Add PreQoS Counter
 	    BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
 				       std::to_string(args.bessd_port),
 				       InsecureChannelCredentials()));
 	    b.runAddCounterCommand(rbuf.sess_entry.ue_addr.u.ipv4_addr,
-				   args.preqoscounter);
+				   (("Pre" + std::string(args.qoscounter)).c_str()));
+	  }
+	  {
+	    // Add PostQoS Counter
+	    BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
+				       std::to_string(args.bessd_port),
+				       InsecureChannelCredentials()));
+	    b.runAddCounterCommand(rbuf.sess_entry.ue_addr.u.ipv4_addr,
+				   (("Post" + std::string(args.qoscounter)).c_str()));
 	  }
           break;
         case MSG_SESS_DEL:
@@ -380,12 +415,43 @@ int main(int argc, char **argv) {
             zmq_sess_map.erase(it);
           }
 	  {
-	    // Delete Counter
+	    // Delete PDR
+	    BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
+				       std::to_string(args.bessd_port),
+				       InsecureChannelCredentials()));
+	    b.runDelPDRCommand(Core, /*rbuf.sess_entry.ul_s1_info.enb_addr.u.ipv4_addr*/0,
+			       /*rbuf.sess_entry.ul_s1_info.sgw_teid*/0,
+			       ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),
+			       0,
+			       0,
+			       0,
+			       0,
+			       args.pdrlookup);
+	  }
+	  {
+	    // Del FAR
+	    BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
+				       std::to_string(args.bessd_port),
+				       InsecureChannelCredentials()));
+	    b.runDelFARCommand(0, /* far id*/
+			       0, /* fseid */
+			       args.farlookup);
+	  }
+	  {
+	    // Delete PreQoS Counter
 	    BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
 				       std::to_string(args.bessd_port),
 				       InsecureChannelCredentials()));
 	    b.runDelCounterCommand(ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),
-				   args.preqoscounter);
+				   (("Pre" + std::string(args.qoscounter)).c_str()));
+	  }
+	  {
+	    // Delete PostQoS Counter
+	    BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
+				       std::to_string(args.bessd_port),
+				       InsecureChannelCredentials()));
+	    b.runDelCounterCommand(ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),
+				   (("Post" + std::string(args.qoscounter)).c_str()));
 	  }
           break;
         default:
