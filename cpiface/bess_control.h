@@ -19,7 +19,7 @@ using namespace grpc;
  */
 #define BESSD_IP "localhost"
 #define BESSD_PORT 10514u
-enum src_iface_type {Access = 1, Core};
+enum src_iface_type { Access = 1, Core };
 
 /**
  * Module decls
@@ -103,12 +103,12 @@ class BessClient {
   }
 
   void runAddPDRCommand(const enum src_iface_type sit, const uint32_t enodeip,
-			const uint32_t teid, const uint32_t ueaddr,
-			const uint32_t inetip, const uint16_t ueport,
-			const uint16_t inetport, const uint8_t protoid,
-			const uint32_t pdr_id, const uint32_t fseid,
-			const uint32_t far_id, const uint8_t need_decap,
-			const char *modname) {
+                        const uint32_t teid, const uint32_t ueaddr,
+                        const uint32_t inetip, const uint16_t ueport,
+                        const uint16_t inetport, const uint8_t protoid,
+                        const uint32_t pdr_id, const uint32_t fseid,
+                        const uint32_t far_id, const uint8_t need_decap,
+                        const char *modname) {
     bess::pb::WildcardMatchCommandAddArg *wmcaa =
         new bess::pb::WildcardMatchCommandAddArg();
     wmcaa->set_gate(1);
@@ -224,10 +224,10 @@ class BessClient {
   }
 
   void runDelPDRCommand(const enum src_iface_type sit, const uint32_t enodeip,
-			const uint32_t teid, const uint32_t ueaddr,
-			const uint32_t inetip, const uint16_t ueport,
-			const uint16_t inetport, const uint8_t protoid,
-			const char *modname) {
+                        const uint32_t teid, const uint32_t ueaddr,
+                        const uint32_t inetip, const uint16_t ueport,
+                        const uint16_t inetport, const uint8_t protoid,
+                        const char *modname) {
     bess::pb::WildcardMatchCommandDeleteArg *wmcda =
         new bess::pb::WildcardMatchCommandDeleteArg();
 
@@ -320,11 +320,11 @@ class BessClient {
   }
 
   void runAddFARCommand(const uint32_t far_id, const uint32_t fseid,
-			const uint8_t tunnel, const uint8_t drop,
-			const uint8_t notify_cp, const uint16_t tuntype,
-			const uint32_t tun_src_ip, const uint32_t tun_dst_ip,
-			const uint32_t teid, const uint16_t tun_port,
-			const char *modname) {
+                        const uint8_t tunnel, const uint8_t drop,
+                        const uint8_t notify_cp, const uint16_t tuntype,
+                        const uint32_t tun_src_ip, const uint32_t tun_dst_ip,
+                        const uint32_t teid, const uint16_t tun_port,
+                        const char *modname) {
     bess::pb::ExactMatchCommandAddArg *emcaa =
         new bess::pb::ExactMatchCommandAddArg();
     emcaa->set_gate(1);
@@ -337,7 +337,6 @@ class BessClient {
     /* set fseid */
     bess::pb::FieldData *_fseid = emcaa->add_fields();
     _fseid->set_value_int(fseid);
-
 
     /* SET VALUES */
     /* set tunnel action */
@@ -372,7 +371,6 @@ class BessClient {
     bess::pb::FieldData *_tun_port = emcaa->add_values();
     _tun_port->set_value_int(tun_port);
 
-
     ::google::protobuf::Any *any = new ::google::protobuf::Any();
     any->PackFrom(*emcaa);
     crt.set_name(modname);
@@ -394,7 +392,7 @@ class BessClient {
   }
 
   void runDelFARCommand(const uint32_t far_id, const uint32_t fseid,
-			const char *modname) {
+                        const char *modname) {
     bess::pb::ExactMatchCommandDeleteArg *emcda =
         new bess::pb::ExactMatchCommandDeleteArg();
 
@@ -427,10 +425,8 @@ class BessClient {
     /* `any' freed up by ModuleCommand() */
   }
 
-  void runAddCounterCommand(const uint32_t ctr_id,
-			    const char *modname) {
-    bess::pb::CounterAddArg *caa =
-        new bess::pb::CounterAddArg();
+  void runAddCounterCommand(const uint32_t ctr_id, const char *modname) {
+    bess::pb::CounterAddArg *caa = new bess::pb::CounterAddArg();
     caa->set_ctr_id(ctr_id);
     ::google::protobuf::Any *any = new ::google::protobuf::Any();
     any->PackFrom(*caa);
@@ -452,10 +448,8 @@ class BessClient {
     /* `any' freed up by ModuleCommand() */
   }
 
-  void runDelCounterCommand(const uint32_t ctr_id,
-			    const char *modname) {
-    bess::pb::CounterRemoveArg *cra =
-        new bess::pb::CounterRemoveArg();
+  void runDelCounterCommand(const uint32_t ctr_id, const char *modname) {
+    bess::pb::CounterRemoveArg *cra = new bess::pb::CounterRemoveArg();
     cra->set_ctr_id(ctr_id);
     ::google::protobuf::Any *any = new ::google::protobuf::Any();
     any->PackFrom(*cra);
