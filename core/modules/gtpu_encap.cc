@@ -78,14 +78,6 @@ static PacketTemplate outer_ip_template;
 /*----------------------------------------------------------------------------------*/
 int GtpuEncap::dp_session_create(struct session_info *entry) {
   struct session_info *data;
-#if 0
-	struct ue_session_info *ue_data;
-	uint32_t ue_sess_id, bear_id;
-
-	ue_data = NULL;
-	ue_sess_id = UE_SESS_ID(entry->sess_id);
-	bear_id = UE_BEAR_ID(entry->sess_id);
-#endif
 
   /* allocate memory for session info */
   data = (struct session_info *)rte_calloc("session_info",
@@ -112,10 +104,7 @@ int GtpuEncap::dp_session_create(struct session_info *entry) {
   DLOG(INFO) << "Adding entry for UE ip address: "
              << ToIpv4Address(be32_t(addr)) << std::endl;
   DLOG(INFO) << "------------------------------------------------" << std::endl;
-#if 0
-	data->num_ul_pcc_rules = 0;
-	data->num_dl_pcc_rules = 0;
-#endif
+
   return 0;
 }
 /*----------------------------------------------------------------------------------*/
@@ -217,51 +206,9 @@ CommandResponse GtpuEncap::ShowCount(const bess::pb::EmptyArg &) {
 /*----------------------------------------------------------------------------------*/
 void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   int cnt = batch->cnt();
-  int hits = cnt;
-#if 0
-  int hits = 0;
-  uint64_t key[bess::PacketBatch::kMaxBurst];
-  void *key_ptr[bess::PacketBatch::kMaxBurst];
-  struct session_info *data[bess::PacketBatch::kMaxBurst];
-  uint64_t hit_mask = 0ULL;
 
   for (int i = 0; i < cnt; i++) {
     bess::Packet *p = batch->pkts()[i];
-    /* assuming that this module comes right after EthernetDecap */
-    /* pkt_len can be used as the length of IP datagram */
-    Ipv4 *iph = p->head_data<Ipv4 *>();
-    be32_t daddr = iph->dst;
-    be32_t saddr = iph->src;
-    DLOG(INFO) << "ip->saddr: " << ToIpv4Address(saddr)
-               << ", ip->daddr: " << ToIpv4Address(daddr) << std::endl;
-    key[i] = SESS_ID(daddr.raw_value(), DEFAULT_BEARER);
-    key_ptr[i] = &key[i];
-  }
-
-  if ((hits = rte_hash_lookup_bulk_data(session_map, (const void **)&key_ptr,
-                                        cnt, &hit_mask, (void **)data)) <= 0) {
-    DLOG(INFO) << "Failed to look-up" << std::endl;
-    /* Since default module is sink, the packets go right in the dump */
-    /* RunNextModule() sends batch to DEFAULT GATE */
-    RunNextModule(ctx, batch);
-    return;
-  }
-
-  DLOG(INFO) << "rte_hash_lookup_bulk_data output: (cnts: " << cnt
-             << ", hits: " << hits << ", hit_mask: " << hit_mask << ")"
-             << std::endl;
-#endif
-
-  for (int i = 0, j = 0; i < cnt && j < hits; i++) {
-    bess::Packet *p = batch->pkts()[i];
-#if 0
-    if (!ISSET_BIT(hit_mask, i)) {
-      EmitPacket(ctx, p, DEFAULT_GATE);
-      DLOG(INFO) << "Fetch failed for ip->daddr: "
-                 << ToIpv4Address(be32_t(UE_ADDR(key[i]))) << std::endl;
-      continue;
-    }
-#endif
 
     /* check attributes' values now */
     uint32_t at_tout_sip;
@@ -280,12 +227,12 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     off = attr_offset(tout_uport);
     at_tout_uport = get_attr_with_offset<uint16_t>(off, p);
 
-#if 0
+#if DEBUG
     /* checking values now */
-    std::cerr << "Tunnel out sip: " << ntohl(at_tout_sip) << ", real: " << data[i]->ul_s1_info.sgw_addr.u.ipv4_addr << std::endl;
+    std::cerr << "Tunnel out sip: " << at_tout_sip << ", real: " << data[i]->ul_s1_info.sgw_addr.u.ipv4_addr << std::endl;
     std::cerr << "Tunnel out dip: " << (at_tout_dip) << ", real: " << data[i]->ul_s1_info.enb_addr.u.ipv4_addr << std::endl;
     std::cerr << "Tunnel out teid: " << (at_tout_teid) << ", real: " << data[i]->dl_s1_info.enb_teid << std::endl;
-    std::cerr << "Tunnel out udp port: " << ntohs(at_tout_uport) << ", real: " << UDP_PORT_GTPU << std::endl;
+    std::cerr << "Tunnel out udp port: " << at_tout_uport << ", real: " << UDP_PORT_GTPU << std::endl;
 #endif
 
     /* assuming that this module comes right after EthernetDecap */
@@ -311,31 +258,20 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 
     /* setting gtpu header */
     gtph->length = (be16_t)(pkt_len);
-#if 0
-    gtph->teid = (be32_t)(data[i]->dl_s1_info.enb_teid);
-#else
     gtph->teid = (be32_t)(at_tout_teid);
-#endif
 
     /* setting outer UDP header */
     Udp *udph = (Udp *)(new_p + sizeof(Ipv4));
     udph->length = (be16_t)(pkt_len + sizeof(Gtpv1) + sizeof(Udp));
-    udph->src_port = udph->dst_port = (be16_t)(ntohs(at_tout_uport));
+    udph->src_port = udph->dst_port = (be16_t)(at_tout_uport);
 
     /* setting outer IP header */
     iph = (Ipv4 *)(new_p);
     iph->length =
         (be16_t)(pkt_len + sizeof(Gtpv1) + sizeof(Udp) + sizeof(Ipv4));
-#if 0
-    iph->src = (be32_t)(data[i]->ul_s1_info.sgw_addr.u.ipv4_addr);
-    iph->dst = (be32_t)(data[i]->ul_s1_info.enb_addr.u.ipv4_addr);
-#else
-    iph->src = (be32_t)(ntohl(at_tout_sip));
+    iph->src = (be32_t)(at_tout_sip);
     iph->dst = (be32_t)(at_tout_dip);
-#endif
     EmitPacket(ctx, p, FORWARD_GATE);
-    /* increment hit idx */
-    j++;
   }
 }
 /*----------------------------------------------------------------------------------*/
