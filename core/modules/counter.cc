@@ -31,6 +31,8 @@
 #include "counter.h"
 /* for ntohl() */
 #include <arpa/inet.h>
+/* for GetDesc() */
+#include "utils/format.h"
 /*----------------------------------------------------------------------------------*/
 const Commands Counter::cmds = {
     {"add", "CounterAddArg", MODULE_CMD_FUNC(&Counter::AddCounter),
@@ -89,6 +91,11 @@ void Counter::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   }
 
   RunNextModule(ctx, batch);
+}
+/*----------------------------------------------------------------------------------*/
+std::string Counter::GetDesc() const {
+  return bess::utils::Format("%zu sessions",
+			     (size_t)counters.size());
 }
 /*----------------------------------------------------------------------------------*/
 ADD_MODULE(Counter, "counter",
