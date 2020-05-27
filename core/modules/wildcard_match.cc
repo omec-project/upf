@@ -197,16 +197,19 @@ inline gate_idx_t WildcardMatch::LookupEntry(const wm_hkey_t &key,
           uint8_t bytes[bess::metadata::kMetadataAttrMaxSize];
         } value_t;
         value_t buf;
-	memset(&buf, 0, sizeof(buf));
+        memset(&buf, 0, sizeof(buf));
 
-	void *mt_ptr = _ptr_attr_with_offset<value_t>(attr_offset(value_attr_id), pkt);
-	bess::utils::uint64_to_bin(buf.bytes, *(uint64_t *)(((uint8_t *)&result.keyv) + value_pos), value_size, true);
-	bess::utils::CopySmall(mt_ptr,
-			       buf.bytes,
-			       value_size);
-	DLOG(INFO) << "Setting value " << std::hex << *(reinterpret_cast<uint64_t *>(mt_ptr))
-		   << " for attr_id: " << value_attr_id << " of size: " << value_size
-		   << " at value_pos: " << value_pos << std::endl;
+        void *mt_ptr =
+            _ptr_attr_with_offset<value_t>(attr_offset(value_attr_id), pkt);
+        bess::utils::uint64_to_bin(
+            buf.bytes, *(uint64_t *)(((uint8_t *)&result.keyv) + value_pos),
+            value_size, true);
+        bess::utils::CopySmall(mt_ptr, buf.bytes, value_size);
+        DLOG(INFO) << "Setting value " << std::hex
+                   << *(reinterpret_cast<uint64_t *>(mt_ptr))
+                   << " for attr_id: " << value_attr_id
+                   << " of size: " << value_size
+                   << " at value_pos: " << value_pos << std::endl;
       }
     }
   }
