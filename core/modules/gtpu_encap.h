@@ -28,35 +28,15 @@ class GtpuEncap final : public Module {
 
   /* Gates: (0) Default, (1) Forward */
   static const gate_idx_t kNumOGates = 2;
-  static const Commands cmds;
 
-  CommandResponse Init(const bess::pb::GtpuEncapArg &arg);
-  void DeInit() override;
-  CommandResponse AddSessionRecord(
-      const bess::pb::GtpuEncapAddSessionRecordArg &arg);
-  CommandResponse RemoveSessionRecord(
-      const bess::pb::GtpuEncapRemoveSessionRecordArg &arg);
-  CommandResponse ShowRecords(const bess::pb::EmptyArg &);
-  CommandResponse ShowCount(const bess::pb::EmptyArg &);
   void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
-  // returns the number of active UE sessions
-  std::string GetDesc() const override;
+  CommandResponse Init(const bess::pb::EmptyArg &);
 
  private:
-  int dp_session_create(struct session_info *entry);
-
-  struct rte_hash *session_map = NULL;
-
-  uint32_t s1u_sgw_ip = 0; /* S1U IP address */
   int tout_sip_attr = -1;
   int tout_dip_attr = -1;
   int tout_teid = -1;
   int tout_uport = -1;
-
-  /**
-   * Number of possible subscribers
-   */
-  int InitNumSubs = 0;
 };
 /*----------------------------------------------------------------------------------*/
 #endif  // BESS_MODULES_GTPUENCAP_H_
