@@ -1047,50 +1047,6 @@ message IPFragArg {
 }
 
 /**
- * The GtpuDecap module trims the GTPU header from the Ethernet frame
- *
- * __Input Gates__: 1
- * __Output Gates__: 2
- */
-message GtpuDecapArg {
-  string ename = 1; /// name of gtpencap module
-}
-
-/**
- * The GtpuEncap module encapsulates an IP packet for tunnelling purposes
- *
- * __Input Gates__: 1
- * __Output Gates__: 1
- */
-message GtpuEncapArg {
-  uint32 s1u_sgw_ip = 1; /// IP address of S1U interface
-  uint32 num_subscribers = 2; /// Number of subscribers limit
-}
-
-/**
- * The GtpuEncap module has a command `add(...)` which takes two
- * parameters.  This function accepts the teids, and UE IP address, and creates
- * a session record.
- * Example use in bessctl: `gencap.add(teid=0xf0000000, eteid=..., ueaddr=0x10000001, enodeb_ip=...)`
- */
-message GtpuEncapAddSessionRecordArg {
-  uint32 teid = 1; /// sgw tunnel endpoint identifier
-  uint32 eteid = 2; /// enodeb tunnel endpoint identifier
-  uint32 ueaddr = 3; /// ip address of UE
-  uint32 enodeb_ip = 4; /// enodeb ip address
-}
-
-/**
- * The GtpuEncap module has a command `remove(...)` which takes one
- * parameter.  This function accepts the ueaddr, and removes the
- * respective session record.
- * Example use in bessctl: `gencap.remove(ueaddr=0x10000001)`
- */
-message GtpuEncapRemoveSessionRecordArg {
-  uint32 ueaddr = 1; /// ip address of UE
-}
-
-/**
  * The Counter module has a command `add(...)` which takes one
  * parameters.  This function accepts the counter id of a
  * session record.
