@@ -30,12 +30,12 @@ class GtpuParser final : public Module {
   static const gate_idx_t kNumOGates = 2;
   CommandResponse Init(const bess::pb::EmptyArg &);
   void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
+
  private:
   /* set attributes */
-  void set_gtp_parsing_attrs(be32_t *sip, be32_t *dip,
-			     be16_t *sp, be16_t *dp,
-			     be32_t *teid, be32_t *tipd,
-			     uint8_t *protoid, bess::Packet *p);
+  void set_gtp_parsing_attrs(be32_t *sip, be32_t *dip, be16_t *sp, be16_t *dp,
+                             be32_t *teid, be32_t *tipd, uint8_t *protoid,
+                             bess::Packet *p);
   int src_ip_id = -1;
   int dst_ip_id = -1;
   int src_port_id = -1;
