@@ -144,19 +144,18 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 }
 /*----------------------------------------------------------------------------------*/
 CommandResponse GtpuEncap::Init(const bess::pb::EmptyArg &) {
-
   using AccessMode = bess::metadata::Attribute::AccessMode;
   tout_sip_attr = AddMetadataAttr("tunnel_out_src_ip4addr", sizeof(uint32_t),
-				  AccessMode::kRead);
+                                  AccessMode::kRead);
   DLOG(INFO) << "tout_sip_attr: " << tout_sip_attr << std::endl;
   tout_dip_attr = AddMetadataAttr("tunnel_out_dst_ip4addr", sizeof(uint32_t),
                                   AccessMode::kRead);
   DLOG(INFO) << "tout_dip_attr: " << tout_dip_attr << std::endl;
   tout_teid =
-	  AddMetadataAttr("tunnel_out_teid", sizeof(uint32_t), AccessMode::kRead);
+      AddMetadataAttr("tunnel_out_teid", sizeof(uint32_t), AccessMode::kRead);
   DLOG(INFO) << "tout_teid: " << tout_teid << std::endl;
   tout_uport = AddMetadataAttr("tunnel_out_udp_port", sizeof(uint16_t),
-			       AccessMode::kRead);
+                               AccessMode::kRead);
   DLOG(INFO) << "tout_uport: " << tout_uport << std::endl;
   return CommandSuccess();
 }

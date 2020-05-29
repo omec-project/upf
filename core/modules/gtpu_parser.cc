@@ -24,11 +24,9 @@ using bess::utils::Udp;
 enum { DEFAULT_GATE = 0, FORWARD_GATE };
 const unsigned short UDP_PORT_GTPU = 2152;
 /*----------------------------------------------------------------------------------*/
-void GtpuParser::set_gtp_parsing_attrs(be32_t *sip, be32_t *dip,
-				       be16_t *sp, be16_t *dp,
-				       be32_t *teid, be32_t *tipd,
-				       uint8_t *protoid, bess::Packet *p)
-{
+void GtpuParser::set_gtp_parsing_attrs(be32_t *sip, be32_t *dip, be16_t *sp,
+                                       be16_t *dp, be32_t *teid, be32_t *tipd,
+                                       uint8_t *protoid, bess::Packet *p) {
   void *mt_ptr = NULL;
   /* set src_ip */
   mt_ptr = _ptr_attr_with_offset<uint32_t>(attr_offset(src_ip_id), p);
@@ -75,43 +73,38 @@ void GtpuParser::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     switch (iph->protocol) {
       case Ipv4::kTcp:
         tcph = (Tcp *)((char *)iph + (iph->header_length << 2));
-	set_gtp_parsing_attrs(&iph->src, &iph->dst,
-			      &tcph->src_port, &tcph->dst_port,
-			      (be32_t *)&_const_val, (be32_t *)&_const_val,
-			      &iph->protocol, p);
+        set_gtp_parsing_attrs(&iph->src, &iph->dst, &tcph->src_port,
+                              &tcph->dst_port, (be32_t *)&_const_val,
+                              (be32_t *)&_const_val, &iph->protocol, p);
         break;
       case Ipv4::kUdp:
         udph = (Udp *)((char *)iph + (iph->header_length << 2));
         if (udph->dst_port == (be16_t)(UDP_PORT_GTPU)) {
           gtph = (Gtpv1 *)(udph + 1);
-	  //uint32_t teid = gtph->teid.value();
+          // uint32_t teid = gtph->teid.value();
           /* reuse iph, tcph, and udph for innser headers too */
           iph = (Ipv4 *)((char *)gtph + gtph->header_length());
           if (iph->protocol == Ipv4::kTcp) {
             tcph = (Tcp *)((char *)iph + (iph->header_length << 2));
-	    set_gtp_parsing_attrs(&iph->src, &iph->dst,
-				  &tcph->src_port, &tcph->dst_port,
-				  (be32_t *)&_const_val, (be32_t *)&_const_val,
-				  &iph->protocol, p);
+            set_gtp_parsing_attrs(&iph->src, &iph->dst, &tcph->src_port,
+                                  &tcph->dst_port, (be32_t *)&_const_val,
+                                  (be32_t *)&_const_val, &iph->protocol, p);
           } else if (iph->protocol == Ipv4::kUdp) {
             udph = (Udp *)((char *)iph + (iph->header_length << 2));
-	    set_gtp_parsing_attrs(&iph->src, &iph->dst,
-				  &udph->src_port, &udph->dst_port,
-				  (be32_t *)&_const_val, (be32_t *)&_const_val,
-				  &iph->protocol, p);
+            set_gtp_parsing_attrs(&iph->src, &iph->dst, &udph->src_port,
+                                  &udph->dst_port, (be32_t *)&_const_val,
+                                  (be32_t *)&_const_val, &iph->protocol, p);
           }
         } else {
-	    set_gtp_parsing_attrs(&iph->src, &iph->dst,
-				  &udph->src_port, &udph->dst_port,
-				  (be32_t *)&_const_val, (be32_t *)&_const_val,
-				  &iph->protocol, p);
-	}
+          set_gtp_parsing_attrs(&iph->src, &iph->dst, &udph->src_port,
+                                &udph->dst_port, (be32_t *)&_const_val,
+                                (be32_t *)&_const_val, &iph->protocol, p);
+        }
         break;
       case Ipv4::kIcmp: {
-	set_gtp_parsing_attrs(&iph->src, &iph->dst,
-			      (be16_t *)&_const_val, (be16_t *)&_const_val,
-			      (be32_t *)&_const_val, (be32_t *)&_const_val,
-			      &iph->protocol, p);
+        set_gtp_parsing_attrs(&iph->src, &iph->dst, (be16_t *)&_const_val,
+                              (be16_t *)&_const_val, (be32_t *)&_const_val,
+                              (be32_t *)&_const_val, &iph->protocol, p);
       } break;
       default:
         /* nothing here at the moment */
@@ -124,20 +117,16 @@ void GtpuParser::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 /*----------------------------------------------------------------------------------*/
 CommandResponse GtpuParser::Init(const bess::pb::EmptyArg &) {
   using AccessMode = bess::metadata::Attribute::AccessMode;
-  src_ip_id = AddMetadataAttr("src_ip", sizeof(uint32_t),
-			      AccessMode::kWrite);
-  dst_ip_id = AddMetadataAttr("dst_ip", sizeof(uint32_t),
-			      AccessMode::kWrite);
-  src_port_id = AddMetadataAttr("src_port", sizeof(uint16_t),
-				AccessMode::kWrite);
-  dst_port_id = AddMetadataAttr("dst_port", sizeof(uint16_t),
-				AccessMode::kWrite);
-  teid_id = AddMetadataAttr("teid", sizeof(uint32_t),
-			    AccessMode::kWrite);
-  tunnel_ip4_dst_id = AddMetadataAttr("tunnel_ipv4_dst", sizeof(uint32_t),
-				      AccessMode::kWrite);
-  proto_id = AddMetadataAttr("ip_proto", sizeof(uint8_t),
-			     AccessMode::kWrite);
+  src_ip_id = AddMetadataAttr("src_ip", sizeof(uint32_t), AccessMode::kWrite);
+  dst_ip_id = AddMetadataAttr("dst_ip", sizeof(uint32_t), AccessMode::kWrite);
+  src_port_id =
+      AddMetadataAttr("src_port", sizeof(uint16_t), AccessMode::kWrite);
+  dst_port_id =
+      AddMetadataAttr("dst_port", sizeof(uint16_t), AccessMode::kWrite);
+  teid_id = AddMetadataAttr("teid", sizeof(uint32_t), AccessMode::kWrite);
+  tunnel_ip4_dst_id =
+      AddMetadataAttr("tunnel_ipv4_dst", sizeof(uint32_t), AccessMode::kWrite);
+  proto_id = AddMetadataAttr("ip_proto", sizeof(uint8_t), AccessMode::kWrite);
 
   return CommandSuccess();
 }
