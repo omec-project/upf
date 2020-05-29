@@ -24,9 +24,6 @@ enum src_iface_type { Access = 1, Core };
 /**
  * Module decls
  */
-#define ENCAPMOD "GTPUEncap"
-#define ENCAPADDMETHOD "add"
-#define ENCAPREMMETHOD "remove"
 #define PDRLOOKUPMOD "PDRLookup"
 #define PDRADDMETHOD "add"
 #define PDRDELMETHOD "delete"
@@ -49,66 +46,18 @@ class BessClient {
  public:
   BessClient(std::shared_ptr<Channel> channel)
       : stub_(bess::pb::BESSControl::NewStub(channel)), crt() {}
-  void runAddCommand(const uint32_t teid, const uint32_t eteid,
-                     const uint32_t ueaddr, const uint32_t enode_ip,
-                     const char *modname) {
-    bess::pb::GtpuEncapAddSessionRecordArg *geasra =
-        new bess::pb::GtpuEncapAddSessionRecordArg();
-    geasra->set_teid(teid);
-    geasra->set_eteid(eteid);
-    geasra->set_ueaddr(ueaddr);
-    geasra->set_enodeb_ip(enode_ip);
-    ::google::protobuf::Any *any = new ::google::protobuf::Any();
-    any->PackFrom(*geasra);
-    crt.set_name(modname);
-    crt.set_cmd(ENCAPADDMETHOD);
-    crt.set_allocated_arg(any);
-    Status status = stub_->ModuleCommand(&context, crt, &cre);
-    // Act upon its status.
-    if (status.ok()) {
-      VLOG(1) << "runAddCommand RPC successfully executed." << std::endl;
-    } else {
-      std::cout << status.error_code() << ": " << status.error_message()
-                << std::endl;
-      std::cout << "runAddCommand RPC failed." << std::endl;
-    }
 
-    delete geasra;
-
-    /* `any' freed up by ModuleCommand() */
-  }
-
-  void runRemoveCommand(const uint32_t ueaddr, const char *modname) {
-    bess::pb::GtpuEncapRemoveSessionRecordArg *rsra =
-        new bess::pb::GtpuEncapRemoveSessionRecordArg();
-    rsra->set_ueaddr(ueaddr);
-    ::google::protobuf::Any *any = new ::google::protobuf::Any();
-    any->PackFrom(*rsra);
-    crt.set_name(modname);
-    crt.set_cmd(ENCAPREMMETHOD);
-    crt.set_allocated_arg(any);
-    Status status = stub_->ModuleCommand(&context, crt, &cre);
-    // Act upon its status.
-    if (status.ok()) {
-      VLOG(1) << "runRemoveCommand RPC successfully executed." << std::endl;
-    } else {
-      std::cout << status.error_code() << ": " << status.error_message()
-                << std::endl;
-      std::cout << "runRemoveCommand RPC failed." << std::endl;
-    }
-
-    delete rsra;
-
-    /* `any' freed up by ModuleCommand() */
-  }
-
-  void runAddPDRCommand(const enum src_iface_type sit, const uint32_t enodeip,
-                        const uint32_t teid, const uint32_t ueaddr,
-                        const uint32_t inetip, const uint16_t ueport,
-                        const uint16_t inetport, const uint8_t protoid,
-                        const uint32_t pdr_id, const uint32_t fseid,
-                        const uint32_t far_id, const uint8_t need_decap,
-                        const char *modname) {
+  void runAddPDRCommand(const enum src_iface_type sit, const uint32_t tipd,
+			const uint32_t tipd_mask, const uint32_t enb_teid,
+			const uint32_t enb_teid_mask, const uint32_t ueaddr,
+                        const uint32_t ueaddr_mask, const uint32_t inetip,
+			const uint32_t inetip_mask, const uint16_t ueport,
+                        const uint16_t ueport_mask, const uint16_t inetport,
+			const uint16_t inetport_mask, const uint8_t protoid,
+                        const uint8_t protoid_mask, const uint32_t pdr_id,
+			const uint32_t fseid, const uint32_t ctr_id,
+			const uint32_t far_id, const uint8_t need_decap,
+			const char *modname) {
     bess::pb::WildcardMatchCommandAddArg *wmcaa =
         new bess::pb::WildcardMatchCommandAddArg();
     wmcaa->set_gate(1);
@@ -122,11 +71,11 @@ class BessClient {
 
     /* set tunnel_ipv4_dst */
     bess::pb::FieldData *tunnel_ipv4_dst = wmcaa->add_values();
-    tunnel_ipv4_dst->set_value_int(enodeip);
+    tunnel_ipv4_dst->set_value_int(tipd);
 
     /* set teid */
     bess::pb::FieldData *_teid = wmcaa->add_values();
-    _teid->set_value_int(teid);
+    _teid->set_value_int(enb_teid);
 
     /* set dst ip */
     bess::pb::FieldData *dst_ip = wmcaa->add_values();
@@ -156,31 +105,31 @@ class BessClient {
 
     /* set tunnel_ipv4_dst - Setting it to 0 for the time being */
     tunnel_ipv4_dst = wmcaa->add_masks();
-    tunnel_ipv4_dst->set_value_int(0x00u);
+    tunnel_ipv4_dst->set_value_int(tipd_mask);
 
-    /* set teid - Setting it to 0 for the time being */
+    /* set teid */
     _teid = wmcaa->add_masks();
-    _teid->set_value_int(0x00u);
+    _teid->set_value_int(enb_teid_mask);
 
     /* set dst ip */
     dst_ip = wmcaa->add_masks();
-    dst_ip->set_value_int(0xFFFFFFFFu);
+    dst_ip->set_value_int(ueaddr_mask);
 
     /* set src ip */
     src_ip = wmcaa->add_masks();
-    src_ip->set_value_int(0x0000);
+    src_ip->set_value_int(inetip_mask);
 
     /* set dst l4 port */
     l4_dstport = wmcaa->add_masks();
-    l4_dstport->set_value_int(0x0000);
+    l4_dstport->set_value_int(ueport_mask);
 
     /* set src l4 port */
     l4_srcport = wmcaa->add_masks();
-    l4_srcport->set_value_int(0x0000);
+    l4_srcport->set_value_int(inetport_mask);
 
     /* set proto id */
     _protoid = wmcaa->add_masks();
-    _protoid->set_value_int(0x00);
+    _protoid->set_value_int(protoid_mask);
 
     /* SET VALUESV */
     /* set pdr_id, set to 0 for the time being */
@@ -191,9 +140,9 @@ class BessClient {
     _void = wmcaa->add_valuesv();
     _void->set_value_int(fseid);
 
-    /* set ctr_id, set to 0 for the time being */
+    /* set ctr_id, set to teid for the time being */
     _void = wmcaa->add_valuesv();
-    _void->set_value_int(ueaddr);
+    _void->set_value_int(ctr_id);
 
     /* set far_id, set to 0 for the time being */
     _void = wmcaa->add_valuesv();
@@ -223,11 +172,14 @@ class BessClient {
     /* `any' freed up by ModuleCommand() */
   }
 
-  void runDelPDRCommand(const enum src_iface_type sit, const uint32_t enodeip,
-                        const uint32_t teid, const uint32_t ueaddr,
-                        const uint32_t inetip, const uint16_t ueport,
-                        const uint16_t inetport, const uint8_t protoid,
-                        const char *modname) {
+  void runDelPDRCommand(const enum src_iface_type sit, const uint32_t tipd,
+                        const uint32_t tipd_mask, const uint32_t enb_teid,
+			const uint32_t enb_teid_mask, const uint32_t ueaddr,
+                        const uint32_t ueaddr_mask, const uint32_t inetip,
+			const uint32_t inetip_mask, const uint16_t ueport,
+                        const uint16_t ueport_mask, const uint16_t inetport,
+			const uint16_t inetport_mask, const uint8_t protoid,
+                        const uint8_t protoid_mask, const char *modname) {
     bess::pb::WildcardMatchCommandDeleteArg *wmcda =
         new bess::pb::WildcardMatchCommandDeleteArg();
 
@@ -239,11 +191,11 @@ class BessClient {
 
     /* set tunnel_ipv4_dst */
     bess::pb::FieldData *tunnel_ipv4_dst = wmcda->add_values();
-    tunnel_ipv4_dst->set_value_int(enodeip);
+    tunnel_ipv4_dst->set_value_int(tipd);
 
     /* set teid */
     bess::pb::FieldData *_teid = wmcda->add_values();
-    _teid->set_value_int(teid);
+    _teid->set_value_int(enb_teid);
 
     /* set dst ip */
     bess::pb::FieldData *dst_ip = wmcda->add_values();
@@ -273,31 +225,31 @@ class BessClient {
 
     /* set tunnel_ipv4_dst - Setting it to 0 for the time being */
     tunnel_ipv4_dst = wmcda->add_masks();
-    tunnel_ipv4_dst->set_value_int(0x00u);
+    tunnel_ipv4_dst->set_value_int(tipd_mask);
 
-    /* set teid - Setting it to 0 for the time being */
+    /* set teid */
     _teid = wmcda->add_masks();
-    _teid->set_value_int(0x00u);
+    _teid->set_value_int(enb_teid_mask);
 
     /* set dst ip */
     dst_ip = wmcda->add_masks();
-    dst_ip->set_value_int(0xFFFFFFFFu);
+    dst_ip->set_value_int(ueaddr_mask);
 
     /* set src ip */
     src_ip = wmcda->add_masks();
-    src_ip->set_value_int(0x0000);
+    src_ip->set_value_int(inetip_mask);
 
     /* set dst l4 port */
     l4_dstport = wmcda->add_masks();
-    l4_dstport->set_value_int(0x0000);
+    l4_dstport->set_value_int(ueport_mask);
 
     /* set src l4 port */
     l4_srcport = wmcda->add_masks();
-    l4_srcport->set_value_int(0x0000);
+    l4_srcport->set_value_int(inetport_mask);
 
     /* set proto id */
     _protoid = wmcda->add_masks();
-    _protoid->set_value_int(0x00);
+    _protoid->set_value_int(protoid_mask);
 
     ::google::protobuf::Any *any = new ::google::protobuf::Any();
     any->PackFrom(*wmcda);

@@ -41,7 +41,7 @@ const Commands Counter::cmds = {
      Command::THREAD_SAFE}};
 /*----------------------------------------------------------------------------------*/
 CommandResponse Counter::AddCounter(const bess::pb::CounterAddArg &arg) {
-  uint32_t ctr_id = ntohl(arg.ctr_id());
+  uint32_t ctr_id = arg.ctr_id();
 
   if (counters.find(ctr_id) == counters.end()) {
     SessionStats s = {.pkt_count = 0, .byte_count = 0};
@@ -52,7 +52,7 @@ CommandResponse Counter::AddCounter(const bess::pb::CounterAddArg &arg) {
 }
 /*----------------------------------------------------------------------------------*/
 CommandResponse Counter::RemoveCounter(const bess::pb::CounterRemoveArg &arg) {
-  uint32_t ctr_id = ntohl(arg.ctr_id());
+  uint32_t ctr_id = arg.ctr_id();
 
   if (counters.find(ctr_id) != counters.end()) {
     std::cerr << this->name() << "[" << ctr_id
