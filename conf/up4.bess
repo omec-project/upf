@@ -400,29 +400,35 @@ if max_ip_defrag_flows is not None:
     # Drop pkts that are unable to be fragmented
     sgiIP4Defrag:0 -> Sink()
 
-# Replace SetMetadata with GTPPatser that creates individual attributes
-DST_IPV4={'offset':30, 'num_bytes':4}
-SRC_IPV4={'offset':26, 'num_bytes':4}
-DST_PORT={'offset':36, 'num_bytes':2}
-SRC_PORT={'offset':32, 'num_bytes':2}
-IP_PROTO={'offset':23, 'num_bytes':1}
-_in:gate -> ueLookup::IPLookup() -> SetMetadata(attrs=[{'name':'direction', 'size':1, 'value_int':Downlink}, \
-                                                       {'name':'src_iface', 'size':1, 'value_int':Core}, \
-                                                       {'name':'tunnel_ipv4_dst', 'size':4, 'value_int':0xFFFFFFFF}, \
-                                                       {'name':'teid','size': 4,'value_int':0xFFFFFFFF}]) \
+######################################################
+# The following atrributes are created by GtpuParser:
+#   - dst_ip
+#   - src_ip
+#   - dst_port
+#   - src_port
+#   - teid (fseid)
+#   - tunnel_ip4_dst
+#   - proto_id
+
+_in:gate -> ueLookup::IPLookup() \
+    -> SetMetadata(attrs=[{'name':'direction', 'size':1, 'value_int':Downlink}, \
+                          {'name':'src_iface', 'size':1, 'value_int':Core}]) \
+    -> LinkMerge::Merge() \
+    -> DLParse::GtpuParser():1 \
     -> PDRLookup::WildcardMatch(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
                                         {'attr_name':'tunnel_ipv4_dst', 'num_bytes':4}, \
                                         {'attr_name':'teid', 'num_bytes':4}, \
-                                        DST_IPV4, \
-                                        SRC_IPV4, \
-                                        DST_PORT, \
-                                        SRC_PORT, \
-                                        IP_PROTO], \
+                                        {'attr_name':'dst_ip', 'num_bytes':4}, \
+                                        {'attr_name':'src_ip', 'num_bytes':4}, \
+                                        {'attr_name':'dst_port', 'num_bytes':2}, \
+                                        {'attr_name':'src_port', 'num_bytes':2}, \
+                                        {'attr_name':'ip_proto', 'num_bytes':1}], \
                                 values=[{'attr_name':'pdr_id', 'num_bytes':4}, \
                                         {'attr_name':'fseid', 'num_bytes':4}, \
                                         {'attr_name':'ctr_id', 'num_bytes':4}, \
                                         {'attr_name':'far_id', 'num_bytes':4}, \
                                         {'attr_name':'needs_gtpu_decap', 'num_bytes':1}]):1 \
+    -> PreQoSCounter::Counter(name_id='ctr_id') \
     -> FARLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
                                      {'attr_name':'fseid', 'num_bytes':4}], \
                              values=[{'attr_name':'needs_tunneling', 'num_bytes':1}, \
@@ -433,12 +439,13 @@ _in:gate -> ueLookup::IPLookup() -> SetMetadata(attrs=[{'name':'direction', 'siz
                                      {'attr_name':'tunnel_out_dst_ip4addr', 'num_bytes':4}, \
                                      {'attr_name':'tunnel_out_teid', 'num_bytes':4}, \
                                      {'attr_name':'tunnel_out_udp_port', 'num_bytes':2}]):1 \
-    -> PreQoSCounter::Counter(name_id='ctr_id') \
     -> ExecuteFAR::ExactMatch(fields=[{'attr_name':'needs_tunneling', 'num_bytes':1}, \
                                       {'attr_name':'needs_dropping', 'num_bytes':1}, \
-                                      {'attr_name':'notify_cp', 'num_bytes':1}]):1 \
+                                      {'attr_name':'notify_cp', 'num_bytes':1}])
+
+ExecuteFAR:1 \
     -> EtherTrim::GenericDecap(bytes=14) \
-    -> GTPUEncap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0]), num_subscribers=max_sessions):1 \
+    -> GTPUEncap::GtpuEncap():1 \
     -> S1UEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(s1u_ifname))}},
@@ -452,6 +459,7 @@ _in:gate -> ueLookup::IPLookup() -> SetMetadata(attrs=[{'name':'direction', 'siz
 GTPUEncap:0 -> Sink()
 OuterIPCsum:1 -> Sink()
 OuterUDPCsum:1 -> Sink()
+DLParse:0 -> Sink()
 
 # Add ueLookup rules
 ueLookup.add(prefix='0.0.0.0', prefix_len=0, gate=MAX_GATES-1)
@@ -469,11 +477,13 @@ FARLookup:0 -> Sink()
 # Set default ExecuteFAR gate
 ExecuteFAR.set_default_gate(gate=0)
 ExecuteFAR:0 -> FARDrop::Sink()
-ExecuteFAR:2 -> FARNotifyCP::Sink()
+ExecuteFAR:3 -> FARNotifyCP::Sink()
+
 # Add needs_tunneling, needs_dropping & notify_cp rules here
 ExecuteFAR.add(fields=[{'value_int':1}, {'value_int':0}, {'value_int':0}], gate=1)
 ExecuteFAR.add(fields=[{'value_int':0}, {'value_int':1}, {'value_int':0}], gate=0)
-ExecuteFAR.add(fields=[{'value_int':0}, {'value_int':0}, {'value_int':1}], gate=2)
+ExecuteFAR.add(fields=[{'value_int':0}, {'value_int':0}, {'value_int':1}], gate=3)
+ExecuteFAR.add(fields=[{'value_int':0}, {'value_int':0}, {'value_int':0}], gate=2)
 
 
 # ====================================================
@@ -520,24 +530,28 @@ em_u:1 -> Sink()
 em_u.set_default_gate(gate=1)
 
 # Verify IP Checksum
-s1uFastBPF:GTPUGate -> em_u:0 -> s1uRxIPCksum::IPChecksum(verify=True) -> s1uRxUDPCksum::L4Checksum(verify=True)
+s1uFastBPF:GTPUGate -> em_u:0 \
+    -> s1uRxIPCksum::IPChecksum(verify=True) \
+    -> s1uRxUDPCksum::L4Checksum(verify=True)
 s1uRxIPCksum:1 -> Sink()
 s1uRxUDPCksum:1 -> Sink()
 
 # Append s1uIP4Defrag module (if enabled)
 if max_ip_defrag_flows is not None:
-    s1uRxUDPCksum:0 -> s1uIP4Defrag::IPDefrag(num_flows=max_ip_defrag_flows, numa=0):1 -> EtherDecapTrim::GenericDecap(bytes=14)
+    s1uRxUDPCksum:0 \
+        -> s1uIP4Defrag::IPDefrag(num_flows=max_ip_defrag_flows, numa=0)
     # Drop pkts that are unable to be fragmented
     s1uIP4Defrag:0 -> Sink()
+    _in = s1uIP4Defrag
+    gate = 1
 else:
-    s1uRxUDPCksum:0 -> EtherDecapTrim::GenericDecap(bytes=14)
+    _in = s1uRxUDPCksum
+    gate = 0
 
-EtherDecapTrim -> GTPUDecap::GtpuDecap(ename="GTPUEncap"):1 \
-    -> SGIEtherAdd::GenericEncap(fields=[
-        {'size': 6, 'value': {'value_int': 0x0}},
-        {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(sgi_ifname))}},
-        {'size': 2, 'value': {'value_int': 0x0800}}]) \
-    -> sgiRoutes
+_in:gate -> InetLookup::IPLookup() \
+    -> SetMetadata(attrs=[{'name':'direction', 'size':1, 'value_int':Uplink}, \
+                          {'name':'src_iface', 'size':1, 'value_int':Access}]) \
+    -> LinkMerge
 
 s1uFastBPF:GTPUEchoGate \
     	-> gtpRxIPCksum::IPChecksum(verify=True) \
@@ -546,11 +560,22 @@ s1uFastBPF:GTPUEchoGate \
         -> EthSwap::MACSwap() \
         -> 1:OuterUDPCsum
 
+ExecuteFAR:2 \
+    -> EtherDecapTrim::GenericDecap(bytes=14) -> GTPUDecap::GtpuDecap() \
+    -> SGIEtherAdd::GenericEncap(fields=[
+        {'size': 6, 'value': {'value_int': 0x0}},
+        {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(sgi_ifname))}},
+        {'size': 2, 'value': {'value_int': 0x0800}}]) \
+    -> sgiRoutes
+
+
 # Drop unknown packets
 GTPUEcho:0 -> Sink()
-GTPUDecap:0 -> Sink()
 gtpRxIPCksum:1 -> Sink()
 gtpRxUDPCksum:1 -> Sink()
+
+# Add InetLookup rules
+InetLookup.add(prefix='0.0.0.0', prefix_len=0, gate=0)
 
 # Pipeline complete, resume bessd
 bess.resume_all()
