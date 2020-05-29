@@ -48,16 +48,16 @@ class BessClient {
       : stub_(bess::pb::BESSControl::NewStub(channel)), crt() {}
 
   void runAddPDRCommand(const enum src_iface_type sit, const uint32_t tipd,
-			const uint32_t tipd_mask, const uint32_t enb_teid,
-			const uint32_t enb_teid_mask, const uint32_t ueaddr,
+                        const uint32_t tipd_mask, const uint32_t enb_teid,
+                        const uint32_t enb_teid_mask, const uint32_t ueaddr,
                         const uint32_t ueaddr_mask, const uint32_t inetip,
-			const uint32_t inetip_mask, const uint16_t ueport,
+                        const uint32_t inetip_mask, const uint16_t ueport,
                         const uint16_t ueport_mask, const uint16_t inetport,
-			const uint16_t inetport_mask, const uint8_t protoid,
+                        const uint16_t inetport_mask, const uint8_t protoid,
                         const uint8_t protoid_mask, const uint32_t pdr_id,
-			const uint32_t fseid, const uint32_t ctr_id,
-			const uint32_t far_id, const uint8_t need_decap,
-			const char *modname) {
+                        const uint32_t fseid, const uint32_t ctr_id,
+                        const uint32_t far_id, const uint8_t need_decap,
+                        const char *modname) {
     bess::pb::WildcardMatchCommandAddArg *wmcaa =
         new bess::pb::WildcardMatchCommandAddArg();
     wmcaa->set_gate(1);
@@ -174,11 +174,11 @@ class BessClient {
 
   void runDelPDRCommand(const enum src_iface_type sit, const uint32_t tipd,
                         const uint32_t tipd_mask, const uint32_t enb_teid,
-			const uint32_t enb_teid_mask, const uint32_t ueaddr,
+                        const uint32_t enb_teid_mask, const uint32_t ueaddr,
                         const uint32_t ueaddr_mask, const uint32_t inetip,
-			const uint32_t inetip_mask, const uint16_t ueport,
+                        const uint32_t inetip_mask, const uint16_t ueport,
                         const uint16_t ueport_mask, const uint16_t inetport,
-			const uint16_t inetport_mask, const uint8_t protoid,
+                        const uint16_t inetport_mask, const uint8_t protoid,
                         const uint8_t protoid_mask, const char *modname) {
     bess::pb::WildcardMatchCommandDeleteArg *wmcda =
         new bess::pb::WildcardMatchCommandDeleteArg();
