@@ -3,55 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright(c) 2019 Intel Corporation
 
-# for errnos
-import errno
-from conf.utils import *
-
-
-# ====================================================
-#       Parameters
-# ====================================================
-
-
-conf_file = get_env('CONF_FILE', 'conf/spgwu.json')
-conf = get_json_conf(conf_file, False)
-
-# Maximum number of flows to manage ip4 frags for re-assembly
-max_ip_defrag_flows = None
-try:
-    max_ip_defrag_flows = int(conf["max_ip_defrag_flows"])
-except ValueError:
-    print('Invalid value for max_ip_defrag_flows. Not installing IP4Defrag module.')
-except KeyError:
-    print('max_ip_defrag_flows value not set. Not installing IP4Defrag module.')
-
-# Enable ip4 fragmentation
-ip_frag_with_eth_mtu = None
-try:
-    ip_frag_with_eth_mtu = int(conf["ip_frag_with_eth_mtu"])
-except ValueError:
-    print('Invalid value for ip_frag_with_eth_mtu. Not installing IP4Frag module.')
-except KeyError:
-    print('ip_frag_with_eth_mtu value not set. Not installing IP4Frag module.')
-
-# See this link for details:
-## https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py
-## TODO:XXX KEEP MEASURE FALSE FOR THE TIME BEING. METADATA IS SET TO 0. THIS
-## COULD CLASH WITH TIMESTAMP'S METADATA
-measure = False
-#try:
-#    measure = bool(conf["measure"])
-#except ValueError:
-#    print('Invalid value for measure. Not installing Measure module.')
-#except KeyError:
-#    print('measure value not set. Not installing Measure module.')
-
-# Detect mode. Default is dpdk
-mode = None
-try:
-    mode = conf["mode"]
-except KeyError:
-    print('Autodetecting network driver')
+from conf.parser import *
 
 
 # ====================================================
@@ -107,10 +59,10 @@ class Port:
     def detect_mode(self):
         try:
             peer_by_interface(self.name)
-            mode = 'dpdk'
+            parser.mode = 'dpdk'
         except:
-            mode = 'linux'
-        return mode
+            parser.mode = 'linux'
+        return parser.mode
 
     def init_fastpath(self, **kwargs):
         # Initialize PMDPort and RX/TX modules
@@ -123,12 +75,6 @@ class Port:
         self.bpf = __bess_module__("{}FastBPF".format(name), 'BPF')
         self.bpf.clear()
 
-        # Default drop when no matches
-        if measure:
-            self.fpi -> Timestamp() -> self.bpf:0 -> Sink()
-        else:
-            self.fpi -> self.bpf:0 -> Sink()
-
         # Initialize route module
         self.rtr = __bess_module__("{}Routes".format(name), 'IPLookup')
 
@@ -139,48 +85,49 @@ class Port:
         # Attach fastpath to worker's root TC
         self.fpi.attach_task(wid=self.wid)
 
-    def setup_port(self, idx, workers):
+    def setup_port(self, idx, conf_workers):
         # Pick the worker handling this port
-        self.wid = idx % workers
+        self.wid = idx % conf_workers
 
         name = self.name
         wid = self.wid
         print('Setting up port {} on worker {}'.format(name,wid))
 
         # Detect the mode of this interface - DPDK/AF_XDP/AF_PACKET
-        global mode
-        if mode is None:
-            mode = self.detect_mode()
+        global parser
+        conf_mode = parser.mode
+        if conf_mode is None:
+            conf_mode = self.detect_mode()
 
-        if mode in ['af_xdp', 'linux']:
+        if conf_mode in ['af_xdp', 'linux']:
             try:
                 # Initialize kernel fastpath.
                 # AF_XDP requires that num_rx_qs == num_tx_qs
                 kwargs = {"vdev" : "net_af_xdp{},iface={},start_queue=0,queue_count={}"
-                          .format(idx, name, workers), "num_out_q": workers, "num_inc_q": workers}
+                          .format(idx, name, conf_workers), "num_out_q": conf_workers, "num_inc_q": conf_workers}
                 self.init_fastpath(**kwargs)
             except:
-                if mode == 'linux':
+                if conf_mode == 'linux':
                     print('Failed to create AF_XDP socket for {}. Retrying with AF_PACKET socket...'.format(name))
-                    mode = 'af_packet'
+                    conf_mode = 'af_packet'
                 else:
                     print('Failed to create AF_XDP socket for {}. Exiting...'.format(name))
                     sys.exit()
 
-        if mode == 'af_packet':
+        if conf_mode == 'af_packet':
             try:
                 # Initialize kernel fastpath
-                kwargs = {"vdev" : "net_af_packet{},iface={},qpairs={}".format(idx, name, workers), "num_out_q": workers}
+                kwargs = {"vdev" : "net_af_packet{},iface={},qpairs={}".format(idx, name, conf_workers), "num_out_q": conf_workers}
                 self.init_fastpath(**kwargs)
             except:
                 print('Failed to create AF_PACKET socket for {}. Exiting...'.format(name))
                 sys.exit()
 
-        elif mode == 'dpdk':
+        elif conf_mode == 'dpdk':
             kwargs = None
             pci = alias_by_interface(name)
             if pci is not None:
-                kwargs = {"pci": pci, "num_out_q": workers}
+                kwargs = {"pci": pci, "num_out_q": conf_workers}
                 try:
                     self.init_fastpath(**kwargs)
                 except:
@@ -198,7 +145,7 @@ class Port:
                 if fidx is None:
                     raise Exception(
                         'Registered port for {} not detected!'.format(name))
-                kwargs = {"port_id": fidx, "num_out_q": workers}
+                kwargs = {"port_id": fidx, "num_out_q": conf_workers}
                 self.init_fastpath(**kwargs)
 
             # Initialize kernel slowpath port and RX/TX modules
@@ -245,57 +192,31 @@ class Port:
                 print('Mirror veth interface: {} misconfigured: {}'.format(name, e))
         else:
             raise Exception('Invalid mode selected.')
-        # Direct fast path traffic to Frag module
-        merge = __bess_module__("{}Merge".format(name), 'Merge')
-
-        out = self.fpo
-
-        # Attach frag module (if enabled)
-        if ip_frag_with_eth_mtu is not None:
-            frag = __bess_module__("{}IP4Frag".format(name), 'IPFrag', mtu=ip_frag_with_eth_mtu)
-            frag:1 -> out
-            frag:0 -> Sink()
-            out = frag
-
-        # Attach telemeric module (if enabled)
-        if measure:
-            m = Measure()
-            m -> out
-            out = m
-
-        # Attach nat module (if enabled)
-        if self.ext_addrs is not None:
-            # Tokenize the string
-            addrs = self.ext_addrs.split(' or ')
-            # Make a list of ext_addr
-            nat_list = list()
-            for addr in addrs:
-                nat_dict = dict()
-                nat_dict['ext_addr'] = addr
-                nat_list.append(nat_dict)
-
-            # Create the NAT module
-            self.nat = __bess_module__("{}NAT".format(conf[interface]["ifname"]), 'NAT', ext_addrs=nat_list)
-            self.nat:1 -> out
-            out = self.nat
-
-        # Attach Merge module to the 'outlist' of modules
-        merge -> out
 
 
 # ====================================================
-#       Validate
+#	Read json config file (START HERE)
+# ====================================================
+
+Uplink = 1
+Downlink = 2
+Access = 1
+Core = 2
+interfaces = ["s1u", "sgi"]
+parser = Parser('conf/spgwu.json')
+parser.parse(interfaces)
+
+
+# ====================================================
+#       Validate CIDRs
 # ====================================================
 
 
-# CIDRs
-enb_cidr = conf["enb_cidr"]
-ue_cidr = conf["ue_cidr"]
-
-cidrs = [enb_cidr, ue_cidr]
+cidrs = [parser.enb_cidr, parser.ue_cidr]
 for cidr in cidrs:
     if validate_cidr(cidr) is False:
         exit(1, 'Invalid {}'.format(cidr))
+
 
 # ====================================================
 #       Core Setup
@@ -303,102 +224,77 @@ for cidr in cidrs:
 
 
 # Initialize workers
-workers = 1
-try:
-    workers = int(conf["workers"])
-except ValueError:
-    print('Invalid workers value! Re-setting # of workers to 1.')
-
 cores = get_process_affinity()
-for wid in xrange(workers):
+for wid in xrange(parser.workers):
     bess.add_worker(wid=wid, core=int(cores[wid % len(cores)]))
+
 
 # ====================================================
 #       Port Setup
 # ====================================================
 
-Uplink = 1
-Downlink = 2
-
-Access = 1
-Core = 2
-
-interfaces = ["s1u", "sgi"]
 ports = {}
 
 # Before constructing the pipeline, pause bessd
 bess.pause_all()
 
-for idx, interface in enumerate(interfaces):
+for idx, iface in enumerate(interfaces):
+    # check if source natting for a given port is required
     try:
-        ext_addrs = conf[interface]["ip_masquerade"]
+        ext_addrs = parser.interfaces[iface]["ip_masquerade"]
     except KeyError:
         ext_addrs = None
 
-    port = Port(conf[interface]["ifname"], ext_addrs)
+    port = Port(parser.interfaces[iface]["ifname"], ext_addrs)
     if port.name in ports:
         continue
-    port.setup_port(idx, workers)
+    port.setup_port(idx, parser.workers)
+
+    out = port.fpo
+    # enable frag module (if enabled) to control port MTU size
+    if parser.ip_frag_with_eth_mtu is not None:
+        frag = __bess_module__("{}IP4Frag".format(port.name), 'IPFrag', mtu=parser.ip_frag_with_eth_mtu)
+        frag:1 -> out
+        frag:0 -> Sink()
+        out = frag
+
+    # enable telemetrics (if enabled) (how many bytes seen in and out of port)
+    if parser.measure:
+        port.fpi -> Timestamp(attr_name="{}timestamp".format(port.name)) -> port.bpf -> Sink()
+        m = Measure(attr_name="{}timestamp".format(port.name))
+        m -> out
+        out = m
+    else:
+        port.fpi -> port.bpf -> Sink()
+
+    # Attach nat module (if enabled)
+    if port.ext_addrs is not None:
+        # Tokenize the string
+        addrs = port.ext_addrs.split(' or ')
+        # Make a list of ext_addr
+        nat_list = list()
+        for addr in addrs:
+            nat_dict = dict()
+            nat_dict['ext_addr'] = addr
+            nat_list.append(nat_dict)
+
+        # Create the NAT module
+        port.nat = __bess_module__("{}NAT".format(parser.interfaces[iface]["ifname"]), 'NAT', ext_addrs=nat_list)
+        port.nat:1 -> out
+        out = port.nat
+
+    # Direct fast path traffic to Merge module
+    merge = __bess_module__("{}Merge".format(port.name), 'Merge')
+    # Attach Merge module to the 'outlist' of modules
+    merge -> out
+
+    # Finally add entry to ports list
     ports[port.name] = port
 
-s1u_ifname = conf["s1u"]["ifname"]
-sgi_ifname = conf["sgi"]["ifname"]
-
 
 # ====================================================
-#       Downlink Pipeline
+# 	Shared Pipeline (DL + UL)
 # ====================================================
-
-s1uRoutes = ports[s1u_ifname].rtr
-
-# Maximum number of sessions to manage
-try:
-    max_sessions = int(conf["max_sessions"])
-except ValueError:
-    print('Invalid max_sessions value!')
-
-# Setting filter to detect UE subnet
-sgiFastBPF = ports[sgi_ifname].bpf
-UEGate = ports[sgi_ifname].bpf_gate()
-if ports[sgi_ifname].nat is not None:
-    ue_filter = {"priority": -UEGate,
-                 "filter": "ip dst {}".format(ports[sgi_ifname].ext_addrs), "gate": UEGate}
-else:
-    ue_filter = {"priority": -UEGate,
-                 "filter": "ip dst net {}".format(ue_cidr), "gate": UEGate}
-sgiFastBPF.add(filters=[ue_filter])
-
-# Verify that destination MAC address matches that with sgi interface
-# Exact match on desstination MAC address of the interface
-em_d = __bess_module__("{}MACDstMatch".format(sgi_ifname), 'ExactMatch',
-                       fields=[{'offset':0, 'num_bytes':6}])
-macstr_d = mac_by_interface(sgi_ifname)
-em_d.add(fields=[{'value_int': mac2hex(macstr_d)}], gate=0)
-# Drop all pkts that fail match
-em_d:1 -> Sink()
-# All matches go to gate 1
-em_d.set_default_gate(gate=1)
-
-# Verify IP/UDP Checksum
-sgiFastBPF:UEGate -> sgiRxIPCksum::IPChecksum(verify=True) -> sgiRxUDPCksum::L4Checksum(verify=True) -> em_d
-_in = em_d
-gate = 0
-sgiRxIPCksum:1 -> Sink()
-sgiRxUDPCksum:1 -> Sink()
-
-# Append nat module (if enabled)
-if ports[sgi_ifname].nat is not None:
-    _in:gate -> 1:ports[sgi_ifname].nat
-    _in = ports[sgi_ifname].nat
-    gate = 0
-
-# Append sgiIP4Defrag module (if enabled)
-if max_ip_defrag_flows is not None:
-    _in:gate -> sgiIP4Defrag::IPDefrag(num_flows=max_ip_defrag_flows, numa=0)
-    _in = sgiIP4Defrag
-    gate = 1
-    # Drop pkts that are unable to be fragmented
-    sgiIP4Defrag:0 -> Sink()
 
 ######################################################
 # The following atrributes are created by GtpuParser:
@@ -410,11 +306,8 @@ if max_ip_defrag_flows is not None:
 #   - tunnel_ip4_dst
 #   - proto_id
 
-_in:gate -> ueLookup::IPLookup() \
-    -> SetMetadata(attrs=[{'name':'direction', 'size':1, 'value_int':Downlink}, \
-                          {'name':'src_iface', 'size':1, 'value_int':Core}]) \
-    -> LinkMerge::Merge() \
-    -> DLParse::GtpuParser():1 \
+LinkMerge::Merge() \
+    -> PktParse::GtpuParser():1 \
     -> PDRLookup::WildcardMatch(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
                                         {'attr_name':'tunnel_ipv4_dst', 'num_bytes':4}, \
                                         {'attr_name':'teid', 'num_bytes':4}, \
@@ -443,43 +336,19 @@ _in:gate -> ueLookup::IPLookup() \
                                       {'attr_name':'needs_dropping', 'num_bytes':1}, \
                                       {'attr_name':'notify_cp', 'num_bytes':1}])
 
-ExecuteFAR:1 \
-    -> EtherTrim::GenericDecap(bytes=14) \
-    -> GTPUEncap::GtpuEncap():1 \
-    -> S1UEtherAdd::GenericEncap(fields=[
-        {'size': 6, 'value': {'value_int': 0x0}},
-        {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(s1u_ifname))}},
-        {'size': 2, 'value': {'value_int': 0x0800}}]) \
-    -> PostQoSCounter::Counter(name_id='ctr_id') \
-    -> OuterUDPCsum::L4Checksum() \
-    -> OuterIPCsum::IPChecksum() \
-    -> s1uRoutes
-
 # Drop unknown packets
-GTPUEncap:0 -> Sink()
-OuterIPCsum:1 -> Sink()
-OuterUDPCsum:1 -> Sink()
-DLParse:0 -> Sink()
-
-# Add ueLookup rules
-ueLookup.add(prefix='0.0.0.0', prefix_len=0, gate=MAX_GATES-1)
-ueLookup.add(prefix=cidr2netmask(ue_cidr)[0], prefix_len=(int)(ue_cidr.split('/')[1]), gate=0)
-ueLookup:MAX_GATES-1 -> Sink()
-
-# Set default PDRLookup gate
-PDRLookup.set_default_gate(gate=0)
+PktParse:0 -> Sink()
 PDRLookup:0 -> Sink()
-
-# Set default FARLookup gate
-FARLookup.set_default_gate(gate=0)
 FARLookup:0 -> Sink()
-
-# Set default ExecuteFAR gate
-ExecuteFAR.set_default_gate(gate=0)
 ExecuteFAR:0 -> FARDrop::Sink()
 ExecuteFAR:3 -> FARNotifyCP::Sink()
 
-# Add needs_tunneling, needs_dropping & notify_cp rules here
+# Set default gates for relevant modules
+PDRLookup.set_default_gate(gate=0)
+FARLookup.set_default_gate(gate=0)
+ExecuteFAR.set_default_gate(gate=0)
+
+# Add needs_tunneling, needs_dropping & notify_cp rules to ExecuteFAR here
 ExecuteFAR.add(fields=[{'value_int':1}, {'value_int':0}, {'value_int':0}], gate=1)
 ExecuteFAR.add(fields=[{'value_int':0}, {'value_int':1}, {'value_int':0}], gate=0)
 ExecuteFAR.add(fields=[{'value_int':0}, {'value_int':0}, {'value_int':1}], gate=3)
@@ -487,92 +356,185 @@ ExecuteFAR.add(fields=[{'value_int':0}, {'value_int':0}, {'value_int':0}], gate=
 
 
 # ====================================================
+#       Downlink Pipeline
+# ====================================================
+
+# Pick fast-path gate for DL pipeline
+sgiFastBPF = ports[parser.sgi_ifname].bpf
+UEGate = ports[parser.sgi_ifname].bpf_gate()
+
+
+# 1. Build initial DL pipeline here
+sgiFastBPF:UEGate \
+    -> sgiRxIPCksum::IPChecksum(verify=True) \
+    -> sgiRxUDPCksum::L4Checksum(verify=True) \
+    -> DLMACDstMatch::ExactMatch(fields=[{'offset':0, 'num_bytes':6}])
+
+# Record last module to chain up optional modules
+_in = DLMACDstMatch
+gate = 0
+
+# Append nat module (if enabled)
+if ports[parser.sgi_ifname].nat is not None:
+    _in:gate -> 1:ports[parser.sgi_ifname].nat
+    _in = ports[parser.sgi_ifname].nat
+    gate = 0
+
+# Append sgiIP4Defrag module (if enabled)
+if parser.max_ip_defrag_flows is not None:
+    _in:gate -> sgiIP4Defrag::IPDefrag(num_flows=parser.max_ip_defrag_flows, numa=0)
+    _in = sgiIP4Defrag
+    gate = 1
+    # Drop pkts that are unable to be fragmented
+    sgiIP4Defrag:0 -> Sink()
+
+# 2. Build the remaining first half of the DL pipeline before entering the shared pipeline
+_in:gate -> ueLookup::IPLookup() \
+    -> SetMetadata(attrs=[{'name':'direction', 'size':1, 'value_int':Downlink}, \
+                          {'name':'src_iface', 'size':1, 'value_int':Core}]) \
+    -> LinkMerge # Start of the shared pipeline
+
+
+# 3. Complete the last part of the DL pipeline
+ExecuteFAR:1 \
+    -> EtherTrim::GenericDecap(bytes=14) \
+    -> GTPUEncap::GtpuEncap():1 \
+    -> S1UEtherAdd::GenericEncap(fields=[
+        {'size': 6, 'value': {'value_int': 0x0}},
+        {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(parser.s1u_ifname))}},
+        {'size': 2, 'value': {'value_int': 0x0800}}]) \
+    -> PostQoSCounter::Counter(name_id='ctr_id') \
+    -> OuterUDPCsum::L4Checksum() \
+    -> OuterIPCsum::IPChecksum() \
+    -> ports[parser.s1u_ifname].rtr
+
+# Drop unknown packets
+GTPUEncap:0 -> Sink()
+sgiRxIPCksum:1 -> Sink()
+sgiRxUDPCksum:1 -> Sink()
+OuterIPCsum:1 -> Sink()
+OuterUDPCsum:1 -> Sink()
+DLMACDstMatch:1 -> Sink()
+ueLookup:MAX_GATES-1 -> Sink()
+
+# Set default gates for relevant modules
+DLMACDstMatch.set_default_gate(gate=1)
+
+# Add SGi filter rules, i.e.:
+# setting filter to detect ue_filter traffic
+# the filter can either be based on the NAT IP addr(s),
+# or ue IP addr subnet
+if ports[parser.sgi_ifname].nat is not None:
+    ue_filter = {"priority": -UEGate,
+                 "filter": "ip dst {}".format(ports[parser.sgi_ifname].ext_addrs), "gate": UEGate}
+else:
+    ue_filter = {"priority": -UEGate,
+                 "filter": "ip dst net {}".format(parser.ue_cidr), "gate": UEGate}
+sgiFastBPF.add(filters=[ue_filter])
+
+# Verify that destination MAC address matches that with sgi interface
+# i.e. insert a rule so that destination MAC address of the interface
+# is an 'exact' match
+macstr_d = mac_by_interface(parser.sgi_ifname)
+DLMACDstMatch.add(fields=[{'value_int': mac2hex(macstr_d)}], gate=0)
+
+# Add ueLookup rules
+ueLookup.add(prefix='0.0.0.0', prefix_len=0, gate=MAX_GATES-1)
+ueLookup.add(prefix=cidr2netmask(parser.ue_cidr)[0], prefix_len=(int)(parser.ue_cidr.split('/')[1]), gate=0)
+
+
+# ====================================================
 #       Uplink Pipeline
 # ====================================================
 
 
-# Setting filter to detect gtpu traffic
-# src net 11.1.1.0 mask 255.255.255.0           # check eNB subnet
-# and dst host 11.1.1.1                         # check S/PGWU IP
-# and udp dst port 2152                         # check GTPU port
-# and (udp[28:4] & 0xffffff00) = 0x10000000     # check UE subnet
-s1uFastBPF = ports[s1u_ifname].bpf
-check_enb_subnet = "src net {} ".format(enb_cidr)
-check_spgwu_ip = " and dst host " + \
-    " or ".join(str(x) for x in ips_by_interface(s1u_ifname))
-check_gtpu_port = " and udp dst port 2152"
-check_ue_subnet = " and (udp[28:4] & 0x{}) = 0x{}".format(
-    cidr2mask(ue_cidr), ip2hex(cidr2block(ue_cidr)[0]))
-check_gtpu_msg_echo = " and udp[9] = 0x1"
+# Pick fast-path and echo gates for UL pipeline
+s1uFastBPF = ports[parser.s1u_ifname].bpf
+GTPUEchoGate = ports[parser.s1u_ifname].bpf_gate()
+GTPUGate = ports[parser.s1u_ifname].bpf_gate()
 
-GTPUEchoGate = ports[s1u_ifname].bpf_gate()
-uplink_echo_filter = {"priority": -GTPUEchoGate, "filter": check_enb_subnet +
-                      check_spgwu_ip + check_gtpu_port +
-                      check_gtpu_msg_echo, "gate": GTPUEchoGate}
-s1uFastBPF.add(filters=[uplink_echo_filter])
 
-GTPUGate = ports[s1u_ifname].bpf_gate()
-uplink_filter = {"priority": -GTPUGate, "filter": check_enb_subnet +
-               check_spgwu_ip + check_gtpu_port, "gate": GTPUGate}
-s1uFastBPF.add(filters=[uplink_filter])
-
-sgiRoutes = ports[sgi_ifname].rtr
-
-# Verify that destination MAC address matches that with s1u interface
-# Exact match on desstination MAC address of the interface
-em_u = __bess_module__("{}MACDstMatch".format(s1u_ifname), 'ExactMatch',
-                       fields=[{'offset':0, 'num_bytes':6}])
-macstr_u = mac_by_interface(s1u_ifname)
-em_u.add(fields=[{'value_int': mac2hex(macstr_u)}], gate=0)
-# Drop all pkts that fail match
-em_u:1 -> Sink()
-# All matches go to gate 1
-em_u.set_default_gate(gate=1)
-
-# Verify IP Checksum
-s1uFastBPF:GTPUGate -> em_u:0 \
+# 1. Build initial UL pipeline here
+s1uFastBPF:GTPUGate \
     -> s1uRxIPCksum::IPChecksum(verify=True) \
-    -> s1uRxUDPCksum::L4Checksum(verify=True)
-s1uRxIPCksum:1 -> Sink()
-s1uRxUDPCksum:1 -> Sink()
+    -> s1uRxUDPCksum::L4Checksum(verify=True) \
+    -> ULMACDstMatch::ExactMatch(fields=[{'offset':0, 'num_bytes':6}])
+
+# Record last module to chain up option modules
+_in = ULMACDstMatch
+gate = 0
 
 # Append s1uIP4Defrag module (if enabled)
-if max_ip_defrag_flows is not None:
-    s1uRxUDPCksum:0 \
-        -> s1uIP4Defrag::IPDefrag(num_flows=max_ip_defrag_flows, numa=0)
-    # Drop pkts that are unable to be fragmented
-    s1uIP4Defrag:0 -> Sink()
+if parser.max_ip_defrag_flows is not None:
+    _in:gate ->s1uIP4Defrag::IPDefrag(num_flows=parser.max_ip_defrag_flows, numa=0)
     _in = s1uIP4Defrag
     gate = 1
-else:
-    _in = s1uRxUDPCksum
-    gate = 0
+    # Drop pkts that are unable to be fragmented
+    s1uIP4Defrag:0 -> Sink()    
 
+# 2. Build the remaining first half of the UL pipeline before entering the shard pipeline
 _in:gate -> InetLookup::IPLookup() \
     -> SetMetadata(attrs=[{'name':'direction', 'size':1, 'value_int':Uplink}, \
                           {'name':'src_iface', 'size':1, 'value_int':Access}]) \
-    -> LinkMerge
+    -> LinkMerge # Start of the shared pipeline
 
-s1uFastBPF:GTPUEchoGate \
-    	-> gtpRxIPCksum::IPChecksum(verify=True) \
-        -> gtpRxUDPCksum::L4Checksum(verify=True) \
-	-> GTPUEcho::GtpuEcho(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0])):1 \
-        -> EthSwap::MACSwap() \
-        -> 1:OuterUDPCsum
-
+# 3. Complete the last part of the UL pipeline
 ExecuteFAR:2 \
     -> EtherDecapTrim::GenericDecap(bytes=14) -> GTPUDecap::GtpuDecap() \
     -> SGIEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
-        {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(sgi_ifname))}},
+        {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(parser.sgi_ifname))}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
-    -> sgiRoutes
+    -> ports[parser.sgi_ifname].rtr
 
+# 4. GTP Echo response pipeline
+s1uFastBPF:GTPUEchoGate \
+    	-> gtpRxIPCksum::IPChecksum(verify=True) \
+        -> gtpRxUDPCksum::L4Checksum(verify=True) \
+	-> GTPUEcho::GtpuEcho(s1u_sgw_ip=ip2long(ips_by_interface(parser.s1u_ifname)[0])):1 \
+        -> EthSwap::MACSwap() \
+        -> 1:OuterUDPCsum
 
 # Drop unknown packets
 GTPUEcho:0 -> Sink()
 gtpRxIPCksum:1 -> Sink()
 gtpRxUDPCksum:1 -> Sink()
+ULMACDstMatch:1 -> Sink()
+s1uRxIPCksum:1 -> Sink()
+s1uRxUDPCksum:1 -> Sink()
+
+# Set default gates for relevant modules
+ULMACDstMatch.set_default_gate(gate=1)
+
+# Add S1u filter rules, i.e.:
+# setting filter to detect gtpu traffic
+# src net 11.1.1.0 mask 255.255.255.0           # check eNB subnet
+# and dst host 11.1.1.1                         # check S/PGWU IP
+# and udp dst port 2152                         # check GTPU port
+# and (udp[28:4] & 0xffffff00) = 0x10000000     # check UE subnet
+check_enb_subnet = "src net {} ".format(parser.enb_cidr)
+check_spgwu_ip = " and dst host " + \
+    " or ".join(str(x) for x in ips_by_interface(parser.s1u_ifname))
+check_gtpu_port = " and udp dst port 2152"
+check_ue_subnet = " and (udp[28:4] & 0x{}) = 0x{}".format(
+    cidr2mask(parser.ue_cidr), ip2hex(cidr2block(parser.ue_cidr)[0]))
+check_gtpu_msg_echo = " and udp[9] = 0x1"
+
+# Echo filter
+uplink_echo_filter = {"priority": -GTPUEchoGate, "filter": check_enb_subnet +
+                      check_spgwu_ip + check_gtpu_port +
+                      check_gtpu_msg_echo, "gate": GTPUEchoGate}
+s1uFastBPF.add(filters=[uplink_echo_filter])
+
+# PDU rule
+uplink_filter = {"priority": -GTPUGate, "filter": check_enb_subnet +
+               check_spgwu_ip + check_gtpu_port, "gate": GTPUGate}
+s1uFastBPF.add(filters=[uplink_filter])
+
+# Verify that destination MAC address matches that with s1u interface
+# Exact match on desstination MAC address of the interface
+macstr_u = mac_by_interface(parser.s1u_ifname)
+ULMACDstMatch.add(fields=[{'value_int': mac2hex(macstr_u)}], gate=0)
 
 # Add InetLookup rules
 InetLookup.add(prefix='0.0.0.0', prefix_len=0, gate=0)
@@ -582,45 +544,8 @@ bess.resume_all()
 
 
 # ====================================================
-#       SIM_TEST
+#       Route Control
 # ====================================================
-
-import time
-
-def sim_start_test():
-    start_teid = 0xf0000000
-    start_ue_ip = 0x10000001
-    start_enb_ip = 0x0b010181
-    NG4T_MAX_UE_RAN = 500000
-    NG4T_MAX_ENB_RAN = 80
-
-    for i in range(max_sessions):
-
-        # NG4T-based formula to calculate enodeB IP address against a given UE IP address
-        # il_trafficgen also uses the same scheme
-        # See SimuCPEnbv4Teid(...) in ngic code for more details
-        ue_of_ran = i % NG4T_MAX_UE_RAN
-        ran = i / NG4T_MAX_UE_RAN
-        enb_of_ran = ue_of_ran % NG4T_MAX_ENB_RAN
-        enb_idx = ran * NG4T_MAX_ENB_RAN + enb_of_ran
-
-        GTPUEncap.add(teid=start_teid+i, eteid=i+1, ueaddr=start_ue_ip+i, enodeb_ip=start_enb_ip+enb_idx)
-
-def sim_end_test():
-    start_ue_ip = 0x10000001
-
-    for i in range(max_sessions):
-        GTPUEncap.remove(ueaddr=start_ue_ip+i)
-
-    GTPUEncap.show_records()
-
-### Uncomment the following lines to test with il_trafficgen ###
-# Start the test
-#sim_start_test()
-# Wait for 30 seconds before deleting the session info entries (optional)
-#time.sleep(30)
-#sim_end_test()
-
 # Finally send SIGHUP to route_control daemon on reload
 # TODO: behavior is unspecified if route_control.py pid is not found
 route_control_pid = getpythonpid('route_control.py')
