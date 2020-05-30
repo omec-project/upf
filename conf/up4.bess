@@ -202,6 +202,10 @@ Uplink = 1
 Downlink = 2
 Access = 1
 Core = 2
+FARForwardAction = 0
+FARTunnelAction = 1
+FARDropAction = 2
+FARNotifyCPAction = 4
 interfaces = ["s1u", "sgi"]
 parser = Parser('conf/spgwu.json')
 parser.parse(interfaces)
@@ -324,35 +328,24 @@ LinkMerge::Merge() \
     -> PreQoSCounter::Counter(name_id='ctr_id') \
     -> FARLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
                                      {'attr_name':'fseid', 'num_bytes':4}], \
-                             values=[{'attr_name':'needs_tunneling', 'num_bytes':1}, \
-                                     {'attr_name':'needs_dropping', 'num_bytes':1}, \
-                                     {'attr_name':'notify_cp', 'num_bytes':1}, \
+                             values=[{'attr_name':'action', 'num_bytes':1}, \
                                      {'attr_name':'tunnel_out_type', 'num_bytes':1}, \
                                      {'attr_name':'tunnel_out_src_ip4addr', 'num_bytes':4}, \
                                      {'attr_name':'tunnel_out_dst_ip4addr', 'num_bytes':4}, \
                                      {'attr_name':'tunnel_out_teid', 'num_bytes':4}, \
                                      {'attr_name':'tunnel_out_udp_port', 'num_bytes':2}]):1 \
-    -> ExecuteFAR::ExactMatch(fields=[{'attr_name':'needs_tunneling', 'num_bytes':1}, \
-                                      {'attr_name':'needs_dropping', 'num_bytes':1}, \
-                                      {'attr_name':'notify_cp', 'num_bytes':1}])
+    -> ExecuteFAR::Split(size=1, attribute='action')
 
 # Drop unknown packets
 PktParse:0 -> Sink()
 PDRLookup:0 -> Sink()
 FARLookup:0 -> Sink()
-ExecuteFAR:0 -> FARDrop::Sink()
-ExecuteFAR:3 -> FARNotifyCP::Sink()
+ExecuteFAR:FARDropAction -> FARDrop::Sink()
+ExecuteFAR:FARNotifyCPAction -> FARNotifyCP::Sink()
 
 # Set default gates for relevant modules
 PDRLookup.set_default_gate(gate=0)
 FARLookup.set_default_gate(gate=0)
-ExecuteFAR.set_default_gate(gate=0)
-
-# Add needs_tunneling, needs_dropping & notify_cp rules to ExecuteFAR here
-ExecuteFAR.add(fields=[{'value_int':1}, {'value_int':0}, {'value_int':0}], gate=1)
-ExecuteFAR.add(fields=[{'value_int':0}, {'value_int':1}, {'value_int':0}], gate=0)
-ExecuteFAR.add(fields=[{'value_int':0}, {'value_int':0}, {'value_int':1}], gate=3)
-ExecuteFAR.add(fields=[{'value_int':0}, {'value_int':0}, {'value_int':0}], gate=2)
 
 
 # ====================================================
@@ -399,7 +392,7 @@ _in:gate -> ueLookup::IPLookup() \
 
 
 # 3. Complete the last part of the DL pipeline
-ExecuteFAR:1 \
+ExecuteFAR:FARTunnelAction \
     -> EtherTrim::GenericDecap(bytes=14) \
     -> GTPUEncap::GtpuEncap():1 \
     -> S1UEtherAdd::GenericEncap(fields=[
@@ -479,7 +472,7 @@ _in:gate -> InetLookup::IPLookup() \
     -> LinkMerge # Start of the shared pipeline
 
 # 3. Complete the last part of the UL pipeline
-ExecuteFAR:2 \
+ExecuteFAR:FARForwardAction \
     -> EtherDecapTrim::GenericDecap(bytes=14) -> GTPUDecap::GtpuDecap() \
     -> SGIEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
