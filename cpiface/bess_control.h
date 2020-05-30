@@ -25,7 +25,7 @@ enum src_iface_type { Access = 1, Core };
  *  FAR related flags
  */
 #define DO_TUNNEL (1)
-#define DO_DROP   (2)
+#define DO_DROP (2)
 #define DO_NOTIFY (4)
 /**
  * Module decls
@@ -299,9 +299,12 @@ class BessClient {
     /* SET VALUES */
     /* set FAR action */
     uint8_t action = 0;
-    if (tunnel)    action = action | DO_TUNNEL;
-    if (drop)      action = action | DO_DROP;
-    if (notify_cp) action = action | DO_NOTIFY;
+    if (tunnel)
+      action = action | DO_TUNNEL;
+    if (drop)
+      action = action | DO_DROP;
+    if (notify_cp)
+      action = action | DO_NOTIFY;
     bess::pb::FieldData *_action = emcaa->add_values();
     _action->set_value_int(action);
 
