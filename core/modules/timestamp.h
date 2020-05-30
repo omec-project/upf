@@ -39,7 +39,9 @@ class Timestamp final : public Module {
   using MarkerType = uint32_t;
   static const MarkerType kMarker = 0x54C5BE55;
 
-  Timestamp() : Module(), offset_(), attr_id(-1) { max_allowed_workers_ = Worker::kMaxWorkers; }
+  Timestamp() : Module(), offset_(), attr_id(-1) {
+    max_allowed_workers_ = Worker::kMaxWorkers;
+  }
 
   CommandResponse Init(const bess::pb::TimestampArg &arg);
 
