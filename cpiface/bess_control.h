@@ -22,6 +22,12 @@ using namespace grpc;
 enum src_iface_type { Access = 1, Core };
 
 /**
+ *  FAR related flags
+ */
+#define DO_TUNNEL (1)
+#define DO_DROP   (2)
+#define DO_NOTIFY (4)
+/**
  * Module decls
  */
 #define PDRLOOKUPMOD "PDRLookup"
@@ -291,17 +297,13 @@ class BessClient {
     _fseid->set_value_int(fseid);
 
     /* SET VALUES */
-    /* set tunnel action */
-    bess::pb::FieldData *_tunnel = emcaa->add_values();
-    _tunnel->set_value_int(tunnel);
-
-    /* set drop action */
-    bess::pb::FieldData *_drop = emcaa->add_values();
-    _drop->set_value_int(drop);
-
-    /* set notify_cp */
-    bess::pb::FieldData *_notify_cp = emcaa->add_values();
-    _notify_cp->set_value_int(notify_cp);
+    /* set FAR action */
+    uint8_t action = 0;
+    if (tunnel)    action = action | DO_TUNNEL;
+    if (drop)      action = action | DO_DROP;
+    if (notify_cp) action = action | DO_NOTIFY;
+    bess::pb::FieldData *_action = emcaa->add_values();
+    _action->set_value_int(action);
 
     /* set tuntype */
     bess::pb::FieldData *_tuntype = emcaa->add_values();
