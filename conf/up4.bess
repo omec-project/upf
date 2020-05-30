@@ -260,12 +260,12 @@ for idx, iface in enumerate(interfaces):
 
     # enable telemetrics (if enabled) (how many bytes seen in and out of port)
     if parser.measure:
-        port.fpi -> Timestamp(attr_name="{}timestamp".format(port.name)) -> port.bpf -> Sink()
+        port.fpi -> Timestamp(attr_name="{}timestamp".format(port.name)) -> port.bpf
         m = Measure(attr_name="{}timestamp".format(port.name))
         m -> out
         out = m
     else:
-        port.fpi -> port.bpf -> Sink()
+        port.fpi -> port.bpf
 
     # Attach nat module (if enabled)
     if port.ext_addrs is not None:
@@ -361,7 +361,10 @@ ExecuteFAR.add(fields=[{'value_int':0}, {'value_int':0}, {'value_int':0}], gate=
 
 # Pick fast-path gate for DL pipeline
 sgiFastBPF = ports[parser.sgi_ifname].bpf
-UEGate = ports[parser.sgi_ifname].bpf_gate()
+UEGate = 0
+if ports[parser.sgi_ifname].ext_addrs is not None:
+    UEGate = ports[parser.sgi_ifname].bpf_gate()
+    ports[parser.sgi_ifname].bpf -> Sink()
 
 
 # 1. Build initial DL pipeline here
@@ -427,10 +430,7 @@ DLMACDstMatch.set_default_gate(gate=1)
 if ports[parser.sgi_ifname].nat is not None:
     ue_filter = {"priority": -UEGate,
                  "filter": "ip dst {}".format(ports[parser.sgi_ifname].ext_addrs), "gate": UEGate}
-else:
-    ue_filter = {"priority": -UEGate,
-                 "filter": "ip dst net {}".format(parser.ue_cidr), "gate": UEGate}
-sgiFastBPF.add(filters=[ue_filter])
+    sgiFastBPF.add(filters=[ue_filter])
 
 # Verify that destination MAC address matches that with sgi interface
 # i.e. insert a rule so that destination MAC address of the interface
@@ -451,7 +451,7 @@ ueLookup.add(prefix=cidr2netmask(parser.ue_cidr)[0], prefix_len=(int)(parser.ue_
 # Pick fast-path and echo gates for UL pipeline
 s1uFastBPF = ports[parser.s1u_ifname].bpf
 GTPUEchoGate = ports[parser.s1u_ifname].bpf_gate()
-GTPUGate = ports[parser.s1u_ifname].bpf_gate()
+GTPUGate = 0
 
 
 # 1. Build initial UL pipeline here
