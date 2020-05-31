@@ -544,3 +544,108 @@ bess.resume_all()
 route_control_pid = getpythonpid('route_control.py')
 if route_control_pid:
     os.kill(route_control_pid, signal.SIGHUP)
+
+
+# ===================================================
+#	SIM TEST
+#====================================================
+import time
+
+def sim_start_test():
+    start_teid = 0xf0000000
+    start_ue_ip = 0x10000001
+    start_enb_ip = 0x0b010181
+    NG4T_MAX_UE_RAN = 500000
+    NG4T_MAX_ENB_RAN = 80
+    s1u_sgw_ip=ip2long(ips_by_interface(parser.s1u_ifname)[0])
+
+    for i in range(parser.max_sessions):
+
+        # NG4T-based formula to calculate enodeB IP address against a given UE IP address
+        # il_trafficgen also uses the same scheme
+        # See SimuCPEnbv4Teid(...) in ngic code for more details
+        ue_of_ran = i % NG4T_MAX_UE_RAN
+        ran = i / NG4T_MAX_UE_RAN
+        enb_of_ran = ue_of_ran % NG4T_MAX_ENB_RAN
+        enb_idx = ran * NG4T_MAX_ENB_RAN + enb_of_ran
+
+        PDRLookup.add(gate=1, priority=1,
+                      values=[{'value_int':Core},	     # src_iface
+                              {'value_int':0},		     # tunnel_ipv4_dst
+                              {'value_int':0},               # enb_teid
+                              {'value_int':start_ue_ip+i},   # ueaddr ip
+                              {'value_int':0},               # inet ip
+                              {'value_int':0},               # ue port
+                              {'value_int':0},               # inet port
+                              {'value_int':0}],              # proto-id
+                      masks=[{'value_int':0xFF},	     # src_iface-mask
+                              {'value_int':0},		     # tunnel_ipv4_dst-mask
+                              {'value_int':0},               # enb_teid-mask
+                              {'value_int':0xFFFFFFFF},      # ueaddr ip-mask
+                              {'value_int':0},               # inet ip-mask
+                              {'value_int':0},               # ue port-mask
+                              {'value_int':0},               # inet port-mask
+                              {'value_int':0}],              # proto-id-mask
+                      valuesv=[{'value_int':0},	     	     # pdr-id
+                              {'value_int':start_teid+i},    # fseid
+                              {'value_int':start_teid+i},    # ctr_id
+                              {'value_int':1},               # far_id
+                              {'value_int':0}])              # need_decap
+
+        PDRLookup.add(gate=1, priority=1,
+                      values=[{'value_int':Access},	     # src_iface
+                              {'value_int':0},		     # tunnel_ipv4_dst
+                              {'value_int':0},               # enb_teid
+                              {'value_int':0},               # inet ip
+                              {'value_int':start_ue_ip+i},   # ueaddr ip
+                              {'value_int':0},               # inet port
+                              {'value_int':0},               # ue port
+                              {'value_int':0}],              # proto-id
+                      masks=[{'value_int':0xFF},	     # src_iface-mask
+                              {'value_int':0},		     # tunnel_ipv4_dst-mask
+                              {'value_int':0},               # enb_teid-mask
+                              {'value_int':0},               # inet ip-mask
+                              {'value_int':0xFFFFFFFF},      # ueaddr ip-mask
+                              {'value_int':0},               # inet port-mask
+                              {'value_int':0},               # ue port-mask
+                              {'value_int':0}],              # proto-id-mask
+                      valuesv=[{'value_int':0},	     	     # pdr-id
+                              {'value_int':start_teid+i},    # fseid
+                              {'value_int':start_teid+i},    # ctr_id
+                              {'value_int':0},               # far_id
+                              {'value_int':1}])              # need_decap-mask
+
+        FARLookup.add(gate=1,
+                      fields=[{'value_int':1},                      # far-id
+                              {'value_int':start_teid+i}],          # fseid
+                      values=[{'value_int':FARTunnelAction},        # action
+                              {'value_int':1},                      # tunnel_out_type
+                              {'value_int':s1u_sgw_ip},             # s1u_ip
+                              {'value_int':start_enb_ip+enb_idx},   # enb ip
+                              {'value_int':start_teid+i},           # enb teid
+                              {'value_int':2152}])                  # udp gtpu port
+
+        FARLookup.add(gate=1,
+                      fields=[{'value_int':0},                      # far-id
+                              {'value_int':start_teid+i}],          # fseid
+                      values=[{'value_int':FARForwardAction},       # action
+                              {'value_int':0},                      # tunnel_out_type
+                              {'value_int':0},                      # not needed
+                              {'value_int':0},                      # not needed
+                              {'value_int':0},                      # not needed
+                              {'value_int':0}])                     # not needed
+
+        PreQoSCounter.add(ctr_id=start_teid+i)                      # fseid
+
+        PostQoSCounter.add(ctr_id=start_teid+i)                     # fseid
+
+
+#def sim_end_test():
+    # do nothing for the time being
+
+### Uncomment the following lines to test with il_trafficgen ###
+# Start the test
+#sim_start_test()
+# Wait for 30 seconds before deleting the session info entries (optional)
+#time.sleep(100)
+#sim_end_test()
