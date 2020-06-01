@@ -20,7 +20,7 @@
 #define ZMQ_SEND_PORT 5557
 #define ZMQ_NB_IP "172.17.0.1"
 #define ZMQ_NB_PORT 1111
-#define S1U_SGW_IP "11.1.1.1"
+#define S1U_SGW_IP "127.0.0.1"
 #define UDP_PORT_GTPU 2152
 /*--------------------------------------------------------------------------------*/
 /**

@@ -89,19 +89,12 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     off = attr_offset(tout_uport);
     at_tout_uport = get_attr_with_offset<uint16_t>(off, p);
 
-#if DEBUG
     /* checking values now */
-    std::cerr << "Tunnel out sip: " << at_tout_sip
-              << ", real: " << data[i]->ul_s1_info.sgw_addr.u.ipv4_addr
-              << std::endl;
-    std::cerr << "Tunnel out dip: " << (at_tout_dip)
-              << ", real: " << data[i]->ul_s1_info.enb_addr.u.ipv4_addr
-              << std::endl;
-    std::cerr << "Tunnel out teid: " << (at_tout_teid)
-              << ", real: " << data[i]->dl_s1_info.enb_teid << std::endl;
-    std::cerr << "Tunnel out udp port: " << at_tout_uport
-              << ", real: " << UDP_PORT_GTPU << std::endl;
-#endif
+    DLOG(INFO) << "tunnel out sip: " << at_tout_sip
+	       << ", tunnel out dip: " << at_tout_dip
+	       << ", tunnel out teid: " << at_tout_teid
+	       << ", tunnel out udp port: " << at_tout_uport
+	       << std::endl;
 
     /* assuming that this module comes right after EthernetDecap */
     /* pkt_len can be used as the length of IP datagram */
