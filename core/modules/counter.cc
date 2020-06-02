@@ -15,6 +15,7 @@ const Commands Counter::cmds = {
 CommandResponse Counter::AddCounter(const bess::pb::CounterAddArg &arg) {
   uint32_t ctr_id = arg.ctr_id();
 
+  /* check_exist is still here for over-protection */
   if (counters.find(ctr_id) == counters.end()) {
     SessionStats s = {.pkt_count = 0, .byte_count = 0};
     counters.insert(std::pair<uint32_t, SessionStats>(ctr_id, s));
@@ -26,6 +27,7 @@ CommandResponse Counter::AddCounter(const bess::pb::CounterAddArg &arg) {
 CommandResponse Counter::RemoveCounter(const bess::pb::CounterRemoveArg &arg) {
   uint32_t ctr_id = arg.ctr_id();
 
+  /* check_exist is still here for over-protection */
   if (counters.find(ctr_id) != counters.end()) {
     std::cerr << this->name() << "[" << ctr_id
               << "]: " << counters[ctr_id].pkt_count << ", "
@@ -41,6 +43,8 @@ CommandResponse Counter::Init(const bess::pb::CounterArg &arg) {
   name_id = arg.name_id();
   if (name_id == "")
     return CommandFailure(EINVAL, "Invalid counter idx name");
+  check_exist = arg.check_exist();
+
   using AccessMode = bess::metadata::Attribute::AccessMode;
   attr_id = AddMetadataAttr(name_id, sizeof(uint32_t), AccessMode::kRead);
 
@@ -53,7 +57,7 @@ void Counter::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   for (int i = 0; i < cnt; i++) {
     uint32_t ctr_id = get_attr<uint32_t>(this, attr_id, batch->pkts()[i]);
     // check if ctr_id is present
-    if (counters.find(ctr_id) != counters.end()) {
+    if (!check_exist || counters.find(ctr_id) != counters.end()) {
       SessionStats s = counters[ctr_id];
       s.pkt_count += 1;
       s.byte_count += batch->pkts()[i]->total_len();
