@@ -1,3 +1,8 @@
+# vim: syntax=py
+# -*- mode: python -*-
+# SPDX-License-Identifier: Apache-2.0
+# Copyright(c) 2019 Intel Corporation
+#
 # Copyright (c) 2014-2016, The Regents of the University of California.
 # Copyright (c) 2016-2017, Nefeli Networks, Inc.
 # All rights reserved.
@@ -33,9 +38,9 @@ import socket
 
 src_mac='02:1e:67:9f:4d:ae'
 dst_mac='06:16:3e:1b:72:32'
-nh_mac1='30:31:32:33:34:35'
-nh_mac2='40:41:42:43:44:45'
-nh_mac3='50:51:52:53:54:55'
+nh_mac1='00:00:00:00:00:01'
+nh_mac2='00:00:00:00:00:02'
+nh_mac3='00:00:00:00:00:03'
 nh_mac4='60:61:62:63:64:65'
 
 def aton(ip):
@@ -67,16 +72,13 @@ em::ExactMatch(fields=[{'offset':0, 'num_bytes':6},
                        {'offset':30, 'num_bytes':4},
                        {'attr_name':'foo', 'num_bytes':2}],
                values=[{'offset':0, 'num_bytes':6},
-                       {'attr_name':'bar', 'num_bytes':5}])
+                       {'attr_name':'bar', 'num_bytes':1}])
 
 Source() -> Rewrite(templates=packets) -> SetMetadata(attrs=[{'name': 'foo', 'size': 2, 'value_int':0x3344}]) -> em
 
-em:0 -> Sink()
-em:1 -> Sink()
-em:2 -> Sink()
-em:3 -> Sink()
-em:4 -> Sink()
-em:5 -> Sink()   # used as default gate
+em:0 -> m0::Merge() -> attrCmp::Split(size=1, attribute='bar')
+em:1 -> m0
+em:2 -> m0
 
 em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_int':17}, {'value_bin':aton('172.16.100.1')}, {'value_bin':aton('10.0.0.1')}, {'value_int': 0x4433}], gate=0, values=[{'value_int': mac2hex(nh_mac1)}, {'value_int': 30}])
 em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_int':17}, {'value_bin':aton('172.12.55.99')}, {'value_bin':aton('12.34.56.78')}, {'value_int': 0x4433}], gate=1, values=[{'value_int': mac2hex(nh_mac2)}, {'value_int': 29}])
@@ -87,4 +89,23 @@ em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_int':17}, {'value_bin':a
 em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_bin':chr(17)}, {'value_bin':aton('192.168.1.123')}, {'value_bin':aton('12.34.56.78')}, {'value_int': 0x4433}], gate=3, values=[{'value_int': mac2hex(nh_mac4)}, {'value_int': 27}])
 em.delete(fields=[{'value_int': mac2hex(dst_mac)}, {'value_bin':chr(17)}, {'value_bin':aton('192.168.1.123')}, {'value_bin':aton('12.34.56.78')}, {'value_int': 0x4433}])
 
-em.set_default_gate(gate=5)
+# Setting out gates
+em:3 -> BackgroundTraffic::Sink()   # used as default gate
+em.set_default_gate(gate=3)
+
+# setting failure gates
+attrCmp -> em0Failure::Sink()
+
+# setting success gates
+attrCmp:30 -> m1::Merge() -> offsetCmp::Split(size=6, offset=0)
+attrCmp:29 -> m1
+attrCmp:28 -> m1
+
+
+# setting failure gates
+offsetCmp -> em1Failure::Sink()
+
+# setting success gates
+offsetCmp:1 -> m2::Merge() -> Success::Sink()
+offsetCmp:2 -> m2
+offsetCmp:3 -> m2

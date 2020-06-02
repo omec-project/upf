@@ -325,7 +325,7 @@ LinkMerge::Merge() \
                                         {'attr_name':'ctr_id', 'num_bytes':4}, \
                                         {'attr_name':'far_id', 'num_bytes':4}, \
                                         {'attr_name':'needs_gtpu_decap', 'num_bytes':1}]):1 \
-    -> PreQoSCounter::Counter(name_id='ctr_id') \
+    -> PreQoSCounter::Counter(name_id='ctr_id', check_exist=True) \
     -> FARLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
                                      {'attr_name':'fseid', 'num_bytes':4}], \
                              values=[{'attr_name':'action', 'num_bytes':1}, \
@@ -393,13 +393,13 @@ _in:gate -> ueLookup::IPLookup() \
 
 # 3. Complete the last part of the DL pipeline
 ExecuteFAR:FARTunnelAction \
-    -> EtherTrim::GenericDecap(bytes=14) \
+    -> EtherEncapTrim::GenericDecap(bytes=14) \
     -> GTPUEncap::GtpuEncap():1 \
     -> S1UEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(parser.s1u_ifname))}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
-    -> PostQoSCounter::Counter(name_id='ctr_id') \
+    -> PostQoSCounter::Counter(name_id='ctr_id', check_exist=True) \
     -> OuterUDPCsum::L4Checksum() \
     -> OuterIPCsum::IPChecksum() \
     -> ports[parser.s1u_ifname].rtr
