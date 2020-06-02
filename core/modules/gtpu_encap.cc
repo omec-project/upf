@@ -91,10 +91,9 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 
     /* checking values now */
     DLOG(INFO) << "tunnel out sip: " << at_tout_sip
-	       << ", tunnel out dip: " << at_tout_dip
-	       << ", tunnel out teid: " << at_tout_teid
-	       << ", tunnel out udp port: " << at_tout_uport
-	       << std::endl;
+               << ", tunnel out dip: " << at_tout_dip
+               << ", tunnel out teid: " << at_tout_teid
+               << ", tunnel out udp port: " << at_tout_uport << std::endl;
 
     /* assuming that this module comes right after EthernetDecap */
     /* pkt_len can be used as the length of IP datagram */
