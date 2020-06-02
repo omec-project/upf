@@ -29,6 +29,7 @@ class Counter final : public Module {
  private:
   std::map<uint32_t, SessionStats> counters;
   std::string name_id;
+  bool check_exist;
   int attr_id;
 };
 

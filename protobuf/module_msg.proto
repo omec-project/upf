@@ -1077,6 +1077,7 @@ message CounterRemoveArg {
 */
 message CounterArg {
   string name_id = 1; /// Name of the counter_id
+  bool check_exist = 2; /// verify each counter pre-exists before any operation (default = False)
 }
 
 /**
