@@ -8,6 +8,14 @@ import errno
 # for get_env
 from conf.utils import *
 
+# Some macros
+# how many times should controller try to connect before giving up
+MAX_RETRIES = 5
+# Sleep these many seconds before trying to reconnect
+SLEEP_S = 2
+# Maximum number of gates per module instance in BESS. Don't change it.
+MAX_GATES = 8192
+
 # ====================================================
 #       Parameters
 # ====================================================
