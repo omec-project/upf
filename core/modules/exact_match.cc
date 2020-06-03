@@ -312,13 +312,12 @@ void ExactMatch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   table_.MakeKeys(batch, buffer_fn, keys);
 
   int cnt = batch->cnt();
-  ValueTuple default_tuple;
-  default_tuple.gate = default_gate;
+  Value default_value(default_gate);
 
   for (int i = 0; i < cnt; i++) {
     bess::Packet *pkt = batch->pkts()[i];
     ValueTuple res;
-    res = table_.Find(keys[i], default_tuple);
+    res = table_.Find(keys[i], default_value);
     if (res.gate != default_gate) {
       /* setting respecive values */
       setValues(pkt, res.action);
