@@ -48,14 +48,20 @@ using google::protobuf::RepeatedPtrField;
 typedef enum { FIELD_TYPE = 0, VALUE_TYPE } Type;
 
 class ExactMatch;
-class ValueTuple {
+class Value {
   friend class ExactMatch;
-
  public:
-  ValueTuple() : gate(), action() {}
-
- private:
+  Value(gate_idx_t g = 0) : gate(g) {}
+  Value(const Value &v) : gate(v.gate) {}
   gate_idx_t gate;
+};
+
+class ValueTuple : public Value {
+ friend class ExactMatch;
+ public:
+  ValueTuple() : Value(), action() {}
+  ValueTuple(Value v) : Value(v), action() {}
+
   ExactMatchKey action;
 };
 

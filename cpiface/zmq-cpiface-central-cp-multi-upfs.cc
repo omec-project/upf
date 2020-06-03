@@ -327,78 +327,98 @@ int main(int argc, char **argv) {
             BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
-            b.runAddPDRCommand(
-                Core, 0, 0, /* tunnel_ipv4_dst + mask */
-                0, 0,       /* enb teid + mask */
-                rbuf.sess_entry.ue_addr.u.ipv4_addr,
-                0xFFFFFFFFu,                           /* ueaddr ip + mask */
-                0, 0,                                  /* inet ip + mask */
-                0, 0,                                  /* ueport + mask */
-                0, 0,                                  /* inet port + mask */
-                0, 0,                                  /* proto-id + mask */
-                0,                                     /* pdr id */
-                rbuf.sess_entry.dl_s1_info.enb_teid,   /* fseid */
-                (rbuf.sess_entry.dl_s1_info.enb_teid), /* ctr_id */
-                1,                                     /* far id */
-                0,                                     /* need decap */
-                args.pdrlookup);
+            PDRArgs pa = {
+                .sit = Core,        /* source iface */
+                .tipd = 0,          /* tunnel_ipv4_dst */
+                .tipd_mask = 0,     /* tunnel_ipv4_dst mask */
+                .enb_teid = 0,      /* enb teid */
+                .enb_teid_mask = 0, /* enb teid mask */
+                .saddr = rbuf.sess_entry.ue_addr.u.ipv4_addr, /* ueaddr ip */
+                .saddr_mask = 0xFFFFFFFFu, /* ueaddr ip mask */
+                .daddr = 0,                /* inet ip */
+                .daddr_mask = 0,           /* inet ip mask */
+                .sport = 0,                /* ueport */
+                .sport_mask = 0,           /* ueport mask */
+                .dport = 0,                /* inet port */
+                .dport_mask = 0,           /* inet port mask */
+                .protoid = 0,              /* proto-id */
+                .protoid_mask = 0,         /* proto-id + mask */
+                .pdr_id = 0,               /* pdr id */
+                .fseid = rbuf.sess_entry.dl_s1_info.enb_teid,  /* fseid */
+                .ctr_id = rbuf.sess_entry.dl_s1_info.enb_teid, /* ctr_id */
+                .far_id = 1,                                   /* far id */
+                .need_decap = 0,                               /* need decap */
+            };
+            b.runAddPDRCommand(&pa, args.pdrlookup);
           }
           {
             // Add PDR (UPLINK)
             BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
-            b.runAddPDRCommand(
-                Access, 0, 0, /* tunnel_ipv4_dst + mask */
-                0 /*rbuf.sess_entry.dl_s1_info.enb_teid*/,
-                0 /*xFFFFFFFFu*/, /* enb teid + mask */
-                0, 0,             /* inet ip + mask */
-                rbuf.sess_entry.ue_addr.u.ipv4_addr,
-                0xFFFFFFFFu,                           /* ueaddr ip + mask */
-                0, 0,                                  /* ueport + mask */
-                0, 0,                                  /* inet port + mask */
-                0, 0,                                  /* proto-id + mask */
-                0,                                     /* pdr id */
-                rbuf.sess_entry.dl_s1_info.enb_teid,   /* fseid */
-                (rbuf.sess_entry.dl_s1_info.enb_teid), /* ctr_id */
-                0,                                     /* far id */
-                1,                                     /* need decap */
-                args.pdrlookup);
+            PDRArgs pa = {
+                .sit = Access,      /* source iface */
+                .tipd = 0,          /* tunnel_ipv4_dst */
+                .tipd_mask = 0,     /* tunnel_ipv4_dst mask */
+                .enb_teid = 0,      /* enb teid */
+                .enb_teid_mask = 0, /* enb teid mask */
+                .saddr = 0,         /* inet ip */
+                .saddr_mask = 0,    /* inet ip mask */
+                .daddr = rbuf.sess_entry.ue_addr.u.ipv4_addr, /* ueaddr ip */
+                .daddr_mask = 0xFFFFFFFFu, /* ueaddr ip mask */
+                .sport = 0,                /* ueport */
+                .sport_mask = 0,           /* ueport mask */
+                .dport = 0,                /* inet port */
+                .dport_mask = 0,           /* inet port mask */
+                .protoid = 0,              /* proto-id */
+                .protoid_mask = 0,         /* proto-id + mask */
+                .pdr_id = 0,               /* pdr id */
+                .fseid = rbuf.sess_entry.dl_s1_info.enb_teid,  /* fseid */
+                .ctr_id = rbuf.sess_entry.dl_s1_info.enb_teid, /* ctr_id */
+                .far_id = 0,                                   /* far id */
+                .need_decap = 1,                               /* need decap */
+            };
+            b.runAddPDRCommand(&pa, args.pdrlookup);
           }
           {
             // Add FAR (DOWNLINK)
             BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
-            b.runAddFARCommand(
-                1,                                        /* far id*/
-                rbuf.sess_entry.dl_s1_info.enb_teid,      /* fseid */
-                1,                                        /* needs tunnelling */
-                0,                                        /* needs dropping */
-                0,                                        /* notify cp */
-                1,                                        /* tunnel out type */
-                ntohl((uint32_t)(inet_addr(S1U_SGW_IP))), /* n3 addr */
-                rbuf.sess_entry.ul_s1_info.enb_addr.u.ipv4_addr, /* enb addr */
-                rbuf.sess_entry.dl_s1_info.enb_teid,             /* enb_teid */
-                UDP_PORT_GTPU,                                   /* 2152 */
-                args.farlookup);
+            FARArgs fa = {
+                .far_id = 1,                                  /* far id*/
+                .fseid = rbuf.sess_entry.dl_s1_info.enb_teid, /* fseid */
+                .tunnel = 1,    /* needs tunnelling */
+                .drop = 0,      /* needs dropping */
+                .notify_cp = 0, /* notify cp */
+                .tuntype = 1,   /* tunnel out type */
+                .tun_src_ip =
+                    ntohl((uint32_t)(inet_addr(S1U_SGW_IP))), /* n3 addr */
+                .tun_dst_ip = rbuf.sess_entry.ul_s1_info.enb_addr.u
+                                  .ipv4_addr,                /* enb addr */
+                .teid = rbuf.sess_entry.dl_s1_info.enb_teid, /* enb_teid */
+                .tun_port = UDP_PORT_GTPU,                   /* 2152 */
+            };
+            b.runAddFARCommand(&fa, args.farlookup);
           }
           {
             // Add FAR (UPLINK)
             BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
-            b.runAddFARCommand(0,                                   /* far id*/
-                               rbuf.sess_entry.dl_s1_info.enb_teid, /* fseid */
-                               0, /* needs tunnelling */
-                               0, /* needs dropping */
-                               0, /* notify cp */
-                               0, /* tunnel out type */
-                               0, /* not needed */
-                               0, /* not needed */
-                               0, /* not needed */
-                               0, /* not needed */
-                               args.farlookup);
+            FARArgs fa = {
+                .far_id = 0,                                  /* far id*/
+                .fseid = rbuf.sess_entry.dl_s1_info.enb_teid, /* fseid */
+                .tunnel = 0,     /* needs tunnelling */
+                .drop = 0,       /* needs dropping */
+                .notify_cp = 0,  /* notify cp */
+                .tuntype = 0,    /* tunnel out type */
+                .tun_src_ip = 0, /* not needed */
+                .tun_dst_ip = 0, /* not needed */
+                .teid = 0,       /* not needed */
+                .tun_port = 0,   /* not needed */
+            };
+            b.runAddFARCommand(&fa, args.farlookup);
           }
           {
             // Add PreQoS Counter
@@ -453,49 +473,80 @@ int main(int argc, char **argv) {
             BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
-            b.runDelPDRCommand(Core, 0, 0, /* tunnel_ipv4_dst + mask */
-                               0, 0,       /* enb_teid + mask */
-                               ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),
-                               0xFFFFFFFFu, /* ue addr ip + mask */
-                               0, 0,        /* inet ip + mask */
-                               0, 0,        /* ue port + mask */
-                               0, 0,        /* inet port + mask */
-                               0, 0,        /* proto id + mask */
-                               args.pdrlookup);
+            PDRArgs pa = {
+                .sit = Core,        /* source iface */
+                .tipd = 0,          /* tunnel_ipv4_dst */
+                .tipd_mask = 0,     /* tunnel_ipv4_dst mask */
+                .enb_teid = 0,      /* enb teid */
+                .enb_teid_mask = 0, /* enb teid mask */
+                .saddr =
+                    ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr), /* ueaddr ip */
+                .saddr_mask = 0xFFFFFFFFu, /* ueaddr ip mask */
+                .daddr = 0,                /* inet ip */
+                .daddr_mask = 0,           /* inet ip mask */
+                .sport = 0,                /* ueport */
+                .sport_mask = 0,           /* ueport mask */
+                .dport = 0,                /* inet port */
+                .dport_mask = 0,           /* inet port mask */
+                .protoid = 0,              /* proto-id */
+                .protoid_mask = 0,         /* proto-id + mask */
+                .pdr_id = 0,               /* pdr id (not needed) */
+                .fseid = 0,                /* fseid (not needed) */
+                .ctr_id = 0,               /* ctr_id (not needed) */
+                .far_id = 0,               /* far id (not needed) */
+                .need_decap = 0,           /* need decap (not needed) */
+            };
+            b.runDelPDRCommand(&pa, args.pdrlookup);
           }
           {
             // Delete PDR (UPLINK)
             BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
-            b.runDelPDRCommand(Access, 0, 0, /* tunnel_ipv4_dst + mask */
-                               0 /*enb_teid*/,
-                               0 /*xFFFFFFFFu*/, /* enb_teid + mask */
-                               0, 0,             /* inet ip + mask */
-                               ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),
-                               0xFFFFFFFFu, /* ueaddr ip + mask */
-                               0, 0,        /* ue port + mask */
-                               0, 0,        /* inet port + mask */
-                               0, 0,        /* proto id + mask */
-                               args.pdrlookup);
+            PDRArgs pa = {
+                .sit = Access,      /* source iface */
+                .tipd = 0,          /* tunnel_ipv4_dst */
+                .tipd_mask = 0,     /* tunnel_ipv4_dst mask */
+                .enb_teid = 0,      /* enb teid */
+                .enb_teid_mask = 0, /* enb teid mask */
+                .saddr = 0,         /* inet ip */
+                .saddr_mask = 0,    /* inet ip mask */
+                .daddr =
+                    ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr), /* ueaddr ip */
+                .daddr_mask = 0xFFFFFFFFu, /* ueaddr ip mask */
+                .sport = 0,                /* ueport */
+                .sport_mask = 0,           /* ueport mask */
+                .dport = 0,                /* inet port */
+                .dport_mask = 0,           /* inet port mask */
+                .protoid = 0,              /* proto-id */
+                .protoid_mask = 0,         /* proto-id + mask */
+                .pdr_id = 0,               /* pdr id (not needed) */
+                .fseid = 0,                /* fseid (not needed) */
+                .ctr_id = 0,               /* ctr_id (not needed) */
+                .far_id = 0,               /* far id (not needed) */
+                .need_decap = 0,           /* need decap (not needed) */
+            };
+            b.runDelPDRCommand(&pa, args.pdrlookup);
           }
           {
             // Del FAR (DOWNLINK)
             BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
-            b.runDelFARCommand(1,        /* far id*/
-                               enb_teid, /* fseid */
-                               args.farlookup);
+            FARArgs fa;
+            fa.far_id = 1;
+            fa.fseid = enb_teid;
+            b.runDelFARCommand(&fa, args.farlookup);
           }
           {
             // Del FAR (UPLINK)
             BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
-            b.runDelFARCommand(0,        /* far id*/
-                               enb_teid, /* fseid */
-                               args.farlookup);
+            FARArgs fa;
+            fa.far_id = 0;
+            fa.fseid = enb_teid;
+            b.runDelFARCommand(&fa, args.farlookup);
           }
           {
             // Delete PreQoS Counter
