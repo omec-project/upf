@@ -161,4 +161,5 @@ docker run --name bess-web -d --restart unless-stopped \
 docker run --name bess-cpiface -td --restart unless-stopped \
 	--net container:pause \
 	--entrypoint zmq-cpiface \
-	upf-epc-cpiface:"$(<VERSION)"
+	upf-epc-cpiface:"$(<VERSION)" -u 198.18.0.1 \
+	-N 172.17.0.1 -Z 172.17.0.2
