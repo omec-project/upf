@@ -26,17 +26,6 @@ parser.parse(interfaces)
 
 
 # ====================================================
-#       Validate CIDRs
-# ====================================================
-
-
-cidrs = [parser.enb_cidr, parser.ue_cidr]
-for cidr in cidrs:
-    if validate_cidr(cidr) is False:
-        exit(1, 'Invalid {}'.format(cidr))
-
-
-# ====================================================
 #       Core Setup
 # ====================================================
 
@@ -66,45 +55,12 @@ for idx, iface in enumerate(interfaces):
     p = port.Port(parser.interfaces[iface]["ifname"], ext_addrs)
     if p.name in ports:
         continue
-    p.setup_port(idx, parser.mode, parser.workers)
 
-    out = p.fpo
-    # enable frag module (if enabled) to control port MTU size
-    if parser.ip_frag_with_eth_mtu is not None:
-        frag = __bess_module__("{}IP4Frag".format(p.name), 'IPFrag', mtu=parser.ip_frag_with_eth_mtu)
-        frag:1 -> out
-        frag:0 -> Sink()
-        out = frag
+    # initialize port with the configured driver
+    p.init_port(idx, parser.mode, parser.workers)
 
-    # enable telemetrics (if enabled) (how many bytes seen in and out of port)
-    if parser.measure:
-        p.fpi -> Timestamp(attr_name="{}timestamp".format(p.name)) -> p.bpf
-        m = Measure(attr_name="{}timestamp".format(p.name))
-        m -> out
-        out = m
-    else:
-        p.fpi -> p.bpf
-
-    # Attach nat module (if enabled)
-    if p.ext_addrs is not None:
-        # Tokenize the string
-        addrs = p.ext_addrs.split(' or ')
-        # Make a list of ext_addr
-        nat_list = list()
-        for addr in addrs:
-            nat_dict = dict()
-            nat_dict['ext_addr'] = addr
-            nat_list.append(nat_dict)
-
-        # Create the NAT module
-        p.nat = __bess_module__("{}NAT".format(parser.interfaces[iface]["ifname"]), 'NAT', ext_addrs=nat_list)
-        p.nat:1 -> out
-        out = p.nat
-
-    # Direct fast path traffic to Merge module
-    merge = __bess_module__("{}Merge".format(p.name), 'Merge')
-    # Attach Merge module to the 'outlist' of modules
-    merge -> out
+    # setup port module with auxiliary modules
+    p.setup_port(parser.ip_frag_with_eth_mtu, parser.measure)
 
     # Finally add entry to ports list
     ports[p.name] = p
