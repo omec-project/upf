@@ -161,12 +161,8 @@ class ExactMatchTable {
   ExactMatchTable()
       : raw_key_size_(),
         total_key_size_(),
-        raw_value_size_(),
-        total_value_size_(),
         num_fields_(),
-        num_values_(),
         fields_(),
-        values_(),
         table_() {}
 
   // Add a new rule.
@@ -190,20 +186,6 @@ class ExactMatchTable {
 
     table_.Insert(key, val, ExactMatchKeyHash(total_key_size_),
                   ExactMatchKeyEq(total_key_size_));
-
-    return MakeError(0);
-  }
-
-  Error CreateValue(ExactMatchKey &v, const ExactMatchRuleFields &values) {
-    Error err;
-
-    if (values.size() == 0) {
-      return MakeError(EINVAL, "rule has no values");
-    }
-
-    if ((err = gather_value(values, &v)).first != 0) {
-      return err;
-    }
 
     return MakeError(0);
   }
@@ -331,40 +313,14 @@ class ExactMatchTable {
     return DoAddField(f, mt_attr_name, idx, m);
   }
 
-  // Set the `idx`th field of this table to one at offset `offset` bytes into a
-  // buffer with length `size` and mask `mask`.
-  // Returns 0 on success, non-zero errno on failure.
-  Error AddValue(int offset, int size, uint64_t mask, int idx) {
-    ExactMatchField v = {
-        .mask = mask, .attr_id = 0, .offset = offset, .pos = 0, .size = size};
-    return DoAddValue(v, "", idx, nullptr);
-  }
-
-  // Set the `idx`th field of this table to one at the offset of the
-  // `mt_attr_name` metadata field as seen by module `m`, with length `size` and
-  // mask `mask`.
-  // Returns 0 on success, non-zero errno on failure.
-  Error AddValue(Module *m, const std::string &mt_attr_name, int size,
-                 uint64_t mask, int idx) {
-    ExactMatchField v = {
-        .mask = mask, .attr_id = 0, .offset = 0, .pos = 0, .size = size};
-    return DoAddValue(v, mt_attr_name, idx, m);
-  }
-
   size_t num_fields() const { return num_fields_; }
-  size_t num_values() const { return num_values_; }
 
   // Returns the ith field.
   const ExactMatchField &get_field(size_t i) const { return fields_[i]; }
 
-  // Returns the ith value.
-  const ExactMatchField &get_value(size_t i) const { return values_[i]; }
-
   typename EmTable::iterator begin() { return table_.begin(); }
 
   typename EmTable::iterator end() { return table_.end(); }
-
-  ExactMatchField *getVals() { return values_; };
 
  private:
   Error MakeError(int code, const std::string &msg = "") {
@@ -384,33 +340,6 @@ class ExactMatchTable {
     for (size_t i = 0; i < fields.size(); i++) {
       int field_size = fields_[i].size;
       int field_pos = fields_[i].pos;
-
-      const std::vector<uint8_t> &f_obj = fields[i];
-
-      if (static_cast<size_t>(field_size) != f_obj.size()) {
-        return MakeError(
-            EINVAL, Format("rule field %zu should have size %d (has %zu)", i,
-                           field_size, f_obj.size()));
-      }
-
-      memcpy(reinterpret_cast<uint8_t *>(key) + field_pos, f_obj.data(),
-             field_size);
-    }
-
-    return MakeError(0);
-  }
-
-  Error gather_value(const ExactMatchRuleFields &fields, ExactMatchKey *key) {
-    if (fields.size() != num_values_) {
-      return MakeError(EINVAL, Format("rule should have %zu fields (has %zu)",
-                                      num_values_, fields.size()));
-    }
-
-    *key = {};
-
-    for (size_t i = 0; i < fields.size(); i++) {
-      int field_size = values_[i].size;
-      int field_pos = values_[i].pos;
 
       const std::vector<uint8_t> &f_obj = fields[i];
 
@@ -513,82 +442,15 @@ class ExactMatchTable {
     return MakeError(0);
   }
 
-  // Helper for public AddField functions.
-  // DoAddValue inserts `field` as the `idx`th field for this table.
-  // If `mt_attr_name` is set, the `offset` field of `field` will be ignored and
-  // the inserted field will use the offset of `mt_attr_name` as reported by the
-  // module `m`.
-  // Returns 0 on success, non-zero errno on failure.
-  Error DoAddValue(const ExactMatchField &value,
-                   const std::string &mt_attr_name, int idx,
-                   Module *m = nullptr) {
-    if (idx >= MAX_FIELDS) {
-      return MakeError(EINVAL,
-                       Format("idx %d is not in [0,%d)", idx, MAX_FIELDS));
-    }
-    ExactMatchField *v = &values_[idx];
-    v->size = value.size;
-    if (v->size < 1 || v->size > MAX_FIELD_SIZE) {
-      return MakeError(EINVAL, Format("idx %d: 'size' must be in [1,%d]", idx,
-                                      MAX_FIELD_SIZE));
-    }
-
-    if (mt_attr_name.length() > 0) {
-      v->attr_id = m->AddMetadataAttr(mt_attr_name, v->size,
-                                      metadata::Attribute::AccessMode::kWrite);
-      if (v->attr_id < 0) {
-        return MakeError(-v->attr_id,
-                         Format("idx %d: add_metadata_attr() failed", idx));
-      }
-    } else {
-      v->attr_id = -1;
-      v->offset = value.offset;
-      if (v->offset < 0 || v->offset > 1024) {
-        return MakeError(EINVAL, Format("idx %d: invalid 'offset'", idx));
-      }
-    }
-
-    int force_be = (v->attr_id < 0);
-
-    if (value.mask == 0) {
-      /* by default all bits are considered */
-      v->mask = SetBitsHigh<uint64_t>(v->size * 8);
-    } else {
-      if (!utils::uint64_to_bin(&v->mask, value.mask, v->size,
-                                utils::is_be_system() | force_be)) {
-        return MakeError(
-            EINVAL, Format("idx %d: not a valid %d-byte mask", idx, v->size));
-      }
-    }
-
-    if (v->mask == 0) {
-      return MakeError(EINVAL, Format("idx %d: empty mask", idx));
-    }
-
-    num_values_++;
-
-    v->pos = raw_value_size_;
-    raw_value_size_ += v->size;
-    total_value_size_ = align_ceil(raw_value_size_, sizeof(uint64_t));
-    return MakeError(0);
-  }
-
   // unaligend key size, used as an accumulator for calls to AddField()
   size_t raw_key_size_;
 
   // aligned total key size
   size_t total_key_size_;
 
-  // unaligend key size, used as an accumulator for calls to AddField()
-  size_t raw_value_size_;
-
-  // aligned total key size
-  size_t total_value_size_;
-
   size_t num_fields_;
-  size_t num_values_;
+
   ExactMatchField fields_[MAX_FIELDS];
-  ExactMatchField values_[MAX_FIELDS];
 
   EmTable table_;
 };
