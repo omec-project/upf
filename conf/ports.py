@@ -7,12 +7,39 @@ from conf.parser import *
 import conf
 import inspect
 import sys
+import scapy.all as scapy
 
 
 def setup_globals():
     caller_frame = inspect.stack()[1][0]
     caller_globals = caller_frame.f_globals
     globals().update(caller_globals)
+
+
+# ====================================================
+#       Sim Create Packets
+# ====================================================
+# Craft a packet with the specified IP addresses
+def gen_inet_packet(proto, src_ip, dst_ip):
+    eth = scapy.Ether(src='a0:b0:c0:d0:e0:f0', dst='a0:b0:c0:d0:e0:f1')
+    ip = scapy.IP(src=src_ip, dst=dst_ip)
+    udp = proto(sport=10001, dport=10002)
+    payload = 'helloworld'
+    pkt = eth/ip/udp/payload
+    return bytes(pkt)
+
+def gen_ue_packet(proto, src_ip, dst_ip):
+    eth = scapy.Ether(src='a0:b0:c0:d0:e0:f1', dst='a0:b0:c0:d0:e0:f0')
+    ip = scapy.IP(src=src_ip, dst=dst_ip)
+    udp = proto(sport=2152, dport=2152)
+    payload = 'helloworld'
+    pkt = eth/ip/udp/payload
+    return bytes(pkt)
+
+inet_packets = [gen_inet_packet(scapy.UDP, '172.16.100.1', '16.0.0.1'),
+               gen_inet_packet(scapy.UDP, '172.12.55.99', '16.0.0.1')]
+ue_packets = [gen_ue_packet(scapy.UDP, '11.1.1.128', '172.1.1.1'),
+              gen_ue_packet(scapy.UDP, '11.1.1.129', '182.0.0.2')]
 
 
 # ====================================================
@@ -51,6 +78,7 @@ class Port:
         self.fpo = None
         self.bpf = None
         self.rtr = None
+        self.rewrite = None
         self.bpfgate = 0
         self.routes_table = None
         self.nat = None
@@ -130,6 +158,15 @@ class Port:
                 print('Failed to create AF_PACKET socket for {}. Exiting...'.format(name))
                 sys.exit()
 
+        elif conf_mode == 'sim':
+            self.fpi = Source(name="{}_source".format(name))
+            self.fpo = Sink(name="{}_out".format(name))
+            self.bpf = BPF(name="{}FastBPF".format(name))
+            self.bpf.clear()
+
+            # Attach fastpath to worker's root TC
+            self.fpi.attach_task(wid=self.wid)
+
         elif conf_mode == 'dpdk':
             kwargs = None
             pci = alias_by_interface(name)
@@ -201,7 +238,7 @@ class Port:
         else:
             raise Exception('Invalid mode selected.')
 
-    def setup_port(self, conf_frag_mtu, conf_measure):
+    def setup_port(self, conf_frag_mtu, conf_measure, conf_mode):
         out = self.fpo
         # enable frag module (if enabled) to control port MTU size
         if conf_frag_mtu is not None:
@@ -210,16 +247,27 @@ class Port:
             frag.connect(next_mod=Sink())
             out = frag
 
+        # create rewrite module if conf_mode == 'sim'
+        if conf_mode == 'sim':
+            self.rewrite = Rewrite(name="{}_rewrite".format(self.name), templates=inet_packets)
+            #self.fpi.connect(next_mod=self.rewrite)
+
         # enable telemetrics (if enabled) (how many bytes seen in and out of port)
         if conf_measure:
             t = Timestamp(name="{}_timestamp".format(self.name), attr_name="{}timestamp".format(self.name))
-            self.fpi.connect(next_mod=t)
+            if conf_mode == 'sim':
+                self.rewrite.connect(next_mod=t)
+            else:
+                self.fpi.connect(next_mod=t)
             t.connect(next_mod=self.bpf)
             m = Measure(name="{}_measure".format(self.name), attr_name="{}timestamp".format(self.name))
             m.connect(next_mod=out)
             out = m
         else:
-            self.fpi.connect(next_mod=self.bpf)
+            if conf_mode == 'sim':
+                self.rewrite.connect(next_mod=self.bpf)
+            else:
+                self.fpi.connect(next_mod=self.bpf)
 
         # Attach nat module (if enabled)
         if self.ext_addrs is not None:
@@ -242,3 +290,6 @@ class Port:
 
         # Attach Merge module to the 'outlist' of modules
         merge.connect(out)
+
+        if conf_mode == 'sim':
+            self.rtr = merge
