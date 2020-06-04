@@ -81,9 +81,8 @@ CommandResponse ExactMatch::AddFieldOne(const bess::pb::Field &field,
       return CommandFailure(ret.first, "%s", ret.second.c_str());
     }
   } else if (field.position_case() == bess::pb::Field::kOffset) {
-    ret = (t == FIELD_TYPE)
-              ? table_.AddField(field.offset(), size, mask64, idx)
-              : AddValue(field.offset(), size, mask64, idx);
+    ret = (t == FIELD_TYPE) ? table_.AddField(field.offset(), size, mask64, idx)
+                            : AddValue(field.offset(), size, mask64, idx);
     if (ret.first) {
       return CommandFailure(ret.first, "%s", ret.second.c_str());
     }
@@ -337,8 +336,8 @@ void ExactMatch::RuleFieldsFromPb(
     bess::utils::ExactMatchRuleFields *rule, Type type) {
   for (auto i = 0; i < fields.size(); i++) {
     (void)type;
-    int field_size = (type == FIELD_TYPE) ? table_.get_field(i).size
-                                          : get_value(i).size;
+    int field_size =
+        (type == FIELD_TYPE) ? table_.get_field(i).size : get_value(i).size;
     int attr_id = (type == FIELD_TYPE) ? table_.get_field(i).attr_id
                                        : get_value(i).attr_id;
 
