@@ -8,7 +8,6 @@ import errno
 # for get_env
 from conf.utils import *
 
-# Some macros
 # how many times should controller try to connect before giving up
 MAX_RETRIES = 5
 # Sleep these many seconds before trying to reconnect
@@ -74,9 +73,13 @@ class Parser:
         except KeyError:
             print('Autodetecting network driver')
 
-        # CIDRs for UEs & enbs
+        # CIDRs for UEs & enbs, read and validate
         self.enb_cidr = self.conf["enb_cidr"]
+        if validate_cidr(self.enb_cidr) is False:
+            exit(1, 'Invalid {}'.format(self.enb_cidr))
         self.ue_cidr = self.conf["ue_cidr"]
+        if validate_cidr(self.ue_cidr) is False:
+            exit(1, 'Invalid {}'.format(self.ue_cidr))
 
         # Parse workers
         try:

@@ -4,6 +4,7 @@
 # Copyright(c) 2019 Intel Corporation
 
 from conf.parser import *
+import conf
 import inspect
 import sys
 
@@ -18,29 +19,6 @@ def setup_globals():
 #       Port Helpers
 # ====================================================
 dpdk_ports = {}
-
-
-def link_modules(module, next_module, ogate=0, igate=0):
-    # Connect module to next_module
-    for _ in range(MAX_RETRIES):
-        try:
-            bess.connect_modules(module, next_module, ogate, igate)
-        except bess.Error as e:
-            if e.code == errno.EBUSY:
-                break
-            else:
-                return
-        except Exception as e:
-            print(
-                'Error connecting module {}:{}->{}:{}: {}. Retrying in {} secs...'
-                .format(module, ogate, igate, next_module, e, SLEEP_S))
-            time.sleep(SLEEP_S)
-        else:
-            break
-    else:
-        print('BESS module connection ({}:{}->{}:{}) failure.'.format(
-            module, ogate, igate, next_module))
-        return
 
 
 def scan_dpdk_ports():
@@ -98,25 +76,25 @@ class Port:
         # Initialize PMDPort and RX/TX modules
         name = self.name
         fast = PMDPort(name="{}Fast".format(name), **kwargs)
-        self.fpi = __bess_module__("{}FastPI".format(name), 'PortInc', port=fast.name)
-        self.fpo = __bess_module__("{}FastPO".format(name), 'PortOut', port=fast.name)
+        self.fpi = PortInc(name="{}FastPI".format(name), port=fast.name)
+        self.fpo = PortOut(name="{}FastPO".format(name), port=fast.name)
 
         # Initialize BPF to classify incoming traffic to go to kernel and/or pipeline
-        self.bpf = __bess_module__("{}FastBPF".format(name), 'BPF')
+        self.bpf = BPF(name="{}FastBPF".format(name))
         self.bpf.clear()
 
         # Initialize route module
-        self.rtr = __bess_module__("{}Routes".format(name), 'IPLookup')
+        self.rtr = IPLookup(name="{}Routes".format(name))
 
         # Default route goes to Sink
         self.rtr.add(prefix='0.0.0.0', prefix_len=0, gate=MAX_GATES-1)
         s = Sink(name="{}bad_route".format(name))
-        link_modules("{}Routes".format(name), "{}bad_route".format(name), MAX_GATES-1)
+        self.rtr.connect(next_mod=s, ogate=MAX_GATES-1)
 
         # Attach fastpath to worker's root TC
         self.fpi.attach_task(wid=self.wid)
 
-    def setup_port(self, idx, conf_mode, conf_workers):
+    def init_port(self, idx, conf_mode, conf_workers):
         # Pick the worker handling this port
         self.wid = idx % conf_workers
 
@@ -182,9 +160,9 @@ class Port:
                 peer = peer_by_interface(name)
                 vdev = "net_af_packet{},iface={}".format(idx, peer)
                 slow = PMDPort(name="{}Slow".format(name), vdev=vdev)
-                spi = __bess_module__("{}SlowPI".format(name), 'PortInc', port=slow.name)
-                spo = __bess_module__("{}SlowPO".format(name), 'PortOut', port=slow.name)
-                qspo = __bess_module__("{}QSlowPO".format(name), 'Queue')
+                spi = PortInc(name="{}SlowPI".format(name), port=slow.name)
+                spo = PortOut(name="{}SlowPO".format(name), port=slow.name)
+                qspo = Queue(name="{}QSlowPO".format(name))
 
                 # host_ip_filter: tcpdump -i foo 'dst host 198.19.0.1 or 198.18.0.1' -d
                 # Should always be set to lowest priority
@@ -196,11 +174,11 @@ class Port:
                 self.bpf.add(filters=[host_ip_filter])
 
                 # Direct control traffic from DPDK to kernel
-                link_modules("{}FastBPF".format(name), "{}QSlowPO".format(name), HostGate)
-                link_modules("{}QSlowPO".format(name), "{}SlowPO".format(name))
+                self.bpf.connect(next_mod=qspo, ogate=HostGate)
+                qspo.connect(next_mod=spo)
 
                 # Direct control traffic from kernel to DPDK
-                link_modules("{}SlowPI".format(name), "{}FastPO".format(name))
+                spi.connect(next_mod=self.fpo)
 
                 tc = 'slow{}'.format(wid)
                 try:
@@ -222,3 +200,45 @@ class Port:
                 print('Mirror veth interface: {} misconfigured: {}'.format(name, e))
         else:
             raise Exception('Invalid mode selected.')
+
+    def setup_port(self, conf_frag_mtu, conf_measure):
+        out = self.fpo
+        # enable frag module (if enabled) to control port MTU size
+        if conf_frag_mtu is not None:
+            frag = IPFrag(name="{}IP4Frag".format(self.name), mtu=conf_frag_mtu)
+            frag.connect(next_mod=out, ogate=1)
+            frag.connect(next_mod=Sink())
+            out = frag
+
+        # enable telemetrics (if enabled) (how many bytes seen in and out of port)
+        if conf_measure:
+            t = Timestamp(name="{}_timestamp".format(self.name), attr_name="{}timestamp".format(self.name))
+            self.fpi.connect(next_mod=t)
+            t.connect(next_mod=self.bpf)
+            m = Measure(name="{}_measure".format(self.name), attr_name="{}timestamp".format(self.name))
+            m.connect(next_mod=out)
+            out = m
+        else:
+            self.fpi.connect(next_mod=self.bpf)
+
+        # Attach nat module (if enabled)
+        if self.ext_addrs is not None:
+            # Tokenize the string
+            addrs = self.ext_addrs.split(' or ')
+            # Make a list of ext_addr
+            nat_list = list()
+            for addr in addrs:
+                nat_dict = dict()
+                nat_dict['ext_addr'] = addr
+                nat_list.append(nat_dict)
+
+            # Create the NAT module
+            self.nat = NAT(name="{}NAT".format(self.name), ext_addrs=nat_list)
+            self.nat.connect(next_mod=out, ogate=1)
+            out = self.nat
+
+        # Direct fast path traffic to Merge module
+        merge = Merge(name="{}Merge".format(self.name))
+
+        # Attach Merge module to the 'outlist' of modules
+        merge.connect(out)
