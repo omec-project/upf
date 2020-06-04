@@ -60,7 +60,7 @@ for idx, iface in enumerate(interfaces):
     p.init_port(idx, parser.mode, parser.workers)
 
     # setup port module with auxiliary modules
-    p.setup_port(parser.ip_frag_with_eth_mtu, parser.measure)
+    p.setup_port(parser.ip_frag_with_eth_mtu, parser.measure, parser.mode)
 
     # Finally add entry to ports list
     ports[p.name] = p
@@ -321,13 +321,15 @@ if route_control_pid:
 #====================================================
 import time
 
+start_teid = 0xf0000000
+start_ue_ip = 0x10000001
+start_enb_ip = 0x0b010181
+NG4T_MAX_UE_RAN = 500000
+NG4T_MAX_ENB_RAN = 80
+s1u_sgw_ip=ip2long(ips_by_interface(parser.s1u_ifname)[0])
+
+
 def sim_start_test():
-    start_teid = 0xf0000000
-    start_ue_ip = 0x10000001
-    start_enb_ip = 0x0b010181
-    NG4T_MAX_UE_RAN = 500000
-    NG4T_MAX_ENB_RAN = 80
-    s1u_sgw_ip=ip2long(ips_by_interface(parser.s1u_ifname)[0])
 
     for i in range(parser.max_sessions):
 
@@ -409,13 +411,77 @@ def sim_start_test():
 
         PostQoSCounter.add(ctr_id=start_teid+i)                     # fseid
 
+    # Connect the source with the pipeline to start pumping the packets
+    ##ports[parser.s1u_ifname].fpi.connect(next_mod=ports[parser.s1u_ifname].rewrite)
+    ports[parser.sgi_ifname].fpi.connect(next_mod=ports[parser.sgi_ifname].rewrite)
 
-#def sim_end_test():
-    # do nothing for the time being
+
+def sim_end_test():
+
+    # Disconnect the source with the pipeline to end traffic movement
+    ##bess.disconnect_modules(ports[parser.s1u_ifname].fpi.name)
+    bess.disconnect_modules(ports[parser.sgi_ifname].fpi.name)
+
+    for i in range(parser.max_sessions):
+
+        # NG4T-based formula to calculate enodeB IP address against a given UE IP address
+        # il_trafficgen also uses the same scheme
+        # See SimuCPEnbv4Teid(...) in ngic code for more details
+        ue_of_ran = i % NG4T_MAX_UE_RAN
+        ran = i / NG4T_MAX_UE_RAN
+        enb_of_ran = ue_of_ran % NG4T_MAX_ENB_RAN
+        enb_idx = ran * NG4T_MAX_ENB_RAN + enb_of_ran
+
+        PDRLookup.delete(values=[{'value_int':Core},	     # src_iface
+                              {'value_int':0},		     # tunnel_ipv4_dst
+                              {'value_int':0},               # enb_teid
+                              {'value_int':start_ue_ip+i},   # ueaddr ip
+                              {'value_int':0},               # inet ip
+                              {'value_int':0},               # ue port
+                              {'value_int':0},               # inet port
+                              {'value_int':0}],              # proto-id
+                      masks=[{'value_int':0xFF},	     # src_iface-mask
+                              {'value_int':0},		     # tunnel_ipv4_dst-mask
+                              {'value_int':0},               # enb_teid-mask
+                              {'value_int':0xFFFFFFFF},      # ueaddr ip-mask
+                              {'value_int':0},               # inet ip-mask
+                              {'value_int':0},               # ue port-mask
+                              {'value_int':0},               # inet port-mask
+                              {'value_int':0}])              # proto-id-mask
+
+        PDRLookup.delete(values=[{'value_int':Access},	     # src_iface
+                              {'value_int':0},		     # tunnel_ipv4_dst
+                              {'value_int':0},               # enb_teid
+                              {'value_int':0},               # inet ip
+                              {'value_int':start_ue_ip+i},   # ueaddr ip
+                              {'value_int':0},               # inet port
+                              {'value_int':0},               # ue port
+                              {'value_int':0}],              # proto-id
+                      masks=[{'value_int':0xFF},	     # src_iface-mask
+                              {'value_int':0},		     # tunnel_ipv4_dst-mask
+                              {'value_int':0},               # enb_teid-mask
+                              {'value_int':0},               # inet ip-mask
+                              {'value_int':0xFFFFFFFF},      # ueaddr ip-mask
+                              {'value_int':0},               # inet port-mask
+                              {'value_int':0},               # ue port-mask
+                              {'value_int':0}])              # proto-id-mask
+
+        FARLookup.delete(fields=[{'value_int':1},                   # far-id
+                              {'value_int':start_teid+i}])          # fseid
+
+        FARLookup.delete(fields=[{'value_int':0},                   # far-id
+                              {'value_int':start_teid+i}])          # fseid
+
+        PreQoSCounter.remove(ctr_id=start_teid+i)                      # fseid
+
+        PostQoSCounter.remove(ctr_id=start_teid+i)                     # fseid
+
+    #bess.reset_all()
+
 
 ### Uncomment the following lines to test with il_trafficgen ###
 # Start the test
 #sim_start_test()
 # Wait for 30 seconds before deleting the session info entries (optional)
-#time.sleep(100)
+#time.sleep(30)
 #sim_end_test()
