@@ -74,9 +74,14 @@ class ExactMatch final : public Module {
 
   static const Commands cmds;
 
-  ExactMatch() : Module(), default_gate_(),
-	  raw_value_size_(), total_value_size_(),
-	  num_values_(), values_(), table_() {
+  ExactMatch()
+      : Module(),
+        default_gate_(),
+        raw_value_size_(),
+        total_value_size_(),
+        num_values_(),
+        values_(),
+        table_() {
     max_allowed_workers_ = Worker::kMaxWorkers;
   }
 
@@ -105,7 +110,8 @@ class ExactMatch final : public Module {
   ExactMatchField *getVals() { return values_; };
   Error gather_value(const ExactMatchRuleFields &fields, ExactMatchKey *key) {
     if (fields.size() != num_values_) {
-      return std::make_pair(EINVAL, bess::utils::Format("rule should have %zu fields (has %zu)",
+      return std::make_pair(
+          EINVAL, bess::utils::Format("rule should have %zu fields (has %zu)",
                                       num_values_, fields.size()));
     }
 
@@ -119,8 +125,9 @@ class ExactMatch final : public Module {
 
       if (static_cast<size_t>(field_size) != f_obj.size()) {
         return std::make_pair(
-            EINVAL, bess::utils::Format("rule field %zu should have size %d (has %zu)", i,
-                           field_size, f_obj.size()));
+            EINVAL,
+            bess::utils::Format("rule field %zu should have size %d (has %zu)",
+                                i, field_size, f_obj.size()));
       }
 
       memcpy(reinterpret_cast<uint8_t *>(key) + field_pos, f_obj.data(),
@@ -139,28 +146,32 @@ class ExactMatch final : public Module {
                    const std::string &mt_attr_name, int idx,
                    Module *m = nullptr) {
     if (idx >= MAX_FIELDS) {
-      return std::make_pair(EINVAL,
-                       bess::utils::Format("idx %d is not in [0,%d)", idx, MAX_FIELDS));
+      return std::make_pair(
+          EINVAL,
+          bess::utils::Format("idx %d is not in [0,%d)", idx, MAX_FIELDS));
     }
     ExactMatchField *v = &values_[idx];
     v->size = value.size;
     if (v->size < 1 || v->size > MAX_FIELD_SIZE) {
-      return std::make_pair(EINVAL, bess::utils::Format("idx %d: 'size' must be in [1,%d]", idx,
+      return std::make_pair(
+          EINVAL, bess::utils::Format("idx %d: 'size' must be in [1,%d]", idx,
                                       MAX_FIELD_SIZE));
     }
 
     if (mt_attr_name.length() > 0) {
-      v->attr_id = m->AddMetadataAttr(mt_attr_name, v->size,
-                                      bess::metadata::Attribute::AccessMode::kWrite);
+      v->attr_id = m->AddMetadataAttr(
+          mt_attr_name, v->size, bess::metadata::Attribute::AccessMode::kWrite);
       if (v->attr_id < 0) {
-        return std::make_pair(-v->attr_id,
-                         bess::utils::Format("idx %d: add_metadata_attr() failed", idx));
+        return std::make_pair(
+            -v->attr_id,
+            bess::utils::Format("idx %d: add_metadata_attr() failed", idx));
       }
     } else {
       v->attr_id = -1;
       v->offset = value.offset;
       if (v->offset < 0 || v->offset > 1024) {
-        return std::make_pair(EINVAL, bess::utils::Format("idx %d: invalid 'offset'", idx));
+        return std::make_pair(
+            EINVAL, bess::utils::Format("idx %d: invalid 'offset'", idx));
       }
     }
 
@@ -170,15 +181,17 @@ class ExactMatch final : public Module {
       /* by default all bits are considered */
       v->mask = bess::utils::SetBitsHigh<uint64_t>(v->size * 8);
     } else {
-	if (!bess::utils::uint64_to_bin(&v->mask, value.mask, v->size,
-			     bess::utils::is_be_system() | force_be)) {
+      if (!bess::utils::uint64_to_bin(&v->mask, value.mask, v->size,
+                                      bess::utils::is_be_system() | force_be)) {
         return std::make_pair(
-            EINVAL, bess::utils::Format("idx %d: not a valid %d-byte mask", idx, v->size));
+            EINVAL, bess::utils::Format("idx %d: not a valid %d-byte mask", idx,
+                                        v->size));
       }
     }
 
     if (v->mask == 0) {
-      return std::make_pair(EINVAL, bess::utils::Format("idx %d: empty mask", idx));
+      return std::make_pair(EINVAL,
+                            bess::utils::Format("idx %d: empty mask", idx));
     }
 
     num_values_++;
