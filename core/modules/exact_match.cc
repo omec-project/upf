@@ -76,14 +76,14 @@ CommandResponse ExactMatch::AddFieldOne(const bess::pb::Field &field,
   if (field.position_case() == bess::pb::Field::kAttrName) {
     ret = (t == FIELD_TYPE)
               ? table_.AddField(this, field.attr_name(), size, mask64, idx)
-              : table_.AddValue(this, field.attr_name(), size, mask64, idx);
+              : AddValue(this, field.attr_name(), size, mask64, idx);
     if (ret.first) {
       return CommandFailure(ret.first, "%s", ret.second.c_str());
     }
   } else if (field.position_case() == bess::pb::Field::kOffset) {
     ret = (t == FIELD_TYPE)
               ? table_.AddField(field.offset(), size, mask64, idx)
-              : table_.AddValue(field.offset(), size, mask64, idx);
+              : AddValue(field.offset(), size, mask64, idx);
     if (ret.first) {
       return CommandFailure(ret.first, "%s", ret.second.c_str());
     }
@@ -230,16 +230,16 @@ Error ExactMatch::AddRule(const bess::pb::ExactMatchCommandAddArg &arg) {
   t.gate = gate;
   RuleFieldsFromPb(arg.fields(), &rule, FIELD_TYPE);
   /* check whether values match with the the table's */
-  if (arg.values_size() != (ssize_t)table_.num_values())
+  if (arg.values_size() != (ssize_t)num_values())
     return std::make_pair(
         EINVAL, bess::utils::Format(
                     "rule has incorrect number of values. Need %d, has %d",
-                    (int)table_.num_values(), arg.values_size()));
+                    (int)num_values(), arg.values_size()));
   /* check if values are non-zero */
   if (arg.values_size() > 0) {
     RuleFieldsFromPb(arg.values(), &action, VALUE_TYPE);
 
-    if ((err = table_.CreateValue(t.action, action)).first != 0)
+    if ((err = CreateValue(t.action, action)).first != 0)
       return err;
   }
 
@@ -264,14 +264,14 @@ CommandResponse ExactMatch::SetRuntimeConfig(
 }
 
 void ExactMatch::setValues(bess::Packet *pkt, ExactMatchKey &action) {
-  size_t num_values_ = table_.num_values();
+  size_t num_values_ = num_values();
 
   for (size_t i = 0; i < num_values_; i++) {
-    int value_size = table_.get_value(i).size;
-    int value_pos = table_.get_value(i).pos;
-    int value_off = table_.get_value(i).offset;
-    int value_attr_id = table_.get_value(i).attr_id;
-    uint64_t mask = table_.get_value(i).mask;
+    int value_size = get_value(i).size;
+    int value_pos = get_value(i).pos;
+    int value_off = get_value(i).offset;
+    int value_attr_id = get_value(i).attr_id;
+    uint64_t mask = get_value(i).mask;
     uint8_t *data = pkt->head_data<uint8_t *>() + value_off;
 
     if (value_attr_id < 0) { /* if it is offset-based */
@@ -338,9 +338,9 @@ void ExactMatch::RuleFieldsFromPb(
   for (auto i = 0; i < fields.size(); i++) {
     (void)type;
     int field_size = (type == FIELD_TYPE) ? table_.get_field(i).size
-                                          : table_.get_value(i).size;
+                                          : get_value(i).size;
     int attr_id = (type == FIELD_TYPE) ? table_.get_field(i).attr_id
-                                       : table_.get_value(i).attr_id;
+                                       : get_value(i).attr_id;
 
     bess::pb::FieldData current = fields.Get(i);
     if (current.encoding_case() == bess::pb::FieldData::kValueBin) {
