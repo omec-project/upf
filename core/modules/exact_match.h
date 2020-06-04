@@ -50,6 +50,7 @@ typedef enum { FIELD_TYPE = 0, VALUE_TYPE } Type;
 class ExactMatch;
 class Value {
   friend class ExactMatch;
+
  public:
   Value(gate_idx_t g = 0) : gate(g) {}
   Value(const Value &v) : gate(v.gate) {}
@@ -57,7 +58,8 @@ class Value {
 };
 
 class ValueTuple : public Value {
- friend class ExactMatch;
+  friend class ExactMatch;
+
  public:
   ValueTuple() : Value(), action() {}
   ValueTuple(Value v) : Value(v), action() {}
