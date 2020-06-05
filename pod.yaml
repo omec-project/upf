@@ -1,33 +1,89 @@
+---
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: s1u-sgi-net
+  annotations:
+    k8s.v1.cni.cncf.io/resourceName: intel.com/sriov_vfio
+spec:
+  config: '{
+    "type": "vfioveth",
+    "name": "s1u-sgi-net",
+    "ipam": {
+        "type": "host-local",
+        "subnet": "198.18.0.0/24",
+        "rangeStart": "198.18.0.2",
+        "rangeEnd": "198.18.0.250",
+        "gateway": "198.18.0.1"
+    }
+}'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spgwu-conf
+data:
+  spgwu.json: |
+    {
+      "ue_cidr": "16.0.0.0/16",
+      "enb_cidr": "11.1.1.128/25",
+      "s1u": {
+        "ifname": "s1u-sgi"
+      },
+      "sgi": {
+        "ifname": "s1u-sgi"
+      },
+      "workers": "1",
+      "max_sessions": 50000
+    }
+---
 apiVersion: v1
 kind: Pod
 metadata:
   name: bess
   annotations:
       k8s.v1.cni.cncf.io/networks: '[
-            { "name": "s1u-net", "interface": "s1u" },
-            { "name": "sgi-net", "interface": "sgi" }
+            { "name": "s1u-sgi-net", "interface": "s1u-sgi" }
     ]'
 spec:
   shareProcessNamespace: true
+  initContainers:
+  # Currently CNI doesn't allow metric we're doing it here instead of net-attach-def
+  - name: routes
+    image: krsna1729/spgwu
+    env:
+    - name: ENB_SUBNET
+      value: '11.1.1.128/25'
+    - name: S1U_GATEWAY
+      value: '198.18.0.1'
+    - name: SGI_GATEWAY
+      value: '198.18.0.1'
+    command: ["sh", "-xec"]
+    args:
+    - ip route add $ENB_SUBNET via $S1U_GATEWAY;
+      ip route add default via $SGI_GATEWAY metric 110;
+    securityContext:
+      capabilities:
+        add:
+          - NET_ADMIN
+
   # Reqd. if working with AF_PACKET so that kernel does not reply to GTP-U packets
-  #initContainers:
   #- name: iptables
   #  image: krsna1729/spgwu
   #  command: [ "sh", "-xec"]
+  #  args:
+  #  - iptables -I OUTPUT -p icmp --icmp-type port-unreachable -j DROP;
   #  securityContext:
   #    capabilities:
   #      add:
   #        - NET_ADMIN
-  #  args:
-  #  - iptables -I OUTPUT -p icmp --icmp-type port-unreachable -j DROP;
   containers:
   - name: bess-routectl
     image: krsna1729/spgwu
-    command: ["/route_control.py"]
+    command: ["/opt/bess/bessctl/conf/route_control.py"]
     args:
     - -i
-    - s1u
-    - sgi
+    - s1u-sgi
     env:
     - name: PYTHONUNBUFFERED
       value: "1"
@@ -35,32 +91,28 @@ spec:
       limits:
         cpu: 256m
         memory: 128Mi
-    volumeMounts:
-    - name: bess-conf
-      mountPath: /route_control.py
-      subpath: route_control.py
   - name: bess
     image: krsna1729/spgwu
     stdin: true
     tty: true
     args:
     - -grpc-url=0.0.0.0:10514
+    env:
+    - name: CONF_FILE
+      value: /conf/spgwu.json
     livenessProbe:
       tcpSocket:
         port: 10514
-      initialDelaySeconds: 15
+      initialDelaySeconds: 30
       periodSeconds: 20
     lifecycle:
       postStart:
         exec:
-          command: ["sh", "-c", "until bessctl run spgwu; do sleep 2; done;"]
+          command: ["sh", "-c", "until ss | grep -q 10514; do sleep 5; echo waiting for bessd; done; ./bessctl run spgwu;"]
     securityContext:
-      # TODO: fix DPDK port detection issue and remove priviledged
-      privileged: true
       capabilities:
         add:
-        - NET_ADMIN # To add routes post-startup
-        - IPC_LOCK # AF_PACKET vdev uses mmap
+        - IPC_LOCK # AF_PACKET vdev (and 4K pages) uses mmap
     resources:
       limits:
         hugepages-1Gi: 2Gi
@@ -68,7 +120,7 @@ spec:
         memory: 256Mi
         intel.com/sriov_vfio: '1'
     volumeMounts:
-    - name: bess-conf
+    - name: spgwu-conf
       mountPath: /conf
     - name: hugepages
       mountPath: /dev/hugepages
@@ -94,7 +146,7 @@ spec:
         cpu: 256m
         memory: 128Mi
   volumes:
-  - name: bess-conf
+  - name: spgwu-conf
     configMap:
       name: spgwu-conf
   - name: hugepages

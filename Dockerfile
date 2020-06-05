@@ -31,7 +31,7 @@ RUN mkdir linux && \
 
 # dpdk
 ARG DPDK_URL='http://dpdk.org/git/dpdk-stable'
-ARG DPDK_VER='v19.11.1'
+ARG DPDK_VER='19.11'
 ENV DPDK_DIR="/dpdk"
 RUN git clone -b $DPDK_VER -q --depth 1 $DPDK_URL $DPDK_DIR
 
