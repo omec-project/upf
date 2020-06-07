@@ -46,7 +46,7 @@ docker-push:
 		docker push ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}upf-epc-$$target:${DOCKER_TAG}; \
 	done
 
-bin: docker-build
+bin:
 		DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_BUILD_ARGS) \
 			--target binaries \
 			--output bin \
