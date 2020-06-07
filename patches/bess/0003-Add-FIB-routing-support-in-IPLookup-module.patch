@@ -1,29 +1,43 @@
-From b7139642079ffeccc1eefc430332159d5810a335 Mon Sep 17 00:00:00 2001
+From f508c852812a397a2fd08c53b1327f03a261c411 Mon Sep 17 00:00:00 2001
 From: Muhammad Asim Jamshed <muhammad.jamshed@intel.com>
 Date: Mon, 15 Jun 2020 15:14:14 -0700
 Subject: [PATCH] Add FIB routing support in IPLookup module.
 
 Signed-off-by: Muhammad Asim Jamshed <muhammad.jamshed@intel.com>
 ---
- core/modules/ip_lookup.cc | 63 +++++++++++++++++++++++++++++++++++++--
+ build.py                  |  2 +-
+ core/modules/ip_lookup.cc | 61 +++++++++++++++++++++++++++++++++++++--
  core/modules/ip_lookup.h  | 14 +++++++++
- 2 files changed, 74 insertions(+), 3 deletions(-)
+ 3 files changed, 74 insertions(+), 3 deletions(-)
 
+diff --git a/build.py b/build.py
+index 3fac9064..d0f16cc7 100755
+--- a/build.py
++++ b/build.py
+@@ -95,7 +95,7 @@ DPDK_TARGET = 'x86_64-native-linuxapp-gcc'
+ kernel_release = cmd('uname -r', quiet=True).strip()
+
+ DPDK_DIR = '%s/%s' % (DEPS_DIR, DPDK_VER)
+-DPDK_CFLAGS = '"-g -w -fPIC"'
++DPDK_CFLAGS = '"-g -w -fPIC -DALLOW_EXPERIMENTAL_API"'
+ DPDK_CONFIG = '%s/build/.config' % DPDK_DIR
+
+ extra_libs = set()
 diff --git a/core/modules/ip_lookup.cc b/core/modules/ip_lookup.cc
 index 3c8b1157..7e976d41 100644
 --- a/core/modules/ip_lookup.cc
 +++ b/core/modules/ip_lookup.cc
 @@ -32,7 +32,6 @@
- 
+
  #include <rte_config.h>
  #include <rte_errno.h>
 -#include <rte_lpm.h>
- 
+
  #include "../utils/bits.h"
  #include "../utils/ether.h"
 @@ -54,15 +53,26 @@ const Commands IPLookup::cmds = {
       Command::THREAD_UNSAFE}};
- 
+
  CommandResponse IPLookup::Init(const bess::pb::IPLookupArg &arg) {
 +#if RTE_VERSION < RTE_VERSION_NUM(19, 11, 0, 0)
    struct rte_lpm_config conf = {
@@ -38,7 +52,7 @@ index 3c8b1157..7e976d41 100644
 +  conf.dir24_8.nh_sz = RTE_FIB_DIR24_8_4B;
 +  conf.dir24_8.num_tbl8 = arg.max_tbl8s() ? arg.max_tbl8s() : 128;
 +#endif
- 
+
    default_gate_ = DROP_GATE;
 -
 -  lpm_ = rte_lpm_create(name().c_str(), /* socket_id = */ 0, &conf);
@@ -47,11 +61,11 @@ index 3c8b1157..7e976d41 100644
 +#else
 +  lpm_ = rte_fib_create(name().c_str(), /* socket_id = */ rte_socket_id(), &conf);
 +#endif
- 
+
    if (!lpm_) {
      return CommandFailure(rte_errno, "DPDK error: %s", rte_strerror(rte_errno));
 @@ -73,7 +83,11 @@ CommandResponse IPLookup::Init(const bess::pb::IPLookupArg &arg) {
- 
+
  void IPLookup::DeInit() {
    if (lpm_) {
 +#if RTE_VERSION < RTE_VERSION_NUM(19, 11, 0, 0)
@@ -61,11 +75,11 @@ index 3c8b1157..7e976d41 100644
 +#endif
    }
  }
- 
+
 @@ -86,6 +100,7 @@ void IPLookup::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
    int cnt = batch->cnt();
    int i;
- 
+
 +#if RTE_VERSION < RTE_VERSION_NUM(19, 11, 0, 0)
  #if VECTOR_OPTIMIZATION
    // Convert endianness for four addresses at the same time
@@ -98,7 +112,7 @@ index 3c8b1157..7e976d41 100644
 +  USED(default_gate);
 +#endif
  }
- 
+
  ParsedPrefix IPLookup::ParseIpv4Prefix(
 @@ -201,7 +239,12 @@ CommandResponse IPLookup::CommandAdd(
      default_gate_ = gate;
@@ -127,7 +141,7 @@ index 3c8b1157..7e976d41 100644
      }
 @@ -233,7 +280,17 @@ CommandResponse IPLookup::CommandDelete(
  }
- 
+
  CommandResponse IPLookup::CommandClear(const bess::pb::EmptyArg &) {
 +#if RTE_VERSION < RTE_VERSION_NUM(19, 11, 0, 0)
    rte_lpm_delete_all(lpm_);
@@ -142,7 +156,7 @@ index 3c8b1157..7e976d41 100644
 +#endif
    return CommandSuccess();
  }
- 
+
 diff --git a/core/modules/ip_lookup.h b/core/modules/ip_lookup.h
 index de020e7f..a866ad08 100644
 --- a/core/modules/ip_lookup.h
@@ -160,12 +174,12 @@ index de020e7f..a866ad08 100644
 +#include <rte_fib.h>
 +}
 +#endif
- 
+
  using bess::utils::be32_t;
  using ParsedPrefix = std::tuple<int, std::string, be32_t>;
 @@ -59,7 +68,12 @@ class IPLookup final : public Module {
    CommandResponse CommandClear(const bess::pb::EmptyArg &arg);
- 
+
   private:
 +#if RTE_VERSION < RTE_VERSION_NUM(19, 11, 0, 0)
    struct rte_lpm *lpm_;
@@ -176,6 +190,6 @@ index de020e7f..a866ad08 100644
    gate_idx_t default_gate_;
    ParsedPrefix ParseIpv4Prefix(const std::string &prefix, uint64_t prefix_len);
  };
--- 
+--
 2.25.1
 
