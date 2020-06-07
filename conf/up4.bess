@@ -479,9 +479,10 @@ def sim_end_test():
     #bess.reset_all()
 
 
-### Uncomment the following lines to test with il_trafficgen ###
-# Start the test
-#sim_start_test()
-# Wait for 30 seconds before deleting the session info entries (optional)
-#time.sleep(30)
-#sim_end_test()
+### Uncomment the following lines to test with Source ###
+if parser.mode == 'sim':
+    # Start the test
+    sim_start_test()
+    # Wait for 30 seconds before deleting the session info entries (optional)
+    time.sleep(30)
+    sim_end_test()
