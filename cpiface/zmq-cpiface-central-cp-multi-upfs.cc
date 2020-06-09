@@ -436,7 +436,16 @@ int main(int argc, char **argv) {
                                        InsecureChannelCredentials()));
             b.runAddCounterCommand(
                 (rbuf.sess_entry.dl_s1_info.enb_teid),
-                (("Post" + std::string(args.qoscounter)).c_str()));
+                (("PostUL" + std::string(args.qoscounter)).c_str()));
+          }
+          {
+            // Add PostQoS Counter
+            BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
+                                           std::to_string(args.bessd_port),
+                                       InsecureChannelCredentials()));
+            b.runAddCounterCommand(
+                (rbuf.sess_entry.dl_s1_info.enb_teid),
+                (("PostDL" + std::string(args.qoscounter)).c_str()));
           }
           break;
         case MSG_SESS_DEL:
@@ -562,7 +571,15 @@ int main(int argc, char **argv) {
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
             b.runDelCounterCommand(
-                (enb_teid), (("Post" + std::string(args.qoscounter)).c_str()));
+                (enb_teid), (("PostUL" + std::string(args.qoscounter)).c_str()));
+          }
+          {
+            // Delete PostQoS Counter
+            BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
+                                           std::to_string(args.bessd_port),
+                                       InsecureChannelCredentials()));
+            b.runDelCounterCommand(
+                (enb_teid), (("PostDL" + std::string(args.qoscounter)).c_str()));
           }
           break;
         default:
