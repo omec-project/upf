@@ -10,8 +10,10 @@
 #include <map>
 
 struct SessionStats {
-  int pkt_count;
-  int byte_count;
+  uint64_t ul_pkt_count;
+  uint64_t ul_byte_count;
+  uint64_t dl_pkt_count;
+  uint64_t dl_byte_count;
 };
 
 class Counter final : public Module {
@@ -30,7 +32,8 @@ class Counter final : public Module {
   std::map<uint32_t, SessionStats> counters;
   std::string name_id;
   bool check_exist;
-  int attr_id;
+  int ctr_attr_id;
+  int dir_attr_id;
 };
 
 #endif  // BESS_MODULES_COUNTER_H_

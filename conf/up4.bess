@@ -12,8 +12,8 @@ port.setup_globals()
 #	Read json config file (START HERE)
 # ====================================================
 
-Uplink = 1
-Downlink = 2
+Uplink = 0x01
+Downlink = 0x02
 Access = 1
 Core = 2
 FARForwardAction = 0
@@ -156,7 +156,7 @@ if parser.max_ip_defrag_flows is not None:
 
 # 2. Build the remaining first half of the DL pipeline before entering the shared pipeline
 _in:gate -> ueLookup::IPLookup() \
-    -> SetMetadata(attrs=[{'name':'direction', 'size':1, 'value_int':Downlink}, \
+    -> SetMetadata(attrs=[{'name':'direction', 'size':4, 'value_int':Downlink}, \
                           {'name':'src_iface', 'size':1, 'value_int':Core}]) \
     -> LinkMerge # Start of the shared pipeline
 
@@ -169,7 +169,7 @@ ExecuteFAR:FARTunnelAction \
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(parser.s1u_ifname))}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
-    -> PostQoSCounter::Counter(name_id='ctr_id', check_exist=True) \
+    -> PostDLQoSCounter::Counter(name_id='ctr_id', check_exist=True) \
     -> OuterUDPCsum::L4Checksum() \
     -> OuterIPCsum::IPChecksum() \
     -> ports[parser.s1u_ifname].rtr
@@ -237,7 +237,7 @@ if parser.max_ip_defrag_flows is not None:
 
 # 2. Build the remaining first half of the UL pipeline before entering the shard pipeline
 _in:gate -> InetLookup::IPLookup() \
-    -> SetMetadata(attrs=[{'name':'direction', 'size':1, 'value_int':Uplink}, \
+    -> SetMetadata(attrs=[{'name':'direction', 'size':4, 'value_int':Uplink}, \
                           {'name':'src_iface', 'size':1, 'value_int':Access}]) \
     -> LinkMerge # Start of the shared pipeline
 
@@ -248,6 +248,7 @@ ExecuteFAR:FARForwardAction \
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(parser.sgi_ifname))}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
+    -> PostULQoSCounter::Counter(name_id='ctr_id', check_exist=True) \
     -> ports[parser.sgi_ifname].rtr
 
 # 4. GTP Echo response pipeline
@@ -409,7 +410,7 @@ def sim_start_test():
 
         PreQoSCounter.add(ctr_id=start_teid+i)                      # fseid
 
-        PostQoSCounter.add(ctr_id=start_teid+i)                     # fseid
+        PostDLQoSCounter.add(ctr_id=start_teid+i)                     # fseid
 
     # Connect the source with the pipeline to start pumping the packets
     ##ports[parser.s1u_ifname].fpi.connect(next_mod=ports[parser.s1u_ifname].rewrite)
@@ -474,7 +475,7 @@ def sim_end_test():
 
         PreQoSCounter.remove(ctr_id=start_teid+i)                      # fseid
 
-        PostQoSCounter.remove(ctr_id=start_teid+i)                     # fseid
+        PostDLQoSCounter.remove(ctr_id=start_teid+i)                     # fseid
 
     #bess.reset_all()
 
