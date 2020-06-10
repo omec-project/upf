@@ -11,9 +11,11 @@ gui_port=8000
 # "dpdk" set as default
 # "af_xdp" uses AF_XDP sockets via DPDK's vdev for pkt I/O. This version is non-zc version. ZC version still needs to be evaluated.
 # "af_packet" uses AF_PACKET sockets via DPDK's vdev for pkt I/O.
+# "sim" uses Source() modules to simulate traffic generation
 mode="dpdk"
 #mode="af_xdp"
 #mode="af_packet"
+#mode="sim"
 
 # Gateway interface(s)
 #
@@ -123,14 +125,20 @@ sudo ln -s "$sandbox" /var/run/netns/pause
 
 case $mode in
 "dpdk") setup_mirror_links ;;
-*)
+"af_xdp"|"af_packet")
 	move_ifaces
 	# Make sure that kernel does not send back icmp dest unreachable msg(s)
 	sudo ip netns exec pause iptables -I OUTPUT -p icmp --icmp-type port-unreachable -j DROP
 	;;
+*)
+    ;;
 esac
 
-setup_trafficgen_routes
+# Setup trafficgen routes
+if [ "$mode" != 'sim' ]
+   then
+       setup_trafficgen_routes
+fi
 
 # Run bessd
 docker run --name bess -td --restart unless-stopped \
@@ -143,6 +151,18 @@ docker run --name bess -td --restart unless-stopped \
 	upf-epc-bess:"$(<VERSION)"
 
 docker logs bess
+
+# Run bess-web
+docker run --name bess-web -d --restart unless-stopped \
+	--net container:bess \
+	--entrypoint bessctl \
+	upf-epc-bess:"$(<VERSION)" http 0.0.0.0 $gui_port
+
+# Don't run any other container if mode is "sim"
+if [ "$mode" == 'sim' ]
+then
+    exit
+fi
 
 # Run bess-routectl
 docker run --name bess-routectl -td --restart unless-stopped \
