@@ -5,6 +5,9 @@
 
 from conf.parser import *
 import conf.ports as port
+from scapy.contrib.gtp import *
+import scapy.all as scapy
+
 port.setup_globals()
 
 
@@ -23,6 +26,52 @@ FARNotifyCPAction = 4
 interfaces = ["s1u", "sgi"]
 parser = Parser('conf/spgwu.json')
 parser.parse(interfaces)
+
+# Catch sgi & s1u MAC/IPv4 addresses
+macstr_d = None
+macstr_u = None
+s1u_ip = None
+if parser.mode == 'sim':
+    macstr_d = '00:00:00:00:00:02'
+    macstr_u = '00:00:00:00:00:01'
+    s1u_ip = {0: '11.1.1.1'}
+else:
+    macstr_d = mac_by_interface(parser.sgi_ifname)
+    macstr_u = mac_by_interface(parser.s1u_ifname)
+    s1u_ip = ips_by_interface(parser.s1u_ifname)
+
+
+# ====================================================
+#       SIM Create Packet Functions
+# ====================================================
+#
+# Craft a packet with the specified IP addresses
+# TODOs - XXX:
+#
+# 1. Shift all sim-related code to a separate file (sim_gen.py)
+# 2. Replace hard-coded teids, src_ips, dst_ips, inet_ips with wildcards
+# Volunteers needed to do this job!!!
+
+def gen_inet_packet(proto, src_mac, dst_mac, src_ip, dst_ip):
+    eth = scapy.Ether(src=src_mac, dst=dst_mac)
+    ip = scapy.IP(src=src_ip, dst=dst_ip)
+    udp = proto(sport=10001, dport=10002)
+    payload = 'helloworld'
+    pkt = eth/ip/udp/payload
+    return bytes(pkt)
+
+def gen_ue_packet(proto, src_mac, dst_mac, src_ip, dst_ip, inner_src_ip, inner_dst_ip):
+    eth = scapy.Ether(src=src_mac, dst=dst_mac)
+    ip = scapy.IP(src=src_ip, dst=dst_ip)
+    udp = proto(sport=2152, dport=2152)
+    payload = 'helloworld'
+    pkt = eth/ip/udp/GTP_U_Header(teid=0xf0000000)/scapy.IP(src=inner_src_ip, dst=inner_dst_ip)/scapy.TCP()
+    return bytes(pkt)
+
+inet_packets = [gen_inet_packet(scapy.UDP, macstr_u, macstr_d, '172.16.100.1', '16.0.0.1'),
+               gen_inet_packet(scapy.UDP, macstr_u, macstr_d, '172.12.55.99', '16.0.0.1')]
+ue_packets = [gen_ue_packet(scapy.UDP, macstr_d, macstr_u, '11.1.1.128', '11.1.1.1', '16.0.0.1', '172.16.100.1')]
+packet_generator = {'s1u': ue_packets, 'sgi': inet_packets}
 
 
 # ====================================================
@@ -43,13 +92,15 @@ for wid in xrange(parser.workers):
 ports = {}
 
 # Before constructing the pipeline, pause bessd
-bess.pause_all()
+#bess.pause_all()
 
 for idx, iface in enumerate(interfaces):
     # check if source natting for a given port is required
     try:
         ext_addrs = parser.interfaces[iface]["ip_masquerade"]
     except KeyError:
+        ext_addrs = None
+    except TypeError:
         ext_addrs = None
 
     p = port.Port(parser.interfaces[iface]["ifname"], ext_addrs)
@@ -60,7 +111,7 @@ for idx, iface in enumerate(interfaces):
     p.init_port(idx, parser.mode, parser.workers)
 
     # setup port module with auxiliary modules
-    p.setup_port(parser.ip_frag_with_eth_mtu, parser.measure, parser.mode)
+    p.setup_port(parser.ip_frag_with_eth_mtu, parser.measure, packet_generator[iface])
 
     # Finally add entry to ports list
     ports[p.name] = p
@@ -167,7 +218,7 @@ ExecuteFAR:FARTunnelAction \
     -> GTPUEncap::GtpuEncap():1 \
     -> S1UEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
-        {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(parser.s1u_ifname))}},
+        {'size': 6, 'value': {'value_int': mac2hex(macstr_u)}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
     -> PostDLQoSCounter::Counter(name_id='ctr_id', check_exist=True) \
     -> OuterUDPCsum::L4Checksum() \
@@ -198,7 +249,6 @@ if ports[parser.sgi_ifname].nat is not None:
 # Verify that destination MAC address matches that with sgi interface
 # i.e. insert a rule so that destination MAC address of the interface
 # is an 'exact' match
-macstr_d = mac_by_interface(parser.sgi_ifname)
 DLMACDstMatch.add(fields=[{'value_int': mac2hex(macstr_d)}], gate=0)
 
 # Add ueLookup rules
@@ -246,7 +296,7 @@ ExecuteFAR:FARForwardAction \
     -> EtherDecapTrim::GenericDecap(bytes=14) -> GTPUDecap::GtpuDecap() \
     -> SGIEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
-        {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(parser.sgi_ifname))}},
+        {'size': 6, 'value': {'value_int': mac2hex(macstr_d)}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
     -> PostULQoSCounter::Counter(name_id='ctr_id', check_exist=True) \
     -> ports[parser.sgi_ifname].rtr
@@ -255,7 +305,7 @@ ExecuteFAR:FARForwardAction \
 s1uFastBPF:GTPUEchoGate \
     	-> gtpRxIPCksum::IPChecksum(verify=True) \
         -> gtpRxUDPCksum::L4Checksum(verify=True) \
-	-> GTPUEcho::GtpuEcho(s1u_sgw_ip=ip2long(ips_by_interface(parser.s1u_ifname)[0])):1 \
+	-> GTPUEcho::GtpuEcho(s1u_sgw_ip=ip2long(s1u_ip[0])):1 \
         -> EthSwap::MACSwap() \
         -> 1:OuterUDPCsum
 
@@ -278,7 +328,7 @@ ULMACDstMatch.set_default_gate(gate=1)
 # and (udp[28:4] & 0xffffff00) = 0x10000000     # check UE subnet
 check_enb_subnet = "src net {} ".format(parser.enb_cidr)
 check_spgwu_ip = " and dst host " + \
-    " or ".join(str(x) for x in ips_by_interface(parser.s1u_ifname))
+    " or ".join(str(x) for x in s1u_ip)
 check_gtpu_port = " and udp dst port 2152"
 check_ue_subnet = " and (udp[28:4] & 0x{}) = 0x{}".format(
     cidr2mask(parser.ue_cidr), ip2hex(cidr2block(parser.ue_cidr)[0]))
@@ -297,14 +347,10 @@ s1uFastBPF.add(filters=[uplink_filter])
 
 # Verify that destination MAC address matches that with s1u interface
 # Exact match on desstination MAC address of the interface
-macstr_u = mac_by_interface(parser.s1u_ifname)
 ULMACDstMatch.add(fields=[{'value_int': mac2hex(macstr_u)}], gate=0)
 
 # Add InetLookup rules
 InetLookup.add(prefix='0.0.0.0', prefix_len=0, gate=0)
-
-# Pipeline complete, resume bessd
-bess.resume_all()
 
 
 # ====================================================
@@ -318,7 +364,7 @@ if route_control_pid:
 
 
 # ===================================================
-#	SIM TEST
+#	SIM TEST FUNC DEFINITIONS
 #====================================================
 import time
 
@@ -327,7 +373,7 @@ start_ue_ip = 0x10000001
 start_enb_ip = 0x0b010181
 NG4T_MAX_UE_RAN = 500000
 NG4T_MAX_ENB_RAN = 80
-s1u_sgw_ip=ip2long(ips_by_interface(parser.s1u_ifname)[0])
+s1u_sgw_ip=ip2long(s1u_ip[0])
 
 
 def sim_start_test():
@@ -368,7 +414,7 @@ def sim_start_test():
         PDRLookup.add(gate=1, priority=1,
                       values=[{'value_int':Access},	     # src_iface
                               {'value_int':0},		     # tunnel_ipv4_dst
-                              {'value_int':0},               # enb_teid
+                              {'value_int':start_teid+i},    # enb_teid
                               {'value_int':0},               # inet ip
                               {'value_int':start_ue_ip+i},   # ueaddr ip
                               {'value_int':0},               # inet port
@@ -376,7 +422,7 @@ def sim_start_test():
                               {'value_int':0}],              # proto-id
                       masks=[{'value_int':0xFF},	     # src_iface-mask
                               {'value_int':0},		     # tunnel_ipv4_dst-mask
-                              {'value_int':0},               # enb_teid-mask
+                              {'value_int':0xFFFFFFFF},      # enb_teid-mask
                               {'value_int':0},               # inet ip-mask
                               {'value_int':0xFFFFFFFF},      # ueaddr ip-mask
                               {'value_int':0},               # inet port-mask
@@ -413,15 +459,15 @@ def sim_start_test():
         PostDLQoSCounter.add(ctr_id=start_teid+i)                     # fseid
 
     # Connect the source with the pipeline to start pumping the packets
-    ##ports[parser.s1u_ifname].fpi.connect(next_mod=ports[parser.s1u_ifname].rewrite)
-    ports[parser.sgi_ifname].fpi.connect(next_mod=ports[parser.sgi_ifname].rewrite)
+    bess.resume_all()
 
 
 def sim_end_test():
 
     # Disconnect the source with the pipeline to end traffic movement
-    ##bess.disconnect_modules(ports[parser.s1u_ifname].fpi.name)
+    bess.pause_all()
     bess.disconnect_modules(ports[parser.sgi_ifname].fpi.name)
+    bess.disconnect_modules(ports[parser.s1u_ifname].fpi.name)
 
     for i in range(parser.max_sessions):
 
@@ -452,7 +498,7 @@ def sim_end_test():
 
         PDRLookup.delete(values=[{'value_int':Access},	     # src_iface
                               {'value_int':0},		     # tunnel_ipv4_dst
-                              {'value_int':0},               # enb_teid
+                              {'value_int':start_teid+i},    # enb_teid
                               {'value_int':0},               # inet ip
                               {'value_int':start_ue_ip+i},   # ueaddr ip
                               {'value_int':0},               # inet port
@@ -460,7 +506,7 @@ def sim_end_test():
                               {'value_int':0}],              # proto-id
                       masks=[{'value_int':0xFF},	     # src_iface-mask
                               {'value_int':0},		     # tunnel_ipv4_dst-mask
-                              {'value_int':0},               # enb_teid-mask
+                              {'value_int':0xFFFFFFFF},      # enb_teid-mask
                               {'value_int':0},               # inet ip-mask
                               {'value_int':0xFFFFFFFF},      # ueaddr ip-mask
                               {'value_int':0},               # inet port-mask
@@ -477,8 +523,13 @@ def sim_end_test():
 
         PostDLQoSCounter.remove(ctr_id=start_teid+i)                     # fseid
 
+    #bess.resume_all()
     #bess.reset_all()
 
+
+# ===================================================
+#	SIM TEST CALLS
+#====================================================
 
 ### Uncomment the following lines to test with Source ###
 if parser.mode == 'sim':
@@ -487,3 +538,6 @@ if parser.mode == 'sim':
     # Wait for 30 seconds before deleting the session info entries (optional)
     time.sleep(30)
     sim_end_test()
+
+# Pipeline complete, resume bessd (if it is not "sim")
+#bess.resume_all()
