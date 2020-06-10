@@ -81,7 +81,7 @@ void GtpuParser::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
         udph = (Udp *)((char *)iph + (iph->header_length << 2));
         if (udph->dst_port == (be16_t)(UDP_PORT_GTPU)) {
           gtph = (Gtpv1 *)(udph + 1);
-	  be32_t teid = (be32_t)gtph->teid.value();
+          be32_t teid = (be32_t)gtph->teid.value();
           /* reuse iph, tcph, and udph for innser headers too */
           iph = (Ipv4 *)((char *)gtph + gtph->header_length());
           if (iph->protocol == Ipv4::kTcp) {
