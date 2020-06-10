@@ -571,7 +571,8 @@ int main(int argc, char **argv) {
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
             b.runDelCounterCommand(
-                (enb_teid), (("PostUL" + std::string(args.qoscounter)).c_str()));
+                (enb_teid),
+                (("PostUL" + std::string(args.qoscounter)).c_str()));
           }
           {
             // Delete PostQoS Counter
@@ -579,7 +580,8 @@ int main(int argc, char **argv) {
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
             b.runDelCounterCommand(
-                (enb_teid), (("PostDL" + std::string(args.qoscounter)).c_str()));
+                (enb_teid),
+                (("PostDL" + std::string(args.qoscounter)).c_str()));
           }
           break;
         default:
