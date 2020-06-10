@@ -118,6 +118,16 @@ docker run --name pause -td --restart unless-stopped \
 	--hostname $(hostname) \
 	k8s.gcr.io/pause
 
+# Run bessd
+docker run --name bess -td --restart unless-stopped \
+	--cpuset-cpus=12-13 \
+	--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
+	-v "$PWD/conf":/opt/bess/bessctl/conf \
+	--net container:pause \
+	$PRIVS \
+	$DEVICES \
+	upf-epc-bess:"$(<VERSION)"
+
 # Emulate CNI + init container
 sudo mkdir -p /var/run/netns
 sandbox=$(docker inspect --format='{{.NetworkSettings.SandboxKey}}' pause)
@@ -125,19 +135,18 @@ sudo ln -s "$sandbox" /var/run/netns/pause
 
 case $mode in
 "dpdk") setup_mirror_links ;;
-"af_xdp"|"af_packet")
+"af_xdp" | "af_packet")
 	move_ifaces
 	# Make sure that kernel does not send back icmp dest unreachable msg(s)
 	sudo ip netns exec pause iptables -I OUTPUT -p icmp --icmp-type port-unreachable -j DROP
 	;;
-*)
-    ;;
+*) ;;
+
 esac
 
 # Setup trafficgen routes
-if [ "$mode" != 'sim' ]
-   then
-       setup_trafficgen_routes
+if [ "$mode" != 'sim' ]; then
+	setup_trafficgen_routes
 fi
 
 # Run bessd
@@ -159,9 +168,8 @@ docker run --name bess-web -d --restart unless-stopped \
 	upf-epc-bess:"$(<VERSION)" http 0.0.0.0 $gui_port
 
 # Don't run any other container if mode is "sim"
-if [ "$mode" == 'sim' ]
-then
-    exit
+if [ "$mode" == 'sim' ]; then
+	exit
 fi
 
 # Run bess-routectl
