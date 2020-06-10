@@ -65,7 +65,11 @@ class Parser:
 
         # Fetch interfaces
         for iface in ifaces:
-            self.interfaces[iface] = self.conf[iface]
+            try:
+                self.interfaces[iface] = self.conf[iface]
+            except KeyError:
+                self.interfaces[iface] = {'ifname': iface}
+                print('Can\'t read {} interface. Setting it to default ({}).'.format(iface, iface))
 
         # Detect mode. Default is dpdk
         try:
@@ -98,4 +102,6 @@ class Parser:
             self.s1u_ifname = self.conf["s1u"]["ifname"]
             self.sgi_ifname = self.conf["sgi"]["ifname"]
         except KeyError:
-            print('Can\'t parse interface name(s)!')
+            self.s1u_ifname = "s1u"
+            self.sgi_ifname = "sgi"
+            print('Can\'t parse interface name(s)! Setting it to default values ({}, {})'.format("s1u", "sgi"))
