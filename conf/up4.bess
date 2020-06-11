@@ -52,25 +52,26 @@ else:
 # 2. Replace hard-coded teids, src_ips, dst_ips, inet_ips with wildcards
 # Volunteers needed to do this job!!!
 
-def gen_inet_packet(proto, src_mac, dst_mac, src_ip, dst_ip):
+def gen_inet_packet(size, proto, src_mac, dst_mac, src_ip, dst_ip):
     eth = scapy.Ether(src=src_mac, dst=dst_mac)
     ip = scapy.IP(src=src_ip, dst=dst_ip)
     udp = proto(sport=10001, dport=10002)
-    payload = 'helloworld'
+    payload = ('hello' + '0123456789' * 200)[:size-len(eth/ip/udp)]
     pkt = eth/ip/udp/payload
     return bytes(pkt)
 
-def gen_ue_packet(proto, src_mac, dst_mac, src_ip, dst_ip, inner_src_ip, inner_dst_ip):
+def gen_ue_packet(size, proto, src_mac, dst_mac, src_ip, dst_ip, inner_src_ip, inner_dst_ip):
     eth = scapy.Ether(src=src_mac, dst=dst_mac)
     ip = scapy.IP(src=src_ip, dst=dst_ip)
     udp = proto(sport=2152, dport=2152)
-    payload = 'helloworld'
-    pkt = eth/ip/udp/GTP_U_Header(teid=0xf0000000)/scapy.IP(src=inner_src_ip, dst=inner_dst_ip)/scapy.TCP()
+    inet_p = scapy.IP(src=inner_src_ip, dst=inner_dst_ip)/scapy.TCP()
+    payload = ('hello' + '0123456789' * 200)[:size-len(eth/ip/udp/inet_p)]
+    pkt = eth/ip/udp/GTP_U_Header(teid=0xf0000000)/inet_p/payload
     return bytes(pkt)
 
-inet_packets = [gen_inet_packet(scapy.UDP, macstr_u, macstr_d, '172.16.100.1', '16.0.0.1'),
-               gen_inet_packet(scapy.UDP, macstr_u, macstr_d, '172.12.55.99', '16.0.0.1')]
-ue_packets = [gen_ue_packet(scapy.UDP, macstr_d, macstr_u, '11.1.1.128', '11.1.1.1', '16.0.0.1', '172.16.100.1')]
+inet_packets = [gen_inet_packet(128, scapy.UDP, macstr_u, macstr_d, '172.16.100.1', '16.0.0.1'),
+               gen_inet_packet(128, scapy.UDP, macstr_u, macstr_d, '172.12.55.99', '16.0.0.1')]
+ue_packets = [gen_ue_packet(128, scapy.UDP, macstr_d, macstr_u, '11.1.1.128', '11.1.1.1', '16.0.0.1', '172.16.100.1')]
 packet_generator = {'s1u': ue_packets, 'sgi': inet_packets}
 
 
@@ -92,7 +93,7 @@ for wid in xrange(parser.workers):
 ports = {}
 
 # Before constructing the pipeline, pause bessd
-#bess.pause_all()
+bess.pause_all()
 
 for idx, iface in enumerate(interfaces):
     # check if source natting for a given port is required
@@ -540,4 +541,4 @@ if parser.mode == 'sim':
     sim_end_test()
 
 # Pipeline complete, resume bessd (if it is not "sim")
-#bess.resume_all()
+bess.resume_all()
