@@ -5,8 +5,7 @@
 
 from conf.parser import *
 import conf.ports as port
-from scapy.contrib.gtp import *
-import scapy.all as scapy
+import conf.sim as sim
 
 port.setup_globals()
 
@@ -41,37 +40,9 @@ else:
     s1u_ip = ips_by_interface(parser.s1u_ifname)
 
 
-# ====================================================
-#       SIM Create Packet Functions
-# ====================================================
-#
-# Craft a packet with the specified IP addresses
-# TODOs - XXX:
-#
-# 1. Shift all sim-related code to a separate file (sim_gen.py)
-# 2. Replace hard-coded teids, src_ips, dst_ips, inet_ips with wildcards
-# Volunteers needed to do this job!!!
-
-def gen_inet_packet(size, proto, src_mac, dst_mac, src_ip, dst_ip):
-    eth = scapy.Ether(src=src_mac, dst=dst_mac)
-    ip = scapy.IP(src=src_ip, dst=dst_ip)
-    udp = proto(sport=10001, dport=10002)
-    payload = ('hello' + '0123456789' * 200)[:size-len(eth/ip/udp)]
-    pkt = eth/ip/udp/payload
-    return bytes(pkt)
-
-def gen_ue_packet(size, proto, src_mac, dst_mac, src_ip, dst_ip, inner_src_ip, inner_dst_ip):
-    eth = scapy.Ether(src=src_mac, dst=dst_mac)
-    ip = scapy.IP(src=src_ip, dst=dst_ip)
-    udp = proto(sport=2152, dport=2152)
-    inet_p = scapy.IP(src=inner_src_ip, dst=inner_dst_ip)/scapy.TCP()
-    payload = ('hello' + '0123456789' * 200)[:size-len(eth/ip/udp/inet_p)]
-    pkt = eth/ip/udp/GTP_U_Header(teid=0xf0000000)/inet_p/payload
-    return bytes(pkt)
-
-inet_packets = [gen_inet_packet(128, scapy.UDP, macstr_u, macstr_d, '172.16.100.1', '16.0.0.1'),
-               gen_inet_packet(128, scapy.UDP, macstr_u, macstr_d, '172.12.55.99', '16.0.0.1')]
-ue_packets = [gen_ue_packet(128, scapy.UDP, macstr_d, macstr_u, '11.1.1.128', '11.1.1.1', '16.0.0.1', '172.16.100.1')]
+inet_packets = [sim.gen_inet_packet(128, macstr_u, macstr_d, '172.16.100.1', '16.0.0.1'),
+               sim.gen_inet_packet(128, macstr_u, macstr_d, '172.12.55.99', '16.0.0.1')]
+ue_packets = [sim.gen_ue_packet(128, macstr_d, macstr_u, '11.1.1.128', '11.1.1.1', '16.0.0.1', '172.16.100.1')]
 packet_generator = {'s1u': ue_packets, 'sgi': inet_packets}
 
 
@@ -284,7 +255,7 @@ if parser.max_ip_defrag_flows is not None:
     _in = s1uIP4Defrag
     gate = 1
     # Drop pkts that are unable to be fragmented
-    s1uIP4Defrag:0 -> Sink()    
+    s1uIP4Defrag:0 -> Sink()
 
 # 2. Build the remaining first half of the UL pipeline before entering the shard pipeline
 _in:gate -> InetLookup::IPLookup() \
