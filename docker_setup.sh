@@ -85,6 +85,7 @@ function setup_mirror_links() {
 function move_ifaces() {
 	for ((i = 0; i < num_ifaces; i++)); do
 		sudo ip link set "${ifaces[$i]}" netns pause up
+		sudo ip netns exec pause ip link set "${ifaces[$i]}" promisc off
 	done
 	setup_addrs
 }
@@ -105,7 +106,7 @@ elif [ "$mode" == 'af_xdp' ]; then
 	PRIVS='--privileged'
 
 elif [ "$mode" == 'af_packet' ]; then
-	PRIVS='--cap-add IPC_LOCK --cap-add NET_ADMIN'
+	PRIVS='--cap-add IPC_LOCK'
 
 fi
 

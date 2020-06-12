@@ -1,0 +1,52 @@
+From e1bc63488d346cb84ae7e76f2bc480247f577abb Mon Sep 17 00:00:00 2001
+From: Saikrishna Edupuganti <saikrishna.edupuganti@intel.com>
+Date: Fri, 12 Jun 2020 21:36:53 +0000
+Subject: [PATCH] af_packet Avoid set ioctl if there is no flag diff
+
+rte_eth_dev_start -> rte_eth_dev_config_restore
+In 19.11 DPDK started returning errors
+https://github.com/DPDK/dpdk/commit/9039c8125730adfd46b8c891e7f205eb4ac43c67
+https://github.com/DPDK/dpdk/commit/69d0e7092874db1909bc40986c06219f1880dc23
+
+Gist
+https://gist.github.com/krsna1729/0c7160920343f9fa55f760c770286155
+
+We also patch af_packet PMD to change set flags only when needed
+
+Signed-off-by: Saikrishna Edupuganti <saikrishna.edupuganti@intel.com>
+---
+ drivers/net/af_packet/rte_eth_af_packet.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/drivers/net/af_packet/rte_eth_af_packet.c b/drivers/net/af_packet/rte_eth_af_packet.c
+index f5806bf42..29d45eb47 100644
+--- a/drivers/net/af_packet/rte_eth_af_packet.c
++++ b/drivers/net/af_packet/rte_eth_af_packet.c
+@@ -472,6 +472,7 @@ static int
+ eth_dev_change_flags(char *if_name, uint32_t flags, uint32_t mask)
+ {
+ 	struct ifreq ifr;
++	uint32_t cur_flags;
+ 	int ret = 0;
+ 	int s;
+
+@@ -484,8 +485,16 @@ eth_dev_change_flags(char *if_name, uint32_t flags, uint32_t mask)
+ 		ret = -errno;
+ 		goto out;
+ 	}
++
++	cur_flags = ifr.ifr_flags;
+ 	ifr.ifr_flags &= mask;
+ 	ifr.ifr_flags |= flags;
++
++	// Return if there is no change
++	if (cur_flags == ifr.ifr_flags){
++		goto out;
++	}
++
+ 	if (ioctl(s, SIOCSIFFLAGS, &ifr) < 0) {
+ 		ret = -errno;
+ 		goto out;
+--
+2.25.1
+
