@@ -37,6 +37,8 @@ RUN git clone -b $DPDK_VER -q --depth 1 $DPDK_URL $DPDK_DIR
 
 # Customizing DPDK install
 WORKDIR $DPDK_DIR
+COPY patches/dpdk patches
+RUN cat patches/* | patch -p1
 
 ARG CPU=native
 ARG RTE_TARGET='x86_64-native-linuxapp-gcc'

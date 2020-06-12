@@ -1,0 +1,46 @@
+From 260ef6f9bef9cce1a1c171e9da7b6ba854e9f994 Mon Sep 17 00:00:00 2001
+From: Saikrishna Edupuganti <saikrishna.edupuganti@intel.com>
+Date: Fri, 12 Jun 2020 00:11:50 +0000
+Subject: [PATCH] Add switch for promiscuous mode
+
+Set promiscuous only if explicitly asked by user
+
+Signed-off-by: Saikrishna Edupuganti <saikrishna.edupuganti@intel.com>
+---
+ core/drivers/pmd.cc           | 7 ++++++-
+ protobuf/ports/port_msg.proto | 1 +
+ 2 files changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/core/drivers/pmd.cc b/core/drivers/pmd.cc
+index a3cbf1fd..733b50ec 100644
+--- a/core/drivers/pmd.cc
++++ b/core/drivers/pmd.cc
+@@ -313,7 +313,12 @@ CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
+     }
+   }
+
+-  rte_eth_promiscuous_enable(ret_port_id);
++  if (arg.promiscuous_mode()) {
++    ret = rte_eth_promiscuous_enable(ret_port_id);
++    if (ret != 0) {
++      return CommandFailure(-ret, "rte_eth_promiscuous_enable() failed");
++    }
++  }
+
+   int offload_mask = 0;
+   offload_mask |= arg.vlan_offload_rx_strip() ? ETH_VLAN_STRIP_OFFLOAD : 0;
+diff --git a/protobuf/ports/port_msg.proto b/protobuf/ports/port_msg.proto
+index 1e8b6af8..853380e1 100644
+--- a/protobuf/ports/port_msg.proto
++++ b/protobuf/ports/port_msg.proto
+@@ -50,6 +50,7 @@ message PMDPortArg {
+   oneof socket {
+     int32 socket_id = 8;
+   }
++  bool promiscuous_mode = 9;
+ }
+
+ message UnixSocketPortArg {
+--
+2.25.1
+
