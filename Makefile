@@ -37,7 +37,8 @@ docker-build:
 			--build-arg org_label_schema_vcs_ref="${DOCKER_LABEL_VCS_REF}" \
 			--build-arg org_label_schema_build_date="${DOCKER_LABEL_BUILD_DATE}" \
 			--build-arg org_opencord_vcs_commit_date="${DOCKER_LABEL_COMMIT_DATE}" \
-			.; \
+			. \
+			|| exit 1; \
 	done
 
 docker-push:
