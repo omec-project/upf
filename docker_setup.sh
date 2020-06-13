@@ -179,12 +179,6 @@ docker run --name bess-routectl -td --restart unless-stopped \
 	--entrypoint /route_control.py \
 	upf-epc-bess:"$(<VERSION)" -i "${ifaces[@]}"
 
-# Run bess-web
-docker run --name bess-web -d --restart unless-stopped \
-	--net container:pause \
-	--entrypoint bessctl \
-	upf-epc-bess:"$(<VERSION)" http 0.0.0.0 $gui_port
-
 # Run bess-cpiface
 docker run --name bess-cpiface -td --restart unless-stopped \
 	--net container:pause \
