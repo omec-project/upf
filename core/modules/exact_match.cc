@@ -277,30 +277,33 @@ void ExactMatch::setValues(bess::Packet *pkt, ExactMatchKey &action) {
              value_size);
     } else { /* if it is attribute-based */
       switch (value_size) {
-	case 1:
-	    set_attr<uint8_t>(this, value_attr_id, pkt, *((uint8_t *)((uint8_t *)&action + value_pos)));
-	    break;
-	case 2:
-	    set_attr<uint16_t>(this, value_attr_id, pkt, *((uint16_t *)((uint8_t *)&action + value_pos)));
-	    break;
-	case 4:
-	    set_attr<uint32_t>(this, value_attr_id, pkt, *((uint32_t *)((uint8_t *)&action + value_pos)));
-	    break;
-	case 8:
-	    set_attr<uint64_t>(this, value_attr_id, pkt, *((uint64_t *)((uint8_t *)&action + value_pos)));
-	    break;
-      default: {
+        case 1:
+          set_attr<uint8_t>(this, value_attr_id, pkt,
+                            *((uint8_t *)((uint8_t *)&action + value_pos)));
+          break;
+        case 2:
+          set_attr<uint16_t>(this, value_attr_id, pkt,
+                             *((uint16_t *)((uint8_t *)&action + value_pos)));
+          break;
+        case 4:
+          set_attr<uint32_t>(this, value_attr_id, pkt,
+                             *((uint32_t *)((uint8_t *)&action + value_pos)));
+          break;
+        case 8:
+          set_attr<uint64_t>(this, value_attr_id, pkt,
+                             *((uint64_t *)((uint8_t *)&action + value_pos)));
+          break;
+        default: {
           typedef struct {
             uint8_t bytes[bess::metadata::kMetadataAttrMaxSize];
-	  } value_t;
-	  void *mt_ptr =
-	    _ptr_attr_with_offset<value_t>(attr_offset(value_attr_id), pkt);
-	  bess::utils::CopySmall(
-          mt_ptr,
-          reinterpret_cast<uint8_t *>(((uint8_t *)(&action)) + value_pos),
-          value_size);
-      }
-	  break;
+          } value_t;
+          void *mt_ptr =
+              _ptr_attr_with_offset<value_t>(attr_offset(value_attr_id), pkt);
+          bess::utils::CopySmall(
+              mt_ptr,
+              reinterpret_cast<uint8_t *>(((uint8_t *)(&action)) + value_pos),
+              value_size);
+        } break;
       }
     }
   }
