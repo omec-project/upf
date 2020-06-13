@@ -196,7 +196,7 @@ inline gate_idx_t WildcardMatch::LookupEntry(const wm_hkey_t &key,
         typedef struct {
           uint8_t bytes[bess::metadata::kMetadataAttrMaxSize];
         } value_t;
-	uint8_t *buf = (uint8_t *)&result.keyv + value_pos;
+        uint8_t *buf = (uint8_t *)&result.keyv + value_pos;
 
         DLOG(INFO) << "Setting value " << std::hex
                    << *(reinterpret_cast<uint64_t *>(buf))
@@ -204,26 +204,28 @@ inline gate_idx_t WildcardMatch::LookupEntry(const wm_hkey_t &key,
                    << " of size: " << value_size
                    << " at value_pos: " << value_pos << std::endl;
 
-	switch (value_size) {
-	case 1:
-	    set_attr<uint8_t>(this, value_attr_id, pkt, *((uint8_t *)buf));
-	    break;
-	case 2:
-	    set_attr<uint16_t>(this, value_attr_id, pkt, *((uint16_t *)((uint8_t *)buf)));
-	    break;
-	case 4:
-	    set_attr<uint32_t>(this, value_attr_id, pkt, *((uint32_t *)((uint8_t *)buf)));
-	    break;
-	case 8:
-	    set_attr<uint64_t>(this, value_attr_id, pkt, *((uint64_t *)((uint8_t *)buf)));
-	    break;
-	default: {
-	    void *mt_ptr =
-	      _ptr_attr_with_offset<value_t>(attr_offset(value_attr_id), pkt);
-	    bess::utils::CopySmall(mt_ptr, buf, value_size);
-	}
-	    break;
-	}
+        switch (value_size) {
+          case 1:
+            set_attr<uint8_t>(this, value_attr_id, pkt, *((uint8_t *)buf));
+            break;
+          case 2:
+            set_attr<uint16_t>(this, value_attr_id, pkt,
+                               *((uint16_t *)((uint8_t *)buf)));
+            break;
+          case 4:
+            set_attr<uint32_t>(this, value_attr_id, pkt,
+                               *((uint32_t *)((uint8_t *)buf)));
+            break;
+          case 8:
+            set_attr<uint64_t>(this, value_attr_id, pkt,
+                               *((uint64_t *)((uint8_t *)buf)));
+            break;
+          default: {
+            void *mt_ptr =
+                _ptr_attr_with_offset<value_t>(attr_offset(value_attr_id), pkt);
+            bess::utils::CopySmall(mt_ptr, buf, value_size);
+          } break;
+        }
       }
     }
   }
@@ -366,7 +368,7 @@ CommandResponse WildcardMatch::ExtractValue(const T &arg, wm_hkey_t *keyv) {
     bess::pb::FieldData valuedata = arg.valuesv(i);
     if (valuedata.encoding_case() == bess::pb::FieldData::kValueInt) {
       if (!bess::utils::uint64_to_bin(&v, valuedata.value_int(), value_size,
-				      false)) {
+                                      false)) {
         return CommandFailure(EINVAL, "idx %zu: not a correct %d-byte value", i,
                               value_size);
       }
