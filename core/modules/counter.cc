@@ -19,8 +19,7 @@ CommandResponse Counter::AddCounter(const bess::pb::CounterAddArg &arg) {
 
   /* check_exist is still here for over-protection */
   if (counters.find(ctr_id) == counters.end()) {
-    SessionStats s = {.pkt_count = 0,
-                      .byte_count = 0};
+    SessionStats s = {.pkt_count = 0, .byte_count = 0};
     counters.insert(std::pair<uint32_t, SessionStats>(ctr_id, s));
   } else
     return CommandFailure(EINVAL, "Unable to add ctr");
@@ -32,10 +31,9 @@ CommandResponse Counter::RemoveCounter(const bess::pb::CounterRemoveArg &arg) {
 
   /* check_exist is still here for over-protection */
   if (counters.find(ctr_id) != counters.end()) {
-    std::cerr << this->name() << "[" << ctr_id << "]: "
-              << counters[ctr_id].pkt_count << ", "
-              << counters[ctr_id].byte_count
-	      << std::endl;
+    std::cerr << this->name() << "[" << ctr_id
+              << "]: " << counters[ctr_id].pkt_count << ", "
+              << counters[ctr_id].byte_count << std::endl;
     counters.erase(ctr_id);
   } else {
     return CommandFailure(EINVAL, "Unable to remove ctr");
