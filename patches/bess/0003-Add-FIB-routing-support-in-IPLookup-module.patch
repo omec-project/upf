@@ -1,16 +1,16 @@
-From 06c0b21b92bda80304ec3c0fc679d1fa0800f287 Mon Sep 17 00:00:00 2001
+From b7139642079ffeccc1eefc430332159d5810a335 Mon Sep 17 00:00:00 2001
 From: Muhammad Asim Jamshed <muhammad.jamshed@intel.com>
-Date: Wed, 22 Apr 2020 12:50:58 -0700
+Date: Mon, 15 Jun 2020 15:14:14 -0700
 Subject: [PATCH] Add FIB routing support in IPLookup module.
 
 Signed-off-by: Muhammad Asim Jamshed <muhammad.jamshed@intel.com>
 ---
- core/modules/ip_lookup.cc | 61 +++++++++++++++++++++++++++++++++++++--
+ core/modules/ip_lookup.cc | 63 +++++++++++++++++++++++++++++++++++++--
  core/modules/ip_lookup.h  | 14 +++++++++
- 2 files changed, 73 insertions(+), 2 deletions(-)
+ 2 files changed, 74 insertions(+), 3 deletions(-)
 
 diff --git a/core/modules/ip_lookup.cc b/core/modules/ip_lookup.cc
-index 3c8b1157..c45edcf8 100644
+index 3c8b1157..7e976d41 100644
 --- a/core/modules/ip_lookup.cc
 +++ b/core/modules/ip_lookup.cc
 @@ -32,7 +32,6 @@
@@ -41,10 +41,11 @@ index 3c8b1157..c45edcf8 100644
  
    default_gate_ = DROP_GATE;
 -
+-  lpm_ = rte_lpm_create(name().c_str(), /* socket_id = */ 0, &conf);
 +#if RTE_VERSION < RTE_VERSION_NUM(19, 11, 0, 0)
-   lpm_ = rte_lpm_create(name().c_str(), /* socket_id = */ 0, &conf);
++  lpm_ = rte_lpm_create(name().c_str(), /* socket_id = */ rte_socket_id(), &conf);
 +#else
-+  lpm_ = rte_fib_create(name().c_str(), /* socket_id = */ 0, &conf);
++  lpm_ = rte_fib_create(name().c_str(), /* socket_id = */ rte_socket_id(), &conf);
 +#endif
  
    if (!lpm_) {
