@@ -241,7 +241,7 @@ class Port:
             out = m
         else:
             if self.mode == 'sim':
-                self.rewrite.connect(next_mod=self.bpf)
+                self.rewrite.connect(next_mod=self.bpf)   # ---> pass
             else:
                 self.fpi.connect(next_mod=self.bpf)
 

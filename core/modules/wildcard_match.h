@@ -42,8 +42,8 @@
 using bess::utils::CuckooMap;
 using bess::utils::HashResult;
 
-#define MAX_TUPLES 16
-#define MAX_FIELDS 16
+#define MAX_TUPLES 8
+#define MAX_FIELDS 8
 #define MAX_FIELD_SIZE 8
 static_assert(MAX_FIELD_SIZE <= sizeof(uint64_t),
               "field cannot be larger than 8 bytes");
@@ -67,7 +67,7 @@ struct WmField {
 };
 
 struct wm_hkey_t {
-  uint64_t u64_arr[MAX_FIELDS * MAX_FIELD_SIZE];
+  uint64_t u64_arr[MAX_FIELDS];
 };
 
 struct WmData {

@@ -47,7 +47,7 @@
 #include "endian.h"
 #include "format.h"
 
-#define MAX_FIELDS 16
+#define MAX_FIELDS 8
 #define MAX_FIELD_SIZE 8
 
 static_assert(MAX_FIELD_SIZE <= sizeof(uint64_t),
@@ -69,7 +69,7 @@ using Error = std::pair<int, std::string>;
 // hand. Use ExactMatchTable::MakeKey() and ExactMatchTable::MakeKeys() to
 // create a key.
 struct ExactMatchKey {
-  uint64_t u64_arr[MAX_FIELDS * MAX_FIELD_SIZE];
+  uint64_t u64_arr[MAX_FIELDS];
 };
 
 // Equality operator for two ExactMatchKeys
