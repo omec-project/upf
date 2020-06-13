@@ -270,27 +270,38 @@ void ExactMatch::setValues(bess::Packet *pkt, ExactMatchKey &action) {
     int value_pos = get_value(i).pos;
     int value_off = get_value(i).offset;
     int value_attr_id = get_value(i).attr_id;
-    uint64_t mask = get_value(i).mask;
     uint8_t *data = pkt->head_data<uint8_t *>() + value_off;
 
     if (value_attr_id < 0) { /* if it is offset-based */
       memcpy(data, reinterpret_cast<uint8_t *>(&action) + value_pos,
              value_size);
     } else { /* if it is attribute-based */
-      typedef struct {
-        uint8_t bytes[bess::metadata::kMetadataAttrMaxSize];
-      } value_t;
-      void *mt_ptr =
-          _ptr_attr_with_offset<value_t>(attr_offset(value_attr_id), pkt);
-      bess::utils::CopySmall(
+      switch (value_size) {
+	case 1:
+	    set_attr<uint8_t>(this, value_attr_id, pkt, *((uint8_t *)((uint8_t *)&action + value_pos)));
+	    break;
+	case 2:
+	    set_attr<uint16_t>(this, value_attr_id, pkt, *((uint16_t *)((uint8_t *)&action + value_pos)));
+	    break;
+	case 4:
+	    set_attr<uint32_t>(this, value_attr_id, pkt, *((uint32_t *)((uint8_t *)&action + value_pos)));
+	    break;
+	case 8:
+	    set_attr<uint64_t>(this, value_attr_id, pkt, *((uint64_t *)((uint8_t *)&action + value_pos)));
+	    break;
+      default: {
+          typedef struct {
+            uint8_t bytes[bess::metadata::kMetadataAttrMaxSize];
+	  } value_t;
+	  void *mt_ptr =
+	    _ptr_attr_with_offset<value_t>(attr_offset(value_attr_id), pkt);
+	  bess::utils::CopySmall(
           mt_ptr,
           reinterpret_cast<uint8_t *>(((uint8_t *)(&action)) + value_pos),
           value_size);
-      DLOG(INFO) << "Setting value " << std::hex
-                 << *(reinterpret_cast<uint64_t *>(mt_ptr))
-                 << " for attr_id: " << value_attr_id
-                 << " of size: " << value_size << " at value_pos: " << value_pos
-                 << ", Mask: " << mask << std::endl;
+      }
+	  break;
+      }
     }
   }
 }

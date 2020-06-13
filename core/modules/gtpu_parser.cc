@@ -27,28 +27,20 @@ const unsigned short UDP_PORT_GTPU = 2152;
 void GtpuParser::set_gtp_parsing_attrs(be32_t *sip, be32_t *dip, be16_t *sp,
                                        be16_t *dp, be32_t *teid, be32_t *tipd,
                                        uint8_t *protoid, bess::Packet *p) {
-  void *mt_ptr = NULL;
   /* set src_ip */
-  mt_ptr = _ptr_attr_with_offset<uint32_t>(attr_offset(src_ip_id), p);
-  bess::utils::CopySmall(mt_ptr, sip, sizeof(uint32_t));
+  set_attr<uint32_t>(this, src_ip_id, p, sip->raw_value());
   /* set dst_ip */
-  mt_ptr = _ptr_attr_with_offset<uint32_t>(attr_offset(dst_ip_id), p);
-  bess::utils::CopySmall(mt_ptr, dip, sizeof(uint32_t));
+  set_attr<uint32_t>(this, dst_ip_id, p, dip->raw_value());
   /* set src_port_id */
-  mt_ptr = _ptr_attr_with_offset<uint16_t>(attr_offset(src_port_id), p);
-  bess::utils::CopySmall(mt_ptr, sp, sizeof(uint16_t));
+  set_attr<uint16_t>(this, src_port_id, p, sp->raw_value());
   /* set dst_port_id */
-  mt_ptr = _ptr_attr_with_offset<uint16_t>(attr_offset(dst_port_id), p);
-  bess::utils::CopySmall(mt_ptr, dp, sizeof(uint16_t));
+  set_attr<uint16_t>(this, dst_port_id, p, dp->raw_value());
   /* set tied_id */
-  mt_ptr = _ptr_attr_with_offset<uint32_t>(attr_offset(teid_id), p);
-  bess::utils::CopySmall(mt_ptr, teid, sizeof(uint32_t));
+  set_attr<uint32_t>(this, teid_id, p, teid->raw_value());
   /* tunnel_ip4_dst_id  */
-  mt_ptr = _ptr_attr_with_offset<uint32_t>(attr_offset(tunnel_ip4_dst_id), p);
-  bess::utils::CopySmall(mt_ptr, tipd, sizeof(uint32_t));
+  set_attr<uint32_t>(this, tunnel_ip4_dst_id, p, tipd->raw_value());
   /* proto_id */
-  mt_ptr = _ptr_attr_with_offset<uint8_t>(attr_offset(proto_id), p);
-  bess::utils::CopySmall(mt_ptr, protoid, sizeof(uint8_t));
+  set_attr<uint8_t>(this, proto_id, p, *protoid);
 }
 /*----------------------------------------------------------------------------------*/
 void GtpuParser::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {

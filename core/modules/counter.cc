@@ -73,10 +73,6 @@ void Counter::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     // check if ctr_id is present
     if (!check_exist || counters.find(ctr_id) != counters.end()) {
       SessionStats s = counters[ctr_id];
-      void *mt_ptr = _ptr_attr_with_offset<uint32_t>(attr_offset(dir_attr_id),
-                                                     batch->pkts()[i]);
-      bess::utils::CopySmall(mt_ptr, &dir_id, 4);
-      dir_id = ntohl(dir_id);
       if (dir_id == UPLINK) {
         s.ul_pkt_count += 1;
         s.ul_byte_count += batch->pkts()[i]->total_len();
