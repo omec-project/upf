@@ -14,6 +14,7 @@ SLEEP_S = 2
 # Maximum number of gates per module instance in BESS. Don't change it.
 MAX_GATES = 8192
 
+
 # ====================================================
 #       Parameters
 # ====================================================
