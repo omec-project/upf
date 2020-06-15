@@ -60,14 +60,12 @@ void Counter::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 
   for (int i = 0; i < cnt; i++) {
     uint32_t ctr_id = get_attr<uint32_t>(this, ctr_attr_id, batch->pkts()[i]);
+    std::map<uint32_t, SessionStats>::iterator it;
 
     // check if ctr_id is present
-    if (!check_exist || counters.find(ctr_id) != counters.end()) {
-      SessionStats s = counters[ctr_id];
-      s.pkt_count += 1;
-      s.byte_count += batch->pkts()[i]->total_len();
-      counters.erase(ctr_id);
-      counters.insert(std::pair<uint32_t, SessionStats>(ctr_id, s));
+    if (!check_exist || (it = counters.find(ctr_id)) != counters.end()) {
+      it->second.pkt_count += 1;
+      it->second.byte_count += batch->pkts()[i]->total_len();
     }
   }
 
