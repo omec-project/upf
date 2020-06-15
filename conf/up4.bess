@@ -14,8 +14,6 @@ port.setup_globals()
 #	Read json config file (START HERE)
 # ====================================================
 
-Uplink = 0x0100
-Downlink = 0x0200
 Access = 1
 Core = 2
 FARForwardAction = 0
@@ -180,8 +178,7 @@ if parser.max_ip_defrag_flows is not None:
 # 2. Build the remaining first half of the DL pipeline before entering the shared pipeline
 #ports[parser.sgi_ifname].rewrite \
 _in:gate -> ueLookup::IPLookup() \
-    -> SetMetadata(attrs=[{'name':'direction', 'size':4, 'value_int':Downlink}, \
-                          {'name':'src_iface', 'size':1, 'value_int':Core}]) \
+    -> SetMetadata(attrs=[{'name':'src_iface', 'size':1, 'value_int':Core}]) \
     -> LinkMerge # Start of the shared pipeline
 
 
@@ -261,8 +258,7 @@ if parser.max_ip_defrag_flows is not None:
 # 2. Build the remaining first half of the UL pipeline before entering the shard pipeline
 #ports[parser.s1u_ifname].rewrite \
 _in:gate -> InetLookup::IPLookup() \
-    -> SetMetadata(attrs=[{'name':'direction', 'size':4, 'value_int':Uplink}, \
-                          {'name':'src_iface', 'size':1, 'value_int':Access}]) \
+    -> SetMetadata(attrs=[{'name':'src_iface', 'size':1, 'value_int':Access}]) \
     -> LinkMerge # Start of the shared pipeline
 
 # 3. Complete the last part of the UL pipeline
@@ -509,8 +505,8 @@ def sim_end_test():
 if parser.mode == 'sim':
     # Start the test
     sim_start_test()
-    # Wait for 1000 seconds before deleting the session info entries (optional)
-    time.sleep(1000)
+    # Wait for 60 seconds before deleting the session info entries (optional)
+    time.sleep(60)
     sim_end_test()
 
 # Pipeline complete, resume bessd (if it is not "sim")
