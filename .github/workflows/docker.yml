@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - central-cp-multi-upfs
 
 jobs:
   build:
@@ -21,9 +20,6 @@ jobs:
         PASSWORD: ${{ secrets.GITHUB_TOKEN }}
       run: |
         docker login https://docker.pkg.github.com -u $USERNAME -p $PASSWORD
-    - name: Conditional central-cp-multi-upfs tag
-      if: contains( github.ref, 'central-cp-multi-upfs' )
-      run: echo "::set-env name=VERSION::central-cp-multi-upfs"
     - name: Build and push Docker image
       run: |
         make docker-build
