@@ -21,7 +21,7 @@ FARTunnelAction = 1
 FARDropAction = 2
 FARNotifyCPAction = 4
 interfaces = ["s1u", "sgi"]
-parser = Parser('conf/spgwu.json')
+parser = Parser('conf/upf.json')
 parser.parse(interfaces)
 
 # Catch sgi & s1u MAC/IPv4 addresses
