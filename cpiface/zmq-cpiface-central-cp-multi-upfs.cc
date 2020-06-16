@@ -14,6 +14,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <zmq.h>
+#include <jsoncpp/json/value.h>
+#include <jsoncpp/json/reader.h>
+#include <fstream>
 /*--------------------------------------------------------------------------------*/
 #define ZMQ_SERVER_IP "127.0.0.1"
 #define ZMQ_RECV_PORT 20
@@ -22,6 +25,7 @@
 #define ZMQ_NB_PORT 1111
 #define S1U_SGW_IP "127.0.0.1"
 #define UDP_PORT_GTPU 2152
+#define SCRIPT_NAME "/tmp/conf/upf.json"
 /*--------------------------------------------------------------------------------*/
 /**
  * ZMQ stuff
@@ -168,6 +172,19 @@ int main(int argc, char **argv) {
   Args args;
   // set args coming from command-line
   args.parse(argc, argv);
+
+  // values from json file always take precedence
+  Json::Value root;
+  Json::Reader reader;
+  std::ifstream script(SCRIPT_NAME);
+  script >> root;
+  if (reader.parse(script, root, true)) {
+    std::cerr << "Failed to parse configuration\n"
+	      << reader.getFormattedErrorMessages();
+  }
+  strcpy(args.zmqd_nb_ip, root["cpiface"]["zmqd_nb_ip"].asString().c_str());
+  strcpy(args.zmqd_ip, root["cpiface"]["zmqd_ip"].asString().c_str());
+  strcpy(args.s1u_sgw_ip, root["cpiface"]["s1u_sgw_ip"].asString().c_str());
 
   if (context0 == NULL || context1 == NULL || context2 == NULL) {
     std::cerr << "Failed to create context(s)!: " << strerror(errno)
@@ -427,7 +444,7 @@ int main(int argc, char **argv) {
                                        InsecureChannelCredentials()));
             b.runAddCounterCommand(
                 (rbuf.sess_entry.dl_s1_info.enb_teid),
-                (("Pre" + std::string(args.qoscounter)).c_str()));
+		(("Pre" + std::string(args.qoscounter)).c_str()));
           }
           {
             // Add PostQoS Counter
@@ -505,7 +522,7 @@ int main(int argc, char **argv) {
                 .far_id = 0,               /* far id (not needed) */
                 .need_decap = 0,           /* need decap (not needed) */
             };
-            b.runDelPDRCommand(&pa, args.pdrlookup);
+	    b.runDelPDRCommand(&pa, args.pdrlookup);
           }
           {
             // Delete PDR (UPLINK)
@@ -535,7 +552,7 @@ int main(int argc, char **argv) {
                 .far_id = 0,               /* far id (not needed) */
                 .need_decap = 0,           /* need decap (not needed) */
             };
-            b.runDelPDRCommand(&pa, args.pdrlookup);
+	    b.runDelPDRCommand(&pa, args.pdrlookup);
           }
           {
             // Del FAR (DOWNLINK)
@@ -563,7 +580,8 @@ int main(int argc, char **argv) {
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
             b.runDelCounterCommand(
-                (enb_teid), (("Pre" + std::string(args.qoscounter)).c_str()));
+                (enb_teid),
+		(("Pre" + std::string(args.qoscounter)).c_str()));
           }
           {
             // Delete PostQoS Counter

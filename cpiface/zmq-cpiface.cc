@@ -14,6 +14,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <zmq.h>
+#include <jsoncpp/json/value.h>
+#include <jsoncpp/json/reader.h>
+#include <fstream>
 /*--------------------------------------------------------------------------------*/
 #define ZMQ_SERVER_IP "127.0.0.1"
 #define S1U_SGW_IP "127.0.0.1"
@@ -23,6 +26,7 @@
 #define ZMQ_NB_PORT 1111
 #define S1U_SGW_IP "11.1.1.1"
 #define UDP_PORT_GTPU 2152
+#define SCRIPT_NAME "/tmp/conf/upf.json"
 /*--------------------------------------------------------------------------------*/
 /**
  * ZMQ stuff
@@ -177,6 +181,21 @@ int main(int argc, char **argv) {
   if (context0 == NULL || context1 == NULL || context2 == NULL) {
     std::cerr << "Failed to create context(s)!: " << strerror(errno)
               << std::endl;
+
+  // values from json file always take precedence
+  Json::Value root;
+  Json::Reader reader;
+  std::ifstream script(SCRIPT_NAME);
+  script >> root;
+  if (reader.parse(script, root, true)) {
+    std::cerr << "Failed to parse configuration\n"
+	      << reader.getFormattedErrorMessages();
+  }
+  strcpy(args.zmqd_ip, root["cpiface"]["zmqd_ip"].asString().c_str());
+
+  if (context1 == NULL || context2 == NULL || receiver == NULL) {
+    std::cerr << "Failed to create context(s) or receiver socket!: "
+              << strerror(errno) << std::endl;
     return EXIT_FAILURE;
   }
 
