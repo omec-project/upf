@@ -250,18 +250,21 @@ CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
     return CommandFailure(-ret, "rte_eth_dev_configure() failed");
   }
 
-  //int sid = rte_eth_dev_socket_id(ret_port_id);
-  //if (sid < 0 || sid > RTE_MAX_NUMA_NODES) {
+  // int sid = rte_eth_dev_socket_id(ret_port_id);
+  // if (sid < 0 || sid > RTE_MAX_NUMA_NODES) {
   //  sid = 0;  // if socket_id is invalid, set to 0
   //}
 
-  int sid = arg.socket_case() == bess::pb::PMDPortArg::kSocketId ?
-	  arg.socket_id() : rte_eth_dev_socket_id(ret_port_id);
-  LOG(INFO) << "Initializing Port:" << ret_port_id << " with memory from socket " << sid;
+  int sid = arg.socket_case() == bess::pb::PMDPortArg::kSocketId
+                ? arg.socket_id()
+                : rte_eth_dev_socket_id(ret_port_id);
+  LOG(INFO) << "Initializing Port:" << ret_port_id
+            << " with memory from socket " << sid;
   /* if socket_id is invalid, set to 0 */
   if (sid < 0 || sid > RTE_MAX_NUMA_NODES) {
     sid = 0;
-    LOG(WARNING) << "Initializing Port:" << ret_port_id << " with memory from socket " << sid;
+    LOG(WARNING) << "Initializing Port:" << ret_port_id
+                 << " with memory from socket " << sid;
   }
 
   eth_rxconf = dev_info.default_rxconf;
@@ -302,9 +305,10 @@ CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
   }
   dpdk_port_id_ = ret_port_id;
 
-  //int numa_node = rte_eth_dev_socket_id(static_cast<int>(ret_port_id));
-  int numa_node = arg.socket_case() == bess::pb::PMDPortArg::kSocketId ?
-              sid : rte_eth_dev_socket_id(ret_port_id);
+  // int numa_node = rte_eth_dev_socket_id(static_cast<int>(ret_port_id));
+  int numa_node = arg.socket_case() == bess::pb::PMDPortArg::kSocketId
+                      ? sid
+                      : rte_eth_dev_socket_id(ret_port_id);
   node_placement_ =
       numa_node == -1 ? UNCONSTRAINED_SOCKET : (1ull << numa_node);
 
