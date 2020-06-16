@@ -6,17 +6,17 @@
 #include "bess_control.h"
 #include <arpa/inet.h>
 #include <ctime>
+#include <fstream>
 #include <getopt.h>
 #include <iterator>
+#include <jsoncpp/json/reader.h>
+#include <jsoncpp/json/value.h>
 #include <map>
 #include <netdb.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <zmq.h>
-#include <jsoncpp/json/value.h>
-#include <jsoncpp/json/reader.h>
-#include <fstream>
 /*--------------------------------------------------------------------------------*/
 #define ZMQ_SERVER_IP "127.0.0.1"
 #define S1U_SGW_IP "127.0.0.1"
@@ -189,7 +189,7 @@ int main(int argc, char **argv) {
   script >> root;
   if (reader.parse(script, root, true)) {
     std::cerr << "Failed to parse configuration\n"
-	      << reader.getFormattedErrorMessages();
+              << reader.getFormattedErrorMessages();
   }
   strcpy(args.zmqd_ip, root["cpiface"]["zmqd_ip"].asString().c_str());
 
