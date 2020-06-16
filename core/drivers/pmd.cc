@@ -246,16 +246,15 @@ CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
     eth_conf.lpbk_mode = 1;
   }
   if (arg.hwcksum()) {
-    eth_conf.rxmode.offloads = DEV_RX_OFFLOAD_IPV4_CKSUM |
-	    DEV_RX_OFFLOAD_UDP_CKSUM |
-	    DEV_RX_OFFLOAD_TCP_CKSUM |
-	    DEV_RX_OFFLOAD_OUTER_IPV4_CKSUM;
+    eth_conf.rxmode.offloads =
+        DEV_RX_OFFLOAD_IPV4_CKSUM | DEV_RX_OFFLOAD_UDP_CKSUM |
+        DEV_RX_OFFLOAD_TCP_CKSUM | DEV_RX_OFFLOAD_OUTER_IPV4_CKSUM;
   }
 
   ret = rte_eth_dev_configure(ret_port_id, num_rxq, num_txq, &eth_conf);
   if (ret != 0) {
     VLOG(1) << "Failed to configure with hardware checksum offload. "
-	    << "Create PMDPort without hardware offload" << std::endl;
+            << "Create PMDPort without hardware offload" << std::endl;
     return CommandFailure(-ret, "rte_eth_dev_configure() failed");
   }
 
