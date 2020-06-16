@@ -7,11 +7,18 @@
 FROM nefelinetworks/bess_build AS bess-build
 RUN apt-get update && \
     apt-get -y install --no-install-recommends \
+        autoconf \
+        automake \
         build-essential \
         ca-certificates \
+        clang-format \
+        doxygen \
         git \
         libelf-dev \
+        libjansson-dev \
+        libjansson4 \
         libnuma-dev \
+        libtool \
         pkg-config \
         unzip \
         wget
@@ -52,9 +59,27 @@ RUN sed -ri 's,(IGB_UIO=).*,\1n,' config/common_linux* && \
     make $MAKEFLAGS EXTRA_CFLAGS="-march=$CPU -g -w -fPIC -DALLOW_EXPERIMENTAL_API"
 
 WORKDIR /
+
+ARG ENABLE_NTF
+ARG NTF_COMMIT=master
+
 ARG BESS_COMMIT=master
 RUN apt-get update && apt-get install -y wget unzip ca-certificates git
 RUN wget -qO bess.zip https://github.com/NetSys/bess/archive/${BESS_COMMIT}.zip && unzip bess.zip
+
+RUN if [ x"$ENABLE_NTF" != "x" ]; then \
+    wget -qO ntf.zip https://github.com/Network-Tokens/ntf/archive/${NTF_COMMIT}.zip \
+    && unzip ntf.zip \
+    && cp ntf-${NTF_COMMIT}/bessctl/conf/* bess-${BESS_COMMIT}/bessctl/conf/ \
+    && cp ntf-${NTF_COMMIT}/modules/* bess-${BESS_COMMIT}/core/modules/ \
+    && cp ntf-${NTF_COMMIT}/protobuf/* bess-${BESS_COMMIT}/protobuf/ \
+    && cp ntf-${NTF_COMMIT}/utils/* bess-${BESS_COMMIT}/core/utils/; \
+    wget -qO cjose.zip https://github.com/cisco/cjose/archive/master.zip \
+    && unzip cjose.zip \
+    && cd cjose-master \
+    && ./configure && make && make install; \
+  fi
+
 WORKDIR bess-${BESS_COMMIT}
 COPY core/ core/
 COPY patches/bess patches
@@ -95,7 +120,11 @@ COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin/bessd
 COPY --from=bess-build /bin/modules /bin/modules
 COPY conf /opt/bess/bessctl/conf
-RUN ln -s /opt/bess/bessctl/bessctl /bin
+RUN ln -s /opt/bess/bessctl/bessctl /bin; \
+  if [ x"$ENABLE_NTF" != "x" ]; then \
+    sed -i 's/"enable_ntf": false/"enable_ntf": true/g' \
+    /opt/bess/bessctl/conf/spgwu.json; \
+  fi
 ENV PYTHONPATH="/opt/bess"
 WORKDIR /opt/bess/bessctl
 ENTRYPOINT ["bessd", "-f"]
