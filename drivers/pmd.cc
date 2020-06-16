@@ -36,12 +36,11 @@
 #include "../utils/ether.h"
 #include "../utils/format.h"
 
-static const rte_eth_conf default_eth_conf(const rte_eth_dev_info &dev_info,
-                                           int nb_rxq) {
+static const rte_eth_conf default_eth_conf(const rte_eth_dev_info &dev_info) {
   rte_eth_conf ret = {};
 
   ret.link_speeds = ETH_LINK_SPEED_AUTONEG;
-  ret.rxmode.mq_mode = (nb_rxq > 1) ? ETH_MQ_RX_RSS : ETH_MQ_RX_NONE;
+  ret.rxmode.mq_mode = ETH_MQ_RX_RSS;
   ret.rxmode.offloads = 0;
 
   ret.rx_adv_conf.rss_conf = {
@@ -241,48 +240,32 @@ CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
    * with minor tweaks */
   rte_eth_dev_info_get(ret_port_id, &dev_info);
 
-  eth_conf = default_eth_conf(dev_info, num_rxq);
+  eth_conf = default_eth_conf(dev_info);
   if (arg.loopback()) {
     eth_conf.lpbk_mode = 1;
-  }
-  if (arg.hwcksum()) {
-    eth_conf.rxmode.offloads = DEV_RX_OFFLOAD_IPV4_CKSUM |
-	    DEV_RX_OFFLOAD_UDP_CKSUM |
-	    DEV_RX_OFFLOAD_TCP_CKSUM |
-	    DEV_RX_OFFLOAD_OUTER_IPV4_CKSUM;
   }
 
   ret = rte_eth_dev_configure(ret_port_id, num_rxq, num_txq, &eth_conf);
   if (ret != 0) {
-    VLOG(1) << "Failed to configure with hardware checksum offload. "
-	    << "Create PMDPort without hardware offload" << std::endl;
     return CommandFailure(-ret, "rte_eth_dev_configure() failed");
   }
 
-  int sid = rte_eth_dev_socket_id(ret_port_id);
+  //int sid = rte_eth_dev_socket_id(ret_port_id);
+  //if (sid < 0 || sid > RTE_MAX_NUMA_NODES) {
+  //  sid = 0;  // if socket_id is invalid, set to 0
+  //}
+
+  int sid = arg.socket_case() == bess::pb::PMDPortArg::kSocketId ?
+	  arg.socket_id() : rte_eth_dev_socket_id(ret_port_id);
+  LOG(INFO) << "Initializing Port:" << ret_port_id << " with memory from socket " << sid;
+  /* if socket_id is invalid, set to 0 */
   if (sid < 0 || sid > RTE_MAX_NUMA_NODES) {
-    sid = 0;  // if socket_id is invalid, set to 0
+    sid = 0;
+    LOG(WARNING) << "Initializing Port:" << ret_port_id << " with memory from socket " << sid;
   }
 
   eth_rxconf = dev_info.default_rxconf;
   eth_rxconf.rx_drop_en = 1;
-
-  if (dev_info.rx_desc_lim.nb_min > 0 &&
-      queue_size[PACKET_DIR_INC] < dev_info.rx_desc_lim.nb_min) {
-    int old_size_rxq = queue_size[PACKET_DIR_INC];
-    queue_size[PACKET_DIR_INC] = dev_info.rx_desc_lim.nb_min;
-    LOG(WARNING) << "resizing RX queue size from " << old_size_rxq << " to "
-                 << queue_size[PACKET_DIR_INC];
-  }
-
-  if (dev_info.rx_desc_lim.nb_max > 0 &&
-      queue_size[PACKET_DIR_INC] > dev_info.rx_desc_lim.nb_max) {
-    int old_size_rxq = queue_size[PACKET_DIR_INC];
-    queue_size[PACKET_DIR_INC] = dev_info.rx_desc_lim.nb_max;
-    LOG(WARNING) << "capping RX queue size from " << old_size_rxq << " to "
-                 << queue_size[PACKET_DIR_INC];
-  }
-
   for (int i = 0; i < num_rxq; i++) {
     ret = rte_eth_rx_queue_setup(ret_port_id, i, queue_size[PACKET_DIR_INC],
                                  sid, &eth_rxconf,
@@ -290,22 +273,6 @@ CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
     if (ret != 0) {
       return CommandFailure(-ret, "rte_eth_rx_queue_setup() failed");
     }
-  }
-
-  if (dev_info.tx_desc_lim.nb_min > 0 &&
-      queue_size[PACKET_DIR_OUT] < dev_info.tx_desc_lim.nb_min) {
-    int old_size_txq = queue_size[PACKET_DIR_OUT];
-    queue_size[PACKET_DIR_OUT] = dev_info.tx_desc_lim.nb_min;
-    LOG(WARNING) << "resizing TX queue size from " << old_size_txq << " to "
-                 << queue_size[PACKET_DIR_OUT];
-  }
-
-  if (dev_info.tx_desc_lim.nb_max > 0 &&
-      queue_size[PACKET_DIR_OUT] > dev_info.tx_desc_lim.nb_max) {
-    int old_size_txq = queue_size[PACKET_DIR_OUT];
-    queue_size[PACKET_DIR_OUT] = dev_info.tx_desc_lim.nb_max;
-    LOG(WARNING) << "capping TX queue size from " << old_size_txq << " to "
-                 << queue_size[PACKET_DIR_OUT];
   }
 
   for (int i = 0; i < num_txq; i++) {
@@ -335,7 +302,9 @@ CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
   }
   dpdk_port_id_ = ret_port_id;
 
-  int numa_node = rte_eth_dev_socket_id(static_cast<int>(ret_port_id));
+  //int numa_node = rte_eth_dev_socket_id(static_cast<int>(ret_port_id));
+  int numa_node = arg.socket_case() == bess::pb::PMDPortArg::kSocketId ?
+              sid : rte_eth_dev_socket_id(ret_port_id);
   node_placement_ =
       numa_node == -1 ? UNCONSTRAINED_SOCKET : (1ull << numa_node);
 
