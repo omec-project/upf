@@ -47,11 +47,7 @@ struct Args {
     struct in_addr upf_comm_ip;
     struct in_addr s1u_ip;
     char hostname[HOSTNAME_LEN];
-  } rmb = {
-	  {.s_addr = 0},
-	  {.s_addr = 0},
-	  ""
-  };
+  } rmb = {{.s_addr = 0}, {.s_addr = 0}, ""};
   void parse(const int argc, char **argv) {
     int c;
     // Get args from command line
@@ -61,17 +57,18 @@ struct Args {
         {"zmqd_ip", required_argument, NULL, 'Z'},
         {"zmqd_send_port", required_argument, NULL, 's'},
         {"zmqd_recv_port", required_argument, NULL, 'r'},
-	{"zmqd_nb_ip", required_argument, NULL, 'N'},
-	{"zmqd_nb_port", required_argument, NULL, 'n'},
-	{"s1u_sgw_ip", required_argument, NULL, 'u'},
+        {"zmqd_nb_ip", required_argument, NULL, 'N'},
+        {"zmqd_nb_port", required_argument, NULL, 'n'},
+        {"s1u_sgw_ip", required_argument, NULL, 'u'},
         {"encapmod", required_argument, NULL, 'M'},
-	{"hostname", required_argument, NULL, 'h'},
+        {"hostname", required_argument, NULL, 'h'},
         {0, 0, 0, 0}};
     do {
       int option_index = 0;
       uint32_t val = 0;
 
-      c = getopt_long(argc, argv, "B:b:Z:s:r:M:N:n:u:h:", long_options, &option_index);
+      c = getopt_long(argc, argv, "B:b:Z:s:r:M:N:n:u:h:", long_options,
+                      &option_index);
 
       if (c == -1)
         break;
@@ -111,22 +108,22 @@ struct Args {
           strncpy(encapmod, optarg, MIN(strlen(optarg), MODULE_NAME_LEN - 1));
           break;
         case 'N':
-	  strncpy(zmqd_nb_ip, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
-	  break;
+          strncpy(zmqd_nb_ip, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
+          break;
         case 'n':
-	  val = strtoul(optarg, NULL, 10);
-	  if (val == ULONG_MAX && errno == ERANGE) {
-		  std::cerr << "Failed to parse zmqd_nb_port" << std::endl;
-		  exit(EXIT_FAILURE);
-	  }
-	  zmqd_nb_port = (uint16_t)(val & 0x0000FFFF);
-	  break;
+          val = strtoul(optarg, NULL, 10);
+          if (val == ULONG_MAX && errno == ERANGE) {
+            std::cerr << "Failed to parse zmqd_nb_port" << std::endl;
+            exit(EXIT_FAILURE);
+          }
+          zmqd_nb_port = (uint16_t)(val & 0x0000FFFF);
+          break;
         case 'u':
-	  strncpy(s1u_sgw_ip, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
-	  break;
-      case 'h':
-	      strncpy(rmb.hostname, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
-	      break;
+          strncpy(s1u_sgw_ip, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
+          break;
+        case 'h':
+          strncpy(rmb.hostname, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
+          break;
         default:
           std::cerr << "Unknown argument - " << argv[optind] << std::endl;
           exit(EXIT_FAILURE);
@@ -160,24 +157,25 @@ int main(int argc, char **argv) {
   args.parse(argc, argv);
 
   if (context0 == NULL || context1 == NULL || context2 == NULL) {
-    std::cerr << "Failed to create context(s)!: "
-              << strerror(errno) << std::endl;
+    std::cerr << "Failed to create context(s)!: " << strerror(errno)
+              << std::endl;
     return EXIT_FAILURE;
   }
 
   // Socket to register to CP
   reg = zmq_socket(context0, ZMQ_REQ);
   if (reg == NULL) {
-    std::cerr << "Failed to create reg socket!: "
-	      << strerror(errno) << std::endl;
+    std::cerr << "Failed to create reg socket!: " << strerror(errno)
+              << std::endl;
     return EXIT_FAILURE;
   }
 
   // connect to registration port
   if (zmq_connect(reg, ("tcp://" + std::string(args.zmqd_nb_ip) + ":" +
-			std::to_string(args.zmqd_nb_port)).c_str()) < 0) {
-    std::cerr << "Failed to connect to registration port!: "
-	      << strerror(errno) << std::endl;
+                        std::to_string(args.zmqd_nb_port))
+                           .c_str()) < 0) {
+    std::cerr << "Failed to connect to registration port!: " << strerror(errno)
+              << std::endl;
     return EXIT_FAILURE;
   }
 
@@ -205,12 +203,14 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
   // get response
-  if (zmq_recv(reg, &args.zmqd_send_port, sizeof(args.zmqd_send_port), 0) == -1) {
+  if (zmq_recv(reg, &args.zmqd_send_port, sizeof(args.zmqd_send_port), 0) ==
+      -1) {
     std::cerr << "Failed to recv registration request from CP!" << std::endl;
     return EXIT_FAILURE;
   }
 
-  VLOG(1) << "Received port #: " << args.zmqd_send_port << " from registration port." << std::endl;
+  VLOG(1) << "Received port #: " << args.zmqd_send_port
+          << " from registration port." << std::endl;
 
   // close registration socket
   zmq_close(reg);
@@ -219,14 +219,16 @@ int main(int argc, char **argv) {
   receiver = zmq_socket(context1, ZMQ_PULL);
 
   if (receiver == NULL) {
-    std::cerr << "Failed to create receiver socket!: "
-	      << strerror(errno) << std::endl;
+    std::cerr << "Failed to create receiver socket!: " << strerror(errno)
+              << std::endl;
     return EXIT_FAILURE;
   }
   // Socket to recv message from
-  if (zmq_bind(receiver, ("tcp://" + std::string(args.zmqd_ip) + ":"
-			  + std::to_string(args.zmqd_recv_port)).c_str()) != 0) {
-    std::cerr << "Failed to bind to receiver ZMQ port!: " << strerror(errno) << std::endl;
+  if (zmq_bind(receiver, ("tcp://" + std::string(args.zmqd_ip) + ":" +
+                          std::to_string(args.zmqd_recv_port))
+                             .c_str()) != 0) {
+    std::cerr << "Failed to bind to receiver ZMQ port!: " << strerror(errno)
+              << std::endl;
     return EXIT_FAILURE;
   }
   //  Socket to send messages to
@@ -253,8 +255,8 @@ int main(int argc, char **argv) {
         {receiver, 0, ZMQ_POLLIN, 0},
     };
     if (zmq_poll((zmq_pollitem_t *)items, 1, -1) < 0) {
-	    std::cerr << "ZMQ poll failed!: " << strerror(errno) << std::endl;
-	    return EXIT_FAILURE;
+      std::cerr << "ZMQ poll failed!: " << strerror(errno) << std::endl;
+      return EXIT_FAILURE;
     }
     if (items[0].revents & ZMQ_POLLIN) {
       struct msgbuf rbuf;
@@ -268,7 +270,7 @@ int main(int argc, char **argv) {
       memset(&resp, 0, sizeof(struct resp_msgbuf));
       switch (mtype) {
         case MSG_SESS_CRE:
-	  VLOG(1) << "Got a session create request, ";
+          VLOG(1) << "Got a session create request, ";
           VLOG(1) << "UEADDR: " << rbuf.sess_entry.ue_addr
                   << ", ENODEADDR: " << rbuf.sess_entry.ul_s1_info.enb_addr
                   << ", sgw_teid: " << (rbuf.sess_entry.ul_s1_info.sgw_teid)
@@ -284,7 +286,7 @@ int main(int argc, char **argv) {
           resp.sess_id = rbuf.sess_entry.sess_id;
           break;
         case MSG_SESS_MOD:
-	  VLOG(1) << "Got a session modify request, ";
+          VLOG(1) << "Got a session modify request, ";
           VLOG(1) << "UEADDR: " << rbuf.sess_entry.ue_addr
                   << ", ENODEADDR: " << rbuf.sess_entry.ul_s1_info.enb_addr
                   << ", sgw_teid: " << (rbuf.sess_entry.ul_s1_info.sgw_teid)
@@ -315,7 +317,7 @@ int main(int argc, char **argv) {
           }
           break;
         case MSG_SESS_DEL:
-	  VLOG(1) << "Got a session delete request" << std::endl;
+          VLOG(1) << "Got a session delete request" << std::endl;
           VLOG(1) << "UEADDR: " << rbuf.sess_entry.ue_addr
                   << ", ENODEADDR: " << rbuf.sess_entry.ul_s1_info.enb_addr
                   << ", sgw_teid: " << (rbuf.sess_entry.ul_s1_info.sgw_teid)
@@ -349,7 +351,7 @@ int main(int argc, char **argv) {
           }
           break;
         default:
-	  VLOG(1) << "Got a request with mtype: " << mtype << std::endl;
+          VLOG(1) << "Got a request with mtype: " << mtype << std::endl;
           break;
       }
       size = zmq_send(sender, &resp, sizeof(resp), ZMQ_NOBLOCK);
@@ -357,7 +359,7 @@ int main(int argc, char **argv) {
         std::cerr << "Error in zmq sending: " << strerror(errno) << std::endl;
         break;
       } else {
-	VLOG(1) << "Sending back response block" << std::endl;
+        VLOG(1) << "Sending back response block" << std::endl;
       }
     }
   }
