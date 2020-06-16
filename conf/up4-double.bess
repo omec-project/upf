@@ -88,58 +88,6 @@ for idx, iface in enumerate(interfaces):
 
 
 # ====================================================
-# 	Shared Pipeline (DL + UL)
-# ====================================================
-
-######################################################
-# The following atrributes are created by GtpuParser:
-#   - dst_ip
-#   - src_ip
-#   - dst_port
-#   - src_port
-#   - teid (fseid)
-#   - tunnel_ip4_dst
-#   - proto_id
-
-LinkMerge::Merge() \
-    -> PktParse::GtpuParser():1 \
-    -> PDRLookup::WildcardMatch(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
-                                        {'attr_name':'tunnel_ipv4_dst', 'num_bytes':4}, \
-                                        {'attr_name':'teid', 'num_bytes':4}, \
-                                        {'attr_name':'dst_ip', 'num_bytes':4}, \
-                                        {'attr_name':'src_ip', 'num_bytes':4}, \
-                                        {'attr_name':'dst_port', 'num_bytes':2}, \
-                                        {'attr_name':'src_port', 'num_bytes':2}, \
-                                        {'attr_name':'ip_proto', 'num_bytes':1}], \
-                                values=[{'attr_name':'pdr_id', 'num_bytes':4}, \
-                                        {'attr_name':'fseid', 'num_bytes':4}, \
-                                        {'attr_name':'ctr_id', 'num_bytes':4}, \
-                                        {'attr_name':'far_id', 'num_bytes':4}, \
-                                        {'attr_name':'needs_gtpu_decap', 'num_bytes':1}]):1 \
-    -> PreQoSCounter::Counter(name_id='ctr_id', check_exist=True) \
-    -> FARLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
-                                     {'attr_name':'fseid', 'num_bytes':4}], \
-                             values=[{'attr_name':'action', 'num_bytes':1}, \
-                                     {'attr_name':'tunnel_out_type', 'num_bytes':1}, \
-                                     {'attr_name':'tunnel_out_src_ip4addr', 'num_bytes':4}, \
-                                     {'attr_name':'tunnel_out_dst_ip4addr', 'num_bytes':4}, \
-                                     {'attr_name':'tunnel_out_teid', 'num_bytes':4}, \
-                                     {'attr_name':'tunnel_out_udp_port', 'num_bytes':2}]):1 \
-    -> ExecuteFAR::Split(size=1, attribute='action')
-
-# Drop unknown packets
-PktParse:0 -> Sink()
-PDRLookup:0 -> Sink()
-FARLookup:0 -> Sink()
-ExecuteFAR:FARDropAction -> FARDrop::Sink()
-ExecuteFAR:FARNotifyCPAction -> FARNotifyCP::Sink()
-
-# Set default gates for relevant modules
-PDRLookup.set_default_gate(gate=0)
-FARLookup.set_default_gate(gate=0)
-
-
-# ====================================================
 #       Downlink Pipeline
 # ====================================================
 
@@ -153,8 +101,8 @@ if ports[parser.sgi_ifname].ext_addrs is not None:
 
 # 1. Build initial DL pipeline here
 sgiFastBPF:UEGate \
-    -> sgiRxIPCksum::IPChecksum(verify=True) \
-    -> sgiRxUDPCksum::L4Checksum(verify=True) \
+    -> sgiRxIPCksum::IPChecksum(verify=True, hw=True) \
+    -> sgiRxUDPCksum::L4Checksum(verify=True, hw=True) \
     -> DLMACDstMatch::ExactMatch(fields=[{'offset':0, 'num_bytes':6}])
 
 # Record last module to chain up optional modules
@@ -178,12 +126,43 @@ if parser.max_ip_defrag_flows is not None:
 # 2. Build the remaining first half of the DL pipeline before entering the shared pipeline
 #ports[parser.sgi_ifname].rewrite \
 _in:gate -> ueLookup::IPLookup() \
-    -> SetMetadata(attrs=[{'name':'src_iface', 'size':1, 'value_int':Core}]) \
-    -> LinkMerge # Start of the shared pipeline
+    -> DLPktParse::GtpuParser():1 \
+    -> DLPDRLookup::WildcardMatch(fields=[{'attr_name':'tunnel_ipv4_dst', 'num_bytes':4}, \
+                                          {'attr_name':'teid', 'num_bytes':4}, \
+                                          {'attr_name':'dst_ip', 'num_bytes':4}, \
+                                          {'attr_name':'src_ip', 'num_bytes':4}, \
+                                          {'attr_name':'dst_port', 'num_bytes':2}, \
+                                          {'attr_name':'src_port', 'num_bytes':2}, \
+                                          {'attr_name':'ip_proto', 'num_bytes':1}], \
+                                  values=[{'attr_name':'pdr_id', 'num_bytes':4}, \
+                                          {'attr_name':'fseid', 'num_bytes':4}, \
+                                          {'attr_name':'ctr_id', 'num_bytes':4}, \
+                                          {'attr_name':'far_id', 'num_bytes':4}, \
+                                          {'attr_name':'needs_gtpu_decap', 'num_bytes':1}]):1 \
+    -> PreDLQoSCounter::Counter(name_id='ctr_id', check_exist=True) \
+    -> DLFARLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
+                                       {'attr_name':'fseid', 'num_bytes':4}], \
+                               values=[{'attr_name':'action', 'num_bytes':1}, \
+                                       {'attr_name':'tunnel_out_type', 'num_bytes':1}, \
+                                       {'attr_name':'tunnel_out_src_ip4addr', 'num_bytes':4}, \
+                                       {'attr_name':'tunnel_out_dst_ip4addr', 'num_bytes':4}, \
+                                       {'attr_name':'tunnel_out_teid', 'num_bytes':4}, \
+                                       {'attr_name':'tunnel_out_udp_port', 'num_bytes':2}]):1 \
+    -> DLExecuteFAR::Split(size=1, attribute='action')
 
+# Drop unknown packets
+DLPktParse:0 -> Sink()
+DLPDRLookup:0 -> Sink()
+DLFARLookup:0 -> Sink()
+DLExecuteFAR:FARDropAction -> DLFARDrop::Sink()
+DLExecuteFAR:FARNotifyCPAction -> DLFARNotifyCP::Sink()
+
+# Set default gates for relevant modules
+DLPDRLookup.set_default_gate(gate=0)
+DLFARLookup.set_default_gate(gate=0)
 
 # 3. Complete the last part of the DL pipeline
-ExecuteFAR:FARTunnelAction \
+DLExecuteFAR:FARTunnelAction \
     -> EtherEncapTrim::GenericDecap(bytes=14) \
     -> GTPUEncap::GtpuEncap():1 \
     -> S1UEtherAdd::GenericEncap(fields=[
@@ -239,8 +218,8 @@ GTPUGate = 0
 
 # 1. Build initial UL pipeline here
 s1uFastBPF:GTPUGate \
-    -> s1uRxIPCksum::IPChecksum(verify=True) \
-    -> s1uRxUDPCksum::L4Checksum(verify=True) \
+    -> s1uRxIPCksum::IPChecksum(verify=True, hw=True) \
+    -> s1uRxUDPCksum::L4Checksum(verify=True, hw=True) \
     -> ULMACDstMatch::ExactMatch(fields=[{'offset':0, 'num_bytes':6}])
 
 # Record last module to chain up option modules
@@ -258,11 +237,43 @@ if parser.max_ip_defrag_flows is not None:
 # 2. Build the remaining first half of the UL pipeline before entering the shard pipeline
 #ports[parser.s1u_ifname].rewrite \
 _in:gate -> InetLookup::IPLookup() \
-    -> SetMetadata(attrs=[{'name':'src_iface', 'size':1, 'value_int':Access}]) \
-    -> LinkMerge # Start of the shared pipeline
+    -> ULPktParse::GtpuParser():1 \
+    -> ULPDRLookup::WildcardMatch(fields=[{'attr_name':'tunnel_ipv4_dst', 'num_bytes':4}, \
+                                          {'attr_name':'teid', 'num_bytes':4}, \
+                                          {'attr_name':'dst_ip', 'num_bytes':4}, \
+                                          {'attr_name':'src_ip', 'num_bytes':4}, \
+                                          {'attr_name':'dst_port', 'num_bytes':2}, \
+                                          {'attr_name':'src_port', 'num_bytes':2}, \
+                                          {'attr_name':'ip_proto', 'num_bytes':1}], \
+                                  values=[{'attr_name':'pdr_id', 'num_bytes':4}, \
+                                          {'attr_name':'fseid', 'num_bytes':4}, \
+                                          {'attr_name':'ctr_id', 'num_bytes':4}, \
+                                          {'attr_name':'far_id', 'num_bytes':4}, \
+                                          {'attr_name':'needs_gtpu_decap', 'num_bytes':1}]):1 \
+    -> PreULQoSCounter::Counter(name_id='ctr_id', check_exist=True) \
+    -> ULFARLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
+                                       {'attr_name':'fseid', 'num_bytes':4}], \
+                               values=[{'attr_name':'action', 'num_bytes':1}, \
+                                       {'attr_name':'tunnel_out_type', 'num_bytes':1}, \
+                                       {'attr_name':'tunnel_out_src_ip4addr', 'num_bytes':4}, \
+                                       {'attr_name':'tunnel_out_dst_ip4addr', 'num_bytes':4}, \
+                                       {'attr_name':'tunnel_out_teid', 'num_bytes':4}, \
+                                       {'attr_name':'tunnel_out_udp_port', 'num_bytes':2}]):1 \
+    -> ULExecuteFAR::Split(size=1, attribute='action')
+
+# Drop unknown packets
+ULPktParse:0 -> Sink()
+ULPDRLookup:0 -> Sink()
+ULFARLookup:0 -> Sink()
+ULExecuteFAR:FARDropAction -> ULFARDrop::Sink()
+ULExecuteFAR:FARNotifyCPAction -> ULFARNotifyCP::Sink()
+
+# Set default gates for relevant modules
+ULPDRLookup.set_default_gate(gate=0)
+ULFARLookup.set_default_gate(gate=0)
 
 # 3. Complete the last part of the UL pipeline
-ExecuteFAR:FARForwardAction \
+ULExecuteFAR:FARForwardAction \
     -> EtherDecapTrim::GenericDecap(bytes=14) -> GTPUDecap::GtpuDecap() \
     -> SGIEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
@@ -358,17 +369,15 @@ def sim_start_test():
         enb_of_ran = ue_of_ran % NG4T_MAX_ENB_RAN
         enb_idx = ran * NG4T_MAX_ENB_RAN + enb_of_ran
 
-        PDRLookup.add(gate=1, priority=1,
-                      values=[{'value_int':Core},	     # src_iface
-                              {'value_int':0},		     # tunnel_ipv4_dst
+        DLPDRLookup.add(gate=1, priority=1,
+                      values=[{'value_int':0},		     # tunnel_ipv4_dst
                               {'value_int':0},               # enb_teid
                               {'value_int':start_ue_ip+i},   # ueaddr ip
                               {'value_int':0},               # inet ip
                               {'value_int':0},               # ue port
                               {'value_int':0},               # inet port
                               {'value_int':0}],              # proto-id
-                      masks=[{'value_int':0xFF},	     # src_iface-mask
-                              {'value_int':0},		     # tunnel_ipv4_dst-mask
+                      masks=[{'value_int':0},		     # tunnel_ipv4_dst-mask
                               {'value_int':0},               # enb_teid-mask
                               {'value_int':0xFFFFFFFF},      # ueaddr ip-mask
                               {'value_int':0},               # inet ip-mask
@@ -381,17 +390,15 @@ def sim_start_test():
                               {'value_int':1},               # far_id
                               {'value_int':0}])              # need_decap
 
-        PDRLookup.add(gate=1, priority=1,
-                      values=[{'value_int':Access},	     # src_iface
-                              {'value_int':0},		     # tunnel_ipv4_dst
+        ULPDRLookup.add(gate=1, priority=1,
+                      values=[{'value_int':0},		     # tunnel_ipv4_dst
                               {'value_int':start_teid+i},    # enb_teid
                               {'value_int':0},               # inet ip
                               {'value_int':start_ue_ip+i},   # ueaddr ip
                               {'value_int':0},               # inet port
                               {'value_int':0},               # ue port
                               {'value_int':0}],              # proto-id
-                      masks=[{'value_int':0xFF},	     # src_iface-mask
-                              {'value_int':0},		     # tunnel_ipv4_dst-mask
+                      masks=[{'value_int':0},		     # tunnel_ipv4_dst-mask
                               {'value_int':0xFFFFFFFF},      # enb_teid-mask
                               {'value_int':0},               # inet ip-mask
                               {'value_int':0xFFFFFFFF},      # ueaddr ip-mask
@@ -404,7 +411,7 @@ def sim_start_test():
                               {'value_int':0},               # far_id
                               {'value_int':1}])              # need_decap-mask
 
-        FARLookup.add(gate=1,
+        DLFARLookup.add(gate=1,
                       fields=[{'value_int':1},                      # far-id
                               {'value_int':start_teid+i}],          # fseid
                       values=[{'value_int':FARTunnelAction},        # action
@@ -414,7 +421,7 @@ def sim_start_test():
                               {'value_int':start_teid+i},           # enb teid
                               {'value_int':2152}])                  # udp gtpu port
 
-        FARLookup.add(gate=1,
+        ULFARLookup.add(gate=1,
                       fields=[{'value_int':0},                      # far-id
                               {'value_int':start_teid+i}],          # fseid
                       values=[{'value_int':FARForwardAction},       # action
@@ -424,7 +431,8 @@ def sim_start_test():
                               {'value_int':0},                      # not needed
                               {'value_int':0}])                     # not needed
 
-        PreQoSCounter.add(ctr_id=start_teid+i)                      # fseid
+        PreDLQoSCounter.add(ctr_id=start_teid+i)                      # fseid
+        PreULQoSCounter.add(ctr_id=start_teid+i)                      # fseid
 
         PostDLQoSCounter.add(ctr_id=start_teid+i)                     # fseid
         PostULQoSCounter.add(ctr_id=start_teid+i)                     # fseid
@@ -450,16 +458,14 @@ def sim_end_test():
         enb_of_ran = ue_of_ran % NG4T_MAX_ENB_RAN
         enb_idx = ran * NG4T_MAX_ENB_RAN + enb_of_ran
 
-        PDRLookup.delete(values=[{'value_int':Core},	     # src_iface
-                              {'value_int':0},		     # tunnel_ipv4_dst
+        DLPDRLookup.delete(values=[{'value_int':0},		     # tunnel_ipv4_dst
                               {'value_int':0},               # enb_teid
                               {'value_int':start_ue_ip+i},   # ueaddr ip
                               {'value_int':0},               # inet ip
                               {'value_int':0},               # ue port
                               {'value_int':0},               # inet port
                               {'value_int':0}],              # proto-id
-                      masks=[{'value_int':0xFF},	     # src_iface-mask
-                              {'value_int':0},		     # tunnel_ipv4_dst-mask
+                      masks=[{'value_int':0},		     # tunnel_ipv4_dst-mask
                               {'value_int':0},               # enb_teid-mask
                               {'value_int':0xFFFFFFFF},      # ueaddr ip-mask
                               {'value_int':0},               # inet ip-mask
@@ -467,16 +473,14 @@ def sim_end_test():
                               {'value_int':0},               # inet port-mask
                               {'value_int':0}])              # proto-id-mask
 
-        PDRLookup.delete(values=[{'value_int':Access},	     # src_iface
-                              {'value_int':0},		     # tunnel_ipv4_dst
+        ULPDRLookup.delete(values=[{'value_int':0},		     # tunnel_ipv4_dst
                               {'value_int':start_teid+i},    # enb_teid
                               {'value_int':0},               # inet ip
                               {'value_int':start_ue_ip+i},   # ueaddr ip
                               {'value_int':0},               # inet port
                               {'value_int':0},               # ue port
                               {'value_int':0}],              # proto-id
-                      masks=[{'value_int':0xFF},	     # src_iface-mask
-                              {'value_int':0},		     # tunnel_ipv4_dst-mask
+                      masks=[{'value_int':0},		     # tunnel_ipv4_dst-mask
                               {'value_int':0xFFFFFFFF},      # enb_teid-mask
                               {'value_int':0},               # inet ip-mask
                               {'value_int':0xFFFFFFFF},      # ueaddr ip-mask
@@ -484,13 +488,14 @@ def sim_end_test():
                               {'value_int':0},               # ue port-mask
                               {'value_int':0}])              # proto-id-mask
 
-        FARLookup.delete(fields=[{'value_int':1},                   # far-id
+        DLFARLookup.delete(fields=[{'value_int':1},                   # far-id
                               {'value_int':start_teid+i}])          # fseid
 
-        FARLookup.delete(fields=[{'value_int':0},                   # far-id
+        ULFARLookup.delete(fields=[{'value_int':0},                   # far-id
                               {'value_int':start_teid+i}])          # fseid
 
-        PreQoSCounter.remove(ctr_id=start_teid+i)                      # fseid
+        PreDLQoSCounter.remove(ctr_id=start_teid+i)                      # fseid
+        PreULQoSCounter.remove(ctr_id=start_teid+i)                      # fseid
 
         PostDLQoSCounter.remove(ctr_id=start_teid+i)                     # fseid
         PostULQoSCounter.remove(ctr_id=start_teid+i)                     # fseid
@@ -508,7 +513,7 @@ if parser.mode == 'sim':
     # Start the test
     sim_start_test()
     # Wait for 1000 seconds before deleting the session info entries (optional)
-    time.sleep(1000)
+    time.sleep(10000)
     sim_end_test()
 
 # Pipeline complete, resume bessd (if it is not "sim")
