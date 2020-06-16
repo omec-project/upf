@@ -34,5 +34,12 @@
     },
 
     "": "Number of worker threads. Default: use 1 thread to run both (uplink/downlink) pipelines",
-    "workers": 1
+    "workers": 1,
+
+    "": "Route control settings",
+    "cpiface": {
+	"s1u_sgw_ip": "198.18.0.1",
+	"zmqd_nb_ip": "172.17.0.1",
+	"zmqd_ip": "172.17.0.2"
+    }
 }
