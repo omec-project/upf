@@ -185,6 +185,7 @@ int main(int argc, char **argv) {
   strcpy(args.zmqd_nb_ip, root["cpiface"]["zmqd_nb_ip"].asString().c_str());
   strcpy(args.zmqd_ip, root["cpiface"]["zmqd_ip"].asString().c_str());
   strcpy(args.s1u_sgw_ip, root["cpiface"]["s1u_sgw_ip"].asString().c_str());
+  strcpy(args.rmb.hostname, root["cpiface"]["hostname"].asString().c_str());
 
   if (context0 == NULL || context1 == NULL || context2 == NULL) {
     std::cerr << "Failed to create context(s)!: " << strerror(errno)
