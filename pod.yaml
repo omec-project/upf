@@ -23,7 +23,7 @@ kind: ConfigMap
 metadata:
   name: spgwu-conf
 data:
-  spgwu.json: |
+  upf.json: |
     {
       "ue_cidr": "16.0.0.0/16",
       "enb_cidr": "11.1.1.128/25",
@@ -99,7 +99,7 @@ spec:
     - -grpc-url=0.0.0.0:10514
     env:
     - name: CONF_FILE
-      value: /conf/spgwu.json
+      value: /conf/upf.json
     livenessProbe:
       tcpSocket:
         port: 10514

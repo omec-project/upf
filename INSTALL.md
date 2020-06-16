@@ -43,7 +43,7 @@ To run BESS daemon with NGIC modules' code:
 ```
 
 To update the pipeline, reflect changes to [`conf/spgwu.bess`](conf/spgwu.bess)
-and/or [`conf/spgwu.json`](conf/spgwu.json)
+and/or [`conf/upf.json`](conf/upf.json)
 
 To install the pipeline, do:
 

@@ -6,7 +6,7 @@ CPU ?= native
 CXXFLAGS ?= -march=$(CPU) -g -O3 -std=c++17 -Werror -Wall -Wcast-align
 TARGET ?= zmq-cpiface
 PBDIR ?= ./pb
-GRPC_LIBS = -l:libprotobuf.a -l:libgrpc++.a -l:libgrpc_unsecure.a -l:libcares.a -lpthread -lz
+GRPC_LIBS = -l:libprotobuf.a -l:libgrpc++.a -l:libgrpc_unsecure.a -l:libcares.a -lpthread -lz -ljsoncpp
 SRCS := zmq-cpiface.cc
 
 all:
