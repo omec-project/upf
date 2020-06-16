@@ -999,6 +999,7 @@ message SourceArg {
 */
 message IPChecksumArg {
  bool verify = 1; /// check checksum
+ bool hw = 2; /// enable hardware offload
 }
 
 /**
@@ -1011,6 +1012,7 @@ message IPChecksumArg {
 */
 message L4ChecksumArg {
  bool verify = 1; /// check checksum
+ bool hw = 2; /// enable hardware offload
 }
 
 /**
