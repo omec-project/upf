@@ -144,7 +144,8 @@ class Port:
             kwargs = None
             pci = alias_by_interface(name)
             if pci is not None:
-                kwargs = {"pci": pci, "num_out_q": conf_workers}
+                # Try setting hwcksum to False, if PMDPort fails
+                kwargs = {"pci": pci, "num_out_q": conf_workers, "hwcksum": True}
                 try:
                     self.init_fastpath(**kwargs)
                 except:
@@ -162,7 +163,8 @@ class Port:
                 if fidx is None:
                     raise Exception(
                         'Registered port for {} not detected!'.format(name))
-                kwargs = {"port_id": fidx, "num_out_q": conf_workers}
+                # Try setting hwcksum to False, if PMDPort fails
+                kwargs = {"port_id": fidx, "num_out_q": conf_workers,  "hwcksum": True}
                 self.init_fastpath(**kwargs)
 
             # Initialize kernel slowpath port and RX/TX modules

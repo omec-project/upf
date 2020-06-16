@@ -513,7 +513,7 @@ if parser.mode == 'sim':
     # Start the test
     sim_start_test()
     # Wait for 1000 seconds before deleting the session info entries (optional)
-    time.sleep(10000)
+    time.sleep(1000)
     sim_end_test()
 
 # Pipeline complete, resume bessd (if it is not "sim")
