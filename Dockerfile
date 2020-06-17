@@ -90,8 +90,7 @@ RUN apt-get update && \
         iptools \
         protobuf \
         pyroute2 \
-	scapy
-        #https://github.com/secdev/scapy/archive/b65e795c62accd383e1bb6b17cd9f7a9143ae117.zip
+        scapy
 COPY --from=pip /usr/local/lib/python2.7/site-packages/psutil /usr/local/lib/python2.7/site-packages/psutil
 COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin/bessd
@@ -118,7 +117,7 @@ RUN make $MAKEFLAGS && \
 FROM ubuntu:bionic AS cpiface
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        libgoogle-glog0v5 libjsoncpp-dev \
+        libgoogle-glog0v5 \
         libzmq5 && \
     rm -rf /var/lib/apt/lists/*
 
