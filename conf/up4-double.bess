@@ -139,7 +139,7 @@ _in:gate -> ueLookup::IPLookup() \
                                           {'attr_name':'ctr_id', 'num_bytes':4}, \
                                           {'attr_name':'far_id', 'num_bytes':4}, \
                                           {'attr_name':'needs_gtpu_decap', 'num_bytes':1}]):1 \
-    -> PreDLQoSCounter::Counter(name_id='ctr_id', check_exist=True) \
+    -> PreDLQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
     -> DLFARLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
                                        {'attr_name':'fseid', 'num_bytes':4}], \
                                values=[{'attr_name':'action', 'num_bytes':1}, \
@@ -169,7 +169,7 @@ DLExecuteFAR:FARTunnelAction \
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(macstr_u)}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
-    -> PostDLQoSCounter::Counter(name_id='ctr_id', check_exist=True) \
+    -> PostDLQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
     -> OuterUDPCsum::L4Checksum() \
     -> OuterIPCsum::IPChecksum() \
     -> ports[parser.s1u_ifname].rtr
@@ -250,7 +250,7 @@ _in:gate -> InetLookup::IPLookup() \
                                           {'attr_name':'ctr_id', 'num_bytes':4}, \
                                           {'attr_name':'far_id', 'num_bytes':4}, \
                                           {'attr_name':'needs_gtpu_decap', 'num_bytes':1}]):1 \
-    -> PreULQoSCounter::Counter(name_id='ctr_id', check_exist=True) \
+    -> PreULQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
     -> ULFARLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
                                        {'attr_name':'fseid', 'num_bytes':4}], \
                                values=[{'attr_name':'action', 'num_bytes':1}, \
@@ -279,7 +279,7 @@ ULExecuteFAR:FARForwardAction \
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(macstr_d)}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
-    -> PostULQoSCounter::Counter(name_id='ctr_id', check_exist=True) \
+    -> PostULQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
     -> ports[parser.sgi_ifname].rtr
 
 # 4. GTP Echo response pipeline
@@ -386,7 +386,7 @@ def sim_start_test():
                               {'value_int':0}],              # proto-id-mask
                       valuesv=[{'value_int':0},	     	     # pdr-id
                               {'value_int':start_teid+i},    # fseid
-                              {'value_int':start_teid+i},    # ctr_id
+                              {'value_int':i},    	     # ctr_id
                               {'value_int':1},               # far_id
                               {'value_int':0}])              # need_decap
 
@@ -407,7 +407,7 @@ def sim_start_test():
                               {'value_int':0}],              # proto-id-mask
                       valuesv=[{'value_int':0},	     	     # pdr-id
                               {'value_int':start_teid+i},    # fseid
-                              {'value_int':start_teid+i},    # ctr_id
+                              {'value_int':i},    	     # ctr_id
                               {'value_int':0},               # far_id
                               {'value_int':1}])              # need_decap-mask
 
@@ -431,11 +431,11 @@ def sim_start_test():
                               {'value_int':0},                      # not needed
                               {'value_int':0}])                     # not needed
 
-        PreDLQoSCounter.add(ctr_id=start_teid+i)                      # fseid
-        PreULQoSCounter.add(ctr_id=start_teid+i)                      # fseid
+        PreDLQoSCounter.add(ctr_id=i)                      # fseid
+        PreULQoSCounter.add(ctr_id=i)                      # fseid
 
-        PostDLQoSCounter.add(ctr_id=start_teid+i)                     # fseid
-        PostULQoSCounter.add(ctr_id=start_teid+i)                     # fseid
+        PostDLQoSCounter.add(ctr_id=i)                     # fseid
+        PostULQoSCounter.add(ctr_id=i)                     # fseid
 
     # Connect the source with the pipeline to start pumping the packets
     bess.resume_all()
@@ -458,7 +458,7 @@ def sim_end_test():
         enb_of_ran = ue_of_ran % NG4T_MAX_ENB_RAN
         enb_idx = ran * NG4T_MAX_ENB_RAN + enb_of_ran
 
-        DLPDRLookup.delete(values=[{'value_int':0},		     # tunnel_ipv4_dst
+        DLPDRLookup.delete(values=[{'value_int':0},	     # tunnel_ipv4_dst
                               {'value_int':0},               # enb_teid
                               {'value_int':start_ue_ip+i},   # ueaddr ip
                               {'value_int':0},               # inet ip
@@ -473,7 +473,7 @@ def sim_end_test():
                               {'value_int':0},               # inet port-mask
                               {'value_int':0}])              # proto-id-mask
 
-        ULPDRLookup.delete(values=[{'value_int':0},		     # tunnel_ipv4_dst
+        ULPDRLookup.delete(values=[{'value_int':0},	     # tunnel_ipv4_dst
                               {'value_int':start_teid+i},    # enb_teid
                               {'value_int':0},               # inet ip
                               {'value_int':start_ue_ip+i},   # ueaddr ip
@@ -488,17 +488,17 @@ def sim_end_test():
                               {'value_int':0},               # ue port-mask
                               {'value_int':0}])              # proto-id-mask
 
-        DLFARLookup.delete(fields=[{'value_int':1},                   # far-id
-                              {'value_int':start_teid+i}])          # fseid
+        DLFARLookup.delete(fields=[{'value_int':1},           # far-id
+                              {'value_int':start_teid+i}])    # fseid
 
-        ULFARLookup.delete(fields=[{'value_int':0},                   # far-id
-                              {'value_int':start_teid+i}])          # fseid
+        ULFARLookup.delete(fields=[{'value_int':0},           # far-id
+                              {'value_int':start_teid+i}])    # fseid
 
-        PreDLQoSCounter.remove(ctr_id=start_teid+i)                      # fseid
-        PreULQoSCounter.remove(ctr_id=start_teid+i)                      # fseid
+        PreDLQoSCounter.remove(ctr_id=i)                      # fseid
+        PreULQoSCounter.remove(ctr_id=i)                      # fseid
 
-        PostDLQoSCounter.remove(ctr_id=start_teid+i)                     # fseid
-        PostULQoSCounter.remove(ctr_id=start_teid+i)                     # fseid
+        PostDLQoSCounter.remove(ctr_id=i)                     # fseid
+        PostULQoSCounter.remove(ctr_id=i)                     # fseid
 
     #bess.resume_all()
     #bess.reset_all()
@@ -512,8 +512,8 @@ def sim_end_test():
 if parser.mode == 'sim':
     # Start the test
     sim_start_test()
-    # Wait for 1000 seconds before deleting the session info entries (optional)
-    time.sleep(1000)
+    # Wait for 10000 seconds before deleting the session info entries (optional)
+    time.sleep(10000)
     sim_end_test()
 
 # Pipeline complete, resume bessd (if it is not "sim")
