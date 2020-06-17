@@ -17,6 +17,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <zmq.h>
+#include <stack>
 /*--------------------------------------------------------------------------------*/
 #define ZMQ_SERVER_IP "127.0.0.1"
 #define ZMQ_RECV_PORT 20
@@ -36,6 +37,10 @@ void *reg;
 void *context0;
 void *context1;
 void *context2;
+struct TeidEntry {
+  uint32_t teid;
+  uint32_t ctr_id;
+};
 /*--------------------------------------------------------------------------------*/
 struct Args {
   char bessd_ip[HOSTNAME_LEN] = BESSD_IP;
@@ -162,7 +167,9 @@ int main(int argc, char **argv) {
 
   /* key: SESS_ID(rbuf.sess_entry.ue_addr.u.ipv4_addr, DEFAULT_BEARER), val:
    * enb_teid) */
-  std::map<uint64_t, uint32_t> zmq_sess_map;
+  std::map<uint64_t, TeidEntry> zmq_sess_map;
+  std::stack<uint32_t> counter;
+  uint32_t counter_count = 0;
 
   context0 = zmq_ctx_new();
   context1 = zmq_ctx_new();
@@ -186,6 +193,12 @@ int main(int argc, char **argv) {
   strcpy(args.zmqd_ip, root["cpiface"]["zmqd_ip"].asString().c_str());
   strcpy(args.s1u_sgw_ip, root["cpiface"]["s1u_sgw_ip"].asString().c_str());
   strcpy(args.rmb.hostname, root["cpiface"]["hostname"].asString().c_str());
+  counter_count = root["max_sessions"].asInt();
+  script.close();
+
+  /* initialize stack */
+  for (int32_t k = counter_count-1; k >= 0; k--)
+    counter.push(k);
 
   if (context0 == NULL || context1 == NULL || context2 == NULL) {
     std::cerr << "Failed to create context(s)!: " << strerror(errno)
@@ -299,6 +312,8 @@ int main(int argc, char **argv) {
       }
       long mtype = rbuf.mtype;
       uint32_t enb_teid = 0;
+      uint32_t curr_ctr = 0;
+      TeidEntry te;
       memset(&resp, 0, sizeof(struct resp_msgbuf));
       switch (mtype) {
         case MSG_SESS_CRE:
@@ -313,9 +328,16 @@ int main(int argc, char **argv) {
           resp.op_id = rbuf.sess_entry.op_id;
           resp.dp_id.id = rbuf.dp_id.id;
           resp.mtype = DPN_RESPONSE;
+	  te.teid = 0;
+	  te.ctr_id = counter.top();
           zmq_sess_map[SESS_ID(rbuf.sess_entry.ue_addr.u.ipv4_addr,
-                               DEFAULT_BEARER)] = 0;
+                               DEFAULT_BEARER)] = te;
+	  VLOG(1) << "Assigning sess with IP addr: "
+		  << rbuf.sess_entry.ue_addr.u.ipv4_addr
+		  << " counter: " << te.ctr_id << std::endl;
           resp.sess_id = rbuf.sess_entry.sess_id;
+	  /* ctr_id is used up */
+	  counter.pop();
           break;
         case MSG_SESS_MOD:
           VLOG(1) << "Got a session modify request, ";
@@ -336,9 +358,16 @@ int main(int argc, char **argv) {
             std::cerr << "No record found!" << std::endl;
             break;
           } else {
-            zmq_sess_map[SESS_ID(rbuf.sess_entry.ue_addr.u.ipv4_addr,
-                                 DEFAULT_BEARER)] =
-                rbuf.sess_entry.dl_s1_info.enb_teid;
+	    curr_ctr = zmq_sess_map[SESS_ID(rbuf.sess_entry.ue_addr.u.ipv4_addr,
+					    DEFAULT_BEARER)].ctr_id;
+	    te.teid = rbuf.sess_entry.dl_s1_info.enb_teid;
+	    te.ctr_id = curr_ctr;
+	    zmq_sess_map[SESS_ID(rbuf.sess_entry.ue_addr.u.ipv4_addr,
+				 DEFAULT_BEARER)] = te;
+	    VLOG(1) << "Assigning sess with IP addr: "
+		    << rbuf.sess_entry.ue_addr.u.ipv4_addr
+		    << " and teid: " << te.teid
+		    << " counter: " << te.ctr_id << std::endl;
           }
           {
             // Add PDR (DOWNLINK)
@@ -363,7 +392,7 @@ int main(int argc, char **argv) {
                 .protoid_mask = 0,         /* proto-id + mask */
                 .pdr_id = 0,               /* pdr id */
                 .fseid = rbuf.sess_entry.dl_s1_info.enb_teid,  /* fseid */
-                .ctr_id = rbuf.sess_entry.dl_s1_info.enb_teid, /* ctr_id */
+                .ctr_id = curr_ctr, /* ctr_id */
                 .far_id = 1,                                   /* far id */
                 .need_decap = 0,                               /* need decap */
             };
@@ -392,7 +421,7 @@ int main(int argc, char **argv) {
                 .protoid_mask = 0,         /* proto-id + mask */
                 .pdr_id = 0,               /* pdr id */
                 .fseid = rbuf.sess_entry.dl_s1_info.enb_teid,  /* fseid */
-                .ctr_id = rbuf.sess_entry.dl_s1_info.enb_teid, /* ctr_id */
+                .ctr_id = curr_ctr, /* ctr_id */
                 .far_id = 0,                                   /* far id */
                 .need_decap = 1,                               /* need decap */
             };
@@ -444,7 +473,7 @@ int main(int argc, char **argv) {
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
             b.runAddCounterCommand(
-                (rbuf.sess_entry.dl_s1_info.enb_teid),
+                (curr_ctr),
                 (("Pre" + std::string(args.qoscounter)).c_str()));
           }
           {
@@ -453,7 +482,7 @@ int main(int argc, char **argv) {
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
             b.runAddCounterCommand(
-                (rbuf.sess_entry.dl_s1_info.enb_teid),
+                (curr_ctr),
                 (("PostUL" + std::string(args.qoscounter)).c_str()));
           }
           {
@@ -462,7 +491,7 @@ int main(int argc, char **argv) {
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
             b.runAddCounterCommand(
-                (rbuf.sess_entry.dl_s1_info.enb_teid),
+                (curr_ctr),
                 (("PostDL" + std::string(args.qoscounter)).c_str()));
           }
           break;
@@ -486,11 +515,18 @@ int main(int argc, char **argv) {
                           DEFAULT_BEARER)) == zmq_sess_map.end()) {
             std::cerr << "No record found!" << std::endl;
             break;
-          } else
+          } else {
             enb_teid = zmq_sess_map[SESS_ID(
-                ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr), DEFAULT_BEARER)];
+                ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr), DEFAULT_BEARER)].teid;
+	    curr_ctr = zmq_sess_map[SESS_ID(
+                ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr), DEFAULT_BEARER)].ctr_id;
+	    VLOG(1) << "Assigning sess with IP addr: "
+		    << ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr)
+		    << " and teid: " << enb_teid
+		    << " counter: " << curr_ctr << std::endl;
+	  }
           {
-            std::map<std::uint64_t, uint32_t>::iterator it = zmq_sess_map.find(
+            std::map<std::uint64_t, TeidEntry>::iterator it = zmq_sess_map.find(
                 SESS_ID(ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),
                         DEFAULT_BEARER));
             zmq_sess_map.erase(it);
@@ -581,7 +617,7 @@ int main(int argc, char **argv) {
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
             b.runDelCounterCommand(
-                (enb_teid), (("Pre" + std::string(args.qoscounter)).c_str()));
+                (curr_ctr), (("Pre" + std::string(args.qoscounter)).c_str()));
           }
           {
             // Delete PostQoS Counter
@@ -589,7 +625,7 @@ int main(int argc, char **argv) {
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
             b.runDelCounterCommand(
-                (enb_teid),
+                (curr_ctr),
                 (("PostUL" + std::string(args.qoscounter)).c_str()));
           }
           {
@@ -598,9 +634,12 @@ int main(int argc, char **argv) {
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
             b.runDelCounterCommand(
-                (enb_teid),
+                (curr_ctr),
                 (("PostDL" + std::string(args.qoscounter)).c_str()));
           }
+	  /* freed up counter id is returned to the stack */
+	  VLOG(1) << "Curr Ctr returned: " << curr_ctr << std::endl;
+	  counter.push(curr_ctr);
           break;
         default:
           VLOG(1) << "Got a request with mtype: " << mtype << std::endl;

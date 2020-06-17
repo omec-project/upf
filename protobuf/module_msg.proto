@@ -1080,6 +1080,7 @@ message CounterRemoveArg {
 message CounterArg {
   string name_id = 1; /// Name of the counter_id
   bool check_exist = 2; /// verify each counter pre-exists before any operation (default = False)
+  uint32 total = 3; /// Total number of entries it can support
 }
 
 /**
