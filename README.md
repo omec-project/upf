@@ -5,10 +5,10 @@ Copyright(c) 2019 Intel Corporation
 
 # UPF-EPC - Overview
 
-UPF-EPC is a revised version of [ngic-rtc](https://github.com/omec-project/ngic-rtc)'s [dp](https://github.com/omec-project/ngic-rtc/dp).
-It works seamlessly with all NFs available in the omec-project's EPC. Like ngic-rtc's dp, it communicates with [cp](https://github.com/omec-project/ngic-rtc/cp) and
+UPF-EPC is a revised version of [ngic-rtc](https://github.com/omec-project/ngic-rtc/tree/central-cp-multi-upfs)'s [dp](https://github.com/omec-project/ngic-rtc/tree/central-cp-multi-upfs/dp).
+It works seamlessly with all NFs available in the omec-project's EPC. Like ngic-rtc's dp, it communicates with [cp](https://github.com/omec-project/ngic-rtc/tree/central-cp-multi-upfs/cp) and
 conforms to Control User Plane Separated (CUPS) architecture. The prototype is based on the 3GPP TS23501 specifications of EPC and functions as a co-located Service
-and Packet Gateway (SPGW-U).
+and Packet Gateway (SPGW-U). This branch is compatible with Aether's control plane.
 
 The dataplane is built on top of [Berkeley Extensible Software Switch](https://github.com/NetSys/bess/) (BESS) programmable framework, where each submodule in the SPGW-U
 pipeline is represented by a BESS-based module. As a result, the pipeline built using BESS can visually be interpreted as a directed acyclic graph, where

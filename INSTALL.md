@@ -22,12 +22,12 @@ You need the following dependencies.
 
 ### ZMQ Streamer
 
-UPF-EPC communicates with the CP via [ZMQ streamer](https://github.com/omec-project/ngic-rtc/blob/master/dev_scripts/start-ZMQ_Streamer.sh). Please adjust
-[`interface.cfg`](https://github.com/omec-project/ngic-rtc/blob/master/config/interface.cfg) so that both `zmq_cp_ip` and `zmq_dp_ip` are set to `docker0`'s IP address.
+UPF-EPC communicates with the CP via ZMQ. Please adjust
+[`interface.cfg`](https://github.com/omec-project/ngic-rtc/tree/central-cp-multi-upfs/config/interface.cfg) accordingly.
 
 ### CP
 
-Please refer to [INSTALL.md](https://github.com/omec-project/ngic-rtc/blob/master/INSTALL.MD) to get CP running.
+Please refer to [INSTALL.md](https://github.com/omec-project/ngic-rtc/tree/central-cp-multi-upfs/INSTALL.MD) to get CP running.
 
 ### DP
 
