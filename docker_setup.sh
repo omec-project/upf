@@ -116,16 +116,7 @@ docker run --name pause -td --restart unless-stopped \
 	--hostname $(hostname) \
 	k8s.gcr.io/pause
 
-# Run bessd
-docker run --name bess -td --restart unless-stopped \
-	--cpuset-cpus=12-13 \
-	--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
-	-v "$PWD/conf":/opt/bess/bessctl/conf \
-	--net container:pause \
-	$PRIVS \
-	$DEVICES \
-	upf-epc-bess:"$(<VERSION)"
-
+# Emulate CNI + init container
 sudo mkdir -p /var/run/netns
 sandbox=$(docker inspect --format='{{.NetworkSettings.SandboxKey}}' pause)
 sudo ln -s "$sandbox" /var/run/netns/pause
@@ -139,8 +130,17 @@ case $mode in
 	;;
 esac
 
-# Setup trafficgen routes
 setup_trafficgen_routes
+
+# Run bessd
+docker run --name bess -td --restart unless-stopped \
+	--cpuset-cpus=12-13 \
+	--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
+	-v "$PWD/conf":/opt/bess/bessctl/conf \
+	--net container:pause \
+	$PRIVS \
+	$DEVICES \
+	upf-epc-bess:"$(<VERSION)"
 
 docker logs bess
 
