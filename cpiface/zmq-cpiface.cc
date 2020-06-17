@@ -21,12 +21,11 @@
 #include <zmq.h>
 /*--------------------------------------------------------------------------------*/
 #define ZMQ_SERVER_IP "127.0.0.1"
-#define S1U_SGW_IP "127.0.0.1"
-#define ZMQ_RECV_PORT 5560
+#define ZMQ_RECV_PORT 20
 #define ZMQ_SEND_PORT 5557
-#define ZMQ_NB_IP "172.17.0.1"
-#define ZMQ_NB_PORT 21
-#define S1U_SGW_IP "11.1.1.1"
+#define ZMQ_NB_IP "127.0.0.1"
+#define ZMQ_NB_PORT 1111
+#define S1U_SGW_IP "127.0.0.1"
 #define UDP_PORT_GTPU 2152
 #define SCRIPT_NAME "/tmp/conf/upf.json"
 /*--------------------------------------------------------------------------------*/
@@ -49,7 +48,6 @@ struct Args {
   uint16_t zmqd_send_port = ZMQ_SEND_PORT;
   uint16_t zmqd_recv_port = ZMQ_RECV_PORT;
   uint16_t zmqd_nb_port = ZMQ_NB_PORT;
-  char encapmod[MODULE_NAME_LEN] = ENCAPMOD;
   char pdrlookup[MODULE_NAME_LEN] = PDRLOOKUPMOD;
   char farlookup[MODULE_NAME_LEN] = FARLOOKUPMOD;
   char qoscounter[MODULE_NAME_LEN] = QOSCOUNTERMOD;
@@ -71,18 +69,18 @@ struct Args {
         {"zmqd_nb_ip", required_argument, NULL, 'N'},
         {"zmqd_nb_port", required_argument, NULL, 'n'},
         {"s1u_sgw_ip", required_argument, NULL, 'u'},
-        {"encapmod", required_argument, NULL, 'M'},
+        {"pdrlookup", required_argument, NULL, 'P'},
+        {"farlookup", required_argument, NULL, 'F'},
+        {"qoscounter", required_argument, NULL, 'c'},
         {"hostname", required_argument, NULL, 'h'},
-	{"pdrlookup", required_argument, NULL, 'P'},
-	{"farlookup", required_argument, NULL, 'F'},
-	{"qoscounter", required_argument, NULL, 'c'},
         {0, 0, 0, 0}};
     do {
       int option_index = 0;
       uint32_t val = 0;
 
-      c = getopt_long(argc, argv, "B:b:Z:s:r:M:N:n:u:h:P:", long_options,
+      c = getopt_long(argc, argv, "B:b:Z:s:r:c:P:F:N:n:u:h:", long_options,
                       &option_index);
+
       if (c == -1)
         break;
 
@@ -123,9 +121,6 @@ struct Args {
           }
           zmqd_recv_port = (uint16_t)(val & 0x0000FFFF);
           break;
-        case 'M':
-          strncpy(encapmod, optarg, MIN(strlen(optarg), MODULE_NAME_LEN - 1));
-          break;
         case 'N':
           strncpy(zmqd_nb_ip, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
           break;
@@ -137,16 +132,16 @@ struct Args {
           }
           zmqd_nb_port = (uint16_t)(val & 0x0000FFFF);
           break;
+        case 'P':
+          strncpy(pdrlookup, optarg, MIN(strlen(optarg), MODULE_NAME_LEN - 1));
+          break;
         case 'u':
           strncpy(s1u_sgw_ip, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
           break;
         case 'h':
           strncpy(rmb.hostname, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
           break;
-      	case 'P':
-	  strncpy(pdrlookup, optarg, MIN(strlen(optarg), MODULE_NAME_LEN - 1));
-	  break;
-      	default:
+        default:
           std::cerr << "Unknown argument - " << argv[optind] << std::endl;
           exit(EXIT_FAILURE);
           break;
@@ -210,10 +205,6 @@ int main(int argc, char **argv) {
   // set args coming from command-line
   args.parse(argc, argv);
 
-  if (context0 == NULL || context1 == NULL || context2 == NULL) {
-    std::cerr << "Failed to create context(s)!: " << strerror(errno)
-              << std::endl;
-
   // values from json file always take precedence
   Json::Value root;
   Json::Reader reader;
@@ -223,11 +214,14 @@ int main(int argc, char **argv) {
     std::cerr << "Failed to parse configuration\n"
               << reader.getFormattedErrorMessages();
   }
+  strcpy(args.zmqd_nb_ip, root["cpiface"]["zmqd_nb_ip"].asString().c_str());
   strcpy(args.zmqd_ip, root["cpiface"]["zmqd_ip"].asString().c_str());
+  strcpy(args.s1u_sgw_ip, root["cpiface"]["s1u_sgw_ip"].asString().c_str());
+  strcpy(args.rmb.hostname, root["cpiface"]["hostname"].asString().c_str());
 
-  if (context1 == NULL || context2 == NULL || receiver == NULL) {
-    std::cerr << "Failed to create context(s) or receiver socket!: "
-              << strerror(errno) << std::endl;
+  if (context0 == NULL || context1 == NULL || context2 == NULL) {
+    std::cerr << "Failed to create context(s)!: " << strerror(errno)
+              << std::endl;
     return EXIT_FAILURE;
   }
 
@@ -358,7 +352,7 @@ int main(int argc, char **argv) {
         break;
       }
       long mtype = rbuf.mtype;
-      uint32_t enb_teid;
+      uint32_t enb_teid = 0;
       memset(&resp, 0, sizeof(struct resp_msgbuf));
       switch (mtype) {
         case MSG_SESS_CRE:
@@ -427,12 +421,12 @@ int main(int argc, char **argv) {
                 .fseid = rbuf.sess_entry.dl_s1_info.enb_teid,  /* fseid */
                 .ctr_id = rbuf.sess_entry.dl_s1_info.enb_teid, /* ctr_id */
                 .far_id = 1,                                   /* far id */
-                .need_decap = 0                                /* need decap */
+                .need_decap = 0,                               /* need decap */
             };
             b.runAddPDRCommand(&pa, args.pdrlookup);
           }
           {
-            // ADDPDR (UPLINK)
+            // Add PDR (UPLINK)
             BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
@@ -456,7 +450,7 @@ int main(int argc, char **argv) {
                 .fseid = rbuf.sess_entry.dl_s1_info.enb_teid,  /* fseid */
                 .ctr_id = rbuf.sess_entry.dl_s1_info.enb_teid, /* ctr_id */
                 .far_id = 0,                                   /* far id */
-                .need_decap = 1                                /* need decap */
+                .need_decap = 1,                               /* need decap */
             };
             b.runAddPDRCommand(&pa, args.pdrlookup);
           }
@@ -477,12 +471,12 @@ int main(int argc, char **argv) {
                 .tun_dst_ip = rbuf.sess_entry.ul_s1_info.enb_addr.u
                                   .ipv4_addr,                /* enb addr */
                 .teid = rbuf.sess_entry.dl_s1_info.enb_teid, /* enb_teid */
-                .tun_port = UDP_PORT_GTPU                    /* 2152 */
+                .tun_port = UDP_PORT_GTPU,                   /* 2152 */
             };
             b.runAddFARCommand(&fa, args.farlookup);
           }
           {
-            // ADD FAR (UPLINK)
+            // Add FAR (UPLINK)
             BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
@@ -496,7 +490,7 @@ int main(int argc, char **argv) {
                 .tun_src_ip = 0, /* not needed */
                 .tun_dst_ip = 0, /* not needed */
                 .teid = 0,       /* not needed */
-                .tun_port = 0    /* not needed */
+                .tun_port = 0,   /* not needed */
             };
             b.runAddFARCommand(&fa, args.farlookup);
           }
@@ -506,7 +500,7 @@ int main(int argc, char **argv) {
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
             b.runAddCounterCommand(
-                rbuf.sess_entry.dl_s1_info.enb_teid,
+                (rbuf.sess_entry.dl_s1_info.enb_teid),
                 (("Pre" + std::string(args.qoscounter)).c_str()));
           }
           {
@@ -515,7 +509,7 @@ int main(int argc, char **argv) {
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
             b.runAddCounterCommand(
-                rbuf.sess_entry.dl_s1_info.enb_teid,
+                (rbuf.sess_entry.dl_s1_info.enb_teid),
                 (("PostUL" + std::string(args.qoscounter)).c_str()));
           }
           {
@@ -524,7 +518,7 @@ int main(int argc, char **argv) {
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
             b.runAddCounterCommand(
-                rbuf.sess_entry.dl_s1_info.enb_teid,
+                (rbuf.sess_entry.dl_s1_info.enb_teid),
                 (("PostDL" + std::string(args.qoscounter)).c_str()));
           }
           break;
@@ -583,7 +577,7 @@ int main(int argc, char **argv) {
                 .fseid = 0,                /* fseid (not needed) */
                 .ctr_id = 0,               /* ctr_id (not needed) */
                 .far_id = 0,               /* far id (not needed) */
-                .need_decap = 0            /* need decap (not needed) */
+                .need_decap = 0,           /* need decap (not needed) */
             };
             b.runDelPDRCommand(&pa, args.pdrlookup);
           }
@@ -613,7 +607,7 @@ int main(int argc, char **argv) {
                 .fseid = 0,                /* fseid (not needed) */
                 .ctr_id = 0,               /* ctr_id (not needed) */
                 .far_id = 0,               /* far id (not needed) */
-                .need_decap = 0            /* need decap (not needed) */
+                .need_decap = 0,           /* need decap (not needed) */
             };
             b.runDelPDRCommand(&pa, args.pdrlookup);
           }
@@ -643,7 +637,7 @@ int main(int argc, char **argv) {
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
             b.runDelCounterCommand(
-                enb_teid, (("Pre" + std::string(args.qoscounter)).c_str()));
+                (enb_teid), (("Pre" + std::string(args.qoscounter)).c_str()));
           }
           {
             // Delete PostQoS Counter
@@ -651,7 +645,8 @@ int main(int argc, char **argv) {
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
             b.runDelCounterCommand(
-                enb_teid, (("PostUL" + std::string(args.qoscounter)).c_str()));
+                (enb_teid),
+                (("PostUL" + std::string(args.qoscounter)).c_str()));
           }
           {
             // Delete PostQoS Counter
@@ -659,7 +654,8 @@ int main(int argc, char **argv) {
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
             b.runDelCounterCommand(
-                enb_teid, (("PostDL" + std::string(args.qoscounter)).c_str()));
+                (enb_teid),
+                (("PostDL" + std::string(args.qoscounter)).c_str()));
           }
           break;
         case MSG_KEEPALIVE_ACK:
