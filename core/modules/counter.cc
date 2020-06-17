@@ -16,19 +16,23 @@ const Commands Counter::cmds = {
 /*----------------------------------------------------------------------------------*/
 CommandResponse Counter::AddCounter(const bess::pb::CounterAddArg &arg) {
   uint32_t ctr_id = arg.ctr_id();
-
+#ifdef HASHMAP_BASED
   /* check_exist is still here for over-protection */
   if (counters.find(ctr_id) == counters.end()) {
     SessionStats s = {.pkt_count = 0, .byte_count = 0};
     counters.insert(std::pair<uint32_t, SessionStats>(ctr_id, s));
   } else
     return CommandFailure(EINVAL, "Unable to add ctr");
+#else
+  (void)ctr_id;
+#endif
   return CommandSuccess();
 }
 /*----------------------------------------------------------------------------------*/
 CommandResponse Counter::RemoveCounter(const bess::pb::CounterRemoveArg &arg) {
   uint32_t ctr_id = arg.ctr_id();
 
+#ifdef HASHMAP_BASED
   /* check_exist is still here for over-protection */
   if (counters.find(ctr_id) != counters.end()) {
     std::cerr << this->name() << "[" << ctr_id
@@ -38,6 +42,14 @@ CommandResponse Counter::RemoveCounter(const bess::pb::CounterRemoveArg &arg) {
   } else {
     return CommandFailure(EINVAL, "Unable to remove ctr");
   }
+#else
+  if (ctr_id < total_count && counters[ctr_id].pkt_count != 0) {
+    std::cerr << this->name() << "[" << ctr_id
+              << "]: " << counters[ctr_id].pkt_count << ", "
+              << counters[ctr_id].byte_count << std::endl;
+    counters[ctr_id].pkt_count = counters[ctr_id].byte_count = 0;
+  }
+#endif
   return CommandSuccess();
 }
 /*----------------------------------------------------------------------------------*/
@@ -50,6 +62,15 @@ CommandResponse Counter::Init(const bess::pb::CounterArg &arg) {
   using AccessMode = bess::metadata::Attribute::AccessMode;
   ctr_attr_id = AddMetadataAttr(name_id, sizeof(uint32_t), AccessMode::kRead);
 
+#ifndef HASHMAP_BASED
+  total_count = arg.total();
+  if (total_count <= 0)
+    return CommandFailure(EINVAL, "Invalid total number");
+  counters = (SessionStats *)calloc(total_count, sizeof(SessionStats));
+  if (counters == NULL)
+    return CommandFailure(ENOMEM, "Unable to allocate memory for counters!");
+#endif
+
   return CommandSuccess();
 }
 /*----------------------------------------------------------------------------------*/
@@ -58,6 +79,7 @@ void Counter::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 
   for (int i = 0; i < cnt; i++) {
     uint32_t ctr_id = get_attr<uint32_t>(this, ctr_attr_id, batch->pkts()[i]);
+#ifdef HASHMAP_BASED
     std::map<uint32_t, SessionStats>::iterator it;
 
     // check if ctr_id is present
@@ -65,13 +87,23 @@ void Counter::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
       it->second.pkt_count += 1;
       it->second.byte_count += batch->pkts()[i]->total_len();
     }
+#else
+    if (ctr_id < total_count) {
+      counters[ctr_id].pkt_count += 1;
+      counters[ctr_id].byte_count += batch->pkts()[i]->total_len();
+    }
+#endif
   }
 
   RunNextModule(ctx, batch);
 }
 /*----------------------------------------------------------------------------------*/
 std::string Counter::GetDesc() const {
+#ifdef HASHMAP_BASED
   return bess::utils::Format("%zu sessions", (size_t)counters.size());
+#else
+  return "";
+#endif
 }
 /*----------------------------------------------------------------------------------*/
 ADD_MODULE(Counter, "counter",

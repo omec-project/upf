@@ -27,10 +27,15 @@ class Counter final : public Module {
   std::string GetDesc() const override;
 
  private:
+#ifdef HASHMAP_BASED
   std::map<uint32_t, SessionStats> counters;
+#else
+  SessionStats *counters;
+#endif
   std::string name_id;
   bool check_exist;
   int ctr_attr_id;
+  uint32_t total_count;
 };
 
 #endif  // BESS_MODULES_COUNTER_H_
