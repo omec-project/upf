@@ -109,7 +109,7 @@ sudo rm -rf /var/run/netns/pause
 make docker-build
 
 if [ "$mode" == 'dpdk' ]; then
-	DEVICES=${DEVICES:-'--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio'}
+        DEVICES=${DEVICES:-'--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio'}
 	PRIVS='--cap-add IPC_LOCK'
 
 elif [ "$mode" == 'af_xdp' ]; then
@@ -125,16 +125,6 @@ docker run --name pause -td --restart unless-stopped \
 	-p $gui_port:$gui_port \
 	--hostname $(hostname) \
 	k8s.gcr.io/pause
-
-# Run bessd
-docker run --name bess -td --restart unless-stopped \
-	--cpuset-cpus=12-13 \
-	--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
-	-v "$PWD/conf":/opt/bess/bessctl/conf \
-	--net container:pause \
-	$PRIVS \
-	$DEVICES \
-	upf-epc-bess:"$(<VERSION)"
 
 # Emulate CNI + init container
 sudo mkdir -p /var/run/netns
