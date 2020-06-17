@@ -116,7 +116,7 @@ LinkMerge::Merge() \
                                         {'attr_name':'ctr_id', 'num_bytes':4}, \
                                         {'attr_name':'far_id', 'num_bytes':4}, \
                                         {'attr_name':'needs_gtpu_decap', 'num_bytes':1}]):1 \
-    -> PreQoSCounter::Counter(name_id='ctr_id', check_exist=True) \
+    -> PreQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
     -> FARLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
                                      {'attr_name':'fseid', 'num_bytes':4}], \
                              values=[{'attr_name':'action', 'num_bytes':1}, \
@@ -190,7 +190,7 @@ ExecuteFAR:FARTunnelAction \
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(macstr_u)}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
-    -> PostDLQoSCounter::Counter(name_id='ctr_id', check_exist=True) \
+    -> PostDLQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
     -> OuterUDPCsum::L4Checksum() \
     -> OuterIPCsum::IPChecksum() \
     -> ports[parser.s1u_ifname].rtr
@@ -268,7 +268,7 @@ ExecuteFAR:FARForwardAction \
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(macstr_d)}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
-    -> PostULQoSCounter::Counter(name_id='ctr_id', check_exist=True) \
+    -> PostULQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
     -> ports[parser.sgi_ifname].rtr
 
 # 4. GTP Echo response pipeline
@@ -377,7 +377,7 @@ def sim_start_test():
                               {'value_int':0}],              # proto-id-mask
                       valuesv=[{'value_int':0},	     	     # pdr-id
                               {'value_int':start_teid+i},    # fseid
-                              {'value_int':start_teid+i},    # ctr_id
+                              {'value_int':i},    	     # ctr_id
                               {'value_int':1},               # far_id
                               {'value_int':0}])              # need_decap
 
@@ -400,7 +400,7 @@ def sim_start_test():
                               {'value_int':0}],              # proto-id-mask
                       valuesv=[{'value_int':0},	     	     # pdr-id
                               {'value_int':start_teid+i},    # fseid
-                              {'value_int':start_teid+i},    # ctr_id
+                              {'value_int':i},    	     # ctr_id
                               {'value_int':0},               # far_id
                               {'value_int':1}])              # need_decap-mask
 
@@ -424,10 +424,10 @@ def sim_start_test():
                               {'value_int':0},                      # not needed
                               {'value_int':0}])                     # not needed
 
-        PreQoSCounter.add(ctr_id=start_teid+i)                      # fseid
+        PreQoSCounter.add(ctr_id=i)                        # fseid
 
-        PostDLQoSCounter.add(ctr_id=start_teid+i)                     # fseid
-        PostULQoSCounter.add(ctr_id=start_teid+i)                     # fseid
+        PostDLQoSCounter.add(ctr_id=i)                     # fseid
+        PostULQoSCounter.add(ctr_id=i)                     # fseid
 
     # Connect the source with the pipeline to start pumping the packets
     bess.resume_all()
@@ -490,10 +490,10 @@ def sim_end_test():
         FARLookup.delete(fields=[{'value_int':0},                   # far-id
                               {'value_int':start_teid+i}])          # fseid
 
-        PreQoSCounter.remove(ctr_id=start_teid+i)                      # fseid
+        PreQoSCounter.remove(ctr_id=i)                        # fseid
 
-        PostDLQoSCounter.remove(ctr_id=start_teid+i)                     # fseid
-        PostULQoSCounter.remove(ctr_id=start_teid+i)                     # fseid
+        PostDLQoSCounter.remove(ctr_id=i)                     # fseid
+        PostULQoSCounter.remove(ctr_id=i)                     # fseid
 
     #bess.resume_all()
     #bess.reset_all()
@@ -507,8 +507,8 @@ def sim_end_test():
 if parser.mode == 'sim':
     # Start the test
     sim_start_test()
-    # Wait for 1000 seconds before deleting the session info entries (optional)
-    time.sleep(1000)
+    # Wait for 10000 seconds before deleting the session info entries (optional)
+    time.sleep(10000)
     sim_end_test()
 
 # Pipeline complete, resume bessd (if it is not "sim")
