@@ -13,13 +13,13 @@
 #include <jsoncpp/json/value.h>
 #include <map>
 #include <netdb.h>
+#include <stack>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <zmq.h>
-#include <stack>
 /*--------------------------------------------------------------------------------*/
 #define ZMQ_SERVER_IP "127.0.0.1"
 #define ZMQ_RECV_PORT 20
@@ -229,7 +229,7 @@ int main(int argc, char **argv) {
   script.close();
 
   /* initialize stack */
-  for (int32_t k = counter_count-1; k >= 0; k--)
+  for (int32_t k = counter_count - 1; k >= 0; k--)
     counter.push(k);
 
   if (context0 == NULL || context1 == NULL || context2 == NULL) {
@@ -384,16 +384,16 @@ int main(int argc, char **argv) {
           my_dp_id = rbuf.dp_id.id;
           resp.dp_id.id = rbuf.dp_id.id;
           resp.mtype = DPN_RESPONSE;
-	  te.teid = 0;
-	  te.ctr_id = counter.top();
+          te.teid = 0;
+          te.ctr_id = counter.top();
           zmq_sess_map[SESS_ID(rbuf.sess_entry.ue_addr.u.ipv4_addr,
                                DEFAULT_BEARER)] = te;
-	  VLOG(1) << "Assigning sess with IP addr: "
-		  << rbuf.sess_entry.ue_addr.u.ipv4_addr
-		  << " counter: " << te.ctr_id << std::endl;
+          VLOG(1) << "Assigning sess with IP addr: "
+                  << rbuf.sess_entry.ue_addr.u.ipv4_addr
+                  << " counter: " << te.ctr_id << std::endl;
           resp.sess_id = rbuf.sess_entry.sess_id;
-	  /* ctr_id is used up */
-	  counter.pop();
+          /* ctr_id is used up */
+          counter.pop();
           break;
         case MSG_SESS_MOD:
           VLOG(1) << "Got a session modify request, ";
@@ -414,16 +414,17 @@ int main(int argc, char **argv) {
             std::cerr << "No record found!" << std::endl;
             break;
           } else {
-	    curr_ctr = zmq_sess_map[SESS_ID(rbuf.sess_entry.ue_addr.u.ipv4_addr,
-					    DEFAULT_BEARER)].ctr_id;
-	    te.teid = rbuf.sess_entry.dl_s1_info.enb_teid;
-	    te.ctr_id = curr_ctr;
-	    zmq_sess_map[SESS_ID(rbuf.sess_entry.ue_addr.u.ipv4_addr,
-				 DEFAULT_BEARER)] = te;
-	    VLOG(1) << "Assigning sess with IP addr: "
-		    << rbuf.sess_entry.ue_addr.u.ipv4_addr
-		    << " and teid: " << te.teid
-		    << " counter: " << te.ctr_id << std::endl;
+            curr_ctr = zmq_sess_map[SESS_ID(rbuf.sess_entry.ue_addr.u.ipv4_addr,
+                                            DEFAULT_BEARER)]
+                           .ctr_id;
+            te.teid = rbuf.sess_entry.dl_s1_info.enb_teid;
+            te.ctr_id = curr_ctr;
+            zmq_sess_map[SESS_ID(rbuf.sess_entry.ue_addr.u.ipv4_addr,
+                                 DEFAULT_BEARER)] = te;
+            VLOG(1) << "Assigning sess with IP addr: "
+                    << rbuf.sess_entry.ue_addr.u.ipv4_addr
+                    << " and teid: " << te.teid << " counter: " << te.ctr_id
+                    << std::endl;
           }
           {
             // Add PDR (DOWNLINK)
@@ -447,10 +448,10 @@ int main(int argc, char **argv) {
                 .protoid = 0,              /* proto-id */
                 .protoid_mask = 0,         /* proto-id + mask */
                 .pdr_id = 0,               /* pdr id */
-                .fseid = rbuf.sess_entry.dl_s1_info.enb_teid,  /* fseid */
-                .ctr_id = curr_ctr, /* ctr_id */
-                .far_id = 1,                                   /* far id */
-                .need_decap = 0,                               /* need decap */
+                .fseid = rbuf.sess_entry.dl_s1_info.enb_teid, /* fseid */
+                .ctr_id = curr_ctr,                           /* ctr_id */
+                .far_id = 1,                                  /* far id */
+                .need_decap = 0,                              /* need decap */
             };
             b.runAddPDRCommand(&pa, args.pdrlookup);
           }
@@ -476,10 +477,10 @@ int main(int argc, char **argv) {
                 .protoid = 0,              /* proto-id */
                 .protoid_mask = 0,         /* proto-id + mask */
                 .pdr_id = 0,               /* pdr id */
-                .fseid = rbuf.sess_entry.dl_s1_info.enb_teid,  /* fseid */
-                .ctr_id = curr_ctr, /* ctr_id */
-                .far_id = 0,                                   /* far id */
-                .need_decap = 1,                               /* need decap */
+                .fseid = rbuf.sess_entry.dl_s1_info.enb_teid, /* fseid */
+                .ctr_id = curr_ctr,                           /* ctr_id */
+                .far_id = 0,                                  /* far id */
+                .need_decap = 1,                              /* need decap */
             };
             b.runAddPDRCommand(&pa, args.pdrlookup);
           }
@@ -529,8 +530,7 @@ int main(int argc, char **argv) {
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
             b.runAddCounterCommand(
-                (curr_ctr),
-                (("Pre" + std::string(args.qoscounter)).c_str()));
+                (curr_ctr), (("Pre" + std::string(args.qoscounter)).c_str()));
           }
           {
             // Add PostQoS Counter
@@ -572,15 +572,19 @@ int main(int argc, char **argv) {
             std::cerr << "No record found!" << std::endl;
             break;
           } else {
-            enb_teid = zmq_sess_map[SESS_ID(
-                ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr), DEFAULT_BEARER)].teid;
-	    curr_ctr = zmq_sess_map[SESS_ID(
-                ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr), DEFAULT_BEARER)].ctr_id;
-	    VLOG(1) << "Assigning sess with IP addr: "
-		    << ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr)
-		    << " and teid: " << enb_teid
-		    << " counter: " << curr_ctr << std::endl;
-	  }
+            enb_teid =
+                zmq_sess_map[SESS_ID(ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),
+                                     DEFAULT_BEARER)]
+                    .teid;
+            curr_ctr =
+                zmq_sess_map[SESS_ID(ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),
+                                     DEFAULT_BEARER)]
+                    .ctr_id;
+            VLOG(1) << "Assigning sess with IP addr: "
+                    << ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr)
+                    << " and teid: " << enb_teid << " counter: " << curr_ctr
+                    << std::endl;
+          }
           {
             std::map<std::uint64_t, TeidEntry>::iterator it = zmq_sess_map.find(
                 SESS_ID(ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),
@@ -693,9 +697,9 @@ int main(int argc, char **argv) {
                 (curr_ctr),
                 (("PostDL" + std::string(args.qoscounter)).c_str()));
           }
-	  /* freed up counter id is returned to the stack */
-	  VLOG(1) << "Curr Ctr returned: " << curr_ctr << std::endl;
-	  counter.push(curr_ctr);
+          /* freed up counter id is returned to the stack */
+          VLOG(1) << "Curr Ctr returned: " << curr_ctr << std::endl;
+          counter.push(curr_ctr);
           break;
         case MSG_KEEPALIVE_ACK:
           my_dp_id = rbuf.dp_id.id;
