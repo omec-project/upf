@@ -49,10 +49,11 @@ docker-push:
 		docker push ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}upf-epc-$$target:${DOCKER_TAG}; \
 	done
 
-bin:
+# Change target to bess-build/cpiface to exctract src/obj/bins for performance analysis
+output: docker-build
 		DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_BUILD_ARGS) \
-			--target binaries \
-			--output bin \
+			--target artifacts \
+			--output output \
 			.;
 
-.PHONY: docker-build docker-push bin
+.PHONY: docker-build docker-push output
