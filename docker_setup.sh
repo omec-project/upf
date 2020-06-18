@@ -3,8 +3,9 @@
 # Copyright(c) 2019 Intel Corporation
 
 set -e
-# TCP port of bess-web monitor
+# TCP port of bess/web monitor
 gui_port=8000
+bessd_port=10514
 
 # Driver options. Choose any one of the three
 #
@@ -114,6 +115,7 @@ fi
 
 # Run pause
 docker run --name pause -td --restart unless-stopped \
+	-p $bessd_port:$bessd_port \
 	-p $gui_port:$gui_port \
 	--hostname $(hostname) \
 	k8s.gcr.io/pause
@@ -147,7 +149,7 @@ docker run --name bess -td --restart unless-stopped \
 	--net container:pause \
 	$PRIVS \
 	$DEVICES \
-	upf-epc-bess:"$(<VERSION)"
+	upf-epc-bess:"$(<VERSION)" -grpc-url=0.0.0.0:$bessd_port
 
 docker logs bess
 
