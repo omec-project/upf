@@ -58,7 +58,7 @@ try:
 except ValueError:
     print('Invalid value for enable_ntf. Disabling Network Token Functions.')
 except KeyError:
-    print('measure value not set. Disabling Network Token Functions.')
+    print('enable_ntf value not set. Disabling Network Token Functions.')
 
 # ====================================================
 #       Port Helpers
@@ -344,6 +344,21 @@ sgi_ifname = conf["sgi"]["ifname"]
 
 
 # ====================================================
+#       Network Token Functions Setup
+# ====================================================
+
+ntf = None
+if conf["enable_ntf"]:
+    ntf = NTF()
+    # TODO: Populate these tables by talking to the NTE
+    ntf.table_create(dpid=1, max_entries=5)
+    ntf.entry_create(dpid=1, entry_id=1, dscp=1, token={
+      'app_id': 0x10001,
+      'encryption_key': '{"alg":"A128CBC-HS256","k":"Qr_XwDGctna3SlR88rEJYt6Zm100SASYeJWSJihDnsA","key_ops":["encrypt","decrypt"],"kty":"oct"}'
+    })
+
+
+# ====================================================
 #       Downlink Pipeline
 # ====================================================
 
@@ -387,20 +402,9 @@ if max_ip_defrag_flows is not None:
     # Drop pkts that are unable to be fragmented
     sgiIP4Defrag:0 -> Sink()
 
-# If NTF is enabled, add NTF before s1uRoutes on the downlink
-if enable_ntf:
-  ntf_down = NTF()
-  ntf_down.table_create(dpid=1, max_entries=5)
-  ntf_down.entry_create(dpid=1, entry_id=1, dscp=1, token={
-    'app_id': 0x10001,
-    'encryption_key': '{"alg":"A128CBC-HS256","k":"Qr_XwDGctna3SlR88rEJYt6Zm100SASYeJWSJihDnsA","key_ops":["encrypt","decrypt"],"kty":"oct"}'
-  })
-else:
-  ntf_down = NoOp()
+_in:gate -> EtherTrim::GenericDecap(bytes=14)
 
-_in:gate -> EtherTrim::GenericDecap(bytes=14) \
-    -> ntf_down \
-    -> GTPUEncap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0]), num_subscribers=max_sessions):1 \
+GTPUEncap::GtpuEncap(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0]), num_subscribers=max_sessions):1 \
     -> S1UEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(s1u_ifname))}},
@@ -408,6 +412,12 @@ _in:gate -> EtherTrim::GenericDecap(bytes=14) \
     -> OuterUDPCsum::L4Checksum() \
     -> OuterIPCsum::IPChecksum() \
     -> s1uRoutes
+
+_in = EtherTrim
+if enable_ntf:
+    _in -> 1:ntf
+    _in = ntf
+_in:0 -> GTPUEncap
 
 # Drop unknown packets
 GTPUEncap:0 -> Sink()
@@ -447,17 +457,6 @@ uplink_filter = {"priority": -GTPUGate, "filter": check_enb_subnet +
 s1uFastBPF.add(filters=[uplink_filter])
 
 sgiRoutes = ports[sgi_ifname].rtr
-#
-# If NTF is enabled, add NTF before sgiRoutes on the uplink
-if enable_ntf:
-  ntf_up = NTF()
-  ntf_up.table_create(dpid=1, max_entries=5)
-  ntf_up.entry_create(dpid=1, entry_id=1, dscp=1, token={
-    'app_id': 0x10001,
-    'encryption_key': '{"alg":"A128CBC-HS256","k":"Qr_XwDGctna3SlR88rEJYt6Zm100SASYeJWSJihDnsA","key_ops":["encrypt","decrypt"],"kty":"oct"}'
-  })
-else:
-  ntf_up = NoOp()
 
 # Verify IP Checksum
 s1uFastBPF:GTPUGate -> s1uRxIPCksum::IPChecksum(verify=True) -> s1uRxUDPCksum::L4Checksum(verify=True)
@@ -472,18 +471,24 @@ if max_ip_defrag_flows is not None:
 else:
     s1uRxUDPCksum:0 -> EtherDecapTrim::GenericDecap(bytes=14)
 
-EtherDecapTrim -> GTPUDecap::GtpuDecap(ename="GTPUEncap"):1 \
-    -> ntf_up \
-    -> SGIEtherAdd::GenericEncap(fields=[
+EtherDecapTrim -> GTPUDecap::GtpuDecap(ename="GTPUEncap")
+
+SGIEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(mac_by_interface(sgi_ifname))}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
     -> sgiRoutes
 
+_in = GTPUDecap
+if enable_ntf:
+    _in:1 -> 0:ntf
+    _in = ntf
+_in:1 -> SGIEtherAdd
+
 s1uFastBPF:GTPUEchoGate \
-    	-> gtpRxIPCksum::IPChecksum(verify=True) \
+        -> gtpRxIPCksum::IPChecksum(verify=True) \
         -> gtpRxUDPCksum::L4Checksum(verify=True) \
-	-> GTPUEcho::GtpuEcho(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0])):1 \
+        -> GTPUEcho::GtpuEcho(s1u_sgw_ip=ip2long(ips_by_interface(s1u_ifname)[0])):1 \
         -> EthSwap::MACSwap() \
         -> 1:OuterUDPCsum
 
