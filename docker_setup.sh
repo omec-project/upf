@@ -93,9 +93,9 @@ function move_ifaces() {
 	setup_addrs
 }
 
-# Stop previous instances of bess-web, bess-cpiface, bess-routectl and bess before restarting
-docker stop pause bess bess-routectl bess-web bess-cpiface || true
-docker rm -f pause bess bess-routectl bess-web bess-cpiface || true
+# Stop previous instances of bess* before restarting
+docker stop pause bess bess-routectl bess-web bess-cpiface bess-pfcpiface || true
+docker rm -f pause bess bess-routectl bess-web bess-cpiface bess-pfcpiface || true
 sudo rm -rf /var/run/netns/pause
 
 # Build
@@ -178,3 +178,8 @@ docker run --name bess-cpiface -td --restart unless-stopped \
 	-v "$PWD/conf":/tmp/conf \
 	upf-epc-cpiface:"$(<VERSION)" --s1u_sgw_ip 198.18.0.1 \
 	--zmqd_nb_ip 172.17.0.1 --zmqd_ip 172.17.0.2
+
+# Run bess-pfcpiface
+docker run --name bess-pfcpiface -td --restart unless-stopped \
+	--net container:pause \
+	upf-epc-pfcpiface:"$(<VERSION)"
