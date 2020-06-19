@@ -47,7 +47,7 @@ docker-push:
 	done
 
 # Change target to bess-build/cpiface to exctract src/obj/bins for performance analysis
-output: docker-build
+output:
 		DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_BUILD_ARGS) \
 			--target artifacts \
 			--output output \
