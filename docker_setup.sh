@@ -189,5 +189,6 @@ docker run --name bess-cpiface -td --restart unless-stopped \
 
 # Run bess-pfcpiface
 docker run --name bess-pfcpiface -td --restart unless-stopped \
-	--net container:pause \
+        --net container:pause \
+        -v "$PWD/conf/upf.json":/tmp/upf.json \
 	upf-epc-pfcpiface:"$(<VERSION)"

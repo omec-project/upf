@@ -126,7 +126,9 @@ RUN CGO_ENABLED=0 go build -o /bin/pfcpiface
 # Stage pfcpiface: runtime image of pfcpiface toward SMF/SPGW-C
 FROM alpine AS pfcpiface
 COPY --from=pfcpiface-build /bin/pfcpiface /bin
-ENTRYPOINT [ "/bin/pfcpiface" ]
+# Converting entrypoint from /bin/pfcpiface to /bin/sh for the time being
+# The BESS pipeline is not installed @ dockerized init time.
+ENTRYPOINT [ "/bin/sh" ]
 
 # Stage binaries: dummy stage for collecting artifacts
 FROM scratch AS artifacts
