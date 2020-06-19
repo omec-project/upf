@@ -116,9 +116,21 @@ RUN apt-get update && \
 
 COPY --from=cpiface-build /bin/zmq-cpiface /bin
 
+FROM golang AS pfcpiface-build
+WORKDIR /pfcpiface
+COPY pfcpiface/go.mod pfcpiface/go.sum ./
+RUN go mod download
+COPY pfcpiface .
+RUN CGO_ENABLED=0 go build -o /bin/pfcpiface
+
+# Stage pfcpiface: runtime image of pfcpiface toward SMF/SPGW-C
+FROM alpine AS pfcpiface
+COPY --from=pfcpiface-build /bin/pfcpiface /bin
+ENTRYPOINT [ "/bin/pfcpiface" ]
 
 # Stage binaries: dummy stage for collecting artifacts
-FROM scratch as artifacts
+FROM scratch AS artifacts
 COPY --from=bess /bin/bessd /
 COPY --from=cpiface /bin/zmq-cpiface /
+COPY --from=pfcpiface /bin/pfcpiface /
 COPY --from=bess-build /protobuf /protobuf
