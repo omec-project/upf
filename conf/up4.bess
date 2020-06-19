@@ -16,6 +16,8 @@ port.setup_globals()
 
 Access = 1
 Core = 2
+Uplink = 0
+Downlink = 1
 FARForwardAction = 0
 FARTunnelAction = 1
 FARDropAction = 2
@@ -378,7 +380,7 @@ def sim_start_test():
                       valuesv=[{'value_int':0},	     	     # pdr-id
                               {'value_int':start_teid+i},    # fseid
                               {'value_int':i},    	     # ctr_id
-                              {'value_int':1},               # far_id
+                              {'value_int':Downlink},        # far_id
                               {'value_int':0}])              # need_decap
 
         PDRLookup.add(gate=1, priority=1,
@@ -401,7 +403,7 @@ def sim_start_test():
                       valuesv=[{'value_int':0},	     	     # pdr-id
                               {'value_int':start_teid+i},    # fseid
                               {'value_int':i},    	     # ctr_id
-                              {'value_int':0},               # far_id
+                              {'value_int':Uplink},          # far_id
                               {'value_int':1}])              # need_decap-mask
 
         FARLookup.add(gate=1,
