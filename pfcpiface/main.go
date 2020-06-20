@@ -16,6 +16,10 @@ import (
 	"google.golang.org/grpc"
 )
 
+const (
+	modeSim = "sim"
+)
+
 var (
 	bess       = flag.String("bess", "localhost:10514", "BESS IP/port combo")
 	configPath = flag.String("config", "upf.json", "path to upf config")
@@ -23,6 +27,7 @@ var (
 
 // Conf : Json conf struct
 type Conf struct {
+	Mode        string      `json:"mode"`
 	MaxSessions uint32      `json:"max_sessions"`
 	Cpiface     CpifaceType `json:"cpiface"`
 }
@@ -53,6 +58,26 @@ func ParseJSON(filepath *string, conf *Conf) {
 	json.Unmarshal(byteValue, conf)
 }
 
+func sim(upf *upf) {
+	// Pause workers before
+	upf.pauseAll()
+
+	for i := uint32(0); i < upf.maxSessions; i++ {
+
+		// create and add pdr
+		upf.addPDR(uint32(i))
+
+		// create and add far
+		upf.addFAR(uint32(i))
+
+		// create and add counters
+		upf.addCounters(uint32(i))
+	}
+
+	upf.resumeAll()
+	log.Println("Done!")
+}
+
 func main() {
 	var conf Conf
 
@@ -63,10 +88,6 @@ func main() {
 	ParseJSON(configPath, &conf)
 	log.Println(conf)
 
-	upf := upf{}
-	// setting s1u_sgw_ip
-	upf.s1uSgwIP = conf.Cpiface.N3IP
-
 	// get bess grpc client
 	conn, err := grpc.Dial(*bess, grpc.WithInsecure())
 	if err != nil {
@@ -74,27 +95,14 @@ func main() {
 	}
 	defer conn.Close()
 
-	c := pb.NewBESSControlClient(conn)
-	ctx := context.Background()
-
-	// operation needs pausing workers
-	_, err = c.PauseAll(ctx, &pb.EmptyRequest{})
-	if err != nil {
-		log.Println("unable to pause:", err)
+	upf := &upf{
+		n3IP:        conf.Cpiface.N3IP,
+		client:      pb.NewBESSControlClient(conn),
+		ctx:         context.Background(),
+		maxSessions: conf.MaxSessions,
 	}
 
-	for i := uint32(0); i < conf.MaxSessions; i++ {
-
-		// create and add pdr
-		upf.addPDR(ctx, c, uint32(i))
-
-		// create and add far
-		upf.addFAR(ctx, c, uint32(i))
-
-		// create and add counters
-		upf.addCounters(ctx, c, uint32(i))
+	if conf.Mode == modeSim {
+		sim(upf)
 	}
-
-	log.Println("Done!")
-	c.ResumeAll(ctx, &pb.EmptyRequest{})
 }
