@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"flag"
 	"io/ioutil"
@@ -30,20 +29,7 @@ type Conf struct {
 
 // CpifaceType : ZMQ-based interface struct
 type CpifaceType struct {
-	N3IP string `json:"s1u_sgw_ip"`
-}
-
-func inetAton(ip string) (ipInt uint32) {
-	ipByte := net.ParseIP(ip).To4()
-	ipInt = ip2int(ipByte)
-	return
-}
-
-func ip2int(ip net.IP) uint32 {
-	if len(ip) == 16 {
-		return binary.BigEndian.Uint32(ip[12:16])
-	}
-	return binary.BigEndian.Uint32(ip)
+	N3IP net.IP `json:"s1u_sgw_ip"`
 }
 
 // ParseJSON : parse json file and populate corresponding struct
@@ -77,8 +63,9 @@ func main() {
 	ParseJSON(configPath, &conf)
 	log.Println(conf)
 
+	upf := upf{}
 	// setting s1u_sgw_ip
-	s1uSgwIP := inetAton(conf.Cpiface.N3IP)
+	upf.s1uSgwIP = conf.Cpiface.N3IP
 
 	// get bess grpc client
 	conn, err := grpc.Dial(*bess, grpc.WithInsecure())
@@ -99,13 +86,13 @@ func main() {
 	for i := uint32(0); i < conf.MaxSessions; i++ {
 
 		// create and add pdr
-		addPDR(ctx, c, uint32(i))
+		upf.addPDR(ctx, c, uint32(i))
 
 		// create and add far
-		addFAR(ctx, c, s1uSgwIP, uint32(i))
+		upf.addFAR(ctx, c, uint32(i))
 
 		// create and add counters
-		addCounters(ctx, c, uint32(i))
+		upf.addCounters(ctx, c, uint32(i))
 	}
 
 	log.Println("Done!")
