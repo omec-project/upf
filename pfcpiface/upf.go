@@ -16,7 +16,10 @@ import (
 )
 
 type upf struct {
-	s1uSgwIP net.IP
+	n3IP        net.IP
+	client      pb.BESSControlClient
+	ctx         context.Context
+	maxSessions uint32
 }
 
 // to be replaced with go-pfcp structs
@@ -77,7 +80,17 @@ func ip2int(ip net.IP) uint32 {
 	return binary.BigEndian.Uint32(ip)
 }
 
-func (u *upf) addPDR(ctx context.Context, c pb.BESSControlClient, sessionID uint32) {
+func (u *upf) pauseAll() error {
+	_, err := u.client.PauseAll(u.ctx, &pb.EmptyRequest{})
+	return err
+}
+
+func (u *upf) resumeAll() error {
+	_, err := u.client.ResumeAll(u.ctx, &pb.EmptyRequest{})
+	return err
+}
+
+func (u *upf) addPDR(sessionID uint32) {
 
 	const ueip, teid = 0x10000001, 0xf0000000
 
@@ -119,7 +132,7 @@ func (u *upf) addPDR(ctx context.Context, c pb.BESSControlClient, sessionID uint
 		return
 	}
 
-	for res, err := c.ModuleCommand(ctx, &pb.CommandRequest{
+	for res, err := u.client.ModuleCommand(u.ctx, &pb.CommandRequest{
 		Name: "PDRLookup",
 		Cmd:  "add",
 		Arg:  any,
@@ -184,7 +197,7 @@ func (u *upf) addPDR(ctx context.Context, c pb.BESSControlClient, sessionID uint
 		return
 	}
 
-	for res, err := c.ModuleCommand(ctx, &pb.CommandRequest{
+	for res, err := u.client.ModuleCommand(u.ctx, &pb.CommandRequest{
 		Name: "PDRLookup",
 		Cmd:  "add",
 		Arg:  any,
@@ -211,11 +224,11 @@ func (u *upf) addPDR(ctx context.Context, c pb.BESSControlClient, sessionID uint
 	}
 }
 
-func (u *upf) addFAR(ctx context.Context, c pb.BESSControlClient, sessionID uint32) {
+func (u *upf) addFAR(sessionID uint32) {
 
 	const ueip, teid, enbip = 0x10000001, 0xf0000000, 0x0b010181
 	const ng4tMaxUeRan, ng4tMaxEnbRan = 500000, 80
-	s1uip := ip2int(u.s1uSgwIP)
+	s1uip := ip2int(u.n3IP)
 
 	// NG4T-based formula to calculate enodeB IP address against a given UE IP address
 	// il_trafficgen also uses the same scheme
@@ -247,7 +260,7 @@ func (u *upf) addFAR(ctx context.Context, c pb.BESSControlClient, sessionID uint
 		return
 	}
 
-	for res, err := c.ModuleCommand(ctx, &pb.CommandRequest{
+	for res, err := u.client.ModuleCommand(u.ctx, &pb.CommandRequest{
 		Name: "FARLookup",
 		Cmd:  "add",
 		Arg:  any,
@@ -295,7 +308,7 @@ func (u *upf) addFAR(ctx context.Context, c pb.BESSControlClient, sessionID uint
 		return
 	}
 
-	for res, err := c.ModuleCommand(ctx, &pb.CommandRequest{
+	for res, err := u.client.ModuleCommand(u.ctx, &pb.CommandRequest{
 		Name: "FARLookup",
 		Cmd:  "add",
 		Arg:  any,
@@ -322,7 +335,7 @@ func (u *upf) addFAR(ctx context.Context, c pb.BESSControlClient, sessionID uint
 	}
 }
 
-func (u *upf) addCounters(ctx context.Context, c pb.BESSControlClient, sessionID uint32) {
+func (u *upf) addCounters(sessionID uint32) {
 
 	f := &pb.CounterAddArg{
 		CtrId: sessionID,
@@ -334,7 +347,7 @@ func (u *upf) addCounters(ctx context.Context, c pb.BESSControlClient, sessionID
 		return
 	}
 
-	for res, err := c.ModuleCommand(ctx, &pb.CommandRequest{
+	for res, err := u.client.ModuleCommand(u.ctx, &pb.CommandRequest{
 		Name: "PreQoSCounter",
 		Cmd:  "add",
 		Arg:  any,
@@ -370,7 +383,7 @@ func (u *upf) addCounters(ctx context.Context, c pb.BESSControlClient, sessionID
 		return
 	}
 
-	for res, err := c.ModuleCommand(ctx, &pb.CommandRequest{
+	for res, err := u.client.ModuleCommand(u.ctx, &pb.CommandRequest{
 		Name: "PostDLQoSCounter",
 		Cmd:  "add",
 		Arg:  any,
@@ -406,7 +419,7 @@ func (u *upf) addCounters(ctx context.Context, c pb.BESSControlClient, sessionID
 		return
 	}
 
-	for res, err := c.ModuleCommand(ctx, &pb.CommandRequest{
+	for res, err := u.client.ModuleCommand(u.ctx, &pb.CommandRequest{
 		Name: "PostULQoSCounter",
 		Cmd:  "add",
 		Arg:  any,
