@@ -5,13 +5,19 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"log"
+	"net"
 	"strings"
 
 	"github.com/golang/protobuf/ptypes"
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
 	"google.golang.org/grpc"
 )
+
+type upf struct {
+	s1uSgwIP net.IP
+}
 
 // to be replaced with go-pfcp structs
 
@@ -64,7 +70,14 @@ var intEnc = func(u uint64) *pb.FieldData {
 	return &pb.FieldData{Encoding: &pb.FieldData_ValueInt{ValueInt: u}}
 }
 
-func addPDR(ctx context.Context, c pb.BESSControlClient, sessionID uint32) {
+func ip2int(ip net.IP) uint32 {
+	if len(ip) == 16 {
+		return binary.BigEndian.Uint32(ip[12:16])
+	}
+	return binary.BigEndian.Uint32(ip)
+}
+
+func (u *upf) addPDR(ctx context.Context, c pb.BESSControlClient, sessionID uint32) {
 
 	const ueip, teid = 0x10000001, 0xf0000000
 
@@ -198,10 +211,12 @@ func addPDR(ctx context.Context, c pb.BESSControlClient, sessionID uint32) {
 	}
 }
 
-func addFAR(ctx context.Context, c pb.BESSControlClient, s1uip uint32, sessionID uint32) {
+func (u *upf) addFAR(ctx context.Context, c pb.BESSControlClient, sessionID uint32) {
 
 	const ueip, teid, enbip = 0x10000001, 0xf0000000, 0x0b010181
 	const ng4tMaxUeRan, ng4tMaxEnbRan = 500000, 80
+	s1uip := ip2int(u.s1uSgwIP)
+
 	// NG4T-based formula to calculate enodeB IP address against a given UE IP address
 	// il_trafficgen also uses the same scheme
 	// See SimuCPEnbv4Teid(...) in ngic code for more details
@@ -307,7 +322,7 @@ func addFAR(ctx context.Context, c pb.BESSControlClient, s1uip uint32, sessionID
 	}
 }
 
-func addCounters(ctx context.Context, c pb.BESSControlClient, sessionID uint32) {
+func (u *upf) addCounters(ctx context.Context, c pb.BESSControlClient, sessionID uint32) {
 
 	f := &pb.CounterAddArg{
 		CtrId: sessionID,
