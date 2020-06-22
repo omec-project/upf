@@ -62,16 +62,68 @@ func sim(upf *upf) {
 	// Pause workers before
 	upf.pauseAll()
 
+	const ueip, teid, enbip = 0x10000001, 0xf0000000, 0x0b010181
+	const ng4tMaxUeRan, ng4tMaxEnbRan = 500000, 80
+	s1uip := ip2int(upf.n3IP)
+
 	for i := uint32(0); i < upf.maxSessions; i++ {
+		// NG4T-based formula to calculate enodeB IP address against a given UE IP address
+		// il_trafficgen also uses the same scheme
+		// See SimuCPEnbv4Teid(...) in ngic code for more details
+		ueOfRan := i % ng4tMaxUeRan
+		ran := i / ng4tMaxUeRan
+		enbOfRan := ueOfRan % ng4tMaxEnbRan
+		enbIdx := ran*ng4tMaxEnbRan + enbOfRan
 
-		// create and add pdr
-		upf.addPDR(uint32(i))
+		// create and add downlink pdr
+		pdrDown := pdr{
+			srcIface:     core,
+			srcIP:        ueip + i,
+			srcIfaceMask: 0xFF,
+			srcIPMask:    0xFFFFFFFF,
+			fseID:        teid + i,
+			ctrID:        i,
+			farID:        downlink,
+		}
+		upf.addPDR(pdrDown)
 
-		// create and add far
-		upf.addFAR(uint32(i))
+		// create and add uplink pdr
+		pdrUp := pdr{
+			srcIface:     access,
+			eNBTeid:      teid + i,
+			dstIP:        ueip + i,
+			srcIfaceMask: 0xFF,
+			eNBTeidMask:  0xFFFFFFFF,
+			dstIPMask:    0xFFFFFFFF,
+			fseID:        teid + i,
+			ctrID:        i,
+			farID:        uplink,
+		}
+		upf.addPDR(pdrUp)
+
+		// create and add downlink far
+		farDown := far{
+			farID:       downlink,
+			fseID:       teid + i,
+			action:      farTunnel,
+			tunnelType:  0x1,
+			s1uIP:       s1uip,
+			eNBIP:       enbip + enbIdx,
+			eNBTeid:     teid + i,
+			UDPGTPUPort: udpGTPUPort,
+		}
+		upf.addFAR(farDown)
+
+		// create and add uplink far
+		farUp := far{
+			farID:  uplink,
+			fseID:  teid + i,
+			action: farForward,
+		}
+		upf.addFAR(farUp)
 
 		// create and add counters
-		upf.addCounters(uint32(i))
+		upf.addCounters(pdrDown.ctrID)
 	}
 
 	upf.resumeAll()
@@ -102,7 +154,7 @@ func main() {
 		maxSessions: conf.MaxSessions,
 	}
 
-	if conf.Mode == modeSim {
-		sim(upf)
-	}
+	//if conf.Mode == modeSim {
+	sim(upf)
+	//}
 }
