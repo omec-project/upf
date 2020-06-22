@@ -60,11 +60,13 @@ COPY core/ core/
 COPY patches/bess patches
 RUN cp -a ${DPDK_DIR} deps/dpdk-19.11.1 && \
     cat patches/* | patch -p1
-RUN ./build.py bess && \
+RUN ./build.py --plugin sample_plugin bess && \
     cp bin/bessd /bin && \
+    mkdir -p /bin/modules && \
+    cp core/modules/*.so /bin/modules && \
     mkdir -p /opt/bess && \
     cp -r bessctl pybess /opt/bess && \
-    cp -a core/pb /pb
+    cp -r core/pb /pb
 
 # Stage pip: compile psutil
 FROM python:2.7-slim AS pip
@@ -90,7 +92,8 @@ RUN apt-get update && \
         https://github.com/secdev/scapy/archive/b65e795c62accd383e1bb6b17cd9f7a9143ae117.zip
 COPY --from=pip /usr/local/lib/python2.7/site-packages/psutil /usr/local/lib/python2.7/site-packages/psutil
 COPY --from=bess-build /opt/bess /opt/bess
-COPY --from=bess-build /bin/bessd /bin
+COPY --from=bess-build /bin/bessd /bin/bessd
+COPY --from=bess-build /bin/modules /bin/modules
 COPY conf /opt/bess/bessctl/conf
 RUN ln -s /opt/bess/bessctl/bessctl /bin
 ENV PYTHONPATH="/opt/bess"
