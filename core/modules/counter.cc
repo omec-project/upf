@@ -25,6 +25,7 @@ CommandResponse Counter::AddCounter(const bess::pb::CounterAddArg &arg) {
     return CommandFailure(EINVAL, "Unable to add ctr");
 #else
   (void)ctr_id;
+  curr_count++;
 #endif
   return CommandSuccess();
 }
@@ -48,6 +49,7 @@ CommandResponse Counter::RemoveCounter(const bess::pb::CounterRemoveArg &arg) {
               << "]: " << counters[ctr_id].pkt_count << ", "
               << counters[ctr_id].byte_count << std::endl;
     counters[ctr_id].pkt_count = counters[ctr_id].byte_count = 0;
+    curr_count--;
   }
 #endif
   return CommandSuccess();
@@ -69,6 +71,7 @@ CommandResponse Counter::Init(const bess::pb::CounterArg &arg) {
   counters = (SessionStats *)calloc(total_count, sizeof(SessionStats));
   if (counters == NULL)
     return CommandFailure(ENOMEM, "Unable to allocate memory for counters!");
+  curr_count = 0;
 #endif
 
   return CommandSuccess();
@@ -102,7 +105,7 @@ std::string Counter::GetDesc() const {
 #ifdef HASHMAP_BASED
   return bess::utils::Format("%zu sessions", (size_t)counters.size());
 #else
-  return "";
+  return bess::utils::Format("%zu sessions", (size_t)curr_count);
 #endif
 }
 /*----------------------------------------------------------------------------------*/

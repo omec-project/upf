@@ -15,6 +15,8 @@
 #include <netdb.h>
 #include <stack>
 #include <sys/socket.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <zmq.h>
@@ -162,6 +164,25 @@ void sig_handler(int signo) {
   google::protobuf::ShutdownProtobufLibrary();
 }
 /*--------------------------------------------------------------------------------*/
+void getS1uAddrViaJson(char *s1u_sgw_ip, const char *ifname)
+{
+  int fd;
+  struct ifreq ifr;
+
+  fd = socket(AF_INET, SOCK_DGRAM, 0);
+
+  if (fd != -1) {
+    /* IPv4 address */
+    ifr.ifr_addr.sa_family = AF_INET;
+    /* IP address attached to "s1u" */
+    strncpy(ifr.ifr_name, ifname, IFNAMSIZ-1);
+    if (ioctl(fd, SIOCGIFADDR, &ifr) == 0) {
+      strcpy(s1u_sgw_ip, inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
+    }
+    close(fd);
+  }
+}
+/*--------------------------------------------------------------------------------*/
 int main(int argc, char **argv) {
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 
@@ -191,8 +212,8 @@ int main(int argc, char **argv) {
   }
   strcpy(args.zmqd_nb_ip, root["cpiface"]["zmqd_nb_ip"].asString().c_str());
   strcpy(args.zmqd_ip, root["cpiface"]["zmqd_ip"].asString().c_str());
-  strcpy(args.s1u_sgw_ip, root["cpiface"]["s1u_sgw_ip"].asString().c_str());
   strcpy(args.rmb.hostname, root["cpiface"]["hostname"].asString().c_str());
+  getS1uAddrViaJson(args.s1u_sgw_ip, root["s1u"]["ifname"].asString().c_str());
   counter_count = root["max_sessions"].asInt();
   script.close();
 
