@@ -31,6 +31,7 @@ class Counter final : public Module {
   std::map<uint32_t, SessionStats> counters;
 #else
   SessionStats *counters;
+  uint32_t curr_count;
 #endif
   std::string name_id;
   bool check_exist;
