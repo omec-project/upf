@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
@@ -44,16 +43,14 @@ func ParseJSON(filepath *string, conf *Conf) {
 	jsonFile, err := os.Open(*filepath)
 
 	if err != nil {
-		log.Println("Error opening file: ", err)
-		return
+		log.Fatalln("Error opening file: ", err)
 	}
 	defer jsonFile.Close()
 
 	/* read our opened file */
 	byteValue, err := ioutil.ReadAll(jsonFile)
 	if err != nil {
-		log.Println("Error reading file: ", err)
-		return
+		log.Fatalln("Error reading file: ", err)
 	}
 
 	json.Unmarshal(byteValue, conf)
@@ -64,15 +61,14 @@ func ParseN3IP(n3name string) net.IP {
 	byNameInterface, err := net.InterfaceByName(n3name)
 
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(-1)
+		log.Fatalln("Unable to get info on N3 interface name:", err)
 	}
 
 	addresses, err := byNameInterface.Addrs()
 
 	ip, _, err := net.ParseCIDR(addresses[0].String())
 	if err != nil {
-		fmt.Println("Unable to parse N3IP: ", err)
+		log.Fatalln("Unable to parse N3IP: ", err)
 	}
 	return ip
 }
@@ -162,7 +158,7 @@ func main() {
 	// get bess grpc client
 	conn, err := grpc.Dial(*bess, grpc.WithInsecure())
 	if err != nil {
-		log.Println("did not connect:", err)
+		log.Fatalln("did not connect:", err)
 	}
 	defer conn.Close()
 
