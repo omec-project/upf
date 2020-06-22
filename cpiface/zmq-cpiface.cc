@@ -12,11 +12,11 @@
 #include <jsoncpp/json/reader.h>
 #include <jsoncpp/json/value.h>
 #include <map>
+#include <net/if.h>
 #include <netdb.h>
 #include <stack>
-#include <sys/socket.h>
-#include <net/if.h>
 #include <sys/ioctl.h>
+#include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <zmq.h>
@@ -164,8 +164,7 @@ void sig_handler(int signo) {
   google::protobuf::ShutdownProtobufLibrary();
 }
 /*--------------------------------------------------------------------------------*/
-void getS1uAddrViaJson(char *s1u_sgw_ip, const char *ifname)
-{
+void getS1uAddrViaJson(char *s1u_sgw_ip, const char *ifname) {
   int fd;
   struct ifreq ifr;
 
@@ -175,9 +174,10 @@ void getS1uAddrViaJson(char *s1u_sgw_ip, const char *ifname)
     /* IPv4 address */
     ifr.ifr_addr.sa_family = AF_INET;
     /* IP address attached to "s1u" */
-    strncpy(ifr.ifr_name, ifname, IFNAMSIZ-1);
+    strncpy(ifr.ifr_name, ifname, IFNAMSIZ - 1);
     if (ioctl(fd, SIOCGIFADDR, &ifr) == 0) {
-      strcpy(s1u_sgw_ip, inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
+      strcpy(s1u_sgw_ip,
+             inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
     }
     close(fd);
   }
