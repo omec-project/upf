@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
@@ -27,14 +28,14 @@ var (
 
 // Conf : Json conf struct
 type Conf struct {
-	Mode        string      `json:"mode"`
-	MaxSessions uint32      `json:"max_sessions"`
-	Cpiface     CpifaceType `json:"cpiface"`
+	Mode        string    `json:"mode"`
+	MaxSessions uint32    `json:"max_sessions"`
+	N3Iface     IfaceType `json:"s1u"`
 }
 
-// CpifaceType : ZMQ-based interface struct
-type CpifaceType struct {
-	N3IP net.IP `json:"s1u_sgw_ip"`
+// IfaceType : Gateway interface struct
+type IfaceType struct {
+	N3IfaceName string `json:"ifname"`
 }
 
 // ParseJSON : parse json file and populate corresponding struct
@@ -56,6 +57,24 @@ func ParseJSON(filepath *string, conf *Conf) {
 	}
 
 	json.Unmarshal(byteValue, conf)
+}
+
+// ParseN3IP : parse N3 IP address from the interface name
+func ParseN3IP(n3name string) net.IP {
+	byNameInterface, err := net.InterfaceByName(n3name)
+
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(-1)
+	}
+
+	addresses, err := byNameInterface.Addrs()
+
+	ip, _, err := net.ParseCIDR(addresses[0].String())
+	if err != nil {
+		fmt.Println("Unable to parse N3IP: ", err)
+	}
+	return ip
 }
 
 func sim(upf *upf) {
@@ -148,7 +167,7 @@ func main() {
 	defer conn.Close()
 
 	upf := &upf{
-		n3IP:        conf.Cpiface.N3IP,
+		n3IP:        ParseN3IP(conf.N3Iface.N3IfaceName),
 		client:      pb.NewBESSControlClient(conn),
 		ctx:         context.Background(),
 		maxSessions: conf.MaxSessions,

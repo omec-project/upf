@@ -15,7 +15,8 @@
 #include <netdb.h>
 #include <stack>
 #include <sys/socket.h>
-#include <sys/time.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -164,36 +165,22 @@ void sig_handler(int signo) {
   google::protobuf::ShutdownProtobufLibrary();
 }
 /*--------------------------------------------------------------------------------*/
-void force_restart(int argc, char **argv) {
-  pid_t pid;
-  int status;
+void getS1uAddrViaJson(char *s1u_sgw_ip, const char *ifname)
+{
+  int fd;
+  struct ifreq ifr;
 
-  pid = fork();
+  fd = socket(AF_INET, SOCK_DGRAM, 0);
 
-  if (pid == -1) {
-    std::cerr << "Failed to fork: " << strerror(errno) << std::endl;
-    exit(EXIT_FAILURE);
-  } else if (pid == 0) {  // child process
-    execv(argv[0], argv);
-    exit(EXIT_SUCCESS);
-  } else {  // parent process
-    if (waitpid(pid, &status, 0) > 0) {
-      if (WIFEXITED(status) && !WEXITSTATUS(status))
-        std::cerr << "Restart successful!" << std::endl;
-      else if (WIFEXITED(status) && WEXITSTATUS(status)) {
-        if (WEXITSTATUS(status) == 127) {
-          // execv failed
-          std::cerr << "execv() failed\n" << std::endl;
-        } else
-          std::cerr << "Program terminated normally, "
-                    << "but returned a non-zero status" << std::endl;
-      } else
-        std::cerr << "Program didn't terminate normally" << std::endl;
-    } else {
-      // waitpid() failed
-      std::cerr << "waitpid() failed" << std::endl;
+  if (fd != -1) {
+    /* IPv4 address */
+    ifr.ifr_addr.sa_family = AF_INET;
+    /* IP address attached to "s1u" */
+    strncpy(ifr.ifr_name, ifname, IFNAMSIZ-1);
+    if (ioctl(fd, SIOCGIFADDR, &ifr) == 0) {
+      strcpy(s1u_sgw_ip, inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
     }
-    exit(EXIT_SUCCESS);
+    close(fd);
   }
 }
 /*--------------------------------------------------------------------------------*/
@@ -223,8 +210,8 @@ int main(int argc, char **argv) {
   }
   strcpy(args.zmqd_nb_ip, root["cpiface"]["zmqd_nb_ip"].asString().c_str());
   strcpy(args.zmqd_ip, root["cpiface"]["zmqd_ip"].asString().c_str());
-  strcpy(args.s1u_sgw_ip, root["cpiface"]["s1u_sgw_ip"].asString().c_str());
   strcpy(args.rmb.hostname, root["cpiface"]["hostname"].asString().c_str());
+  getS1uAddrViaJson(args.s1u_sgw_ip, root["s1u"]["ifname"].asString().c_str());
   counter_count = root["max_sessions"].asInt();
   script.close();
 
