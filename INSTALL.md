@@ -89,3 +89,18 @@ To drop into BESS shell
 ```bash
 docker exec -it bess bessctl
 ```
+
+## Network Token Functions
+
+OMEC includes a Network Token Function (NTF) which provides preliminary support
+for Network Tokens, a new protocol to expose datapath services to end users and
+application providers. More details are available at https://networktokens.org
+
+In order to compile NTF support, run the following:
+
+```bash
+ENABLE_NTF=1 ./docker_setup.sh
+```
+
+Update [`conf/spgwu.json`](conf/spgwu.json) and set the `enable_ntf` option to
+`true`.

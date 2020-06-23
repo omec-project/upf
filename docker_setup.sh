@@ -115,7 +115,6 @@ elif [ "$mode" == 'af_xdp' ]; then
 
 elif [ "$mode" == 'af_packet' ]; then
 	PRIVS='--cap-add IPC_LOCK'
-
 fi
 
 # Run pause
