@@ -13,6 +13,7 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/runtime/protoiface"
 )
 
 type upf struct {
@@ -102,38 +103,67 @@ func (u *upf) resumeAll() error {
 	return err
 }
 
-func (u *upf) addPDR(p pdr) {
+func (u *upf) processPDR(p pdr, method string) {
 
-	f := &pb.WildcardMatchCommandAddArg{
-		Gate:     1,
-		Priority: 1,
-		Values: []*pb.FieldData{
-			intEnc(uint64(p.srcIface)),     /* src_iface */
-			intEnc(uint64(p.tunnelIP4Dst)), /* tunnel_ipv4_dst */
-			intEnc(uint64(p.eNBTeid)),      /* enb_teid */
-			intEnc(uint64(p.srcIP)),        /* ueaddr ip*/
-			intEnc(uint64(p.dstIP)),        /* inet ip */
-			intEnc(uint64(p.srcPort)),      /* ue port */
-			intEnc(uint64(p.dstPort)),      /* inet port */
-			intEnc(uint64(p.proto)),        /* proto id */
-		},
-		Masks: []*pb.FieldData{
-			intEnc(uint64(p.srcIfaceMask)),     /* src_iface-mask */
-			intEnc(uint64(p.tunnelIP4DstMask)), /* tunnel_ipv4_dst-mask */
-			intEnc(uint64(p.eNBTeidMask)),      /* enb_teid-mask */
-			intEnc(uint64(p.srcIPMask)),        /* ueaddr ip-mask */
-			intEnc(uint64(p.dstIPMask)),        /* inet ip-mask */
-			intEnc(uint64(p.srcPortMask)),      /* ue port-mask */
-			intEnc(uint64(p.dstPortMask)),      /* inet port-mask */
-			intEnc(uint64(p.protoMask)),        /* proto id-mask */
-		},
-		Valuesv: []*pb.FieldData{
-			intEnc(uint64(p.pdrID)),     /* pdr-id */
-			intEnc(uint64(p.fseID)),     /* fseid */
-			intEnc(uint64(p.ctrID)),     /* ctr_id */
-			intEnc(uint64(p.farID)),     /* far_id */
-			intEnc(uint64(p.needDecap)), /* need_decap */
-		},
+	var f protoiface.MessageV1
+
+	if method == string("add") {
+		f = &pb.WildcardMatchCommandAddArg{
+			Gate:     1,
+			Priority: 1,
+			Values: []*pb.FieldData{
+				intEnc(uint64(p.srcIface)),     /* src_iface */
+				intEnc(uint64(p.tunnelIP4Dst)), /* tunnel_ipv4_dst */
+				intEnc(uint64(p.eNBTeid)),      /* enb_teid */
+				intEnc(uint64(p.srcIP)),        /* ueaddr ip*/
+				intEnc(uint64(p.dstIP)),        /* inet ip */
+				intEnc(uint64(p.srcPort)),      /* ue port */
+				intEnc(uint64(p.dstPort)),      /* inet port */
+				intEnc(uint64(p.proto)),        /* proto id */
+			},
+			Masks: []*pb.FieldData{
+				intEnc(uint64(p.srcIfaceMask)),     /* src_iface-mask */
+				intEnc(uint64(p.tunnelIP4DstMask)), /* tunnel_ipv4_dst-mask */
+				intEnc(uint64(p.eNBTeidMask)),      /* enb_teid-mask */
+				intEnc(uint64(p.srcIPMask)),        /* ueaddr ip-mask */
+				intEnc(uint64(p.dstIPMask)),        /* inet ip-mask */
+				intEnc(uint64(p.srcPortMask)),      /* ue port-mask */
+				intEnc(uint64(p.dstPortMask)),      /* inet port-mask */
+				intEnc(uint64(p.protoMask)),        /* proto id-mask */
+			},
+			Valuesv: []*pb.FieldData{
+				intEnc(uint64(p.pdrID)),     /* pdr-id */
+				intEnc(uint64(p.fseID)),     /* fseid */
+				intEnc(uint64(p.ctrID)),     /* ctr_id */
+				intEnc(uint64(p.farID)),     /* far_id */
+				intEnc(uint64(p.needDecap)), /* need_decap */
+			},
+		}
+	} else if method == string("delete") {
+		f = &pb.WildcardMatchCommandDeleteArg{
+			Values: []*pb.FieldData{
+				intEnc(uint64(p.srcIface)),     /* src_iface */
+				intEnc(uint64(p.tunnelIP4Dst)), /* tunnel_ipv4_dst */
+				intEnc(uint64(p.eNBTeid)),      /* enb_teid */
+				intEnc(uint64(p.srcIP)),        /* ueaddr ip*/
+				intEnc(uint64(p.dstIP)),        /* inet ip */
+				intEnc(uint64(p.srcPort)),      /* ue port */
+				intEnc(uint64(p.dstPort)),      /* inet port */
+				intEnc(uint64(p.proto)),        /* proto id */
+			},
+			Masks: []*pb.FieldData{
+				intEnc(uint64(p.srcIfaceMask)),     /* src_iface-mask */
+				intEnc(uint64(p.tunnelIP4DstMask)), /* tunnel_ipv4_dst-mask */
+				intEnc(uint64(p.eNBTeidMask)),      /* enb_teid-mask */
+				intEnc(uint64(p.srcIPMask)),        /* ueaddr ip-mask */
+				intEnc(uint64(p.dstIPMask)),        /* inet ip-mask */
+				intEnc(uint64(p.srcPortMask)),      /* ue port-mask */
+				intEnc(uint64(p.dstPortMask)),      /* inet port-mask */
+				intEnc(uint64(p.protoMask)),        /* proto id-mask */
+			},
+		}
+	} else {
+		log.Fatalln("Invalid method name")
 	}
 
 	any, err := ptypes.MarshalAny(f)
@@ -144,7 +174,7 @@ func (u *upf) addPDR(p pdr) {
 
 	for res, err := u.client.ModuleCommand(u.ctx, &pb.CommandRequest{
 		Name: "PDRLookup",
-		Cmd:  "add",
+		Cmd:  method,
 		Arg:  any,
 	}); ; {
 
@@ -170,24 +200,44 @@ func (u *upf) addPDR(p pdr) {
 	}
 }
 
-func (u *upf) addFAR(far far) {
+func (u *upf) addPDR(p pdr) {
+	u.processPDR(p, "add")
+}
 
-	f := &pb.ExactMatchCommandAddArg{
-		Gate: 1,
-		Fields: []*pb.FieldData{
-			intEnc(uint64(far.farID)), /* far_id */
-			intEnc(uint64(far.fseID)), /* fseid */
-		},
-		Values: []*pb.FieldData{
-			intEnc(uint64(far.action)),      /* action */
-			intEnc(uint64(far.tunnelType)),  /* tunnel_out_type */
-			intEnc(uint64(far.s1uIP)),       /* s1u-ip */
-			intEnc(uint64(far.eNBIP)),       /* enb ip */
-			intEnc(uint64(far.eNBTeid)),     /* enb teid */
-			intEnc(uint64(far.UDPGTPUPort)), /* udp gtpu port */
-		},
+func (u *upf) delPDR(p pdr) {
+	u.processPDR(p, "delete")
+}
+
+func (u *upf) processFAR(far far, method string) {
+
+	var f protoiface.MessageV1
+
+	if method == string("add") {
+		f = &pb.ExactMatchCommandAddArg{
+			Gate: 1,
+			Fields: []*pb.FieldData{
+				intEnc(uint64(far.farID)), /* far_id */
+				intEnc(uint64(far.fseID)), /* fseid */
+			},
+			Values: []*pb.FieldData{
+				intEnc(uint64(far.action)),      /* action */
+				intEnc(uint64(far.tunnelType)),  /* tunnel_out_type */
+				intEnc(uint64(far.s1uIP)),       /* s1u-ip */
+				intEnc(uint64(far.eNBIP)),       /* enb ip */
+				intEnc(uint64(far.eNBTeid)),     /* enb teid */
+				intEnc(uint64(far.UDPGTPUPort)), /* udp gtpu port */
+			},
+		}
+	} else if method == string("delete") {
+		f = &pb.ExactMatchCommandDeleteArg{
+			Fields: []*pb.FieldData{
+				intEnc(uint64(far.farID)), /* far_id */
+				intEnc(uint64(far.fseID)), /* fseid */
+			},
+		}
+	} else {
+		log.Fatalln("Invalid method name")
 	}
-
 	any, err := ptypes.MarshalAny(f)
 	if err != nil {
 		log.Println("Error marshalling the rule", f, err)
@@ -196,7 +246,7 @@ func (u *upf) addFAR(far far) {
 
 	for res, err := u.client.ModuleCommand(u.ctx, &pb.CommandRequest{
 		Name: "FARLookup",
-		Cmd:  "add",
+		Cmd:  method,
 		Arg:  any,
 	}); ; {
 
@@ -221,10 +271,28 @@ func (u *upf) addFAR(far far) {
 	}
 }
 
-func (u *upf) addCounters(ctrID uint32) {
+func (u *upf) addFAR(f far) {
+	u.processFAR(f, "add")
+}
 
-	f := &pb.CounterAddArg{
-		CtrId: ctrID,
+func (u *upf) delFAR(f far) {
+	u.processFAR(f, "delete")
+}
+
+func (u *upf) processCounters(ctrID uint32, method string) {
+
+	var f protoiface.MessageV1
+
+	if method == string("add") {
+		f = &pb.CounterAddArg{
+			CtrId: ctrID,
+		}
+	} else if method == string("remove") {
+		f = &pb.CounterRemoveArg{
+			CtrId: ctrID,
+		}
+	} else {
+		log.Fatalln("Invalid method name")
 	}
 
 	any, err := ptypes.MarshalAny(f)
@@ -235,7 +303,7 @@ func (u *upf) addCounters(ctrID uint32) {
 
 	for res, err := u.client.ModuleCommand(u.ctx, &pb.CommandRequest{
 		Name: "PreQoSCounter",
-		Cmd:  "add",
+		Cmd:  method,
 		Arg:  any,
 	}); ; {
 
@@ -271,7 +339,7 @@ func (u *upf) addCounters(ctrID uint32) {
 
 	for res, err := u.client.ModuleCommand(u.ctx, &pb.CommandRequest{
 		Name: "PostDLQoSCounter",
-		Cmd:  "add",
+		Cmd:  method,
 		Arg:  any,
 	}); ; {
 
@@ -307,7 +375,7 @@ func (u *upf) addCounters(ctrID uint32) {
 
 	for res, err := u.client.ModuleCommand(u.ctx, &pb.CommandRequest{
 		Name: "PostULQoSCounter",
-		Cmd:  "add",
+		Cmd:  method,
 		Arg:  any,
 	}); ; {
 
@@ -330,4 +398,12 @@ func (u *upf) addCounters(ctrID uint32) {
 			break
 		}
 	}
+}
+
+func (u *upf) addCounters(ctrID uint32) {
+	u.processCounters(ctrID, "add")
+}
+
+func (u *upf) delCounters(ctrID uint32) {
+	u.processCounters(ctrID, "remove")
 }

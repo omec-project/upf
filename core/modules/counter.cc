@@ -49,8 +49,8 @@ CommandResponse Counter::RemoveCounter(const bess::pb::CounterRemoveArg &arg) {
               << "]: " << counters[ctr_id].pkt_count << ", "
               << counters[ctr_id].byte_count << std::endl;
     counters[ctr_id].pkt_count = counters[ctr_id].byte_count = 0;
-    curr_count--;
   }
+  curr_count--;
 #endif
   return CommandSuccess();
 }
