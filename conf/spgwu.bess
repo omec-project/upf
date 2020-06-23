@@ -348,7 +348,7 @@ sgi_ifname = conf["sgi"]["ifname"]
 # ====================================================
 
 ntf = None
-if conf["enable_ntf"]:
+if enable_ntf:
     ntf = NTF()
     # TODO: Populate these tables by talking to the NTE
     ntf.table_create(dpid=1, max_entries=5)
