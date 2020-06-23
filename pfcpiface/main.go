@@ -23,6 +23,7 @@ const (
 var (
 	bess       = flag.String("bess", "localhost:10514", "BESS IP/port combo")
 	configPath = flag.String("config", "upf.json", "path to upf config")
+	simuSess   = flag.String("simuSess", "create", "create or delete simulated sessions")
 )
 
 // Conf : Json conf struct
@@ -70,6 +71,7 @@ func ParseN3IP(n3name string) net.IP {
 	if err != nil {
 		log.Fatalln("Unable to parse N3IP: ", err)
 	}
+	log.Println("N3 IP: ", ip)
 	return ip
 }
 
@@ -90,7 +92,7 @@ func sim(upf *upf) {
 		enbOfRan := ueOfRan % ng4tMaxEnbRan
 		enbIdx := ran*ng4tMaxEnbRan + enbOfRan
 
-		// create and add downlink pdr
+		// create/delete downlink pdr
 		pdrDown := pdr{
 			srcIface:     core,
 			srcIP:        ueip + i,
@@ -100,9 +102,13 @@ func sim(upf *upf) {
 			ctrID:        i,
 			farID:        downlink,
 		}
-		upf.addPDR(pdrDown)
+		if *simuSess == string("create") {
+			upf.addPDR(pdrDown)
+		} else if *simuSess == string("delete") {
+			upf.delPDR(pdrDown)
+		}
 
-		// create and add uplink pdr
+		// create/delete uplink pdr
 		pdrUp := pdr{
 			srcIface:     access,
 			eNBTeid:      teid + i,
@@ -114,9 +120,13 @@ func sim(upf *upf) {
 			ctrID:        i,
 			farID:        uplink,
 		}
-		upf.addPDR(pdrUp)
+		if *simuSess == string("create") {
+			upf.addPDR(pdrUp)
+		} else if *simuSess == string("delete") {
+			upf.delPDR(pdrUp)
+		}
 
-		// create and add downlink far
+		// create/delete downlink far
 		farDown := far{
 			farID:       downlink,
 			fseID:       teid + i,
@@ -127,18 +137,30 @@ func sim(upf *upf) {
 			eNBTeid:     teid + i,
 			UDPGTPUPort: udpGTPUPort,
 		}
-		upf.addFAR(farDown)
+		if *simuSess == string("create") {
+			upf.addFAR(farDown)
+		} else if *simuSess == string("delete") {
+			upf.delFAR(farDown)
+		}
 
-		// create and add uplink far
+		// create/delete uplink far
 		farUp := far{
 			farID:  uplink,
 			fseID:  teid + i,
 			action: farForward,
 		}
-		upf.addFAR(farUp)
+		if *simuSess == string("create") {
+			upf.addFAR(farUp)
+		} else if *simuSess == string("delete") {
+			upf.delFAR(farUp)
+		}
 
-		// create and add counters
-		upf.addCounters(pdrDown.ctrID)
+		// create/delete counters
+		if *simuSess == string("create") {
+			upf.addCounters(pdrDown.ctrID)
+		} else if *simuSess == string("delete") {
+			upf.delCounters(pdrDown.ctrID)
+		}
 	}
 
 	upf.resumeAll()
