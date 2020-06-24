@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"time"
 
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
 	"google.golang.org/grpc"
@@ -23,7 +24,7 @@ const (
 var (
 	bess       = flag.String("bess", "localhost:10514", "BESS IP/port combo")
 	configPath = flag.String("config", "upf.json", "path to upf config")
-	simuSess   = flag.String("simuSess", "create", "create or delete simulated sessions")
+	simuDelay  = flag.Duration("simuDelay", 0, "create/delete simulated sessions with simuDelay")
 )
 
 // Conf : Json conf struct
@@ -75,7 +76,7 @@ func ParseN3IP(n3name string) net.IP {
 	return ip
 }
 
-func sim(upf *upf) {
+func sim(upf *upf, method string) {
 	// Pause workers before
 	upf.pauseAll()
 
@@ -102,11 +103,6 @@ func sim(upf *upf) {
 			ctrID:        i,
 			farID:        downlink,
 		}
-		if *simuSess == string("create") {
-			upf.addPDR(pdrDown)
-		} else if *simuSess == string("delete") {
-			upf.delPDR(pdrDown)
-		}
 
 		// create/delete uplink pdr
 		pdrUp := pdr{
@@ -120,11 +116,6 @@ func sim(upf *upf) {
 			ctrID:        i,
 			farID:        uplink,
 		}
-		if *simuSess == string("create") {
-			upf.addPDR(pdrUp)
-		} else if *simuSess == string("delete") {
-			upf.delPDR(pdrUp)
-		}
 
 		// create/delete downlink far
 		farDown := far{
@@ -137,11 +128,6 @@ func sim(upf *upf) {
 			eNBTeid:     teid + i,
 			UDPGTPUPort: udpGTPUPort,
 		}
-		if *simuSess == string("create") {
-			upf.addFAR(farDown)
-		} else if *simuSess == string("delete") {
-			upf.delFAR(farDown)
-		}
 
 		// create/delete uplink far
 		farUp := far{
@@ -149,17 +135,30 @@ func sim(upf *upf) {
 			fseID:  teid + i,
 			action: farForward,
 		}
-		if *simuSess == string("create") {
-			upf.addFAR(farUp)
-		} else if *simuSess == string("delete") {
-			upf.delFAR(farUp)
-		}
 
-		// create/delete counters
-		if *simuSess == string("create") {
-			upf.addCounters(pdrDown.ctrID)
-		} else if *simuSess == string("delete") {
-			upf.delCounters(pdrDown.ctrID)
+		switch method {
+		case "create":
+			upf.addPDR(pdrDown)
+			upf.addPDR(pdrUp)
+
+			upf.addFAR(farDown)
+			upf.addFAR(farUp)
+
+			upf.addCounter(pdrDown.ctrID, "PreQoSCounter")
+			upf.addCounter(pdrDown.ctrID, "PostDLQoSCounter")
+			upf.addCounter(pdrDown.ctrID, "PostULQoSCounter")
+		case "delete":
+			upf.delPDR(pdrDown)
+			upf.delPDR(pdrUp)
+
+			upf.delFAR(farDown)
+			upf.delFAR(farUp)
+
+			upf.delCounter(pdrDown.ctrID, "PreQoSCounter")
+			upf.delCounter(pdrDown.ctrID, "PostDLQoSCounter")
+			upf.delCounter(pdrDown.ctrID, "PostULQoSCounter")
+		default:
+			log.Fatalln("Unsupported method", method)
 		}
 	}
 
@@ -191,7 +190,13 @@ func main() {
 		maxSessions: conf.MaxSessions,
 	}
 
-	//if conf.Mode == modeSim {
-	sim(upf)
-	//}
+	if *simuDelay > 0 {
+		log.Println("Adding sessions:", conf.MaxSessions)
+		sim(upf, "create")
+
+		time.Sleep(*simuDelay)
+
+		log.Println("Deleting sessions:", conf.MaxSessions)
+		sim(upf, "delete")
+	}
 }
