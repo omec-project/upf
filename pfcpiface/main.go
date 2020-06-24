@@ -77,6 +77,8 @@ func ParseN3IP(n3name string) net.IP {
 }
 
 func sim(upf *upf, method string) {
+	start := time.Now()
+
 	// Pause workers before
 	upf.pauseAll()
 
@@ -163,7 +165,8 @@ func sim(upf *upf, method string) {
 	}
 
 	upf.resumeAll()
-	log.Println("Done!")
+
+	log.Println("Sessions/s:", float64(upf.maxSessions)/time.Since(start).Seconds())
 }
 
 func main() {
