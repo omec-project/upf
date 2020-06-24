@@ -136,7 +136,7 @@ FROM alpine AS pfcpiface
 COPY --from=pfcpiface-build /bin/pfcpiface /bin
 # Converting entrypoint from /bin/pfcpiface to /bin/sh for the time being
 # The BESS pipeline is not installed @ dockerized init time.
-ENTRYPOINT [ "/bin/sh" ]
+ENTRYPOINT [ "/bin/pfcpiface" ]
 
 # Stage binaries: dummy stage for collecting artifacts
 FROM scratch AS artifacts

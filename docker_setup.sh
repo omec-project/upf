@@ -153,6 +153,11 @@ docker run --name bess -td --restart unless-stopped \
 
 docker logs bess
 
+# Sleep for a couple of secs before setting up the pipeline
+sleep 10
+docker exec bess ./bessctl run up4
+sleep 10
+
 # Run bess-web
 docker run --name bess-web -d --restart unless-stopped \
 	--net container:bess \
@@ -180,7 +185,8 @@ docker run --name bess-cpiface -td --restart unless-stopped \
 	--zmqd_nb_ip 172.17.0.1 --zmqd_ip 172.17.0.2
 
 # Run bess-pfcpiface
-docker run --name bess-pfcpiface -td --restart unless-stopped \
+docker run --name bess-pfcpiface -td --restart on-failure \
 	--net container:pause \
 	-v "$PWD/conf/upf.json":/tmp/upf.json \
-	upf-epc-pfcpiface:"$(<VERSION)"
+	upf-epc-pfcpiface:"$(<VERSION)" \
+	-config /tmp/upf.json -simuDelay 5m
