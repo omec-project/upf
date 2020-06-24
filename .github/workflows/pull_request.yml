@@ -9,43 +9,36 @@ jobs:
       DOCKER_REPOSITORY: "upf-epc/"
     runs-on: ubuntu-latest
     steps:
-
       # Checkout and build
-    - uses: actions/checkout@v1
-    - name: Build the Docker image
-      run: |
-        make docker-build
+      - uses: actions/checkout@master
+      - name: Build the Docker image
+        run: |
+          make docker-build
 
-    # Format the code
-    - name: Dependencies
-      run: |
-        sudo cp $(which clang-format-9) /bin/clang-format
-    - name: Checkout PR
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        hub pr checkout $(jq -r ".number" "$GITHUB_EVENT_PATH")
-    - name: Clang Format
-      run: |
-        SRC=$(git ls-tree --full-tree -r HEAD | grep -e "\.\(c\|h\|cc\|hh\|hpp\|cpp\)\$" | cut -f 2)
-        wget https://raw.githubusercontent.com/NetSys/bess/master/core/.clang-format
-        clang-format -style=file -i $SRC
-        rm .clang-format
-    - name: Shell Format
-      run: |
-        wget -qO shfmt https://github.com/mvdan/sh/releases/download/v3.1.1/shfmt_v3.1.1_linux_amd64
-        chmod +x shfmt && sudo mv shfmt /bin
-        shfmt -w -l .
+      # Format the code
+      - name: Clang Format
+        run: |
+          SRC=$(git ls-tree --full-tree -r HEAD | grep -e "\.\(c\|h\|cc\|hh\|hpp\|cpp\)\$" | cut -f 2)
+          wget https://raw.githubusercontent.com/NetSys/bess/master/core/.clang-format
+          clang-format-9 -style=file -i $SRC
+          rm .clang-format
+      - name: Shell Format
+        run: |
+          wget -qO shfmt https://github.com/mvdan/sh/releases/download/v3.1.1/shfmt_v3.1.1_linux_amd64
+          chmod +x shfmt && sudo mv shfmt /bin
+          shfmt -w -l .
 
-    # Build again and commit
-    - name: Build the Docker image (after format)
-      run: |
-        make docker-build
-    - name: Commit and push
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        git remote set-url origin https://x-access-token:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git
-        git config --global user.email "actions@github"
-        git config --global user.name "Github Actions"
-        hub commit -a -m "Apply formatting" && hub push || echo "Nothing to commit"
+      # Build again and commit
+      - name: Build the Docker image (after format)
+        run: |
+          make docker-build
+      - name: Update PR with formatting
+        uses: gr2m/create-or-update-pull-request-action@v1.x
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          body: |
+            Updated formatting
+          branch: github.event.pull_request.head.ref
+          author: "Github Actions <actions@github>"
+          commit-message: "Actions: Apply formatting"
