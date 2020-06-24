@@ -170,12 +170,13 @@ func sim(upf *upf, method string) {
 }
 
 func main() {
-	var conf Conf
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	// cmdline args
 	flag.Parse()
 
 	// read and parse json startup file
+	var conf Conf
 	ParseJSON(configPath, &conf)
 	log.Println(conf)
 
