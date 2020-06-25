@@ -4,7 +4,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"flag"
 	"io/ioutil"
@@ -140,25 +139,40 @@ func sim(upf *upf, method string) {
 
 		switch method {
 		case "create":
-			upf.addPDR(pdrDown)
-			upf.addPDR(pdrUp)
+			doneCh := make(chan bool, 8)
+			upf.addPDR(doneCh, pdrDown)
+			upf.addPDR(doneCh, pdrUp)
 
-			upf.addFAR(farDown)
-			upf.addFAR(farUp)
+			upf.addFAR(doneCh, farDown)
+			upf.addFAR(doneCh, farUp)
 
-			upf.addCounter(pdrDown.ctrID, "PreQoSCounter")
-			upf.addCounter(pdrDown.ctrID, "PostDLQoSCounter")
-			upf.addCounter(pdrDown.ctrID, "PostULQoSCounter")
+			upf.addCounter(doneCh, pdrDown.ctrID, "PreQoSCounter")
+			upf.addCounter(doneCh, pdrDown.ctrID, "PostDLQoSCounter")
+			upf.addCounter(doneCh, pdrDown.ctrID, "PostULQoSCounter")
+
+			for i := 0; i < 7; i++ {
+				<-doneCh
+			}
+			close(doneCh)
+
 		case "delete":
-			upf.delPDR(pdrDown)
-			upf.delPDR(pdrUp)
+			doneCh := make(chan bool, 8)
 
-			upf.delFAR(farDown)
-			upf.delFAR(farUp)
+			upf.delPDR(doneCh, pdrDown)
+			upf.delPDR(doneCh, pdrUp)
 
-			upf.delCounter(pdrDown.ctrID, "PreQoSCounter")
-			upf.delCounter(pdrDown.ctrID, "PostDLQoSCounter")
-			upf.delCounter(pdrDown.ctrID, "PostULQoSCounter")
+			upf.delFAR(doneCh, farDown)
+			upf.delFAR(doneCh, farUp)
+
+			upf.delCounter(doneCh, pdrDown.ctrID, "PreQoSCounter")
+			upf.delCounter(doneCh, pdrDown.ctrID, "PostDLQoSCounter")
+			upf.delCounter(doneCh, pdrDown.ctrID, "PostULQoSCounter")
+
+			for i := 0; i < 7; i++ {
+				<-doneCh
+			}
+			close(doneCh)
+
 		default:
 			log.Fatalln("Unsupported method", method)
 		}
@@ -190,7 +204,6 @@ func main() {
 	upf := &upf{
 		n3IP:        ParseN3IP(conf.N3Iface.N3IfaceName),
 		client:      pb.NewBESSControlClient(conn),
-		ctx:         context.Background(),
 		maxSessions: conf.MaxSessions,
 	}
 
