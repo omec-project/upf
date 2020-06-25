@@ -5,8 +5,6 @@
 PLUGINS_DIR=${PLUGINS_DIR:-"plugins"}
 
 build_bess() {
-	set -e
-
 	PLUGINS=$(find "$PLUGINS_DIR" -mindepth 1 -maxdepth 1 -type d)
 	echo "Found plugins: $PLUGINS"
 
