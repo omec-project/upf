@@ -14,7 +14,7 @@ You need the following dependencies.
 * Hugepages mounted at `/dev/hugepages` or updated location in [`docker_setup.sh`](docker_setup.sh)
 * Update mode for devices: `dpdk`, `af_xdp` or `af_packet` in [`docker_setup.sh`](docker_setup.sh),
     along with device details
-* Update [`docker_setup.sh`](docker_setup.sh) and [`conf/spgwu.bess`](conf/spgwu.bess) to run iltrafficgen tests
+* Update [`docker_setup.sh`](docker_setup.sh) and [`conf/up4.bess`](conf/up4.bess) to run iltrafficgen tests
 
 >`docker_setup.sh` is a quick start guide to set up UPF-EPC for evaluation.
 
@@ -42,13 +42,12 @@ To run BESS daemon with NGIC modules' code:
 ./docker_setup.sh
 ```
 
-To update the pipeline, reflect changes to [`conf/spgwu.bess`](conf/spgwu.bess)
+To update the pipeline, reflect changes to [`conf/up4.bess`](conf/up4.bess)
 and/or [`conf/upf.json`](conf/upf.json)
 
-To install the pipeline, do:
+To display the pipeline, do:
 
 ```bash
-docker exec bess ./bessctl run spgwu
 docker exec bess ./bessctl show pipeline > pipeline.txt
 ```
 
@@ -59,7 +58,7 @@ Control program(s) to dynamically configure BESS modules
 | Functionality | Controller |
 |---------------|------------|
 | Routes | [route_control.py](conf/route_control.py) |
-| UE sessions | Static trafficgen only in `spgwu.bess` |
+| UE sessions | Static trafficgen only in `pfcpiface/main.go` |
 | CP communication | [zmq-cpiface.cc](cpiface/zmq-cpiface.cc) |
 
 ## Testing
