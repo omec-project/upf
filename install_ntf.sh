@@ -11,8 +11,6 @@ SUDO=''
 [[ $EUID -ne 0 ]] && SUDO=sudo
 
 install_ntf() {
-	set -e
-
 	$SUDO apt install -y \
 		autoconf \
 		automake \
