@@ -8,19 +8,16 @@ import (
 	"encoding/binary"
 	"log"
 	"net"
-	"strings"
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
-	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type upf struct {
 	n3IP        net.IP
 	client      pb.BESSControlClient
-	ctx         context.Context
 	maxSessions uint32
 }
 
@@ -93,12 +90,16 @@ func ip2int(ip net.IP) uint32 {
 }
 
 func (u *upf) pauseAll() error {
-	_, err := u.client.PauseAll(u.ctx, &pb.EmptyRequest{})
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	_, err := u.client.PauseAll(ctx, &pb.EmptyRequest{})
 	return err
 }
 
 func (u *upf) resumeAll() error {
-	_, err := u.client.ResumeAll(u.ctx, &pb.EmptyRequest{})
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	_, err := u.client.ResumeAll(ctx, &pb.EmptyRequest{})
 	return err
 }
 
@@ -109,117 +110,99 @@ func (u *upf) processPDR(any *anypb.Any, method string) {
 		return
 	}
 
-	for {
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
 
-		res, err := u.client.ModuleCommand(u.ctx, &pb.CommandRequest{
-			Name: "PDRLookup",
-			Cmd:  method,
-			Arg:  any,
-		})
+	u.client.ModuleCommand(ctx, &pb.CommandRequest{
+		Name: "PDRLookup",
+		Cmd:  method,
+		Arg:  any,
+	})
+}
 
-		if err != nil {
-			// codes.DeadlineExceeded.String() has a diff string literal. WHY ?!!
-			if !strings.Contains(grpc.ErrorDesc(err), "deadline exceeded") {
-				log.Println("Error running module command:", err)
-				return
-			}
-			log.Println("Deadline exceeded when trying to insert DOWNLINK PDR rule! Retrying...")
+func (u *upf) addPDR(c chan bool, p pdr) {
+	go func() {
+		var any *anypb.Any
+		var err error
+
+		f := &pb.WildcardMatchCommandAddArg{
+			Gate:     1,
+			Priority: 1,
+			Values: []*pb.FieldData{
+				intEnc(uint64(p.srcIface)),     /* src_iface */
+				intEnc(uint64(p.tunnelIP4Dst)), /* tunnel_ipv4_dst */
+				intEnc(uint64(p.eNBTeid)),      /* enb_teid */
+				intEnc(uint64(p.srcIP)),        /* ueaddr ip*/
+				intEnc(uint64(p.dstIP)),        /* inet ip */
+				intEnc(uint64(p.srcPort)),      /* ue port */
+				intEnc(uint64(p.dstPort)),      /* inet port */
+				intEnc(uint64(p.proto)),        /* proto id */
+			},
+			Masks: []*pb.FieldData{
+				intEnc(uint64(p.srcIfaceMask)),     /* src_iface-mask */
+				intEnc(uint64(p.tunnelIP4DstMask)), /* tunnel_ipv4_dst-mask */
+				intEnc(uint64(p.eNBTeidMask)),      /* enb_teid-mask */
+				intEnc(uint64(p.srcIPMask)),        /* ueaddr ip-mask */
+				intEnc(uint64(p.dstIPMask)),        /* inet ip-mask */
+				intEnc(uint64(p.srcPortMask)),      /* ue port-mask */
+				intEnc(uint64(p.dstPortMask)),      /* inet port-mask */
+				intEnc(uint64(p.protoMask)),        /* proto id-mask */
+			},
+			Valuesv: []*pb.FieldData{
+				intEnc(uint64(p.pdrID)),     /* pdr-id */
+				intEnc(uint64(p.fseID)),     /* fseid */
+				intEnc(uint64(p.ctrID)),     /* ctr_id */
+				intEnc(uint64(p.farID)),     /* far_id */
+				intEnc(uint64(p.needDecap)), /* need_decap */
+			},
 		}
-
-		if res.GetError() != nil {
-			if res.GetError().Code == 2 {
-				log.Println(res.GetError(), "Retrying...")
-				time.Sleep(1 * time.Second)
-				continue
-			}
-			log.Println("Error updating rule:", res.GetError())
+		any, err = ptypes.MarshalAny(f)
+		if err != nil {
+			log.Println("Error marshalling the rule", f, err)
 			return
 		}
 
-		/* everything went fine */
-		if err == nil {
-			break
+		u.processPDR(any, "add")
+		c <- true
+	}()
+}
+
+func (u *upf) delPDR(c chan bool, p pdr) {
+	go func() {
+		var any *anypb.Any
+		var err error
+
+		f := &pb.WildcardMatchCommandDeleteArg{
+			Values: []*pb.FieldData{
+				intEnc(uint64(p.srcIface)),     /* src_iface */
+				intEnc(uint64(p.tunnelIP4Dst)), /* tunnel_ipv4_dst */
+				intEnc(uint64(p.eNBTeid)),      /* enb_teid */
+				intEnc(uint64(p.srcIP)),        /* ueaddr ip*/
+				intEnc(uint64(p.dstIP)),        /* inet ip */
+				intEnc(uint64(p.srcPort)),      /* ue port */
+				intEnc(uint64(p.dstPort)),      /* inet port */
+				intEnc(uint64(p.proto)),        /* proto id */
+			},
+			Masks: []*pb.FieldData{
+				intEnc(uint64(p.srcIfaceMask)),     /* src_iface-mask */
+				intEnc(uint64(p.tunnelIP4DstMask)), /* tunnel_ipv4_dst-mask */
+				intEnc(uint64(p.eNBTeidMask)),      /* enb_teid-mask */
+				intEnc(uint64(p.srcIPMask)),        /* ueaddr ip-mask */
+				intEnc(uint64(p.dstIPMask)),        /* inet ip-mask */
+				intEnc(uint64(p.srcPortMask)),      /* ue port-mask */
+				intEnc(uint64(p.dstPortMask)),      /* inet port-mask */
+				intEnc(uint64(p.protoMask)),        /* proto id-mask */
+			},
 		}
-	}
-}
+		any, err = ptypes.MarshalAny(f)
+		if err != nil {
+			log.Println("Error marshalling the rule", f, err)
+			return
+		}
 
-func (u *upf) addPDR(p pdr) {
-	var any *anypb.Any
-	var err error
-
-	f := &pb.WildcardMatchCommandAddArg{
-		Gate:     1,
-		Priority: 1,
-		Values: []*pb.FieldData{
-			intEnc(uint64(p.srcIface)),     /* src_iface */
-			intEnc(uint64(p.tunnelIP4Dst)), /* tunnel_ipv4_dst */
-			intEnc(uint64(p.eNBTeid)),      /* enb_teid */
-			intEnc(uint64(p.srcIP)),        /* ueaddr ip*/
-			intEnc(uint64(p.dstIP)),        /* inet ip */
-			intEnc(uint64(p.srcPort)),      /* ue port */
-			intEnc(uint64(p.dstPort)),      /* inet port */
-			intEnc(uint64(p.proto)),        /* proto id */
-		},
-		Masks: []*pb.FieldData{
-			intEnc(uint64(p.srcIfaceMask)),     /* src_iface-mask */
-			intEnc(uint64(p.tunnelIP4DstMask)), /* tunnel_ipv4_dst-mask */
-			intEnc(uint64(p.eNBTeidMask)),      /* enb_teid-mask */
-			intEnc(uint64(p.srcIPMask)),        /* ueaddr ip-mask */
-			intEnc(uint64(p.dstIPMask)),        /* inet ip-mask */
-			intEnc(uint64(p.srcPortMask)),      /* ue port-mask */
-			intEnc(uint64(p.dstPortMask)),      /* inet port-mask */
-			intEnc(uint64(p.protoMask)),        /* proto id-mask */
-		},
-		Valuesv: []*pb.FieldData{
-			intEnc(uint64(p.pdrID)),     /* pdr-id */
-			intEnc(uint64(p.fseID)),     /* fseid */
-			intEnc(uint64(p.ctrID)),     /* ctr_id */
-			intEnc(uint64(p.farID)),     /* far_id */
-			intEnc(uint64(p.needDecap)), /* need_decap */
-		},
-	}
-	any, err = ptypes.MarshalAny(f)
-	if err != nil {
-		log.Println("Error marshalling the rule", f, err)
-		return
-	}
-
-	u.processPDR(any, "add")
-}
-
-func (u *upf) delPDR(p pdr) {
-	var any *anypb.Any
-	var err error
-
-	f := &pb.WildcardMatchCommandDeleteArg{
-		Values: []*pb.FieldData{
-			intEnc(uint64(p.srcIface)),     /* src_iface */
-			intEnc(uint64(p.tunnelIP4Dst)), /* tunnel_ipv4_dst */
-			intEnc(uint64(p.eNBTeid)),      /* enb_teid */
-			intEnc(uint64(p.srcIP)),        /* ueaddr ip*/
-			intEnc(uint64(p.dstIP)),        /* inet ip */
-			intEnc(uint64(p.srcPort)),      /* ue port */
-			intEnc(uint64(p.dstPort)),      /* inet port */
-			intEnc(uint64(p.proto)),        /* proto id */
-		},
-		Masks: []*pb.FieldData{
-			intEnc(uint64(p.srcIfaceMask)),     /* src_iface-mask */
-			intEnc(uint64(p.tunnelIP4DstMask)), /* tunnel_ipv4_dst-mask */
-			intEnc(uint64(p.eNBTeidMask)),      /* enb_teid-mask */
-			intEnc(uint64(p.srcIPMask)),        /* ueaddr ip-mask */
-			intEnc(uint64(p.dstIPMask)),        /* inet ip-mask */
-			intEnc(uint64(p.srcPortMask)),      /* ue port-mask */
-			intEnc(uint64(p.dstPortMask)),      /* inet port-mask */
-			intEnc(uint64(p.protoMask)),        /* proto id-mask */
-		},
-	}
-	any, err = ptypes.MarshalAny(f)
-	if err != nil {
-		log.Println("Error marshalling the rule", f, err)
-		return
-	}
-
-	u.processPDR(any, "delete")
+		u.processPDR(any, "delete")
+		c <- true
+	}()
 }
 
 func (u *upf) processFAR(any *anypb.Any, method string) {
@@ -229,147 +212,113 @@ func (u *upf) processFAR(any *anypb.Any, method string) {
 		return
 	}
 
-	for {
-		res, err := u.client.ModuleCommand(u.ctx, &pb.CommandRequest{
-			Name: "FARLookup",
-			Cmd:  method,
-			Arg:  any,
-		})
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
 
-		if err != nil {
-			// codes.DeadlineExceeded.String() has a diff string literal. WHY ?!!
-			if !strings.Contains(grpc.ErrorDesc(err), "deadline exceeded") {
-				log.Println("Error running module command:", err)
-				return
-			}
-			log.Println("Deadline exceeded when trying to insert DOWNLINK FAR rule! Retrying...")
+	u.client.ModuleCommand(ctx, &pb.CommandRequest{
+		Name: "FARLookup",
+		Cmd:  method,
+		Arg:  any,
+	})
+}
+
+func (u *upf) addFAR(c chan bool, far far) {
+	go func() {
+		var any *anypb.Any
+		var err error
+
+		f := &pb.ExactMatchCommandAddArg{
+			Gate: 1,
+			Fields: []*pb.FieldData{
+				intEnc(uint64(far.farID)), /* far_id */
+				intEnc(uint64(far.fseID)), /* fseid */
+			},
+			Values: []*pb.FieldData{
+				intEnc(uint64(far.action)),      /* action */
+				intEnc(uint64(far.tunnelType)),  /* tunnel_out_type */
+				intEnc(uint64(far.s1uIP)),       /* s1u-ip */
+				intEnc(uint64(far.eNBIP)),       /* enb ip */
+				intEnc(uint64(far.eNBTeid)),     /* enb teid */
+				intEnc(uint64(far.UDPGTPUPort)), /* udp gtpu port */
+			},
 		}
-
-		if res.GetError() != nil {
-			if res.GetError().Code == 2 {
-				log.Println(res.GetError(), "Retrying...")
-				time.Sleep(1 * time.Second)
-				continue
-			}
-			log.Println("Error updating rule:", res.GetError())
+		any, err = ptypes.MarshalAny(f)
+		if err != nil {
+			log.Println("Error marshalling the rule", f, err)
 			return
 		}
+		u.processFAR(any, "add")
+		c <- true
+	}()
+}
 
-		/* everything went fine */
-		if err == nil {
-			break
+func (u *upf) delFAR(c chan bool, far far) {
+	go func() {
+		var any *anypb.Any
+		var err error
+
+		f := &pb.ExactMatchCommandDeleteArg{
+			Fields: []*pb.FieldData{
+				intEnc(uint64(far.farID)), /* far_id */
+				intEnc(uint64(far.fseID)), /* fseid */
+			},
 		}
-	}
-}
-
-func (u *upf) addFAR(far far) {
-	var any *anypb.Any
-	var err error
-
-	f := &pb.ExactMatchCommandAddArg{
-		Gate: 1,
-		Fields: []*pb.FieldData{
-			intEnc(uint64(far.farID)), /* far_id */
-			intEnc(uint64(far.fseID)), /* fseid */
-		},
-		Values: []*pb.FieldData{
-			intEnc(uint64(far.action)),      /* action */
-			intEnc(uint64(far.tunnelType)),  /* tunnel_out_type */
-			intEnc(uint64(far.s1uIP)),       /* s1u-ip */
-			intEnc(uint64(far.eNBIP)),       /* enb ip */
-			intEnc(uint64(far.eNBTeid)),     /* enb teid */
-			intEnc(uint64(far.UDPGTPUPort)), /* udp gtpu port */
-		},
-	}
-	any, err = ptypes.MarshalAny(f)
-	if err != nil {
-		log.Println("Error marshalling the rule", f, err)
-		return
-	}
-	u.processFAR(any, "add")
-}
-
-func (u *upf) delFAR(far far) {
-	var any *anypb.Any
-	var err error
-
-	f := &pb.ExactMatchCommandDeleteArg{
-		Fields: []*pb.FieldData{
-			intEnc(uint64(far.farID)), /* far_id */
-			intEnc(uint64(far.fseID)), /* fseid */
-		},
-	}
-	any, err = ptypes.MarshalAny(f)
-	if err != nil {
-		log.Println("Error marshalling the rule", f, err)
-		return
-	}
-	u.processFAR(any, "delete")
+		any, err = ptypes.MarshalAny(f)
+		if err != nil {
+			log.Println("Error marshalling the rule", f, err)
+			return
+		}
+		u.processFAR(any, "delete")
+		c <- true
+	}()
 }
 
 func (u *upf) processCounters(any *anypb.Any, method string, counterName string) {
 
-	for {
-		res, err := u.client.ModuleCommand(u.ctx, &pb.CommandRequest{
-			Name: counterName,
-			Cmd:  method,
-			Arg:  any,
-		})
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
 
-		if err != nil {
-			// codes.DeadlineExceeded.String() has a diff string literal. WHY ?!!
-			if !strings.Contains(grpc.ErrorDesc(err), "deadline exceeded") {
-				log.Println("Error running module command:", err)
-				return
-			}
-			log.Println("Deadline exceeded when trying to insert PreQoSCounter rule! Retrying...")
+	u.client.ModuleCommand(ctx, &pb.CommandRequest{
+		Name: counterName,
+		Cmd:  method,
+		Arg:  any,
+	})
+}
+
+func (u *upf) addCounter(c chan bool, ctrID uint32, counterName string) {
+	go func() {
+		var any *anypb.Any
+		var err error
+
+		f := &pb.CounterAddArg{
+			CtrId: ctrID,
 		}
 
-		if res.GetError() != nil {
-			if res.GetError().Code == 2 {
-				log.Println(res.GetError(), "Retrying...")
-				time.Sleep(1 * time.Second)
-				continue
-			}
-			log.Println("Error updating rule:", res.GetError())
+		any, err = ptypes.MarshalAny(f)
+		if err != nil {
+			log.Println("Error marshalling the rule", f, err)
 			return
 		}
+		u.processCounters(any, "add", counterName)
+		c <- true
+	}()
+}
 
-		/* everything went fine */
-		if err == nil {
-			break
+func (u *upf) delCounter(c chan bool, ctrID uint32, counterName string) {
+	go func() {
+		var any *anypb.Any
+		var err error
+
+		f := &pb.CounterRemoveArg{
+			CtrId: ctrID,
 		}
-	}
-}
 
-func (u *upf) addCounter(ctrID uint32, counterName string) {
-	var any *anypb.Any
-	var err error
-
-	f := &pb.CounterAddArg{
-		CtrId: ctrID,
-	}
-
-	any, err = ptypes.MarshalAny(f)
-	if err != nil {
-		log.Println("Error marshalling the rule", f, err)
-		return
-	}
-	u.processCounters(any, "add", counterName)
-}
-
-func (u *upf) delCounter(ctrID uint32, counterName string) {
-	var any *anypb.Any
-	var err error
-
-	f := &pb.CounterRemoveArg{
-		CtrId: ctrID,
-	}
-
-	any, err = ptypes.MarshalAny(f)
-	if err != nil {
-		log.Println("Error marshalling the rule", f, err)
-		return
-	}
-	u.processCounters(any, "remove", counterName)
+		any, err = ptypes.MarshalAny(f)
+		if err != nil {
+			log.Println("Error marshalling the rule", f, err)
+			return
+		}
+		u.processCounters(any, "remove", counterName)
+		c <- true
+	}()
 }
