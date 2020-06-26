@@ -13,14 +13,13 @@ RUN apt-get update && \
 ARG MAKEFLAGS
 
 # linux ver should match target machine's kernel
-WORKDIR /linux
-ARG LINUX_VER=5.4.49
-RUN curl -L https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-${LINUX_VER}.tar.xz | \
-    tar x -JC . --strip-components=1 && \
+WORKDIR /libbpf
+ARG LIBBPF_VER=v0.0.9
+RUN curl -L https://github.com/libbpf/libbpf/tarball/${LIBBPF_VER} | \
+    tar xz -C . --strip-components=1 && \
     cp include/uapi/linux/if_xdp.h /usr/include/linux && \
-    cd tools/lib/bpf/ && \
-    make $MAKEFLAGS install_lib && \
-    make $MAKEFLAGS install_headers && \
+    cd src && \
+    make install && \
     ldconfig
 
 # BESS pre-reqs
@@ -36,7 +35,7 @@ RUN cat patches/* | patch -p1 && \
     ./build.py dpdk
 
 # Hack to get static version linked
-RUN rm -f /usr/local/lib64/libbpf.so*
+RUN rm -f /usr/lib64/libbpf.so*
 
 # Plugins
 RUN mkdir -p plugins
