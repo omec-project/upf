@@ -158,6 +158,9 @@ class Port:
         if mode is None:
             mode = self.detect_mode()
 
+        if mode not in ['af_xdp', 'linux', 'dpdk', 'af_packet']:
+            raise Exception('Invalid mode: {} selected.'.format(mode))
+
         if mode in ['af_xdp', 'linux']:
             try:
                 # Initialize kernel fastpath.
@@ -182,7 +185,7 @@ class Port:
                 print('Failed to create AF_PACKET socket for {}. Exiting...'.format(name))
                 sys.exit()
 
-        elif mode == 'dpdk':
+        if mode == 'dpdk':
             kwargs = None
             pci = alias_by_interface(name)
             if pci is not None:
@@ -249,8 +252,7 @@ class Port:
                     mod.attach_task(mod.name)
             except Exception as e:
                 print('Mirror veth interface: {} misconfigured: {}'.format(name, e))
-        else:
-            raise Exception('Invalid mode selected.')
+
         # Direct fast path traffic to Frag module
         merge = __bess_module__("{}Merge".format(name), 'Merge')
 
