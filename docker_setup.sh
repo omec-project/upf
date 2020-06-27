@@ -194,7 +194,7 @@ docker run --name bess-cpiface -td --restart unless-stopped \
 
 SIMU_ARGS=${SIMU_ARGS:-""}
 # Run bess-pfcpiface depending on mode type
-    docker run --name bess-pfcpiface -td --restart on-failure \
+docker run --name bess-pfcpiface -td --restart on-failure \
 	--net container:pause \
 	-v "$PWD/conf/upf.json":/tmp/upf.json \
 	upf-epc-pfcpiface:"$(<VERSION)" \
