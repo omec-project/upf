@@ -28,9 +28,15 @@ var (
 
 // Conf : Json conf struct
 type Conf struct {
-	Mode        string    `json:"mode"`
-	MaxSessions uint32    `json:"max_sessions"`
-	N3Iface     IfaceType `json:"s1u"`
+	Mode        string      `json:"mode"`
+	MaxSessions uint32      `json:"max_sessions"`
+	N3Iface     IfaceType   `json:"s1u"`
+	CPIface     CPIfaceInfo `json:"cpiface"`
+}
+
+// CPIfaceInfo : CPIface interface settings
+type CPIfaceInfo struct {
+	SourceIP string `json:"zmqd_ip"`
 }
 
 // IfaceType : Gateway interface struct
@@ -193,6 +199,8 @@ func main() {
 	var conf Conf
 	ParseJSON(configPath, &conf)
 	log.Println(conf)
+	// parse N3IP
+	n3IP := ParseN3IP(conf.N3Iface.N3IfaceName)
 
 	// get bess grpc client
 	conn, err := grpc.Dial(*bess, grpc.WithInsecure())
@@ -202,7 +210,7 @@ func main() {
 	defer conn.Close()
 
 	upf := &upf{
-		n3IP:        ParseN3IP(conf.N3Iface.N3IfaceName),
+		n3IP:        n3IP,
 		client:      pb.NewBESSControlClient(conn),
 		maxSessions: conf.MaxSessions,
 	}
@@ -215,5 +223,7 @@ func main() {
 
 		log.Println("Deleting sessions:", conf.MaxSessions)
 		sim(upf, "delete")
+	} else {
+		pfcpifaceMainLoop(n3IP.String(), conf.CPIface.SourceIP)
 	}
 }
