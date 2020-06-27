@@ -89,6 +89,156 @@ func ip2int(ip net.IP) uint32 {
 	return binary.BigEndian.Uint32(ip)
 }
 
+func (u *upf) sim(method string) {
+	start := time.Now()
+
+	// Pause workers before
+	u.pauseAll()
+
+	const ueip, teid, enbip = 0x10000001, 0xf0000000, 0x0b010181
+	const ng4tMaxUeRan, ng4tMaxEnbRan = 500000, 80
+	s1uip := ip2int(u.n3IP)
+
+	for i := uint32(0); i < u.maxSessions; i++ {
+		// NG4T-based formula to calculate enodeB IP address against a given UE IP address
+		// il_trafficgen also uses the same scheme
+		// See SimuCPEnbv4Teid(...) in ngic code for more details
+		ueOfRan := i % ng4tMaxUeRan
+		ran := i / ng4tMaxUeRan
+		enbOfRan := ueOfRan % ng4tMaxEnbRan
+		enbIdx := ran*ng4tMaxEnbRan + enbOfRan
+
+		// create/delete downlink pdr
+		pdrDown := pdr{
+			srcIface:     core,
+			srcIP:        ueip + i,
+			srcIfaceMask: 0xFF,
+			srcIPMask:    0xFFFFFFFF,
+			fseID:        teid + i,
+			ctrID:        i,
+			farID:        downlink,
+		}
+
+		// create/delete uplink pdr
+		pdrUp := pdr{
+			srcIface:     access,
+			eNBTeid:      teid + i,
+			dstIP:        ueip + i,
+			srcIfaceMask: 0xFF,
+			eNBTeidMask:  0xFFFFFFFF,
+			dstIPMask:    0xFFFFFFFF,
+			fseID:        teid + i,
+			ctrID:        i,
+			farID:        uplink,
+		}
+
+		// create/delete downlink far
+		farDown := far{
+			farID:       downlink,
+			fseID:       teid + i,
+			action:      farTunnel,
+			tunnelType:  0x1,
+			s1uIP:       s1uip,
+			eNBIP:       enbip + enbIdx,
+			eNBTeid:     teid + i,
+			UDPGTPUPort: udpGTPUPort,
+		}
+
+		// create/delete uplink far
+		farUp := far{
+			farID:  uplink,
+			fseID:  teid + i,
+			action: farForward,
+		}
+
+		deleteEntries := func(timeout time.Duration) {
+			calls := 7
+			boom := time.After(timeout)
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			defer cancel()
+
+			done := make(chan bool)
+
+			u.delPDR(ctx, done, pdrDown)
+			u.delPDR(ctx, done, pdrUp)
+
+			u.delFAR(ctx, done, farDown)
+			u.delFAR(ctx, done, farUp)
+
+			u.delCounter(ctx, done, pdrDown.ctrID, "PreQoSCounter")
+			u.delCounter(ctx, done, pdrDown.ctrID, "PostDLQoSCounter")
+			u.delCounter(ctx, done, pdrDown.ctrID, "PostULQoSCounter")
+
+			for {
+				select {
+				case ok := <-done:
+					if !ok {
+						log.Println("Unable to delete entries")
+					}
+					calls = calls - 1
+					if calls == 0 {
+						return
+					}
+				case <-boom:
+					return
+				}
+			}
+		}
+
+		createEntries := func(timeout time.Duration) {
+			calls := 7
+			boom := time.After(timeout)
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			defer cancel()
+
+			done := make(chan bool)
+
+			u.addPDR(ctx, done, pdrDown)
+			u.addPDR(ctx, done, pdrUp)
+
+			u.addFAR(ctx, done, farDown)
+			u.addFAR(ctx, done, farUp)
+
+			u.addCounter(ctx, done, pdrDown.ctrID, "PreQoSCounter")
+			u.addCounter(ctx, done, pdrDown.ctrID, "PostDLQoSCounter")
+			u.addCounter(ctx, done, pdrDown.ctrID, "PostULQoSCounter")
+
+			for {
+				select {
+				case ok := <-done:
+					if !ok {
+						log.Println("Error adding entries")
+						cancel()
+						go deleteEntries(timeout)
+						return
+					}
+					calls = calls - 1
+					if calls == 0 {
+						return
+					}
+				case <-boom:
+					log.Println("Timed out adding entries")
+					return
+				}
+			}
+		}
+
+		switch timeout := 100 * time.Millisecond; method {
+		case "create":
+			createEntries(timeout)
+
+		case "delete":
+			deleteEntries(timeout)
+
+		default:
+			log.Fatalln("Unsupported method", method)
+		}
+	}
+	u.resumeAll()
+
+	log.Println("Sessions/s:", float64(u.maxSessions)/time.Since(start).Seconds())
+}
+
 func (u *upf) pauseAll() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
@@ -103,15 +253,12 @@ func (u *upf) resumeAll() error {
 	return err
 }
 
-func (u *upf) processPDR(any *anypb.Any, method string) {
+func (u *upf) processPDR(ctx context.Context, any *anypb.Any, method string) {
 
 	if method != "add" && method != "delete" {
 		log.Println("Invalid method name: ", method)
 		return
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
 
 	u.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "PDRLookup",
@@ -120,7 +267,7 @@ func (u *upf) processPDR(any *anypb.Any, method string) {
 	})
 }
 
-func (u *upf) addPDR(c chan bool, p pdr) {
+func (u *upf) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 	go func() {
 		var any *anypb.Any
 		var err error
@@ -162,12 +309,12 @@ func (u *upf) addPDR(c chan bool, p pdr) {
 			return
 		}
 
-		u.processPDR(any, "add")
-		c <- true
+		u.processPDR(ctx, any, "add")
+		done <- true
 	}()
 }
 
-func (u *upf) delPDR(c chan bool, p pdr) {
+func (u *upf) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 	go func() {
 		var any *anypb.Any
 		var err error
@@ -200,20 +347,17 @@ func (u *upf) delPDR(c chan bool, p pdr) {
 			return
 		}
 
-		u.processPDR(any, "delete")
-		c <- true
+		u.processPDR(ctx, any, "delete")
+		done <- true
 	}()
 }
 
-func (u *upf) processFAR(any *anypb.Any, method string) {
+func (u *upf) processFAR(ctx context.Context, any *anypb.Any, method string) {
 
 	if method != "add" && method != "delete" {
 		log.Println("Invalid method name: ", method)
 		return
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
 
 	u.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "FARLookup",
@@ -222,7 +366,7 @@ func (u *upf) processFAR(any *anypb.Any, method string) {
 	})
 }
 
-func (u *upf) addFAR(c chan bool, far far) {
+func (u *upf) addFAR(ctx context.Context, done chan<- bool, far far) {
 	go func() {
 		var any *anypb.Any
 		var err error
@@ -247,12 +391,12 @@ func (u *upf) addFAR(c chan bool, far far) {
 			log.Println("Error marshalling the rule", f, err)
 			return
 		}
-		u.processFAR(any, "add")
-		c <- true
+		u.processFAR(ctx, any, "add")
+		done <- true
 	}()
 }
 
-func (u *upf) delFAR(c chan bool, far far) {
+func (u *upf) delFAR(ctx context.Context, done chan<- bool, far far) {
 	go func() {
 		var any *anypb.Any
 		var err error
@@ -268,16 +412,12 @@ func (u *upf) delFAR(c chan bool, far far) {
 			log.Println("Error marshalling the rule", f, err)
 			return
 		}
-		u.processFAR(any, "delete")
-		c <- true
+		u.processFAR(ctx, any, "delete")
+		done <- true
 	}()
 }
 
-func (u *upf) processCounters(any *anypb.Any, method string, counterName string) {
-
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-
+func (u *upf) processCounters(ctx context.Context, any *anypb.Any, method string, counterName string) {
 	u.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: counterName,
 		Cmd:  method,
@@ -285,7 +425,7 @@ func (u *upf) processCounters(any *anypb.Any, method string, counterName string)
 	})
 }
 
-func (u *upf) addCounter(c chan bool, ctrID uint32, counterName string) {
+func (u *upf) addCounter(ctx context.Context, done chan<- bool, ctrID uint32, counterName string) {
 	go func() {
 		var any *anypb.Any
 		var err error
@@ -299,12 +439,12 @@ func (u *upf) addCounter(c chan bool, ctrID uint32, counterName string) {
 			log.Println("Error marshalling the rule", f, err)
 			return
 		}
-		u.processCounters(any, "add", counterName)
-		c <- true
+		u.processCounters(ctx, any, "add", counterName)
+		done <- true
 	}()
 }
 
-func (u *upf) delCounter(c chan bool, ctrID uint32, counterName string) {
+func (u *upf) delCounter(ctx context.Context, done chan<- bool, ctrID uint32, counterName string) {
 	go func() {
 		var any *anypb.Any
 		var err error
@@ -318,7 +458,7 @@ func (u *upf) delCounter(c chan bool, ctrID uint32, counterName string) {
 			log.Println("Error marshalling the rule", f, err)
 			return
 		}
-		u.processCounters(any, "remove", counterName)
-		c <- true
+		u.processCounters(ctx, any, "remove", counterName)
+		done <- true
 	}()
 }
