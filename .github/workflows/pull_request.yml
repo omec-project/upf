@@ -40,5 +40,4 @@ jobs:
           body: |
             Updated formatting
           branch: ${{ github.event.pull_request.head.ref }}
-          author: "Github Actions <actions@github>"
           commit-message: "Actions: Apply formatting"
