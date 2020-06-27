@@ -86,6 +86,14 @@ function move_ifaces() {
 	for ((i = 0; i < num_ifaces; i++)); do
 		sudo ip link set "${ifaces[$i]}" netns pause up
 		sudo ip netns exec pause ip link set "${ifaces[$i]}" promisc off
+		sudo ip netns exec pause ip link set "${ifaces[$i]}" xdp off
+		if [ "$mode" == 'af_xdp' ]; then
+		    sudo ip netns exec pause ethtool --features "${ifaces[$i]}" ntuple off
+		    sudo ip netns exec pause ethtool --features "${ifaces[$i]}" ntuple on
+		    sudo ip netns exec pause ethtool -N "${ifaces[$i]}" flow-type udp4 action 0
+			sudo ip netns exec pause ethtool -N "${ifaces[$i]}" flow-type tcp4 action 0
+		    sudo ip netns exec pause ethtool -u "${ifaces[$i]}"
+		fi
 	done
 	setup_addrs
 }
