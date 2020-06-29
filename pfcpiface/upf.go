@@ -16,6 +16,8 @@ import (
 )
 
 type upf struct {
+	n3Iface     string
+	n6Iface     string
 	n3IP        net.IP
 	client      pb.BESSControlClient
 	maxSessions uint32
@@ -151,84 +153,12 @@ func (u *upf) sim(method string) {
 			action: farForward,
 		}
 
-		deleteEntries := func(timeout time.Duration) {
-			calls := 7
-			boom := time.After(timeout)
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			defer cancel()
-
-			done := make(chan bool)
-
-			u.delPDR(ctx, done, pdrDown)
-			u.delPDR(ctx, done, pdrUp)
-
-			u.delFAR(ctx, done, farDown)
-			u.delFAR(ctx, done, farUp)
-
-			u.delCounter(ctx, done, pdrDown.ctrID, "PreQoSCounter")
-			u.delCounter(ctx, done, pdrDown.ctrID, "PostDLQoSCounter")
-			u.delCounter(ctx, done, pdrDown.ctrID, "PostULQoSCounter")
-
-			for {
-				select {
-				case ok := <-done:
-					if !ok {
-						log.Println("Unable to delete entries")
-					}
-					calls = calls - 1
-					if calls == 0 {
-						return
-					}
-				case <-boom:
-					return
-				}
-			}
-		}
-
-		createEntries := func(timeout time.Duration) {
-			calls := 7
-			boom := time.After(timeout)
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			defer cancel()
-
-			done := make(chan bool)
-
-			u.addPDR(ctx, done, pdrDown)
-			u.addPDR(ctx, done, pdrUp)
-
-			u.addFAR(ctx, done, farDown)
-			u.addFAR(ctx, done, farUp)
-
-			u.addCounter(ctx, done, pdrDown.ctrID, "PreQoSCounter")
-			u.addCounter(ctx, done, pdrDown.ctrID, "PostDLQoSCounter")
-			u.addCounter(ctx, done, pdrDown.ctrID, "PostULQoSCounter")
-
-			for {
-				select {
-				case ok := <-done:
-					if !ok {
-						log.Println("Error adding entries")
-						cancel()
-						go deleteEntries(timeout)
-						return
-					}
-					calls = calls - 1
-					if calls == 0 {
-						return
-					}
-				case <-boom:
-					log.Println("Timed out adding entries")
-					return
-				}
-			}
-		}
-
 		switch timeout := 100 * time.Millisecond; method {
 		case "create":
-			createEntries(timeout)
+			u.createEntries(pdrDown, pdrUp, farDown, farUp, timeout)
 
 		case "delete":
-			deleteEntries(timeout)
+			u.deleteEntries(pdrDown, pdrUp, farDown, farUp, timeout)
 
 		default:
 			log.Fatalln("Unsupported method", method)
@@ -237,6 +167,78 @@ func (u *upf) sim(method string) {
 	u.resumeAll()
 
 	log.Println("Sessions/s:", float64(u.maxSessions)/time.Since(start).Seconds())
+}
+
+func (u *upf) createEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time.Duration) {
+	calls := 7
+	boom := time.After(timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	done := make(chan bool)
+
+	u.addPDR(ctx, done, pdrDown)
+	u.addPDR(ctx, done, pdrUp)
+
+	u.addFAR(ctx, done, farDown)
+	u.addFAR(ctx, done, farUp)
+
+	u.addCounter(ctx, done, pdrDown.ctrID, "PreQoSCounter")
+	u.addCounter(ctx, done, pdrDown.ctrID, "PostDLQoSCounter")
+	u.addCounter(ctx, done, pdrDown.ctrID, "PostULQoSCounter")
+
+	for {
+		select {
+		case ok := <-done:
+			if !ok {
+				log.Println("Error adding entries")
+				cancel()
+				go u.deleteEntries(pdrDown, pdrUp, farDown, farUp, timeout)
+				return
+			}
+			calls = calls - 1
+			if calls == 0 {
+				return
+			}
+		case <-boom:
+			log.Println("Timed out adding entries")
+			return
+		}
+	}
+}
+
+func (u *upf) deleteEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time.Duration) {
+	calls := 7
+	boom := time.After(timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	done := make(chan bool)
+
+	u.delPDR(ctx, done, pdrDown)
+	u.delPDR(ctx, done, pdrUp)
+
+	u.delFAR(ctx, done, farDown)
+	u.delFAR(ctx, done, farUp)
+
+	u.delCounter(ctx, done, pdrDown.ctrID, "PreQoSCounter")
+	u.delCounter(ctx, done, pdrDown.ctrID, "PostDLQoSCounter")
+	u.delCounter(ctx, done, pdrDown.ctrID, "PostULQoSCounter")
+
+	for {
+		select {
+		case ok := <-done:
+			if !ok {
+				log.Println("Unable to delete entries")
+			}
+			calls = calls - 1
+			if calls == 0 {
+				return
+			}
+		case <-boom:
+			return
+		}
+	}
 }
 
 func (u *upf) pauseAll() error {
@@ -461,4 +463,36 @@ func (u *upf) delCounter(ctx context.Context, done chan<- bool, ctrID uint32, co
 		u.processCounters(ctx, any, "remove", counterName)
 		done <- true
 	}()
+}
+
+func (u *upf) measure(ifName string, f *pb.MeasureCommandGetSummaryArg) *pb.MeasureCommandGetSummaryResponse {
+	modName := func() string {
+		return ifName + "_measure"
+	}
+
+	any, err := ptypes.MarshalAny(f)
+	if err != nil {
+		log.Println("Error marshalling the rule", f, err)
+		return nil
+	}
+
+	ctx := context.Background()
+	modRes, err := u.client.ModuleCommand(ctx, &pb.CommandRequest{
+		Name: modName(),
+		Cmd:  "get_summary",
+		Arg:  any,
+	})
+	if err != nil {
+		log.Println("Error calling get_summary on module", modName(), err)
+		return nil
+	}
+
+	var res pb.MeasureCommandGetSummaryResponse
+	err = modRes.GetData().UnmarshalTo(&res)
+	if err != nil {
+		log.Println("Error unmarshalling the response", modName(), err)
+		return nil
+	}
+
+	return &res
 }

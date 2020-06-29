@@ -20,7 +20,7 @@
     "": "ip_frag_with_eth_mtu: 1518",
 
     "": "Telemetrics-See this link for details: https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py",
-    "measure": false,
+    "measure": true,
 
     "": "Gateway interfaces",
     "s1u": {
