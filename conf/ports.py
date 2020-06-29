@@ -233,13 +233,13 @@ class Port:
 
         # enable telemetrics (if enabled) (how many bytes seen in and out of port)
         if conf_measure:
-            t = Timestamp(name="{}_timestamp".format(self.name), attr_name="{}timestamp".format(self.name))
+            t = Timestamp(name="{}_timestamp".format(self.name))
             if self.mode == 'sim':
                 self.rewrite.connect(next_mod=t)
             else:
                 self.fpi.connect(next_mod=t)
             t.connect(next_mod=self.bpf)
-            m = Measure(name="{}_measure".format(self.name), attr_name="{}timestamp".format(self.name))
+            m = Measure(name="{}_measure".format(self.name))
             m.connect(next_mod=out)
             out = m
         else:
