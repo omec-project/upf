@@ -12,13 +12,13 @@ import (
 )
 
 func getPctiles() []float64 {
-	return []float64{25, 50, 75, 90, 99}
+	return []float64{50, 75, 90, 95, 99, 100}
 }
 
-func makeBuckets(values []uint64) map[float64]uint64 {
-	buckets := make(map[float64]uint64)
+func makeBuckets(values []uint64) map[float64]float64 {
+	buckets := make(map[float64]float64)
 	for idx, pctile := range getPctiles() {
-		buckets[pctile] = values[idx]
+		buckets[pctile] = float64(values[idx])
 	}
 	return buckets
 }
@@ -94,14 +94,14 @@ func (uc *upfCollector) Describe(ch chan<- *prometheus.Desc) {
 
 //Collect writes all metrics to prometheus metric channel
 func (uc *upfCollector) Collect(ch chan<- prometheus.Metric) {
-	uc.histLatencyJitter(ch)
+	uc.summaryLatencyJitter(ch)
 	uc.portStats(ch)
 }
 
 func (uc *upfCollector) portStats(ch chan<- prometheus.Metric) {
 }
 
-func (uc *upfCollector) histLatencyJitter(ch chan<- prometheus.Metric) {
+func (uc *upfCollector) summaryLatencyJitter(ch chan<- prometheus.Metric) {
 	measureIface := func(ifaceLabel, ifaceName string) {
 		req := &pb.MeasureCommandGetSummaryArg{
 			Clear:              true,
@@ -115,7 +115,7 @@ func (uc *upfCollector) histLatencyJitter(ch chan<- prometheus.Metric) {
 
 		latencies := res.GetLatency().GetPercentileValuesNs()
 		if latencies != nil {
-			l := prometheus.MustNewConstHistogram(
+			l := prometheus.MustNewConstSummary(
 				uc.latency,
 				res.Packets,
 				float64(res.Latency.GetTotalNs()),
@@ -128,7 +128,7 @@ func (uc *upfCollector) histLatencyJitter(ch chan<- prometheus.Metric) {
 
 		jitters := res.GetJitter().GetPercentileValuesNs()
 		if jitters != nil {
-			j := prometheus.MustNewConstHistogram(
+			j := prometheus.MustNewConstSummary(
 				uc.jitter,
 				res.Packets,
 				float64(res.Jitter.GetTotalNs()),
