@@ -107,6 +107,9 @@ class Port:
         if conf_mode is None:
             conf_mode = self.detect_mode()
 
+        if conf_mode not in ['af_xdp', 'linux', 'dpdk', 'af_packet', 'sim']:
+            raise Exception('Invalid mode: {} selected.'.format(conf_mode))
+
         if conf_mode in ['af_xdp', 'linux']:
             try:
                 # Initialize kernel fastpath.
@@ -131,7 +134,7 @@ class Port:
                 print('Failed to create AF_PACKET socket for {}. Exiting...'.format(name))
                 sys.exit()
 
-        elif conf_mode == 'sim':
+        if conf_mode == 'sim':
             self.fpi = Source(name="{}_source".format(name))
             self.fpo = Sink(name="{}_out".format(name))
             self.bpf = BPF(name="{}FastBPF".format(name))
@@ -140,7 +143,7 @@ class Port:
             # Attach fastpath to worker's root TC
             self.fpi.attach_task(wid=self.wid)
 
-        elif conf_mode == 'dpdk':
+        if conf_mode == 'dpdk':
             kwargs = None
             pci = alias_by_interface(name)
             if pci is not None:
@@ -210,8 +213,6 @@ class Port:
                     mod.attach_task(mod.name)
             except Exception as e:
                 print('Mirror veth interface: {} misconfigured: {}'.format(name, e))
-        else:
-            raise Exception('Invalid mode selected.')
 
         # Finall set conf mode
         self.mode = conf_mode
