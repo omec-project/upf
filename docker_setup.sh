@@ -133,7 +133,7 @@ sandbox=$(docker inspect --format='{{.NetworkSettings.SandboxKey}}' pause)
 sudo ln -s "$sandbox" /var/run/netns/pause
 
 case $mode in
-"dpdk") setup_mirror_links ;;
+"dpdk" | "sim") setup_mirror_links ;;
 "af_xdp" | "af_packet")
 	move_ifaces
 	# Make sure that kernel does not send back icmp dest unreachable msg(s)
@@ -171,6 +171,13 @@ docker run --name bess-web -d --restart unless-stopped \
 	--entrypoint bessctl \
 	upf-epc-bess:"$(<VERSION)" http 0.0.0.0 $gui_port
 
+# Run bess-pfcpiface depending on mode type
+docker run --name bess-pfcpiface -td --restart on-failure \
+	--net container:pause \
+	-v "$PWD/conf/upf.json":/conf/upf.json \
+	upf-epc-pfcpiface:"$(<VERSION)" \
+	-config /conf/upf.json
+
 # Don't run any other container if mode is "sim"
 if [ "$mode" == 'sim' ]; then
 	exit
@@ -190,11 +197,3 @@ docker run --name bess-cpiface -td --restart unless-stopped \
 	-v "$PWD/conf":/tmp/conf \
 	upf-epc-cpiface:"$(<VERSION)" --s1u_sgw_ip 198.18.0.1 \
 	--zmqd_nb_ip 172.17.0.1 --zmqd_ip 172.17.0.2
-
-SIMU_ARGS=${SIMU_ARGS:-""}
-# Run bess-pfcpiface depending on mode type
-docker run --name bess-pfcpiface -td --restart on-failure \
-	--net container:pause \
-	-v "$PWD/conf/upf.json":/tmp/upf.json \
-	upf-epc-pfcpiface:"$(<VERSION)" \
-	-config /tmp/upf.json $SIMU_ARGS
