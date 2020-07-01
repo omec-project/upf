@@ -154,11 +154,10 @@ if ports[parser.sgi_ifname].ext_addrs is not None:
 # 1. Build initial DL pipeline here
 sgiFastBPF:UEGate \
     -> sgiRxIPCksum::IPChecksum(verify=True) \
-    -> sgiRxUDPCksum::L4Checksum(verify=True) \
-    -> DLMACDstMatch::ExactMatch(fields=[{'offset':0, 'num_bytes':6}])
+    -> sgiRxUDPCksum::L4Checksum(verify=True)
 
 # Record last module to chain up optional modules
-_in = DLMACDstMatch
+_in = sgiRxUDPCksum
 gate = 0
 
 # Append nat module (if enabled)
@@ -201,10 +200,6 @@ sgiRxIPCksum:1 -> Sink()
 sgiRxUDPCksum:1 -> Sink()
 OuterIPCsum:1 -> Sink()
 OuterUDPCsum:1 -> Sink()
-DLMACDstMatch:1 -> Sink()
-
-# Set default gates for relevant modules
-DLMACDstMatch.set_default_gate(gate=1)
 
 # Add SGi filter rules, i.e.:
 # setting filter to detect ue_filter traffic
@@ -214,11 +209,6 @@ if ports[parser.sgi_ifname].nat is not None:
     ue_filter = {"priority": -UEGate,
                  "filter": "ip dst {}".format(ports[parser.sgi_ifname].ext_addrs), "gate": UEGate}
     sgiFastBPF.add(filters=[ue_filter])
-
-# Verify that destination MAC address matches that with sgi interface
-# i.e. insert a rule so that destination MAC address of the interface
-# is an 'exact' match
-DLMACDstMatch.add(fields=[{'value_int': mac2hex(macstr_d)}], gate=0)
 
 
 # ====================================================
@@ -234,11 +224,10 @@ GTPUGate = 0
 # 1. Build initial UL pipeline here
 s1uFastBPF:GTPUGate \
     -> s1uRxIPCksum::IPChecksum(verify=True) \
-    -> s1uRxUDPCksum::L4Checksum(verify=True) \
-    -> ULMACDstMatch::ExactMatch(fields=[{'offset':0, 'num_bytes':6}])
+    -> s1uRxUDPCksum::L4Checksum(verify=True)
 
 # Record last module to chain up option modules
-_in = ULMACDstMatch
+_in = s1uRxUDPCksum
 gate = 0
 
 # Append s1uIP4Defrag module (if enabled)
@@ -272,12 +261,8 @@ GTPUEcho::GtpuEcho(s1u_sgw_ip=ip2long(s1u_ip[0])):1 \
 
 # Drop unknown packets
 GTPUEcho:0 -> Sink()
-ULMACDstMatch:1 -> Sink()
 s1uRxIPCksum:1 -> Sink()
 s1uRxUDPCksum:1 -> Sink()
-
-# Set default gates for relevant modules
-ULMACDstMatch.set_default_gate(gate=1)
 
 # Add S1u filter rules, i.e.:
 # setting filter to detect gtpu traffic
@@ -292,10 +277,6 @@ check_gtpu_port = " and udp dst port 2152"
 uplink_filter = {"priority": -GTPUGate, "filter": check_ip +
                check_spgwu_ip + check_gtpu_port, "gate": GTPUGate}
 s1uFastBPF.add(filters=[uplink_filter])
-
-# Verify that destination MAC address matches that with s1u interface
-# Exact match on desstination MAC address of the interface
-ULMACDstMatch.add(fields=[{'value_int': mac2hex(macstr_u)}], gate=0)
 
 
 # ====================================================
