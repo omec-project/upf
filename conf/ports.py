@@ -50,7 +50,6 @@ class Port:
         self.fpo = None
         self.bpf = None
         self.rtr = None
-        self.rewrite = None
         self.bpfgate = 0
         self.routes_table = None
         self.nat = None
@@ -217,7 +216,7 @@ class Port:
         # Finall set conf mode
         self.mode = conf_mode
 
-    def setup_port(self, conf_frag_mtu, conf_measure, type_of_packets):
+    def setup_port(self, conf_frag_mtu, conf_measure, type_of_packets, **seq_kwargs):
         out = self.fpo
         # enable frag module (if enabled) to control port MTU size
         if conf_frag_mtu is not None:
@@ -228,14 +227,21 @@ class Port:
 
         # create rewrite module if mode == 'sim'
         if self.mode == 'sim':
-            self.rewrite = Rewrite(name="{}_rewrite".format(self.name), templates=type_of_packets)
-            self.fpi.connect(next_mod=self.rewrite)
+            rewrite = Rewrite(name="{}_rewrite".format(self.name), templates=type_of_packets)
+            update = SequentialUpdate(name="{}_update".format(self.name), **seq_kwargs)
+            udpcsum = L4Checksum()
+            ipcsum = IPChecksum()
+
+            self.fpi.connect(next_mod=rewrite)
+            rewrite.connect(next_mod=update)
+            update.connect(next_mod=udpcsum)
+            udpcsum.connect(next_mod=ipcsum)
 
         # enable telemetrics (if enabled) (how many bytes seen in and out of port)
         if conf_measure:
             t = Timestamp(name="{}_timestamp".format(self.name))
             if self.mode == 'sim':
-                self.rewrite.connect(next_mod=t)
+                ipcsum.connect(next_mod=t)
             else:
                 self.fpi.connect(next_mod=t)
             t.connect(next_mod=self.bpf)
@@ -244,7 +250,7 @@ class Port:
             out = m
         else:
             if self.mode == 'sim':
-                self.rewrite.connect(next_mod=self.bpf)   # ---> pass
+                ipcsum.connect(next_mod=self.bpf)   # ---> pass
             else:
                 self.fpi.connect(next_mod=self.bpf)
 
