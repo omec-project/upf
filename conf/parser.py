@@ -28,8 +28,6 @@ class Parser:
         self.ip_frag_with_eth_mtu = None
         self.measure = False
         self.mode = None
-        self.enb_cidr = None
-        self.ue_cide = None
         self.workers = 1
         self.max_sessions = None
         self.s1u_ifname = None
@@ -76,14 +74,6 @@ class Parser:
             self.mode = self.conf["mode"]
         except KeyError:
             print('Autodetecting network driver')
-
-        # CIDRs for UEs & enbs, read and validate
-        self.enb_cidr = self.conf["enb_cidr"]
-        if validate_cidr(self.enb_cidr) is False:
-            exit(1, 'Invalid {}'.format(self.enb_cidr))
-        self.ue_cidr = self.conf["ue_cidr"]
-        if validate_cidr(self.ue_cidr) is False:
-            exit(1, 'Invalid {}'.format(self.ue_cidr))
 
         # Parse workers
         try:
