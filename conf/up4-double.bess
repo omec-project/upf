@@ -127,7 +127,7 @@ if parser.max_ip_defrag_flows is not None:
 
 # 2. Build the remaining first half of the DL pipeline before entering the shared pipeline
 #ports[parser.sgi_ifname].rewrite \
-_in:gate -> ueLookup::IPLookup() \
+_in:gate \
     -> DLPktParse::GtpuParser():1 \
     -> DLPDRLookup::WildcardMatch(fields=[{'attr_name':'tunnel_ipv4_dst', 'num_bytes':4}, \
                                           {'attr_name':'teid', 'num_bytes':4}, \
@@ -183,7 +183,6 @@ sgiRxUDPCksum:1 -> Sink()
 OuterIPCsum:1 -> Sink()
 OuterUDPCsum:1 -> Sink()
 DLMACDstMatch:1 -> Sink()
-ueLookup:MAX_GATES-1 -> Sink()
 
 # Set default gates for relevant modules
 DLMACDstMatch.set_default_gate(gate=1)
@@ -202,10 +201,6 @@ if ports[parser.sgi_ifname].nat is not None:
 # is an 'exact' match
 DLMACDstMatch.add(fields=[{'value_int': mac2hex(macstr_d)}], gate=0)
 
-# Add ueLookup rules
-ueLookup.add(prefix='0.0.0.0', prefix_len=0, gate=MAX_GATES-1)
-ueLookup.add(prefix=cidr2netmask(parser.ue_cidr)[0], prefix_len=(int)(parser.ue_cidr.split('/')[1]), gate=0)
-
 
 # ====================================================
 #       Uplink Pipeline
@@ -214,7 +209,6 @@ ueLookup.add(prefix=cidr2netmask(parser.ue_cidr)[0], prefix_len=(int)(parser.ue_
 
 # Pick fast-path and echo gates for UL pipeline
 s1uFastBPF = ports[parser.s1u_ifname].bpf
-GTPUEchoGate = ports[parser.s1u_ifname].bpf_gate()
 GTPUGate = 0
 
 
@@ -238,7 +232,7 @@ if parser.max_ip_defrag_flows is not None:
 
 # 2. Build the remaining first half of the UL pipeline before entering the shard pipeline
 #ports[parser.s1u_ifname].rewrite \
-_in:gate -> InetLookup::IPLookup() \
+_in:gate \
     -> ULPktParse::GtpuParser():1 \
     -> ULPDRLookup::WildcardMatch(fields=[{'attr_name':'tunnel_ipv4_dst', 'num_bytes':4}, \
                                           {'attr_name':'teid', 'num_bytes':4}, \
@@ -285,17 +279,12 @@ ULExecuteFAR:FARForwardAction \
     -> ports[parser.sgi_ifname].rtr
 
 # 4. GTP Echo response pipeline
-s1uFastBPF:GTPUEchoGate \
-    	-> gtpRxIPCksum::IPChecksum(verify=True) \
-        -> gtpRxUDPCksum::L4Checksum(verify=True) \
-	-> GTPUEcho::GtpuEcho(s1u_sgw_ip=ip2long(s1u_ip[0])):1 \
-        -> EthSwap::MACSwap() \
-        -> 1:OuterUDPCsum
+GTPUEcho::GtpuEcho(s1u_sgw_ip=ip2long(s1u_ip[0])):1 \
+    -> EthSwap::MACSwap() \
+    -> 1:OuterUDPCsum
 
 # Drop unknown packets
 GTPUEcho:0 -> Sink()
-gtpRxIPCksum:1 -> Sink()
-gtpRxUDPCksum:1 -> Sink()
 ULMACDstMatch:1 -> Sink()
 s1uRxIPCksum:1 -> Sink()
 s1uRxUDPCksum:1 -> Sink()
@@ -305,35 +294,21 @@ ULMACDstMatch.set_default_gate(gate=1)
 
 # Add S1u filter rules, i.e.:
 # setting filter to detect gtpu traffic
-# src net 11.1.1.0 mask 255.255.255.0           # check eNB subnet
 # and dst host 11.1.1.1                         # check S/PGWU IP
 # and udp dst port 2152                         # check GTPU port
-# and (udp[28:4] & 0xffffff00) = 0x10000000     # check UE subnet
-check_enb_subnet = "src net {} ".format(parser.enb_cidr)
+check_ip = "ip"
 check_spgwu_ip = " and dst host " + \
     " or ".join(str(x) for x in s1u_ip)
 check_gtpu_port = " and udp dst port 2152"
-check_ue_subnet = " and (udp[28:4] & 0x{}) = 0x{}".format(
-    cidr2mask(parser.ue_cidr), ip2hex(cidr2block(parser.ue_cidr)[0]))
-check_gtpu_msg_echo = " and udp[9] = 0x1"
-
-# Echo filter
-uplink_echo_filter = {"priority": -GTPUEchoGate, "filter": check_enb_subnet +
-                      check_spgwu_ip + check_gtpu_port +
-                      check_gtpu_msg_echo, "gate": GTPUEchoGate}
-s1uFastBPF.add(filters=[uplink_echo_filter])
 
 # PDU rule
-uplink_filter = {"priority": -GTPUGate, "filter": check_enb_subnet +
+uplink_filter = {"priority": -GTPUGate, "filter": check_ip +
                check_spgwu_ip + check_gtpu_port, "gate": GTPUGate}
 s1uFastBPF.add(filters=[uplink_filter])
 
 # Verify that destination MAC address matches that with s1u interface
 # Exact match on desstination MAC address of the interface
 ULMACDstMatch.add(fields=[{'value_int': mac2hex(macstr_u)}], gate=0)
-
-# Add InetLookup rules
-InetLookup.add(prefix='0.0.0.0', prefix_len=0, gate=0)
 
 
 # ====================================================
