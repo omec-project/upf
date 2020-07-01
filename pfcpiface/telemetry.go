@@ -12,7 +12,7 @@ import (
 )
 
 func getPctiles() []float64 {
-	return []float64{50, 75, 90, 95, 99, 100}
+	return []float64{50, 75, 90, 95, 99, 99.9, 99.99, 99.999, 99.9999, 100}
 }
 
 func makeBuckets(values []uint64) map[float64]float64 {
