@@ -121,7 +121,7 @@ func main() {
 		return
 	}
 
-	go pfcpifaceMainLoop(n3IP.String(), conf.CPIface.SourceIP)
+	go pfcpifaceMainLoop(upf, n3IP.String(), conf.CPIface.SourceIP)
 
 	setupProm(upf)
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))
