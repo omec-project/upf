@@ -218,6 +218,7 @@ if ports[parser.sgi_ifname].nat is not None:
 
 # Pick fast-path and echo gates for UL pipeline
 s1uFastBPF = ports[parser.s1u_ifname].bpf
+GTPUEchoGate = ports[parser.s1u_ifname].bpf_gate()
 GTPUGate = 0
 
 
@@ -255,7 +256,8 @@ ExecuteFAR:FARForwardAction \
     -> ports[parser.sgi_ifname].rtr
 
 # 4. GTP Echo response pipeline
-GTPUEcho::GtpuEcho(s1u_sgw_ip=ip2long(s1u_ip[0])):1 \
+s1uFastBPF:GTPUEchoGate \
+    -> GTPUEcho::GtpuEcho(s1u_sgw_ip=ip2long(s1u_ip[0])):1 \
     -> EthSwap::MACSwap() \
     -> 1:OuterUDPCsum
 
@@ -272,6 +274,13 @@ check_ip = "ip"
 check_spgwu_ip = " and dst host " + \
     " or ".join(str(x) for x in s1u_ip)
 check_gtpu_port = " and udp dst port 2152"
+check_gtpu_msg_echo = " and udp[9] = 0x1"
+
+# Echo filter
+uplink_echo_filter = {"priority": -GTPUEchoGate, "filter": check_ip +
+                      check_spgwu_ip + check_gtpu_port +
+                      check_gtpu_msg_echo, "gate": GTPUEchoGate}
+s1uFastBPF.add(filters=[uplink_echo_filter])
 
 # PDU rule
 uplink_filter = {"priority": -GTPUGate, "filter": check_ip +
