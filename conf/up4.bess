@@ -54,7 +54,7 @@ seq_kwargs = {'s1u': sim.get_ue_sequpdate_args(parser.max_sessions), 'sgi': sim.
 
 # Initialize workers
 cores = get_process_affinity()
-for wid in xrange(parser.workers):
+for wid in range(parser.workers):
     bess.add_worker(wid=wid, core=int(cores[wid % len(cores)]))
 
 

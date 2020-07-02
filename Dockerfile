@@ -63,12 +63,12 @@ RUN ./build_bess.sh && \
     cp -a protobuf /protobuf
 
 # Stage pip: compile psutil
-FROM python:2.7-slim AS pip
+FROM python:3.8-slim AS pip
 RUN apt-get update && apt-get install -y gcc
 RUN pip install --no-cache-dir psutil
 
 # Stage bess: creates the runtime image of BESS
-FROM python:2.7-slim AS bess
+FROM python:3.8-slim AS bess
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         libgraph-easy-perl \
@@ -84,7 +84,7 @@ RUN apt-get update && \
         protobuf \
         pyroute2 \
         scapy
-COPY --from=pip /usr/local/lib/python2.7/site-packages/psutil /usr/local/lib/python2.7/site-packages/psutil
+COPY --from=pip /usr/local/lib/python3.8/site-packages/psutil /usr/local/lib/python3.8/site-packages/psutil
 COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin/bessd
 COPY --from=bess-build /bin/modules /bin/modules
