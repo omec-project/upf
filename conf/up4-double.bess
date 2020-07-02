@@ -53,7 +53,7 @@ packet_generator = {'s1u': ue_packets, 'sgi': inet_packets}
 
 # Initialize workers
 cores = get_process_affinity()
-for wid in xrange(parser.workers):
+for wid in range(parser.workers):
     bess.add_worker(wid=wid, core=int(cores[wid % len(cores)]))
 
 

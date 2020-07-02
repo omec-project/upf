@@ -72,7 +72,7 @@ def mac_by_interface(name):
 
 
 def mac2hex(mac):
-    return long(mac.replace(':', ''), 16)
+    return int(mac.replace(':', ''), 16)
 
 
 def peer_by_interface(name):
