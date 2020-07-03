@@ -2,7 +2,10 @@
 # -*- mode: python -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright(c) 2019 Intel Corporation
-
+#
+# TODO/XXX/FIXME
+# THIS FILE IS OUTDATED AND NEEDS TO BE REVISED TO MAKE IT FUNCTIONAL.
+# PLEASE DON'T USE IT TILL FURTHER UPDATES
 from conf.parser import *
 import conf.ports as port
 import conf.sim as sim

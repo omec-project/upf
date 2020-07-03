@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"encoding/binary"
 	"log"
 	"net"
 	"time"
@@ -21,6 +20,7 @@ type upf struct {
 	n3IP        net.IP
 	client      pb.BESSControlClient
 	maxSessions uint32
+	simInfo     SimModeInfo
 }
 
 // to be replaced with go-pfcp structs
@@ -84,26 +84,14 @@ var intEnc = func(u uint64) *pb.FieldData {
 	return &pb.FieldData{Encoding: &pb.FieldData_ValueInt{ValueInt: u}}
 }
 
-func ip2int(ip net.IP) uint32 {
-	if len(ip) == 16 {
-		return binary.BigEndian.Uint32(ip[12:16])
-	}
-	return binary.BigEndian.Uint32(ip)
-}
-
-func int2ip(nn uint32) net.IP {
-	ip := make(net.IP, 4)
-	binary.BigEndian.PutUint32(ip, nn)
-	return ip
-}
-
 func (u *upf) sim(method string) {
 	start := time.Now()
 
 	// Pause workers before
 	u.pauseAll()
 
-	const ueip, teid, enbip = 0x10000001, 0xf0000000, 0x0b010181
+	//const ueip, teid, enbip = 0x10000001, 0xf0000000, 0x0b010181
+	ueip, teid, enbip := net.ParseIP(u.simInfo.StartUeIP), hex2int(u.simInfo.StartTeid), net.ParseIP(u.simInfo.StartEnodeIP)
 	const ng4tMaxUeRan, ng4tMaxEnbRan = 500000, 80
 	s1uip := ip2int(u.n3IP)
 
@@ -119,7 +107,7 @@ func (u *upf) sim(method string) {
 		// create/delete downlink pdr
 		pdrDown := pdr{
 			srcIface:     core,
-			srcIP:        ueip + i,
+			srcIP:        ip2int(ueip) + i,
 			srcIfaceMask: 0xFF,
 			srcIPMask:    0xFFFFFFFF,
 			fseID:        teid + i,
@@ -131,7 +119,7 @@ func (u *upf) sim(method string) {
 		pdrUp := pdr{
 			srcIface:     access,
 			eNBTeid:      teid + i,
-			dstIP:        ueip + i,
+			dstIP:        ip2int(ueip) + i,
 			srcIfaceMask: 0xFF,
 			eNBTeidMask:  0xFFFFFFFF,
 			dstIPMask:    0xFFFFFFFF,
@@ -147,7 +135,7 @@ func (u *upf) sim(method string) {
 			action:      farTunnel,
 			tunnelType:  0x1,
 			s1uIP:       s1uip,
-			eNBIP:       enbip + enbIdx,
+			eNBIP:       ip2int(enbip) + enbIdx,
 			eNBTeid:     teid + i,
 			UDPGTPUPort: udpGTPUPort,
 		}
