@@ -119,9 +119,9 @@ void Measure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     uint64_t pkt_time = 0;
     if (attr_id_ != -1) {
       uint64_t *ptr = ptr_attr<uint64_t>(this, attr_id_, batch->pkts()[i]);
-      //pkt_time = get_attr<uint64_t>(this, attr_id_, batch->pkts()[i]);
+      // pkt_time = get_attr<uint64_t>(this, attr_id_, batch->pkts()[i]);
       if (ptr != NULL)
-	pkt_time = *ptr;
+        pkt_time = *ptr;
     }
     if (pkt_time || IsTimestamped(batch->pkts()[i], offset, &pkt_time)) {
       uint64_t diff;
