@@ -28,6 +28,11 @@ class Parser:
         self.ip_frag_with_eth_mtu = None
         self.measure = False
         self.mode = None
+        self.sim_start_ue_ip = None
+        self.sim_start_enb_ip = None
+        self.sim_start_teid = None
+        self.sim_pkt_size = None
+        self.sim_total_flows = None
         self.workers = 1
         self.max_sessions = None
         self.s1u_ifname = None
@@ -74,6 +79,16 @@ class Parser:
             self.mode = self.conf["mode"]
         except KeyError:
             print('Autodetecting network driver')
+
+        # params for simulation
+        try:
+            self.sim_start_ue_ip = self.conf["sim"]["start_ue_ip"]
+            self.sim_start_enb_ip = self.conf["sim"]["start_enb_ip"]
+            self.sim_start_teid = int(self.conf["sim"]["start_teid"], 16)
+            self.sim_pkt_size = self.conf["sim"]["pkt_size"]
+            self.sim_total_flows = self.conf["sim"]["total_flows"]
+        except ValueError:
+            print('Invalid sim mode fields added.')
 
         # Parse workers
         try:

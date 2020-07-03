@@ -34,6 +34,14 @@ type Conf struct {
 	N3Iface     IfaceType   `json:"s1u"`
 	N6Iface     IfaceType   `json:"sgi"`
 	CPIface     CPIfaceInfo `json:"cpiface"`
+	SimInfo     SimModeInfo `json:"sim"`
+}
+
+// SimModeInfo : Sim mode attributes
+type SimModeInfo struct {
+	StartUeIP    string `json:"start_ue_ip"`
+	StartEnodeIP string `json:"start_enb_ip"`
+	StartTeid    string `json:"start_teid"`
 }
 
 // CPIfaceInfo : CPIface interface settings
@@ -109,6 +117,7 @@ func main() {
 		n3IP:        n3IP,
 		client:      pb.NewBESSControlClient(conn),
 		maxSessions: conf.MaxSessions,
+		simInfo:     conf.SimInfo,
 	}
 
 	if *simulate != "" {
