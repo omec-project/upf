@@ -196,4 +196,4 @@ docker run --name bess-cpiface -td --restart unless-stopped \
 	--entrypoint zmq-cpiface \
 	-v "$PWD/conf":/tmp/conf \
 	upf-epc-cpiface:"$(<VERSION)" --s1u_sgw_ip 198.18.0.1 \
-	--zmqd_nb_ip 172.17.0.1 --zmqd_ip 172.17.0.2
+	--nb_dst_ip 172.17.0.1 --nb_src_ip 172.17.0.2

@@ -46,8 +46,8 @@ struct TeidEntry {
 /*--------------------------------------------------------------------------------*/
 struct Args {
   char bessd_ip[HOSTNAME_LEN] = BESSD_IP;
-  char zmqd_ip[HOSTNAME_LEN] = ZMQ_SERVER_IP;
-  char zmqd_nb_ip[HOSTNAME_LEN] = ZMQ_NB_IP;
+  char nb_src_ip[HOSTNAME_LEN] = ZMQ_SERVER_IP;
+  char nb_dst_ip[HOSTNAME_LEN] = ZMQ_NB_IP;
   char s1u_sgw_ip[HOSTNAME_LEN] = S1U_SGW_IP;
   uint16_t bessd_port = BESSD_PORT;
   uint16_t zmqd_send_port = ZMQ_SEND_PORT;
@@ -68,10 +68,10 @@ struct Args {
     static const struct option long_options[] = {
         {"bessd_ip", required_argument, NULL, 'B'},
         {"bessd_port", required_argument, NULL, 'b'},
-        {"zmqd_ip", required_argument, NULL, 'Z'},
+        {"nb_src_ip", required_argument, NULL, 'Z'},
         {"zmqd_send_port", required_argument, NULL, 's'},
         {"zmqd_recv_port", required_argument, NULL, 'r'},
-        {"zmqd_nb_ip", required_argument, NULL, 'N'},
+        {"nb_dst_ip", required_argument, NULL, 'N'},
         {"zmqd_nb_port", required_argument, NULL, 'n'},
         {"s1u_sgw_ip", required_argument, NULL, 'u'},
         {"pdrlookup", required_argument, NULL, 'P'},
@@ -108,7 +108,7 @@ struct Args {
           strncpy(farlookup, optarg, MIN(strlen(optarg), MODULE_NAME_LEN - 1));
           break;
         case 'Z':
-          strncpy(zmqd_ip, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
+          strncpy(nb_src_ip, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
           break;
         case 's':
           val = strtoul(optarg, NULL, 10);
@@ -127,7 +127,7 @@ struct Args {
           zmqd_recv_port = (uint16_t)(val & 0x0000FFFF);
           break;
         case 'N':
-          strncpy(zmqd_nb_ip, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
+          strncpy(nb_dst_ip, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
           break;
         case 'n':
           val = strtoul(optarg, NULL, 10);
@@ -210,8 +210,8 @@ int main(int argc, char **argv) {
     std::cerr << "Failed to parse configuration\n"
               << reader.getFormattedErrorMessages();
   }
-  strcpy(args.zmqd_nb_ip, root["cpiface"]["zmqd_nb_ip"].asString().c_str());
-  strcpy(args.zmqd_ip, root["cpiface"]["zmqd_ip"].asString().c_str());
+  strcpy(args.nb_dst_ip, root["cpiface"]["nb_dst_ip"].asString().c_str());
+  strcpy(args.nb_src_ip, root["cpiface"]["nb_src_ip"].asString().c_str());
   strcpy(args.rmb.hostname, root["cpiface"]["hostname"].asString().c_str());
   getS1uAddrViaJson(args.s1u_sgw_ip, root["s1u"]["ifname"].asString().c_str());
   counter_count = root["max_sessions"].asInt();
@@ -236,7 +236,7 @@ int main(int argc, char **argv) {
   }
 
   // connect to registration port
-  if (zmq_connect(reg, ("tcp://" + std::string(args.zmqd_nb_ip) + ":" +
+  if (zmq_connect(reg, ("tcp://" + std::string(args.nb_dst_ip) + ":" +
                         std::to_string(args.zmqd_nb_port))
                            .c_str()) < 0) {
     std::cerr << "Failed to connect to registration port!: " << strerror(errno)
@@ -247,8 +247,8 @@ int main(int argc, char **argv) {
   VLOG(1) << "Connected to registration handle" << std::endl;
 
   // Build message
-  if (inet_aton(args.zmqd_ip, &args.rmb.upf_comm_ip) == 0) {
-    std::cerr << "Invalid address: " << args.zmqd_ip << std::endl;
+  if (inet_aton(args.nb_src_ip, &args.rmb.upf_comm_ip) == 0) {
+    std::cerr << "Invalid address: " << args.nb_src_ip << std::endl;
     return EXIT_FAILURE;
   }
   // set S1U IP address
@@ -289,7 +289,7 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
   // Socket to recv message from
-  if (zmq_bind(receiver, ("tcp://" + std::string(args.zmqd_ip) + ":" +
+  if (zmq_bind(receiver, ("tcp://" + std::string(args.nb_src_ip) + ":" +
                           std::to_string(args.zmqd_recv_port))
                              .c_str()) != 0) {
     std::cerr << "Failed to bind to receiver ZMQ port!: " << strerror(errno)
@@ -298,7 +298,7 @@ int main(int argc, char **argv) {
   }
   //  Socket to send messages to
   sender = zmq_socket(context2, ZMQ_PUSH);
-  if (zmq_connect(sender, ("tcp://" + std::string(args.zmqd_nb_ip) + ":" +
+  if (zmq_connect(sender, ("tcp://" + std::string(args.nb_dst_ip) + ":" +
                            std::to_string(args.zmqd_send_port))
                               .c_str()) < 0) {
     std::cerr << "Failed to connect to sender!: " << strerror(errno)

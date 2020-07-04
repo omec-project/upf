@@ -46,7 +46,7 @@ type SimModeInfo struct {
 
 // CPIfaceInfo : CPIface interface settings
 type CPIfaceInfo struct {
-	SourceIP string `json:"zmqd_ip"`
+	SourceIP string `json:"nb_src_ip"`
 }
 
 // IfaceType : Gateway interface struct
