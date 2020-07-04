@@ -44,8 +44,8 @@
 
     "": "Control plane controller settings",
     "cpiface": {
-	"zmqd_nb_ip": "172.17.0.1",
-	"zmqd_ip": "172.17.0.2",
+	"nb_dst_ip": "172.17.0.1",
+	"nb_src_ip": "172.17.0.2",
 	"hostname": "ngic-skx2"
     }
 }

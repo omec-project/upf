@@ -20,6 +20,15 @@ const (
 	MaxItems = 10
 )
 
+type sessRecord struct {
+	pdrs     [MaxItems]pdr
+	fars     [MaxItems]far
+	pdrCount uint8
+	farCount uint8
+}
+
+var sessions map[uint64]sessRecord
+
 func parsePDRFromPFCPSessEstReqPayload(sereq *message.SessionEstablishmentRequest, fseid *ie.FSEIDFields) (pdrs [MaxItems]pdr, fars [MaxItems]far, pdrCnt uint8, farCnt uint8) {
 
 	pdrIdx := uint8(0)
@@ -182,7 +191,11 @@ func pfcpifaceMainLoop(upf *upf, n3ip string, sourceIP string) {
 		return
 	}
 
+	// Initialize pkt buf
 	buf := make([]byte, PktBufSz)
+	// Initialize sessions map
+	sessions = make(map[uint64]sessRecord)
+
 	for {
 		// blocking read
 		n, addr, err := conn.ReadFrom(buf)
@@ -211,7 +224,7 @@ func pfcpifaceMainLoop(upf *upf, n3ip string, sourceIP string) {
 		case message.MsgTypeHeartbeatRequest:
 			outgoingMessage = handleHeartbeatRequest(msg, addr)
 		case message.MsgTypeSessionDeletionRequest:
-			outgoingMessage = handleSessionDeletionRequest(msg, addr, sourceIP)
+			outgoingMessage = handleSessionDeletionRequest(upf, msg, addr, sourceIP)
 		case message.MsgTypeAssociationReleaseRequest:
 			outgoingMessage = handleAssociationReleaseRequest(msg, addr, sourceIP, n3ip)
 		default:
@@ -243,6 +256,7 @@ func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP 
 	}
 	log.Println("Got an association setup request with TS: ", ts, " from: ", addr)
 
+	// Build response message
 	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
 	asres, err := message.NewAssociationSetupResponse(ie.NewRecoveryTimeStamp(time.Now()),
 		ie.NewNodeID(sourceIP, "", ""),       /* node id */
@@ -270,6 +284,7 @@ func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceI
 
 	log.Println("Got an association release request from: ", addr)
 
+	// Build response message
 	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
 	arres, err := message.NewAssociationReleaseResponse(ie.NewRecoveryTimeStamp(time.Now()),
 		ie.NewNodeID(sourceIP, "", ""),       /* node id */
@@ -313,15 +328,22 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 	done := make(chan bool)
 	upf.pauseAll()
 	for i := uint8(0); i < pdrCount; i++ {
-		log.Println("Adding PDR: ", pdrs[i])
 		upf.addPDR(ctx, done, pdrs[i])
 	}
 
 	for i := uint8(0); i < farCount; i++ {
 		upf.addFAR(ctx, done, fars[i])
-		log.Println("Adding FAR: ", fars[i])
 	}
 	upf.resumeAll()
+
+	// Adding current session details to the hash map
+	sessItem := sessRecord{
+		pdrs:     pdrs,
+		fars:     fars,
+		pdrCount: pdrCount,
+		farCount: farCount,
+	}
+	sessions[fseid.SEID] = sessItem
 
 	// Build response message
 	seres, err := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
@@ -394,6 +416,7 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
 					upf.addFAR(ctx, done, far)
 					upf.resumeAll()
 				}
+				// got the header now breaking off early
 				break
 			}
 		}
@@ -427,6 +450,7 @@ func handleHeartbeatRequest(msg message.Message, addr net.Addr) []byte {
 
 	log.Println("Got a heartbeat request from: ", addr)
 
+	// Build response message
 	hbres, err := message.NewHeartbeatResponse(ie.NewRecoveryTimeStamp(time.Now()), /* ts */
 		ie.NewSequenceNumber(hbreq.SequenceNumber), /* seq # */
 	).Marshal()
@@ -440,7 +464,7 @@ func handleHeartbeatRequest(msg message.Message, addr net.Addr) []byte {
 	return hbres
 }
 
-func handleSessionDeletionRequest(msg message.Message, addr net.Addr, sourceIP string) []byte {
+func handleSessionDeletionRequest(upf *upf, msg message.Message, addr net.Addr, sourceIP string) []byte {
 	sdreq, ok := msg.(*message.SessionDeletionRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -449,6 +473,27 @@ func handleSessionDeletionRequest(msg message.Message, addr net.Addr, sourceIP s
 
 	log.Println("Got a session deletion request from: ", addr)
 
+	/* retrieve sessionRecord */
+	sessItem := sessions[(sdreq.SEID() >> 2)]
+
+	/* create context */
+	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+	defer cancel()
+	done := make(chan bool)
+	// pause daemon, and then delete FAR(s) and PDR(s), finally resume
+	upf.pauseAll()
+	for i := uint8(0); i < sessItem.pdrCount; i++ {
+		upf.delPDR(ctx, done, sessItem.pdrs[i])
+	}
+	for i := uint8(0); i < sessItem.farCount; i++ {
+		upf.delFAR(ctx, done, sessItem.fars[i])
+	}
+	upf.resumeAll()
+
+	/* delete sessionRecord */
+	delete(sessions, (sdreq.SEID() >> 2))
+
+	// Build response message
 	smres, err := message.NewSessionDeletionResponse(0, /* MO?? <-- what's this */
 		0,                                    /* FO <-- what's this? */
 		(sdreq.SEID() >> 2),                  /* seid */
