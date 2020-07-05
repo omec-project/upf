@@ -18,35 +18,34 @@ const (
 	PktBufSz = 1500
 	PFCPPort = "8805"
 	MaxItems = 10
+	Timeout  = 1000 * time.Millisecond
 )
 
 type sessRecord struct {
-	pdrs     [MaxItems]pdr
-	fars     [MaxItems]far
-	pdrCount uint8
-	farCount uint8
+	pdrs []pdr
+	fars []far
 }
 
 var sessions map[uint64]sessRecord
 
-func parsePDRFromPFCPSessEstReqPayload(sereq *message.SessionEstablishmentRequest, fseid *ie.FSEIDFields) (pdrs [MaxItems]pdr, fars [MaxItems]far, pdrCnt uint8, farCnt uint8) {
+func parsePDRFromPFCPSessEstReqPayload(sereq *message.SessionEstablishmentRequest, fseid *ie.FSEIDFields) (pdrs []pdr, fars []far) {
 
-	pdrIdx := uint8(0)
-	farIdx := uint8(0)
+	pdrList := make([]pdr, 0, MaxItems)
+	farList := make([]far, 0, MaxItems)
 
 	/* read PDR(s) */
 	ies1, err := ie.ParseMultiIEs(sereq.Payload)
 	if err != nil {
 		log.Println("Failed to parse sereq for IEs!")
-		return pdrs, fars, pdrIdx, farIdx
+		return pdrList, farList
 	}
 	/*
-	 * Iteratively go through all IEs. You can't use ie.PDR or ie.FAR since a single
+	 * Iteratively go through all IEs. You can't use ie.CreatePDR or ie.CreateFAR since a single
 	 * message can carry multiple CreatePDR & CreateFAR messages.
 	 */
 	for _, ie1 := range ies1 {
 		switch ie1.Type {
-		case sereq.CreatePDR.Type:
+		case ie.CreatePDR:
 			var srcIface uint8
 			var teid uint32
 			var ueIP4 net.IP
@@ -54,124 +53,108 @@ func parsePDRFromPFCPSessEstReqPayload(sereq *message.SessionEstablishmentReques
 			/* reset outerHeaderRemoval to begin with */
 			outerHeaderRemoval := uint8(0)
 
-			farID, err := ie1.FARID()
-			if err != nil {
-				log.Println("Could not read FAR ID!")
-				return pdrs, fars, pdrIdx, farIdx
-			}
-
 			pdrID, err := ie1.PDRID()
 			if err != nil {
 				log.Println("Could not read PDR!")
-				return pdrs, fars, pdrIdx, farIdx
+				return pdrList, farList
 			}
 
-			ies2, err := ie.ParseMultiIEs(ie1.Payload)
+			pdi, err := ie1.PDI()
 			if err != nil {
-				log.Println("Failed to parse PDR IE!")
-			} else {
-				for _, ie2 := range ies2 {
-					if ie2.Type == ie.PDI {
-						ies3, err := ie.ParseMultiIEs(ie2.Payload)
-						if err != nil {
-							log.Println("Failed to parse PDI IE!")
-						} else {
-							for _, ie3 := range ies3 {
-								if ie3.Type == ie.SourceInterface {
-									srcIface, err = ie3.SourceInterface()
-									if err != nil {
-										log.Println("Failed to parse Source Interface IE!")
-									} else {
-										if srcIface == ie.SrcInterfaceCPFunction {
-											log.Println("Detected src interface cp function. Ignoring for the time being")
-										}
-									}
-								} else if ie3.Type == ie.FTEID {
-									fteid, err := ie3.FTEID()
-									if err != nil {
-										log.Println("Failed to parse FTEID IE")
-									} else {
-										teid = fteid.TEID
-									}
-								} else if ie3.Type == ie.UEIPAddress {
-									ueip4, err := ie3.UEIPAddress()
-									if err != nil {
-										log.Println("Failed to parse UE IP address")
-									} else {
-										ueIP4 = ueip4.IPv4Address
-									}
-								}
-							}
-						}
-					} else if ie2.Type == ie.OuterHeaderRemoval { /* capture outerHeaderRemoval if it exists */
-						outerHeaderRemovalDesc, err := ie2.OuterHeaderRemovalDescription()
-						if err != nil {
-							log.Println("Could not read outer header removal")
-						} else {
-							if outerHeaderRemovalDesc == 0 { /* 0 == GTPU/UDP/IP4 */
-								log.Println("Selected outerHeaderRemoval")
-								outerHeaderRemoval = 1
-							}
-						}
-					}
-				}
+				log.Println("Could not read PDI!")
+				return pdrList, farList
+			}
 
-				/* populated everything for PDR, and set the right pdr_ */
-				if srcIface == ie.SrcInterfaceAccess {
-					pdrU := pdr{
-						srcIface:     access,
-						eNBTeid:      teid,
-						dstIP:        ip2int(ueIP4),
-						srcIfaceMask: 0xFF,
-						eNBTeidMask:  0xFFFFFFFF,
-						dstIPMask:    0xFFFFFFFF,
-						pdrID:        uint32(pdrID),
-						fseID:        uint32(fseid.SEID), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-						ctrID:        0,                  // ctrID currently not being set <--- FIXIT/TODO/XXX
-						farID:        uint8(farID),
-						needDecap:    outerHeaderRemoval,
+			for _, ie2 := range pdi {
+				switch ie2.Type {
+				case ie.SourceInterface:
+					srcIface, err = ie2.SourceInterface()
+					if err != nil {
+						log.Println("Failed to parse Source Interface IE!")
+					} else {
+						if srcIface == ie.SrcInterfaceCPFunction {
+							log.Println("Detected src interface cp function. Ignoring for the time being")
+						}
 					}
-					pdrs[pdrIdx] = pdrU
-					pdrIdx++
-				} else if srcIface == ie.SrcInterfaceCore {
-					pdrD := pdr{
-						srcIface:     core,
-						srcIP:        ip2int(ueIP4),
-						srcIfaceMask: 0xFF,
-						srcIPMask:    0xFFFFFFFF,
-						pdrID:        uint32(pdrID),
-						fseID:        uint32(fseid.SEID), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-						ctrID:        0,                  // ctrID currently not being set <--- FIXIT/TOOD/XXX
-						farID:        uint8(farID),       // farID currently not being set <--- FIXIT/TODO/XXX
-						needDecap:    outerHeaderRemoval,
+				case ie.FTEID:
+					fteid, err := ie2.FTEID()
+					if err != nil {
+						log.Println("Failed to parse FTEID IE")
+					} else {
+						teid = fteid.TEID
 					}
-					pdrs[pdrIdx] = pdrD
-					pdrIdx++
+				case ie.UEIPAddress:
+					ueip4, err := ie2.UEIPAddress()
+					if err != nil {
+						log.Println("Failed to parse UE IP address")
+					} else {
+						ueIP4 = ueip4.IPv4Address
+					}
+				case ie.SDFFilter:
+					// Do nothing for the time being
+				case ie.QFI:
+					// Do nothing for the time being
 				}
 			}
 
-		case sereq.CreateFAR.Type:
+			farID, err := ie1.FARID()
+			if err != nil {
+				log.Println("Could not read FAR ID!")
+				return pdrList, farList
+			}
+
+			// populated everything for PDR, and set the right pdr_
+			if srcIface == ie.SrcInterfaceAccess {
+				pdrU := pdr{
+					srcIface:     access,
+					eNBTeid:      teid,
+					dstIP:        ip2int(ueIP4),
+					srcIfaceMask: 0xFF,
+					eNBTeidMask:  0xFFFFFFFF,
+					dstIPMask:    0xFFFFFFFF,
+					pdrID:        uint32(pdrID),
+					fseID:        uint32(fseid.SEID), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
+					ctrID:        0,                  // ctrID currently not being set <--- FIXIT/TODO/XXX
+					farID:        uint8(farID),
+					needDecap:    outerHeaderRemoval,
+				}
+				pdrList = append(pdrList, pdrU)
+			} else if srcIface == ie.SrcInterfaceCore {
+				pdrD := pdr{
+					srcIface:     core,
+					srcIP:        ip2int(ueIP4),
+					srcIfaceMask: 0xFF,
+					srcIPMask:    0xFFFFFFFF,
+					pdrID:        uint32(pdrID),
+					fseID:        uint32(fseid.SEID), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
+					ctrID:        0,                  // ctrID currently not being set <--- FIXIT/TOOD/XXX
+					farID:        uint8(farID),       // farID currently not being set <--- FIXIT/TODO/XXX
+					needDecap:    outerHeaderRemoval,
+				}
+				pdrList = append(pdrList, pdrD)
+			}
+
+		case ie.CreateFAR:
 			if err != nil {
 				log.Println("Failed to parse FAR IE!")
 			} else {
 				farID, err := ie1.FARID()
 				if err != nil {
 					log.Println("Could not read FAR ID!")
-					return pdrs, fars, pdrIdx, farIdx
+					return pdrList, farList
 				}
 				far := far{
 					farID:  uint8(farID),       // farID currently being truncated to uint8 <--- FIXIT/TODO/XXX
 					fseID:  uint32(fseid.SEID), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
 					action: farForward,
 				}
-				fars[farIdx] = far
-				farIdx++
+				farList = append(farList, far)
 			}
 
 		}
 	}
 
-	return pdrs, fars, pdrIdx, farIdx
+	return pdrList, farList
 }
 
 func pfcpifaceMainLoop(upf *upf, n3ip string, sourceIP string) {
@@ -320,28 +303,25 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 	}
 
 	/* Read CreatePDRs and CreateFARs from payload */
-	pdrs, fars, pdrCount, farCount := parsePDRFromPFCPSessEstReqPayload(sereq, fseid)
+	pdrs, fars := parsePDRFromPFCPSessEstReqPayload(sereq, fseid)
 
 	/* create context, pause daemon, insert PDR(s), and resume daemon */
-	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
 	done := make(chan bool)
 	upf.pauseAll()
-	for i := uint8(0); i < pdrCount; i++ {
-		upf.addPDR(ctx, done, pdrs[i])
+	for _, pdr := range pdrs {
+		upf.addPDR(ctx, done, pdr)
 	}
-
-	for i := uint8(0); i < farCount; i++ {
-		upf.addFAR(ctx, done, fars[i])
+	for _, far := range fars {
+		upf.addFAR(ctx, done, far)
 	}
 	upf.resumeAll()
 
 	// Adding current session details to the hash map
 	sessItem := sessRecord{
-		pdrs:     pdrs,
-		fars:     fars,
-		pdrCount: pdrCount,
-		farCount: farCount,
+		pdrs: pdrs,
+		fars: fars,
 	}
 	sessions[fseid.SEID] = sessItem
 
@@ -365,7 +345,6 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 	return seres
 }
 
-/* this function assumes that a single PFCP Sess Mod Request carries only one UpdateFAR IE */
 func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Addr, sourceIP string) []byte {
 	smreq, ok := msg.(*message.SessionModificationRequest)
 	if !ok {
@@ -375,49 +354,66 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
 
 	log.Println("Got a session modification request from: ", addr)
 
-	/* check for updatefar, and fetch FAR ID */
-	farID, err := smreq.UpdateFAR.FARID()
-	if err != nil {
-		log.Println("Unable to find update FAR's FAR ID!")
-	}
 	/* fetch FSEID */
 	fseid := (smreq.SEID() >> 2)
 
-	/* Read UpdateFAR from payload */
-	ies, err := smreq.UpdateFAR.UpdateForwardingParameters()
+	/* read FAR(s). These can be multiple */
+	ies1, err := ie.ParseMultiIEs(smreq.Payload)
 	if err != nil {
-		log.Println("Unable to find UpdateForwardingParameters!")
+		log.Println("Failed to parse smreq for IEs!")
 	} else {
-		for _, ie1 := range ies {
-			if ie1.Type == ie.OuterHeaderCreation {
-				outerheadercreationfields, err := ie1.OuterHeaderCreation()
+		/*
+		 * Iteratively go through all IEs. You can't use ie.UpdateFAR since a single
+		 * message can carry multiple UpdateFAR messages.
+		 */
+		for _, ie1 := range ies1 {
+			switch ie1.Type {
+			case ie.UpdateFAR:
+				/* check for updatefar, and fetch FAR ID */
+				farID, err := ie1.FARID()
 				if err != nil {
-					log.Println("Unable to parse OuterHeaderCreationFields!")
-				} else {
-					eNBTeid := outerheadercreationfields.TEID
-					eNBIP := outerheadercreationfields.IPv4Address
-					s1uIP4 := upf.n3IP
-					far := far{
-						farID:       uint8(farID),  // farID currently being truncated to uint8 <--- FIXIT/TODO/XXX
-						fseID:       uint32(fseid), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-						action:      farTunnel,
-						tunnelType:  0x1,
-						s1uIP:       ip2int(s1uIP4),
-						eNBIP:       ip2int(eNBIP),
-						eNBTeid:     eNBTeid,
-						UDPGTPUPort: udpGTPUPort,
-					}
-					/* create context */
-					ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
-					defer cancel()
-					done := make(chan bool)
-					// pause daemon, and then insert FAR, finally resume
-					upf.pauseAll()
-					upf.addFAR(ctx, done, far)
-					upf.resumeAll()
+					log.Println("Unable to find updateFAR's FAR ID!")
 				}
-				// got the header now breaking off early
-				break
+
+				/* Read UpdateFAR from payload */
+				ies2, err := ie1.UpdateForwardingParameters()
+				if err != nil {
+					log.Println("Unable to find UpdateForwardingParameters!")
+				} else {
+					for _, ie2 := range ies2 {
+						switch ie2.Type {
+						case ie.OuterHeaderCreation:
+							outerheadercreationfields, err := ie2.OuterHeaderCreation()
+							if err != nil {
+								log.Println("Unable to parse OuterHeaderCreationFields!")
+							} else {
+								eNBTeid := outerheadercreationfields.TEID
+								eNBIP := outerheadercreationfields.IPv4Address
+								s1uIP4 := upf.n3IP
+								far := far{
+									farID:       uint8(farID),  // farID currently being truncated to uint8 <--- FIXIT/TODO/XXX
+									fseID:       uint32(fseid), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
+									action:      farTunnel,
+									tunnelType:  0x1,
+									s1uIP:       ip2int(s1uIP4),
+									eNBIP:       ip2int(eNBIP),
+									eNBTeid:     eNBTeid,
+									UDPGTPUPort: udpGTPUPort,
+								}
+								/* create context */
+								ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+								defer cancel()
+								done := make(chan bool)
+								// pause daemon, and then insert FAR, finally resume
+								upf.pauseAll()
+								upf.addFAR(ctx, done, far)
+								upf.resumeAll()
+							}
+						case ie.DestinationInterface:
+							// Do nothing for the time being
+						}
+					}
+				}
 			}
 		}
 	}
@@ -482,11 +478,11 @@ func handleSessionDeletionRequest(upf *upf, msg message.Message, addr net.Addr, 
 	done := make(chan bool)
 	// pause daemon, and then delete FAR(s) and PDR(s), finally resume
 	upf.pauseAll()
-	for i := uint8(0); i < sessItem.pdrCount; i++ {
-		upf.delPDR(ctx, done, sessItem.pdrs[i])
+	for _, pdr := range sessItem.pdrs {
+		upf.delPDR(ctx, done, pdr)
 	}
-	for i := uint8(0); i < sessItem.farCount; i++ {
-		upf.delFAR(ctx, done, sessItem.fars[i])
+	for _, far := range sessItem.fars {
+		upf.delFAR(ctx, done, far)
 	}
 	upf.resumeAll()
 
