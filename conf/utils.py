@@ -120,3 +120,13 @@ def ip2long(ip):
 
 def get_process_affinity():
     return psutil.Process().cpu_affinity()
+
+
+def set_process_affinity(pid, cpus):
+    psutil.Process(pid).cpu_affinity(cpus)
+
+
+def set_process_affinity_all(cpus):
+    for pid in psutil.pids():
+        for thread in psutil.Process(pid).threads():
+            set_process_affinity(thread.id, cpus)
