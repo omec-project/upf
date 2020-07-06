@@ -58,10 +58,15 @@ seq_kwargs = {'s1u': sim.get_ue_sequpdate_args(parser.sim_total_flows, parser.si
 
 # Initialize workers
 cores = get_process_affinity()
-set_process_affinity_all([cores[0]])
-cores = cores[1:] + [cores[0]]
+workers = cores[:parser.workers]
+if len(cores) > parser.workers:
+    nonworkers = cores[parser.workers:]
+else:
+    nonworkers = cores
+
+set_process_affinity_all(nonworkers)
 for wid in range(parser.workers):
-    bess.add_worker(wid=wid, core=int(cores[wid % len(cores)]))
+    bess.add_worker(wid=wid, core=int(workers[wid % len(workers)]))
 
 
 # ====================================================
