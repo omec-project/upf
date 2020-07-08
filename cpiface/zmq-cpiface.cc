@@ -257,11 +257,11 @@ int main(int argc, char **argv) {
     if (zmq_poll((zmq_pollitem_t *)items, 1, -1) < 0) {
       std::cerr << "ZMQ poll failed!: " << strerror(errno);
       if (errno != EINTR) {
-	std::cerr << std::endl;
-	return EXIT_FAILURE;
+        std::cerr << std::endl;
+        return EXIT_FAILURE;
       } else {
-	std::cerr << "Retrying..." << std::endl;
-	continue;
+        std::cerr << "Retrying..." << std::endl;
+        continue;
       }
     }
     if (items[0].revents & ZMQ_POLLIN) {
