@@ -331,9 +331,9 @@ int main(int argc, char **argv) {
           resp.sess_id = rbuf.sess_entry.sess_id;
           /* why is the ue ip address stored in reverse endian order just in
            * delete message? */
-          if (zmq_sess_map.find(
-		  SESS_ID((rbuf.sess_entry.ue_addr.u.ipv4_addr),
-                          DEFAULT_BEARER)) == zmq_sess_map.end()) {
+          if (zmq_sess_map.find(SESS_ID((rbuf.sess_entry.ue_addr.u.ipv4_addr),
+                                        DEFAULT_BEARER)) ==
+              zmq_sess_map.end()) {
             std::cerr << "No record found!" << std::endl;
             break;
           }
@@ -345,8 +345,7 @@ int main(int argc, char **argv) {
             b.runRemoveCommand(ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),
                                args.encapmod);
             std::map<std::uint64_t, bool>::iterator it = zmq_sess_map.find(
-		SESS_ID((rbuf.sess_entry.ue_addr.u.ipv4_addr),
-                        DEFAULT_BEARER));
+                SESS_ID((rbuf.sess_entry.ue_addr.u.ipv4_addr), DEFAULT_BEARER));
             zmq_sess_map.erase(it);
           }
           break;
