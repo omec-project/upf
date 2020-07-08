@@ -544,21 +544,21 @@ int main(int argc, char **argv) {
             break;
           } else {
             enb_teid =
-                zmq_sess_map[SESS_ID(ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),
+                zmq_sess_map[SESS_ID((rbuf.sess_entry.ue_addr.u.ipv4_addr),
                                      DEFAULT_BEARER)]
                     .teid;
             curr_ctr =
-                zmq_sess_map[SESS_ID(ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),
+                zmq_sess_map[SESS_ID((rbuf.sess_entry.ue_addr.u.ipv4_addr),
                                      DEFAULT_BEARER)]
                     .ctr_id;
             VLOG(1) << "Assigning sess with IP addr: "
-                    << ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr)
+                    << (rbuf.sess_entry.ue_addr.u.ipv4_addr)
                     << " and teid: " << enb_teid << " counter: " << curr_ctr
                     << std::endl;
           }
           {
             std::map<std::uint64_t, TeidEntry>::iterator it = zmq_sess_map.find(
-                SESS_ID(ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),
+                SESS_ID((rbuf.sess_entry.ue_addr.u.ipv4_addr),
                         DEFAULT_BEARER));
             zmq_sess_map.erase(it);
           }
@@ -574,7 +574,7 @@ int main(int argc, char **argv) {
                 .enb_teid = 0,      /* enb teid */
                 .enb_teid_mask = 0, /* enb teid mask */
                 .saddr =
-                    ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr), /* ueaddr ip */
+                    (rbuf.sess_entry.ue_addr.u.ipv4_addr), /* ueaddr ip */
                 .saddr_mask = 0xFFFFFFFFu, /* ueaddr ip mask */
                 .daddr = 0,                /* inet ip */
                 .daddr_mask = 0,           /* inet ip mask */
@@ -606,7 +606,7 @@ int main(int argc, char **argv) {
                 .saddr = 0,         /* inet ip */
                 .saddr_mask = 0,    /* inet ip mask */
                 .daddr =
-                    ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr), /* ueaddr ip */
+                    (rbuf.sess_entry.ue_addr.u.ipv4_addr), /* ueaddr ip */
                 .daddr_mask = 0xFFFFFFFFu, /* ueaddr ip mask */
                 .sport = 0,                /* ueport */
                 .sport_mask = 0,           /* ueport mask */
