@@ -255,8 +255,14 @@ int main(int argc, char **argv) {
         {receiver, 0, ZMQ_POLLIN, 0},
     };
     if (zmq_poll((zmq_pollitem_t *)items, 1, -1) < 0) {
-      std::cerr << "ZMQ poll failed!: " << strerror(errno) << std::endl;
-      return EXIT_FAILURE;
+      std::cerr << "ZMQ poll failed!: " << strerror(errno);
+      if (errno != EINTR) {
+	std::cerr << std::endl;
+	return EXIT_FAILURE;
+      } else {
+	std::cerr << "Retrying..." << std::endl;
+	continue;
+      }
     }
     if (items[0].revents & ZMQ_POLLIN) {
       struct msgbuf rbuf;
