@@ -30,10 +30,9 @@ jobs:
           shfmt -w -l .
 
       # Build again and commit
-      - name: Build the Docker image (after format) and push
+      - name: Build the Docker image (after format)
         run: |
           make docker-build
-          make docker-push
       - name: Update PR with formatting
         uses: gr2m/create-or-update-pull-request-action@v1.x
         env:
@@ -44,3 +43,12 @@ jobs:
           branch: ${{ github.event.pull_request.head.ref }}
           author: "Github Actions <actions@github>"
           commit-message: "Actions: Apply formatting"
+      - name: Docker login GH packages
+        env:
+          USERNAME: ${{ github.actor }}
+          PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          docker login https://docker.pkg.github.com -u $USERNAME -p $PASSWORD
+      - name: Push Docker image
+        run: |
+          make docker-push
