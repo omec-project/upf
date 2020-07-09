@@ -25,13 +25,9 @@ func makeBuckets(values []uint64) map[float64]float64 {
 
 //upfCollector provides all UPF metrics
 type upfCollector struct {
-	rxPackets *prometheus.Desc
-	rxBytes   *prometheus.Desc
-	rxDropped *prometheus.Desc
-
-	txPackets *prometheus.Desc
-	txBytes   *prometheus.Desc
-	txDropped *prometheus.Desc
+	packets *prometheus.Desc
+	bytes   *prometheus.Desc
+	dropped *prometheus.Desc
 
 	latency *prometheus.Desc
 	jitter  *prometheus.Desc
@@ -41,29 +37,17 @@ type upfCollector struct {
 
 func newUpfCollector(upf *upf) *upfCollector {
 	return &upfCollector{
-		rxPackets: prometheus.NewDesc(prometheus.BuildFQName("upf", "rx_packets", "count"),
+		packets: prometheus.NewDesc(prometheus.BuildFQName("upf", "packets", "count"),
 			"Shows the number of packets received by the UPF port",
-			[]string{"iface"}, nil,
+			[]string{"iface", "dir"}, nil,
 		),
-		rxBytes: prometheus.NewDesc(prometheus.BuildFQName("upf", "rx_bytes", "count"),
+		bytes: prometheus.NewDesc(prometheus.BuildFQName("upf", "bytes", "count"),
 			"Shows the number of bytes received by the UPF port",
-			[]string{"iface"}, nil,
+			[]string{"iface", "dir"}, nil,
 		),
-		rxDropped: prometheus.NewDesc(prometheus.BuildFQName("upf", "rx_dropped", "count"),
+		dropped: prometheus.NewDesc(prometheus.BuildFQName("upf", "dropped", "count"),
 			"Shows the number of packets dropped on receive by the UPF port",
-			[]string{"iface"}, nil,
-		),
-		txPackets: prometheus.NewDesc(prometheus.BuildFQName("upf", "tx_packets", "count"),
-			"Shows the number of packets received by the UPF port",
-			[]string{"iface"}, nil,
-		),
-		txBytes: prometheus.NewDesc(prometheus.BuildFQName("upf", "tx_bytes", "count"),
-			"Shows the number of bytes received by the UPF port",
-			[]string{"iface"}, nil,
-		),
-		txDropped: prometheus.NewDesc(prometheus.BuildFQName("upf", "tx_dropped", "count"),
-			"Shows the number of packets dropped by the UPF port",
-			[]string{"iface"}, nil,
+			[]string{"iface", "dir"}, nil,
 		),
 		latency: prometheus.NewDesc(prometheus.BuildFQName("upf", "latency", "ns"),
 			"Shows the packet processing latency percentiles in UPF",
@@ -80,13 +64,9 @@ func newUpfCollector(upf *upf) *upfCollector {
 //Describe writes all descriptors to the prometheus desc channel.
 func (uc *upfCollector) Describe(ch chan<- *prometheus.Desc) {
 
-	ch <- uc.rxPackets
-	ch <- uc.rxBytes
-	ch <- uc.rxDropped
-
-	ch <- uc.txPackets
-	ch <- uc.txBytes
-	ch <- uc.txDropped
+	ch <- uc.packets
+	ch <- uc.bytes
+	ch <- uc.dropped
 
 	ch <- uc.latency
 	ch <- uc.jitter
@@ -99,6 +79,58 @@ func (uc *upfCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (uc *upfCollector) portStats(ch chan<- prometheus.Metric) {
+	// When operating in sim mode there are no BESS ports
+	if uc.upf.simInfo != nil {
+		return
+	}
+
+	portstats := func(ifaceLabel, ifaceName string) {
+		packets := func(packets uint64, direction string) {
+			p := prometheus.MustNewConstMetric(
+				uc.packets,
+				prometheus.CounterValue,
+				float64(packets),
+				ifaceLabel, direction,
+			)
+			ch <- p
+		}
+		bytes := func(bytes uint64, direction string) {
+			p := prometheus.MustNewConstMetric(
+				uc.bytes,
+				prometheus.CounterValue,
+				float64(bytes),
+				ifaceLabel, direction,
+			)
+			ch <- p
+		}
+		dropped := func(dropped uint64, direction string) {
+			p := prometheus.MustNewConstMetric(
+				uc.dropped,
+				prometheus.CounterValue,
+				float64(dropped),
+				ifaceLabel, direction,
+			)
+			ch <- p
+		}
+
+		res := uc.upf.portStats(ifaceName)
+		if res == nil {
+			return
+		}
+
+		packets(res.Inc.Packets, "rx")
+		packets(res.Out.Packets, "tx")
+
+		bytes(res.Inc.Packets, "rx")
+		bytes(res.Out.Packets, "tx")
+
+		dropped(res.Inc.Packets, "rx")
+		dropped(res.Out.Packets, "tx")
+
+	}
+
+	portstats("N3", uc.upf.n3Iface)
+	portstats("N6", uc.upf.n6Iface)
 }
 
 func (uc *upfCollector) summaryLatencyJitter(ch chan<- prometheus.Metric) {

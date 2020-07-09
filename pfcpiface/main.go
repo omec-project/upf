@@ -111,13 +111,18 @@ func main() {
 	}
 	defer conn.Close()
 
+	var simInfo *SimModeInfo = nil
+	if conf.Mode == modeSim {
+		simInfo = &conf.SimInfo
+	}
+
 	upf := &upf{
 		n3Iface:     conf.N3Iface.IfName,
 		n6Iface:     conf.N6Iface.IfName,
 		n3IP:        n3IP,
 		client:      pb.NewBESSControlClient(conn),
 		maxSessions: conf.MaxSessions,
-		simInfo:     conf.SimInfo,
+		simInfo:     simInfo,
 	}
 
 	if *simulate != "" {
