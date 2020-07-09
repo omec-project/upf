@@ -2,10 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2020 Intel Corporation
 
-ENABLE_NTF=${ENABLE_NTF:-""}
+ENABLE_NTF=${ENABLE_NTF:-0}
 NTF_COMMIT=${NTF_COMMIT:-master}
 CJOSE_COMMIT=${CJOSE_COMMIT:-9261231f08d2a3cbcf5d73c5f9e754a2f1c379ac}
 PLUGINS_DIR=${PLUGINS_DIR:-"plugins"}
+PLUGIN_DEST_DIR="${PLUGINS_DIR}/ntf"
 
 SUDO=''
 [[ $EUID -ne 0 ]] && SUDO=sudo
@@ -20,20 +21,20 @@ install_ntf() {
 		libjansson4 \
 		libtool
 
-	pushd /
-	wget -qO cjose.zip "https://github.com/cisco/cjose/archive/${CJOSE_COMMIT}.zip"
-	unzip cjose.zip
-	rm cjose.zip
-	cd cjose-${CJOSE_COMMIT}
+	mkdir /tmp/cjose
+	pushd /tmp/cjose
+	curl -L "https://github.com/cisco/cjose/tarball/${CJOSE_COMMIT}" |
+		tar xz -C . --strip-components=1
 	./configure --prefix=/usr
 	make
 	make install
 	popd
 
-	wget -qO ntf.zip "https://github.com/Network-Tokens/ntf/archive/${NTF_COMMIT}.zip"
-	unzip ntf.zip
-	rm ntf.zip
-	mv "ntf-${NTF_COMMIT}" "${PLUGINS_DIR}"
+	mkdir ${PLUGIN_DEST_DIR}
+	pushd ${PLUGIN_DEST_DIR}
+	curl -L "https://github.com/Network-Tokens/ntf/tarball/${NTF_COMMIT}" |
+		tar xz -C . --strip-components=1
+	popd
 }
 
 cleanup_image() {
@@ -47,7 +48,7 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-[ -z "$ENABLE_NTF" ] && exit 0
+[ "$ENABLE_NTF" == "0" ] && exit 0
 
 echo "Installing NTF plugin..."
 install_ntf

@@ -267,13 +267,19 @@ int main(int argc, char **argv) {
 
   //  Process messages from either socket
   while (true) {
-    static const zmq_pollitem_t items[] = {
+    zmq_pollitem_t items[] = {
         {receiver, 0, ZMQ_POLLIN, 0},
     };
     uint32_t timeout = 1000; // 1 seond 
     if (zmq_poll((zmq_pollitem_t *)items, 1, timeout) < 0) {
-      std::cerr << "ZMQ poll failed!: " << strerror(errno) << std::endl;
-      return EXIT_FAILURE;
+      std::cerr << "ZMQ poll failed!: " << strerror(errno);
+      if (errno != EINTR) {
+        std::cerr << std::endl;
+        return EXIT_FAILURE;
+      } else {
+        std::cerr << "Retrying..." << std::endl;
+        continue;
+      }
     }
     if (items[0].revents & ZMQ_POLLIN) {
       gettimeofday(&last_ack, NULL); // as long as we get packets from control path we are good 
@@ -351,9 +357,9 @@ int main(int argc, char **argv) {
           resp.sess_id = rbuf.sess_entry.sess_id;
           /* why is the ue ip address stored in reverse endian order just in
            * delete message? */
-          if (zmq_sess_map.find(
-                  SESS_ID(ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),
-                          DEFAULT_BEARER)) == zmq_sess_map.end()) {
+          if (zmq_sess_map.find(SESS_ID((rbuf.sess_entry.ue_addr.u.ipv4_addr),
+                                        DEFAULT_BEARER)) ==
+              zmq_sess_map.end()) {
             std::cerr << "No record found!" << std::endl;
             break;
           }
@@ -362,11 +368,10 @@ int main(int argc, char **argv) {
             BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
-            b.runRemoveCommand(ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),
+            b.runRemoveCommand((rbuf.sess_entry.ue_addr.u.ipv4_addr),
                                args.encapmod);
             std::map<std::uint64_t, bool>::iterator it = zmq_sess_map.find(
-                SESS_ID(ntohl(rbuf.sess_entry.ue_addr.u.ipv4_addr),
-                        DEFAULT_BEARER));
+                SESS_ID((rbuf.sess_entry.ue_addr.u.ipv4_addr), DEFAULT_BEARER));
             zmq_sess_map.erase(it);
           }
           break;

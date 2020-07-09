@@ -35,6 +35,6 @@
     "": "Number of worker threads. Default: use 1 thread to run both (uplink/downlink) pipelines",
     "workers": 1,
 
-    "": "Whether to enable Network Token Functions",
+    "": "Enable Network Token Functionality (requires upf-epc to be built with ENABLE_NTF=1)",
     "enable_ntf": false
 }
