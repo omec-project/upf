@@ -558,8 +558,7 @@ int main(int argc, char **argv) {
           }
           {
             std::map<std::uint64_t, TeidEntry>::iterator it = zmq_sess_map.find(
-                SESS_ID((rbuf.sess_entry.ue_addr.u.ipv4_addr),
-                        DEFAULT_BEARER));
+                SESS_ID((rbuf.sess_entry.ue_addr.u.ipv4_addr), DEFAULT_BEARER));
             zmq_sess_map.erase(it);
           }
           {
@@ -573,8 +572,7 @@ int main(int argc, char **argv) {
                 .tipd_mask = 0,     /* tunnel_ipv4_dst mask */
                 .enb_teid = 0,      /* enb teid */
                 .enb_teid_mask = 0, /* enb teid mask */
-                .saddr =
-                    (rbuf.sess_entry.ue_addr.u.ipv4_addr), /* ueaddr ip */
+                .saddr = (rbuf.sess_entry.ue_addr.u.ipv4_addr), /* ueaddr ip */
                 .saddr_mask = 0xFFFFFFFFu, /* ueaddr ip mask */
                 .daddr = 0,                /* inet ip */
                 .daddr_mask = 0,           /* inet ip mask */
@@ -605,8 +603,7 @@ int main(int argc, char **argv) {
                 .enb_teid_mask = 0, /* enb teid mask */
                 .saddr = 0,         /* inet ip */
                 .saddr_mask = 0,    /* inet ip mask */
-                .daddr =
-                    (rbuf.sess_entry.ue_addr.u.ipv4_addr), /* ueaddr ip */
+                .daddr = (rbuf.sess_entry.ue_addr.u.ipv4_addr), /* ueaddr ip */
                 .daddr_mask = 0xFFFFFFFFu, /* ueaddr ip mask */
                 .sport = 0,                /* ueport */
                 .sport_mask = 0,           /* ueport mask */
