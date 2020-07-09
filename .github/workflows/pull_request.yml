@@ -7,6 +7,7 @@ jobs:
     env:
       DOCKER_REGISTRY: "docker.pkg.github.com/omec-project/"
       DOCKER_REPOSITORY: "upf-epc/"
+      VERSION: "PR-${{ github.event.pull_request.number }}"
     runs-on: ubuntu-latest
     steps:
       # Checkout and build
@@ -29,9 +30,10 @@ jobs:
           shfmt -w -l .
 
       # Build again and commit
-      - name: Build the Docker image (after format)
+      - name: Build the Docker image (after format) and push
         run: |
           make docker-build
+          make docker-push
       - name: Update PR with formatting
         uses: gr2m/create-or-update-pull-request-action@v1.x
         env:
