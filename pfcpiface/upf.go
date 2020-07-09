@@ -20,7 +20,7 @@ type upf struct {
 	n3IP        net.IP
 	client      pb.BESSControlClient
 	maxSessions uint32
-	simInfo     SimModeInfo
+	simInfo     *SimModeInfo
 }
 
 // to be replaced with go-pfcp structs
@@ -489,4 +489,17 @@ func (u *upf) measure(ifName string, f *pb.MeasureCommandGetSummaryArg) *pb.Meas
 	}
 
 	return &res
+}
+
+func (u *upf) portStats(ifname string) *pb.GetPortStatsResponse {
+	req := &pb.GetPortStatsRequest{
+		Name: ifname + "Fast",
+	}
+	ctx := context.Background()
+	res, err := u.client.GetPortStats(ctx, req)
+	if err != nil || res.GetError() != nil {
+		log.Println("Error calling GetPortStats", ifname, err, res.GetError().Errmsg)
+		return nil
+	}
+	return res
 }
