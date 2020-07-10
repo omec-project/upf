@@ -195,4 +195,4 @@ docker run --name bess-cpiface -td --restart unless-stopped \
 	--net container:pause \
 	--entrypoint zmq-cpiface \
 	-v "$PWD/conf":/tmp/conf \
-	upf-epc-cpiface:"$(<VERSION)"
+	upf-epc-cpiface:"$(<VERSION)" --json_config /tmp/conf/upf.json
