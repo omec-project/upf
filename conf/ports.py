@@ -216,7 +216,7 @@ class Port:
         # Finall set conf mode
         self.mode = conf_mode
 
-    def setup_port(self, conf_frag_mtu, conf_measure, type_of_packets, **seq_kwargs):
+    def setup_port(self, conf_frag_mtu, conf_measure, type_of_packets = "", **seq_kwargs):
         out = self.fpo
         # enable frag module (if enabled) to control port MTU size
         if conf_frag_mtu is not None:
