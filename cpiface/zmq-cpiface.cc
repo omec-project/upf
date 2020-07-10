@@ -14,6 +14,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <zmq.h>
+#include <sys/time.h>
+#include <assert.h>
 /*--------------------------------------------------------------------------------*/
 #define ZMQ_SERVER_IP "172.17.0.2"
 #define ZMQ_RECV_PORT 20
@@ -197,6 +199,7 @@ int main(int argc, char **argv) {
     std::cerr << "Unable to retreive hostname of DP!" << std::endl;
     return EXIT_FAILURE;
   }
+  VLOG(1) << "DP hostname  - " << args.rmb.hostname<<std::endl;
   // send registration request
   if (zmq_send(reg, (void *)&args.rmb, sizeof(args.rmb), 0) == -1) {
     std::cerr << "Failed to send registration request to CP!" << std::endl;
@@ -249,12 +252,26 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
+  uint32_t my_dp_id = 0;
+
+  struct timeval last_ack, current_time; 
+  gettimeofday(&last_ack, NULL);
+  uint32_t dp_cp_timeout_interval = 100;
+
+  struct resp_msgbuf keepalive;
+  keepalive.mtype = DPN_KEEPALIVE_REQ;
+  keepalive.op_id = 1; // for now always 1...
+  keepalive.sess_id = 0; // node specific message
+  keepalive.dp_id.id = my_dp_id; // DP is not aware about its id... 
+  strcpy(keepalive.dp_id.name, args.rmb.hostname);
+
   //  Process messages from either socket
   while (true) {
     zmq_pollitem_t items[] = {
         {receiver, 0, ZMQ_POLLIN, 0},
     };
-    if (zmq_poll((zmq_pollitem_t *)items, 1, -1) < 0) {
+    uint32_t timeout = 1000; // 1 seond 
+    if (zmq_poll((zmq_pollitem_t *)items, 1, timeout) < 0) {
       std::cerr << "ZMQ poll failed!: " << strerror(errno);
       if (errno != EINTR) {
         std::cerr << std::endl;
@@ -265,6 +282,8 @@ int main(int argc, char **argv) {
       }
     }
     if (items[0].revents & ZMQ_POLLIN) {
+      gettimeofday(&last_ack, NULL); // as long as we get packets from control path we are good 
+      bool send_resp = true;
       struct msgbuf rbuf;
       struct resp_msgbuf resp;
       int size = zmq_recv(receiver, &rbuf, sizeof(rbuf), 0);
@@ -285,6 +304,7 @@ int main(int argc, char **argv) {
                   << ntohl(rbuf.sess_entry.dl_s1_info.enb_teid) << ")"
                   << std::endl;
           resp.op_id = rbuf.sess_entry.op_id;
+          my_dp_id = rbuf.dp_id.id;
           resp.dp_id.id = rbuf.dp_id.id;
           resp.mtype = DPN_RESPONSE;
           zmq_sess_map[SESS_ID(rbuf.sess_entry.ue_addr.u.ipv4_addr,
@@ -355,17 +375,38 @@ int main(int argc, char **argv) {
             zmq_sess_map.erase(it);
           }
           break;
+        case MSG_KEEPALIVE_ACK:
+          my_dp_id = rbuf.dp_id.id;
+          send_resp = false;
+          VLOG(1) << "Got a keepalive ack from CP, "<<my_dp_id;
+          break;
         default:
+          send_resp = false;
           VLOG(1) << "Got a request with mtype: " << mtype << std::endl;
           break;
       }
-      size = zmq_send(sender, &resp, sizeof(resp), ZMQ_NOBLOCK);
-      if (size == -1) {
-        std::cerr << "Error in zmq sending: " << strerror(errno) << std::endl;
-        break;
-      } else {
-        VLOG(1) << "Sending back response block" << std::endl;
+      if(send_resp == true) {
+        size = zmq_send(sender, &resp, sizeof(resp), ZMQ_NOBLOCK);
+        if (size == -1) {
+          std::cerr << "Error in zmq sending: " << strerror(errno) << std::endl;
+          break;
+        } else {
+          VLOG(1) << "Sending back response block" << std::endl;
+        }
       }
+    } else {
+        VLOG(1) << "ZMQ poll timeout DPID " << my_dp_id<<std::endl;
+        gettimeofday(&current_time, NULL);
+        if(current_time.tv_sec - last_ack.tv_sec > dp_cp_timeout_interval) {
+            std::cerr << "CP<-->DP communication broken. DPID - " << my_dp_id<<std::endl;
+            assert(0);
+        }
+        keepalive.dp_id.id = my_dp_id; 
+        int size = zmq_send(sender, &keepalive, sizeof(keepalive), ZMQ_NOBLOCK);
+        if (size == -1) {
+          std::cerr << "Error in zmq sending: " << strerror(errno) << std::endl;
+          break;
+        }
     }
   }
 
