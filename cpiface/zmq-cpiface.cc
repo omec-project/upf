@@ -468,7 +468,7 @@ int main(int argc, char **argv) {
                 .notify_cp = 0, /* notify cp */
                 .tuntype = 1,   /* tunnel out type */
                 .tun_src_ip =
-                    ntohl((uint32_t)(inet_addr(S1U_SGW_IP))), /* n3 addr */
+                    ntohl((uint32_t)(inet_addr(args.s1u_sgw_ip))), /* n3 addr */
                 .tun_dst_ip = rbuf.sess_entry.ul_s1_info.enb_addr.u
                                   .ipv4_addr,                /* enb addr */
                 .teid = rbuf.sess_entry.dl_s1_info.enb_teid, /* enb_teid */

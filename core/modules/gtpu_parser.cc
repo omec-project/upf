@@ -86,6 +86,10 @@ void GtpuParser::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
             set_gtp_parsing_attrs(&iph->src, &iph->dst, &udph->src_port,
                                   &udph->dst_port, (be32_t *)&teid,
                                   (be32_t *)&_const_val, &iph->protocol, p);
+          } else {
+	    set_gtp_parsing_attrs(&iph->src, &iph->dst, (be16_t *)&_const_val,
+                                  (be16_t *)&_const_val, (be32_t *)&teid,
+                                  (be32_t *)&_const_val, &iph->protocol, p);
           }
         } else {
           set_gtp_parsing_attrs(&iph->src, &iph->dst, &udph->src_port,
