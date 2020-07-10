@@ -29,26 +29,24 @@ parser.parse(interfaces)
 # Catch sgi & s1u MAC/IPv4 addresses
 macstr_d = None
 macstr_u = None
-s1u_ip = None
+s1u_ip = ips_by_interface(parser.s1u_ifname)
 if parser.mode == 'sim':
     macstr_d = '00:00:00:00:00:02'
     macstr_u = '00:00:00:00:00:01'
+    inet_packets = [sim.gen_inet_packet(parser.sim_pkt_size, macstr_u, macstr_d,
+                                        '172.16.100.1', parser.sim_start_ue_ip),
+                    sim.gen_inet_packet(parser.sim_pkt_size, macstr_u, macstr_d,
+                                        '172.12.55.99', parser.sim_start_ue_ip)]
+    ue_packets = [sim.gen_ue_packet(parser.sim_pkt_size, macstr_d, macstr_u,
+                                    parser.sim_start_enb_ip, s1u_ip[0],
+                                    parser.sim_start_ue_ip, '172.16.100.1',
+                                    parser.sim_start_teid)]
+    packet_generator = {'s1u': ue_packets, 'sgi': inet_packets}
+    seq_kwargs = {'s1u': sim.get_ue_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip, parser.sim_start_teid),
+                  'sgi': sim.get_inet_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip)}
 else:
     macstr_d = mac_by_interface(parser.sgi_ifname)
     macstr_u = mac_by_interface(parser.s1u_ifname)
-
-s1u_ip = ips_by_interface(parser.s1u_ifname)
-inet_packets = [sim.gen_inet_packet(parser.sim_pkt_size, macstr_u, macstr_d,
-                                    '172.16.100.1', parser.sim_start_ue_ip),
-               sim.gen_inet_packet(parser.sim_pkt_size, macstr_u, macstr_d,
-                                   '172.12.55.99', parser.sim_start_ue_ip)]
-ue_packets = [sim.gen_ue_packet(parser.sim_pkt_size, macstr_d, macstr_u,
-                                parser.sim_start_enb_ip, s1u_ip[0],
-                                parser.sim_start_ue_ip, '172.16.100.1',
-                                parser.sim_start_teid)]
-packet_generator = {'s1u': ue_packets, 'sgi': inet_packets}
-seq_kwargs = {'s1u': sim.get_ue_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip, parser.sim_start_teid),
-              'sgi': sim.get_inet_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip)}
 
 
 # ====================================================
@@ -92,7 +90,10 @@ for idx, iface in enumerate(interfaces):
     p.init_port(idx, parser.mode, parser.workers)
 
     # setup port module with auxiliary modules
-    p.setup_port(parser.ip_frag_with_eth_mtu, parser.measure, packet_generator[iface], **seq_kwargs[iface])
+    if parser.mode == 'sim':
+        p.setup_port(parser.ip_frag_with_eth_mtu, parser.measure, packet_generator[iface], **seq_kwargs[iface])
+    else:
+        p.setup_port(parser.ip_frag_with_eth_mtu, parser.measure)
 
     # Finally add entry to ports list
     ports[p.name] = p

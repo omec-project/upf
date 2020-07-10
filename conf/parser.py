@@ -89,6 +89,8 @@ class Parser:
             self.sim_total_flows = self.conf["sim"]["total_flows"]
         except ValueError:
             print('Invalid sim mode fields added.')
+        except KeyError:
+            print('Sim mode not selected.')
 
         # Parse workers
         try:
