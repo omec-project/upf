@@ -27,8 +27,10 @@
 #define ZMQ_NB_IP "127.0.0.1"
 #define ZMQ_NB_PORT 1111
 #define S1U_SGW_IP "127.0.0.1"
+#define DEFAULT_HOSTNAME "localhost"
 #define UDP_PORT_GTPU 2152
 #define SCRIPT_NAME "/tmp/conf/upf.json"
+#define FILENAME_LEN 1024
 /*--------------------------------------------------------------------------------*/
 /**
  * ZMQ stuff
@@ -56,11 +58,12 @@ struct Args {
   char pdrlookup[MODULE_NAME_LEN] = PDRLOOKUPMOD;
   char farlookup[MODULE_NAME_LEN] = FARLOOKUPMOD;
   char qoscounter[MODULE_NAME_LEN] = QOSCOUNTERMOD;
+  char json_conf[FILENAME_LEN] = SCRIPT_NAME;
 
   struct RegMsgBundle {
     struct in_addr upf_comm_ip;
     struct in_addr s1u_ip;
-    char hostname[HOSTNAME_LEN];
+    char hostname[HOSTNAME_LEN] = DEFAULT_HOSTNAME;
   } rmb = {{.s_addr = 0}, {.s_addr = 0}, ""};
   void parse(const int argc, char **argv) {
     int c;
@@ -78,12 +81,13 @@ struct Args {
         {"farlookup", required_argument, NULL, 'F'},
         {"qoscounter", required_argument, NULL, 'c'},
         {"hostname", required_argument, NULL, 'h'},
+        {"json_config", required_argument, NULL, 'f'},
         {0, 0, 0, 0}};
     do {
       int option_index = 0;
       uint32_t val = 0;
 
-      c = getopt_long(argc, argv, "B:b:Z:s:r:c:P:F:N:n:u:h:", long_options,
+      c = getopt_long(argc, argv, "B:b:Z:s:r:c:P:F:N:n:u:h:f:", long_options,
                       &option_index);
 
       if (c == -1)
@@ -106,6 +110,9 @@ struct Args {
           break;
         case 'F':
           strncpy(farlookup, optarg, MIN(strlen(optarg), MODULE_NAME_LEN - 1));
+          break;
+        case 'f':
+          strncpy(json_conf, optarg, MIN(strlen(optarg), MODULE_NAME_LEN - 1));
           break;
         case 'Z':
           strncpy(nb_src_ip, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
@@ -164,7 +171,57 @@ void sig_handler(int signo) {
   google::protobuf::ShutdownProtobufLibrary();
 }
 /*--------------------------------------------------------------------------------*/
-void getS1uAddrViaJson(char *s1u_sgw_ip, const char *ifname) {
+void
+getNBSrcIPViaJson(char *nb_src_ip, const char *nb_dst)
+{
+#define DUMMY_PORT 9
+  sockaddr_storage ss_addr = {0};
+  unsigned long addr = inet_addr(nb_dst);
+
+  ((struct sockaddr_in *)&ss_addr)->sin_addr.s_addr = addr;
+  ((struct sockaddr_in *)&ss_addr)->sin_family = AF_INET;
+  ((struct sockaddr_in *)&ss_addr)->sin_port = htons(DUMMY_PORT);
+
+  int handle = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  if (handle == -1) {
+    std::cerr << "Unable to create socket for nb_src_ip probing."
+	      << " Sticking to original: " << nb_src_ip << std::endl;
+    return;
+  }
+  socklen_t ss_addrlen = sizeof(ss_addr);
+  if (connect(handle, (sockaddr *)&ss_addr, ss_addrlen) == -1 && errno != ECONNREFUSED) {
+    std::cerr << "Unable to determine nb_src_ip. "
+	      << " Sticking to original: " << nb_src_ip << std::endl;
+    return;
+  }
+  if (getsockname(handle, (sockaddr *)&ss_addr, &ss_addrlen) == -1) {
+    std::cerr << "Unable to determine nb_src_ip. "
+	      << " Sticking to original: " << nb_src_ip << std::endl;
+    return;
+  }
+
+  char *source_address = inet_ntoa(((struct sockaddr_in *)&ss_addr)->sin_addr);
+  std::cerr << "NB source address: %s" << source_address << std::endl;
+  strcpy(nb_src_ip, source_address);
+}
+/*--------------------------------------------------------------------------------*/
+void
+getNBDstIPViaJson(char *nb_dst_ip, const char *nb_dst)
+{
+  struct hostent *he = gethostbyname(nb_dst);
+  if (he == NULL) {
+    std::cerr << "Failed to fetch IP address from host: " << nb_dst
+	      << ". Sticking to original: " << nb_dst_ip << std::endl;
+    return;
+  } else {
+    struct in_addr raddr;
+    memcpy(&raddr, he->h_addr, sizeof(uint32_t));
+    strcpy(nb_dst_ip, inet_ntoa(raddr));
+  }
+}
+/*--------------------------------------------------------------------------------*/
+void
+getS1uAddrViaJson(char *s1u_sgw_ip, const char *ifname) {
   int fd;
   struct ifreq ifr;
 
@@ -201,19 +258,24 @@ int main(int argc, char **argv) {
   // set args coming from command-line
   args.parse(argc, argv);
 
-  // values from json file always take precedence
+  // values from command line arguments always take precedence
   Json::Value root;
   Json::Reader reader;
-  std::ifstream script(SCRIPT_NAME);
+  std::ifstream script(args.json_conf);
   script >> root;
   if (reader.parse(script, root, true)) {
     std::cerr << "Failed to parse configuration\n"
               << reader.getFormattedErrorMessages();
   }
-  strcpy(args.nb_dst_ip, root["cpiface"]["nb_dst_ip"].asString().c_str());
-  strcpy(args.nb_src_ip, root["cpiface"]["nb_src_ip"].asString().c_str());
-  strcpy(args.rmb.hostname, root["cpiface"]["hostname"].asString().c_str());
-  getS1uAddrViaJson(args.s1u_sgw_ip, root["s1u"]["ifname"].asString().c_str());
+
+  if (!strcmp(args.nb_dst_ip, ZMQ_NB_IP))
+    getNBDstIPViaJson(args.nb_dst_ip, root["cpiface"]["nb_dst_ip"].asString().c_str());
+  if (!strcmp(args.nb_src_ip, ZMQ_SERVER_IP))
+    getNBSrcIPViaJson(args.nb_src_ip, args.nb_dst_ip);
+  if (!strcmp(args.rmb.hostname, DEFAULT_HOSTNAME))
+    strcpy(args.rmb.hostname, root["cpiface"]["hostname"].asString().c_str());
+  if (!strcmp(args.s1u_sgw_ip, S1U_SGW_IP))
+    getS1uAddrViaJson(args.s1u_sgw_ip, root["s1u"]["ifname"].asString().c_str());
   counter_count = root["max_sessions"].asInt();
   script.close();
 
