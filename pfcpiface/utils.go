@@ -5,6 +5,7 @@ package main
 
 import (
 	"encoding/binary"
+	"log"
 	"net"
 	"strconv"
 	"strings"
@@ -30,4 +31,16 @@ func hex2int(hexStr string) uint32 {
 	// base 16 for hexadecimal
 	result, _ := strconv.ParseUint(cleaned, 16, 32)
 	return uint32(result)
+}
+
+func getOutboundIP(dstIP string) net.IP {
+	conn, err := net.Dial("udp", dstIP+":"+PFCPPort)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP
 }

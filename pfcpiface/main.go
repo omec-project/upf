@@ -46,7 +46,7 @@ type SimModeInfo struct {
 
 // CPIfaceInfo : CPIface interface settings
 type CPIfaceInfo struct {
-	SourceIP string `json:"nb_src_ip"`
+	DestIP string `json:"nb_dst_ip"`
 }
 
 // IfaceType : Gateway interface struct
@@ -135,7 +135,10 @@ func main() {
 		return
 	}
 
-	go pfcpifaceMainLoop(upf, n3IP.String(), conf.CPIface.SourceIP)
+	n4SrcIP := getOutboundIP(conf.CPIface.DestIP)
+	log.Println("N4 IP: ", n4SrcIP.String())
+
+	go pfcpifaceMainLoop(upf, n3IP.String(), n4SrcIP.String())
 
 	setupProm(upf)
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))
