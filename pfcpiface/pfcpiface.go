@@ -103,15 +103,27 @@ func parsePDRFromPFCPSessEstReqPayload(sereq *message.SessionEstablishmentReques
 				return pdrList, farList
 			}
 
+			// uplink PDR may not have UE IP address IE
+			// FIXIT/TODO/XXX Move this inside SrcInterfaceAccess IE check??
+			var ueIP uint32
+			var ueIPMask uint32
+			if len(ueIP4) == 0 {
+				ueIP = 0
+				ueIPMask = 0
+			} else {
+				ueIP = ip2int(ueIP4)
+				ueIPMask = 0xFFFFFFFF
+			}
+
 			// populated everything for PDR, and set the right pdr_
 			if srcIface == ie.SrcInterfaceAccess {
 				pdrU := pdr{
 					srcIface:     access,
 					eNBTeid:      teid,
-					dstIP:        ip2int(ueIP4),
+					dstIP:        ueIP,
 					srcIfaceMask: 0xFF,
 					eNBTeidMask:  0xFFFFFFFF,
-					dstIPMask:    0xFFFFFFFF,
+					dstIPMask:    ueIPMask,
 					pdrID:        uint32(pdrID),
 					fseID:        uint32(fseid.SEID), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
 					ctrID:        0,                  // ctrID currently not being set <--- FIXIT/TODO/XXX
@@ -122,9 +134,9 @@ func parsePDRFromPFCPSessEstReqPayload(sereq *message.SessionEstablishmentReques
 			} else if srcIface == ie.SrcInterfaceCore {
 				pdrD := pdr{
 					srcIface:     core,
-					srcIP:        ip2int(ueIP4),
+					srcIP:        ueIP,
 					srcIfaceMask: 0xFF,
-					srcIPMask:    0xFFFFFFFF,
+					srcIPMask:    ueIPMask,
 					pdrID:        uint32(pdrID),
 					fseID:        uint32(fseid.SEID), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
 					ctrID:        0,                  // ctrID currently not being set <--- FIXIT/TOOD/XXX
