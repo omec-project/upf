@@ -26,9 +26,8 @@
 #define ZMQ_RECV_PORT 20
 #define ZMQ_SEND_PORT 5557
 #define ZMQ_NB_IP "127.0.0.1"
-#define ZMQ_NB_PORT 1111
+#define ZMQ_NB_PORT 21
 #define S1U_SGW_IP "127.0.0.1"
-#define DEFAULT_HOSTNAME "localhost"
 #define UDP_PORT_GTPU 2152
 #define SCRIPT_NAME "/tmp/conf/upf.json"
 #define FILENAME_LEN 1024
@@ -64,7 +63,7 @@ struct Args {
   struct RegMsgBundle {
     struct in_addr upf_comm_ip;
     struct in_addr s1u_ip;
-    char hostname[HOSTNAME_LEN] = DEFAULT_HOSTNAME;
+    char hostname[HOSTNAME_LEN];
   } rmb = {{.s_addr = 0}, {.s_addr = 0}, ""};
   void parse(const int argc, char **argv) {
     int c;
@@ -202,7 +201,7 @@ getNBSrcIPViaJson(char *nb_src_ip, const char *nb_dst)
   }
 
   char *source_address = inet_ntoa(((struct sockaddr_in *)&ss_addr)->sin_addr);
-  std::cerr << "NB source address: %s" << source_address << std::endl;
+  std::cerr << "NB source address: " << source_address << std::endl;
   strcpy(nb_src_ip, source_address);
 }
 /*--------------------------------------------------------------------------------*/
@@ -268,10 +267,9 @@ int main(int argc, char **argv) {
 
   if (!strcmp(args.nb_dst_ip, ZMQ_NB_IP))
     getNBDstIPViaJson(args.nb_dst_ip, root["cpiface"]["nb_dst_ip"].asString().c_str());
+  strcpy(args.rmb.hostname, root["cpiface"]["host"].asString().c_str());
   if (!strcmp(args.nb_src_ip, ZMQ_SERVER_IP))
     getNBSrcIPViaJson(args.nb_src_ip, args.nb_dst_ip);
-  if (!strcmp(args.rmb.hostname, DEFAULT_HOSTNAME))
-    strcpy(args.rmb.hostname, root["cpiface"]["hostname"].asString().c_str());
   if (!strcmp(args.s1u_sgw_ip, S1U_SGW_IP))
     getS1uAddrViaJson(args.s1u_sgw_ip, root["s1u"]["ifname"].asString().c_str());
   counter_count = root["max_sessions"].asInt();
