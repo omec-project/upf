@@ -39,12 +39,12 @@
  */
 #define MAX_SERVICE 1
 
-enum { 
-  MSG_SESS_CRE = 2, 
-  MSG_SESS_MOD, 
+enum {
+  MSG_SESS_CRE = 2,
+  MSG_SESS_MOD,
   MSG_SESS_DEL,
-  MSG_KEEPALIVE = 100, 
-  MSG_KEEPALIVE_ACK = 101 
+  MSG_KEEPALIVE = 100,
+  MSG_KEEPALIVE_ACK = 101
 };
 
 enum {
