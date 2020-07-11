@@ -11,11 +11,11 @@
 #include <map>
 #include <netdb.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <zmq.h>
-#include <sys/time.h>
-#include <sys/wait.h>
 /*--------------------------------------------------------------------------------*/
 #define ZMQ_SERVER_IP "172.17.0.2"
 #define ZMQ_RECV_PORT 20
@@ -23,8 +23,8 @@
 #define ZMQ_NB_IP "172.17.0.1"
 #define ZMQ_NB_PORT 21
 #define S1U_SGW_IP "11.1.1.1"
-#define ZMQ_POLL_TIMEOUT 1000 // in msecs
-#define KEEPALIVE_TIMEOUT 100 // in secs
+#define ZMQ_POLL_TIMEOUT 1000  // in msecs
+#define KEEPALIVE_TIMEOUT 100  // in secs
 /*--------------------------------------------------------------------------------*/
 /**
  * ZMQ stuff
@@ -146,9 +146,7 @@ void sig_handler(int signo) {
   google::protobuf::ShutdownProtobufLibrary();
 }
 /*--------------------------------------------------------------------------------*/
-void
-force_restart(int argc, char **argv)
-{
+void force_restart(int argc, char **argv) {
   pid_t pid;
   int status;
 
@@ -157,24 +155,22 @@ force_restart(int argc, char **argv)
   if (pid == -1) {
     std::cerr << "Failed to fork: " << strerror(errno) << std::endl;
     exit(EXIT_FAILURE);
-  } else if (pid == 0) { // child process
+  } else if (pid == 0) {  // child process
     execv(argv[0], argv);
     exit(EXIT_SUCCESS);
-  } else { // parent process
+  } else {  // parent process
     if (waitpid(pid, &status, 0) > 0) {
       if (WIFEXITED(status) && !WEXITSTATUS(status))
-	std::cerr << "Restart successful!" << std::endl;
+        std::cerr << "Restart successful!" << std::endl;
       else if (WIFEXITED(status) && WEXITSTATUS(status)) {
-	if (WEXITSTATUS(status) == 127) {
+        if (WEXITSTATUS(status) == 127) {
           // execv failed
-	  std::cerr << "execv() failed\n" << std::endl;
-	} else
-	  std::cerr << "Program terminated normally, "
-		    << "but returned a non-zero status"
-		    << std::endl;
+          std::cerr << "execv() failed\n" << std::endl;
+        } else
+          std::cerr << "Program terminated normally, "
+                    << "but returned a non-zero status" << std::endl;
       } else
-	  std::cerr << "Program didn't terminate normally"
-		    << std::endl;
+        std::cerr << "Program didn't terminate normally" << std::endl;
     } else {
       // waitpid() failed
       std::cerr << "waitpid() failed" << std::endl;
@@ -303,9 +299,9 @@ int main(int argc, char **argv) {
 
   struct resp_msgbuf keepalive;
   keepalive.mtype = DPN_KEEPALIVE_REQ;
-  keepalive.op_id = 1; // for now always 1...
-  keepalive.sess_id = 0; // node specific message
-  keepalive.dp_id.id = my_dp_id; // DP is not aware about its id...
+  keepalive.op_id = 1;            // for now always 1...
+  keepalive.sess_id = 0;          // node specific message
+  keepalive.dp_id.id = my_dp_id;  // DP is not aware about its id...
   strcpy(keepalive.dp_id.name, args.rmb.hostname);
 
   //  Process messages from either socket
@@ -348,7 +344,7 @@ int main(int argc, char **argv) {
                   << ntohl(rbuf.sess_entry.dl_s1_info.enb_teid) << ")"
                   << std::endl;
           resp.op_id = rbuf.sess_entry.op_id;
-	  // SPGW-C returns the DP ID
+          // SPGW-C returns the DP ID
           my_dp_id = rbuf.dp_id.id;
           resp.dp_id.id = rbuf.dp_id.id;
           resp.mtype = DPN_RESPONSE;
@@ -424,7 +420,7 @@ int main(int argc, char **argv) {
           my_dp_id = rbuf.dp_id.id;
           send_resp = false;
           VLOG(1) << "Got a keepalive ack from CP, and it gave me dp_id: "
-		  << my_dp_id << std::endl;
+                  << my_dp_id << std::endl;
           break;
         default:
           send_resp = false;
@@ -442,27 +438,26 @@ int main(int argc, char **argv) {
         }
       }
     } else {
-        VLOG(1) << "ZMQ poll timeout DPID " << my_dp_id<<std::endl;
-        gettimeofday(&current_time, NULL);
-        if (current_time.tv_sec - last_ack.tv_sec > dp_cp_timeout_interval) {
-          {
-	    // Before restarting, delete all session records
-            // Create BessClient
-            BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
-                                           std::to_string(args.bessd_port),
-                                       InsecureChannelCredentials()));
-            b.runRemoveAllCommand(args.encapmod);
-          }
-          std::cerr << "CP<-->DP communication broken. DPID: "
-		    << my_dp_id << ". DP is restarting..." << std::endl;
-	  force_restart(argc, argv);
+      VLOG(1) << "ZMQ poll timeout DPID " << my_dp_id << std::endl;
+      gettimeofday(&current_time, NULL);
+      if (current_time.tv_sec - last_ack.tv_sec > dp_cp_timeout_interval) {
+        {
+          // Create BessClient
+          BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
+                                         std::to_string(args.bessd_port),
+                                     InsecureChannelCredentials()));
+          b.runRemoveAllCommand(args.encapmod);
         }
-        keepalive.dp_id.id = my_dp_id;
-        int size = zmq_send(sender, &keepalive, sizeof(keepalive), ZMQ_NOBLOCK);
-        if (size == -1) {
-          std::cerr << "Error in zmq sending: " << strerror(errno) << std::endl;
-          break;
-        }
+        std::cerr << "CP<-->DP communication broken. DPID: " << my_dp_id
+                  << ". DP is restarting..." << std::endl;
+        force_restart(argc, argv);
+      }
+      keepalive.dp_id.id = my_dp_id;
+      int size = zmq_send(sender, &keepalive, sizeof(keepalive), ZMQ_NOBLOCK);
+      if (size == -1) {
+        std::cerr << "Error in zmq sending: " << strerror(errno) << std::endl;
+        break;
+      }
     }
   }
 

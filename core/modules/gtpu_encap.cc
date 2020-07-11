@@ -35,7 +35,8 @@ const Commands GtpuEncap::cmds = {
     {"remove", "GtpuEncapRemoveSessionRecordArg",
      MODULE_CMD_FUNC(&GtpuEncap::RemoveSessionRecord), Command::THREAD_SAFE},
     {"remove_all", "EmptyArg",
-     MODULE_CMD_FUNC(&GtpuEncap::RemoveAllSessionRecords), Command::THREAD_SAFE},
+     MODULE_CMD_FUNC(&GtpuEncap::RemoveAllSessionRecords),
+     Command::THREAD_SAFE},
     {"show_records", "EmptyArg", MODULE_CMD_FUNC(&GtpuEncap::ShowRecords),
      Command::THREAD_SAFE},
     {"show_count", "EmptyArg", MODULE_CMD_FUNC(&GtpuEncap::ShowCount),
@@ -162,9 +163,7 @@ CommandResponse GtpuEncap::AddSessionRecord(
   return CommandSuccess();
 }
 /*----------------------------------------------------------------------------------*/
-CommandResponse GtpuEncap::RemoveAllSessionRecords(
-    const bess::pb::EmptyArg &) {
-
+CommandResponse GtpuEncap::RemoveAllSessionRecords(const bess::pb::EmptyArg &) {
   uint32_t next = 0;
   uint64_t *key;
   void *_data;
@@ -179,7 +178,7 @@ CommandResponse GtpuEncap::RemoveAllSessionRecords(
         std::cerr << "Failed to remove record with UE address: "
                   << ToIpv4Address(be32_t(ip)) << std::endl;
       } else {
-	continue;
+        continue;
       }
       rte_free(data);
       /* resetting back to NULL */

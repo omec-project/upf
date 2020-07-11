@@ -94,8 +94,7 @@ class BessClient {
   }
 
   void runRemoveAllCommand(const char *modname) {
-    bess::pb::EmptyArg *ea =
-        new bess::pb::EmptyArg();
+    bess::pb::EmptyArg *ea = new bess::pb::EmptyArg();
     ::google::protobuf::Any *any = new ::google::protobuf::Any();
     any->PackFrom(*ea);
     crt.set_name(modname);
