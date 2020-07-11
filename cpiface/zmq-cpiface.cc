@@ -171,9 +171,7 @@ void sig_handler(int signo) {
   google::protobuf::ShutdownProtobufLibrary();
 }
 /*--------------------------------------------------------------------------------*/
-void
-getNBSrcIPViaJson(char *nb_src_ip, const char *nb_dst)
-{
+void getNBSrcIPViaJson(char *nb_src_ip, const char *nb_dst) {
 #define DUMMY_PORT 9
   sockaddr_storage ss_addr = {0};
   unsigned long addr = inet_addr(nb_dst);
@@ -185,18 +183,19 @@ getNBSrcIPViaJson(char *nb_src_ip, const char *nb_dst)
   int handle = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if (handle == -1) {
     std::cerr << "Unable to create socket for nb_src_ip probing."
-	      << " Sticking to original: " << nb_src_ip << std::endl;
+              << " Sticking to original: " << nb_src_ip << std::endl;
     return;
   }
   socklen_t ss_addrlen = sizeof(ss_addr);
-  if (connect(handle, (sockaddr *)&ss_addr, ss_addrlen) == -1 && errno != ECONNREFUSED) {
+  if (connect(handle, (sockaddr *)&ss_addr, ss_addrlen) == -1 &&
+      errno != ECONNREFUSED) {
     std::cerr << "Unable to determine nb_src_ip. "
-	      << " Sticking to original: " << nb_src_ip << std::endl;
+              << " Sticking to original: " << nb_src_ip << std::endl;
     return;
   }
   if (getsockname(handle, (sockaddr *)&ss_addr, &ss_addrlen) == -1) {
     std::cerr << "Unable to determine nb_src_ip. "
-	      << " Sticking to original: " << nb_src_ip << std::endl;
+              << " Sticking to original: " << nb_src_ip << std::endl;
     return;
   }
 
@@ -205,13 +204,11 @@ getNBSrcIPViaJson(char *nb_src_ip, const char *nb_dst)
   strcpy(nb_src_ip, source_address);
 }
 /*--------------------------------------------------------------------------------*/
-void
-getNBDstIPViaJson(char *nb_dst_ip, const char *nb_dst)
-{
+void getNBDstIPViaJson(char *nb_dst_ip, const char *nb_dst) {
   struct hostent *he = gethostbyname(nb_dst);
   if (he == NULL) {
     std::cerr << "Failed to fetch IP address from host: " << nb_dst
-	      << ". Sticking to original: " << nb_dst_ip << std::endl;
+              << ". Sticking to original: " << nb_dst_ip << std::endl;
     return;
   } else {
     struct in_addr raddr;
@@ -220,8 +217,7 @@ getNBDstIPViaJson(char *nb_dst_ip, const char *nb_dst)
   }
 }
 /*--------------------------------------------------------------------------------*/
-void
-getS1uAddrViaJson(char *s1u_sgw_ip, const char *ifname) {
+void getS1uAddrViaJson(char *s1u_sgw_ip, const char *ifname) {
   int fd;
   struct ifreq ifr;
 
@@ -266,12 +262,14 @@ int main(int argc, char **argv) {
   }
 
   if (!strcmp(args.nb_dst_ip, ZMQ_NB_IP))
-    getNBDstIPViaJson(args.nb_dst_ip, root["cpiface"]["nb_dst_ip"].asString().c_str());
-  strcpy(args.rmb.hostname, root["cpiface"]["host"].asString().c_str());
+    getNBDstIPViaJson(args.nb_dst_ip,
+                      root["cpiface"]["nb_dst_ip"].asString().c_str());
+  strcpy(args.rmb.hostname, root["cpiface"]["hostname"].asString().c_str());
   if (!strcmp(args.nb_src_ip, ZMQ_SERVER_IP))
     getNBSrcIPViaJson(args.nb_src_ip, args.nb_dst_ip);
   if (!strcmp(args.s1u_sgw_ip, S1U_SGW_IP))
-    getS1uAddrViaJson(args.s1u_sgw_ip, root["s1u"]["ifname"].asString().c_str());
+    getS1uAddrViaJson(args.s1u_sgw_ip,
+                      root["s1u"]["ifname"].asString().c_str());
   counter_count = root["max_sessions"].asInt();
   script.close();
 
