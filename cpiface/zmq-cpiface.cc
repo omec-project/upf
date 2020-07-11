@@ -442,6 +442,7 @@ int main(int argc, char **argv) {
       gettimeofday(&current_time, NULL);
       if (current_time.tv_sec - last_ack.tv_sec > dp_cp_timeout_interval) {
         {
+          // Before restarting, delete all session records
           // Create BessClient
           BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
                                          std::to_string(args.bessd_port),
