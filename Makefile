@@ -18,8 +18,6 @@ DOCKER_REPOSITORY        ?=
 DOCKER_TAG               ?= ${VERSION}
 DOCKER_IMAGENAME         := ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}${PROJECT_NAME}:${DOCKER_TAG}
 DOCKER_BUILDKIT          ?= 1
-BUILDKIT_INLINE_CACHE    ?= 1
-DOCKER_BUILD_ARGS        ?= --build-arg MAKEFLAGS=-j$(shell nproc) --build-arg CPU --build-arg BUILDKIT_INLINE_CACHE
 DOCKER_BUILD_ARGS        += --build-arg ENABLE_NTF=$(ENABLE_NTF)
 
 ## Docker labels. Only set ref and commit date if committed
