@@ -26,6 +26,7 @@ using namespace grpc;
 #define ENCAPMOD "GTPUEncap"
 #define ENCAPADDMETHOD "add"
 #define ENCAPREMMETHOD "remove"
+#define ENCAPREMALLMETHOD "remove_all"
 #define MODULE_NAME_LEN 128
 #define HOSTNAME_LEN 256
 /*--------------------------------------------------------------------------------*/
@@ -88,6 +89,28 @@ class BessClient {
     }
 
     delete rsra;
+
+    /* `any' freed up by ModuleCommand() */
+  }
+
+  void runRemoveAllCommand(const char *modname) {
+    bess::pb::EmptyArg *ea = new bess::pb::EmptyArg();
+    ::google::protobuf::Any *any = new ::google::protobuf::Any();
+    any->PackFrom(*ea);
+    crt.set_name(modname);
+    crt.set_cmd(ENCAPREMALLMETHOD);
+    crt.set_allocated_arg(any);
+    Status status = stub_->ModuleCommand(&context, crt, &cre);
+    // Act upon its status.
+    if (status.ok()) {
+      VLOG(1) << "runRemoveAllCommand RPC successfully executed." << std::endl;
+    } else {
+      std::cout << status.error_code() << ": " << status.error_message()
+                << std::endl;
+      std::cout << "runRemoveAllCommand RPC failed." << std::endl;
+    }
+
+    delete ea;
 
     /* `any' freed up by ModuleCommand() */
   }

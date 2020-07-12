@@ -18,8 +18,7 @@ DOCKER_REPOSITORY        ?=
 DOCKER_TAG               ?= ${VERSION}
 DOCKER_IMAGENAME         := ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}${PROJECT_NAME}:${DOCKER_TAG}
 DOCKER_BUILDKIT          ?= 1
-BUILDKIT_INLINE_CACHE    ?= 1
-DOCKER_BUILD_ARGS        ?= --build-arg MAKEFLAGS=-j$(shell nproc) --build-arg CPU --build-arg BUILDKIT_INLINE_CACHE
+DOCKER_BUILD_ARGS        ?= --build-arg MAKEFLAGS=-j$(shell nproc) --build-arg CPU
 DOCKER_BUILD_ARGS        += --build-arg ENABLE_NTF=$(ENABLE_NTF)
 
 ## Docker labels. Only set ref and commit date if committed
@@ -36,7 +35,6 @@ docker-build:
 		DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build --pull $(DOCKER_BUILD_ARGS) \
 			--target $$target \
 			--tag ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}upf-epc-$$target:${DOCKER_TAG} \
-			--cache-from ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}upf-epc-$$target:${DOCKER_TAG} \
 			--build-arg org_label_schema_version="${VERSION}" \
 			--build-arg org_label_schema_vcs_url="${DOCKER_LABEL_VCS_URL}" \
 			--build-arg org_label_schema_vcs_ref="${DOCKER_LABEL_VCS_REF}" \

@@ -34,6 +34,9 @@ const Commands GtpuEncap::cmds = {
      MODULE_CMD_FUNC(&GtpuEncap::AddSessionRecord), Command::THREAD_SAFE},
     {"remove", "GtpuEncapRemoveSessionRecordArg",
      MODULE_CMD_FUNC(&GtpuEncap::RemoveSessionRecord), Command::THREAD_SAFE},
+    {"remove_all", "EmptyArg",
+     MODULE_CMD_FUNC(&GtpuEncap::RemoveAllSessionRecords),
+     Command::THREAD_SAFE},
     {"show_records", "EmptyArg", MODULE_CMD_FUNC(&GtpuEncap::ShowRecords),
      Command::THREAD_SAFE},
     {"show_count", "EmptyArg", MODULE_CMD_FUNC(&GtpuEncap::ShowCount),
@@ -156,6 +159,32 @@ CommandResponse GtpuEncap::AddSessionRecord(
               << ToIpv4Address(be32_t(ueaddr)) << std::endl;
     return CommandFailure(ENOMEM, "Failed to insert session record");
   }
+
+  return CommandSuccess();
+}
+/*----------------------------------------------------------------------------------*/
+CommandResponse GtpuEncap::RemoveAllSessionRecords(const bess::pb::EmptyArg &) {
+  uint32_t next = 0;
+  uint64_t *key;
+  void *_data;
+  int rc;
+  do {
+    rc = rte_hash_iterate(session_map, (const void **)&key, &_data, &next);
+    if (rc >= 0) {
+      struct session_info *data = (struct session_info *)_data;
+      /* now remove the record */
+      if (rte_hash_del_key(session_map, key) < 0) {
+        uint32_t ip = UE_ADDR(*key);
+        std::cerr << "Failed to remove record with UE address: "
+                  << ToIpv4Address(be32_t(ip)) << std::endl;
+      } else {
+        continue;
+      }
+      rte_free(data);
+      /* resetting back to NULL */
+      next = 0;
+    }
+  } while (rc >= 0);
 
   return CommandSuccess();
 }

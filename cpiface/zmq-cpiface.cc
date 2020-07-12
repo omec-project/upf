@@ -11,7 +11,9 @@
 #include <map>
 #include <netdb.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <zmq.h>
 /*--------------------------------------------------------------------------------*/
@@ -19,8 +21,10 @@
 #define ZMQ_RECV_PORT 20
 #define ZMQ_SEND_PORT 5557
 #define ZMQ_NB_IP "172.17.0.1"
-#define ZMQ_NB_PORT 1111
+#define ZMQ_NB_PORT 21
 #define S1U_SGW_IP "11.1.1.1"
+#define ZMQ_POLL_TIMEOUT 1000  // in msecs
+#define KEEPALIVE_TIMEOUT 100  // in secs
 /*--------------------------------------------------------------------------------*/
 /**
  * ZMQ stuff
@@ -142,17 +146,56 @@ void sig_handler(int signo) {
   google::protobuf::ShutdownProtobufLibrary();
 }
 /*--------------------------------------------------------------------------------*/
+void force_restart(int argc, char **argv) {
+  pid_t pid;
+  int status;
+
+  pid = fork();
+
+  if (pid == -1) {
+    std::cerr << "Failed to fork: " << strerror(errno) << std::endl;
+    exit(EXIT_FAILURE);
+  } else if (pid == 0) {  // child process
+    execv(argv[0], argv);
+    exit(EXIT_SUCCESS);
+  } else {  // parent process
+    if (waitpid(pid, &status, 0) > 0) {
+      if (WIFEXITED(status) && !WEXITSTATUS(status))
+        std::cerr << "Restart successful!" << std::endl;
+      else if (WIFEXITED(status) && WEXITSTATUS(status)) {
+        if (WEXITSTATUS(status) == 127) {
+          // execv failed
+          std::cerr << "execv() failed\n" << std::endl;
+        } else
+          std::cerr << "Program terminated normally, "
+                    << "but returned a non-zero status" << std::endl;
+      } else
+        std::cerr << "Program didn't terminate normally" << std::endl;
+    } else {
+      // waitpid() failed
+      std::cerr << "waitpid() failed" << std::endl;
+    }
+    exit(EXIT_SUCCESS);
+  }
+}
+/*--------------------------------------------------------------------------------*/
 int main(int argc, char **argv) {
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 
   std::map<uint64_t, bool> zmq_sess_map;
+  // set my_dp_id to 0, SPGW-C will give me the id
+  uint32_t my_dp_id = 0;
+  struct timeval last_ack, current_time;
+  // set it to 100 secs for the time being
+  const uint32_t dp_cp_timeout_interval = KEEPALIVE_TIMEOUT;
+  // 1 second zmq_poll timeout
+  const uint32_t zmq_poll_timeout = ZMQ_POLL_TIMEOUT;
+  // set default values first
+  Args args;
 
   context0 = zmq_ctx_new();
   context1 = zmq_ctx_new();
   context2 = zmq_ctx_new();
-
-  // set default values first
-  Args args;
   // set args coming from command-line
   args.parse(argc, argv);
 
@@ -197,6 +240,9 @@ int main(int argc, char **argv) {
     std::cerr << "Unable to retreive hostname of DP!" << std::endl;
     return EXIT_FAILURE;
   }
+
+  VLOG(1) << "DP hostname: " << args.rmb.hostname << std::endl;
+
   // send registration request
   if (zmq_send(reg, (void *)&args.rmb, sizeof(args.rmb), 0) == -1) {
     std::cerr << "Failed to send registration request to CP!" << std::endl;
@@ -249,12 +295,22 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
+  gettimeofday(&last_ack, NULL);
+
+  struct resp_msgbuf keepalive;
+  keepalive.mtype = DPN_KEEPALIVE_REQ;
+  keepalive.op_id = 1;            // for now always 1...
+  keepalive.sess_id = 0;          // node specific message
+  keepalive.dp_id.id = my_dp_id;  // DP is not aware about its id...
+  strcpy(keepalive.dp_id.name, args.rmb.hostname);
+
   //  Process messages from either socket
   while (true) {
     zmq_pollitem_t items[] = {
         {receiver, 0, ZMQ_POLLIN, 0},
     };
-    if (zmq_poll((zmq_pollitem_t *)items, 1, -1) < 0) {
+
+    if (zmq_poll((zmq_pollitem_t *)items, 1, zmq_poll_timeout) < 0) {
       std::cerr << "ZMQ poll failed!: " << strerror(errno);
       if (errno != EINTR) {
         std::cerr << std::endl;
@@ -265,6 +321,9 @@ int main(int argc, char **argv) {
       }
     }
     if (items[0].revents & ZMQ_POLLIN) {
+      // as long as we get packets from control path we are good
+      gettimeofday(&last_ack, NULL);
+      bool send_resp = true;
       struct msgbuf rbuf;
       struct resp_msgbuf resp;
       int size = zmq_recv(receiver, &rbuf, sizeof(rbuf), 0);
@@ -285,6 +344,8 @@ int main(int argc, char **argv) {
                   << ntohl(rbuf.sess_entry.dl_s1_info.enb_teid) << ")"
                   << std::endl;
           resp.op_id = rbuf.sess_entry.op_id;
+          // SPGW-C returns the DP ID
+          my_dp_id = rbuf.dp_id.id;
           resp.dp_id.id = rbuf.dp_id.id;
           resp.mtype = DPN_RESPONSE;
           zmq_sess_map[SESS_ID(rbuf.sess_entry.ue_addr.u.ipv4_addr,
@@ -355,16 +416,48 @@ int main(int argc, char **argv) {
             zmq_sess_map.erase(it);
           }
           break;
+        case MSG_KEEPALIVE_ACK:
+          my_dp_id = rbuf.dp_id.id;
+          send_resp = false;
+          VLOG(1) << "Got a keepalive ack from CP, and it gave me dp_id: "
+                  << my_dp_id << std::endl;
+          break;
         default:
+          send_resp = false;
           VLOG(1) << "Got a request with mtype: " << mtype << std::endl;
           break;
       }
-      size = zmq_send(sender, &resp, sizeof(resp), ZMQ_NOBLOCK);
+
+      if (send_resp == true) {
+        size = zmq_send(sender, &resp, sizeof(resp), ZMQ_NOBLOCK);
+        if (size == -1) {
+          std::cerr << "Error in zmq sending: " << strerror(errno) << std::endl;
+          break;
+        } else {
+          VLOG(1) << "Sending back response block" << std::endl;
+        }
+      }
+    } else {
+      VLOG(1) << "ZMQ poll timeout DPID " << my_dp_id << std::endl;
+      gettimeofday(&current_time, NULL);
+      if (current_time.tv_sec - last_ack.tv_sec > dp_cp_timeout_interval) {
+        {
+          // Before restarting, delete all session records
+          // Create BessClient
+          BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
+                                         std::to_string(args.bessd_port),
+                                     InsecureChannelCredentials()));
+          b.runRemoveAllCommand(args.encapmod);
+        }
+        std::cerr << "CP<-->DP communication broken. DPID: " << my_dp_id
+                  << ". DP is restarting..." << std::endl;
+        force_restart(argc, argv);
+      }
+      keepalive.dp_id.id = my_dp_id;
+      int size = zmq_send(sender, &keepalive, sizeof(keepalive), ZMQ_NOBLOCK);
       if (size == -1) {
         std::cerr << "Error in zmq sending: " << strerror(errno) << std::endl;
         break;
-      } else {
-        VLOG(1) << "Sending back response block" << std::endl;
       }
     }
   }
