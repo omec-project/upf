@@ -559,7 +559,7 @@ int main(int argc, char **argv) {
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
             b.runAddCounterCommand(
-                (curr_ctr), (("Pre" + std::string(args.qoscounter)).c_str()));
+                (curr_ctr), (("pre" + std::string(args.qoscounter)).c_str()));
           }
           {
             // Add PostQoS Counter
@@ -568,7 +568,7 @@ int main(int argc, char **argv) {
                                        InsecureChannelCredentials()));
             b.runAddCounterCommand(
                 (curr_ctr),
-                (("PostUL" + std::string(args.qoscounter)).c_str()));
+                (("postUL" + std::string(args.qoscounter)).c_str()));
           }
           {
             // Add PostQoS Counter
@@ -577,7 +577,7 @@ int main(int argc, char **argv) {
                                        InsecureChannelCredentials()));
             b.runAddCounterCommand(
                 (curr_ctr),
-                (("PostDL" + std::string(args.qoscounter)).c_str()));
+                (("postDL" + std::string(args.qoscounter)).c_str()));
           }
           break;
         case MSG_SESS_DEL:
@@ -703,7 +703,7 @@ int main(int argc, char **argv) {
                                            std::to_string(args.bessd_port),
                                        InsecureChannelCredentials()));
             b.runDelCounterCommand(
-                (curr_ctr), (("Pre" + std::string(args.qoscounter)).c_str()));
+                (curr_ctr), (("pre" + std::string(args.qoscounter)).c_str()));
           }
           {
             // Delete PostQoS Counter
@@ -712,7 +712,7 @@ int main(int argc, char **argv) {
                                        InsecureChannelCredentials()));
             b.runDelCounterCommand(
                 (curr_ctr),
-                (("PostUL" + std::string(args.qoscounter)).c_str()));
+                (("postUL" + std::string(args.qoscounter)).c_str()));
           }
           {
             // Delete PostQoS Counter
@@ -721,7 +721,7 @@ int main(int argc, char **argv) {
                                        InsecureChannelCredentials()));
             b.runDelCounterCommand(
                 (curr_ctr),
-                (("PostDL" + std::string(args.qoscounter)).c_str()));
+                (("postDL" + std::string(args.qoscounter)).c_str()));
           }
           /* freed up counter id is returned to the stack */
           VLOG(1) << "Curr Ctr returned: " << curr_ctr << std::endl;

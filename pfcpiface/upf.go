@@ -177,9 +177,9 @@ func (u *upf) createEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time
 	u.addFAR(ctx, done, farDown)
 	u.addFAR(ctx, done, farUp)
 
-	u.addCounter(ctx, done, pdrDown.ctrID, "PreQoSCounter")
-	u.addCounter(ctx, done, pdrDown.ctrID, "PostDLQoSCounter")
-	u.addCounter(ctx, done, pdrDown.ctrID, "PostULQoSCounter")
+	u.addCounter(ctx, done, pdrDown.ctrID, "preQoSCounter")
+	u.addCounter(ctx, done, pdrDown.ctrID, "postDLQoSCounter")
+	u.addCounter(ctx, done, pdrDown.ctrID, "postULQoSCounter")
 
 	for {
 		select {
@@ -215,9 +215,9 @@ func (u *upf) deleteEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time
 	u.delFAR(ctx, done, farDown)
 	u.delFAR(ctx, done, farUp)
 
-	u.delCounter(ctx, done, pdrDown.ctrID, "PreQoSCounter")
-	u.delCounter(ctx, done, pdrDown.ctrID, "PostDLQoSCounter")
-	u.delCounter(ctx, done, pdrDown.ctrID, "PostULQoSCounter")
+	u.delCounter(ctx, done, pdrDown.ctrID, "preQoSCounter")
+	u.delCounter(ctx, done, pdrDown.ctrID, "postDLQoSCounter")
+	u.delCounter(ctx, done, pdrDown.ctrID, "postULQoSCounter")
 
 	for {
 		select {
@@ -257,7 +257,7 @@ func (u *upf) processPDR(ctx context.Context, any *anypb.Any, method string) {
 	}
 
 	u.client.ModuleCommand(ctx, &pb.CommandRequest{
-		Name: "PDRLookup",
+		Name: "pdrLookup",
 		Cmd:  method,
 		Arg:  any,
 	})
@@ -356,7 +356,7 @@ func (u *upf) processFAR(ctx context.Context, any *anypb.Any, method string) {
 	}
 
 	u.client.ModuleCommand(ctx, &pb.CommandRequest{
-		Name: "FARLookup",
+		Name: "farLookup",
 		Cmd:  method,
 		Arg:  any,
 	})

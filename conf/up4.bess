@@ -18,10 +18,10 @@ Access = 1
 Core = 2
 Uplink = 0
 Downlink = 1
-FARForwardAction = 0
-FARTunnelAction = 1
-FARDropAction = 2
-FARNotifyCPAction = 4
+farForwardAction = 0
+farTunnelAction = 1
+farDropAction = 2
+farNotifyCPAction = 4
 interfaces = ["s1u", "sgi"]
 parser = Parser('conf/upf.json')
 parser.parse(interfaces)
@@ -113,9 +113,9 @@ for idx, iface in enumerate(interfaces):
 #   - tunnel_ip4_dst
 #   - proto_id
 
-LinkMerge::Merge() \
-    -> PktParse::GtpuParser():1 \
-    -> PDRLookup::WildcardMatch(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
+linkMerge::Merge() \
+    -> pktParse::GtpuParser():1 \
+    -> pdrLookup::WildcardMatch(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
                                         {'attr_name':'tunnel_ipv4_dst', 'num_bytes':4}, \
                                         {'attr_name':'teid', 'num_bytes':4}, \
                                         {'attr_name':'dst_ip', 'num_bytes':4}, \
@@ -128,8 +128,8 @@ LinkMerge::Merge() \
                                         {'attr_name':'ctr_id', 'num_bytes':4}, \
                                         {'attr_name':'far_id', 'num_bytes':4}, \
                                         {'attr_name':'needs_gtpu_decap', 'num_bytes':1}]):1 \
-    -> PreQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
-    -> FARLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
+    -> preQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
+    -> farLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
                                      {'attr_name':'fseid', 'num_bytes':4}], \
                              values=[{'attr_name':'action', 'num_bytes':1}, \
                                      {'attr_name':'tunnel_out_type', 'num_bytes':1}, \
@@ -137,18 +137,18 @@ LinkMerge::Merge() \
                                      {'attr_name':'tunnel_out_dst_ip4addr', 'num_bytes':4}, \
                                      {'attr_name':'tunnel_out_teid', 'num_bytes':4}, \
                                      {'attr_name':'tunnel_out_udp_port', 'num_bytes':2}]):1 \
-    -> ExecuteFAR::Split(size=1, attribute='action')
+    -> executeFAR::Split(size=1, attribute='action')
 
 # Drop unknown packets
-PktParse:0 -> Sink()
-PDRLookup:0 -> Sink()
-FARLookup:0 -> Sink()
-ExecuteFAR:FARDropAction -> FARDrop::Sink()
-ExecuteFAR:FARNotifyCPAction -> FARNotifyCP::Sink()
+pktParse:0 -> badPkts::Sink()
+pdrLookup:0 -> pdrLookupFail::Sink()
+farLookup:0 -> farLookupFail::Sink()
+executeFAR:farDropAction -> farDrop::Sink()
+executeFAR:farNotifyCPAction -> farNotifyCP::Sink()
 
 # Set default gates for relevant modules
-PDRLookup.set_default_gate(gate=0)
-FARLookup.set_default_gate(gate=0)
+pdrLookup.set_default_gate(gate=0)
+farLookup.set_default_gate(gate=0)
 
 
 # ====================================================
@@ -184,34 +184,34 @@ if parser.max_ip_defrag_flows is not None:
     _in = sgiIP4Defrag
     gate = 1
     # Drop pkts that are unable to be fragmented
-    sgiIP4Defrag:0 -> Sink()
+    sgiIP4Defrag:0 -> sgiIP4DefragFail::Sink()
 
 # 2. Build the remaining first half of the DL pipeline before entering the shared pipeline
 #ports[parser.sgi_ifname].rewrite \
 _in:gate \
     -> SetMetadata(attrs=[{'name':'src_iface', 'size':1, 'value_int':Core}]) \
-    -> LinkMerge # Start of the shared pipeline
+    -> linkMerge # Start of the shared pipeline
 
 
 # 3. Complete the last part of the DL pipeline
-ExecuteFAR:FARTunnelAction \
-    -> EtherEncapTrim::GenericDecap(bytes=14) \
-    -> GTPUEncap::GtpuEncap():1 \
-    -> S1UEtherAdd::GenericEncap(fields=[
+executeFAR:farTunnelAction \
+    -> etherEncapTrim::GenericDecap(bytes=14) \
+    -> gtpuEncap::GtpuEncap():1 \
+    -> s1uEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(macstr_u)}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
-    -> PostDLQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
-    -> OuterUDPCsum::L4Checksum() \
-    -> OuterIPCsum::IPChecksum() \
+    -> postDLQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
+    -> outerUDPCsum::L4Checksum() \
+    -> outerIPCsum::IPChecksum() \
     -> ports[parser.s1u_ifname].rtr
 
 # Drop unknown packets
-GTPUEncap:0 -> Sink()
-sgiRxIPCksum:1 -> Sink()
-sgiRxUDPCksum:1 -> Sink()
-OuterIPCsum:1 -> Sink()
-OuterUDPCsum:1 -> Sink()
+gtpuEncap:0 -> gtpuEncapFail::Sink()
+sgiRxIPCksum:1 -> sgiRxIPCksumFail::Sink()
+sgiRxUDPCksum:1 -> sgiRxUDPCksumFail::Sink()
+outerIPCsum:1 -> outerIPCsumFail::Sink()
+outerUDPCsum:1 -> outerUDPCsumFail::Sink()
 
 # Add SGi filter rules, i.e.:
 # setting filter to detect ue_filter traffic
@@ -249,34 +249,34 @@ if parser.max_ip_defrag_flows is not None:
     _in = s1uIP4Defrag
     gate = 1
     # Drop pkts that are unable to be fragmented
-    s1uIP4Defrag:0 -> Sink()
+    s1uIP4Defrag:0 -> s1uIP4DefragFail::Sink()
 
 # 2. Build the remaining first half of the UL pipeline before entering the shard pipeline
 #ports[parser.s1u_ifname].rewrite \
 _in:gate \
     -> SetMetadata(attrs=[{'name':'src_iface', 'size':1, 'value_int':Access}]) \
-    -> LinkMerge # Start of the shared pipeline
+    -> linkMerge # Start of the shared pipeline
 
 # 3. Complete the last part of the UL pipeline
-ExecuteFAR:FARForwardAction \
-    -> EtherDecapTrim::GenericDecap(bytes=14) -> GTPUDecap::GtpuDecap() \
-    -> SGIEtherAdd::GenericEncap(fields=[
+executeFAR:farForwardAction \
+    -> etherDecapTrim::GenericDecap(bytes=14) -> gtpuDecap::GtpuDecap() \
+    -> sgiEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(macstr_d)}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
-    -> PostULQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
+    -> postULQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
     -> ports[parser.sgi_ifname].rtr
 
 # 4. GTP Echo response pipeline
 s1uFastBPF:GTPUEchoGate \
-    -> GTPUEcho::GtpuEcho(s1u_sgw_ip=ip2long(s1u_ip[0])):1 \
-    -> EthSwap::MACSwap() \
-    -> 1:OuterUDPCsum
+    -> gtpuEcho::GtpuEcho(s1u_sgw_ip=ip2long(s1u_ip[0])):1 \
+    -> ethSwap::MACSwap() \
+    -> 1:outerUDPCsum
 
 # Drop unknown packets
-GTPUEcho:0 -> Sink()
-s1uRxIPCksum:1 -> Sink()
-s1uRxUDPCksum:1 -> Sink()
+gtpuEcho:0 -> badGtpuEchoPkt::Sink()
+s1uRxIPCksum:1 -> s1uRxIPCksumFail::Sink()
+s1uRxUDPCksum:1 -> s1uRxUDPCksumFail::Sink()
 
 # Add S1u filter rules, i.e.:
 # setting filter to detect gtpu traffic
