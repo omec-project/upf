@@ -30,10 +30,10 @@ enum src_iface_type { Access = 1, Core };
 /**
  * Module decls
  */
-#define PDRLOOKUPMOD "PDRLookup"
+#define PDRLOOKUPMOD "pdrLookup"
 #define PDRADDMETHOD "add"
 #define PDRDELMETHOD "delete"
-#define FARLOOKUPMOD "FARLookup"
+#define FARLOOKUPMOD "farLookup"
 #define FARADDMETHOD "add"
 #define FARDELMETHOD "delete"
 #define QOSCOUNTERMOD "QoSCounter"
