@@ -18,6 +18,7 @@ type upf struct {
 	n3Iface     string
 	n6Iface     string
 	n3IP        net.IP
+	fqdnHost    string
 	client      pb.BESSControlClient
 	maxSessions uint32
 	simInfo     *SimModeInfo

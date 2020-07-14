@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 
+	fqdn "github.com/Showmax/go-fqdn"
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
 	"google.golang.org/grpc"
 )
@@ -120,6 +121,7 @@ func main() {
 		n3Iface:     conf.N3Iface.IfName,
 		n6Iface:     conf.N6Iface.IfName,
 		n3IP:        n3IP,
+		fqdnHost:    fqdn.Get(),
 		client:      pb.NewBESSControlClient(conn),
 		maxSessions: conf.MaxSessions,
 		simInfo:     simInfo,
