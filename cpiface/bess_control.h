@@ -516,7 +516,8 @@ class BessClient {
     Status status = stub_->ModuleCommand(&context, crt, &cre);
     // Act upon its status.
     if (status.ok()) {
-      VLOG(1) << "runClrCountersCommand RPC successfully executed." << std::endl;
+      VLOG(1) << "runClrCountersCommand RPC successfully executed."
+              << std::endl;
     } else {
       std::cout << status.error_code() << ": " << status.error_message()
                 << std::endl;
@@ -528,17 +529,13 @@ class BessClient {
     /* `any' freed up by ModuleCommand() */
   }
 
-  void (BessClient::*grpc_ptr[GRPC_COUNT])(const void *args, const char *name) = {
-    &BessClient::runAddPDRCommand,
-    &BessClient::runDelPDRCommand,
-    &BessClient::runAddFARCommand,
-    &BessClient::runDelFARCommand,
-    &BessClient::runAddCounterCommand,
-    &BessClient::runDelCounterCommand,
-    &BessClient::runClrPDRsCommand,
-    &BessClient::runClrFARsCommand,
-    &BessClient::runClrCountersCommand
-  };
+  void (BessClient::*grpc_ptr[GRPC_COUNT])(const void *args,
+                                           const char *name) = {
+      &BessClient::runAddPDRCommand,     &BessClient::runDelPDRCommand,
+      &BessClient::runAddFARCommand,     &BessClient::runDelFARCommand,
+      &BessClient::runAddCounterCommand, &BessClient::runDelCounterCommand,
+      &BessClient::runClrPDRsCommand,    &BessClient::runClrFARsCommand,
+      &BessClient::runClrCountersCommand};
 };
 /*--------------------------------------------------------------------------------*/
 std::ostream &operator<<(std::ostream &os, const struct ip_addr &ip) {

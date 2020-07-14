@@ -34,8 +34,8 @@ void *reg;
 void *context0;
 void *context1;
 void *context2;
-#define ZMQ_POLL_TIMEOUT 1000 // in msecs
-#define KEEPALIVE_TIMEOUT 100 // in secs
+#define ZMQ_POLL_TIMEOUT 1000  // in msecs
+#define KEEPALIVE_TIMEOUT 100  // in secs
 
 struct TeidEntry {
   uint32_t teid;
@@ -51,9 +51,7 @@ void sig_handler(int signo) {
   google::protobuf::ShutdownProtobufLibrary();
 }
 /*--------------------------------------------------------------------------------*/
-void
-force_restart(int argc, char **argv)
-{
+void force_restart(int argc, char **argv) {
   pid_t pid;
   int status;
 
@@ -62,24 +60,22 @@ force_restart(int argc, char **argv)
   if (pid == -1) {
     std::cerr << "Failed to fork: " << strerror(errno) << std::endl;
     exit(EXIT_FAILURE);
-  } else if (pid == 0) { // child process
+  } else if (pid == 0) {  // child process
     execv(argv[0], argv);
     exit(EXIT_SUCCESS);
-  } else { // parent process
+  } else {  // parent process
     if (waitpid(pid, &status, 0) > 0) {
       if (WIFEXITED(status) && !WEXITSTATUS(status))
-	std::cerr << "Restart successful!" << std::endl;
+        std::cerr << "Restart successful!" << std::endl;
       else if (WIFEXITED(status) && WEXITSTATUS(status)) {
-	if (WEXITSTATUS(status) == 127) {
+        if (WEXITSTATUS(status) == 127) {
           // execv failed
-	  std::cerr << "execv() failed\n" << std::endl;
-	} else
-	  std::cerr << "Program terminated normally, "
-		    << "but returned a non-zero status"
-		    << std::endl;
+          std::cerr << "execv() failed\n" << std::endl;
+        } else
+          std::cerr << "Program terminated normally, "
+                    << "but returned a non-zero status" << std::endl;
       } else
-	  std::cerr << "Program didn't terminate normally"
-		    << std::endl;
+        std::cerr << "Program didn't terminate normally" << std::endl;
     } else {
       // waitpid() failed
       std::cerr << "waitpid() failed" << std::endl;
@@ -88,11 +84,11 @@ force_restart(int argc, char **argv)
   }
 }
 /*--------------------------------------------------------------------------------*/
-void invokeGRPCall(Args args, void *func_args, const char *modname, uint8_t funcID)
-{
-  BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
-			     std::to_string(args.bessd_port),
-			     InsecureChannelCredentials()));
+void invokeGRPCall(Args args, void *func_args, const char *modname,
+                   uint8_t funcID) {
+  BessClient b(CreateChannel(
+      std::string(args.bessd_ip) + ":" + std::to_string(args.bessd_port),
+      InsecureChannelCredentials()));
   ((b).*(b.grpc_ptr[funcID]))(func_args, modname);
 }
 /*--------------------------------------------------------------------------------*/
@@ -316,51 +312,45 @@ int main(int argc, char **argv) {
                     << " and teid: " << te.teid << " counter: " << te.ctr_id
                     << std::endl;
           }
-	  pdrD.saddr = rbuf.sess_entry.ue_addr.u.ipv4_addr; /* ueaddr ip */
-	  pdrD.fseid = rbuf.sess_entry.dl_s1_info.enb_teid; /* fseid */
-	  pdrD.ctr_id = curr_ctr;                           /* ctr_id */
-	  // Add PDR (DOWNLINK)
-	  invokeGRPCall(args, &pdrD, args.pdrlookup, GRPC_PDR_ADD);
+          pdrD.saddr = rbuf.sess_entry.ue_addr.u.ipv4_addr; /* ueaddr ip */
+          pdrD.fseid = rbuf.sess_entry.dl_s1_info.enb_teid; /* fseid */
+          pdrD.ctr_id = curr_ctr;                           /* ctr_id */
+          // Add PDR (DOWNLINK)
+          invokeGRPCall(args, &pdrD, args.pdrlookup, GRPC_PDR_ADD);
 
-	  pdrU.daddr = rbuf.sess_entry.ue_addr.u.ipv4_addr; /* ueaddr ip */
-	  pdrU.fseid = rbuf.sess_entry.dl_s1_info.enb_teid; /* fseid */
-	  pdrU.ctr_id = curr_ctr;                           /* ctr_id */
-	  // Add PDR (UPLINK)
-	  invokeGRPCall(args, &pdrU, args.pdrlookup, GRPC_PDR_ADD);
+          pdrU.daddr = rbuf.sess_entry.ue_addr.u.ipv4_addr; /* ueaddr ip */
+          pdrU.fseid = rbuf.sess_entry.dl_s1_info.enb_teid; /* fseid */
+          pdrU.ctr_id = curr_ctr;                           /* ctr_id */
+          // Add PDR (UPLINK)
+          invokeGRPCall(args, &pdrU, args.pdrlookup, GRPC_PDR_ADD);
 
-	  farD.fseid = rbuf.sess_entry.dl_s1_info.enb_teid; /* fseid */
-	  farD.tun_src_ip =
-		  ntohl((uint32_t)(inet_addr(args.s1u_sgw_ip))); /* n3 addr */
-	  farD.tun_dst_ip = rbuf.sess_entry.ul_s1_info.enb_addr.u
-		  .ipv4_addr;                /* enb addr */
-	  farD.teid = rbuf.sess_entry.dl_s1_info.enb_teid;/* enb_teid */
-	  // Add FAR (DOWNLINK)
-	  invokeGRPCall(args, &farD, args.farlookup, GRPC_FAR_ADD);
+          farD.fseid = rbuf.sess_entry.dl_s1_info.enb_teid; /* fseid */
+          farD.tun_src_ip =
+              ntohl((uint32_t)(inet_addr(args.s1u_sgw_ip))); /* n3 addr */
+          farD.tun_dst_ip =
+              rbuf.sess_entry.ul_s1_info.enb_addr.u.ipv4_addr; /* enb addr */
+          farD.teid = rbuf.sess_entry.dl_s1_info.enb_teid;     /* enb_teid */
+          // Add FAR (DOWNLINK)
+          invokeGRPCall(args, &farD, args.farlookup, GRPC_FAR_ADD);
 
-	  farU.fseid = rbuf.sess_entry.dl_s1_info.enb_teid; /* fseid */
-	  // Add FAR (UPLINK)
-	  invokeGRPCall(args, &farU, args.farlookup, GRPC_FAR_ADD);
+          farU.fseid = rbuf.sess_entry.dl_s1_info.enb_teid; /* fseid */
+          // Add FAR (UPLINK)
+          invokeGRPCall(args, &farU, args.farlookup, GRPC_FAR_ADD);
 
-	  // Add PreQoS Counter
-	  invokeGRPCall(
-		args,
-		(&curr_ctr),
-		(("pre" + std::string(args.qoscounter)).c_str()),
-		GRPC_CTR_ADD);
+          // Add PreQoS Counter
+          invokeGRPCall(args, (&curr_ctr),
+                        (("pre" + std::string(args.qoscounter)).c_str()),
+                        GRPC_CTR_ADD);
 
-	  // Add PostQoS Counter
-	  invokeGRPCall(
-		args,
-                (&curr_ctr),
-                (("postUL" + std::string(args.qoscounter)).c_str()),
-		GRPC_CTR_ADD);
+          // Add PostQoS Counter
+          invokeGRPCall(args, (&curr_ctr),
+                        (("postUL" + std::string(args.qoscounter)).c_str()),
+                        GRPC_CTR_ADD);
 
-	  // Add PostQoS Counter
-	  invokeGRPCall(
-		args,
-                (&curr_ctr),
-                (("postDL" + std::string(args.qoscounter)).c_str()),
-		GRPC_CTR_ADD);
+          // Add PostQoS Counter
+          invokeGRPCall(args, (&curr_ctr),
+                        (("postDL" + std::string(args.qoscounter)).c_str()),
+                        GRPC_CTR_ADD);
           break;
         case MSG_SESS_DEL:
           VLOG(1) << "Got a session delete request" << std::endl;
@@ -402,45 +392,39 @@ int main(int argc, char **argv) {
             zmq_sess_map.erase(it);
           }
 
-	  pdrD.saddr = (rbuf.sess_entry.ue_addr.u.ipv4_addr); /* ueaddr ip */
-	  // Delete PDR (DOWNLINK)
-	  invokeGRPCall(args, &pdrD, args.pdrlookup, GRPC_PDR_DEL);
+          pdrD.saddr = (rbuf.sess_entry.ue_addr.u.ipv4_addr); /* ueaddr ip */
+          // Delete PDR (DOWNLINK)
+          invokeGRPCall(args, &pdrD, args.pdrlookup, GRPC_PDR_DEL);
 
-	  pdrU.daddr = (rbuf.sess_entry.ue_addr.u.ipv4_addr); /* ueaddr ip */
-	  // Delete PDR (UPLINK)
-	  invokeGRPCall(args, &pdrU, args.pdrlookup, GRPC_PDR_DEL);
+          pdrU.daddr = (rbuf.sess_entry.ue_addr.u.ipv4_addr); /* ueaddr ip */
+          // Delete PDR (UPLINK)
+          invokeGRPCall(args, &pdrU, args.pdrlookup, GRPC_PDR_DEL);
 
-	  // Del FAR (DOWNLINK)
-	  FARArgs fa;
-	  fa.far_id = 1;
-	  fa.fseid = enb_teid;
-	  invokeGRPCall(args, &fa, args.farlookup, GRPC_FAR_DEL);
+          // Del FAR (DOWNLINK)
+          FARArgs fa;
+          fa.far_id = 1;
+          fa.fseid = enb_teid;
+          invokeGRPCall(args, &fa, args.farlookup, GRPC_FAR_DEL);
 
-	  // Del FAR (UPLINK)
-	  fa.far_id = 0;
-	  fa.fseid = enb_teid;
-	  invokeGRPCall(args, &fa, args.farlookup, GRPC_FAR_DEL);
+          // Del FAR (UPLINK)
+          fa.far_id = 0;
+          fa.fseid = enb_teid;
+          invokeGRPCall(args, &fa, args.farlookup, GRPC_FAR_DEL);
 
-	  // Delete PreQoS Counter
-	  invokeGRPCall(
-			args,
-			(&curr_ctr),
-			(("pre" + std::string(args.qoscounter)).c_str()),
-			GRPC_CTR_DEL);
+          // Delete PreQoS Counter
+          invokeGRPCall(args, (&curr_ctr),
+                        (("pre" + std::string(args.qoscounter)).c_str()),
+                        GRPC_CTR_DEL);
 
-	  // Delete PostQoS Counter
-	  invokeGRPCall(
-			args,
-			(&curr_ctr),
-			(("postUL" + std::string(args.qoscounter)).c_str()),
-			GRPC_CTR_DEL);
+          // Delete PostQoS Counter
+          invokeGRPCall(args, (&curr_ctr),
+                        (("postUL" + std::string(args.qoscounter)).c_str()),
+                        GRPC_CTR_DEL);
 
-	  // Delete PostQoS Counter
-	  invokeGRPCall(
-			args,
-			(&curr_ctr),
-			(("postDL" + std::string(args.qoscounter)).c_str()),
-			GRPC_CTR_DEL);
+          // Delete PostQoS Counter
+          invokeGRPCall(args, (&curr_ctr),
+                        (("postDL" + std::string(args.qoscounter)).c_str()),
+                        GRPC_CTR_DEL);
 
           /* freed up counter id is returned to the stack */
           VLOG(1) << "Curr Ctr returned: " << curr_ctr << std::endl;
@@ -471,24 +455,21 @@ int main(int argc, char **argv) {
       VLOG(1) << "ZMQ poll timeout DPID " << my_dp_id << std::endl;
       gettimeofday(&current_time, NULL);
       if (current_time.tv_sec - last_ack.tv_sec > dp_cp_timeout_interval) {
-	invokeGRPCall(args, NULL, args.pdrlookup, GRPC_PDR_CLR);
-	invokeGRPCall(args, NULL, args.farlookup, GRPC_FAR_CLR);
-	invokeGRPCall(args,
-		      NULL,
-		      (("pre" + std::string(args.qoscounter)).c_str()),
-		      GRPC_CTR_CLR);
-	invokeGRPCall(args,
-		      NULL,
-		      (("postUL" + std::string(args.qoscounter)).c_str()),
-		      GRPC_CTR_CLR);
-	invokeGRPCall(args,
-		      NULL,
-		      (("postDL" + std::string(args.qoscounter)).c_str()),
-		      GRPC_CTR_CLR);
+        invokeGRPCall(args, NULL, args.pdrlookup, GRPC_PDR_CLR);
+        invokeGRPCall(args, NULL, args.farlookup, GRPC_FAR_CLR);
+        invokeGRPCall(args, NULL,
+                      (("pre" + std::string(args.qoscounter)).c_str()),
+                      GRPC_CTR_CLR);
+        invokeGRPCall(args, NULL,
+                      (("postUL" + std::string(args.qoscounter)).c_str()),
+                      GRPC_CTR_CLR);
+        invokeGRPCall(args, NULL,
+                      (("postDL" + std::string(args.qoscounter)).c_str()),
+                      GRPC_CTR_CLR);
 
-	std::cerr << "CP<-->DP communication broken. DPID: " << my_dp_id
-		  << ". DP is restarting..." << std::endl;
-	force_restart(argc, argv);
+        std::cerr << "CP<-->DP communication broken. DPID: " << my_dp_id
+                  << ". DP is restarting..." << std::endl;
+        force_restart(argc, argv);
       }
       keepalive.dp_id.id = my_dp_id;
       int size = zmq_send(sender, &keepalive, sizeof(keepalive), ZMQ_NOBLOCK);

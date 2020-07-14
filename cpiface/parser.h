@@ -151,18 +151,17 @@ struct Args {
     script >> root;
     if (reader.parse(script, root, true)) {
       std::cerr << "Failed to parse configuration\n"
-		<< reader.getFormattedErrorMessages();
+                << reader.getFormattedErrorMessages();
     }
 
     if (!strcmp(nb_dst_ip, ZMQ_NB_IP))
       getNBDstIPViaJson(nb_dst_ip,
-			root["cpiface"]["nb_dst_ip"].asString().c_str());
+                        root["cpiface"]["nb_dst_ip"].asString().c_str());
     strcpy(rmb.hostname, root["cpiface"]["hostname"].asString().c_str());
     if (!strcmp(nb_src_ip, ZMQ_SERVER_IP))
       getNBSrcIPViaJson(nb_src_ip, nb_dst_ip);
     if (!strcmp(s1u_sgw_ip, S1U_SGW_IP))
-      getS1uAddrViaJson(s1u_sgw_ip,
-			root["s1u"]["ifname"].asString().c_str());
+      getS1uAddrViaJson(s1u_sgw_ip, root["s1u"]["ifname"].asString().c_str());
     counter_count = root["max_sessions"].asInt();
     script.close();
   }
@@ -179,25 +178,26 @@ struct Args {
     int handle = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (handle == -1) {
       std::cerr << "Unable to create socket for nb_src_ip probing."
-		<< " Sticking to original: " << nb_src_ip << std::endl;
+                << " Sticking to original: " << nb_src_ip << std::endl;
       return;
     }
     socklen_t ss_addrlen = sizeof(ss_addr);
     if (connect(handle, (sockaddr *)&ss_addr, ss_addrlen) == -1 &&
-	errno != ECONNREFUSED) {
+        errno != ECONNREFUSED) {
       std::cerr << "Unable to determine nb_src_ip. "
-		<< " Sticking to original: " << nb_src_ip << std::endl;
+                << " Sticking to original: " << nb_src_ip << std::endl;
       close(handle);
       return;
     }
     if (getsockname(handle, (sockaddr *)&ss_addr, &ss_addrlen) == -1) {
       std::cerr << "Unable to determine nb_src_ip. "
-		<< " Sticking to original: " << nb_src_ip << std::endl;
+                << " Sticking to original: " << nb_src_ip << std::endl;
       close(handle);
       return;
     }
 
-    char *source_address = inet_ntoa(((struct sockaddr_in *)&ss_addr)->sin_addr);
+    char *source_address =
+        inet_ntoa(((struct sockaddr_in *)&ss_addr)->sin_addr);
     std::cerr << "NB source address: " << source_address << std::endl;
     strcpy(nb_src_ip, source_address);
     close(handle);
@@ -207,7 +207,7 @@ struct Args {
     struct hostent *he = gethostbyname(nb_dst);
     if (he == NULL) {
       std::cerr << "Failed to fetch IP address from host: " << nb_dst
-		<< ". Sticking to original: " << nb_dst_ip << std::endl;
+                << ". Sticking to original: " << nb_dst_ip << std::endl;
       return;
     } else {
       struct in_addr raddr;
@@ -229,7 +229,7 @@ struct Args {
       strncpy(ifr.ifr_name, ifname, IFNAMSIZ - 1);
       if (ioctl(fd, SIOCGIFADDR, &ifr) == 0) {
         strcpy(s1u_sgw_ip,
-	       inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
+               inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
       }
       close(fd);
     }
