@@ -164,9 +164,14 @@ if ports[parser.sgi_ifname].ext_addrs is not None:
 
 
 # 1. Build initial DL pipeline here
-sgiFastBPF:UEGate \
-    -> sgiRxIPCksum::IPChecksum(verify=True) \
-    -> sgiRxUDPCksum::L4Checksum(verify=True)
+if ports[parser.sgi_ifname].hwcksum == True:
+    sgiFastBPF:UEGate \
+        -> sgiRxIPCksum::IPChecksum(verify=True, hw=True) \
+        -> sgiRxUDPCksum::L4Checksum(verify=True, hw=True)
+else:
+    sgiFastBPF:UEGate \
+        -> sgiRxIPCksum::IPChecksum(verify=True) \
+        -> sgiRxUDPCksum::L4Checksum(verify=True)
 
 # Record last module to chain up optional modules
 _in = sgiRxUDPCksum
@@ -235,9 +240,14 @@ GTPUGate = 0
 
 
 # 1. Build initial UL pipeline here
-s1uFastBPF:GTPUGate \
-    -> s1uRxIPCksum::IPChecksum(verify=True) \
-    -> s1uRxUDPCksum::L4Checksum(verify=True)
+if ports[parser.s1u_ifname].hwcksum == True:
+    s1uFastBPF:GTPUGate \
+        -> s1uRxIPCksum::IPChecksum(verify=True, hw=True) \
+        -> s1uRxUDPCksum::L4Checksum(verify=True, hw=True)
+else:
+    s1uFastBPF:GTPUGate \
+        -> s1uRxIPCksum::IPChecksum(verify=True) \
+        -> s1uRxUDPCksum::L4Checksum(verify=True)
 
 # Record last module to chain up option modules
 _in = s1uRxUDPCksum

@@ -249,9 +249,6 @@ CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
     eth_conf.rxmode.offloads = DEV_RX_OFFLOAD_IPV4_CKSUM |
                                DEV_RX_OFFLOAD_UDP_CKSUM |
                                DEV_RX_OFFLOAD_TCP_CKSUM;
-    if (dev_info.rx_offload_capa & DEV_RX_OFFLOAD_OUTER_IPV4_CKSUM) {
-      eth_conf.rxmode.offloads |= DEV_RX_OFFLOAD_OUTER_IPV4_CKSUM;
-    }
   }
 
   ret = rte_eth_dev_configure(ret_port_id, num_rxq, num_txq, &eth_conf);
