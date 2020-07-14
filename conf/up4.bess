@@ -100,6 +100,21 @@ for idx, iface in enumerate(interfaces):
 
 
 # ====================================================
+#       Network Token Functions Setup
+# ====================================================
+
+ntf = None
+if parser.enable_ntf:
+    ntf = NTF()
+    # TODO: Populate these tables by talking to the NTE
+    ntf.table_create(dpid=1, max_entries=5)
+    ntf.entry_create(dpid=1, entry_id=1, dscp=1, token={
+      'app_id': 0x10001,
+      'encryption_key': '{"alg":"A128CBC-HS256","k":"Qr_XwDGctna3SlR88rEJYt6Zm100SASYeJWSJihDnsA","key_ops":["encrypt","decrypt"],"kty":"oct"}'
+    })
+
+
+# ====================================================
 # 	Shared Pipeline (DL + UL)
 # ====================================================
 
@@ -200,8 +215,15 @@ _in:gate \
 
 # 3. Complete the last part of the DL pipeline
 executeFAR:farTunnelAction \
-    -> etherEncapTrim::GenericDecap(bytes=14) \
-    -> gtpuEncap::GtpuEncap():1 \
+    -> etherEncapTrim::GenericDecap(bytes=14)
+
+# Insert downlink NTF module if enabled
+_in = etherEncapTrim
+if enable_ntf:
+    _in -> 1:ntf
+    _in = ntf
+
+_in -> gtpuEncap::GtpuEncap():1 \
     -> s1uEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(macstr_u)}},
@@ -269,8 +291,16 @@ _in:gate \
 
 # 3. Complete the last part of the UL pipeline
 executeFAR:farForwardAction \
-    -> etherDecapTrim::GenericDecap(bytes=14) -> gtpuDecap::GtpuDecap() \
-    -> sgiEtherAdd::GenericEncap(fields=[
+    -> etherDecapTrim::GenericDecap(bytes=14)
+    -> gtpuDecap::GtpuDecap() \
+
+# Insert uplink NTF module if enabled
+_in = gtpuDecap
+if enable_ntf:
+    _in:1 -> 0:ntf
+    _in = ntf
+
+_in:1 -> sgiEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': mac2hex(macstr_d)}},
         {'size': 2, 'value': {'value_int': 0x0800}}]) \
