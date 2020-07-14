@@ -11,6 +11,8 @@
 const Commands Counter::cmds = {
     {"add", "CounterAddArg", MODULE_CMD_FUNC(&Counter::AddCounter),
      Command::THREAD_SAFE},
+    {"removeAll", "EmptyArg", MODULE_CMD_FUNC(&Counter::RemoveAllCounters),
+     Command::THREAD_SAFE},
     {"remove", "CounterRemoveArg", MODULE_CMD_FUNC(&Counter::RemoveCounter),
      Command::THREAD_SAFE}};
 /*----------------------------------------------------------------------------------*/
@@ -26,6 +28,16 @@ CommandResponse Counter::AddCounter(const bess::pb::CounterAddArg &arg) {
 #else
   (void)ctr_id;
   curr_count++;
+#endif
+  return CommandSuccess();
+}
+/*----------------------------------------------------------------------------------*/
+CommandResponse Counter::RemoveAllCounters(const bess::pb::EmptyArg &) {
+#ifdef HASHMAP_BASED
+  counters.clear();
+#else
+  memset(counters, 0, sizeof(SessionStats) * total_count);
+  curr_count = 0;
 #endif
   return CommandSuccess();
 }

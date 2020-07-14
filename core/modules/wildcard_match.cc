@@ -68,7 +68,7 @@ const Commands WildcardMatch::cmds = {
     {"delete", "WildcardMatchCommandDeleteArg",
      MODULE_CMD_FUNC(&WildcardMatch::CommandDelete), Command::THREAD_SAFE},
     {"clear", "EmptyArg", MODULE_CMD_FUNC(&WildcardMatch::CommandClear),
-     Command::THREAD_UNSAFE},
+     Command::THREAD_SAFE},
     {"set_default_gate", "WildcardMatchCommandSetDefaultGateArg",
      MODULE_CMD_FUNC(&WildcardMatch::CommandSetDefaultGate),
      Command::THREAD_SAFE}};

@@ -21,6 +21,7 @@ class Counter final : public Module {
   static const Commands cmds;
   CommandResponse AddCounter(const bess::pb::CounterAddArg &arg);
   CommandResponse RemoveCounter(const bess::pb::CounterRemoveArg &arg);
+  CommandResponse RemoveAllCounters(const bess::pb::EmptyArg &);
   CommandResponse Init(const bess::pb::CounterArg &arg);
   void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
   // returns the number of active UE sessions

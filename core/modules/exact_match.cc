@@ -54,7 +54,7 @@ const Commands ExactMatch::cmds = {
     {"delete", "ExactMatchCommandDeleteArg",
      MODULE_CMD_FUNC(&ExactMatch::CommandDelete), Command::THREAD_SAFE},
     {"clear", "EmptyArg", MODULE_CMD_FUNC(&ExactMatch::CommandClear),
-     Command::THREAD_UNSAFE},
+     Command::THREAD_SAFE},
     {"set_default_gate", "ExactMatchCommandSetDefaultGateArg",
      MODULE_CMD_FUNC(&ExactMatch::CommandSetDefaultGate),
      Command::THREAD_SAFE}};
