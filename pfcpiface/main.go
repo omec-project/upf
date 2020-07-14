@@ -47,7 +47,8 @@ type SimModeInfo struct {
 
 // CPIfaceInfo : CPIface interface settings
 type CPIfaceInfo struct {
-	DestIP string `json:"nb_dst_ip"`
+	DestIP   string `json:"nb_dst_ip"`
+	FQDNHost string `json:"hostname"`
 }
 
 // IfaceType : Gateway interface struct
@@ -104,6 +105,11 @@ func main() {
 	log.Println(conf)
 	// parse N3IP
 	n3IP := ParseN3IP(conf.N3Iface.IfName)
+	// fetch fqdn. Prefer json field
+	fqdnh := conf.CPIface.FQDNHost
+	if fqdnh == "" {
+		fqdnh = fqdn.Get()
+	}
 
 	// get bess grpc client
 	conn, err := grpc.Dial(*bess, grpc.WithInsecure())
@@ -121,7 +127,7 @@ func main() {
 		n3Iface:     conf.N3Iface.IfName,
 		n6Iface:     conf.N6Iface.IfName,
 		n3IP:        n3IP,
-		fqdnHost:    fqdn.Get(),
+		fqdnHost:    fqdnh,
 		client:      pb.NewBESSControlClient(conn),
 		maxSessions: conf.MaxSessions,
 		simInfo:     simInfo,

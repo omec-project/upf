@@ -170,7 +170,7 @@ func parsePDRFromPFCPSessEstReqPayload(sereq *message.SessionEstablishmentReques
 }
 
 func pfcpifaceMainLoop(upf *upf, n3ip string, sourceIP string) {
-	log.Println("pfcpifaceMainLoop says hello!!!")
+	log.Println("pfcpifaceMainLoop@" + upf.fqdnHost + " says hello!!!")
 
 	// Verify IP + Port binding
 	laddr, err := net.ResolveUDPAddr("udp", sourceIP+":"+PFCPPort)
@@ -211,7 +211,7 @@ func pfcpifaceMainLoop(upf *upf, n3ip string, sourceIP string) {
 		var outgoingMessage []byte
 		switch msg.MessageType() {
 		case message.MsgTypeAssociationSetupRequest:
-			outgoingMessage = handleAssociationSetupRequest(msg, addr, sourceIP, upf.fqdnHost, n3ip)
+			outgoingMessage = handleAssociationSetupRequest(msg, addr, sourceIP, n3ip)
 		case message.MsgTypeSessionEstablishmentRequest:
 			outgoingMessage = handleSessionEstablishmentRequest(upf, msg, addr, sourceIP)
 		case message.MsgTypeSessionModificationRequest:
@@ -237,7 +237,7 @@ func pfcpifaceMainLoop(upf *upf, n3ip string, sourceIP string) {
 	}
 }
 
-func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP string, fqdnHost string, n3ip string) []byte {
+func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP string, n3ip string) []byte {
 	asreq, ok := msg.(*message.AssociationSetupRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -254,7 +254,7 @@ func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP 
 	// Build response message
 	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
 	asres, err := message.NewAssociationSetupResponse(ie.NewRecoveryTimeStamp(time.Now()),
-		ie.NewNodeID(sourceIP, "", fqdnHost), /* node id */
+		ie.NewNodeID(sourceIP, "", ""),       /* node id (IPv4) */
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
@@ -282,7 +282,7 @@ func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceI
 	// Build response message
 	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
 	arres, err := message.NewAssociationReleaseResponse(ie.NewRecoveryTimeStamp(time.Now()),
-		ie.NewNodeID(sourceIP, "", ""),       /* node id */
+		ie.NewNodeID(sourceIP, "", ""),       /* node id (IPv4) */
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
@@ -343,7 +343,7 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 		fseid.SEID,                           /* seid */
 		sereq.SequenceNumber,                 /* seq # */
 		0,                                    /* priority */
-		ie.NewNodeID(sourceIP, "", ""),       /* node id */
+		ie.NewNodeID(sourceIP, "", ""),       /* node id (IPv4) */
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 		ie.NewFSEID((fseid.SEID<<2), net.ParseIP(sourceIP), nil, nil),
 	).Marshal()
