@@ -8,4 +8,5 @@ require (
 	github.com/wmnsk/go-pfcp v0.0.2-0.20200705143537-99a4faec89ff
 	google.golang.org/grpc v1.30.0
 	google.golang.org/protobuf v1.25.0
+    github.com/badhrinathpa/p4rtc_go 1.3 
 )

@@ -13,7 +13,7 @@ bessd_port=10514
 # "af_xdp" uses AF_XDP sockets via DPDK's vdev for pkt I/O. This version is non-zc version. ZC version still needs to be evaluated.
 # "af_packet" uses AF_PACKET sockets via DPDK's vdev for pkt I/O.
 # "sim" uses Source() modules to simulate traffic generation
-mode="dpdk"
+mode="af_xdp"
 #mode="af_xdp"
 #mode="af_packet"
 #mode="sim"
@@ -109,90 +109,9 @@ sudo rm -rf /var/run/netns/pause
 # Build
 make docker-build
 
-if [ "$mode" == 'dpdk' ]; then
-	DEVICES=${DEVICES:-'--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio'}
-	PRIVS='--cap-add IPC_LOCK'
-
-elif [ "$mode" == 'af_xdp' ]; then
-	PRIVS='--privileged'
-
-elif [ "$mode" == 'af_packet' ]; then
-	PRIVS='--cap-add IPC_LOCK'
-fi
-
-# Run pause
-docker run --name pause -td --restart unless-stopped \
-	-p $bessd_port:$bessd_port \
-	-p $gui_port:$gui_port \
-	--hostname $(hostname) \
-	k8s.gcr.io/pause
-
-# Emulate CNI + init container
-sudo mkdir -p /var/run/netns
-sandbox=$(docker inspect --format='{{.NetworkSettings.SandboxKey}}' pause)
-sudo ln -s "$sandbox" /var/run/netns/pause
-
-case $mode in
-"dpdk" | "sim") setup_mirror_links ;;
-"af_xdp" | "af_packet")
-	move_ifaces
-	# Make sure that kernel does not send back icmp dest unreachable msg(s)
-	sudo ip netns exec pause iptables -I OUTPUT -p icmp --icmp-type port-unreachable -j DROP
-	;;
-*) ;;
-
-esac
-
-# Setup trafficgen routes
-if [ "$mode" != 'sim' ]; then
-	setup_trafficgen_routes
-fi
-
-# Run bessd
-docker run --name bess -td --restart unless-stopped \
-	--cpuset-cpus=12-13 \
-	--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
-	-v "$PWD/conf":/opt/bess/bessctl/conf \
-	--net container:pause \
-	$PRIVS \
-	$DEVICES \
-	upf-epc-bess:"$(<VERSION)" -grpc-url=0.0.0.0:$bessd_port
-
-docker logs bess
-
-# Sleep for a couple of secs before setting up the pipeline
-sleep 10
-docker exec bess ./bessctl run up4
-sleep 10
-
-# Run bess-web
-docker run --name bess-web -d --restart unless-stopped \
-	--net container:bess \
-	--entrypoint bessctl \
-	upf-epc-bess:"$(<VERSION)" http 0.0.0.0 $gui_port
-
 # Run bess-pfcpiface depending on mode type
 docker run --name bess-pfcpiface -td --restart on-failure \
-	--net container:pause \
 	-v "$PWD/conf/upf.json":/conf/upf.json \
 	upf-epc-pfcpiface:"$(<VERSION)" \
 	-config /conf/upf.json
 
-# Don't run any other container if mode is "sim"
-if [ "$mode" == 'sim' ]; then
-	exit
-fi
-
-# Run bess-routectl
-docker run --name bess-routectl -td --restart unless-stopped \
-	-v "$PWD/conf/route_control.py":/route_control.py \
-	--net container:pause --pid container:bess \
-	--entrypoint /route_control.py \
-	upf-epc-bess:"$(<VERSION)" -i "${ifaces[@]}"
-
-# Run bess-cpiface
-docker run --name bess-cpiface -td --restart unless-stopped \
-	--net container:pause \
-	--entrypoint zmq-cpiface \
-	-v "$PWD/conf":/tmp/conf \
-	upf-epc-cpiface:"$(<VERSION)" --json_config /tmp/conf/upf.json

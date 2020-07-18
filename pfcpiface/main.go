@@ -5,6 +5,7 @@ package main
 
 import (
 	"encoding/json"
+    "fmt"
 	"flag"
 	"io/ioutil"
 	"log"
@@ -12,8 +13,7 @@ import (
 	"net/http"
 	"os"
 
-	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
-	"google.golang.org/grpc"
+    "github.com/badhrinathpa/p4rtc_go"
 )
 
 const (
@@ -34,6 +34,7 @@ type Conf struct {
 	N3Iface     IfaceType   `json:"s1u"`
 	N6Iface     IfaceType   `json:"sgi"`
 	CPIface     CPIfaceInfo `json:"cpiface"`
+    PFCPIface   PFCPIfaceInfo `json:"pfcpiface"`
 	SimInfo     SimModeInfo `json:"sim"`
 }
 
@@ -47,6 +48,11 @@ type SimModeInfo struct {
 // CPIfaceInfo : CPIface interface settings
 type CPIfaceInfo struct {
 	DestIP string `json:"nb_dst_ip"`
+}
+
+// CPIfaceInfo : CPIface interface settings
+type PFCPIfaceInfo struct {
+	N3IP string `json:"n3_ip"`
 }
 
 // IfaceType : Gateway interface struct
@@ -74,21 +80,13 @@ func ParseJSON(filepath *string, conf *Conf) {
 }
 
 // ParseN3IP : parse N3 IP address from the interface name
-func ParseN3IP(n3name string) net.IP {
-	byNameInterface, err := net.InterfaceByName(n3name)
-
-	if err != nil {
-		log.Fatalln("Unable to get info on N3 interface name:", n3name, err)
-	}
-
-	addresses, err := byNameInterface.Addrs()
-
-	ip, _, err := net.ParseCIDR(addresses[0].String())
+func ParseN3IP(n3name string) (net.IP, net.IPMask)  {
+	ip, ip_net, err := net.ParseCIDR(n3name)
 	if err != nil {
 		log.Fatalln("Unable to parse N3IP: ", err)
 	}
 	log.Println("N3 IP: ", ip)
-	return ip
+	return ip, (ip_net).Mask
 }
 
 func main() {
@@ -102,14 +100,8 @@ func main() {
 	ParseJSON(configPath, &conf)
 	log.Println(conf)
 	// parse N3IP
-	n3IP := ParseN3IP(conf.N3Iface.IfName)
-
-	// get bess grpc client
-	conn, err := grpc.Dial(*bess, grpc.WithInsecure())
-	if err != nil {
-		log.Fatalln("did not connect:", err)
-	}
-	defer conn.Close()
+	n3IP, n3IPMask := ParseN3IP(conf.PFCPIface.N3IP)
+    fmt.Println("N3IP: ", n3IP ,", N3IPMask: ", n3IPMask)
 
 	var simInfo *SimModeInfo = nil
 	if conf.Mode == modeSim {
@@ -120,7 +112,6 @@ func main() {
 		n3Iface:     conf.N3Iface.IfName,
 		n6Iface:     conf.N6Iface.IfName,
 		n3IP:        n3IP,
-		client:      pb.NewBESSControlClient(conn),
 		maxSessions: conf.MaxSessions,
 		simInfo:     simInfo,
 	}
@@ -140,6 +131,18 @@ func main() {
 
 	go pfcpifaceMainLoop(upf, n3IP.String(), n4SrcIP.String())
 
-	setupProm(upf)
+    var host string = "onos:51001"
+    var deviceId uint64 = 1
+    //var client *p4rtc_bad.P4rtClient = nil
+    client, err := p4rtc_bad.CreateChannel(host, deviceId)
+    if err != nil{
+        fmt.Printf("create channel failed : %v", err)
+    }
+    if client != nil{
+        fmt.Printf("device id %d", (*client).DeviceID)
+    }
+
+	
+    setupProm(upf)
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))
 }
