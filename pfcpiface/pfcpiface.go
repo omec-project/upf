@@ -359,7 +359,7 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 	defer cancel()
 	done := make(chan bool)
 	calls := len(pdrs) + len(fars)
-	boom := time.After(Timeout)
+
 	err = upf.pauseAll()
 	if err != nil {
 		log.Fatalln("Unable to pause BESS:", err)
@@ -370,24 +370,8 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 	for _, far := range fars {
 		upf.addFAR(ctx, done, far)
 	}
-	for {
-		select {
-		case ok := <-done:
-			if !ok {
-				log.Println("Error adding PDRs and/or FARs")
-				cancel()
-				break
-			}
-			calls = calls - 1
-		case <-boom:
-			log.Println("Timed out adding PDRs and/or FARs")
-			break
-		}
-		if calls == 0 {
-			break
-		}
-	}
 
+	upf.GRPCJoin(calls, Timeout, done)
 	err = upf.resumeAll()
 	if err != nil {
 		log.Fatalln("Unable to resume BESS:", err)
@@ -448,76 +432,61 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
 				farID, err := ie1.FARID()
 				if err != nil {
 					log.Println("Unable to find updateFAR's FAR ID!")
+					continue
+				}
+				var eNBTeid uint32
+				eNBIP := uint32(0)
+				n6IP4 := uint32(0)
+				tunnelType := uint8(0)
+				/* Read UpdateFAR from payload */
+				ies2, err := ie1.UpdateForwardingParameters()
+				if err != nil {
+					log.Println("Unable to find UpdateForwardingParameters!")
 				} else {
-					var eNBTeid uint32
-					eNBIP := uint32(0)
-					n6IP4 := uint32(0)
-					tunnelType := uint8(0)
-					/* Read UpdateFAR from payload */
-					ies2, err := ie1.UpdateForwardingParameters()
-					if err != nil {
-						log.Println("Unable to find UpdateForwardingParameters!")
-					} else {
-						for _, ie2 := range ies2 {
-							switch ie2.Type {
-							case ie.OuterHeaderCreation:
-								outerheadercreationfields, err := ie2.OuterHeaderCreation()
-								if err != nil {
-									log.Println("Unable to parse OuterHeaderCreationFields!")
-								} else {
-									eNBTeid = outerheadercreationfields.TEID
-									eNBIP = ip2int(outerheadercreationfields.IPv4Address)
-									n6IP4 = ip2int(upf.n3IP)
-									tunnelType = uint8(1)
-								}
-							case ie.DestinationInterface:
-								// Do nothing for the time being
+					for _, ie2 := range ies2 {
+						switch ie2.Type {
+						case ie.OuterHeaderCreation:
+							outerheadercreationfields, err := ie2.OuterHeaderCreation()
+							if err != nil {
+								log.Println("Unable to parse OuterHeaderCreationFields!")
+							} else {
+								eNBTeid = outerheadercreationfields.TEID
+								eNBIP = ip2int(outerheadercreationfields.IPv4Address)
+								n6IP4 = ip2int(upf.n3IP)
+								tunnelType = uint8(1)
 							}
+						case ie.DestinationInterface:
+							// Do nothing for the time being
 						}
 					}
-					far := far{
-						farID:       uint8(farID),  // farID currently being truncated to uint8 <--- FIXIT/TODO/XXX
-						fseID:       uint32(fseid), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-						action:      farForwardD,
-						tunnelType:  tunnelType,
-						s1uIP:       n6IP4,
-						eNBIP:       eNBIP,
-						eNBTeid:     eNBTeid,
-						UDPGTPUPort: udpGTPUPort,
-					}
-					/* create context */
-					ctx, cancel := context.WithTimeout(context.Background(), Timeout)
-					defer cancel()
-					done := make(chan bool)
-					calls := 1
-					boom := time.After(Timeout)
-					// pause daemon, and then insert FAR, finally resume
-					err = upf.pauseAll()
-					if err != nil {
-						log.Fatalln("Unable to pause BESS:", err)
-					}
-					upf.addFAR(ctx, done, far)
-					for {
-						select {
-						case ok := <-done:
-							if !ok {
-								log.Println("Error adding FAR")
-								cancel()
-								break
-							}
-							calls = calls - 1
-						case <-boom:
-							log.Println("Timed out adding FAR")
-							break
-						}
-						if calls == 0 {
-							break
-						}
-					}
-					err = upf.resumeAll()
-					if err != nil {
-						log.Fatalln("Unable to resume BESS:", err)
-					}
+				}
+				far := far{
+					farID:       uint8(farID),  // farID currently being truncated to uint8 <--- FIXIT/TODO/XXX
+					fseID:       uint32(fseid), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
+					action:      farForwardD,
+					tunnelType:  tunnelType,
+					s1uIP:       n6IP4,
+					eNBIP:       eNBIP,
+					eNBTeid:     eNBTeid,
+					UDPGTPUPort: udpGTPUPort,
+				}
+				/* create context */
+				ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+				defer cancel()
+				done := make(chan bool)
+				calls := 1
+
+				// pause daemon, and then insert FAR, finally resume
+				err = upf.pauseAll()
+				if err != nil {
+					log.Fatalln("Unable to pause BESS:", err)
+				}
+				upf.addFAR(ctx, done, far)
+
+				upf.GRPCJoin(calls, Timeout, done)
+				err = upf.resumeAll()
+				if err != nil {
+					log.Fatalln("Unable to resume BESS:", err)
 				}
 			}
 		}
@@ -582,7 +551,7 @@ func handleSessionDeletionRequest(upf *upf, msg message.Message, addr net.Addr, 
 
 	done := make(chan bool)
 	calls := len(sessItem.pdrs) + len(sessItem.fars)
-	boom := time.After(Timeout)
+
 	// pause daemon, and then delete FAR(s) and PDR(s), finally resume
 	err := upf.pauseAll()
 	if err != nil {
@@ -594,23 +563,8 @@ func handleSessionDeletionRequest(upf *upf, msg message.Message, addr net.Addr, 
 	for _, far := range sessItem.fars {
 		upf.delFAR(ctx, done, far)
 	}
-	for {
-		select {
-		case ok := <-done:
-			if !ok {
-				log.Println("Error deleting PDRs and/or FARs")
-				cancel()
-				break
-			}
-			calls = calls - 1
-		case <-boom:
-			log.Println("Timed out deleting PDRs and/or FARs")
-			break
-		}
-		if calls == 0 {
-			break
-		}
-	}
+
+	upf.GRPCJoin(calls, Timeout, done)
 	err = upf.resumeAll()
 	if err != nil {
 		log.Fatalln("Unable to resume BESS:", err)
