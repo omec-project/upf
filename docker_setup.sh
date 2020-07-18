@@ -3,17 +3,20 @@
 # Copyright(c) 2019 Intel Corporation
 
 set -e
-# TCP port of bess-web monitor
+# TCP port of bess/web monitor
 gui_port=8000
+bessd_port=10514
 
 # Driver options. Choose any one of the three
 #
 # "dpdk" set as default
 # "af_xdp" uses AF_XDP sockets via DPDK's vdev for pkt I/O. This version is non-zc version. ZC version still needs to be evaluated.
 # "af_packet" uses AF_PACKET sockets via DPDK's vdev for pkt I/O.
+# "sim" uses Source() modules to simulate traffic generation
 mode="dpdk"
 #mode="af_xdp"
 #mode="af_packet"
+#mode="sim"
 
 # Gateway interface(s)
 #
@@ -43,7 +46,7 @@ nhmacaddrs=(68:05:ca:31:fa:7a 68:05:ca:31:fa:7b)
 # IPv4 route table entries in cidr format per port
 #
 # In the order of ("{r-s1u}" "{r-sgi}")
-routes=("11.1.1.128/27 11.1.1.160/27 11.1.1.192/27 11.1.1.224/27" "13.1.1.128/27 13.1.1.160/27 13.1.1.192/27 13.1.1.224/27")
+routes=("11.1.1.128/25" "0.0.0.0/0")
 
 num_ifaces=${#ifaces[@]}
 num_ipaddrs=${#ipaddrs[@]}
@@ -54,7 +57,7 @@ function setup_trafficgen_routes() {
 		sudo ip netns exec pause ip neighbor add "${nhipaddrs[$i]}" lladdr "${nhmacaddrs[$i]}" dev "${ifaces[$i % num_ifaces]}"
 		routelist=${routes[$i]}
 		for route in $routelist; do
-			sudo ip netns exec pause ip route add "$route" via "${nhipaddrs[$i]}"
+			sudo ip netns exec pause ip route add "$route" via "${nhipaddrs[$i]}" metric 100
 		done
 	done
 }
@@ -98,9 +101,9 @@ function move_ifaces() {
 	setup_addrs
 }
 
-# Stop previous instances of bess-web, bess-cpiface, bess-routectl and bess before restarting
-docker stop pause bess bess-routectl bess-web bess-cpiface || true
-docker rm -f pause bess bess-routectl bess-web bess-cpiface || true
+# Stop previous instances of bess* before restarting
+docker stop pause bess bess-routectl bess-web bess-cpiface bess-pfcpiface || true
+docker rm -f pause bess bess-routectl bess-web bess-cpiface bess-pfcpiface || true
 sudo rm -rf /var/run/netns/pause
 
 # Build
@@ -119,6 +122,7 @@ fi
 
 # Run pause
 docker run --name pause -td --restart unless-stopped \
+	-p $bessd_port:$bessd_port \
 	-p $gui_port:$gui_port \
 	--hostname $(hostname) \
 	k8s.gcr.io/pause
@@ -129,15 +133,20 @@ sandbox=$(docker inspect --format='{{.NetworkSettings.SandboxKey}}' pause)
 sudo ln -s "$sandbox" /var/run/netns/pause
 
 case $mode in
-"dpdk") setup_mirror_links ;;
-*)
+"dpdk" | "sim") setup_mirror_links ;;
+"af_xdp" | "af_packet")
 	move_ifaces
 	# Make sure that kernel does not send back icmp dest unreachable msg(s)
 	sudo ip netns exec pause iptables -I OUTPUT -p icmp --icmp-type port-unreachable -j DROP
 	;;
+*) ;;
+
 esac
 
-setup_trafficgen_routes
+# Setup trafficgen routes
+if [ "$mode" != 'sim' ]; then
+	setup_trafficgen_routes
+fi
 
 # Run bessd
 docker run --name bess -td --restart unless-stopped \
@@ -147,9 +156,32 @@ docker run --name bess -td --restart unless-stopped \
 	--net container:pause \
 	$PRIVS \
 	$DEVICES \
-	upf-epc-bess:"$(<VERSION)"
+	upf-epc-bess:"$(<VERSION)" -grpc-url=0.0.0.0:$bessd_port
 
 docker logs bess
+
+# Sleep for a couple of secs before setting up the pipeline
+sleep 10
+docker exec bess ./bessctl run up4
+sleep 10
+
+# Run bess-web
+docker run --name bess-web -d --restart unless-stopped \
+	--net container:bess \
+	--entrypoint bessctl \
+	upf-epc-bess:"$(<VERSION)" http 0.0.0.0 $gui_port
+
+# Run bess-pfcpiface depending on mode type
+docker run --name bess-pfcpiface -td --restart on-failure \
+	--net container:pause \
+	-v "$PWD/conf/upf.json":/conf/upf.json \
+	upf-epc-pfcpiface:"$(<VERSION)" \
+	-config /conf/upf.json
+
+# Don't run any other container if mode is "sim"
+if [ "$mode" == 'sim' ]; then
+	exit
+fi
 
 # Run bess-routectl
 docker run --name bess-routectl -td --restart unless-stopped \
@@ -158,14 +190,9 @@ docker run --name bess-routectl -td --restart unless-stopped \
 	--entrypoint /route_control.py \
 	upf-epc-bess:"$(<VERSION)" -i "${ifaces[@]}"
 
-# Run bess-web
-docker run --name bess-web -d --restart unless-stopped \
-	--net container:pause \
-	--entrypoint bessctl \
-	upf-epc-bess:"$(<VERSION)" http 0.0.0.0 $gui_port
-
 # Run bess-cpiface
 docker run --name bess-cpiface -td --restart unless-stopped \
 	--net container:pause \
 	--entrypoint zmq-cpiface \
-	upf-epc-cpiface:"$(<VERSION)"
+	-v "$PWD/conf":/tmp/conf \
+	upf-epc-cpiface:"$(<VERSION)" --json_config /tmp/conf/upf.json

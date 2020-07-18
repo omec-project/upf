@@ -29,6 +29,11 @@ jobs:
           chmod +x shfmt && sudo mv shfmt /bin
           shfmt -w -l .
 
+      # Hack to ignore pfcpiface/vendor/ dir
+      - name: Ignore Vendor
+        run: |
+          git checkout pfcpiface/vendor
+
       # Build again and commit
       - name: Build the Docker image (after format)
         run: |
