@@ -90,7 +90,10 @@ func (u *upf) sim(method string) {
 	start := time.Now()
 
 	// Pause workers before
-	u.pauseAll()
+	err := u.pauseAll()
+	if err != nil {
+		log.Fatalln("Unable to pause BESS:", err)
+	}
 
 	//const ueip, teid, enbip = 0x10000001, 0xf0000000, 0x0b010181
 	ueip, teid, enbip := net.ParseIP(u.simInfo.StartUeIP), hex2int(u.simInfo.StartTeid), net.ParseIP(u.simInfo.StartEnodeIP)
@@ -162,7 +165,10 @@ func (u *upf) sim(method string) {
 			log.Fatalln("Unsupported method", method)
 		}
 	}
-	u.resumeAll()
+	err = u.resumeAll()
+	if err != nil {
+		log.Fatalln("Unable to resume BESS:", err)
+	}
 
 	log.Println("Sessions/s:", float64(u.maxSessions)/time.Since(start).Seconds())
 }
