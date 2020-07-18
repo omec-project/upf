@@ -18,12 +18,6 @@ func ip2int(ip net.IP) uint32 {
 	return binary.BigEndian.Uint32(ip)
 }
 
-func int2ip(nn uint32) net.IP {
-	ip := make(net.IP, 4)
-	binary.BigEndian.PutUint32(ip, nn)
-	return ip
-}
-
 func hex2int(hexStr string) uint32 {
 	// remove 0x suffix if found in the input string
 	cleaned := strings.Replace(hexStr, "0x", "", -1)
@@ -43,4 +37,12 @@ func getOutboundIP(dstIP string) net.IP {
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 
 	return localAddr.IP
+}
+
+func mySEID(peerSEID uint64) uint64 {
+	return (peerSEID >> 2)
+}
+
+func peerSEID(mySEID uint64) uint64 {
+	return (mySEID << 2)
 }

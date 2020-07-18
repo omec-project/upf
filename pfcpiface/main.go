@@ -73,7 +73,10 @@ func ParseJSON(filepath *string, conf *Conf) {
 		log.Fatalln("Error reading file: ", err)
 	}
 
-	json.Unmarshal(byteValue, conf)
+	err = json.Unmarshal(byteValue, conf)
+	if err != nil {
+		log.Fatalln("Unable to unmarshal conf attributes:", err)
+	}
 }
 
 // ParseN3IP : parse N3 IP address from the interface name
