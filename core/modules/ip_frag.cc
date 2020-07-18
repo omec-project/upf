@@ -1,3 +1,7 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * Copyright(c) 2020 Intel Corporation
+ */
 /* for ip_frag decls */
 #include "ip_frag.h"
 /* for rte_zmalloc() */
