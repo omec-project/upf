@@ -58,8 +58,8 @@ CommandResponse Counter::RemoveCounter(const bess::pb::CounterRemoveArg &arg) {
 #else
   if (ctr_id < total_count && counters[ctr_id].pkt_count != 0) {
     DLOG(INFO) << this->name() << "[" << ctr_id
-	       << "]: " << counters[ctr_id].pkt_count << ", "
-	       << counters[ctr_id].byte_count << std::endl;
+               << "]: " << counters[ctr_id].pkt_count << ", "
+               << counters[ctr_id].byte_count << std::endl;
     counters[ctr_id].pkt_count = counters[ctr_id].byte_count = 0;
   }
   curr_count--;

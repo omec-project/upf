@@ -175,7 +175,6 @@ func (u *upf) sim(method string) {
 
 func (u *upf) createEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time.Duration) {
 	calls := 7
-	boom := time.After(timeout)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -191,29 +190,14 @@ func (u *upf) createEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time
 	u.addCounter(ctx, done, pdrDown.ctrID, "postDLQoSCounter")
 	u.addCounter(ctx, done, pdrDown.ctrID, "postULQoSCounter")
 
-	for {
-		select {
-		case ok := <-done:
-			if !ok {
-				log.Println("Error adding entries")
-				cancel()
-				go u.deleteEntries(pdrDown, pdrUp, farDown, farUp, timeout)
-				return
-			}
-			calls = calls - 1
-			if calls == 0 {
-				return
-			}
-		case <-boom:
-			log.Println("Timed out adding entries")
-			return
-		}
+	rc := u.GRPCJoin(calls, timeout, done)
+	if !rc {
+		go u.deleteEntries(pdrDown, pdrUp, farDown, farUp, timeout)
 	}
 }
 
 func (u *upf) deleteEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time.Duration) {
 	calls := 7
-	boom := time.After(timeout)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -229,20 +213,7 @@ func (u *upf) deleteEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time
 	u.delCounter(ctx, done, pdrDown.ctrID, "postDLQoSCounter")
 	u.delCounter(ctx, done, pdrDown.ctrID, "postULQoSCounter")
 
-	for {
-		select {
-		case ok := <-done:
-			if !ok {
-				log.Println("Unable to delete entries")
-			}
-			calls = calls - 1
-			if calls == 0 {
-				return
-			}
-		case <-boom:
-			return
-		}
-	}
+	u.GRPCJoin(calls, timeout, done)
 }
 
 func (u *upf) pauseAll() error {
@@ -511,4 +482,25 @@ func (u *upf) portStats(ifname string) *pb.GetPortStatsResponse {
 		return nil
 	}
 	return res
+}
+
+func (u *upf) GRPCJoin(calls int, timeout time.Duration, done chan bool) bool {
+	boom := time.After(timeout)
+
+	for {
+		select {
+		case ok := <-done:
+			if !ok {
+				log.Println("Error making GRPC calls")
+				return false
+			}
+			calls--
+			if calls == 0 {
+				return true
+			}
+		case <-boom:
+			log.Println("Timed out adding entries")
+			return true
+		}
+	}
 }
