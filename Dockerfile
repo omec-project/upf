@@ -58,15 +58,16 @@ RUN ./build_bess.sh && \
     cp core/modules/*.so /bin/modules && \
     mkdir -p /opt/bess && \
     cp -r bessctl pybess /opt/bess && \
-    cp -r core/pb /pb
+    cp -r core/pb /pb && \
+    cp -a protobuf /protobuf
 
 # Stage pip: compile psutil
-FROM python:2.7-slim AS pip
+FROM python:3.8-slim AS pip
 RUN apt-get update && apt-get install -y gcc
 RUN pip install --no-cache-dir psutil
 
 # Stage bess: creates the runtime image of BESS
-FROM python:2.7-slim AS bess
+FROM python:3.8-slim AS bess
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         libgraph-easy-perl \
@@ -81,8 +82,8 @@ RUN apt-get update && \
         iptools \
         protobuf \
         pyroute2 \
-        https://github.com/secdev/scapy/archive/b65e795c62accd383e1bb6b17cd9f7a9143ae117.zip
-COPY --from=pip /usr/local/lib/python2.7/site-packages/psutil /usr/local/lib/python2.7/site-packages/psutil
+        scapy
+COPY --from=pip /usr/local/lib/python3.8/site-packages/psutil /usr/local/lib/python3.8/site-packages/psutil
 COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin/bessd
 COPY --from=bess-build /bin/modules /bin/modules
@@ -95,7 +96,7 @@ ENTRYPOINT ["bessd", "-f"]
 FROM nefelinetworks/bess_build  AS cpiface-build
 ARG MAKEFLAGS
 ARG CPU=native
-RUN apt-get update -y && apt-get install -y libzmq3-dev
+RUN apt-get update -y && apt-get install -y libzmq3-dev libjsoncpp-dev
 WORKDIR /cpiface
 COPY cpiface .
 COPY --from=bess-build /pb pb
@@ -114,8 +115,19 @@ RUN apt-get update && \
 
 COPY --from=cpiface-build /bin/zmq-cpiface /bin
 
+FROM golang AS pfcpiface-build
+WORKDIR /pfcpiface
+COPY pfcpiface .
+RUN CGO_ENABLED=0 go build -mod=vendor -o /bin/pfcpiface
 
-# Stage binaries: dummy stage for collecting binaries
-FROM scratch as binaries
+# Stage pfcpiface: runtime image of pfcpiface toward SMF/SPGW-C
+FROM alpine AS pfcpiface
+COPY --from=pfcpiface-build /bin/pfcpiface /bin
+ENTRYPOINT [ "/bin/pfcpiface" ]
+
+# Stage binaries: dummy stage for collecting artifacts
+FROM scratch AS artifacts
 COPY --from=bess /bin/bessd /
 COPY --from=cpiface /bin/zmq-cpiface /
+COPY --from=pfcpiface /bin/pfcpiface /
+COPY --from=bess-build /protobuf /protobuf
