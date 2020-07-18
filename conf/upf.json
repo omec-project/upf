@@ -1,16 +1,20 @@
 {
-    "": "Vdev support. Enable `\"mode\": \"af_xdp\"` to enable AF_XDP mode, or `\"mode\": \"af_packet\"` to enable AF_PACKET mode",
+    "": "Vdev or sim support. Enable `\"mode\": \"af_xdp\"` to enable AF_XDP mode, or `\"mode\": \"af_packet\"` to enable AF_PACKET mode, or `\"mode\": \"sim\"` to generate synthetic traffic from BESS's Source module",
     "": "mode: af_xdp",
     "": "mode: af_packet",
-
-    "": "UE IP range",
-    "ue_cidr": "16.0.0.0/16",
-
-    "": "eNodeB IP range",
-    "enb_cidr": "11.1.1.128/25",
+    "": "mode: sim",
 
     "": "max UE sessions",
     "max_sessions": 50000,
+
+    "": "Use the sim block to enable simulation using either Source module or via il_trafficgen",
+    "sim": {
+	"start_ue_ip": "16.0.0.1",
+	"start_enb_ip": "11.1.1.129",
+	"start_teid": "0xf0000000",
+	"pkt_size": 128,
+	"total_flows": 5000
+    },
 
     "": "max IP frag table entries (for IPv4 reassembly). Update the line below to `\"max_ip_defrag_flows\": 1000` to enable",
     "": "max_ip_defrag_flows: 1000",
@@ -19,7 +23,7 @@
     "": "ip_frag_with_eth_mtu: 1518",
 
     "": "Telemetrics-See this link for details: https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py",
-    "measure": false,
+    "measure": true,
 
     "": "Gateway interfaces",
     "s1u": {
@@ -35,6 +39,13 @@
     "": "Number of worker threads. Default: use 1 thread to run both (uplink/downlink) pipelines",
     "workers": 1,
 
-    "": "Enable Network Token Functionality (requires upf-epc to be built with ENABLE_NTF=1)",
-    "enable_ntf": false
+    "": "Whether to enable Network Token Functions",
+    "enable_ntf": false,
+
+    "": "Control plane controller settings",
+    "cpiface": {
+	"nb_dst_ip": "172.17.0.1",
+	"" : "nb_dst_ip: CPHostname",
+	"hostname": "ngic-skx2"
+    }
 }
