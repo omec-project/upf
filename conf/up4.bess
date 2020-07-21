@@ -179,6 +179,11 @@ gtpuEncap:0 -> gtpuEncapFail::Sink()
 pdrLookup.set_default_gate(gate=pdrFailGate)
 farLookup.set_default_gate(gate=farFailGate)
 
+# Set gates for BPF filters
+GTPUEchoGate = ports[parser.s1u_ifname].bpf_gate()
+GTPUGate = ports[parser.s1u_ifname].bpf_gate()
+UEGate = ports[parser.sgi_ifname].bpf_gate()
+
 
 # ====================================================
 #       Downlink Pipeline
@@ -186,11 +191,6 @@ farLookup.set_default_gate(gate=farFailGate)
 
 # Pick fast-path gate for DL pipeline
 sgiFastBPF = ports[parser.sgi_ifname].bpf
-UEGate = 0
-if ports[parser.sgi_ifname].ext_addrs is not None:
-    UEGate = ports[parser.sgi_ifname].bpf_gate()
-    ports[parser.sgi_ifname].bpf -> Sink()
-
 
 # 1. Build initial DL pipeline here
 if ports[parser.sgi_ifname].hwcksum == True:
@@ -244,19 +244,14 @@ if ports[parser.sgi_ifname].nat is not None:
     ue_filter = {"priority": -UEGate,
                  "filter": "ip dst {}".format(ports[parser.sgi_ifname].ext_addrs), "gate": UEGate}
     sgiFastBPF.add(filters=[ue_filter])
-
-# Add Sgi filter rules, i.e.:
-# setting filter to detect gtpu traffic
-# and dst host x.x.x.x                         # check S/PGWU IP
-# and udp dst port 2152                         # check GTPU port
-check_ip = "ip"
-check_spgwu_ip = " and dst host " + \
-    " or ".join(str(x) for x in sgi_ip)
-check_gtpu_port = " and udp dst port 2152"
-GTPUGate = 0 #ports[parser.sgi_ifname].bpf_gate()
-downlink_filter = {"priority": -GTPUGate, "filter": check_ip +
-               check_spgwu_ip + check_gtpu_port, "gate": GTPUGate}
-sgiFastBPF.add(filters=[downlink_filter])
+else:
+    # Add Sgi filter rules, i.e.:
+    # setting filter to detect gtpu traffic
+    # and dst host x.x.x.x                         # check S/PGWU IP
+    # and udp dst port 2152                         # check GTPU port
+    check_ip = "ip"
+    downlink_filter = {"priority": -UEGate, "filter": check_ip, "gate": UEGate}
+    sgiFastBPF.add(filters=[downlink_filter])
 
 
 # ====================================================
@@ -266,9 +261,6 @@ sgiFastBPF.add(filters=[downlink_filter])
 
 # Pick fast-path and echo gates for UL pipeline
 s1uFastBPF = ports[parser.s1u_ifname].bpf
-GTPUEchoGate = ports[parser.s1u_ifname].bpf_gate()
-GTPUGate = 0
-
 
 # 1. Build initial UL pipeline here
 if ports[parser.s1u_ifname].hwcksum == True:
