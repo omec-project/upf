@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+    "strconv"
 
     "github.com/badhrinathpa/p4rtc_go"
 )
@@ -52,7 +53,10 @@ type CPIfaceInfo struct {
 
 // CPIfaceInfo : CPIface interface settings
 type PFCPIfaceInfo struct {
-	N3IP string `json:"n3_ip"`
+	N3IP         string `json:"n3_ip"`
+    P4rtc_server string `json:"p4rtc_server"`
+    P4rtc_port   uint32 `json:"p4rtc_port"`
+    UEIP         string `json:"ue_ip_pool"`
 }
 
 // IfaceType : Gateway interface struct
@@ -102,6 +106,9 @@ func main() {
 	// parse N3IP
 	n3IP, n3IPMask := ParseN3IP(conf.PFCPIface.N3IP)
     fmt.Println("N3IP: ", n3IP ,", N3IPMask: ", n3IPMask)
+    p4rtc_server :=  conf.PFCPIface.P4rtc_server
+    fmt.Println("p4rtc server ip/name", p4rtc_server)
+    p4rtc_port := conf.PFCPIface.P4rtc_port
 
 	var simInfo *SimModeInfo = nil
 	if conf.Mode == modeSim {
@@ -131,18 +138,26 @@ func main() {
 
 	go pfcpifaceMainLoop(upf, n3IP.String(), n4SrcIP.String())
 
-    var host string = "onos:51001"
+    var host string = p4rtc_server + ":" +strconv.Itoa(int(p4rtc_port))
+	log.Println("server name: ", host)
     var deviceId uint64 = 1
     //var client *p4rtc_bad.P4rtClient = nil
     client, err := p4rtc_bad.CreateChannel(host, deviceId)
     if err != nil{
-        fmt.Printf("create channel failed : %v", err)
+        fmt.Printf("create channel failed : %v\n", err)
     }
     if client != nil{
-        fmt.Printf("device id %d", (*client).DeviceID)
-    }
+        fmt.Printf("device id %d\n", (*client).DeviceID)
+        p4InfoPath := "/bin/p4info.txt"
+        deviceConfigPath := "/bin/bmv2.json"
 
-	
+        err := client.SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath)
+        if err != nil{
+            fmt.Printf("set forwarding pipeling config failed. %v\n",err)
+        }
+    }else {
+        fmt.Printf("p4runtime client is null.\n")
+    }
     setupProm(upf)
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))
 }
