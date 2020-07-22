@@ -115,6 +115,17 @@ RUN apt-get update && \
 
 COPY --from=cpiface-build /bin/zmq-cpiface /bin
 
+# Stage build bess golang pb
+FROM golang AS protoc-gen
+RUN go get github.com/golang/protobuf/protoc-gen-go
+
+FROM bess-build AS go-pb
+COPY --from=protoc-gen /go/bin/protoc-gen-go /bin
+RUN mkdir /bess_pb && \
+    protoc -I /usr/include -I /protobuf/ \
+        /protobuf/*.proto /protobuf/ports/*.proto \
+        --go_out=plugins=grpc:/bess_pb
+
 FROM golang AS pfcpiface-build
 WORKDIR /pfcpiface
 COPY pfcpiface .
@@ -131,3 +142,4 @@ COPY --from=bess /bin/bessd /
 COPY --from=cpiface /bin/zmq-cpiface /
 COPY --from=pfcpiface /bin/pfcpiface /
 COPY --from=bess-build /protobuf /protobuf
+COPY --from=go-pb /bess_pb /bess_pb

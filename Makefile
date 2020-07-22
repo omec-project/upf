@@ -57,15 +57,9 @@ output:
 			.;
 
 # Golang grpc/protobuf generation
-PROTOS += output/protobuf/*.proto
-PROTOS += output/protobuf/ports/*.proto
-
-PROTO_INC += -I /usr/include
-PROTO_INC += -I output/protobuf/
-
-BESS_PB_DIR ?= pfcpiface/bess_pb
+BESS_PB_DIR ?= pfcpiface
 
 pb: output
-	protoc ${PROTO_INC} ${PROTOS} --go_out=plugins=grpc:${BESS_PB_DIR}
+	cp -a output/bess_pb ${BESS_PB_DIR}
 
 .PHONY: docker-build docker-push output pb
