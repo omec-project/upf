@@ -232,16 +232,20 @@ func (u *upf) resumeAll() error {
 
 func (u *upf) processPDR(ctx context.Context, any *anypb.Any, method string) {
 
-	if method != "add" && method != "delete" {
+	if method != "add" && method != "delete" && method != "clear" {
 		log.Println("Invalid method name: ", method)
 		return
 	}
 
-	u.client.ModuleCommand(ctx, &pb.CommandRequest{
+	cr, err := u.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "pdrLookup",
 		Cmd:  method,
 		Arg:  any,
 	})
+
+	if err != nil {
+		log.Println("pdrLookup method failed!:", cr.Error)
+	}
 }
 
 func (u *upf) addPDR(ctx context.Context, done chan<- bool, p pdr) {
@@ -330,16 +334,20 @@ func (u *upf) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 func (u *upf) processFAR(ctx context.Context, any *anypb.Any, method string) {
 
-	if method != "add" && method != "delete" {
+	if method != "add" && method != "delete" && method != "clear" {
 		log.Println("Invalid method name: ", method)
 		return
 	}
 
-	u.client.ModuleCommand(ctx, &pb.CommandRequest{
+	cr, err := u.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "farLookup",
 		Cmd:  method,
 		Arg:  any,
 	})
+
+	if err != nil {
+		log.Println("farLookup method failed!:", cr.Error)
+	}
 }
 
 func (u *upf) addFAR(ctx context.Context, done chan<- bool, far far) {
@@ -394,11 +402,15 @@ func (u *upf) delFAR(ctx context.Context, done chan<- bool, far far) {
 }
 
 func (u *upf) processCounters(ctx context.Context, any *anypb.Any, method string, counterName string) {
-	u.client.ModuleCommand(ctx, &pb.CommandRequest{
+	cr, err := u.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: counterName,
 		Cmd:  method,
 		Arg:  any,
 	})
+
+	if err != nil {
+		log.Println("counter method failed!:", cr.Error)
+	}
 }
 
 func (u *upf) addCounter(ctx context.Context, done chan<- bool, ctrID uint32, counterName string) {
@@ -435,6 +447,58 @@ func (u *upf) delCounter(ctx context.Context, done chan<- bool, ctrID uint32, co
 			return
 		}
 		u.processCounters(ctx, any, "remove", counterName)
+		done <- true
+	}()
+}
+
+func (u *upf) removeAllPDRs(ctx context.Context, done chan<- bool) {
+	go func() {
+		var any *anypb.Any
+		var err error
+
+		f := &pb.EmptyArg{}
+		any, err = ptypes.MarshalAny(f)
+		if err != nil {
+			log.Println("Error marshalling the rule", f, err)
+			return
+		}
+
+		u.processPDR(ctx, any, "clear")
+		done <- true
+	}()
+}
+
+func (u *upf) removeAllFARs(ctx context.Context, done chan<- bool) {
+	go func() {
+		var any *anypb.Any
+		var err error
+
+		f := &pb.EmptyArg{}
+		any, err = ptypes.MarshalAny(f)
+		if err != nil {
+			log.Println("Error marshalling the rule", f, err)
+			return
+		}
+
+		u.processFAR(ctx, any, "clear")
+		done <- true
+	}()
+}
+
+func (u *upf) removeAllCounters(ctx context.Context, done chan<- bool, name string) {
+	go func() {
+		var any *anypb.Any
+		var err error
+
+		f := &pb.EmptyArg{}
+		any, err = ptypes.MarshalAny(f)
+		if err != nil {
+			log.Println("Error marshalling the rule", f, err)
+			return
+		}
+
+		u.processCounters(ctx, any, "removeAll", name)
+
 		done <- true
 	}()
 }
