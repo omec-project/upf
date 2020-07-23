@@ -15,10 +15,11 @@ import (
 
 // PktBufSz : buffer size for incoming pkt
 const (
-	PktBufSz = 1500
-	PFCPPort = "8805"
-	MaxItems = 10
-	Timeout  = 1000 * time.Millisecond
+	PktBufSz    = 1500
+	PFCPPort    = "8805"
+	MaxItems    = 10
+	Timeout     = 1000 * time.Millisecond
+	readTimeout = 25 * time.Second
 )
 
 type sessRecord struct {
@@ -206,6 +207,30 @@ func parsePDRFromPFCPSessEstReqPayload(upf *upf, sereq *message.SessionEstablish
 	return pdrList, farList
 }
 
+func deleteAllSessions(upf *upf) {
+	/* create context, pause daemon, insert PDR(s), and resume daemon */
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel()
+	done := make(chan bool)
+	calls := 5
+
+	err := upf.pauseAll()
+	if err != nil {
+		log.Fatalln("Unable to pause BESS:", err)
+	}
+	upf.removeAllPDRs(ctx, done)
+	upf.removeAllFARs(ctx, done)
+	upf.removeAllCounters(ctx, done, "preQoSCounter")
+	upf.removeAllCounters(ctx, done, "postDLQoSCounter")
+	upf.removeAllCounters(ctx, done, "postULQoSCounter")
+
+	upf.GRPCJoin(calls, Timeout, done)
+	err = upf.resumeAll()
+	if err != nil {
+		log.Fatalln("Unable to resume BESS:", err)
+	}
+}
+
 func pfcpifaceMainLoop(upf *upf, n3ip string, sourceIP string) {
 	log.Println("pfcpifaceMainLoop@" + upf.fqdnHost + " says hello!!!")
 
@@ -223,18 +248,34 @@ func pfcpifaceMainLoop(upf *upf, n3ip string, sourceIP string) {
 		return
 	}
 
+	// flag to check SMF/SPGW-C is connected
+	cpConnected := false
+
 	// Initialize pkt buf
 	buf := make([]byte, PktBufSz)
 	// Initialize sessions map
 	sessions = make(map[uint64]sessRecord)
 
 	for {
+		err := conn.SetReadDeadline(time.Now().Add(readTimeout))
+		if err != nil {
+			log.Fatalln("Unable to set deadline for read")
+		}
 		// blocking read
 		n, addr, err := conn.ReadFrom(buf)
 		if err != nil {
-			log.Fatalln("Unable to read packet buffer")
-			return
+			if err, ok := err.(net.Error); ok && err.Timeout() {
+				// do nothing for the time being
+				log.Println(err)
+				if cpConnected {
+					deleteAllSessions(upf)
+					cpConnected = false
+				}
+				continue
+			}
+			log.Fatalln("Read error:", err)
 		}
+
 		// use wmnsk lib to parse the pfcp message
 		msg, err := message.Parse(buf[:n])
 		if err != nil {
@@ -249,6 +290,7 @@ func pfcpifaceMainLoop(upf *upf, n3ip string, sourceIP string) {
 		switch msg.MessageType() {
 		case message.MsgTypeAssociationSetupRequest:
 			outgoingMessage = handleAssociationSetupRequest(msg, addr, sourceIP, n3ip)
+			cpConnected = true
 		case message.MsgTypeSessionEstablishmentRequest:
 			outgoingMessage = handleSessionEstablishmentRequest(upf, msg, addr, sourceIP)
 		case message.MsgTypeSessionModificationRequest:

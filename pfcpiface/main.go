@@ -88,6 +88,9 @@ func ParseN3IP(n3name string) net.IP {
 	}
 
 	addresses, err := byNameInterface.Addrs()
+	if err != nil {
+		log.Fatalln("Unable to retrieve addresses from interface name!", err)
+	}
 
 	ip, _, err := net.ParseCIDR(addresses[0].String())
 	if err != nil {
