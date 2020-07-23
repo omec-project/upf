@@ -11,10 +11,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Checkout and build
-      - uses: actions/checkout@master
+      - uses: actions/checkout@main
       - name: Build the Docker image
         run: |
           make docker-build
+
+      - name: Generate bess_pb
+        run: |
+          make pb
 
       # Format the code
       - name: Clang Format
