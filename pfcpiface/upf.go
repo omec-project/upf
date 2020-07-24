@@ -156,10 +156,10 @@ func (u *upf) sim(method string) {
 
 		switch timeout := 100 * time.Millisecond; method {
 		case "create":
-			u.createEntries(pdrDown, pdrUp, farDown, farUp, timeout)
+			u.simcreateEntries(pdrDown, pdrUp, farDown, farUp, timeout)
 
 		case "delete":
-			u.deleteEntries(pdrDown, pdrUp, farDown, farUp, timeout)
+			u.simdeleteEntries(pdrDown, pdrUp, farDown, farUp, timeout)
 
 		default:
 			log.Fatalln("Unsupported method", method)
@@ -173,7 +173,7 @@ func (u *upf) sim(method string) {
 	log.Println("Sessions/s:", float64(u.maxSessions)/time.Since(start).Seconds())
 }
 
-func (u *upf) createEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time.Duration) {
+func (u *upf) simcreateEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time.Duration) {
 	calls := 7
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -192,11 +192,11 @@ func (u *upf) createEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time
 
 	rc := u.GRPCJoin(calls, timeout, done)
 	if !rc {
-		go u.deleteEntries(pdrDown, pdrUp, farDown, farUp, timeout)
+		go u.simdeleteEntries(pdrDown, pdrUp, farDown, farUp, timeout)
 	}
 }
 
-func (u *upf) deleteEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time.Duration) {
+func (u *upf) simdeleteEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time.Duration) {
 	calls := 7
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -214,6 +214,65 @@ func (u *upf) deleteEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time
 	u.delCounter(ctx, done, pdrDown.ctrID, "postULQoSCounter")
 
 	u.GRPCJoin(calls, timeout, done)
+}
+
+func (u *upf) sendMsgToUPF(method string, pdrs []pdr, fars []far) {
+	// create context
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel()
+	done := make(chan bool)
+	calls := len(pdrs) + len(fars)
+
+	// pause daemon, and then insert FAR(s), finally resume
+	err := u.pauseAll()
+	if err != nil {
+		log.Fatalln("Unable to pause BESS:", err)
+	}
+	for _, pdr := range pdrs {
+		switch method {
+		case "add":
+			u.addPDR(ctx, done, pdr)
+		case "del":
+			u.delPDR(ctx, done, pdr)
+		}
+	}
+	for _, far := range fars {
+		switch method {
+		case "add":
+			u.addFAR(ctx, done, far)
+		case "del":
+			u.delFAR(ctx, done, far)
+		}
+	}
+	u.GRPCJoin(calls, Timeout, done)
+	err = u.resumeAll()
+	if err != nil {
+		log.Fatalln("Unable to resume BESS:", err)
+	}
+}
+
+func sendDeleteAllSessionsMsgtoUPF(upf *upf) {
+	/* create context, pause daemon, insert PDR(s), and resume daemon */
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel()
+	done := make(chan bool)
+	calls := 5
+
+	err := upf.pauseAll()
+	if err != nil {
+		log.Fatalln("Unable to pause BESS:", err)
+	}
+	upf.removeAllPDRs(ctx, done)
+	upf.removeAllFARs(ctx, done)
+	upf.removeAllCounters(ctx, done, "preQoSCounter")
+	upf.removeAllCounters(ctx, done, "postDLQoSCounter")
+	upf.removeAllCounters(ctx, done, "postULQoSCounter")
+
+	upf.GRPCJoin(calls, Timeout, done)
+	err = upf.resumeAll()
+	if err != nil {
+		log.Fatalln("Unable to resume BESS:", err)
+	}
 }
 
 func (u *upf) pauseAll() error {
