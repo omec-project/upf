@@ -121,11 +121,11 @@ func (uc *upfCollector) portStats(ch chan<- prometheus.Metric) {
 		packets(res.Inc.Packets, "rx")
 		packets(res.Out.Packets, "tx")
 
-		bytes(res.Inc.Packets, "rx")
-		bytes(res.Out.Packets, "tx")
+		bytes(res.Inc.Bytes, "rx")
+		bytes(res.Out.Bytes, "tx")
 
-		dropped(res.Inc.Packets, "rx")
-		dropped(res.Out.Packets, "tx")
+		dropped(res.Inc.Dropped, "rx")
+		dropped(res.Out.Dropped, "tx")
 
 	}
 
