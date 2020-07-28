@@ -128,7 +128,7 @@ func main() {
 	}
 	defer conn.Close()
 
-	var simInfo *SimModeInfo = nil
+	var simInfo *SimModeInfo
 	if conf.Mode == modeSim {
 		simInfo = &conf.SimInfo
 	}

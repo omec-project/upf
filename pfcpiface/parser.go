@@ -149,6 +149,9 @@ func parseFAR(ie1 *ie.IE, fseid uint64, n3IP net.IP, fwdType string) *far {
 		ies2, err = ie1.ForwardingParameters()
 	} else if fwdType == "update" {
 		ies2, err = ie1.UpdateForwardingParameters()
+	} else {
+		log.Println("Invalid fwdType specified!")
+		return nil
 	}
 	if err != nil {
 		log.Println("Unable to find ForwardingParameters!")

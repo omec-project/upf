@@ -213,7 +213,10 @@ func (u *upf) simdeleteEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout t
 	u.delCounter(ctx, done, pdrDown.ctrID, "postDLQoSCounter")
 	u.delCounter(ctx, done, pdrDown.ctrID, "postULQoSCounter")
 
-	u.GRPCJoin(calls, timeout, done)
+	rc := u.GRPCJoin(calls, timeout, done)
+	if !rc {
+		log.Println("Unable to complete GRPC call(s)")
+	}
 }
 
 func (u *upf) sendMsgToUPF(method string, pdrs []pdr, fars []far) {
@@ -244,7 +247,10 @@ func (u *upf) sendMsgToUPF(method string, pdrs []pdr, fars []far) {
 			u.delFAR(ctx, done, far)
 		}
 	}
-	u.GRPCJoin(calls, Timeout, done)
+	rc := u.GRPCJoin(calls, Timeout, done)
+	if !rc {
+		log.Println("Unable to make GRPC calls")
+	}
 	err = u.resumeAll()
 	if err != nil {
 		log.Fatalln("Unable to resume BESS:", err)
@@ -268,7 +274,10 @@ func sendDeleteAllSessionsMsgtoUPF(upf *upf) {
 	upf.removeAllCounters(ctx, done, "postDLQoSCounter")
 	upf.removeAllCounters(ctx, done, "postULQoSCounter")
 
-	upf.GRPCJoin(calls, Timeout, done)
+	rc := upf.GRPCJoin(calls, Timeout, done)
+	if !rc {
+		log.Println("Unable to make GRPC calls")
+	}
 	err = upf.resumeAll()
 	if err != nil {
 		log.Fatalln("Unable to resume BESS:", err)
@@ -623,7 +632,7 @@ func (u *upf) GRPCJoin(calls int, timeout time.Duration, done chan bool) bool {
 			}
 		case <-boom:
 			log.Println("Timed out adding entries")
-			return true
+			return false
 		}
 	}
 }
