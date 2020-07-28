@@ -6,11 +6,11 @@ package main
 import (
 	"log"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
-	"golang.org/x/net/ipv4"
 )
 
 // PktBufSz : buffer size for incoming pkt
@@ -90,14 +90,9 @@ func pfcpifaceMainLoop(upf *upf, n3ip string, sourceIP string) {
 
 		// if sourceIP is not set, fetch it from the msg header
 		if sourceIP == "0.0.0.0" {
-			header, err := ipv4.ParseHeader(buf[:n])
-			if err == nil {
-				log.Println("N4 Src IP gets resolved to:", header.Dst.String())
-				sourceIP = header.Dst.String()
-			} else {
-				log.Println("Failed to parse message header. Skipping...")
-				continue
-			}
+			addrString := strings.Split(addr.String(), ":")
+			sourceIP = getOutboundIP(addrString[0]).String()
+			log.Println("Source IP address is now: ", sourceIP)
 		}
 
 		//log.Println("Message: ", msg)
