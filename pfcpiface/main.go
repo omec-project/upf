@@ -47,8 +47,8 @@ type SimModeInfo struct {
 
 // CPIfaceInfo : CPIface interface settings
 type CPIfaceInfo struct {
-	DestIP string `json:"nb_dst_ip"`
-	//SrcIP    string `json:"nb_src_ip"`
+	DestIP   string `json:"nb_dst_ip"`
+	SrcIP    string `json:"nb_src_ip"`
 	FQDNHost string `json:"hostname"`
 }
 
@@ -79,12 +79,12 @@ func ParseJSON(filepath *string, conf *Conf) {
 	}
 }
 
-// ParseN3IP : parse N3 IP address from the interface name
-func ParseN3IP(n3name string) net.IP {
-	byNameInterface, err := net.InterfaceByName(n3name)
+// ParseIP : parse IP address from the interface name
+func ParseIP(name string, iface string) net.IP {
+	byNameInterface, err := net.InterfaceByName(name)
 
 	if err != nil {
-		log.Fatalln("Unable to get info on N3 interface name:", n3name, err)
+		log.Fatalln("Unable to get info on interface name:", name, err)
 	}
 
 	addresses, err := byNameInterface.Addrs()
@@ -94,9 +94,9 @@ func ParseN3IP(n3name string) net.IP {
 
 	ip, _, err := net.ParseCIDR(addresses[0].String())
 	if err != nil {
-		log.Fatalln("Unable to parse N3IP: ", err)
+		log.Fatalln("Unable to parse", iface, " IP: ", err)
 	}
-	log.Println("N3 IP: ", ip)
+	log.Println(iface, " IP: ", ip)
 	return ip
 }
 
@@ -111,8 +111,9 @@ func main() {
 	ParseJSON(configPath, &conf)
 	log.Println(conf)
 
-	n3IP := ParseN3IP(conf.N3Iface.IfName)
-	n6IP := ParseN3IP(conf.N6Iface.IfName)
+	n3IP := ParseIP(conf.N3Iface.IfName, "N3")
+	n6IP := ParseIP(conf.N6Iface.IfName, "N6")
+	n4SrcIP := net.ParseIP("0.0.0.0")
 
 	// fetch fqdn. Prefer json field
 	fqdnh := conf.CPIface.FQDNHost
@@ -153,7 +154,17 @@ func main() {
 		return
 	}
 
-	n4SrcIP := getOutboundIP(conf.CPIface.DestIP)
+	if conf.CPIface.SrcIP == "" {
+		if conf.CPIface.DestIP != "" {
+			n4SrcIP = getOutboundIP(conf.CPIface.DestIP)
+		}
+	} else {
+		addrs, err := net.LookupHost(conf.CPIface.SrcIP)
+		if err == nil {
+			n4SrcIP = net.ParseIP(addrs[0])
+		}
+	}
+
 	log.Println("N4 IP: ", n4SrcIP.String())
 
 	go pfcpifaceMainLoop(upf, n3IP.String(), n4SrcIP.String())
