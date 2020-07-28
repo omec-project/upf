@@ -97,52 +97,59 @@ func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
 		ueIPMask = 0xFFFFFFFF
 	}
 
+	pdrI := pdr{
+		pdrID:     uint32(pdrID),
+		fseID:     uint32(fseid.SEID), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
+		ctrID:     0,                  // ctrID currently not being set <--- FIXIT/TODO/XXX
+		farID:     uint8(farID),       // farID currently not being set <--- FIXIT/TODO/XXX
+		needDecap: outerHeaderRemoval,
+	}
 	// populated everything for PDR, and set the right pdr_
 	if srcIface == ie.SrcInterfaceAccess {
-		pdrU := pdr{
-			srcIface:     access,
-			eNBTeid:      teid,
-			dstIP:        ueIP,
-			srcIfaceMask: 0xFF,
-			eNBTeidMask:  0xFFFFFFFF,
-			dstIPMask:    ueIPMask,
-			pdrID:        uint32(pdrID),
-			fseID:        uint32(fseid.SEID), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-			ctrID:        0,                  // ctrID currently not being set <--- FIXIT/TODO/XXX
-			farID:        uint8(farID),
-			needDecap:    outerHeaderRemoval,
-		}
-		return &pdrU
+		pdrI.srcIface = access
+		pdrI.eNBTeid = teid
+		pdrI.dstIP = ueIP
+		pdrI.srcIfaceMask = 0xFF
+		pdrI.eNBTeidMask = 0xFFFFFFFF
+		pdrI.dstIPMask = ueIPMask
 	} else if srcIface == ie.SrcInterfaceCore {
-		pdrD := pdr{
-			srcIface:     core,
-			srcIP:        ueIP,
-			srcIfaceMask: 0xFF,
-			srcIPMask:    ueIPMask,
-			pdrID:        uint32(pdrID),
-			fseID:        uint32(fseid.SEID), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-			ctrID:        0,                  // ctrID currently not being set <--- FIXIT/TOOD/XXX
-			farID:        uint8(farID),       // farID currently not being set <--- FIXIT/TODO/XXX
-			needDecap:    outerHeaderRemoval,
-		}
-		return &pdrD
+		pdrI.srcIface = core
+		pdrI.srcIP = ueIP
+		pdrI.srcIfaceMask = 0xFF
+		pdrI.srcIPMask = ueIPMask
+	} else {
+		return nil
 	}
 
-	return nil
+	return &pdrI
 }
 
-func parseCreateFAR(ie1 *ie.IE, fseid *ie.FSEIDFields, n6IP net.IP) *far {
+func parseCreateFAR(ie1 *ie.IE, fseid uint64, n6IP net.IP) *far {
+	return parseFAR(ie1, fseid, n6IP, "create")
+}
+
+func parseUpdateFAR(ie1 *ie.IE, fseid uint64, n3IP net.IP) *far {
+	return parseFAR(ie1, fseid, n3IP, "update")
+}
+
+func parseFAR(ie1 *ie.IE, fseid uint64, n3IP net.IP, fwdType string) *far {
 	farID, err := ie1.FARID()
 	if err != nil {
 		log.Println("Could not read FAR ID!")
 		return nil
 	}
-	/* Read outerheadercreation from payload (if it exists) */
+	// Read outerheadercreation from payload (if it exists)
 	var eNBTeid uint32
 	eNBIP := uint32(0)
 	n6IP4 := uint32(0)
 	tunnelType := uint8(0)
-	ies2, err := ie1.ForwardingParameters()
+	var ies2 []*ie.IE
+
+	if fwdType == "create" {
+		ies2, err = ie1.ForwardingParameters()
+	} else if fwdType == "update" {
+		ies2, err = ie1.UpdateForwardingParameters()
+	}
 	if err != nil {
 		log.Println("Unable to find ForwardingParameters!")
 		return nil
@@ -157,61 +164,15 @@ func parseCreateFAR(ie1 *ie.IE, fseid *ie.FSEIDFields, n6IP net.IP) *far {
 			}
 			eNBTeid = outerheadercreationfields.TEID
 			eNBIP = ip2int(outerheadercreationfields.IPv4Address)
-			n6IP4 = ip2int(n6IP)
+			n6IP4 = ip2int(n3IP)
 			tunnelType = uint8(1)
-		}
-	}
-
-	return &far{
-		farID:       uint8(farID),       // farID currently being truncated to uint8 <--- FIXIT/TODO/XXX
-		fseID:       uint32(fseid.SEID), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-		action:      farForwardU,
-		tunnelType:  tunnelType,
-		s1uIP:       n6IP4,
-		eNBIP:       eNBIP,
-		eNBTeid:     eNBTeid,
-		UDPGTPUPort: udpGTPUPort,
-	}
-}
-
-func parseUpdateFAR(ie1 *ie.IE, fseid uint64, n3IP net.IP) *far {
-	/* check for updatefar, and fetch FAR ID */
-	farID, err := ie1.FARID()
-	if err != nil {
-		log.Println("Unable to find updateFAR's FAR ID!")
-		return nil
-	}
-	var eNBTeid uint32
-	eNBIP := uint32(0)
-	n6IP4 := uint32(0)
-	tunnelType := uint8(0)
-	/* Read UpdateFAR from payload */
-	ies2, err := ie1.UpdateForwardingParameters()
-	if err != nil {
-		log.Println("Unable to find UpdateForwardingParameters!")
-		return nil
-	}
-	for _, ie2 := range ies2 {
-		switch ie2.Type {
-		case ie.OuterHeaderCreation:
-			outerheadercreationfields, err := ie2.OuterHeaderCreation()
-			if err != nil {
-				log.Println("Unable to parse OuterHeaderCreationFields!")
-			} else {
-				eNBTeid = outerheadercreationfields.TEID
-				eNBIP = ip2int(outerheadercreationfields.IPv4Address)
-				n6IP4 = ip2int(n3IP)
-				tunnelType = uint8(1)
-			}
-		case ie.DestinationInterface:
-			// Do nothing for the time being
 		}
 	}
 
 	return &far{
 		farID:       uint8(farID),  // farID currently being truncated to uint8 <--- FIXIT/TODO/XXX
 		fseID:       uint32(fseid), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-		action:      farForwardD,
+		action:      farForwardU,
 		tunnelType:  tunnelType,
 		s1uIP:       n6IP4,
 		eNBIP:       eNBIP,
@@ -243,7 +204,7 @@ func parsePDRFromPFCPSessEstReqPayload(upf *upf, sereq *message.SessionEstablish
 			}
 
 		case ie.CreateFAR:
-			if f := parseCreateFAR(ie1, fseid, upf.n6IP); f != nil {
+			if f := parseCreateFAR(ie1, fseid.SEID, upf.n6IP); f != nil {
 				fars = append(fars, *f)
 			}
 		}
