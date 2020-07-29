@@ -124,15 +124,15 @@ func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
 	return &pdrI
 }
 
-func parseCreateFAR(ie1 *ie.IE, fseid uint64, n6IP net.IP) *far {
-	return parseFAR(ie1, fseid, n6IP, "create")
+func parseCreateFAR(ie1 *ie.IE, fseid uint64, n6IP net.IP, dir uint8) *far {
+	return parseFAR(ie1, fseid, n6IP, "create", dir)
 }
 
-func parseUpdateFAR(ie1 *ie.IE, fseid uint64, n3IP net.IP) *far {
-	return parseFAR(ie1, fseid, n3IP, "update")
+func parseUpdateFAR(ie1 *ie.IE, fseid uint64, n3IP net.IP, dir uint8) *far {
+	return parseFAR(ie1, fseid, n3IP, "update", dir)
 }
 
-func parseFAR(ie1 *ie.IE, fseid uint64, n3IP net.IP, fwdType string) *far {
+func parseFAR(ie1 *ie.IE, fseid uint64, n3IP net.IP, fwdType string, dir uint8) *far {
 	farID, err := ie1.FARID()
 	if err != nil {
 		log.Println("Could not read FAR ID!")
@@ -175,7 +175,7 @@ func parseFAR(ie1 *ie.IE, fseid uint64, n3IP net.IP, fwdType string) *far {
 	return &far{
 		farID:       uint8(farID),  // farID currently being truncated to uint8 <--- FIXIT/TODO/XXX
 		fseID:       uint32(fseid), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-		action:      farForwardU,
+		action:      dir,
 		tunnelType:  tunnelType,
 		s1uIP:       n6IP4,
 		eNBIP:       eNBIP,
@@ -207,7 +207,7 @@ func parsePDRFromPFCPSessEstReqPayload(upf *upf, sereq *message.SessionEstablish
 			}
 
 		case ie.CreateFAR:
-			if f := parseCreateFAR(ie1, fseid.SEID, upf.n6IP); f != nil {
+			if f := parseCreateFAR(ie1, fseid.SEID, upf.n6IP, farForwardU); f != nil {
 				fars = append(fars, *f)
 			}
 		}
