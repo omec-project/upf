@@ -19,7 +19,7 @@ jobs:
         USERNAME: ${{ github.actor }}
         PASSWORD: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        docker login https://docker.pkg.github.com -u $USERNAME -p $PASSWORD
+        echo $PASSWORD | docker login https://docker.pkg.github.com -u $USERNAME --password-stdin
     - name: Build and push Docker image
       run: |
         make docker-build
