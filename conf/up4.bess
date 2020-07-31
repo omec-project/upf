@@ -48,6 +48,18 @@ if parser.mode == 'sim':
                                     parser.sim_start_enb_ip, s1u_ip[0],
                                     parser.sim_start_ue_ip, '172.16.100.1',
                                     parser.sim_start_teid)]
+    if parser.enable_ntf:
+        # Every 30th packet will be a STUN packet.  With 5000 flows, this
+        # results in about 1000 flows with network tokens, and every 3rd packet
+        # is a STUN packet with a token.  This is not a good representation of
+        # a real world test, but it is enough to verify that NTF can match
+        # tokens and pass traffic through with mode="sim".
+        ue_packets = ue_packets * 29
+        ue_packets.append(
+          sim.gen_ue_ntf_packet(parser.sim_pkt_size, macstr_d, macstr_u,
+                                parser.sim_start_enb_ip, s1u_ip[0],
+                                parser.sim_start_ue_ip, '172.16.100.1',
+                                parser.sim_start_teid))
     packet_generator = {'s1u': ue_packets, 'sgi': inet_packets}
     seq_kwargs = {'s1u': sim.get_ue_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip, parser.sim_start_teid),
                   'sgi': sim.get_inet_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip)}
@@ -107,6 +119,23 @@ for idx, iface in enumerate(interfaces):
 
 
 # ====================================================
+#       Network Token Functions Setup
+# ====================================================
+
+ntf = None
+if parser.enable_ntf:
+    try:
+        ntf = NTF()
+        # TODO: Populate these tables by talking to the NTE
+        ntf.table_create(dpid=1, max_entries=5)
+        ntf.entry_create(dpid=1, entry_id=1, dscp=1, token={
+          'app_id': 0xB00F,
+          'encryption_key': '{"alg":"A128CBC-HS256","k":"Qr_XwDGctna3SlR88rEJYt6Zm100SASYeJWSJihDnsA","key_ops":["encrypt","decrypt"],"kty":"oct"}'
+        })
+    except NameError:
+        pass
+
+# ====================================================
 # 	Shared Pipeline (DL + UL)
 # ====================================================
 
@@ -134,8 +163,15 @@ linkMerge::Merge() \
                                         {'attr_name':'fseid', 'num_bytes':4}, \
                                         {'attr_name':'ctr_id', 'num_bytes':4}, \
                                         {'attr_name':'far_id', 'num_bytes':4}]):noGTPUDecap \
-    -> preQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
-    -> farLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
+    -> preQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions)
+
+# Insert NTF module, if enabled
+_in = preQoSCounter
+if ntf:
+  _in -> ntf
+  _in = ntf
+
+_in -> farLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
                                      {'attr_name':'fseid', 'num_bytes':4}], \
                              values=[{'attr_name':'action', 'num_bytes':1}, \
                                      {'attr_name':'tunnel_out_type', 'num_bytes':1}, \
@@ -148,7 +184,8 @@ linkMerge::Merge() \
 
 # Add logical pipeline when gtpudecap is needed
 pdrLookup:GTPUDecap \
-    -> etherTrimDecap::GenericDecap(bytes=14) -> gtpuDecap::GtpuDecap() \
+    -> etherTrimDecap::GenericDecap(bytes=14) \
+    -> gtpuDecap::GtpuDecap() \
     -> sgiEtherAdd::GenericEncap(fields=[
         {'size': 6, 'value': {'value_int': 0x0}},
         {'size': 6, 'value': {'value_int': 0x0}},
