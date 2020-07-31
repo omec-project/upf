@@ -83,13 +83,13 @@ func ParseJSON(filepath *string, conf *Conf) {
 	json.Unmarshal(byteValue, conf)
 }
 
-// ParseN3IP : parse N3 IP address from the interface name
-func ParseN3IP(n3name string) (net.IP, net.IPMask)  {
+// ParseIP : parse IP address from config
+func ParseIP(n3name string) (net.IP, net.IPMask)  {
 	ip, ip_net, err := net.ParseCIDR(n3name)
 	if err != nil {
-		log.Fatalln("Unable to parse N3IP: ", err)
+		log.Fatalln("Unable to parse IP: ", err)
 	}
-	log.Println("N3 IP: ", ip)
+	log.Println("IP: ", ip)
 	return ip, (ip_net).Mask
 }
 
@@ -104,8 +104,10 @@ func main() {
 	ParseJSON(configPath, &conf)
 	log.Println(conf)
 	// parse N3IP
-	n3IP, n3IPMask := ParseN3IP(conf.PFCPIface.N3IP)
+	n3IP, n3IPMask := ParseIP(conf.PFCPIface.N3IP)
     fmt.Println("N3IP: ", n3IP ,", N3IPMask: ", n3IPMask)
+	ueIP, ueIPMask := ParseIP(conf.PFCPIface.UEIP)
+    fmt.Println("UEIP: ", ueIP ,", UEIPMask: ", ueIPMask)
     p4rtc_server :=  conf.PFCPIface.P4rtc_server
     fmt.Println("p4rtc server ip/name", p4rtc_server)
     p4rtc_port := conf.PFCPIface.P4rtc_port
@@ -154,6 +156,30 @@ func main() {
         err := client.SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath)
         if err != nil{
             fmt.Printf("set forwarding pipeling config failed. %v\n",err)
+        }
+
+        intf_entry := p4rtc_bad.Intf_Table_Entry{
+                        Ip: n3IP,
+                        Prefix_Len: n3IPMask,
+                        Src_Intf: "ACCESS",
+                        Direction: "UPLINK",
+                    }
+        func_type := p4rtc_bad.FUNCTION_TYPE_INSERT
+        err = client.WriteInterfaceTable(
+                                intf_entry, func_type)
+        if err != nil{
+            fmt.Printf("Write Interface table failed. %v\n",err)
+        }
+        intf_entry = p4rtc_bad.Intf_Table_Entry{
+                        Ip: ueIP,
+                        Prefix_Len: ueIPMask,
+                        Src_Intf: "CORE",
+                        Direction: "DOWNLINK",
+                    }
+        err = client.WriteInterfaceTable(
+                                intf_entry, func_type)
+        if err != nil{
+            fmt.Printf("Write Interface table failed. %v\n",err)
         }
     }else {
         fmt.Printf("p4runtime client is null.\n")
