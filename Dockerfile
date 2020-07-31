@@ -136,10 +136,13 @@ FROM alpine AS pfcpiface
 COPY --from=pfcpiface-build /bin/pfcpiface /bin
 ENTRYPOINT [ "/bin/pfcpiface" ]
 
+# Stage pb: dummy stage for collecting protobufs
+FROM scratch AS pb
+COPY --from=bess-build /protobuf /protobuf
+COPY --from=go-pb /bess_pb /bess_pb
+
 # Stage binaries: dummy stage for collecting artifacts
 FROM scratch AS artifacts
 COPY --from=bess /bin/bessd /
 COPY --from=cpiface /bin/zmq-cpiface /
 COPY --from=pfcpiface /bin/pfcpiface /
-COPY --from=bess-build /protobuf /protobuf
-COPY --from=go-pb /bess_pb /bess_pb
