@@ -51,15 +51,19 @@ docker-push:
 
 # Change target to bess-build/cpiface to exctract src/obj/bins for performance analysis
 output:
-		DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_BUILD_ARGS) \
-			--target artifacts \
-			--output output \
-			.;
+	DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_BUILD_ARGS) \
+		--target artifacts \
+		--output output \
+		.;
 
 # Golang grpc/protobuf generation
 BESS_PB_DIR ?= pfcpiface
 
-pb: output
+pb:
+	DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_BUILD_ARGS) \
+		--target pb \
+		--output output \
+		.;
 	cp -a output/bess_pb ${BESS_PB_DIR}
 
 .PHONY: docker-build docker-push output pb

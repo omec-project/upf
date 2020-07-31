@@ -12,13 +12,20 @@ jobs:
     steps:
       # Checkout and build
       - uses: actions/checkout@v2.3.1
+
+      - name: Generate protobuf
+        run: |
+          make pb
+
+      - name: Update Go Vendor
+        working-directory: pfcpiface
+        run: |
+          go mod tidy
+          go mod vendor
+
       - name: Build the Docker image
         run: |
           make docker-build
-
-      - name: Generate bess_pb
-        run: |
-          make pb
 
       # Format the code
       - name: Clang Format
@@ -31,27 +38,23 @@ jobs:
         run: |
           wget -qO shfmt https://github.com/mvdan/sh/releases/download/v3.1.1/shfmt_v3.1.1_linux_amd64
           chmod +x shfmt && sudo mv shfmt /bin
-          shfmt -w -l .
-
-      # Hack to ignore pfcpiface/vendor/ dir
-      - name: Ignore Vendor
-        run: |
-          git checkout pfcpiface/vendor
+          # https://github.com/mvdan/sh/issues/288
+          shfmt -l -w $(shfmt -f . | grep -v vendor/)
 
       # Build again and commit
       - name: Build the Docker image (after format)
         run: |
           make docker-build
-      - name: Update PR with formatting
+      - name: Update PR with changes
         uses: gr2m/create-or-update-pull-request-action@v1.x
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           body: |
-            Updated formatting
+            Updated with changes from CI
           branch: ${{ github.event.pull_request.head.ref }}
           author: "Github Actions <actions@github>"
-          commit-message: "Actions: Apply formatting"
+          commit-message: "Actions: Updated with changes from CI"
       - name: Docker login GH packages
         env:
           USERNAME: ${{ github.actor }}
