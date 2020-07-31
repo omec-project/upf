@@ -11,6 +11,8 @@ github.com/badhrinathpa/p4rtc_go v0.0.0-20200731181211-1b024783d5d8 h1:EdsX1czdQ
 github.com/badhrinathpa/p4rtc_go v0.0.0-20200731181211-1b024783d5d8/go.mod h1:M/iNVPzoO5pUYnrdIEpqwg9exP0oZ23dkJf3UxQuoLA=
 github.com/badhrinathpa/p4rtc_go v0.0.0-20200731181815-a5af1bf68631 h1:BLy765SmASEotrZezur1t/iKu9C1VBjK9dGCijDCOwM=
 github.com/badhrinathpa/p4rtc_go v0.0.0-20200731181815-a5af1bf68631/go.mod h1:M/iNVPzoO5pUYnrdIEpqwg9exP0oZ23dkJf3UxQuoLA=
+github.com/badhrinathpa/p4rtc_go v0.0.0-20200731202557-6684bae44878 h1:v/fgLZiWrAcpurERH0vJWv3d/UevmebrbyGajGQnhHk=
+github.com/badhrinathpa/p4rtc_go v0.0.0-20200731202557-6684bae44878/go.mod h1:M/iNVPzoO5pUYnrdIEpqwg9exP0oZ23dkJf3UxQuoLA=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
