@@ -15,10 +15,10 @@ import (
 )
 
 type upf struct {
-	n3Iface     string
-	n6Iface     string
-	n3IP        net.IP
-	n6IP        net.IP
+	accessIface string
+	coreIface   string
+	accessIP    net.IP
+	coreIP      net.IP
 	fqdnHost    string
 	client      pb.BESSControlClient
 	maxSessions uint32
@@ -76,7 +76,7 @@ type far struct {
 
 	action      uint8
 	tunnelType  uint8
-	s1uIP       uint32
+	accessIP    uint32
 	eNBIP       uint32
 	eNBTeid     uint32
 	UDPGTPUPort uint16
@@ -98,7 +98,7 @@ func (u *upf) sim(method string) {
 	//const ueip, teid, enbip = 0x10000001, 0xf0000000, 0x0b010181
 	ueip, teid, enbip := net.ParseIP(u.simInfo.StartUeIP), hex2int(u.simInfo.StartTeid), net.ParseIP(u.simInfo.StartEnodeIP)
 	const ng4tMaxUeRan, ng4tMaxEnbRan = 500000, 80
-	s1uip := ip2int(u.n3IP)
+	accessIP := ip2int(u.accessIP)
 
 	for i := uint32(0); i < u.maxSessions; i++ {
 		// NG4T-based formula to calculate enodeB IP address against a given UE IP address
@@ -141,7 +141,7 @@ func (u *upf) sim(method string) {
 			fseID:       teid + i,
 			action:      farForwardD,
 			tunnelType:  0x1,
-			s1uIP:       s1uip,
+			accessIP:    accessIP,
 			eNBIP:       ip2int(enbip) + enbIdx,
 			eNBTeid:     teid + i,
 			UDPGTPUPort: udpGTPUPort,
@@ -432,7 +432,7 @@ func (u *upf) addFAR(ctx context.Context, done chan<- bool, far far) {
 			Values: []*pb.FieldData{
 				intEnc(uint64(far.action)),      /* action */
 				intEnc(uint64(far.tunnelType)),  /* tunnel_out_type */
-				intEnc(uint64(far.s1uIP)),       /* s1u-ip */
+				intEnc(uint64(far.accessIP)),    /* access-ip */
 				intEnc(uint64(far.eNBIP)),       /* enb ip */
 				intEnc(uint64(far.eNBTeid)),     /* enb teid */
 				intEnc(uint64(far.UDPGTPUPort)), /* udp gtpu port */
