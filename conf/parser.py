@@ -38,6 +38,7 @@ class Parser:
         self.s1u_ifname = None
         self.sgi_ifname = None
         self.interfaces = dict()
+        self.enable_ntf = False
 
     def parse(self, ifaces):
         # Maximum number of flows to manage ip4 frags for re-assembly
@@ -112,3 +113,9 @@ class Parser:
             self.s1u_ifname = "s1u"
             self.sgi_ifname = "sgi"
             print('Can\'t parse interface name(s)! Setting it to default values ({}, {})'.format("s1u", "sgi"))
+
+        # Network Token Function
+        try:
+            self.enable_ntf = bool(self.conf['enable_ntf'])
+        except KeyError:
+            print('Network Token Function disabled')
