@@ -161,7 +161,8 @@ struct Args {
     if (!strcmp(nb_src_ip, ZMQ_SERVER_IP))
       getNBSrcIPViaJson(nb_src_ip, nb_dst_ip);
     if (!strcmp(s1u_sgw_ip, S1U_SGW_IP))
-      getS1uAddrViaJson(s1u_sgw_ip, root["s1u"]["ifname"].asString().c_str());
+      getS1uAddrViaJson(s1u_sgw_ip,
+                        root["access"]["ifname"].asString().c_str());
     counter_count = root["max_sessions"].asInt();
     script.close();
   }

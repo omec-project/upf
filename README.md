@@ -55,21 +55,23 @@ reading from file /tmp/tmpUBTGau, link-type EN10MB (Ethernet)
 ### Complete
 
 * IPv4 support
-* S1-U, SGi interfacing
+* N3, N4, N6, N9 interfacing
 * Single & Multi-port support
 * Monitoring/Debugging capabilties using *(i)* tcpdump on individual BESS modules, *(ii)* visualization web interface, and *(iii)* command line shell interface for displaying statistics *etc*.
 * Static IP routing
 * Dynamic IP routing
 * Support for IPv4 datagrams reassembly
-* Support for IP packets fragmentation
+* Support for IPv4 packets fragmentation
 * Support for UE IP NAT
+*
 
 ### In Progress
 
-* Billing and Charging
+* I-UPF/A-UPF
 
 ### Pending
 
+* DDN support
 * PCC (Policy Control and Charging) rules configuration.
 * ADC (Application Detection and control) rules configuration.
 * Packet Filters for Service Data Flow (SDF) configuration.

@@ -124,15 +124,15 @@ func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
 	return &pdrI
 }
 
-func parseCreateFAR(ie1 *ie.IE, fseid uint64, n6IP net.IP, dir uint8) *far {
-	return parseFAR(ie1, fseid, n6IP, "create", dir)
+func parseCreateFAR(ie1 *ie.IE, fseid uint64, coreIP net.IP, dir uint8) *far {
+	return parseFAR(ie1, fseid, coreIP, "create", dir)
 }
 
-func parseUpdateFAR(ie1 *ie.IE, fseid uint64, n3IP net.IP, dir uint8) *far {
-	return parseFAR(ie1, fseid, n3IP, "update", dir)
+func parseUpdateFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP, dir uint8) *far {
+	return parseFAR(ie1, fseid, accessIP, "update", dir)
 }
 
-func parseFAR(ie1 *ie.IE, fseid uint64, n3IP net.IP, fwdType string, dir uint8) *far {
+func parseFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP, fwdType string, dir uint8) *far {
 	farID, err := ie1.FARID()
 	if err != nil {
 		log.Println("Could not read FAR ID!")
@@ -141,7 +141,7 @@ func parseFAR(ie1 *ie.IE, fseid uint64, n3IP net.IP, fwdType string, dir uint8) 
 	// Read outerheadercreation from payload (if it exists)
 	var eNBTeid uint32
 	eNBIP := uint32(0)
-	n6IP4 := uint32(0)
+	coreIP4 := uint32(0)
 	tunnelType := uint8(0)
 	var ies2 []*ie.IE
 
@@ -167,7 +167,7 @@ func parseFAR(ie1 *ie.IE, fseid uint64, n3IP net.IP, fwdType string, dir uint8) 
 			}
 			eNBTeid = outerheadercreationfields.TEID
 			eNBIP = ip2int(outerheadercreationfields.IPv4Address)
-			n6IP4 = ip2int(n3IP)
+			coreIP4 = ip2int(accessIP)
 			tunnelType = uint8(1)
 		}
 	}
@@ -177,7 +177,7 @@ func parseFAR(ie1 *ie.IE, fseid uint64, n3IP net.IP, fwdType string, dir uint8) 
 		fseID:       uint32(fseid), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
 		action:      dir,
 		tunnelType:  tunnelType,
-		s1uIP:       n6IP4,
+		accessIP:    coreIP4,
 		eNBIP:       eNBIP,
 		eNBTeid:     eNBTeid,
 		UDPGTPUPort: udpGTPUPort,
@@ -207,7 +207,7 @@ func parsePDRFromPFCPSessEstReqPayload(upf *upf, sereq *message.SessionEstablish
 			}
 
 		case ie.CreateFAR:
-			if f := parseCreateFAR(ie1, fseid.SEID, upf.n6IP, farForwardU); f != nil {
+			if f := parseCreateFAR(ie1, fseid.SEID, upf.coreIP, farForwardU); f != nil {
 				fars = append(fars, *f)
 			}
 		}

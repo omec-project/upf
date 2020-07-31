@@ -29,7 +29,7 @@ type sessRecord struct {
 
 var sessions map[uint64]sessRecord
 
-func pfcpifaceMainLoop(upf *upf, n3ip string, sourceIP string) {
+func pfcpifaceMainLoop(upf *upf, accessIP string, sourceIP string) {
 	log.Println("pfcpifaceMainLoop@" + upf.fqdnHost + " says hello!!!")
 
 	// Verify IP + Port binding
@@ -101,7 +101,7 @@ func pfcpifaceMainLoop(upf *upf, n3ip string, sourceIP string) {
 		var outgoingMessage []byte
 		switch msg.MessageType() {
 		case message.MsgTypeAssociationSetupRequest:
-			outgoingMessage = handleAssociationSetupRequest(msg, addr, sourceIP, n3ip)
+			outgoingMessage = handleAssociationSetupRequest(msg, addr, sourceIP, accessIP)
 			cpConnected = true
 		case message.MsgTypeSessionEstablishmentRequest:
 			outgoingMessage = handleSessionEstablishmentRequest(upf, msg, addr, sourceIP)
@@ -112,7 +112,7 @@ func pfcpifaceMainLoop(upf *upf, n3ip string, sourceIP string) {
 		case message.MsgTypeSessionDeletionRequest:
 			outgoingMessage = handleSessionDeletionRequest(upf, msg, addr, sourceIP)
 		case message.MsgTypeAssociationReleaseRequest:
-			outgoingMessage = handleAssociationReleaseRequest(msg, addr, sourceIP, n3ip)
+			outgoingMessage = handleAssociationReleaseRequest(msg, addr, sourceIP, accessIP)
 			cleanupSessions()
 		default:
 			log.Println("Message type: ", msg.MessageTypeName(), " is currently not supported")
@@ -129,7 +129,7 @@ func pfcpifaceMainLoop(upf *upf, n3ip string, sourceIP string) {
 	}
 }
 
-func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP string, n3ip string) []byte {
+func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP string, accessIP string) []byte {
 	asreq, ok := msg.(*message.AssociationSetupRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -150,7 +150,7 @@ func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP 
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
-		ie.NewUserPlaneIPResourceInformation(0x41, 0, n3ip, "", "", ie.SrcInterfaceAccess),
+		ie.NewUserPlaneIPResourceInformation(0x41, 0, accessIP, "", "", ie.SrcInterfaceAccess),
 		ie.NewSequenceNumber(asreq.SequenceNumber), /* seq # */
 	).Marshal() /* userplane ip resource info */
 	if err != nil {
@@ -162,7 +162,7 @@ func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP 
 	return asres
 }
 
-func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceIP string, n3ip string) []byte {
+func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceIP string, accessIP string) []byte {
 	arreq, ok := msg.(*message.AssociationReleaseRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -178,7 +178,7 @@ func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceI
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
-		ie.NewUserPlaneIPResourceInformation(0x41, 0, n3ip, "", "", ie.SrcInterfaceAccess),
+		ie.NewUserPlaneIPResourceInformation(0x41, 0, accessIP, "", "", ie.SrcInterfaceAccess),
 		ie.NewSequenceNumber(arreq.SequenceNumber), /* seq # */
 	).Marshal() /* userplane ip resource info */
 	if err != nil {
@@ -265,7 +265,7 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
 		for _, ie1 := range ies1 {
 			switch ie1.Type {
 			case ie.UpdateFAR:
-				if f := parseUpdateFAR(ie1, fseid, upf.n3IP, farForwardD); f != nil {
+				if f := parseUpdateFAR(ie1, fseid, upf.accessIP, farForwardD); f != nil {
 					fars = append(fars, *f)
 				}
 			default:

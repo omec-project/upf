@@ -32,8 +32,8 @@ var (
 type Conf struct {
 	Mode        string      `json:"mode"`
 	MaxSessions uint32      `json:"max_sessions"`
-	N3Iface     IfaceType   `json:"s1u"`
-	N6Iface     IfaceType   `json:"sgi"`
+	AccessIface IfaceType   `json:"access"`
+	CoreIface   IfaceType   `json:"core"`
 	CPIface     CPIfaceInfo `json:"cpiface"`
 	SimInfo     SimModeInfo `json:"sim"`
 }
@@ -111,8 +111,8 @@ func main() {
 	ParseJSON(configPath, &conf)
 	log.Println(conf)
 
-	n3IP := ParseIP(conf.N3Iface.IfName, "N3")
-	n6IP := ParseIP(conf.N6Iface.IfName, "N6")
+	accessIP := ParseIP(conf.AccessIface.IfName, "Access")
+	coreIP := ParseIP(conf.CoreIface.IfName, "Core")
 	n4SrcIP := net.ParseIP("0.0.0.0")
 
 	// fetch fqdn. Prefer json field
@@ -134,10 +134,10 @@ func main() {
 	}
 
 	upf := &upf{
-		n3Iface:     conf.N3Iface.IfName,
-		n6Iface:     conf.N6Iface.IfName,
-		n3IP:        n3IP,
-		n6IP:        n6IP,
+		accessIface: conf.AccessIface.IfName,
+		coreIface:   conf.CoreIface.IfName,
+		accessIP:    accessIP,
+		coreIP:      coreIP,
 		fqdnHost:    fqdnh,
 		client:      pb.NewBESSControlClient(conn),
 		maxSessions: conf.MaxSessions,
@@ -167,7 +167,7 @@ func main() {
 
 	log.Println("N4 IP: ", n4SrcIP.String())
 
-	go pfcpifaceMainLoop(upf, n3IP.String(), n4SrcIP.String())
+	go pfcpifaceMainLoop(upf, accessIP.String(), n4SrcIP.String())
 
 	setupProm(upf)
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))
