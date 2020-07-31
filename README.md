@@ -41,7 +41,8 @@ reading from file /tmp/tmpUBTGau, link-type EN10MB (Ethernet)
 ```
 
 * Visualize your dataplane pipeline
-<img src="https://ibin.co/50MaB2FZdlsz.png">
+<img src="https://pasteboard.co/Jkfmy3W.png">
+<!--<img src="https://ibin.co/50MaB2FZdlsz.png">-->
 <!--![](docs/images/bess_snip2.png)-->
 
 ## Feature List
