@@ -14,7 +14,7 @@ import (
 	"os"
     "strconv"
 
-    "github.com/badhrinathpa/p4rtc_go"
+   // "github.com/badhrinathpa/p4rtc_go"
 )
 
 const (
@@ -143,8 +143,8 @@ func main() {
     var host string = p4rtc_server + ":" +strconv.Itoa(int(p4rtc_port))
 	log.Println("server name: ", host)
     var deviceId uint64 = 1
-    //var client *p4rtc_bad.P4rtClient = nil
-    client, err := p4rtc_bad.CreateChannel(host, deviceId)
+    //var client *P4rtClient = nil
+    client, err := CreateChannel(host, deviceId)
     if err != nil{
         fmt.Printf("create channel failed : %v\n", err)
     }
@@ -158,21 +158,24 @@ func main() {
             fmt.Printf("set forwarding pipeling config failed. %v\n",err)
         }
 
-        intf_entry := p4rtc_bad.Intf_Table_Entry{
-                        Ip: n3IP,
-                        Prefix_Len: n3IPMask,
+        prefix_size,_ := n3IPMask.Size()
+        intf_entry := Intf_Table_Entry{
+                        Ip: n3IP.To4(),
+                        Prefix_Len: prefix_size,
                         Src_Intf: "ACCESS",
                         Direction: "UPLINK",
                     }
-        func_type := p4rtc_bad.FUNCTION_TYPE_INSERT
+        func_type := FUNCTION_TYPE_INSERT
         err = client.WriteInterfaceTable(
                                 intf_entry, func_type)
         if err != nil{
             fmt.Printf("Write Interface table failed. %v\n",err)
         }
-        intf_entry = p4rtc_bad.Intf_Table_Entry{
-                        Ip: ueIP,
-                        Prefix_Len: ueIPMask,
+        
+        prefix_size,_ = ueIPMask.Size()
+        intf_entry = Intf_Table_Entry{
+                        Ip: ueIP.To4(),
+                        Prefix_Len: prefix_size,
                         Src_Intf: "CORE",
                         Direction: "DOWNLINK",
                     }
