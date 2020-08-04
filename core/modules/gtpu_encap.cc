@@ -24,11 +24,11 @@
 /*----------------------------------------------------------------------------------*/
 using bess::utils::be16_t;
 using bess::utils::be32_t;
+using bess::utils::Ethernet;
 using bess::utils::Gtpv1;
 using bess::utils::Ipv4;
 using bess::utils::ToIpv4Address;
 using bess::utils::Udp;
-using bess::utils::Ethernet;
 
 enum { DEFAULT_GATE = 0, FORWARD_GATE };
 enum {
