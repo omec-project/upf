@@ -14,6 +14,8 @@
 #include "utils/ip.h"
 /* for udp header */
 #include "utils/udp.h"
+/* for ethernet header */
+#include "utils/ether.h"
 /* for gtp header */
 #include "utils/gtp.h"
 /* for GetDesc() */
@@ -26,8 +28,14 @@ using bess::utils::Gtpv1;
 using bess::utils::Ipv4;
 using bess::utils::ToIpv4Address;
 using bess::utils::Udp;
+using bess::utils::Ethernet;
 
 enum { DEFAULT_GATE = 0, FORWARD_GATE };
+enum {
+  ATTR_R_ETHER_SRC,
+  ATTR_R_ETHER_DST,
+  ATTR_R_ETHER_TYPE,
+};
 /*----------------------------------------------------------------------------------*/
 // Template for generating UDP packets without data
 struct [[gnu::packed]] PacketTemplate {
@@ -110,6 +118,29 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
       continue;
     }
 
+    /* set Ethernet header */
+    Ethernet::Address ether_src;
+    Ethernet::Address ether_dst;
+    bess::utils::be16_t ether_type;
+
+    ether_src = get_attr<Ethernet::Address>(this, ATTR_R_ETHER_SRC, p);
+    ether_dst = get_attr<Ethernet::Address>(this, ATTR_R_ETHER_DST, p);
+    ether_type = get_attr<bess::utils::be16_t>(this, ATTR_R_ETHER_TYPE, p);
+
+    Ethernet *eth = static_cast<Ethernet *>(p->prepend(sizeof(*eth)));
+
+    // not enough headroom?
+    if (unlikely(!eth)) {
+      /* failed to prepend header space for encaped packet */
+      EmitPacket(ctx, p, DEFAULT_GATE);
+      DLOG(INFO) << "prepend() failed!" << std::endl;
+      continue;
+    }
+
+    eth->dst_addr = ether_dst;
+    eth->src_addr = ether_src;
+    eth->ether_type = ether_type;
+
     /* setting GTPU pointer */
     Gtpv1 *gtph = (Gtpv1 *)(new_p + sizeof(Ipv4) + sizeof(Udp));
 
@@ -137,6 +168,10 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 /*----------------------------------------------------------------------------------*/
 CommandResponse GtpuEncap::Init(const bess::pb::EmptyArg &) {
   using AccessMode = bess::metadata::Attribute::AccessMode;
+  AddMetadataAttr("ether_src", sizeof(Ethernet::Address), AccessMode::kRead);
+  AddMetadataAttr("ether_dst", sizeof(Ethernet::Address), AccessMode::kRead);
+  AddMetadataAttr("ether_type", sizeof(Ethernet::Type), AccessMode::kRead);
+
   tout_sip_attr = AddMetadataAttr("tunnel_out_src_ip4addr", sizeof(uint32_t),
                                   AccessMode::kRead);
   DLOG(INFO) << "tout_sip_attr: " << tout_sip_attr << std::endl;
@@ -149,6 +184,7 @@ CommandResponse GtpuEncap::Init(const bess::pb::EmptyArg &) {
   tout_uport = AddMetadataAttr("tunnel_out_udp_port", sizeof(uint16_t),
                                AccessMode::kRead);
   DLOG(INFO) << "tout_uport: " << tout_uport << std::endl;
+
   return CommandSuccess();
 }
 /*----------------------------------------------------------------------------------*/
