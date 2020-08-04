@@ -12,6 +12,8 @@
 #include "utils/endian.h"
 /* for ToIpv4Address() */
 #include "utils/ip.h"
+/* for Ethernet header */
+#include "utils/ether.h"
 /* for udp header */
 #include "utils/udp.h"
 /* for gtp header */
@@ -23,19 +25,19 @@
 using bess::utils::Gtpv1;
 using bess::utils::Ipv4;
 using bess::utils::Udp;
+using bess::utils::Ethernet;
 /*----------------------------------------------------------------------------------*/
 void GtpuDecap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   int cnt = batch->cnt();
 
   for (int i = 0; i < cnt; i++) {
     bess::Packet *p = batch->pkts()[i];
-    /* assuming that this module comes right after EthernetTrim */
-    /* pkt_len can be used as the length of IP datagram */
-    /* Trim iph->ihl<<2 + sizeof(Udp) + size of Gtpv1 header */
-    Ipv4 *iph = p->head_data<Ipv4 *>();
+    /* Trim sizeof(Ethernet) + iph->ihl<<2 + sizeof(Udp) + size of Gtpv1 header */
+    Ethernet *eth = p->head_data<Ethernet *>();
+    Ipv4 *iph = (Ipv4 *)((uint8_t *)eth + sizeof(*eth));
     Gtpv1 *gtph =
         (Gtpv1 *)((uint8_t *)iph + (iph->header_length << 2) + sizeof(Udp));
-    batch->pkts()[i]->adj((iph->header_length << 2) + sizeof(Udp) +
+    batch->pkts()[i]->adj(sizeof(Ethernet) + (iph->header_length << 2) + sizeof(Udp) +
                           gtph->header_length());
   }
 
