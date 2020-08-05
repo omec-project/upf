@@ -315,7 +315,7 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 		return nil
 	}
 
-    if client.CheckStatus() != Ready {
+    if client == nil || client.CheckStatus() != Ready {
         client, err = CreateChannel(host, deviceId, timeout)
         if err != nil{
             log.Println("create channel failed : %v", err)
