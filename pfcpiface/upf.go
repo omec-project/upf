@@ -48,6 +48,7 @@ type pdr struct {
 	eNBTeid      uint32
 	srcIP        uint32
 	dstIP        uint32
+	fseidIP      uint32
 	srcPort      uint16
 	dstPort      uint16
 	proto        uint8
@@ -261,6 +262,11 @@ func (u *upf) processPDR(ctx context.Context, any *anypb.Any, method string) {
 		Cmd:  method,
 		Arg:  any,
 	})
+}
+
+func (u *upf) addP4PDR(ctx context.Context, done chan<- bool, p pdr) error {
+    log.Println("Add P4 PDR entry")
+    return client.WritePdrTable(p, FUNCTION_TYPE_INSERT)
 }
 
 func (u *upf) addPDR(ctx context.Context, done chan<- bool, p pdr) {

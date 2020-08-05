@@ -21,6 +21,22 @@ const (
 	modeSim = "sim"
 )
 
+const (
+    Idle = 0
+    Connecting = 1
+    Ready = 2
+    TransientFailure = 3
+    Shutdown = 4
+)
+
+var (
+    host     string
+    deviceId uint64 = 1
+    timeout  uint32 = 10
+    conf     Conf
+    client   *P4rtClient = nil
+)
+
 var (
 	bess       = flag.String("bess", "localhost:10514", "BESS IP/port combo")
 	configPath = flag.String("config", "upf.json", "path to upf config")
@@ -93,6 +109,52 @@ func ParseIP(n3name string) (net.IP, net.IPMask)  {
 	return ip, (ip_net).Mask
 }
 
+func SetSwitchInfo(conf Conf) error{
+    fmt.Println("Set Switch Info")
+	n3IP, n3IPMask := ParseIP(conf.PFCPIface.N3IP)
+    fmt.Println("N3IP: ", n3IP ,", N3IPMask: ", n3IPMask)
+	ueIP, ueIPMask := ParseIP(conf.PFCPIface.UEIP)
+    fmt.Println("UEIP: ", ueIP ,", UEIPMask: ", ueIPMask)
+    fmt.Printf("device id %d\n", (*client).DeviceID)
+    p4InfoPath := "/bin/p4info.txt"
+    deviceConfigPath := "/bin/bmv2.json"
+
+    err := client.SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath)
+    if err != nil{
+        fmt.Printf("set forwarding pipeling config failed. %v\n",err)
+        return err
+    }
+
+    prefix_size,_ := n3IPMask.Size()
+    intf_entry := Intf_Table_Entry{
+        Ip: n3IP.To4(),
+        Prefix_Len: prefix_size,
+        Src_Intf: "ACCESS",
+        Direction: "UPLINK",
+    }
+
+    func_type := FUNCTION_TYPE_INSERT
+
+    err = client.WriteInterfaceTable(
+                            intf_entry, func_type)
+    if err != nil{
+        fmt.Printf("Write Interface table failed. %v\n",err)
+        return err
+    }
+
+    prefix_size,_ = ueIPMask.Size()
+    intf_entry = Intf_Table_Entry{
+        Ip: ueIP.To4(),
+        Prefix_Len: prefix_size,
+        Src_Intf: "CORE",
+        Direction: "DOWNLINK",
+    }
+    
+    err = client.WriteInterfaceTable(
+                        intf_entry, func_type)
+    return err
+}
+
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
@@ -100,14 +162,11 @@ func main() {
 	flag.Parse()
 
 	// read and parse json startup file
-	var conf Conf
 	ParseJSON(configPath, &conf)
 	log.Println(conf)
 	// parse N3IP
 	n3IP, n3IPMask := ParseIP(conf.PFCPIface.N3IP)
     fmt.Println("N3IP: ", n3IP ,", N3IPMask: ", n3IPMask)
-	ueIP, ueIPMask := ParseIP(conf.PFCPIface.UEIP)
-    fmt.Println("UEIP: ", ueIP ,", UEIPMask: ", ueIPMask)
     p4rtc_server :=  conf.PFCPIface.P4rtc_server
     fmt.Println("p4rtc server ip/name", p4rtc_server)
     p4rtc_port := conf.PFCPIface.P4rtc_port
@@ -140,53 +199,25 @@ func main() {
 
 	go pfcpifaceMainLoop(upf, n3IP.String(), n4SrcIP.String())
 
-    var host string = p4rtc_server + ":" +strconv.Itoa(int(p4rtc_port))
+    host = p4rtc_server + ":" +strconv.Itoa(int(p4rtc_port))
 	log.Println("server name: ", host)
-    var deviceId uint64 = 1
-    //var client *P4rtClient = nil
-    client, err := CreateChannel(host, deviceId)
+    deviceId = 1
+    timeout = 30
+    var err error
+    client, err = CreateChannel(host, deviceId, timeout)
     if err != nil{
         fmt.Printf("create channel failed : %v\n", err)
     }
     if client != nil{
         fmt.Printf("device id %d\n", (*client).DeviceID)
-        p4InfoPath := "/bin/p4info.txt"
-        deviceConfigPath := "/bin/bmv2.json"
-
-        err := client.SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath)
+        err = SetSwitchInfo(conf)
         if err != nil{
-            fmt.Printf("set forwarding pipeling config failed. %v\n",err)
-        }
-
-        prefix_size,_ := n3IPMask.Size()
-        intf_entry := Intf_Table_Entry{
-                        Ip: n3IP.To4(),
-                        Prefix_Len: prefix_size,
-                        Src_Intf: "ACCESS",
-                        Direction: "UPLINK",
-                    }
-        func_type := FUNCTION_TYPE_INSERT
-        err = client.WriteInterfaceTable(
-                                intf_entry, func_type)
-        if err != nil{
-            fmt.Printf("Write Interface table failed. %v\n",err)
-        }
-        
-        prefix_size,_ = ueIPMask.Size()
-        intf_entry = Intf_Table_Entry{
-                        Ip: ueIP.To4(),
-                        Prefix_Len: prefix_size,
-                        Src_Intf: "CORE",
-                        Direction: "DOWNLINK",
-                    }
-        err = client.WriteInterfaceTable(
-                                intf_entry, func_type)
-        if err != nil{
-            fmt.Printf("Write Interface table failed. %v\n",err)
+            fmt.Printf("Switch set info failed. %v\n",err)
         }
     }else {
         fmt.Printf("p4runtime client is null.\n")
     }
+    
     setupProm(upf)
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))
 }

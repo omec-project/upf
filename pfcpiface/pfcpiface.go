@@ -307,6 +307,7 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 
 	log.Println("Got a session establishment request from: ", addr)
 
+    var fail bool = false
 	/* Read fseid from the IE */
 	fseid, err := sereq.CPFSEID.FSEID()
 	if err != nil {
@@ -314,28 +315,54 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 		return nil
 	}
 
-	/* Read CreatePDRs and CreateFARs from payload */
-	pdrs, fars := parsePDRFromPFCPSessEstReqPayload(sereq, fseid)
+    if client.CheckStatus() != Ready {
+        client, err = CreateChannel(host, deviceId, timeout)
+        if err != nil{
+            log.Println("create channel failed : %v", err)
+            fail = true
+        }
 
-	/* create context, pause daemon, insert PDR(s), and resume daemon */
-	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
-	defer cancel()
-	done := make(chan bool)
-	upf.pauseAll()
-	for _, pdr := range pdrs {
-		upf.addPDR(ctx, done, pdr)
-	}
-	for _, far := range fars {
-		upf.addFAR(ctx, done, far)
-	}
-	upf.resumeAll()
+        if client != nil{
+            log.Println("Set switch info.")
+            err = SetSwitchInfo(conf)
+            if err != nil{
+                log.Println("Switch set info failed. %v\n",err)
+                fail = true
+            }
+        } else {
+            log.Println("p4runtime client null")
+            fail = true
+        }
+    }
 
-	// Adding current session details to the hash map
-	sessItem := sessRecord{
-		pdrs: pdrs,
-		fars: fars,
-	}
-	sessions[fseid.SEID] = sessItem
+    var cause uint8 = 0 
+    if fail == true {
+        cause = ie.CauseRequestRejected
+    } else {
+	    /* Read CreatePDRs and CreateFARs from payload */
+        pdrs, fars := parsePDRFromPFCPSessEstReqPayload(sereq, fseid)
+
+        /* create context, pause daemon, insert PDR(s), and resume daemon */
+        ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+        defer cancel()
+        done := make(chan bool)
+	    upf.pauseAll()
+	    for _, pdr := range pdrs {
+		    upf.addPDR(ctx, done, pdr)
+	    } 
+	    for _, far := range fars {
+		    upf.addFAR(ctx, done, far)
+	    }
+	    upf.resumeAll()
+
+	    // Adding current session details to the hash map
+	    sessItem := sessRecord{
+		    pdrs: pdrs,
+		    fars: fars,
+	    }
+	    sessions[fseid.SEID] = sessItem
+        cause = ie.CauseRequestAccepted
+    }
 
 	// Build response message
 	seres, err := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
@@ -344,7 +371,7 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 		sereq.SequenceNumber,                 /* seq # */
 		0,                                    /* priority */
 		ie.NewNodeID(sourceIP, "", ""),       /* node id */
-		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
+		ie.NewCause(cause),                   /* accept it blindly for the time being */
 		ie.NewFSEID((fseid.SEID<<2), net.ParseIP(sourceIP), nil, nil),
 	).Marshal()
 

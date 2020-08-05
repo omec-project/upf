@@ -7,6 +7,9 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+    "time"
+    "sync/atomic"
+    "encoding/binary"
 
 	"github.com/golang/protobuf/proto"
 	p4_config_v1 "github.com/p4lang/p4runtime/go/p4/config/v1"
@@ -23,6 +26,17 @@ const (
 	FUNCTION_TYPE_UPDATE uint8 = 2
 	FUNCTION_TYPE_DELETE uint8 = 3
 )
+
+type count32 uint32
+var counter_p4 count32
+
+func (c *count32) inc() uint32 {
+    return atomic.AddUint32((*uint32)(c), 1)
+}
+
+func (c *count32) get() uint32 {
+    return atomic.LoadUint32((*uint32)(c))
+}
 
 type Intf_Table_Entry struct {
 	Ip         []byte
@@ -55,6 +69,7 @@ type AppTableEntry struct {
 }
 type P4rtClient struct {
 	Client     p4.P4RuntimeClient
+    Conn       *grpc.ClientConn
 	P4Info     p4_config_v1.P4Info
 	Stream     p4.P4Runtime_StreamChannelClient
 	DeviceID   uint64
@@ -97,6 +112,10 @@ func (c *P4rtClient) get_enum_val(enum_name string,
 	return nil, err
 }
 
+func (c *P4rtClient) CheckStatus() (state int) {
+      return int(c.Conn.GetState())
+}
+
 func (c *P4rtClient) SetMastership(electionID p4.Uint128) (err error) {
 	c.ElectionID = electionID
 	mastershipReq := &p4.StreamMessageRequest{
@@ -111,9 +130,12 @@ func (c *P4rtClient) SetMastership(electionID p4.Uint128) (err error) {
 	return
 }
 
-func (c *P4rtClient) Init() (err error) {
+func (c *P4rtClient) Init(timeout uint32) (err error) {
 	// Initialize stream for mastership and packet I/O
-	c.Stream, err = c.Client.StreamChannel(context.Background())
+    ctx, cancel := context.WithTimeout(context.Background(), 
+                                       time.Duration(timeout) * time.Second)
+    defer cancel()
+	c.Stream, err = c.Client.StreamChannel(ctx)
 	if err != nil {
 		fmt.Printf("stream channel error: %v\n", err)
 		return
@@ -123,6 +145,7 @@ func (c *P4rtClient) Init() (err error) {
 			res, err := c.Stream.Recv()
 			if err != nil {
 				fmt.Printf("stream recv error: %v\n", err)
+                return
 			} else if arb := res.GetArbitration(); arb != nil {
 				if code.Code(arb.Status.Code) == code.Code_OK {
 					fmt.Println("client is master")
@@ -135,9 +158,103 @@ func (c *P4rtClient) Init() (err error) {
 
 		}
 	}()
-
-	fmt.Println("exited from recv thread.")
+	
+    select {
+   	    case <-ctx.Done():
+		    fmt.Println(ctx.Err()) // prints "context deadline exceeded"
+	}
+	
+    fmt.Println("exited from recv thread.")
 	return
+}
+
+func (c *P4rtClient) WritePdrTable(
+	pdr_entry pdr,
+	func_type uint8) error {
+
+	fmt.Println("WritePdrTable. \n")
+	te := AppTableEntry{
+		Table_Name:  "PreQosPipe.pdrs",
+		Action_Name: "PreQosPipe.set_pdr_attributes",
+	}
+
+	te.Field_Size = 2
+	te.Fields = make([]Match_Field, te.Field_Size)
+	te.Fields[0].Name = "src_iface"
+    enum_name := "InterfaceType"
+    var src_intf_str string
+    var ue_ip uint32
+    var decap_val uint8 = 0
+    var ue_ip_mask uint32 = 0xFFFFFFFF
+    if pdr_entry.srcIface == access {
+        src_intf_str = "ACCESS"
+        ue_ip = pdr_entry.dstIP
+        decap_val = 1
+    } else {
+        src_intf_str = "CORE"
+        ue_ip = pdr_entry.srcIP
+    }
+    
+    b := make([]byte, 4)
+    val,_ := c.get_enum_val(enum_name, src_intf_str)
+	te.Fields[0].Value = val
+
+	te.Fields[1].Name = "ue_addr"
+    binary.LittleEndian.PutUint32(b, ue_ip)
+	te.Fields[1].Value = b
+    binary.LittleEndian.PutUint32(b, ue_ip_mask)
+	te.Fields[1].Mask = b
+
+    if pdr_entry.srcIface == access {
+	   te.Field_Size = 4
+	   te.Fields[2].Name = "teid"
+       binary.LittleEndian.PutUint32(b, pdr_entry.eNBTeid)
+	   te.Fields[2].Value = b
+       binary.LittleEndian.PutUint32(b, pdr_entry.eNBTeidMask)
+	   te.Fields[2].Mask =  b
+	   
+       te.Fields[3].Name = "tunnel_ipv4_dst"
+       binary.LittleEndian.PutUint32(b, pdr_entry.tunnelIP4Dst)
+	   te.Fields[3].Value = b 
+       binary.LittleEndian.PutUint32(b, pdr_entry.tunnelIP4DstMask)
+	   te.Fields[3].Mask =  b
+    }
+	
+    if func_type == FUNCTION_TYPE_DELETE {
+        te.Action_Name = "NoAction"
+    } else if func_type == FUNCTION_TYPE_INSERT {
+
+        te.Param_Size = 5
+	    te.Params = make([]Action_Param, te.Param_Size)
+	    te.Params[0].Name = "id"
+        binary.LittleEndian.PutUint32(b, pdr_entry.pdrID)
+	    te.Params[0].Value = b
+
+	    te.Params[1].Name = "fseid"
+        fseid_val := make([]byte, 12)
+        binary.LittleEndian.PutUint32(b, pdr_entry.fseidIP)
+        copy(fseid_val[:4], b)
+        binary.LittleEndian.PutUint32(b, pdr_entry.fseID)
+        copy(fseid_val[4:], b)
+    	te.Params[1].Value = fseid_val
+	
+        te.Params[2].Name = "ctr_id"
+        ctr_id_val := counter_p4.inc()
+        binary.LittleEndian.PutUint32(b, ctr_id_val)
+	    te.Params[2].Value = b
+
+	    te.Params[3].Name = "far_id"
+        binary.LittleEndian.PutUint32(b, uint32(pdr_entry.farID))
+    	te.Params[3].Value = b
+	
+        te.Params[4].Name = "needs_gtpu_decap"
+        b = make([]byte, 1)
+        b[0] = byte(decap_val)
+	    te.Params[4].Value = b
+    }
+	
+    var prio int32 = 2
+	return c.InsertTableEntry(te, func_type, prio)
 }
 
 func (c *P4rtClient) WriteInterfaceTable(
@@ -421,7 +538,7 @@ func LoadDeviceConfig(deviceConfigPath string) (P4DeviceConfig, error) {
 	return bin, nil
 }
 
-func CreateChannel(host string, deviceID uint64) (*P4rtClient, error) {
+func CreateChannel(host string, deviceID uint64, timeout uint32) (*P4rtClient, error) {
 	log.Println("create channel")
 	// Second, check to see if we can reuse the gRPC connection for a new P4RT client
 	conn, err := GetConnection(host)
@@ -432,10 +549,11 @@ func CreateChannel(host string, deviceID uint64) (*P4rtClient, error) {
 
 	client := &P4rtClient{
 		Client:   p4.NewP4RuntimeClient(conn),
+        Conn:     conn,
 		DeviceID: deviceID,
 	}
 
-	err = client.Init()
+	err = client.Init(timeout)
 	if err != nil {
 		fmt.Printf("Client Init error: %v\n", err)
 		return nil, err
