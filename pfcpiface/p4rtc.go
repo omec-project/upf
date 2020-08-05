@@ -206,23 +206,26 @@ func (c *P4rtClient) WritePdrTable(
 	te.Fields[0].Value = val
 
 	te.Fields[1].Name = "ue_addr"
-    binary.LittleEndian.PutUint32(b, ue_ip)
-	te.Fields[1].Value = b
-    binary.LittleEndian.PutUint32(b, ue_ip_mask)
-	te.Fields[1].Mask = b
+    binary.LittleEndian.PutUint32(b[0:], ue_ip)
+	copy(te.Fields[1].Value[0:4],b[:])
+    binary.LittleEndian.PutUint32(b[0:], ue_ip_mask)
+	copy(te.Fields[1].Mask[0:4],b[:])
+	//te.Fields[1].Mask = b
 
     if pdr_entry.srcIface == access {
 	   te.Field_Size = 4
 	   te.Fields[2].Name = "teid"
-       binary.LittleEndian.PutUint32(b, pdr_entry.eNBTeid)
-	   te.Fields[2].Value = b
-       binary.LittleEndian.PutUint32(b, pdr_entry.eNBTeidMask)
-	   te.Fields[2].Mask =  b
+       binary.LittleEndian.PutUint32(b[0:], pdr_entry.eNBTeid)
+	   copy(te.Fields[2].Value[0:4],b[:])
+	   //te.Fields[2].Value = b
+       binary.LittleEndian.PutUint32(b[0:], pdr_entry.eNBTeidMask)
+	   copy(te.Fields[2].Mask[0:4],b[:])
+	   //te.Fields[2].Mask =  b
 	   
        te.Fields[3].Name = "tunnel_ipv4_dst"
-       binary.LittleEndian.PutUint32(b, pdr_entry.tunnelIP4Dst)
+       binary.LittleEndian.PutUint32(b[0:], pdr_entry.tunnelIP4Dst)
 	   te.Fields[3].Value = b 
-       binary.LittleEndian.PutUint32(b, pdr_entry.tunnelIP4DstMask)
+       binary.LittleEndian.PutUint32(b[0:], pdr_entry.tunnelIP4DstMask)
 	   te.Fields[3].Mask =  b
     }
 	
