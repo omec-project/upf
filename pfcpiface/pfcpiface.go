@@ -343,6 +343,8 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
         pdrs, fars := parsePDRFromPFCPSessEstReqPayload(sereq, fseid)
 
         /* create context, pause daemon, insert PDR(s), and resume daemon */
+        
+        /*    
         ctx, cancel := context.WithTimeout(context.Background(), Timeout)
         defer cancel()
         done := make(chan bool)
@@ -353,9 +355,12 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 	    for _, far := range fars {
 		    upf.addFAR(ctx, done, far)
 	    }
-	    upf.resumeAll()
-
-	    // Adding current session details to the hash map
+	    upf.resumeAll() */
+	    
+	    for _, pdr := range pdrs {
+		    upf.addP4PDR(pdr)
+	    } 
+        // Adding current session details to the hash map
 	    sessItem := sessRecord{
 		    pdrs: pdrs,
 		    fars: fars,

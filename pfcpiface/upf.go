@@ -264,7 +264,7 @@ func (u *upf) processPDR(ctx context.Context, any *anypb.Any, method string) {
 	})
 }
 
-func (u *upf) addP4PDR(ctx context.Context, done chan<- bool, p pdr) error {
+func (u *upf) addP4PDR(p pdr) error {
     log.Println("Add P4 PDR entry")
     return client.WritePdrTable(p, FUNCTION_TYPE_INSERT)
 }
