@@ -14,6 +14,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	p4_config_v1 "github.com/p4lang/p4runtime/go/p4/config/v1"
 	p4 "github.com/p4lang/p4runtime/go/p4/v1"
+    "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"google.golang.org/genproto/googleapis/rpc/code"
 	"google.golang.org/grpc"
 )
@@ -132,10 +133,13 @@ func (c *P4rtClient) SetMastership(electionID p4.Uint128) (err error) {
 
 func (c *P4rtClient) Init(timeout uint32) (err error) {
 	// Initialize stream for mastership and packet I/O
-    ctx, cancel := context.WithTimeout(context.Background(), 
-                                       time.Duration(timeout) * time.Second)
-    defer cancel()
-	c.Stream, err = c.Client.StreamChannel(ctx)
+    //ctx, cancel := context.WithTimeout(context.Background(), 
+    //                                   time.Duration(timeout) * time.Second)
+    //defer cancel()
+	c.Stream, err = c.Client.StreamChannel(
+                                context.Background(),
+                                grpc_retry.WithMax(3), 
+                                grpc_retry.WithPerRetryTimeout(1*time.Second))
 	if err != nil {
 		fmt.Printf("stream channel error: %v\n", err)
 		return
@@ -159,10 +163,11 @@ func (c *P4rtClient) Init(timeout uint32) (err error) {
 		}
 	}()
 	
+    /*
     select {
    	    case <-ctx.Done():
 		    fmt.Println(ctx.Err()) // prints "context deadline exceeded"
-	}
+	}*/
 	
     fmt.Println("exited from recv thread.")
 	return
