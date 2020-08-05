@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"time"
+    "encoding/binary"
 
 	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
@@ -48,6 +49,7 @@ func parsePDRFromPFCPSessEstReqPayload(sereq *message.SessionEstablishmentReques
 		case ie.CreatePDR:
 			var srcIface uint8
 			var teid uint32
+			var tunnelIp uint32
 			var ueIP4 net.IP
 
 			/* reset outerHeaderRemoval to begin with */
@@ -82,6 +84,8 @@ func parsePDRFromPFCPSessEstReqPayload(sereq *message.SessionEstablishmentReques
 						log.Println("Failed to parse FTEID IE")
 					} else {
 						teid = fteid.TEID
+                        netIp := fteid.IPv4Address.To4()
+                        tunnelIp = binary.LittleEndian.Uint32(netIp)
 					}
 				case ie.UEIPAddress:
 					ueip4, err := ie2.UEIPAddress()
@@ -123,7 +127,11 @@ func parsePDRFromPFCPSessEstReqPayload(sereq *message.SessionEstablishmentReques
 					dstIP:        ueIP,
 					srcIfaceMask: 0xFF,
 					eNBTeidMask:  0xFFFFFFFF,
+                    ueIP:         ueIP,
+                    ueIPMask:     ueIPMask,
 					dstIPMask:    ueIPMask,
+                    tunnelIP4Dst: tunnelIp,
+                    tunnelIP4DstMask: 0xFFFFFFFF,
 					pdrID:        uint32(pdrID),
 					fseID:        uint32(fseid.SEID), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
 					ctrID:        0,                  // ctrID currently not being set <--- FIXIT/TODO/XXX
@@ -136,6 +144,8 @@ func parsePDRFromPFCPSessEstReqPayload(sereq *message.SessionEstablishmentReques
 					srcIface:     core,
 					srcIP:        ueIP,
 					srcIfaceMask: 0xFF,
+                    ueIP:         ueIP,
+                    ueIPMask:     ueIPMask,
 					srcIPMask:    ueIPMask,
 					pdrID:        uint32(pdrID),
 					fseID:        uint32(fseid.SEID), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
@@ -357,8 +367,24 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 	    }
 	    upf.resumeAll() */
 	    
+        var ue_ip_val uint32
+        var ue_ip_val_mask uint32
+        var fseidIP uint32
+        n3IP,_ := ParseIP(conf.PFCPIface.N3IP)
+        fseidIP = binary.LittleEndian.Uint32(n3IP)
 	    for _, pdr := range pdrs {
-		    upf.addP4PDR(pdr)
+		    if pdr.ueIP != 0 {
+                ue_ip_val = pdr.ueIP
+                ue_ip_val_mask = pdr.ueIPMask
+                break;
+            }
+	    } 
+
+        for _, pdr := range pdrs {
+            pdr.fseidIP = fseidIP
+            pdr.ueIP = ue_ip_val
+            pdr.ueIPMask = ue_ip_val_mask
+		    upf.addP4PDR(pdr, FUNCTION_TYPE_INSERT)
 	    } 
         // Adding current session details to the hash map
 	    sessItem := sessRecord{

@@ -174,8 +174,7 @@ func (c *P4rtClient) Init(timeout uint32) (err error) {
 }
 
 func (c *P4rtClient) WritePdrTable(
-	pdr_entry pdr,
-	func_type uint8) error {
+	pdr_entry pdr, func_type uint8) error {
 
 	fmt.Println("WritePdrTable. \n")
 	te := AppTableEntry{
@@ -189,16 +188,12 @@ func (c *P4rtClient) WritePdrTable(
 	te.Fields[0].Name = "src_iface"
     enum_name := "InterfaceType"
     var src_intf_str string
-    var ue_ip uint32
     var decap_val uint8 = 0
-    var ue_ip_mask uint32 = 0xFFFFFFFF
     if pdr_entry.srcIface == access {
         src_intf_str = "ACCESS"
-        ue_ip = pdr_entry.dstIP
         decap_val = 1
     } else {
         src_intf_str = "CORE"
-        ue_ip = pdr_entry.srcIP
     }
     
     b := make([]byte, 4)
@@ -207,25 +202,25 @@ func (c *P4rtClient) WritePdrTable(
 
 	te.Fields[1].Name = "ue_addr"
     te.Fields[1].Value = make([]byte, 4)
-    binary.LittleEndian.PutUint32(te.Fields[1].Value, ue_ip)
+    binary.BigEndian.PutUint32(te.Fields[1].Value, pdr_entry.ueIP)
     te.Fields[1].Mask = make([]byte, 4)
-    binary.LittleEndian.PutUint32(te.Fields[1].Mask, ue_ip_mask)
+    binary.BigEndian.PutUint32(te.Fields[1].Mask, pdr_entry.ueIPMask)
 	//te.Fields[1].Mask = b
 
     if pdr_entry.srcIface == access {
 	   te.Field_Size = 4
        te.Fields[2].Name = "teid"
        te.Fields[2].Value = make([]byte, 4)
-       binary.LittleEndian.PutUint32(te.Fields[2].Value, pdr_entry.eNBTeid)
+       binary.BigEndian.PutUint32(te.Fields[2].Value, pdr_entry.eNBTeid)
        te.Fields[2].Mask = make([]byte, 4)
-       binary.LittleEndian.PutUint32(te.Fields[2].Mask, pdr_entry.eNBTeidMask)
+       binary.BigEndian.PutUint32(te.Fields[2].Mask, pdr_entry.eNBTeidMask)
 	   //te.Fields[2].Mask =  b
 
        te.Fields[3].Name = "tunnel_ipv4_dst"
        te.Fields[3].Value = make([]byte, 4)
-       binary.LittleEndian.PutUint32(te.Fields[3].Value, pdr_entry.tunnelIP4Dst)
+       binary.BigEndian.PutUint32(te.Fields[3].Value, pdr_entry.tunnelIP4Dst)
        te.Fields[3].Mask = make([]byte, 4)
-       binary.LittleEndian.PutUint32(te.Fields[3].Mask, pdr_entry.tunnelIP4DstMask)
+       binary.BigEndian.PutUint32(te.Fields[3].Mask, pdr_entry.tunnelIP4DstMask)
     }
 	
     if func_type == FUNCTION_TYPE_DELETE {
@@ -236,13 +231,13 @@ func (c *P4rtClient) WritePdrTable(
 	    te.Params = make([]Action_Param, te.Param_Size)
 	    te.Params[0].Name = "id"
         te.Params[0].Value = make([]byte, 4)
-        binary.LittleEndian.PutUint32(te.Params[0].Value, pdr_entry.pdrID)
+        binary.BigEndian.PutUint32(te.Params[0].Value, pdr_entry.pdrID)
 
 	    te.Params[1].Name = "fseid"
         fseid_val := make([]byte, 12)
-        binary.LittleEndian.PutUint32(b, pdr_entry.fseidIP)
+        binary.BigEndian.PutUint32(b, pdr_entry.fseidIP)
         copy(fseid_val[:4], b)
-        binary.LittleEndian.PutUint32(b, pdr_entry.fseID)
+        binary.BigEndian.PutUint32(b, pdr_entry.fseID)
         copy(fseid_val[4:], b)
         te.Params[1].Value = make([]byte, 12)
         copy(te.Params[1].Value, fseid_val)
@@ -250,11 +245,11 @@ func (c *P4rtClient) WritePdrTable(
         te.Params[2].Name = "ctr_id"
         ctr_id_val := counter_p4.inc()
         te.Params[2].Value = make([]byte, 4)
-        binary.LittleEndian.PutUint32(te.Params[2].Value, ctr_id_val)
+        binary.BigEndian.PutUint32(te.Params[2].Value, ctr_id_val)
 
 	    te.Params[3].Name = "far_id"
         te.Params[3].Value = make([]byte, 4)
-        binary.LittleEndian.PutUint32(te.Params[3].Value, uint32(pdr_entry.farID))
+        binary.BigEndian.PutUint32(te.Params[3].Value, uint32(pdr_entry.farID))
     	te.Params[3].Value = b
 	
         te.Params[4].Name = "needs_gtpu_decap"
@@ -424,7 +419,10 @@ func (c *P4rtClient) InsertTableEntry(
 	}
 
 	fmt.Printf("adding fields\n")
-	for _, mf := range tableEntry.Fields {
+	for count, mf := range tableEntry.Fields {
+        if uint32(count) >= tableEntry.Field_Size{
+            break
+        }
 		err := c.addFieldValue(entry, mf, tableID)
 		if err != nil {
 			fmt.Printf("AddFieldValue failed  %v\n", err)
