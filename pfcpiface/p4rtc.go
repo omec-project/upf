@@ -183,8 +183,9 @@ func (c *P4rtClient) WritePdrTable(
 		Action_Name: "PreQosPipe.set_pdr_attributes",
 	}
 
-	te.Field_Size = 2
+	te.Field_Size = 4
 	te.Fields = make([]Match_Field, te.Field_Size)
+	te.Field_Size = 2
 	te.Fields[0].Name = "src_iface"
     enum_name := "InterfaceType"
     var src_intf_str string
