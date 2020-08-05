@@ -206,27 +206,26 @@ func (c *P4rtClient) WritePdrTable(
 	te.Fields[0].Value = val
 
 	te.Fields[1].Name = "ue_addr"
-    binary.LittleEndian.PutUint32(b[0:], ue_ip)
-	copy(te.Fields[1].Value[0:4],b[:])
-    binary.LittleEndian.PutUint32(b[0:], ue_ip_mask)
-	copy(te.Fields[1].Mask[0:4],b[:])
+    te.Fields[1].Value = make([]byte, 4)
+    binary.LittleEndian.PutUint32(te.Fields[1].Value, ue_ip)
+    te.Fields[1].Mask = make([]byte, 4)
+    binary.LittleEndian.PutUint32(te.Fields[1].Mask, ue_ip_mask)
 	//te.Fields[1].Mask = b
 
     if pdr_entry.srcIface == access {
 	   te.Field_Size = 4
-	   te.Fields[2].Name = "teid"
-       binary.LittleEndian.PutUint32(b[0:], pdr_entry.eNBTeid)
-	   copy(te.Fields[2].Value[0:4],b[:])
-	   //te.Fields[2].Value = b
-       binary.LittleEndian.PutUint32(b[0:], pdr_entry.eNBTeidMask)
-	   copy(te.Fields[2].Mask[0:4],b[:])
+       te.Fields[2].Name = "teid"
+       te.Fields[2].Value = make([]byte, 4)
+       binary.LittleEndian.PutUint32(te.Fields[2].Value, pdr_entry.eNBTeid)
+       te.Fields[2].Mask = make([]byte, 4)
+       binary.LittleEndian.PutUint32(te.Fields[2].Mask, pdr_entry.eNBTeidMask)
 	   //te.Fields[2].Mask =  b
-	   
+
        te.Fields[3].Name = "tunnel_ipv4_dst"
-       binary.LittleEndian.PutUint32(b[0:], pdr_entry.tunnelIP4Dst)
-	   te.Fields[3].Value = b 
-       binary.LittleEndian.PutUint32(b[0:], pdr_entry.tunnelIP4DstMask)
-	   te.Fields[3].Mask =  b
+       te.Fields[3].Value = make([]byte, 4)
+       binary.LittleEndian.PutUint32(te.Fields[3].Value, pdr_entry.tunnelIP4Dst)
+       te.Fields[3].Mask = make([]byte, 4)
+       binary.LittleEndian.PutUint32(te.Fields[3].Mask, pdr_entry.tunnelIP4DstMask)
     }
 	
     if func_type == FUNCTION_TYPE_DELETE {
@@ -236,8 +235,8 @@ func (c *P4rtClient) WritePdrTable(
         te.Param_Size = 5
 	    te.Params = make([]Action_Param, te.Param_Size)
 	    te.Params[0].Name = "id"
-        binary.LittleEndian.PutUint32(b, pdr_entry.pdrID)
-	    te.Params[0].Value = b
+        te.Params[0].Value = make([]byte, 4)
+        binary.LittleEndian.PutUint32(te.Params[0].Value, pdr_entry.pdrID)
 
 	    te.Params[1].Name = "fseid"
         fseid_val := make([]byte, 12)
@@ -245,21 +244,22 @@ func (c *P4rtClient) WritePdrTable(
         copy(fseid_val[:4], b)
         binary.LittleEndian.PutUint32(b, pdr_entry.fseID)
         copy(fseid_val[4:], b)
-    	te.Params[1].Value = fseid_val
+        te.Params[1].Value = make([]byte, 12)
+        copy(te.Params[1].Value, fseid_val)
 	
         te.Params[2].Name = "ctr_id"
         ctr_id_val := counter_p4.inc()
-        binary.LittleEndian.PutUint32(b, ctr_id_val)
-	    te.Params[2].Value = b
+        te.Params[2].Value = make([]byte, 4)
+        binary.LittleEndian.PutUint32(te.Params[2].Value, ctr_id_val)
 
 	    te.Params[3].Name = "far_id"
-        binary.LittleEndian.PutUint32(b, uint32(pdr_entry.farID))
+        te.Params[3].Value = make([]byte, 4)
+        binary.LittleEndian.PutUint32(te.Params[3].Value, uint32(pdr_entry.farID))
     	te.Params[3].Value = b
 	
         te.Params[4].Name = "needs_gtpu_decap"
-        b = make([]byte, 1)
-        b[0] = byte(decap_val)
-	    te.Params[4].Value = b
+        te.Params[4].Value = make([]byte, 1)
+	    te.Params[4].Value[0] = byte(decap_val)
     }
 	
     var prio int32 = 2
