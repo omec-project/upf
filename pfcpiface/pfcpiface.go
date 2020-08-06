@@ -384,7 +384,20 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
             pdr.fseidIP = fseidIP
             pdr.ueIP = ue_ip_val
             pdr.ueIPMask = ue_ip_val_mask
-		    upf.addP4PDR(pdr, FUNCTION_TYPE_INSERT)
+		    err := upf.addP4PDR(pdr, FUNCTION_TYPE_INSERT)
+            if err != nil{
+                log.Println("pdr entry function failed. %v", err)
+                cause = ie.CauseRequestRejected
+            }
+	    } 
+        
+        for _, far := range fars {
+            far.fseidIP = fseidIP
+		    err := upf.addP4FAR(far, FUNCTION_TYPE_INSERT)
+            if err != nil{
+                log.Println("far entry function failed. %v", err)
+                cause = ie.CauseRequestRejected
+            }
 	    } 
         // Adding current session details to the hash map
 	    sessItem := sessRecord{

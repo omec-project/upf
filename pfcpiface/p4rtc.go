@@ -173,6 +173,83 @@ func (c *P4rtClient) Init(timeout uint32) (err error) {
 	return
 }
 
+func (c *P4rtClient) WriteFarTable(
+	far_entry far, func_type uint8) error {
+
+	fmt.Println("WriteFarTable. \n")
+	te := AppTableEntry{
+		Table_Name:  "PreQosPipe.load_far_attributes",
+	}
+
+	te.Field_Size = 2
+	te.Fields = make([]Match_Field, te.Field_Size)
+	te.Fields[0].Name = "far_id"
+    
+    te.Fields[0].Value = make([]byte, 4)
+    binary.BigEndian.PutUint32(te.Fields[0].Value, uint32(far_entry.farID))
+
+	te.Fields[1].Name = "session_id"
+    fseid_val := make([]byte, 12)
+    binary.BigEndian.PutUint32(fseid_val[:4], far_entry.fseidIP)
+    binary.BigEndian.PutUint32(fseid_val[4:], far_entry.fseID)
+    te.Params[1].Value = make([]byte, 12)
+    copy(te.Params[1].Value, fseid_val)
+    
+    if func_type == FUNCTION_TYPE_DELETE {
+        te.Action_Name = "NoAction"
+        te.Param_Size = 0
+    } else if func_type == FUNCTION_TYPE_INSERT {
+        te.Action_Name = "PreQosPipe.load_normal_far_attributes"
+        te.Param_Size = 2
+	    te.Params = make([]Action_Param, te.Param_Size)
+	    te.Params[0].Name = "needs_dropping"
+        te.Params[0].Value = make([]byte, 1)
+        te.Params[0].Value[0] = byte(far_entry.action)
+	    te.Params[1].Name = "notify_cp"
+        te.Params[1].Value = make([]byte, 1)
+        te.Params[1].Value[0] = byte(far_entry.action)
+    } else if func_type == FUNCTION_TYPE_UPDATE {
+
+        te.Action_Name = "PreQosPipe.load_tunnel_far_attributes"
+        te.Param_Size = 7
+	    te.Params = make([]Action_Param, te.Param_Size)
+	    te.Params[0].Name = "needs_dropping"
+        te.Params[0].Value = make([]byte, 1)
+        te.Params[0].Value[0] = byte(far_entry.action & 0x01)
+	    te.Params[1].Name = "notify_cp"
+        te.Params[1].Value = make([]byte, 1)
+        te.Params[1].Value[0] = byte(far_entry.action & 0x02)
+	    te.Params[2].Name = "src_addr"
+        te.Params[2].Value = make([]byte, 4)
+        binary.BigEndian.PutUint32(te.Params[2].Value, far_entry.s1uIP)
+	    te.Params[3].Name = "dst_addr"
+        te.Params[3].Value = make([]byte, 4)
+        binary.BigEndian.PutUint32(te.Params[3].Value, far_entry.eNBIP)
+	    te.Params[4].Name = "teid"
+        te.Params[4].Value = make([]byte, 4)
+        binary.BigEndian.PutUint32(te.Params[4].Value, far_entry.eNBTeid)
+	    te.Params[5].Name = "dport"
+        te.Params[5].Value = make([]byte, 2)
+        binary.BigEndian.PutUint16(te.Params[5].Value, far_entry.UDPGTPUPort)
+	    te.Params[6].Name = "tunnel_type"
+	    enum_name := "TunnelType"
+        var tunnelStr string
+        if far_entry.tunnelType == 0x1 {
+            tunnelStr = "GTPU"
+        }
+	    val, err := c.get_enum_val(enum_name, tunnelStr)
+	    if err != nil {
+	    	fmt.Printf("Could not find enum val %v", err)
+	    	return err
+	    }
+        te.Params[6].Value = make([]byte, 1)
+	    te.Params[6].Value[0] = val[0]
+    }
+	
+    var prio int32 = 0
+	return c.InsertTableEntry(te, func_type, prio)
+}
+
 func (c *P4rtClient) WritePdrTable(
 	pdr_entry pdr, func_type uint8) error {
 
@@ -196,7 +273,6 @@ func (c *P4rtClient) WritePdrTable(
         src_intf_str = "CORE"
     }
     
-    b := make([]byte, 4)
     val,_ := c.get_enum_val(enum_name, src_intf_str)
 	te.Fields[0].Value = val
 
@@ -225,6 +301,7 @@ func (c *P4rtClient) WritePdrTable(
 	
     if func_type == FUNCTION_TYPE_DELETE {
         te.Action_Name = "NoAction"
+        te.Param_Size = 0
     } else if func_type == FUNCTION_TYPE_INSERT {
 
         te.Param_Size = 5
@@ -235,10 +312,8 @@ func (c *P4rtClient) WritePdrTable(
 
 	    te.Params[1].Name = "fseid"
         fseid_val := make([]byte, 12)
-        binary.BigEndian.PutUint32(b, pdr_entry.fseidIP)
-        copy(fseid_val[:4], b)
-        binary.BigEndian.PutUint32(b, pdr_entry.fseID)
-        copy(fseid_val[4:], b)
+        binary.BigEndian.PutUint32(fseid_val[:4], pdr_entry.fseidIP)
+        binary.BigEndian.PutUint32(fseid_val[4:], pdr_entry.fseID)
         te.Params[1].Value = make([]byte, 12)
         copy(te.Params[1].Value, fseid_val)
 	
@@ -250,7 +325,6 @@ func (c *P4rtClient) WritePdrTable(
 	    te.Params[3].Name = "far_id"
         te.Params[3].Value = make([]byte, 4)
         binary.BigEndian.PutUint32(te.Params[3].Value, uint32(pdr_entry.farID))
-    	te.Params[3].Value = b
 	
         te.Params[4].Name = "needs_gtpu_decap"
         te.Params[4].Value = make([]byte, 1)
