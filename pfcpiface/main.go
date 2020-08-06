@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	// "github.com/badhrinathpa/p4rtc_go"
 )
 
 const (

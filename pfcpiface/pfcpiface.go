@@ -270,7 +270,8 @@ func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP 
 
 	// Build response message
 	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
-	asres, err := message.NewAssociationSetupResponse(ie.NewRecoveryTimeStamp(time.Now()),
+	asres, err := message.NewAssociationSetupResponse(
+		ie.NewRecoveryTimeStamp(time.Now()),
 		ie.NewNodeID(sourceIP, "", ""),       /* node id */
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
@@ -387,11 +388,11 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 			}
 		}
 
-		for _, pdr := range pdrs {
-			pdr.fseidIP = fseidIP
-			pdr.ueIP = ue_ip_val
-			pdr.ueIPMask = ue_ip_val_mask
-			err := upf.P4PDRFunc(pdr, FUNCTION_TYPE_INSERT)
+		for i := range pdrs {
+			pdrs[i].fseidIP = fseidIP
+			pdrs[i].ueIP = ue_ip_val
+			pdrs[i].ueIPMask = ue_ip_val_mask
+			err := upf.P4PDRFunc(pdrs[i], FUNCTION_TYPE_INSERT)
 			if err != nil {
 				log.Println("pdr entry function failed. %v", err)
 				cause = ie.CauseRequestRejected
@@ -399,9 +400,9 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 			}
 		}
 
-		for _, far := range fars {
-			far.fseidIP = fseidIP
-			err := upf.P4FARFunc(far, FUNCTION_TYPE_INSERT)
+		for j := range fars {
+			fars[j].fseidIP = fseidIP
+			err := upf.P4FARFunc(fars[j], FUNCTION_TYPE_INSERT)
 			if err != nil {
 				log.Println("far entry function failed. %v", err)
 				cause = ie.CauseRequestRejected
