@@ -4,7 +4,7 @@
 package main
 
 import (
-	"context"
+	//"context"
 	"encoding/binary"
 	"log"
 	"net"
@@ -352,7 +352,7 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 		}
 	}
 
-	var cause uint8 = 0
+	var cause uint8 = ie.CauseRequestAccepted
 	if fail == true {
 		cause = ie.CauseRequestRejected
 	} else {
@@ -362,17 +362,17 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 		/* create context, pause daemon, insert PDR(s), and resume daemon */
 
 		/*
-		        ctx, cancel := context.WithTimeout(context.Background(), Timeout)
-		        defer cancel()
-		        done := make(chan bool)
-			    upf.pauseAll()
-			    for _, pdr := range pdrs {
-				    upf.addPDR(ctx, done, pdr)
-			    }
-			    for _, far := range fars {
-				    upf.addFAR(ctx, done, far)
-			    }
-			    upf.resumeAll() */
+			        ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+			        defer cancel()
+			        done := make(chan bool)
+				    upf.pauseAll()
+				    for _, pdr := range pdrs {
+					    upf.addPDR(ctx, done, pdr)
+				    }
+				    for _, far := range fars {
+					    upf.addFAR(ctx, done, far)
+				    }
+				    upf.resumeAll() */
 
 		var ue_ip_val uint32
 		var ue_ip_val_mask uint32
@@ -391,28 +391,33 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 			pdr.fseidIP = fseidIP
 			pdr.ueIP = ue_ip_val
 			pdr.ueIPMask = ue_ip_val_mask
-			err := upf.addP4PDR(pdr, FUNCTION_TYPE_INSERT)
+			err := upf.P4PDRFunc(pdr, FUNCTION_TYPE_INSERT)
 			if err != nil {
 				log.Println("pdr entry function failed. %v", err)
 				cause = ie.CauseRequestRejected
+				break
 			}
 		}
 
 		for _, far := range fars {
 			far.fseidIP = fseidIP
-			err := upf.addP4FAR(far, FUNCTION_TYPE_INSERT)
+			err := upf.P4FARFunc(far, FUNCTION_TYPE_INSERT)
 			if err != nil {
 				log.Println("far entry function failed. %v", err)
 				cause = ie.CauseRequestRejected
+				break
 			}
 		}
-		// Adding current session details to the hash map
-		sessItem := sessRecord{
-			pdrs: pdrs,
-			fars: fars,
+
+		if cause == ie.CauseRequestAccepted {
+			// Adding current session details to the hash map
+			sessItem := sessRecord{
+				pdrs: pdrs,
+				fars: fars,
+			}
+			sessions[fseid.SEID] = sessItem
+			cause = ie.CauseRequestAccepted
 		}
-		sessions[fseid.SEID] = sessItem
-		cause = ie.CauseRequestAccepted
 	}
 
 	// Build response message
@@ -447,10 +452,12 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
 	/* fetch FSEID */
 	fseid := (smreq.SEID() >> 2)
 
+	var cause uint8 = ie.CauseRequestAccepted
 	/* read FAR(s). These can be multiple */
 	ies1, err := ie.ParseMultiIEs(smreq.Payload)
 	if err != nil {
 		log.Println("Failed to parse smreq for IEs!")
+		cause = ie.CauseRequestRejected
 	} else {
 		/*
 		 * Iteratively go through all IEs. You can't use ie.UpdateFAR since a single
@@ -463,12 +470,23 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
 				farID, err := ie1.FARID()
 				if err != nil {
 					log.Println("Unable to find updateFAR's FAR ID!")
+					cause = ie.CauseRequestRejected
+					break
+				}
+
+				applyAction, err := ie1.ApplyAction()
+				if err != nil {
+					log.Println("Could not read Apply Action!")
+					cause = ie.CauseRequestRejected
+					break
 				}
 
 				/* Read UpdateFAR from payload */
 				ies2, err := ie1.UpdateForwardingParameters()
 				if err != nil {
 					log.Println("Unable to find UpdateForwardingParameters!")
+					cause = ie.CauseRequestRejected
+					break
 				} else {
 					for _, ie2 := range ies2 {
 						switch ie2.Type {
@@ -484,6 +502,7 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
 									farID:       uint8(farID),  // farID currently being truncated to uint8 <--- FIXIT/TODO/XXX
 									fseID:       uint32(fseid), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
 									action:      farTunnel,
+									applyAction: applyAction,
 									tunnelType:  0x1,
 									s1uIP:       ip2int(s1uIP4),
 									eNBIP:       ip2int(eNBIP),
@@ -491,13 +510,24 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
 									UDPGTPUPort: udpGTPUPort,
 								}
 								/* create context */
-								ctx, cancel := context.WithTimeout(context.Background(), Timeout)
-								defer cancel()
-								done := make(chan bool)
-								// pause daemon, and then insert FAR, finally resume
-								upf.pauseAll()
-								upf.addFAR(ctx, done, far)
-								upf.resumeAll()
+								/*
+									ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+									defer cancel()
+									done := make(chan bool)
+									// pause daemon, and then insert FAR, finally resume
+									upf.pauseAll()
+									upf.addFAR(ctx, done, far)
+									upf.resumeAll()
+								*/
+								var fseidIP uint32
+								n3IP, _ := ParseIP(conf.PFCPIface.N3IP)
+								fseidIP = binary.LittleEndian.Uint32(n3IP)
+								far.fseidIP = fseidIP
+								err := upf.P4FARFunc(far, FUNCTION_TYPE_UPDATE)
+								if err != nil {
+									log.Println("far entry function failed. %v", err)
+									cause = ie.CauseRequestRejected
+								}
 							}
 						case ie.DestinationInterface:
 							// Do nothing for the time being
@@ -510,11 +540,11 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
 
 	// Build response message
 	smres, err := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */
-		0,                                    /* FO <-- what's this? */
-		(smreq.SEID() >> 2),                  /* seid */
-		smreq.SequenceNumber,                 /* seq # */
-		0,                                    /* priority */
-		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
+		0,                    /* FO <-- what's this? */
+		(smreq.SEID() >> 2),  /* seid */
+		smreq.SequenceNumber, /* seq # */
+		0,                    /* priority */
+		ie.NewCause(cause),   /* accept it blindly for the time being */
 		ie.NewFSEID((smreq.SEID()<<2), net.ParseIP(sourceIP), nil, nil),
 	).Marshal()
 
@@ -563,18 +593,35 @@ func handleSessionDeletionRequest(upf *upf, msg message.Message, addr net.Addr, 
 	sessItem := sessions[(sdreq.SEID() >> 2)]
 
 	/* create context */
-	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
-	defer cancel()
-	done := make(chan bool)
-	// pause daemon, and then delete FAR(s) and PDR(s), finally resume
-	upf.pauseAll()
+	/*
+		ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+		defer cancel()
+		done := make(chan bool)
+		// pause daemon, and then delete FAR(s) and PDR(s), finally resume
+		upf.pauseAll()
+		for _, pdr := range sessItem.pdrs {
+			upf.delPDR(ctx, done, pdr)
+		}
+		for _, far := range sessItem.fars {
+			upf.delFAR(ctx, done, far)
+		}
+	    upf.resumeAll() */
+
 	for _, pdr := range sessItem.pdrs {
-		upf.delPDR(ctx, done, pdr)
+		err := upf.P4PDRFunc(pdr, FUNCTION_TYPE_DELETE)
+		if err != nil {
+			log.Println("pdr entry function failed. %v", err)
+			break
+		}
 	}
+
 	for _, far := range sessItem.fars {
-		upf.delFAR(ctx, done, far)
+		err := upf.P4FARFunc(far, FUNCTION_TYPE_DELETE)
+		if err != nil {
+			log.Println("far entry function failed. %v", err)
+			break
+		}
 	}
-	upf.resumeAll()
 
 	/* delete sessionRecord */
 	delete(sessions, (sdreq.SEID() >> 2))

@@ -165,10 +165,10 @@ func (c *P4rtClient) Init(timeout uint32) (err error) {
 	}()
 
 	/*
-	    select {
-	   	    case <-ctx.Done():
-			    fmt.Println(ctx.Err()) // prints "context deadline exceeded"
-		}*/
+		    select {
+		   	    case <-ctx.Done():
+				    fmt.Println(ctx.Err()) // prints "context deadline exceeded"
+			}*/
 
 	fmt.Println("exited from recv thread.")
 	return
