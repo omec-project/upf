@@ -2,19 +2,19 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
-    "time"
-    "sync/atomic"
-    "encoding/binary"
+	"sync/atomic"
+	"time"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	p4_config_v1 "github.com/p4lang/p4runtime/go/p4/config/v1"
 	p4 "github.com/p4lang/p4runtime/go/p4/v1"
-    "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"google.golang.org/genproto/googleapis/rpc/code"
 	"google.golang.org/grpc"
 )
@@ -29,14 +29,15 @@ const (
 )
 
 type count32 uint32
+
 var counter_p4 count32
 
 func (c *count32) inc() uint32 {
-    return atomic.AddUint32((*uint32)(c), 1)
+	return atomic.AddUint32((*uint32)(c), 1)
 }
 
 func (c *count32) get() uint32 {
-    return atomic.LoadUint32((*uint32)(c))
+	return atomic.LoadUint32((*uint32)(c))
 }
 
 type Intf_Table_Entry struct {
@@ -70,7 +71,7 @@ type AppTableEntry struct {
 }
 type P4rtClient struct {
 	Client     p4.P4RuntimeClient
-    Conn       *grpc.ClientConn
+	Conn       *grpc.ClientConn
 	P4Info     p4_config_v1.P4Info
 	Stream     p4.P4Runtime_StreamChannelClient
 	DeviceID   uint64
@@ -114,7 +115,7 @@ func (c *P4rtClient) get_enum_val(enum_name string,
 }
 
 func (c *P4rtClient) CheckStatus() (state int) {
-      return int(c.Conn.GetState())
+	return int(c.Conn.GetState())
 }
 
 func (c *P4rtClient) SetMastership(electionID p4.Uint128) (err error) {
@@ -133,13 +134,13 @@ func (c *P4rtClient) SetMastership(electionID p4.Uint128) (err error) {
 
 func (c *P4rtClient) Init(timeout uint32) (err error) {
 	// Initialize stream for mastership and packet I/O
-    //ctx, cancel := context.WithTimeout(context.Background(), 
-    //                                   time.Duration(timeout) * time.Second)
-    //defer cancel()
+	//ctx, cancel := context.WithTimeout(context.Background(),
+	//                                   time.Duration(timeout) * time.Second)
+	//defer cancel()
 	c.Stream, err = c.Client.StreamChannel(
-                                context.Background(),
-                                grpc_retry.WithMax(3), 
-                                grpc_retry.WithPerRetryTimeout(1*time.Second))
+		context.Background(),
+		grpc_retry.WithMax(3),
+		grpc_retry.WithPerRetryTimeout(1*time.Second))
 	if err != nil {
 		fmt.Printf("stream channel error: %v\n", err)
 		return
@@ -149,7 +150,7 @@ func (c *P4rtClient) Init(timeout uint32) (err error) {
 			res, err := c.Stream.Recv()
 			if err != nil {
 				fmt.Printf("stream recv error: %v\n", err)
-                return
+				return
 			} else if arb := res.GetArbitration(); arb != nil {
 				if code.Code(arb.Status.Code) == code.Code_OK {
 					fmt.Println("client is master")
@@ -162,14 +163,14 @@ func (c *P4rtClient) Init(timeout uint32) (err error) {
 
 		}
 	}()
-	
-    /*
-    select {
-   	    case <-ctx.Done():
-		    fmt.Println(ctx.Err()) // prints "context deadline exceeded"
-	}*/
-	
-    fmt.Println("exited from recv thread.")
+
+	/*
+	    select {
+	   	    case <-ctx.Done():
+			    fmt.Println(ctx.Err()) // prints "context deadline exceeded"
+		}*/
+
+	fmt.Println("exited from recv thread.")
 	return
 }
 
@@ -178,75 +179,75 @@ func (c *P4rtClient) WriteFarTable(
 
 	fmt.Println("WriteFarTable. \n")
 	te := AppTableEntry{
-		Table_Name:  "PreQosPipe.load_far_attributes",
+		Table_Name: "PreQosPipe.load_far_attributes",
 	}
 
 	te.Field_Size = 2
 	te.Fields = make([]Match_Field, te.Field_Size)
 	te.Fields[0].Name = "far_id"
-    
-    te.Fields[0].Value = make([]byte, 4)
-    binary.BigEndian.PutUint32(te.Fields[0].Value, uint32(far_entry.farID))
+
+	te.Fields[0].Value = make([]byte, 4)
+	binary.BigEndian.PutUint32(te.Fields[0].Value, uint32(far_entry.farID))
 
 	te.Fields[1].Name = "session_id"
-    fseid_val := make([]byte, 12)
-    binary.BigEndian.PutUint32(fseid_val[:4], far_entry.fseidIP)
-    binary.BigEndian.PutUint32(fseid_val[4:], far_entry.fseID)
-    te.Params[1].Value = make([]byte, 12)
-    copy(te.Params[1].Value, fseid_val)
-    
-    if func_type == FUNCTION_TYPE_DELETE {
-        te.Action_Name = "NoAction"
-        te.Param_Size = 0
-    } else if func_type == FUNCTION_TYPE_INSERT {
-        te.Action_Name = "PreQosPipe.load_normal_far_attributes"
-        te.Param_Size = 2
-	    te.Params = make([]Action_Param, te.Param_Size)
-	    te.Params[0].Name = "needs_dropping"
-        te.Params[0].Value = make([]byte, 1)
-        te.Params[0].Value[0] = byte(far_entry.action)
-	    te.Params[1].Name = "notify_cp"
-        te.Params[1].Value = make([]byte, 1)
-        te.Params[1].Value[0] = byte(far_entry.action)
-    } else if func_type == FUNCTION_TYPE_UPDATE {
+	fseid_val := make([]byte, 12)
+	binary.BigEndian.PutUint32(fseid_val[:4], far_entry.fseidIP)
+	binary.BigEndian.PutUint32(fseid_val[4:], far_entry.fseID)
+	te.Fields[1].Value = make([]byte, 12)
+	copy(te.Fields[1].Value, fseid_val)
 
-        te.Action_Name = "PreQosPipe.load_tunnel_far_attributes"
-        te.Param_Size = 7
-	    te.Params = make([]Action_Param, te.Param_Size)
-	    te.Params[0].Name = "needs_dropping"
-        te.Params[0].Value = make([]byte, 1)
-        te.Params[0].Value[0] = byte(far_entry.action & 0x01)
-	    te.Params[1].Name = "notify_cp"
-        te.Params[1].Value = make([]byte, 1)
-        te.Params[1].Value[0] = byte(far_entry.action & 0x02)
-	    te.Params[2].Name = "src_addr"
-        te.Params[2].Value = make([]byte, 4)
-        binary.BigEndian.PutUint32(te.Params[2].Value, far_entry.s1uIP)
-	    te.Params[3].Name = "dst_addr"
-        te.Params[3].Value = make([]byte, 4)
-        binary.BigEndian.PutUint32(te.Params[3].Value, far_entry.eNBIP)
-	    te.Params[4].Name = "teid"
-        te.Params[4].Value = make([]byte, 4)
-        binary.BigEndian.PutUint32(te.Params[4].Value, far_entry.eNBTeid)
-	    te.Params[5].Name = "dport"
-        te.Params[5].Value = make([]byte, 2)
-        binary.BigEndian.PutUint16(te.Params[5].Value, far_entry.UDPGTPUPort)
-	    te.Params[6].Name = "tunnel_type"
-	    enum_name := "TunnelType"
-        var tunnelStr string
-        if far_entry.tunnelType == 0x1 {
-            tunnelStr = "GTPU"
-        }
-	    val, err := c.get_enum_val(enum_name, tunnelStr)
-	    if err != nil {
-	    	fmt.Printf("Could not find enum val %v", err)
-	    	return err
-	    }
-        te.Params[6].Value = make([]byte, 1)
-	    te.Params[6].Value[0] = val[0]
-    }
-	
-    var prio int32 = 0
+	if func_type == FUNCTION_TYPE_DELETE {
+		te.Action_Name = "NoAction"
+		te.Param_Size = 0
+	} else if func_type == FUNCTION_TYPE_INSERT {
+		te.Action_Name = "PreQosPipe.load_normal_far_attributes"
+		te.Param_Size = 2
+		te.Params = make([]Action_Param, te.Param_Size)
+		te.Params[0].Name = "needs_dropping"
+		te.Params[0].Value = make([]byte, 1)
+		te.Params[0].Value[0] = byte(far_entry.applyAction & 0x01)
+		te.Params[1].Name = "notify_cp"
+		te.Params[1].Value = make([]byte, 1)
+		te.Params[1].Value[0] = byte(far_entry.applyAction & 0x02)
+	} else if func_type == FUNCTION_TYPE_UPDATE {
+
+		te.Action_Name = "PreQosPipe.load_tunnel_far_attributes"
+		te.Param_Size = 7
+		te.Params = make([]Action_Param, te.Param_Size)
+		te.Params[0].Name = "needs_dropping"
+		te.Params[0].Value = make([]byte, 1)
+		te.Params[0].Value[0] = byte(far_entry.applyAction & 0x01)
+		te.Params[1].Name = "notify_cp"
+		te.Params[1].Value = make([]byte, 1)
+		te.Params[1].Value[0] = byte(far_entry.applyAction & 0x02)
+		te.Params[2].Name = "src_addr"
+		te.Params[2].Value = make([]byte, 4)
+		binary.BigEndian.PutUint32(te.Params[2].Value, far_entry.s1uIP)
+		te.Params[3].Name = "dst_addr"
+		te.Params[3].Value = make([]byte, 4)
+		binary.BigEndian.PutUint32(te.Params[3].Value, far_entry.eNBIP)
+		te.Params[4].Name = "teid"
+		te.Params[4].Value = make([]byte, 4)
+		binary.BigEndian.PutUint32(te.Params[4].Value, far_entry.eNBTeid)
+		te.Params[5].Name = "dport"
+		te.Params[5].Value = make([]byte, 2)
+		binary.BigEndian.PutUint16(te.Params[5].Value, far_entry.UDPGTPUPort)
+		te.Params[6].Name = "tunnel_type"
+		enum_name := "TunnelType"
+		var tunnelStr string
+		if far_entry.tunnelType == 0x1 {
+			tunnelStr = "GTPU"
+		}
+		val, err := c.get_enum_val(enum_name, tunnelStr)
+		if err != nil {
+			fmt.Printf("Could not find enum val %v", err)
+			return err
+		}
+		te.Params[6].Value = make([]byte, 1)
+		te.Params[6].Value[0] = val[0]
+	}
+
+	var prio int32 = 0
 	return c.InsertTableEntry(te, func_type, prio)
 }
 
@@ -263,75 +264,75 @@ func (c *P4rtClient) WritePdrTable(
 	te.Fields = make([]Match_Field, te.Field_Size)
 	te.Field_Size = 2
 	te.Fields[0].Name = "src_iface"
-    enum_name := "InterfaceType"
-    var src_intf_str string
-    var decap_val uint8 = 0
-    if pdr_entry.srcIface == access {
-        src_intf_str = "ACCESS"
-        decap_val = 1
-    } else {
-        src_intf_str = "CORE"
-    }
-    
-    val,_ := c.get_enum_val(enum_name, src_intf_str)
+	enum_name := "InterfaceType"
+	var src_intf_str string
+	var decap_val uint8 = 0
+	if pdr_entry.srcIface == access {
+		src_intf_str = "ACCESS"
+		decap_val = 1
+	} else {
+		src_intf_str = "CORE"
+	}
+
+	val, _ := c.get_enum_val(enum_name, src_intf_str)
 	te.Fields[0].Value = val
 
 	te.Fields[1].Name = "ue_addr"
-    te.Fields[1].Value = make([]byte, 4)
-    binary.BigEndian.PutUint32(te.Fields[1].Value, pdr_entry.ueIP)
-    te.Fields[1].Mask = make([]byte, 4)
-    binary.BigEndian.PutUint32(te.Fields[1].Mask, pdr_entry.ueIPMask)
+	te.Fields[1].Value = make([]byte, 4)
+	binary.BigEndian.PutUint32(te.Fields[1].Value, pdr_entry.ueIP)
+	te.Fields[1].Mask = make([]byte, 4)
+	binary.BigEndian.PutUint32(te.Fields[1].Mask, pdr_entry.ueIPMask)
 	//te.Fields[1].Mask = b
 
-    if pdr_entry.srcIface == access {
-	   te.Field_Size = 4
-       te.Fields[2].Name = "teid"
-       te.Fields[2].Value = make([]byte, 4)
-       binary.BigEndian.PutUint32(te.Fields[2].Value, pdr_entry.eNBTeid)
-       te.Fields[2].Mask = make([]byte, 4)
-       binary.BigEndian.PutUint32(te.Fields[2].Mask, pdr_entry.eNBTeidMask)
-	   //te.Fields[2].Mask =  b
+	if pdr_entry.srcIface == access {
+		te.Field_Size = 4
+		te.Fields[2].Name = "teid"
+		te.Fields[2].Value = make([]byte, 4)
+		binary.BigEndian.PutUint32(te.Fields[2].Value, pdr_entry.eNBTeid)
+		te.Fields[2].Mask = make([]byte, 4)
+		binary.BigEndian.PutUint32(te.Fields[2].Mask, pdr_entry.eNBTeidMask)
+		//te.Fields[2].Mask =  b
 
-       te.Fields[3].Name = "tunnel_ipv4_dst"
-       te.Fields[3].Value = make([]byte, 4)
-       binary.BigEndian.PutUint32(te.Fields[3].Value, pdr_entry.tunnelIP4Dst)
-       te.Fields[3].Mask = make([]byte, 4)
-       binary.BigEndian.PutUint32(te.Fields[3].Mask, pdr_entry.tunnelIP4DstMask)
-    }
-	
-    if func_type == FUNCTION_TYPE_DELETE {
-        te.Action_Name = "NoAction"
-        te.Param_Size = 0
-    } else if func_type == FUNCTION_TYPE_INSERT {
+		te.Fields[3].Name = "tunnel_ipv4_dst"
+		te.Fields[3].Value = make([]byte, 4)
+		binary.LittleEndian.PutUint32(te.Fields[3].Value, pdr_entry.tunnelIP4Dst)
+		te.Fields[3].Mask = make([]byte, 4)
+		binary.BigEndian.PutUint32(te.Fields[3].Mask, pdr_entry.tunnelIP4DstMask)
+	}
 
-        te.Param_Size = 5
-	    te.Params = make([]Action_Param, te.Param_Size)
-	    te.Params[0].Name = "id"
-        te.Params[0].Value = make([]byte, 4)
-        binary.BigEndian.PutUint32(te.Params[0].Value, pdr_entry.pdrID)
+	if func_type == FUNCTION_TYPE_DELETE {
+		te.Action_Name = "NoAction"
+		te.Param_Size = 0
+	} else if func_type == FUNCTION_TYPE_INSERT {
 
-	    te.Params[1].Name = "fseid"
-        fseid_val := make([]byte, 12)
-        binary.BigEndian.PutUint32(fseid_val[:4], pdr_entry.fseidIP)
-        binary.BigEndian.PutUint32(fseid_val[4:], pdr_entry.fseID)
-        te.Params[1].Value = make([]byte, 12)
-        copy(te.Params[1].Value, fseid_val)
-	
-        te.Params[2].Name = "ctr_id"
-        ctr_id_val := counter_p4.inc()
-        te.Params[2].Value = make([]byte, 4)
-        binary.BigEndian.PutUint32(te.Params[2].Value, ctr_id_val)
+		te.Param_Size = 5
+		te.Params = make([]Action_Param, te.Param_Size)
+		te.Params[0].Name = "id"
+		te.Params[0].Value = make([]byte, 4)
+		binary.BigEndian.PutUint32(te.Params[0].Value, pdr_entry.pdrID)
 
-	    te.Params[3].Name = "far_id"
-        te.Params[3].Value = make([]byte, 4)
-        binary.BigEndian.PutUint32(te.Params[3].Value, uint32(pdr_entry.farID))
-	
-        te.Params[4].Name = "needs_gtpu_decap"
-        te.Params[4].Value = make([]byte, 1)
-	    te.Params[4].Value[0] = byte(decap_val)
-    }
-	
-    var prio int32 = 2
+		te.Params[1].Name = "fseid"
+		fseid_val := make([]byte, 12)
+		binary.BigEndian.PutUint32(fseid_val[:4], pdr_entry.fseidIP)
+		binary.BigEndian.PutUint32(fseid_val[4:], pdr_entry.fseID)
+		te.Params[1].Value = make([]byte, 12)
+		copy(te.Params[1].Value, fseid_val)
+
+		te.Params[2].Name = "ctr_id"
+		ctr_id_val := counter_p4.inc()
+		te.Params[2].Value = make([]byte, 4)
+		binary.BigEndian.PutUint32(te.Params[2].Value, ctr_id_val)
+
+		te.Params[3].Name = "far_id"
+		te.Params[3].Value = make([]byte, 4)
+		binary.BigEndian.PutUint32(te.Params[3].Value, uint32(pdr_entry.farID))
+
+		te.Params[4].Name = "needs_gtpu_decap"
+		te.Params[4].Value = make([]byte, 1)
+		te.Params[4].Value[0] = byte(decap_val)
+	}
+
+	var prio int32 = 2
 	return c.InsertTableEntry(te, func_type, prio)
 }
 
@@ -494,9 +495,9 @@ func (c *P4rtClient) InsertTableEntry(
 
 	fmt.Printf("adding fields\n")
 	for count, mf := range tableEntry.Fields {
-        if uint32(count) >= tableEntry.Field_Size{
-            break
-        }
+		if uint32(count) >= tableEntry.Field_Size {
+			break
+		}
 		err := c.addFieldValue(entry, mf, tableID)
 		if err != nil {
 			fmt.Printf("AddFieldValue failed  %v\n", err)
@@ -520,7 +521,7 @@ func (c *P4rtClient) InsertTableEntry(
 		},
 	}
 
-    fmt.Println(proto.MarshalTextString(update))
+	fmt.Println(proto.MarshalTextString(update))
 	return c.WriteReq(update)
 }
 
@@ -630,7 +631,7 @@ func CreateChannel(host string, deviceID uint64, timeout uint32) (*P4rtClient, e
 
 	client := &P4rtClient{
 		Client:   p4.NewP4RuntimeClient(conn),
-        Conn:     conn,
+		Conn:     conn,
 		DeviceID: deviceID,
 	}
 

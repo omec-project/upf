@@ -5,10 +5,10 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"log"
 	"net"
 	"time"
-    "encoding/binary"
 
 	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
@@ -84,8 +84,8 @@ func parsePDRFromPFCPSessEstReqPayload(sereq *message.SessionEstablishmentReques
 						log.Println("Failed to parse FTEID IE")
 					} else {
 						teid = fteid.TEID
-                        netIp := fteid.IPv4Address.To4()
-                        tunnelIp = binary.LittleEndian.Uint32(netIp)
+						netIp := fteid.IPv4Address.To4()
+						tunnelIp = binary.LittleEndian.Uint32(netIp)
 					}
 				case ie.UEIPAddress:
 					ueip4, err := ie2.UEIPAddress()
@@ -122,21 +122,21 @@ func parsePDRFromPFCPSessEstReqPayload(sereq *message.SessionEstablishmentReques
 			// populated everything for PDR, and set the right pdr_
 			if srcIface == ie.SrcInterfaceAccess {
 				pdrU := pdr{
-					srcIface:     access,
-					eNBTeid:      teid,
-					dstIP:        ueIP,
-					srcIfaceMask: 0xFF,
-					eNBTeidMask:  0xFFFFFFFF,
-                    ueIP:         ueIP,
-                    ueIPMask:     ueIPMask,
-					dstIPMask:    ueIPMask,
-                    tunnelIP4Dst: tunnelIp,
-                    tunnelIP4DstMask: 0xFFFFFFFF,
-					pdrID:        uint32(pdrID),
-					fseID:        uint32(fseid.SEID), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-					ctrID:        0,                  // ctrID currently not being set <--- FIXIT/TODO/XXX
-					farID:        uint8(farID),
-					needDecap:    outerHeaderRemoval,
+					srcIface:         access,
+					eNBTeid:          teid,
+					dstIP:            ueIP,
+					srcIfaceMask:     0xFF,
+					eNBTeidMask:      0xFFFFFFFF,
+					ueIP:             ueIP,
+					ueIPMask:         ueIPMask,
+					dstIPMask:        ueIPMask,
+					tunnelIP4Dst:     tunnelIp,
+					tunnelIP4DstMask: 0xFFFFFFFF,
+					pdrID:            uint32(pdrID),
+					fseID:            uint32(fseid.SEID), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
+					ctrID:            0,                  // ctrID currently not being set <--- FIXIT/TODO/XXX
+					farID:            uint8(farID),
+					needDecap:        outerHeaderRemoval,
 				}
 				pdrList = append(pdrList, pdrU)
 			} else if srcIface == ie.SrcInterfaceCore {
@@ -144,8 +144,8 @@ func parsePDRFromPFCPSessEstReqPayload(sereq *message.SessionEstablishmentReques
 					srcIface:     core,
 					srcIP:        ueIP,
 					srcIfaceMask: 0xFF,
-                    ueIP:         ueIP,
-                    ueIPMask:     ueIPMask,
+					ueIP:         ueIP,
+					ueIPMask:     ueIPMask,
 					srcIPMask:    ueIPMask,
 					pdrID:        uint32(pdrID),
 					fseID:        uint32(fseid.SEID), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
@@ -165,10 +165,17 @@ func parsePDRFromPFCPSessEstReqPayload(sereq *message.SessionEstablishmentReques
 					log.Println("Could not read FAR ID!")
 					return pdrList, farList
 				}
+				applyAction, err := ie1.ApplyAction()
+				if err != nil {
+					log.Println("Could not read Apply Action!")
+					return pdrList, farList
+				}
+
 				far := far{
-					farID:  uint8(farID),       // farID currently being truncated to uint8 <--- FIXIT/TODO/XXX
-					fseID:  uint32(fseid.SEID), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-					action: farForward,
+					farID:       uint8(farID),       // farID currently being truncated to uint8 <--- FIXIT/TODO/XXX
+					fseID:       uint32(fseid.SEID), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
+					action:      farForward,
+					applyAction: applyAction,
 				}
 				farList = append(farList, far)
 			}
@@ -317,7 +324,7 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 
 	log.Println("Got a session establishment request from: ", addr)
 
-    var fail bool = false
+	var fail bool = false
 	/* Read fseid from the IE */
 	fseid, err := sereq.CPFSEID.FSEID()
 	if err != nil {
@@ -325,97 +332,97 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 		return nil
 	}
 
-    if client == nil || client.CheckStatus() != Ready {
-        client, err = CreateChannel(host, deviceId, timeout)
-        if err != nil{
-            log.Println("create channel failed : %v", err)
-            fail = true
-        }
+	if client == nil || client.CheckStatus() != Ready {
+		client, err = CreateChannel(host, deviceId, timeout)
+		if err != nil {
+			log.Println("create channel failed : %v", err)
+			fail = true
+		}
 
-        if client != nil{
-            log.Println("Set switch info.")
-            err = SetSwitchInfo(conf)
-            if err != nil{
-                log.Println("Switch set info failed. %v\n",err)
-                fail = true
-            }
-        } else {
-            log.Println("p4runtime client null")
-            fail = true
-        }
-    }
+		if client != nil {
+			log.Println("Set switch info.")
+			err = SetSwitchInfo(conf)
+			if err != nil {
+				log.Println("Switch set info failed. %v\n", err)
+				fail = true
+			}
+		} else {
+			log.Println("p4runtime client null")
+			fail = true
+		}
+	}
 
-    var cause uint8 = 0 
-    if fail == true {
-        cause = ie.CauseRequestRejected
-    } else {
-	    /* Read CreatePDRs and CreateFARs from payload */
-        pdrs, fars := parsePDRFromPFCPSessEstReqPayload(sereq, fseid)
+	var cause uint8 = 0
+	if fail == true {
+		cause = ie.CauseRequestRejected
+	} else {
+		/* Read CreatePDRs and CreateFARs from payload */
+		pdrs, fars := parsePDRFromPFCPSessEstReqPayload(sereq, fseid)
 
-        /* create context, pause daemon, insert PDR(s), and resume daemon */
-        
-        /*    
-        ctx, cancel := context.WithTimeout(context.Background(), Timeout)
-        defer cancel()
-        done := make(chan bool)
-	    upf.pauseAll()
-	    for _, pdr := range pdrs {
-		    upf.addPDR(ctx, done, pdr)
-	    } 
-	    for _, far := range fars {
-		    upf.addFAR(ctx, done, far)
-	    }
-	    upf.resumeAll() */
-	    
-        var ue_ip_val uint32
-        var ue_ip_val_mask uint32
-        var fseidIP uint32
-        n3IP,_ := ParseIP(conf.PFCPIface.N3IP)
-        fseidIP = binary.LittleEndian.Uint32(n3IP)
-	    for _, pdr := range pdrs {
-		    if pdr.ueIP != 0 {
-                ue_ip_val = pdr.ueIP
-                ue_ip_val_mask = pdr.ueIPMask
-                break;
-            }
-	    } 
+		/* create context, pause daemon, insert PDR(s), and resume daemon */
 
-        for _, pdr := range pdrs {
-            pdr.fseidIP = fseidIP
-            pdr.ueIP = ue_ip_val
-            pdr.ueIPMask = ue_ip_val_mask
-		    err := upf.addP4PDR(pdr, FUNCTION_TYPE_INSERT)
-            if err != nil{
-                log.Println("pdr entry function failed. %v", err)
-                cause = ie.CauseRequestRejected
-            }
-	    } 
-        
-        for _, far := range fars {
-            far.fseidIP = fseidIP
-		    err := upf.addP4FAR(far, FUNCTION_TYPE_INSERT)
-            if err != nil{
-                log.Println("far entry function failed. %v", err)
-                cause = ie.CauseRequestRejected
-            }
-	    } 
-        // Adding current session details to the hash map
-	    sessItem := sessRecord{
-		    pdrs: pdrs,
-		    fars: fars,
-	    }
-	    sessions[fseid.SEID] = sessItem
-        cause = ie.CauseRequestAccepted
-    }
+		/*
+		        ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+		        defer cancel()
+		        done := make(chan bool)
+			    upf.pauseAll()
+			    for _, pdr := range pdrs {
+				    upf.addPDR(ctx, done, pdr)
+			    }
+			    for _, far := range fars {
+				    upf.addFAR(ctx, done, far)
+			    }
+			    upf.resumeAll() */
+
+		var ue_ip_val uint32
+		var ue_ip_val_mask uint32
+		var fseidIP uint32
+		n3IP, _ := ParseIP(conf.PFCPIface.N3IP)
+		fseidIP = binary.LittleEndian.Uint32(n3IP)
+		for _, pdr := range pdrs {
+			if pdr.ueIP != 0 {
+				ue_ip_val = pdr.ueIP
+				ue_ip_val_mask = pdr.ueIPMask
+				break
+			}
+		}
+
+		for _, pdr := range pdrs {
+			pdr.fseidIP = fseidIP
+			pdr.ueIP = ue_ip_val
+			pdr.ueIPMask = ue_ip_val_mask
+			err := upf.addP4PDR(pdr, FUNCTION_TYPE_INSERT)
+			if err != nil {
+				log.Println("pdr entry function failed. %v", err)
+				cause = ie.CauseRequestRejected
+			}
+		}
+
+		for _, far := range fars {
+			far.fseidIP = fseidIP
+			err := upf.addP4FAR(far, FUNCTION_TYPE_INSERT)
+			if err != nil {
+				log.Println("far entry function failed. %v", err)
+				cause = ie.CauseRequestRejected
+			}
+		}
+		// Adding current session details to the hash map
+		sessItem := sessRecord{
+			pdrs: pdrs,
+			fars: fars,
+		}
+		sessions[fseid.SEID] = sessItem
+		cause = ie.CauseRequestAccepted
+	}
 
 	// Build response message
 	seres, err := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
-		0,                                    /* FO <-- what's this? */
-		fseid.SEID,                           /* seid */
-		sereq.SequenceNumber,                 /* seq # */
-		0,                                    /* priority */
-		ie.NewNodeID(sourceIP, "", ""),       /* node id */
-		ie.NewCause(cause),                   /* accept it blindly for the time being */
+		0,                              /* FO <-- what's this? */
+		fseid.SEID,                     /* seid */
+		sereq.SequenceNumber,           /* seq # */
+		0,                              /* priority */
+		ie.NewNodeID(sourceIP, "", ""), /* node id */
+		ie.NewCause(cause),             /* accept it blindly for the time being */
 		ie.NewFSEID((fseid.SEID<<2), net.ParseIP(sourceIP), nil, nil),
 	).Marshal()
 

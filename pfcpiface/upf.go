@@ -48,7 +48,7 @@ type pdr struct {
 	eNBTeid      uint32
 	srcIP        uint32
 	dstIP        uint32
-    ueIP         uint32
+	ueIP         uint32
 	fseidIP      uint32
 	srcPort      uint16
 	dstPort      uint16
@@ -72,11 +72,12 @@ type pdr struct {
 }
 
 type far struct {
-	farID uint8
-	fseID uint32
-    fseidIP uint32
+	farID   uint8
+	fseID   uint32
+	fseidIP uint32
 
 	action      uint8
+	applyAction uint8
 	tunnelType  uint8
 	s1uIP       uint32
 	eNBIP       uint32
@@ -268,13 +269,13 @@ func (u *upf) processPDR(ctx context.Context, any *anypb.Any, method string) {
 }
 
 func (u *upf) addP4PDR(p pdr, func_type uint8) error {
-    log.Println("Add P4 PDR entry")
-    return client.WritePdrTable(p, func_type)
+	log.Println("Add P4 PDR entry")
+	return client.WritePdrTable(p, func_type)
 }
 
 func (u *upf) addP4FAR(p far, func_type uint8) error {
-    log.Println("Add P4 FAR entry")
-    return client.WriteFarTable(p, func_type)
+	log.Println("Add P4 FAR entry")
+	return client.WriteFarTable(p, func_type)
 }
 
 func (u *upf) addPDR(ctx context.Context, done chan<- bool, p pdr) {
