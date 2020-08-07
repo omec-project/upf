@@ -208,7 +208,7 @@ func (c *P4rtClient) WriteFarTable(
 		te.Params[0].Value[0] = byte(far_entry.applyAction & 0x01)
 		te.Params[1].Name = "notify_cp"
 		te.Params[1].Value = make([]byte, 1)
-		te.Params[1].Value[0] = byte(far_entry.applyAction & 0x02)
+		te.Params[1].Value[0] = byte(far_entry.applyAction & 0x08)
 	} else if func_type == FUNCTION_TYPE_UPDATE {
 
 		te.Action_Name = "PreQosPipe.load_tunnel_far_attributes"
@@ -219,7 +219,7 @@ func (c *P4rtClient) WriteFarTable(
 		te.Params[0].Value[0] = byte(far_entry.applyAction & 0x01)
 		te.Params[1].Name = "notify_cp"
 		te.Params[1].Value = make([]byte, 1)
-		te.Params[1].Value[0] = byte(far_entry.applyAction & 0x02)
+		te.Params[1].Value[0] = byte(far_entry.applyAction & 0x08)
 		te.Params[2].Name = "src_addr"
 		te.Params[2].Value = make([]byte, 4)
 		binary.BigEndian.PutUint32(te.Params[2].Value, far_entry.s1uIP)

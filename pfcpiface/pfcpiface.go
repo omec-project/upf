@@ -380,6 +380,9 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 		var fseidIP uint32
 		n3IP, _ := ParseIP(conf.PFCPIface.N3IP)
 		fseidIP = binary.LittleEndian.Uint32(n3IP)
+        log.Println("fseidIP ", fseidIP)
+		fseidIP = binary.LittleEndian.Uint32(upf.n3IP)
+        log.Println("fseidIP ", fseidIP)
 		for _, pdr := range pdrs {
 			if pdr.ueIP != 0 {
 				ue_ip_val = pdr.ueIP
@@ -475,12 +478,13 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
 					break
 				}
 
-				applyAction, err := ie1.ApplyAction()
+				/*applyAction, err := ie1.ApplyAction()
 				if err != nil {
 					log.Println("Could not read Apply Action!")
 					cause = ie.CauseRequestRejected
 					break
-				}
+				}*/
+                var applyAction uint8 = 0
 
 				/* Read UpdateFAR from payload */
 				ies2, err := ie1.UpdateForwardingParameters()
@@ -523,6 +527,8 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
 								var fseidIP uint32
 								n3IP, _ := ParseIP(conf.PFCPIface.N3IP)
 								fseidIP = binary.LittleEndian.Uint32(n3IP)
+		                        fseidIP = binary.LittleEndian.Uint32(upf.n3IP)
+                                log.Println("fseidIP ", fseidIP)
 								far.fseidIP = fseidIP
 								err := upf.P4FARFunc(far, FUNCTION_TYPE_UPDATE)
 								if err != nil {
