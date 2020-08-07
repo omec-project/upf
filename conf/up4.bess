@@ -185,20 +185,10 @@ _in -> farLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
 # Add logical pipeline when gtpudecap is needed
 pdrLookup:GTPUDecap \
     -> gtpuDecap::GtpuDecap() \
-    -> coreEtherAdd::GenericEncap(fields=[
-        {'size': 6, 'value': {'value_int': 0x0}},
-        {'size': 6, 'value': {'value_int': 0x0}},
-        {'size': 2, 'value': {'value_int': 0x0800}}]) \
     -> preQoSCounter
 
 # Add logical pipeline when gtpuencap is needed
 farLookup:GTPUEncap \
-    -> etherTrimEncap::GenericDecap(bytes=14) \
-    -> SetMetadata(attrs=[
-        {'name':'ether_src', 'size': 6, 'value_int': 0x0},
-        {'name':'ether_dst', 'size': 6, 'value_int': 0x0},
-        {'name':'ether_type', 'size': 2, 'value_int': 0x0800}
-    ]) \
     -> gtpuEncap::GtpuEncap():1 \
     -> outerUDPCsum::L4Checksum() \
     -> outerIPCsum::IPChecksum() \
