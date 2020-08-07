@@ -40,11 +40,10 @@ void GtpuDecap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
         (Gtpv1 *)((uint8_t *)iph + (iph->header_length << 2) + sizeof(Udp));
     // Don't swap lines 44 with 42, otherwise gtph->header_length()
     // gets overwritten by ethh!!
-    batch->pkts()[i]->adj((iph->header_length << 2) +
-                          sizeof(Udp) + gtph->header_length());
-    memcpy((uint8_t *)gtph + gtph->header_length() - sizeof(*eth),
-	   eth,
-	   sizeof(*eth));
+    batch->pkts()[i]->adj((iph->header_length << 2) + sizeof(Udp) +
+                          gtph->header_length());
+    memcpy((uint8_t *)gtph + gtph->header_length() - sizeof(*eth), eth,
+           sizeof(*eth));
   }
 
   RunNextModule(ctx, batch);

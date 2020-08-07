@@ -123,7 +123,8 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     Ipv4 *iph = (Ipv4 *)(new_p + sizeof(*eth));
 
     /* setting GTPU pointer */
-    Gtpv1 *gtph = (Gtpv1 *)(new_p + sizeof(Ethernet) + sizeof(Ipv4) + sizeof(Udp));
+    Gtpv1 *gtph =
+        (Gtpv1 *)(new_p + sizeof(Ethernet) + sizeof(Ipv4) + sizeof(Udp));
 
     /* copying template content */
     bess::utils::Copy(iph, &outer_ip_template, sizeof(outer_ip_template));
@@ -138,8 +139,8 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     udph->src_port = udph->dst_port = (be16_t)(at_tout_uport);
 
     /* setting outer IP header */
-    iph->length =
-      (be16_t)(pkt_len + sizeof(Gtpv1) + sizeof(Udp) + sizeof(Ipv4) - sizeof(Ethernet));
+    iph->length = (be16_t)(pkt_len + sizeof(Gtpv1) + sizeof(Udp) +
+                           sizeof(Ipv4) - sizeof(Ethernet));
     iph->src = (be32_t)(at_tout_sip);
     iph->dst = (be32_t)(at_tout_dip);
     EmitPacket(ctx, p, FORWARD_GATE);
