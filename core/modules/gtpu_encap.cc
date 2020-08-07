@@ -31,11 +31,6 @@ using bess::utils::ToIpv4Address;
 using bess::utils::Udp;
 
 enum { DEFAULT_GATE = 0, FORWARD_GATE };
-enum {
-  ATTR_R_ETHER_SRC,
-  ATTR_R_ETHER_DST,
-  ATTR_R_ETHER_TYPE,
-};
 /*----------------------------------------------------------------------------------*/
 // Template for generating UDP packets without data
 struct [[gnu::packed]] PacketTemplate {
@@ -117,10 +112,10 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     }
 
     /* setting Ethernet header */
-    memcpy(new_p, eth, sizeof(*eth));
+    memcpy(new_p, eth, sizeof(Ethernet));
 
     /* setting IPv4 header */
-    Ipv4 *iph = (Ipv4 *)(new_p + sizeof(*eth));
+    Ipv4 *iph = (Ipv4 *)(new_p + sizeof(Ethernet));
 
     /* setting GTPU pointer */
     Gtpv1 *gtph =
@@ -130,12 +125,12 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     bess::utils::Copy(iph, &outer_ip_template, sizeof(outer_ip_template));
 
     /* setting gtpu header */
-    gtph->length = (be16_t)(pkt_len - sizeof(*eth));
+    gtph->length = (be16_t)(pkt_len - sizeof(Ethernet));
     gtph->teid = (be32_t)(at_tout_teid);
 
     /* setting outer UDP header */
-    Udp *udph = (Udp *)(new_p + sizeof(*eth) + sizeof(Ipv4));
-    udph->length = (be16_t)(pkt_len + sizeof(Gtpv1) + sizeof(Udp));
+    Udp *udph = (Udp *)(new_p + sizeof(Ethernet) + sizeof(Ipv4));
+    udph->length = (be16_t)(pkt_len + sizeof(Gtpv1) + sizeof(Udp) - sizeof(Ethernet));
     udph->src_port = udph->dst_port = (be16_t)(at_tout_uport);
 
     /* setting outer IP header */
