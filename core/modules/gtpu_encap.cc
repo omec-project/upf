@@ -103,10 +103,8 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
                << ", tunnel out teid: " << at_tout_teid
                << ", tunnel out udp port: " << at_tout_uport << std::endl;
 
-    /* assuming that this module comes right after EthernetDecap */
-    /* pkt_len can be used as the length of IP datagram */
     uint16_t pkt_len = p->total_len();
-    Ipv4 *iph = p->head_data<Ipv4 *>();
+    Ethernet *eth = p->head_data<Ethernet *>();
 
     /* pre-allocate space for encaped header(s) */
     char *new_p = static_cast<char *>(
@@ -118,48 +116,30 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
       continue;
     }
 
-    /* set Ethernet header */
-    Ethernet::Address ether_src;
-    Ethernet::Address ether_dst;
-    bess::utils::be16_t ether_type;
+    /* setting Ethernet header */
+    memcpy(new_p, eth, sizeof(*eth));
 
-    ether_src = get_attr<Ethernet::Address>(this, ATTR_R_ETHER_SRC, p);
-    ether_dst = get_attr<Ethernet::Address>(this, ATTR_R_ETHER_DST, p);
-    ether_type = get_attr<bess::utils::be16_t>(this, ATTR_R_ETHER_TYPE, p);
-
-    Ethernet *eth = static_cast<Ethernet *>(p->prepend(sizeof(*eth)));
-
-    // not enough headroom?
-    if (unlikely(!eth)) {
-      /* failed to prepend header space for encaped packet */
-      EmitPacket(ctx, p, DEFAULT_GATE);
-      DLOG(INFO) << "prepend() failed!" << std::endl;
-      continue;
-    }
-
-    eth->dst_addr = ether_dst;
-    eth->src_addr = ether_src;
-    eth->ether_type = ether_type;
+    /* setting IPv4 header */
+    Ipv4 *iph = (Ipv4 *)(new_p + sizeof(*eth));
 
     /* setting GTPU pointer */
-    Gtpv1 *gtph = (Gtpv1 *)(new_p + sizeof(Ipv4) + sizeof(Udp));
+    Gtpv1 *gtph = (Gtpv1 *)(new_p + sizeof(Ethernet) + sizeof(Ipv4) + sizeof(Udp));
 
     /* copying template content */
-    bess::utils::Copy(new_p, &outer_ip_template, sizeof(outer_ip_template));
+    bess::utils::Copy(iph, &outer_ip_template, sizeof(outer_ip_template));
 
     /* setting gtpu header */
-    gtph->length = (be16_t)(pkt_len);
+    gtph->length = (be16_t)(pkt_len - sizeof(*eth));
     gtph->teid = (be32_t)(at_tout_teid);
 
     /* setting outer UDP header */
-    Udp *udph = (Udp *)(new_p + sizeof(Ipv4));
+    Udp *udph = (Udp *)(new_p + sizeof(*eth) + sizeof(Ipv4));
     udph->length = (be16_t)(pkt_len + sizeof(Gtpv1) + sizeof(Udp));
     udph->src_port = udph->dst_port = (be16_t)(at_tout_uport);
 
     /* setting outer IP header */
-    iph = (Ipv4 *)(new_p);
     iph->length =
-        (be16_t)(pkt_len + sizeof(Gtpv1) + sizeof(Udp) + sizeof(Ipv4));
+      (be16_t)(pkt_len + sizeof(Gtpv1) + sizeof(Udp) + sizeof(Ipv4) - sizeof(Ethernet));
     iph->src = (be32_t)(at_tout_sip);
     iph->dst = (be32_t)(at_tout_dip);
     EmitPacket(ctx, p, FORWARD_GATE);
@@ -168,10 +148,6 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 /*----------------------------------------------------------------------------------*/
 CommandResponse GtpuEncap::Init(const bess::pb::EmptyArg &) {
   using AccessMode = bess::metadata::Attribute::AccessMode;
-  AddMetadataAttr("ether_src", sizeof(Ethernet::Address), AccessMode::kRead);
-  AddMetadataAttr("ether_dst", sizeof(Ethernet::Address), AccessMode::kRead);
-  AddMetadataAttr("ether_type", sizeof(Ethernet::Type), AccessMode::kRead);
-
   tout_sip_attr = AddMetadataAttr("tunnel_out_src_ip4addr", sizeof(uint32_t),
                                   AccessMode::kRead);
   DLOG(INFO) << "tout_sip_attr: " << tout_sip_attr << std::endl;

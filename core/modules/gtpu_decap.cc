@@ -32,14 +32,19 @@ void GtpuDecap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 
   for (int i = 0; i < cnt; i++) {
     bess::Packet *p = batch->pkts()[i];
-    /* Trim sizeof(Ethernet) + iph->ihl<<2 + sizeof(Udp) + size of Gtpv1 header
+    /* Trim iph->ihl<<2 + sizeof(Udp) + size of Gtpv1 header
      */
     Ethernet *eth = p->head_data<Ethernet *>();
     Ipv4 *iph = (Ipv4 *)((uint8_t *)eth + sizeof(*eth));
     Gtpv1 *gtph =
         (Gtpv1 *)((uint8_t *)iph + (iph->header_length << 2) + sizeof(Udp));
-    batch->pkts()[i]->adj(sizeof(Ethernet) + (iph->header_length << 2) +
+    // Don't swap lines 44 with 42, otherwise gtph->header_length()
+    // gets overwritten by ethh!!
+    batch->pkts()[i]->adj((iph->header_length << 2) +
                           sizeof(Udp) + gtph->header_length());
+    memcpy((uint8_t *)gtph + gtph->header_length() - sizeof(*eth),
+	   eth,
+	   sizeof(*eth));
   }
 
   RunNextModule(ctx, batch);
