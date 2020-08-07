@@ -378,10 +378,8 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 		var ue_ip_val uint32
 		var ue_ip_val_mask uint32
 		var fseidIP uint32
-		n3IP, _ := ParseIP(conf.PFCPIface.N3IP)
-		fseidIP = binary.LittleEndian.Uint32(n3IP)
-        log.Println("fseidIP ", fseidIP)
-		fseidIP = binary.LittleEndian.Uint32(upf.n3IP)
+        log.Println("n3IP ", upf.n3IP.String())
+		fseidIP = binary.LittleEndian.Uint32(upf.n3IP.To4())
         log.Println("fseidIP ", fseidIP)
 		for _, pdr := range pdrs {
 			if pdr.ueIP != 0 {
@@ -525,9 +523,8 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
 									upf.resumeAll()
 								*/
 								var fseidIP uint32
-								n3IP, _ := ParseIP(conf.PFCPIface.N3IP)
-								fseidIP = binary.LittleEndian.Uint32(n3IP)
-		                        fseidIP = binary.LittleEndian.Uint32(upf.n3IP)
+                                log.Println("n3IP ", upf.n3IP.String())
+		                        fseidIP = binary.LittleEndian.Uint32(upf.n3IP.To4())
                                 log.Println("fseidIP ", fseidIP)
 								far.fseidIP = fseidIP
 								err := upf.P4FARFunc(far, FUNCTION_TYPE_UPDATE)
