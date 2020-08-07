@@ -378,9 +378,9 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 		var ue_ip_val uint32
 		var ue_ip_val_mask uint32
 		var fseidIP uint32
-        log.Println("n3IP ", upf.n3IP.String())
+		log.Println("n3IP ", upf.n3IP.String())
 		fseidIP = binary.LittleEndian.Uint32(upf.n3IP.To4())
-        log.Println("fseidIP ", fseidIP)
+		log.Println("fseidIP ", fseidIP)
 		for _, pdr := range pdrs {
 			if pdr.ueIP != 0 {
 				ue_ip_val = pdr.ueIP
@@ -453,6 +453,7 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
 
 	/* fetch FSEID */
 	fseid := (smreq.SEID() >> 2)
+	sessItem := sessions[fseid]
 
 	var cause uint8 = ie.CauseRequestAccepted
 	/* read FAR(s). These can be multiple */
@@ -476,13 +477,26 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
 					break
 				}
 
-				/*applyAction, err := ie1.ApplyAction()
+				var flag bool = false
+				for _, far := range sessItem.fars {
+					if far.farID == uint8(farID) {
+						flag = true
+						break
+					}
+				}
+
+				if flag == false {
+					log.Println("Unknown FAR ID ", farID)
+					cause = ie.CauseRequestRejected
+					break
+				}
+
+				applyAction, err := ie1.ApplyAction()
 				if err != nil {
 					log.Println("Could not read Apply Action!")
 					cause = ie.CauseRequestRejected
 					break
-				}*/
-                var applyAction uint8 = 0
+				}
 
 				/* Read UpdateFAR from payload */
 				ies2, err := ie1.UpdateForwardingParameters()
@@ -523,9 +537,9 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
 									upf.resumeAll()
 								*/
 								var fseidIP uint32
-                                log.Println("n3IP ", upf.n3IP.String())
-		                        fseidIP = binary.LittleEndian.Uint32(upf.n3IP.To4())
-                                log.Println("fseidIP ", fseidIP)
+								log.Println("n3IP ", upf.n3IP.String())
+								fseidIP = binary.LittleEndian.Uint32(upf.n3IP.To4())
+								log.Println("fseidIP ", fseidIP)
 								far.fseidIP = fseidIP
 								err := upf.P4FARFunc(far, FUNCTION_TYPE_UPDATE)
 								if err != nil {
@@ -538,6 +552,11 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
 						}
 					}
 				}
+			}
+
+			if cause == ie.CauseRequestRejected {
+				log.Println("Request rejected. Exit")
+				break
 			}
 		}
 	}
