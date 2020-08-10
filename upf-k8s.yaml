@@ -101,7 +101,7 @@ spec:
   #      add:
   #        - NET_ADMIN
   containers:
-  - name: bess-routectl
+  - name: routectl
     image: omecproject/upf-epc-bess:master-latest
     command: ["/opt/bess/bessctl/conf/route_control.py"]
     args:
@@ -115,7 +115,7 @@ spec:
       limits:
         cpu: 256m
         memory: 128Mi
-  - name: bess
+  - name: bessd
     image: omecproject/upf-epc-bess:master-latest
     stdin: true
     tty: true
@@ -149,7 +149,7 @@ spec:
       mountPath: /conf
     - name: hugepages
       mountPath: /dev/hugepages
-  - name: bess-web
+  - name: web
     image: omecproject/upf-epc-bess:master-latest 
     command: ["bessctl"]
     args:
