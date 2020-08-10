@@ -41,7 +41,7 @@ void GtpuDecap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     // Don't swap lines 44 with 42, otherwise gtph->header_length()
     // gets overwritten by ethh!!
     auto *new_p = batch->pkts()[i]->adj((iph->header_length << 2) +
-					sizeof(Udp) + gtph->header_length());
+                                        sizeof(Udp) + gtph->header_length());
     memcpy(new_p, eth, sizeof(*eth));
   }
 

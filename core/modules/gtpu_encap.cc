@@ -130,7 +130,8 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 
     /* setting outer UDP header */
     Udp *udph = (Udp *)(new_p + sizeof(Ethernet) + sizeof(Ipv4));
-    udph->length = (be16_t)(pkt_len + sizeof(Gtpv1) + sizeof(Udp) - sizeof(Ethernet));
+    udph->length =
+        (be16_t)(pkt_len + sizeof(Gtpv1) + sizeof(Udp) - sizeof(Ethernet));
     udph->src_port = udph->dst_port = (be16_t)(at_tout_uport);
 
     /* setting outer IP header */
