@@ -44,6 +44,10 @@ jobs:
         run: |
           gofmt -s -l -w $(gofmt -s -l . | grep -v vendor/)
 
+      - name: Show all CI changes
+        run: |
+          git --no-pager diff
+
       # Build again and commit
       - name: Build the Docker image (after format)
         run: |
