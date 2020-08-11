@@ -55,6 +55,7 @@ class Port:
         self.nat = None
         self.ext_addrs = ext_addrs
         self.mode = None
+        self.hwcksum = False
 
     def bpf_gate(self):
         if self.bpfgate < MAX_GATES - 2:
@@ -146,10 +147,10 @@ class Port:
             kwargs = None
             pci = alias_by_interface(name)
             if pci is not None:
-                # Try setting hwcksum to False, if PMDPort fails
                 kwargs = {"pci": pci, "num_out_q": conf_workers, "hwcksum": True}
                 try:
                     self.init_fastpath(**kwargs)
+                    self.hwcksum = True
                 except:
                     kwargs = None
                     print('Unable to initialize {} fastpath using alias {},\
@@ -165,9 +166,17 @@ class Port:
                 if fidx is None:
                     raise Exception(
                         'Registered port for {} not detected!'.format(name))
-                # Try setting hwcksum to False, if PMDPort fails
                 kwargs = {"port_id": fidx, "num_out_q": conf_workers,  "hwcksum": True}
-                self.init_fastpath(**kwargs)
+                try:
+                    self.init_fastpath(**kwargs)
+                    self.hwcksum = True
+                except:
+                    # Try setting hwcksum to False & re-init DPDK fastpath
+                    # if everything else fails
+                    print('Unable to initialize {} fastpath with hardware checksum,\
+                    offloading. Falling back to SW-based cksum'.format(name))
+                    kwargs = {"port_id": fidx, "num_out_q": conf_workers,  "hwcksum": False}
+                    self.init_fastpath(**kwargs)
 
             # Initialize kernel slowpath port and RX/TX modules
             try:
@@ -270,11 +279,19 @@ class Port:
             self.nat.connect(next_mod=out, ogate=1)
             out = self.nat
 
+        # Set src mac address on Ethernet header for egress pkts
+        update = Update(name="{}SrcEther".format(self.name), fields=[
+            {'offset': 6, 'size': 6, 'value': mac2hex(mac_by_interface(self.name))}
+            ])
+
+        # Attach Update module to the 'outlist' of modules
+        update.connect(out)
+
         # Direct fast path traffic to Merge module
         merge = Merge(name="{}Merge".format(self.name))
 
-        # Attach Merge module to the 'outlist' of modules
-        merge.connect(out)
+        # Attach it to merge
+        merge.connect(update)
 
         if self.mode == 'sim':
             self.rtr = merge

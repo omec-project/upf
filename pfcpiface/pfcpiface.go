@@ -5,9 +5,9 @@ package main
 
 import (
 	//"context"
-	"encoding/binary"
 	"log"
 	"net"
+    "strings"
 	"time"
 
 	"github.com/wmnsk/go-pfcp/ie"
@@ -16,10 +16,11 @@ import (
 
 // PktBufSz : buffer size for incoming pkt
 const (
-	PktBufSz = 1500
-	PFCPPort = "8805"
-	MaxItems = 10
-	Timeout  = 1000 * time.Millisecond
+	PktBufSz    = 1500
+	PFCPPort    = "8805"
+	MaxItems    = 10
+	Timeout     = 1000 * time.Millisecond
+	readTimeout = 25 * time.Second
 )
 
 type sessRecord struct {
@@ -29,165 +30,8 @@ type sessRecord struct {
 
 var sessions map[uint64]sessRecord
 
-func parsePDRFromPFCPSessEstReqPayload(sereq *message.SessionEstablishmentRequest, fseid *ie.FSEIDFields) (pdrs []pdr, fars []far) {
-
-	pdrList := make([]pdr, 0, MaxItems)
-	farList := make([]far, 0, MaxItems)
-
-	/* read PDR(s) */
-	ies1, err := ie.ParseMultiIEs(sereq.Payload)
-	if err != nil {
-		log.Println("Failed to parse sereq for IEs!")
-		return pdrList, farList
-	}
-	/*
-	 * Iteratively go through all IEs. You can't use ie.CreatePDR or ie.CreateFAR since a single
-	 * message can carry multiple CreatePDR & CreateFAR messages.
-	 */
-	for _, ie1 := range ies1 {
-		switch ie1.Type {
-		case ie.CreatePDR:
-			var srcIface uint8
-			var teid uint32
-			var tunnelIp uint32
-			var ueIP4 net.IP
-
-			/* reset outerHeaderRemoval to begin with */
-			outerHeaderRemoval := uint8(0)
-
-			pdrID, err := ie1.PDRID()
-			if err != nil {
-				log.Println("Could not read PDR!")
-				return pdrList, farList
-			}
-
-			pdi, err := ie1.PDI()
-			if err != nil {
-				log.Println("Could not read PDI!")
-				return pdrList, farList
-			}
-
-			for _, ie2 := range pdi {
-				switch ie2.Type {
-				case ie.SourceInterface:
-					srcIface, err = ie2.SourceInterface()
-					if err != nil {
-						log.Println("Failed to parse Source Interface IE!")
-					} else {
-						if srcIface == ie.SrcInterfaceCPFunction {
-							log.Println("Detected src interface cp function. Ignoring for the time being")
-						}
-					}
-				case ie.FTEID:
-					fteid, err := ie2.FTEID()
-					if err != nil {
-						log.Println("Failed to parse FTEID IE")
-					} else {
-						teid = fteid.TEID
-						netIp := fteid.IPv4Address.To4()
-						tunnelIp = binary.LittleEndian.Uint32(netIp)
-					}
-				case ie.UEIPAddress:
-					ueip4, err := ie2.UEIPAddress()
-					if err != nil {
-						log.Println("Failed to parse UE IP address")
-					} else {
-						ueIP4 = ueip4.IPv4Address
-					}
-				case ie.SDFFilter:
-					// Do nothing for the time being
-				case ie.QFI:
-					// Do nothing for the time being
-				}
-			}
-
-			farID, err := ie1.FARID()
-			if err != nil {
-				log.Println("Could not read FAR ID!")
-				return pdrList, farList
-			}
-
-			// uplink PDR may not have UE IP address IE
-			// FIXIT/TODO/XXX Move this inside SrcInterfaceAccess IE check??
-			var ueIP uint32
-			var ueIPMask uint32
-			if len(ueIP4) == 0 {
-				ueIP = 0
-				ueIPMask = 0
-			} else {
-				ueIP = ip2int(ueIP4)
-				ueIPMask = 0xFFFFFFFF
-			}
-
-			// populated everything for PDR, and set the right pdr_
-			if srcIface == ie.SrcInterfaceAccess {
-				pdrU := pdr{
-					srcIface:         access,
-					eNBTeid:          teid,
-					dstIP:            ueIP,
-					srcIfaceMask:     0xFF,
-					eNBTeidMask:      0xFFFFFFFF,
-					ueIP:             ueIP,
-					ueIPMask:         ueIPMask,
-					dstIPMask:        ueIPMask,
-					tunnelIP4Dst:     tunnelIp,
-					tunnelIP4DstMask: 0xFFFFFFFF,
-					pdrID:            uint32(pdrID),
-					fseID:            uint32(fseid.SEID), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-					ctrID:            0,                  // ctrID currently not being set <--- FIXIT/TODO/XXX
-					farID:            uint8(farID),
-					needDecap:        outerHeaderRemoval,
-				}
-				pdrList = append(pdrList, pdrU)
-			} else if srcIface == ie.SrcInterfaceCore {
-				pdrD := pdr{
-					srcIface:     core,
-					srcIP:        ueIP,
-					srcIfaceMask: 0xFF,
-					ueIP:         ueIP,
-					ueIPMask:     ueIPMask,
-					srcIPMask:    ueIPMask,
-					pdrID:        uint32(pdrID),
-					fseID:        uint32(fseid.SEID), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-					ctrID:        0,                  // ctrID currently not being set <--- FIXIT/TOOD/XXX
-					farID:        uint8(farID),       // farID currently not being set <--- FIXIT/TODO/XXX
-					needDecap:    outerHeaderRemoval,
-				}
-				pdrList = append(pdrList, pdrD)
-			}
-
-		case ie.CreateFAR:
-			if err != nil {
-				log.Println("Failed to parse FAR IE!")
-			} else {
-				farID, err := ie1.FARID()
-				if err != nil {
-					log.Println("Could not read FAR ID!")
-					return pdrList, farList
-				}
-				applyAction, err := ie1.ApplyAction()
-				if err != nil {
-					log.Println("Could not read Apply Action!")
-					return pdrList, farList
-				}
-
-				far := far{
-					farID:       uint8(farID),       // farID currently being truncated to uint8 <--- FIXIT/TODO/XXX
-					fseID:       uint32(fseid.SEID), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-					action:      farForward,
-					applyAction: applyAction,
-				}
-				farList = append(farList, far)
-			}
-
-		}
-	}
-
-	return pdrList, farList
-}
-
-func pfcpifaceMainLoop(upf *upf, n3ip string, sourceIP string) {
-	log.Println("pfcpifaceMainLoop says hello!!!")
+func pfcpifaceMainLoop(upf *upf, accessIP string, sourceIP string) {
+	log.Println("pfcpifaceMainLoop@" + upf.fqdnHost + " says hello!!!")
 
 	// Verify IP + Port binding
 	laddr, err := net.ResolveUDPAddr("udp", sourceIP+":"+PFCPPort)
@@ -203,23 +47,53 @@ func pfcpifaceMainLoop(upf *upf, n3ip string, sourceIP string) {
 		return
 	}
 
+	// flag to check SMF/SPGW-C is connected
+	cpConnected := false
+
+	// cleanup the pipeline
+	cleanupSessions := func() {
+		if cpConnected {
+			sendDeleteAllSessionsMsgtoUPF(upf)
+			cpConnected = false
+		}
+	}
+
 	// Initialize pkt buf
 	buf := make([]byte, PktBufSz)
+	// Initialize pkt header
+
 	// Initialize sessions map
 	sessions = make(map[uint64]sessRecord)
 
 	for {
+		err := conn.SetReadDeadline(time.Now().Add(readTimeout))
+		if err != nil {
+			log.Fatalln("Unable to set deadline for read:", err)
+		}
 		// blocking read
 		n, addr, err := conn.ReadFrom(buf)
 		if err != nil {
-			log.Fatalln("Unable to read packet buffer")
-			return
+			if err, ok := err.(net.Error); ok && err.Timeout() {
+				// do nothing for the time being
+				log.Println(err)
+				cleanupSessions()
+				continue
+			}
+			log.Fatalln("Read error:", err)
 		}
+
 		// use wmnsk lib to parse the pfcp message
 		msg, err := message.Parse(buf[:n])
 		if err != nil {
 			log.Println("Ignoring undecodable message: ", buf[:n], " error: ", err)
 			continue
+		}
+
+		// if sourceIP is not set, fetch it from the msg header
+		if sourceIP == "0.0.0.0" {
+			addrString := strings.Split(addr.String(), ":")
+			sourceIP = getOutboundIP(addrString[0]).String()
+			log.Println("Source IP address is now: ", sourceIP)
 		}
 
 		//log.Println("Message: ", msg)
@@ -228,7 +102,8 @@ func pfcpifaceMainLoop(upf *upf, n3ip string, sourceIP string) {
 		var outgoingMessage []byte
 		switch msg.MessageType() {
 		case message.MsgTypeAssociationSetupRequest:
-			outgoingMessage = handleAssociationSetupRequest(msg, addr, sourceIP, n3ip)
+			outgoingMessage = handleAssociationSetupRequest(msg, addr, sourceIP, accessIP)
+			cpConnected = true
 		case message.MsgTypeSessionEstablishmentRequest:
 			outgoingMessage = handleSessionEstablishmentRequest(upf, msg, addr, sourceIP)
 		case message.MsgTypeSessionModificationRequest:
@@ -238,7 +113,8 @@ func pfcpifaceMainLoop(upf *upf, n3ip string, sourceIP string) {
 		case message.MsgTypeSessionDeletionRequest:
 			outgoingMessage = handleSessionDeletionRequest(upf, msg, addr, sourceIP)
 		case message.MsgTypeAssociationReleaseRequest:
-			outgoingMessage = handleAssociationReleaseRequest(msg, addr, sourceIP, n3ip)
+			outgoingMessage = handleAssociationReleaseRequest(msg, addr, sourceIP, accessIP)
+			cleanupSessions()
 		default:
 			log.Println("Message type: ", msg.MessageTypeName(), " is currently not supported")
 			continue
@@ -254,7 +130,29 @@ func pfcpifaceMainLoop(upf *upf, n3ip string, sourceIP string) {
 	}
 }
 
-func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP string, n3ip string) []byte {
+func channel_setup() (*P4rtClient, error) {
+    log.Println("Channel Setup.")
+    localclient, err := CreateChannel(host, deviceId, timeout)
+    if err != nil {
+        log.Println("create channel failed : %v\n", err)
+        return nil, err
+    }
+    if localclient != nil {
+        log.Println("device id %d\n", (*localclient).DeviceID)
+        err = SetSwitchInfo(conf)
+        if err != nil {
+            log.Println("Switch set info failed. %v\n", err)
+            return nil, err
+        }
+    } else {
+        log.Println("p4runtime client is null.\n")
+        return nil, err
+    }
+
+    return localclient, nil
+}
+
+func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP string, accessIP string) []byte {
 	asreq, ok := msg.(*message.AssociationSetupRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -270,13 +168,12 @@ func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP 
 
 	// Build response message
 	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
-	asres, err := message.NewAssociationSetupResponse(
-		ie.NewRecoveryTimeStamp(time.Now()),
-		ie.NewNodeID(sourceIP, "", ""),       /* node id */
+	asres, err := message.NewAssociationSetupResponse(ie.NewRecoveryTimeStamp(time.Now()),
+		ie.NewNodeID(sourceIP, "", ""),       /* node id (IPv4) */
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
-		ie.NewUserPlaneIPResourceInformation(0x41, 0, n3ip, "", "", ie.SrcInterfaceAccess),
+		ie.NewUserPlaneIPResourceInformation(0x41, 0, accessIP, "", "", ie.SrcInterfaceAccess),
 		ie.NewSequenceNumber(asreq.SequenceNumber), /* seq # */
 	).Marshal() /* userplane ip resource info */
 	if err != nil {
@@ -288,7 +185,7 @@ func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP 
 	return asres
 }
 
-func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceIP string, n3ip string) []byte {
+func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceIP string, accessIP string) []byte {
 	arreq, ok := msg.(*message.AssociationReleaseRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -300,11 +197,11 @@ func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceI
 	// Build response message
 	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
 	arres, err := message.NewAssociationReleaseResponse(ie.NewRecoveryTimeStamp(time.Now()),
-		ie.NewNodeID(sourceIP, "", ""),       /* node id */
+		ie.NewNodeID(sourceIP, "", ""),       /* node id (IPv4) */
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
-		ie.NewUserPlaneIPResourceInformation(0x41, 0, n3ip, "", "", ie.SrcInterfaceAccess),
+		ie.NewUserPlaneIPResourceInformation(0x41, 0, accessIP, "", "", ie.SrcInterfaceAccess),
 		ie.NewSequenceNumber(arreq.SequenceNumber), /* seq # */
 	).Marshal() /* userplane ip resource info */
 	if err != nil {
@@ -333,83 +230,28 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 		return nil
 	}
 
-	if client == nil || client.CheckStatus() != Ready {
-		client, err = CreateChannel(host, deviceId, timeout)
-		if err != nil {
-			log.Println("create channel failed : %v", err)
-			fail = true
-		}
-
-		if client != nil {
-			log.Println("Set switch info.")
-			err = SetSwitchInfo(conf)
-			if err != nil {
-				log.Println("Switch set info failed. %v\n", err)
-				fail = true
-			}
-		} else {
-			log.Println("p4runtime client null")
-			fail = true
-		}
-	}
+    if enable_p4rt == true {
+        if p4client == nil || p4client.CheckStatus() != Ready {
+            p4client, err = channel_setup()
+            if err != nil {
+                log.Println("create channel failed : %v", err)
+                fail = true
+            }
+        }
+    }
 
 	var cause uint8 = ie.CauseRequestAccepted
 	if fail == true {
 		cause = ie.CauseRequestRejected
 	} else {
 		/* Read CreatePDRs and CreateFARs from payload */
-		pdrs, fars := parsePDRFromPFCPSessEstReqPayload(sereq, fseid)
+		pdrs, fars := parsePDRFromPFCPSessEstReqPayload(upf, sereq, fseid)
 
-		/* create context, pause daemon, insert PDR(s), and resume daemon */
-
-		/*
-			        ctx, cancel := context.WithTimeout(context.Background(), Timeout)
-			        defer cancel()
-			        done := make(chan bool)
-				    upf.pauseAll()
-				    for _, pdr := range pdrs {
-					    upf.addPDR(ctx, done, pdr)
-				    }
-				    for _, far := range fars {
-					    upf.addFAR(ctx, done, far)
-				    }
-				    upf.resumeAll() */
-
-		var ue_ip_val uint32
-		var ue_ip_val_mask uint32
-		var fseidIP uint32
-		log.Println("n3IP ", upf.n3IP.String())
-		fseidIP = binary.LittleEndian.Uint32(upf.n3IP.To4())
-		log.Println("fseidIP ", fseidIP)
-		for _, pdr := range pdrs {
-			if pdr.ueIP != 0 {
-				ue_ip_val = pdr.ueIP
-				ue_ip_val_mask = pdr.ueIPMask
-				break
-			}
-		}
-
-		for i := range pdrs {
-			pdrs[i].fseidIP = fseidIP
-			pdrs[i].ueIP = ue_ip_val
-			pdrs[i].ueIPMask = ue_ip_val_mask
-			err := upf.P4PDRFunc(pdrs[i], FUNCTION_TYPE_INSERT)
-			if err != nil {
-				log.Println("pdr entry function failed. %v", err)
-				cause = ie.CauseRequestRejected
-				break
-			}
-		}
-
-		for j := range fars {
-			fars[j].fseidIP = fseidIP
-			err := upf.P4FARFunc(fars[j], FUNCTION_TYPE_INSERT)
-			if err != nil {
-				log.Println("far entry function failed. %v", err)
-				cause = ie.CauseRequestRejected
-				break
-			}
-		}
+        if enable_p4rt == true {
+           upf.insertEntryP4Upf(pdrs, fars)
+        } else {
+	        upf.sendMsgToUPF("add", pdrs, fars)
+	    }
 
 		if cause == ie.CauseRequestAccepted {
 			// Adding current session details to the hash map
@@ -430,7 +272,7 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 		0,                              /* priority */
 		ie.NewNodeID(sourceIP, "", ""), /* node id */
 		ie.NewCause(cause),             /* accept it blindly for the time being */
-		ie.NewFSEID((fseid.SEID<<2), net.ParseIP(sourceIP), nil, nil),
+		ie.NewFSEID(peerSEID(fseid.SEID), net.ParseIP(sourceIP), nil, nil),
 	).Marshal()
 
 	if err != nil {
@@ -452,30 +294,21 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
 	log.Println("Got a session modification request from: ", addr)
 
 	/* fetch FSEID */
-	fseid := (smreq.SEID() >> 2)
-	sessItem := sessions[fseid]
 
-    var err error
+	fseid := (mySEID(smreq.SEID()))
+	fars := make([]far, 0, MaxItems)
+
     var flag bool = false
-	if client == nil || client.CheckStatus() != Ready {
-		client, err = CreateChannel(host, deviceId, timeout)
-		if err != nil {
-			log.Println("create channel failed : %v", err)
-			flag = true
-		}
-
-		if client != nil {
-			log.Println("Set switch info.")
-			err = SetSwitchInfo(conf)
-			if err != nil {
-				log.Println("Switch set info failed. %v\n", err)
-				flag = true
-			}
-		} else {
-			log.Println("p4runtime client null")
-			flag = true
-		}
-	}
+    if enable_p4rt == true {
+        var err error
+        if p4client == nil || p4client.CheckStatus() != Ready {
+            p4client, err = channel_setup()
+            if err != nil {
+                log.Println("create channel failed : %v", err)
+                flag = true
+            }
+        }
+    }
 
 	var cause uint8 = ie.CauseRequestAccepted
     if flag == true {
@@ -493,107 +326,32 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
              */
             for _, ie1 := range ies1 {
                 switch ie1.Type {
-                case ie.UpdateFAR:
-                    /* check for updatefar, and fetch FAR ID */
-                    farID, err := ie1.FARID()
-                    if err != nil {
-                        log.Println("Unable to find updateFAR's FAR ID!")
-                        cause = ie.CauseRequestRejected
-                        break
-                    }
-
-                    flag  = false
-                    for _, far := range sessItem.fars {
-                        if far.farID == uint8(farID) {
-                            flag = true
-                            break
-                        }
-                    }
-
-                    if flag == false {
-                        log.Println("Unknown FAR ID ", farID)
-                        cause = ie.CauseRequestRejected
-                        break
-                    }
-
-                    applyAction, err := ie1.ApplyAction()
-                    if err != nil {
-                        log.Println("Could not read Apply Action!")
-                        cause = ie.CauseRequestRejected
-                        break
-                    }
-
-                    /* Read UpdateFAR from payload */
-                    ies2, err := ie1.UpdateForwardingParameters()
-                    if err != nil {
-                        log.Println("Unable to find UpdateForwardingParameters!")
-                        cause = ie.CauseRequestRejected
-                        break
-                    } else {
-                        for _, ie2 := range ies2 {
-                            switch ie2.Type {
-                            case ie.OuterHeaderCreation:
-                                outerheadercreationfields, err := ie2.OuterHeaderCreation()
-                                if err != nil {
-                                    log.Println("Unable to parse OuterHeaderCreationFields!")
-                                } else {
-                                    eNBTeid := outerheadercreationfields.TEID
-                                    eNBIP := outerheadercreationfields.IPv4Address
-                                    s1uIP4 := upf.n3IP
-                                    far := far{
-                                        farID:       uint8(farID),  // farID currently being truncated to uint8 <--- FIXIT/TODO/XXX
-                                        fseID:       uint32(fseid), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-                                        action:      farTunnel,
-                                        applyAction: applyAction,
-									    tunnelType:  0x1,
-									    s1uIP:       ip2int(s1uIP4),
-									    eNBIP:       ip2int(eNBIP),
-									    eNBTeid:     eNBTeid,
-									    UDPGTPUPort: udpGTPUPort,
-								    }
-								    /* create context */
-								    /*
-									ctx, cancel := context.WithTimeout(context.Background(), Timeout)
-									defer cancel()
-									done := make(chan bool)
-									upf.pauseAll()
-									upf.addFAR(ctx, done, far)
-									upf.resumeAll()
-								    */
-                                    var fseidIP uint32
-                                    log.Println("n3IP ", upf.n3IP.String())
-                                    fseidIP = binary.LittleEndian.Uint32(upf.n3IP.To4())
-                                    log.Println("fseidIP ", fseidIP)
-                                    far.fseidIP = fseidIP
-								    err := upf.P4FARFunc(far, FUNCTION_TYPE_UPDATE)
-								    if err != nil {
-									    log.Println("far entry function failed. %v", err)
-									    cause = ie.CauseRequestRejected
-								    }
-							    }
-						    case ie.DestinationInterface:
-							    // Do nothing for the time being
-						    }
-					    }
-				    }
-			    }
-
-			    if cause == ie.CauseRequestRejected {
-				    log.Println("Request rejected. Exit")
-				    break
+                    case ie.UpdateFAR:
+				        if f := parseUpdateFAR(ie1, fseid, 
+                                upf.accessIP, farForwardD); f != nil {
+					        fars = append(fars, *f)
+				        }
+			         default:
+	                	/* more will be added later */
 			    }
 		    }
 	    }
-    }
 
+        if enable_p4rt == true {
+            cause = upf.updateFarP4Upf(fars)
+        } else {
+            upf.sendMsgToUPF("add", nil, fars)
+		}
+
+    }
 	// Build response message
 	smres, err := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */
 		0,                    /* FO <-- what's this? */
-		(smreq.SEID() >> 2),  /* seid */
+		(mySEID(smreq.SEID())),  /* seid */
 		smreq.SequenceNumber, /* seq # */
 		0,                    /* priority */
 		ie.NewCause(cause),   /* accept it blindly for the time being */
-		ie.NewFSEID((smreq.SEID()<<2), net.ParseIP(sourceIP), nil, nil),
+		ie.NewFSEID(peerSEID(smreq.SEID()), net.ParseIP(sourceIP), nil, nil),
 	).Marshal()
 
 	if err != nil {
@@ -638,71 +396,36 @@ func handleSessionDeletionRequest(upf *upf, msg message.Message, addr net.Addr, 
 	log.Println("Got a session deletion request from: ", addr)
 
 	/* retrieve sessionRecord */
-	sessItem := sessions[(sdreq.SEID() >> 2)]
-
-	/* create context */
-	/*
-		ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
-		defer cancel()
-		done := make(chan bool)
-		// pause daemon, and then delete FAR(s) and PDR(s), finally resume
-		upf.pauseAll()
-		for _, pdr := range sessItem.pdrs {
-			upf.delPDR(ctx, done, pdr)
-		}
-		for _, far := range sessItem.fars {
-			upf.delFAR(ctx, done, far)
-		}
-	    upf.resumeAll() */
+	sessItem := sessions[mySEID(sdreq.SEID())]
 
     var flag bool = false
-    var err error
-	if client == nil || client.CheckStatus() != Ready {
-		client, err = CreateChannel(host, deviceId, timeout)
-		if err != nil {
-			log.Println("create channel failed : %v", err)
-			flag = true
-		}
-
-		if client != nil {
-			log.Println("Set switch info.")
-			err = SetSwitchInfo(conf)
-			if err != nil {
-				log.Println("Switch set info failed. %v\n", err)
-				flag = true
-			}
-		} else {
-			log.Println("p4runtime client null")
-			flag = true
-		}
-	}
+    if enable_p4rt == true {
+        var err error
+        if p4client == nil || p4client.CheckStatus() != Ready {
+            p4client, err = channel_setup()
+            if err != nil {
+                log.Println("create channel failed : %v", err)
+                flag = true
+            }
+        }
+    }
 
 	var cause uint8 = ie.CauseRequestAccepted
     if flag == false {
-        for _, pdr := range sessItem.pdrs {
-            err := upf.P4PDRFunc(pdr, FUNCTION_TYPE_DELETE)
-            if err != nil {
-                log.Println("pdr entry function failed. %v", err)
-                break
-            }
-        }
-
-        for _, far := range sessItem.fars {
-            err := upf.P4FARFunc(far, FUNCTION_TYPE_DELETE)
-            if err != nil {
-                log.Println("far entry function failed. %v", err)
-                break
-            }
-        }
+        if enable_p4rt == true {
+            upf.deleteEntryP4Upf(sessItem.pdrs, sessItem.fars)
+        } else {
+	        upf.sendMsgToUPF("del", sessItem.pdrs, sessItem.fars)
+	    }
 
         /* delete sessionRecord */
-        delete(sessions, (sdreq.SEID() >> 2))
+        delete(sessions, mySEID(sdreq.SEID()))
     }
 
 	// Build response message
 	smres, err := message.NewSessionDeletionResponse(0, /* MO?? <-- what's this */
 		0,                                    /* FO <-- what's this? */
-		(sdreq.SEID() >> 2),                  /* seid */
+		mySEID(sdreq.SEID()),                 /* seid */
 		sdreq.SequenceNumber,                 /* seq # */
 		0,                                    /* priority */
 		ie.NewCause(cause), /* accept it blindly for the time being */

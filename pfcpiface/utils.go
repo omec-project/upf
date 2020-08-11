@@ -44,3 +44,11 @@ func getOutboundIP(dstIP string) net.IP {
 
 	return localAddr.IP
 }
+
+func mySEID(peerSEID uint64) uint64 {
+	return (peerSEID >> 2)
+}
+
+func peerSEID(mySEID uint64) uint64 {
+	return (mySEID << 2)
+}

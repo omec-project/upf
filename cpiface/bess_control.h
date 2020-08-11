@@ -33,14 +33,29 @@ enum src_iface_type { Access = 1, Core };
 #define PDRLOOKUPMOD "pdrLookup"
 #define PDRADDMETHOD "add"
 #define PDRDELMETHOD "delete"
+#define PDRCLRMETHOD "clear"
 #define FARLOOKUPMOD "farLookup"
 #define FARADDMETHOD "add"
 #define FARDELMETHOD "delete"
+#define FARCLRMETHOD "clear"
 #define QOSCOUNTERMOD "QoSCounter"
 #define COUNTERADDMETHOD "add"
 #define COUNTERDELMETHOD "remove"
+#define COUNTERCLRMETHOD "removeAll"
 #define MODULE_NAME_LEN 128
 #define HOSTNAME_LEN 256
+enum {
+  GRPC_PDR_ADD,
+  GRPC_PDR_DEL,
+  GRPC_FAR_ADD,
+  GRPC_FAR_DEL,
+  GRPC_CTR_ADD,
+  GRPC_CTR_DEL,
+  GRPC_PDR_CLR,
+  GRPC_FAR_CLR,
+  GRPC_CTR_CLR,
+  GRPC_COUNT
+};
 /*--------------------------------------------------------------------------------*/
 struct PDRArgs {
   enum src_iface_type sit; /* source iface */
@@ -89,10 +104,11 @@ class BessClient {
   BessClient(std::shared_ptr<Channel> channel)
       : stub_(bess::pb::BESSControl::NewStub(channel)), crt() {}
 
-  void runAddPDRCommand(const PDRArgs *pa, const char *modname) {
+  void runAddPDRCommand(const void *v, const char *modname) {
+    const PDRArgs *pa = (const PDRArgs *)v;
     bess::pb::WildcardMatchCommandAddArg *wmcaa =
         new bess::pb::WildcardMatchCommandAddArg();
-    wmcaa->set_gate(1);
+    wmcaa->set_gate(pa->need_decap);
     wmcaa->set_priority(1);
 
     /* SET VALUES */
@@ -180,10 +196,6 @@ class BessClient {
     _void = wmcaa->add_valuesv();
     _void->set_value_int(pa->far_id);
 
-    /* set needs_gtpu_decap, set to 0 for the time being */
-    _void = wmcaa->add_valuesv();
-    _void->set_value_int(pa->need_decap);
-
     ::google::protobuf::Any *any = new ::google::protobuf::Any();
     any->PackFrom(*wmcaa);
     crt.set_name(modname);
@@ -204,7 +216,8 @@ class BessClient {
     /* `any' freed up by ModuleCommand() */
   }
 
-  void runDelPDRCommand(const PDRArgs *pa, const char *modname) {
+  void runDelPDRCommand(const void *v, const char *modname) {
+    const PDRArgs *pa = (const PDRArgs *)v;
     bess::pb::WildcardMatchCommandDeleteArg *wmcda =
         new bess::pb::WildcardMatchCommandDeleteArg();
 
@@ -296,10 +309,11 @@ class BessClient {
     /* `any' freed up by ModuleCommand() */
   }
 
-  void runAddFARCommand(const FARArgs *fa, const char *modname) {
+  void runAddFARCommand(const void *v, const char *modname) {
+    const FARArgs *fa = (const FARArgs *)v;
     bess::pb::ExactMatchCommandAddArg *emcaa =
         new bess::pb::ExactMatchCommandAddArg();
-    emcaa->set_gate(1);
+    emcaa->set_gate(fa->tuntype);
 
     /* SET FIELDS */
     /* set far_id value */
@@ -362,7 +376,8 @@ class BessClient {
     /* `any' freed up by ModuleCommand() */
   }
 
-  void runDelFARCommand(const FARArgs *fa, const char *modname) {
+  void runDelFARCommand(const void *v, const char *modname) {
+    const FARArgs *fa = (const FARArgs *)v;
     bess::pb::ExactMatchCommandDeleteArg *emcda =
         new bess::pb::ExactMatchCommandDeleteArg();
 
@@ -395,7 +410,8 @@ class BessClient {
     /* `any' freed up by ModuleCommand() */
   }
 
-  void runAddCounterCommand(const uint32_t ctr_id, const char *modname) {
+  void runAddCounterCommand(const void *v, const char *modname) {
+    const uint32_t ctr_id = *((const uint32_t *)v);
     bess::pb::CounterAddArg *caa = new bess::pb::CounterAddArg();
     caa->set_ctr_id(ctr_id);
     ::google::protobuf::Any *any = new ::google::protobuf::Any();
@@ -418,7 +434,8 @@ class BessClient {
     /* `any' freed up by ModuleCommand() */
   }
 
-  void runDelCounterCommand(const uint32_t ctr_id, const char *modname) {
+  void runDelCounterCommand(const void *v, const char *modname) {
+    const uint32_t ctr_id = *((const uint32_t *)v);
     bess::pb::CounterRemoveArg *cra = new bess::pb::CounterRemoveArg();
     cra->set_ctr_id(ctr_id);
     ::google::protobuf::Any *any = new ::google::protobuf::Any();
@@ -440,6 +457,81 @@ class BessClient {
 
     /* `any' freed up by ModuleCommand() */
   }
+
+  void runClrPDRsCommand(const void *v, const char *modname) {
+    bess::pb::EmptyArg *ea = new bess::pb::EmptyArg();
+    ::google::protobuf::Any *any = new ::google::protobuf::Any();
+    any->PackFrom(*ea);
+    crt.set_name(modname);
+    crt.set_cmd(PDRCLRMETHOD);
+    crt.set_allocated_arg(any);
+    Status status = stub_->ModuleCommand(&context, crt, &cre);
+    // Act upon its status.
+    if (status.ok()) {
+      VLOG(1) << "runClrPDRsCommand RPC successfully executed." << std::endl;
+    } else {
+      std::cout << status.error_code() << ": " << status.error_message()
+                << std::endl;
+      std::cout << "runClrPDRsCommand RPC failed." << std::endl;
+    }
+
+    delete ea;
+
+    /* `any' freed up by ModuleCommand() */
+  }
+
+  void runClrFARsCommand(const void *v, const char *modname) {
+    bess::pb::EmptyArg *ea = new bess::pb::EmptyArg();
+    ::google::protobuf::Any *any = new ::google::protobuf::Any();
+    any->PackFrom(*ea);
+    crt.set_name(modname);
+    crt.set_cmd(FARCLRMETHOD);
+    crt.set_allocated_arg(any);
+    Status status = stub_->ModuleCommand(&context, crt, &cre);
+    // Act upon its status.
+    if (status.ok()) {
+      VLOG(1) << "runClrFARsCommand RPC successfully executed." << std::endl;
+    } else {
+      std::cout << status.error_code() << ": " << status.error_message()
+                << std::endl;
+      std::cout << "runClrFARsCommand RPC failed." << std::endl;
+    }
+
+    delete ea;
+
+    /* `any' freed up by ModuleCommand() */
+  }
+
+  void runClrCountersCommand(const void *v, const char *modname) {
+    bess::pb::EmptyArg *ea = new bess::pb::EmptyArg();
+    ::google::protobuf::Any *any = new ::google::protobuf::Any();
+    any->PackFrom(*ea);
+    crt.set_name(modname);
+    crt.set_cmd(COUNTERCLRMETHOD);
+    crt.set_allocated_arg(any);
+    Status status = stub_->ModuleCommand(&context, crt, &cre);
+    // Act upon its status.
+    if (status.ok()) {
+      VLOG(1) << "runClrCountersCommand RPC successfully executed."
+              << std::endl;
+    } else {
+      std::cout << status.error_code() << ": " << status.error_message()
+                << std::endl;
+      std::cout << "runClrCountersCommand RPC failed." << std::endl;
+    }
+
+    delete ea;
+
+    /* `any' freed up by ModuleCommand() */
+  }
+
+  void (BessClient::*grpc_ptr[GRPC_COUNT])(const void *args,
+                                           const char *name) = {
+      &BessClient::runAddPDRCommand,     &BessClient::runDelPDRCommand,
+      &BessClient::runAddFARCommand,     &BessClient::runDelFARCommand,
+      &BessClient::runAddCounterCommand, &BessClient::runDelCounterCommand,
+      &BessClient::runClrPDRsCommand,    &BessClient::runClrFARsCommand,
+      &BessClient::runClrCountersCommand};
 };
 /*--------------------------------------------------------------------------------*/
 std::ostream &operator<<(std::ostream &os, const struct ip_addr &ip) {

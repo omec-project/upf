@@ -11,6 +11,8 @@
 const Commands Counter::cmds = {
     {"add", "CounterAddArg", MODULE_CMD_FUNC(&Counter::AddCounter),
      Command::THREAD_SAFE},
+    {"removeAll", "EmptyArg", MODULE_CMD_FUNC(&Counter::RemoveAllCounters),
+     Command::THREAD_SAFE},
     {"remove", "CounterRemoveArg", MODULE_CMD_FUNC(&Counter::RemoveCounter),
      Command::THREAD_SAFE}};
 /*----------------------------------------------------------------------------------*/
@@ -30,6 +32,16 @@ CommandResponse Counter::AddCounter(const bess::pb::CounterAddArg &arg) {
   return CommandSuccess();
 }
 /*----------------------------------------------------------------------------------*/
+CommandResponse Counter::RemoveAllCounters(const bess::pb::EmptyArg &) {
+#ifdef HASHMAP_BASED
+  counters.clear();
+#else
+  memset(counters, 0, sizeof(SessionStats) * total_count);
+  curr_count = 0;
+#endif
+  return CommandSuccess();
+}
+/*----------------------------------------------------------------------------------*/
 CommandResponse Counter::RemoveCounter(const bess::pb::CounterRemoveArg &arg) {
   uint32_t ctr_id = arg.ctr_id();
 
@@ -45,9 +57,9 @@ CommandResponse Counter::RemoveCounter(const bess::pb::CounterRemoveArg &arg) {
   }
 #else
   if (ctr_id < total_count && counters[ctr_id].pkt_count != 0) {
-    std::cerr << this->name() << "[" << ctr_id
-              << "]: " << counters[ctr_id].pkt_count << ", "
-              << counters[ctr_id].byte_count << std::endl;
+    DLOG(INFO) << this->name() << "[" << ctr_id
+               << "]: " << counters[ctr_id].pkt_count << ", "
+               << counters[ctr_id].byte_count << std::endl;
     counters[ctr_id].pkt_count = counters[ctr_id].byte_count = 0;
   }
   curr_count--;

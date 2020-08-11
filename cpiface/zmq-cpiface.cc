@@ -3,33 +3,27 @@
  * Copyright(c) 2019 Intel Corporation
  */
 
+/* for bess-based GRPC funcs */
 #include "bess_control.h"
-#include <arpa/inet.h>
+/* for parsing */
+#include "parser.h"
 #include <ctime>
-#include <fstream>
-#include <getopt.h>
+/* for stack iterator */
 #include <iterator>
-#include <jsoncpp/json/reader.h>
-#include <jsoncpp/json/value.h>
+/* for session map*/
 #include <map>
-#include <net/if.h>
-#include <netdb.h>
+/* for stack */
 #include <stack>
-#include <sys/ioctl.h>
-#include <sys/socket.h>
 #include <sys/types.h>
+/* for exec wait */
+#include <sys/wait.h>
 #include <unistd.h>
+/* for libzmq */
 #include <zmq.h>
-/*--------------------------------------------------------------------------------*/
-#define ZMQ_SERVER_IP "127.0.0.1"
-#define ZMQ_RECV_PORT 20
-#define ZMQ_SEND_PORT 5557
-#define ZMQ_NB_IP "127.0.0.1"
-#define ZMQ_NB_PORT 21
-#define S1U_SGW_IP "127.0.0.1"
-#define UDP_PORT_GTPU 2152
-#define SCRIPT_NAME "/tmp/conf/upf.json"
-#define FILENAME_LEN 1024
+/* for gettimeofday */
+#include <sys/time.h>
+/* for templates */
+#include "template.h"
 /*--------------------------------------------------------------------------------*/
 /**
  * ZMQ stuff
@@ -40,125 +34,12 @@ void *reg;
 void *context0;
 void *context1;
 void *context2;
+#define ZMQ_POLL_TIMEOUT 1000  // in msecs
+#define KEEPALIVE_TIMEOUT 100  // in secs
+
 struct TeidEntry {
   uint32_t teid;
   uint32_t ctr_id;
-};
-/*--------------------------------------------------------------------------------*/
-struct Args {
-  char bessd_ip[HOSTNAME_LEN] = BESSD_IP;
-  char nb_src_ip[HOSTNAME_LEN] = ZMQ_SERVER_IP;
-  char nb_dst_ip[HOSTNAME_LEN] = ZMQ_NB_IP;
-  char s1u_sgw_ip[HOSTNAME_LEN] = S1U_SGW_IP;
-  uint16_t bessd_port = BESSD_PORT;
-  uint16_t zmqd_send_port = ZMQ_SEND_PORT;
-  uint16_t zmqd_recv_port = ZMQ_RECV_PORT;
-  uint16_t zmqd_nb_port = ZMQ_NB_PORT;
-  char pdrlookup[MODULE_NAME_LEN] = PDRLOOKUPMOD;
-  char farlookup[MODULE_NAME_LEN] = FARLOOKUPMOD;
-  char qoscounter[MODULE_NAME_LEN] = QOSCOUNTERMOD;
-  char json_conf[FILENAME_LEN] = SCRIPT_NAME;
-
-  struct RegMsgBundle {
-    struct in_addr upf_comm_ip;
-    struct in_addr s1u_ip;
-    char hostname[HOSTNAME_LEN];
-  } rmb = {{.s_addr = 0}, {.s_addr = 0}, ""};
-  void parse(const int argc, char **argv) {
-    int c;
-    // Get args from command line
-    static const struct option long_options[] = {
-        {"bessd_ip", required_argument, NULL, 'B'},
-        {"bessd_port", required_argument, NULL, 'b'},
-        {"nb_src_ip", required_argument, NULL, 'Z'},
-        {"zmqd_send_port", required_argument, NULL, 's'},
-        {"zmqd_recv_port", required_argument, NULL, 'r'},
-        {"nb_dst_ip", required_argument, NULL, 'N'},
-        {"zmqd_nb_port", required_argument, NULL, 'n'},
-        {"s1u_sgw_ip", required_argument, NULL, 'u'},
-        {"pdrlookup", required_argument, NULL, 'P'},
-        {"farlookup", required_argument, NULL, 'F'},
-        {"qoscounter", required_argument, NULL, 'c'},
-        {"hostname", required_argument, NULL, 'h'},
-        {"json_config", required_argument, NULL, 'f'},
-        {0, 0, 0, 0}};
-    do {
-      int option_index = 0;
-      uint32_t val = 0;
-
-      c = getopt_long(argc, argv, "B:b:Z:s:r:c:P:F:N:n:u:h:f:", long_options,
-                      &option_index);
-
-      if (c == -1)
-        break;
-
-      switch (c) {
-        case 'B':
-          strncpy(bessd_ip, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
-          break;
-        case 'b':
-          val = strtoul(optarg, NULL, 10);
-          if (val == ULONG_MAX && errno == ERANGE) {
-            std::cerr << "Failed to parse bessd_port" << std::endl;
-            exit(EXIT_FAILURE);
-          }
-          bessd_port = (uint16_t)(val & 0x0000FFFF);
-          break;
-        case 'c':
-          strncpy(qoscounter, optarg, MIN(strlen(optarg), MODULE_NAME_LEN - 1));
-          break;
-        case 'F':
-          strncpy(farlookup, optarg, MIN(strlen(optarg), MODULE_NAME_LEN - 1));
-          break;
-        case 'f':
-          strncpy(json_conf, optarg, MIN(strlen(optarg), MODULE_NAME_LEN - 1));
-          break;
-        case 'Z':
-          strncpy(nb_src_ip, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
-          break;
-        case 's':
-          val = strtoul(optarg, NULL, 10);
-          if (val == ULONG_MAX && errno == ERANGE) {
-            std::cerr << "Failed to parse zmqd_send_port" << std::endl;
-            exit(EXIT_FAILURE);
-          }
-          zmqd_send_port = (uint16_t)(val & 0x0000FFFF);
-          break;
-        case 'r':
-          val = strtoul(optarg, NULL, 10);
-          if (val == ULONG_MAX && errno == ERANGE) {
-            std::cerr << "Failed to parse zmqd_recv_port" << std::endl;
-            exit(EXIT_FAILURE);
-          }
-          zmqd_recv_port = (uint16_t)(val & 0x0000FFFF);
-          break;
-        case 'N':
-          strncpy(nb_dst_ip, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
-          break;
-        case 'n':
-          val = strtoul(optarg, NULL, 10);
-          if (val == ULONG_MAX && errno == ERANGE) {
-            std::cerr << "Failed to parse zmqd_nb_port" << std::endl;
-            exit(EXIT_FAILURE);
-          }
-          zmqd_nb_port = (uint16_t)(val & 0x0000FFFF);
-          break;
-        case 'P':
-          strncpy(pdrlookup, optarg, MIN(strlen(optarg), MODULE_NAME_LEN - 1));
-          break;
-        case 'u':
-          strncpy(s1u_sgw_ip, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
-          break;
-        case 'h':
-          strncpy(rmb.hostname, optarg, MIN(strlen(optarg), HOSTNAME_LEN - 1));
-          break;
-        default:
-          std::cerr << "Unknown argument - " << argv[optind] << std::endl;
-          exit(EXIT_FAILURE);
-          break;
-      }
-    } while (c != -1);
-  }
 };
 /*--------------------------------------------------------------------------------*/
 void sig_handler(int signo) {
@@ -170,69 +51,45 @@ void sig_handler(int signo) {
   google::protobuf::ShutdownProtobufLibrary();
 }
 /*--------------------------------------------------------------------------------*/
-void getNBSrcIPViaJson(char *nb_src_ip, const char *nb_dst) {
-#define DUMMY_PORT 9
-  sockaddr_storage ss_addr = {0};
-  unsigned long addr = inet_addr(nb_dst);
+void force_restart(int argc, char **argv) {
+  pid_t pid;
+  int status;
 
-  ((struct sockaddr_in *)&ss_addr)->sin_addr.s_addr = addr;
-  ((struct sockaddr_in *)&ss_addr)->sin_family = AF_INET;
-  ((struct sockaddr_in *)&ss_addr)->sin_port = htons(DUMMY_PORT);
+  pid = fork();
 
-  int handle = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-  if (handle == -1) {
-    std::cerr << "Unable to create socket for nb_src_ip probing."
-              << " Sticking to original: " << nb_src_ip << std::endl;
-    return;
-  }
-  socklen_t ss_addrlen = sizeof(ss_addr);
-  if (connect(handle, (sockaddr *)&ss_addr, ss_addrlen) == -1 &&
-      errno != ECONNREFUSED) {
-    std::cerr << "Unable to determine nb_src_ip. "
-              << " Sticking to original: " << nb_src_ip << std::endl;
-    return;
-  }
-  if (getsockname(handle, (sockaddr *)&ss_addr, &ss_addrlen) == -1) {
-    std::cerr << "Unable to determine nb_src_ip. "
-              << " Sticking to original: " << nb_src_ip << std::endl;
-    return;
-  }
-
-  char *source_address = inet_ntoa(((struct sockaddr_in *)&ss_addr)->sin_addr);
-  std::cerr << "NB source address: " << source_address << std::endl;
-  strcpy(nb_src_ip, source_address);
-}
-/*--------------------------------------------------------------------------------*/
-void getNBDstIPViaJson(char *nb_dst_ip, const char *nb_dst) {
-  struct hostent *he = gethostbyname(nb_dst);
-  if (he == NULL) {
-    std::cerr << "Failed to fetch IP address from host: " << nb_dst
-              << ". Sticking to original: " << nb_dst_ip << std::endl;
-    return;
-  } else {
-    struct in_addr raddr;
-    memcpy(&raddr, he->h_addr, sizeof(uint32_t));
-    strcpy(nb_dst_ip, inet_ntoa(raddr));
-  }
-}
-/*--------------------------------------------------------------------------------*/
-void getS1uAddrViaJson(char *s1u_sgw_ip, const char *ifname) {
-  int fd;
-  struct ifreq ifr;
-
-  fd = socket(AF_INET, SOCK_DGRAM, 0);
-
-  if (fd != -1) {
-    /* IPv4 address */
-    ifr.ifr_addr.sa_family = AF_INET;
-    /* IP address attached to "s1u" */
-    strncpy(ifr.ifr_name, ifname, IFNAMSIZ - 1);
-    if (ioctl(fd, SIOCGIFADDR, &ifr) == 0) {
-      strcpy(s1u_sgw_ip,
-             inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
+  if (pid == -1) {
+    std::cerr << "Failed to fork: " << strerror(errno) << std::endl;
+    exit(EXIT_FAILURE);
+  } else if (pid == 0) {  // child process
+    execv(argv[0], argv);
+    exit(EXIT_SUCCESS);
+  } else {  // parent process
+    if (waitpid(pid, &status, 0) > 0) {
+      if (WIFEXITED(status) && !WEXITSTATUS(status))
+        std::cerr << "Restart successful!" << std::endl;
+      else if (WIFEXITED(status) && WEXITSTATUS(status)) {
+        if (WEXITSTATUS(status) == 127) {
+          // execv failed
+          std::cerr << "execv() failed\n" << std::endl;
+        } else
+          std::cerr << "Program terminated normally, "
+                    << "but returned a non-zero status" << std::endl;
+      } else
+        std::cerr << "Program didn't terminate normally" << std::endl;
+    } else {
+      // waitpid() failed
+      std::cerr << "waitpid() failed" << std::endl;
     }
-    close(fd);
+    exit(EXIT_SUCCESS);
   }
+}
+/*--------------------------------------------------------------------------------*/
+void invokeGRPCall(Args args, void *func_args, const char *modname,
+                   uint8_t funcID) {
+  BessClient b(CreateChannel(
+      std::string(args.bessd_ip) + ":" + std::to_string(args.bessd_port),
+      InsecureChannelCredentials()));
+  ((b).*(b.grpc_ptr[funcID]))(func_args, modname);
 }
 /*--------------------------------------------------------------------------------*/
 int main(int argc, char **argv) {
@@ -242,41 +99,23 @@ int main(int argc, char **argv) {
    * enb_teid) */
   std::map<uint64_t, TeidEntry> zmq_sess_map;
   std::stack<uint32_t> counter;
-  uint32_t counter_count = 0;
+  // set my_dp_id to 0, SPGW-C will give me the id
+  uint32_t my_dp_id = 0;
+  struct timeval last_ack, current_time;
+  // set it to 100 secs for the time being
+  const uint32_t dp_cp_timeout_interval = KEEPALIVE_TIMEOUT;
+  // 1 second zmq_poll timeout
+  const uint32_t zmq_poll_timeout = ZMQ_POLL_TIMEOUT;
+  Args args;
 
   context0 = zmq_ctx_new();
   context1 = zmq_ctx_new();
   context2 = zmq_ctx_new();
-
-  // set default values first
-  Args args;
   // set args coming from command-line
   args.parse(argc, argv);
 
-  // values from command line arguments always take precedence
-  Json::Value root;
-  Json::Reader reader;
-  std::ifstream script(args.json_conf);
-  script >> root;
-  if (reader.parse(script, root, true)) {
-    std::cerr << "Failed to parse configuration\n"
-              << reader.getFormattedErrorMessages();
-  }
-
-  if (!strcmp(args.nb_dst_ip, ZMQ_NB_IP))
-    getNBDstIPViaJson(args.nb_dst_ip,
-                      root["cpiface"]["nb_dst_ip"].asString().c_str());
-  strcpy(args.rmb.hostname, root["cpiface"]["hostname"].asString().c_str());
-  if (!strcmp(args.nb_src_ip, ZMQ_SERVER_IP))
-    getNBSrcIPViaJson(args.nb_src_ip, args.nb_dst_ip);
-  if (!strcmp(args.s1u_sgw_ip, S1U_SGW_IP))
-    getS1uAddrViaJson(args.s1u_sgw_ip,
-                      root["s1u"]["ifname"].asString().c_str());
-  counter_count = root["max_sessions"].asInt();
-  script.close();
-
   /* initialize stack */
-  for (int32_t k = counter_count - 1; k >= 0; k--)
+  for (int32_t k = args.counter_count - 1; k >= 0; k--)
     counter.push(k);
 
   if (context0 == NULL || context1 == NULL || context2 == NULL) {
@@ -314,12 +153,14 @@ int main(int argc, char **argv) {
     std::cerr << "Invalid address: " << args.s1u_sgw_ip << std::endl;
     return EXIT_FAILURE;
   }
-  // retrieve hostname
-  if (!strcmp(args.rmb.hostname, "") &&
-      gethostname(args.rmb.hostname, sizeof(args.rmb.hostname)) == -1) {
-    std::cerr << "Unable to retreive hostname of DP!" << std::endl;
-    return EXIT_FAILURE;
+  // retrieve hostname (along with domain name), incase json conf
+  // did not give us anything
+  if (!strcmp(args.rmb.hostname, "")) {
+    args.fetchHostname(args.rmb.hostname, sizeof(args.rmb.hostname));
   }
+
+  VLOG(1) << "DP hostname: " << args.rmb.hostname << std::endl;
+
   // send registration request
   if (zmq_send(reg, (void *)&args.rmb, sizeof(args.rmb), 0) == -1) {
     std::cerr << "Failed to send registration request to CP!" << std::endl;
@@ -372,12 +213,22 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
+  gettimeofday(&last_ack, NULL);
+
+  struct resp_msgbuf keepalive;
+  keepalive.mtype = DPN_KEEPALIVE_REQ;
+  keepalive.op_id = 1;            // for now always 1...
+  keepalive.sess_id = 0;          // node specific message
+  keepalive.dp_id.id = my_dp_id;  // DP is not aware about its id...
+  strcpy(keepalive.dp_id.name, args.rmb.hostname);
+
   //  Process messages from either socket
   while (true) {
     zmq_pollitem_t items[] = {
         {receiver, 0, ZMQ_POLLIN, 0},
     };
-    if (zmq_poll((zmq_pollitem_t *)items, 1, -1) < 0) {
+
+    if (zmq_poll((zmq_pollitem_t *)items, 1, zmq_poll_timeout) < 0) {
       std::cerr << "ZMQ poll failed!: " << strerror(errno);
       if (errno != EINTR) {
         std::cerr << std::endl;
@@ -388,6 +239,9 @@ int main(int argc, char **argv) {
       }
     }
     if (items[0].revents & ZMQ_POLLIN) {
+      // as long as we get packets from control path we are good
+      gettimeofday(&last_ack, NULL);
+      bool send_resp = true;
       struct msgbuf rbuf;
       struct resp_msgbuf resp;
       int size = zmq_recv(receiver, &rbuf, sizeof(rbuf), 0);
@@ -411,6 +265,8 @@ int main(int argc, char **argv) {
                   << ntohl(rbuf.sess_entry.dl_s1_info.enb_teid) << ")"
                   << std::endl;
           resp.op_id = rbuf.sess_entry.op_id;
+          // SPGW-C returns the DP ID
+          my_dp_id = rbuf.dp_id.id;
           resp.dp_id.id = rbuf.dp_id.id;
           resp.mtype = DPN_RESPONSE;
           te.teid = 0;
@@ -455,130 +311,45 @@ int main(int argc, char **argv) {
                     << " and teid: " << te.teid << " counter: " << te.ctr_id
                     << std::endl;
           }
-          {
-            // Add PDR (DOWNLINK)
-            BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
-                                           std::to_string(args.bessd_port),
-                                       InsecureChannelCredentials()));
-            PDRArgs pa = {
-                .sit = Core,        /* source iface */
-                .tipd = 0,          /* tunnel_ipv4_dst */
-                .tipd_mask = 0,     /* tunnel_ipv4_dst mask */
-                .enb_teid = 0,      /* enb teid */
-                .enb_teid_mask = 0, /* enb teid mask */
-                .saddr = rbuf.sess_entry.ue_addr.u.ipv4_addr, /* ueaddr ip */
-                .saddr_mask = 0xFFFFFFFFu, /* ueaddr ip mask */
-                .daddr = 0,                /* inet ip */
-                .daddr_mask = 0,           /* inet ip mask */
-                .sport = 0,                /* ueport */
-                .sport_mask = 0,           /* ueport mask */
-                .dport = 0,                /* inet port */
-                .dport_mask = 0,           /* inet port mask */
-                .protoid = 0,              /* proto-id */
-                .protoid_mask = 0,         /* proto-id + mask */
-                .pdr_id = 0,               /* pdr id */
-                .fseid = rbuf.sess_entry.dl_s1_info.enb_teid, /* fseid */
-                .ctr_id = curr_ctr,                           /* ctr_id */
-                .far_id = 1,                                  /* far id */
-                .need_decap = 0,                              /* need decap */
-            };
-            b.runAddPDRCommand(&pa, args.pdrlookup);
-          }
-          {
-            // Add PDR (UPLINK)
-            BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
-                                           std::to_string(args.bessd_port),
-                                       InsecureChannelCredentials()));
-            PDRArgs pa = {
-                .sit = Access,      /* source iface */
-                .tipd = 0,          /* tunnel_ipv4_dst */
-                .tipd_mask = 0,     /* tunnel_ipv4_dst mask */
-                .enb_teid = 0,      /* enb teid */
-                .enb_teid_mask = 0, /* enb teid mask */
-                .saddr = 0,         /* inet ip */
-                .saddr_mask = 0,    /* inet ip mask */
-                .daddr = rbuf.sess_entry.ue_addr.u.ipv4_addr, /* ueaddr ip */
-                .daddr_mask = 0xFFFFFFFFu, /* ueaddr ip mask */
-                .sport = 0,                /* ueport */
-                .sport_mask = 0,           /* ueport mask */
-                .dport = 0,                /* inet port */
-                .dport_mask = 0,           /* inet port mask */
-                .protoid = 0,              /* proto-id */
-                .protoid_mask = 0,         /* proto-id + mask */
-                .pdr_id = 0,               /* pdr id */
-                .fseid = rbuf.sess_entry.dl_s1_info.enb_teid, /* fseid */
-                .ctr_id = curr_ctr,                           /* ctr_id */
-                .far_id = 0,                                  /* far id */
-                .need_decap = 1,                              /* need decap */
-            };
-            b.runAddPDRCommand(&pa, args.pdrlookup);
-          }
-          {
-            // Add FAR (DOWNLINK)
-            BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
-                                           std::to_string(args.bessd_port),
-                                       InsecureChannelCredentials()));
-            FARArgs fa = {
-                .far_id = 1,                                  /* far id*/
-                .fseid = rbuf.sess_entry.dl_s1_info.enb_teid, /* fseid */
-                .tunnel = 1,    /* needs tunnelling */
-                .drop = 0,      /* needs dropping */
-                .notify_cp = 0, /* notify cp */
-                .tuntype = 1,   /* tunnel out type */
-                .tun_src_ip =
-                    ntohl((uint32_t)(inet_addr(args.s1u_sgw_ip))), /* n3 addr */
-                .tun_dst_ip = rbuf.sess_entry.ul_s1_info.enb_addr.u
-                                  .ipv4_addr,                /* enb addr */
-                .teid = rbuf.sess_entry.dl_s1_info.enb_teid, /* enb_teid */
-                .tun_port = UDP_PORT_GTPU,                   /* 2152 */
-            };
-            b.runAddFARCommand(&fa, args.farlookup);
-          }
-          {
-            // Add FAR (UPLINK)
-            BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
-                                           std::to_string(args.bessd_port),
-                                       InsecureChannelCredentials()));
-            FARArgs fa = {
-                .far_id = 0,                                  /* far id*/
-                .fseid = rbuf.sess_entry.dl_s1_info.enb_teid, /* fseid */
-                .tunnel = 0,     /* needs tunnelling */
-                .drop = 0,       /* needs dropping */
-                .notify_cp = 0,  /* notify cp */
-                .tuntype = 0,    /* tunnel out type */
-                .tun_src_ip = 0, /* not needed */
-                .tun_dst_ip = 0, /* not needed */
-                .teid = 0,       /* not needed */
-                .tun_port = 0,   /* not needed */
-            };
-            b.runAddFARCommand(&fa, args.farlookup);
-          }
-          {
-            // Add PreQoS Counter
-            BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
-                                           std::to_string(args.bessd_port),
-                                       InsecureChannelCredentials()));
-            b.runAddCounterCommand(
-                (curr_ctr), (("pre" + std::string(args.qoscounter)).c_str()));
-          }
-          {
-            // Add PostQoS Counter
-            BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
-                                           std::to_string(args.bessd_port),
-                                       InsecureChannelCredentials()));
-            b.runAddCounterCommand(
-                (curr_ctr),
-                (("postUL" + std::string(args.qoscounter)).c_str()));
-          }
-          {
-            // Add PostQoS Counter
-            BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
-                                           std::to_string(args.bessd_port),
-                                       InsecureChannelCredentials()));
-            b.runAddCounterCommand(
-                (curr_ctr),
-                (("postDL" + std::string(args.qoscounter)).c_str()));
-          }
+          pdrD.saddr = rbuf.sess_entry.ue_addr.u.ipv4_addr; /* ueaddr ip */
+          pdrD.fseid = rbuf.sess_entry.dl_s1_info.enb_teid; /* fseid */
+          pdrD.ctr_id = curr_ctr;                           /* ctr_id */
+          // Add PDR (DOWNLINK)
+          invokeGRPCall(args, &pdrD, args.pdrlookup, GRPC_PDR_ADD);
+
+          pdrU.daddr = rbuf.sess_entry.ue_addr.u.ipv4_addr; /* ueaddr ip */
+          pdrU.fseid = rbuf.sess_entry.dl_s1_info.enb_teid; /* fseid */
+          pdrU.ctr_id = curr_ctr;                           /* ctr_id */
+          // Add PDR (UPLINK)
+          invokeGRPCall(args, &pdrU, args.pdrlookup, GRPC_PDR_ADD);
+
+          farD.fseid = rbuf.sess_entry.dl_s1_info.enb_teid; /* fseid */
+          farD.tun_src_ip =
+              ntohl((uint32_t)(inet_addr(args.s1u_sgw_ip))); /* n3 addr */
+          farD.tun_dst_ip =
+              rbuf.sess_entry.ul_s1_info.enb_addr.u.ipv4_addr; /* enb addr */
+          farD.teid = rbuf.sess_entry.dl_s1_info.enb_teid;     /* enb_teid */
+          // Add FAR (DOWNLINK)
+          invokeGRPCall(args, &farD, args.farlookup, GRPC_FAR_ADD);
+
+          farU.fseid = rbuf.sess_entry.dl_s1_info.enb_teid; /* fseid */
+          // Add FAR (UPLINK)
+          invokeGRPCall(args, &farU, args.farlookup, GRPC_FAR_ADD);
+
+          // Add PreQoS Counter
+          invokeGRPCall(args, (&curr_ctr),
+                        (("pre" + std::string(args.qoscounter)).c_str()),
+                        GRPC_CTR_ADD);
+
+          // Add PostQoS Counter
+          invokeGRPCall(args, (&curr_ctr),
+                        (("postUL" + std::string(args.qoscounter)).c_str()),
+                        GRPC_CTR_ADD);
+
+          // Add PostQoS Counter
+          invokeGRPCall(args, (&curr_ctr),
+                        (("postDL" + std::string(args.qoscounter)).c_str()),
+                        GRPC_CTR_ADD);
           break;
         case MSG_SESS_DEL:
           VLOG(1) << "Got a session delete request" << std::endl;
@@ -619,124 +390,91 @@ int main(int argc, char **argv) {
                 SESS_ID((rbuf.sess_entry.ue_addr.u.ipv4_addr), DEFAULT_BEARER));
             zmq_sess_map.erase(it);
           }
-          {
-            // Delete PDR (DOWNLINK)
-            BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
-                                           std::to_string(args.bessd_port),
-                                       InsecureChannelCredentials()));
-            PDRArgs pa = {
-                .sit = Core,        /* source iface */
-                .tipd = 0,          /* tunnel_ipv4_dst */
-                .tipd_mask = 0,     /* tunnel_ipv4_dst mask */
-                .enb_teid = 0,      /* enb teid */
-                .enb_teid_mask = 0, /* enb teid mask */
-                .saddr = (rbuf.sess_entry.ue_addr.u.ipv4_addr), /* ueaddr ip */
-                .saddr_mask = 0xFFFFFFFFu, /* ueaddr ip mask */
-                .daddr = 0,                /* inet ip */
-                .daddr_mask = 0,           /* inet ip mask */
-                .sport = 0,                /* ueport */
-                .sport_mask = 0,           /* ueport mask */
-                .dport = 0,                /* inet port */
-                .dport_mask = 0,           /* inet port mask */
-                .protoid = 0,              /* proto-id */
-                .protoid_mask = 0,         /* proto-id + mask */
-                .pdr_id = 0,               /* pdr id (not needed) */
-                .fseid = 0,                /* fseid (not needed) */
-                .ctr_id = 0,               /* ctr_id (not needed) */
-                .far_id = 0,               /* far id (not needed) */
-                .need_decap = 0,           /* need decap (not needed) */
-            };
-            b.runDelPDRCommand(&pa, args.pdrlookup);
-          }
-          {
-            // Delete PDR (UPLINK)
-            BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
-                                           std::to_string(args.bessd_port),
-                                       InsecureChannelCredentials()));
-            PDRArgs pa = {
-                .sit = Access,      /* source iface */
-                .tipd = 0,          /* tunnel_ipv4_dst */
-                .tipd_mask = 0,     /* tunnel_ipv4_dst mask */
-                .enb_teid = 0,      /* enb teid */
-                .enb_teid_mask = 0, /* enb teid mask */
-                .saddr = 0,         /* inet ip */
-                .saddr_mask = 0,    /* inet ip mask */
-                .daddr = (rbuf.sess_entry.ue_addr.u.ipv4_addr), /* ueaddr ip */
-                .daddr_mask = 0xFFFFFFFFu, /* ueaddr ip mask */
-                .sport = 0,                /* ueport */
-                .sport_mask = 0,           /* ueport mask */
-                .dport = 0,                /* inet port */
-                .dport_mask = 0,           /* inet port mask */
-                .protoid = 0,              /* proto-id */
-                .protoid_mask = 0,         /* proto-id + mask */
-                .pdr_id = 0,               /* pdr id (not needed) */
-                .fseid = 0,                /* fseid (not needed) */
-                .ctr_id = 0,               /* ctr_id (not needed) */
-                .far_id = 0,               /* far id (not needed) */
-                .need_decap = 0,           /* need decap (not needed) */
-            };
-            b.runDelPDRCommand(&pa, args.pdrlookup);
-          }
-          {
-            // Del FAR (DOWNLINK)
-            BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
-                                           std::to_string(args.bessd_port),
-                                       InsecureChannelCredentials()));
-            FARArgs fa;
-            fa.far_id = 1;
-            fa.fseid = enb_teid;
-            b.runDelFARCommand(&fa, args.farlookup);
-          }
-          {
-            // Del FAR (UPLINK)
-            BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
-                                           std::to_string(args.bessd_port),
-                                       InsecureChannelCredentials()));
-            FARArgs fa;
-            fa.far_id = 0;
-            fa.fseid = enb_teid;
-            b.runDelFARCommand(&fa, args.farlookup);
-          }
-          {
-            // Delete PreQoS Counter
-            BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
-                                           std::to_string(args.bessd_port),
-                                       InsecureChannelCredentials()));
-            b.runDelCounterCommand(
-                (curr_ctr), (("pre" + std::string(args.qoscounter)).c_str()));
-          }
-          {
-            // Delete PostQoS Counter
-            BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
-                                           std::to_string(args.bessd_port),
-                                       InsecureChannelCredentials()));
-            b.runDelCounterCommand(
-                (curr_ctr),
-                (("postUL" + std::string(args.qoscounter)).c_str()));
-          }
-          {
-            // Delete PostQoS Counter
-            BessClient b(CreateChannel(std::string(args.bessd_ip) + ":" +
-                                           std::to_string(args.bessd_port),
-                                       InsecureChannelCredentials()));
-            b.runDelCounterCommand(
-                (curr_ctr),
-                (("postDL" + std::string(args.qoscounter)).c_str()));
-          }
+
+          pdrD.saddr = (rbuf.sess_entry.ue_addr.u.ipv4_addr); /* ueaddr ip */
+          // Delete PDR (DOWNLINK)
+          invokeGRPCall(args, &pdrD, args.pdrlookup, GRPC_PDR_DEL);
+
+          pdrU.daddr = (rbuf.sess_entry.ue_addr.u.ipv4_addr); /* ueaddr ip */
+          // Delete PDR (UPLINK)
+          invokeGRPCall(args, &pdrU, args.pdrlookup, GRPC_PDR_DEL);
+
+          // Del FAR (DOWNLINK)
+          FARArgs fa;
+          fa.far_id = 1;
+          fa.fseid = enb_teid;
+          invokeGRPCall(args, &fa, args.farlookup, GRPC_FAR_DEL);
+
+          // Del FAR (UPLINK)
+          fa.far_id = 0;
+          fa.fseid = enb_teid;
+          invokeGRPCall(args, &fa, args.farlookup, GRPC_FAR_DEL);
+
+          // Delete PreQoS Counter
+          invokeGRPCall(args, (&curr_ctr),
+                        (("pre" + std::string(args.qoscounter)).c_str()),
+                        GRPC_CTR_DEL);
+
+          // Delete PostQoS Counter
+          invokeGRPCall(args, (&curr_ctr),
+                        (("postUL" + std::string(args.qoscounter)).c_str()),
+                        GRPC_CTR_DEL);
+
+          // Delete PostQoS Counter
+          invokeGRPCall(args, (&curr_ctr),
+                        (("postDL" + std::string(args.qoscounter)).c_str()),
+                        GRPC_CTR_DEL);
+
           /* freed up counter id is returned to the stack */
           VLOG(1) << "Curr Ctr returned: " << curr_ctr << std::endl;
           counter.push(curr_ctr);
           break;
+        case MSG_KEEPALIVE_ACK:
+          my_dp_id = rbuf.dp_id.id;
+          send_resp = false;
+          VLOG(1) << "Got a keepalive ack from CP, and it gave me dp_id: "
+                  << my_dp_id << std::endl;
+          break;
         default:
+          send_resp = false;
           VLOG(1) << "Got a request with mtype: " << mtype << std::endl;
           break;
       }
-      size = zmq_send(sender, &resp, sizeof(resp), ZMQ_NOBLOCK);
+
+      if (send_resp == true) {
+        size = zmq_send(sender, &resp, sizeof(resp), ZMQ_NOBLOCK);
+        if (size == -1) {
+          std::cerr << "Error in zmq sending: " << strerror(errno) << std::endl;
+          break;
+        } else {
+          VLOG(1) << "Sending back response block" << std::endl;
+        }
+      }
+    } else {
+      VLOG(1) << "ZMQ poll timeout DPID " << my_dp_id << std::endl;
+      gettimeofday(&current_time, NULL);
+      if (current_time.tv_sec - last_ack.tv_sec > dp_cp_timeout_interval) {
+        invokeGRPCall(args, NULL, args.pdrlookup, GRPC_PDR_CLR);
+        invokeGRPCall(args, NULL, args.farlookup, GRPC_FAR_CLR);
+        invokeGRPCall(args, NULL,
+                      (("pre" + std::string(args.qoscounter)).c_str()),
+                      GRPC_CTR_CLR);
+        invokeGRPCall(args, NULL,
+                      (("postUL" + std::string(args.qoscounter)).c_str()),
+                      GRPC_CTR_CLR);
+        invokeGRPCall(args, NULL,
+                      (("postDL" + std::string(args.qoscounter)).c_str()),
+                      GRPC_CTR_CLR);
+
+        std::cerr << "CP<-->DP communication broken. DPID: " << my_dp_id
+                  << ". DP is restarting..." << std::endl;
+        force_restart(argc, argv);
+      }
+      keepalive.dp_id.id = my_dp_id;
+      int size = zmq_send(sender, &keepalive, sizeof(keepalive), ZMQ_NOBLOCK);
       if (size == -1) {
         std::cerr << "Error in zmq sending: " << strerror(errno) << std::endl;
         break;
-      } else {
-        VLOG(1) << "Sending back response block" << std::endl;
       }
     }
   }

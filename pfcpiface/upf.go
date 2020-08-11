@@ -5,19 +5,23 @@ package main
 
 import (
 	"context"
+    "encoding/binary"
 	"log"
 	"net"
 	"time"
 
+	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/golang/protobuf/ptypes"
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type upf struct {
-	n3Iface     string
-	n6Iface     string
-	n3IP        net.IP
+	accessIface string
+	coreIface   string
+	accessIP    net.IP
+	coreIP      net.IP
+	fqdnHost    string
 	client      pb.BESSControlClient
 	maxSessions uint32
 	simInfo     *SimModeInfo
@@ -38,8 +42,8 @@ const (
 	downlink = 0x1
 
 	// far-action specific values
-	farForward = 0x0
-	farTunnel  = 0x1
+	farForwardU = 0x0
+	farForwardD = 0x1
 )
 
 type pdr struct {
@@ -79,7 +83,7 @@ type far struct {
 	action      uint8
 	applyAction uint8
 	tunnelType  uint8
-	s1uIP       uint32
+	accessIP    uint32
 	eNBIP       uint32
 	eNBTeid     uint32
 	UDPGTPUPort uint16
@@ -93,12 +97,15 @@ func (u *upf) sim(method string) {
 	start := time.Now()
 
 	// Pause workers before
-	u.pauseAll()
+	err := u.pauseAll()
+	if err != nil {
+		log.Fatalln("Unable to pause BESS:", err)
+	}
 
 	//const ueip, teid, enbip = 0x10000001, 0xf0000000, 0x0b010181
 	ueip, teid, enbip := net.ParseIP(u.simInfo.StartUeIP), hex2int(u.simInfo.StartTeid), net.ParseIP(u.simInfo.StartEnodeIP)
 	const ng4tMaxUeRan, ng4tMaxEnbRan = 500000, 80
-	s1uip := ip2int(u.n3IP)
+	accessIP := ip2int(u.accessIP)
 
 	for i := uint32(0); i < u.maxSessions; i++ {
 		// NG4T-based formula to calculate enodeB IP address against a given UE IP address
@@ -118,6 +125,7 @@ func (u *upf) sim(method string) {
 			fseID:        teid + i,
 			ctrID:        i,
 			farID:        downlink,
+			needDecap:    0,
 		}
 
 		// create/delete uplink pdr
@@ -131,15 +139,16 @@ func (u *upf) sim(method string) {
 			fseID:        teid + i,
 			ctrID:        i,
 			farID:        uplink,
+			needDecap:    1,
 		}
 
 		// create/delete downlink far
 		farDown := far{
 			farID:       downlink,
 			fseID:       teid + i,
-			action:      farTunnel,
+			action:      farForwardD,
 			tunnelType:  0x1,
-			s1uIP:       s1uip,
+			accessIP:    accessIP,
 			eNBIP:       ip2int(enbip) + enbIdx,
 			eNBTeid:     teid + i,
 			UDPGTPUPort: udpGTPUPort,
@@ -149,28 +158,30 @@ func (u *upf) sim(method string) {
 		farUp := far{
 			farID:  uplink,
 			fseID:  teid + i,
-			action: farForward,
+			action: farForwardU,
 		}
 
 		switch timeout := 100 * time.Millisecond; method {
 		case "create":
-			u.createEntries(pdrDown, pdrUp, farDown, farUp, timeout)
+			u.simcreateEntries(pdrDown, pdrUp, farDown, farUp, timeout)
 
 		case "delete":
-			u.deleteEntries(pdrDown, pdrUp, farDown, farUp, timeout)
+			u.simdeleteEntries(pdrDown, pdrUp, farDown, farUp, timeout)
 
 		default:
 			log.Fatalln("Unsupported method", method)
 		}
 	}
-	u.resumeAll()
+	err = u.resumeAll()
+	if err != nil {
+		log.Fatalln("Unable to resume BESS:", err)
+	}
 
 	log.Println("Sessions/s:", float64(u.maxSessions)/time.Since(start).Seconds())
 }
 
-func (u *upf) createEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time.Duration) {
+func (u *upf) simcreateEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time.Duration) {
 	calls := 7
-	boom := time.After(timeout)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -186,29 +197,14 @@ func (u *upf) createEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time
 	u.addCounter(ctx, done, pdrDown.ctrID, "postDLQoSCounter")
 	u.addCounter(ctx, done, pdrDown.ctrID, "postULQoSCounter")
 
-	for {
-		select {
-		case ok := <-done:
-			if !ok {
-				log.Println("Error adding entries")
-				cancel()
-				go u.deleteEntries(pdrDown, pdrUp, farDown, farUp, timeout)
-				return
-			}
-			calls = calls - 1
-			if calls == 0 {
-				return
-			}
-		case <-boom:
-			log.Println("Timed out adding entries")
-			return
-		}
+	rc := u.GRPCJoin(calls, timeout, done)
+	if !rc {
+		go u.simdeleteEntries(pdrDown, pdrUp, farDown, farUp, timeout)
 	}
 }
 
-func (u *upf) deleteEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time.Duration) {
+func (u *upf) simdeleteEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time.Duration) {
 	calls := 7
-	boom := time.After(timeout)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -224,19 +220,158 @@ func (u *upf) deleteEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time
 	u.delCounter(ctx, done, pdrDown.ctrID, "postDLQoSCounter")
 	u.delCounter(ctx, done, pdrDown.ctrID, "postULQoSCounter")
 
-	for {
-		select {
-		case ok := <-done:
-			if !ok {
-				log.Println("Unable to delete entries")
-			}
-			calls = calls - 1
-			if calls == 0 {
-				return
-			}
-		case <-boom:
-			return
+	rc := u.GRPCJoin(calls, timeout, done)
+	if !rc {
+		log.Println("Unable to complete GRPC call(s)")
+	}
+}
+
+func (u *upf) sendMsgToUPF(method string, pdrs []pdr, fars []far) {
+	// create context
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel()
+	done := make(chan bool)
+	calls := len(pdrs) + len(fars)
+
+	// pause daemon, and then insert FAR(s), finally resume
+	err := u.pauseAll()
+	if err != nil {
+		log.Fatalln("Unable to pause BESS:", err)
+	}
+	for _, pdr := range pdrs {
+		switch method {
+		case "add":
+			u.addPDR(ctx, done, pdr)
+		case "del":
+			u.delPDR(ctx, done, pdr)
 		}
+	}
+	for _, far := range fars {
+		switch method {
+		case "add":
+			u.addFAR(ctx, done, far)
+		case "del":
+			u.delFAR(ctx, done, far)
+		}
+	}
+	rc := u.GRPCJoin(calls, Timeout, done)
+	if !rc {
+		log.Println("Unable to make GRPC calls")
+	}
+	err = u.resumeAll()
+	if err != nil {
+		log.Fatalln("Unable to resume BESS:", err)
+	}
+}
+
+func (u *upf) deleteEntryP4Upf(pdrs []pdr, fars []far) uint8 {
+	var cause uint8 = ie.CauseRequestAccepted
+	for _, pdr := range pdrs {
+		err := u.P4PDRFunc(pdr, FUNCTION_TYPE_DELETE)
+		if err != nil {
+			log.Println("pdr entry function failed. %v", err)
+			cause = ie.CauseRequestRejected
+			return cause
+		}
+	}
+
+	for _, far := range fars {
+		err := u.P4FARFunc(far, FUNCTION_TYPE_DELETE)
+		if err != nil {
+			log.Println("far entry function failed. %v", err)
+			cause = ie.CauseRequestRejected
+			return cause
+		}
+	}
+
+	return cause
+}
+
+func (u *upf) updateFarP4Upf(fars []far) uint8 {
+	var fseidIP uint32
+	var cause uint8 = ie.CauseRequestAccepted
+	log.Println("AccessIP ", u.accessIP.String())
+	fseidIP = binary.LittleEndian.Uint32(u.accessIP.To4())
+	log.Println("fseidIP ", fseidIP)
+	for _,far := range fars {
+		far.fseidIP = fseidIP
+		err := u.P4FARFunc(far, FUNCTION_TYPE_UPDATE)
+		if err != nil {
+			log.Println("far entry function failed. %v", err)
+			cause = ie.CauseRequestRejected
+			return cause
+		}
+	}
+
+	return cause
+}
+
+func (u *upf) insertEntryP4Upf(pdrs []pdr, fars []far) uint8 {
+	log.Println("Insert PDR and FAR entries")
+	var cause uint8 = ie.CauseRequestAccepted
+	var ue_ip_val uint32
+	var ue_ip_val_mask uint32
+	var fseidIP uint32
+	log.Println("Access IP ", u.accessIP.String())
+	fseidIP = binary.LittleEndian.Uint32(u.accessIP.To4())
+	log.Println("fseidIP ", fseidIP)
+	for _, pdr := range pdrs {
+		if pdr.ueIP != 0 {
+			ue_ip_val = pdr.ueIP
+			ue_ip_val_mask = pdr.ueIPMask
+			break
+		}
+	}
+
+	for i := range pdrs {
+		pdrs[i].fseidIP = fseidIP
+		pdrs[i].ueIP = ue_ip_val
+		pdrs[i].ueIPMask = ue_ip_val_mask
+		err := u.P4PDRFunc(pdrs[i], FUNCTION_TYPE_INSERT)
+		if err != nil {
+			log.Println("pdr entry function failed. %v", err)
+			cause = ie.CauseRequestRejected
+			return cause
+		}
+	}
+
+	for j := range fars {
+		fars[j].fseidIP = fseidIP
+		err := u.P4FARFunc(fars[j], FUNCTION_TYPE_INSERT)
+		if err != nil {
+			log.Println("far entry function failed. %v", err)
+			cause = ie.CauseRequestRejected
+			return cause
+		}
+	}
+
+	return cause
+}
+
+func sendDeleteAllSessionsMsgtoUPF(upf *upf) {
+	/* create context, pause daemon, insert PDR(s), and resume daemon */
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel()
+	done := make(chan bool)
+	calls := 5
+
+	err := upf.pauseAll()
+	if err != nil {
+		log.Fatalln("Unable to pause BESS:", err)
+	}
+	upf.removeAllPDRs(ctx, done)
+	upf.removeAllFARs(ctx, done)
+	upf.removeAllCounters(ctx, done, "preQoSCounter")
+	upf.removeAllCounters(ctx, done, "postDLQoSCounter")
+	upf.removeAllCounters(ctx, done, "postULQoSCounter")
+
+	rc := upf.GRPCJoin(calls, Timeout, done)
+	if !rc {
+		log.Println("Unable to make GRPC calls")
+	}
+	err = upf.resumeAll()
+	if err != nil {
+		log.Fatalln("Unable to resume BESS:", err)
 	}
 }
 
@@ -256,26 +391,30 @@ func (u *upf) resumeAll() error {
 
 func (u *upf) processPDR(ctx context.Context, any *anypb.Any, method string) {
 
-	if method != "add" && method != "delete" {
+	if method != "add" && method != "delete" && method != "clear" {
 		log.Println("Invalid method name: ", method)
 		return
 	}
 
-	u.client.ModuleCommand(ctx, &pb.CommandRequest{
+	cr, err := u.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "pdrLookup",
 		Cmd:  method,
 		Arg:  any,
 	})
+
+	if err != nil {
+		log.Println("pdrLookup method failed!:", cr.Error)
+	}
 }
 
 func (u *upf) P4PDRFunc(p pdr, func_type uint8) error {
 	log.Println("Add P4 PDR entry")
-	return client.WritePdrTable(p, func_type)
+	return p4client.WritePdrTable(p, func_type)
 }
 
 func (u *upf) P4FARFunc(p far, func_type uint8) error {
 	log.Println("Add P4 FAR entry")
-	return client.WriteFarTable(p, func_type)
+	return p4client.WriteFarTable(p, func_type)
 }
 
 func (u *upf) addPDR(ctx context.Context, done chan<- bool, p pdr) {
@@ -284,7 +423,7 @@ func (u *upf) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 		var err error
 
 		f := &pb.WildcardMatchCommandAddArg{
-			Gate:     1,
+			Gate:     uint64(p.needDecap),
 			Priority: 1,
 			Values: []*pb.FieldData{
 				intEnc(uint64(p.srcIface)),     /* src_iface */
@@ -307,11 +446,10 @@ func (u *upf) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 				intEnc(uint64(p.protoMask)),        /* proto id-mask */
 			},
 			Valuesv: []*pb.FieldData{
-				intEnc(uint64(p.pdrID)),     /* pdr-id */
-				intEnc(uint64(p.fseID)),     /* fseid */
-				intEnc(uint64(p.ctrID)),     /* ctr_id */
-				intEnc(uint64(p.farID)),     /* far_id */
-				intEnc(uint64(p.needDecap)), /* need_decap */
+				intEnc(uint64(p.pdrID)), /* pdr-id */
+				intEnc(uint64(p.fseID)), /* fseid */
+				intEnc(uint64(p.ctrID)), /* ctr_id */
+				intEnc(uint64(p.farID)), /* far_id */
 			},
 		}
 		any, err = ptypes.MarshalAny(f)
@@ -365,16 +503,20 @@ func (u *upf) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 func (u *upf) processFAR(ctx context.Context, any *anypb.Any, method string) {
 
-	if method != "add" && method != "delete" {
+	if method != "add" && method != "delete" && method != "clear" {
 		log.Println("Invalid method name: ", method)
 		return
 	}
 
-	u.client.ModuleCommand(ctx, &pb.CommandRequest{
+	cr, err := u.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "farLookup",
 		Cmd:  method,
 		Arg:  any,
 	})
+
+	if err != nil {
+		log.Println("farLookup method failed!:", cr.Error)
+	}
 }
 
 func (u *upf) addFAR(ctx context.Context, done chan<- bool, far far) {
@@ -383,7 +525,7 @@ func (u *upf) addFAR(ctx context.Context, done chan<- bool, far far) {
 		var err error
 
 		f := &pb.ExactMatchCommandAddArg{
-			Gate: 1,
+			Gate: uint64(far.tunnelType),
 			Fields: []*pb.FieldData{
 				intEnc(uint64(far.farID)), /* far_id */
 				intEnc(uint64(far.fseID)), /* fseid */
@@ -391,7 +533,7 @@ func (u *upf) addFAR(ctx context.Context, done chan<- bool, far far) {
 			Values: []*pb.FieldData{
 				intEnc(uint64(far.action)),      /* action */
 				intEnc(uint64(far.tunnelType)),  /* tunnel_out_type */
-				intEnc(uint64(far.s1uIP)),       /* s1u-ip */
+				intEnc(uint64(far.accessIP)),    /* access-ip */
 				intEnc(uint64(far.eNBIP)),       /* enb ip */
 				intEnc(uint64(far.eNBTeid)),     /* enb teid */
 				intEnc(uint64(far.UDPGTPUPort)), /* udp gtpu port */
@@ -429,11 +571,15 @@ func (u *upf) delFAR(ctx context.Context, done chan<- bool, far far) {
 }
 
 func (u *upf) processCounters(ctx context.Context, any *anypb.Any, method string, counterName string) {
-	u.client.ModuleCommand(ctx, &pb.CommandRequest{
+	cr, err := u.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: counterName,
 		Cmd:  method,
 		Arg:  any,
 	})
+
+	if err != nil {
+		log.Println("counter method failed!:", cr.Error)
+	}
 }
 
 func (u *upf) addCounter(ctx context.Context, done chan<- bool, ctrID uint32, counterName string) {
@@ -470,6 +616,58 @@ func (u *upf) delCounter(ctx context.Context, done chan<- bool, ctrID uint32, co
 			return
 		}
 		u.processCounters(ctx, any, "remove", counterName)
+		done <- true
+	}()
+}
+
+func (u *upf) removeAllPDRs(ctx context.Context, done chan<- bool) {
+	go func() {
+		var any *anypb.Any
+		var err error
+
+		f := &pb.EmptyArg{}
+		any, err = ptypes.MarshalAny(f)
+		if err != nil {
+			log.Println("Error marshalling the rule", f, err)
+			return
+		}
+
+		u.processPDR(ctx, any, "clear")
+		done <- true
+	}()
+}
+
+func (u *upf) removeAllFARs(ctx context.Context, done chan<- bool) {
+	go func() {
+		var any *anypb.Any
+		var err error
+
+		f := &pb.EmptyArg{}
+		any, err = ptypes.MarshalAny(f)
+		if err != nil {
+			log.Println("Error marshalling the rule", f, err)
+			return
+		}
+
+		u.processFAR(ctx, any, "clear")
+		done <- true
+	}()
+}
+
+func (u *upf) removeAllCounters(ctx context.Context, done chan<- bool, name string) {
+	go func() {
+		var any *anypb.Any
+		var err error
+
+		f := &pb.EmptyArg{}
+		any, err = ptypes.MarshalAny(f)
+		if err != nil {
+			log.Println("Error marshalling the rule", f, err)
+			return
+		}
+
+		u.processCounters(ctx, any, "removeAll", name)
+
 		done <- true
 	}()
 }
@@ -517,4 +715,25 @@ func (u *upf) portStats(ifname string) *pb.GetPortStatsResponse {
 		return nil
 	}
 	return res
+}
+
+func (u *upf) GRPCJoin(calls int, timeout time.Duration, done chan bool) bool {
+	boom := time.After(timeout)
+
+	for {
+		select {
+		case ok := <-done:
+			if !ok {
+				log.Println("Error making GRPC calls")
+				return false
+			}
+			calls--
+			if calls == 0 {
+				return true
+			}
+		case <-boom:
+			log.Println("Timed out adding entries")
+			return false
+		}
+	}
 }

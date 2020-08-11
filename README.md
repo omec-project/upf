@@ -3,7 +3,9 @@ SPDX-License-Identifier: Apache-2.0
 Copyright(c) 2019 Intel Corporation
 -->
 
-# UPF-EPC - Overview
+# upf-epc
+
+## Overview
 
 UPF-EPC is a revised version of [ngic-rtc](https://github.com/omec-project/ngic-rtc/tree/central-cp-multi-upfs)'s [dp](https://github.com/omec-project/ngic-rtc/tree/central-cp-multi-upfs/dp).
 It works seamlessly with all NFs available in the omec-project's EPC. Like ngic-rtc's dp, it communicates with [cp](https://github.com/omec-project/ngic-rtc/tree/central-cp-multi-upfs/cp) and
@@ -44,26 +46,32 @@ reading from file /tmp/tmpUBTGau, link-type EN10MB (Ethernet)
 <img src="https://ibin.co/50MaB2FZdlsz.png">
 <!--![](docs/images/bess_snip2.png)-->
 
+## Demo
+
+[![5G UPF](http://img.youtube.com/vi/qNbNG9SXFn0/0.jpg)](http://www.youtube.com/watch?v=qNbNG9SXFn0 "5G UPF")
+
 ## Feature List
 
 ### Complete
 
 * IPv4 support
-* S1-U, SGi interfacing
+* N3, N4, N6, N9 interfacing
 * Single & Multi-port support
 * Monitoring/Debugging capabilties using *(i)* tcpdump on individual BESS modules, *(ii)* visualization web interface, and *(iii)* command line shell interface for displaying statistics *etc*.
 * Static IP routing
 * Dynamic IP routing
 * Support for IPv4 datagrams reassembly
-* Support for IP packets fragmentation
+* Support for IPv4 packets fragmentation
 * Support for UE IP NAT
+*
 
 ### In Progress
 
-* Billing and Charging
+* I-UPF/A-UPF
 
 ### Pending
 
+* DDN support
 * PCC (Policy Control and Charging) rules configuration.
 * ADC (Application Detection and control) rules configuration.
 * Packet Filters for Service Data Flow (SDF) configuration.

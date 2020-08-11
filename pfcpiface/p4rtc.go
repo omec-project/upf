@@ -222,7 +222,7 @@ func (c *P4rtClient) WriteFarTable(
 		te.Params[1].Value[0] = byte(far_entry.applyAction & 0x08)
 		te.Params[2].Name = "src_addr"
 		te.Params[2].Value = make([]byte, 4)
-		binary.BigEndian.PutUint32(te.Params[2].Value, far_entry.s1uIP)
+		binary.BigEndian.PutUint32(te.Params[2].Value, far_entry.accessIP)
 		te.Params[3].Name = "dst_addr"
 		te.Params[3].Value = make([]byte, 4)
 		binary.BigEndian.PutUint32(te.Params[3].Value, far_entry.eNBIP)
