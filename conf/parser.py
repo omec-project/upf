@@ -35,9 +35,10 @@ class Parser:
         self.sim_total_flows = None
         self.workers = 1
         self.max_sessions = None
-        self.s1u_ifname = None
-        self.sgi_ifname = None
+        self.access_ifname = None
+        self.core_ifname = None
         self.interfaces = dict()
+        self.enable_ntf = False
 
     def parse(self, ifaces):
         # Maximum number of flows to manage ip4 frags for re-assembly
@@ -106,9 +107,15 @@ class Parser:
 
         # Interface names
         try:
-            self.s1u_ifname = self.conf["s1u"]["ifname"]
-            self.sgi_ifname = self.conf["sgi"]["ifname"]
+            self.access_ifname = self.conf["access"]["ifname"]
+            self.core_ifname = self.conf["core"]["ifname"]
         except KeyError:
-            self.s1u_ifname = "s1u"
-            self.sgi_ifname = "sgi"
-            print('Can\'t parse interface name(s)! Setting it to default values ({}, {})'.format("s1u", "sgi"))
+            self.access_ifname = "access"
+            self.core_ifname = "core"
+            print('Can\'t parse interface name(s)! Setting it to default values ({}, {})'.format("access", "core"))
+
+        # Network Token Function
+        try:
+            self.enable_ntf = bool(self.conf['enable_ntf'])
+        except KeyError:
+            print('Network Token Function disabled')

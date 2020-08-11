@@ -14,6 +14,8 @@
 #include "utils/ip.h"
 /* for udp header */
 #include "utils/udp.h"
+/* for ethernet header */
+#include "utils/ether.h"
 /* for gtp header */
 #include "utils/gtp.h"
 /* for GetDesc() */
@@ -22,6 +24,7 @@
 /*----------------------------------------------------------------------------------*/
 using bess::utils::be16_t;
 using bess::utils::be32_t;
+using bess::utils::Ethernet;
 using bess::utils::Gtpv1;
 using bess::utils::Ipv4;
 using bess::utils::ToIpv4Address;
@@ -95,10 +98,8 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
                << ", tunnel out teid: " << at_tout_teid
                << ", tunnel out udp port: " << at_tout_uport << std::endl;
 
-    /* assuming that this module comes right after EthernetDecap */
-    /* pkt_len can be used as the length of IP datagram */
     uint16_t pkt_len = p->total_len();
-    Ipv4 *iph = p->head_data<Ipv4 *>();
+    Ethernet *eth = p->head_data<Ethernet *>();
 
     /* pre-allocate space for encaped header(s) */
     char *new_p = static_cast<char *>(
@@ -110,25 +111,32 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
       continue;
     }
 
+    /* setting Ethernet header */
+    memcpy(new_p, eth, sizeof(Ethernet));
+
+    /* setting IPv4 header */
+    Ipv4 *iph = (Ipv4 *)(new_p + sizeof(Ethernet));
+
     /* setting GTPU pointer */
-    Gtpv1 *gtph = (Gtpv1 *)(new_p + sizeof(Ipv4) + sizeof(Udp));
+    Gtpv1 *gtph =
+        (Gtpv1 *)(new_p + sizeof(Ethernet) + sizeof(Ipv4) + sizeof(Udp));
 
     /* copying template content */
-    bess::utils::Copy(new_p, &outer_ip_template, sizeof(outer_ip_template));
+    bess::utils::Copy(iph, &outer_ip_template, sizeof(outer_ip_template));
 
     /* setting gtpu header */
-    gtph->length = (be16_t)(pkt_len);
+    gtph->length = (be16_t)(pkt_len - sizeof(Ethernet));
     gtph->teid = (be32_t)(at_tout_teid);
 
     /* setting outer UDP header */
-    Udp *udph = (Udp *)(new_p + sizeof(Ipv4));
-    udph->length = (be16_t)(pkt_len + sizeof(Gtpv1) + sizeof(Udp));
+    Udp *udph = (Udp *)(new_p + sizeof(Ethernet) + sizeof(Ipv4));
+    udph->length =
+        (be16_t)(pkt_len + sizeof(Gtpv1) + sizeof(Udp) - sizeof(Ethernet));
     udph->src_port = udph->dst_port = (be16_t)(at_tout_uport);
 
     /* setting outer IP header */
-    iph = (Ipv4 *)(new_p);
-    iph->length =
-        (be16_t)(pkt_len + sizeof(Gtpv1) + sizeof(Udp) + sizeof(Ipv4));
+    iph->length = (be16_t)(pkt_len + sizeof(Gtpv1) + sizeof(Udp) +
+                           sizeof(Ipv4) - sizeof(Ethernet));
     iph->src = (be32_t)(at_tout_sip);
     iph->dst = (be32_t)(at_tout_dip);
     EmitPacket(ctx, p, FORWARD_GATE);
@@ -149,6 +157,7 @@ CommandResponse GtpuEncap::Init(const bess::pb::EmptyArg &) {
   tout_uport = AddMetadataAttr("tunnel_out_udp_port", sizeof(uint16_t),
                                AccessMode::kRead);
   DLOG(INFO) << "tout_uport: " << tout_uport << std::endl;
+
   return CommandSuccess();
 }
 /*----------------------------------------------------------------------------------*/

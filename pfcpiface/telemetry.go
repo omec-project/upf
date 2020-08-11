@@ -121,16 +121,16 @@ func (uc *upfCollector) portStats(ch chan<- prometheus.Metric) {
 		packets(res.Inc.Packets, "rx")
 		packets(res.Out.Packets, "tx")
 
-		bytes(res.Inc.Packets, "rx")
-		bytes(res.Out.Packets, "tx")
+		bytes(res.Inc.Bytes, "rx")
+		bytes(res.Out.Bytes, "tx")
 
-		dropped(res.Inc.Packets, "rx")
-		dropped(res.Out.Packets, "tx")
+		dropped(res.Inc.Dropped, "rx")
+		dropped(res.Out.Dropped, "tx")
 
 	}
 
-	portstats("N3", uc.upf.n3Iface)
-	portstats("N6", uc.upf.n6Iface)
+	portstats("Access", uc.upf.accessIface)
+	portstats("Core", uc.upf.coreIface)
 }
 
 func (uc *upfCollector) summaryLatencyJitter(ch chan<- prometheus.Metric) {
@@ -171,8 +171,8 @@ func (uc *upfCollector) summaryLatencyJitter(ch chan<- prometheus.Metric) {
 			ch <- j
 		}
 	}
-	measureIface("N3", uc.upf.n3Iface)
-	measureIface("N6", uc.upf.n6Iface)
+	measureIface("Access", uc.upf.accessIface)
+	measureIface("Core", uc.upf.coreIface)
 }
 
 func setupProm(upf *upf) {
