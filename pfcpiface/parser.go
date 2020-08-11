@@ -14,7 +14,6 @@ import (
 )
 
 func parseFlowDesc(flowDesc string) (IP4AddressNet string) {
-
 	var err error
 	var prefix string
 
@@ -71,6 +70,7 @@ func parseCreatePDRPDI(pdi []*ie.IE) *pdr {
 				log.Println("Failed to parse FTEID IE")
 				continue
 			}
+
 			teid := fteid.TEID
 			tunnelIPv4Address := fteid.IPv4Address
 
@@ -225,11 +225,13 @@ func parseUpdateFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP) *far {
 }
 
 func parseFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP, fwdType string) *far {
+	sessItem := sessions[fseid]
 	farID, err := ie1.FARID()
 	if err != nil {
 		log.Println("Could not read FAR ID!")
 		return nil
 	}
+
 	// Read outerheadercreation from payload (if it exists)
 	var tunnelTEID uint32
 	tunnelDst := uint32(0)
@@ -238,10 +240,28 @@ func parseFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP, fwdType string) *far {
 	var ies2 []*ie.IE
 	var dir uint8 = 0xFF
 
+	applyAction, err := ie1.ApplyAction()
+	if err != nil {
+		log.Println("Could not read Apply Action!")
+		return nil
+	}
+
 	if fwdType == "create" {
 		ies2, err = ie1.ForwardingParameters()
 	} else if fwdType == "update" {
 		ies2, err = ie1.UpdateForwardingParameters()
+		var found bool = false
+		for _, far := range sessItem.fars {
+			if uint8(farID) == far.farID {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			log.Println("Invalid farID ", farID)
+			return nil
+		}
 	} else {
 		log.Println("Invalid fwdType specified!")
 		return nil
@@ -280,6 +300,7 @@ func parseFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP, fwdType string) *far {
 		farID:        uint8(farID),  // farID currently being truncated to uint8 <--- FIXIT/TODO/XXX
 		fseID:        uint32(fseid), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
 		action:       dir,
+		applyAction:  applyAction,
 		tunnelType:   tunnelType,
 		tunnelIP4Src: tunnelSrc,
 		tunnelIP4Dst: tunnelDst,
@@ -306,6 +327,7 @@ func parsePDRsFARs(upf *upf, sereq *message.SessionEstablishmentRequest, fseid *
 		switch ie1.Type {
 		case ie.CreatePDR:
 			if p := parseCreatePDR(ie1, fseid); p != nil {
+				printPDR(*p)
 				pdrs = append(pdrs, *p)
 			} else {
 				return pdrs, fars, errors.New("Failed to parse PDR")
@@ -313,7 +335,7 @@ func parsePDRsFARs(upf *upf, sereq *message.SessionEstablishmentRequest, fseid *
 
 		case ie.CreateFAR:
 			if f := parseCreateFAR(ie1, fseid.SEID, upf.coreIP); f != nil {
-				//printFAR(*f)
+				printFAR(*f)
 				fars = append(fars, *f)
 			}
 		}

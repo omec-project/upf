@@ -52,6 +52,8 @@ type pdr struct {
 	tunnelTEID   uint32
 	srcIP        uint32
 	dstIP        uint32
+	ueIP         uint32
+	fseidIP      uint32
 	srcPort      uint16
 	dstPort      uint16
 	proto        uint8
@@ -61,6 +63,7 @@ type pdr struct {
 	tunnelTEIDMask   uint32
 	srcIPMask        uint32
 	dstIPMask        uint32
+	ueIPMask         uint32
 	srcPortMask      uint16
 	dstPortMask      uint16
 	protoMask        uint8
@@ -74,10 +77,12 @@ type pdr struct {
 }
 
 type far struct {
-	farID uint8
-	fseID uint32
+	farID   uint8
+	fseID   uint32
+	fseidIP uint32
 
 	action       uint8
+	applyAction  uint8
 	tunnelType   uint8
 	tunnelIP4Src uint32
 	tunnelIP4Dst uint32
@@ -325,71 +330,6 @@ func (u *upf) simdeleteEntries(pdrs []pdr, fars []far, timeout time.Duration) {
 	}
 }
 
-func (u *upf) sendMsgToUPF(method string, pdrs []pdr, fars []far) {
-	// create context
-	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
-	defer cancel()
-	done := make(chan bool)
-	calls := len(pdrs) + len(fars)
-
-	// pause daemon, and then insert FAR(s), finally resume
-	err := u.pauseAll()
-	if err != nil {
-		log.Fatalln("Unable to pause BESS:", err)
-	}
-	for _, pdr := range pdrs {
-		switch method {
-		case "add":
-			u.addPDR(ctx, done, pdr)
-		case "del":
-			u.delPDR(ctx, done, pdr)
-		}
-	}
-	for _, far := range fars {
-		switch method {
-		case "add":
-			u.addFAR(ctx, done, far)
-		case "del":
-			u.delFAR(ctx, done, far)
-		}
-	}
-	rc := u.GRPCJoin(calls, Timeout, done)
-	if !rc {
-		log.Println("Unable to make GRPC calls")
-	}
-	err = u.resumeAll()
-	if err != nil {
-		log.Fatalln("Unable to resume BESS:", err)
-	}
-}
-
-func sendDeleteAllSessionsMsgtoUPF(upf *upf) {
-	/* create context, pause daemon, insert PDR(s), and resume daemon */
-	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
-	defer cancel()
-	done := make(chan bool)
-	calls := 5
-
-	err := upf.pauseAll()
-	if err != nil {
-		log.Fatalln("Unable to pause BESS:", err)
-	}
-	upf.removeAllPDRs(ctx, done)
-	upf.removeAllFARs(ctx, done)
-	upf.removeAllCounters(ctx, done, "preQoSCounter")
-	upf.removeAllCounters(ctx, done, "postDLQoSCounter")
-	upf.removeAllCounters(ctx, done, "postULQoSCounter")
-
-	rc := upf.GRPCJoin(calls, Timeout, done)
-	if !rc {
-		log.Println("Unable to make GRPC calls")
-	}
-	err = upf.resumeAll()
-	if err != nil {
-		log.Fatalln("Unable to resume BESS:", err)
-	}
-}
-
 func (u *upf) pauseAll() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
@@ -587,6 +527,7 @@ func (u *upf) processCounters(ctx context.Context, any *anypb.Any, method string
 	}
 }
 
+/*
 func (u *upf) addCounter(ctx context.Context, done chan<- bool, ctrID uint32, counterName string) {
 	go func() {
 		var any *anypb.Any
@@ -624,7 +565,7 @@ func (u *upf) delCounter(ctx context.Context, done chan<- bool, ctrID uint32, co
 		done <- true
 	}()
 }
-
+*/
 func (u *upf) removeAllPDRs(ctx context.Context, done chan<- bool) {
 	go func() {
 		var any *anypb.Any

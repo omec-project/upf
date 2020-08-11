@@ -11,21 +11,25 @@ import (
 	"net"
 	"net/http"
 	"os"
-
-	fqdn "github.com/Showmax/go-fqdn"
-	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
-	"google.golang.org/grpc"
 )
 
 const (
 	modeSim = "sim"
 )
 
+//grpc channel state
+const (
+	Ready = 2 //grpc channel state Ready
+)
+
 var (
-	bess       = flag.String("bess", "localhost:10514", "BESS IP/port combo")
-	configPath = flag.String("config", "upf.json", "path to upf config")
-	httpAddr   = flag.String("http", "0.0.0.0:8080", "http IP/port combo")
-	simulate   = flag.String("simulate", "", "create|delete simulated sessions")
+	bessIP          = flag.String("bess", "localhost:10514", "BESS IP/port combo")
+	configPath      = flag.String("config", "upf.json", "path to upf config")
+	httpAddr        = flag.String("http", "0.0.0.0:8080", "http IP/port combo")
+	simulate        = flag.String("simulate", "", "create|delete simulated sessions")
+	n4SrcIPStr      = flag.String("n4SrcIPStr", "", "N4Interface IP")
+	p4RtcServerIP   = flag.String("p4RtcServerIP", "", "P4 Server ip")
+	p4RtcServerPort = flag.String("p4RtcServerPort", "", "P4 Server port")
 )
 
 // Conf : Json conf struct
@@ -35,6 +39,8 @@ type Conf struct {
 	AccessIface IfaceType   `json:"access"`
 	CoreIface   IfaceType   `json:"core"`
 	CPIface     CPIfaceInfo `json:"cpiface"`
+	P4rtcIface  P4rtcInfo   `json:"p4rtciface"`
+	EnableP4rt  bool        `json:"enable_p4rt"`
 	SimInfo     SimModeInfo `json:"sim"`
 }
 
@@ -56,9 +62,28 @@ type CPIfaceInfo struct {
 	FQDNHost string `json:"hostname"`
 }
 
+// P4rtcInfo : P4 runtime interface settings
+type P4rtcInfo struct {
+	AccessIP    string `json:"access_ip"`
+	P4rtcServer string `json:"p4rtc_server"`
+	P4rtcPort   string `json:"p4rtc_port"`
+	UEIP        string `json:"ue_ip_pool"`
+}
+
 // IfaceType : Gateway interface struct
 type IfaceType struct {
 	IfName string `json:"ifname"`
+}
+
+type common interface {
+	parseFunc(conf *Conf)
+	getUpfInfo(conf *Conf, u *upf)
+	getAccessIP(val *string)
+	getCoreIP(val *string)
+	getN4SrcIP(val *string)
+	handleChannelStatus() bool
+	sendMsgToUPF(method string, pdrs []pdr, fars []far, u *upf) uint8
+	sendDeleteAllSessionsMsgtoUPF(upf *upf)
 }
 
 // ParseJSON : parse json file and populate corresponding struct
@@ -83,6 +108,16 @@ func ParseJSON(filepath *string, conf *Conf) {
 	}
 }
 
+// ParseStrIP : parse IP address from config
+func ParseStrIP(n3name string) (net.IP, net.IPMask) {
+	ip, ipNet, err := net.ParseCIDR(n3name)
+	if err != nil {
+		log.Fatalln("Unable to parse IP: ", err)
+	}
+	log.Println("IP: ", ip)
+	return ip, (ipNet).Mask
+}
+
 // ParseIP : parse IP address from the interface name
 func ParseIP(name string, iface string) net.IP {
 	byNameInterface, err := net.InterfaceByName(name)
@@ -104,48 +139,79 @@ func ParseIP(name string, iface string) net.IP {
 	return ip
 }
 
+func setSwitchInfo(p4rtClient *P4rtClient) (net.IP, net.IPMask, error) {
+	log.Println("Set Switch Info")
+	log.Println("device id ", (*p4rtClient).DeviceID)
+	p4InfoPath := "/bin/p4info.txt"
+	deviceConfigPath := "/bin/bmv2.json"
+
+	errin := p4rtClient.GetForwardingPipelineConfig()
+	if errin != nil {
+		errin = p4rtClient.SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath)
+		if errin != nil {
+			log.Println("set forwarding pipeling config failed. ", errin)
+			return nil, nil, errin
+		}
+	}
+
+	intfEntry := IntfTableEntry{
+		SrcIntf:   "ACCESS",
+		Direction: "UPLINK",
+	}
+
+	errin = p4rtClient.ReadInterfaceTable(&intfEntry)
+	if errin != nil {
+		log.Println("Read Interface table failed ", errin)
+		return nil, nil, errin
+	}
+
+	log.Println("accessip after read intf ", intfEntry.IP)
+	accessIP := net.IP(intfEntry.IP)
+	accessIPMask := net.CIDRMask(intfEntry.PrefixLen, 32)
+	log.Println("AccessIP: ", accessIP, ", AccessIPMask: ", accessIPMask)
+
+	return accessIP, accessIPMask, errin
+}
+
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	// cmdline args
 	flag.Parse()
-
-	// read and parse json startup file
 	var conf Conf
+	var intf common
+	// read and parse json startup file
 	ParseJSON(configPath, &conf)
 	log.Println(conf)
 
-	accessIP := ParseIP(conf.AccessIface.IfName, "Access")
-	coreIP := ParseIP(conf.CoreIface.IfName, "Core")
-	n4SrcIP := net.ParseIP("0.0.0.0")
-
-	// fetch fqdn. Prefer json field
-	fqdnh := conf.CPIface.FQDNHost
-	if fqdnh == "" {
-		fqdnh = fqdn.Get()
+	p4rtcSt := &p4rtc{}
+	bessSt := &bess{}
+	if conf.EnableP4rt {
+		intf = p4rtcSt
+	} else {
+		intf = bessSt
 	}
 
-	// get bess grpc client
-	conn, err := grpc.Dial(*bess, grpc.WithInsecure())
-	if err != nil {
-		log.Fatalln("did not connect:", err)
-	}
-	defer conn.Close()
+	intf.parseFunc(&conf)
+
+	log.Println("bessip ", *bessIP)
+	/*
+		    conn, errin := grpc.Dial(*bessIP, grpc.WithInsecure())
+			if errin != nil {
+				log.Fatalln("did not connect:", errin)
+			}
+			defer conn.Close()
+		    log.Println("upf ", *upfPt)
+		    upfPt.client = pb.NewBESSControlClient(conn)
+	*/
+
+	upfPt := &upf{}
+	intf.getUpfInfo(&conf, upfPt)
 
 	var simInfo *SimModeInfo
 	if conf.Mode == modeSim {
 		simInfo = &conf.SimInfo
-	}
-
-	upf := &upf{
-		accessIface: conf.AccessIface.IfName,
-		coreIface:   conf.CoreIface.IfName,
-		accessIP:    accessIP,
-		coreIP:      coreIP,
-		fqdnHost:    fqdnh,
-		client:      pb.NewBESSControlClient(conn),
-		maxSessions: conf.MaxSessions,
-		simInfo:     simInfo,
+		upfPt.simInfo = simInfo
 	}
 
 	if *simulate != "" {
@@ -154,25 +220,21 @@ func main() {
 		}
 
 		log.Println(*simulate, "sessions:", conf.MaxSessions)
-		upf.sim(*simulate)
+		upfPt.sim(*simulate)
 		return
 	}
 
-	if conf.CPIface.SrcIP == "" {
-		if conf.CPIface.DestIP != "" {
-			n4SrcIP = getOutboundIP(conf.CPIface.DestIP)
-		}
-	} else {
-		addrs, err := net.LookupHost(conf.CPIface.SrcIP)
-		if err == nil {
-			n4SrcIP = net.ParseIP(addrs[0])
-		}
-	}
+	var n4srcIP string
+	var accessIP string
+	var coreIP string
+	intf.getN4SrcIP(&n4srcIP)
+	intf.getAccessIP(&accessIP)
+	intf.getCoreIP(&coreIP)
+	log.Println("n4srcip ", n4srcIP)
+	log.Println("accessip ", accessIP)
+	log.Println("coreip ", coreIP)
+	go pfcpifaceMainLoop(intf, upfPt, accessIP, coreIP, n4srcIP)
 
-	log.Println("N4 IP: ", n4SrcIP.String())
-
-	go pfcpifaceMainLoop(upf, accessIP.String(), coreIP.String(), n4SrcIP.String())
-
-	setupProm(upf)
+	setupProm(upfPt)
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))
 }

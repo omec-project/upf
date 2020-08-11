@@ -133,6 +133,10 @@ RUN CGO_ENABLED=0 go build -mod=vendor -o /bin/pfcpiface
 
 # Stage pfcpiface: runtime image of pfcpiface toward SMF/SPGW-C
 FROM alpine AS pfcpiface
+COPY conf /opt/bess/bessctl/conf
+COPY conf/p4info.bin /bin/
+COPY conf/p4info.txt /bin/
+COPY conf/bmv2.json /bin/
 COPY --from=pfcpiface-build /bin/pfcpiface /bin
 ENTRYPOINT [ "/bin/pfcpiface" ]
 
