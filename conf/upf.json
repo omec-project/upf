@@ -9,11 +9,11 @@
 
     "": "Use the sim block to enable simulation using either Source module or via il_trafficgen",
     "sim": {
-	"start_ue_ip": "16.0.0.1",
-	"start_enb_ip": "11.1.1.129",
-	"start_teid": "0xf0000000",
-	"pkt_size": 128,
-	"total_flows": 5000
+        "start_ue_ip": "16.0.0.1",
+        "start_enb_ip": "11.1.1.129",
+        "start_teid": "0xf0000000",
+        "pkt_size": 128,
+        "total_flows": 5000
     },
 
     "": "max IP frag table entries (for IPv4 reassembly). Update the line below to `\"max_ip_defrag_flows\": 1000` to enable",
@@ -26,14 +26,14 @@
     "measure": true,
 
     "": "Gateway interfaces",
-    "s1u": {
+    "access": {
         "ifname": "ens803f2"
     },
 
     "": "UE IP Natting. Update the line below to `\"ip_masquerade\": \"<ip> [or <ip>]\"` to enable",
-    "sgi": {
+    "core": {
         "ifname": "ens803f3",
-	"": "ip_masquerade: 18.0.0.1 or 18.0.0.2 or 18.0.0.3"
+        "": "ip_masquerade: 18.0.0.1 or 18.0.0.2 or 18.0.0.3"
     },
 
     "": "Number of worker threads. Default: use 1 thread to run both (uplink/downlink) pipelines",
@@ -44,8 +44,8 @@
 
     "": "Control plane controller settings",
     "cpiface": {
-	"nb_dst_ip": "172.17.0.1",
-	"" : "nb_dst_ip: CPHostname",
-	"hostname": "ngic-skx2"
+        "nb_dst_ip": "172.17.0.1",
+        "" : "nb_dst_ip: CPHostname",
+        "hostname": "ngic-skx2"
     }
 }

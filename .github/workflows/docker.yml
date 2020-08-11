@@ -13,13 +13,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     # Checkout and build
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2.3.2
     - name: Docker login GH packages
       env:
         USERNAME: ${{ github.actor }}
         PASSWORD: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        docker login https://docker.pkg.github.com -u $USERNAME -p $PASSWORD
+        echo $PASSWORD | docker login https://docker.pkg.github.com -u $USERNAME --password-stdin
     - name: Build and push Docker image
       run: |
         make docker-build

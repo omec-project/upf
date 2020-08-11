@@ -2,13 +2,13 @@
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
-  name: s1u-sgi-net
+  name: s1u-net
   annotations:
-    k8s.v1.cni.cncf.io/resourceName: intel.com/sriov_vfio
+    k8s.v1.cni.cncf.io/resourceName: intel.com/sriov_vfio_s1u_net
 spec:
   config: '{
     "type": "vfioveth",
-    "name": "s1u-sgi-net",
+    "name": "s1u-net",
     "ipam": {
         "type": "host-local",
         "subnet": "198.18.0.0/24",
@@ -18,19 +18,39 @@ spec:
     }
 }'
 ---
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: sgi-net
+  annotations:
+    k8s.v1.cni.cncf.io/resourceName: intel.com/sriov_vfio_sgi_net
+spec:
+  config: '{
+    "type": "vfioveth",
+    "name": "sgi-net",
+    "ipam": {
+        "type": "host-local",
+        "subnet": "198.19.0.0/24",
+        "rangeStart": "198.19.0.2",
+        "rangeEnd": "198.19.0.250",
+        "gateway": "198.19.0.1"
+    }
+}'
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: spgwu-conf
+  name: upf-conf
 data:
   upf.json: |
     {
       "s1u": {
-        "ifname": "s1u-sgi"
+        "ifname": "s1u"
       },
       "sgi": {
-        "ifname": "s1u-sgi"
+        "ifname": "sgi"
       },
+      "measure": true,
       "workers": "1",
       "max_sessions": 50000
     }
@@ -38,24 +58,29 @@ data:
 apiVersion: v1
 kind: Pod
 metadata:
-  name: bess
+  name: upf
+  labels:
+    app: upf
   annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "8080"
       k8s.v1.cni.cncf.io/networks: '[
-            { "name": "s1u-sgi-net", "interface": "s1u-sgi" }
+            { "name": "s1u-net", "interface": "s1u" },
+            { "name": "sgi-net", "interface": "sgi" }
     ]'
 spec:
   shareProcessNamespace: true
   initContainers:
   # Currently CNI doesn't allow metric we're doing it here instead of net-attach-def
   - name: routes
-    image: krsna1729/spgwu
+    image: omecproject/upf-epc-bess:master-latest
     env:
     - name: ENB_SUBNET
       value: '11.1.1.128/25'
     - name: S1U_GATEWAY
       value: '198.18.0.1'
     - name: SGI_GATEWAY
-      value: '198.18.0.1'
+      value: '198.19.0.1'
     command: ["sh", "-xec"]
     args:
     - ip route add $ENB_SUBNET via $S1U_GATEWAY;
@@ -67,7 +92,7 @@ spec:
 
   # Reqd. if working with AF_PACKET so that kernel does not reply to GTP-U packets
   #- name: iptables
-  #  image: krsna1729/spgwu
+  #  image: omecproject/upf-epc-bess:master-latest
   #  command: [ "sh", "-xec"]
   #  args:
   #  - iptables -I OUTPUT -p icmp --icmp-type port-unreachable -j DROP;
@@ -76,12 +101,13 @@ spec:
   #      add:
   #        - NET_ADMIN
   containers:
-  - name: bess-routectl
-    image: krsna1729/spgwu
+  - name: routectl
+    image: omecproject/upf-epc-bess:master-latest
     command: ["/opt/bess/bessctl/conf/route_control.py"]
     args:
     - -i
-    - s1u-sgi
+    - s1u
+    - sgi
     env:
     - name: PYTHONUNBUFFERED
       value: "1"
@@ -89,8 +115,8 @@ spec:
       limits:
         cpu: 256m
         memory: 128Mi
-  - name: bess
-    image: krsna1729/spgwu
+  - name: bessd
+    image: omecproject/upf-epc-bess:master-latest
     stdin: true
     tty: true
     args:
@@ -106,7 +132,7 @@ spec:
     lifecycle:
       postStart:
         exec:
-          command: ["sh", "-c", "until ss | grep -q 10514; do sleep 5; echo waiting for bessd; done; ./bessctl run spgwu;"]
+          command: ["sh", "-c", "until ss | grep -q 10514; do sleep 5; echo waiting for bessd; done; ./bessctl run up4;"]
     securityContext:
       capabilities:
         add:
@@ -116,14 +142,15 @@ spec:
         hugepages-1Gi: 2Gi
         cpu: 2
         memory: 256Mi
-        intel.com/sriov_vfio: '1'
+        intel.com/sriov_vfio_s1u_net: '1'
+        intel.com/sriov_vfio_sgi_net: '1'
     volumeMounts:
-    - name: spgwu-conf
+    - name: upf-conf
       mountPath: /conf
     - name: hugepages
       mountPath: /dev/hugepages
-  - name: bess-web
-    image: krsna1729/spgwu
+  - name: web
+    image: omecproject/upf-epc-bess:master-latest 
     command: ["bessctl"]
     args:
     - http
@@ -133,20 +160,27 @@ spec:
       limits:
         cpu: 256m
         memory: 128Mi
-  - name: cpiface
-    image: krsna1729/cpiface
-    command: ["zmq-cpiface"]
-    env:
-    - name: GLOG_v
-      value: "1"
+  - name: pfcpiface
+    image: omecproject/upf-epc-pfcpiface:master-latest
+    command: ["pfcpiface"]
+    args:
+    - -config
+    - /conf/upf.json
+    volumeMounts:
+    - name: upf-conf
+      mountPath: /conf
+    ports:
+    - name: http
+      containerPort: 8080
+      protocol: TCP
     resources:
       limits:
         cpu: 256m
         memory: 128Mi
   volumes:
-  - name: spgwu-conf
+  - name: upf-conf
     configMap:
-      name: spgwu-conf
+      name: upf-conf
   - name: hugepages
     emptyDir:
       medium: HugePages
