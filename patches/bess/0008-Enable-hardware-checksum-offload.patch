@@ -1,0 +1,33 @@
+From 6e7af10aa5ed7d82813ec783d28f25931bc3fbeb Mon Sep 17 00:00:00 2001
+From: Muhammad Asim Jamshed <muhammad.jamshed@intel.com>
+Date: Fri, 17 Jul 2020 17:07:29 -0700
+Subject: [PATCH] Enable hardware checksum offload.
+
+---
+ core/drivers/pmd.cc | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/core/drivers/pmd.cc b/core/drivers/pmd.cc
+index a516a82d..669563d1 100644
+--- a/core/drivers/pmd.cc
++++ b/core/drivers/pmd.cc
+@@ -245,9 +245,16 @@ CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
+   if (arg.loopback()) {
+     eth_conf.lpbk_mode = 1;
+   }
++  if (arg.hwcksum()) {
++    eth_conf.rxmode.offloads = DEV_RX_OFFLOAD_IPV4_CKSUM |
++                               DEV_RX_OFFLOAD_UDP_CKSUM |
++                               DEV_RX_OFFLOAD_TCP_CKSUM;
++  }
+ 
+   ret = rte_eth_dev_configure(ret_port_id, num_rxq, num_txq, &eth_conf);
+   if (ret != 0) {
++    VLOG(1) << "Failed to configure with hardware checksum offload. "
++            << "Create PMDPort without hardware offload" << std::endl;
+     return CommandFailure(-ret, "rte_eth_dev_configure() failed");
+   }
+ 
+-- 
+2.17.1
+

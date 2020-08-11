@@ -1,0 +1,51 @@
+{
+    "": "Vdev or sim support. Enable `\"mode\": \"af_xdp\"` to enable AF_XDP mode, or `\"mode\": \"af_packet\"` to enable AF_PACKET mode, or `\"mode\": \"sim\"` to generate synthetic traffic from BESS's Source module",
+    "": "mode: af_xdp",
+    "": "mode: af_packet",
+    "": "mode: sim",
+
+    "": "max UE sessions",
+    "max_sessions": 50000,
+
+    "": "Use the sim block to enable simulation using either Source module or via il_trafficgen",
+    "sim": {
+        "start_ue_ip": "16.0.0.1",
+        "start_enb_ip": "11.1.1.129",
+        "start_teid": "0xf0000000",
+        "pkt_size": 128,
+        "total_flows": 5000
+    },
+
+    "": "max IP frag table entries (for IPv4 reassembly). Update the line below to `\"max_ip_defrag_flows\": 1000` to enable",
+    "": "max_ip_defrag_flows: 1000",
+
+    "": "Update the line below to `\"ip_frag_with_eth_mtu\": 1518` to enable",
+    "": "ip_frag_with_eth_mtu: 1518",
+
+    "": "Telemetrics-See this link for details: https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py",
+    "measure": true,
+
+    "": "Gateway interfaces",
+    "access": {
+        "ifname": "ens803f2"
+    },
+
+    "": "UE IP Natting. Update the line below to `\"ip_masquerade\": \"<ip> [or <ip>]\"` to enable",
+    "core": {
+        "ifname": "ens803f3",
+        "": "ip_masquerade: 18.0.0.1 or 18.0.0.2 or 18.0.0.3"
+    },
+
+    "": "Number of worker threads. Default: use 1 thread to run both (uplink/downlink) pipelines",
+    "workers": 1,
+
+    "": "Whether to enable Network Token Functions",
+    "enable_ntf": false,
+
+    "": "Control plane controller settings",
+    "cpiface": {
+        "nb_dst_ip": "172.17.0.1",
+        "" : "nb_dst_ip: CPHostname",
+        "hostname": "ngic-skx2"
+    }
+}

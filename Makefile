@@ -27,7 +27,7 @@ DOCKER_LABEL_VCS_REF     ?= $(shell git diff-index --quiet HEAD -- && git rev-pa
 DOCKER_LABEL_COMMIT_DATE ?= $(shell git diff-index --quiet HEAD -- && git show -s --format=%cd --date=iso-strict HEAD || echo "unknown" )
 DOCKER_LABEL_BUILD_DATE  ?= $(shell date -u "+%Y-%m-%dT%H:%M:%SZ")
 
-DOCKER_TARGETS           ?= bess cpiface
+DOCKER_TARGETS           ?= bess cpiface pfcpiface
 
 # https://docs.docker.com/engine/reference/commandline/build/#specifying-target-build-stage---target
 docker-build:
@@ -49,10 +49,21 @@ docker-push:
 		docker push ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}upf-epc-$$target:${DOCKER_TAG}; \
 	done
 
-bin:
-		DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_BUILD_ARGS) \
-			--target binaries \
-			--output bin \
-			.;
+# Change target to bess-build/cpiface to exctract src/obj/bins for performance analysis
+output:
+	DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_BUILD_ARGS) \
+		--target artifacts \
+		--output output \
+		.;
 
-.PHONY: docker-build docker-push bin
+# Golang grpc/protobuf generation
+BESS_PB_DIR ?= pfcpiface
+
+pb:
+	DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_BUILD_ARGS) \
+		--target pb \
+		--output output \
+		.;
+	cp -a output/bess_pb ${BESS_PB_DIR}
+
+.PHONY: docker-build docker-push output pb
