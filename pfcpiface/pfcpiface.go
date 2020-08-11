@@ -206,7 +206,7 @@ func parsePDRFromPFCPSessEstReqPayload(upf *upf, sereq *message.SessionEstablish
 	return pdrList, farList
 }
 
-func pfcpifaceMainLoop(upf *upf, n3ip string, sourceIP string) {
+func pfcpifaceMainLoop(upf *upf, n3ip string, sourceIP string, smfIP string) {
 	log.Println("pfcpifaceMainLoop@" + upf.fqdnHost + " says hello!!!")
 
 	// Verify IP + Port binding
@@ -222,6 +222,8 @@ func pfcpifaceMainLoop(upf *upf, n3ip string, sourceIP string) {
 		log.Fatalln("Unable to bind to listening port!", err)
 		return
 	}
+
+    initiateAssociationSetupRequest(sourceIP, n3ip, smfIP, conn)
 
 	// Initialize pkt buf
 	buf := make([]byte, PktBufSz)
@@ -554,4 +556,28 @@ func handleSessionDeletionRequest(upf *upf, msg message.Message, addr net.Addr, 
 	log.Println("Sent session deletion response to: ", addr)
 
 	return smres
+}
+
+
+func initiateAssociationSetupRequest(sourceIP string, n3ip string, n4DstIp string, conn *net.UDPConn) {
+    // Build request message
+    asreq, err := message.NewAssociationSetupRequest(ie.NewRecoveryTimeStamp(time.Now()),
+            ie.NewNodeID(sourceIP, "", ""),       /* node id (IPv4) */
+            // 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
+            //      = 01000001
+            ie.NewUserPlaneIPResourceInformation(0x41, 0, n3ip, "", "", ie.SrcInterfaceAccess),
+            ).Marshal() /* userplane ip resource info */
+        if err != nil {
+            log.Fatalln("Unable to create association setup response", err)
+        }
+
+    smfAddr, err := net.ResolveUDPAddr("udp", n4DstIp+":"+PFCPPort)
+        if err != nil {
+            log.Fatalln("Unable to resolve udp addr!", err)
+            return
+        }
+
+    if _, err := conn.WriteTo(asreq, smfAddr); err != nil {
+        log.Fatalln("Unable to transmit association setup request ", err)
+    }
 }

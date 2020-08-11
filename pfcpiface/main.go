@@ -147,10 +147,11 @@ func main() {
 		return
 	}
 
-	n4SrcIP := getOutboundIP(conf.CPIface.DestIP)
-	log.Println("N4 IP: ", n4SrcIP.String())
+	n4SrcIP, n4DstIP := getOutboundIP(conf.CPIface.DestIP)
+	log.Println("N4 SRc IP: ", n4SrcIP.String())
+	log.Println("N4 Dst IP: ", n4DstIP.String())
 
-	go pfcpifaceMainLoop(upf, n3IP.String(), n4SrcIP.String())
+	go pfcpifaceMainLoop(upf, n3IP.String(), n4SrcIP.String(), n4DstIP.String())
 
 	setupProm(upf)
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))
