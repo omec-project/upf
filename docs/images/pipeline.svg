@@ -1,0 +1,1092 @@
+<svg width="1555.5" height="879" viewBox="0 0 1166.625 659.25" xmlns="http://www.w3.org/2000/svg">
+  <g class="graph" transform="matrix(.3 0 0 .3 456.34030374 591.42230845)">
+    <path fill="#fff" stroke="transparent" d="M-4 4v-2472h802.5V4H-4z"/>
+    <g class="node">
+      <text x="521.5078" y="-1906.7" font-family="Times,serif" font-size="12">
+        accessFastBPF
+      </text>
+      <text x="549.4959" y="-1894.4" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        BPF
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M521-1881.5v-7h37v7h-37z"/>
+      <text x="538" y="-1883.1" font-family="Times,serif" font-size="6" fill="#fff">
+        0
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M558-1881.5v-7h36v7h-36z"/>
+      <text x="574.5" y="-1883.1" font-family="Times,serif" font-size="6" fill="#fff">
+        1
+      </text>
+      <path fill="none" stroke="#000" d="M519.5-1881v-39h75v39h-75z"/>
+    </g>
+    <g class="node">
+      <text x="454.8432" y="-1809.7" font-family="Times,serif" font-size="12">
+        accessRxIPCksum
+      </text>
+      <text x="476.5037" y="-1797.4" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        IPChecksum
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M454-1784.5v-7h46v7h-46z"/>
+      <text x="475.5" y="-1786.1" font-family="Times,serif" font-size="6" fill="#fff">
+        0
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M500-1784.5v-7h45v7h-45z"/>
+      <text x="521" y="-1786.1" font-family="Times,serif" font-size="6" fill="#fff">
+        1
+      </text>
+      <path fill="none" stroke="#000" d="M452.5-1784v-39h93v39h-93z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M539-1881.5c0 19.5843-10.1077 39.1891-20.1611 53.8451"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M520.0508-1826.3384l-4.319 3.0675 1.4634-5.0913 2.8556 2.0238z"/>
+      <path fill="#fff" stroke="transparent" d="M537.5-1847v-10h39v10h-39z"/>
+      <text x="537.25" y="-1848.9" font-family="Times,serif" font-size="9">
+        635.9 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="647.0038" y="-1809.7" font-family="Times,serif" font-size="12">
+        gtpuEcho
+      </text>
+      <text x="651.7543" y="-1797.4" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        GtpuEcho
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M640-1784.5v-7h30v7h-30z"/>
+      <text x="653.5" y="-1786.1" font-family="Times,serif" font-size="6" fill="#fff">
+        0
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M670-1784.5v-7h30v7h-30z"/>
+      <text x="683.5" y="-1786.1" font-family="Times,serif" font-size="6" fill="#fff">
+        1
+      </text>
+      <path fill="none" stroke="#000" d="M639-1784v-39h62v39h-62z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M576-1881.5c0 15.8518 32.0584 39.7906 58.7315 56.9647"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M635.685-1826.0028l3.2754 4.1635-5.1569-1.2123 1.8815-2.9512z"/>
+      <path fill="#fff" stroke="transparent" d="M605.5-1847v-10h19v10h-19z"/>
+      <text x="605.375" y="-1848.9" font-family="Times,serif" font-size="9">
+        0 pps
+      </text>
+    </g>
+    <g class="node">
+      <text x="633.522" y="-293.2" font-family="Times,serif" font-size="12">
+        accessMerge
+      </text>
+      <text x="652.7568" y="-280.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Merge
+      </text>
+      <path fill="none" stroke="#000" d="M631.5-274v-32h65v32h-65z"/>
+    </g>
+    <g class="node">
+      <text x="627.6898" y="-203.2" font-family="Times,serif" font-size="12">
+        accessSrcEther
+      </text>
+      <text x="651.0058" y="-190.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Update
+      </text>
+      <path fill="none" stroke="#000" d="M626-184v-32h76v32h-76z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M664-273.9098v52.4263"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M665.7501-221.2543l-1.7501 5-1.7499-5.0001 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M666.5-240v-10h39v10h-39z"/>
+      <text x="666.25" y="-241.9" font-family="Times,serif" font-size="9">
+        635.9 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="469.5096" y="-1709.7" font-family="Times,serif" font-size="12">
+        accessRxIPCksumFail
+      </text>
+      <text x="515.2479" y="-1697.4" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Sink
+      </text>
+      <path fill="none" stroke="#000" d="M467.5-1690.5v-32h111v32h-111z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M523-1784.5v56.797"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M524.7501-1727.6337l-1.7501 5-1.7499-5.0001 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M525.5-1750v-10h19v10h-19z"/>
+      <text x="525.375" y="-1751.9" font-family="Times,serif" font-size="9">
+        0 pps
+      </text>
+    </g>
+    <g class="node">
+      <text x="328.6778" y="-1712.7" font-family="Times,serif" font-size="12">
+        accessRxUDPCksum
+      </text>
+      <text x="356.0042" y="-1700.4" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        L4Checksum
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M328-1687.5v-7h52v7h-52z"/>
+      <text x="352.5" y="-1689.1" font-family="Times,serif" font-size="6" fill="#fff">
+        0
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M380-1687.5v-7h52v7h-52z"/>
+      <text x="404.5" y="-1689.1" font-family="Times,serif" font-size="6" fill="#fff">
+        1
+      </text>
+      <path fill="none" stroke="#000" d="M327-1687v-39h106v39H327z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M477-1784.5c0 25.0198-19.8412 43.3629-41.5765 55.951"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M436.2749-1727.0201l-5.2183.9122 3.5105-3.9673 1.7078 3.0551z"/>
+      <path fill="#fff" stroke="transparent" d="M473.5-1750v-10h39v10h-39z"/>
+      <text x="473.25" y="-1751.9" font-family="Times,serif" font-size="9">
+        635.9 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="352.8442" y="-1590.2" font-family="Times,serif" font-size="12">
+        accessRxUDPCksumFail
+      </text>
+      <text x="405.2479" y="-1577.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Sink
+      </text>
+      <path fill="none" stroke="#000" d="M350.5-1571v-32h125v32h-125z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M406-1687.5c0 27.2943 2.6012 58.6576 4.6323 78.9866"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M412.3936-1608.4906l-1.2328 5.152-2.2491-4.7963 3.4819-.3557z"/>
+      <path fill="#fff" stroke="transparent" d="M412.5-1640v-10h19v10h-19z"/>
+      <text x="412.375" y="-1641.9" font-family="Times,serif" font-size="9">
+        0 pps
+      </text>
+    </g>
+    <g class="node">
+      <text x="267.3402" y="-1590.2" font-family="Times,serif" font-size="12">
+        setattr1
+      </text>
+      <text x="262.509" y="-1577.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        SetMetadata
+      </text>
+      <path fill="none" stroke="#000" d="M254-1571v-32h62v32h-62z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M354-1687.5c0 32.5402-24.8885 62.2447-44.7702 80.7823"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M310.2031-1605.2369l-4.874 2.0754 2.5159-4.6618 2.3581 2.5864z"/>
+      <path fill="#fff" stroke="transparent" d="M352.5-1640v-10h39v10h-39z"/>
+      <text x="352.25" y="-1641.9" font-family="Times,serif" font-size="9">
+        635.9 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="625.6912" y="-113.2" font-family="Times,serif" font-size="12">
+        access_measure
+      </text>
+      <text x="648.5092" y="-100.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Measure
+      </text>
+      <path fill="none" stroke="#000" d="M624-94v-32h80v32h-80z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M664-183.9098v52.4263"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M665.7501-131.2543l-1.7501 5-1.7499-5.0001 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M666.5-150v-10h39v10h-39z"/>
+      <text x="666.25" y="-151.9" font-family="Times,serif" font-size="9">
+        635.9 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="638.0122" y="-23.2" font-family="Times,serif" font-size="12">
+        access_out
+      </text>
+      <text x="655.7479" y="-10.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Sink
+      </text>
+      <path fill="none" stroke="#000" d="M633-4v-32h62v32h-62z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M664-93.9098v52.4263"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M665.7501-41.2543l-1.7501 5-1.7499-5.0001 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M666.5-60v-10h39v10h-39z"/>
+      <text x="666.25" y="-61.9" font-family="Times,serif" font-size="9">
+        635.9 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="521.6918" y="-2357.2" font-family="Times,serif" font-size="12">
+        access_rewrite
+      </text>
+      <text x="542.7562" y="-2344.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Rewrite
+      </text>
+      <path fill="none" stroke="#000" d="M520-2338v-32h74v32h-74z"/>
+    </g>
+    <g class="node">
+      <text x="522.6854" y="-2267.2" font-family="Times,serif" font-size="12">
+        access_update
+      </text>
+      <text x="525.01" y="-2254.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        SequentialUpdate
+      </text>
+      <path fill="none" stroke="#000" d="M521-2248v-32h72v32h-72z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M557-2337.9098v52.4263"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M558.7501-2285.2543l-1.7501 5-1.7499-5.0001 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M559.5-2304v-10h39v10h-39z"/>
+      <text x="559.25" y="-2305.9" font-family="Times,serif" font-size="9">
+        635.9 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="523.522" y="-2447.2" font-family="Times,serif" font-size="12">
+        access_source
+      </text>
+      <text x="545.0053" y="-2434.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Source
+      </text>
+      <path fill="none" stroke="#000" d="M521.5-2428v-32h71v32h-71z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M557-2427.9098v52.4263"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M558.7501-2375.2543l-1.7501 5-1.7499-5.0001 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M559.5-2394v-10h39v10h-39z"/>
+      <text x="559.25" y="-2395.9" font-family="Times,serif" font-size="9">
+        635.9 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="513.6824" y="-1997.2" font-family="Times,serif" font-size="12">
+        access_timestamp
+      </text>
+      <text x="536.7536" y="-1984.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Timestamp
+      </text>
+      <path fill="none" stroke="#000" d="M512-1978v-32h90v32h-90z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M557-1977.7135v52.1316"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M558.7501-1925.1647L557-1920.1648l-1.7499-5 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M559.5-1944v-10h39v10h-39z"/>
+      <text x="559.25" y="-1945.9" font-family="Times,serif" font-size="9">
+        635.9 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="522.8416" y="-2177.2" font-family="Times,serif" font-size="12">
+        l4_checksum0
+      </text>
+      <text x="533.5042" y="-2164.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        L4Checksum
+      </text>
+      <path fill="none" stroke="#000" d="M520.5-2158v-32h73v32h-73z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M557-2247.9098v52.4263"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M558.7501-2195.2543l-1.7501 5-1.7499-5.0001 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M559.5-2214v-10h39v10h-39z"/>
+      <text x="559.25" y="-2215.9" font-family="Times,serif" font-size="9">
+        635.9 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="614.5062" y="-1709.7" font-family="Times,serif" font-size="12">
+        badGtpuEchoPkt
+      </text>
+      <text x="647.2479" y="-1697.4" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Sink
+      </text>
+      <path fill="none" stroke="#000" d="M612.5-1690.5v-32h85v32h-85z"/>
+    </g>
+    <g class="node">
+      <text x="241.0004" y="-1252.7" font-family="Times,serif" font-size="12">
+        badPkts
+      </text>
+      <text x="251.7479" y="-1240.4" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Sink
+      </text>
+      <path fill="none" stroke="#000" d="M229-1233.5v-32h62v32h-62z"/>
+    </g>
+    <g class="node">
+      <text x="162.504" y="-1903.7" font-family="Times,serif" font-size="12">
+        coreFastBPF
+      </text>
+      <text x="185.4959" y="-1891.4" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        BPF
+      </text>
+      <path fill="none" stroke="#000" d="M160.5-1884.5v-32h65v32h-65z"/>
+    </g>
+    <g class="node">
+      <text x="153.8394" y="-1809.7" font-family="Times,serif" font-size="12">
+        coreRxIPCksum
+      </text>
+      <text x="170.5037" y="-1797.4" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        IPChecksum
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M153-1784.5v-7h41v7h-41z"/>
+      <text x="172" y="-1786.1" font-family="Times,serif" font-size="6" fill="#fff">
+        0
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M194-1784.5v-7h40v7h-40z"/>
+      <text x="212.5" y="-1786.1" font-family="Times,serif" font-size="6" fill="#fff">
+        1
+      </text>
+      <path fill="none" stroke="#000" d="M151.5-1784v-39h83v39h-83z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M193-1884.4824v55.9656"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M194.7501-1828.2317l-1.7501 5-1.7499-5h3.5z"/>
+      <path fill="#fff" stroke="transparent" d="M195.5-1847v-10h39v10h-39z"/>
+      <text x="195.25" y="-1848.9" font-family="Times,serif" font-size="9">
+        635.9 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="295.0182" y="-293.2" font-family="Times,serif" font-size="12">
+        coreMerge
+      </text>
+      <text x="309.2568" y="-280.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Merge
+      </text>
+      <path fill="none" stroke="#000" d="M290-274v-32h62v32h-62z"/>
+    </g>
+    <g class="node">
+      <text x="289.686" y="-203.2" font-family="Times,serif" font-size="12">
+        coreSrcEther
+      </text>
+      <text x="308.0058" y="-190.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Update
+      </text>
+      <path fill="none" stroke="#000" d="M288-184v-32h66v32h-66z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M321-273.9098v52.4263"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M322.7501-221.2543l-1.7501 5-1.7499-5.0001 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M323.5-240v-10h39v10h-39z"/>
+      <text x="323.25" y="-241.9" font-family="Times,serif" font-size="9">
+        635.9 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="180.5058" y="-1709.7" font-family="Times,serif" font-size="12">
+        coreRxIPCksumFail
+      </text>
+      <text x="221.2479" y="-1697.4" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Sink
+      </text>
+      <path fill="none" stroke="#000" d="M178.5-1690.5v-32h101v32h-101z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M214-1784.5c0 19.4512 4.5539 41.1478 8.6434 56.7101"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M224.3878-1728.0431l-.3826 5.2836-2.9958-4.369 3.3784-.9146z"/>
+      <path fill="#fff" stroke="transparent" d="M220.5-1750v-10h19v10h-19z"/>
+      <text x="220.375" y="-1751.9" font-family="Times,serif" font-size="9">
+        0 pps
+      </text>
+    </g>
+    <g class="node">
+      <text x="49.674" y="-1712.7" font-family="Times,serif" font-size="12">
+        coreRxUDPCksum
+      </text>
+      <text x="72.0042" y="-1700.4" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        L4Checksum
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M49-1687.5v-7h47v7H49z"/>
+      <text x="71" y="-1689.1" font-family="Times,serif" font-size="6" fill="#fff">
+        0
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M96-1687.5v-7h47v7H96z"/>
+      <text x="118" y="-1689.1" font-family="Times,serif" font-size="6" fill="#fff">
+        1
+      </text>
+      <path fill="none" stroke="#000" d="M48-1687v-39h96v39H48z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M173-1784.5c0 13.9725-25.3404 37.5834-46.9472 55.1758"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M127.0598-1727.8882l-4.9911 1.7752 2.7947-4.5003 2.1964 2.7251z"/>
+      <path fill="#fff" stroke="transparent" d="M163-1750v-10h44v10h-44z"/>
+      <text x="163" y="-1751.9" font-family="Times,serif" font-size="9">
+        635.91 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="106.8404" y="-1590.2" font-family="Times,serif" font-size="12">
+        coreRxUDPCksumFail
+      </text>
+      <text x="154.2479" y="-1577.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Sink
+      </text>
+      <path fill="none" stroke="#000" d="M104.5-1571v-32h115v32h-115z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M120-1687.5c0 29.5355 15.6337 60.4405 27.8246 80.05"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M149.3203-1608.3592l1.203 5.1591-4.1576-3.2828 2.9546-1.8763z"/>
+      <path fill="#fff" stroke="transparent" d="M140.5-1640v-10h19v10h-19z"/>
+      <text x="140.375" y="-1641.9" font-family="Times,serif" font-size="9">
+        0 pps
+      </text>
+    </g>
+    <g class="node">
+      <text x="21.3402" y="-1590.2" font-family="Times,serif" font-size="12">
+        setattr0
+      </text>
+      <text x="16.509" y="-1577.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        SetMetadata
+      </text>
+      <path fill="none" stroke="#000" d="M8-1571v-32h62v32H8z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M72-1687.5c0 28.7325-12.3261 59.8831-21.9118 79.7641"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M51.6228-1606.8908l-3.7794 3.712.6396-5.2587 3.1398 1.5467z"/>
+      <path fill="#fff" stroke="transparent" d="M72-1640v-10h44v10H72z"/>
+      <text x="72" y="-1641.9" font-family="Times,serif" font-size="9">
+        635.91 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="287.6874" y="-113.2" font-family="Times,serif" font-size="12">
+        core_measure
+      </text>
+      <text x="305.5092" y="-100.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Measure
+      </text>
+      <path fill="none" stroke="#000" d="M286-94v-32h70v32h-70z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M321-183.9098v52.4263"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M322.7501-131.2543l-1.7501 5-1.7499-5.0001 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M323.5-150v-10h39v10h-39z"/>
+      <text x="323.25" y="-151.9" font-family="Times,serif" font-size="9">
+        635.9 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="300.0084" y="-23.2" font-family="Times,serif" font-size="12">
+        core_out
+      </text>
+      <text x="312.7479" y="-10.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Sink
+      </text>
+      <path fill="none" stroke="#000" d="M290-4v-32h62v32h-62z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M321-93.9098v52.4263"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M322.7501-41.2543l-1.7501 5-1.7499-5.0001 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M323-60v-10h44v10h-44z"/>
+      <text x="323" y="-61.9" font-family="Times,serif" font-size="9">
+        635.91 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="162.688" y="-2357.2" font-family="Times,serif" font-size="12">
+        core_rewrite
+      </text>
+      <text x="178.7562" y="-2344.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Rewrite
+      </text>
+      <path fill="none" stroke="#000" d="M161-2338v-32h64v32h-64z"/>
+    </g>
+    <g class="node">
+      <text x="164.1816" y="-2267.2" font-family="Times,serif" font-size="12">
+        core_update
+      </text>
+      <text x="161.51" y="-2254.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        SequentialUpdate
+      </text>
+      <path fill="none" stroke="#000" d="M159.5-2248v-32h67v32h-67z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M193-2337.9098v52.4263"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M194.7501-2285.2543l-1.7501 5-1.7499-5.0001 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M195.5-2304v-10h39v10h-39z"/>
+      <text x="195.25" y="-2305.9" font-family="Times,serif" font-size="9">
+        635.9 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="164.0182" y="-2447.2" font-family="Times,serif" font-size="12">
+        core_source
+      </text>
+      <text x="180.5053" y="-2434.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Source
+      </text>
+      <path fill="none" stroke="#000" d="M162-2428v-32h62v32h-62z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M193-2427.9098v52.4263"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M194.7501-2375.2543l-1.7501 5-1.7499-5.0001 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M195.5-2394v-10h39v10h-39z"/>
+      <text x="195.25" y="-2395.9" font-family="Times,serif" font-size="9">
+        635.9 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="154.6786" y="-1997.2" font-family="Times,serif" font-size="12">
+        core_timestamp
+      </text>
+      <text x="172.7536" y="-1984.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Timestamp
+      </text>
+      <path fill="none" stroke="#000" d="M153-1978v-32h80v32h-80z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M193-1977.7135v56.0654"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M194.7501-1921.5998l-1.7501 5-1.7499-5.0001 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M195.5-1944v-10h39v10h-39z"/>
+      <text x="195.25" y="-1945.9" font-family="Times,serif" font-size="9">
+        635.9 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="158.8416" y="-2177.2" font-family="Times,serif" font-size="12">
+        l4_checksum1
+      </text>
+      <text x="169.5042" y="-2164.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        L4Checksum
+      </text>
+      <path fill="none" stroke="#000" d="M156.5-2158v-32h73v32h-73z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M193-2247.9098v52.4263"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M194.7501-2195.2543l-1.7501 5-1.7499-5.0001 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M195.5-2214v-10h39v10h-39z"/>
+      <text x="195.25" y="-2215.9" font-family="Times,serif" font-size="9">
+        635.9 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="689.6786" y="-1416.2" font-family="Times,serif" font-size="12">
+        echoOuterIPCsum
+      </text>
+      <text x="711.0037" y="-1403.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        IPChecksum
+      </text>
+      <path fill="none" stroke="#000" d="M688-1397v-32h92v32h-92z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M734-1396.9689V-385c0 30.7303-24.0326 58.0642-43.9346 75.4314"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M691.089-308.1416l-4.9406 1.9116 2.6701-4.5753 2.2705 2.6637z"/>
+      <path fill="#fff" stroke="transparent" d="M736.5-845.5v-10h19v10h-19z"/>
+      <text x="736.375" y="-847.4" font-family="Times,serif" font-size="9">
+        0 pps
+      </text>
+    </g>
+    <g class="node">
+      <text x="683.5132" y="-1532.2" font-family="Times,serif" font-size="12">
+        echoOuterUDPCsum
+      </text>
+      <text x="710.5042" y="-1519.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        L4Checksum
+      </text>
+      <path fill="none" stroke="#000" d="M681.5-1513v-32h105v32h-105z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M734-1512.8707v78.301"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M735.7501-1434.3662L734-1429.3663l-1.7499-5 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M736.5-1466v-10h19v10h-19z"/>
+      <text x="736.375" y="-1467.9" font-family="Times,serif" font-size="9">
+        0 pps
+      </text>
+    </g>
+    <g class="node">
+      <text x="713.339" y="-1648.2" font-family="Times,serif" font-size="12">
+        ethSwap
+      </text>
+      <text x="713.7527" y="-1635.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        MACSwap
+      </text>
+      <path fill="none" stroke="#000" d="M703-1629v-32h62v32h-62z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M734-1628.8707v78.301"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M735.7501-1550.3662L734-1545.3663l-1.7499-5 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M736.5-1582v-10h19v10h-19z"/>
+      <text x="736.375" y="-1583.9" font-family="Times,serif" font-size="9">
+        0 pps
+      </text>
+    </g>
+    <g class="node">
+      <text x="431.5108" y="-489.7" font-family="Times,serif" font-size="12">
+        executeFAR
+      </text>
+      <text x="452.9968" y="-477.4" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Split
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M431-464.5v-7h16v7h-16z"/>
+      <text x="437.5" y="-466.1" font-family="Times,serif" font-size="6" fill="#fff">
+        0
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M447-464.5v-7h15v7h-15z"/>
+      <text x="453" y="-466.1" font-family="Times,serif" font-size="6" fill="#fff">
+        1
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M462-464.5v-7h15v7h-15z"/>
+      <text x="468" y="-466.1" font-family="Times,serif" font-size="6" fill="#fff">
+        2
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M477-464.5v-7h15v7h-15z"/>
+      <text x="483" y="-466.1" font-family="Times,serif" font-size="6" fill="#fff">
+        4
+      </text>
+      <path fill="none" stroke="#000" d="M429.5-464v-39h63v39h-63z"/>
+    </g>
+    <g class="node">
+      <text x="550.013" y="-388.2" font-family="Times,serif" font-size="12">
+        farDrop
+      </text>
+      <text x="560.7479" y="-375.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Sink
+      </text>
+      <path fill="none" stroke="#000" d="M538-369v-32h62v32h-62z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M470-464.5c0 17.0243 17.5795 12.0254 31 22.5 15.5172 12.111 32.4857 26.3331 45.5906 37.5413"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M547.8712-405.6659l2.6565 4.5832-4.9348-1.9263 2.2783-2.6569z"/>
+      <path fill="#fff" stroke="transparent" d="M521.5-430v-10h19v10h-19z"/>
+      <text x="521.375" y="-431.9" font-family="Times,serif" font-size="9">
+        0 pps
+      </text>
+    </g>
+    <g class="node">
+      <text x="636.8414" y="-388.2" font-family="Times,serif" font-size="12">
+        farNotifyCP
+      </text>
+      <text x="658.2479" y="-375.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Sink
+      </text>
+      <path fill="none" stroke="#000" d="M634.5-369v-32h63v32h-63z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M485-464.5c0 28.8966 34.2558 11.5565 61 22.5 32.0344 13.1082 39.7974 17.0193 71 32 4.3908 2.108 8.9768 4.3684 13.5061 6.6366"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M631.3277-404.909l3.6793 3.8112-5.2529-.6849 1.5736-3.1263z"/>
+      <path fill="#fff" stroke="transparent" d="M580.5-430v-10h19v10h-19z"/>
+      <text x="580.375" y="-431.9" font-family="Times,serif" font-size="9">
+        0 pps
+      </text>
+    </g>
+    <g class="node">
+      <text x="406.506" y="-393.2" font-family="Times,serif" font-size="12">
+        postDLQoSCounter
+      </text>
+      <text x="440.0028" y="-380.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Counter
+      </text>
+      <text x="427.3767" y="-367.9" font-family="Times,serif" font-size="9">
+        50000 sessions
+      </text>
+      <path fill="none" stroke="#000" d="M404.5-364v-42h99v42h-99z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M454-464.5v53.1725"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M455.7501-411.258L454-406.2581l-1.7499-5 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M456.5-430v-10h39v10h-39z"/>
+      <text x="456.25" y="-431.9" font-family="Times,serif" font-size="9">
+        635.9 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="273.506" y="-393.2" font-family="Times,serif" font-size="12">
+        postULQoSCounter
+      </text>
+      <text x="307.0028" y="-380.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Counter
+      </text>
+      <text x="294.3767" y="-367.9" font-family="Times,serif" font-size="9">
+        50000 sessions
+      </text>
+      <path fill="none" stroke="#000" d="M271.5-364v-42h99v42h-99z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M439-464.5c0 1.2448-46.8224 32.467-81.4785 55.4059"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M358.0681-407.3574l-5.1356 1.2994 3.2043-4.2184 1.9313 2.919z"/>
+      <path fill="#fff" stroke="transparent" d="M407.5-430v-10h39v10h-39z"/>
+      <text x="407.25" y="-431.9" font-family="Times,serif" font-size="9">
+        635.9 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="340.1764" y="-963.7" font-family="Times,serif" font-size="12">
+        farLookup
+      </text>
+      <text x="343.7596" y="-951.4" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        ExactMatch
+      </text>
+      <text x="326.5071" y="-938.4" font-family="Times,serif" font-size="9">
+        2 fields, 100000 rules
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M326-928.5v-7h27v7h-27z"/>
+      <text x="338" y="-930.1" font-family="Times,serif" font-size="6" fill="#fff">
+        0
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M353-928.5v-7h26v7h-26z"/>
+      <text x="364.5" y="-930.1" font-family="Times,serif" font-size="6" fill="#fff">
+        1
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M379-928.5v-7h26v7h-26z"/>
+      <text x="390.5" y="-930.1" font-family="Times,serif" font-size="6" fill="#fff">
+        2
+      </text>
+      <path fill="none" stroke="#000" d="M324.5-928v-49h81v49h-81z"/>
+    </g>
+    <g class="node">
+      <text x="433.8428" y="-853.7" font-family="Times,serif" font-size="12">
+        farLookupFail
+      </text>
+      <text x="460.2479" y="-841.4" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Sink
+      </text>
+      <path fill="none" stroke="#000" d="M431.5-834.5v-32h73v32h-73z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M392-928.5c0 15.2817 15.0869 11.8025 26 22.5 11.5479 11.3197 23.7081 24.7788 33.1447 35.6079"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M452.5395-871.4548l1.9525 4.9246-4.5973-2.6322 2.6448-2.2924z"/>
+      <path fill="#fff" stroke="transparent" d="M433.5-894v-10h19v10h-19z"/>
+      <text x="433.375" y="-895.9" font-family="Times,serif" font-size="9">
+        0 pps
+      </text>
+    </g>
+    <g class="node">
+      <text x="438.6842" y="-580.2" font-family="Times,serif" font-size="12">
+        farMerge
+      </text>
+      <text x="449.2568" y="-567.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Merge
+      </text>
+      <path fill="none" stroke="#000" d="M430-561v-32h62v32h-62z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M339-928.5c0 56.0159-99 21.9841-99 78V-667c0 39.3882 121.9339 69.9184 184.6592 83.018"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M425.2624-585.6444l4.5424 2.7256-5.2507.702.7083-3.4276z"/>
+      <path fill="#fff" stroke="transparent" d="M242-752v-10h44v10h-44z"/>
+      <text x="242" y="-753.9" font-family="Times,serif" font-size="9">
+        635.92 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="340.3404" y="-856.7" font-family="Times,serif" font-size="12">
+        gtpuEncap
+      </text>
+      <text x="345.7568" y="-844.4" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        GtpuEncap
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M336-831.5v-7h30v7h-30z"/>
+      <text x="349.5" y="-833.1" font-family="Times,serif" font-size="6" fill="#fff">
+        0
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M366-831.5v-7h30v7h-30z"/>
+      <text x="379.5" y="-833.1" font-family="Times,serif" font-size="6" fill="#fff">
+        1
+      </text>
+      <path fill="none" stroke="#000" d="M335-831v-39h62v39h-62z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M366-928.5v53.4335"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M367.7501-875.0538l-1.7501 5-1.7499-5h3.5z"/>
+      <path fill="#fff" stroke="transparent" d="M368-894v-10h44v10h-44z"/>
+      <text x="368" y="-895.9" font-family="Times,serif" font-size="9">
+        635.92 kpps
+      </text>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M461-560.7135v52.1316"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M462.7501-508.1647L461-503.1648l-1.7499-5 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M463-527v-10h38v10h-38z"/>
+      <text x="462.7499" y="-528.9" font-family="Times,serif" font-size="9">
+        1.27 Mpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="341.011" y="-1154.2" font-family="Times,serif" font-size="12">
+        gtpuDecap
+      </text>
+      <text x="346.5097" y="-1141.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        GtpuDecap
+      </text>
+      <path fill="none" stroke="#000" d="M336-1135v-32h62v32h-62z"/>
+    </g>
+    <g class="node">
+      <text x="327.8428" y="-1064.2" font-family="Times,serif" font-size="12">
+        preQoSCounter
+      </text>
+      <text x="351.0028" y="-1051.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Counter
+      </text>
+      <text x="338.3767" y="-1038.9" font-family="Times,serif" font-size="9">
+        50000 sessions
+      </text>
+      <path fill="none" stroke="#000" d="M325.5-1035v-42h79v42h-79z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M366.6607-1134.8845c-.303 14.3923-.7525 35.7427-1.1074 52.6034"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M367.3014-1082.1673l-1.855 4.962-1.6442-5.0358 3.4992.0738z"/>
+      <path fill="#fff" stroke="transparent" d="M369-1101v-10h44v10h-44z"/>
+      <text x="369" y="-1102.9" font-family="Times,serif" font-size="9">
+        635.91 kpps
+      </text>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M655-1784.5v56.797"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M656.7501-1727.6337l-1.7501 5-1.7499-5.0001 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M657.5-1750v-10h19v10h-19z"/>
+      <text x="657.375" y="-1751.9" font-family="Times,serif" font-size="9">
+        0 pps
+      </text>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M685-1784.5c0 27.6495 20.2196 28.6381 30 54.5 7.9496 21.0208 13.0728 46.2835 15.9719 63.7775"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M732.7365-1666.2701l-.9356 5.2141-2.5202-4.6596 3.4558-.5545z"/>
+      <path fill="#fff" stroke="transparent" d="M705.5-1750v-10h19v10h-19z"/>
+      <text x="705.375" y="-1751.9" font-family="Times,serif" font-size="9">
+        0 pps
+      </text>
+    </g>
+    <g class="node">
+      <text x="316.5068" y="-760.2" font-family="Times,serif" font-size="12">
+        gtpuEncapFail
+      </text>
+      <text x="343.2479" y="-747.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Sink
+      </text>
+      <path fill="none" stroke="#000" d="M314.5-741v-32h73v32h-73z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M351-831.5v52.9983"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M352.7501-778.2771l-1.7501 5-1.7499-5h3.5z"/>
+      <path fill="#fff" stroke="transparent" d="M353.5-797v-10h19v10h-19z"/>
+      <text x="353.375" y="-798.9" font-family="Times,serif" font-size="9">
+        0 pps
+      </text>
+    </g>
+    <g class="node">
+      <text x="423.6714" y="-760.2" font-family="Times,serif" font-size="12">
+        outerUDPCsum
+      </text>
+      <text x="438.0042" y="-747.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        L4Checksum
+      </text>
+      <path fill="none" stroke="#000" d="M422-741v-32h80v32h-80z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M381-831.5c0 24.6155 20.5154 43.3238 40.8967 55.8362"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M422.83-777.145l3.4064 4.057-5.1929-1.0472 1.7865-3.0098z"/>
+      <path fill="#fff" stroke="transparent" d="M399-797v-10h44v10h-44z"/>
+      <text x="399" y="-798.9" font-family="Times,serif" font-size="9">
+        635.91 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="522.8416" y="-2087.2" font-family="Times,serif" font-size="12">
+        ip_checksum0
+      </text>
+      <text x="534.5037" y="-2074.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        IPChecksum
+      </text>
+      <path fill="none" stroke="#000" d="M520.5-2068v-32h73v32h-73z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M557-2067.9098v52.4263"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M558.7501-2015.2543l-1.7501 5-1.7499-5.0001 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M559-2034v-10h44v10h-44z"/>
+      <text x="559" y="-2035.9" font-family="Times,serif" font-size="9">
+        635.91 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="158.8416" y="-2087.2" font-family="Times,serif" font-size="12">
+        ip_checksum1
+      </text>
+      <text x="170.5037" y="-2074.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        IPChecksum
+      </text>
+      <path fill="none" stroke="#000" d="M156.5-2068v-32h73v32h-73z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M193-2067.9098v52.4263"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M194.7501-2015.2543l-1.7501 5-1.7499-5.0001 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M195-2034v-10h44v10h-44z"/>
+      <text x="195" y="-2035.9" font-family="Times,serif" font-size="9">
+        635.91 kpps
+      </text>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M557-2157.9098v52.4263"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M558.7501-2105.2543l-1.7501 5-1.7499-5.0001 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M559-2124v-10h44v10h-44z"/>
+      <text x="559" y="-2125.9" font-family="Times,serif" font-size="9">
+        635.91 kpps
+      </text>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M193-2157.9098v52.4263"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M194.7501-2105.2543l-1.7501 5-1.7499-5.0001 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M195-2124v-10h44v10h-44z"/>
+      <text x="195" y="-2125.9" font-family="Times,serif" font-size="9">
+        635.91 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="251.0076" y="-1474.2" font-family="Times,serif" font-size="12">
+        linkMerge
+      </text>
+      <text x="264.2568" y="-1461.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Merge
+      </text>
+      <path fill="none" stroke="#000" d="M245-1455v-32h62v32h-62z"/>
+    </g>
+    <g class="node">
+      <text x="255.3396" y="-1357.7" font-family="Times,serif" font-size="12">
+        pktParse
+      </text>
+      <text x="255.7581" y="-1345.4" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        GtpuParser
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M246-1332.5v-7h30v7h-30z"/>
+      <text x="259.5" y="-1334.1" font-family="Times,serif" font-size="6" fill="#fff">
+        0
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M276-1332.5v-7h30v7h-30z"/>
+      <text x="289.5" y="-1334.1" font-family="Times,serif" font-size="6" fill="#fff">
+        1
+      </text>
+      <path fill="none" stroke="#000" d="M245-1332v-39h62v39h-62z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M276-1454.8837v78.4036"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M277.7501-1376.3293L276-1371.3294l-1.7499-5 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M278-1408v-10h38v10h-38z"/>
+      <text x="277.7499" y="-1409.9" font-family="Times,serif" font-size="9">
+        1.27 Mpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="430.8368" y="-670.2" font-family="Times,serif" font-size="12">
+        outerIPCsum
+      </text>
+      <text x="439.5037" y="-657.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        IPChecksum
+      </text>
+      <path fill="none" stroke="#000" d="M428.5-651v-32h67v32h-67z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M461.8212-650.9098c-.1625 14.6271-.4035 36.3212-.5825 52.4263"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M462.9861-598.2346l-1.8055 4.9803-1.6942-5.0192 3.4997.0389z"/>
+      <path fill="#fff" stroke="transparent" d="M464-617v-10h44v10h-44z"/>
+      <text x="464" y="-618.9" font-family="Times,serif" font-size="9">
+        635.91 kpps
+      </text>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M462-740.9098v52.4263"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M463.7501-688.2543l-1.7501 5-1.7499-5.0001 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M464-707v-10h44v10h-44z"/>
+      <text x="464" y="-708.9" font-family="Times,serif" font-size="9">
+        635.91 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="339.8372" y="-1260.7" font-family="Times,serif" font-size="12">
+        pdrLookup
+      </text>
+      <text x="338.2625" y="-1248.4" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        WildcardMatch
+      </text>
+      <text x="327.5071" y="-1235.4" font-family="Times,serif" font-size="9">
+        8 fields, 100000 rules
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M327-1225.5v-7h27v7h-27z"/>
+      <text x="339" y="-1227.1" font-family="Times,serif" font-size="6" fill="#fff">
+        0
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M354-1225.5v-7h26v7h-26z"/>
+      <text x="365.5" y="-1227.1" font-family="Times,serif" font-size="6" fill="#fff">
+        1
+      </text>
+      <path fill="#01295f" stroke="transparent" d="M380-1225.5v-7h26v7h-26z"/>
+      <text x="391.5" y="-1227.1" font-family="Times,serif" font-size="6" fill="#fff">
+        2
+      </text>
+      <path fill="none" stroke="#000" d="M325.5-1225v-49h81v49h-81z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M367-1225.5v52.9983"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M368.7501-1172.2771l-1.7501 5-1.7499-5h3.5z"/>
+      <path fill="#fff" stroke="transparent" d="M369-1191v-10h44v10h-44z"/>
+      <text x="369" y="-1192.9" font-family="Times,serif" font-size="9">
+        635.91 kpps
+      </text>
+    </g>
+    <g class="node">
+      <text x="434.5036" y="-1154.2" font-family="Times,serif" font-size="12">
+        pdrLookupFail
+      </text>
+      <text x="462.2479" y="-1141.9" font-family="Times,serif" font-style="italic" font-size="9" fill="#888">
+        Sink
+      </text>
+      <path fill="none" stroke="#000" d="M432.5-1135v-32h75v32h-75z"/>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M393-1225.5c0 15.2817 14.8627 12.0362 26 22.5 10.9019 10.2427 22.6185 22.1229 32.069 31.9401"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M452.5076-1172.0882l2.1979 4.82-4.724-2.3973 2.5261-2.4227z"/>
+      <path fill="#fff" stroke="transparent" d="M436.5-1191v-10h19v10h-19z"/>
+      <text x="436.375" y="-1192.9" font-family="Times,serif" font-size="9">
+        0 pps
+      </text>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M340-1225.5c0 37.3604-48.334 20.5828-64 54.5-7.4546 16.1393-7.4962 23.88 0 40 9.7396 20.9443 28.527 38.1383 46.3399 50.7552"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M323.7215-1081.4174l3.12 4.2812-5.1088-1.4012 1.9888-2.88z"/>
+      <path fill="#fff" stroke="transparent" d="M278.5-1146v-10h39v10h-39z"/>
+      <text x="278.25" y="-1147.9" font-family="Times,serif" font-size="9">
+        635.9 kpps
+      </text>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M261-1332.5c0 20.845-.3193 44.6325-.597 61.3823"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M262.1461-1270.6909l-1.8352 4.9694-1.6643-5.0292 3.4995.0598z"/>
+      <path fill="#fff" stroke="transparent" d="M263.5-1298v-10h19v10h-19z"/>
+      <text x="263.375" y="-1299.9" font-family="Times,serif" font-size="9">
+        0 pps
+      </text>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M291-1332.5c0 22.0218 14.7142 40.8189 31.1077 54.9276"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M323.5756-1278.6282l2.7283 4.5409-4.9646-1.8484 2.2363-2.6925z"/>
+      <path fill="#fff" stroke="transparent" d="M306-1298v-10h38v10h-38z"/>
+      <text x="305.7499" y="-1299.9" font-family="Times,serif" font-size="9">
+        1.27 Mpps
+      </text>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M500.6058-363.9164c37.931 17.1592 90.7693 41.0623 125.9777 56.9899"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M627.3821-308.486l3.8342 3.6553-5.2768-.4665 1.4426-3.1888z"/>
+      <path fill="#fff" stroke="transparent" d="M579-330v-10h44v10h-44z"/>
+      <text x="579" y="-331.9" font-family="Times,serif" font-size="9">
+        635.89 kpps
+      </text>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M321-363.9164v52.8098"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M322.7501-311.008l-1.7501 5-1.7499-5.0001 3.5.0001z"/>
+      <path fill="#fff" stroke="transparent" d="M323-330v-10h44v10h-44z"/>
+      <text x="323" y="-331.9" font-family="Times,serif" font-size="9">
+        635.89 kpps
+      </text>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M365-1034.8055v52.4217"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M366.7501-982.3083l-1.7501 5-1.7499-5h3.5z"/>
+      <path fill="#fff" stroke="transparent" d="M367-1001v-10h38v10h-38z"/>
+      <text x="366.7499" y="-1002.9" font-family="Times,serif" font-size="9">
+        1.27 Mpps
+      </text>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M70.4718-1571.5961c43.9461 21.5095 123.4818 60.4384 169.6662 83.0434"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M241.054-1490.0528l3.7215 3.7699-5.2602-.6263 1.5387-3.1436z"/>
+      <path fill="#fff" stroke="transparent" d="M195.5-1524v-10h39v10h-39z"/>
+      <text x="195.25" y="-1525.9" font-family="Times,serif" font-size="9">
+        635.9 kpps
+      </text>
+    </g>
+    <g class="edge">
+      <path fill="none" stroke="#ffb30f" d="M283.7486-1570.8707c-1.5829 20.402-4.3141 55.6044-6.0751 78.301"/>
+      <path fill="#ffb30f" stroke="#ffb30f" d="M279.4014-1492.2159l-2.1316 4.8496-1.3579-5.1204 3.4895.2708z"/>
+      <path fill="#fff" stroke="transparent" d="M284-1524v-10h44v10h-44z"/>
+      <text x="284" y="-1525.9" font-family="Times,serif" font-size="9">
+        635.89 kpps
+      </text>
+    </g>
+  </g>
+</svg>
