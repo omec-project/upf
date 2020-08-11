@@ -42,7 +42,7 @@ jobs:
           shfmt -l -w $(shfmt -f . | grep -v vendor/)
       - name: Go Format
         run: |
-          gofmt -s -l -w $(gofmt -s -l . | grep -v vendor/)
+          go fmt
 
       - name: Show all CI changes
         run: |
