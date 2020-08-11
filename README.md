@@ -5,6 +5,8 @@ Copyright(c) 2019 Intel Corporation
 
 # upf-epc
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/omec-project/upf-epc)](https://goreportcard.com/report/github.com/omec-project/upf-epc)
+
 ## Overview
 
 UPF-EPC is a revised version of [ngic-rtc](https://github.com/omec-project/ngic-rtc/tree/central-cp-multi-upfs)'s [dp](https://github.com/omec-project/ngic-rtc/tree/central-cp-multi-upfs/dp).
