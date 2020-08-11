@@ -114,6 +114,8 @@ func main() {
 	accessIP := ParseIP(conf.AccessIface.IfName, "Access")
 	coreIP := ParseIP(conf.CoreIface.IfName, "Core")
 	n4SrcIP := net.ParseIP("0.0.0.0")
+  n4DstIP := net.ParseIP("0.0.0.0")
+  
 
 	// fetch fqdn. Prefer json field
 	fqdnh := conf.CPIface.FQDNHost
@@ -156,8 +158,8 @@ func main() {
 
 	if conf.CPIface.SrcIP == "" {
 		if conf.CPIface.DestIP != "" {
-			n4SrcIP = getOutboundIP(conf.CPIface.DestIP)
-		}
+	    n4SrcIP, n4DstIP := getOutboundIP(conf.CPIface.DestIP)
+    }
 	} else {
 		addrs, err := net.LookupHost(conf.CPIface.SrcIP)
 		if err == nil {
@@ -165,9 +167,10 @@ func main() {
 		}
 	}
 
-	log.Println("N4 IP: ", n4SrcIP.String())
-
-	go pfcpifaceMainLoop(upf, accessIP.String(), n4SrcIP.String())
+	log.Println("N4 local IP: ", n4SrcIP.String())
+	log.Println("N4 remote IP: ", n4DstIP.String())
+	
+	go pfcpifaceMainLoop(upf, n3IP.String(), n4SrcIP.String(), n4DstIP.String())
 
 	setupProm(upf)
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))
