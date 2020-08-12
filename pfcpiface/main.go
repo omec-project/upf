@@ -162,9 +162,9 @@ func main() {
 		}
 	} else {
 		addrs, err := net.LookupHost(conf.CPIface.SrcIP)
-			if err == nil {
-				n4SrcIP = net.ParseIP(addrs[0])
-			}
+		if err == nil {
+			n4SrcIP = net.ParseIP(addrs[0])
+		}
 	}
 
 	log.Println("N4 local IP: ", n4SrcIP.String())

@@ -111,7 +111,6 @@ func pfcpifaceMainLoop(upf *upf, accessIP string, sourceIP string, smfIP string)
 			cpConnected = true
 		case message.MsgTypeAssociationSetupResponse:
 			cpConnected = handleAssociationSetupResponse(msg, addr, sourceIP, accessIP)
-			cpConnected = true
 		case message.MsgTypeSessionEstablishmentRequest:
 			outgoingMessage = handleSessionEstablishmentRequest(upf, msg, addr, sourceIP)
 		case message.MsgTypeSessionModificationRequest:
@@ -183,9 +182,9 @@ func handleAssociationSetupResponse(msg message.Message, addr net.Addr, sourceIP
 		log.Println("Got an association setup response with invalid TS: ", err, " from: ", addr)
 		return false
 	}
-	log.Println("Got an association setup response with TS: ", ts, " from: ", addr)
+	log.Println("Received a PFCP association setup response with TS: ", ts, " from: ", addr)
 
-	log.Println("Association formed with Control Plane - ", addr)
+	log.Println("PFCP Association formed with Control Plane - ", addr)
 
 	return true
 }
