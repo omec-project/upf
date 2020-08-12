@@ -31,6 +31,7 @@ var sessions map[uint64]sessRecord
 
 func pfcpifaceMainLoop(upf *upf, accessIP string, sourceIP string, smfIP string) {
 	log.Println("pfcpifaceMainLoop@" + upf.fqdnHost + " says hello!!!")
+	cpConnectedMsg := make(chan bool)
 
 	// Verify IP + Port binding
 	laddr, err := net.ResolveUDPAddr("udp", sourceIP+":"+PFCPPort)
@@ -59,7 +60,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP string, sourceIP string, smfIP string)
 
 	//initiate connection if smf address available
 	if smfIP != "0.0.0.0" {
-		go initiateAssociationSetupRequest(sourceIP, accessIP, smfIP, conn)
+		go initiateAssociationSetupRequest(sourceIP, accessIP, smfIP, conn, cpConnectedMsg)
 	}
 
 	// Initialize pkt buf
@@ -108,8 +109,10 @@ func pfcpifaceMainLoop(upf *upf, accessIP string, sourceIP string, smfIP string)
 		case message.MsgTypeAssociationSetupRequest:
 			outgoingMessage = handleAssociationSetupRequest(msg, addr, sourceIP, accessIP)
 			cpConnected = true
+			cpConnectedMsg <- cpConnected
 		case message.MsgTypeAssociationSetupResponse:
 			cpConnected = handleAssociationSetupResponse(msg, addr, sourceIP, accessIP)
+			cpConnectedMsg <- cpConnected
 		case message.MsgTypeSessionEstablishmentRequest:
 			outgoingMessage = handleSessionEstablishmentRequest(upf, msg, addr, sourceIP)
 		case message.MsgTypeSessionModificationRequest:
@@ -184,7 +187,6 @@ func handleAssociationSetupResponse(msg message.Message, addr net.Addr, sourceIP
 	log.Println("Received a PFCP association setup response with TS: ", ts, " from: ", addr)
 
 	log.Println("PFCP Association formed with Control Plane - ", addr)
-
 	return true
 }
 
@@ -379,7 +381,9 @@ func handleSessionDeletionRequest(upf *upf, msg message.Message, addr net.Addr, 
 	return smres
 }
 
-func initiateAssociationSetupRequest(sourceIP string, n3ip string, n4DstIp string, conn *net.UDPConn) {
+func initiateAssociationSetupRequest(sourceIP string, n3ip string, n4DstIp string, conn *net.UDPConn, ch chan bool) {
+	c1 := make(chan int, 1)
+	numRetransmissions := 0
 	for {
 		// Build request message
 		asreq, err := message.NewAssociationSetupRequest(ie.NewRecoveryTimeStamp(time.Now()),
@@ -400,6 +404,27 @@ func initiateAssociationSetupRequest(sourceIP string, n3ip string, n4DstIp strin
 
 		if _, err := conn.WriteTo(asreq, smfAddr); err != nil {
 			log.Fatalln("Unable to transmit association setup request ", err)
+		}
+		go func() {
+			time.Sleep(2 * time.Second)
+			c1 <- 1
+		}()
+
+		msg := false
+		select {
+		case msg = <-ch:
+			log.Println("Received response from CP ", msg)
+		case <-c1:
+			numRetransmissions++
+		}
+		if msg == true {
+			log.Println("CP Connected ", msg)
+			return
+		} else if numRetransmissions >= 10 {
+			log.Println("Numer of retransmissions exceeded ")
+			return
+		} else {
+			log.Println("No response from CP. Retry pfcp setup ")
 		}
 	}
 }
