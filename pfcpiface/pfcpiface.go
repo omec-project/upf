@@ -29,7 +29,6 @@ type sessRecord struct {
 
 var sessions map[uint64]sessRecord
 
-
 func pfcpifaceMainLoop(upf *upf, accessIP string, sourceIP string) {
 	log.Println("pfcpifaceMainLoop@" + upf.fqdnHost + " says hello!!!")
 
@@ -353,5 +352,3 @@ func handleSessionDeletionRequest(upf *upf, msg message.Message, addr net.Addr, 
 
 	return smres
 }
-
-

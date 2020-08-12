@@ -100,7 +100,6 @@ func ParseIP(name string, iface string) net.IP {
 	return ip
 }
 
-
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
@@ -157,8 +156,8 @@ func main() {
 
 	if conf.CPIface.SrcIP == "" {
 		if conf.CPIface.DestIP != "" {
-	    n4SrcIP = getOutboundIP(conf.CPIface.DestIP)
-    }
+			n4SrcIP = getOutboundIP(conf.CPIface.DestIP)
+		}
 	} else {
 		addrs, err := net.LookupHost(conf.CPIface.SrcIP)
 		if err == nil {
@@ -166,7 +165,7 @@ func main() {
 		}
 	}
 
-	log.Println("N4 local IP: ", n4SrcIP.String())
+	log.Println("N4 IP: ", n4SrcIP.String())
 	go pfcpifaceMainLoop(upf, accessIP.String(), n4SrcIP.String())
 
 	setupProm(upf)
