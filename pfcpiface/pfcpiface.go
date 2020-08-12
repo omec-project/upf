@@ -58,6 +58,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP string, sourceIP string, smfIP string)
 		}
 	}
 
+	//initiate connection if smf address available 
 	if smfIP != "0.0.0.0" {
 		initiateAssociationSetupRequest(sourceIP, accessIP, smfIP, conn)
 	}
@@ -96,8 +97,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP string, sourceIP string, smfIP string)
 		// if sourceIP is not set, fetch it from the msg header
 		if sourceIP == "0.0.0.0" {
 			addrString := strings.Split(addr.String(), ":")
-			sIP, _ := getOutboundIP(addrString[0])
-			sourceIP = sIP.String()
+			sourceIP := getLocalIP(addrString[0]).String()
 			log.Println("Source IP address is now: ", sourceIP)
 		}
 
@@ -108,6 +108,9 @@ func pfcpifaceMainLoop(upf *upf, accessIP string, sourceIP string, smfIP string)
 		switch msg.MessageType() {
 		case message.MsgTypeAssociationSetupRequest:
 			outgoingMessage = handleAssociationSetupRequest(msg, addr, sourceIP, accessIP)
+			cpConnected = true
+		case message.MsgTypeAssociationSetupResponse:
+			cpConnected = handleAssociationSetupResponse(msg, addr, sourceIP, accessIP)
 			cpConnected = true
 		case message.MsgTypeSessionEstablishmentRequest:
 			outgoingMessage = handleSessionEstablishmentRequest(upf, msg, addr, sourceIP)
@@ -166,6 +169,25 @@ func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP 
 	log.Println("Sent association setup response to: ", addr)
 
 	return asres
+}
+
+func handleAssociationSetupResponse(msg message.Message, addr net.Addr, sourceIP string, accessIP string) bool {
+	asres, ok := msg.(*message.AssociationSetupResponse)
+	if !ok {
+		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
+		return false
+	}
+
+	ts, err := asres.RecoveryTimeStamp.RecoveryTimeStamp()
+	if err != nil {
+		log.Println("Got an association setup response with invalid TS: ", err, " from: ", addr)
+		return false
+	}
+	log.Println("Got an association setup response with TS: ", ts, " from: ", addr)
+
+	log.Println("Association formed with Control Plane - ", addr)
+
+	return true
 }
 
 func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceIP string, accessIP string) []byte {

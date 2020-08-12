@@ -157,7 +157,8 @@ func main() {
 
 	if conf.CPIface.SrcIP == "" {
 		if conf.CPIface.DestIP != "" {
-			n4SrcIP, n4DstIP = getOutboundIP(conf.CPIface.DestIP)
+			n4SrcIP = getLocalIP(conf.CPIface.DestIP)
+			n4DstIP = getRemoteIP(conf.CPIface.DestIP)
 		}
 	} else {
 		addrs, err := net.LookupHost(conf.CPIface.SrcIP)
