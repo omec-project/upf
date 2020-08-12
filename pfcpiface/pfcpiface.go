@@ -29,7 +29,6 @@ type sessRecord struct {
 
 var sessions map[uint64]sessRecord
 
-
 func pfcpifaceMainLoop(upf *upf, accessIP string, sourceIP string, smfIP string) {
 	log.Println("pfcpifaceMainLoop@" + upf.fqdnHost + " says hello!!!")
 
@@ -58,9 +57,9 @@ func pfcpifaceMainLoop(upf *upf, accessIP string, sourceIP string, smfIP string)
 		}
 	}
 
-	//initiate connection if smf address available 
+	//initiate connection if smf address available
 	if smfIP != "0.0.0.0" {
-		initiateAssociationSetupRequest(sourceIP, accessIP, smfIP, conn)
+		go initiateAssociationSetupRequest(sourceIP, accessIP, smfIP, conn)
 	}
 
 	// Initialize pkt buf
@@ -247,10 +246,10 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 
 	// Build response message
 	seres, err := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
-		0,                                    /* FO <-- what's this? */
-		fseid.SEID,                           /* seid */
-		sereq.SequenceNumber,                 /* seq # */
-		0,                                    /* priority */
+		0,                    /* FO <-- what's this? */
+		fseid.SEID,           /* seid */
+		sereq.SequenceNumber, /* seq # */
+		0,                    /* priority */
 		ie.NewNodeID(sourceIP, "", ""),       /* node id (IPv4) */
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 		ie.NewFSEID(peerSEID(fseid.SEID), net.ParseIP(sourceIP), nil, nil),
@@ -305,10 +304,10 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
 
 	// Build response message
 	smres, err := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */
-		0,                                    /* FO <-- what's this? */
-		(mySEID(smreq.SEID())),               /* seid */
-		smreq.SequenceNumber,                 /* seq # */
-		0,                                    /* priority */
+		0, /* FO <-- what's this? */
+		(mySEID(smreq.SEID())), /* seid */
+		smreq.SequenceNumber,   /* seq # */
+		0,                      /* priority */
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 		ie.NewFSEID(peerSEID(smreq.SEID()), net.ParseIP(sourceIP), nil, nil),
 	).Marshal()
@@ -364,10 +363,10 @@ func handleSessionDeletionRequest(upf *upf, msg message.Message, addr net.Addr, 
 
 	// Build response message
 	smres, err := message.NewSessionDeletionResponse(0, /* MO?? <-- what's this */
-		0,                                    /* FO <-- what's this? */
-		mySEID(sdreq.SEID()),                 /* seid */
-		sdreq.SequenceNumber,                 /* seq # */
-		0,                                    /* priority */
+		0,                    /* FO <-- what's this? */
+		mySEID(sdreq.SEID()), /* seid */
+		sdreq.SequenceNumber, /* seq # */
+		0,                    /* priority */
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 	).Marshal()
 
@@ -380,26 +379,27 @@ func handleSessionDeletionRequest(upf *upf, msg message.Message, addr net.Addr, 
 	return smres
 }
 
-
 func initiateAssociationSetupRequest(sourceIP string, n3ip string, n4DstIp string, conn *net.UDPConn) {
-	// Build request message
-	asreq, err := message.NewAssociationSetupRequest(ie.NewRecoveryTimeStamp(time.Now()),
-			ie.NewNodeID(sourceIP, "", ""),       /* node id (IPv4) */
+	for {
+		// Build request message
+		asreq, err := message.NewAssociationSetupRequest(ie.NewRecoveryTimeStamp(time.Now()),
+			ie.NewNodeID(sourceIP, "", ""), /* node id (IPv4) */
 			// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 			//      = 01000001
 			ie.NewUserPlaneIPResourceInformation(0x41, 0, n3ip, "", "", ie.SrcInterfaceAccess),
-			).Marshal() /* userplane ip resource info */
-	if err != nil {
-		log.Fatalln("Unable to create association setup response", err)
-	}
+		).Marshal() /* userplane ip resource info */
+		if err != nil {
+			log.Fatalln("Unable to create association setup response", err)
+		}
 
-	smfAddr, err := net.ResolveUDPAddr("udp", n4DstIp+":"+PFCPPort)
-	if err != nil {
-		log.Fatalln("Unable to resolve udp addr!", err)
-		return
-	}
+		smfAddr, err := net.ResolveUDPAddr("udp", n4DstIp+":"+PFCPPort)
+		if err != nil {
+			log.Fatalln("Unable to resolve udp addr!", err)
+			return
+		}
 
-	if _, err := conn.WriteTo(asreq, smfAddr); err != nil {
-		log.Fatalln("Unable to transmit association setup request ", err)
+		if _, err := conn.WriteTo(asreq, smfAddr); err != nil {
+			log.Fatalln("Unable to transmit association setup request ", err)
+		}
 	}
 }
