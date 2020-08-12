@@ -27,18 +27,15 @@ func hex2int(hexStr string) uint32 {
 	return uint32(result)
 }
 
-func getOutboundIP(dstIP string) (net.IP, net.IP)  {
+func getOutboundIP(dstIP string) (net.IP)  {
 	log.Println("SPGWC address IP: ", dstIP)
 	conn, err := net.Dial("udp", dstIP+":"+PFCPPort)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer conn.Close()
-    remoteAddr := conn.RemoteAddr().(*net.UDPAddr)
-	log.Println("SPGWC address IP: ", remoteAddr.IP.String())
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
-
-	return localAddr.IP, remoteAddr.IP
+	return localAddr.IP
 }
 
 func mySEID(peerSEID uint64) uint64 {
