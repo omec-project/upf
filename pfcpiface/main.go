@@ -166,6 +166,7 @@ func main() {
 	}
 
 	log.Println("N4 IP: ", n4SrcIP.String())
+
 	go pfcpifaceMainLoop(upf, accessIP.String(), n4SrcIP.String())
 
 	setupProm(upf)

@@ -27,8 +27,7 @@ func hex2int(hexStr string) uint32 {
 	return uint32(result)
 }
 
-func getOutboundIP(dstIP string) (net.IP)  {
-	log.Println("SPGWC address IP: ", dstIP)
+func getOutboundIP(dstIP string) net.IP  {
 	conn, err := net.Dial("udp", dstIP+":"+PFCPPort)
 	if err != nil {
 		log.Fatal(err)
