@@ -417,7 +417,7 @@ func initiateAssociationSetupRequest(sourceIP string, n3ip string, n4DstIp strin
 		case <-c1:
 			numRetransmissions++
 		}
-		if msg == true {
+		if msg {
 			log.Println("CP Connected ", msg)
 			return
 		} else if numRetransmissions >= 10 {
