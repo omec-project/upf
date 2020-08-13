@@ -6,10 +6,41 @@ package main
 import (
 	"log"
 	"net"
+	"strconv"
+	"strings"
 
 	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
 )
+
+func parseFlowDesc(flowDesc string) (IPAddress string, Prefix int) {
+
+	var err error
+	token := strings.Split(flowDesc, " ")
+	//log.Println("IP Full String is:", token[4])
+	if token[4] == "" {
+		return "0.0.0.0", 0
+	}
+	addrString := strings.Split(token[4], "/")
+	for i := range addrString {
+		switch i {
+		case 0:
+			IPAddress = addrString[i]
+			if IPAddress == "any" {
+				return "0.0.0.0", 0
+			}
+		case 1:
+			Prefix, err = strconv.Atoi(addrString[i])
+			if err != nil {
+				return IPAddress, 0
+			}
+		default:
+			// do nothing
+		}
+	}
+
+	return IPAddress, Prefix
+}
 
 func parseCreatePDRPDI(pdi []*ie.IE) (srcIface uint8, teid uint32, ueIP4 net.IP) {
 	var err error
@@ -41,6 +72,16 @@ func parseCreatePDRPDI(pdi []*ie.IE) (srcIface uint8, teid uint32, ueIP4 net.IP)
 			}
 		case ie.SDFFilter:
 			// Do nothing for the time being
+			sdfFields, err := ie2.SDFFilter()
+			if err != nil {
+				log.Println("Unable to parse SDF filter!")
+			} else {
+				flowDesc := sdfFields.FlowDescription
+				if flowDesc != "" {
+					IPAddress, prefix := parseFlowDesc(flowDesc)
+					log.Println("Flow Description is:", IPAddress, prefix)
+				}
+			}
 		case ie.QFI:
 			// Do nothing for the time being
 		}
@@ -124,15 +165,15 @@ func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
 	return &pdrI
 }
 
-func parseCreateFAR(ie1 *ie.IE, fseid uint64, coreIP net.IP, dir uint8) *far {
-	return parseFAR(ie1, fseid, coreIP, "create", dir)
+func parseCreateFAR(ie1 *ie.IE, fseid uint64, coreIP net.IP) *far {
+	return parseFAR(ie1, fseid, coreIP, "create")
 }
 
-func parseUpdateFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP, dir uint8) *far {
-	return parseFAR(ie1, fseid, accessIP, "update", dir)
+func parseUpdateFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP) *far {
+	return parseFAR(ie1, fseid, accessIP, "update")
 }
 
-func parseFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP, fwdType string, dir uint8) *far {
+func parseFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP, fwdType string) *far {
 	farID, err := ie1.FARID()
 	if err != nil {
 		log.Println("Could not read FAR ID!")
@@ -144,6 +185,7 @@ func parseFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP, fwdType string, dir uin
 	coreIP4 := uint32(0)
 	tunnelType := uint8(0)
 	var ies2 []*ie.IE
+	var dir uint8 = 0xFF
 
 	if fwdType == "create" {
 		ies2, err = ie1.ForwardingParameters()
@@ -169,6 +211,17 @@ func parseFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP, fwdType string, dir uin
 			eNBIP = ip2int(outerheadercreationfields.IPv4Address)
 			coreIP4 = ip2int(accessIP)
 			tunnelType = uint8(1)
+		case ie.DestinationInterface:
+			destinationinterface, err := ie2.DestinationInterface()
+			if err != nil {
+				log.Println("Unable to parse DestinationInterface field")
+				continue
+			}
+			if destinationinterface == ie.DstInterfaceAccess {
+				dir = farForwardD
+			} else if destinationinterface == ie.DstInterfaceCore {
+				dir = farForwardU
+			}
 		}
 	}
 
@@ -207,7 +260,7 @@ func parsePDRFromPFCPSessEstReqPayload(upf *upf, sereq *message.SessionEstablish
 			}
 
 		case ie.CreateFAR:
-			if f := parseCreateFAR(ie1, fseid.SEID, upf.coreIP, farForwardU); f != nil {
+			if f := parseCreateFAR(ie1, fseid.SEID, upf.coreIP); f != nil {
 				fars = append(fars, *f)
 			}
 		}
