@@ -265,7 +265,7 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
 		for _, ie1 := range ies1 {
 			switch ie1.Type {
 			case ie.UpdateFAR:
-				if f := parseUpdateFAR(ie1, fseid, upf.accessIP, farForwardD); f != nil {
+				if f := parseUpdateFAR(ie1, fseid, upf.accessIP); f != nil {
 					fars = append(fars, *f)
 				}
 			default:
