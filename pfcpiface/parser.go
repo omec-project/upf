@@ -6,44 +6,46 @@ package main
 import (
 	"log"
 	"net"
-	"strconv"
 	"strings"
 
 	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
 )
 
-func parseFlowDesc(flowDesc string) (IPAddress string, Prefix int) {
+func parseFlowDesc(flowDesc string) (IP4AddressNet string) {
 
 	var err error
+	var prefix string
+
 	token := strings.Split(flowDesc, " ")
 	//log.Println("IP Full String is:", token[4])
 	if token[4] == "" {
-		return "0.0.0.0", 0
+		return "0.0.0.0/0"
 	}
 	addrString := strings.Split(token[4], "/")
 	for i := range addrString {
 		switch i {
 		case 0:
-			IPAddress = addrString[i]
-			if IPAddress == "any" {
-				return "0.0.0.0", 0
+			IP4AddressNet = addrString[i]
+			if IP4AddressNet == "any" {
+				return "0.0.0.0/0"
 			}
 		case 1:
-			Prefix, err = strconv.Atoi(addrString[i])
+			prefix = addrString[i]
 			if err != nil {
-				return IPAddress, 0
+				return IP4AddressNet + "/32"
 			}
 		default:
 			// do nothing
 		}
 	}
 
-	return IPAddress, Prefix
+	return IP4AddressNet + "/" + prefix
 }
 
-func parseCreatePDRPDI(pdi []*ie.IE) (srcIface uint8, teid uint32, ueIP4 net.IP) {
+func parseCreatePDRPDI(pdi []*ie.IE) (srcIface uint8, teid uint32, ueIP4 net.IP, inetIP4Address string) {
 	var err error
+	inetIP4Address = "0.0.0.0/0"
 
 	for _, ie2 := range pdi {
 		switch ie2.Type {
@@ -78,21 +80,22 @@ func parseCreatePDRPDI(pdi []*ie.IE) (srcIface uint8, teid uint32, ueIP4 net.IP)
 			} else {
 				flowDesc := sdfFields.FlowDescription
 				if flowDesc != "" {
-					IPAddress, prefix := parseFlowDesc(flowDesc)
-					log.Println("Flow Description is:", IPAddress, prefix)
+					inetIP4Address := parseFlowDesc(flowDesc)
+					log.Println("Flow Description is:", inetIP4Address)
 				}
 			}
 		case ie.QFI:
 			// Do nothing for the time being
 		}
 	}
-	return srcIface, teid, ueIP4
+	return srcIface, teid, ueIP4, inetIP4Address
 }
 
 func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
 	var srcIface uint8
 	var teid uint32
 	var ueIP4 net.IP
+	var inetIP4Address string
 
 	/* reset outerHeaderRemoval to begin with */
 	outerHeaderRemoval := uint8(0)
@@ -118,7 +121,7 @@ func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
 	}
 
 	// parse PDI IE and fetch srcIface, teid, and ueIPv4Address
-	srcIface, teid, ueIP4 = parseCreatePDRPDI(pdi)
+	srcIface, teid, ueIP4, inetIP4Address = parseCreatePDRPDI(pdi)
 
 	farID, err := ie1.FARID()
 	if err != nil {
@@ -138,6 +141,22 @@ func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
 		ueIPMask = 0xFFFFFFFF
 	}
 
+	var dstIP uint32
+	var dstIPMask uint32
+	dstIP4, dstIP4Net, err := net.ParseCIDR(inetIP4Address)
+	if err != nil {
+		log.Println("Failed to parse inet IP address!, inetIP4Address:", inetIP4Address)
+		dstIP4 = net.IP("0.0.0.0")
+	}
+
+	if len(dstIP4) == 0 {
+		dstIP = 0
+		dstIPMask = 0
+	} else {
+		dstIP = ip2int(dstIP4)
+		dstIPMask = ip2int(dstIP4Net.IP)
+	}
+
 	pdrI := pdr{
 		pdrID:     uint32(pdrID),
 		fseID:     uint32(fseid.SEID), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
@@ -149,15 +168,19 @@ func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
 	if srcIface == ie.SrcInterfaceAccess {
 		pdrI.srcIface = access
 		pdrI.eNBTeid = teid
+		pdrI.srcIP = dstIP
 		pdrI.dstIP = ueIP
 		pdrI.srcIfaceMask = 0xFF
 		pdrI.eNBTeidMask = 0xFFFFFFFF
+		pdrI.srcIPMask = dstIPMask
 		pdrI.dstIPMask = ueIPMask
 	} else if srcIface == ie.SrcInterfaceCore {
 		pdrI.srcIface = core
 		pdrI.srcIP = ueIP
+		pdrI.dstIP = dstIP
 		pdrI.srcIfaceMask = 0xFF
 		pdrI.srcIPMask = ueIPMask
+		pdrI.dstIPMask = dstIPMask
 	} else {
 		return nil
 	}
