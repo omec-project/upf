@@ -80,7 +80,7 @@ func parseCreatePDRPDI(pdi []*ie.IE) (srcIface uint8, teid uint32, ueIP4 net.IP,
 			} else {
 				flowDesc := sdfFields.FlowDescription
 				if flowDesc != "" {
-					inetIP4Address := parseFlowDesc(flowDesc)
+					inetIP4Address = parseFlowDesc(flowDesc)
 					log.Println("Flow Description is:", inetIP4Address)
 				}
 			}
@@ -149,7 +149,7 @@ func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
 		dstIP4 = net.IP("0.0.0.0")
 	}
 
-	if len(dstIP4) == 0 {
+	if dstIP4.String() == "0.0.0.0" {
 		dstIP = 0
 		dstIPMask = 0
 	} else {
