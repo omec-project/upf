@@ -27,6 +27,12 @@ func hex2int(hexStr string) uint32 {
 	return uint32(result)
 }
 
+func int2ip(nn uint32) net.IP {
+	ip := make(net.IP, 4)
+	binary.BigEndian.PutUint32(ip, nn)
+	return ip
+}
+
 func getOutboundIP(dstIP string) net.IP {
 	conn, err := net.Dial("udp", dstIP+":"+PFCPPort)
 	if err != nil {

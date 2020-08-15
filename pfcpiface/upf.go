@@ -82,6 +82,32 @@ type far struct {
 	UDPGTPUPort uint16
 }
 
+func printPDR(pdr pdr) {
+	log.Println("------------------ PDR ---------------------")
+	log.Println("Src Iface:", pdr.srcIface)
+	log.Println("tunnelIP4Dst:", int2ip(pdr.tunnelIP4Dst))
+	log.Println("eNBTeid:", pdr.eNBTeid)
+	log.Println("srcIP:", int2ip(pdr.srcIP))
+	log.Println("dstIP:", int2ip(pdr.dstIP))
+	log.Println("srcPort:", pdr.srcPort)
+	log.Println("dstPort:", pdr.dstPort)
+	log.Println("proto:", pdr.proto)
+	log.Println("Src Iface Mask:", pdr.srcIfaceMask)
+	log.Println("tunnelIP4Dst Mask:", int2ip(pdr.tunnelIP4DstMask))
+	log.Println("eNBTeid Mask:", pdr.eNBTeidMask)
+	log.Println("srcIP Mask:", int2ip(pdr.srcIPMask))
+	log.Println("dstIP Mask:", int2ip(pdr.dstIPMask))
+	log.Println("srcPort Mask:", pdr.srcPortMask)
+	log.Println("dstPort Mask:", pdr.dstPortMask)
+	log.Println("proto Mask:", pdr.protoMask)
+	log.Println("pdrID:", pdr.pdrID)
+	log.Println("fseID", pdr.fseID)
+	log.Println("ctrID:", pdr.ctrID)
+	log.Println("farID:", pdr.farID)
+	log.Println("needDecap:", pdr.needDecap)
+	log.Println("--------------------------------------------")
+}
+
 var intEnc = func(u uint64) *pb.FieldData {
 	return &pb.FieldData{Encoding: &pb.FieldData_ValueInt{ValueInt: u}}
 }
