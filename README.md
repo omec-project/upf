@@ -5,6 +5,8 @@ Copyright(c) 2019 Intel Corporation
 
 # upf-epc
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/omec-project/upf-epc)](https://goreportcard.com/report/github.com/omec-project/upf-epc)
+
 ## Overview
 
 UPF-EPC is a revised version of [ngic-rtc](https://github.com/omec-project/ngic-rtc/tree/central-cp-multi-upfs)'s [dp](https://github.com/omec-project/ngic-rtc/tree/central-cp-multi-upfs/dp).
@@ -43,8 +45,8 @@ reading from file /tmp/tmpUBTGau, link-type EN10MB (Ethernet)
 ```
 
 * Visualize your dataplane pipeline
-<img src="https://ibin.co/50MaB2FZdlsz.png">
-<!--![](docs/images/bess_snip2.png)-->
+
+![Pipeline](docs/images/pipeline.svg)
 
 ## Demo
 
