@@ -16,11 +16,11 @@ type HeartbeatResponse struct {
 }
 
 // NewHeartbeatResponse creates a new HeartbeatResponse.
-func NewHeartbeatResponse(ts *ie.IE, ies ...*ie.IE) *HeartbeatResponse {
+func NewHeartbeatResponse(seq uint32, ts *ie.IE, ies ...*ie.IE) *HeartbeatResponse {
 	m := &HeartbeatResponse{
 		Header: NewHeader(
 			1, 0, 0, 0,
-			MsgTypeHeartbeatResponse, 0, 0, 0,
+			MsgTypeHeartbeatResponse, 0, seq, 0,
 			nil,
 		),
 		RecoveryTimeStamp: ts,

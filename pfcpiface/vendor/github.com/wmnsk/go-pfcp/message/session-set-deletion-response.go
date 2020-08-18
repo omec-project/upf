@@ -18,11 +18,11 @@ type SessionSetDeletionResponse struct {
 }
 
 // NewSessionSetDeletionResponse creates a new SessionSetDeletionResponse.
-func NewSessionSetDeletionResponse(id, cause, offending *ie.IE, ies ...*ie.IE) *SessionSetDeletionResponse {
+func NewSessionSetDeletionResponse(seq uint32, id, cause, offending *ie.IE, ies ...*ie.IE) *SessionSetDeletionResponse {
 	m := &SessionSetDeletionResponse{
 		Header: NewHeader(
 			1, 0, 0, 0,
-			MsgTypeSessionSetDeletionResponse, 0, 0, 0,
+			MsgTypeSessionSetDeletionResponse, 0, seq, 0,
 			nil,
 		),
 		NodeID:      id,
