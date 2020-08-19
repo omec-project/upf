@@ -29,7 +29,7 @@ type sessRecord struct {
 
 var sessions map[uint64]sessRecord
 
-func pfcpifaceMainLoop(upf *upf, accessIP string, sourceIP string) {
+func pfcpifaceMainLoop(upf *upf, accessIP string, coreIP string, sourceIP string) {
 	log.Println("pfcpifaceMainLoop@" + upf.fqdnHost + " says hello!!!")
 
 	// Verify IP + Port binding
@@ -101,7 +101,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP string, sourceIP string) {
 		var outgoingMessage []byte
 		switch msg.MessageType() {
 		case message.MsgTypeAssociationSetupRequest:
-			outgoingMessage = handleAssociationSetupRequest(msg, addr, sourceIP, accessIP)
+			outgoingMessage = handleAssociationSetupRequest(msg, addr, sourceIP, accessIP, coreIP)
 			cpConnected = true
 		case message.MsgTypeSessionEstablishmentRequest:
 			outgoingMessage = handleSessionEstablishmentRequest(upf, msg, addr, sourceIP)
@@ -129,7 +129,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP string, sourceIP string) {
 	}
 }
 
-func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP string, accessIP string) []byte {
+func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP string, accessIP string, coreIP string) []byte {
 	asreq, ok := msg.(*message.AssociationSetupRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -152,6 +152,8 @@ func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP 
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
 		ie.NewUserPlaneIPResourceInformation(0x41, 0, accessIP, "", "", ie.SrcInterfaceAccess),
+		ie.NewUserPlaneIPResourceInformation(0x41, 0, coreIP, "", "", ie.SrcInterfaceCore),
+		ie.NewSequenceNumber(asreq.SequenceNumber), /* seq # */
 	).Marshal() /* userplane ip resource info */
 	if err != nil {
 		log.Fatalln("Unable to create association setup response", err)
