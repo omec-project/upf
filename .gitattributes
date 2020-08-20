@@ -1,2 +1,4 @@
 *       text    eol=lf
 *.bess  text    diff=python
+*.pcap  binary
+*.bytes binary
