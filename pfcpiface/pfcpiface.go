@@ -381,8 +381,8 @@ func handleSessionDeletionRequest(upf *upf, msg message.Message, addr net.Addr, 
 	return smres
 }
 
-func initiateAssociationSetupRequest(sourceIP string, n3ip string, n4DstIp string, conn *net.UDPConn, ch chan bool) {
-	c1 := make(chan int, 1)
+func initiateAssociationSetupRequest(sourceIP string, n3ip string, n4DstIp string, conn *net.UDPConn, rspReceived chan bool) {
+	timeout := make(chan int, 1)
 	numRetransmissions := 0
 	for {
 		// Build request message
@@ -407,24 +407,22 @@ func initiateAssociationSetupRequest(sourceIP string, n3ip string, n4DstIp strin
 		}
 		go func() {
 			time.Sleep(2 * time.Second)
-			c1 <- 1
+			timeout <- 1
 		}()
 
 		msg := false
 		select {
-		case msg = <-ch:
-			log.Println("Received response from CP ", msg)
-		case <-c1:
+		case msg = <-rspReceived:
+			log.Println("Received response from CP. CP Connected ", msg)
+			return
+		case <-timeout:
 			numRetransmissions++
-		}
-		if msg {
-			log.Println("CP Connected ", msg)
-			return
-		} else if numRetransmissions >= 10 {
-			log.Println("Numer of retransmissions exceeded ")
-			return
-		} else {
-			log.Println("No response from CP. Retry pfcp setup ")
+			if numRetransmissions >= 10 {
+				log.Println("Number of retransmissions exceeded ")
+				return
+			} else {
+				log.Println("No response from CP. Retry pfcp setup ")
+			}
 		}
 	}
 }

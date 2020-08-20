@@ -34,7 +34,6 @@ func getRemoteIP(dstIP string) net.IP  {
 	}
 	defer conn.Close()
     remoteAddr := conn.RemoteAddr().(*net.UDPAddr)
-	log.Println("SPGWC/SMF address IP: ", remoteAddr.IP.String())
 
 	return remoteAddr.IP
 }
@@ -46,7 +45,6 @@ func getLocalIP(dstIP string) net.IP {
 	}
 	defer conn.Close()
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
-	log.Println("SPGWU/UPF address IP: ", localAddr.IP.String())
 	return localAddr.IP
 }
 

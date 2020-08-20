@@ -158,7 +158,9 @@ func main() {
 	if conf.CPIface.SrcIP == "" {
 		if conf.CPIface.DestIP != "" {
 			n4SrcIP = getLocalIP(conf.CPIface.DestIP)
+			log.Println("SPGWU/UPF address IP: ", n4SrcIP.String())
 			n4DstIP = getRemoteIP(conf.CPIface.DestIP)
+			log.Println("SPGWC/SMF address IP: ", n4DstIP.String())
 		}
 	} else {
 		addrs, err := net.LookupHost(conf.CPIface.SrcIP)
