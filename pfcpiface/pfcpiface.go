@@ -155,13 +155,13 @@ func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP 
 
 	// Build response message
 	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
-	asres, err := message.NewAssociationSetupResponse(ie.NewRecoveryTimeStamp(time.Now()),
+	asres, err := message.NewAssociationSetupResponse(asreq.SequenceNumber,
+		ie.NewRecoveryTimeStamp(time.Now()),
 		ie.NewNodeID(sourceIP, "", ""),       /* node id (IPv4) */
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
 		ie.NewUserPlaneIPResourceInformation(0x41, 0, accessIP, "", "", ie.SrcInterfaceAccess),
-		ie.NewSequenceNumber(asreq.SequenceNumber), /* seq # */
 	).Marshal() /* userplane ip resource info */
 	if err != nil {
 		log.Fatalln("Unable to create association setup response", err)
@@ -201,13 +201,13 @@ func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceI
 
 	// Build response message
 	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
-	arres, err := message.NewAssociationReleaseResponse(ie.NewRecoveryTimeStamp(time.Now()),
+	arres, err := message.NewAssociationReleaseResponse(arreq.SequenceNumber,
+		ie.NewRecoveryTimeStamp(time.Now()),
 		ie.NewNodeID(sourceIP, "", ""),       /* node id (IPv4) */
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
 		ie.NewUserPlaneIPResourceInformation(0x41, 0, accessIP, "", "", ie.SrcInterfaceAccess),
-		ie.NewSequenceNumber(arreq.SequenceNumber), /* seq # */
 	).Marshal() /* userplane ip resource info */
 	if err != nil {
 		log.Fatalln("Unable to create association release response", err)
@@ -333,8 +333,8 @@ func handleHeartbeatRequest(msg message.Message, addr net.Addr) []byte {
 	log.Println("Got a heartbeat request from: ", addr)
 
 	// Build response message
-	hbres, err := message.NewHeartbeatResponse(ie.NewRecoveryTimeStamp(time.Now()), /* ts */
-		ie.NewSequenceNumber(hbreq.SequenceNumber), /* seq # */
+	hbres, err := message.NewHeartbeatResponse(hbreq.SequenceNumber,
+		ie.NewRecoveryTimeStamp(time.Now()), /* ts */
 	).Marshal()
 
 	if err != nil {

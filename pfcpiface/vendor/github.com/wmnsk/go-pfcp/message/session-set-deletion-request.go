@@ -17,11 +17,11 @@ type SessionSetDeletionRequest struct {
 }
 
 // NewSessionSetDeletionRequest creates a new SessionSetDeletionRequest.
-func NewSessionSetDeletionRequest(id, csid *ie.IE, ies ...*ie.IE) *SessionSetDeletionRequest {
+func NewSessionSetDeletionRequest(seq uint32, id, csid *ie.IE, ies ...*ie.IE) *SessionSetDeletionRequest {
 	m := &SessionSetDeletionRequest{
 		Header: NewHeader(
 			1, 0, 0, 0,
-			MsgTypeSessionSetDeletionRequest, 0, 0, 0,
+			MsgTypeSessionSetDeletionRequest, 0, seq, 0,
 			nil,
 		),
 		NodeID: id,

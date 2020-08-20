@@ -18,11 +18,11 @@ type NodeReportResponse struct {
 }
 
 // NewNodeReportResponse creates a new NodeReportResponse.
-func NewNodeReportResponse(id, cause, offending *ie.IE, ies ...*ie.IE) *NodeReportResponse {
+func NewNodeReportResponse(seq uint32, id, cause, offending *ie.IE, ies ...*ie.IE) *NodeReportResponse {
 	m := &NodeReportResponse{
 		Header: NewHeader(
 			1, 0, 0, 0,
-			MsgTypeNodeReportResponse, 0, 0, 0,
+			MsgTypeNodeReportResponse, 0, seq, 0,
 			nil,
 		),
 		NodeID:      id,
