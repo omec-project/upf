@@ -1,0 +1,77 @@
+# Copyright (c) 2014-2016, The Regents of the University of California.
+# Copyright (c) 2016-2017, Nefeli Networks, Inc.
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+# list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+#
+# * Neither the names of the copyright holders nor the names of their
+# contributors may be used to endorse or promote products derived from this
+# software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+import os
+import random
+import scapy.all as scapy
+import string
+
+from socket import inet_aton as aton
+
+NUM_VMS = int($BESS_VMS!'1')
+NUM_VPORTS = int($BESS_PORTS!'2')
+NUM_QUEUES = int($BESS_QUEUES!'1')
+
+# QEMU 2.8 supports up to 1024, older versions are hardcoded with 256
+QSIZE = int($BESS_QSIZE!'1024')
+
+bess.add_worker(wid=0, core=0)
+bess.add_tc('nf_to_host', policy='round_robin', wid=0)
+
+kwargs = {'num_inc_q': NUM_QUEUES,
+          'num_out_q': NUM_QUEUES,
+          'size_inc_q': QSIZE,
+          'size_out_q': QSIZE}
+
+os.system('sudo mkdir -p /tmp/bessd')
+os.system('sudo rm -f /tmp/bessd/vhost_user*.sock')
+
+def build_udp(size):
+    eth = scapy.Ether(src='02:fe:00:00:00:01', dst='02:fe:00:00:00:02')
+    ip = scapy.IP(src='10.0.0.1', dst='10.0.0.2')
+    udp = scapy.UDP(sport=10001, dport=10002)
+    header = eth/ip/udp
+    payload = '0' * (size - len(header))
+    return bytes(header/payload)
+
+for i in range(NUM_VMS):
+    for j in range(NUM_VPORTS):
+        v = 'v{}_{}'.format(i, j)
+        vdev_str = 'eth_vhost_{},iface=/tmp/bessd/vhost_user{}_{}.sock,queues={}' \
+                .format(v, i, j, NUM_QUEUES)
+        p = PMDPort(name=v, vdev=vdev_str, num_inc_q=NUM_QUEUES, \
+                    num_out_q=NUM_QUEUES, size_inc_q=QSIZE, size_out_q=QSIZE)
+        for k in range(NUM_QUEUES):
+            # simply loopback
+            qinc = QueueInc(port=p, qid=k)
+            qinc -> QueueOut(port=p, qid=k)
+            qinc.attach_task(parent='nf_to_host')
+
+print('Now you can run either launch_vm.py or launch_container.py')

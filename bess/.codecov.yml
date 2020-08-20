@@ -1,0 +1,7 @@
+codecov:
+  branch: master  # base branch for delta computation
+
+ignore:           # files and folders to be ignored
+  - "*_test.cc$"
+  - "*_bench.cc$"
+  - "test_*.py"

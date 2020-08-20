@@ -1,0 +1,102 @@
+# Copyright (c) 2014-2016, The Regents of the University of California.
+# Copyright (c) 2016-2017, Nefeli Networks, Inc.
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+# list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+#
+# * Neither the names of the copyright holders nor the names of their
+# contributors may be used to endorse or promote products derived from this
+# software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+import time
+import pprint
+
+import scapy.all as scapy
+
+Source() -> rewrite::Rewrite() -> bpf::BPF()
+bpf:0 -> Sink()      # for unmatched packets
+bpf:1 -> Sink()      # for matched packets
+bpf:2 -> Sink()      # for matched packets (by the second filter)
+
+def run_testcase(exps, test_pkts):
+    rewrite.clear()
+    rewrite.add(templates=map(lambda x: bytes(x), test_pkts))
+
+    # the higher number, the higher priority.
+    bpf.clear()
+    bpf.add(filters=[{'priority': -i, 'filter': exp, 'gate': i + 1} \
+            for i, exp in enumerate(exps)])
+
+    bess.resume_all()
+
+    old_stats = bess.get_module_info(bpf.name).ogates
+    time.sleep(2)
+    new_stats = bess.get_module_info(bpf.name).ogates
+
+    pps_unmatched = \
+            (new_stats[0].pkts - old_stats[0].pkts) / \
+            (new_stats[0].timestamp - old_stats[0].timestamp)
+
+    pps_matched = sum([
+            ((new_stats[i+1].pkts - old_stats[i+1].pkts) / \
+             (new_stats[i+1].timestamp - old_stats[i+1].timestamp))
+            for i in range(len(exps))])
+
+    pps_total = pps_matched + pps_unmatched
+
+    print('Total: %8.3fMpps   Matched: %8.3fMpps   Unmatched: %8.3fMpps' %
+          (pps_total / 1000000.0,
+           pps_matched / 1000000.0,
+           pps_unmatched / 1000000.0))
+
+    bess.pause_all()
+
+udp_pkt   = scapy.Ether()/scapy.IP()/scapy.UDP()
+tcp_pkt   = scapy.Ether()/scapy.IP()/scapy.TCP()
+http_pkt1 = scapy.Ether()/scapy.IP()/scapy.TCP(sport=8080, dport=80)
+http_pkt2 = scapy.Ether()/scapy.IP()/scapy.TCP(sport=8081, dport=80)
+http_pkt3 = scapy.Ether()/scapy.IP()/scapy.TCP(sport=1234, dport=80)
+ftp_pkt   = scapy.Ether()/scapy.IP()/scapy.TCP(dport=21)
+
+testcases = [
+    ([''], [udp_pkt]),
+    ([''], [udp_pkt, tcp_pkt]),
+    (['udp'], [udp_pkt]),
+    (['udp'], [tcp_pkt]),
+    (['udp'], [udp_pkt, tcp_pkt]),
+    (['tcp dst port 80'], [http_pkt1, http_pkt2, http_pkt3, ftp_pkt]),
+    (['tcp src portrange 8000-9000 && tcp dst port 80'], [http_pkt1]),
+    (['tcp src portrange 8000-9000 && tcp dst port 80'], [http_pkt1, http_pkt2, http_pkt3]),
+    (['tcp src portrange 8000-9000 && tcp dst port 80'], [http_pkt1, http_pkt2, http_pkt3, ftp_pkt]),
+    (['tcp src portrange 8000-9000 && tcp dst port 80', 'tcp'], [http_pkt1, http_pkt2, http_pkt3, ftp_pkt, udp_pkt]),
+]
+
+for i, case in enumerate(testcases):
+    print()
+    print('Testcase %d: %s' % (i, ', '.join(case[0])))
+    pprint.pprint(case[1])
+
+print
+for i, case in enumerate(testcases):
+    print('Testcase %d:\t\t' % i, end=' ')
+    run_testcase(*case)
