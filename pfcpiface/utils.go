@@ -27,13 +27,13 @@ func hex2int(hexStr string) uint32 {
 	return uint32(result)
 }
 
-func getRemoteIP(dstIP string) net.IP  {
+func getRemoteIP(dstIP string) net.IP {
 	conn, err := net.Dial("udp", dstIP+":"+PFCPPort)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer conn.Close()
-    remoteAddr := conn.RemoteAddr().(*net.UDPAddr)
+	remoteAddr := conn.RemoteAddr().(*net.UDPAddr)
 
 	return remoteAddr.IP
 }

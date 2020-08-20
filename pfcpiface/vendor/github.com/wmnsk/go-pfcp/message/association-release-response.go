@@ -17,11 +17,11 @@ type AssociationReleaseResponse struct {
 }
 
 // NewAssociationReleaseResponse creates a new AssociationReleaseResponse.
-func NewAssociationReleaseResponse(id, cause *ie.IE, ies ...*ie.IE) *AssociationReleaseResponse {
+func NewAssociationReleaseResponse(seq uint32, id, cause *ie.IE, ies ...*ie.IE) *AssociationReleaseResponse {
 	m := &AssociationReleaseResponse{
 		Header: NewHeader(
 			1, 0, 0, 0,
-			MsgTypeAssociationReleaseResponse, 0, 0, 0,
+			MsgTypeAssociationReleaseResponse, 0, seq, 0,
 			nil,
 		),
 		NodeID: id,

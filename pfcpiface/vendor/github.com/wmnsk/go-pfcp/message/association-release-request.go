@@ -16,11 +16,11 @@ type AssociationReleaseRequest struct {
 }
 
 // NewAssociationReleaseRequest creates a new AssociationReleaseRequest.
-func NewAssociationReleaseRequest(id *ie.IE, ies ...*ie.IE) *AssociationReleaseRequest {
+func NewAssociationReleaseRequest(seq uint32, id *ie.IE, ies ...*ie.IE) *AssociationReleaseRequest {
 	m := &AssociationReleaseRequest{
 		Header: NewHeader(
 			1, 0, 0, 0,
-			MsgTypeAssociationReleaseRequest, 0, 0, 0,
+			MsgTypeAssociationReleaseRequest, 0, seq, 0,
 			nil,
 		),
 		NodeID: id,

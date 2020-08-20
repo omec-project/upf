@@ -17,11 +17,11 @@ type HeartbeatRequest struct {
 }
 
 // NewHeartbeatRequest creates a new HeartbeatRequest.
-func NewHeartbeatRequest(ts, ip *ie.IE, ies ...*ie.IE) *HeartbeatRequest {
+func NewHeartbeatRequest(seq uint32, ts, ip *ie.IE, ies ...*ie.IE) *HeartbeatRequest {
 	m := &HeartbeatRequest{
 		Header: NewHeader(
 			1, 0, 0, 0,
-			MsgTypeHeartbeatRequest, 0, 0, 0,
+			MsgTypeHeartbeatRequest, 0, seq, 0,
 			nil,
 		),
 		RecoveryTimeStamp: ts,
