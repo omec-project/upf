@@ -1,0 +1,48 @@
+# Copyright (c) 2016-2017, Nefeli Networks, Inc.
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+# list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+#
+# * Neither the names of the copyright holders nor the names of their
+# contributors may be used to endorse or promote products derived from this
+# software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+# Dummy UrlFilter example with HTTP packets
+
+import scapy.all as scapy
+
+eth = scapy.Ether(src='02:1e:67:9f:4d:ae', dst='06:16:3e:1b:72:32')
+ip = scapy.IP(src='192.168.0.1', dst='10.0.0.1')
+tcp = scapy.TCP(sport=10001, dport=80, seq=12345)
+payload = 'GET /pub/WWW/TheProject.html HTTP/1.1\r\nHost: www.google.com\r\n\r\n'
+pkt = bytes(eth/ip/tcp/payload)
+
+src::FlowGen(template=pkt, pps=2.2e6, flow_rate=800, flow_duration=5.0, \
+    arrival='uniform', duration='uniform', quick_rampup=False)
+
+blacklist_rules = [{'host': 'www.%d.com' % i, 'path': '/'} for i in range(100)]
+filter::UrlFilter(blacklist=blacklist_rules)
+
+src -> 0:filter
+filter:0 -> Sink()
+filter:1 -> Sink()

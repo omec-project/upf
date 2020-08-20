@@ -1,0 +1,100 @@
+#!/bin/bash
+
+: ${CXX_FORMAT:=clang-format}
+: ${PY_FORMAT:=autopep8}
+
+CXX_EXTS=".c .h .cpp .hpp .cc .hh .cxx .hxx"
+PY_EXTS=".py"
+
+command_exists() {
+	command -v $1 >/dev/null 2>&1
+}
+
+match_extension() {
+	local filename=$(basename $1)
+	local extension=".${filename##*.}"
+	local ext
+
+	for ext in $2; do [[ "$ext" == "$extension" ]] && return 0; done
+	return 1
+}
+
+get_patch() {
+	local reformatted=""
+	local file
+	patch=""
+
+	for file in $files; do
+		if match_extension $file "$CXX_EXTS"; then
+			reformatted=`$CXX_FORMAT -style=file $file`
+		elif match_extension $file "$PY_EXTS"; then
+			reformatted=`$PY_FORMAT $file`
+		else
+			continue
+		fi
+
+		# show colored version to the user
+		echo "$reformatted" | git --no-pager diff --no-index --color=always $file -
+
+		# ... and save non-colored patch for git-apply
+		file_diff=`echo "$reformatted" | diff -u $file - | \
+			   sed -e "1s|--- |--- a/|" -e "2s|+++ -|+++ b/$file|"`
+
+		# diff output does not have a linefeed at the end.
+		# We need one if there are multiple diff outputs.
+		if [[ ! -z $file_diff ]]; then
+			patch+=$file_diff
+			patch+=$'\n'
+		fi
+	done
+}
+
+apply_and_commit() {
+	# The "git add" we use below do not work with non-default index file,
+	# which is used by "git commit -a" or "git commit <files>"
+	if [[ $GIT_INDEX_FILE != ".git/index" ]]; then
+		echo "Error: Non-default index file is being used (GIT_INDEX_FILE is set)." >&2
+		echo "       Are you using 'git commit [--only] -- <files>' to bypass staging?" >&2
+		exit 1
+	fi
+
+	# Do some files have partial commits? (only some portion of a file is staged)
+	if [[ ! -z $(git diff -- $files) ]]; then
+		echo "Error: Partial commits are not supported." >&2
+		exit 1
+	fi
+
+	(echo "$patch" | git apply -)
+	git add -- $files
+}
+
+if ! command_exists $CXX_FORMAT; then
+	echo "Error: '$CXX_FORMAT' not found." >&2
+	echo "       Use '--no-verify' to bypass format checker (not recommended)" >&2
+	exit 1
+fi
+
+if ! command_exists $PY_FORMAT; then
+	echo "Error: '$PY_FORMAT' not found. Try 'pip install $PY_FORMAT'?" >&2
+	echo "       Use '--no-verify' to bypass format checker (not recommended)" >&2
+	exit 1
+fi
+
+# Allows us to read user input below, assigns stdin to keyboard
+exec < /dev/tty
+
+files=`git diff-index --cached --name-only HEAD`
+get_patch
+if [[ ! -z $patch ]]; then
+	echo "==========================================="
+	echo "Files in the commit do not comply with the formatting rules. Options:"
+	echo "y - commit without reformatting (not recommended)"
+	echo "r - apply the patch and commit"
+	echo "n - abort"
+	read -p "Do you want to commit anyway? [y/r/N] " yn
+	case $yn in
+		[Yy]* ) exit 0;;
+		[Rr]* ) apply_and_commit && exit 0;;
+		* ) exit 1;;
+	esac
+fi

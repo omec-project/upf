@@ -1,0 +1,95 @@
+# Copyright (c) 2014-2016, The Regents of the University of California.
+# Copyright (c) 2016-2017, Nefeli Networks, Inc.
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+# list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+#
+# * Neither the names of the copyright holders nor the names of their
+# contributors may be used to endorse or promote products derived from this
+# software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+import scapy.all as scapy
+import socket
+import struct
+
+def atoh(ip):
+    return socket.inet_aton(ip)
+
+# Craft a packet with the specified IP address and port number
+def gen_packet(dst_ip, dst_port):
+    eth = scapy.Ether(src='02:1e:67:9f:4d:ae', dst='06:16:3e:1b:72:32')
+    ip = scapy.IP(src='10.0.0.1', dst=dst_ip)
+    udp = scapy.UDP(sport=1234, dport=dst_port)
+    payload = 'helloworld'
+    pkt = eth/ip/udp/payload
+    return bytes(pkt)
+
+pkts = [gen_packet('172.16.100.1', 80),
+        gen_packet('172.12.55.99', 54321),
+        gen_packet('172.12.55.3', 8080),
+        gen_packet('172.16.100.1', 345),
+        gen_packet('172.12.55.99', 12345),
+        gen_packet('192.168.1.123', 80)]
+
+# destination IP address + destination port number + metadata 'in_port'
+wm::WildcardMatch(fields=[{'offset':30, 'num_bytes':4},
+                          {'offset':36, 'num_bytes':2},
+                          {'attr_name':'in_port', 'num_bytes':2}])
+
+# locally emulate two input ports
+Source() -> SetMetadata(attrs=[{'name': 'in_port', 'size': 2, 'value_int': 1}]) -> Rewrite(templates=pkts) -> wm
+Source() -> SetMetadata(attrs=[{'name': 'in_port', 'size': 2, 'value_int': 2}]) -> Rewrite(templates=pkts) -> wm
+
+wm:0 -> Sink()
+wm:1 -> Sink()
+wm:2 -> Sink()
+wm:3 -> Sink()
+wm:5 -> Sink()   # used as default gate
+
+wm.set_default_gate(gate=5)
+
+# 172.16.100.1/32, port 80, in_port 1
+wm.add(values=[{'value_bin':atoh('172.16.100.1')},  {'value_int':80}, {'value_int': 1}], gate=0,
+        masks=[{'value_bin':atoh('255.255.255.255')}, {'value_int':0xffff}, {'value_int':0xffff}], priority=3)
+
+# 172.12.55.99/32, in_port 2
+wm.add(values=[{'value_bin':atoh('172.12.55.99')}, {'value_int': 0}, {'value_int':  2}], gate=1,
+        masks=[{'value_bin':atoh('255.255.255.255')}, {'value_int': 0}, {'value_int':0xffff }], priority=1)
+
+# 172.12.55.3/32, in_port 1 (w/ the same wildcard pattern as the previous one)
+wm.add(values=[{'value_bin':atoh('172.12.55.3')},{'value_int': 0},  {'value_int':1} ], gate=2,
+        masks=[{'value_bin':atoh('255.255.255.255')},{'value_int':0x0000},{'value_int': 0xffff}], priority=0)
+
+# 172.0.0.0/8, port <= 1023
+wm.add(values=[{'value_bin':atoh('172.0.0.0')},{'value_int':0},{'value_int':0}], gate=2,
+        masks=[{'value_bin':atoh('255.0.0.0')},{'value_int': 0xfc00},{'value_int':0x0000}], priority=2)
+
+# port 80
+wm.add(values=[{'value_bin':atoh('0.0.0.0')}, {'value_int': 80}, {'value_int': 0}], gate=3,
+    masks=[{'value_bin':atoh('0.0.0.0')},{'value_int':0xffff},{'value_int':0x0000}], priority=0)
+
+# delete test
+wm.add(values=[{'value_bin':atoh('172.12.55.0')},{'value_int':0},{'value_int':0}], gate=0,
+    masks=[{'value_bin':atoh('255.255.255.0')},{'value_int': 0x0000},{'value_int':0x0000}], priority=4)
+wm.delete(values=[{'value_bin':atoh('172.12.55.0')},{'value_int': 0},{'value_int':  0}],
+    masks=[{'value_bin':atoh('255.255.255.0')}, {'value_int':0x0000},{'value_int': 0x0000}  ])
