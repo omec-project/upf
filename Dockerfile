@@ -23,10 +23,8 @@ RUN curl -L https://github.com/libbpf/libbpf/tarball/${LIBBPF_VER} | \
     ldconfig
 
 # BESS pre-reqs
+COPY bess /bess
 WORKDIR /bess
-ARG BESS_COMMIT=master
-RUN curl -L https://github.com/NetSys/bess/tarball/${BESS_COMMIT} | \
-    tar xz -C . --strip-components=1
 
 # Patch BESS, patch and build DPDK
 COPY patches/dpdk/* deps/
