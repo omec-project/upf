@@ -26,11 +26,11 @@ type AssociationSetupResponse struct {
 }
 
 // NewAssociationSetupResponse creates a new AssociationSetupResponse.
-func NewAssociationSetupResponse(ies ...*ie.IE) *AssociationSetupResponse {
+func NewAssociationSetupResponse(seq uint32, ies ...*ie.IE) *AssociationSetupResponse {
 	m := &AssociationSetupResponse{
 		Header: NewHeader(
 			1, 0, 0, 0,
-			MsgTypeAssociationSetupResponse, 0, 0, 0,
+			MsgTypeAssociationSetupResponse, 0, seq, 0,
 			nil,
 		),
 	}
