@@ -4,7 +4,11 @@
 
 package message
 
-import "io"
+import (
+	"io"
+
+	"github.com/wmnsk/go-pfcp/internal/logger"
+)
 
 // MessageType definitions.
 const (
@@ -105,6 +109,7 @@ func Parse(b []byte) (Message, error) {
 	case MsgTypeSessionReportResponse:
 		m = &SessionReportResponse{}
 	default:
+		logger.Logf("Parse() got an unknown type of message(Type=%d), parsing with *Generic.", b[1])
 		m = &Generic{}
 	}
 

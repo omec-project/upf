@@ -7,6 +7,8 @@ package ie
 import (
 	"encoding/binary"
 	"io"
+
+	"github.com/wmnsk/go-pfcp/internal/logger"
 )
 
 // IE Type definitions.
@@ -558,14 +560,22 @@ func newStringIE(t uint16, v string) *IE {
 
 func newGroupedIE(itype, eid uint16, ies ...*IE) *IE {
 	i := NewVendorSpecificIE(itype, eid, make([]byte, 0))
-	i.ChildIEs = ies
-	for _, ie := range i.ChildIEs {
+
+	for _, ie := range ies {
+		if ie == nil {
+			continue
+		}
+
+		i.ChildIEs = append(i.ChildIEs, ie)
+
 		serialized, err := ie.Marshal()
 		if err != nil {
+			logger.Logf("newGroupedIE() failed to marshal an IE(Type=%d): %v", ie.Type, err)
 			return nil
 		}
 		i.Payload = append(i.Payload, serialized...)
 	}
+
 	i.SetLength()
 
 	return i
