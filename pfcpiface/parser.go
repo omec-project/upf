@@ -43,7 +43,7 @@ func parseFlowDesc(flowDesc string) (IP4AddressNet string) {
 	return IP4AddressNet + "/" + prefix
 }
 
-func parseCreatePDRPDI(pdi []*ie.IE) (srcIface uint8, teid uint32, ueIP4 net.IP, inetIP4Address string) {
+func parseCreatePDRPDI(pdi []*ie.IE) (srcIface uint8, teid uint32, ueIP4 net.IP, inetIP4Address string, tunnelIPv4Address net.IP) {
 	var err error
 	inetIP4Address = "0.0.0.0/0"
 
@@ -64,6 +64,7 @@ func parseCreatePDRPDI(pdi []*ie.IE) (srcIface uint8, teid uint32, ueIP4 net.IP,
 				log.Println("Failed to parse FTEID IE")
 			} else {
 				teid = fteid.TEID
+				tunnelIPv4Address = fteid.IPv4Address
 			}
 		case ie.UEIPAddress:
 			ueip4, err := ie2.UEIPAddress()
@@ -88,7 +89,7 @@ func parseCreatePDRPDI(pdi []*ie.IE) (srcIface uint8, teid uint32, ueIP4 net.IP,
 			// Do nothing for the time being
 		}
 	}
-	return srcIface, teid, ueIP4, inetIP4Address
+	return srcIface, teid, ueIP4, inetIP4Address, tunnelIPv4Address
 }
 
 func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
@@ -96,6 +97,7 @@ func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
 	var teid uint32
 	var ueIP4 net.IP
 	var inetIP4Address string
+	var tunnelIPv4Address net.IP
 
 	/* reset outerHeaderRemoval to begin with */
 	outerHeaderRemoval := uint8(0)
@@ -121,7 +123,7 @@ func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
 	}
 
 	// parse PDI IE and fetch srcIface, teid, and ueIPv4Address
-	srcIface, teid, ueIP4, inetIP4Address = parseCreatePDRPDI(pdi)
+	srcIface, teid, ueIP4, inetIP4Address, tunnelIPv4Address = parseCreatePDRPDI(pdi)
 
 	farID, err := ie1.FARID()
 	if err != nil {
@@ -164,6 +166,15 @@ func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
 		farID:     uint8(farID),       // farID currently not being set <--- FIXIT/TODO/XXX
 		needDecap: outerHeaderRemoval,
 	}
+
+	if teid != 0 {
+		pdrI.eNBTeid = teid
+		pdrI.eNBTeidMask = 0xFFFFFFFF
+		pdrI.tunnelIP4Dst = ip2int(tunnelIPv4Address)
+		pdrI.tunnelIP4DstMask = 0xFFFFFFFF
+		log.Println("TunnelIPv4Address:", tunnelIPv4Address)
+	}
+
 	// populated everything for PDR, and set the right pdr_
 	if srcIface == ie.SrcInterfaceAccess {
 		pdrI.srcIface = access
@@ -279,6 +290,7 @@ func parsePDRFromPFCPSessEstReqPayload(upf *upf, sereq *message.SessionEstablish
 		switch ie1.Type {
 		case ie.CreatePDR:
 			if p := parseCreatePDR(ie1, fseid); p != nil {
+				printPDR(*p)
 				pdrs = append(pdrs, *p)
 			}
 
