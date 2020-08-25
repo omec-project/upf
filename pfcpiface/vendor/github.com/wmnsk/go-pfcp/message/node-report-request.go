@@ -21,11 +21,11 @@ type NodeReportRequest struct {
 }
 
 // NewNodeReportRequest creates a new NodeReportRequest.
-func NewNodeReportRequest(ies ...*ie.IE) *NodeReportRequest {
+func NewNodeReportRequest(seq uint32, ies ...*ie.IE) *NodeReportRequest {
 	m := &NodeReportRequest{
 		Header: NewHeader(
 			1, 0, 0, 0,
-			MsgTypeNodeReportRequest, 0, 0, 0,
+			MsgTypeNodeReportRequest, 0, seq, 0,
 			nil,
 		),
 	}

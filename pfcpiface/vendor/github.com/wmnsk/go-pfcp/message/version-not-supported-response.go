@@ -15,11 +15,11 @@ type VersionNotSupportedResponse struct {
 }
 
 // NewVersionNotSupportedResponse creates a new VersionNotSupportedResponse.
-func NewVersionNotSupportedResponse(ies ...*ie.IE) *VersionNotSupportedResponse {
+func NewVersionNotSupportedResponse(seq uint32, ies ...*ie.IE) *VersionNotSupportedResponse {
 	m := &VersionNotSupportedResponse{
 		Header: NewHeader(
 			1, 0, 0, 0,
-			MsgTypeVersionNotSupportedResponse, 0, 0, 0,
+			MsgTypeVersionNotSupportedResponse, 0, seq, 0,
 			nil,
 		),
 		IEs: ies,
