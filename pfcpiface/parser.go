@@ -43,19 +43,24 @@ func parseFlowDesc(flowDesc string) (IP4AddressNet string) {
 	return IP4AddressNet + "/" + prefix
 }
 
-func parseCreatePDRPDI(pdi []*ie.IE) (srcIface uint8, teid uint32, ueIP4 net.IP, inetIP4Address string, tunnelIPv4Address net.IP) {
-	var err error
-	inetIP4Address = "0.0.0.0/0"
+func parseCreatePDRPDI(pdi []*ie.IE) (pdrI pdr) {
+	inetIP4Address := "0.0.0.0/0"
 
 	for _, ie2 := range pdi {
 		switch ie2.Type {
 		case ie.SourceInterface:
-			srcIface, err = ie2.SourceInterface()
+			srcIface, err := ie2.SourceInterface()
 			if err != nil {
 				log.Println("Failed to parse Source Interface IE!")
 			} else {
 				if srcIface == ie.SrcInterfaceCPFunction {
 					log.Println("Detected src interface cp function. Ignoring for the time being")
+				} else if srcIface == ie.SrcInterfaceAccess {
+					pdrI.srcIface = access
+					pdrI.srcIfaceMask = 0xFF
+				} else if srcIface == ie.SrcInterfaceCore {
+					pdrI.srcIface = core
+					pdrI.srcIfaceMask = 0xFF
 				}
 			}
 		case ie.FTEID:
@@ -63,15 +68,48 @@ func parseCreatePDRPDI(pdi []*ie.IE) (srcIface uint8, teid uint32, ueIP4 net.IP,
 			if err != nil {
 				log.Println("Failed to parse FTEID IE")
 			} else {
-				teid = fteid.TEID
-				tunnelIPv4Address = fteid.IPv4Address
+				teid := fteid.TEID
+				tunnelIPv4Address := fteid.IPv4Address
+
+				if teid != 0 {
+					pdrI.eNBTeid = teid
+					pdrI.eNBTeidMask = 0xFFFFFFFF
+					pdrI.tunnelIP4Dst = ip2int(tunnelIPv4Address)
+					pdrI.tunnelIP4DstMask = 0xFFFFFFFF
+					log.Println("TunnelIPv4Address:", tunnelIPv4Address)
+				}
 			}
+		case ie.QFI:
+			// Do nothing for the time being
+		}
+	}
+
+	for _, ie2 := range pdi {
+		switch ie2.Type {
 		case ie.UEIPAddress:
 			ueip4, err := ie2.UEIPAddress()
 			if err != nil {
 				log.Println("Failed to parse UE IP address")
 			} else {
-				ueIP4 = ueip4.IPv4Address
+				ueIP4 := ueip4.IPv4Address
+				// uplink PDR may not have UE IP address IE
+				// FIXIT/TODO/XXX Move this inside SrcInterfaceAccess IE check??
+				var ueIP uint32
+				var ueIPMask uint32
+				if len(ueIP4) == 0 {
+					ueIP = 0
+					ueIPMask = 0
+				} else {
+					ueIP = ip2int(ueIP4)
+					ueIPMask = 0xFFFFFFFF
+				}
+				if pdrI.srcIface == access {
+					pdrI.dstIP = ueIP
+					pdrI.dstIPMask = ueIPMask
+				} else if pdrI.srcIface == core {
+					pdrI.srcIP = ueIP
+					pdrI.srcIPMask = ueIPMask
+				}
 			}
 		case ie.SDFFilter:
 			// Do nothing for the time being
@@ -83,21 +121,39 @@ func parseCreatePDRPDI(pdi []*ie.IE) (srcIface uint8, teid uint32, ueIP4 net.IP,
 				if flowDesc != "" {
 					inetIP4Address = parseFlowDesc(flowDesc)
 					log.Println("Flow Description is:", inetIP4Address)
+
+					var dstIP uint32
+					var dstIPMask uint32
+					dstIP4, dstIP4Net, err := net.ParseCIDR(inetIP4Address)
+					if err != nil {
+						log.Println("Failed to parse inet IP address!, inetIP4Address:", inetIP4Address)
+						dstIP4 = net.IP("0.0.0.0")
+					}
+
+					if dstIP4.String() == "0.0.0.0" {
+						dstIP = 0
+						dstIPMask = 0
+					} else {
+						dstIP = ip2int(dstIP4)
+						dstIPMask = ip2int(dstIP4Net.IP)
+					}
+
+					if pdrI.srcIface == access {
+						pdrI.srcIP = dstIP
+						pdrI.srcIPMask = dstIPMask
+					} else if pdrI.srcIface == core {
+						pdrI.dstIP = dstIP
+						pdrI.dstIPMask = dstIPMask
+					}
 				}
 			}
-		case ie.QFI:
-			// Do nothing for the time being
 		}
 	}
-	return srcIface, teid, ueIP4, inetIP4Address, tunnelIPv4Address
+
+	return pdrI
 }
 
 func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
-	var srcIface uint8
-	var teid uint32
-	var ueIP4 net.IP
-	var inetIP4Address string
-	var tunnelIPv4Address net.IP
 
 	/* reset outerHeaderRemoval to begin with */
 	outerHeaderRemoval := uint8(0)
@@ -123,7 +179,7 @@ func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
 	}
 
 	// parse PDI IE and fetch srcIface, teid, and ueIPv4Address
-	srcIface, teid, ueIP4, inetIP4Address, tunnelIPv4Address = parseCreatePDRPDI(pdi)
+	pdrI := parseCreatePDRPDI(pdi)
 
 	farID, err := ie1.FARID()
 	if err != nil {
@@ -131,68 +187,14 @@ func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
 		return nil
 	}
 
-	// uplink PDR may not have UE IP address IE
-	// FIXIT/TODO/XXX Move this inside SrcInterfaceAccess IE check??
-	var ueIP uint32
-	var ueIPMask uint32
-	if len(ueIP4) == 0 {
-		ueIP = 0
-		ueIPMask = 0
-	} else {
-		ueIP = ip2int(ueIP4)
-		ueIPMask = 0xFFFFFFFF
-	}
+	pdrI.pdrID = uint32(pdrID)
+	pdrI.fseID = uint32(fseid.SEID) // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
+	pdrI.ctrID = 0                  // ctrID currently not being set <--- FIXIT/TODO/XXX
+	pdrI.farID = uint8(farID)       // farID currently not being set <--- FIXIT/TODO/XXX
+	pdrI.needDecap = outerHeaderRemoval
 
-	var dstIP uint32
-	var dstIPMask uint32
-	dstIP4, dstIP4Net, err := net.ParseCIDR(inetIP4Address)
-	if err != nil {
-		log.Println("Failed to parse inet IP address!, inetIP4Address:", inetIP4Address)
-		dstIP4 = net.IP("0.0.0.0")
-	}
-
-	if dstIP4.String() == "0.0.0.0" {
-		dstIP = 0
-		dstIPMask = 0
-	} else {
-		dstIP = ip2int(dstIP4)
-		dstIPMask = ip2int(dstIP4Net.IP)
-	}
-
-	pdrI := pdr{
-		pdrID:     uint32(pdrID),
-		fseID:     uint32(fseid.SEID), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-		ctrID:     0,                  // ctrID currently not being set <--- FIXIT/TODO/XXX
-		farID:     uint8(farID),       // farID currently not being set <--- FIXIT/TODO/XXX
-		needDecap: outerHeaderRemoval,
-	}
-
-	if teid != 0 {
-		pdrI.eNBTeid = teid
-		pdrI.eNBTeidMask = 0xFFFFFFFF
-		pdrI.tunnelIP4Dst = ip2int(tunnelIPv4Address)
-		pdrI.tunnelIP4DstMask = 0xFFFFFFFF
-		log.Println("TunnelIPv4Address:", tunnelIPv4Address)
-	}
-
-	// populated everything for PDR, and set the right pdr_
-	if srcIface == ie.SrcInterfaceAccess {
-		pdrI.srcIface = access
-		pdrI.eNBTeid = teid
-		pdrI.srcIP = dstIP
-		pdrI.dstIP = ueIP
-		pdrI.srcIfaceMask = 0xFF
-		pdrI.eNBTeidMask = 0xFFFFFFFF
-		pdrI.srcIPMask = dstIPMask
-		pdrI.dstIPMask = ueIPMask
-	} else if srcIface == ie.SrcInterfaceCore {
-		pdrI.srcIface = core
-		pdrI.srcIP = ueIP
-		pdrI.dstIP = dstIP
-		pdrI.srcIfaceMask = 0xFF
-		pdrI.srcIPMask = ueIPMask
-		pdrI.dstIPMask = dstIPMask
-	} else {
+	// if srcIface is neither acceess nor core, then return nil
+	if pdrI.srcIface != access && pdrI.srcIface != core {
 		return nil
 	}
 
