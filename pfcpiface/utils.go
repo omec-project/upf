@@ -18,6 +18,13 @@ func ip2int(ip net.IP) uint32 {
 	return binary.BigEndian.Uint32(ip)
 }
 
+func ipMask2int(ip net.IPMask) uint32 {
+	if len(ip) == 16 {
+		return binary.BigEndian.Uint32(ip[12:16])
+	}
+	return binary.BigEndian.Uint32(ip)
+}
+
 func hex2int(hexStr string) uint32 {
 	// remove 0x suffix if found in the input string
 	cleaned := strings.Replace(hexStr, "0x", "", -1)

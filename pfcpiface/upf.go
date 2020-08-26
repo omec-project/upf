@@ -108,6 +108,19 @@ func printPDR(pdr pdr) {
 	log.Println("--------------------------------------------")
 }
 
+func printFAR(far far) {
+	log.Println("------------------ FAR ---------------------")
+	log.Println("FAR ID:", far.farID)
+	log.Println("fseID:", far.fseID)
+	log.Println("action:", far.action)
+	log.Println("tunnelType:", far.tunnelType)
+	log.Println("accessIP:", far.accessIP)
+	log.Println("eNBIP:", far.eNBIP)
+	log.Println("eNBTeid:", far.eNBTeid)
+	log.Println("UDPGTPUPort:", far.UDPGTPUPort)
+	log.Println("--------------------------------------------")
+}
+
 var intEnc = func(u uint64) *pb.FieldData {
 	return &pb.FieldData{Encoding: &pb.FieldData_ValueInt{ValueInt: u}}
 }
@@ -347,9 +360,21 @@ func (u *upf) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 		var any *anypb.Any
 		var err error
 
+		prio := int64(1)
+
+		if p.srcIface == core && p.tunnelIP4DstMask != 0 {
+			log.Println("**********Setting priority to 10****************")
+			prio = 10
+		}
+		/*
+			if p.srcIface == access && p.dstIPMask != 0 {
+				log.Println("**********Setting priority to 10****************")
+				prio = 10
+			}
+		*/
 		f := &pb.WildcardMatchCommandAddArg{
 			Gate:     uint64(p.needDecap),
-			Priority: 1,
+			Priority: prio,
 			Values: []*pb.FieldData{
 				intEnc(uint64(p.srcIface)),     /* src_iface */
 				intEnc(uint64(p.tunnelIP4Dst)), /* tunnel_ipv4_dst */

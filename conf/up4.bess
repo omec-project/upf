@@ -16,8 +16,6 @@ port.setup_globals()
 
 Access = 1
 Core = 2
-Uplink = 0
-Downlink = 1
 noGTPUDecap = 0
 GTPUDecap = 1
 noGTPUEncap = 0
@@ -154,10 +152,10 @@ linkMerge::Merge() \
     -> pdrLookup::WildcardMatch(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
                                         {'attr_name':'tunnel_ipv4_dst', 'num_bytes':4}, \
                                         {'attr_name':'teid', 'num_bytes':4}, \
-                                        {'attr_name':'dst_ip', 'num_bytes':4}, \
                                         {'attr_name':'src_ip', 'num_bytes':4}, \
-                                        {'attr_name':'dst_port', 'num_bytes':2}, \
+                                        {'attr_name':'dst_ip', 'num_bytes':4}, \
                                         {'attr_name':'src_port', 'num_bytes':2}, \
+                                        {'attr_name':'dst_port', 'num_bytes':2}, \
                                         {'attr_name':'ip_proto', 'num_bytes':1}], \
                                 values=[{'attr_name':'pdr_id', 'num_bytes':4}, \
                                         {'attr_name':'fseid', 'num_bytes':4}, \
