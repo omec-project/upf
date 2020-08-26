@@ -44,7 +44,6 @@ func parseFlowDesc(flowDesc string) (IP4AddressNet string) {
 }
 
 func parseCreatePDRPDI(pdi []*ie.IE) (pdrI pdr) {
-	inetIP4Address := "0.0.0.0/0"
 
 	for _, ie2 := range pdi {
 		switch ie2.Type {
@@ -104,14 +103,16 @@ func parseCreatePDRPDI(pdi []*ie.IE) (pdrI pdr) {
 					ueIPMask = 0xFFFFFFFF
 				}
 				if pdrI.srcIface == access {
-					pdrI.dstIP = ueIP
-					pdrI.dstIPMask = ueIPMask
-				} else if pdrI.srcIface == core {
 					pdrI.srcIP = ueIP
 					pdrI.srcIPMask = ueIPMask
+				} else if pdrI.srcIface == core {
+					pdrI.dstIP = ueIP
+					pdrI.dstIPMask = ueIPMask
 				}
 			}
+
 		case ie.SDFFilter:
+			inetIP4Address := "0.0.0.0/0"
 			// Do nothing for the time being
 			sdfFields, err := ie2.SDFFilter()
 			if err != nil {
@@ -135,15 +136,15 @@ func parseCreatePDRPDI(pdi []*ie.IE) (pdrI pdr) {
 						dstIPMask = 0
 					} else {
 						dstIP = ip2int(dstIP4)
-						dstIPMask = ip2int(dstIP4Net.IP)
+						dstIPMask = ipMask2int(dstIP4Net.Mask)
 					}
 
 					if pdrI.srcIface == access {
-						pdrI.srcIP = dstIP
-						pdrI.srcIPMask = dstIPMask
-					} else if pdrI.srcIface == core {
 						pdrI.dstIP = dstIP
 						pdrI.dstIPMask = dstIPMask
+					} else if pdrI.srcIface == core {
+						pdrI.srcIP = dstIP
+						pdrI.srcIPMask = dstIPMask
 					}
 				}
 			}
@@ -170,12 +171,9 @@ func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
 		return nil
 	}
 
-	_, err = ie1.OuterHeaderRemoval()
-	if err == nil {
-		res, err := ie1.OuterHeaderRemovalDescription()
-		if res == 0 && err == nil { // 0 == GTP-U/UDP/IPv4
-			outerHeaderRemoval = 1
-		}
+	res, err := ie1.OuterHeaderRemovalDescription()
+	if res == 0 && err == nil { // 0 == GTP-U/UDP/IPv4
+		outerHeaderRemoval = 1
 	}
 
 	// parse PDI IE and fetch srcIface, teid, and ueIPv4Address
@@ -292,12 +290,13 @@ func parsePDRFromPFCPSessEstReqPayload(upf *upf, sereq *message.SessionEstablish
 		switch ie1.Type {
 		case ie.CreatePDR:
 			if p := parseCreatePDR(ie1, fseid); p != nil {
-				printPDR(*p)
+				//printPDR(*p)
 				pdrs = append(pdrs, *p)
 			}
 
 		case ie.CreateFAR:
 			if f := parseCreateFAR(ie1, fseid.SEID, upf.coreIP); f != nil {
+				//printFAR(*f)
 				fars = append(fars, *f)
 			}
 		}
