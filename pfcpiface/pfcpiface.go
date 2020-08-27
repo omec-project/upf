@@ -28,6 +28,7 @@ type sessRecord struct {
 }
 
 var sessions map[uint64]sessRecord
+var sequence_number uint32 = 1
 
 func pfcpifaceMainLoop(upf *upf, accessIP string, sourceIP string, smfIP string) {
 	log.Println("pfcpifaceMainLoop@" + upf.fqdnHost + " says hello!!!")
@@ -384,9 +385,11 @@ func handleSessionDeletionRequest(upf *upf, msg message.Message, addr net.Addr, 
 func initiateAssociationSetupRequest(sourceIP string, n3ip string, n4DstIp string, conn *net.UDPConn, rspReceived chan bool) {
 	timeout := make(chan int, 1)
 	numRetransmissions := 0
+	seq_num := sequence_number
+	sequence_number++
 	for {
 		// Build request message
-		asreq, err := message.NewAssociationSetupRequest(ie.NewRecoveryTimeStamp(time.Now()),
+		asreq, err := message.NewAssociationSetupRequest(seq_num, ie.NewRecoveryTimeStamp(time.Now()),
 			ie.NewNodeID(sourceIP, "", ""), /* node id (IPv4) */
 			// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 			//      = 01000001
