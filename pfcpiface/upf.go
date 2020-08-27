@@ -174,6 +174,8 @@ func (u *upf) sim(method string) {
 			needDecap:    1,
 		}
 
+		pdrs := []pdr{pdrUp, pdrDown}
+
 		// create/delete downlink far
 		farDown := far{
 			farID:       downlink,
@@ -193,12 +195,14 @@ func (u *upf) sim(method string) {
 			action: farForwardU,
 		}
 
+		fars := []far{farDown, farUp}
+
 		switch timeout := 100 * time.Millisecond; method {
 		case "create":
-			u.simcreateEntries(pdrDown, pdrUp, farDown, farUp, timeout)
+			u.simcreateEntries(pdrs, fars, timeout)
 
 		case "delete":
-			u.simdeleteEntries(pdrDown, pdrUp, farDown, farUp, timeout)
+			u.simdeleteEntries(pdrs, fars, timeout)
 
 		default:
 			log.Fatalln("Unsupported method", method)
@@ -212,45 +216,40 @@ func (u *upf) sim(method string) {
 	log.Println("Sessions/s:", float64(u.maxSessions)/time.Since(start).Seconds())
 }
 
-func (u *upf) simcreateEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time.Duration) {
-	calls := 7
+func (u *upf) simcreateEntries(pdrs []pdr, fars []far, timeout time.Duration) {
+	calls := len(pdrs) + len(fars)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	done := make(chan bool)
+	for _, pdrv := range pdrs {
+		u.addPDR(ctx, done, pdrv)
+	}
 
-	u.addPDR(ctx, done, pdrDown)
-	u.addPDR(ctx, done, pdrUp)
-
-	u.addFAR(ctx, done, farDown)
-	u.addFAR(ctx, done, farUp)
-
-	u.addCounter(ctx, done, pdrDown.ctrID, "preQoSCounter")
-	u.addCounter(ctx, done, pdrDown.ctrID, "postDLQoSCounter")
-	u.addCounter(ctx, done, pdrDown.ctrID, "postULQoSCounter")
+	for _, farv := range fars {
+		u.addFAR(ctx, done, farv)
+	}
 
 	rc := u.GRPCJoin(calls, timeout, done)
 	if !rc {
-		go u.simdeleteEntries(pdrDown, pdrUp, farDown, farUp, timeout)
+		log.Println("Unable to complete GRPC call(s). Deleting")
+		go u.simdeleteEntries(pdrs, fars, timeout)
 	}
 }
 
-func (u *upf) simdeleteEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time.Duration) {
-	calls := 7
+func (u *upf) simdeleteEntries(pdrs []pdr, fars []far, timeout time.Duration) {
+	calls := len(pdrs) + len(fars)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	done := make(chan bool)
+	for _, pdrv := range pdrs {
+		u.delPDR(ctx, done, pdrv)
+	}
 
-	u.delPDR(ctx, done, pdrDown)
-	u.delPDR(ctx, done, pdrUp)
-
-	u.delFAR(ctx, done, farDown)
-	u.delFAR(ctx, done, farUp)
-
-	u.delCounter(ctx, done, pdrDown.ctrID, "preQoSCounter")
-	u.delCounter(ctx, done, pdrDown.ctrID, "postDLQoSCounter")
-	u.delCounter(ctx, done, pdrDown.ctrID, "postULQoSCounter")
+	for _, farv := range fars {
+		u.delFAR(ctx, done, farv)
+	}
 
 	rc := u.GRPCJoin(calls, timeout, done)
 	if !rc {
