@@ -40,6 +40,14 @@ jobs:
           chmod +x shfmt && sudo mv shfmt /bin
           # https://github.com/mvdan/sh/issues/288
           shfmt -l -w $(shfmt -f . | grep -v vendor/)
+      - name: Go Format
+        working-directory: pfcpiface
+        run: |
+          go fmt
+
+      - name: Show all CI changes
+        run: |
+          git --no-pager diff
 
       # Build again and commit
       - name: Build the Docker image (after format)

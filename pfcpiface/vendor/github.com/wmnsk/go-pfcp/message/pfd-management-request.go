@@ -16,11 +16,11 @@ type PFDManagementRequest struct {
 }
 
 // NewPFDManagementRequest creates a new PFDManagementRequest.
-func NewPFDManagementRequest(app *ie.IE, ies ...*ie.IE) *PFDManagementRequest {
+func NewPFDManagementRequest(seq uint32, app *ie.IE, ies ...*ie.IE) *PFDManagementRequest {
 	m := &PFDManagementRequest{
 		Header: NewHeader(
 			1, 0, 0, 0,
-			MsgTypePFDManagementRequest, 0, 0, 0,
+			MsgTypePFDManagementRequest, 0, seq, 0,
 			nil,
 		),
 		ApplicationIDsPFDs: app,

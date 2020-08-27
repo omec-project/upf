@@ -26,11 +26,11 @@ type AssociationSetupRequest struct {
 }
 
 // NewAssociationSetupRequest creates a new AssociationSetupRequest.
-func NewAssociationSetupRequest(ies ...*ie.IE) *AssociationSetupRequest {
+func NewAssociationSetupRequest(seq uint32, ies ...*ie.IE) *AssociationSetupRequest {
 	m := &AssociationSetupRequest{
 		Header: NewHeader(
 			1, 0, 0, 0,
-			MsgTypeAssociationSetupRequest, 0, 0, 0,
+			MsgTypeAssociationSetupRequest, 0, seq, 0,
 			nil,
 		),
 	}
