@@ -151,9 +151,9 @@ func (u *upf) sim(method string) {
 		// create/delete downlink pdr
 		pdrDown := pdr{
 			srcIface:     core,
-			srcIP:        ip2int(ueip) + i,
+			dstIP:        ip2int(ueip) + i,
 			srcIfaceMask: 0xFF,
-			srcIPMask:    0xFFFFFFFF,
+			dstIPMask:    0xFFFFFFFF,
 			fseID:        teid + i,
 			ctrID:        i,
 			farID:        downlink,
@@ -164,10 +164,10 @@ func (u *upf) sim(method string) {
 		pdrUp := pdr{
 			srcIface:     access,
 			eNBTeid:      teid + i,
-			dstIP:        ip2int(ueip) + i,
+			srcIP:        ip2int(ueip) + i,
 			srcIfaceMask: 0xFF,
 			eNBTeidMask:  0xFFFFFFFF,
-			dstIPMask:    0xFFFFFFFF,
+			srcIPMask:    0xFFFFFFFF,
 			fseID:        teid + i,
 			ctrID:        i,
 			farID:        uplink,
