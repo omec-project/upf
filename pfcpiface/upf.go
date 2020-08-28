@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"log"
+	"math"
 	"net"
 	"time"
 
@@ -163,7 +164,7 @@ func (u *upf) sim(method string) {
 			srcIfaceMask: 0xFF,
 			dstIPMask:    0xFFFFFFFF,
 
-			precedence: 10,
+			precedence: 255,
 
 			fseID:     n3TEID + i,
 			ctrID:     i,
@@ -180,7 +181,7 @@ func (u *upf) sim(method string) {
 			tunnelTEIDMask:   0xFFFFFFFF,
 			tunnelIP4DstMask: 0xFFFFFFFF,
 
-			precedence: 20,
+			precedence: 1,
 
 			fseID:     n3TEID + i,
 			ctrID:     i,
@@ -200,7 +201,7 @@ func (u *upf) sim(method string) {
 			tunnelTEIDMask:   0xFFFFFFFF,
 			srcIPMask:        0xFFFFFFFF,
 
-			precedence: 10,
+			precedence: 255,
 
 			fseID:     n3TEID + i,
 			ctrID:     i,
@@ -219,7 +220,7 @@ func (u *upf) sim(method string) {
 			tunnelTEIDMask:   0xFFFFFFFF,
 			dstIPMask:        0xFFFFFFFF,
 
-			precedence: 20,
+			precedence: 1,
 
 			fseID:     n3TEID + i,
 			ctrID:     i,
@@ -428,7 +429,7 @@ func (u *upf) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 		f := &pb.WildcardMatchCommandAddArg{
 			Gate:     uint64(p.needDecap),
-			Priority: int64(p.precedence),
+			Priority: int64(math.MaxUint32 - p.precedence),
 			Values: []*pb.FieldData{
 				intEnc(uint64(p.srcIface)),     /* src_iface */
 				intEnc(uint64(p.tunnelIP4Dst)), /* tunnel_ipv4_dst */
