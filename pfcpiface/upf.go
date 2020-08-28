@@ -182,7 +182,7 @@ func (u *upf) sim(method string) {
 
 			precedence: 20,
 
-			fseID:     n9TEID + i,
+			fseID:     n3TEID + i,
 			ctrID:     i,
 			farID:     n3,
 			needDecap: 1,
