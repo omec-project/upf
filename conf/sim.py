@@ -115,10 +115,10 @@ def gen_ue_ntf_packet(size, src_mac, dst_mac, src_ip, dst_ip, inner_src_ip, inne
     return bytes(pkt)
 
 
-def get_ue_sequpdate_args(max_session, start_ue_ip, start_n3_teid):
+def gen_gtpu_sequpdate_args(max_session, start_ue_ip, ue_ip_offset, start_teid):
     kwargs = {"fields": [
-        {'offset': 46, 'size': 4, 'min': start_n3_teid,
-         'max': start_n3_teid+max_session-1},
-        {'offset': 62, 'size': 4, 'min': ip2long(start_ue_ip),
+        {'offset': 46, 'size': 4, 'min': start_teid,
+         'max': start_teid+max_session-1},
+        {'offset': ue_ip_offset, 'size': 4, 'min': ip2long(start_ue_ip),
          'max': ip2long(start_ue_ip)+max_session-1}]}
     return kwargs

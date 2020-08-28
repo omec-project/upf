@@ -9,6 +9,7 @@
 
     "": "Use the sim block to enable simulation using either Source module or via il_trafficgen",
     "sim": {
+        "core": "n6",
         "start_ue_ip": "16.0.0.1",
         "start_enb_ip": "11.1.1.129",
         "start_aupf_ip": "13.1.1.199",
