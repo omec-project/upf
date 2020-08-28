@@ -30,7 +30,7 @@ class Parser:
         self.mode = None
         self.sim_start_ue_ip = None
         self.sim_start_enb_ip = None
-        self.sim_start_teid = None
+        self.sim_start_n3_teid = None
         self.sim_pkt_size = None
         self.sim_total_flows = None
         self.workers = 1
@@ -85,7 +85,7 @@ class Parser:
         try:
             self.sim_start_ue_ip = self.conf["sim"]["start_ue_ip"]
             self.sim_start_enb_ip = self.conf["sim"]["start_enb_ip"]
-            self.sim_start_teid = int(self.conf["sim"]["start_teid"], 16)
+            self.sim_start_n3_teid = int(self.conf["sim"]["start_n3_teid"], 16)
             self.sim_pkt_size = self.conf["sim"]["pkt_size"]
             self.sim_total_flows = self.conf["sim"]["total_flows"]
         except ValueError:
