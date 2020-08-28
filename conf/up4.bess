@@ -42,10 +42,10 @@ if parser.mode == 'sim':
                                         '172.16.100.1', parser.sim_start_ue_ip),
                     sim.gen_inet_packet(parser.sim_pkt_size, macstr_u, macstr_d,
                                         '172.12.55.99', parser.sim_start_ue_ip)]
-    ue_packets = [sim.gen_ue_packet(parser.sim_pkt_size, macstr_d, macstr_u,
+    ue_packets = [sim.gen_gtpu_packet(parser.sim_pkt_size, macstr_d, macstr_u,
                                     parser.sim_start_enb_ip, access_ip[0],
                                     parser.sim_start_ue_ip, '172.16.100.1',
-                                    parser.sim_start_teid)]
+                                    parser.sim_start_n3_teid)]
     if parser.enable_ntf:
         # Every 30th packet will be a STUN packet.  With 5000 flows, this
         # results in about 1000 flows with network tokens, and every 3rd packet
@@ -57,9 +57,9 @@ if parser.mode == 'sim':
           sim.gen_ue_ntf_packet(parser.sim_pkt_size, macstr_d, macstr_u,
                                 parser.sim_start_enb_ip, access_ip[0],
                                 parser.sim_start_ue_ip, '172.16.100.1',
-                                parser.sim_start_teid))
+                                parser.sim_start_n3_teid))
     packet_generator = {'access': ue_packets, 'core': inet_packets}
-    seq_kwargs = {'access': sim.get_ue_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip, parser.sim_start_teid),
+    seq_kwargs = {'access': sim.get_ue_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip, parser.sim_start_n3_teid),
                   'core': sim.get_inet_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip)}
 else:
     macstr_d = mac_by_interface(parser.core_ifname)

@@ -71,8 +71,8 @@ func parseCreatePDRPDI(pdi []*ie.IE) (pdrI pdr) {
 				tunnelIPv4Address := fteid.IPv4Address
 
 				if teid != 0 {
-					pdrI.eNBTeid = teid
-					pdrI.eNBTeidMask = 0xFFFFFFFF
+					pdrI.tunnelTEID = teid
+					pdrI.tunnelTEIDMask = 0xFFFFFFFF
 					pdrI.tunnelIP4Dst = ip2int(tunnelIPv4Address)
 					pdrI.tunnelIP4DstMask = 0xFFFFFFFF
 					log.Println("TunnelIPv4Address:", tunnelIPv4Address)
@@ -161,7 +161,13 @@ func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
 
 	pdrID, err := ie1.PDRID()
 	if err != nil {
-		log.Println("Could not read PDR!")
+		log.Println("Could not read PDR ID!")
+		return nil
+	}
+
+	precedence, err := ie1.Precedence()
+	if err != nil {
+		log.Println("Could not read Precedence!")
 		return nil
 	}
 
@@ -185,6 +191,7 @@ func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
 		return nil
 	}
 
+	pdrI.precedence = precedence
 	pdrI.pdrID = uint32(pdrID)
 	pdrI.fseID = uint32(fseid.SEID) // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
 	pdrI.ctrID = 0                  // ctrID currently not being set <--- FIXIT/TODO/XXX
@@ -214,9 +221,9 @@ func parseFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP, fwdType string) *far {
 		return nil
 	}
 	// Read outerheadercreation from payload (if it exists)
-	var eNBTeid uint32
-	eNBIP := uint32(0)
-	coreIP4 := uint32(0)
+	var tunnelTEID uint32
+	tunnelDst := uint32(0)
+	tunnelSrc := uint32(0)
 	tunnelType := uint8(0)
 	var ies2 []*ie.IE
 	var dir uint8 = 0xFF
@@ -241,9 +248,9 @@ func parseFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP, fwdType string) *far {
 				log.Println("Unable to parse OuterHeaderCreationFields!")
 				continue
 			}
-			eNBTeid = outerheadercreationfields.TEID
-			eNBIP = ip2int(outerheadercreationfields.IPv4Address)
-			coreIP4 = ip2int(accessIP)
+			tunnelTEID = outerheadercreationfields.TEID
+			tunnelDst = ip2int(outerheadercreationfields.IPv4Address)
+			tunnelSrc = ip2int(accessIP)
 			tunnelType = uint8(1)
 		case ie.DestinationInterface:
 			destinationinterface, err := ie2.DestinationInterface()
@@ -260,14 +267,14 @@ func parseFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP, fwdType string) *far {
 	}
 
 	return &far{
-		farID:       uint8(farID),  // farID currently being truncated to uint8 <--- FIXIT/TODO/XXX
-		fseID:       uint32(fseid), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-		action:      dir,
-		tunnelType:  tunnelType,
-		accessIP:    coreIP4,
-		eNBIP:       eNBIP,
-		eNBTeid:     eNBTeid,
-		UDPGTPUPort: udpGTPUPort,
+		farID:        uint8(farID),  // farID currently being truncated to uint8 <--- FIXIT/TODO/XXX
+		fseID:        uint32(fseid), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
+		action:       dir,
+		tunnelType:   tunnelType,
+		tunnelIP4Src: tunnelSrc,
+		tunnelIP4Dst: tunnelDst,
+		tunnelTEID:   tunnelTEID,
+		tunnelPort:   tunnelPort,
 	}
 }
 
