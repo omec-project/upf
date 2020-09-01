@@ -209,7 +209,26 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 	}
 
 	/* Read CreatePDRs and CreateFARs from payload */
-	pdrs, fars := parsePDRFromPFCPSessEstReqPayload(upf, sereq, fseid)
+	pdrs, fars, err := parsePDRsFARs(upf, sereq, fseid)
+	if err != nil {
+		log.Println(err)
+		// Build response message
+		seres, err := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
+			0,                              /* FO <-- what's this? */
+			fseid.SEID,                     /* seid */
+			sereq.SequenceNumber,           /* seq # */
+			0,                              /* priority */
+			ie.NewNodeID(sourceIP, "", ""), /* node id (IPv4) */
+			ie.NewCause(ie.CauseRequestRejected),
+		).Marshal()
+
+		if err != nil {
+			log.Fatalln("Unable to create session establishment response", err)
+		}
+
+		log.Println("Sending session establishment response to: ", addr)
+		return seres
+	}
 
 	upf.sendMsgToUPF("add", pdrs, fars)
 
@@ -235,7 +254,7 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 		log.Fatalln("Unable to create session establishment response", err)
 	}
 
-	log.Println("Sent session establishment response to: ", addr)
+	log.Println("Sending session establishment response to: ", addr)
 
 	return seres
 }
