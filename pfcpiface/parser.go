@@ -4,6 +4,7 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"net"
 	"strings"
@@ -43,40 +44,42 @@ func parseFlowDesc(flowDesc string) (IP4AddressNet string) {
 	return IP4AddressNet + "/" + prefix
 }
 
-func parseCreatePDRPDI(pdi []*ie.IE) (pdrI pdr) {
+func parseCreatePDRPDI(pdi []*ie.IE) *pdr {
 
+	var pdrI pdr
 	for _, ie2 := range pdi {
 		switch ie2.Type {
 		case ie.SourceInterface:
 			srcIface, err := ie2.SourceInterface()
 			if err != nil {
 				log.Println("Failed to parse Source Interface IE!")
-			} else {
-				if srcIface == ie.SrcInterfaceCPFunction {
-					log.Println("Detected src interface cp function. Ignoring for the time being")
-				} else if srcIface == ie.SrcInterfaceAccess {
-					pdrI.srcIface = access
-					pdrI.srcIfaceMask = 0xFF
-				} else if srcIface == ie.SrcInterfaceCore {
-					pdrI.srcIface = core
-					pdrI.srcIfaceMask = 0xFF
-				}
+				continue
+			}
+
+			if srcIface == ie.SrcInterfaceCPFunction {
+				log.Println("Detected src interface cp function. Ignoring for the time being")
+			} else if srcIface == ie.SrcInterfaceAccess {
+				pdrI.srcIface = access
+				pdrI.srcIfaceMask = 0xFF
+			} else if srcIface == ie.SrcInterfaceCore {
+				pdrI.srcIface = core
+				pdrI.srcIfaceMask = 0xFF
 			}
 		case ie.FTEID:
 			fteid, err := ie2.FTEID()
 			if err != nil {
 				log.Println("Failed to parse FTEID IE")
-			} else {
-				teid := fteid.TEID
-				tunnelIPv4Address := fteid.IPv4Address
+				continue
+			}
+			teid := fteid.TEID
+			tunnelIPv4Address := fteid.IPv4Address
 
-				if teid != 0 {
-					pdrI.tunnelTEID = teid
-					pdrI.tunnelTEIDMask = 0xFFFFFFFF
-					pdrI.tunnelIP4Dst = ip2int(tunnelIPv4Address)
-					pdrI.tunnelIP4DstMask = 0xFFFFFFFF
-					log.Println("TunnelIPv4Address:", tunnelIPv4Address)
-				}
+			if teid != 0 {
+				pdrI.tunnelTEID = teid
+				pdrI.tunnelTEIDMask = 0xFFFFFFFF
+				pdrI.tunnelIP4Dst = ip2int(tunnelIPv4Address)
+				pdrI.tunnelIP4DstMask = 0xFFFFFFFF
+				log.Println("TunnelIPv4Address:", tunnelIPv4Address)
 			}
 		case ie.QFI:
 			// Do nothing for the time being
@@ -89,69 +92,74 @@ func parseCreatePDRPDI(pdi []*ie.IE) (pdrI pdr) {
 			ueip4, err := ie2.UEIPAddress()
 			if err != nil {
 				log.Println("Failed to parse UE IP address")
-			} else {
-				ueIP4 := ueip4.IPv4Address
-				// uplink PDR may not have UE IP address IE
-				// FIXIT/TODO/XXX Move this inside SrcInterfaceAccess IE check??
-				var ueIP uint32
-				var ueIPMask uint32
-				if len(ueIP4) == 0 {
-					ueIP = 0
-					ueIPMask = 0
-				} else {
-					ueIP = ip2int(ueIP4)
-					ueIPMask = 0xFFFFFFFF
-				}
-				if pdrI.srcIface == access {
-					pdrI.srcIP = ueIP
-					pdrI.srcIPMask = ueIPMask
-				} else if pdrI.srcIface == core {
-					pdrI.dstIP = ueIP
-					pdrI.dstIPMask = ueIPMask
-				}
+				continue
 			}
 
+			ueIP4 := ueip4.IPv4Address
+			// uplink PDR may not have UE IP address IE
+			// FIXIT/TODO/XXX Move this inside SrcInterfaceAccess IE check??
+			var ueIP uint32
+			var ueIPMask uint32
+			if len(ueIP4) == 0 {
+				ueIP = 0
+				ueIPMask = 0
+			} else {
+				ueIP = ip2int(ueIP4)
+				ueIPMask = 0xFFFFFFFF
+			}
+			if pdrI.srcIface == access {
+				pdrI.srcIP = ueIP
+				pdrI.srcIPMask = ueIPMask
+			} else if pdrI.srcIface == core {
+				pdrI.dstIP = ueIP
+				pdrI.dstIPMask = ueIPMask
+			}
 		case ie.SDFFilter:
 			inetIP4Address := "0.0.0.0/0"
 			// Do nothing for the time being
 			sdfFields, err := ie2.SDFFilter()
 			if err != nil {
 				log.Println("Unable to parse SDF filter!")
-			} else {
-				flowDesc := sdfFields.FlowDescription
-				if flowDesc != "" {
-					inetIP4Address = parseFlowDesc(flowDesc)
-					log.Println("Flow Description is:", inetIP4Address)
+				continue
+			}
 
-					var dstIP uint32
-					var dstIPMask uint32
-					dstIP4, dstIP4Net, err := net.ParseCIDR(inetIP4Address)
-					if err != nil {
-						log.Println("Failed to parse inet IP address!, inetIP4Address:", inetIP4Address)
-						dstIP4 = net.IP("0.0.0.0")
-					}
+			flowDesc := sdfFields.FlowDescription
+			if flowDesc == "" {
+				log.Println("Empty SDF filter description!")
+				// TODO: Implement referencing SDF ID
+				continue
+			}
+			inetIP4Address = parseFlowDesc(flowDesc)
+			log.Println("Flow Description is:", inetIP4Address)
 
-					if dstIP4.String() == "0.0.0.0" {
-						dstIP = 0
-						dstIPMask = 0
-					} else {
-						dstIP = ip2int(dstIP4)
-						dstIPMask = ipMask2int(dstIP4Net.Mask)
-					}
+			dstIP4, dstIP4Net, err := net.ParseCIDR(inetIP4Address)
+			if err != nil {
+				log.Println("Failed to parse inet IP address!, inetIP4Address:", inetIP4Address)
+				// TODO: remove continue and return nil to signal error
+				// once spgw-c is updated
+				continue
+				//return nil
+			}
 
-					if pdrI.srcIface == access {
-						pdrI.dstIP = dstIP
-						pdrI.dstIPMask = dstIPMask
-					} else if pdrI.srcIface == core {
-						pdrI.srcIP = dstIP
-						pdrI.srcIPMask = dstIPMask
-					}
-				}
+			var dstIP uint32
+			var dstIPMask uint32
+
+			if dstIP4.String() != "0.0.0.0" {
+				dstIP = ip2int(dstIP4)
+				dstIPMask = ipMask2int(dstIP4Net.Mask)
+			}
+
+			if pdrI.srcIface == access {
+				pdrI.dstIP = dstIP
+				pdrI.dstIPMask = dstIPMask
+			} else if pdrI.srcIface == core {
+				pdrI.srcIP = dstIP
+				pdrI.srcIPMask = dstIPMask
 			}
 		}
 	}
 
-	return pdrI
+	return &pdrI
 }
 
 func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
@@ -184,6 +192,9 @@ func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
 
 	// parse PDI IE and fetch srcIface, teid, and ueIPv4Address
 	pdrI := parseCreatePDRPDI(pdi)
+	if pdrI == nil {
+		return nil
+	}
 
 	farID, err := ie1.FARID()
 	if err != nil {
@@ -203,7 +214,7 @@ func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
 		return nil
 	}
 
-	return &pdrI
+	return pdrI
 }
 
 func parseCreateFAR(ie1 *ie.IE, fseid uint64, coreIP net.IP) *far {
@@ -278,7 +289,7 @@ func parseFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP, fwdType string) *far {
 	}
 }
 
-func parsePDRFromPFCPSessEstReqPayload(upf *upf, sereq *message.SessionEstablishmentRequest, fseid *ie.FSEIDFields) ([]pdr, []far) {
+func parsePDRsFARs(upf *upf, sereq *message.SessionEstablishmentRequest, fseid *ie.FSEIDFields) ([]pdr, []far, error) {
 
 	pdrs := make([]pdr, 0, MaxItems)
 	fars := make([]far, 0, MaxItems)
@@ -286,8 +297,7 @@ func parsePDRFromPFCPSessEstReqPayload(upf *upf, sereq *message.SessionEstablish
 	/* read PDR(s) */
 	ies1, err := ie.ParseMultiIEs(sereq.Payload)
 	if err != nil {
-		log.Println("Failed to parse sereq for IEs!")
-		return pdrs, fars
+		return pdrs, fars, errors.New("Failed to parse sereq for IEs!")
 	}
 
 	// Iteratively go through all IEs. You can't use ie.CreatePDR or ie.CreateFAR since a single
@@ -297,8 +307,9 @@ func parsePDRFromPFCPSessEstReqPayload(upf *upf, sereq *message.SessionEstablish
 		switch ie1.Type {
 		case ie.CreatePDR:
 			if p := parseCreatePDR(ie1, fseid); p != nil {
-				//printPDR(*p)
 				pdrs = append(pdrs, *p)
+			} else {
+				return pdrs, fars, errors.New("Failed to parse PDR")
 			}
 
 		case ie.CreateFAR:
@@ -309,5 +320,5 @@ func parsePDRFromPFCPSessEstReqPayload(upf *upf, sereq *message.SessionEstablish
 		}
 	}
 
-	return pdrs, fars
+	return pdrs, fars, nil
 }
