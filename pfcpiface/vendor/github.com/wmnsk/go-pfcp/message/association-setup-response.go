@@ -11,18 +11,19 @@ import (
 // AssociationSetupResponse is a AssociationSetupResponse formed PFCP Header and its IEs above.
 type AssociationSetupResponse struct {
 	*Header
-	NodeID                        *ie.IE
-	Cause                         *ie.IE
-	RecoveryTimeStamp             *ie.IE
-	UPFunctionFeatures            *ie.IE
-	CPFunctionFeatures            *ie.IE
-	AlternativeSMFIPAddress       *ie.IE
-	PFCPASRspFlags                *ie.IE
-	UEIPAddressPoolInformation    *ie.IE
-	GTPUPathQoSControlInformation *ie.IE
-	ClockDriftControlInformation  *ie.IE
-	UPFInstanceID                 *ie.IE
-	IEs                           []*ie.IE
+	NodeID                         *ie.IE
+	Cause                          *ie.IE
+	RecoveryTimeStamp              *ie.IE
+	UPFunctionFeatures             *ie.IE
+	CPFunctionFeatures             *ie.IE
+	UserPlaneIPResourceInformation *ie.IE
+	AlternativeSMFIPAddress        *ie.IE
+	PFCPASRspFlags                 *ie.IE
+	UEIPAddressPoolInformation     *ie.IE
+	GTPUPathQoSControlInformation  *ie.IE
+	ClockDriftControlInformation   *ie.IE
+	UPFInstanceID                  *ie.IE
+	IEs                            []*ie.IE
 }
 
 // NewAssociationSetupResponse creates a new AssociationSetupResponse.
@@ -47,6 +48,8 @@ func NewAssociationSetupResponse(seq uint32, ies ...*ie.IE) *AssociationSetupRes
 			m.UPFunctionFeatures = i
 		case ie.CPFunctionFeatures:
 			m.CPFunctionFeatures = i
+		case ie.UserPlaneIPResourceInformation:
+			m.UserPlaneIPResourceInformation = i
 		case ie.AlternativeSMFIPAddress:
 			m.AlternativeSMFIPAddress = i
 		case ie.PFCPASRspFlags:
@@ -111,6 +114,12 @@ func (m *AssociationSetupResponse) MarshalTo(b []byte) error {
 		offset += i.MarshalLen()
 	}
 	if i := m.CPFunctionFeatures; i != nil {
+		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
+			return err
+		}
+		offset += i.MarshalLen()
+	}
+	if i := m.UserPlaneIPResourceInformation; i != nil {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
@@ -204,6 +213,8 @@ func (m *AssociationSetupResponse) UnmarshalBinary(b []byte) error {
 			m.UPFunctionFeatures = i
 		case ie.CPFunctionFeatures:
 			m.CPFunctionFeatures = i
+		case ie.UserPlaneIPResourceInformation:
+			m.UserPlaneIPResourceInformation = i
 		case ie.AlternativeSMFIPAddress:
 			m.AlternativeSMFIPAddress = i
 		case ie.PFCPASRspFlags:
@@ -241,6 +252,9 @@ func (m *AssociationSetupResponse) MarshalLen() int {
 		l += i.MarshalLen()
 	}
 	if i := m.CPFunctionFeatures; i != nil {
+		l += i.MarshalLen()
+	}
+	if i := m.UserPlaneIPResourceInformation; i != nil {
 		l += i.MarshalLen()
 	}
 	if i := m.AlternativeSMFIPAddress; i != nil {

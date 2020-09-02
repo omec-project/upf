@@ -5,8 +5,8 @@
 package ie
 
 // NewEthernetTrafficInformation creates a new EthernetTrafficInformation IE.
-func NewEthernetTrafficInformation(detected, removed *IE) *IE {
-	return newGroupedIE(EthernetTrafficInformation, 0, detected, removed)
+func NewEthernetTrafficInformation(ies ...*IE) *IE {
+	return newGroupedIE(EthernetTrafficInformation, 0, ies...)
 }
 
 // EthernetTrafficInformation returns the IEs above EthernetTrafficInformation if the type of IE matches.

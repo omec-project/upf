@@ -13,22 +13,22 @@ type SessionEstablishmentRequest struct {
 	*Header
 	NodeID                         *ie.IE
 	CPFSEID                        *ie.IE
-	CreatePDR                      *ie.IE
-	CreateFAR                      *ie.IE
-	CreateURR                      *ie.IE
-	CreateQER                      *ie.IE
+	CreatePDR                      []*ie.IE
+	CreateFAR                      []*ie.IE
+	CreateURR                      []*ie.IE
+	CreateQER                      []*ie.IE
 	CreateBAR                      *ie.IE
-	CreateTrafficEndpoint          *ie.IE
+	CreateTrafficEndpoint          []*ie.IE
 	PDNType                        *ie.IE
 	FQCSID                         *ie.IE
 	UserPlaneInactivityTimer       *ie.IE
 	UserID                         *ie.IE
 	TraceInformation               *ie.IE
 	APNDNN                         *ie.IE
-	CreateMAR                      *ie.IE
+	CreateMAR                      []*ie.IE
 	PFCPSEReqFlags                 *ie.IE
 	CreateBridgeInfoForTSC         *ie.IE
-	CreateSRR                      *ie.IE
+	CreateSRR                      []*ie.IE
 	ProvideATSSSControlInformation *ie.IE
 	RecoveryTimeStamp              *ie.IE
 	IEs                            []*ie.IE
@@ -51,17 +51,17 @@ func NewSessionEstablishmentRequest(mp, fo uint8, seid uint64, seq uint32, pri u
 		case ie.FSEID:
 			m.CPFSEID = i
 		case ie.CreatePDR:
-			m.CreatePDR = i
+			m.CreatePDR = append(m.CreatePDR, i)
 		case ie.CreateFAR:
-			m.CreateFAR = i
+			m.CreateFAR = append(m.CreateFAR, i)
 		case ie.CreateURR:
-			m.CreateURR = i
+			m.CreateURR = append(m.CreateURR, i)
 		case ie.CreateQER:
-			m.CreateQER = i
+			m.CreateQER = append(m.CreateQER, i)
 		case ie.CreateBAR:
 			m.CreateBAR = i
 		case ie.CreateTrafficEndpoint:
-			m.CreateTrafficEndpoint = i
+			m.CreateTrafficEndpoint = append(m.CreateTrafficEndpoint, i)
 		case ie.PDNType:
 			m.PDNType = i
 		case ie.FQCSID:
@@ -75,13 +75,13 @@ func NewSessionEstablishmentRequest(mp, fo uint8, seid uint64, seq uint32, pri u
 		case ie.APNDNN:
 			m.APNDNN = i
 		case ie.CreateMAR:
-			m.CreateMAR = i
+			m.CreateMAR = append(m.CreateMAR, i)
 		case ie.PFCPSEReqFlags:
 			m.PFCPSEReqFlags = i
 		case ie.CreateBridgeInfoForTSC:
 			m.CreateBridgeInfoForTSC = i
 		case ie.CreateSRR:
-			m.CreateSRR = i
+			m.CreateSRR = append(m.CreateSRR, i)
 		case ie.ProvideATSSSControlInformation:
 			m.ProvideATSSSControlInformation = i
 		case ie.RecoveryTimeStamp:
@@ -125,25 +125,25 @@ func (m *SessionEstablishmentRequest) MarshalTo(b []byte) error {
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.CreatePDR; i != nil {
+	for _, i := range m.CreatePDR {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.CreateFAR; i != nil {
+	for _, i := range m.CreateFAR {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.CreateURR; i != nil {
+	for _, i := range m.CreateURR {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.CreateQER; i != nil {
+	for _, i := range m.CreateQER {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
@@ -155,7 +155,7 @@ func (m *SessionEstablishmentRequest) MarshalTo(b []byte) error {
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.CreateTrafficEndpoint; i != nil {
+	for _, i := range m.CreateTrafficEndpoint {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
@@ -197,7 +197,7 @@ func (m *SessionEstablishmentRequest) MarshalTo(b []byte) error {
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.CreateMAR; i != nil {
+	for _, i := range m.CreateMAR {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
@@ -215,7 +215,7 @@ func (m *SessionEstablishmentRequest) MarshalTo(b []byte) error {
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.CreateSRR; i != nil {
+	for _, i := range m.CreateSRR {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
@@ -280,17 +280,17 @@ func (m *SessionEstablishmentRequest) UnmarshalBinary(b []byte) error {
 		case ie.FSEID:
 			m.CPFSEID = i
 		case ie.CreatePDR:
-			m.CreatePDR = i
+			m.CreatePDR = append(m.CreatePDR, i)
 		case ie.CreateFAR:
-			m.CreateFAR = i
+			m.CreateFAR = append(m.CreateFAR, i)
 		case ie.CreateURR:
-			m.CreateURR = i
+			m.CreateURR = append(m.CreateURR, i)
 		case ie.CreateQER:
-			m.CreateQER = i
+			m.CreateQER = append(m.CreateQER, i)
 		case ie.CreateBAR:
 			m.CreateBAR = i
 		case ie.CreateTrafficEndpoint:
-			m.CreateTrafficEndpoint = i
+			m.CreateTrafficEndpoint = append(m.CreateTrafficEndpoint, i)
 		case ie.PDNType:
 			m.PDNType = i
 		case ie.FQCSID:
@@ -304,13 +304,13 @@ func (m *SessionEstablishmentRequest) UnmarshalBinary(b []byte) error {
 		case ie.APNDNN:
 			m.APNDNN = i
 		case ie.CreateMAR:
-			m.CreateMAR = i
+			m.CreateMAR = append(m.CreateMAR, i)
 		case ie.PFCPSEReqFlags:
 			m.PFCPSEReqFlags = i
 		case ie.CreateBridgeInfoForTSC:
 			m.CreateBridgeInfoForTSC = i
 		case ie.CreateSRR:
-			m.CreateSRR = i
+			m.CreateSRR = append(m.CreateSRR, i)
 		case ie.ProvideATSSSControlInformation:
 			m.ProvideATSSSControlInformation = i
 		case ie.RecoveryTimeStamp:
@@ -333,22 +333,22 @@ func (m *SessionEstablishmentRequest) MarshalLen() int {
 	if i := m.CPFSEID; i != nil {
 		l += i.MarshalLen()
 	}
-	if i := m.CreatePDR; i != nil {
+	for _, i := range m.CreatePDR {
 		l += i.MarshalLen()
 	}
-	if i := m.CreateFAR; i != nil {
+	for _, i := range m.CreateFAR {
 		l += i.MarshalLen()
 	}
-	if i := m.CreateURR; i != nil {
+	for _, i := range m.CreateURR {
 		l += i.MarshalLen()
 	}
-	if i := m.CreateQER; i != nil {
+	for _, i := range m.CreateQER {
 		l += i.MarshalLen()
 	}
 	if i := m.CreateBAR; i != nil {
 		l += i.MarshalLen()
 	}
-	if i := m.CreateTrafficEndpoint; i != nil {
+	for _, i := range m.CreateTrafficEndpoint {
 		l += i.MarshalLen()
 	}
 	if i := m.PDNType; i != nil {
@@ -369,7 +369,7 @@ func (m *SessionEstablishmentRequest) MarshalLen() int {
 	if i := m.APNDNN; i != nil {
 		l += i.MarshalLen()
 	}
-	if i := m.CreateMAR; i != nil {
+	for _, i := range m.CreateMAR {
 		l += i.MarshalLen()
 	}
 	if i := m.PFCPSEReqFlags; i != nil {
@@ -378,7 +378,7 @@ func (m *SessionEstablishmentRequest) MarshalLen() int {
 	if i := m.CreateBridgeInfoForTSC; i != nil {
 		l += i.MarshalLen()
 	}
-	if i := m.CreateSRR; i != nil {
+	for _, i := range m.CreateSRR {
 		l += i.MarshalLen()
 	}
 	if i := m.ProvideATSSSControlInformation; i != nil {

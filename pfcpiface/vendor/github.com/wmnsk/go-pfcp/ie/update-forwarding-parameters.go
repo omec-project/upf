@@ -5,8 +5,8 @@
 package ie
 
 // NewUpdateForwardingParameters creates a new UpdateForwardingParameters IE.
-func NewUpdateForwardingParameters(di, ni, redi, ohc, tlm, fp, he, smflags, ltei, dit, dnai *IE) *IE {
-	return newGroupedIE(UpdateForwardingParameters, 0, di, ni, redi, ohc, tlm, fp, he, smflags, ltei, dit, dnai)
+func NewUpdateForwardingParameters(ies ...*IE) *IE {
+	return newGroupedIE(UpdateForwardingParameters, 0, ies...)
 }
 
 // UpdateForwardingParameters returns the IEs above UpdateForwardingParameters if the type of IE matches.

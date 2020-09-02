@@ -5,8 +5,8 @@
 package ie
 
 // NewDownlinkDataReport creates a new DownlinkDataReport IE.
-func NewDownlinkDataReport(pdr, sinfo, psize *IE) *IE {
-	return newGroupedIE(DownlinkDataReport, 0, pdr, sinfo, psize)
+func NewDownlinkDataReport(ies ...*IE) *IE {
+	return newGroupedIE(DownlinkDataReport, 0, ies...)
 }
 
 // DownlinkDataReport returns the IEs above DownlinkDataReport if the type of IE matches.
