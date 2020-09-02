@@ -5,8 +5,8 @@
 package ie
 
 // NewCreateSRR creates a new CreateSRR IE.
-func NewCreateSRR(srr, availability, qos *IE) *IE {
-	return newGroupedIE(CreateSRR, 0, srr, availability, qos)
+func NewCreateSRR(ies ...*IE) *IE {
+	return newGroupedIE(CreateSRR, 0, ies...)
 }
 
 // CreateSRR returns the IEs above CreateSRR if the type of IE matches.

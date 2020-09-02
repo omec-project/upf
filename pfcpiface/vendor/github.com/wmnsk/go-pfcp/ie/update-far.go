@@ -5,8 +5,8 @@
 package ie
 
 // NewUpdateFAR creates a new UpdateFAR IE.
-func NewUpdateFAR(far, action, fwd, dup, bar, rtp *IE) *IE {
-	return newGroupedIE(UpdateFAR, 0, far, action, fwd, dup, bar, rtp)
+func NewUpdateFAR(ies ...*IE) *IE {
+	return newGroupedIE(UpdateFAR, 0, ies...)
 }
 
 // UpdateFAR returns the IEs above UpdateFAR if the type of IE matches.

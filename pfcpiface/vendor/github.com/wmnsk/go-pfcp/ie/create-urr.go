@@ -5,19 +5,9 @@
 package ie
 
 // NewCreateURR creates a new CreateURR IE.
-func NewCreateURR(
-	urr, method, triggers, period, volth, volqt, evth, evqt,
-	timeth, timeqt, qhtime, dropped, vtime, montime, subvth, subtimeth,
-	subvqt, subtimeqt, subevth, subevqt, inact, likedURR, mInfo, mechanism,
-	aggURRs, far, ethInact, addMontime, reports *IE) *IE {
+func NewCreateURR(ies ...*IE) *IE {
 
-	return newGroupedIE(
-		CreateURR, 0,
-		urr, method, triggers, period, volth, volqt, evth, evqt,
-		timeth, timeqt, qhtime, dropped, vtime, montime, subvth, subtimeth,
-		subvqt, subtimeqt, subevth, subevqt, inact, likedURR, mInfo, mechanism,
-		aggURRs, far, ethInact, addMontime, reports,
-	)
+	return newGroupedIE(CreateURR, 0, ies...)
 }
 
 // CreateURR returns the IEs above CreateURR if the type of IE matches.

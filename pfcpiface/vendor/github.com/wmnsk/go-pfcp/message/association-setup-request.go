@@ -15,6 +15,7 @@ type AssociationSetupRequest struct {
 	RecoveryTimeStamp               *ie.IE
 	UPFunctionFeatures              *ie.IE
 	CPFunctionFeatures              *ie.IE
+	UserPlaneIPResourceInformation  *ie.IE
 	AlternativeSMFIPAddress         *ie.IE
 	SMFSetID                        *ie.IE
 	PFCPSessionRetentionInformation *ie.IE
@@ -45,6 +46,8 @@ func NewAssociationSetupRequest(seq uint32, ies ...*ie.IE) *AssociationSetupRequ
 			m.UPFunctionFeatures = i
 		case ie.CPFunctionFeatures:
 			m.CPFunctionFeatures = i
+		case ie.UserPlaneIPResourceInformation:
+			m.UserPlaneIPResourceInformation = i
 		case ie.AlternativeSMFIPAddress:
 			m.AlternativeSMFIPAddress = i
 		case ie.SMFSetID:
@@ -105,6 +108,12 @@ func (m *AssociationSetupRequest) MarshalTo(b []byte) error {
 		offset += i.MarshalLen()
 	}
 	if i := m.CPFunctionFeatures; i != nil {
+		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
+			return err
+		}
+		offset += i.MarshalLen()
+	}
+	if i := m.UserPlaneIPResourceInformation; i != nil {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
@@ -202,6 +211,8 @@ func (m *AssociationSetupRequest) UnmarshalBinary(b []byte) error {
 			m.UPFunctionFeatures = i
 		case ie.CPFunctionFeatures:
 			m.CPFunctionFeatures = i
+		case ie.UserPlaneIPResourceInformation:
+			m.UserPlaneIPResourceInformation = i
 		case ie.AlternativeSMFIPAddress:
 			m.AlternativeSMFIPAddress = i
 		case ie.SMFSetID:
@@ -238,6 +249,9 @@ func (m *AssociationSetupRequest) MarshalLen() int {
 		l += i.MarshalLen()
 	}
 	if i := m.CPFunctionFeatures; i != nil {
+		l += i.MarshalLen()
+	}
+	if i := m.UserPlaneIPResourceInformation; i != nil {
 		l += i.MarshalLen()
 	}
 	if i := m.AlternativeSMFIPAddress; i != nil {

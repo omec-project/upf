@@ -5,8 +5,8 @@
 package ie
 
 // NewApplicationDetectionInformation creates a new ApplicationDetectionInformation IE.
-func NewApplicationDetectionInformation(appID, instID, flowInfo, pdrID *IE) *IE {
-	return newGroupedIE(ApplicationDetectionInformation, 0, appID, instID, flowInfo, pdrID)
+func NewApplicationDetectionInformation(ies ...*IE) *IE {
+	return newGroupedIE(ApplicationDetectionInformation, 0, ies...)
 }
 
 // ApplicationDetectionInformation returns the IEs above ApplicationDetectionInformation if the type of IE matches.

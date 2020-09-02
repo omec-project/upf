@@ -5,8 +5,8 @@
 package ie
 
 // NewClockDriftControlInformation creates a new ClockDriftControlInformation IE.
-func NewClockDriftControlInformation(info, num, timeOffset, rateRatio *IE) *IE {
-	return newGroupedIE(ClockDriftControlInformation, 0, info, num, timeOffset, rateRatio)
+func NewClockDriftControlInformation(ies ...*IE) *IE {
+	return newGroupedIE(ClockDriftControlInformation, 0, ies...)
 }
 
 // ClockDriftControlInformation returns the IEs above ClockDriftControlInformation if the type of IE matches.

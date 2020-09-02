@@ -5,8 +5,8 @@
 package ie
 
 // NewEthernetPacketFilter creates a new EthernetPacketFilter IE.
-func NewEthernetPacketFilter(fid, fprop, mac, etype, ctag, stag, sdfFilter *IE) *IE {
-	return newGroupedIE(EthernetPacketFilter, 0, fid, fprop, mac, etype, ctag, stag, sdfFilter)
+func NewEthernetPacketFilter(ies ...*IE) *IE {
+	return newGroupedIE(EthernetPacketFilter, 0, ies...)
 }
 
 // EthernetPacketFilter returns the IEs above EthernetPacketFilter if the type of IE matches.

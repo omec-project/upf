@@ -5,8 +5,8 @@
 package ie
 
 // NewMPTCPParameters creates a new MPTCPParameters IE.
-func NewMPTCPParameters(mptcpAddr, ueLinkAddr *IE) *IE {
-	return newGroupedIE(MPTCPParameters, 0, mptcpAddr, ueLinkAddr)
+func NewMPTCPParameters(ies ...*IE) *IE {
+	return newGroupedIE(MPTCPParameters, 0, ies...)
 }
 
 // MPTCPParameters returns the IEs above MPTCPParameters if the type of IE matches.

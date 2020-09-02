@@ -5,8 +5,8 @@
 package ie
 
 // NewDuplicatingParameters creates a new DuplicatingParameters IE.
-func NewDuplicatingParameters(di, ohc, tlm, fp *IE) *IE {
-	return newGroupedIE(DuplicatingParameters, 0, di, ohc, tlm, fp)
+func NewDuplicatingParameters(ies ...*IE) *IE {
+	return newGroupedIE(DuplicatingParameters, 0, ies...)
 }
 
 // DuplicatingParameters returns the IEs above DuplicatingParameters if the type of IE matches.

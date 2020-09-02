@@ -5,8 +5,8 @@
 package ie
 
 // NewUpdateMAR creates a new UpdateMAR IE.
-func NewUpdateMAR(marID, sfunc, smode, updateTGPPAction, updateNonTGPPInfo, tgppAction, nonTGPPInfo *IE) *IE {
-	return newGroupedIE(UpdateMAR, 0, marID, sfunc, smode, updateTGPPAction, updateNonTGPPInfo, tgppAction, nonTGPPInfo)
+func NewUpdateMAR(ies ...*IE) *IE {
+	return newGroupedIE(UpdateMAR, 0, ies...)
 }
 
 // UpdateMAR returns the IEs above UpdateMAR if the type of IE matches.

@@ -15,12 +15,12 @@ type SessionEstablishmentResponse struct {
 	Cause                      *ie.IE
 	OffendingIE                *ie.IE
 	UPFSEID                    *ie.IE
-	CreatedPDR                 *ie.IE
+	CreatedPDR                 []*ie.IE
 	LoadControlInformation     *ie.IE
 	OverloadControlInformation *ie.IE
 	FQCSID                     *ie.IE
 	FailedRuleID               *ie.IE
-	CreatedTrafficEndpoint     *ie.IE
+	CreatedTrafficEndpoint     []*ie.IE
 	CreatedBridgeInfoForTSC    *ie.IE
 	ATSSSControlParameters     *ie.IE
 	IEs                        []*ie.IE
@@ -47,7 +47,7 @@ func NewSessionEstablishmentResponse(mp, fo uint8, seid uint64, seq uint32, pri 
 		case ie.FSEID:
 			m.UPFSEID = i
 		case ie.CreatedPDR:
-			m.CreatedPDR = i
+			m.CreatedPDR = append(m.CreatedPDR, i)
 		case ie.LoadControlInformation:
 			m.LoadControlInformation = i
 		case ie.OverloadControlInformation:
@@ -57,7 +57,7 @@ func NewSessionEstablishmentResponse(mp, fo uint8, seid uint64, seq uint32, pri 
 		case ie.FailedRuleID:
 			m.FailedRuleID = i
 		case ie.CreatedTrafficEndpoint:
-			m.CreatedTrafficEndpoint = i
+			m.CreatedTrafficEndpoint = append(m.CreatedTrafficEndpoint, i)
 		case ie.CreatedBridgeInfoForTSC:
 			m.CreatedBridgeInfoForTSC = i
 		case ie.ATSSSControlParameters:
@@ -113,7 +113,7 @@ func (m *SessionEstablishmentResponse) MarshalTo(b []byte) error {
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.CreatedPDR; i != nil {
+	for _, i := range m.CreatedPDR {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
@@ -143,7 +143,7 @@ func (m *SessionEstablishmentResponse) MarshalTo(b []byte) error {
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.CreatedTrafficEndpoint; i != nil {
+	for _, i := range m.CreatedTrafficEndpoint {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
@@ -212,7 +212,7 @@ func (m *SessionEstablishmentResponse) UnmarshalBinary(b []byte) error {
 		case ie.FSEID:
 			m.UPFSEID = i
 		case ie.CreatedPDR:
-			m.CreatedPDR = i
+			m.CreatedPDR = append(m.CreatedPDR, i)
 		case ie.LoadControlInformation:
 			m.LoadControlInformation = i
 		case ie.OverloadControlInformation:
@@ -222,7 +222,7 @@ func (m *SessionEstablishmentResponse) UnmarshalBinary(b []byte) error {
 		case ie.FailedRuleID:
 			m.FailedRuleID = i
 		case ie.CreatedTrafficEndpoint:
-			m.CreatedTrafficEndpoint = i
+			m.CreatedTrafficEndpoint = append(m.CreatedTrafficEndpoint, i)
 		case ie.CreatedBridgeInfoForTSC:
 			m.CreatedBridgeInfoForTSC = i
 		case ie.ATSSSControlParameters:
@@ -251,7 +251,7 @@ func (m *SessionEstablishmentResponse) MarshalLen() int {
 	if i := m.UPFSEID; i != nil {
 		l += i.MarshalLen()
 	}
-	if i := m.CreatedPDR; i != nil {
+	for _, i := range m.CreatedPDR {
 		l += i.MarshalLen()
 	}
 	if i := m.LoadControlInformation; i != nil {
@@ -266,7 +266,7 @@ func (m *SessionEstablishmentResponse) MarshalLen() int {
 	if i := m.FailedRuleID; i != nil {
 		l += i.MarshalLen()
 	}
-	if i := m.CreatedTrafficEndpoint; i != nil {
+	for _, i := range m.CreatedTrafficEndpoint {
 		l += i.MarshalLen()
 	}
 	if i := m.CreatedBridgeInfoForTSC; i != nil {

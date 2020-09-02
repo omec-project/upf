@@ -5,8 +5,8 @@
 package ie
 
 // NewLoadControlInformation creates a new LoadControlInformation IE.
-func NewLoadControlInformation(seq, metric *IE) *IE {
-	return newGroupedIE(LoadControlInformation, 0, seq, metric)
+func NewLoadControlInformation(ies ...*IE) *IE {
+	return newGroupedIE(LoadControlInformation, 0, ies...)
 }
 
 // LoadControlInformation returns the IEs above LoadControlInformation if the type of IE matches.
