@@ -115,7 +115,6 @@ func parseCreatePDRPDI(pdi []*ie.IE) *pdr {
 				pdrI.dstIPMask = ueIPMask
 			}
 		case ie.SDFFilter:
-			inetIP4Address := "0.0.0.0/0"
 			// Do nothing for the time being
 			sdfFields, err := ie2.SDFFilter()
 			if err != nil {
@@ -129,7 +128,7 @@ func parseCreatePDRPDI(pdi []*ie.IE) *pdr {
 				// TODO: Implement referencing SDF ID
 				continue
 			}
-			inetIP4Address = parseFlowDesc(flowDesc)
+			inetIP4Address := parseFlowDesc(flowDesc)
 			log.Println("Flow Description is:", inetIP4Address)
 
 			dstIP4, dstIP4Net, err := net.ParseCIDR(inetIP4Address)
