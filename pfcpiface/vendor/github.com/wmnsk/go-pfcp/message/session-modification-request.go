@@ -12,38 +12,38 @@ import (
 type SessionModificationRequest struct {
 	*Header
 	CPFSEID                         *ie.IE
-	RemovePDR                       *ie.IE
-	RemoveFAR                       *ie.IE
-	RemoveURR                       *ie.IE
-	RemoveQER                       *ie.IE
+	RemovePDR                       []*ie.IE
+	RemoveFAR                       []*ie.IE
+	RemoveURR                       []*ie.IE
+	RemoveQER                       []*ie.IE
 	RemoveBAR                       *ie.IE
-	RemoveTrafficEndpoint           *ie.IE
-	CreatePDR                       *ie.IE
-	CreateFAR                       *ie.IE
-	CreateURR                       *ie.IE
-	CreateQER                       *ie.IE
+	RemoveTrafficEndpoint           []*ie.IE
+	CreatePDR                       []*ie.IE
+	CreateFAR                       []*ie.IE
+	CreateURR                       []*ie.IE
+	CreateQER                       []*ie.IE
 	CreateBAR                       *ie.IE
-	CreateTrafficEndpoint           *ie.IE
-	UpdatePDR                       *ie.IE
-	UpdateFAR                       *ie.IE
-	UpdateURR                       *ie.IE
-	UpdateQER                       *ie.IE
+	CreateTrafficEndpoint           []*ie.IE
+	UpdatePDR                       []*ie.IE
+	UpdateFAR                       []*ie.IE
+	UpdateURR                       []*ie.IE
+	UpdateQER                       []*ie.IE
 	UpdateBAR                       *ie.IE
-	UpdateTrafficEndpoint           *ie.IE
+	UpdateTrafficEndpoint           []*ie.IE
 	PFCPSMReqFlags                  *ie.IE
-	QueryURR                        *ie.IE
+	QueryURR                        []*ie.IE
 	FQCSID                          *ie.IE
 	UserPlaneInactivityTimer        *ie.IE
 	QueryURRReference               *ie.IE
 	TraceInformation                *ie.IE
-	RemoveMAR                       *ie.IE
-	UpdateMAR                       *ie.IE
-	CreateMAR                       *ie.IE
+	RemoveMAR                       []*ie.IE
+	UpdateMAR                       []*ie.IE
+	CreateMAR                       []*ie.IE
 	NodeID                          *ie.IE
 	PortManagementInformationForTSC *ie.IE
-	RemoveSRR                       *ie.IE
-	CreateSRR                       *ie.IE
-	UpdateSRR                       *ie.IE
+	RemoveSRR                       []*ie.IE
+	CreateSRR                       []*ie.IE
+	UpdateSRR                       []*ie.IE
 	ProvideATSSSControlInformation  *ie.IE
 	EthernetContextInformation      *ie.IE
 	AccessAvailabilityInformation   *ie.IE
@@ -65,45 +65,45 @@ func NewSessionModificationRequest(mp, fo uint8, seid uint64, seq uint32, pri ui
 		case ie.FSEID:
 			m.CPFSEID = i
 		case ie.RemovePDR:
-			m.RemovePDR = i
+			m.RemovePDR = append(m.RemovePDR, i)
 		case ie.RemoveFAR:
-			m.RemoveFAR = i
+			m.RemoveFAR = append(m.RemoveFAR, i)
 		case ie.RemoveURR:
-			m.RemoveURR = i
+			m.RemoveURR = append(m.RemoveURR, i)
 		case ie.RemoveQER:
-			m.RemoveQER = i
+			m.RemoveQER = append(m.RemoveQER, i)
 		case ie.RemoveBAR:
 			m.RemoveBAR = i
 		case ie.RemoveTrafficEndpoint:
-			m.RemoveTrafficEndpoint = i
+			m.RemoveTrafficEndpoint = append(m.RemoveTrafficEndpoint, i)
 		case ie.CreatePDR:
-			m.CreatePDR = i
+			m.CreatePDR = append(m.CreatePDR, i)
 		case ie.CreateFAR:
-			m.CreateFAR = i
+			m.CreateFAR = append(m.CreateFAR, i)
 		case ie.CreateURR:
-			m.CreateURR = i
+			m.CreateURR = append(m.CreateURR, i)
 		case ie.CreateQER:
-			m.CreateQER = i
+			m.CreateQER = append(m.CreateQER, i)
 		case ie.CreateBAR:
 			m.CreateBAR = i
 		case ie.CreateTrafficEndpoint:
-			m.CreateTrafficEndpoint = i
+			m.CreateTrafficEndpoint = append(m.CreateTrafficEndpoint, i)
 		case ie.UpdatePDR:
-			m.UpdatePDR = i
+			m.UpdatePDR = append(m.UpdatePDR, i)
 		case ie.UpdateFAR:
-			m.UpdateFAR = i
+			m.UpdateFAR = append(m.UpdateFAR, i)
 		case ie.UpdateURR:
-			m.UpdateURR = i
+			m.UpdateURR = append(m.UpdateURR, i)
 		case ie.UpdateQER:
-			m.UpdateQER = i
+			m.UpdateQER = append(m.UpdateQER, i)
 		case ie.UpdateBARWithinSessionModificationRequest:
 			m.UpdateBAR = i
 		case ie.UpdateTrafficEndpoint:
-			m.UpdateTrafficEndpoint = i
+			m.UpdateTrafficEndpoint = append(m.UpdateTrafficEndpoint, i)
 		case ie.PFCPSMReqFlags:
 			m.PFCPSMReqFlags = i
 		case ie.QueryURR:
-			m.QueryURR = i
+			m.QueryURR = append(m.QueryURR, i)
 		case ie.FQCSID:
 			m.FQCSID = i
 		case ie.UserPlaneInactivityTimer:
@@ -113,21 +113,21 @@ func NewSessionModificationRequest(mp, fo uint8, seid uint64, seq uint32, pri ui
 		case ie.TraceInformation:
 			m.TraceInformation = i
 		case ie.RemoveMAR:
-			m.RemoveMAR = i
+			m.RemoveMAR = append(m.RemoveMAR, i)
 		case ie.UpdateMAR:
-			m.UpdateMAR = i
+			m.UpdateMAR = append(m.UpdateMAR, i)
 		case ie.CreateMAR:
-			m.CreateMAR = i
+			m.CreateMAR = append(m.CreateMAR, i)
 		case ie.NodeID:
 			m.NodeID = i
 		case ie.PortManagementInformationForTSCWithinSessionModificationRequest:
 			m.PortManagementInformationForTSC = i
 		case ie.RemoveSRR:
-			m.RemoveSRR = i
+			m.RemoveSRR = append(m.RemoveSRR, i)
 		case ie.CreateSRR:
-			m.CreateSRR = i
+			m.CreateSRR = append(m.CreateSRR, i)
 		case ie.UpdateSRR:
-			m.UpdateSRR = i
+			m.UpdateSRR = append(m.UpdateSRR, i)
 		case ie.ProvideATSSSControlInformation:
 			m.ProvideATSSSControlInformation = i
 		case ie.EthernetContextInformation:
@@ -167,25 +167,25 @@ func (m *SessionModificationRequest) MarshalTo(b []byte) error {
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.RemovePDR; i != nil {
+	for _, i := range m.RemovePDR {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.RemoveFAR; i != nil {
+	for _, i := range m.RemoveFAR {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.RemoveURR; i != nil {
+	for _, i := range m.RemoveURR {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.RemoveQER; i != nil {
+	for _, i := range m.RemoveQER {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
@@ -197,31 +197,31 @@ func (m *SessionModificationRequest) MarshalTo(b []byte) error {
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.RemoveTrafficEndpoint; i != nil {
+	for _, i := range m.RemoveTrafficEndpoint {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.CreatePDR; i != nil {
+	for _, i := range m.CreatePDR {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.CreateFAR; i != nil {
+	for _, i := range m.CreateFAR {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.CreateURR; i != nil {
+	for _, i := range m.CreateURR {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.CreateQER; i != nil {
+	for _, i := range m.CreateQER {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
@@ -233,31 +233,31 @@ func (m *SessionModificationRequest) MarshalTo(b []byte) error {
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.CreateTrafficEndpoint; i != nil {
+	for _, i := range m.CreateTrafficEndpoint {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.UpdatePDR; i != nil {
+	for _, i := range m.UpdatePDR {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.UpdateFAR; i != nil {
+	for _, i := range m.UpdateFAR {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.UpdateURR; i != nil {
+	for _, i := range m.UpdateURR {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.UpdateQER; i != nil {
+	for _, i := range m.UpdateQER {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
@@ -269,7 +269,7 @@ func (m *SessionModificationRequest) MarshalTo(b []byte) error {
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.UpdateTrafficEndpoint; i != nil {
+	for _, i := range m.UpdateTrafficEndpoint {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
@@ -281,7 +281,7 @@ func (m *SessionModificationRequest) MarshalTo(b []byte) error {
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.QueryURR; i != nil {
+	for _, i := range m.QueryURR {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
@@ -311,19 +311,19 @@ func (m *SessionModificationRequest) MarshalTo(b []byte) error {
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.RemoveMAR; i != nil {
+	for _, i := range m.RemoveMAR {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.UpdateMAR; i != nil {
+	for _, i := range m.UpdateMAR {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.CreateMAR; i != nil {
+	for _, i := range m.CreateMAR {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
@@ -341,19 +341,19 @@ func (m *SessionModificationRequest) MarshalTo(b []byte) error {
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.RemoveSRR; i != nil {
+	for _, i := range m.RemoveSRR {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.CreateSRR; i != nil {
+	for _, i := range m.CreateSRR {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.UpdateSRR; i != nil {
+	for _, i := range m.UpdateSRR {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
@@ -422,45 +422,45 @@ func (m *SessionModificationRequest) UnmarshalBinary(b []byte) error {
 		case ie.FSEID:
 			m.CPFSEID = i
 		case ie.RemovePDR:
-			m.RemovePDR = i
+			m.RemovePDR = append(m.RemovePDR, i)
 		case ie.RemoveFAR:
-			m.RemoveFAR = i
+			m.RemoveFAR = append(m.RemoveFAR, i)
 		case ie.RemoveURR:
-			m.RemoveURR = i
+			m.RemoveURR = append(m.RemoveURR, i)
 		case ie.RemoveQER:
-			m.RemoveQER = i
+			m.RemoveQER = append(m.RemoveQER, i)
 		case ie.RemoveBAR:
 			m.RemoveBAR = i
 		case ie.RemoveTrafficEndpoint:
-			m.RemoveTrafficEndpoint = i
+			m.RemoveTrafficEndpoint = append(m.RemoveTrafficEndpoint, i)
 		case ie.CreatePDR:
-			m.CreatePDR = i
+			m.CreatePDR = append(m.CreatePDR, i)
 		case ie.CreateFAR:
-			m.CreateFAR = i
+			m.CreateFAR = append(m.CreateFAR, i)
 		case ie.CreateURR:
-			m.CreateURR = i
+			m.CreateURR = append(m.CreateURR, i)
 		case ie.CreateQER:
-			m.CreateQER = i
+			m.CreateQER = append(m.CreateQER, i)
 		case ie.CreateBAR:
 			m.CreateBAR = i
 		case ie.CreateTrafficEndpoint:
-			m.CreateTrafficEndpoint = i
+			m.CreateTrafficEndpoint = append(m.CreateTrafficEndpoint, i)
 		case ie.UpdatePDR:
-			m.UpdatePDR = i
+			m.UpdatePDR = append(m.UpdatePDR, i)
 		case ie.UpdateFAR:
-			m.UpdateFAR = i
+			m.UpdateFAR = append(m.UpdateFAR, i)
 		case ie.UpdateURR:
-			m.UpdateURR = i
+			m.UpdateURR = append(m.UpdateURR, i)
 		case ie.UpdateQER:
-			m.UpdateQER = i
+			m.UpdateQER = append(m.UpdateQER, i)
 		case ie.UpdateBARWithinSessionModificationRequest:
 			m.UpdateBAR = i
 		case ie.UpdateTrafficEndpoint:
-			m.UpdateTrafficEndpoint = i
+			m.UpdateTrafficEndpoint = append(m.UpdateTrafficEndpoint, i)
 		case ie.PFCPSMReqFlags:
 			m.PFCPSMReqFlags = i
 		case ie.QueryURR:
-			m.QueryURR = i
+			m.QueryURR = append(m.QueryURR, i)
 		case ie.FQCSID:
 			m.FQCSID = i
 		case ie.UserPlaneInactivityTimer:
@@ -470,21 +470,21 @@ func (m *SessionModificationRequest) UnmarshalBinary(b []byte) error {
 		case ie.TraceInformation:
 			m.TraceInformation = i
 		case ie.RemoveMAR:
-			m.RemoveMAR = i
+			m.RemoveMAR = append(m.RemoveMAR, i)
 		case ie.UpdateMAR:
-			m.UpdateMAR = i
+			m.UpdateMAR = append(m.UpdateMAR, i)
 		case ie.CreateMAR:
-			m.CreateMAR = i
+			m.CreateMAR = append(m.CreateMAR, i)
 		case ie.NodeID:
 			m.NodeID = i
 		case ie.PortManagementInformationForTSCWithinSessionModificationRequest:
 			m.PortManagementInformationForTSC = i
 		case ie.RemoveSRR:
-			m.RemoveSRR = i
+			m.RemoveSRR = append(m.RemoveSRR, i)
 		case ie.CreateSRR:
-			m.CreateSRR = i
+			m.CreateSRR = append(m.CreateSRR, i)
 		case ie.UpdateSRR:
-			m.UpdateSRR = i
+			m.UpdateSRR = append(m.UpdateSRR, i)
 		case ie.ProvideATSSSControlInformation:
 			m.ProvideATSSSControlInformation = i
 		case ie.EthernetContextInformation:
@@ -506,64 +506,64 @@ func (m *SessionModificationRequest) MarshalLen() int {
 	if i := m.CPFSEID; i != nil {
 		l += i.MarshalLen()
 	}
-	if i := m.RemovePDR; i != nil {
+	for _, i := range m.RemovePDR {
 		l += i.MarshalLen()
 	}
-	if i := m.RemoveFAR; i != nil {
+	for _, i := range m.RemoveFAR {
 		l += i.MarshalLen()
 	}
-	if i := m.RemoveURR; i != nil {
+	for _, i := range m.RemoveURR {
 		l += i.MarshalLen()
 	}
-	if i := m.RemoveQER; i != nil {
+	for _, i := range m.RemoveQER {
 		l += i.MarshalLen()
 	}
 	if i := m.RemoveBAR; i != nil {
 		l += i.MarshalLen()
 	}
-	if i := m.RemoveTrafficEndpoint; i != nil {
+	for _, i := range m.RemoveTrafficEndpoint {
 		l += i.MarshalLen()
 	}
-	if i := m.CreatePDR; i != nil {
+	for _, i := range m.CreatePDR {
 		l += i.MarshalLen()
 	}
-	if i := m.CreateFAR; i != nil {
+	for _, i := range m.CreateFAR {
 		l += i.MarshalLen()
 	}
-	if i := m.CreateURR; i != nil {
+	for _, i := range m.CreateURR {
 		l += i.MarshalLen()
 	}
-	if i := m.CreateQER; i != nil {
+	for _, i := range m.CreateQER {
 		l += i.MarshalLen()
 	}
 	if i := m.CreateBAR; i != nil {
 		l += i.MarshalLen()
 	}
-	if i := m.CreateTrafficEndpoint; i != nil {
+	for _, i := range m.CreateTrafficEndpoint {
 		l += i.MarshalLen()
 	}
-	if i := m.UpdatePDR; i != nil {
+	for _, i := range m.UpdatePDR {
 		l += i.MarshalLen()
 	}
-	if i := m.UpdateFAR; i != nil {
+	for _, i := range m.UpdateFAR {
 		l += i.MarshalLen()
 	}
-	if i := m.UpdateURR; i != nil {
+	for _, i := range m.UpdateURR {
 		l += i.MarshalLen()
 	}
-	if i := m.UpdateQER; i != nil {
+	for _, i := range m.UpdateQER {
 		l += i.MarshalLen()
 	}
 	if i := m.UpdateBAR; i != nil {
 		l += i.MarshalLen()
 	}
-	if i := m.UpdateTrafficEndpoint; i != nil {
+	for _, i := range m.UpdateTrafficEndpoint {
 		l += i.MarshalLen()
 	}
 	if i := m.PFCPSMReqFlags; i != nil {
 		l += i.MarshalLen()
 	}
-	if i := m.QueryURR; i != nil {
+	for _, i := range m.QueryURR {
 		l += i.MarshalLen()
 	}
 	if i := m.FQCSID; i != nil {
@@ -578,13 +578,13 @@ func (m *SessionModificationRequest) MarshalLen() int {
 	if i := m.TraceInformation; i != nil {
 		l += i.MarshalLen()
 	}
-	if i := m.RemoveMAR; i != nil {
+	for _, i := range m.RemoveMAR {
 		l += i.MarshalLen()
 	}
-	if i := m.UpdateMAR; i != nil {
+	for _, i := range m.UpdateMAR {
 		l += i.MarshalLen()
 	}
-	if i := m.CreateMAR; i != nil {
+	for _, i := range m.CreateMAR {
 		l += i.MarshalLen()
 	}
 	if i := m.NodeID; i != nil {
@@ -593,13 +593,13 @@ func (m *SessionModificationRequest) MarshalLen() int {
 	if i := m.PortManagementInformationForTSC; i != nil {
 		l += i.MarshalLen()
 	}
-	if i := m.RemoveSRR; i != nil {
+	for _, i := range m.RemoveSRR {
 		l += i.MarshalLen()
 	}
-	if i := m.CreateSRR; i != nil {
+	for _, i := range m.CreateSRR {
 		l += i.MarshalLen()
 	}
-	if i := m.UpdateSRR; i != nil {
+	for _, i := range m.UpdateSRR {
 		l += i.MarshalLen()
 	}
 	if i := m.ProvideATSSSControlInformation; i != nil {

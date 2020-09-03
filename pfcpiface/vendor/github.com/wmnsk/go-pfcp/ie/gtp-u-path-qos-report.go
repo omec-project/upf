@@ -5,8 +5,8 @@
 package ie
 
 // NewGTPUPathQoSReport creates a new GTPUPathQoSReport IE.
-func NewGTPUPathQoSReport(peer, itype, qTrigger, ts, stime, qos *IE) *IE {
-	return newGroupedIE(GTPUPathQoSReport, 0, peer, itype, qTrigger, ts, stime, qos)
+func NewGTPUPathQoSReport(ies ...*IE) *IE {
+	return newGroupedIE(GTPUPathQoSReport, 0, ies...)
 }
 
 // GTPUPathQoSReport returns the IEs above GTPUPathQoSReport if the type of IE matches.

@@ -5,8 +5,8 @@
 package ie
 
 // NewSessionReport creates a new SessionReport IE.
-func NewSessionReport(srr, availability, qos *IE) *IE {
-	return newGroupedIE(SessionReport, 0, srr, availability, qos)
+func NewSessionReport(ies ...*IE) *IE {
+	return newGroupedIE(SessionReport, 0, ies...)
 }
 
 // SessionReport returns the IEs above SessionReport if the type of IE matches.

@@ -5,8 +5,8 @@
 package ie
 
 // NewClockDriftReport creates a new ClockDriftReport IE.
-func NewClockDriftReport(domain, offset, rate, ts *IE) *IE {
-	return newGroupedIE(ClockDriftReport, 0, domain, offset, rate, ts)
+func NewClockDriftReport(ies ...*IE) *IE {
+	return newGroupedIE(ClockDriftReport, 0, ies...)
 }
 
 // ClockDriftReport returns the IEs above ClockDriftReport if the type of IE matches.

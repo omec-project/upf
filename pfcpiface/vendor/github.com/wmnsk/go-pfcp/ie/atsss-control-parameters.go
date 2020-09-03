@@ -5,8 +5,8 @@
 package ie
 
 // NewATSSSControlParameters creates a new ATSSSControlParameters IE.
-func NewATSSSControlParameters(mptcp, atsssll, pmf *IE) *IE {
-	return newGroupedIE(ATSSSControlParameters, 0, mptcp, atsssll, pmf)
+func NewATSSSControlParameters(ies ...*IE) *IE {
+	return newGroupedIE(ATSSSControlParameters, 0, ies...)
 }
 
 // ATSSSControlParameters returns the IEs above ATSSSControlParameters if the type of IE matches.

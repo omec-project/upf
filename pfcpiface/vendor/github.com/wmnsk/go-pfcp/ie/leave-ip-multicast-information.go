@@ -5,8 +5,8 @@
 package ie
 
 // NewLeaveIPMulticastInformationWithinUsageReport creates a new LeaveIPMulticastInformationWithinUsageReport IE.
-func NewLeaveIPMulticastInformationWithinUsageReport(multi, source *IE) *IE {
-	return newGroupedIE(LeaveIPMulticastInformationWithinUsageReport, 0, multi, source)
+func NewLeaveIPMulticastInformationWithinUsageReport(ies ...*IE) *IE {
+	return newGroupedIE(LeaveIPMulticastInformationWithinUsageReport, 0, ies...)
 }
 
 // LeaveIPMulticastInformationWithinUsageReport returns the IEs above LeaveIPMulticastInformationWithinUsageReport if the type of IE matches.
