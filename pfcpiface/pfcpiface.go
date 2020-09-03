@@ -152,8 +152,7 @@ func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP 
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
 		ie.NewUserPlaneIPResourceInformation(0x41, 0, accessIP, "", "", ie.SrcInterfaceAccess),
-		ie.NewUserPlaneIPResourceInformation(0x41, 0, coreIP, "", "", ie.SrcInterfaceCore),
-		ie.NewSequenceNumber(asreq.SequenceNumber), /* seq # */
+		//ie.NewUserPlaneIPResourceInformation(0x41, 0, coreIP, "", "", ie.SrcInterfaceCore),
 	).Marshal() /* userplane ip resource info */
 	if err != nil {
 		log.Fatalln("Unable to create association setup response", err)
