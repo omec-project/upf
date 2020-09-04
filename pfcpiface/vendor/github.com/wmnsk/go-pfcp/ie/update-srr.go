@@ -5,8 +5,8 @@
 package ie
 
 // NewUpdateSRR creates a new UpdateSRR IE.
-func NewUpdateSRR(srr, availability, qos *IE) *IE {
-	return newGroupedIE(UpdateSRR, 0, srr, availability, qos)
+func NewUpdateSRR(ies ...*IE) *IE {
+	return newGroupedIE(UpdateSRR, 0, ies...)
 }
 
 // UpdateSRR returns the IEs above UpdateSRR if the type of IE matches.

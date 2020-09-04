@@ -125,21 +125,21 @@ class BessClient {
     bess::pb::FieldData *_teid = wmcaa->add_values();
     _teid->set_value_int(pa->enb_teid);
 
-    /* set dst ip */
-    bess::pb::FieldData *dst_ip = wmcaa->add_values();
-    dst_ip->set_value_int(pa->saddr);
-
     /* set src ip */
     bess::pb::FieldData *src_ip = wmcaa->add_values();
     src_ip->set_value_int(pa->daddr);
 
-    /* set dst l4 port */
-    bess::pb::FieldData *l4_dstport = wmcaa->add_values();
-    l4_dstport->set_value_int(pa->sport);
+    /* set dst ip */
+    bess::pb::FieldData *dst_ip = wmcaa->add_values();
+    dst_ip->set_value_int(pa->saddr);
 
     /* set src l4 port */
     bess::pb::FieldData *l4_srcport = wmcaa->add_values();
     l4_srcport->set_value_int(pa->dport);
+
+    /* set dst l4 port */
+    bess::pb::FieldData *l4_dstport = wmcaa->add_values();
+    l4_dstport->set_value_int(pa->sport);
 
     /* set proto id */
     bess::pb::FieldData *_protoid = wmcaa->add_values();
@@ -159,21 +159,21 @@ class BessClient {
     _teid = wmcaa->add_masks();
     _teid->set_value_int(pa->enb_teid_mask);
 
-    /* set dst ip */
-    dst_ip = wmcaa->add_masks();
-    dst_ip->set_value_int(pa->saddr_mask);
-
     /* set src ip */
     src_ip = wmcaa->add_masks();
     src_ip->set_value_int(pa->daddr_mask);
 
-    /* set dst l4 port */
-    l4_dstport = wmcaa->add_masks();
-    l4_dstport->set_value_int(pa->sport_mask);
+    /* set dst ip */
+    dst_ip = wmcaa->add_masks();
+    dst_ip->set_value_int(pa->saddr_mask);
 
     /* set src l4 port */
     l4_srcport = wmcaa->add_masks();
     l4_srcport->set_value_int(pa->dport_mask);
+
+    /* set dst l4 port */
+    l4_dstport = wmcaa->add_masks();
+    l4_dstport->set_value_int(pa->sport_mask);
 
     /* set proto id */
     _protoid = wmcaa->add_masks();

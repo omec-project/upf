@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"log"
+	"math"
 	"net"
 	"time"
 
@@ -29,15 +30,16 @@ type upf struct {
 
 // Don't change these values
 const (
-	udpGTPUPort = 2152
+	tunnelPort = 2152
 
 	// src-iface consts
 	core   = 0x2
 	access = 0x1
 
 	// far-id specific directions
-	uplink   = 0x0
-	downlink = 0x1
+	n3 = 0x0
+	n6 = 0x1
+	n9 = 0x2
 
 	// far-action specific values
 	farForwardU = 0x0
@@ -47,7 +49,7 @@ const (
 type pdr struct {
 	srcIface     uint8
 	tunnelIP4Dst uint32
-	eNBTeid      uint32
+	tunnelTEID   uint32
 	srcIP        uint32
 	dstIP        uint32
 	srcPort      uint16
@@ -56,30 +58,70 @@ type pdr struct {
 
 	srcIfaceMask     uint8
 	tunnelIP4DstMask uint32
-	eNBTeidMask      uint32
+	tunnelTEIDMask   uint32
 	srcIPMask        uint32
 	dstIPMask        uint32
 	srcPortMask      uint16
 	dstPortMask      uint16
 	protoMask        uint8
 
-	pdrID     uint32
-	fseID     uint32
-	ctrID     uint32
-	farID     uint8
-	needDecap uint8
+	precedence uint32
+	pdrID      uint32
+	fseID      uint32
+	ctrID      uint32
+	farID      uint8
+	needDecap  uint8
 }
 
 type far struct {
 	farID uint8
 	fseID uint32
 
-	action      uint8
-	tunnelType  uint8
-	accessIP    uint32
-	eNBIP       uint32
-	eNBTeid     uint32
-	UDPGTPUPort uint16
+	action       uint8
+	tunnelType   uint8
+	tunnelIP4Src uint32
+	tunnelIP4Dst uint32
+	tunnelTEID   uint32
+	tunnelPort   uint16
+}
+
+func printPDR(pdr pdr) {
+	log.Println("------------------ PDR ---------------------")
+	log.Println("Src Iface:", pdr.srcIface)
+	log.Println("tunnelIP4Dst:", int2ip(pdr.tunnelIP4Dst))
+	log.Println("tunnelTEID:", pdr.tunnelTEID)
+	log.Println("srcIP:", int2ip(pdr.srcIP))
+	log.Println("dstIP:", int2ip(pdr.dstIP))
+	log.Println("srcPort:", pdr.srcPort)
+	log.Println("dstPort:", pdr.dstPort)
+	log.Println("proto:", pdr.proto)
+	log.Println("Src Iface Mask:", pdr.srcIfaceMask)
+	log.Println("tunnelIP4Dst Mask:", int2ip(pdr.tunnelIP4DstMask))
+	log.Println("tunnelTEIDMask Mask:", pdr.tunnelTEIDMask)
+	log.Println("srcIP Mask:", int2ip(pdr.srcIPMask))
+	log.Println("dstIP Mask:", int2ip(pdr.dstIPMask))
+	log.Println("srcPort Mask:", pdr.srcPortMask)
+	log.Println("dstPort Mask:", pdr.dstPortMask)
+	log.Println("proto Mask:", pdr.protoMask)
+	log.Println("pdrID:", pdr.pdrID)
+	log.Println("fseID", pdr.fseID)
+	log.Println("ctrID:", pdr.ctrID)
+	log.Println("farID:", pdr.farID)
+	log.Println("needDecap:", pdr.needDecap)
+	log.Println("--------------------------------------------")
+}
+
+func printFAR(far far) {
+	log.Println("------------------ FAR ---------------------")
+	log.Println("FAR ID:", far.farID)
+	log.Println("fseID:", far.fseID)
+	log.Println("action:", far.action)
+	log.Println("tunnelType:", far.tunnelType)
+	log.Println("tunnelIP4Src:", far.tunnelIP4Src)
+	log.Println("tunnelIP4Dst:", far.tunnelIP4Dst)
+	log.Println("tunnelTEID:", far.tunnelTEID)
+	log.Println("tunnelPort:", far.tunnelPort)
+	log.Println("--------------------------------------------")
 }
 
 var intEnc = func(u uint64) *pb.FieldData {
@@ -96,9 +138,14 @@ func (u *upf) sim(method string) {
 	}
 
 	//const ueip, teid, enbip = 0x10000001, 0xf0000000, 0x0b010181
-	ueip, teid, enbip := net.ParseIP(u.simInfo.StartUeIP), hex2int(u.simInfo.StartTeid), net.ParseIP(u.simInfo.StartEnodeIP)
+	ueip := u.simInfo.StartUEIP
+	enbip := u.simInfo.StartENBIP
+	aupfip := u.simInfo.StartAUPFIP
+	n9appip := u.simInfo.N9AppIP
+	n3TEID := hex2int(u.simInfo.StartN3TEID)
+	n9TEID := hex2int(u.simInfo.StartN9TEID)
+
 	const ng4tMaxUeRan, ng4tMaxEnbRan = 500000, 80
-	accessIP := ip2int(u.accessIP)
 
 	for i := uint32(0); i < u.maxSessions; i++ {
 		// NG4T-based formula to calculate enodeB IP address against a given UE IP address
@@ -110,56 +157,120 @@ func (u *upf) sim(method string) {
 		enbIdx := ran*ng4tMaxEnbRan + enbOfRan
 
 		// create/delete downlink pdr
-		pdrDown := pdr{
-			srcIface:     core,
-			srcIP:        ip2int(ueip) + i,
+		pdrN6Down := pdr{
+			srcIface: core,
+			dstIP:    ip2int(ueip) + i,
+
 			srcIfaceMask: 0xFF,
-			srcIPMask:    0xFFFFFFFF,
-			fseID:        teid + i,
-			ctrID:        i,
-			farID:        downlink,
-			needDecap:    0,
+			dstIPMask:    0xFFFFFFFF,
+
+			precedence: 255,
+
+			fseID:     n3TEID + i,
+			ctrID:     i,
+			farID:     n3,
+			needDecap: 0,
+		}
+
+		pdrN9Down := pdr{
+			srcIface:     core,
+			tunnelTEID:   n9TEID + i,
+			tunnelIP4Dst: ip2int(u.coreIP),
+
+			srcIfaceMask:     0xFF,
+			tunnelTEIDMask:   0xFFFFFFFF,
+			tunnelIP4DstMask: 0xFFFFFFFF,
+
+			precedence: 1,
+
+			fseID:     n3TEID + i,
+			ctrID:     i,
+			farID:     n3,
+			needDecap: 1,
 		}
 
 		// create/delete uplink pdr
-		pdrUp := pdr{
+		pdrN6Up := pdr{
 			srcIface:     access,
-			eNBTeid:      teid + i,
-			dstIP:        ip2int(ueip) + i,
-			srcIfaceMask: 0xFF,
-			eNBTeidMask:  0xFFFFFFFF,
-			dstIPMask:    0xFFFFFFFF,
-			fseID:        teid + i,
-			ctrID:        i,
-			farID:        uplink,
-			needDecap:    1,
+			tunnelIP4Dst: ip2int(u.accessIP),
+			tunnelTEID:   n3TEID + i,
+			srcIP:        ip2int(ueip) + i,
+
+			srcIfaceMask:     0xFF,
+			tunnelIP4DstMask: 0xFFFFFFFF,
+			tunnelTEIDMask:   0xFFFFFFFF,
+			srcIPMask:        0xFFFFFFFF,
+
+			precedence: 255,
+
+			fseID:     n3TEID + i,
+			ctrID:     i,
+			farID:     n6,
+			needDecap: 1,
 		}
+
+		pdrN9Up := pdr{
+			srcIface:     access,
+			tunnelIP4Dst: ip2int(u.accessIP),
+			tunnelTEID:   n3TEID + i,
+			dstIP:        ip2int(n9appip),
+
+			srcIfaceMask:     0xFF,
+			tunnelIP4DstMask: 0xFFFFFFFF,
+			tunnelTEIDMask:   0xFFFFFFFF,
+			dstIPMask:        0xFFFFFFFF,
+
+			precedence: 1,
+
+			fseID:     n3TEID + i,
+			ctrID:     i,
+			farID:     n9,
+			needDecap: 1,
+		}
+
+		pdrs := []pdr{pdrN6Down, pdrN9Down, pdrN6Up, pdrN9Up}
 
 		// create/delete downlink far
 		farDown := far{
-			farID:       downlink,
-			fseID:       teid + i,
-			action:      farForwardD,
-			tunnelType:  0x1,
-			accessIP:    accessIP,
-			eNBIP:       ip2int(enbip) + enbIdx,
-			eNBTeid:     teid + i,
-			UDPGTPUPort: udpGTPUPort,
+			farID: n3,
+			fseID: n3TEID + i,
+
+			action:       farForwardD,
+			tunnelType:   0x1,
+			tunnelIP4Src: ip2int(u.accessIP),
+			tunnelIP4Dst: ip2int(enbip) + enbIdx,
+			tunnelTEID:   n3TEID + i,
+			tunnelPort:   tunnelPort,
 		}
 
 		// create/delete uplink far
-		farUp := far{
-			farID:  uplink,
-			fseID:  teid + i,
+		farN6Up := far{
+			farID: n6,
+			fseID: n3TEID + i,
+
 			action: farForwardU,
 		}
 
+		farN9Up := far{
+			farID: n9,
+			fseID: n3TEID + i,
+
+			action:       farForwardU,
+			tunnelType:   0x1,
+			tunnelIP4Src: ip2int(u.coreIP),
+			tunnelIP4Dst: ip2int(aupfip),
+			tunnelTEID:   n9TEID + i,
+			tunnelPort:   tunnelPort,
+		}
+
+		fars := []far{farDown, farN6Up, farN9Up}
+
 		switch timeout := 100 * time.Millisecond; method {
 		case "create":
-			u.simcreateEntries(pdrDown, pdrUp, farDown, farUp, timeout)
+			u.simcreateEntries(pdrs, fars, timeout)
 
 		case "delete":
-			u.simdeleteEntries(pdrDown, pdrUp, farDown, farUp, timeout)
+			u.simdeleteEntries(pdrs, fars, timeout)
 
 		default:
 			log.Fatalln("Unsupported method", method)
@@ -173,45 +284,40 @@ func (u *upf) sim(method string) {
 	log.Println("Sessions/s:", float64(u.maxSessions)/time.Since(start).Seconds())
 }
 
-func (u *upf) simcreateEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time.Duration) {
-	calls := 7
+func (u *upf) simcreateEntries(pdrs []pdr, fars []far, timeout time.Duration) {
+	calls := len(pdrs) + len(fars)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	done := make(chan bool)
+	for _, pdrv := range pdrs {
+		u.addPDR(ctx, done, pdrv)
+	}
 
-	u.addPDR(ctx, done, pdrDown)
-	u.addPDR(ctx, done, pdrUp)
-
-	u.addFAR(ctx, done, farDown)
-	u.addFAR(ctx, done, farUp)
-
-	u.addCounter(ctx, done, pdrDown.ctrID, "preQoSCounter")
-	u.addCounter(ctx, done, pdrDown.ctrID, "postDLQoSCounter")
-	u.addCounter(ctx, done, pdrDown.ctrID, "postULQoSCounter")
+	for _, farv := range fars {
+		u.addFAR(ctx, done, farv)
+	}
 
 	rc := u.GRPCJoin(calls, timeout, done)
 	if !rc {
-		go u.simdeleteEntries(pdrDown, pdrUp, farDown, farUp, timeout)
+		log.Println("Unable to complete GRPC call(s). Deleting")
+		go u.simdeleteEntries(pdrs, fars, timeout)
 	}
 }
 
-func (u *upf) simdeleteEntries(pdrDown, pdrUp pdr, farDown, farUp far, timeout time.Duration) {
-	calls := 7
+func (u *upf) simdeleteEntries(pdrs []pdr, fars []far, timeout time.Duration) {
+	calls := len(pdrs) + len(fars)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	done := make(chan bool)
+	for _, pdrv := range pdrs {
+		u.delPDR(ctx, done, pdrv)
+	}
 
-	u.delPDR(ctx, done, pdrDown)
-	u.delPDR(ctx, done, pdrUp)
-
-	u.delFAR(ctx, done, farDown)
-	u.delFAR(ctx, done, farUp)
-
-	u.delCounter(ctx, done, pdrDown.ctrID, "preQoSCounter")
-	u.delCounter(ctx, done, pdrDown.ctrID, "postDLQoSCounter")
-	u.delCounter(ctx, done, pdrDown.ctrID, "postULQoSCounter")
+	for _, farv := range fars {
+		u.delFAR(ctx, done, farv)
+	}
 
 	rc := u.GRPCJoin(calls, timeout, done)
 	if !rc {
@@ -323,11 +429,11 @@ func (u *upf) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 		f := &pb.WildcardMatchCommandAddArg{
 			Gate:     uint64(p.needDecap),
-			Priority: 1,
+			Priority: int64(math.MaxUint32 - p.precedence),
 			Values: []*pb.FieldData{
 				intEnc(uint64(p.srcIface)),     /* src_iface */
 				intEnc(uint64(p.tunnelIP4Dst)), /* tunnel_ipv4_dst */
-				intEnc(uint64(p.eNBTeid)),      /* enb_teid */
+				intEnc(uint64(p.tunnelTEID)),   /* enb_teid */
 				intEnc(uint64(p.srcIP)),        /* ueaddr ip*/
 				intEnc(uint64(p.dstIP)),        /* inet ip */
 				intEnc(uint64(p.srcPort)),      /* ue port */
@@ -337,7 +443,7 @@ func (u *upf) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 			Masks: []*pb.FieldData{
 				intEnc(uint64(p.srcIfaceMask)),     /* src_iface-mask */
 				intEnc(uint64(p.tunnelIP4DstMask)), /* tunnel_ipv4_dst-mask */
-				intEnc(uint64(p.eNBTeidMask)),      /* enb_teid-mask */
+				intEnc(uint64(p.tunnelTEIDMask)),   /* enb_teid-mask */
 				intEnc(uint64(p.srcIPMask)),        /* ueaddr ip-mask */
 				intEnc(uint64(p.dstIPMask)),        /* inet ip-mask */
 				intEnc(uint64(p.srcPortMask)),      /* ue port-mask */
@@ -371,7 +477,7 @@ func (u *upf) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 			Values: []*pb.FieldData{
 				intEnc(uint64(p.srcIface)),     /* src_iface */
 				intEnc(uint64(p.tunnelIP4Dst)), /* tunnel_ipv4_dst */
-				intEnc(uint64(p.eNBTeid)),      /* enb_teid */
+				intEnc(uint64(p.tunnelTEID)),   /* enb_teid */
 				intEnc(uint64(p.srcIP)),        /* ueaddr ip*/
 				intEnc(uint64(p.dstIP)),        /* inet ip */
 				intEnc(uint64(p.srcPort)),      /* ue port */
@@ -381,7 +487,7 @@ func (u *upf) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 			Masks: []*pb.FieldData{
 				intEnc(uint64(p.srcIfaceMask)),     /* src_iface-mask */
 				intEnc(uint64(p.tunnelIP4DstMask)), /* tunnel_ipv4_dst-mask */
-				intEnc(uint64(p.eNBTeidMask)),      /* enb_teid-mask */
+				intEnc(uint64(p.tunnelTEIDMask)),   /* enb_teid-mask */
 				intEnc(uint64(p.srcIPMask)),        /* ueaddr ip-mask */
 				intEnc(uint64(p.dstIPMask)),        /* inet ip-mask */
 				intEnc(uint64(p.srcPortMask)),      /* ue port-mask */
@@ -430,12 +536,12 @@ func (u *upf) addFAR(ctx context.Context, done chan<- bool, far far) {
 				intEnc(uint64(far.fseID)), /* fseid */
 			},
 			Values: []*pb.FieldData{
-				intEnc(uint64(far.action)),      /* action */
-				intEnc(uint64(far.tunnelType)),  /* tunnel_out_type */
-				intEnc(uint64(far.accessIP)),    /* access-ip */
-				intEnc(uint64(far.eNBIP)),       /* enb ip */
-				intEnc(uint64(far.eNBTeid)),     /* enb teid */
-				intEnc(uint64(far.UDPGTPUPort)), /* udp gtpu port */
+				intEnc(uint64(far.action)),       /* action */
+				intEnc(uint64(far.tunnelType)),   /* tunnel_out_type */
+				intEnc(uint64(far.tunnelIP4Src)), /* access-ip */
+				intEnc(uint64(far.tunnelIP4Dst)), /* enb ip */
+				intEnc(uint64(far.tunnelTEID)),   /* enb teid */
+				intEnc(uint64(far.tunnelPort)),   /* udp gtpu port */
 			},
 		}
 		any, err = ptypes.MarshalAny(f)

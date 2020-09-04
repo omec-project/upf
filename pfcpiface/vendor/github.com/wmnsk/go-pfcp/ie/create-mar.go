@@ -5,8 +5,8 @@
 package ie
 
 // NewCreateMAR creates a new CreateMAR IE.
-func NewCreateMAR(marID, sfunc, smode, tgppAction, nonTGPPInfo *IE) *IE {
-	return newGroupedIE(CreateMAR, 0, marID, sfunc, smode, tgppAction, nonTGPPInfo)
+func NewCreateMAR(ies ...*IE) *IE {
+	return newGroupedIE(CreateMAR, 0, ies...)
 }
 
 // CreateMAR returns the IEs above CreateMAR if the type of IE matches.

@@ -13,7 +13,7 @@ type SessionReportRequest struct {
 	*Header
 	ReportType                        *ie.IE
 	DownlinkDataReport                *ie.IE
-	UsageReport                       *ie.IE
+	UsageReport                       []*ie.IE
 	ErrorIndicationReport             *ie.IE
 	LoadControlInformation            *ie.IE
 	OverloadControlInformation        *ie.IE
@@ -43,7 +43,7 @@ func NewSessionReportRequest(mp, fo uint8, seid uint64, seq uint32, pri uint8, i
 		case ie.DownlinkDataReport:
 			m.DownlinkDataReport = i
 		case ie.UsageReportWithinSessionReportRequest:
-			m.UsageReport = i
+			m.UsageReport = append(m.UsageReport, i)
 		case ie.ErrorIndicationReport:
 			m.ErrorIndicationReport = i
 		case ie.LoadControlInformation:
@@ -101,7 +101,7 @@ func (m *SessionReportRequest) MarshalTo(b []byte) error {
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.UsageReport; i != nil {
+	for _, i := range m.UsageReport {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
@@ -208,7 +208,7 @@ func (m *SessionReportRequest) UnmarshalBinary(b []byte) error {
 		case ie.DownlinkDataReport:
 			m.DownlinkDataReport = i
 		case ie.UsageReportWithinSessionReportRequest:
-			m.UsageReport = i
+			m.UsageReport = append(m.UsageReport, i)
 		case ie.ErrorIndicationReport:
 			m.ErrorIndicationReport = i
 		case ie.LoadControlInformation:
@@ -245,7 +245,7 @@ func (m *SessionReportRequest) MarshalLen() int {
 	if i := m.DownlinkDataReport; i != nil {
 		l += i.MarshalLen()
 	}
-	if i := m.UsageReport; i != nil {
+	for _, i := range m.UsageReport {
 		l += i.MarshalLen()
 	}
 	if i := m.ErrorIndicationReport; i != nil {

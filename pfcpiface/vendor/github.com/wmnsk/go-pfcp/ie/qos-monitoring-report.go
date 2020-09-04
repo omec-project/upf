@@ -5,8 +5,8 @@
 package ie
 
 // NewQoSMonitoringReport creates a new QoSMonitoringReport IE.
-func NewQoSMonitoringReport(qfi, qos, ts, stime *IE) *IE {
-	return newGroupedIE(QoSMonitoringReport, 0, qfi, qos, ts, stime)
+func NewQoSMonitoringReport(ies ...*IE) *IE {
+	return newGroupedIE(QoSMonitoringReport, 0, ies...)
 }
 
 // QoSMonitoringReport returns the IEs above QoSMonitoringReport if the type of IE matches.

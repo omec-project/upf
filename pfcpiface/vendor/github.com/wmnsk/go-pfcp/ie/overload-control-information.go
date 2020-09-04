@@ -5,8 +5,8 @@
 package ie
 
 // NewOverloadControlInformation creates a new OverloadControlInformation IE.
-func NewOverloadControlInformation(seq, metric, period, flags *IE) *IE {
-	return newGroupedIE(OverloadControlInformation, 0, seq, metric, period, flags)
+func NewOverloadControlInformation(ies ...*IE) *IE {
+	return newGroupedIE(OverloadControlInformation, 0, ies...)
 }
 
 // OverloadControlInformation returns the IEs above OverloadControlInformation if the type of IE matches.

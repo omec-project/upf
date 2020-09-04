@@ -14,7 +14,7 @@ ARG MAKEFLAGS
 
 # linux ver should match target machine's kernel
 WORKDIR /libbpf
-ARG LIBBPF_VER=v0.0.9
+ARG LIBBPF_VER=v0.1.0
 RUN curl -L https://github.com/libbpf/libbpf/tarball/${LIBBPF_VER} | \
     tar xz -C . --strip-components=1 && \
     cp include/uapi/linux/if_xdp.h /usr/include/linux && \

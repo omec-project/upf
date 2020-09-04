@@ -11,7 +11,13 @@ import (
 // SessionDeletionResponse is a SessionDeletionResponse formed PFCP Header and its IEs above.
 type SessionDeletionResponse struct {
 	*Header
-	IEs []*ie.IE
+	Cause                             *ie.IE
+	OffendingIE                       *ie.IE
+	LoadControlInformation            *ie.IE
+	OverloadControlInformation        *ie.IE
+	UsageReport                       []*ie.IE
+	AdditionalUsageReportsInformation *ie.IE
+	IEs                               []*ie.IE
 }
 
 // NewSessionDeletionResponse creates a new SessionDeletionResponse.
@@ -24,6 +30,26 @@ func NewSessionDeletionResponse(mp, fo uint8, seid uint64, seq uint32, pri uint8
 		),
 		IEs: ies,
 	}
+
+	for _, i := range ies {
+		switch i.Type {
+		case ie.Cause:
+			m.Cause = i
+		case ie.OffendingIE:
+			m.OffendingIE = i
+		case ie.LoadControlInformation:
+			m.LoadControlInformation = i
+		case ie.OverloadControlInformation:
+			m.OverloadControlInformation = i
+		case ie.UsageReportWithinSessionModificationResponse:
+			m.UsageReport = append(m.UsageReport, i)
+		case ie.AdditionalUsageReportsInformation:
+			m.AdditionalUsageReportsInformation = i
+		default:
+			m.IEs = append(m.IEs, i)
+		}
+	}
+
 	m.SetLength()
 
 	return m
@@ -47,6 +73,44 @@ func (m *SessionDeletionResponse) MarshalTo(b []byte) error {
 	m.Header.Payload = make([]byte, m.MarshalLen()-m.Header.MarshalLen())
 
 	offset := 0
+
+	if i := m.Cause; i != nil {
+		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
+			return err
+		}
+		offset += i.MarshalLen()
+	}
+	if i := m.OffendingIE; i != nil {
+		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
+			return err
+		}
+		offset += i.MarshalLen()
+	}
+	if i := m.LoadControlInformation; i != nil {
+		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
+			return err
+		}
+		offset += i.MarshalLen()
+	}
+	if i := m.OverloadControlInformation; i != nil {
+		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
+			return err
+		}
+		offset += i.MarshalLen()
+	}
+	for _, i := range m.UsageReport {
+		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
+			return err
+		}
+		offset += i.MarshalLen()
+	}
+	if i := m.AdditionalUsageReportsInformation; i != nil {
+		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
+			return err
+		}
+		offset += i.MarshalLen()
+	}
+
 	for _, ie := range m.IEs {
 		if ie == nil {
 			continue
@@ -86,7 +150,24 @@ func (m *SessionDeletionResponse) UnmarshalBinary(b []byte) error {
 		return err
 	}
 
-	m.IEs = append(m.IEs, ies...)
+	for _, i := range ies {
+		switch i.Type {
+		case ie.Cause:
+			m.Cause = i
+		case ie.OffendingIE:
+			m.OffendingIE = i
+		case ie.LoadControlInformation:
+			m.LoadControlInformation = i
+		case ie.OverloadControlInformation:
+			m.OverloadControlInformation = i
+		case ie.UsageReportWithinSessionModificationResponse:
+			m.UsageReport = append(m.UsageReport, i)
+		case ie.AdditionalUsageReportsInformation:
+			m.AdditionalUsageReportsInformation = i
+		default:
+			m.IEs = append(m.IEs, i)
+		}
+	}
 
 	return nil
 }
@@ -94,6 +175,25 @@ func (m *SessionDeletionResponse) UnmarshalBinary(b []byte) error {
 // MarshalLen returns the serial length of Data.
 func (m *SessionDeletionResponse) MarshalLen() int {
 	l := m.Header.MarshalLen() - len(m.Header.Payload)
+
+	if i := m.Cause; i != nil {
+		l += i.MarshalLen()
+	}
+	if i := m.OffendingIE; i != nil {
+		l += i.MarshalLen()
+	}
+	if i := m.LoadControlInformation; i != nil {
+		l += i.MarshalLen()
+	}
+	if i := m.OverloadControlInformation; i != nil {
+		l += i.MarshalLen()
+	}
+	for _, i := range m.UsageReport {
+		l += i.MarshalLen()
+	}
+	if i := m.AdditionalUsageReportsInformation; i != nil {
+		l += i.MarshalLen()
+	}
 
 	for _, ie := range m.IEs {
 		if ie == nil {

@@ -40,9 +40,13 @@ type Conf struct {
 
 // SimModeInfo : Sim mode attributes
 type SimModeInfo struct {
-	StartUeIP    string `json:"start_ue_ip"`
-	StartEnodeIP string `json:"start_enb_ip"`
-	StartTeid    string `json:"start_teid"`
+	StartUEIP   net.IP `json:"start_ue_ip"`
+	StartENBIP  net.IP `json:"start_enb_ip"`
+	StartAUPFIP net.IP `json:"start_aupf_ip"`
+	N6AppIP     net.IP `json:"n6_app_ip"`
+	N9AppIP     net.IP `json:"n9_app_ip"`
+	StartN3TEID string `json:"start_n3_teid"`
+	StartN9TEID string `json:"start_n9_teid"`
 }
 
 // CPIfaceInfo : CPIface interface settings
@@ -167,7 +171,7 @@ func main() {
 
 	log.Println("N4 IP: ", n4SrcIP.String())
 
-	go pfcpifaceMainLoop(upf, accessIP.String(), n4SrcIP.String())
+	go pfcpifaceMainLoop(upf, accessIP.String(), coreIP.String(), n4SrcIP.String())
 
 	setupProm(upf)
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))

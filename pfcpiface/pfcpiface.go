@@ -29,7 +29,7 @@ type sessRecord struct {
 
 var sessions map[uint64]sessRecord
 
-func pfcpifaceMainLoop(upf *upf, accessIP string, sourceIP string) {
+func pfcpifaceMainLoop(upf *upf, accessIP string, coreIP string, sourceIP string) {
 	log.Println("pfcpifaceMainLoop@" + upf.fqdnHost + " says hello!!!")
 
 	// Verify IP + Port binding
@@ -101,7 +101,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP string, sourceIP string) {
 		var outgoingMessage []byte
 		switch msg.MessageType() {
 		case message.MsgTypeAssociationSetupRequest:
-			outgoingMessage = handleAssociationSetupRequest(msg, addr, sourceIP, accessIP)
+			outgoingMessage = handleAssociationSetupRequest(msg, addr, sourceIP, accessIP, coreIP)
 			cpConnected = true
 		case message.MsgTypeSessionEstablishmentRequest:
 			outgoingMessage = handleSessionEstablishmentRequest(upf, msg, addr, sourceIP)
@@ -129,7 +129,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP string, sourceIP string) {
 	}
 }
 
-func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP string, accessIP string) []byte {
+func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP string, accessIP string, coreIP string) []byte {
 	asreq, ok := msg.(*message.AssociationSetupRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -152,6 +152,7 @@ func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP 
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
 		ie.NewUserPlaneIPResourceInformation(0x41, 0, accessIP, "", "", ie.SrcInterfaceAccess),
+		//ie.NewUserPlaneIPResourceInformation(0x41, 0, coreIP, "", "", ie.SrcInterfaceCore),
 	).Marshal() /* userplane ip resource info */
 	if err != nil {
 		log.Fatalln("Unable to create association setup response", err)
@@ -207,7 +208,26 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 	}
 
 	/* Read CreatePDRs and CreateFARs from payload */
-	pdrs, fars := parsePDRFromPFCPSessEstReqPayload(upf, sereq, fseid)
+	pdrs, fars, err := parsePDRsFARs(upf, sereq, fseid)
+	if err != nil {
+		log.Println(err)
+		// Build response message
+		seres, err := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
+			0,                              /* FO <-- what's this? */
+			fseid.SEID,                     /* seid */
+			sereq.SequenceNumber,           /* seq # */
+			0,                              /* priority */
+			ie.NewNodeID(sourceIP, "", ""), /* node id (IPv4) */
+			ie.NewCause(ie.CauseRequestRejected),
+		).Marshal()
+
+		if err != nil {
+			log.Fatalln("Unable to create session establishment response", err)
+		}
+
+		log.Println("Sending session establishment response to: ", addr)
+		return seres
+	}
 
 	upf.sendMsgToUPF("add", pdrs, fars)
 
@@ -233,7 +253,7 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 		log.Fatalln("Unable to create session establishment response", err)
 	}
 
-	log.Println("Sent session establishment response to: ", addr)
+	log.Println("Sending session establishment response to: ", addr)
 
 	return seres
 }
@@ -265,7 +285,7 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
 		for _, ie1 := range ies1 {
 			switch ie1.Type {
 			case ie.UpdateFAR:
-				if f := parseUpdateFAR(ie1, fseid, upf.accessIP, farForwardD); f != nil {
+				if f := parseUpdateFAR(ie1, fseid, upf.accessIP); f != nil {
 					fars = append(fars, *f)
 				}
 			default:
