@@ -15,6 +15,7 @@ You need the following dependencies.
 * Update mode for devices: `dpdk`, `af_xdp` or `af_packet` in [`docker_setup.sh`](docker_setup.sh),
     along with device details
 * Update [`docker_setup.sh`](docker_setup.sh) and [`conf/up4.bess`](conf/up4.bess) to run iltrafficgen tests
+* Update [`docker_setup.sh`](docker_setup.sh) and [`conf/upf.json`](conf/upf.json) to run sim mode
 
 >`docker_setup.sh` is a quick start guide to set up UPF-EPC for evaluation.
 
@@ -63,15 +64,69 @@ Control program(s) to dynamically configure BESS modules
 
 ## Testing
 
+### Simulation mode
+UPF-EPC has a simulation mode that enables testing the pipeline on a single machine.
+
+To start UPF-EPC in simulation mode:
+
+1. Enable sim mode in configuration files
+
+```patch
+diff --git a/conf/upf.json b/conf/upf.json
+index 15042f9..e5a4588 100644
+--- a/conf/upf.json
++++ b/conf/upf.json
+@@ -2,7 +2,7 @@
+     "": "Vdev or sim support. Enable `\"mode\": \"af_xdp\"` to enable AF_XDP mode, or `\"mode\": \"af_packet\"` to enable AF_PACKET mode, or `\"mode\": \"sim\"` to generate synthetic traffic from BESS's Source module",
+     "": "mode: af_xdp",
+     "": "mode: af_packet",
+-    "": "mode: sim",
++    "mode": "sim",
+
+     "": "max UE sessions",
+     "max_sessions": 50000,
+diff --git a/docker_setup.sh b/docker_setup.sh
+index 086ad2f..79d81bd 100755
+--- a/docker_setup.sh
++++ b/docker_setup.sh
+@@ -16,7 +16,7 @@ bessd_port=10514
+ mode="dpdk"
+ #mode="af_xdp"
+ #mode="af_packet"
+-#mode="sim"
++mode="sim"
+
+ # Gateway interface(s)
+ #
+```
+
+2. Start DP pipeline
+
+```bash
+ ./docker_setup.sh
+```
+
+
+3. Insert rules into relevant PDR and FAR tables
+
+```bash
+docker exec bess-pfcpiface pfcpiface -config /conf/upf.json -simulate create
+```
+
+4. (optional) [Observe DP pipeline](#observe-dp-pipeline)
+
+
+### Microbenchmarks
+
 UPF-EPC has been tested against 2 microbenchmark applications (on an Intel Xeon Platinum 8170 @ 2.10GHz)
 
-### [il_trafficgen](https://github.com/omec-project/il_trafficgen)
+#### [il_trafficgen](https://github.com/omec-project/il_trafficgen)
 <!-- Baseline performance of the dataplane is ~5 Mpps per CPU -->
 * Tested with up to 30K subscribers
 * 128B Ethernet frame size
 * 1 default bearer per session
 
-### Spirent Landslide 17.5.0 GA testcases
+#### Spirent Landslide 17.5.0 GA testcases
 
 * Tested with up to 10K subscribers
 * 64B Ethernet frame size
