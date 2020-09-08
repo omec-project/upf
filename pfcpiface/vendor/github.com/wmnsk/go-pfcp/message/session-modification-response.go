@@ -9,6 +9,10 @@ import (
 )
 
 // SessionModificationResponse is a SessionModificationResponse formed PFCP Header and its IEs above.
+//
+// TODO: add Packet Rate Status Report IE.
+//
+// TODO: rename CreatedBridgeInfoForTSC => TSCManagementInformation
 type SessionModificationResponse struct {
 	*Header
 	Cause                             *ie.IE

@@ -9,6 +9,8 @@ import (
 )
 
 // SessionEstablishmentResponse is a SessionEstablishmentResponse formed PFCP Header and its IEs above.
+//
+// TODO: add RDS configuration information IE.
 type SessionEstablishmentResponse struct {
 	*Header
 	NodeID                     *ie.IE

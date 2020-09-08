@@ -9,6 +9,10 @@ import (
 )
 
 // SessionModificationRequest is a SessionModificationRequest formed PFCP Header and its IEs above.
+//
+// TODO: add Query Packet Rate Status IE
+//
+// TODO: rename PortManagementInformationForTSC => TSCManagementInformation
 type SessionModificationRequest struct {
 	*Header
 	CPFSEID                         *ie.IE
@@ -46,7 +50,7 @@ type SessionModificationRequest struct {
 	UpdateSRR                       []*ie.IE
 	ProvideATSSSControlInformation  *ie.IE
 	EthernetContextInformation      *ie.IE
-	AccessAvailabilityInformation   *ie.IE
+	AccessAvailabilityInformation   []*ie.IE
 	IEs                             []*ie.IE
 }
 
@@ -133,7 +137,7 @@ func NewSessionModificationRequest(mp, fo uint8, seid uint64, seq uint32, pri ui
 		case ie.EthernetContextInformation:
 			m.EthernetContextInformation = i
 		case ie.AccessAvailabilityInformation:
-			m.AccessAvailabilityInformation = i
+			m.AccessAvailabilityInformation = append(m.AccessAvailabilityInformation, i)
 		default:
 			m.IEs = append(m.IEs, i)
 		}
@@ -371,7 +375,7 @@ func (m *SessionModificationRequest) MarshalTo(b []byte) error {
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.AccessAvailabilityInformation; i != nil {
+	for _, i := range m.AccessAvailabilityInformation {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
@@ -490,7 +494,7 @@ func (m *SessionModificationRequest) UnmarshalBinary(b []byte) error {
 		case ie.EthernetContextInformation:
 			m.EthernetContextInformation = i
 		case ie.AccessAvailabilityInformation:
-			m.AccessAvailabilityInformation = i
+			m.AccessAvailabilityInformation = append(m.AccessAvailabilityInformation, i)
 		default:
 			m.IEs = append(m.IEs, i)
 		}
@@ -608,7 +612,7 @@ func (m *SessionModificationRequest) MarshalLen() int {
 	if i := m.EthernetContextInformation; i != nil {
 		l += i.MarshalLen()
 	}
-	if i := m.AccessAvailabilityInformation; i != nil {
+	for _, i := range m.AccessAvailabilityInformation {
 		l += i.MarshalLen()
 	}
 
