@@ -20,9 +20,10 @@ type bess struct {
 	coreIP   net.IP
 	fqdnh    string
 	conn     *grpc.ClientConn
+	upfPt    *upf
 }
 
-func (b *bess) sendMsgToUPF(method string, pdrs []pdr, fars []far, u *upf) uint8 {
+func (b *bess) sendMsgToUPF(method string, pdrs []pdr, fars []far) uint8 {
 	// create context
 	var cause uint8 = ie.CauseRequestAccepted
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
@@ -30,10 +31,10 @@ func (b *bess) sendMsgToUPF(method string, pdrs []pdr, fars []far, u *upf) uint8
 	done := make(chan bool)
 	calls := len(pdrs) + len(fars)
 
-	log.Println("upf : ", u.client)
+	log.Println("upf : ", b.upfPt.client)
 	log.Println("conn : ", b.conn)
 	// pause daemon, and then insert FAR(s), finally resume
-	err := u.pauseAll()
+	err := b.upfPt.pauseAll()
 	if err != nil {
 		log.Fatalln("Unable to pause BESS:", err)
 	}
@@ -42,9 +43,9 @@ func (b *bess) sendMsgToUPF(method string, pdrs []pdr, fars []far, u *upf) uint8
 		case "add":
 			fallthrough
 		case "mod":
-			u.addPDR(ctx, done, pdr)
+			b.upfPt.addPDR(ctx, done, pdr)
 		case "del":
-			u.delPDR(ctx, done, pdr)
+			b.upfPt.delPDR(ctx, done, pdr)
 		}
 	}
 	for _, far := range fars {
@@ -52,16 +53,16 @@ func (b *bess) sendMsgToUPF(method string, pdrs []pdr, fars []far, u *upf) uint8
 		case "add":
 			fallthrough
 		case "mod":
-			u.addFAR(ctx, done, far)
+			b.upfPt.addFAR(ctx, done, far)
 		case "del":
-			u.delFAR(ctx, done, far)
+			b.upfPt.delFAR(ctx, done, far)
 		}
 	}
-	rc := u.GRPCJoin(calls, Timeout, done)
+	rc := b.upfPt.GRPCJoin(calls, Timeout, done)
 	if !rc {
 		log.Println("Unable to make GRPC calls")
 	}
-	err = u.resumeAll()
+	err = b.upfPt.resumeAll()
 	if err != nil {
 		log.Fatalln("Unable to resume BESS:", err)
 	}
@@ -73,35 +74,43 @@ func (b *bess) handleChannelStatus() bool {
 	return false
 }
 
-func (b *bess) sendDeleteAllSessionsMsgtoUPF(upf *upf) {
+func (b *bess) sendDeleteAllSessionsMsgtoUPF() {
 	/* create context, pause daemon, insert PDR(s), and resume daemon */
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
 	done := make(chan bool)
 	calls := 5
 
-	err := upf.pauseAll()
+	err := b.upfPt.pauseAll()
 	if err != nil {
 		log.Fatalln("Unable to pause BESS:", err)
 	}
-	upf.removeAllPDRs(ctx, done)
-	upf.removeAllFARs(ctx, done)
-	upf.removeAllCounters(ctx, done, "preQoSCounter")
-	upf.removeAllCounters(ctx, done, "postDLQoSCounter")
-	upf.removeAllCounters(ctx, done, "postULQoSCounter")
+	b.upfPt.removeAllPDRs(ctx, done)
+	b.upfPt.removeAllFARs(ctx, done)
+	b.upfPt.removeAllCounters(ctx, done, "preQoSCounter")
+	b.upfPt.removeAllCounters(ctx, done, "postDLQoSCounter")
+	b.upfPt.removeAllCounters(ctx, done, "postULQoSCounter")
 
-	rc := upf.GRPCJoin(calls, Timeout, done)
+	rc := b.upfPt.GRPCJoin(calls, Timeout, done)
 	if !rc {
 		log.Println("Unable to make GRPC calls")
 	}
-	err = upf.resumeAll()
+	err = b.upfPt.resumeAll()
 	if err != nil {
 		log.Fatalln("Unable to resume BESS:", err)
 	}
 }
 
-func (b *bess) getAccessIP(val *string) {
+func (b *bess) getAccessIPStr(val *string) {
 	*val = b.accessIP.String()
+}
+
+func (b *bess) getAccessIP() net.IP {
+	return b.accessIP
+}
+
+func (b *bess) getUpf() *upf {
+	return b.upfPt
 }
 
 func (b *bess) getCoreIP(val *string) {
@@ -112,15 +121,35 @@ func (b *bess) getN4SrcIP(val *string) {
 	*val = b.n4SrcIP.String()
 }
 
-func (b *bess) getUpfInfo(conf *Conf, u *upf) {
-	log.Println("getUpfInfo bess")
-	u.accessIface = conf.AccessIface.IfName
-	u.coreIface = conf.CoreIface.IfName
-	u.accessIP = b.accessIP
-	u.coreIP = b.coreIP
-	u.fqdnHost = b.fqdnh
-	u.client = pb.NewBESSControlClient(b.conn)
-	u.maxSessions = conf.MaxSessions
+func (b *bess) setUpfInfo(conf *Conf) {
+	log.Println("setUpfInfo bess")
+	b.upfPt.accessIface = conf.AccessIface.IfName
+	b.upfPt.coreIface = conf.CoreIface.IfName
+	b.upfPt.accessIP = b.accessIP
+	b.upfPt.coreIP = b.coreIP
+	b.upfPt.fqdnHost = b.fqdnh
+	b.upfPt.maxSessions = conf.MaxSessions
+
+	var simInfo *SimModeInfo
+	if conf.Mode == modeSim {
+		simInfo = &conf.SimInfo
+		b.upfPt.simInfo = simInfo
+	}
+
+	if *simulate != "" {
+		if *simulate != "create" && *simulate != "delete" {
+			log.Fatalln("Invalid simulate method", simulate)
+		}
+
+		log.Println(*simulate, "sessions:", conf.MaxSessions)
+		b.upfPt.sim(*simulate)
+		return
+	}
+}
+
+func (b *bess) exit() {
+	log.Println("Exit function Bess")
+	b.conn.Close()
 }
 
 func (b *bess) parseFunc(conf *Conf) {
@@ -136,11 +165,13 @@ func (b *bess) parseFunc(conf *Conf) {
 
 	// get bess grpc client
 	var errin error
+	b.upfPt = &upf{}
+	log.Println("bessIP ", *bessIP)
+
 	b.conn, errin = grpc.Dial(*bessIP, grpc.WithInsecure())
 	if errin != nil {
 		log.Fatalln("did not connect:", errin)
 	}
-	defer b.conn.Close()
 
 	if conf.CPIface.SrcIP == "" {
 		if conf.CPIface.DestIP != "" {
@@ -152,4 +183,5 @@ func (b *bess) parseFunc(conf *Conf) {
 			b.n4SrcIP = net.ParseIP(addrs[0])
 		}
 	}
+	b.upfPt.client = pb.NewBESSControlClient(b.conn)
 }

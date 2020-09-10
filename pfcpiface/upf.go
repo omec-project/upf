@@ -52,7 +52,6 @@ type pdr struct {
 	tunnelTEID   uint32
 	srcIP        uint32
 	dstIP        uint32
-	ueIP         uint32
 	fseidIP      uint32
 	srcPort      uint16
 	dstPort      uint16
@@ -63,7 +62,6 @@ type pdr struct {
 	tunnelTEIDMask   uint32
 	srcIPMask        uint32
 	dstIPMask        uint32
-	ueIPMask         uint32
 	srcPortMask      uint16
 	dstPortMask      uint16
 	protoMask        uint8
@@ -333,6 +331,7 @@ func (u *upf) simdeleteEntries(pdrs []pdr, fars []far, timeout time.Duration) {
 func (u *upf) pauseAll() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
+	log.Println("client ", u.client)
 	_, err := u.client.PauseAll(ctx, &pb.EmptyRequest{})
 	return err
 }

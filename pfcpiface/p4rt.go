@@ -88,10 +88,23 @@ type p4rtc struct {
 	p4rtcPort    string
 	p4client     *P4rtClient
 	counters     []counter
+	upf          upf
 }
 
-func (p *p4rtc) getAccessIP(val *string) {
+func (p *p4rtc) getAccessIP() net.IP {
+	return p.accessIP
+}
+
+func (p *p4rtc) getAccessIPStr(val *string) {
 	*val = p.accessIP.String()
+}
+
+func (p *p4rtc) exit() {
+	log.Println("Exit function P4rtc")
+}
+
+func (p *p4rtc) getUpf() *upf {
+	return &p.upf
 }
 
 func (p *p4rtc) getCoreIP(val *string) {
@@ -102,14 +115,14 @@ func (p *p4rtc) getN4SrcIP(val *string) {
 	*val = p.n4SrcIP.String()
 }
 
-func (p *p4rtc) getUpfInfo(conf *Conf, u *upf) {
-	log.Println("getUpfInfo p4rtc")
-	u.accessIface = conf.AccessIface.IfName
-	u.coreIface = conf.CoreIface.IfName
-	u.accessIP = p.accessIP
-	u.coreIP = p.coreIP
-	u.fqdnHost = p.fqdnh
-	u.maxSessions = conf.MaxSessions
+func (p *p4rtc) setUpfInfo(conf *Conf) {
+	log.Println("setUpfInfo p4rtc")
+	p.upf.accessIface = conf.AccessIface.IfName
+	p.upf.coreIface = conf.CoreIface.IfName
+	p.upf.accessIP = p.accessIP
+	p.upf.coreIP = p.coreIP
+	p.upf.fqdnHost = p.fqdnh
+	p.upf.maxSessions = conf.MaxSessions
 }
 
 func channelSetup(p *p4rtc) (*P4rtClient, error) {
@@ -183,10 +196,10 @@ func (p *p4rtc) handleChannelStatus() bool {
 	return false
 }
 
-func (p *p4rtc) sendDeleteAllSessionsMsgtoUPF(upf *upf) {
+func (p *p4rtc) sendDeleteAllSessionsMsgtoUPF() {
 	log.Println("Loop through sessions and delete all entries p4")
 	for _, value := range sessions {
-		p.sendMsgToUPF("del", value.pdrs, value.fars, upf)
+		p.sendMsgToUPF("del", value.pdrs, value.fars)
 	}
 }
 
@@ -234,15 +247,15 @@ func (p *p4rtc) parseFunc(conf *Conf) {
 }
 
 func (p *p4rtc) sendMsgToUPF(method string, pdrs []pdr,
-	fars []far, u *upf) uint8 {
+	fars []far) uint8 {
 	log.Println("sendMsgToUPF p4")
 	var funcType uint8
 	var err error
 	var val uint64
 	var cause uint8 = ie.CauseRequestRejected
 	var fseidIP uint32
-	log.Println("Access IP ", u.accessIP.String())
-	fseidIP = binary.LittleEndian.Uint32(u.accessIP.To4())
+	log.Println("Access IP ", p.accessIP.String())
+	fseidIP = binary.LittleEndian.Uint32(p.accessIP.To4())
 	log.Println("fseidIP ", fseidIP)
 	switch method {
 	case "add":

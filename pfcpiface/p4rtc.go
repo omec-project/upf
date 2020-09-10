@@ -290,15 +290,15 @@ func (c *P4rtClient) WritePdrTable(
 
 		te.Fields[2].Name = "tunnel_ipv4_dst"
 		te.Fields[2].Value = make([]byte, 4)
-		binary.LittleEndian.PutUint32(te.Fields[2].Value, pdrEntry.tunnelIP4Dst)
+		binary.BigEndian.PutUint32(te.Fields[2].Value, pdrEntry.tunnelIP4Dst)
 		te.Fields[2].Mask = make([]byte, 4)
 		binary.BigEndian.PutUint32(te.Fields[2].Mask, pdrEntry.tunnelIP4DstMask)
 	} else if pdrEntry.srcIface == core {
 		te.Fields[1].Name = "ue_addr"
 		te.Fields[1].Value = make([]byte, 4)
-		binary.BigEndian.PutUint32(te.Fields[1].Value, pdrEntry.ueIP)
+		binary.BigEndian.PutUint32(te.Fields[1].Value, pdrEntry.dstIP)
 		te.Fields[1].Mask = make([]byte, 4)
-		binary.BigEndian.PutUint32(te.Fields[1].Mask, pdrEntry.ueIPMask)
+		binary.BigEndian.PutUint32(te.Fields[1].Mask, pdrEntry.dstIPMask)
 	}
 
 	if funcType == FunctionTypeDelete {

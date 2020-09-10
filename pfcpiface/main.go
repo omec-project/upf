@@ -76,14 +76,17 @@ type IfaceType struct {
 }
 
 type common interface {
+	exit()
 	parseFunc(conf *Conf)
-	getUpfInfo(conf *Conf, u *upf)
-	getAccessIP(val *string)
+	setUpfInfo(conf *Conf)
+	getUpf() *upf
+	getAccessIPStr(val *string)
+	getAccessIP() net.IP
 	getCoreIP(val *string)
 	getN4SrcIP(val *string)
 	handleChannelStatus() bool
-	sendMsgToUPF(method string, pdrs []pdr, fars []far, u *upf) uint8
-	sendDeleteAllSessionsMsgtoUPF(upf *upf)
+	sendMsgToUPF(method string, pdrs []pdr, fars []far) uint8
+	sendDeleteAllSessionsMsgtoUPF()
 }
 
 // ParseJSON : parse json file and populate corresponding struct
@@ -193,48 +196,20 @@ func main() {
 	}
 
 	intf.parseFunc(&conf)
-
-	log.Println("bessip ", *bessIP)
-	/*
-		    conn, errin := grpc.Dial(*bessIP, grpc.WithInsecure())
-			if errin != nil {
-				log.Fatalln("did not connect:", errin)
-			}
-			defer conn.Close()
-		    log.Println("upf ", *upfPt)
-		    upfPt.client = pb.NewBESSControlClient(conn)
-	*/
-
-	upfPt := &upf{}
-	intf.getUpfInfo(&conf, upfPt)
-
-	var simInfo *SimModeInfo
-	if conf.Mode == modeSim {
-		simInfo = &conf.SimInfo
-		upfPt.simInfo = simInfo
-	}
-
-	if *simulate != "" {
-		if *simulate != "create" && *simulate != "delete" {
-			log.Fatalln("Invalid simulate method", simulate)
-		}
-
-		log.Println(*simulate, "sessions:", conf.MaxSessions)
-		upfPt.sim(*simulate)
-		return
-	}
+	intf.setUpfInfo(&conf)
 
 	var n4srcIP string
 	var accessIP string
 	var coreIP string
 	intf.getN4SrcIP(&n4srcIP)
-	intf.getAccessIP(&accessIP)
+	intf.getAccessIPStr(&accessIP)
 	intf.getCoreIP(&coreIP)
 	log.Println("n4srcip ", n4srcIP)
 	log.Println("accessip ", accessIP)
 	log.Println("coreip ", coreIP)
-	go pfcpifaceMainLoop(intf, upfPt, accessIP, coreIP, n4srcIP)
+	go pfcpifaceMainLoop(intf, accessIP, coreIP, n4srcIP)
 
-	setupProm(upfPt)
+	setupProm(intf)
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))
+	intf.exit()
 }
