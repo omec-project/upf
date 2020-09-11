@@ -95,7 +95,7 @@ func (i *IE) FlowDescription() (string, error) {
 			return "", io.ErrUnexpectedEOF
 		}
 
-		return string(i.Payload[4:l]), nil
+		return string(i.Payload[3 : 3+l]), nil
 	case ApplicationDetectionInformation:
 		ies, err := i.ApplicationDetectionInformation()
 		if err != nil {
