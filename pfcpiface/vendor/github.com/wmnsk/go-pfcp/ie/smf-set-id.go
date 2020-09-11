@@ -26,7 +26,7 @@ func (i *IE) SMFSetID() ([]byte, error) {
 	return i.Payload, nil
 }
 
-// SMFSetIDString returns SMFSetIDString in string if the type of IE matches.
+// SMFSetIDString returns SMFSetID in string if the type of IE matches.
 func (i *IE) SMFSetIDString() (string, error) {
 	v, err := i.SMFSetID()
 	if err != nil {

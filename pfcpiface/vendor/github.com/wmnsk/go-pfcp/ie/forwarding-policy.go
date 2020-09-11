@@ -88,5 +88,5 @@ func (i *IE) ForwardingPolicyIdentifier() (string, error) {
 		return "", io.ErrUnexpectedEOF
 	}
 
-	return string(v[1:idlen]), nil
+	return string(v[1 : idlen+1]), nil
 }
