@@ -53,7 +53,7 @@ func (i *IE) UEIPAddressPoolIdentity() ([]byte, error) {
 	}
 }
 
-// UEIPAddressPoolIdentityString returns UEIPAddressPoolIdentityString in string if the type of IE matches.
+// UEIPAddressPoolIdentityString returns UEIPAddressPoolIdentity in string if the type of IE matches.
 func (i *IE) UEIPAddressPoolIdentityString() (string, error) {
 	v, err := i.UEIPAddressPoolIdentity()
 	if err != nil {
@@ -65,5 +65,5 @@ func (i *IE) UEIPAddressPoolIdentityString() (string, error) {
 		return "", io.ErrUnexpectedEOF
 	}
 
-	return string(v[1:idlen]), nil
+	return string(v[1 : idlen+1]), nil
 }

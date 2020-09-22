@@ -10,18 +10,18 @@ func NewUsageReport(typ uint16, ies ...*IE) *IE {
 }
 
 // NewUsageReportWithinSessionModificationResponse creates a new UsageReportWithinSessionModificationResponse IE.
-func NewUsageReportWithinSessionModificationResponse(urr, seq, trigger, start, end, vol, dur, firstPkt, lastPkt, usage, query, eth *IE) *IE {
-	return NewUsageReport(UsageReportWithinSessionModificationResponse, urr, seq, trigger, start, end, vol, dur, firstPkt, lastPkt, usage, query, eth)
+func NewUsageReportWithinSessionModificationResponse(ies ...*IE) *IE {
+	return NewUsageReport(UsageReportWithinSessionModificationResponse, ies...)
 }
 
 // NewUsageReportWithinSessionDeletionResponse creates a new UsageReportWithinSessionDeletionResponse IE.
-func NewUsageReportWithinSessionDeletionResponse(urr, seq, trigger, start, end, vol, dur, firstPkt, lastPkt, usage, eth *IE) *IE {
-	return NewUsageReport(UsageReportWithinSessionDeletionResponse, urr, seq, trigger, start, end, vol, dur, firstPkt, lastPkt, usage, eth)
+func NewUsageReportWithinSessionDeletionResponse(ies ...*IE) *IE {
+	return NewUsageReport(UsageReportWithinSessionDeletionResponse, ies...)
 }
 
 // NewUsageReportWithinSessionReportRequest creates a new UsageReportWithinSessionReportRequest IE.
-func NewUsageReportWithinSessionReportRequest(urr, seq, trigger, start, end, vol, dur, app, ip, firstPkt, lastPkt, usage, query, ts, eth, join, leave *IE) *IE {
-	return NewUsageReport(UsageReportWithinSessionReportRequest, urr, seq, trigger, start, end, vol, dur, app, ip, firstPkt, lastPkt, usage, query, ts, eth, join, leave)
+func NewUsageReportWithinSessionReportRequest(ies ...*IE) *IE {
+	return NewUsageReport(UsageReportWithinSessionReportRequest, ies...)
 }
 
 // UsageReport returns the IEs above UsageReport if the type of IE matches.

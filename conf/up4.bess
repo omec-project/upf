@@ -16,8 +16,6 @@ port.setup_globals()
 
 Access = 1
 Core = 2
-Uplink = 0
-Downlink = 1
 noGTPUDecap = 0
 GTPUDecap = 1
 noGTPUEncap = 0
@@ -40,29 +38,47 @@ core_ip = ips_by_interface(parser.core_ifname)
 if parser.mode == 'sim':
     macstr_d = '00:00:00:00:00:02'
     macstr_u = '00:00:00:00:00:01'
-    inet_packets = [sim.gen_inet_packet(parser.sim_pkt_size, macstr_u, macstr_d,
-                                        '172.16.100.1', parser.sim_start_ue_ip),
-                    sim.gen_inet_packet(parser.sim_pkt_size, macstr_u, macstr_d,
-                                        '172.12.55.99', parser.sim_start_ue_ip)]
-    ue_packets = [sim.gen_ue_packet(parser.sim_pkt_size, macstr_d, macstr_u,
+    n36_pkts = [sim.gen_gtpu_packet(parser.sim_pkt_size, macstr_d, macstr_u,
                                     parser.sim_start_enb_ip, access_ip[0],
-                                    parser.sim_start_ue_ip, '172.16.100.1',
-                                    parser.sim_start_teid)]
+                                    parser.sim_start_ue_ip, parser.sim_n6_app_ip,
+                                    parser.sim_start_n3_teid)]
+
+    n39_pkts = [sim.gen_gtpu_packet(parser.sim_pkt_size, macstr_d, macstr_u,
+                                    parser.sim_start_enb_ip, access_ip[0],
+                                    parser.sim_start_ue_ip, parser.sim_n9_app_ip,
+                                    parser.sim_start_n3_teid)]
+
+    n63_pkts = [sim.gen_inet_packet(parser.sim_pkt_size, macstr_u, macstr_d,
+                                    parser.sim_n6_app_ip, parser.sim_start_ue_ip)]
+
+    n93_pkts = [sim.gen_gtpu_packet(parser.sim_pkt_size, macstr_d, macstr_u,
+                                    parser.sim_start_aupf_ip, core_ip[0],
+                                    parser.sim_n9_app_ip, parser.sim_start_ue_ip,
+                                    parser.sim_start_n9_teid)]
     if parser.enable_ntf:
         # Every 30th packet will be a STUN packet.  With 5000 flows, this
         # results in about 1000 flows with network tokens, and every 3rd packet
         # is a STUN packet with a token.  This is not a good representation of
         # a real world test, but it is enough to verify that NTF can match
         # tokens and pass traffic through with mode="sim".
-        ue_packets = ue_packets * 29
-        ue_packets.append(
+        n36_pkts = n36_pkts * 29
+        n36_pkts.append(
           sim.gen_ue_ntf_packet(parser.sim_pkt_size, macstr_d, macstr_u,
                                 parser.sim_start_enb_ip, access_ip[0],
-                                parser.sim_start_ue_ip, '172.16.100.1',
-                                parser.sim_start_teid))
-    packet_generator = {'access': ue_packets, 'core': inet_packets}
-    seq_kwargs = {'access': sim.get_ue_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip, parser.sim_start_teid),
-                  'core': sim.get_inet_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip)}
+                                parser.sim_start_ue_ip, parser.sim_n6_app_ip,
+                                parser.sim_start_n3_teid))
+
+    n3_seq = sim.gen_gtpu_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip, 62, parser.sim_start_n3_teid)
+    n6_seq = sim.get_inet_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip)
+    n9_seq = sim.gen_gtpu_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip, 66, parser.sim_start_n9_teid)
+
+    if parser.sim_core == "n6":
+        packet_generator = {'access': n36_pkts, 'core': n63_pkts}
+        seq_kwargs = {'access': n3_seq, 'core': n6_seq}
+    else:
+        packet_generator = {'access': n39_pkts, 'core': n93_pkts}
+        seq_kwargs = {'access': n3_seq, 'core': n9_seq}
+
 else:
     macstr_d = mac_by_interface(parser.core_ifname)
     macstr_u = mac_by_interface(parser.access_ifname)
@@ -154,10 +170,10 @@ linkMerge::Merge() \
     -> pdrLookup::WildcardMatch(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
                                         {'attr_name':'tunnel_ipv4_dst', 'num_bytes':4}, \
                                         {'attr_name':'teid', 'num_bytes':4}, \
-                                        {'attr_name':'dst_ip', 'num_bytes':4}, \
                                         {'attr_name':'src_ip', 'num_bytes':4}, \
-                                        {'attr_name':'dst_port', 'num_bytes':2}, \
+                                        {'attr_name':'dst_ip', 'num_bytes':4}, \
                                         {'attr_name':'src_port', 'num_bytes':2}, \
+                                        {'attr_name':'dst_port', 'num_bytes':2}, \
                                         {'attr_name':'ip_proto', 'num_bytes':1}], \
                                 values=[{'attr_name':'pdr_id', 'num_bytes':4}, \
                                         {'attr_name':'fseid', 'num_bytes':4}, \

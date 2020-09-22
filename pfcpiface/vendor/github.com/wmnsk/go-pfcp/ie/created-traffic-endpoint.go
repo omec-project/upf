@@ -5,8 +5,8 @@
 package ie
 
 // NewCreatedTrafficEndpoint creates a new CreatedTrafficEndpoint IE.
-func NewCreatedTrafficEndpoint(id, fteid1, fteid2, ueIP *IE) *IE {
-	return newGroupedIE(CreatedTrafficEndpoint, 0, id, fteid1, fteid2, ueIP)
+func NewCreatedTrafficEndpoint(ies ...*IE) *IE {
+	return newGroupedIE(CreatedTrafficEndpoint, 0, ies...)
 }
 
 // CreatedTrafficEndpoint returns the IEs above CreatedTrafficEndpoint if the type of IE matches.

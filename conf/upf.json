@@ -9,9 +9,15 @@
 
     "": "Use the sim block to enable simulation using either Source module or via il_trafficgen",
     "sim": {
+        "": "At this point we can simulate either N3/N6 or N3/N9 traffic, so choose n6 or n9 below",
+        "core": "n6",
         "start_ue_ip": "16.0.0.1",
         "start_enb_ip": "11.1.1.129",
-        "start_teid": "0xf0000000",
+        "start_aupf_ip": "13.1.1.199",
+        "n6_app_ip": "6.6.6.6",
+        "n9_app_ip": "9.9.9.9",
+        "start_n3_teid": "0x30000000",
+        "start_n9_teid": "0x90000000",
         "pkt_size": 128,
         "total_flows": 5000
     },

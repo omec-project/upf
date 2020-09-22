@@ -67,7 +67,25 @@ func (i *IE) NodeID() (string, error) {
 	case NodeIDIPv6Address:
 		return net.IP(i.Payload[1:]).To16().String(), nil
 	case NodeIDFQDN:
-		return string(i.Payload[1:]), nil
+		b := i.Payload[1:]
+		var (
+			nodeID []string
+			offset int
+		)
+		max := len(b)
+		for {
+			if offset >= max {
+				break
+			}
+			l := int(b[offset])
+			if offset+l+1 > max {
+				break
+			}
+			nodeID = append(nodeID, string(b[offset+1:offset+l+1]))
+			offset += l + 1
+		}
+
+		return strings.Join(nodeID, "."), nil
 	default:
 		return "", &InvalidNodeIDError{ID: i.Payload[0]}
 	}

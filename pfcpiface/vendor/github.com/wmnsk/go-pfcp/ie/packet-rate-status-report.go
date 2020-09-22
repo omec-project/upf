@@ -5,8 +5,8 @@
 package ie
 
 // NewPacketRateStatusReport creates a new PacketRateStatusReport IE.
-func NewPacketRateStatusReport(qer, status *IE) *IE {
-	return newGroupedIE(PacketRateStatusReport, 0, qer, status)
+func NewPacketRateStatusReport(ies ...*IE) *IE {
+	return newGroupedIE(PacketRateStatusReport, 0, ies...)
 }
 
 // PacketRateStatusReport returns the IEs above PacketRateStatusReport if the type of IE matches.

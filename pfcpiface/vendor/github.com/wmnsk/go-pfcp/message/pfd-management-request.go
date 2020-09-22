@@ -11,23 +11,30 @@ import (
 // PFDManagementRequest is a PFDManagementRequest formed PFCP Header and its IEs above.
 type PFDManagementRequest struct {
 	*Header
-	ApplicationIDsPFDs *ie.IE
+	ApplicationIDsPFDs []*ie.IE
 	IEs                []*ie.IE
 }
 
 // NewPFDManagementRequest creates a new PFDManagementRequest.
-func NewPFDManagementRequest(seq uint32, app *ie.IE, ies ...*ie.IE) *PFDManagementRequest {
+func NewPFDManagementRequest(seq uint32, ies ...*ie.IE) *PFDManagementRequest {
 	m := &PFDManagementRequest{
 		Header: NewHeader(
 			1, 0, 0, 0,
 			MsgTypePFDManagementRequest, 0, seq, 0,
 			nil,
 		),
-		ApplicationIDsPFDs: app,
-		IEs:                ies,
 	}
-	m.SetLength()
 
+	for _, i := range ies {
+		switch i.Type {
+		case ie.ApplicationIDsPFDs:
+			m.ApplicationIDsPFDs = append(m.ApplicationIDsPFDs, i)
+		default:
+			m.IEs = append(m.IEs, i)
+		}
+	}
+
+	m.SetLength()
 	return m
 }
 
@@ -49,7 +56,7 @@ func (m *PFDManagementRequest) MarshalTo(b []byte) error {
 	m.Header.Payload = make([]byte, m.MarshalLen()-m.Header.MarshalLen())
 
 	offset := 0
-	if i := m.ApplicationIDsPFDs; i != nil {
+	for _, i := range m.ApplicationIDsPFDs {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
@@ -98,7 +105,7 @@ func (m *PFDManagementRequest) UnmarshalBinary(b []byte) error {
 	for _, i := range ies {
 		switch i.Type {
 		case ie.ApplicationIDsPFDs:
-			m.ApplicationIDsPFDs = i
+			m.ApplicationIDsPFDs = append(m.ApplicationIDsPFDs, i)
 		default:
 			m.IEs = append(m.IEs, i)
 		}
@@ -111,7 +118,7 @@ func (m *PFDManagementRequest) UnmarshalBinary(b []byte) error {
 func (m *PFDManagementRequest) MarshalLen() int {
 	l := m.Header.MarshalLen() - len(m.Header.Payload)
 
-	if i := m.ApplicationIDsPFDs; i != nil {
+	for _, i := range m.ApplicationIDsPFDs {
 		l += i.MarshalLen()
 	}
 
@@ -127,16 +134,7 @@ func (m *PFDManagementRequest) MarshalLen() int {
 
 // SetLength sets the length in Length field.
 func (m *PFDManagementRequest) SetLength() {
-	l := m.Header.MarshalLen() - len(m.Header.Payload) - 4
-
-	if i := m.ApplicationIDsPFDs; i != nil {
-		l += i.MarshalLen()
-	}
-
-	for _, ie := range m.IEs {
-		l += ie.MarshalLen()
-	}
-	m.Header.Length = uint16(l)
+	m.Header.Length = uint16(m.MarshalLen() - 4)
 }
 
 // MessageTypeName returns the name of protocol.

@@ -9,6 +9,8 @@ import (
 )
 
 // PFDManagementResponse is a PFDManagementResponse formed PFCP Header and its IEs above.
+//
+// TODO: add Node ID IE.
 type PFDManagementResponse struct {
 	*Header
 	Cause       *ie.IE

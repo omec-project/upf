@@ -5,8 +5,8 @@
 package ie
 
 // NewNonTGPPAccessForwardingActionInformation creates a new NonTGPPAccessForwardingActionInformation IE.
-func NewNonTGPPAccessForwardingActionInformation(farID, weight, priority, urrID *IE) *IE {
-	return newGroupedIE(NonTGPPAccessForwardingActionInformation, 0, farID, weight, priority, urrID)
+func NewNonTGPPAccessForwardingActionInformation(ies ...*IE) *IE {
+	return newGroupedIE(NonTGPPAccessForwardingActionInformation, 0, ies...)
 }
 
 // NonTGPPAccessForwardingActionInformation returns the IEs above NonTGPPAccessForwardingActionInformation if the type of IE matches.

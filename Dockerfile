@@ -5,6 +5,7 @@
 # Multi-stage Dockerfile
 # Stage bess-build: builds bess with its dependencies
 FROM nefelinetworks/bess_build AS bess-build
+ARG CPU=native
 RUN apt-get update && \
     apt-get -y install --no-install-recommends \
         ca-certificates \
@@ -14,7 +15,7 @@ ARG MAKEFLAGS
 
 # linux ver should match target machine's kernel
 WORKDIR /libbpf
-ARG LIBBPF_VER=v0.0.9
+ARG LIBBPF_VER=v0.1.0
 RUN curl -L https://github.com/libbpf/libbpf/tarball/${LIBBPF_VER} | \
     tar xz -C . --strip-components=1 && \
     cp include/uapi/linux/if_xdp.h /usr/include/linux && \

@@ -5,8 +5,8 @@
 package ie
 
 // NewCreateFAR creates a new CreateFAR IE.
-func NewCreateFAR(far, action, fwd, dup, bar, rtp *IE) *IE {
-	return newGroupedIE(CreateFAR, 0, far, action, fwd, dup, bar, rtp)
+func NewCreateFAR(ies ...*IE) *IE {
+	return newGroupedIE(CreateFAR, 0, ies...)
 }
 
 // CreateFAR returns the IEs above CreateFAR if the type of IE matches.

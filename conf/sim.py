@@ -11,6 +11,7 @@ from conf.utils import *
 #       SIM Create Packet Functions
 # ====================================================
 
+
 def gen_inet_packet(size, src_mac, dst_mac, src_ip, dst_ip):
     eth = Ether(src=src_mac, dst=dst_mac)
     ip = IP(src=src_ip, dst=dst_ip)
@@ -27,7 +28,7 @@ def get_inet_sequpdate_args(max_session, start_ue_ip):
     return kwargs
 
 
-def gen_ue_packet(size, src_mac, dst_mac, src_ip, dst_ip, inner_src_ip, inner_dst_ip, teid):
+def gen_gtpu_packet(size, src_mac, dst_mac, src_ip, dst_ip, inner_src_ip, inner_dst_ip, teid):
     eth = Ether(src=src_mac, dst=dst_mac)
     ip = IP(src=src_ip, dst=dst_ip)
     udp = UDP(sport=2152, dport=2152)
@@ -114,10 +115,10 @@ def gen_ue_ntf_packet(size, src_mac, dst_mac, src_ip, dst_ip, inner_src_ip, inne
     return bytes(pkt)
 
 
-def get_ue_sequpdate_args(max_session, start_ue_ip, start_teid):
+def gen_gtpu_sequpdate_args(max_session, start_ue_ip, ue_ip_offset, start_teid):
     kwargs = {"fields": [
         {'offset': 46, 'size': 4, 'min': start_teid,
          'max': start_teid+max_session-1},
-        {'offset': 62, 'size': 4, 'min': ip2long(start_ue_ip),
+        {'offset': ue_ip_offset, 'size': 4, 'min': ip2long(start_ue_ip),
          'max': ip2long(start_ue_ip)+max_session-1}]}
     return kwargs
