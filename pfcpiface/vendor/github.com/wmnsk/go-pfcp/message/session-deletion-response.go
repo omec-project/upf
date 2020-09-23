@@ -9,6 +9,8 @@ import (
 )
 
 // SessionDeletionResponse is a SessionDeletionResponse formed PFCP Header and its IEs above.
+//
+// TODO: add Packet Rate Status Report and Session Report IE.
 type SessionDeletionResponse struct {
 	*Header
 	Cause                             *ie.IE
@@ -28,7 +30,6 @@ func NewSessionDeletionResponse(mp, fo uint8, seid uint64, seq uint32, pri uint8
 			MsgTypeSessionDeletionResponse, seid, seq, pri,
 			nil,
 		),
-		IEs: ies,
 	}
 
 	for _, i := range ies {
@@ -41,7 +42,7 @@ func NewSessionDeletionResponse(mp, fo uint8, seid uint64, seq uint32, pri uint8
 			m.LoadControlInformation = i
 		case ie.OverloadControlInformation:
 			m.OverloadControlInformation = i
-		case ie.UsageReportWithinSessionModificationResponse:
+		case ie.UsageReportWithinSessionDeletionResponse:
 			m.UsageReport = append(m.UsageReport, i)
 		case ie.AdditionalUsageReportsInformation:
 			m.AdditionalUsageReportsInformation = i
@@ -51,7 +52,6 @@ func NewSessionDeletionResponse(mp, fo uint8, seid uint64, seq uint32, pri uint8
 	}
 
 	m.SetLength()
-
 	return m
 }
 
@@ -160,7 +160,7 @@ func (m *SessionDeletionResponse) UnmarshalBinary(b []byte) error {
 			m.LoadControlInformation = i
 		case ie.OverloadControlInformation:
 			m.OverloadControlInformation = i
-		case ie.UsageReportWithinSessionModificationResponse:
+		case ie.UsageReportWithinSessionDeletionResponse:
 			m.UsageReport = append(m.UsageReport, i)
 		case ie.AdditionalUsageReportsInformation:
 			m.AdditionalUsageReportsInformation = i

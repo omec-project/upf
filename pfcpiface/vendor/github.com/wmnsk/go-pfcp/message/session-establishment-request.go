@@ -9,6 +9,8 @@ import (
 )
 
 // SessionEstablishmentRequest is a SessionEstablishmentRequest formed PFCP Header and its IEs above.
+//
+// TODO: add S-NSSAI and Provide RDS configuration information.
 type SessionEstablishmentRequest struct {
 	*Header
 	NodeID                         *ie.IE

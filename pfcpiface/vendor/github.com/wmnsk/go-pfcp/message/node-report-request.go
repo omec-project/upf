@@ -15,8 +15,8 @@ type NodeReportRequest struct {
 	NodeReportType              *ie.IE
 	UserPlanePathFailureReport  *ie.IE
 	UserPlanePathRecoveryReport *ie.IE
-	ClockDriftReport            *ie.IE
-	GTPUPathQoSReport           *ie.IE
+	ClockDriftReport            []*ie.IE
+	GTPUPathQoSReport           []*ie.IE
 	IEs                         []*ie.IE
 }
 
@@ -41,9 +41,9 @@ func NewNodeReportRequest(seq uint32, ies ...*ie.IE) *NodeReportRequest {
 		case ie.UserPlanePathRecoveryReport:
 			m.UserPlanePathRecoveryReport = i
 		case ie.ClockDriftReport:
-			m.ClockDriftReport = i
+			m.ClockDriftReport = append(m.ClockDriftReport, i)
 		case ie.GTPUPathQoSReport:
-			m.GTPUPathQoSReport = i
+			m.GTPUPathQoSReport = append(m.GTPUPathQoSReport, i)
 		default:
 			m.IEs = append(m.IEs, i)
 		}
@@ -95,13 +95,13 @@ func (m *NodeReportRequest) MarshalTo(b []byte) error {
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.ClockDriftReport; i != nil {
+	for _, i := range m.ClockDriftReport {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.GTPUPathQoSReport; i != nil {
+	for _, i := range m.GTPUPathQoSReport {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
@@ -158,9 +158,9 @@ func (m *NodeReportRequest) UnmarshalBinary(b []byte) error {
 		case ie.UserPlanePathRecoveryReport:
 			m.UserPlanePathRecoveryReport = i
 		case ie.ClockDriftReport:
-			m.ClockDriftReport = i
+			m.ClockDriftReport = append(m.ClockDriftReport, i)
 		case ie.GTPUPathQoSReport:
-			m.GTPUPathQoSReport = i
+			m.GTPUPathQoSReport = append(m.GTPUPathQoSReport, i)
 		default:
 			m.IEs = append(m.IEs, i)
 		}
@@ -185,10 +185,10 @@ func (m *NodeReportRequest) MarshalLen() int {
 	if i := m.UserPlanePathRecoveryReport; i != nil {
 		l += i.MarshalLen()
 	}
-	if i := m.ClockDriftReport; i != nil {
+	for _, i := range m.ClockDriftReport {
 		l += i.MarshalLen()
 	}
-	if i := m.GTPUPathQoSReport; i != nil {
+	for _, i := range m.GTPUPathQoSReport {
 		l += i.MarshalLen()
 	}
 
