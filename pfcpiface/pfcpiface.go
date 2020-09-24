@@ -28,9 +28,13 @@ type sessRecord struct {
 }
 
 var sessions map[uint64]sessRecord
+var sequence_number uint32 = 1
 
-func pfcpifaceMainLoop(upf *upf, accessIP string, coreIP string, sourceIP string) {
+func pfcpifaceMainLoop(upf *upf, accessIP string, coreIP string, sourceIP string, smfName string) {
 	log.Println("pfcpifaceMainLoop@" + upf.fqdnHost + " says hello!!!")
+
+	cpConnectionStatus := make(chan bool)
+	cpPfcpAssocResponse := make(chan bool)
 
 	// Verify IP + Port binding
 	laddr, err := net.ResolveUDPAddr("udp", sourceIP+":"+PFCPPort)
@@ -56,6 +60,13 @@ func pfcpifaceMainLoop(upf *upf, accessIP string, coreIP string, sourceIP string
 			cpConnected = false
 		}
 	}
+	//initiate connection if smf address available
+	log.Println("calling manageSmfConnection smf service name ", smfName)
+	manageConnection := false
+	if smfName != "" {
+		manageConnection = true
+		go manageSmfConnection(sourceIP, accessIP, smfName, conn, cpConnectionStatus, cpPfcpAssocResponse)
+	}
 
 	// Initialize pkt buf
 	buf := make([]byte, PktBufSz)
@@ -75,6 +86,10 @@ func pfcpifaceMainLoop(upf *upf, accessIP string, coreIP string, sourceIP string
 			if err, ok := err.(net.Error); ok && err.Timeout() {
 				// do nothing for the time being
 				log.Println(err)
+				cpConnected = false
+				if manageConnection == true {
+					cpConnectionStatus <- cpConnected
+				}
 				cleanupSessions()
 				continue
 			}
@@ -91,7 +106,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP string, coreIP string, sourceIP string
 		// if sourceIP is not set, fetch it from the msg header
 		if sourceIP == "0.0.0.0" {
 			addrString := strings.Split(addr.String(), ":")
-			sourceIP = getOutboundIP(addrString[0]).String()
+			sourceIP = getLocalIP(addrString[0]).String()
 			log.Println("Source IP address is now: ", sourceIP)
 		}
 
@@ -102,7 +117,17 @@ func pfcpifaceMainLoop(upf *upf, accessIP string, coreIP string, sourceIP string
 		switch msg.MessageType() {
 		case message.MsgTypeAssociationSetupRequest:
 			outgoingMessage = handleAssociationSetupRequest(msg, addr, sourceIP, accessIP, coreIP)
-			cpConnected = true
+			if outgoingMessage != nil {
+				cpConnected = true
+				if manageConnection == true {
+					cpConnectionStatus <- cpConnected
+				}
+			}
+		case message.MsgTypeAssociationSetupResponse:
+			cpConnected = handleAssociationSetupResponse(msg, addr, sourceIP, accessIP)
+			if manageConnection == true {
+				cpPfcpAssocResponse <- cpConnected
+			}
 		case message.MsgTypeSessionEstablishmentRequest:
 			outgoingMessage = handleSessionEstablishmentRequest(upf, msg, addr, sourceIP)
 		case message.MsgTypeSessionModificationRequest:
@@ -163,6 +188,30 @@ func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP 
 	return asres
 }
 
+func handleAssociationSetupResponse(msg message.Message, addr net.Addr, sourceIP string, accessIP string) bool {
+	asres, ok := msg.(*message.AssociationSetupResponse)
+	if !ok {
+		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
+		return false
+	}
+
+	ts, err := asres.RecoveryTimeStamp.RecoveryTimeStamp()
+	if err != nil {
+		log.Println("Got an association setup response with invalid TS: ", err, " from: ", addr)
+		return false
+	}
+	log.Println("Received a PFCP association setup response with TS: ", ts, " from: ", addr)
+
+	cause, err := asres.Cause.Cause()
+	if err != nil {
+		log.Println("Got an association setup response without casue ", err, " from: ", addr, "Cause ", cause)
+		return false
+	}
+
+	log.Println("PFCP Association formed with Control Plane - ", addr)
+	return true
+}
+
 func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceIP string, accessIP string) []byte {
 	arreq, ok := msg.(*message.AssociationReleaseRequest)
 	if !ok {
@@ -213,10 +262,10 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 		log.Println(err)
 		// Build response message
 		seres, err := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
-			0,                              /* FO <-- what's this? */
-			fseid.SEID,                     /* seid */
-			sereq.SequenceNumber,           /* seq # */
-			0,                              /* priority */
+			0,                    /* FO <-- what's this? */
+			fseid.SEID,           /* seid */
+			sereq.SequenceNumber, /* seq # */
+			0,                    /* priority */
 			ie.NewNodeID(sourceIP, "", ""), /* node id (IPv4) */
 			ie.NewCause(ie.CauseRequestRejected),
 		).Marshal()
@@ -240,10 +289,10 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 
 	// Build response message
 	seres, err := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
-		0,                                    /* FO <-- what's this? */
-		fseid.SEID,                           /* seid */
-		sereq.SequenceNumber,                 /* seq # */
-		0,                                    /* priority */
+		0,                    /* FO <-- what's this? */
+		fseid.SEID,           /* seid */
+		sereq.SequenceNumber, /* seq # */
+		0,                    /* priority */
 		ie.NewNodeID(sourceIP, "", ""),       /* node id (IPv4) */
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 		ie.NewFSEID(peerSEID(fseid.SEID), net.ParseIP(sourceIP), nil, nil),
@@ -298,10 +347,10 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
 
 	// Build response message
 	smres, err := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */
-		0,                                    /* FO <-- what's this? */
-		(mySEID(smreq.SEID())),               /* seid */
-		smreq.SequenceNumber,                 /* seq # */
-		0,                                    /* priority */
+		0, /* FO <-- what's this? */
+		(mySEID(smreq.SEID())), /* seid */
+		smreq.SequenceNumber,   /* seq # */
+		0,                      /* priority */
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 		ie.NewFSEID(peerSEID(smreq.SEID()), net.ParseIP(sourceIP), nil, nil),
 	).Marshal()
@@ -357,11 +406,12 @@ func handleSessionDeletionRequest(upf *upf, msg message.Message, addr net.Addr, 
 
 	// Build response message
 	smres, err := message.NewSessionDeletionResponse(0, /* MO?? <-- what's this */
-		0,                                    /* FO <-- what's this? */
-		mySEID(sdreq.SEID()),                 /* seid */
-		sdreq.SequenceNumber,                 /* seq # */
-		0,                                    /* priority */
-		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
+		0,                    /* FO <-- what's this? */
+		mySEID(sdreq.SEID()), /* seid */
+		sdreq.SequenceNumber, /* seq # */
+		0,                    /* priority */
+		//ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
+		ie.NewCause(ie.CauseRequestRejected), /* accept it blindly for the time being */
 	).Marshal()
 
 	if err != nil {
@@ -371,4 +421,111 @@ func handleSessionDeletionRequest(upf *upf, msg message.Message, addr net.Addr, 
 	log.Println("Sent session deletion response to: ", addr)
 
 	return smres
+}
+
+func manageSmfConnection(n4LocalIP string, n3ip string, n4Dst string, conn *net.UDPConn, cpConnectionStatus chan bool, cpPfcpAssocResponse chan bool) {
+	statusUpfInitConnection := make(chan bool)
+	msg := false
+
+	cpConnected := false
+
+	initiatePfcpConnection := func() {
+		log.Println("SPGWC/SMF hostname ", n4Dst)
+		n4DstIP := getRemoteIP(n4Dst)
+		log.Println("SPGWC/SMF address IP inside manageSmfConnection ", n4DstIP.String())
+		// initiate request if we have control plane address available
+		if n4DstIP.String() != "0.0.0.0" {
+			generateAssociationRequest(n4LocalIP, n3ip, n4DstIP.String(), conn, cpPfcpAssocResponse, statusUpfInitConnection)
+		}
+		// no worry. Looks like control plane is still not up
+	}
+	updateSmfStatus := func(msg bool) {
+		log.Println("cpConnected : ", cpConnected, "msg ", msg)
+		//events from main Loop
+		if cpConnected == true && msg == false {
+			log.Println("CP disconnected ")
+			cpConnected = false
+		} else if cpConnected == false && msg == true {
+			log.Println("CP Connected ")
+			cpConnected = true
+		} else {
+			log.Println("cpConnected ", cpConnected)
+			log.Println("msg - ", msg)
+		}
+	}
+
+	if n4Dst != "" {
+		go initiatePfcpConnection()
+	}
+
+	ticker := time.NewTicker(5000 * time.Millisecond)
+	for {
+		log.Println("Waiting for input to select call ")
+		select {
+		case msg = <-cpConnectionStatus:
+			//events from main Loop
+			updateSmfStatus(msg)
+		case msg = <-statusUpfInitConnection:
+			log.Println("Received connection status from go routine. Result - ", msg)
+			//events from go routine which initiates connections to SMF
+			updateSmfStatus(msg)
+		case <-ticker.C:
+			if cpConnected == false && n4Dst != "" {
+				log.Println("Retry pfcp connection setup ", n4Dst)
+				go initiatePfcpConnection()
+			}
+		}
+	}
+}
+
+func generateAssociationRequest(n4LocalIP string, n3ip string, n4DstIp string, conn *net.UDPConn,
+	cpPfcpAssocResponse chan bool,
+	statusUpfInitConnections chan bool) {
+
+	seq_num := sequence_number
+	sequence_number++
+	log.Println("n4DstIp ", n4DstIp)
+	// Build request message
+	asreq, err := message.NewAssociationSetupRequest(seq_num, ie.NewRecoveryTimeStamp(time.Now()),
+		ie.NewNodeID(n4LocalIP, "", ""), /* node id (IPv4) */
+		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
+		//      = 01000001
+		ie.NewUserPlaneIPResourceInformation(0x41, 0, n3ip, "", "", ie.SrcInterfaceAccess),
+	).Marshal() /* userplane ip resource info */
+	if err != nil {
+		log.Fatalln("Unable to create association setup response", err)
+	}
+
+	smfAddr, err := net.ResolveUDPAddr("udp", n4DstIp+":"+PFCPPort)
+	if err != nil {
+		log.Fatalln("Unable to resolve udp addr!", err)
+		return
+	}
+
+	log.Println("SMF address ", smfAddr)
+
+	if _, err := conn.WriteTo(asreq, smfAddr); err != nil {
+		log.Fatalln("Unable to transmit association setup request ", err)
+	}
+
+	ticker := time.NewTicker(2000 * time.Millisecond)
+
+	msg := false
+	for {
+		log.Println("Waiting for pfcp association setup response")
+		select {
+		case <-ticker.C:
+			log.Println("PFCP session setup timeout ")
+			ticker.Stop()
+			statusUpfInitConnections <- false
+			return
+		case msg = <-cpPfcpAssocResponse:
+			// msg(false) - Negative response to association request
+			// msg(true)  - Positive response to association request
+			log.Println("PFCP session setup response - ", msg)
+			ticker.Stop()
+			statusUpfInitConnections <- msg
+			return
+		}
+	}
 }
