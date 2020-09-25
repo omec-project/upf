@@ -40,15 +40,25 @@ func int2ip(nn uint32) net.IP {
 	return ip
 }
 
-func getOutboundIP(dstIP string) net.IP {
+func getRemoteIP(dstIP string) net.IP {
+	conn, err := net.Dial("udp", dstIP+":"+PFCPPort)
+	if err != nil {
+		ip := "0.0.0.0"
+		return net.ParseIP(ip)
+	}
+	defer conn.Close()
+	remoteAddr := conn.RemoteAddr().(*net.UDPAddr)
+
+	return remoteAddr.IP
+}
+
+func getLocalIP(dstIP string) net.IP {
 	conn, err := net.Dial("udp", dstIP+":"+PFCPPort)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer conn.Close()
-
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
-
 	return localAddr.IP
 }
 

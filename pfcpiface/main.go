@@ -160,7 +160,9 @@ func main() {
 
 	if conf.CPIface.SrcIP == "" {
 		if conf.CPIface.DestIP != "" {
-			n4SrcIP = getOutboundIP(conf.CPIface.DestIP)
+			log.Println("Dest address ", conf.CPIface.DestIP)
+			n4SrcIP = getLocalIP(conf.CPIface.DestIP)
+			log.Println("SPGWU/UPF address IP: ", n4SrcIP.String())
 		}
 	} else {
 		addrs, err := net.LookupHost(conf.CPIface.SrcIP)
@@ -169,9 +171,9 @@ func main() {
 		}
 	}
 
-	log.Println("N4 IP: ", n4SrcIP.String())
+	log.Println("N4 local IP: ", n4SrcIP.String())
 
-	go pfcpifaceMainLoop(upf, accessIP.String(), coreIP.String(), n4SrcIP.String())
+	go pfcpifaceMainLoop(upf, accessIP.String(), coreIP.String(), n4SrcIP.String(), conf.CPIface.DestIP)
 
 	setupProm(upf)
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))
