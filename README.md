@@ -59,28 +59,29 @@ reading from file /tmp/tmpUBTGau, link-type EN10MB (Ethernet)
 * IPv4 support
 * N3, N4, N6, N9 interfacing
 * Single & Multi-port support
-* Monitoring/Debugging capabilties using *(i)* tcpdump on individual BESS modules, *(ii)* visualization web interface, and *(iii)* command line shell interface for displaying statistics *etc*.
+* Monitoring/Debugging capabilties using
+    - tcpdump on individual BESS modules
+    - visualization web interface
+    - command line shell interface for displaying statistics
 * Static IP routing
 * Dynamic IP routing
 * Support for IPv4 datagrams reassembly
 * Support for IPv4 packets fragmentation
 * Support for UE IP NAT
-*
+* Service Data Flow (SDF) configuration via N4/PFCP.
+* I-UPF/A-UPF ULCL/Branching i.e., simultaneous N6/N9 support within PFCP session
 
 ### In Progress
 
-* I-UPF/A-UPF
+* Usage Reporting Rules (URR)
+* Downlink Data Notification (DDN)
+* Application Detection and Control (ADC) configuration via N4/PFCP.
 
 ### Pending
 
-* DDN support
 * PCC (Policy Control and Charging) rules configuration.
-* ADC (Application Detection and control) rules configuration.
-* Packet Filters for Service Data Flow (SDF) configuration.
-* Packet Selectors/Filters for ADC configuration.
 * SDF and APN based Qos Metering for MBR.
 * Sponsored Domain Name support
-* S5/S8 interfacing
 
 ## Installation
 
