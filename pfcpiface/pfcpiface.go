@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/wmnsk/go-pfcp/ie"
@@ -29,8 +30,17 @@ type sessRecord struct {
 
 var sessions map[uint64]sessRecord
 
-func pfcpifaceMainLoop(upf *upf, accessIP string, coreIP string, sourceIP string) {
+type sequenceNumber struct {
+	seq uint32
+	mux sync.Mutex
+}
+
+var seqNum sequenceNumber
+
+func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 	log.Println("pfcpifaceMainLoop@" + upf.fqdnHost + " says hello!!!")
+
+	cpConnectionStatus := make(chan bool)
 
 	// Verify IP + Port binding
 	laddr, err := net.ResolveUDPAddr("udp", sourceIP+":"+PFCPPort)
@@ -47,6 +57,8 @@ func pfcpifaceMainLoop(upf *upf, accessIP string, coreIP string, sourceIP string
 	}
 
 	// flag to check SMF/SPGW-C is connected
+	//cpConnected is true if upf received request from control plane or
+	// if upf receives +ve response for upf initiated setup request
 	cpConnected := false
 
 	// cleanup the pipeline
@@ -55,6 +67,13 @@ func pfcpifaceMainLoop(upf *upf, accessIP string, coreIP string, sourceIP string
 			sendDeleteAllSessionsMsgtoUPF(upf)
 			cpConnected = false
 		}
+	}
+	//initiate connection if smf address available
+	log.Println("calling manageSmfConnection smf service name ", smfName)
+	manageConnection := false
+	if smfName != "" {
+		manageConnection = true
+		go manageSmfConnection(sourceIP, accessIP, smfName, conn, cpConnectionStatus)
 	}
 
 	// Initialize pkt buf
@@ -75,6 +94,10 @@ func pfcpifaceMainLoop(upf *upf, accessIP string, coreIP string, sourceIP string
 			if err, ok := err.(net.Error); ok && err.Timeout() {
 				// do nothing for the time being
 				log.Println(err)
+				cpConnected = false
+				if manageConnection {
+					cpConnectionStatus <- cpConnected
+				}
 				cleanupSessions()
 				continue
 			}
@@ -91,7 +114,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP string, coreIP string, sourceIP string
 		// if sourceIP is not set, fetch it from the msg header
 		if sourceIP == "0.0.0.0" {
 			addrString := strings.Split(addr.String(), ":")
-			sourceIP = getOutboundIP(addrString[0]).String()
+			sourceIP = getLocalIP(addrString[0]).String()
 			log.Println("Source IP address is now: ", sourceIP)
 		}
 
@@ -102,7 +125,19 @@ func pfcpifaceMainLoop(upf *upf, accessIP string, coreIP string, sourceIP string
 		switch msg.MessageType() {
 		case message.MsgTypeAssociationSetupRequest:
 			outgoingMessage = handleAssociationSetupRequest(msg, addr, sourceIP, accessIP, coreIP)
-			cpConnected = true
+			if outgoingMessage != nil {
+				cpConnected = true
+				if manageConnection {
+					// if we initiated connection, inform go routine
+					cpConnectionStatus <- cpConnected
+				}
+			}
+		case message.MsgTypeAssociationSetupResponse:
+			cpConnected = handleAssociationSetupResponse(msg, addr, sourceIP, accessIP)
+			if manageConnection {
+				// pass on information to go routine that result of association response
+				cpConnectionStatus <- cpConnected
+			}
 		case message.MsgTypeSessionEstablishmentRequest:
 			outgoingMessage = handleSessionEstablishmentRequest(upf, msg, addr, sourceIP)
 		case message.MsgTypeSessionModificationRequest:
@@ -161,6 +196,30 @@ func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP 
 	log.Println("Sent association setup response to: ", addr)
 
 	return asres
+}
+
+func handleAssociationSetupResponse(msg message.Message, addr net.Addr, sourceIP string, accessIP string) bool {
+	asres, ok := msg.(*message.AssociationSetupResponse)
+	if !ok {
+		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
+		return false
+	}
+
+	ts, err := asres.RecoveryTimeStamp.RecoveryTimeStamp()
+	if err != nil {
+		log.Println("Got an association setup response with invalid TS: ", err, " from: ", addr)
+		return false
+	}
+	log.Println("Received a PFCP association setup response with TS: ", ts, " from: ", addr)
+
+	cause, err := asres.Cause.Cause()
+	if err != nil {
+		log.Println("Got an association setup response without casue ", err, " from: ", addr, "Cause ", cause)
+		return false
+	}
+
+	log.Println("PFCP Association formed with Control Plane - ", addr)
+	return true
 }
 
 func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceIP string, accessIP string) []byte {
@@ -371,4 +430,92 @@ func handleSessionDeletionRequest(upf *upf, msg message.Message, addr net.Addr, 
 	log.Println("Sent session deletion response to: ", addr)
 
 	return smres
+}
+
+func getSeqNum() uint32 {
+	seqNum.mux.Lock()
+	defer seqNum.mux.Unlock()
+	seqNum.seq++
+	return seqNum.seq
+}
+
+func manageSmfConnection(n4LocalIP string, n3ip string, n4Dst string, conn *net.UDPConn, cpConnectionStatus chan bool) {
+	msg := false
+	cpConnected := false
+
+	initiatePfcpConnection := func() {
+		log.Println("SPGWC/SMF hostname ", n4Dst)
+		n4DstIP := getRemoteIP(n4Dst)
+		log.Println("SPGWC/SMF address IP inside manageSmfConnection ", n4DstIP.String())
+		// initiate request if we have control plane address available
+		if n4DstIP.String() != "0.0.0.0" {
+			generateAssociationRequest(n4LocalIP, n3ip, n4DstIP.String(), conn)
+		}
+		// no worry. Looks like control plane is still not up
+	}
+	updateSmfStatus := func(msg bool) {
+		log.Println("cpConnected : ", cpConnected, "msg ", msg)
+		//events from main Loop
+		if cpConnected && !msg {
+			log.Println("CP disconnected ")
+			cpConnected = false
+		} else if !cpConnected && msg {
+			log.Println("CP Connected ")
+			cpConnected = true
+		} else {
+			log.Println("cpConnected ", cpConnected, "msg - ", msg)
+		}
+	}
+
+	initiatePfcpConnection()
+
+	connHelathTicker := time.NewTicker(5000 * time.Millisecond)
+	pfcpResponseTicker := time.NewTicker(2000 * time.Millisecond)
+	for {
+		select {
+		case msg = <-cpConnectionStatus:
+			//events from main Loop
+			updateSmfStatus(msg)
+			if cpConnected {
+				pfcpResponseTicker.Stop()
+			}
+		case <-connHelathTicker.C:
+			if !cpConnected {
+				log.Println("Retry pfcp connection setup ", n4Dst)
+				initiatePfcpConnection()
+			}
+		case <-pfcpResponseTicker.C:
+			log.Println("PFCP session setup timeout ")
+			pfcpResponseTicker.Stop()
+			// we will attempt new connection after next recheck
+		}
+	}
+}
+
+func generateAssociationRequest(n4LocalIP string, n3ip string, n4DstIp string, conn *net.UDPConn) {
+
+	seq_num := getSeqNum()
+	log.Println("n4DstIp ", n4DstIp)
+	// Build request message
+	asreq, err := message.NewAssociationSetupRequest(seq_num, ie.NewRecoveryTimeStamp(time.Now()),
+		ie.NewNodeID(n4LocalIP, "", ""), /* node id (IPv4) */
+		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
+		//      = 01000001
+		ie.NewUserPlaneIPResourceInformation(0x41, 0, n3ip, "", "", ie.SrcInterfaceAccess),
+	).Marshal() /* userplane ip resource info */
+	if err != nil {
+		log.Fatalln("Unable to create association setup response", err)
+	}
+
+	smfAddr, err := net.ResolveUDPAddr("udp", n4DstIp+":"+PFCPPort)
+	if err != nil {
+		log.Fatalln("Unable to resolve udp addr!", err)
+		return
+	}
+
+	log.Println("SMF address ", smfAddr)
+
+	if _, err := conn.WriteTo(asreq, smfAddr); err != nil {
+		log.Fatalln("Unable to transmit association setup request ", err)
+	}
 }
