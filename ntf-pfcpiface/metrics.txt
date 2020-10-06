@@ -1,0 +1,155 @@
+# HELP go_gc_duration_seconds A summary of the pause duration of garbage collection cycles.
+# TYPE go_gc_duration_seconds summary
+go_gc_duration_seconds{quantile="0"} 0.000127532
+go_gc_duration_seconds{quantile="0.25"} 0.000127532
+go_gc_duration_seconds{quantile="0.5"} 0.000137785
+go_gc_duration_seconds{quantile="0.75"} 0.000137785
+go_gc_duration_seconds{quantile="1"} 0.000137785
+go_gc_duration_seconds_sum 0.000265317
+go_gc_duration_seconds_count 2
+# HELP go_goroutines Number of goroutines that currently exist.
+# TYPE go_goroutines gauge
+go_goroutines 13
+# HELP go_info Information about the Go environment.
+# TYPE go_info gauge
+go_info{version="go1.14.4"} 1
+# HELP go_memstats_alloc_bytes Number of bytes allocated and still in use.
+# TYPE go_memstats_alloc_bytes gauge
+go_memstats_alloc_bytes 3.555872e+06
+# HELP go_memstats_alloc_bytes_total Total number of bytes allocated, even if freed.
+# TYPE go_memstats_alloc_bytes_total counter
+go_memstats_alloc_bytes_total 6.589944e+06
+# HELP go_memstats_buck_hash_sys_bytes Number of bytes used by the profiling bucket hash table.
+# TYPE go_memstats_buck_hash_sys_bytes gauge
+go_memstats_buck_hash_sys_bytes 1.445369e+06
+# HELP go_memstats_frees_total Total number of frees.
+# TYPE go_memstats_frees_total counter
+go_memstats_frees_total 20553
+# HELP go_memstats_gc_cpu_fraction The fraction of this program's available CPU time used by the GC since the program started.
+# TYPE go_memstats_gc_cpu_fraction gauge
+go_memstats_gc_cpu_fraction 3.3231788147792697e-06
+# HELP go_memstats_gc_sys_bytes Number of bytes used for garbage collection system metadata.
+# TYPE go_memstats_gc_sys_bytes gauge
+go_memstats_gc_sys_bytes 3.574024e+06
+# HELP go_memstats_heap_alloc_bytes Number of heap bytes allocated and still in use.
+# TYPE go_memstats_heap_alloc_bytes gauge
+go_memstats_heap_alloc_bytes 3.555872e+06
+# HELP go_memstats_heap_idle_bytes Number of heap bytes waiting to be used.
+# TYPE go_memstats_heap_idle_bytes gauge
+go_memstats_heap_idle_bytes 6.1284352e+07
+# HELP go_memstats_heap_inuse_bytes Number of heap bytes that are in use.
+# TYPE go_memstats_heap_inuse_bytes gauge
+go_memstats_heap_inuse_bytes 4.907008e+06
+# HELP go_memstats_heap_objects Number of allocated objects.
+# TYPE go_memstats_heap_objects gauge
+go_memstats_heap_objects 9100
+# HELP go_memstats_heap_released_bytes Number of heap bytes released to OS.
+# TYPE go_memstats_heap_released_bytes gauge
+go_memstats_heap_released_bytes 6.0891136e+07
+# HELP go_memstats_heap_sys_bytes Number of heap bytes obtained from system.
+# TYPE go_memstats_heap_sys_bytes gauge
+go_memstats_heap_sys_bytes 6.619136e+07
+# HELP go_memstats_last_gc_time_seconds Number of seconds since 1970 of last garbage collection.
+# TYPE go_memstats_last_gc_time_seconds gauge
+go_memstats_last_gc_time_seconds 1.5934443648073094e+09
+# HELP go_memstats_lookups_total Total number of pointer lookups.
+# TYPE go_memstats_lookups_total counter
+go_memstats_lookups_total 0
+# HELP go_memstats_mallocs_total Total number of mallocs.
+# TYPE go_memstats_mallocs_total counter
+go_memstats_mallocs_total 29653
+# HELP go_memstats_mcache_inuse_bytes Number of bytes in use by mcache structures.
+# TYPE go_memstats_mcache_inuse_bytes gauge
+go_memstats_mcache_inuse_bytes 152768
+# HELP go_memstats_mcache_sys_bytes Number of bytes used for mcache structures obtained from system.
+# TYPE go_memstats_mcache_sys_bytes gauge
+go_memstats_mcache_sys_bytes 163840
+# HELP go_memstats_mspan_inuse_bytes Number of bytes in use by mspan structures.
+# TYPE go_memstats_mspan_inuse_bytes gauge
+go_memstats_mspan_inuse_bytes 125528
+# HELP go_memstats_mspan_sys_bytes Number of bytes used for mspan structures obtained from system.
+# TYPE go_memstats_mspan_sys_bytes gauge
+go_memstats_mspan_sys_bytes 131072
+# HELP go_memstats_next_gc_bytes Number of heap bytes when next garbage collection will take place.
+# TYPE go_memstats_next_gc_bytes gauge
+go_memstats_next_gc_bytes 4.829664e+06
+# HELP go_memstats_other_sys_bytes Number of bytes used for other system allocations.
+# TYPE go_memstats_other_sys_bytes gauge
+go_memstats_other_sys_bytes 1.583615e+06
+# HELP go_memstats_stack_inuse_bytes Number of bytes in use by the stack allocator.
+# TYPE go_memstats_stack_inuse_bytes gauge
+go_memstats_stack_inuse_bytes 917504
+# HELP go_memstats_stack_sys_bytes Number of bytes obtained from system for stack allocator.
+# TYPE go_memstats_stack_sys_bytes gauge
+go_memstats_stack_sys_bytes 917504
+# HELP go_memstats_sys_bytes Number of bytes obtained from system.
+# TYPE go_memstats_sys_bytes gauge
+go_memstats_sys_bytes 7.4006784e+07
+# HELP go_threads Number of OS threads created.
+# TYPE go_threads gauge
+go_threads 12
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 0.38
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+process_max_fds 1.048576e+06
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+process_open_fds 11
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes 1.6531456e+07
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1.5934442664e+09
+# HELP process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE process_virtual_memory_bytes gauge
+process_virtual_memory_bytes 7.34261248e+08
+# HELP process_virtual_memory_max_bytes Maximum amount of virtual memory available in bytes.
+# TYPE process_virtual_memory_max_bytes gauge
+process_virtual_memory_max_bytes -1
+# HELP promhttp_metric_handler_requests_in_flight Current number of scrapes being served.
+# TYPE promhttp_metric_handler_requests_in_flight gauge
+promhttp_metric_handler_requests_in_flight 1
+# HELP promhttp_metric_handler_requests_total Total number of scrapes by HTTP status code.
+# TYPE promhttp_metric_handler_requests_total counter
+promhttp_metric_handler_requests_total{code="200"} 10
+promhttp_metric_handler_requests_total{code="500"} 0
+promhttp_metric_handler_requests_total{code="503"} 0
+# HELP upf_jitter_ns Shows the packet processing jitter percentiles in UPF
+# TYPE upf_jitter_ns summary
+upf_jitter_ns{iface="N3",quantile="50"} 0
+upf_jitter_ns{iface="N3",quantile="75"} 0
+upf_jitter_ns{iface="N3",quantile="90"} 0
+upf_jitter_ns{iface="N3",quantile="95"} 0
+upf_jitter_ns{iface="N3",quantile="99"} 100
+upf_jitter_ns{iface="N3",quantile="100"} 15500
+upf_jitter_ns_sum{iface="N3"} 6.061e+06
+upf_jitter_ns_count{iface="N3"} 3.022048e+06
+upf_jitter_ns{iface="N6",quantile="50"} 0
+upf_jitter_ns{iface="N6",quantile="75"} 0
+upf_jitter_ns{iface="N6",quantile="90"} 0
+upf_jitter_ns{iface="N6",quantile="95"} 0
+upf_jitter_ns{iface="N6",quantile="99"} 100
+upf_jitter_ns{iface="N6",quantile="100"} 16000
+upf_jitter_ns_sum{iface="N6"} 6.1237e+06
+upf_jitter_ns_count{iface="N6"} 3.02384e+06
+# HELP upf_latency_ns Shows the packet processing latency percentiles in UPF
+# TYPE upf_latency_ns summary
+upf_latency_ns{iface="N3",quantile="50"} 9900
+upf_latency_ns{iface="N3",quantile="75"} 10000
+upf_latency_ns{iface="N3",quantile="90"} 10000
+upf_latency_ns{iface="N3",quantile="95"} 10000
+upf_latency_ns{iface="N3",quantile="99"} 11500
+upf_latency_ns{iface="N3",quantile="100"} 26700
+upf_latency_ns_sum{iface="N3"} 3.02592864e+10
+upf_latency_ns_count{iface="N3"} 3.022048e+06
+upf_latency_ns{iface="N6",quantile="50"} 9100
+upf_latency_ns{iface="N6",quantile="75"} 9100
+upf_latency_ns{iface="N6",quantile="90"} 9200
+upf_latency_ns{iface="N6",quantile="95"} 9200
+upf_latency_ns{iface="N6",quantile="99"} 10600
+upf_latency_ns{iface="N6",quantile="100"} 26400
+upf_latency_ns_sum{iface="N6"} 2.77764288e+10
+upf_latency_ns_count{iface="N6"} 3.02384e+06
