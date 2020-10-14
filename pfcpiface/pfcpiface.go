@@ -214,7 +214,7 @@ func handleAssociationSetupResponse(msg message.Message, addr net.Addr, sourceIP
 
 	cause, err := asres.Cause.Cause()
 	if err != nil {
-		log.Println("Got an association setup response without casue ", err, " from: ", addr, "Cause ", cause)
+		log.Println("Got an association setup response without cause ", err, " from: ", addr, "Cause ", cause)
 		return false
 	}
 
@@ -440,7 +440,6 @@ func getSeqNum() uint32 {
 }
 
 func manageSmfConnection(n4LocalIP string, n3ip string, n4Dst string, conn *net.UDPConn, cpConnectionStatus chan bool) {
-	msg := false
 	cpConnected := false
 
 	initiatePfcpConnection := func() {
@@ -473,7 +472,7 @@ func manageSmfConnection(n4LocalIP string, n3ip string, n4Dst string, conn *net.
 	pfcpResponseTicker := time.NewTicker(2000 * time.Millisecond)
 	for {
 		select {
-		case msg = <-cpConnectionStatus:
+		case msg := <-cpConnectionStatus:
 			//events from main Loop
 			updateSmfStatus(msg)
 			if cpConnected {
@@ -494,10 +493,10 @@ func manageSmfConnection(n4LocalIP string, n3ip string, n4Dst string, conn *net.
 
 func generateAssociationRequest(n4LocalIP string, n3ip string, n4DstIp string, conn *net.UDPConn) {
 
-	seq_num := getSeqNum()
+	seqNum := getSeqNum()
 	log.Println("n4DstIp ", n4DstIp)
 	// Build request message
-	asreq, err := message.NewAssociationSetupRequest(seq_num, ie.NewRecoveryTimeStamp(time.Now()),
+	asreq, err := message.NewAssociationSetupRequest(seqNum, ie.NewRecoveryTimeStamp(time.Now()),
 		ie.NewNodeID(n4LocalIP, "", ""), /* node id (IPv4) */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
