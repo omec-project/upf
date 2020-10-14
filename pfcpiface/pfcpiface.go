@@ -4,6 +4,7 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"net"
 	"strings"
@@ -267,8 +268,12 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 	}
 
 	/* Read CreatePDRs and CreateFARs from payload */
-	pdrs, fars, err := parsePDRsFARs(upf, sereq, fseid)
-	if err != nil {
+
+	pdrs := make([]pdr, 0, MaxItems)
+	fars := make([]far, 0, MaxItems)
+
+	sendError := func(err error) []byte {
+
 		log.Println(err)
 		// Build response message
 		seres, err := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
@@ -286,6 +291,22 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 
 		log.Println("Sending session establishment response to: ", addr)
 		return seres
+	}
+
+	for _, cPDR := range sereq.CreatePDR {
+		if p := parseCreatePDR(cPDR, fseid.SEID); p != nil {
+			pdrs = append(pdrs, *p)
+		} else {
+			return sendError(errors.New("Failed to parse PDR"))
+		}
+	}
+
+	for _, cFAR := range sereq.CreateFAR {
+		if f := parseCreateFAR(cFAR, fseid.SEID, upf); f != nil {
+			fars = append(fars, *f)
+		} else {
+			return sendError(errors.New("Failed to parse FAR"))
+		}
 	}
 
 	upf.sendMsgToUPF("add", pdrs, fars)
@@ -330,30 +351,46 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
 	fseid := (mySEID(smreq.SEID()))
 
 	/* initialize farList */
+	pdrs := make([]pdr, 0, MaxItems)
 	fars := make([]far, 0, MaxItems)
 
-	/* read FAR(s). These can be multiple */
-	ies1, err := ie.ParseMultiIEs(smreq.Payload)
-	if err != nil {
-		log.Println("Failed to parse smreq for IEs!")
-	} else {
-		/*
-		 * Iteratively go through all IEs. You can't use ie.UpdateFAR since a single
-		 * message can carry multiple UpdateFAR messages.
-		 */
-		for _, ie1 := range ies1 {
-			switch ie1.Type {
-			case ie.UpdateFAR:
-				if f := parseUpdateFAR(ie1, fseid, upf.accessIP); f != nil {
-					fars = append(fars, *f)
-				}
-			default:
-				/* more will be added later */
-			}
+	sendError := func(err error) []byte {
+
+		log.Println(err)
+		smres, err := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */
+			0,                                    /* FO <-- what's this? */
+			(mySEID(smreq.SEID())),               /* seid */
+			smreq.SequenceNumber,                 /* seq # */
+			0,                                    /* priority */
+			ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
+			ie.NewFSEID(peerSEID(smreq.SEID()), net.ParseIP(sourceIP), nil, nil),
+		).Marshal()
+
+		if err != nil {
+			log.Fatalln("Unable to create session establishment response", err)
+		}
+
+		log.Println("Sending session establishment response to: ", addr)
+		return smres
+	}
+
+	for _, cPDR := range smreq.CreatePDR {
+		if p := parseCreatePDR(cPDR, fseid); p != nil {
+			pdrs = append(pdrs, *p)
+		} else {
+			return sendError(errors.New("Failed to parse PDR"))
 		}
 	}
 
-	upf.sendMsgToUPF("add", nil, fars)
+	for _, cFAR := range smreq.CreateFAR {
+		if f := parseCreateFAR(cFAR, fseid, upf); f != nil {
+			fars = append(fars, *f)
+		} else {
+			return sendError(errors.New("Failed to parse FAR"))
+		}
+	}
+
+	upf.sendMsgToUPF("add", pdrs, fars)
 
 	// Build response message
 	smres, err := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */

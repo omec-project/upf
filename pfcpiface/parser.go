@@ -4,13 +4,11 @@
 package main
 
 import (
-	"errors"
 	"log"
 	"net"
 	"strings"
 
 	"github.com/wmnsk/go-pfcp/ie"
-	"github.com/wmnsk/go-pfcp/message"
 )
 
 func parseFlowDesc(flowDesc string) (IP4AddressNet string) {
@@ -161,7 +159,7 @@ func parseCreatePDRPDI(pdi []*ie.IE) *pdr {
 	return &pdrI
 }
 
-func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
+func parseCreatePDR(ie1 *ie.IE, seid uint64) *pdr {
 
 	/* reset outerHeaderRemoval to begin with */
 	outerHeaderRemoval := uint8(0)
@@ -203,9 +201,9 @@ func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
 
 	pdrI.precedence = precedence
 	pdrI.pdrID = uint32(pdrID)
-	pdrI.fseID = uint32(fseid.SEID) // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-	pdrI.ctrID = 0                  // ctrID currently not being set <--- FIXIT/TODO/XXX
-	pdrI.farID = uint8(farID)       // farID currently not being set <--- FIXIT/TODO/XXX
+	pdrI.fseID = uint32(seid) // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
+	pdrI.ctrID = 0            // ctrID currently not being set <--- FIXIT/TODO/XXX
+	pdrI.farID = uint8(farID) // farID currently not being set <--- FIXIT/TODO/XXX
 	pdrI.needDecap = outerHeaderRemoval
 
 	// if srcIface is neither acceess nor core, then return nil
@@ -216,16 +214,16 @@ func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
 	return pdrI
 }
 
-func parseCreateFAR(ie1 *ie.IE, fseid uint64, coreIP net.IP) *far {
-	return parseFAR(ie1, fseid, coreIP, "create")
+func parseCreateFAR(f *ie.IE, fseid uint64, upf *upf) *far {
+	return parseFAR(f, fseid, upf, "create")
 }
 
-func parseUpdateFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP) *far {
-	return parseFAR(ie1, fseid, accessIP, "update")
+func parseUpdateFAR(f *ie.IE, fseid uint64, upf *upf) *far {
+	return parseFAR(f, fseid, upf, "update")
 }
 
-func parseFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP, fwdType string) *far {
-	farID, err := ie1.FARID()
+func parseFAR(f *ie.IE, fseid uint64, upf *upf, fwdType string) *far {
+	farID, err := f.FARID()
 	if err != nil {
 		log.Println("Could not read FAR ID!")
 		return nil
@@ -235,13 +233,13 @@ func parseFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP, fwdType string) *far {
 	tunnelDst := uint32(0)
 	tunnelSrc := uint32(0)
 	tunnelType := uint8(0)
-	var ies2 []*ie.IE
+	var fIEs []*ie.IE
 	var dir uint8 = 0xFF
 
 	if fwdType == "create" {
-		ies2, err = ie1.ForwardingParameters()
+		fIEs, err = f.ForwardingParameters()
 	} else if fwdType == "update" {
-		ies2, err = ie1.UpdateForwardingParameters()
+		fIEs, err = f.UpdateForwardingParameters()
 	} else {
 		log.Println("Invalid fwdType specified!")
 		return nil
@@ -250,28 +248,29 @@ func parseFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP, fwdType string) *far {
 		log.Println("Unable to find ForwardingParameters!")
 		return nil
 	}
-	for _, ie2 := range ies2 {
-		switch ie2.Type {
+	for _, fIE := range fIEs {
+		switch fIE.Type {
 		case ie.OuterHeaderCreation:
-			outerheadercreationfields, err := ie2.OuterHeaderCreation()
+			outerheadercreationfields, err := fIE.OuterHeaderCreation()
 			if err != nil {
 				log.Println("Unable to parse OuterHeaderCreationFields!")
 				continue
 			}
 			tunnelTEID = outerheadercreationfields.TEID
 			tunnelDst = ip2int(outerheadercreationfields.IPv4Address)
-			tunnelSrc = ip2int(accessIP)
 			tunnelType = uint8(1)
 		case ie.DestinationInterface:
-			destinationinterface, err := ie2.DestinationInterface()
+			destinationinterface, err := fIE.DestinationInterface()
 			if err != nil {
 				log.Println("Unable to parse DestinationInterface field")
 				continue
 			}
 			if destinationinterface == ie.DstInterfaceAccess {
 				dir = farForwardD
+				tunnelSrc = ip2int(upf.accessIP)
 			} else if destinationinterface == ie.DstInterfaceCore {
 				dir = farForwardU
+				tunnelSrc = ip2int(upf.coreIP)
 			}
 		}
 	}
@@ -286,38 +285,4 @@ func parseFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP, fwdType string) *far {
 		tunnelTEID:   tunnelTEID,
 		tunnelPort:   tunnelPort,
 	}
-}
-
-func parsePDRsFARs(upf *upf, sereq *message.SessionEstablishmentRequest, fseid *ie.FSEIDFields) ([]pdr, []far, error) {
-
-	pdrs := make([]pdr, 0, MaxItems)
-	fars := make([]far, 0, MaxItems)
-
-	/* read PDR(s) */
-	ies1, err := ie.ParseMultiIEs(sereq.Payload)
-	if err != nil {
-		return pdrs, fars, errors.New("Failed to parse sereq for IEs!")
-	}
-
-	// Iteratively go through all IEs. You can't use ie.CreatePDR or ie.CreateFAR since a single
-	// message can carry multiple CreatePDR & CreateFAR messages.
-
-	for _, ie1 := range ies1 {
-		switch ie1.Type {
-		case ie.CreatePDR:
-			if p := parseCreatePDR(ie1, fseid); p != nil {
-				pdrs = append(pdrs, *p)
-			} else {
-				return pdrs, fars, errors.New("Failed to parse PDR")
-			}
-
-		case ie.CreateFAR:
-			if f := parseCreateFAR(ie1, fseid.SEID, upf.coreIP); f != nil {
-				//printFAR(*f)
-				fars = append(fars, *f)
-			}
-		}
-	}
-
-	return pdrs, fars, nil
 }
