@@ -42,6 +42,7 @@ type PFCPSession struct {
 	remoteSEID uint64
 	pdrs       []pdr
 	fars       []far
+	urrs       []urr
 }
 
 // NewPFCPSession allocates an session with ID
@@ -58,6 +59,7 @@ func (mgr *PFCPSessionMgr) NewPFCPSession(rseid uint64) uint64 {
 			remoteSEID: rseid,
 			pdrs:       make([]pdr, 0, MaxItems),
 			fars:       make([]far, 0, MaxItems),
+			urrs:       make([]urr, 0, MaxItems),
 		}
 		mgr.sessions[lseid] = s
 		return lseid

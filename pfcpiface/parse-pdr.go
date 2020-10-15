@@ -32,11 +32,14 @@ type pdr struct {
 	precedence uint32
 	pdrID      uint32
 	fseID      uint32
+	fseidIP    uint32
 	ctrID      uint32
 	farID      uint32
+	urrID      uint32
 	needDecap  uint8
 }
 
+/*
 func (p *pdr) printPDR() {
 	log.Println("------------------ PDR ---------------------")
 	log.Println("Src Iface:", p.srcIface)
@@ -57,12 +60,14 @@ func (p *pdr) printPDR() {
 	log.Println("proto Mask:", p.protoMask)
 	log.Println("pdrID:", p.pdrID)
 	log.Println("fseID", p.fseID)
+	log.Println("fseidIP", p.fseidIP)
 	log.Println("ctrID:", p.ctrID)
 	log.Println("farID:", p.farID)
+	log.Println("urrID:", p.urrID)
 	log.Println("needDecap:", p.needDecap)
 	log.Println("--------------------------------------------")
 }
-
+*/
 func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD) error {
 	var ueIP4 net.IP
 
@@ -248,11 +253,17 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD) error
 		return nil
 	}
 
+	urrID, err := ie1.URRID()
+	if err != nil {
+		log.Println("Could not read URR ID!")
+	}
+
 	p.precedence = precedence
 	p.pdrID = uint32(pdrID)
-	p.fseID = uint32(seid) // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-	p.ctrID = 0            // ctrID currently not being set <--- FIXIT/TODO/XXX
-	p.farID = farID        // farID currently not being set <--- FIXIT/TODO/XXX
+	p.fseID = uint32(seid)  // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
+	p.ctrID = 0             // ctrID currently not being set <--- FIXIT/TODO/XXX
+	p.farID = uint32(farID) // farID currently not being set <--- FIXIT/TODO/XXX
+	p.urrID = uint32(urrID)
 	p.needDecap = outerHeaderRemoval
 
 	return nil
