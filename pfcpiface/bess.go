@@ -181,6 +181,7 @@ func (b *bess) parseFunc(conf *Conf) {
 	log.Println("parseFunc bess")
 	b.accessIP = ParseIP(conf.AccessIface.IfName, "Access")
 	b.coreIP = ParseIP(conf.CoreIface.IfName, "Core")
+	b.n4SrcIP = net.ParseIP("0.0.0.0")
 
 	// fetch fqdn. Prefer json field
 	b.fqdnh = conf.CPIface.FQDNHost
