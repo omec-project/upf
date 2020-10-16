@@ -14,6 +14,59 @@ import (
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
+type pdr struct {
+	srcIface     uint8
+	tunnelIP4Dst uint32
+	tunnelTEID   uint32
+	srcIP        uint32
+	dstIP        uint32
+	srcPort      uint16
+	dstPort      uint16
+	proto        uint8
+
+	srcIfaceMask     uint8
+	tunnelIP4DstMask uint32
+	tunnelTEIDMask   uint32
+	srcIPMask        uint32
+	dstIPMask        uint32
+	srcPortMask      uint16
+	dstPortMask      uint16
+	protoMask        uint8
+
+	precedence uint32
+	pdrID      uint32
+	fseID      uint32
+	ctrID      uint32
+	farID      uint8
+	needDecap  uint8
+}
+
+func printPDR(pdr pdr) {
+	log.Println("------------------ PDR ---------------------")
+	log.Println("Src Iface:", pdr.srcIface)
+	log.Println("tunnelIP4Dst:", int2ip(pdr.tunnelIP4Dst))
+	log.Println("tunnelTEID:", pdr.tunnelTEID)
+	log.Println("srcIP:", int2ip(pdr.srcIP))
+	log.Println("dstIP:", int2ip(pdr.dstIP))
+	log.Println("srcPort:", pdr.srcPort)
+	log.Println("dstPort:", pdr.dstPort)
+	log.Println("proto:", pdr.proto)
+	log.Println("Src Iface Mask:", pdr.srcIfaceMask)
+	log.Println("tunnelIP4Dst Mask:", int2ip(pdr.tunnelIP4DstMask))
+	log.Println("tunnelTEIDMask Mask:", pdr.tunnelTEIDMask)
+	log.Println("srcIP Mask:", int2ip(pdr.srcIPMask))
+	log.Println("dstIP Mask:", int2ip(pdr.dstIPMask))
+	log.Println("srcPort Mask:", pdr.srcPortMask)
+	log.Println("dstPort Mask:", pdr.dstPortMask)
+	log.Println("proto Mask:", pdr.protoMask)
+	log.Println("pdrID:", pdr.pdrID)
+	log.Println("fseID", pdr.fseID)
+	log.Println("ctrID:", pdr.ctrID)
+	log.Println("farID:", pdr.farID)
+	log.Println("needDecap:", pdr.needDecap)
+	log.Println("--------------------------------------------")
+}
+
 type endpoint struct {
 	IPNet *net.IPNet
 	Port  uint16
@@ -280,77 +333,4 @@ func parseCreatePDR(ie1 *ie.IE, seid uint64) *pdr {
 	}
 
 	return pdrI
-}
-
-func parseCreateFAR(f *ie.IE, fseid uint64, upf *upf) *far {
-	return parseFAR(f, fseid, upf, "create")
-}
-
-func parseUpdateFAR(f *ie.IE, fseid uint64, upf *upf) *far {
-	return parseFAR(f, fseid, upf, "update")
-}
-
-func parseFAR(f *ie.IE, fseid uint64, upf *upf, fwdType string) *far {
-	farID, err := f.FARID()
-	if err != nil {
-		log.Println("Could not read FAR ID!")
-		return nil
-	}
-	// Read outerheadercreation from payload (if it exists)
-	var tunnelTEID uint32
-	tunnelDst := uint32(0)
-	tunnelSrc := uint32(0)
-	tunnelType := uint8(0)
-	var fIEs []*ie.IE
-	var dir uint8 = 0xFF
-
-	if fwdType == "create" {
-		fIEs, err = f.ForwardingParameters()
-	} else if fwdType == "update" {
-		fIEs, err = f.UpdateForwardingParameters()
-	} else {
-		log.Println("Invalid fwdType specified!")
-		return nil
-	}
-	if err != nil {
-		log.Println("Unable to find ForwardingParameters!")
-		return nil
-	}
-	for _, fIE := range fIEs {
-		switch fIE.Type {
-		case ie.OuterHeaderCreation:
-			outerheadercreationfields, err := fIE.OuterHeaderCreation()
-			if err != nil {
-				log.Println("Unable to parse OuterHeaderCreationFields!")
-				continue
-			}
-			tunnelTEID = outerheadercreationfields.TEID
-			tunnelDst = ip2int(outerheadercreationfields.IPv4Address)
-			tunnelType = uint8(1)
-		case ie.DestinationInterface:
-			destinationinterface, err := fIE.DestinationInterface()
-			if err != nil {
-				log.Println("Unable to parse DestinationInterface field")
-				continue
-			}
-			if destinationinterface == ie.DstInterfaceAccess {
-				dir = farForwardD
-				tunnelSrc = ip2int(upf.accessIP)
-			} else if destinationinterface == ie.DstInterfaceCore {
-				dir = farForwardU
-				tunnelSrc = ip2int(upf.coreIP)
-			}
-		}
-	}
-
-	return &far{
-		farID:        uint8(farID),  // farID currently being truncated to uint8 <--- FIXIT/TODO/XXX
-		fseID:        uint32(fseid), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-		action:       dir,
-		tunnelType:   tunnelType,
-		tunnelIP4Src: tunnelSrc,
-		tunnelIP4Dst: tunnelDst,
-		tunnelTEID:   tunnelTEID,
-		tunnelPort:   tunnelPort,
-	}
 }
