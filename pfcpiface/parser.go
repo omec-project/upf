@@ -21,9 +21,12 @@ type endpoint struct {
 
 func (ep *endpoint) parseNet(ipnet string) error {
 	ipNetFields := strings.Split(ipnet, "/")
-	if len(ipNetFields) == 1 {
+	log.Println(ipNetFields)
+	switch len(ipNetFields) {
+	case 1:
 		ipnet = ipNetFields[0] + "/32"
-	} else {
+	case 2:
+	default:
 		return errors.New("Incorrect network string")
 	}
 
@@ -61,32 +64,31 @@ type ipFilterRule struct {
 
 func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 	fields := strings.Fields(flowDesc)
-	fmt.Println("Number of fields", len(fields))
 
 	ipf.action = fields[0]
 	ipf.direction = fields[1]
 
-	if err := ipf.parseProto(fields[2]); err != nil {
-		return err
-	}
+	ipf.proto = parseProto(fields[2])
 
 	// bring to common intermediate representation
 	xform := func(i int) {
+		log.Println(fields)
 		switch fields[i] {
 		case "any":
 			fields[i] = "0.0.0.0/0"
 		case "assigned":
-			if ueIP != "" {
+			if ueIP != "" && ueIP != "<nil>" {
 				fields[i] = ueIP
 			} else {
 				fields[i] = "0.0.0.0/0"
 			}
 		}
+		log.Println(fields)
 	}
 
 	for i := 3; i < len(fields); i++ {
-		f := fields[i]
-		switch f {
+		log.Println(fields[i])
+		switch fields[i] {
 		case "from":
 			i++
 			xform(i)
@@ -118,19 +120,31 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 	return nil
 }
 
-func (ipf *ipFilterRule) parseProto(proto string) error {
-	p, err := strconv.ParseUint(proto, 10, 16)
-	if err != nil {
-		return errors.New("Unable to parse proto")
+func parseProto(proto string) uint8 {
+	switch proto {
+	case "udp":
+		return 17
+	case "tcp":
+		return 6
+	default:
+		return 0xff // IANA reserved
 	}
-	ipf.proto = uint8(p)
-	return nil
 }
 
 func parseCreatePDRPDI(pdi []*ie.IE) *pdr {
 	var pdrI pdr
+	var ueIP4 net.IP
+
 	for _, ie2 := range pdi {
 		switch ie2.Type {
+		case ie.UEIPAddress:
+			ueIPaddr, err := ie2.UEIPAddress()
+			if err != nil {
+				log.Println("Failed to parse UE IP address")
+				continue
+			}
+
+			ueIP4 = ueIPaddr.IPv4Address
 		case ie.SourceInterface:
 			srcIface, err := ie2.SourceInterface()
 			if err != nil {
@@ -140,6 +154,7 @@ func parseCreatePDRPDI(pdi []*ie.IE) *pdr {
 
 			if srcIface == ie.SrcInterfaceCPFunction {
 				log.Println("Detected src interface cp function. Ignoring for the time being")
+				return &pdrI
 			} else if srcIface == ie.SrcInterfaceAccess {
 				pdrI.srcIface = access
 				pdrI.srcIfaceMask = 0xFF
@@ -168,36 +183,8 @@ func parseCreatePDRPDI(pdi []*ie.IE) *pdr {
 		}
 	}
 
-	var ueIP4 net.IP
-
 	for _, ie2 := range pdi {
 		switch ie2.Type {
-		case ie.UEIPAddress:
-			ueIPaddr, err := ie2.UEIPAddress()
-			if err != nil {
-				log.Println("Failed to parse UE IP address")
-				continue
-			}
-
-			ueIP4 = ueIPaddr.IPv4Address
-			// uplink PDR may not have UE IP address IE
-			// FIXIT/TODO/XXX Move this inside SrcInterfaceAccess IE check??
-			var ueIP uint32
-			var ueIPMask uint32
-			if len(ueIP4) == 0 {
-				ueIP = 0
-				ueIPMask = 0
-			} else {
-				ueIP = ip2int(ueIP4)
-				ueIPMask = 0xFFFFFFFF
-			}
-			if pdrI.srcIface == access {
-				pdrI.srcIP = ueIP
-				pdrI.srcIPMask = ueIPMask
-			} else if pdrI.srcIface == core {
-				pdrI.dstIP = ueIP
-				pdrI.dstIPMask = ueIPMask
-			}
 		case ie.SDFFilter:
 			// Do nothing for the time being
 			sdfFields, err := ie2.SDFFilter()
@@ -217,9 +204,12 @@ func parseCreatePDRPDI(pdi []*ie.IE) *pdr {
 			if err != nil {
 				log.Println("Failed to parse flow desc:", err)
 			}
-			log.Println("Flow Description is:", ipf)
+			log.Println("Flow Description is:", flowDesc, ipf)
 
-			pdrI.proto = ipf.proto
+			if ipf.proto != 0xff {
+				pdrI.proto = ipf.proto
+				pdrI.protoMask = 0xff
+			}
 
 			if pdrI.srcIface == access {
 				pdrI.dstIP = ip2int(ipf.dst.IPNet.IP)
