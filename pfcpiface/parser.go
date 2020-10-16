@@ -14,7 +14,6 @@ import (
 )
 
 func parseFlowDesc(flowDesc string) (IP4AddressNet string) {
-
 	var err error
 	var prefix string
 
@@ -71,6 +70,7 @@ func parseCreatePDRPDI(pdi []*ie.IE) *pdr {
 				log.Println("Failed to parse FTEID IE")
 				continue
 			}
+
 			teid := fteid.TEID
 			tunnelIPv4Address := fteid.IPv4Address
 
@@ -161,6 +161,59 @@ func parseCreatePDRPDI(pdi []*ie.IE) *pdr {
 	return &pdrI
 }
 
+func parseCreateURR(ie1 *ie.IE, fseid *ie.FSEIDFields) *urr {
+	log.Println("Parse Create URR")
+	volumeThresh := volumeData{}
+	volumeQuota := volumeData{}
+
+	urrID, err := ie1.URRID()
+	if err != nil {
+		log.Println("Could not read urrID!")
+		return nil
+	}
+
+	measureMeth, err := ie1.MeasurementMethod()
+	if err != nil {
+		log.Println("Could not read Measurement method!")
+		return nil
+	}
+
+	trigger, err := ie1.ReportingTriggers()
+	if err != nil {
+		log.Println("Could not read Reporting triggers!")
+		return nil
+	}
+
+	reportTrig := reportTrigger{flags: trigger}
+	volThreshField, err := ie1.VolumeThreshold()
+	if err == nil {
+		volumeThresh.flags = volThreshField.Flags
+		volumeThresh.totalVol = volThreshField.TotalVolume
+		volumeThresh.uplinkVol = volThreshField.UplinkVolume
+		volumeThresh.downlinkVol = volThreshField.DownlinkVolume
+	}
+
+	volQuotaField, err := ie1.VolumeQuota()
+	if err == nil {
+		volumeQuota.flags = volQuotaField.Flags
+		volumeQuota.totalVol = volQuotaField.TotalVolume
+		volumeQuota.uplinkVol = volQuotaField.UplinkVolume
+		volumeQuota.downlinkVol = volQuotaField.DownlinkVolume
+	}
+
+	urrI := urr{
+		urrID:       uint32(urrID),
+		measureM:    measureMeth,
+		reportT:     reportTrig,
+		reportOpen:  true,
+		volThresh:   volumeThresh,
+		localThresh: volumeThresh.totalVol,
+		volQuota:    volumeQuota,
+	}
+
+	return &urrI
+}
+
 func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
 
 	/* reset outerHeaderRemoval to begin with */
@@ -201,11 +254,18 @@ func parseCreatePDR(ie1 *ie.IE, fseid *ie.FSEIDFields) *pdr {
 		return nil
 	}
 
+	urrID, err := ie1.URRID()
+	if err != nil {
+		log.Println("Could not read URR ID!")
+		return nil
+	}
+
 	pdrI.precedence = precedence
 	pdrI.pdrID = uint32(pdrID)
 	pdrI.fseID = uint32(fseid.SEID) // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
 	pdrI.ctrID = 0                  // ctrID currently not being set <--- FIXIT/TODO/XXX
-	pdrI.farID = uint8(farID)       // farID currently not being set <--- FIXIT/TODO/XXX
+	pdrI.farID = uint32(farID)      // farID currently not being set <--- FIXIT/TODO/XXX
+	pdrI.urrID = uint32(urrID)
 	pdrI.needDecap = outerHeaderRemoval
 
 	// if srcIface is neither acceess nor core, then return nil
@@ -225,11 +285,13 @@ func parseUpdateFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP) *far {
 }
 
 func parseFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP, fwdType string) *far {
+	sessItem := sessions[fseid]
 	farID, err := ie1.FARID()
 	if err != nil {
 		log.Println("Could not read FAR ID!")
 		return nil
 	}
+
 	// Read outerheadercreation from payload (if it exists)
 	var tunnelTEID uint32
 	tunnelDst := uint32(0)
@@ -238,10 +300,28 @@ func parseFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP, fwdType string) *far {
 	var ies2 []*ie.IE
 	var dir uint8 = 0xFF
 
+	applyAction, err := ie1.ApplyAction()
+	if err != nil {
+		log.Println("Could not read Apply Action!")
+		return nil
+	}
+
 	if fwdType == "create" {
 		ies2, err = ie1.ForwardingParameters()
 	} else if fwdType == "update" {
 		ies2, err = ie1.UpdateForwardingParameters()
+		var found bool = false
+		for _, far := range sessItem.fars {
+			if uint32(farID) == far.farID {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			log.Println("Invalid farID ", farID)
+			return nil
+		}
 	} else {
 		log.Println("Invalid fwdType specified!")
 		return nil
@@ -277,9 +357,10 @@ func parseFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP, fwdType string) *far {
 	}
 
 	return &far{
-		farID:        uint8(farID),  // farID currently being truncated to uint8 <--- FIXIT/TODO/XXX
+		farID:        uint32(farID), // farID currently being truncated to uint8 <--- FIXIT/TODO/XXX
 		fseID:        uint32(fseid), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
 		action:       dir,
+		applyAction:  applyAction,
 		tunnelType:   tunnelType,
 		tunnelIP4Src: tunnelSrc,
 		tunnelIP4Dst: tunnelDst,
@@ -288,15 +369,16 @@ func parseFAR(ie1 *ie.IE, fseid uint64, accessIP net.IP, fwdType string) *far {
 	}
 }
 
-func parsePDRsFARs(upf *upf, sereq *message.SessionEstablishmentRequest, fseid *ie.FSEIDFields) ([]pdr, []far, error) {
+func parsePDRsFARs(upf *upf, sereq *message.SessionEstablishmentRequest, fseid *ie.FSEIDFields) ([]pdr, []far, []urr, error) {
 
 	pdrs := make([]pdr, 0, MaxItems)
 	fars := make([]far, 0, MaxItems)
+	urrs := make([]urr, 0, MaxItems)
 
 	/* read PDR(s) */
 	ies1, err := ie.ParseMultiIEs(sereq.Payload)
 	if err != nil {
-		return pdrs, fars, errors.New("Failed to parse sereq for IEs!")
+		return pdrs, fars, urrs, errors.New("Failed to parse sereq for IEs!")
 	}
 
 	// Iteratively go through all IEs. You can't use ie.CreatePDR or ie.CreateFAR since a single
@@ -306,18 +388,24 @@ func parsePDRsFARs(upf *upf, sereq *message.SessionEstablishmentRequest, fseid *
 		switch ie1.Type {
 		case ie.CreatePDR:
 			if p := parseCreatePDR(ie1, fseid); p != nil {
+				printPDR(*p)
 				pdrs = append(pdrs, *p)
 			} else {
-				return pdrs, fars, errors.New("Failed to parse PDR")
+				return pdrs, fars, urrs, errors.New("Failed to parse PDR")
 			}
 
 		case ie.CreateFAR:
 			if f := parseCreateFAR(ie1, fseid.SEID, upf.coreIP); f != nil {
-				//printFAR(*f)
+				printFAR(*f)
 				fars = append(fars, *f)
+			}
+
+		case ie.CreateURR:
+			if u := parseCreateURR(ie1, fseid); u != nil {
+				urrs = append(urrs, *u)
 			}
 		}
 	}
 
-	return pdrs, fars, nil
+	return pdrs, fars, urrs, nil
 }

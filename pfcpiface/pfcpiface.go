@@ -26,6 +26,7 @@ const (
 type sessRecord struct {
 	pdrs []pdr
 	fars []far
+	urrs []urr
 }
 
 var sessions map[uint64]sessRecord
@@ -37,11 +38,29 @@ type sequenceNumber struct {
 
 var seqNum sequenceNumber
 
-func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
-	log.Println("pfcpifaceMainLoop@" + upf.fqdnHost + " says hello!!!")
+type reportRecord struct {
+	fseid uint64
+	srcIP string
+	urrs  *[]urr
+}
 
+func (r *reportRecord) checkInvalid() bool {
+	var flag bool = true
+	for _, urr := range *r.urrs {
+		if urr.reportOpen {
+			flag = false
+			break
+		}
+	}
+	return flag
+}
+
+func pfcpifaceMainLoop(intf common, accessIP, coreIP, sourceIP, smfName string) {
+	upfPt := intf.getUpf()
+	log.Println("pfcpifaceMainLoop@" + upfPt.fqdnHost + " says hello!!!")
+	log.Println("n4 ip ", sourceIP)
+	log.Println("access ip ", accessIP)
 	cpConnectionStatus := make(chan bool)
-
 	// Verify IP + Port binding
 	laddr, err := net.ResolveUDPAddr("udp", sourceIP+":"+PFCPPort)
 	if err != nil {
@@ -64,7 +83,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 	// cleanup the pipeline
 	cleanupSessions := func() {
 		if cpConnected {
-			sendDeleteAllSessionsMsgtoUPF(upf)
+			intf.sendDeleteAllSessionsMsgtoUPF()
 			cpConnected = false
 		}
 	}
@@ -82,7 +101,8 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 
 	// Initialize sessions map
 	sessions = make(map[uint64]sessRecord)
-
+	log.Println("After allocating session record")
+	PrintMemUsage()
 	for {
 		err := conn.SetReadDeadline(time.Now().Add(readTimeout))
 		if err != nil {
@@ -124,7 +144,9 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 		var outgoingMessage []byte
 		switch msg.MessageType() {
 		case message.MsgTypeAssociationSetupRequest:
-			outgoingMessage = handleAssociationSetupRequest(msg, addr, sourceIP, accessIP, coreIP)
+			intf.sendDeleteAllSessionsMsgtoUPF()
+			intf.setUdpConn(conn, addr)
+			outgoingMessage = handleAssociationSetupRequest(intf, msg, addr, sourceIP, accessIP, coreIP)
 			if outgoingMessage != nil {
 				cpConnected = true
 				if manageConnection {
@@ -139,16 +161,18 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 				cpConnectionStatus <- cpConnected
 			}
 		case message.MsgTypeSessionEstablishmentRequest:
-			outgoingMessage = handleSessionEstablishmentRequest(upf, msg, addr, sourceIP)
+			outgoingMessage = handleSessionEstablishmentRequest(intf, msg, addr, sourceIP)
 		case message.MsgTypeSessionModificationRequest:
-			outgoingMessage = handleSessionModificationRequest(upf, msg, addr, sourceIP)
+			outgoingMessage = handleSessionModificationRequest(intf, msg, addr, sourceIP)
 		case message.MsgTypeHeartbeatRequest:
 			outgoingMessage = handleHeartbeatRequest(msg, addr)
 		case message.MsgTypeSessionDeletionRequest:
-			outgoingMessage = handleSessionDeletionRequest(upf, msg, addr, sourceIP)
+			outgoingMessage = handleSessionDeletionRequest(intf, msg, addr, sourceIP)
 		case message.MsgTypeAssociationReleaseRequest:
 			outgoingMessage = handleAssociationReleaseRequest(msg, addr, sourceIP, accessIP)
 			cleanupSessions()
+		case message.MsgTypeSessionReportResponse:
+			handleSessionReportResponse(msg, addr, intf)
 		default:
 			log.Println("Message type: ", msg.MessageTypeName(), " is currently not supported")
 			continue
@@ -164,11 +188,20 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 	}
 }
 
-func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP string, accessIP string, coreIP string) []byte {
+func handleAssociationSetupRequest(intf common, msg message.Message, addr net.Addr, sourceIP string, accessIP string, coreIP string) []byte {
 	asreq, ok := msg.(*message.AssociationSetupRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
 		return nil
+	}
+
+	fail := intf.handleChannelStatus()
+
+	var cause uint8
+	if fail {
+		cause = ie.CauseRequestRejected
+	} else {
+		cause = ie.CauseRequestAccepted
 	}
 
 	ts, err := asreq.RecoveryTimeStamp.RecoveryTimeStamp()
@@ -182,8 +215,8 @@ func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP 
 	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
 	asres, err := message.NewAssociationSetupResponse(asreq.SequenceNumber,
 		ie.NewRecoveryTimeStamp(time.Now()),
-		ie.NewNodeID(sourceIP, "", ""),       /* node id (IPv4) */
-		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
+		ie.NewNodeID(sourceIP, "", ""), /* node id (IPv4) */
+		ie.NewCause(cause),             /* accept it blindly for the time being */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
 		ie.NewUserPlaneIPResourceInformation(0x41, 0, accessIP, "", "", ie.SrcInterfaceAccess),
@@ -250,7 +283,39 @@ func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceI
 	return arres
 }
 
-func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.Addr, sourceIP string) []byte {
+func handleSessionReportResponse(msg message.Message, addr net.Addr, intf common) {
+	srres, ok := msg.(*message.SessionReportResponse)
+	if !ok {
+		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
+		return
+	}
+
+	cause := srres.Cause.Payload[0]
+	if cause == ie.CauseRequestAccepted {
+		log.Println("session req accepted seq : ", srres.SequenceNumber)
+	} else {
+		log.Println("session req not accepted seq : ", srres.SequenceNumber)
+		if cause == ie.CauseSessionContextNotFound {
+			log.Println("context not found. Delete session locally")
+			sessItem := sessions[mySEID(srres.SEID())]
+
+			var flag bool = intf.handleChannelStatus()
+
+			if !flag {
+				intf.sendMsgToUPF("del", sessItem.pdrs,
+					sessItem.fars, sessItem.urrs)
+
+				/* delete sessionRecord */
+				delete(sessions, mySEID(srres.SEID()))
+			}
+		}
+	}
+
+	log.Println("Got session release response from: ", addr)
+}
+
+func handleSessionEstablishmentRequest(intf common, msg message.Message, addr net.Addr, sourceIP string) []byte {
+	upfPt := intf.getUpf()
 	sereq, ok := msg.(*message.SessionEstablishmentRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -258,7 +323,9 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 	}
 
 	log.Println("Got a session establishment request from: ", addr)
+	PrintMemUsage()
 
+	var fail bool
 	/* Read fseid from the IE */
 	fseid, err := sereq.CPFSEID.FSEID()
 	if err != nil {
@@ -266,58 +333,69 @@ func handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.A
 		return nil
 	}
 
-	/* Read CreatePDRs and CreateFARs from payload */
-	pdrs, fars, err := parsePDRsFARs(upf, sereq, fseid)
-	if err != nil {
-		log.Println(err)
-		// Build response message
-		seres, err := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
-			0,                              /* FO <-- what's this? */
-			fseid.SEID,                     /* seid */
-			sereq.SequenceNumber,           /* seq # */
-			0,                              /* priority */
-			ie.NewNodeID(sourceIP, "", ""), /* node id (IPv4) */
-			ie.NewCause(ie.CauseRequestRejected),
-		).Marshal()
+	fail = intf.handleChannelStatus()
 
+	var cause uint8
+	if fail {
+		cause = ie.CauseRequestRejected
+	} else {
+		/* Read CreatePDRs and CreateFARs from payload */
+		pdrs, fars, urrs, err := parsePDRsFARs(upfPt, sereq, fseid)
 		if err != nil {
-			log.Fatalln("Unable to create session establishment response", err)
+			cause = ie.CauseRequestRejected
+		} else {
+			cause = intf.sendMsgToUPF("add", pdrs, fars, urrs)
 		}
 
-		log.Println("Sending session establishment response to: ", addr)
-		return seres
+		log.Println("Before sending URR for reporting.")
+		PrintMemUsage()
+		if cause == ie.CauseRequestAccepted {
+			// Adding current session details to the hash map
+			recItem := reportRecord{
+				fseid: fseid.SEID,
+				srcIP: sourceIP,
+				urrs:  &urrs,
+			}
+			intf.sendURRForReporting(&recItem)
+			sessItem := sessRecord{
+				pdrs: pdrs,
+				fars: fars,
+				urrs: urrs,
+			}
+			sessions[fseid.SEID] = sessItem
+			cause = ie.CauseRequestAccepted
+		}
+		log.Println("After sending URR for reporting.")
+		PrintMemUsage()
 	}
-
-	upf.sendMsgToUPF("add", pdrs, fars)
-
-	// Adding current session details to the hash map
-	sessItem := sessRecord{
-		pdrs: pdrs,
-		fars: fars,
-	}
-	sessions[fseid.SEID] = sessItem
 
 	// Build response message
-	seres, err := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
-		0,                                    /* FO <-- what's this? */
-		fseid.SEID,                           /* seid */
-		sereq.SequenceNumber,                 /* seq # */
-		0,                                    /* priority */
-		ie.NewNodeID(sourceIP, "", ""),       /* node id (IPv4) */
-		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
-		ie.NewFSEID(peerSEID(fseid.SEID), net.ParseIP(sourceIP), nil, nil),
-	).Marshal()
+	seres := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
+		0,                              /* FO <-- what's this? */
+		fseid.SEID,                     /* seid */
+		sereq.SequenceNumber,           /* seq # */
+		0,                              /* priority */
+		ie.NewNodeID(sourceIP, "", ""), /* node id */
+		ie.NewCause(cause),             /* accept it blindly for the time being */
+	)
 
+	if cause == ie.CauseRequestAccepted {
+		seres.UPFSEID = ie.NewFSEID(peerSEID(fseid.SEID),
+			net.ParseIP(sourceIP), nil, nil)
+	}
+
+	ret, err := seres.Marshal()
 	if err != nil {
-		log.Fatalln("Unable to create session establishment response", err)
+		log.Println("Marshal function failed for SE Resp ", err)
+		return nil
 	}
 
 	log.Println("Sending session establishment response to: ", addr)
-
-	return seres
+	return ret
 }
 
-func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Addr, sourceIP string) []byte {
+func handleSessionModificationRequest(intf common, msg message.Message, addr net.Addr, sourceIP string) []byte {
+	//upfPt := intf.getUpf()
 	smreq, ok := msg.(*message.SessionModificationRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -327,51 +405,66 @@ func handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Ad
 	log.Println("Got a session modification request from: ", addr)
 
 	/* fetch FSEID */
+
 	fseid := (mySEID(smreq.SEID()))
 
 	/* initialize farList */
 	fars := make([]far, 0, MaxItems)
 
-	/* read FAR(s). These can be multiple */
-	ies1, err := ie.ParseMultiIEs(smreq.Payload)
-	if err != nil {
-		log.Println("Failed to parse smreq for IEs!")
+	var flag bool = intf.handleChannelStatus()
+
+	var cause uint8 = ie.CauseRequestAccepted
+	if flag {
+		cause = ie.CauseRequestRejected
 	} else {
-		/*
-		 * Iteratively go through all IEs. You can't use ie.UpdateFAR since a single
-		 * message can carry multiple UpdateFAR messages.
-		 */
-		for _, ie1 := range ies1 {
-			switch ie1.Type {
-			case ie.UpdateFAR:
-				if f := parseUpdateFAR(ie1, fseid, upf.accessIP); f != nil {
-					fars = append(fars, *f)
+		/* read FAR(s). These can be multiple */
+		ies1, err := ie.ParseMultiIEs(smreq.Payload)
+		if err != nil {
+			log.Println("Failed to parse smreq for IEs!")
+			cause = ie.CauseRequestRejected
+		} else {
+			/*
+			 * Iteratively go through all IEs. You can't use ie.UpdateFAR since a single
+			 * message can carry multiple UpdateFAR messages.
+			 */
+			for _, ie1 := range ies1 {
+				switch ie1.Type {
+				case ie.UpdateFAR:
+					if f := parseUpdateFAR(ie1, fseid,
+						intf.getAccessIP()); f != nil {
+						fars = append(fars, *f)
+					} else {
+						log.Println("Parse FAR failed.")
+						cause = ie.CauseRequestRejected
+						break
+					}
+				default:
+					/* more will be added later */
 				}
-			default:
-				/* more will be added later */
 			}
 		}
+
+		if cause == ie.CauseRequestAccepted {
+			cause = intf.sendMsgToUPF("mod", nil, fars, nil)
+		}
 	}
-
-	upf.sendMsgToUPF("add", nil, fars)
-
 	// Build response message
-	smres, err := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */
-		0,                                    /* FO <-- what's this? */
-		(mySEID(smreq.SEID())),               /* seid */
-		smreq.SequenceNumber,                 /* seq # */
-		0,                                    /* priority */
-		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
-		ie.NewFSEID(peerSEID(smreq.SEID()), net.ParseIP(sourceIP), nil, nil),
-	).Marshal()
+	smres := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */
+		0,                      /* FO <-- what's this? */
+		(mySEID(smreq.SEID())), /* seid */
+		smreq.SequenceNumber,   /* seq # */
+		0,                      /* priority */
+		ie.NewCause(cause),     /* accept it blindly for the time being */
+	)
 
+	ret, err := smres.Marshal()
 	if err != nil {
-		log.Fatalln("Unable to create session modification response", err)
+		log.Println("Marshal function failed for SM resp ", err)
+		return nil
 	}
 
 	log.Println("Sent session modification response to: ", addr)
-
-	return smres
+	return ret
 }
 
 func handleHeartbeatRequest(msg message.Message, addr net.Addr) []byte {
@@ -397,7 +490,7 @@ func handleHeartbeatRequest(msg message.Message, addr net.Addr) []byte {
 	return hbres
 }
 
-func handleSessionDeletionRequest(upf *upf, msg message.Message, addr net.Addr, sourceIP string) []byte {
+func handleSessionDeletionRequest(intf common, msg message.Message, addr net.Addr, sourceIP string) []byte {
 	sdreq, ok := msg.(*message.SessionDeletionRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -405,23 +498,34 @@ func handleSessionDeletionRequest(upf *upf, msg message.Message, addr net.Addr, 
 	}
 
 	log.Println("Got a session deletion request from: ", addr)
+	PrintMemUsage()
 
 	/* retrieve sessionRecord */
 	sessItem := sessions[mySEID(sdreq.SEID())]
 
-	upf.sendMsgToUPF("del", sessItem.pdrs, sessItem.fars)
+	var flag bool = intf.handleChannelStatus()
 
-	/* delete sessionRecord */
-	delete(sessions, mySEID(sdreq.SEID()))
+	var cause uint8 = ie.CauseRequestAccepted
+	sdRes := message.NewSessionDeletionResponse(0, /* MO?? <-- what's this */
+		0,                    /* FO <-- what's this? */
+		mySEID(sdreq.SEID()), /* seid */
+		sdreq.SequenceNumber, /* seq # */
+		0,                    /* priority */
+		ie.NewCause(cause),   /* accept it blindly for the time being */
+	)
+	if !flag {
+		intf.sendMsgToUPF("del", sessItem.pdrs,
+			sessItem.fars, sessItem.urrs)
 
+		intf.addUsageReports(sdRes, mySEID(sdreq.SEID()))
+		/* delete sessionRecord */
+		delete(sessions, mySEID(sdreq.SEID()))
+	}
+
+	log.Println("After Deleting session.")
+	PrintMemUsage()
 	// Build response message
-	smres, err := message.NewSessionDeletionResponse(0, /* MO?? <-- what's this */
-		0,                                    /* FO <-- what's this? */
-		mySEID(sdreq.SEID()),                 /* seid */
-		sdreq.SequenceNumber,                 /* seq # */
-		0,                                    /* priority */
-		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
-	).Marshal()
+	ret, err := sdRes.Marshal()
 
 	if err != nil {
 		log.Fatalln("Unable to create session deletion response", err)
@@ -429,7 +533,7 @@ func handleSessionDeletionRequest(upf *upf, msg message.Message, addr net.Addr, 
 
 	log.Println("Sent session deletion response to: ", addr)
 
-	return smres
+	return ret
 }
 
 func getSeqNum() uint32 {

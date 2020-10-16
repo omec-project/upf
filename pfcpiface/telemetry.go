@@ -175,8 +175,9 @@ func (uc *upfCollector) summaryLatencyJitter(ch chan<- prometheus.Metric) {
 	measureIface("Core", uc.upf.coreIface)
 }
 
-func setupProm(upf *upf) {
-	uc := newUpfCollector(upf)
+func setupProm(intf common) {
+	upfPt := intf.getUpf()
+	uc := newUpfCollector(upfPt)
 	prometheus.MustRegister(uc)
 	http.Handle("/metrics", promhttp.Handler())
 }
