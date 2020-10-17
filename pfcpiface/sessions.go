@@ -4,8 +4,13 @@
 package main
 
 import (
+	"errors"
 	"math/rand"
 	"time"
+)
+
+var (
+	errSessionNotFound = errors.New("Session not found")
 )
 
 // PFCPSessionMgr manages PFCP sessions

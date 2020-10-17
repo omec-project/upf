@@ -140,19 +140,19 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 	}
 
 	for _, cPDR := range sereq.CreatePDR {
-		if p := parseCreatePDR(cPDR, fseid.SEID); p != nil {
-			pdrs = append(pdrs, *p)
-		} else {
+		var p pdr
+		if err := p.parsePDR(cPDR, fseid.SEID); err != nil {
 			return sendError(errors.New("Failed to parse PDR"))
 		}
+		pdrs = append(pdrs, p)
 	}
 
 	for _, cFAR := range sereq.CreateFAR {
-		if f := parseCreateFAR(cFAR, fseid.SEID, upf); f != nil {
-			fars = append(fars, *f)
-		} else {
-			return sendError(errors.New("Failed to parse FAR"))
+		var f far
+		if err := f.parseFAR(cFAR, fseid.SEID, upf, create); err != nil {
+			return sendError(err)
 		}
+		fars = append(fars, f)
 	}
 
 	upf.sendMsgToUPF("add", pdrs, fars)
@@ -218,19 +218,31 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 	}
 
 	for _, cPDR := range smreq.CreatePDR {
-		if p := parseCreatePDR(cPDR, fseid); p != nil {
-			pdrs = append(pdrs, *p)
-		} else {
+		var p pdr
+		if err := p.parsePDR(cPDR, fseid); err != nil {
 			return sendError(errors.New("Failed to parse PDR"))
 		}
+		pdrs = append(pdrs, p)
 	}
 
 	for _, cFAR := range smreq.CreateFAR {
-		if f := parseCreateFAR(cFAR, fseid, upf); f != nil {
-			fars = append(fars, *f)
-		} else {
-			return sendError(errors.New("Failed to parse FAR"))
+		var f far
+		if err := f.parseFAR(cFAR, fseid, upf, create); err != nil {
+			return sendError(err)
 		}
+		fars = append(fars, f)
+	}
+
+	for _, uFAR := range smreq.UpdateFAR {
+		session, ok := pc.mgr.sessions[smreq.SEID()]
+		if !ok {
+			sendError(errSessionNotFound)
+		}
+		var f far
+		if err := f.parseFAR(uFAR, fseid, upf, create); err != nil {
+			return sendError(err)
+		}
+		session.UpdateFAR(f)
 	}
 
 	upf.sendMsgToUPF("add", pdrs, fars)

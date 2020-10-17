@@ -4,12 +4,8 @@
 package main
 
 import (
-	"errors"
-	"fmt"
 	"log"
 	"net"
-	"strconv"
-	"strings"
 
 	"github.com/wmnsk/go-pfcp/ie"
 )
@@ -41,157 +37,39 @@ type pdr struct {
 	needDecap  uint8
 }
 
-func printPDR(pdr pdr) {
+func (p *pdr) printPDR() {
 	log.Println("------------------ PDR ---------------------")
-	log.Println("Src Iface:", pdr.srcIface)
-	log.Println("tunnelIP4Dst:", int2ip(pdr.tunnelIP4Dst))
-	log.Println("tunnelTEID:", pdr.tunnelTEID)
-	log.Println("srcIP:", int2ip(pdr.srcIP))
-	log.Println("dstIP:", int2ip(pdr.dstIP))
-	log.Println("srcPort:", pdr.srcPort)
-	log.Println("dstPort:", pdr.dstPort)
-	log.Println("proto:", pdr.proto)
-	log.Println("Src Iface Mask:", pdr.srcIfaceMask)
-	log.Println("tunnelIP4Dst Mask:", int2ip(pdr.tunnelIP4DstMask))
-	log.Println("tunnelTEIDMask Mask:", pdr.tunnelTEIDMask)
-	log.Println("srcIP Mask:", int2ip(pdr.srcIPMask))
-	log.Println("dstIP Mask:", int2ip(pdr.dstIPMask))
-	log.Println("srcPort Mask:", pdr.srcPortMask)
-	log.Println("dstPort Mask:", pdr.dstPortMask)
-	log.Println("proto Mask:", pdr.protoMask)
-	log.Println("pdrID:", pdr.pdrID)
-	log.Println("fseID", pdr.fseID)
-	log.Println("ctrID:", pdr.ctrID)
-	log.Println("farID:", pdr.farID)
-	log.Println("needDecap:", pdr.needDecap)
+	log.Println("Src Iface:", p.srcIface)
+	log.Println("tunnelIP4Dst:", int2ip(p.tunnelIP4Dst))
+	log.Println("tunnelTEID:", p.tunnelTEID)
+	log.Println("srcIP:", int2ip(p.srcIP))
+	log.Println("dstIP:", int2ip(p.dstIP))
+	log.Println("srcPort:", p.srcPort)
+	log.Println("dstPort:", p.dstPort)
+	log.Println("proto:", p.proto)
+	log.Println("Src Iface Mask:", p.srcIfaceMask)
+	log.Println("tunnelIP4Dst Mask:", int2ip(p.tunnelIP4DstMask))
+	log.Println("tunnelTEIDMask Mask:", p.tunnelTEIDMask)
+	log.Println("srcIP Mask:", int2ip(p.srcIPMask))
+	log.Println("dstIP Mask:", int2ip(p.dstIPMask))
+	log.Println("srcPort Mask:", p.srcPortMask)
+	log.Println("dstPort Mask:", p.dstPortMask)
+	log.Println("proto Mask:", p.protoMask)
+	log.Println("pdrID:", p.pdrID)
+	log.Println("fseID", p.fseID)
+	log.Println("ctrID:", p.ctrID)
+	log.Println("farID:", p.farID)
+	log.Println("needDecap:", p.needDecap)
 	log.Println("--------------------------------------------")
 }
 
-type endpoint struct {
-	IPNet *net.IPNet
-	Port  uint16
-}
-
-func (ep *endpoint) parseNet(ipnet string) error {
-	ipNetFields := strings.Split(ipnet, "/")
-	log.Println(ipNetFields)
-	switch len(ipNetFields) {
-	case 1:
-		ipnet = ipNetFields[0] + "/32"
-	case 2:
-	default:
-		return errors.New("Incorrect network string")
-	}
-
-	var err error
-	_, ep.IPNet, err = net.ParseCIDR(ipnet)
-	if err != nil {
-		return errors.New("Unable to ParseCIDR")
-	}
-	return nil
-}
-
-func (ep *endpoint) parsePort(port string) error {
-	p, err := strconv.ParseUint(port, 10, 16)
-	if err != nil {
-		return err
-	}
-	ep.Port = uint16(p)
-	return nil
-}
-
-type ipFilterRule struct {
-	action, direction string
-	proto             uint8
-	src, dst          endpoint
-}
-
-// "permit out ip from any to assigned"
-// "permit out ip from 60.60.0.102 to assigned"
-// "permit out ip from 60.60.0.102/32 to assigned"
-// "permit out ip from any to 60.60.0.102"
-// "permit out ip from 60.60.0.1/26 to 60.60.0.102"
-// "permit out ip from 60.60.0.1 8888 to 60.60.0.102/26"
-// "permit out ip from 60.60.0.1 to 60.60.0.102 9999"
-// "permit out ip from 60.60.0.1 8888 to 60.60.0.102 9999"
-
-func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
-	fields := strings.Fields(flowDesc)
-
-	ipf.action = fields[0]
-	ipf.direction = fields[1]
-
-	ipf.proto = parseProto(fields[2])
-
-	// bring to common intermediate representation
-	xform := func(i int) {
-		log.Println(fields)
-		switch fields[i] {
-		case "any":
-			fields[i] = "0.0.0.0/0"
-		case "assigned":
-			if ueIP != "" && ueIP != "<nil>" {
-				fields[i] = ueIP
-			} else {
-				fields[i] = "0.0.0.0/0"
-			}
-		}
-		log.Println(fields)
-	}
-
-	for i := 3; i < len(fields); i++ {
-		log.Println(fields[i])
-		switch fields[i] {
-		case "from":
-			i++
-			xform(i)
-			err := ipf.src.parseNet(fields[i])
-			if err != nil {
-				log.Println(err)
-			}
-
-			if fields[i+1] != "to" {
-				i++
-				ipf.src.parsePort(fields[i])
-			}
-		case "to":
-			i++
-			xform(i)
-			err := ipf.dst.parseNet(fields[i])
-			if err != nil {
-				log.Println(err)
-			}
-
-			if i < len(fields)-1 {
-				i++
-				ipf.dst.parsePort(fields[i])
-			}
-		}
-	}
-
-	fmt.Println(ipf)
-	return nil
-}
-
-func parseProto(proto string) uint8 {
-	switch proto {
-	case "udp":
-		return 17
-	case "tcp":
-		return 6
-	default:
-		return 0xff // IANA reserved
-	}
-}
-
-func parseCreatePDRPDI(pdi []*ie.IE) *pdr {
-	var pdrI pdr
+func (p *pdr) parsPDI(pdiIEs []*ie.IE) error {
 	var ueIP4 net.IP
 
-	for _, ie2 := range pdi {
-		switch ie2.Type {
+	for _, pdiIE := range pdiIEs {
+		switch pdiIE.Type {
 		case ie.UEIPAddress:
-			ueIPaddr, err := ie2.UEIPAddress()
+			ueIPaddr, err := pdiIE.UEIPAddress()
 			if err != nil {
 				log.Println("Failed to parse UE IP address")
 				continue
@@ -199,24 +77,23 @@ func parseCreatePDRPDI(pdi []*ie.IE) *pdr {
 
 			ueIP4 = ueIPaddr.IPv4Address
 		case ie.SourceInterface:
-			srcIface, err := ie2.SourceInterface()
+			srcIface, err := pdiIE.SourceInterface()
 			if err != nil {
 				log.Println("Failed to parse Source Interface IE!")
 				continue
 			}
 
 			if srcIface == ie.SrcInterfaceCPFunction {
-				log.Println("Detected src interface cp function. Ignoring for the time being")
-				return &pdrI
+				log.Println("Source Interface CP Function not supported yet")
 			} else if srcIface == ie.SrcInterfaceAccess {
-				pdrI.srcIface = access
-				pdrI.srcIfaceMask = 0xFF
+				p.srcIface = access
+				p.srcIfaceMask = 0xFF
 			} else if srcIface == ie.SrcInterfaceCore {
-				pdrI.srcIface = core
-				pdrI.srcIfaceMask = 0xFF
+				p.srcIface = core
+				p.srcIfaceMask = 0xFF
 			}
 		case ie.FTEID:
-			fteid, err := ie2.FTEID()
+			fteid, err := pdiIE.FTEID()
 			if err != nil {
 				log.Println("Failed to parse FTEID IE")
 				continue
@@ -225,10 +102,10 @@ func parseCreatePDRPDI(pdi []*ie.IE) *pdr {
 			tunnelIPv4Address := fteid.IPv4Address
 
 			if teid != 0 {
-				pdrI.tunnelTEID = teid
-				pdrI.tunnelTEIDMask = 0xFFFFFFFF
-				pdrI.tunnelIP4Dst = ip2int(tunnelIPv4Address)
-				pdrI.tunnelIP4DstMask = 0xFFFFFFFF
+				p.tunnelTEID = teid
+				p.tunnelTEIDMask = 0xFFFFFFFF
+				p.tunnelIP4Dst = ip2int(tunnelIPv4Address)
+				p.tunnelIP4DstMask = 0xFFFFFFFF
 				log.Println("TunnelIPv4Address:", tunnelIPv4Address)
 			}
 		case ie.QFI:
@@ -236,7 +113,7 @@ func parseCreatePDRPDI(pdi []*ie.IE) *pdr {
 		}
 	}
 
-	for _, ie2 := range pdi {
+	for _, ie2 := range pdiIEs {
 		switch ie2.Type {
 		case ie.SDFFilter:
 			// Do nothing for the time being
@@ -260,28 +137,28 @@ func parseCreatePDRPDI(pdi []*ie.IE) *pdr {
 			log.Println("Flow Description is:", flowDesc, ipf)
 
 			if ipf.proto != 0xff {
-				pdrI.proto = ipf.proto
-				pdrI.protoMask = 0xff
+				p.proto = ipf.proto
+				p.protoMask = 0xff
 			}
 
-			if pdrI.srcIface == access {
-				pdrI.dstIP = ip2int(ipf.dst.IPNet.IP)
-				pdrI.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
-				pdrI.srcIP = ip2int(ipf.src.IPNet.IP)
-				pdrI.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
-			} else if pdrI.srcIface == core {
-				pdrI.srcIP = ip2int(ipf.dst.IPNet.IP)
-				pdrI.srcIPMask = ipMask2int(ipf.dst.IPNet.Mask)
-				pdrI.dstIP = ip2int(ipf.src.IPNet.IP)
-				pdrI.dstIPMask = ipMask2int(ipf.src.IPNet.Mask)
+			if p.srcIface == access {
+				p.dstIP = ip2int(ipf.dst.IPNet.IP)
+				p.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
+				p.srcIP = ip2int(ipf.src.IPNet.IP)
+				p.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
+			} else if p.srcIface == core {
+				p.srcIP = ip2int(ipf.dst.IPNet.IP)
+				p.srcIPMask = ipMask2int(ipf.dst.IPNet.Mask)
+				p.dstIP = ip2int(ipf.src.IPNet.IP)
+				p.dstIPMask = ipMask2int(ipf.src.IPNet.Mask)
 			}
 		}
 	}
 
-	return &pdrI
+	return nil
 }
 
-func parseCreatePDR(ie1 *ie.IE, seid uint64) *pdr {
+func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64) error {
 	/* reset outerHeaderRemoval to begin with */
 	outerHeaderRemoval := uint8(0)
 
@@ -308,10 +185,9 @@ func parseCreatePDR(ie1 *ie.IE, seid uint64) *pdr {
 		outerHeaderRemoval = 1
 	}
 
-	// parse PDI IE and fetch srcIface, teid, and ueIPv4Address
-	pdrI := parseCreatePDRPDI(pdi)
-	if pdrI == nil {
-		return nil
+	err = p.parsPDI(pdi)
+	if err != nil {
+		return err
 	}
 
 	farID, err := ie1.FARID()
@@ -320,17 +196,12 @@ func parseCreatePDR(ie1 *ie.IE, seid uint64) *pdr {
 		return nil
 	}
 
-	pdrI.precedence = precedence
-	pdrI.pdrID = uint32(pdrID)
-	pdrI.fseID = uint32(seid) // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-	pdrI.ctrID = 0            // ctrID currently not being set <--- FIXIT/TODO/XXX
-	pdrI.farID = uint8(farID) // farID currently not being set <--- FIXIT/TODO/XXX
-	pdrI.needDecap = outerHeaderRemoval
+	p.precedence = precedence
+	p.pdrID = uint32(pdrID)
+	p.fseID = uint32(seid) // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
+	p.ctrID = 0            // ctrID currently not being set <--- FIXIT/TODO/XXX
+	p.farID = uint8(farID) // farID currently not being set <--- FIXIT/TODO/XXX
+	p.needDecap = outerHeaderRemoval
 
-	// if srcIface is neither acceess nor core, then return nil
-	if pdrI.srcIface != access && pdrI.srcIface != core {
-		return nil
-	}
-
-	return pdrI
+	return nil
 }

@@ -4,9 +4,17 @@
 package main
 
 import (
+	"errors"
 	"log"
 
 	"github.com/wmnsk/go-pfcp/ie"
+)
+
+type operation int
+
+const (
+	create operation = iota
+	update
 )
 
 type far struct {
@@ -21,88 +29,70 @@ type far struct {
 	tunnelPort   uint16
 }
 
-func printFAR(far far) {
+func (f *far) printFAR() {
 	log.Println("------------------ FAR ---------------------")
-	log.Println("FAR ID:", far.farID)
-	log.Println("fseID:", far.fseID)
-	log.Println("action:", far.action)
-	log.Println("tunnelType:", far.tunnelType)
-	log.Println("tunnelIP4Src:", far.tunnelIP4Src)
-	log.Println("tunnelIP4Dst:", far.tunnelIP4Dst)
-	log.Println("tunnelTEID:", far.tunnelTEID)
-	log.Println("tunnelPort:", far.tunnelPort)
+	log.Println("FAR ID:", f.farID)
+	log.Println("fseID:", f.fseID)
+	log.Println("action:", f.action)
+	log.Println("tunnelType:", f.tunnelType)
+	log.Println("tunnelIP4Src:", f.tunnelIP4Src)
+	log.Println("tunnelIP4Dst:", f.tunnelIP4Dst)
+	log.Println("tunnelTEID:", f.tunnelTEID)
+	log.Println("tunnelPort:", f.tunnelPort)
 	log.Println("--------------------------------------------")
 }
 
-func parseCreateFAR(f *ie.IE, fseid uint64, upf *upf) *far {
-	return parseFAR(f, fseid, upf, "create")
-}
+func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error {
+	f.fseID = uint32(fseid)
 
-func parseUpdateFAR(f *ie.IE, fseid uint64, upf *upf) *far {
-	return parseFAR(f, fseid, upf, "update")
-}
-
-func parseFAR(f *ie.IE, fseid uint64, upf *upf, fwdType string) *far {
-	farID, err := f.FARID()
+	farID, err := farIE.FARID()
 	if err != nil {
-		log.Println("Could not read FAR ID!")
-		return nil
+		return errors.New("Could not read FAR ID")
 	}
-	// Read outerheadercreation from payload (if it exists)
-	var tunnelTEID uint32
-	tunnelDst := uint32(0)
-	tunnelSrc := uint32(0)
-	tunnelType := uint8(0)
-	var fIEs []*ie.IE
-	var dir uint8 = 0xFF
+	f.farID = uint8(farID)
 
-	if fwdType == "create" {
-		fIEs, err = f.ForwardingParameters()
-	} else if fwdType == "update" {
-		fIEs, err = f.UpdateForwardingParameters()
-	} else {
-		log.Println("Invalid fwdType specified!")
-		return nil
+	var fwdIEs []*ie.IE
+	f.action = 0xFF
+
+	switch op {
+	case create:
+		fwdIEs, err = farIE.ForwardingParameters()
+	case update:
+		fwdIEs, err = farIE.UpdateForwardingParameters()
+	default:
+		return errors.New("Invalid op specified")
 	}
+
 	if err != nil {
-		log.Println("Unable to find ForwardingParameters!")
-		return nil
+		return errors.New("Unable to find ForwardingParameters")
 	}
-	for _, fIE := range fIEs {
-		switch fIE.Type {
+
+	for _, fwdIE := range fwdIEs {
+		switch fwdIE.Type {
 		case ie.OuterHeaderCreation:
-			outerheadercreationfields, err := fIE.OuterHeaderCreation()
+			ohcFields, err := fwdIE.OuterHeaderCreation()
 			if err != nil {
 				log.Println("Unable to parse OuterHeaderCreationFields!")
 				continue
 			}
-			tunnelTEID = outerheadercreationfields.TEID
-			tunnelDst = ip2int(outerheadercreationfields.IPv4Address)
-			tunnelType = uint8(1)
+			f.tunnelTEID = ohcFields.TEID
+			f.tunnelIP4Dst = ip2int(ohcFields.IPv4Address)
+			f.tunnelType = uint8(1)
 		case ie.DestinationInterface:
-			destinationinterface, err := fIE.DestinationInterface()
+			dstIface, err := fwdIE.DestinationInterface()
 			if err != nil {
 				log.Println("Unable to parse DestinationInterface field")
 				continue
 			}
-			if destinationinterface == ie.DstInterfaceAccess {
-				dir = farForwardD
-				tunnelSrc = ip2int(upf.accessIP)
-			} else if destinationinterface == ie.DstInterfaceCore {
-				dir = farForwardU
-				tunnelSrc = ip2int(upf.coreIP)
+			if dstIface == ie.DstInterfaceAccess {
+				f.action = farForwardD
+				f.tunnelIP4Src = ip2int(upf.accessIP)
+			} else if dstIface == ie.DstInterfaceCore {
+				f.action = farForwardU
+				f.tunnelIP4Src = ip2int(upf.coreIP)
 			}
 		}
 	}
 
-	return &far{
-		farID:        uint8(farID),  // farID currently being truncated to uint8 <--- FIXIT/TODO/XXX
-		fseID:        uint32(fseid), // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-		action:       dir,
-		tunnelType:   tunnelType,
-		tunnelIP4Src: tunnelSrc,
-		tunnelIP4Dst: tunnelDst,
-		tunnelTEID:   tunnelTEID,
-		tunnelPort:   tunnelPort,
-	}
+	return nil
 }
