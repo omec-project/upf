@@ -129,16 +129,17 @@ func (p *pdr) parsPDI(pdiIEs []*ie.IE) error {
 				// TODO: Implement referencing SDF ID
 				continue
 			}
+			log.Println("Flow Description is:", flowDesc)
+
 			var ipf ipFilterRule
 			err = ipf.parseFlowDesc(flowDesc, ueIP4.String())
 			if err != nil {
-				log.Println("Failed to parse flow desc:", err)
+				return errBadSDF
 			}
-			log.Println("Flow Description is:", flowDesc, ipf)
 
-			if ipf.proto != 0xff {
+			if ipf.proto != reservedProto {
 				p.proto = ipf.proto
-				p.protoMask = 0xff
+				p.protoMask = reservedProto
 			}
 
 			if p.srcIface == access {
@@ -186,7 +187,7 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64) error {
 	}
 
 	err = p.parsPDI(pdi)
-	if err != nil {
+	if err != nil && err != errBadSDF {
 		return err
 	}
 

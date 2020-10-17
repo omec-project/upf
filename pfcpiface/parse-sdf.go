@@ -9,6 +9,14 @@ import (
 	"strings"
 )
 
+const (
+	reservedProto = uint8(0xff)
+)
+
+var (
+	errBadSDF = errors.New("Unsupported SDF format")
+)
+
 type endpoint struct {
 	IPNet *net.IPNet
 	Port  uint16
@@ -60,7 +68,14 @@ type ipFilterRule struct {
 func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 	fields := strings.Fields(flowDesc)
 
+	if err := parseAction(fields[0]); err != nil {
+		return err
+	}
 	ipf.action = fields[0]
+
+	if err := parseDirection(fields[1]); err != nil {
+		return err
+	}
 	ipf.direction = fields[1]
 
 	ipf.proto = parseProto(fields[2])
@@ -115,6 +130,26 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 	return nil
 }
 
+func parseAction(action string) error {
+	switch action {
+	case "permit":
+	case "deny":
+	default:
+		return errBadSDF
+	}
+	return nil
+}
+
+func parseDirection(dir string) error {
+	switch dir {
+	case "in":
+	case "out":
+	default:
+		return errBadSDF
+	}
+	return nil
+}
+
 func parseProto(proto string) uint8 {
 	switch proto {
 	case "udp":
@@ -122,6 +157,6 @@ func parseProto(proto string) uint8 {
 	case "tcp":
 		return 6
 	default:
-		return 0xff // IANA reserved
+		return reservedProto // IANA reserved
 	}
 }
