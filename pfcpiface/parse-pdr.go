@@ -142,12 +142,12 @@ func (p *pdr) parsPDI(pdiIEs []*ie.IE) error {
 				p.protoMask = reservedProto
 			}
 
-			if p.srcIface == access {
+			if p.srcIface == core {
 				p.dstIP = ip2int(ipf.dst.IPNet.IP)
 				p.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
 				p.srcIP = ip2int(ipf.src.IPNet.IP)
 				p.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
-			} else if p.srcIface == core {
+			} else if p.srcIface == access {
 				p.srcIP = ip2int(ipf.dst.IPNet.IP)
 				p.srcIPMask = ipMask2int(ipf.dst.IPNet.Mask)
 				p.dstIP = ip2int(ipf.src.IPNet.IP)

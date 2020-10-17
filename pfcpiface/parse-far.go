@@ -56,7 +56,7 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 		return err
 	}
 
-	if (action&0x20)>>5 == 0 {
+	if (action&0x02)>>1 == 0 {
 		log.Println("Handling forward action only")
 		return nil
 	}
