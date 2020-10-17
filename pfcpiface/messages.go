@@ -4,7 +4,7 @@
 package main
 
 import (
-	"errors"
+	"fmt"
 	"log"
 	"net"
 	"time"
@@ -114,18 +114,17 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 		log.Println("Failed to parse FSEID from session establishment request")
 		return nil
 	}
+	remoteSEID := fseid.SEID
 
 	/* Read CreatePDRs and CreateFARs from payload */
-
-	pdrs := make([]pdr, 0, MaxItems)
-	fars := make([]far, 0, MaxItems)
+	session := pc.mgr.NewPFCPSession(remoteSEID)
 
 	sendError := func(err error) []byte {
 		log.Println(err)
 		// Build response message
 		seres, err := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
 			0,                              /* FO <-- what's this? */
-			fseid.SEID,                     /* seid */
+			remoteSEID,                     /* seid */
 			sereq.SequenceNumber,           /* seq # */
 			0,                              /* priority */
 			ie.NewNodeID(sourceIP, "", ""), /* node id (IPv4) */
@@ -141,38 +140,31 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 
 	for _, cPDR := range sereq.CreatePDR {
 		var p pdr
-		if err := p.parsePDR(cPDR, fseid.SEID); err != nil {
-			return sendError(errors.New("Failed to parse PDR"))
+		if err := p.parsePDR(cPDR, session.localFSEID); err != nil {
+			return sendError(err)
 		}
-		pdrs = append(pdrs, p)
+		session.CreatePDR(p)
 	}
 
 	for _, cFAR := range sereq.CreateFAR {
 		var f far
-		if err := f.parseFAR(cFAR, fseid.SEID, upf, create); err != nil {
+		if err := f.parseFAR(cFAR, session.localFSEID, upf, create); err != nil {
 			return sendError(err)
 		}
-		fars = append(fars, f)
+		session.CreateFAR(f)
 	}
 
-	upf.sendMsgToUPF("add", pdrs, fars)
-
-	// Adding current session details to the hash map
-	sessItem := PFCPSession{
-		pdrs: pdrs,
-		fars: fars,
-	}
-	pc.mgr.sessions[fseid.SEID] = sessItem
+	upf.sendMsgToUPF("add", session.pdrs, session.fars)
 
 	// Build response message
 	seres, err := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
 		0,                                    /* FO <-- what's this? */
-		fseid.SEID,                           /* seid */
+		remoteSEID,                           /* seid */
 		sereq.SequenceNumber,                 /* seq # */
 		0,                                    /* priority */
 		ie.NewNodeID(sourceIP, "", ""),       /* node id (IPv4) */
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
-		ie.NewFSEID(peerSEID(fseid.SEID), net.ParseIP(sourceIP), nil, nil),
+		ie.NewFSEID(session.localFSEID, net.ParseIP(sourceIP), nil, nil),
 	).Marshal()
 	if err != nil {
 		log.Fatalln("Unable to create session establishment response", err)
@@ -192,13 +184,6 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 
 	log.Println("Got a session modification request from: ", addr)
 
-	/* fetch FSEID */
-	fseid := (mySEID(smreq.SEID()))
-
-	/* initialize farList */
-	pdrs := make([]pdr, 0, MaxItems)
-	fars := make([]far, 0, MaxItems)
-
 	sendError := func(err error) []byte {
 		log.Println(err)
 		smres, err := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */
@@ -217,32 +202,50 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 		return smres
 	}
 
+	/* fetch FSEID */
+	localSEID := smreq.SEID()
+	session, ok := pc.mgr.sessions[localSEID]
+	if !ok {
+		return sendError(fmt.Errorf("Session not found: %v", localSEID))
+	}
+
+	pdrs := make([]pdr, 0, MaxItems)
+	fars := make([]far, 0, MaxItems)
+
 	for _, cPDR := range smreq.CreatePDR {
 		var p pdr
-		if err := p.parsePDR(cPDR, fseid); err != nil {
-			return sendError(errors.New("Failed to parse PDR"))
+		if err := p.parsePDR(cPDR, localSEID); err != nil {
+			return sendError(err)
 		}
+		session.CreatePDR(p)
 		pdrs = append(pdrs, p)
 	}
 
 	for _, cFAR := range smreq.CreateFAR {
 		var f far
-		if err := f.parseFAR(cFAR, fseid, upf, create); err != nil {
+		if err := f.parseFAR(cFAR, localSEID, upf, create); err != nil {
 			return sendError(err)
 		}
+		session.CreateFAR(f)
 		fars = append(fars, f)
 	}
 
-	for _, uFAR := range smreq.UpdateFAR {
-		session, ok := pc.mgr.sessions[smreq.SEID()]
-		if !ok {
-			sendError(errSessionNotFound)
+	for _, cPDR := range smreq.UpdatePDR {
+		var p pdr
+		if err := p.parsePDR(cPDR, localSEID); err != nil {
+			return sendError(err)
 		}
+		session.UpdatePDR(p)
+		pdrs = append(pdrs, p)
+	}
+
+	for _, uFAR := range smreq.UpdateFAR {
 		var f far
-		if err := f.parseFAR(uFAR, fseid, upf, create); err != nil {
+		if err := f.parseFAR(uFAR, localSEID, upf, update); err != nil {
 			return sendError(err)
 		}
 		session.UpdateFAR(f)
+		fars = append(fars, f)
 	}
 
 	upf.sendMsgToUPF("add", pdrs, fars)

@@ -47,9 +47,19 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 
 	farID, err := farIE.FARID()
 	if err != nil {
-		return errors.New("Could not read FAR ID")
+		return err
 	}
 	f.farID = uint8(farID)
+
+	action, err := farIE.ApplyAction()
+	if err != nil {
+		return err
+	}
+
+	if (action&0x20)>>5 == 0 {
+		log.Println("Handling forward action only")
+		return nil
+	}
 
 	var fwdIEs []*ie.IE
 	f.action = 0xFF
@@ -64,7 +74,7 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 	}
 
 	if err != nil {
-		return errors.New("Unable to find ForwardingParameters")
+		return err
 	}
 
 	for _, fwdIE := range fwdIEs {

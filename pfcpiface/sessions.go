@@ -4,13 +4,8 @@
 package main
 
 import (
-	"errors"
 	"math/rand"
 	"time"
-)
-
-var (
-	errSessionNotFound = errors.New("Session not found")
 )
 
 // PFCPSessionMgr manages PFCP sessions
@@ -36,26 +31,28 @@ func (mgr *PFCPSessionMgr) RemoveSession(id uint64) {
 
 // PFCPSession implements one PFCP session
 type PFCPSession struct {
-	id   uint64
-	pdrs []pdr
-	fars []far
+	localFSEID  uint64
+	remoteFSEID uint64
+	pdrs        []pdr
+	fars        []far
 }
 
 // NewPFCPSession allocates an session with ID
-func (mgr *PFCPSessionMgr) NewPFCPSession() *PFCPSession {
+func (mgr *PFCPSessionMgr) NewPFCPSession(rseid uint64) *PFCPSession {
 	for i := 0; i < mgr.maxRetries; i++ {
-		id := mgr.rng.Uint64()
+		lseid := mgr.rng.Uint64()
 		// Check if it already exists
-		if _, ok := mgr.sessions[id]; ok {
+		if _, ok := mgr.sessions[lseid]; ok {
 			continue
 		}
 
 		s := PFCPSession{
-			id:   id,
-			pdrs: make([]pdr, 0, MaxItems),
-			fars: make([]far, 0, MaxItems),
+			localFSEID:  lseid,
+			remoteFSEID: rseid,
+			pdrs:        make([]pdr, 0, MaxItems),
+			fars:        make([]far, 0, MaxItems),
 		}
-		mgr.sessions[id] = s
+		mgr.sessions[lseid] = s
 		return &s
 	}
 	return nil
