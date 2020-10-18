@@ -31,10 +31,10 @@ func (mgr *PFCPSessionMgr) RemoveSession(id uint64) {
 
 // PFCPSession implements one PFCP session
 type PFCPSession struct {
-	localFSEID  uint64
-	remoteFSEID uint64
-	pdrs        []pdr
-	fars        []far
+	localSEID  uint64
+	remoteSEID uint64
+	pdrs       []pdr
+	fars       []far
 }
 
 // NewPFCPSession allocates an session with ID
@@ -47,10 +47,10 @@ func (mgr *PFCPSessionMgr) NewPFCPSession(rseid uint64) *PFCPSession {
 		}
 
 		s := PFCPSession{
-			localFSEID:  lseid,
-			remoteFSEID: rseid,
-			pdrs:        make([]pdr, 0, MaxItems),
-			fars:        make([]far, 0, MaxItems),
+			localSEID:  lseid,
+			remoteSEID: rseid,
+			pdrs:       make([]pdr, 0, MaxItems),
+			fars:       make([]far, 0, MaxItems),
 		}
 		mgr.sessions[lseid] = s
 		return &s
