@@ -24,12 +24,12 @@ func (s *PFCPSession) UpdatePDR(p pdr) error {
 }
 
 // RemovePDR removes pdr from existing list of PDRs in the session
-func (s *PFCPSession) RemovePDR(p pdr) error {
+func (s *PFCPSession) RemovePDR(id uint32) (*pdr, error) {
 	for idx, v := range s.pdrs {
-		if v.pdrID == p.pdrID {
+		if v.pdrID == id {
 			s.pdrs = append(s.pdrs[:idx], s.pdrs[idx+1:]...)
-			return nil
+			return &v, nil
 		}
 	}
-	return errors.New("PDR not found")
+	return nil, errors.New("PDR not found")
 }

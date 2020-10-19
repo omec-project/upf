@@ -44,6 +44,7 @@ const (
 	// far-action specific values
 	farForwardU = 0x0
 	farForwardD = 0x1
+	farDrop     = 0x2
 )
 
 var intEnc = func(u uint64) *pb.FieldData {

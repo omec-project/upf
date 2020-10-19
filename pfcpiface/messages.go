@@ -4,6 +4,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -116,9 +117,6 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 	}
 	remoteSEID := fseid.SEID
 
-	/* Read CreatePDRs and CreateFARs from payload */
-	session := pc.mgr.NewPFCPSession(remoteSEID)
-
 	sendError := func(err error) []byte {
 		log.Println(err)
 		// Build response message
@@ -136,6 +134,12 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 
 		log.Println("Sending session establishment response to: ", addr)
 		return seres
+	}
+
+	/* Read CreatePDRs and CreateFARs from payload */
+	session := pc.mgr.NewPFCPSession(remoteSEID)
+	if session == nil {
+		sendError(errors.New("Unable to allocate new PFCP session"))
 	}
 
 	for _, cPDR := range sereq.CreatePDR {
@@ -159,7 +163,7 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 	// Build response message
 	seres, err := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
 		0,                                    /* FO <-- what's this? */
-		remoteSEID,                           /* seid */
+		session.remoteSEID,                   /* seid */
 		sereq.SequenceNumber,                 /* seq # */
 		0,                                    /* priority */
 		ie.NewNodeID(sourceIP, "", ""),       /* node id (IPv4) */
@@ -184,15 +188,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 
 	log.Println("Got a session modification request from: ", addr)
 
-	/* Read fseid from the IE */
-	fseid, err := smreq.CPFSEID.FSEID()
-	if err != nil {
-		log.Println("Failed to parse FSEID from session establishment request")
-		return nil
-	}
-	remoteSEID := fseid.SEID
-	localSEID := smreq.SEID()
-
+	var remoteSEID uint64
 	sendError := func(err error) []byte {
 		log.Println(err)
 		smres, err := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */
@@ -201,7 +197,6 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 			smreq.SequenceNumber,                 /* seq # */
 			0,                                    /* priority */
 			ie.NewCause(ie.CauseRequestRejected), /* accept it blindly for the time being */
-			ie.NewFSEID(localSEID, net.ParseIP(sourceIP), nil, nil),
 		).Marshal()
 		if err != nil {
 			log.Fatalln("Unable to create session establishment response", err)
@@ -211,14 +206,23 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 		return smres
 	}
 
-	/* fetch FSEID */
+	localSEID := smreq.SEID()
 	session, ok := pc.mgr.sessions[localSEID]
 	if !ok {
 		return sendError(fmt.Errorf("Session not found: %v", localSEID))
 	}
 
-	pdrs := make([]pdr, 0, MaxItems)
-	fars := make([]far, 0, MaxItems)
+	if smreq.CPFSEID != nil {
+		fseid, err := smreq.CPFSEID.FSEID()
+		if err == nil {
+			session.remoteSEID = fseid.SEID
+			remoteSEID = fseid.SEID
+			log.Println("Updated FSEID from session modification request")
+		}
+	}
+
+	addPDRs := make([]pdr, 0, MaxItems)
+	addFARs := make([]far, 0, MaxItems)
 
 	for _, cPDR := range smreq.CreatePDR {
 		var p pdr
@@ -226,7 +230,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 			return sendError(err)
 		}
 		session.CreatePDR(p)
-		pdrs = append(pdrs, p)
+		addPDRs = append(addPDRs, p)
 	}
 
 	for _, cFAR := range smreq.CreateFAR {
@@ -235,7 +239,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 			return sendError(err)
 		}
 		session.CreateFAR(f)
-		fars = append(fars, f)
+		addFARs = append(addFARs, f)
 	}
 
 	for _, cPDR := range smreq.UpdatePDR {
@@ -244,7 +248,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 			return sendError(err)
 		}
 		session.UpdatePDR(p)
-		pdrs = append(pdrs, p)
+		addPDRs = append(addPDRs, p)
 	}
 
 	for _, uFAR := range smreq.UpdateFAR {
@@ -253,10 +257,41 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 			return sendError(err)
 		}
 		session.UpdateFAR(f)
-		fars = append(fars, f)
+		addFARs = append(addFARs, f)
 	}
 
-	upf.sendMsgToUPF("add", pdrs, fars)
+	upf.sendMsgToUPF("add", addPDRs, addFARs)
+
+	delPDRs := make([]pdr, 0, MaxItems)
+	delFARs := make([]far, 0, MaxItems)
+
+	for _, rPDR := range smreq.RemovePDR {
+		pdrID, err := rPDR.PDRID()
+		if err != nil {
+			return sendError(err)
+		}
+
+		p, err := session.RemovePDR(uint32(pdrID))
+		if err != nil {
+			return sendError(err)
+		}
+		delPDRs = append(delPDRs, *p)
+	}
+
+	for _, dFAR := range smreq.RemoveFAR {
+		farID, err := dFAR.FARID()
+		if err != nil {
+			return sendError(err)
+		}
+
+		f, err := session.RemoveFAR(uint8(farID))
+		if err != nil {
+			return sendError(err)
+		}
+		delFARs = append(delFARs, *f)
+	}
+
+	upf.sendMsgToUPF("del", delPDRs, delFARs)
 
 	// Build response message
 	smres, err := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */
@@ -265,7 +300,6 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 		smreq.SequenceNumber,                 /* seq # */
 		0,                                    /* priority */
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
-		ie.NewFSEID(localSEID, net.ParseIP(sourceIP), nil, nil),
 	).Marshal()
 	if err != nil {
 		log.Fatalln("Unable to create session modification response", err)
@@ -307,8 +341,6 @@ func (pc *PFCPConn) handleSessionDeletionRequest(upf *upf, msg message.Message, 
 
 	log.Println("Got a session deletion request from: ", addr)
 
-	localSEID := sdreq.SEID()
-
 	sendError := func(err error) []byte {
 		log.Println(err)
 		smres, err := message.NewSessionDeletionResponse(0, /* MO?? <-- what's this */
@@ -327,6 +359,7 @@ func (pc *PFCPConn) handleSessionDeletionRequest(upf *upf, msg message.Message, 
 	}
 
 	/* retrieve sessionRecord */
+	localSEID := sdreq.SEID()
 	session, ok := pc.mgr.sessions[localSEID]
 	if !ok {
 		return sendError(fmt.Errorf("Session not found: %v", localSEID))

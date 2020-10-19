@@ -58,11 +58,12 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 
 	if (action&0x02)>>1 == 0 {
 		log.Println("Handling forward action only")
+		// TODO: Handle buffer
+		f.action = farDrop
 		return nil
 	}
 
 	var fwdIEs []*ie.IE
-	f.action = 0xFF
 
 	switch op {
 	case create:
