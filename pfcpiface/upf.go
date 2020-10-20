@@ -261,6 +261,7 @@ func (u *upf) sendMsgToUPF(method string, pdrs []pdr, fars []far) {
 		log.Fatalln("Unable to pause BESS:", err)
 	}
 	for _, pdr := range pdrs {
+		pdr.printPDR()
 		switch method {
 		case "add":
 			u.addPDR(ctx, done, pdr)
@@ -269,6 +270,7 @@ func (u *upf) sendMsgToUPF(method string, pdrs []pdr, fars []far) {
 		}
 	}
 	for _, far := range fars {
+		far.printFAR()
 		switch method {
 		case "add":
 			u.addFAR(ctx, done, far)
