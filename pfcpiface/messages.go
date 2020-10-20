@@ -239,10 +239,10 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 		fseid, err := smreq.CPFSEID.FSEID()
 		if err == nil {
 			session.remoteSEID = fseid.SEID
-			remoteSEID = fseid.SEID
 			log.Println("Updated FSEID from session modification request")
 		}
 	}
+	remoteSEID = session.remoteSEID
 
 	addPDRs := make([]pdr, 0, MaxItems)
 	addFARs := make([]far, 0, MaxItems)
