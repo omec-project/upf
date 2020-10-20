@@ -14,6 +14,28 @@ import (
 	"github.com/wmnsk/go-pfcp/message"
 )
 
+func handleHeartbeatRequest(msg message.Message, addr net.Addr) []byte {
+	hbreq, ok := msg.(*message.HeartbeatRequest)
+	if !ok {
+		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
+		return nil
+	}
+
+	log.Println("Got a heartbeat request from: ", addr)
+
+	// Build response message
+	hbres, err := message.NewHeartbeatResponse(hbreq.SequenceNumber,
+		ie.NewRecoveryTimeStamp(time.Now()), /* ts */
+	).Marshal()
+	if err != nil {
+		log.Fatalln("Unable to create heartbeat response", err)
+	}
+
+	log.Println("Sent heartbeat response to: ", addr)
+
+	return hbres
+}
+
 func (pc *PFCPConn) handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP string, accessIP string, coreIP string) []byte {
 	asreq, ok := msg.(*message.AssociationSetupRequest)
 	if !ok {
@@ -137,10 +159,11 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 	}
 
 	/* Read CreatePDRs and CreateFARs from payload */
-	session := pc.mgr.NewPFCPSession(remoteSEID)
-	if session == nil {
+	localSEID := pc.mgr.NewPFCPSession(remoteSEID)
+	if localSEID == 0 {
 		sendError(errors.New("Unable to allocate new PFCP session"))
 	}
+	session := pc.mgr.sessions[localSEID]
 
 	for _, cPDR := range sereq.CreatePDR {
 		var p pdr
@@ -175,7 +198,7 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 	}
 
 	log.Println("Sending session establishment response to: ", addr)
-
+	pc.mgr.sessions[localSEID] = session
 	return seres
 }
 
@@ -242,9 +265,9 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 		addFARs = append(addFARs, f)
 	}
 
-	for _, cPDR := range smreq.UpdatePDR {
+	for _, uPDR := range smreq.UpdatePDR {
 		var p pdr
-		if err := p.parsePDR(cPDR, localSEID); err != nil {
+		if err := p.parsePDR(uPDR, localSEID); err != nil {
 			return sendError(err)
 		}
 		session.UpdatePDR(p)
@@ -306,30 +329,8 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 	}
 
 	log.Println("Sent session modification response to: ", addr)
-
+	pc.mgr.sessions[localSEID] = session
 	return smres
-}
-
-func handleHeartbeatRequest(msg message.Message, addr net.Addr) []byte {
-	hbreq, ok := msg.(*message.HeartbeatRequest)
-	if !ok {
-		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
-		return nil
-	}
-
-	log.Println("Got a heartbeat request from: ", addr)
-
-	// Build response message
-	hbres, err := message.NewHeartbeatResponse(hbreq.SequenceNumber,
-		ie.NewRecoveryTimeStamp(time.Now()), /* ts */
-	).Marshal()
-	if err != nil {
-		log.Fatalln("Unable to create heartbeat response", err)
-	}
-
-	log.Println("Sent heartbeat response to: ", addr)
-
-	return hbres
 }
 
 func (pc *PFCPConn) handleSessionDeletionRequest(upf *upf, msg message.Message, addr net.Addr, sourceIP string) []byte {

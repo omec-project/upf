@@ -38,7 +38,7 @@ type PFCPSession struct {
 }
 
 // NewPFCPSession allocates an session with ID
-func (mgr *PFCPSessionMgr) NewPFCPSession(rseid uint64) *PFCPSession {
+func (mgr *PFCPSessionMgr) NewPFCPSession(rseid uint64) uint64 {
 	for i := 0; i < mgr.maxRetries; i++ {
 		lseid := mgr.rng.Uint64()
 		// Check if it already exists
@@ -53,7 +53,7 @@ func (mgr *PFCPSessionMgr) NewPFCPSession(rseid uint64) *PFCPSession {
 			fars:       make([]far, 0, MaxItems),
 		}
 		mgr.sessions[lseid] = s
-		return &s
+		return lseid
 	}
-	return nil
+	return 0
 }
