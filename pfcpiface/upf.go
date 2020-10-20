@@ -249,17 +249,22 @@ func (u *upf) simdeleteEntries(pdrs []pdr, fars []far, timeout time.Duration) {
 }
 
 func (u *upf) sendMsgToUPF(method string, pdrs []pdr, fars []far) {
+	calls := len(pdrs) + len(fars)
+	if calls == 0 {
+		return
+	}
+
 	// create context
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
 	done := make(chan bool)
-	calls := len(pdrs) + len(fars)
 
 	// pause daemon, and then insert FAR(s), finally resume
 	err := u.pauseAll()
 	if err != nil {
 		log.Fatalln("Unable to pause BESS:", err)
 	}
+
 	for _, pdr := range pdrs {
 		pdr.printPDR()
 		switch method {
@@ -269,6 +274,7 @@ func (u *upf) sendMsgToUPF(method string, pdrs []pdr, fars []far) {
 			u.delPDR(ctx, done, pdr)
 		}
 	}
+
 	for _, far := range fars {
 		far.printFAR()
 		switch method {
@@ -278,10 +284,12 @@ func (u *upf) sendMsgToUPF(method string, pdrs []pdr, fars []far) {
 			u.delFAR(ctx, done, far)
 		}
 	}
+
 	rc := u.GRPCJoin(calls, Timeout, done)
 	if !rc {
 		log.Println("Unable to make GRPC calls")
 	}
+
 	err = u.resumeAll()
 	if err != nil {
 		log.Fatalln("Unable to resume BESS:", err)
