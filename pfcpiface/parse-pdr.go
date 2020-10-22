@@ -113,6 +113,17 @@ func (p *pdr) parsPDI(pdiIEs []*ie.IE) error {
 		}
 	}
 
+	// Needed if SDF filter is bad or absent
+	if len(ueIP4) == 4 {
+		if p.srcIface == core {
+			p.dstIP = ip2int(ueIP4)
+			p.dstIPMask = 0xffffffff // /32
+		} else if p.srcIface == access {
+			p.srcIP = ip2int(ueIP4)
+			p.srcIPMask = 0xffffffff // /32
+		}
+	}
+
 	for _, ie2 := range pdiIEs {
 		switch ie2.Type {
 		case ie.SDFFilter:
