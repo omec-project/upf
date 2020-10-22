@@ -30,7 +30,7 @@ type upf struct {
 
 // Don't change these values
 const (
-	tunnelPort = 2152
+	tunnelGTPUPort = 2152
 
 	// src-iface consts
 	core   = 0x2
@@ -163,7 +163,7 @@ func (u *upf) sim(method string) {
 			tunnelIP4Src: ip2int(u.accessIP),
 			tunnelIP4Dst: ip2int(enbip) + enbIdx,
 			tunnelTEID:   n3TEID + i,
-			tunnelPort:   tunnelPort,
+			tunnelPort:   tunnelGTPUPort,
 		}
 
 		// create/delete uplink far
@@ -183,7 +183,7 @@ func (u *upf) sim(method string) {
 			tunnelIP4Src: ip2int(u.coreIP),
 			tunnelIP4Dst: ip2int(aupfip),
 			tunnelTEID:   n9TEID + i,
-			tunnelPort:   tunnelPort,
+			tunnelPort:   tunnelGTPUPort,
 		}
 
 		fars := []far{farDown, farN6Up, farN9Up}

@@ -89,6 +89,7 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 			f.tunnelTEID = ohcFields.TEID
 			f.tunnelIP4Dst = ip2int(ohcFields.IPv4Address)
 			f.tunnelType = uint8(1)
+			f.tunnelPort = tunnelGTPUPort
 		case ie.DestinationInterface:
 			dstIface, err := fwdIE.DestinationInterface()
 			if err != nil {
