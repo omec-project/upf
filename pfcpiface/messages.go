@@ -86,7 +86,7 @@ func handleAssociationSetupResponse(msg message.Message, addr net.Addr, sourceIP
 
 	cause, err := asres.Cause.Cause()
 	if err != nil {
-		log.Println("Got an association setup response without casue ", err, " from: ", addr, "Cause ", cause)
+		log.Println("Got an association setup response without cause ", err, " from: ", addr, "Cause ", cause)
 		return false
 	}
 
@@ -389,7 +389,6 @@ func (pc *PFCPConn) handleSessionDeletionRequest(upf *upf, msg message.Message, 
 }
 
 func (pc *PFCPConn) manageSmfConnection(n4LocalIP string, n3ip string, n4Dst string, conn *net.UDPConn, cpConnectionStatus chan bool) {
-	msg := false
 	cpConnected := false
 
 	initiatePfcpConnection := func() {
@@ -422,7 +421,7 @@ func (pc *PFCPConn) manageSmfConnection(n4LocalIP string, n3ip string, n4Dst str
 	pfcpResponseTicker := time.NewTicker(2000 * time.Millisecond)
 	for {
 		select {
-		case msg = <-cpConnectionStatus:
+		case msg := <-cpConnectionStatus:
 			// events from main Loop
 			updateSmfStatus(msg)
 			if cpConnected {
