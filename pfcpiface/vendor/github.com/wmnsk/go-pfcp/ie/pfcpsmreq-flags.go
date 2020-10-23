@@ -9,35 +9,35 @@ func NewPFCPSMReqFlags(flag uint8) *IE {
 	return newUint8ValIE(PFCPSMReqFlags, flag)
 }
 
-// PFCPSMReqFlags returns PFCPSMReqFlags in []byte if the type of IE matches.
-func (i *IE) PFCPSMReqFlags() ([]byte, error) {
+// PFCPSMReqFlags returns PFCPSMReqFlags in uint8 if the type of IE matches.
+func (i *IE) PFCPSMReqFlags() (uint8, error) {
 	switch i.Type {
 	case PFCPSMReqFlags:
-		return i.Payload, nil
+		return i.Payload[0], nil
 	case ForwardingParameters:
 		ies, err := i.ForwardingParameters()
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 		for _, x := range ies {
 			if x.Type == PFCPSMReqFlags {
 				return x.PFCPSMReqFlags()
 			}
 		}
-		return nil, ErrIENotFound
+		return 0, ErrIENotFound
 	case UpdateForwardingParameters:
 		ies, err := i.UpdateForwardingParameters()
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 		for _, x := range ies {
 			if x.Type == PFCPSMReqFlags {
 				return x.PFCPSMReqFlags()
 			}
 		}
-		return nil, ErrIENotFound
+		return 0, ErrIENotFound
 	default:
-		return nil, &InvalidTypeError{Type: i.Type}
+		return 0, &InvalidTypeError{Type: i.Type}
 	}
 }
 
@@ -54,14 +54,14 @@ func (i *IE) HasDROBU() bool {
 			return false
 		}
 
-		return has1stBit(v[0])
+		return has1stBit(v)
 	case PFCPSRRspFlags:
 		v, err := i.PFCPSRRspFlags()
 		if err != nil {
 			return false
 		}
 
-		return has1stBit(v[0])
+		return has1stBit(v)
 	default:
 		return false
 	}
@@ -80,7 +80,7 @@ func (i *IE) HasSNDEM() bool {
 			return false
 		}
 
-		return has2ndBit(v[0])
+		return has2ndBit(v)
 	default:
 		return false
 	}
@@ -99,7 +99,7 @@ func (i *IE) HasQAURR() bool {
 			return false
 		}
 
-		return has3rdBit(v[0])
+		return has3rdBit(v)
 	default:
 		return false
 	}

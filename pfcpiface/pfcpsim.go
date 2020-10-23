@@ -78,7 +78,7 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 				ie.NewPDI(
 					ie.NewSourceInterface(ie.SrcInterfaceAccess),
 					ie.NewFTEID(0x30000000, net.ParseIP("198.18.0.1"), nil, nil),
-					ie.NewUEIPAddress(0x2, "16.0.0.1", "", 0),
+					ie.NewUEIPAddress(0x2, "16.0.0.1", "", 0, 0),
 					ie.NewSDFFilter("permit out ip from any to assigned", "", "", "", 1),
 				),
 				ie.NewOuterHeaderRemoval(0, 0),
@@ -91,7 +91,7 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 				ie.NewPDI(
 					ie.NewSourceInterface(ie.SrcInterfaceAccess),
 					ie.NewFTEID(0x30000000, net.ParseIP("198.18.0.1"), nil, nil),
-					ie.NewUEIPAddress(0x2, "16.0.0.1", "", 0),
+					ie.NewUEIPAddress(0x2, "16.0.0.1", "", 0, 0),
 					ie.NewSDFFilter("permit out ip from 6.6.6.6/32 to assigned", "", "", "", 2),
 				),
 				ie.NewOuterHeaderRemoval(0, 0),
@@ -114,7 +114,7 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 				ie.NewPrecedence(50),
 				ie.NewPDI(
 					ie.NewSourceInterface(ie.SrcInterfaceCore),
-					ie.NewUEIPAddress(0x2, "16.0.0.1", "", 0),
+					ie.NewUEIPAddress(0x2, "16.0.0.1", "", 0, 0),
 					ie.NewSDFFilter("permit out ip from any to assigned", "", "", "", 1),
 				),
 				ie.NewFARID(3),
@@ -162,6 +162,9 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 			log.Fatal(err)
 		}
 		msg, err := message.Parse(buf[:n])
+		if err != nil {
+			log.Fatalln("Unable to parse session establishment response", err)
+		}
 		seres, ok := msg.(*message.SessionEstablishmentResponse)
 		if !ok {
 			log.Fatalln("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -202,7 +205,7 @@ func modifyPFCP(conn *net.UDPConn, raddr *net.UDPAddr, seid uint64) {
 				ie.NewPrecedence(50),
 				ie.NewPDI(
 					ie.NewSourceInterface(ie.SrcInterfaceCore),
-					ie.NewUEIPAddress(0x2, "16.0.0.1", "", 0),
+					ie.NewUEIPAddress(0x2, "16.0.0.1", "", 0, 0),
 					ie.NewSDFFilter("permit out ip from any to assigned", "", "", "", 1),
 				),
 				ie.NewFARID(3),

@@ -4,28 +4,31 @@
 
 package ie
 
+import "io"
+
 // NewPFCPASRspFlags creates a new PFCPASRspFlags IE.
 func NewPFCPASRspFlags(flag uint8) *IE {
 	return newUint8ValIE(PFCPASRspFlags, flag)
 }
 
-// PFCPASRspFlags returns PFCPASRspFlags in []byte if the type of IE matches.
-func (i *IE) PFCPASRspFlags() ([]byte, error) {
+// PFCPASRspFlags returns PFCPASRspFlags in uint8 if the type of IE matches.
+func (i *IE) PFCPASRspFlags() (uint8, error) {
 	if i.Type != PFCPASRspFlags {
-		return nil, &InvalidTypeError{Type: i.Type}
+		return 0, &InvalidTypeError{Type: i.Type}
+	}
+	if len(i.Payload) < 1 {
+		return 0, io.ErrUnexpectedEOF
 	}
 
-	return i.Payload, nil
+	return i.Payload[0], nil
 }
 
 // HasPSREI reports whether an IE has PSREI bit.
 func (i *IE) HasPSREI() bool {
-	if i.Type != PFCPASRspFlags {
-		return false
-	}
-	if len(i.Payload) < 1 {
+	v, err := i.PFCPASRspFlags()
+	if err != nil {
 		return false
 	}
 
-	return has1stBit(i.Payload[0])
+	return has1stBit(v)
 }
