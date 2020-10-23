@@ -15,5 +15,6 @@ updates:
 
   - package-ecosystem: "gomod"
     directory: "/pfcpiface"
+    vendor: true
     schedule:
       interval: "daily"
