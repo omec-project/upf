@@ -95,8 +95,7 @@ func (i *IE) FARID() (uint32, error) {
 			return 0, err
 		}
 		for _, x := range ies {
-			switch x.Type {
-			case TGPPAccessForwardingActionInformation, NonTGPPAccessForwardingActionInformation:
+			if x.Type == FARID {
 				return x.FARID()
 			}
 		}
