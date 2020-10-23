@@ -9,11 +9,11 @@ func NewPFCPSRRspFlags(flag uint8) *IE {
 	return newUint8ValIE(PFCPSRRspFlags, flag)
 }
 
-// PFCPSRRspFlags returns PFCPSRRspFlags in []byte if the type of IE matches.
-func (i *IE) PFCPSRRspFlags() ([]byte, error) {
+// PFCPSRRspFlags returns PFCPSRRspFlags in uint8 if the type of IE matches.
+func (i *IE) PFCPSRRspFlags() (uint8, error) {
 	if i.Type != PFCPSRRspFlags {
-		return nil, &InvalidTypeError{Type: i.Type}
+		return 0, &InvalidTypeError{Type: i.Type}
 	}
 
-	return i.Payload, nil
+	return i.Payload[0], nil
 }

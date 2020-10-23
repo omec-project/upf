@@ -39,7 +39,7 @@ func (i *IE) FTEID() (*FTEIDFields, error) {
 			return nil, err
 		}
 		for _, x := range ies {
-			switch i.Type {
+			switch x.Type {
 			case FTEID, RedundantTransmissionParameters:
 				return x.FTEID()
 			}
@@ -132,12 +132,9 @@ func NewFTEIDFields(teid uint32, v4, v6 net.IP, chid []byte) *FTEIDFields {
 	var fields *FTEIDFields
 	if chid != nil {
 		fields = &FTEIDFields{
-			IPv4Address: v4,
-			IPv6Address: v6,
-			ChooseID:    chid,
+			ChooseID: chid,
 		}
 		fields.SetChIDFlag()
-
 	} else {
 		fields = &FTEIDFields{
 			TEID:        teid,

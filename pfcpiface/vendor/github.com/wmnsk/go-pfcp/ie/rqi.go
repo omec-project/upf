@@ -11,39 +11,39 @@ func NewRQI(rqi uint8) *IE {
 	return newUint8ValIE(RQI, rqi)
 }
 
-// RQI returns RQI in []byte if the type of IE matches.
-func (i *IE) RQI() ([]byte, error) {
+// RQI returns RQI in uint8 if the type of IE matches.
+func (i *IE) RQI() (uint8, error) {
 	if len(i.Payload) < 1 {
-		return nil, io.ErrUnexpectedEOF
+		return 0, io.ErrUnexpectedEOF
 	}
 
 	switch i.Type {
 	case RQI:
-		return i.Payload, nil
+		return i.Payload[0], nil
 	case CreateQER:
 		ies, err := i.CreateQER()
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 		for _, x := range ies {
 			if x.Type == RQI {
 				return x.RQI()
 			}
 		}
-		return nil, ErrIENotFound
+		return 0, ErrIENotFound
 	case UpdateQER:
 		ies, err := i.UpdateQER()
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 		for _, x := range ies {
 			if x.Type == RQI {
 				return x.RQI()
 			}
 		}
-		return nil, ErrIENotFound
+		return 0, ErrIENotFound
 	default:
-		return nil, &InvalidTypeError{Type: i.Type}
+		return 0, &InvalidTypeError{Type: i.Type}
 	}
 }
 
@@ -54,5 +54,5 @@ func (i *IE) HasRQI() bool {
 		return false
 	}
 
-	return has1stBit(v[0])
+	return has1stBit(v)
 }

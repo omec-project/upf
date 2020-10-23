@@ -11,28 +11,28 @@ func NewPacketReplicationAndDetectionCarryOnInformation(flag uint8) *IE {
 	return newUint8ValIE(PacketReplicationAndDetectionCarryOnInformation, flag)
 }
 
-// PacketReplicationAndDetectionCarryOnInformation returns PacketReplicationAndDetectionCarryOnInformation in []byte if the type of IE matches.
-func (i *IE) PacketReplicationAndDetectionCarryOnInformation() ([]byte, error) {
+// PacketReplicationAndDetectionCarryOnInformation returns PacketReplicationAndDetectionCarryOnInformation in uint8 if the type of IE matches.
+func (i *IE) PacketReplicationAndDetectionCarryOnInformation() (uint8, error) {
 	if len(i.Payload) < 1 {
-		return nil, io.ErrUnexpectedEOF
+		return 0, io.ErrUnexpectedEOF
 	}
 
 	switch i.Type {
 	case PacketReplicationAndDetectionCarryOnInformation:
-		return i.Payload, nil
+		return i.Payload[0], nil
 	case CreatePDR:
 		ies, err := i.CreatePDR()
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 		for _, x := range ies {
 			if x.Type == PacketReplicationAndDetectionCarryOnInformation {
 				return x.PacketReplicationAndDetectionCarryOnInformation()
 			}
 		}
-		return nil, ErrIENotFound
+		return 0, ErrIENotFound
 	default:
-		return nil, &InvalidTypeError{Type: i.Type}
+		return 0, &InvalidTypeError{Type: i.Type}
 	}
 }
 
@@ -43,7 +43,7 @@ func (i *IE) HasPRIUEAI() bool {
 		return false
 	}
 
-	return has1stBit(v[0])
+	return has1stBit(v)
 }
 
 // HasPRINT19I reports whether an IE has PRINT19I bit.
@@ -53,7 +53,7 @@ func (i *IE) HasPRINT19I() bool {
 		return false
 	}
 
-	return has2ndBit(v[0])
+	return has2ndBit(v)
 }
 
 // HasPRIN6I reports whether an IE has PRIN6I bit.
@@ -63,7 +63,7 @@ func (i *IE) HasPRIN6I() bool {
 		return false
 	}
 
-	return has3rdBit(v[0])
+	return has3rdBit(v)
 }
 
 // HasDCARONI reports whether an IE has DCARONI bit.
@@ -73,5 +73,5 @@ func (i *IE) HasDCARONI() bool {
 		return false
 	}
 
-	return has4thBit(v[0])
+	return has4thBit(v)
 }

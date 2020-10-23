@@ -10,8 +10,8 @@ import (
 )
 
 // NewUEIPAddress creates a new UEIPAddress IE.
-func NewUEIPAddress(flags uint8, v4, v6 string, v6d uint8) *IE {
-	fields := NewUEIPAddressFields(flags, v4, v6, v6d)
+func NewUEIPAddress(flags uint8, v4, v6 string, v6d, v6pl uint8) *IE {
+	fields := NewUEIPAddressFields(flags, v4, v6, v6d, v6pl)
 	b, err := fields.Marshal()
 	if err != nil {
 		return nil
@@ -150,26 +150,31 @@ func (i *IE) HasSD() bool {
 
 // UEIPAddressFields represents a fields contained in UEIPAddress IE.
 type UEIPAddressFields struct {
-	Flags       uint8
-	IPv4Address net.IP
-	IPv6Address net.IP
-	IPv6Prefix  uint8
+	Flags                    uint8
+	IPv4Address              net.IP
+	IPv6Address              net.IP
+	IPv6PrefixDelegationBits uint8
+	IPv6PrefixLength         uint8
 }
 
 // NewUEIPAddressFields creates a new UEIPAddressFields.
-func NewUEIPAddressFields(flags uint8, v4, v6 string, v6d uint8) *UEIPAddressFields {
+func NewUEIPAddressFields(flags uint8, v4, v6 string, v6d, v6pl uint8) *UEIPAddressFields {
 	f := &UEIPAddressFields{Flags: flags}
 
 	if has2ndBit(flags) && !has5thBit(flags) {
 		f.IPv4Address = net.ParseIP(v4).To4()
 	}
 
-	if has1stBit(flags) && !has5thBit(flags) {
+	if has1stBit(flags) && !has6thBit(flags) {
 		f.IPv6Address = net.ParseIP(v6).To16()
 	}
 
 	if has4thBit(flags) {
-		f.IPv6Prefix = v6d
+		f.IPv6PrefixDelegationBits = v6d
+	}
+
+	if has7thBit(flags) {
+		f.IPv6PrefixLength = v6pl
 	}
 
 	return f
@@ -202,7 +207,7 @@ func (f *UEIPAddressFields) UnmarshalBinary(b []byte) error {
 		offset += 4
 	}
 
-	if has1stBit(f.Flags) && !has5thBit(f.Flags) {
+	if has1stBit(f.Flags) && !has6thBit(f.Flags) {
 		if l < offset+16 {
 			return io.ErrUnexpectedEOF
 		}
@@ -211,10 +216,17 @@ func (f *UEIPAddressFields) UnmarshalBinary(b []byte) error {
 	}
 
 	if has4thBit(f.Flags) {
-		if l < offset+2 {
+		if l < offset+1 {
 			return io.ErrUnexpectedEOF
 		}
-		f.IPv6Prefix = b[offset]
+		f.IPv6PrefixDelegationBits = b[offset]
+	}
+
+	if has7thBit(f.Flags) {
+		if l < offset+1 {
+			return io.ErrUnexpectedEOF
+		}
+		f.IPv6PrefixLength = b[offset]
 	}
 
 	return nil
@@ -232,7 +244,7 @@ func (f *UEIPAddressFields) Marshal() ([]byte, error) {
 // MarshalTo puts the byte sequence in the byte array given as b.
 func (f *UEIPAddressFields) MarshalTo(b []byte) error {
 	l := len(b)
-	if l < 2 {
+	if l < 1 {
 		return io.ErrUnexpectedEOF
 	}
 
@@ -244,13 +256,18 @@ func (f *UEIPAddressFields) MarshalTo(b []byte) error {
 		offset += 4
 	}
 
-	if has1stBit(f.Flags) && !has5thBit(f.Flags) {
+	if has1stBit(f.Flags) && !has6thBit(f.Flags) {
 		copy(b[offset:offset+16], f.IPv6Address)
 		offset += 16
 	}
 
 	if has4thBit(f.Flags) {
-		b[offset] = f.IPv6Prefix
+		b[offset] = f.IPv6PrefixDelegationBits
+		offset++
+	}
+
+	if has7thBit(f.Flags) {
+		b[offset] = f.IPv6PrefixLength
 	}
 
 	return nil
@@ -262,10 +279,13 @@ func (f *UEIPAddressFields) MarshalLen() int {
 	if has2ndBit(f.Flags) && !has5thBit(f.Flags) {
 		l += 4
 	}
-	if has1stBit(f.Flags) && !has5thBit(f.Flags) {
+	if has1stBit(f.Flags) && !has6thBit(f.Flags) {
 		l += 16
 	}
 	if has4thBit(f.Flags) {
+		l++
+	}
+	if has7thBit(f.Flags) {
 		l++
 	}
 
