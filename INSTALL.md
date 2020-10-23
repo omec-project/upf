@@ -109,9 +109,19 @@ index 086ad2f..79d81bd 100755
 
 3. Insert rules into relevant PDR and FAR tables
 
-```bash
-docker exec bess-pfcpiface pfcpiface -config /conf/upf.json -simulate create
-```
+    gRPC sim mode
+
+    ```bash
+    docker exec bess-pfcpiface pfcpiface -config /conf/upf.json -simulate create
+    ```
+
+    OR
+
+    PFCP sim mode
+
+    ```bash
+    docker exec bess-pfcpiface pfcpiface -config /conf/upf.json -pfcpsim
+    ```
 
 4. (optional) [Observe DP pipeline](#observe-dp-pipeline)
 
