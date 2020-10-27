@@ -137,6 +137,17 @@ FROM alpine AS pfcpiface
 COPY --from=pfcpiface-build /bin/pfcpiface /bin
 ENTRYPOINT [ "/bin/pfcpiface" ]
 
+# Stage NTF pfcpiface (TODO: build fron NTF)
+FROM golang AS ntf-pfcpiface-build
+WORKDIR /ntf-pfcpiface
+COPY ntf-pfcpiface .
+RUN CGO_ENABLED=0 go build -mod=vendor -o /bin/ntf-pfcpiface
+
+# Stage pfcpiface: runtime image of pfcpiface toward SMF/SPGW-C
+FROM alpine AS ntf-pfcpiface
+COPY --from=ntf-pfcpiface-build /bin/ntf-pfcpiface /bin
+ENTRYPOINT [ "/bin/ntf-pfcpiface" ]
+
 # Stage pb: dummy stage for collecting protobufs
 FROM scratch AS pb
 COPY --from=bess-build /protobuf /protobuf

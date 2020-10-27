@@ -17,7 +17,7 @@ import (
 // PktBufSz : buffer size for incoming pkt
 const (
 	PktBufSz    = 1500
-	PFCPPort    = "8805"
+	PFCPPort    = "8806"
 	MaxItems    = 10
 	Timeout     = 1000 * time.Millisecond
 	readTimeout = 25 * time.Second
@@ -149,6 +149,8 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 		case message.MsgTypeAssociationReleaseRequest:
 			outgoingMessage = handleAssociationReleaseRequest(msg, addr, sourceIP, accessIP)
 			cleanupSessions()
+		case message.MsgTypePFDManagementRequest:
+			outgoingMessage = handlePFDManagementRequest(msg, addr)
 		default:
 			log.Println("Message type: ", msg.MessageTypeName(), " is currently not supported")
 			continue
@@ -160,8 +162,47 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 				log.Fatalln("Unable to transmit association setup response", err)
 			}
 		}
-
 	}
+}
+
+func handlePFDManagementRequest(msg message.Message, addr net.Addr) []byte {
+	pfdreq, ok := msg.(*message.PFDManagementRequest)
+	if !ok {
+		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
+		return nil
+	}
+
+	appId, err := pfdreq.ApplicationIDsPFDs[0].ApplicationID()
+	if err != nil {
+		log.Fatalln("Can't read application ID")
+	}
+	log.Println("Got PFD for application ID: ", appId)
+
+	log.Println(pfdreq.ApplicationIDsPFDs[0])
+	pfdContext := pfdreq.ApplicationIDsPFDs[0].PFDContext()
+
+	for ctx := range pfdContext {
+		log.Println(ctx)
+	}
+
+	pfdContents, err := pfdContext[0].PFDContents()
+	if err != nil {
+		log.Fatalln("I have no idea what I am doing")
+	}
+
+	log.Println("Found contents: ", pfdContents)
+
+	pfdres, err := message.NewPFDManagementResponse(pfdreq.SequenceNumber,
+		ie.NewCause(ie.CauseRequestRejected),
+		ie.NewOffendingIE(ie.PFDContents),
+	).Marshal()
+
+	if err != nil {
+		log.Fatalln("Unable to create PFD management response to: ", addr)
+	}
+
+	log.Println("Sent PFD management response to: ", addr)
+	return pfdres
 }
 
 func handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP string, accessIP string, coreIP string) []byte {

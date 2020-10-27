@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
 
 	fqdn "github.com/Showmax/go-fqdn"
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
@@ -24,7 +25,7 @@ const (
 var (
 	bess       = flag.String("bess", "localhost:10514", "BESS IP/port combo")
 	configPath = flag.String("config", "upf.json", "path to upf config")
-	httpAddr   = flag.String("http", "0.0.0.0:8080", "http IP/port combo")
+	httpAddr   = flag.String("http", "0.0.0.0:8081", "http IP/port combo")
 	simulate   = flag.String("simulate", "", "create|delete simulated sessions")
 )
 
@@ -158,22 +159,21 @@ func main() {
 		return
 	}
 
-	if conf.CPIface.SrcIP == "" {
-		if conf.CPIface.DestIP != "" {
-			log.Println("Dest address ", conf.CPIface.DestIP)
-			n4SrcIP = getLocalIP(conf.CPIface.DestIP)
-			log.Println("SPGWU/UPF address IP: ", n4SrcIP.String())
-		}
-	} else {
-		addrs, err := net.LookupHost(conf.CPIface.SrcIP)
-		if err == nil {
-			n4SrcIP = net.ParseIP(addrs[0])
-		}
+	ntfcHost := "ntfc-headless"
+	ntfcIP := getRemoteIP(ntfcHost)
+	for ntfcIP.IsUnspecified() {
+		log.Println("NTF-C address unspecified - waiting for service...")
+		time.Sleep(10 * time.Second)
+		ntfcIP = getRemoteIP(ntfcHost)
 	}
+
+	log.Println("NTF-C address IP: ", ntfcIP.String())
+	n4SrcIP = getLocalIP(ntfcHost)
+	log.Println("NTF-U address IP: ", n4SrcIP.String())
 
 	log.Println("N4 local IP: ", n4SrcIP.String())
 
-	go pfcpifaceMainLoop(upf, accessIP.String(), coreIP.String(), n4SrcIP.String(), conf.CPIface.DestIP)
+	go pfcpifaceMainLoop(upf, accessIP.String(), coreIP.String(), n4SrcIP.String(), ntfcIP.String())
 
 	setupProm(upf)
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))
