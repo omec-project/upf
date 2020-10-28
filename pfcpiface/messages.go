@@ -122,6 +122,72 @@ func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceI
 	return arres
 }
 
+func (pc *PFCPConn) handlePFDMgmtRequest(upf *upf, msg message.Message, addr net.Addr, sourceIP string) []byte {
+	pfdmreq, ok := msg.(*message.PFDManagementRequest)
+	if !ok {
+		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
+		return nil
+	}
+
+	log.Println("Got a PFD management request from: ", addr)
+
+	sendError := func(err error, offendingIE *ie.IE) []byte {
+		log.Panicln(err)
+		// Build response message
+		pfdres, err := message.NewPFDManagementResponse(pfdmreq.SequenceNumber,
+			ie.NewCause(ie.CauseRequestRejected),
+			offendingIE,
+		).Marshal()
+		if err != nil {
+			log.Fatalln("Unable to create PFD management response", err)
+		}
+
+		log.Println("Sending PFD management error response to: ", addr)
+		return pfdres
+	}
+
+	for _, appIDPFD := range pfdmreq.ApplicationIDsPFDs {
+		id, err := appIDPFD.ApplicationID()
+		if err != nil {
+			return sendError(err, appIDPFD)
+		}
+
+		appPFD := pc.mgr.NewAppPFD(id)
+
+		pfdCtx, err := appIDPFD.PFDContext()
+		if err != nil {
+			pc.mgr.RemoveAppPFD(id)
+			return sendError(err, appIDPFD)
+		}
+
+		for _, pfdContent := range pfdCtx {
+			fields, err := pfdContent.PFDContents()
+			if err != nil {
+				pc.mgr.RemoveAppPFD(id)
+				return sendError(err, appIDPFD)
+			}
+			if fields.FlowDescription == "" {
+				return sendError(errors.New("Flow Description not found"), appIDPFD)
+			}
+			appPFD.flowDescs = append(appPFD.flowDescs, fields.FlowDescription)
+		}
+
+		log.Println("Flow descriptions for AppID", id, ":", appPFD.flowDescs)
+	}
+
+	// Build response message
+	pfdres, err := message.NewPFDManagementResponse(pfdmreq.SequenceNumber,
+		ie.NewCause(ie.CauseRequestAccepted),
+		nil,
+	).Marshal()
+	if err != nil {
+		log.Fatalln("Unable to create PFD management response", err)
+	}
+
+	log.Println("Sending PFD management response to: ", addr)
+	return pfdres
+}
+
 func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.Addr, sourceIP string) []byte {
 	sereq, ok := msg.(*message.SessionEstablishmentRequest)
 	if !ok {

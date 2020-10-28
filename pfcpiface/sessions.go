@@ -12,7 +12,14 @@ import (
 type PFCPSessionMgr struct {
 	rng        *rand.Rand
 	maxRetries int
+	appPFDs    map[string]appPFD
 	sessions   map[uint64]PFCPSession
+}
+
+// PFD holds the switch level application IDs
+type appPFD struct {
+	appID     string
+	flowDescs []string
 }
 
 // NewPFCPSessionMgr initializes a manager struct with RNG and map of id/sessions
@@ -20,6 +27,7 @@ func NewPFCPSessionMgr(maxRetries int) *PFCPSessionMgr {
 	return &PFCPSessionMgr{
 		rng:        rand.New(rand.NewSource(time.Now().UnixNano())),
 		maxRetries: maxRetries,
+		appPFDs:    make(map[string]appPFD),
 		sessions:   make(map[uint64]PFCPSession),
 	}
 }
@@ -56,4 +64,19 @@ func (mgr *PFCPSessionMgr) NewPFCPSession(rseid uint64) uint64 {
 		return lseid
 	}
 	return 0
+}
+
+// NewAppPFD stores app PFD in session mgr
+func (mgr *PFCPSessionMgr) NewAppPFD(appID string) *appPFD {
+	afd := appPFD{
+		appID:     appID,
+		flowDescs: make([]string, 0, MaxItems),
+	}
+	mgr.appPFDs[appID] = afd
+	return &afd
+}
+
+// RemoveAppPFD removes appPFD using appID
+func (mgr *PFCPSessionMgr) RemoveAppPFD(appID string) {
+	delete(mgr.appPFDs, appID)
 }
