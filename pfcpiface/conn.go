@@ -141,6 +141,8 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 				// pass on information to go routine that result of association response
 				cpConnectionStatus <- cpConnected
 			}
+		case message.MsgTypePFDManagementRequest:
+			outgoingMessage = pconn.handlePFDMgmtRequest(upf, msg, addr, sourceIP)
 		case message.MsgTypeSessionEstablishmentRequest:
 			outgoingMessage = pconn.handleSessionEstablishmentRequest(upf, msg, addr, sourceIP)
 		case message.MsgTypeSessionModificationRequest:
