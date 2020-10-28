@@ -10,6 +10,8 @@ import (
 )
 
 // NewDroppedDLTrafficThreshold creates a new DroppedDLTrafficThreshold IE.
+//
+// TODO: structurize
 func NewDroppedDLTrafficThreshold(dlpa, dlby bool, packets, bytes uint64) *IE {
 	if dlpa {
 		if dlby { // has both
@@ -38,6 +40,8 @@ func NewDroppedDLTrafficThreshold(dlpa, dlby bool, packets, bytes uint64) *IE {
 }
 
 // DroppedDLTrafficThreshold returns DroppedDLTrafficThreshold in uint8 if the type of IE matches.
+//
+// TODO: implement!
 func (i *IE) DroppedDLTrafficThreshold() (uint8, error) {
 	if len(i.Payload) < 1 {
 		return 0, io.ErrUnexpectedEOF

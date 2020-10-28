@@ -26,7 +26,7 @@ func (i *IE) EthernetFilterProperties() (uint8, error) {
 			return 0, err
 		}
 		for _, x := range ies {
-			if x.Type == EthernetPacketFilter {
+			if x.Type == EthernetFilterProperties {
 				return x.EthernetFilterProperties()
 			}
 		}
