@@ -29,7 +29,7 @@ func (i *IE) Ethertype() (uint16, error) {
 			return 0, err
 		}
 		for _, x := range ies {
-			if x.Type == EthernetPacketFilter {
+			if x.Type == Ethertype {
 				return x.Ethertype()
 			}
 		}
