@@ -142,13 +142,9 @@ ntf = None
 if parser.enable_ntf:
     try:
         ntf = NTF()
-        # TODO: Populate these tables by talking to the NTE
-        ntf.table_create(dpid=1, max_entries=5)
-        ntf.entry_create(dpid=1, entry_id=1, dscp=1, token={
-          'app_id': 0xB00F,
-          'encryption_key': '{"alg":"A128CBC-HS256","k":"Qr_XwDGctna3SlR88rEJYt6Zm100SASYeJWSJihDnsA","key_ops":["encrypt","decrypt"],"kty":"oct"}'
-        })
     except NameError:
+		# Handling NameError here means that the UPF will still start, even if
+		# NTF support is not compiled in.
         pass
 
 # ====================================================

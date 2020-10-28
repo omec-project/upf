@@ -4,14 +4,19 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
+	"github.com/golang/protobuf/ptypes"
+	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
+	"github.com/Network-Tokens/ntf/ntf_pb"
 )
 
 // PktBufSz : buffer size for incoming pkt
@@ -41,6 +46,12 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 	log.Println("pfcpifaceMainLoop@" + upf.fqdnHost + " says hello!!!")
 
 	cpConnectionStatus := make(chan bool)
+
+	// Create the table in NTF
+	err := initializeNtf(upf, "ntf0", 1, 64)
+	if err != nil {
+		log.Fatalln("Error initializing NTF:", err)
+	}
 
 	// Verify IP + Port binding
 	laddr, err := net.ResolveUDPAddr("udp", sourceIP+":"+PFCPPort)
@@ -150,7 +161,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 			outgoingMessage = handleAssociationReleaseRequest(msg, addr, sourceIP, accessIP)
 			cleanupSessions()
 		case message.MsgTypePFDManagementRequest:
-			outgoingMessage = handlePFDManagementRequest(msg, addr)
+			outgoingMessage = handlePFDManagementRequest(upf, msg, addr)
 		default:
 			log.Println("Message type: ", msg.MessageTypeName(), " is currently not supported")
 			continue
@@ -165,32 +176,38 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 	}
 }
 
-func handlePFDManagementRequest(msg message.Message, addr net.Addr) []byte {
+func handlePFDManagementRequest(upf *upf, msg message.Message, addr net.Addr) []byte {
 	pfdreq, ok := msg.(*message.PFDManagementRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
 		return nil
 	}
 
-	appId, err := pfdreq.ApplicationIDsPFDs[0].ApplicationID()
-	if err != nil {
-		log.Fatalln("Can't read application ID")
+	for _, instance := range pfdreq.ApplicationIDsPFDs {
+		appIdStr, err := instance.ApplicationID()
+		if err != nil {
+			log.Println("Failed to read application ID:", err)
+		}
+
+		appId, err := strconv.ParseUint(appIdStr, 10, 32)
+		if err != nil {
+			log.Println("invalid app ID:", appIdStr)
+			return nil
+		}
+
+		contents, err := instance.PFDContents()
+		if err != nil {
+			log.Println("Failed to read application contents:", err)
+		}
+		config := contents.CustomPFDContent
+
+		// TODO: We need to do something about DSCP here
+		log.Println("Found service:", appId, "config:", config)
+		err = ntfCreateService(upf, 1, uint32(appId), config, 42)
+		if err != nil {
+			log.Println("Failed to create service:", err)
+		}
 	}
-	log.Println("Got PFD for application ID: ", appId)
-
-	log.Println(pfdreq.ApplicationIDsPFDs[0])
-	pfdContext := pfdreq.ApplicationIDsPFDs[0].PFDContext()
-
-	for ctx := range pfdContext {
-		log.Println(ctx)
-	}
-
-	pfdContents, err := pfdContext[0].PFDContents()
-	if err != nil {
-		log.Fatalln("I have no idea what I am doing")
-	}
-
-	log.Println("Found contents: ", pfdContents)
 
 	pfdres, err := message.NewPFDManagementResponse(pfdreq.SequenceNumber,
 		ie.NewCause(ie.CauseRequestRejected),
@@ -478,6 +495,94 @@ func getSeqNum() uint32 {
 	defer seqNum.mux.Unlock()
 	seqNum.seq++
 	return seqNum.seq
+}
+
+func initializeNtf(upf *upf, moduleName string, dpid int, maxEntries int) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 100 * time.Millisecond)
+	defer cancel()
+
+	if err := upf.pauseAll(); err != nil {
+		return err
+	}
+
+	// Delete the existing table first
+	any, err := ptypes.MarshalAny(&pb.EmptyArg{})
+	if err != nil {
+		return err
+	}
+
+	cr, err := upf.client.ModuleCommand(ctx, &pb.CommandRequest{
+		Name: "ntf0",
+		Cmd: "table_delete",
+		Arg: any,
+	})
+	log.Println("table_delete:", cr)
+
+	any, err = ptypes.MarshalAny(&ntf_pb.NtfTableCreateArg{
+		Dpid: 1,
+		MaxEntries: 64,
+	})
+	if err != nil {
+		return err
+	}
+
+	log.Println("arg:", any)
+	cr, err = upf.client.ModuleCommand(ctx, &pb.CommandRequest{
+		Name: "ntf0",
+		Cmd: "table_create",
+		Arg: any,
+	})
+	log.Println("table_create:", cr)
+
+	if err != nil {
+		return err
+	}
+	log.Println("ntf.table_create():", cr)
+
+	if err = upf.resumeAll(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func ntfCreateService(upf *upf, dpid uint32, appId uint32, encryptionKey string, dscp uint32) error {
+	if err := upf.pauseAll(); err != nil {
+		return err
+	}
+
+	any, err := ptypes.MarshalAny(&ntf_pb.NtfEntryCreateArg{
+		Dpid: dpid,
+		Token: &ntf_pb.UserCentricNetworkToken{
+			AppId: appId,
+			EncryptionKey: encryptionKey,
+		},
+		Dscp: dscp,
+	})
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100 * time.Millisecond)
+	defer cancel()
+
+	cr, err := upf.client.ModuleCommand(ctx, &pb.CommandRequest{
+		Name: "ntf0",
+		Cmd: "entry_create",
+		Arg: any,
+	})
+	log.Println("entry_create:", cr)
+
+	if err != nil {
+		return err
+	}
+	log.Println("ntf.entry_create():", cr)
+
+	if err = upf.resumeAll(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func manageSmfConnection(n4LocalIP string, n3ip string, n4Dst string, conn *net.UDPConn, cpConnectionStatus chan bool) {
