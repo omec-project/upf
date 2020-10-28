@@ -30,7 +30,7 @@ type upf struct {
 
 // Don't change these values
 const (
-	tunnelPort = 2152
+	tunnelGTPUPort = 2152
 
 	// src-iface consts
 	core   = 0x2
@@ -44,85 +44,8 @@ const (
 	// far-action specific values
 	farForwardU = 0x0
 	farForwardD = 0x1
+	farDrop     = 0x2
 )
-
-type pdr struct {
-	srcIface     uint8
-	tunnelIP4Dst uint32
-	tunnelTEID   uint32
-	srcIP        uint32
-	dstIP        uint32
-	srcPort      uint16
-	dstPort      uint16
-	proto        uint8
-
-	srcIfaceMask     uint8
-	tunnelIP4DstMask uint32
-	tunnelTEIDMask   uint32
-	srcIPMask        uint32
-	dstIPMask        uint32
-	srcPortMask      uint16
-	dstPortMask      uint16
-	protoMask        uint8
-
-	precedence uint32
-	pdrID      uint32
-	fseID      uint32
-	ctrID      uint32
-	farID      uint8
-	needDecap  uint8
-}
-
-type far struct {
-	farID uint8
-	fseID uint32
-
-	action       uint8
-	tunnelType   uint8
-	tunnelIP4Src uint32
-	tunnelIP4Dst uint32
-	tunnelTEID   uint32
-	tunnelPort   uint16
-}
-
-func printPDR(pdr pdr) {
-	log.Println("------------------ PDR ---------------------")
-	log.Println("Src Iface:", pdr.srcIface)
-	log.Println("tunnelIP4Dst:", int2ip(pdr.tunnelIP4Dst))
-	log.Println("tunnelTEID:", pdr.tunnelTEID)
-	log.Println("srcIP:", int2ip(pdr.srcIP))
-	log.Println("dstIP:", int2ip(pdr.dstIP))
-	log.Println("srcPort:", pdr.srcPort)
-	log.Println("dstPort:", pdr.dstPort)
-	log.Println("proto:", pdr.proto)
-	log.Println("Src Iface Mask:", pdr.srcIfaceMask)
-	log.Println("tunnelIP4Dst Mask:", int2ip(pdr.tunnelIP4DstMask))
-	log.Println("tunnelTEIDMask Mask:", pdr.tunnelTEIDMask)
-	log.Println("srcIP Mask:", int2ip(pdr.srcIPMask))
-	log.Println("dstIP Mask:", int2ip(pdr.dstIPMask))
-	log.Println("srcPort Mask:", pdr.srcPortMask)
-	log.Println("dstPort Mask:", pdr.dstPortMask)
-	log.Println("proto Mask:", pdr.protoMask)
-	log.Println("pdrID:", pdr.pdrID)
-	log.Println("fseID", pdr.fseID)
-	log.Println("ctrID:", pdr.ctrID)
-	log.Println("farID:", pdr.farID)
-	log.Println("needDecap:", pdr.needDecap)
-	log.Println("--------------------------------------------")
-}
-
-func printFAR(far far) {
-	log.Println("------------------ FAR ---------------------")
-	log.Println("FAR ID:", far.farID)
-	log.Println("fseID:", far.fseID)
-	log.Println("action:", far.action)
-	log.Println("tunnelType:", far.tunnelType)
-	log.Println("tunnelIP4Src:", far.tunnelIP4Src)
-	log.Println("tunnelIP4Dst:", far.tunnelIP4Dst)
-	log.Println("tunnelTEID:", far.tunnelTEID)
-	log.Println("tunnelPort:", far.tunnelPort)
-	log.Println("--------------------------------------------")
-}
 
 var intEnc = func(u uint64) *pb.FieldData {
 	return &pb.FieldData{Encoding: &pb.FieldData_ValueInt{ValueInt: u}}
@@ -137,7 +60,7 @@ func (u *upf) sim(method string) {
 		log.Fatalln("Unable to pause BESS:", err)
 	}
 
-	//const ueip, teid, enbip = 0x10000001, 0xf0000000, 0x0b010181
+	// const ueip, teid, enbip = 0x10000001, 0xf0000000, 0x0b010181
 	ueip := u.simInfo.StartUEIP
 	enbip := u.simInfo.StartENBIP
 	aupfip := u.simInfo.StartAUPFIP
@@ -240,7 +163,7 @@ func (u *upf) sim(method string) {
 			tunnelIP4Src: ip2int(u.accessIP),
 			tunnelIP4Dst: ip2int(enbip) + enbIdx,
 			tunnelTEID:   n3TEID + i,
-			tunnelPort:   tunnelPort,
+			tunnelPort:   tunnelGTPUPort,
 		}
 
 		// create/delete uplink far
@@ -260,7 +183,7 @@ func (u *upf) sim(method string) {
 			tunnelIP4Src: ip2int(u.coreIP),
 			tunnelIP4Dst: ip2int(aupfip),
 			tunnelTEID:   n9TEID + i,
-			tunnelPort:   tunnelPort,
+			tunnelPort:   tunnelGTPUPort,
 		}
 
 		fars := []far{farDown, farN6Up, farN9Up}
@@ -326,18 +249,24 @@ func (u *upf) simdeleteEntries(pdrs []pdr, fars []far, timeout time.Duration) {
 }
 
 func (u *upf) sendMsgToUPF(method string, pdrs []pdr, fars []far) {
+	calls := len(pdrs) + len(fars)
+	if calls == 0 {
+		return
+	}
+
 	// create context
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
 	done := make(chan bool)
-	calls := len(pdrs) + len(fars)
 
 	// pause daemon, and then insert FAR(s), finally resume
 	err := u.pauseAll()
 	if err != nil {
 		log.Fatalln("Unable to pause BESS:", err)
 	}
+
 	for _, pdr := range pdrs {
+		pdr.printPDR()
 		switch method {
 		case "add":
 			u.addPDR(ctx, done, pdr)
@@ -345,7 +274,9 @@ func (u *upf) sendMsgToUPF(method string, pdrs []pdr, fars []far) {
 			u.delPDR(ctx, done, pdr)
 		}
 	}
+
 	for _, far := range fars {
+		far.printFAR()
 		switch method {
 		case "add":
 			u.addFAR(ctx, done, far)
@@ -353,10 +284,12 @@ func (u *upf) sendMsgToUPF(method string, pdrs []pdr, fars []far) {
 			u.delFAR(ctx, done, far)
 		}
 	}
+
 	rc := u.GRPCJoin(calls, Timeout, done)
 	if !rc {
 		log.Println("Unable to make GRPC calls")
 	}
+
 	err = u.resumeAll()
 	if err != nil {
 		log.Fatalln("Unable to resume BESS:", err)
@@ -405,7 +338,6 @@ func (u *upf) resumeAll() error {
 }
 
 func (u *upf) processPDR(ctx context.Context, any *anypb.Any, method string) {
-
 	if method != "add" && method != "delete" && method != "clear" {
 		log.Println("Invalid method name: ", method)
 		return
@@ -416,7 +348,6 @@ func (u *upf) processPDR(ctx context.Context, any *anypb.Any, method string) {
 		Cmd:  method,
 		Arg:  any,
 	})
-
 	if err != nil {
 		log.Println("pdrLookup method failed!:", cr.Error)
 	}
@@ -507,7 +438,6 @@ func (u *upf) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 }
 
 func (u *upf) processFAR(ctx context.Context, any *anypb.Any, method string) {
-
 	if method != "add" && method != "delete" && method != "clear" {
 		log.Println("Invalid method name: ", method)
 		return
@@ -518,7 +448,6 @@ func (u *upf) processFAR(ctx context.Context, any *anypb.Any, method string) {
 		Cmd:  method,
 		Arg:  any,
 	})
-
 	if err != nil {
 		log.Println("farLookup method failed!:", cr.Error)
 	}
@@ -581,7 +510,6 @@ func (u *upf) processCounters(ctx context.Context, any *anypb.Any, method string
 		Cmd:  method,
 		Arg:  any,
 	})
-
 	if err != nil {
 		log.Println("counter method failed!:", cr.Error)
 	}

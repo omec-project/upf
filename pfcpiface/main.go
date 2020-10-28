@@ -26,6 +26,7 @@ var (
 	configPath = flag.String("config", "upf.json", "path to upf config")
 	httpAddr   = flag.String("http", "0.0.0.0:8080", "http IP/port combo")
 	simulate   = flag.String("simulate", "", "create|delete simulated sessions")
+	pfcpsim    = flag.Bool("pfcpsim", false, "simulate PFCP")
 )
 
 // Conf : Json conf struct
@@ -132,11 +133,6 @@ func main() {
 	}
 	defer conn.Close()
 
-	var simInfo *SimModeInfo
-	if conf.Mode == modeSim {
-		simInfo = &conf.SimInfo
-	}
-
 	upf := &upf{
 		accessIface: conf.AccessIface.IfName,
 		coreIface:   conf.CoreIface.IfName,
@@ -145,7 +141,12 @@ func main() {
 		fqdnHost:    fqdnh,
 		client:      pb.NewBESSControlClient(conn),
 		maxSessions: conf.MaxSessions,
-		simInfo:     simInfo,
+		simInfo:     &conf.SimInfo,
+	}
+
+	if *pfcpsim {
+		pfcpSim()
+		return
 	}
 
 	if *simulate != "" {

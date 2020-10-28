@@ -11,39 +11,39 @@ func NewEthernetFilterProperties(props uint8) *IE {
 	return newUint8ValIE(EthernetFilterProperties, props)
 }
 
-// EthernetFilterProperties returns EthernetFilterProperties in []byte if the type of IE matches.
-func (i *IE) EthernetFilterProperties() ([]byte, error) {
+// EthernetFilterProperties returns EthernetFilterProperties in uint8 if the type of IE matches.
+func (i *IE) EthernetFilterProperties() (uint8, error) {
 	if len(i.Payload) < 1 {
-		return nil, io.ErrUnexpectedEOF
+		return 0, io.ErrUnexpectedEOF
 	}
 
 	switch i.Type {
 	case EthernetFilterProperties:
-		return i.Payload, nil
+		return i.Payload[0], nil
 	case PDI:
 		ies, err := i.PDI()
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 		for _, x := range ies {
 			if x.Type == EthernetPacketFilter {
 				return x.EthernetFilterProperties()
 			}
 		}
-		return nil, ErrIENotFound
+		return 0, ErrIENotFound
 	case EthernetPacketFilter:
 		ies, err := i.EthernetPacketFilter()
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 		for _, x := range ies {
 			if x.Type == EthernetFilterProperties {
 				return x.EthernetFilterProperties()
 			}
 		}
-		return nil, ErrIENotFound
+		return 0, ErrIENotFound
 	default:
-		return nil, &InvalidTypeError{Type: i.Type}
+		return 0, &InvalidTypeError{Type: i.Type}
 	}
 }
 
@@ -54,5 +54,5 @@ func (i *IE) HasBIDE() bool {
 		return false
 	}
 
-	return has1stBit(v[0])
+	return has1stBit(v)
 }
