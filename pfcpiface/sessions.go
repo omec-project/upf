@@ -71,13 +71,11 @@ func (mgr *PFCPSessionMgr) ResetAppPFDs() {
 }
 
 // NewAppPFD stores app PFD in session mgr
-func (mgr *PFCPSessionMgr) NewAppPFD(appID string) *appPFD {
-	afd := appPFD{
+func (mgr *PFCPSessionMgr) NewAppPFD(appID string) {
+	mgr.appPFDs[appID] = appPFD{
 		appID:     appID,
 		flowDescs: make([]string, 0, MaxItems),
 	}
-	mgr.appPFDs[appID] = afd
-	return &afd
 }
 
 // RemoveAppPFD removes appPFD using appID

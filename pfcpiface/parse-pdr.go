@@ -63,7 +63,7 @@ func (p *pdr) printPDR() {
 	log.Println("--------------------------------------------")
 }
 
-func (p *pdr) parsPDI(pdiIEs []*ie.IE) error {
+func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD) error {
 	var ueIP4 net.IP
 
 	for _, pdiIE := range pdiIEs {
@@ -126,6 +126,46 @@ func (p *pdr) parsPDI(pdiIEs []*ie.IE) error {
 
 	for _, ie2 := range pdiIEs {
 		switch ie2.Type {
+		case ie.ApplicationID:
+
+			appID, err := ie2.ApplicationID()
+			if err != nil {
+				log.Println("Unable to parse Application ID", err)
+				continue
+			}
+
+			apfd, ok := appPFDs[appID]
+			if !ok {
+				log.Println("Unable to find Application ID", err)
+				continue
+			}
+			if appID != apfd.appID {
+				log.Fatalln("Mismatch in App ID", appID, apfd.appID)
+			}
+			log.Println("inside application id", apfd.appID, apfd.flowDescs)
+			for _, flowDesc := range apfd.flowDescs {
+				log.Println("flow desc", flowDesc)
+				var ipf ipFilterRule
+				err = ipf.parseFlowDesc(flowDesc, ueIP4.String())
+				if err != nil {
+					return errBadFilterDesc
+				}
+
+				if (p.srcIface == access && ipf.direction == "out") || (p.srcIface == core && ipf.direction == "in") {
+					log.Println("Found a match", p.srcIface, flowDesc)
+					if ipf.proto != reservedProto {
+						p.proto = ipf.proto
+						p.protoMask = reservedProto
+					}
+					// TODO: Verify assumption that flow description in case of PFD is to be taken as-is
+					p.dstIP = ip2int(ipf.dst.IPNet.IP)
+					p.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
+					p.srcIP = ip2int(ipf.src.IPNet.IP)
+					p.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
+
+					break
+				}
+			}
 		case ie.SDFFilter:
 			// Do nothing for the time being
 			sdfFields, err := ie2.SDFFilter()
@@ -145,7 +185,7 @@ func (p *pdr) parsPDI(pdiIEs []*ie.IE) error {
 			var ipf ipFilterRule
 			err = ipf.parseFlowDesc(flowDesc, ueIP4.String())
 			if err != nil {
-				return errBadSDF
+				return errBadFilterDesc
 			}
 
 			if ipf.proto != reservedProto {
@@ -170,7 +210,7 @@ func (p *pdr) parsPDI(pdiIEs []*ie.IE) error {
 	return nil
 }
 
-func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64) error {
+func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD) error {
 	/* reset outerHeaderRemoval to begin with */
 	outerHeaderRemoval := uint8(0)
 
@@ -197,8 +237,8 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64) error {
 		outerHeaderRemoval = 1
 	}
 
-	err = p.parsPDI(pdi)
-	if err != nil && err != errBadSDF {
+	err = p.parsePDI(pdi, appPFDs)
+	if err != nil && err != errBadFilterDesc {
 		return err
 	}
 

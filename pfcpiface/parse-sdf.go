@@ -17,7 +17,7 @@ const (
 )
 
 var (
-	errBadSDF = errors.New("Unsupported SDF format")
+	errBadFilterDesc = errors.New("Unsupported Filter Description format")
 )
 
 type endpoint struct {
@@ -138,7 +138,7 @@ func parseAction(action string) error {
 	case "permit":
 	case "deny":
 	default:
-		return errBadSDF
+		return errBadFilterDesc
 	}
 	return nil
 }
@@ -148,12 +148,16 @@ func parseDirection(dir string) error {
 	case "in":
 	case "out":
 	default:
-		return errBadSDF
+		return errBadFilterDesc
 	}
 	return nil
 }
 
 func parseProto(proto string) uint8 {
+	p, err := strconv.ParseUint(proto, 10, 8)
+	if err == nil {
+		return uint8(p)
+	}
 	switch proto {
 	case "udp":
 		return 17

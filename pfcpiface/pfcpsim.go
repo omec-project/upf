@@ -67,8 +67,8 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 			ie.NewApplicationIDsPFDs(
 				ie.NewApplicationID("1000"),
 				ie.NewPFDContext(
-					ie.NewPFDContents("permit out 17 from 0.0.0.0 to 192.168.96.0/24 2000", "", "", "", "", nil, nil, nil),
-					ie.NewPFDContents("permit in 17 from 192.168.96.0/24 2000 to 0.0.0.0", "", "", "", "", nil, nil, nil),
+					ie.NewPFDContents("permit out ip from any to 6.6.6.6/32", "", "", "", "", nil, nil, nil),
+					ie.NewPFDContents("permit in ip from 6.6.6.6/32 to any", "", "", "", "", nil, nil, nil),
 				),
 			),
 			ie.NewApplicationIDsPFDs(
@@ -127,7 +127,8 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 					ie.NewSourceInterface(ie.SrcInterfaceAccess),
 					ie.NewFTEID(0x30000000, net.ParseIP("198.18.0.1"), nil, nil),
 					ie.NewUEIPAddress(0x2, "16.0.0.1", "", 0, 0),
-					ie.NewSDFFilter("permit out ip from 6.6.6.6/32 to assigned", "", "", "", 2),
+					//ie.NewSDFFilter("permit out ip from 6.6.6.6/32 to assigned", "", "", "", 2),
+					ie.NewApplicationID("1000"),
 				),
 				ie.NewOuterHeaderRemoval(0, 0),
 				ie.NewFARID(2),
