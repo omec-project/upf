@@ -26,7 +26,7 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
-# github.com/wmnsk/go-pfcp v0.0.8-0.20201028160407-e1f621997d19
+# github.com/wmnsk/go-pfcp v0.0.8
 github.com/wmnsk/go-pfcp/ie
 github.com/wmnsk/go-pfcp/internal/logger
 github.com/wmnsk/go-pfcp/internal/utils
