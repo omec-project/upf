@@ -160,7 +160,8 @@ func (pc *PFCPConn) handlePFDMgmtRequest(upf *upf, msg message.Message, addr net
 			return sendError(err, appIDPFD)
 		}
 
-		appPFD := pc.mgr.NewAppPFD(id)
+		pc.mgr.NewAppPFD(id)
+		appPFD := pc.mgr.appPFDs[id]
 
 		pfdCtx, err := appIDPFD.PFDContext()
 		if err != nil {
@@ -179,7 +180,7 @@ func (pc *PFCPConn) handlePFDMgmtRequest(upf *upf, msg message.Message, addr net
 			}
 			appPFD.flowDescs = append(appPFD.flowDescs, fields.FlowDescription)
 		}
-
+		pc.mgr.appPFDs[id] = appPFD
 		log.Println("Flow descriptions for AppID", id, ":", appPFD.flowDescs)
 	}
 
@@ -241,7 +242,7 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 
 	for _, cPDR := range sereq.CreatePDR {
 		var p pdr
-		if err := p.parsePDR(cPDR, session.localSEID); err != nil {
+		if err := p.parsePDR(cPDR, session.localSEID, pc.mgr.appPFDs); err != nil {
 			return sendError(err)
 		}
 		session.CreatePDR(p)
@@ -323,7 +324,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 
 	for _, cPDR := range smreq.CreatePDR {
 		var p pdr
-		if err := p.parsePDR(cPDR, localSEID); err != nil {
+		if err := p.parsePDR(cPDR, localSEID, pc.mgr.appPFDs); err != nil {
 			return sendError(err)
 		}
 		session.CreatePDR(p)
@@ -341,7 +342,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 
 	for _, uPDR := range smreq.UpdatePDR {
 		var p pdr
-		if err := p.parsePDR(uPDR, localSEID); err != nil {
+		if err := p.parsePDR(uPDR, localSEID, pc.mgr.appPFDs); err != nil {
 			return sendError(err)
 		}
 		session.UpdatePDR(p)
