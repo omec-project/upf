@@ -27,7 +27,6 @@ func NewPFCPSessionMgr(maxRetries int) *PFCPSessionMgr {
 	return &PFCPSessionMgr{
 		rng:        rand.New(rand.NewSource(time.Now().UnixNano())),
 		maxRetries: maxRetries,
-		appPFDs:    make(map[string]appPFD),
 		sessions:   make(map[uint64]PFCPSession),
 	}
 }
@@ -64,6 +63,11 @@ func (mgr *PFCPSessionMgr) NewPFCPSession(rseid uint64) uint64 {
 		return lseid
 	}
 	return 0
+}
+
+// ResetAppPFDs resets the map of application PFDs
+func (mgr *PFCPSessionMgr) ResetAppPFDs() {
+	mgr.appPFDs = make(map[string]appPFD)
 }
 
 // NewAppPFD stores app PFD in session mgr

@@ -131,8 +131,16 @@ func (pc *PFCPConn) handlePFDMgmtRequest(upf *upf, msg message.Message, addr net
 
 	log.Println("Got a PFD management request from: ", addr)
 
+	currentAppPFDs := pc.mgr.appPFDs
+
+	// On every PFD management request reset existing contents
+	// TODO: Analyse impact on PDRs referencing these IDs
+	pc.mgr.ResetAppPFDs()
+
 	sendError := func(err error, offendingIE *ie.IE) []byte {
-		log.Panicln(err)
+		// Revert the map to original contents
+		pc.mgr.appPFDs = currentAppPFDs
+		log.Println(err)
 		// Build response message
 		pfdres, err := message.NewPFDManagementResponse(pfdmreq.SequenceNumber,
 			ie.NewCause(ie.CauseRequestRejected),
