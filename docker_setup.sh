@@ -6,6 +6,7 @@ set -e
 # TCP port of bess/web monitor
 gui_port=8000
 bessd_port=10514
+metrics_port=8080
 
 # Driver options. Choose any one of the three
 #
@@ -124,6 +125,7 @@ fi
 docker run --name pause -td --restart unless-stopped \
 	-p $bessd_port:$bessd_port \
 	-p $gui_port:$gui_port \
+	-p $metrics_port:$metrics_port \
 	--hostname $(hostname) \
 	k8s.gcr.io/pause
 

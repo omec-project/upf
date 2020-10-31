@@ -83,7 +83,7 @@ func (i *IE) TransportLevelMarking() (uint16, error) {
 			return 0, err
 		}
 		for _, x := range ies {
-			if x.Type == QoSInformationInGTPUPathQoSReport {
+			if x.Type == TransportLevelMarking {
 				return x.TransportLevelMarking()
 			}
 		}

@@ -20,8 +20,8 @@ func (i *IE) ATSSSLLControlInformation() (uint8, error) {
 	switch i.Type {
 	case ATSSSLLControlInformation:
 		return i.Payload[0], nil
-	case ATSSSControlParameters:
-		ies, err := i.ATSSSControlParameters()
+	case ProvideATSSSControlInformation:
+		ies, err := i.ProvideATSSSControlInformation()
 		if err != nil {
 			return 0, err
 		}

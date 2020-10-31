@@ -5,15 +5,27 @@
 package ie
 
 // NewPFDContext creates a new PFDContext IE.
-func NewPFDContext(contents *IE) *IE {
-	return newGroupedIE(PFDContext, 0, contents)
+func NewPFDContext(contents ...*IE) *IE {
+	return newGroupedIE(PFDContext, 0, contents...)
 }
 
 // PFDContext returns the IEs above PFDContext if the type of IE matches.
 func (i *IE) PFDContext() ([]*IE, error) {
-	if i.Type != PFDContext {
+	switch i.Type {
+	case PFDContext:
+		return ParseMultiIEs(i.Payload)
+	case ApplicationIDsPFDs:
+		ies, err := i.ApplicationIDsPFDs()
+		if err != nil {
+			return nil, err
+		}
+		for _, x := range ies {
+			if x.Type == PFDContext {
+				return x.PFDContext()
+			}
+		}
+		return nil, ErrIENotFound
+	default:
 		return nil, &InvalidTypeError{Type: i.Type}
 	}
-
-	return ParseMultiIEs(i.Payload)
 }

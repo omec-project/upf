@@ -9,23 +9,21 @@ func NewPFCPSEReqFlags(flag uint8) *IE {
 	return newUint8ValIE(PFCPSEReqFlags, flag)
 }
 
-// PFCPSEReqFlags returns PFCPSEReqFlags in []byte if the type of IE matches.
-func (i *IE) PFCPSEReqFlags() ([]byte, error) {
+// PFCPSEReqFlags returns PFCPSEReqFlags in uint8 if the type of IE matches.
+func (i *IE) PFCPSEReqFlags() (uint8, error) {
 	if i.Type != PFCPSEReqFlags {
-		return nil, &InvalidTypeError{Type: i.Type}
+		return 0, &InvalidTypeError{Type: i.Type}
 	}
 
-	return i.Payload, nil
+	return i.Payload[0], nil
 }
 
 // HasRESTI reports whether an IE has RESTI bit.
 func (i *IE) HasRESTI() bool {
-	if i.Type != PFCPSEReqFlags {
-		return false
-	}
-	if len(i.Payload) < 1 {
+	v, err := i.PFCPSEReqFlags()
+	if err != nil {
 		return false
 	}
 
-	return has1stBit(i.Payload[0])
+	return has1stBit(v)
 }
