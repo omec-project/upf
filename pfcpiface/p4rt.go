@@ -132,6 +132,7 @@ func (p *p4rtc) sendURRForReporting(recItem *reportRecord) {
 	   add recItem to map.
 	*/
 	log.Println("sending URR for report : ", recItem.fseid)
+
 	//fseidKey := recItem.fseid
 	log.Println("adding urr report to map")
 	PrintMemUsage()
@@ -148,6 +149,7 @@ func (p *p4rtc) setUdpConn(conn *net.UDPConn, addr net.Addr) {
 func (p *p4rtc) addUsageReports(
 	sdRes *message.SessionDeletionResponse, seidKey uint64) {
 	log.Println("Add Usage reports to sess del response")
+
 	var element, rec *reportRecord
 	//if _, ok := p.reportURR[seidKey]; !ok {
 	if rec = p.getReportFromList(seidKey); rec == nil {
@@ -155,6 +157,7 @@ func (p *p4rtc) addUsageReports(
 		return
 	}
 	var seqn uint32 = 0
+
 	//element = p.reportURR[seidKey]
 	element = rec
 	for _, urr := range *element.urrs {
@@ -170,6 +173,7 @@ func (p *p4rtc) addUsageReports(
 			))
 		seqn++
 	}
+
 	//p.reportURR[seidKey] = nil
 	//delete(p.reportURR, seidKey)
 	_ = p.removeReportFromList(seidKey)
@@ -210,6 +214,7 @@ func (p *p4rtc) handleCounterEntry(ce *IntfCounterEntry) {
 	*/
 
 	//var flag bool = false
+
 
 	batchSize := 50
 	//for _, element := range p.reportURR {
