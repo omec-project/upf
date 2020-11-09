@@ -43,8 +43,9 @@ def scan_dpdk_ports():
 
 
 class Port:
-    def __init__(self, name, ext_addrs):
+    def __init__(self, name, vlan, ext_addrs):
         self.name = name
+        self.vlan = vlan
         self.wid = None
         self.fpi = None
         self.fpo = None
@@ -201,6 +202,11 @@ class Port:
                 qspo.connect(next_mod=spo)
 
                 # Direct control traffic from kernel to DPDK
+                if self.vlan is not None:
+                    v = VLANPush(name="{}_{}".format(name,self.vlan), tci=self.vlan)
+                    v.connect(next_mod=self.fpo)
+                    self.fpo = v
+                
                 spi.connect(next_mod=self.fpo)
 
                 tc = 'slow{}'.format(wid)
@@ -246,13 +252,20 @@ class Port:
             update.connect(next_mod=udpcsum)
             udpcsum.connect(next_mod=ipcsum)
 
+        in_ = self.fpi
+        # vlan tag removal
+        if self.vlan is not None:
+            v = VLANPop(name="{}_vlanpop".format(self.name))
+            in_.connect(next_mod=v)
+            in_ = v
+
         # enable telemetrics (if enabled) (how many bytes seen in and out of port)
         if conf_measure:
             t = Timestamp(name="{}_timestamp".format(self.name))
             if self.mode == 'sim':
                 ipcsum.connect(next_mod=t)
             else:
-                self.fpi.connect(next_mod=t)
+                in_.connect(next_mod=t)
             t.connect(next_mod=self.bpf)
             m = Measure(name="{}_measure".format(self.name))
             m.connect(next_mod=out)
@@ -261,7 +274,7 @@ class Port:
             if self.mode == 'sim':
                 ipcsum.connect(next_mod=self.bpf)   # ---> pass
             else:
-                self.fpi.connect(next_mod=self.bpf)
+                in_.connect(next_mod=self.bpf)
 
         # Attach nat module (if enabled)
         if self.ext_addrs is not None:
