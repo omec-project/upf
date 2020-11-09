@@ -64,7 +64,7 @@ func (p *p4rtc) readCounterVal() {
 	*/
 	var flag bool = false
 
-	for _, m := range p.reportURR {
+	for _, m := range p.reportURRQ {
 		if !m.checkInvalid() {
 			//delete(p.reportURR, key)
 			flag = true
@@ -132,11 +132,12 @@ func (p *p4rtc) sendURRForReporting(recItem *reportRecord) {
 	   add recItem to map.
 	*/
 	log.Println("sending URR for report : ", recItem.fseid)
-	fseidKey := recItem.fseid
+
+	//fseidKey := recItem.fseid
 	log.Println("adding urr report to map")
 	PrintMemUsage()
-	p.reportURR[fseidKey] = recItem
-
+	//p.reportURR[fseidKey] = recItem
+	p.reportURRQ = append(p.reportURRQ, recItem)
 }
 
 func (p *p4rtc) setUdpConn(conn *net.UDPConn, addr net.Addr) {
@@ -148,13 +149,17 @@ func (p *p4rtc) setUdpConn(conn *net.UDPConn, addr net.Addr) {
 func (p *p4rtc) addUsageReports(
 	sdRes *message.SessionDeletionResponse, seidKey uint64) {
 	log.Println("Add Usage reports to sess del response")
-	var element *reportRecord
-	if _, ok := p.reportURR[seidKey]; !ok {
+
+	var element, rec *reportRecord
+	//if _, ok := p.reportURR[seidKey]; !ok {
+	if rec = p.getReportFromList(seidKey); rec == nil {
 		log.Println("seidKey not matching : ", seidKey)
 		return
 	}
 	var seqn uint32 = 0
-	element = p.reportURR[seidKey]
+
+	//element = p.reportURR[seidKey]
+	element = rec
 	for _, urr := range *element.urrs {
 		//log.Println("urrID : ", urr.urrID)
 		//log.Println("urr.localVol : ", urr.localVol)
@@ -168,8 +173,10 @@ func (p *p4rtc) addUsageReports(
 			))
 		seqn++
 	}
-	p.reportURR[seidKey] = nil
-	delete(p.reportURR, seidKey)
+
+	//p.reportURR[seidKey] = nil
+	//delete(p.reportURR, seidKey)
+	_ = p.removeReportFromList(seidKey)
 }
 
 func (p *p4rtc) handleVolQuotaExceed(pdrID uint32, keySeid uint64) {
@@ -208,7 +215,14 @@ func (p *p4rtc) handleCounterEntry(ce *IntfCounterEntry) {
 
 	//var flag bool = false
 
-	for _, element := range p.reportURR {
+
+	batchSize := 50
+	//for _, element := range p.reportURR {
+	var removeReport []*reportRecord
+	var i int
+	for i = 0; i < batchSize && i < len(p.reportURRQ); i++ {
+		element := p.reportURRQ[i]
+		removeReport = append(removeReport, element)
 		log.Println("report URR ip , seid ",
 			element.srcIP, element.fseid)
 		var urrRec []urr
@@ -248,6 +262,16 @@ func (p *p4rtc) handleCounterEntry(ce *IntfCounterEntry) {
 		}
 	}
 
+	if i < len(p.reportURRQ) {
+		p.reportURRQ = p.reportURRQ[i:len(p.reportURRQ)]
+	} else {
+		p.reportURRQ = nil
+	}
+
+	//for _,val := range removeReport {
+	//    p.reportURRQ = append(p.reportURRQ,val)
+	//}
+	p.reportURRQ = append(p.reportURRQ, removeReport...)
 	/*if flag {
 		ret, err := serep.Marshal()
 		if err != nil {
@@ -340,10 +364,11 @@ type p4rtc struct {
 	upf          upf
 	tickerT      *time.Ticker
 	tickerDone   chan bool
-	reportURR    map[uint64]*reportRecord
-	reportChan   chan *IntfCounterEntry
-	udpConn      *net.UDPConn
-	udpAddr      net.Addr
+	//reportURR    map[uint64]*reportRecord
+	reportURRQ []*reportRecord
+	reportChan chan *IntfCounterEntry
+	udpConn    *net.UDPConn
+	udpAddr    net.Addr
 }
 
 func (p *p4rtc) getAccessIP() net.IP {
@@ -453,10 +478,48 @@ func (p *p4rtc) handleChannelStatus() bool {
 	return false
 }
 
+func (p *p4rtc) getReportFromList(seidKey uint64) *reportRecord {
+	log.Println("get report for seid : ", seidKey)
+	for _, val := range p.reportURRQ {
+		if val.fseid == seidKey {
+			return val
+		}
+	}
+
+	return nil
+}
+
+func (p *p4rtc) removeReportFromList(seidKey uint64) *reportRecord {
+	log.Println("Remove report from list : ", seidKey)
+	index := -1
+	var rec *reportRecord
+	for idx, val := range p.reportURRQ {
+		if val.fseid == seidKey {
+			index = idx
+			rec = val
+			break
+		}
+	}
+
+	if index == -1 {
+		return nil
+	}
+	if len(p.reportURRQ) == 1 {
+		p.reportURRQ = nil
+	} else {
+		p.reportURRQ = append(p.reportURRQ[:index],
+			p.reportURRQ[index+1:]...)
+	}
+
+	return rec
+}
+
 func (p *p4rtc) sendDeleteAllSessionsMsgtoUPF() {
 	log.Println("Loop through sessions and delete all entries p4")
-	for _, value := range sessions {
+	for seidKey, value := range sessions {
 		p.sendMsgToUPF("del", value.pdrs, value.fars, value.urrs)
+		_ = p.removeReportFromList(seidKey)
+		delete(sessions, seidKey)
 	}
 }
 
@@ -503,7 +566,8 @@ func (p *p4rtc) parseFunc(conf *Conf) {
 	}
 
 	p.reportChan = make(chan *IntfCounterEntry, 10)
-	p.reportURR = make(map[uint64]*reportRecord)
+	//p.reportURR = make(map[uint64]*reportRecord)
+	//p.reportURRQ = make([]*reportRecord, 10)
 	p.msg_seq = 0
 	p.tickerDone = make(chan bool)
 	p.tickerT = schedule(p.readCounterVal, 10*time.Second, p.tickerDone)

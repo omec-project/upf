@@ -512,7 +512,7 @@ func (c *P4rtClient) getFieldValue(entity *p4.Entity,
 
 func (c *P4rtClient) addFieldValue(entry *p4.TableEntry, field MatchField,
 	tableID uint32) error {
-	log.Println("add Match field")
+	//log.Println("add Match field")
 	fieldVal := &p4.FieldMatch{
 		FieldId: 0,
 	}
@@ -521,7 +521,7 @@ func (c *P4rtClient) addFieldValue(entry *p4.TableEntry, field MatchField,
 		if tables.Preamble.Id == tableID {
 			for _, fields := range tables.MatchFields {
 				if fields.Name == field.Name {
-					log.Println("field name match found.")
+					//log.Println("field name match found.")
 					fieldVal.FieldId = fields.Id
 					switch fields.GetMatchType() {
 					case p4ConfigV1.MatchField_EXACT:
@@ -576,7 +576,7 @@ func (c *P4rtClient) addFieldValue(entry *p4.TableEntry, field MatchField,
 
 func (c *P4rtClient) addActionValue(action *p4.Action, param ActionParam,
 	actionID uint32) error {
-	log.Println("add action param value")
+	//log.Println("add action param value")
 
 	for _, actions := range c.P4Info.Actions {
 		if actions.Preamble.Id == actionID {
@@ -625,7 +625,7 @@ func (c *P4rtClient) ReadCounter(ce *IntfCounterEntry) error {
 //ReadCounterEntry .. Read counter Entry
 func (c *P4rtClient) ReadCounterEntry(ce *IntfCounterEntry) (*p4.ReadResponse, error) {
 
-	log.Println("Read Counter Entry")
+	//log.Println("Read Counter Entry")
 
 	var index p4.Index
 	index.Index = int64(ce.Index)
@@ -774,18 +774,18 @@ func (c *P4rtClient) InsertTableEntry(
 	tableEntry AppTableEntry,
 	funcType uint8, prio int32) error {
 
-	log.Println("Insert Table Entry for Table ", tableEntry.TableName)
+	//log.Println("Insert Table Entry for Table ", tableEntry.TableName)
 	tableID := c.tableID(tableEntry.TableName)
 	actionID := c.actionID(tableEntry.ActionName)
 	directAction := &p4.Action{
 		ActionId: actionID,
 	}
 
-	log.Println("adding action params.")
+	//log.Println("adding action params.")
 	for _, p := range tableEntry.Params {
 		err := c.addActionValue(directAction, p, actionID)
 		if err != nil {
-			log.Println("AddActionValue failed ", err)
+			//log.Println("AddActionValue failed ", err)
 			return err
 		}
 	}
@@ -800,14 +800,14 @@ func (c *P4rtClient) InsertTableEntry(
 		Action:   tableAction,
 	}
 
-	log.Println("adding fields.")
+	//log.Println("adding fields.")
 	for count, mf := range tableEntry.Fields {
 		if uint32(count) >= tableEntry.FieldSize {
 			break
 		}
 		err := c.addFieldValue(entry, mf, tableID)
 		if err != nil {
-			log.Println("AddFieldValue failed ", err)
+			//log.Println("AddFieldValue failed ", err)
 			return err
 		}
 	}
@@ -828,7 +828,7 @@ func (c *P4rtClient) InsertTableEntry(
 		},
 	}
 
-	log.Println(proto.MarshalTextString(update))
+	//log.Println(proto.MarshalTextString(update))
 	return c.WriteReq(update)
 }
 
