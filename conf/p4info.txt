@@ -263,6 +263,13 @@ actions {
 }
 actions {
   preamble {
+    id: 28085271
+    name: "PreQosPipe.ExecuteFar.do_buffer"
+    alias: "do_buffer"
+  }
+}
+actions {
+  preamble {
     id: 26909570
     name: "PreQosPipe.ExecuteFar.do_drop"
     alias: "do_drop"
@@ -416,27 +423,32 @@ actions {
   }
   params {
     id: 3
+    name: "needs_buffering"
+    bitwidth: 1
+  }
+  params {
+    id: 4
     name: "tunnel_type"
     bitwidth: 8
   }
   params {
-    id: 4
+    id: 5
     name: "src_addr"
     bitwidth: 32
   }
   params {
-    id: 5
+    id: 6
     name: "dst_addr"
     bitwidth: 32
   }
   params {
-    id: 6
+    id: 7
     name: "teid"
     bitwidth: 32
   }
   params {
-    id: 7
-    name: "dport"
+    id: 8
+    name: "sport"
     bitwidth: 16
   }
 }
