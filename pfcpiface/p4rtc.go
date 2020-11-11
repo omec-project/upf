@@ -230,7 +230,7 @@ func (c *P4rtClient) WriteFarTable(
 	} else if funcType == FunctionTypeUpdate {
 
 		te.ActionName = "PreQosPipe.load_tunnel_far_attributes"
-		te.ParamSize = 7
+		te.ParamSize = 8
 		te.Params = make([]ActionParam, te.ParamSize)
 		te.Params[0].Name = "needs_dropping"
 		te.Params[0].Value = make([]byte, 1)
@@ -238,19 +238,22 @@ func (c *P4rtClient) WriteFarTable(
 		te.Params[1].Name = "notify_cp"
 		te.Params[1].Value = make([]byte, 1)
 		te.Params[1].Value[0] = byte(farEntry.applyAction & 0x08)
-		te.Params[2].Name = "src_addr"
-		te.Params[2].Value = make([]byte, 4)
-		binary.BigEndian.PutUint32(te.Params[2].Value, farEntry.tunnelIP4Src)
-		te.Params[3].Name = "dst_addr"
+		te.Params[2].Name = "needs_buffering"
+		te.Params[2].Value = make([]byte, 1)
+		te.Params[2].Value[0] = byte(farEntry.applyAction & 0x04)
+		te.Params[3].Name = "src_addr"
 		te.Params[3].Value = make([]byte, 4)
-		binary.BigEndian.PutUint32(te.Params[3].Value, farEntry.tunnelIP4Dst)
-		te.Params[4].Name = "teid"
+		binary.BigEndian.PutUint32(te.Params[3].Value, farEntry.tunnelIP4Src)
+		te.Params[4].Name = "dst_addr"
 		te.Params[4].Value = make([]byte, 4)
-		binary.BigEndian.PutUint32(te.Params[4].Value, farEntry.tunnelTEID)
-		te.Params[5].Name = "dport"
-		te.Params[5].Value = make([]byte, 2)
-		binary.BigEndian.PutUint16(te.Params[5].Value, farEntry.tunnelPort)
-		te.Params[6].Name = "tunnel_type"
+		binary.BigEndian.PutUint32(te.Params[4].Value, farEntry.tunnelIP4Dst)
+		te.Params[5].Name = "teid"
+		te.Params[5].Value = make([]byte, 4)
+		binary.BigEndian.PutUint32(te.Params[5].Value, farEntry.tunnelTEID)
+		te.Params[6].Name = "sport"
+		te.Params[6].Value = make([]byte, 2)
+		binary.BigEndian.PutUint16(te.Params[6].Value, farEntry.tunnelPort)
+		te.Params[7].Name = "tunnel_type"
 		enumName := "TunnelType"
 		var tunnelStr string
 		if farEntry.tunnelType == 0x1 {
@@ -261,8 +264,8 @@ func (c *P4rtClient) WriteFarTable(
 			log.Println("Could not find enum val ", err)
 			return err
 		}
-		te.Params[6].Value = make([]byte, 1)
-		te.Params[6].Value[0] = val[0]
+		te.Params[7].Value = make([]byte, 1)
+		te.Params[7].Value[0] = val[0]
 	}
 
 	var prio int32 = 0
