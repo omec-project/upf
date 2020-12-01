@@ -122,6 +122,81 @@ func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceI
 	return arres
 }
 
+func (pc *PFCPConn) handlePFDMgmtRequest(upf *upf, msg message.Message, addr net.Addr, sourceIP string) []byte {
+	pfdmreq, ok := msg.(*message.PFDManagementRequest)
+	if !ok {
+		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
+		return nil
+	}
+
+	log.Println("Got a PFD management request from: ", addr)
+
+	currentAppPFDs := pc.mgr.appPFDs
+
+	// On every PFD management request reset existing contents
+	// TODO: Analyse impact on PDRs referencing these IDs
+	pc.mgr.ResetAppPFDs()
+
+	sendError := func(err error, offendingIE *ie.IE) []byte {
+		// Revert the map to original contents
+		pc.mgr.appPFDs = currentAppPFDs
+		log.Println(err)
+		// Build response message
+		pfdres, err := message.NewPFDManagementResponse(pfdmreq.SequenceNumber,
+			ie.NewCause(ie.CauseRequestRejected),
+			offendingIE,
+		).Marshal()
+		if err != nil {
+			log.Fatalln("Unable to create PFD management response", err)
+		}
+
+		log.Println("Sending PFD management error response to: ", addr)
+		return pfdres
+	}
+
+	for _, appIDPFD := range pfdmreq.ApplicationIDsPFDs {
+		id, err := appIDPFD.ApplicationID()
+		if err != nil {
+			return sendError(err, appIDPFD)
+		}
+
+		pc.mgr.NewAppPFD(id)
+		appPFD := pc.mgr.appPFDs[id]
+
+		pfdCtx, err := appIDPFD.PFDContext()
+		if err != nil {
+			pc.mgr.RemoveAppPFD(id)
+			return sendError(err, appIDPFD)
+		}
+
+		for _, pfdContent := range pfdCtx {
+			fields, err := pfdContent.PFDContents()
+			if err != nil {
+				pc.mgr.RemoveAppPFD(id)
+				return sendError(err, appIDPFD)
+			}
+			if fields.FlowDescription == "" {
+				return sendError(errors.New("Flow Description not found"), appIDPFD)
+			}
+			appPFD.flowDescs = append(appPFD.flowDescs, fields.FlowDescription)
+		}
+		pc.mgr.appPFDs[id] = appPFD
+		log.Println("Flow descriptions for AppID", id, ":", appPFD.flowDescs)
+	}
+
+	// Build response message
+	pfdres, err := message.NewPFDManagementResponse(pfdmreq.SequenceNumber,
+		ie.NewCause(ie.CauseRequestAccepted),
+		nil,
+	).Marshal()
+	if err != nil {
+		log.Fatalln("Unable to create PFD management response", err)
+	}
+
+	log.Println("Sending PFD management response to: ", addr)
+	return pfdres
+}
+
 func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.Addr, sourceIP string) []byte {
 	sereq, ok := msg.(*message.SessionEstablishmentRequest)
 	if !ok {
@@ -167,7 +242,7 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 
 	for _, cPDR := range sereq.CreatePDR {
 		var p pdr
-		if err := p.parsePDR(cPDR, session.localSEID); err != nil {
+		if err := p.parsePDR(cPDR, session.localSEID, pc.mgr.appPFDs); err != nil {
 			return sendError(err)
 		}
 		session.CreatePDR(p)
@@ -249,7 +324,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 
 	for _, cPDR := range smreq.CreatePDR {
 		var p pdr
-		if err := p.parsePDR(cPDR, localSEID); err != nil {
+		if err := p.parsePDR(cPDR, localSEID, pc.mgr.appPFDs); err != nil {
 			return sendError(err)
 		}
 		session.CreatePDR(p)
@@ -267,7 +342,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 
 	for _, uPDR := range smreq.UpdatePDR {
 		var p pdr
-		if err := p.parsePDR(uPDR, localSEID); err != nil {
+		if err := p.parsePDR(uPDR, localSEID, pc.mgr.appPFDs); err != nil {
 			return sendError(err)
 		}
 		session.UpdatePDR(p)

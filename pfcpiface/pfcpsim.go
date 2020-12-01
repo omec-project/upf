@@ -15,6 +15,29 @@ import (
 
 func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 	{
+		var seq uint32 = 0
+		hbreq, err := message.NewHeartbeatRequest(
+			seq,
+			ie.NewRecoveryTimeStamp(time.Now()),
+			nil,
+		).Marshal()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if _, err := conn.Write(hbreq); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("sent heartbeat request to: %s", raddr)
+
+		buf := make([]byte, 1500)
+		_, _, err = conn.ReadFrom(buf)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	{
 		var seq uint32 = 1
 		asreq, err := message.NewAssociationSetupRequest(
 			seq,
@@ -39,19 +62,31 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 
 	{
 		var seq uint32 = 2
-		hbreq, err := message.NewHeartbeatRequest(
+		asreq, err := message.NewPFDManagementRequest(
 			seq,
-			ie.NewRecoveryTimeStamp(time.Now()),
-			nil,
+			ie.NewApplicationIDsPFDs(
+				ie.NewApplicationID("1000"),
+				ie.NewPFDContext(
+					ie.NewPFDContents("permit out ip from any to 6.6.6.6/32", "", "", "", "", nil, nil, nil),
+					ie.NewPFDContents("permit in ip from 6.6.6.6/32 to any", "", "", "", "", nil, nil, nil),
+				),
+			),
+			ie.NewApplicationIDsPFDs(
+				ie.NewApplicationID("1001"),
+				ie.NewPFDContext(
+					ie.NewPFDContents("permit out 6 from 0.0.0.0 to 192.168.96.0/24 2000", "", "", "", "", nil, nil, nil),
+					ie.NewPFDContents("permit in 6 from 192.168.96.0/24 2000 to 0.0.0.0", "", "", "", "", nil, nil, nil),
+				),
+			),
 		).Marshal()
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		if _, err := conn.Write(hbreq); err != nil {
+		if _, err := conn.Write(asreq); err != nil {
 			log.Fatal(err)
 		}
-		log.Printf("sent heartbeat request to: %s", raddr)
+		log.Printf("sent PFD management request to: %s", raddr)
 
 		buf := make([]byte, 1500)
 		_, _, err = conn.ReadFrom(buf)
@@ -92,7 +127,8 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 					ie.NewSourceInterface(ie.SrcInterfaceAccess),
 					ie.NewFTEID(0x30000000, net.ParseIP("198.18.0.1"), nil, nil),
 					ie.NewUEIPAddress(0x2, "16.0.0.1", "", 0, 0),
-					ie.NewSDFFilter("permit out ip from 6.6.6.6/32 to assigned", "", "", "", 2),
+					//ie.NewSDFFilter("permit out ip from 6.6.6.6/32 to assigned", "", "", "", 2),
+					ie.NewApplicationID("1000"),
 				),
 				ie.NewOuterHeaderRemoval(0, 0),
 				ie.NewFARID(2),
