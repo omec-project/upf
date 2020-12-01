@@ -443,13 +443,13 @@ func (u *upf) processFAR(ctx context.Context, any *anypb.Any, method string) {
 		return
 	}
 
-	cr, err := u.client.ModuleCommand(ctx, &pb.CommandRequest{
+	_, err := u.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "farLookup",
 		Cmd:  method,
 		Arg:  any,
 	})
 	if err != nil {
-		log.Println("farLookup method failed!:", cr.Error)
+		log.Println("farLookup method failed!:", err)
 	}
 }
 
