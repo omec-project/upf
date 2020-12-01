@@ -24,7 +24,7 @@ func (s *PFCPSession) UpdateFAR(f far) error {
 }
 
 // RemoveFAR removes far from existing list of FARs in the session
-func (s *PFCPSession) RemoveFAR(id uint8) (*far, error) {
+func (s *PFCPSession) RemoveFAR(id uint32) (*far, error) {
 	for idx, v := range s.fars {
 		if v.farID == id {
 			s.fars = append(s.fars[:idx], s.fars[idx+1:]...)

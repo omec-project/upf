@@ -382,7 +382,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 			return sendError(err)
 		}
 
-		f, err := session.RemoveFAR(uint8(farID))
+		f, err := session.RemoveFAR(farID)
 		if err != nil {
 			return sendError(err)
 		}
