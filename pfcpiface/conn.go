@@ -47,8 +47,8 @@ type rcvdPacket struct {
 }
 
 type parsedPacket struct {
-	Msg	*message.Message
-	Address  net.Addr
+	Msg     *message.Message
+	Address net.Addr
 }
 
 func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
@@ -93,8 +93,8 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 		go pconn.manageSmfConnection(sourceIP, accessIP, smfName, conn, cpConnectionStatus)
 	}
 
-	pfcpRcvdPktsChan := make(chan *rcvdPacket,1000)
-	pfcpParsedPktsChan := make(chan *parsedPacket,1000)
+	pfcpRcvdPktsChan := make(chan *rcvdPacket, 1000)
+	pfcpParsedPktsChan := make(chan *parsedPacket, 1000)
 	// Initialize pkt header
 
 	pfcpPacketReader := func(pfcpRcvdPkts chan *rcvdPacket) {
@@ -125,7 +125,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 		}
 	}
 
-	pfcpPacketParsing := func(pkt *rcvdPacket, pfcpParsedPktsChan chan *parsedPacket ) {
+	pfcpPacketParsing := func(pkt *rcvdPacket, pfcpParsedPktsChan chan *parsedPacket) {
 		// use wmnsk lib to parse the pfcp message
 		msg, err := message.Parse(pkt.Buf[:pkt.Pkt_size])
 		if err != nil {
