@@ -20,8 +20,8 @@ func (i *IE) PMFControlInformation() (uint8, error) {
 	switch i.Type {
 	case PMFControlInformation:
 		return i.Payload[0], nil
-	case ATSSSControlParameters:
-		ies, err := i.ATSSSControlParameters()
+	case ProvideATSSSControlInformation:
+		ies, err := i.ProvideATSSSControlInformation()
 		if err != nil {
 			return 0, err
 		}

@@ -28,6 +28,65 @@ type counter struct {
 	//free      map[uint64]uint64
 }
 
+type p4rtc struct {
+	accessIP     net.IP
+	accessIPMask net.IPMask
+	n4SrcIP      net.IP
+	coreIP       net.IP
+	host         string
+	fqdnh        string
+	deviceID     uint64
+	timeout      uint32
+	msg_seq      uint32
+	p4rtcServer  string
+	p4rtcPort    string
+	p4client     *P4rtClient
+	counters     []counter
+	upf          upf
+	pfcpConn     *PFCPConn
+	tickerT      *time.Ticker
+	tickerDone   chan bool
+	//reportURR    map[uint64]*reportRecord
+	reportURRQ []*reportRecord
+	reportChan chan *IntfCounterEntry
+	udpConn    *net.UDPConn
+	udpAddr    net.Addr
+}
+
+func setSwitchInfo(p4rtClient *P4rtClient) (net.IP, net.IPMask, error) {
+	log.Println("Set Switch Info")
+	log.Println("device id ", (*p4rtClient).DeviceID)
+	p4InfoPath := "/bin/p4info.txt"
+	deviceConfigPath := "/bin/bmv2.json"
+
+	errin := p4rtClient.GetForwardingPipelineConfig()
+	if errin != nil {
+		errin = p4rtClient.SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath)
+		if errin != nil {
+			log.Println("set forwarding pipeling config failed. ", errin)
+			return nil, nil, errin
+		}
+	}
+
+	intfEntry := IntfTableEntry{
+		SrcIntf:   "ACCESS",
+		Direction: "UPLINK",
+	}
+
+	errin = p4rtClient.ReadInterfaceTable(&intfEntry)
+	if errin != nil {
+		log.Println("Read Interface table failed ", errin)
+		return nil, nil, errin
+	}
+
+	log.Println("accessip after read intf ", intfEntry.IP)
+	accessIP := net.IP(intfEntry.IP)
+	accessIPMask := net.CIDRMask(intfEntry.PrefixLen, 32)
+	log.Println("AccessIP: ", accessIP, ", AccessIPMask: ", accessIPMask)
+
+	return accessIP, accessIPMask, errin
+}
+
 func (c *counter) init() {
 	c.allocated = make(map[uint64]uint64)
 	//c.free = make(map[uint64]uint64)
@@ -73,25 +132,18 @@ func (p *p4rtc) readCounterVal() {
 	}
 
 	if flag {
-		//log.Println("report URR len : ", len(p.reportURR))
-		//for idx, counter := range p.counters {
 		for idx, counter := range p.counters {
 			var entry IntfCounterEntry
+			entry.ByteCount = make([]uint64, p.counters[idx].maxSize)
+			entry.PktCount = make([]uint64, p.counters[idx].maxSize)
 			entry.CounterID = counter.counterID
-			//entry.ByteCount = make(map[uint64]uint64)
-			//entry.PktCount = make(map[uint64]uint64)
-			//entry.ByteCount = make(map[uint64]uint64)
-			//entry.PktCount = make(map[uint64]uint64)
 			var err error
 			var flag bool = false
-			for key := range p.counters[idx].allocated {
-				entry.Index = key
-				err = p.p4client.ReadCounter(&entry)
-				if err == nil {
-					flag = true
-				}
-			}
 
+			err = p.p4client.ReadCounter(&entry)
+			if err == nil {
+				flag = true
+			}
 			if err != nil {
 				log.Println("Read counter failed for counter id : ", entry.CounterID)
 			} else {
@@ -140,10 +192,11 @@ func (p *p4rtc) sendURRForReporting(recItem *reportRecord) {
 	p.reportURRQ = append(p.reportURRQ, recItem)
 }
 
-func (p *p4rtc) setUdpConn(conn *net.UDPConn, addr net.Addr) {
+func (p *p4rtc) setInfo(conn *net.UDPConn, addr net.Addr, pconn *PFCPConn) {
 	log.Println("setUDP Conn ", conn)
 	p.udpConn = conn
 	p.udpAddr = addr
+	p.pfcpConn = pconn
 }
 
 func (p *p4rtc) addUsageReports(
@@ -181,7 +234,7 @@ func (p *p4rtc) addUsageReports(
 
 func (p *p4rtc) handleVolQuotaExceed(pdrID uint32, keySeid uint64) {
 	log.Println("handleVolQuotaExceed")
-	sessItem := sessions[keySeid]
+	sessItem := p.pfcpConn.mgr.sessions[keySeid]
 	var found bool = false
 	for _, pdr := range sessItem.pdrs {
 		if pdr.pdrID == pdrID {
@@ -214,7 +267,6 @@ func (p *p4rtc) handleCounterEntry(ce *IntfCounterEntry) {
 	*/
 
 	//var flag bool = false
-
 
 	batchSize := 50
 	//for _, element := range p.reportURR {
@@ -268,24 +320,9 @@ func (p *p4rtc) handleCounterEntry(ce *IntfCounterEntry) {
 		p.reportURRQ = nil
 	}
 
-	//for _,val := range removeReport {
-	//    p.reportURRQ = append(p.reportURRQ,val)
-	//}
 	p.reportURRQ = append(p.reportURRQ, removeReport...)
-	/*if flag {
-		ret, err := serep.Marshal()
-		if err != nil {
-			log.Println("Marshal function failed for SM resp ", err)
-		}
-
-		// send the report req out
-		if ret != nil {
-			if _, err := p.udpConn.WriteTo(ret, p.udpAddr); err != nil {
-				log.Fatalln("Unable to transmit Report req", err)
-			}
-			p.msg_seq++
-		}
-	}*/
+	ce.ByteCount = nil
+	ce.PktCount = nil
 }
 
 func (p *p4rtc) sendSessRepReq(urrRec []urr, fseid uint64) {
@@ -345,30 +382,6 @@ func (p *p4rtc) getCounterVal(counterID uint8, pdrID uint32) (uint64, error) {
 
 	errin := fmt.Errorf("key alloc fail %v", val)
 	return 0, errin
-}
-
-type p4rtc struct {
-	accessIP     net.IP
-	accessIPMask net.IPMask
-	n4SrcIP      net.IP
-	coreIP       net.IP
-	host         string
-	fqdnh        string
-	deviceID     uint64
-	timeout      uint32
-	msg_seq      uint32
-	p4rtcServer  string
-	p4rtcPort    string
-	p4client     *P4rtClient
-	counters     []counter
-	upf          upf
-	tickerT      *time.Ticker
-	tickerDone   chan bool
-	//reportURR    map[uint64]*reportRecord
-	reportURRQ []*reportRecord
-	reportChan chan *IntfCounterEntry
-	udpConn    *net.UDPConn
-	udpAddr    net.Addr
 }
 
 func (p *p4rtc) getAccessIP() net.IP {
@@ -516,10 +529,12 @@ func (p *p4rtc) removeReportFromList(seidKey uint64) *reportRecord {
 
 func (p *p4rtc) sendDeleteAllSessionsMsgtoUPF() {
 	log.Println("Loop through sessions and delete all entries p4")
-	for seidKey, value := range sessions {
-		p.sendMsgToUPF("del", value.pdrs, value.fars, value.urrs)
-		_ = p.removeReportFromList(seidKey)
-		delete(sessions, seidKey)
+	if (p.pfcpConn != nil) && (p.pfcpConn.mgr != nil) {
+		for seidKey, value := range p.pfcpConn.mgr.sessions {
+			p.sendMsgToUPF("del", value.pdrs, value.fars, value.urrs)
+			_ = p.removeReportFromList(seidKey)
+			p.pfcpConn.mgr.RemoveSession(seidKey)
+		}
 	}
 }
 
@@ -547,6 +562,7 @@ func (p *p4rtc) parseFunc(conf *Conf) {
 		p.n4SrcIP = net.ParseIP("0.0.0.0")
 	}
 
+	p.coreIP = net.ParseIP("0.0.0.0")
 	log.Println("onos server ip ", p.p4rtcServer)
 	log.Println("onos server port ", p.p4rtcPort)
 	log.Println("n4 ip ", p.n4SrcIP.String())
@@ -558,6 +574,15 @@ func (p *p4rtc) parseFunc(conf *Conf) {
 	p.p4client, errin = channelSetup(p)
 	if errin != nil {
 		fmt.Printf("create channel failed : %v\n", errin)
+	} else {
+		errin = p.p4client.ClearPdrTable()
+		if errin != nil {
+			log.Println("clear PDR table failed : ", errin)
+		}
+		errin = p.p4client.ClearFarTable()
+		if errin != nil {
+			log.Println("clear FAR table failed : ", errin)
+		}
 	}
 
 	errin = p.initCounter()
@@ -590,7 +615,7 @@ func (p *p4rtc) sendMsgToUPF(method string, pdrs []pdr,
 		{
 			funcType = FunctionTypeInsert
 			for i := range pdrs {
-				pdrs[i].fseidIP = fseidIP
+				//pdrs[i].fseidIP = fseidIP
 				val, err = p.getCounterVal(
 					preQosPdrCounter, pdrs[i].pdrID)
 				if err != nil {
@@ -606,10 +631,6 @@ func (p *p4rtc) sendMsgToUPF(method string, pdrs []pdr,
 					}
 				}
 			}
-
-			for j := range fars {
-				fars[j].fseidIP = fseidIP
-			}
 		}
 	case "del":
 		{
@@ -622,10 +643,6 @@ func (p *p4rtc) sendMsgToUPF(method string, pdrs []pdr,
 	case "mod":
 		{
 			funcType = FunctionTypeUpdate
-			for j := range fars {
-				printFAR(fars[j])
-				fars[j].fseidIP = fseidIP
-			}
 		}
 	default:
 		{
@@ -643,6 +660,8 @@ func (p *p4rtc) sendMsgToUPF(method string, pdrs []pdr,
 	}
 
 	for _, far := range fars {
+		far.printFAR()
+		log.Println("write far funcType : ", funcType)
 		errin := p.p4client.WriteFarTable(far, funcType)
 		if errin != nil {
 			log.Println("far entry function failed ", errin)

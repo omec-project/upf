@@ -9,57 +9,55 @@ func NewEthernetPDUSessionInformation(info uint8) *IE {
 	return newUint8ValIE(EthernetPDUSessionInformation, info)
 }
 
-// EthernetPDUSessionInformation returns EthernetPDUSessionInformation in []byte if the type of IE matches.
-func (i *IE) EthernetPDUSessionInformation() ([]byte, error) {
+// EthernetPDUSessionInformation returns EthernetPDUSessionInformation in uint8 if the type of IE matches.
+func (i *IE) EthernetPDUSessionInformation() (uint8, error) {
 	switch i.Type {
 	case EthernetPDUSessionInformation:
-		return i.Payload, nil
+		return i.Payload[0], nil
 	case CreatePDR:
 		ies, err := i.CreatePDR()
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 		for _, x := range ies {
 			if x.Type == PDI {
 				return x.EthernetPDUSessionInformation()
 			}
 		}
-		return nil, ErrIENotFound
+		return 0, ErrIENotFound
 	case PDI:
 		ies, err := i.PDI()
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 		for _, x := range ies {
 			if x.Type == EthernetPDUSessionInformation {
 				return x.EthernetPDUSessionInformation()
 			}
 		}
-		return nil, ErrIENotFound
+		return 0, ErrIENotFound
 	case CreateTrafficEndpoint:
 		ies, err := i.CreateTrafficEndpoint()
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 		for _, x := range ies {
 			if x.Type == EthernetPDUSessionInformation {
 				return x.EthernetPDUSessionInformation()
 			}
 		}
-		return nil, ErrIENotFound
+		return 0, ErrIENotFound
 	default:
-		return nil, &InvalidTypeError{Type: i.Type}
+		return 0, &InvalidTypeError{Type: i.Type}
 	}
 }
 
 // HasETHI reports whether an IE has ETHI bit.
 func (i *IE) HasETHI() bool {
-	if i.Type != EthernetPDUSessionInformation {
-		return false
-	}
-	if len(i.Payload) < 1 {
+	v, err := i.EthernetPDUSessionInformation()
+	if err != nil {
 		return false
 	}
 
-	return has1stBit(i.Payload[0])
+	return has1stBit(v)
 }

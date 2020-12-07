@@ -59,8 +59,8 @@ type MatchField struct {
 type IntfCounterEntry struct {
 	CounterID uint64
 	Index     uint64
-	ByteCount [1024]uint64
-	PktCount  [1024]uint64
+	ByteCount []uint64
+	PktCount  []uint64
 }
 
 //AppTableEntry .. Table entry function API
@@ -237,10 +237,14 @@ func (c *P4rtClient) WriteFarTable(
 		te.Params[0].Value[0] = byte(farEntry.applyAction & 0x01)
 		te.Params[1].Name = "notify_cp"
 		te.Params[1].Value = make([]byte, 1)
-		te.Params[1].Value[0] = byte(farEntry.applyAction & 0x08)
+		if (farEntry.applyAction & 0x08) != 0 {
+			te.Params[1].Value[0] = byte(0x01)
+		}
 		te.Params[2].Name = "needs_buffering"
 		te.Params[2].Value = make([]byte, 1)
-		te.Params[2].Value[0] = byte(farEntry.applyAction & 0x04)
+		if (farEntry.applyAction & 0x04) != 0 {
+			te.Params[2].Value[0] = byte(0x01)
+		}
 		te.Params[3].Name = "src_addr"
 		te.Params[3].Value = make([]byte, 4)
 		binary.BigEndian.PutUint32(te.Params[3].Value, farEntry.tunnelIP4Src)
@@ -389,7 +393,7 @@ func (c *P4rtClient) WriteInterfaceTable(
 	val, err = c.getEnumVal(enumName, intfEntry.Direction)
 	if err != nil {
 		log.Println("Could not find enum val ", err)
-		return err
+		return nil
 	}
 	te.Params[1].Value = val
 
@@ -399,13 +403,13 @@ func (c *P4rtClient) WriteInterfaceTable(
 
 func (c *P4rtClient) getCounterValue(entity *p4.Entity,
 	ce *IntfCounterEntry) error {
-	log.Println("get Counter Value")
 	entry := entity.GetCounterEntry()
 	index := uint64(entry.GetIndex().Index)
 	byteCount := uint64(entry.GetData().ByteCount)
 	pktCount := uint64(entry.GetData().PacketCount)
 	ce.ByteCount[index] = byteCount
 	ce.PktCount[index] = pktCount
+	//log.Println("index , bytecount, pktcount ", index, byteCount, pktCount)
 	return nil
 }
 
@@ -611,18 +615,16 @@ func (c *P4rtClient) ReadCounter(ce *IntfCounterEntry) error {
 		return err
 	}
 
+	//log.Println(proto.MarshalTextString(readRes))
 	for _, ent := range readRes.GetEntities() {
 		err := c.getCounterValue(ent, ce)
 		if err != nil {
 			log.Println("getCounterValue failed ", err)
 			continue
 		}
-
-		return nil
 	}
 
-	err = fmt.Errorf("ReadCounter failed")
-	return err
+	return nil
 }
 
 //ReadCounterEntry .. Read counter Entry
@@ -634,7 +636,7 @@ func (c *P4rtClient) ReadCounterEntry(ce *IntfCounterEntry) (*p4.ReadResponse, e
 	index.Index = int64(ce.Index)
 	var entry p4.CounterEntry
 	entry.CounterId = uint32(ce.CounterID)
-	entry.Index = &index
+	//entry.Index = &index
 	var entity p4.Entity
 	var ctrEntry p4.Entity_CounterEntry
 	ctrEntry.CounterEntry = &entry
@@ -653,6 +655,70 @@ func (c *P4rtClient) ReadCounterEntry(ce *IntfCounterEntry) (*p4.ReadResponse, e
 		}*/
 	//log.Println(proto.MarshalTextString(&entity))
 	return c.ReadReq(&entity)
+}
+
+//ClearFarTable ... Clear FAR Table
+func (c *P4rtClient) ClearFarTable() error {
+
+	log.Println("ReadFarTable.")
+	te := AppTableEntry{
+		TableName: "PreQosPipe.load_far_attributes",
+	}
+
+	var prio int32 = 0
+	readRes, err := c.ReadTableEntry(te, prio)
+	if err != nil {
+		log.Println("Read Interface table failed ", err)
+		return err
+	}
+
+	for _, ent := range readRes.GetEntities() {
+		updateType := p4.Update_DELETE
+		update := &p4.Update{
+			Type:   updateType,
+			Entity: ent,
+		}
+
+		//log.Println(proto.MarshalTextString(update))
+		errin := c.WriteReq(update)
+		if errin != nil {
+			log.Println("pdr delete write failed ", errin)
+		}
+	}
+
+	return nil
+}
+
+//ClearPdrTable ... Clear PDR Table
+func (c *P4rtClient) ClearPdrTable() error {
+
+	log.Println("ReadPdrTable.")
+	te := AppTableEntry{
+		TableName: "PreQosPipe.pdrs",
+	}
+
+	var prio int32 = 0
+	readRes, err := c.ReadTableEntry(te, prio)
+	if err != nil {
+		log.Println("Read Pdr table failed ", err)
+		return err
+	}
+
+	for _, ent := range readRes.GetEntities() {
+		updateType := p4.Update_DELETE
+		update := &p4.Update{
+			Type:   updateType,
+			Entity: ent,
+		}
+
+		//log.Println(proto.MarshalTextString(update))
+		errin := c.WriteReq(update)
+		if errin != nil {
+			log.Println("pdr delete write failed ", errin)
+		}
+	}
+
+	return nil
 }
 
 //ReadInterfaceTable ... Read Interface table Entry
@@ -729,7 +795,7 @@ func (c *P4rtClient) ReadTableEntry(
 	entity := &p4.Entity{
 		Entity: &p4.Entity_TableEntry{TableEntry: entry},
 	}
-	log.Println(proto.MarshalTextString(entity))
+	//log.Println(proto.MarshalTextString(entity))
 	return c.ReadReq(entity)
 }
 
@@ -738,12 +804,12 @@ func (c *P4rtClient) ReadReqEntities(entities []*p4.Entity) (*p4.ReadResponse, e
 		DeviceId: c.DeviceID,
 		Entities: entities,
 	}
-	log.Println(proto.MarshalTextString(req))
+	//log.Println(proto.MarshalTextString(req))
 	readClient, err := c.Client.Read(context.Background(), req)
 	if err == nil {
 		readRes, err := readClient.Recv()
 		if err == nil {
-			log.Println(proto.MarshalTextString(readRes))
+			//log.Println(proto.MarshalTextString(readRes))
 			return readRes, nil
 		}
 	}
@@ -777,18 +843,18 @@ func (c *P4rtClient) InsertTableEntry(
 	tableEntry AppTableEntry,
 	funcType uint8, prio int32) error {
 
-	//log.Println("Insert Table Entry for Table ", tableEntry.TableName)
+	log.Println("Insert Table Entry for Table ", tableEntry.TableName)
 	tableID := c.tableID(tableEntry.TableName)
 	actionID := c.actionID(tableEntry.ActionName)
 	directAction := &p4.Action{
 		ActionId: actionID,
 	}
 
-	//log.Println("adding action params.")
+	log.Println("adding action params.")
 	for _, p := range tableEntry.Params {
 		err := c.addActionValue(directAction, p, actionID)
 		if err != nil {
-			//log.Println("AddActionValue failed ", err)
+			log.Println("AddActionValue failed ", err)
 			return err
 		}
 	}
@@ -803,14 +869,14 @@ func (c *P4rtClient) InsertTableEntry(
 		Action:   tableAction,
 	}
 
-	//log.Println("adding fields.")
+	log.Println("adding fields.")
 	for count, mf := range tableEntry.Fields {
 		if uint32(count) >= tableEntry.FieldSize {
 			break
 		}
 		err := c.addFieldValue(entry, mf, tableID)
 		if err != nil {
-			//log.Println("AddFieldValue failed ", err)
+			log.Println("AddFieldValue failed ", err)
 			return err
 		}
 	}
@@ -831,7 +897,7 @@ func (c *P4rtClient) InsertTableEntry(
 		},
 	}
 
-	//log.Println(proto.MarshalTextString(update))
+	log.Println(proto.MarshalTextString(update))
 	return c.WriteReq(update)
 }
 
@@ -843,6 +909,7 @@ func (c *P4rtClient) WriteReq(update *p4.Update) error {
 		Updates:    []*p4.Update{update},
 	}
 	_, err := c.Client.Write(context.Background(), req)
+	log.Println("write error ", err)
 	return err
 }
 

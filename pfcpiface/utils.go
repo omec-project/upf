@@ -77,11 +77,12 @@ func hex2int(hexStr string) uint32 {
 	return uint32(result)
 }
 
+/*
 func int2ip(nn uint32) net.IP {
 	ip := make(net.IP, 4)
 	binary.BigEndian.PutUint32(ip, nn)
 	return ip
-}
+}*/
 
 func getRemoteIP(dstIP string) net.IP {
 	conn, err := net.Dial("udp", dstIP+":"+PFCPPort)
@@ -103,12 +104,4 @@ func getLocalIP(dstIP string) net.IP {
 	defer conn.Close()
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 	return localAddr.IP
-}
-
-func mySEID(peerSEID uint64) uint64 {
-	return (peerSEID >> 2)
-}
-
-func peerSEID(mySEID uint64) uint64 {
-	return (mySEID << 2)
 }

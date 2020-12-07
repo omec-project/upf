@@ -9,23 +9,21 @@ func NewPFCPSRReqFlags(flag uint8) *IE {
 	return newUint8ValIE(PFCPSRReqFlags, flag)
 }
 
-// PFCPSRReqFlags returns PFCPSRReqFlags in []byte if the type of IE matches.
-func (i *IE) PFCPSRReqFlags() ([]byte, error) {
+// PFCPSRReqFlags returns PFCPSRReqFlags in uint8 if the type of IE matches.
+func (i *IE) PFCPSRReqFlags() (uint8, error) {
 	if i.Type != PFCPSRReqFlags {
-		return nil, &InvalidTypeError{Type: i.Type}
+		return 0, &InvalidTypeError{Type: i.Type}
 	}
 
-	return i.Payload, nil
+	return i.Payload[0], nil
 }
 
 // HasPSDBU reports whether an IE has PSDBU bit.
 func (i *IE) HasPSDBU() bool {
-	if i.Type != PFCPSRReqFlags {
-		return false
-	}
-	if len(i.Payload) < 1 {
+	v, err := i.PFCPSRReqFlags()
+	if err != nil {
 		return false
 	}
 
-	return has1stBit(i.Payload[0])
+	return has1stBit(v)
 }

@@ -29,6 +29,7 @@ var (
 	configPath      = flag.String("config", "upf.json", "path to upf config")
 	httpAddr        = flag.String("http", "0.0.0.0:8080", "http IP/port combo")
 	simulate        = flag.String("simulate", "", "create|delete simulated sessions")
+	pfcpsim         = flag.Bool("pfcpsim", false, "simulate PFCP")
 	n4SrcIPStr      = flag.String("n4SrcIPStr", "", "N4Interface IP")
 	p4RtcServerIP   = flag.String("p4RtcServerIP", "", "P4 Server ip")
 	p4RtcServerPort = flag.String("p4RtcServerPort", "", "P4 Server port")
@@ -86,7 +87,7 @@ type common interface {
 	getUpf() *upf
 	readCounterVal()
 	sendURRForReporting(recItem *reportRecord)
-	setUdpConn(udpConn *net.UDPConn, updAddr net.Addr)
+	setInfo(udpConn *net.UDPConn, updAddr net.Addr, pconn *PFCPConn)
 	handleCounterEntry(ce *IntfCounterEntry)
 	getAccessIPStr(val *string)
 	getAccessIP() net.IP
@@ -150,40 +151,6 @@ func ParseIP(name string, iface string) net.IP {
 	return ip
 }
 
-func setSwitchInfo(p4rtClient *P4rtClient) (net.IP, net.IPMask, error) {
-	log.Println("Set Switch Info")
-	log.Println("device id ", (*p4rtClient).DeviceID)
-	p4InfoPath := "/bin/p4info.txt"
-	deviceConfigPath := "/bin/bmv2.json"
-
-	errin := p4rtClient.GetForwardingPipelineConfig()
-	if errin != nil {
-		errin = p4rtClient.SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath)
-		if errin != nil {
-			log.Println("set forwarding pipeling config failed. ", errin)
-			return nil, nil, errin
-		}
-	}
-
-	intfEntry := IntfTableEntry{
-		SrcIntf:   "ACCESS",
-		Direction: "UPLINK",
-	}
-
-	errin = p4rtClient.ReadInterfaceTable(&intfEntry)
-	if errin != nil {
-		log.Println("Read Interface table failed ", errin)
-		return nil, nil, errin
-	}
-
-	log.Println("accessip after read intf ", intfEntry.IP)
-	accessIP := net.IP(intfEntry.IP)
-	accessIPMask := net.CIDRMask(intfEntry.PrefixLen, 32)
-	log.Println("AccessIP: ", accessIP, ", AccessIPMask: ", accessIPMask)
-
-	return accessIP, accessIPMask, errin
-}
-
 func schedule(f func(), interval time.Duration, done <-chan bool) *time.Ticker {
 	ticker := time.NewTicker(interval)
 	go func() {
@@ -220,6 +187,11 @@ func main() {
 
 	intf.parseFunc(&conf)
 	intf.setUpfInfo(&conf)
+
+	if *pfcpsim || *simulate != "" {
+		log.Println("Simulation mode. Done.")
+		return
+	}
 
 	var n4srcIP string
 	var accessIP string

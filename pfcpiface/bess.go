@@ -40,7 +40,7 @@ func (b *bess) sendURRForReporting(recItem *reportRecord) {
 	log.Println("bess sendURRForReporting not handled")
 }
 
-func (b *bess) setUdpConn(udpConn *net.UDPConn, updAddr net.Addr) {
+func (b *bess) setInfo(udpConn *net.UDPConn, updAddr net.Addr, pconn *PFCPConn) {
 	log.Println("bess setUdpConn not handled")
 }
 
@@ -154,6 +154,11 @@ func (b *bess) setUpfInfo(conf *Conf) {
 	b.upfPt.coreIP = b.coreIP
 	b.upfPt.fqdnHost = b.fqdnh
 	b.upfPt.maxSessions = conf.MaxSessions
+
+	if *pfcpsim {
+		pfcpSim()
+		return
+	}
 
 	var simInfo *SimModeInfo
 	if conf.Mode == modeSim {

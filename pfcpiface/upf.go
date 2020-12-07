@@ -30,7 +30,7 @@ type upf struct {
 
 // Don't change these values
 const (
-	tunnelPort = 2152
+	tunnelGTPUPort = 2152
 
 	// src-iface consts
 	core   = 0x2
@@ -44,6 +44,7 @@ const (
 	// far-action specific values
 	farForwardU = 0x0
 	farForwardD = 0x1
+	farDrop     = 0x2
 
 	//measure method
 	//measureDuration = 0x1
@@ -91,130 +92,6 @@ const (
     downlinkPkt uint64
 }*/
 
-type volumeData struct {
-	flags       uint8
-	totalVol    uint64
-	uplinkVol   uint64
-	downlinkVol uint64
-}
-
-type reportTrigger struct {
-	flags uint16
-}
-
-func (r *reportTrigger) isVOLTHSet() bool {
-	u8 := uint8(r.flags >> 8)
-	return has2ndBit(u8)
-}
-func (r *reportTrigger) isVOLQUSet() bool {
-	u8 := uint8(r.flags)
-	return has1stBit(u8)
-}
-
-/*type usageReport struct {
-    urrID  uint32
-    urSeqn uint32
-    startTime uint32
-    stopTime  uint32
-    urTrigger reportTrigger
-    volumeVal  volMeasure
-}*/
-type urr struct {
-	urrID      uint32
-	ctrID      uint32
-	pdrID      uint32
-	measureM   uint8
-	reportOpen bool
-	reportT    reportTrigger
-	//measureP   uint32
-	localVol    uint64
-	localThresh uint64
-	volThresh   volumeData
-	volQuota    volumeData
-}
-
-type pdr struct {
-	srcIface     uint8
-	tunnelIP4Dst uint32
-	tunnelTEID   uint32
-	srcIP        uint32
-	dstIP        uint32
-	fseidIP      uint32
-	srcPort      uint16
-	dstPort      uint16
-	proto        uint8
-
-	srcIfaceMask     uint8
-	tunnelIP4DstMask uint32
-	tunnelTEIDMask   uint32
-	srcIPMask        uint32
-	dstIPMask        uint32
-	srcPortMask      uint16
-	dstPortMask      uint16
-	protoMask        uint8
-
-	precedence uint32
-	pdrID      uint32
-	fseID      uint32
-	ctrID      uint32
-	farID      uint32
-	urrID      uint32
-	needDecap  uint8
-}
-
-type far struct {
-	farID   uint32
-	fseID   uint32
-	fseidIP uint32
-
-	action       uint8
-	applyAction  uint8
-	tunnelType   uint8
-	tunnelIP4Src uint32
-	tunnelIP4Dst uint32
-	tunnelTEID   uint32
-	tunnelPort   uint16
-}
-
-func printPDR(pdr pdr) {
-	log.Println("------------------ PDR ---------------------")
-	log.Println("Src Iface:", pdr.srcIface)
-	log.Println("tunnelIP4Dst:", int2ip(pdr.tunnelIP4Dst))
-	log.Println("tunnelTEID:", pdr.tunnelTEID)
-	log.Println("srcIP:", int2ip(pdr.srcIP))
-	log.Println("dstIP:", int2ip(pdr.dstIP))
-	log.Println("srcPort:", pdr.srcPort)
-	log.Println("dstPort:", pdr.dstPort)
-	log.Println("proto:", pdr.proto)
-	log.Println("Src Iface Mask:", pdr.srcIfaceMask)
-	log.Println("tunnelIP4Dst Mask:", int2ip(pdr.tunnelIP4DstMask))
-	log.Println("tunnelTEIDMask Mask:", pdr.tunnelTEIDMask)
-	log.Println("srcIP Mask:", int2ip(pdr.srcIPMask))
-	log.Println("dstIP Mask:", int2ip(pdr.dstIPMask))
-	log.Println("srcPort Mask:", pdr.srcPortMask)
-	log.Println("dstPort Mask:", pdr.dstPortMask)
-	log.Println("proto Mask:", pdr.protoMask)
-	log.Println("pdrID:", pdr.pdrID)
-	log.Println("fseID", pdr.fseID)
-	log.Println("ctrID:", pdr.ctrID)
-	log.Println("farID:", pdr.farID)
-	log.Println("needDecap:", pdr.needDecap)
-	log.Println("--------------------------------------------")
-}
-
-func printFAR(far far) {
-	log.Println("------------------ FAR ---------------------")
-	log.Println("FAR ID:", far.farID)
-	log.Println("fseID:", far.fseID)
-	log.Println("action:", far.action)
-	log.Println("tunnelType:", far.tunnelType)
-	log.Println("tunnelIP4Src:", far.tunnelIP4Src)
-	log.Println("tunnelIP4Dst:", far.tunnelIP4Dst)
-	log.Println("tunnelTEID:", far.tunnelTEID)
-	log.Println("tunnelPort:", far.tunnelPort)
-	log.Println("--------------------------------------------")
-}
-
 var intEnc = func(u uint64) *pb.FieldData {
 	return &pb.FieldData{Encoding: &pb.FieldData_ValueInt{ValueInt: u}}
 }
@@ -228,7 +105,7 @@ func (u *upf) sim(method string) {
 		log.Fatalln("Unable to pause BESS:", err)
 	}
 
-	//const ueip, teid, enbip = 0x10000001, 0xf0000000, 0x0b010181
+	// const ueip, teid, enbip = 0x10000001, 0xf0000000, 0x0b010181
 	ueip := u.simInfo.StartUEIP
 	enbip := u.simInfo.StartENBIP
 	aupfip := u.simInfo.StartAUPFIP
@@ -331,7 +208,7 @@ func (u *upf) sim(method string) {
 			tunnelIP4Src: ip2int(u.accessIP),
 			tunnelIP4Dst: ip2int(enbip) + enbIdx,
 			tunnelTEID:   n3TEID + i,
-			tunnelPort:   tunnelPort,
+			tunnelPort:   tunnelGTPUPort,
 		}
 
 		// create/delete uplink far
@@ -351,7 +228,7 @@ func (u *upf) sim(method string) {
 			tunnelIP4Src: ip2int(u.coreIP),
 			tunnelIP4Dst: ip2int(aupfip),
 			tunnelTEID:   n9TEID + i,
-			tunnelPort:   tunnelPort,
+			tunnelPort:   tunnelGTPUPort,
 		}
 
 		fars := []far{farDown, farN6Up, farN9Up}
@@ -534,7 +411,6 @@ func (u *upf) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 }
 
 func (u *upf) processFAR(ctx context.Context, any *anypb.Any, method string) {
-
 	if method != "add" && method != "delete" && method != "clear" {
 		log.Println("Invalid method name: ", method)
 		return
@@ -545,7 +421,6 @@ func (u *upf) processFAR(ctx context.Context, any *anypb.Any, method string) {
 		Cmd:  method,
 		Arg:  any,
 	})
-
 	if err != nil {
 		log.Println("farLookup method failed!:", cr.Error)
 	}
@@ -608,13 +483,11 @@ func (u *upf) processCounters(ctx context.Context, any *anypb.Any, method string
 		Cmd:  method,
 		Arg:  any,
 	})
-
 	if err != nil {
 		log.Println("counter method failed!:", cr.Error)
 	}
 }
 
-/*
 func (u *upf) addCounter(ctx context.Context, done chan<- bool, ctrID uint32, counterName string) {
 	go func() {
 		var any *anypb.Any
@@ -652,7 +525,7 @@ func (u *upf) delCounter(ctx context.Context, done chan<- bool, ctrID uint32, co
 		done <- true
 	}()
 }
-*/
+
 func (u *upf) removeAllPDRs(ctx context.Context, done chan<- bool) {
 	go func() {
 		var any *anypb.Any

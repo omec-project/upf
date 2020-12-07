@@ -49,7 +49,7 @@
     "enable_ntf": false,
 
     "": "Whether to enable P4Runtime feature",
-    "enable_p4rt": false,
+    "enable_p4rt": true,
     
     "": "Control plane controller settings",
     "cpiface": {
