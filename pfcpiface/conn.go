@@ -40,11 +40,12 @@ func (c *PFCPConn) getSeqNum() uint32 {
 	return c.seqNum.seq
 }
 
-func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
+func pfcpifaceMainLoop(intf common, accessIP, coreIP, sourceIP, smfName string) {
 	var pconn PFCPConn
+	upfPt := intf.getUpf()
 	pconn.mgr = NewPFCPSessionMgr(100)
 
-	log.Println("pfcpifaceMainLoop@" + upf.fqdnHost + " says hello!!!")
+	log.Println("pfcpifaceMainLoop@" + upfPt.fqdnHost + " says hello!!!")
 
 	cpConnectionStatus := make(chan bool)
 
@@ -69,10 +70,8 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 
 	// cleanup the pipeline
 	cleanupSessions := func() {
-		if cpConnected {
-			sendDeleteAllSessionsMsgtoUPF(upf)
-			cpConnected = false
-		}
+		intf.sendDeleteAllSessionsMsgtoUPF()
+		cpConnected = false
 	}
 	// initiate connection if smf address available
 	log.Println("calling manageSmfConnection smf service name ", smfName)
@@ -127,7 +126,9 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 		var outgoingMessage []byte
 		switch msg.MessageType() {
 		case message.MsgTypeAssociationSetupRequest:
-			outgoingMessage = pconn.handleAssociationSetupRequest(msg, addr, sourceIP, accessIP, coreIP)
+			cleanupSessions()
+			intf.setInfo(conn, addr, &pconn)
+			outgoingMessage = pconn.handleAssociationSetupRequest(intf, msg, addr, sourceIP, accessIP, coreIP)
 			if outgoingMessage != nil {
 				cpConnected = true
 				if manageConnection {
@@ -142,15 +143,15 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 				cpConnectionStatus <- cpConnected
 			}
 		case message.MsgTypePFDManagementRequest:
-			outgoingMessage = pconn.handlePFDMgmtRequest(upf, msg, addr, sourceIP)
+			outgoingMessage = pconn.handlePFDMgmtRequest(intf, msg, addr, sourceIP)
 		case message.MsgTypeSessionEstablishmentRequest:
-			outgoingMessage = pconn.handleSessionEstablishmentRequest(upf, msg, addr, sourceIP)
+			outgoingMessage = pconn.handleSessionEstablishmentRequest(intf, msg, addr, sourceIP)
 		case message.MsgTypeSessionModificationRequest:
-			outgoingMessage = pconn.handleSessionModificationRequest(upf, msg, addr, sourceIP)
+			outgoingMessage = pconn.handleSessionModificationRequest(intf, msg, addr, sourceIP)
 		case message.MsgTypeHeartbeatRequest:
 			outgoingMessage = handleHeartbeatRequest(msg, addr)
 		case message.MsgTypeSessionDeletionRequest:
-			outgoingMessage = pconn.handleSessionDeletionRequest(upf, msg, addr, sourceIP)
+			outgoingMessage = pconn.handleSessionDeletionRequest(intf, msg, addr, sourceIP)
 		case message.MsgTypeAssociationReleaseRequest:
 			outgoingMessage = handleAssociationReleaseRequest(msg, addr, sourceIP, accessIP)
 			cleanupSessions()

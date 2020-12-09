@@ -4,6 +4,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
@@ -36,11 +38,20 @@ func handleHeartbeatRequest(msg message.Message, addr net.Addr) []byte {
 	return hbres
 }
 
-func (pc *PFCPConn) handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP string, accessIP string, coreIP string) []byte {
+func (pc *PFCPConn) handleAssociationSetupRequest(intf common, msg message.Message, addr net.Addr, sourceIP string, accessIP string, coreIP string) []byte {
 	asreq, ok := msg.(*message.AssociationSetupRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
 		return nil
+	}
+
+	fail := intf.handleChannelStatus()
+
+	var cause uint8
+	if fail {
+		cause = ie.CauseRequestRejected
+	} else {
+		cause = ie.CauseRequestAccepted
 	}
 
 	ts, err := asreq.RecoveryTimeStamp.RecoveryTimeStamp()
@@ -54,8 +65,8 @@ func (pc *PFCPConn) handleAssociationSetupRequest(msg message.Message, addr net.
 	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
 	asres, err := message.NewAssociationSetupResponse(asreq.SequenceNumber,
 		ie.NewRecoveryTimeStamp(time.Now()),
-		ie.NewNodeID(sourceIP, "", ""),       /* node id (IPv4) */
-		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
+		ie.NewNodeID(sourceIP, "", ""), /* node id (IPv4) */
+		ie.NewCause(cause),             /* accept it blindly for the time being */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
 		ie.NewUserPlaneIPResourceInformation(0x41, 0, accessIP, "", "", ie.SrcInterfaceAccess),
@@ -122,7 +133,7 @@ func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceI
 	return arres
 }
 
-func (pc *PFCPConn) handlePFDMgmtRequest(upf *upf, msg message.Message, addr net.Addr, sourceIP string) []byte {
+func (pc *PFCPConn) handlePFDMgmtRequest(intf common, msg message.Message, addr net.Addr, sourceIP string) []byte {
 	pfdmreq, ok := msg.(*message.PFDManagementRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -197,7 +208,8 @@ func (pc *PFCPConn) handlePFDMgmtRequest(upf *upf, msg message.Message, addr net
 	return pfdres
 }
 
-func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.Addr, sourceIP string) []byte {
+func (pc *PFCPConn) handleSessionEstablishmentRequest(intf common, msg message.Message, addr net.Addr, sourceIP string) []byte {
+	upf := intf.getUpf()
 	sereq, ok := msg.(*message.SessionEstablishmentRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -233,6 +245,11 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 		return seres
 	}
 
+	fail := intf.handleChannelStatus()
+	if fail {
+		sendError(errors.New("Unable to connect to Data Plane"))
+	}
+
 	/* Read CreatePDRs and CreateFARs from payload */
 	localSEID := pc.mgr.NewPFCPSession(remoteSEID)
 	if localSEID == 0 {
@@ -245,6 +262,9 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 		if err := p.parsePDR(cPDR, session.localSEID, pc.mgr.appPFDs); err != nil {
 			return sendError(err)
 		}
+		_ = binary.Read(bytes.NewBuffer(net.ParseIP(sourceIP).To4()),
+			binary.LittleEndian, &p.fseidIP)
+		//p.fseidIP = binary.LittleEndian.Uint32(sourceIP.To4())
 		session.CreatePDR(p)
 	}
 
@@ -253,10 +273,12 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 		if err := f.parseFAR(cFAR, session.localSEID, upf, create); err != nil {
 			return sendError(err)
 		}
+		_ = binary.Read(bytes.NewBuffer(net.ParseIP(sourceIP).To4()),
+			binary.LittleEndian, &f.fseidIP)
 		session.CreateFAR(f)
 	}
 
-	upf.sendMsgToUPF("add", session.pdrs, session.fars)
+	intf.sendMsgToUPF("add", session.pdrs, session.fars)
 
 	// Build response message
 	seres, err := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
@@ -277,7 +299,8 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 	return seres
 }
 
-func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Addr, sourceIP string) []byte {
+func (pc *PFCPConn) handleSessionModificationRequest(intf common, msg message.Message, addr net.Addr, sourceIP string) []byte {
+	upf := intf.getUpf()
 	smreq, ok := msg.(*message.SessionModificationRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -297,11 +320,16 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 			ie.NewCause(ie.CauseRequestRejected), /* accept it blindly for the time being */
 		).Marshal()
 		if err != nil {
-			log.Fatalln("Unable to create session establishment response", err)
+			log.Fatalln("Unable to create session modification response", err)
 		}
 
-		log.Println("Sending session establishment response to: ", addr)
+		log.Println("Sending session modification response to: ", addr)
 		return smres
+	}
+
+	var fail bool = intf.handleChannelStatus()
+	if fail {
+		sendError(errors.New("Unable to connect to Data Plane"))
 	}
 
 	localSEID := smreq.SEID()
@@ -327,6 +355,8 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 		if err := p.parsePDR(cPDR, localSEID, pc.mgr.appPFDs); err != nil {
 			return sendError(err)
 		}
+		_ = binary.Read(bytes.NewBuffer(net.ParseIP(sourceIP).To4()),
+			binary.LittleEndian, &p.fseidIP)
 		session.CreatePDR(p)
 		addPDRs = append(addPDRs, p)
 	}
@@ -334,31 +364,53 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 	for _, cFAR := range smreq.CreateFAR {
 		var f far
 		if err := f.parseFAR(cFAR, localSEID, upf, create); err != nil {
-			return sendError(err)
+			log.Println("FAR Parse failed ", err)
 		}
+		_ = binary.Read(bytes.NewBuffer(net.ParseIP(sourceIP).To4()),
+			binary.LittleEndian, &f.fseidIP)
 		session.CreateFAR(f)
 		addFARs = append(addFARs, f)
 	}
 
 	for _, uPDR := range smreq.UpdatePDR {
 		var p pdr
-		if err := p.parsePDR(uPDR, localSEID, pc.mgr.appPFDs); err != nil {
+		var err error
+		if err = p.parsePDR(uPDR, localSEID, pc.mgr.appPFDs); err != nil {
 			return sendError(err)
 		}
-		session.UpdatePDR(p)
+		_ = binary.Read(bytes.NewBuffer(net.ParseIP(sourceIP).To4()),
+			binary.LittleEndian, &p.fseidIP)
+		err = session.UpdatePDR(p)
+		if err != nil {
+			log.Println("session PDR update failed ", err)
+			continue
+		}
 		addPDRs = append(addPDRs, p)
 	}
 
 	for _, uFAR := range smreq.UpdateFAR {
 		var f far
-		if err := f.parseFAR(uFAR, localSEID, upf, update); err != nil {
-			return sendError(err)
+		var err error
+		if err = f.parseFAR(uFAR, localSEID, upf, update); err != nil {
+			log.Println("Parse FAR failed")
+			continue
 		}
-		session.UpdateFAR(f)
+		_ = binary.Read(bytes.NewBuffer(net.ParseIP(sourceIP).To4()),
+			binary.LittleEndian, &f.fseidIP)
+		err = session.UpdateFAR(f)
+		if err != nil {
+			log.Println("session PDR update failed ", err)
+			continue
+		}
 		addFARs = append(addFARs, f)
 	}
 
-	upf.sendMsgToUPF("add", addPDRs, addFARs)
+	if len(addFARs) == 0 {
+		var err error = errors.New("No valid Fars")
+		return sendError(err)
+	}
+
+	intf.sendMsgToUPF("mod", addPDRs, addFARs)
 
 	delPDRs := make([]pdr, 0, MaxItems)
 	delFARs := make([]far, 0, MaxItems)
@@ -389,7 +441,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 		delFARs = append(delFARs, *f)
 	}
 
-	upf.sendMsgToUPF("del", delPDRs, delFARs)
+	intf.sendMsgToUPF("del", delPDRs, delFARs)
 
 	// Build response message
 	smres, err := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */
@@ -408,7 +460,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 	return smres
 }
 
-func (pc *PFCPConn) handleSessionDeletionRequest(upf *upf, msg message.Message, addr net.Addr, sourceIP string) []byte {
+func (pc *PFCPConn) handleSessionDeletionRequest(intf common, msg message.Message, addr net.Addr, sourceIP string) []byte {
 	sdreq, ok := msg.(*message.SessionDeletionRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -434,6 +486,11 @@ func (pc *PFCPConn) handleSessionDeletionRequest(upf *upf, msg message.Message, 
 		return smres
 	}
 
+	fail := intf.handleChannelStatus()
+	if fail {
+		sendError(errors.New("Unable to connect to Data Plane"))
+	}
+
 	/* retrieve sessionRecord */
 	localSEID := sdreq.SEID()
 	session, ok := pc.mgr.sessions[localSEID]
@@ -441,7 +498,7 @@ func (pc *PFCPConn) handleSessionDeletionRequest(upf *upf, msg message.Message, 
 		return sendError(fmt.Errorf("Session not found: %v", localSEID))
 	}
 
-	upf.sendMsgToUPF("del", session.pdrs, session.fars)
+	intf.sendMsgToUPF("del", session.pdrs, session.fars)
 
 	/* delete sessionRecord */
 	delete(pc.mgr.sessions, localSEID)
