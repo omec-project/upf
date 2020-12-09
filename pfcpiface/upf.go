@@ -343,13 +343,13 @@ func (u *upf) processPDR(ctx context.Context, any *anypb.Any, method string) {
 		return
 	}
 
-	cr, err := u.client.ModuleCommand(ctx, &pb.CommandRequest{
+	_, err := u.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "pdrLookup",
 		Cmd:  method,
 		Arg:  any,
 	})
 	if err != nil {
-		log.Println("pdrLookup method failed!:", cr.Error)
+		log.Println("pdrLookup method failed!:", err)
 	}
 }
 
