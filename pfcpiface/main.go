@@ -26,6 +26,7 @@ var (
 	configPath = flag.String("config", "upf.json", "path to upf config")
 	httpAddr   = flag.String("http", "0.0.0.0:8080", "http IP/port combo")
 	simulate   = flag.String("simulate", "", "create|delete simulated sessions")
+	pfcpsim    = flag.Bool("pfcpsim", false, "simulate PFCP")
 )
 
 // Conf : Json conf struct
@@ -40,9 +41,13 @@ type Conf struct {
 
 // SimModeInfo : Sim mode attributes
 type SimModeInfo struct {
-	StartUeIP    string `json:"start_ue_ip"`
-	StartEnodeIP string `json:"start_enb_ip"`
-	StartTeid    string `json:"start_teid"`
+	StartUEIP   net.IP `json:"start_ue_ip"`
+	StartENBIP  net.IP `json:"start_enb_ip"`
+	StartAUPFIP net.IP `json:"start_aupf_ip"`
+	N6AppIP     net.IP `json:"n6_app_ip"`
+	N9AppIP     net.IP `json:"n9_app_ip"`
+	StartN3TEID string `json:"start_n3_teid"`
+	StartN9TEID string `json:"start_n9_teid"`
 }
 
 // CPIfaceInfo : CPIface interface settings
@@ -128,11 +133,6 @@ func main() {
 	}
 	defer conn.Close()
 
-	var simInfo *SimModeInfo
-	if conf.Mode == modeSim {
-		simInfo = &conf.SimInfo
-	}
-
 	upf := &upf{
 		accessIface: conf.AccessIface.IfName,
 		coreIface:   conf.CoreIface.IfName,
@@ -141,7 +141,12 @@ func main() {
 		fqdnHost:    fqdnh,
 		client:      pb.NewBESSControlClient(conn),
 		maxSessions: conf.MaxSessions,
-		simInfo:     simInfo,
+		simInfo:     &conf.SimInfo,
+	}
+
+	if *pfcpsim {
+		pfcpSim()
+		return
 	}
 
 	if *simulate != "" {
@@ -156,7 +161,9 @@ func main() {
 
 	if conf.CPIface.SrcIP == "" {
 		if conf.CPIface.DestIP != "" {
-			n4SrcIP = getOutboundIP(conf.CPIface.DestIP)
+			log.Println("Dest address ", conf.CPIface.DestIP)
+			n4SrcIP = getLocalIP(conf.CPIface.DestIP)
+			log.Println("SPGWU/UPF address IP: ", n4SrcIP.String())
 		}
 	} else {
 		addrs, err := net.LookupHost(conf.CPIface.SrcIP)
@@ -165,9 +172,9 @@ func main() {
 		}
 	}
 
-	log.Println("N4 IP: ", n4SrcIP.String())
+	log.Println("N4 local IP: ", n4SrcIP.String())
 
-	go pfcpifaceMainLoop(upf, accessIP.String(), n4SrcIP.String())
+	go pfcpifaceMainLoop(upf, accessIP.String(), coreIP.String(), n4SrcIP.String(), conf.CPIface.DestIP)
 
 	setupProm(upf)
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))

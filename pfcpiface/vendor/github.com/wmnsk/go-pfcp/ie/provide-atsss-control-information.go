@@ -5,8 +5,8 @@
 package ie
 
 // NewProvideATSSSControlInformation creates a new ProvideATSSSControlInformation IE.
-func NewProvideATSSSControlInformation(mptcp, atsssll, pmf *IE) *IE {
-	return newGroupedIE(ProvideATSSSControlInformation, 0, mptcp, atsssll, pmf)
+func NewProvideATSSSControlInformation(ies ...*IE) *IE {
+	return newGroupedIE(ProvideATSSSControlInformation, 0, ies...)
 }
 
 // ProvideATSSSControlInformation returns the IEs above ProvideATSSSControlInformation if the type of IE matches.

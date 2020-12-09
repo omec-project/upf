@@ -15,12 +15,13 @@ type AssociationSetupRequest struct {
 	RecoveryTimeStamp               *ie.IE
 	UPFunctionFeatures              *ie.IE
 	CPFunctionFeatures              *ie.IE
-	AlternativeSMFIPAddress         *ie.IE
+	UserPlaneIPResourceInformation  []*ie.IE
+	AlternativeSMFIPAddress         []*ie.IE
 	SMFSetID                        *ie.IE
 	PFCPSessionRetentionInformation *ie.IE
-	UEIPAddressPoolInformation      *ie.IE
-	GTPUPathQoSControlInformation   *ie.IE
-	ClockDriftControlInformation    *ie.IE
+	UEIPAddressPoolInformation      []*ie.IE
+	GTPUPathQoSControlInformation   []*ie.IE
+	ClockDriftControlInformation    []*ie.IE
 	UPFInstanceID                   *ie.IE
 	IEs                             []*ie.IE
 }
@@ -45,18 +46,20 @@ func NewAssociationSetupRequest(seq uint32, ies ...*ie.IE) *AssociationSetupRequ
 			m.UPFunctionFeatures = i
 		case ie.CPFunctionFeatures:
 			m.CPFunctionFeatures = i
+		case ie.UserPlaneIPResourceInformation:
+			m.UserPlaneIPResourceInformation = append(m.UserPlaneIPResourceInformation, i)
 		case ie.AlternativeSMFIPAddress:
-			m.AlternativeSMFIPAddress = i
+			m.AlternativeSMFIPAddress = append(m.AlternativeSMFIPAddress, i)
 		case ie.SMFSetID:
 			m.SMFSetID = i
 		case ie.PFCPSessionRetentionInformation:
 			m.PFCPSessionRetentionInformation = i
 		case ie.UEIPAddressPoolInformation:
-			m.UEIPAddressPoolInformation = i
+			m.UEIPAddressPoolInformation = append(m.UEIPAddressPoolInformation, i)
 		case ie.GTPUPathQoSControlInformation:
-			m.GTPUPathQoSControlInformation = i
+			m.GTPUPathQoSControlInformation = append(m.GTPUPathQoSControlInformation, i)
 		case ie.ClockDriftControlInformation:
-			m.ClockDriftControlInformation = i
+			m.ClockDriftControlInformation = append(m.ClockDriftControlInformation, i)
 		case ie.NFInstanceID:
 			m.UPFInstanceID = i
 		default:
@@ -110,7 +113,13 @@ func (m *AssociationSetupRequest) MarshalTo(b []byte) error {
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.AlternativeSMFIPAddress; i != nil {
+	for _, i := range m.UserPlaneIPResourceInformation {
+		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
+			return err
+		}
+		offset += i.MarshalLen()
+	}
+	for _, i := range m.AlternativeSMFIPAddress {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
@@ -128,19 +137,19 @@ func (m *AssociationSetupRequest) MarshalTo(b []byte) error {
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.UEIPAddressPoolInformation; i != nil {
+	for _, i := range m.UEIPAddressPoolInformation {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.GTPUPathQoSControlInformation; i != nil {
+	for _, i := range m.GTPUPathQoSControlInformation {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.ClockDriftControlInformation; i != nil {
+	for _, i := range m.ClockDriftControlInformation {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
@@ -202,18 +211,20 @@ func (m *AssociationSetupRequest) UnmarshalBinary(b []byte) error {
 			m.UPFunctionFeatures = i
 		case ie.CPFunctionFeatures:
 			m.CPFunctionFeatures = i
+		case ie.UserPlaneIPResourceInformation:
+			m.UserPlaneIPResourceInformation = append(m.UserPlaneIPResourceInformation, i)
 		case ie.AlternativeSMFIPAddress:
-			m.AlternativeSMFIPAddress = i
+			m.AlternativeSMFIPAddress = append(m.AlternativeSMFIPAddress, i)
 		case ie.SMFSetID:
 			m.SMFSetID = i
 		case ie.PFCPSessionRetentionInformation:
 			m.PFCPSessionRetentionInformation = i
 		case ie.UEIPAddressPoolInformation:
-			m.UEIPAddressPoolInformation = i
+			m.UEIPAddressPoolInformation = append(m.UEIPAddressPoolInformation, i)
 		case ie.GTPUPathQoSControlInformation:
-			m.GTPUPathQoSControlInformation = i
+			m.GTPUPathQoSControlInformation = append(m.GTPUPathQoSControlInformation, i)
 		case ie.ClockDriftControlInformation:
-			m.ClockDriftControlInformation = i
+			m.ClockDriftControlInformation = append(m.ClockDriftControlInformation, i)
 		case ie.NFInstanceID:
 			m.UPFInstanceID = i
 		default:
@@ -240,7 +251,10 @@ func (m *AssociationSetupRequest) MarshalLen() int {
 	if i := m.CPFunctionFeatures; i != nil {
 		l += i.MarshalLen()
 	}
-	if i := m.AlternativeSMFIPAddress; i != nil {
+	for _, i := range m.UserPlaneIPResourceInformation {
+		l += i.MarshalLen()
+	}
+	for _, i := range m.AlternativeSMFIPAddress {
 		l += i.MarshalLen()
 	}
 	if i := m.SMFSetID; i != nil {
@@ -249,13 +263,13 @@ func (m *AssociationSetupRequest) MarshalLen() int {
 	if i := m.PFCPSessionRetentionInformation; i != nil {
 		l += i.MarshalLen()
 	}
-	if i := m.UEIPAddressPoolInformation; i != nil {
+	for _, i := range m.UEIPAddressPoolInformation {
 		l += i.MarshalLen()
 	}
-	if i := m.GTPUPathQoSControlInformation; i != nil {
+	for _, i := range m.GTPUPathQoSControlInformation {
 		l += i.MarshalLen()
 	}
-	if i := m.ClockDriftControlInformation; i != nil {
+	for _, i := range m.ClockDriftControlInformation {
 		l += i.MarshalLen()
 	}
 	if i := m.UPFInstanceID; i != nil {

@@ -5,8 +5,8 @@
 package ie
 
 // NewRedundantTransmissionParameters creates a new RedundantTransmissionParameters IE.
-func NewRedundantTransmissionParameters(fteid, ohc, ni *IE) *IE {
-	return newGroupedIE(RedundantTransmissionParameters, 0, fteid, ohc, ni)
+func NewRedundantTransmissionParameters(ies ...*IE) *IE {
+	return newGroupedIE(RedundantTransmissionParameters, 0, ies...)
 }
 
 // NewRedundantTransmissionParametersInPDI creates a new RedundantTransmissionParameters IE.

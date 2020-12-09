@@ -44,17 +44,6 @@ func (i *IE) BARID() (uint8, error) {
 			}
 		}
 		return 0, ErrIENotFound
-	case QueryURR:
-		ies, err := i.QueryURR()
-		if err != nil {
-			return 0, err
-		}
-		for _, x := range ies {
-			if x.Type == BARID {
-				return x.BARID()
-			}
-		}
-		return 0, ErrIENotFound
 	case CreateBAR:
 		ies, err := i.CreateBAR()
 		if err != nil {

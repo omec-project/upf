@@ -43,7 +43,7 @@ func (i *IE) MinimumPacketDelay() (time.Duration, error) {
 			return 0, err
 		}
 		for _, x := range ies {
-			if x.Type == QoSInformationInGTPUPathQoSReport {
+			if x.Type == MinimumPacketDelay {
 				return x.MinimumPacketDelay()
 			}
 		}

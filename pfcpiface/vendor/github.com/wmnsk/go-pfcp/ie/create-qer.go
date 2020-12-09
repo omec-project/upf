@@ -5,8 +5,8 @@
 package ie
 
 // NewCreateQER creates a new CreateQER IE.
-func NewCreateQER(qer, qci, gate, mbr, gbr, pktRate, prStatus, dlflm, qfi, rQoS, ppi, aw, qInd *IE) *IE {
-	return newGroupedIE(CreateQER, 0, qer, qci, gate, mbr, gbr, pktRate, prStatus, dlflm, qfi, rQoS, ppi, aw, qInd)
+func NewCreateQER(ies ...*IE) *IE {
+	return newGroupedIE(CreateQER, 0, ies...)
 }
 
 // CreateQER returns the IEs above CreateQER if the type of IE matches.

@@ -28,9 +28,14 @@ class Parser:
         self.ip_frag_with_eth_mtu = None
         self.measure = False
         self.mode = None
+        self.sim_core = None
         self.sim_start_ue_ip = None
         self.sim_start_enb_ip = None
-        self.sim_start_teid = None
+        self.sim_start_aupf_ip = None
+        self.sim_n6_app_ip = None
+        self.sim_n9_app_ip = None
+        self.sim_start_n3_teid = None
+        self.sim_start_n9_teid = None
         self.sim_pkt_size = None
         self.sim_total_flows = None
         self.workers = 1
@@ -45,7 +50,8 @@ class Parser:
         try:
             self.max_ip_defrag_flows = int(self.conf["max_ip_defrag_flows"])
         except ValueError:
-            print('Invalid value for max_ip_defrag_flows. Not installing IP4Defrag module.')
+            print(
+                'Invalid value for max_ip_defrag_flows. Not installing IP4Defrag module.')
         except KeyError:
             print('max_ip_defrag_flows value not set. Not installing IP4Defrag module.')
 
@@ -53,13 +59,14 @@ class Parser:
         try:
             self.ip_frag_with_eth_mtu = int(self.conf["ip_frag_with_eth_mtu"])
         except ValueError:
-            print('Invalid value for ip_frag_with_eth_mtu. Not installing IP4Frag module.')
+            print(
+                'Invalid value for ip_frag_with_eth_mtu. Not installing IP4Frag module.')
         except KeyError:
             print('ip_frag_with_eth_mtu value not set. Not installing IP4Frag module.')
 
         # Telemtrics
         # See this link for details:
-        ## https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py
+        # https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py
         try:
             self.measure = bool(self.conf["measure"])
         except ValueError:
@@ -73,7 +80,8 @@ class Parser:
                 self.interfaces[iface] = self.conf[iface]
             except KeyError:
                 self.interfaces[iface] = {'ifname': iface}
-                print('Can\'t read {} interface. Setting it to default ({}).'.format(iface, iface))
+                print('Can\'t read {} interface. Setting it to default ({}).'.format(
+                    iface, iface))
 
         # Detect mode. Default is dpdk
         try:
@@ -83,9 +91,14 @@ class Parser:
 
         # params for simulation
         try:
+            self.sim_core = self.conf["sim"]["core"]
             self.sim_start_ue_ip = self.conf["sim"]["start_ue_ip"]
             self.sim_start_enb_ip = self.conf["sim"]["start_enb_ip"]
-            self.sim_start_teid = int(self.conf["sim"]["start_teid"], 16)
+            self.sim_start_aupf_ip = self.conf["sim"]["start_aupf_ip"]
+            self.sim_n6_app_ip = self.conf["sim"]["n6_app_ip"]
+            self.sim_n9_app_ip = self.conf["sim"]["n9_app_ip"]
+            self.sim_start_n3_teid = int(self.conf["sim"]["start_n3_teid"], 16)
+            self.sim_start_n9_teid = int(self.conf["sim"]["start_n9_teid"], 16)
             self.sim_pkt_size = self.conf["sim"]["pkt_size"]
             self.sim_total_flows = self.conf["sim"]["total_flows"]
         except ValueError:
@@ -112,7 +125,8 @@ class Parser:
         except KeyError:
             self.access_ifname = "access"
             self.core_ifname = "core"
-            print('Can\'t parse interface name(s)! Setting it to default values ({}, {})'.format("access", "core"))
+            print('Can\'t parse interface name(s)! Setting it to default values ({}, {})'.format(
+                "access", "core"))
 
         # Network Token Function
         try:

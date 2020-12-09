@@ -12,7 +12,7 @@ import (
 )
 
 // NewTraceInformation creates a new TraceInformation IE.
-func NewTraceInformation(mcc, mnc, id string, events []byte, depth uint8, interfaces, ip []byte) *IE {
+func NewTraceInformation(mcc, mnc, id string, events []byte, depth uint8, interfaces []byte, ip net.IP) *IE {
 	fields := NewTraceInformationFields(mcc, mnc, id, events, depth, interfaces, ip)
 
 	b, err := fields.Marshal()

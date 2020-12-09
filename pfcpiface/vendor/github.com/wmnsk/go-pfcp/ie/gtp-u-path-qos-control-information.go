@@ -5,8 +5,8 @@
 package ie
 
 // NewGTPUPathQoSControlInformation creates a new GTPUPathQoSControlInformation IE.
-func NewGTPUPathQoSControlInformation(peer, itype, qos, tlm, mp, avgDelay, minDelay, maxDelay, timer *IE) *IE {
-	return newGroupedIE(GTPUPathQoSControlInformation, 0, peer, itype, qos, tlm, mp, avgDelay, minDelay, maxDelay, timer)
+func NewGTPUPathQoSControlInformation(ies ...*IE) *IE {
+	return newGroupedIE(GTPUPathQoSControlInformation, 0, ies...)
 }
 
 // GTPUPathQoSControlInformation returns the IEs above GTPUPathQoSControlInformation if the type of IE matches.
