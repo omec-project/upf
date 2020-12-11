@@ -36,7 +36,7 @@ func handleHeartbeatRequest(msg message.Message, addr net.Addr) []byte {
 	return hbres
 }
 
-func (pc *PFCPConn) handleAssociationSetupRequest(msg message.Message, addr net.Addr, sourceIP string, accessIP string, coreIP string) []byte {
+func (pc *PFCPConn) handleAssociationSetupRequest(intf dataPath, msg message.Message, addr net.Addr, sourceIP string, accessIP string, coreIP string) []byte {
 	asreq, ok := msg.(*message.AssociationSetupRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -122,7 +122,7 @@ func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceI
 	return arres
 }
 
-func (pc *PFCPConn) handlePFDMgmtRequest(upf *upf, msg message.Message, addr net.Addr, sourceIP string) []byte {
+func (pc *PFCPConn) handlePFDMgmtRequest(intf dataPath, msg message.Message, addr net.Addr, sourceIP string) []byte {
 	pfdmreq, ok := msg.(*message.PFDManagementRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -197,7 +197,7 @@ func (pc *PFCPConn) handlePFDMgmtRequest(upf *upf, msg message.Message, addr net
 	return pfdres
 }
 
-func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.Addr, sourceIP string) []byte {
+func (pc *PFCPConn) handleSessionEstablishmentRequest(intf dataPath, msg message.Message, addr net.Addr, sourceIP string) []byte {
 	sereq, ok := msg.(*message.SessionEstablishmentRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -250,13 +250,13 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 
 	for _, cFAR := range sereq.CreateFAR {
 		var f far
-		if err := f.parseFAR(cFAR, session.localSEID, upf, create); err != nil {
+		if err := f.parseFAR(cFAR, session.localSEID, intf, create); err != nil {
 			return sendError(err)
 		}
 		session.CreateFAR(f)
 	}
 
-	upf.sendMsgToUPF("add", session.pdrs, session.fars)
+	intf.sendMsgToUPF("add", session.pdrs, session.fars)
 
 	// Build response message
 	seres, err := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
@@ -277,7 +277,7 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 	return seres
 }
 
-func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Message, addr net.Addr, sourceIP string) []byte {
+func (pc *PFCPConn) handleSessionModificationRequest(intf dataPath, msg message.Message, addr net.Addr, sourceIP string) []byte {
 	smreq, ok := msg.(*message.SessionModificationRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -297,10 +297,10 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 			ie.NewCause(ie.CauseRequestRejected), /* accept it blindly for the time being */
 		).Marshal()
 		if err != nil {
-			log.Fatalln("Unable to create session establishment response", err)
+			log.Fatalln("Unable to create session modification response", err)
 		}
 
-		log.Println("Sending session establishment response to: ", addr)
+		log.Println("Sending session modification response to: ", addr)
 		return smres
 	}
 
@@ -333,7 +333,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 
 	for _, cFAR := range smreq.CreateFAR {
 		var f far
-		if err := f.parseFAR(cFAR, localSEID, upf, create); err != nil {
+		if err := f.parseFAR(cFAR, localSEID, intf, create); err != nil {
 			return sendError(err)
 		}
 		session.CreateFAR(f)
@@ -342,23 +342,33 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 
 	for _, uPDR := range smreq.UpdatePDR {
 		var p pdr
+		var err error
 		if err := p.parsePDR(uPDR, localSEID, pc.mgr.appPFDs); err != nil {
 			return sendError(err)
 		}
-		session.UpdatePDR(p)
+		err = session.UpdatePDR(p)
+		if err != nil {
+			log.Println("session PDR update failed ", err)
+			continue
+		}
 		addPDRs = append(addPDRs, p)
 	}
 
 	for _, uFAR := range smreq.UpdateFAR {
 		var f far
-		if err := f.parseFAR(uFAR, localSEID, upf, update); err != nil {
+		var err error
+		if err := f.parseFAR(uFAR, localSEID, intf, update); err != nil {
 			return sendError(err)
 		}
-		session.UpdateFAR(f)
+		err = session.UpdateFAR(f)
+		if err != nil {
+			log.Println("session PDR update failed ", err)
+			continue
+		}
 		addFARs = append(addFARs, f)
 	}
 
-	upf.sendMsgToUPF("add", addPDRs, addFARs)
+	intf.sendMsgToUPF("mod", addPDRs, addFARs)
 
 	delPDRs := make([]pdr, 0, MaxItems)
 	delFARs := make([]far, 0, MaxItems)
@@ -389,7 +399,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 		delFARs = append(delFARs, *f)
 	}
 
-	upf.sendMsgToUPF("del", delPDRs, delFARs)
+	intf.sendMsgToUPF("del", delPDRs, delFARs)
 
 	// Build response message
 	smres, err := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */
@@ -408,7 +418,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 	return smres
 }
 
-func (pc *PFCPConn) handleSessionDeletionRequest(upf *upf, msg message.Message, addr net.Addr, sourceIP string) []byte {
+func (pc *PFCPConn) handleSessionDeletionRequest(intf dataPath, msg message.Message, addr net.Addr, sourceIP string) []byte {
 	sdreq, ok := msg.(*message.SessionDeletionRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -441,7 +451,7 @@ func (pc *PFCPConn) handleSessionDeletionRequest(upf *upf, msg message.Message, 
 		return sendError(fmt.Errorf("Session not found: %v", localSEID))
 	}
 
-	upf.sendMsgToUPF("del", session.pdrs, session.fars)
+	intf.sendMsgToUPF("del", session.pdrs, session.fars)
 
 	/* delete sessionRecord */
 	delete(pc.mgr.sessions, localSEID)

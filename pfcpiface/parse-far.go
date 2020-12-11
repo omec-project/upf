@@ -42,7 +42,7 @@ func (f *far) printFAR() {
 	log.Println("--------------------------------------------")
 }
 
-func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error {
+func (f *far) parseFAR(farIE *ie.IE, fseid uint64, intf dataPath, op operation) error {
 	f.fseID = uint32(fseid)
 
 	farID, err := farIE.FARID()
@@ -98,10 +98,10 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 			}
 			if dstIface == ie.DstInterfaceAccess {
 				f.action = farForwardD
-				f.tunnelIP4Src = ip2int(upf.accessIP)
+				f.tunnelIP4Src = ip2int(intf.getAccessIP())
 			} else if dstIface == ie.DstInterfaceCore {
 				f.action = farForwardU
-				f.tunnelIP4Src = ip2int(upf.coreIP)
+				f.tunnelIP4Src = ip2int(intf.getCoreIP())
 			}
 		}
 	}

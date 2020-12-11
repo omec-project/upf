@@ -32,10 +32,10 @@ type upfCollector struct {
 	latency *prometheus.Desc
 	jitter  *prometheus.Desc
 
-	upf *upf
+	intf dataPath
 }
 
-func newUpfCollector(upf *upf) *upfCollector {
+func newUpfCollector(intf dataPath) *upfCollector {
 	return &upfCollector{
 		packets: prometheus.NewDesc(prometheus.BuildFQName("upf", "packets", "count"),
 			"Shows the number of packets received by the UPF port",
@@ -57,7 +57,7 @@ func newUpfCollector(upf *upf) *upfCollector {
 			"Shows the packet processing jitter percentiles in UPF",
 			[]string{"iface"}, nil,
 		),
-		upf: upf,
+		intf: intf,
 	}
 }
 
@@ -80,7 +80,7 @@ func (uc *upfCollector) Collect(ch chan<- prometheus.Metric) {
 
 func (uc *upfCollector) portStats(ch chan<- prometheus.Metric) {
 	// When operating in sim mode there are no BESS ports
-	if uc.upf.simInfo != nil {
+	if uc.intf.getSimInfo() != nil {
 		return
 	}
 
@@ -113,7 +113,7 @@ func (uc *upfCollector) portStats(ch chan<- prometheus.Metric) {
 			ch <- p
 		}
 
-		res := uc.upf.portStats(ifaceName)
+		res := uc.intf.portStats(ifaceName)
 		if res == nil {
 			return
 		}
@@ -129,8 +129,8 @@ func (uc *upfCollector) portStats(ch chan<- prometheus.Metric) {
 
 	}
 
-	portstats("Access", uc.upf.accessIface)
-	portstats("Core", uc.upf.coreIface)
+	portstats("Access", uc.intf.getAccessIface())
+	portstats("Core", uc.intf.getCoreIface())
 }
 
 func (uc *upfCollector) summaryLatencyJitter(ch chan<- prometheus.Metric) {
@@ -140,7 +140,7 @@ func (uc *upfCollector) summaryLatencyJitter(ch chan<- prometheus.Metric) {
 			LatencyPercentiles: getPctiles(),
 			JitterPercentiles:  getPctiles(),
 		}
-		res := uc.upf.measure(ifaceName, req)
+		res := uc.intf.measure(ifaceName, req)
 		if res == nil {
 			return
 		}
@@ -171,12 +171,12 @@ func (uc *upfCollector) summaryLatencyJitter(ch chan<- prometheus.Metric) {
 			ch <- j
 		}
 	}
-	measureIface("Access", uc.upf.accessIface)
-	measureIface("Core", uc.upf.coreIface)
+	measureIface("Access", uc.intf.getAccessIface())
+	measureIface("Core", uc.intf.getCoreIface())
 }
 
-func setupProm(upf *upf) {
-	uc := newUpfCollector(upf)
+func setupProm(intf dataPath) {
+	uc := newUpfCollector(intf)
 	prometheus.MustRegister(uc)
 	http.Handle("/metrics", promhttp.Handler())
 }

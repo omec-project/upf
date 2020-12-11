@@ -10,67 +10,238 @@ import (
 	"net"
 	"time"
 
+	fqdn "github.com/Showmax/go-fqdn"
 	"github.com/golang/protobuf/ptypes"
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
+	"github.com/wmnsk/go-pfcp/ie"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-type upf struct {
+type bess struct {
 	accessIface string
 	coreIface   string
 	accessIP    net.IP
+	n4SrcIP     net.IP
 	coreIP      net.IP
-	fqdnHost    string
+	fqdnh       string
+	conn        *grpc.ClientConn
 	client      pb.BESSControlClient
 	maxSessions uint32
 	simInfo     *SimModeInfo
 }
 
-// to be replaced with go-pfcp structs
-
-// Don't change these values
-const (
-	tunnelGTPUPort = 2152
-
-	// src-iface consts
-	core   = 0x2
-	access = 0x1
-
-	// far-id specific directions
-	n3 = 0x0
-	n6 = 0x1
-	n9 = 0x2
-
-	// far-action specific values
-	farForwardU = 0x0
-	farForwardD = 0x1
-	farDrop     = 0x2
-)
-
 var intEnc = func(u uint64) *pb.FieldData {
 	return &pb.FieldData{Encoding: &pb.FieldData_ValueInt{ValueInt: u}}
 }
 
-func (u *upf) sim(method string) {
+func (b *bess) getFqdnHost() string {
+	return b.fqdnh
+}
+
+func (b *bess) getAccessIface() string {
+	return b.accessIface
+}
+
+func (b *bess) getCoreIface() string {
+	return b.coreIface
+}
+
+func (b *bess) getSimInfo() *SimModeInfo {
+	return b.simInfo
+}
+
+func (b *bess) getCoreIP() net.IP {
+	return b.coreIP
+}
+
+func (b *bess) handleChannelStatus() bool {
+	return true
+}
+
+func (b *bess) setInfo(udpConn *net.UDPConn, updAddr net.Addr, pconn *PFCPConn) {
+	log.Println("bess setUdpConn not handled")
+}
+
+func (b *bess) sendMsgToUPF(method string, pdrs []pdr, fars []far) uint8 {
+	// create context
+	var cause uint8 = ie.CauseRequestAccepted
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel()
+	done := make(chan bool)
+	calls := len(pdrs) + len(fars)
+
+	log.Println("upf : ", b.client)
+	log.Println("conn : ", b.conn)
+	// pause daemon, and then insert FAR(s), finally resume
+	err := b.pauseAll()
+	if err != nil {
+		log.Fatalln("Unable to pause BESS:", err)
+	}
+	for _, pdr := range pdrs {
+		switch method {
+		case "add":
+			fallthrough
+		case "mod":
+			b.addPDR(ctx, done, pdr)
+		case "del":
+			b.delPDR(ctx, done, pdr)
+		}
+	}
+	for _, far := range fars {
+		switch method {
+		case "add":
+			fallthrough
+		case "mod":
+			b.addFAR(ctx, done, far)
+		case "del":
+			b.delFAR(ctx, done, far)
+		}
+	}
+	rc := b.GRPCJoin(calls, Timeout, done)
+	if !rc {
+		log.Println("Unable to make GRPC calls")
+	}
+	err = b.resumeAll()
+	if err != nil {
+		log.Fatalln("Unable to resume BESS:", err)
+	}
+
+	return cause
+}
+
+func (b *bess) sendDeleteAllSessionsMsgtoUPF() {
+	/* create context, pause daemon, insert PDR(s), and resume daemon */
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel()
+	done := make(chan bool)
+	calls := 5
+
+	err := b.pauseAll()
+	if err != nil {
+		log.Fatalln("Unable to pause BESS:", err)
+	}
+	b.removeAllPDRs(ctx, done)
+	b.removeAllFARs(ctx, done)
+	b.removeAllCounters(ctx, done, "preQoSCounter")
+	b.removeAllCounters(ctx, done, "postDLQoSCounter")
+	b.removeAllCounters(ctx, done, "postULQoSCounter")
+
+	rc := b.GRPCJoin(calls, Timeout, done)
+	if !rc {
+		log.Println("Unable to make GRPC calls")
+	}
+	err = b.resumeAll()
+	if err != nil {
+		log.Fatalln("Unable to resume BESS:", err)
+	}
+}
+
+func (b *bess) getAccessIPStr(val *string) {
+	*val = b.accessIP.String()
+}
+
+func (b *bess) getAccessIP() net.IP {
+	return b.accessIP
+}
+
+func (b *bess) getCoreIPStr(val *string) {
+	*val = b.coreIP.String()
+}
+
+func (b *bess) getN4SrcIP(val *string) {
+	*val = b.n4SrcIP.String()
+}
+
+func (b *bess) setSimInfo(conf *Conf) {
+	log.Println("setSimInfo bess")
+
+	if *pfcpsim {
+		pfcpSim()
+		return
+	}
+
+	var simInfo *SimModeInfo
+	if conf.Mode == modeSim {
+		simInfo = &conf.SimInfo
+		b.simInfo = simInfo
+	}
+
+	if *simulate != "" {
+		if *simulate != "create" && *simulate != "delete" {
+			log.Fatalln("Invalid simulate method", simulate)
+		}
+
+		log.Println(*simulate, "sessions:", conf.MaxSessions)
+		b.sim(*simulate)
+		return
+	}
+}
+
+func (b *bess) exit() {
+	log.Println("Exit function Bess")
+	b.conn.Close()
+}
+
+func (b *bess) parseFunc(conf *Conf) {
+	log.Println("parseFunc bess")
+	b.accessIP = ParseIP(conf.AccessIface.IfName, "Access")
+	b.coreIP = ParseIP(conf.CoreIface.IfName, "Core")
+	b.n4SrcIP = net.ParseIP("0.0.0.0")
+	b.accessIface = conf.AccessIface.IfName
+	b.coreIface = conf.CoreIface.IfName
+	b.maxSessions = conf.MaxSessions
+
+	// fetch fqdn. Prefer json field
+	b.fqdnh = conf.CPIface.FQDNHost
+	if b.fqdnh == "" {
+		b.fqdnh = fqdn.Get()
+	}
+
+	// get bess grpc client
+	var errin error
+	log.Println("bessIP ", *bessIP)
+
+	b.conn, errin = grpc.Dial(*bessIP, grpc.WithInsecure())
+	if errin != nil {
+		log.Fatalln("did not connect:", errin)
+	}
+
+	if conf.CPIface.SrcIP == "" {
+		if conf.CPIface.DestIP != "" {
+			log.Println("Dest address ", conf.CPIface.DestIP)
+			b.n4SrcIP = getLocalIP(conf.CPIface.DestIP)
+			log.Println("SPGWU/UPF address IP: ", b.n4SrcIP.String())
+		}
+	} else {
+		addrs, errin := net.LookupHost(conf.CPIface.SrcIP)
+		if errin == nil {
+			b.n4SrcIP = net.ParseIP(addrs[0])
+		}
+	}
+	b.client = pb.NewBESSControlClient(b.conn)
+}
+
+func (b *bess) sim(method string) {
 	start := time.Now()
 
 	// Pause workers before
-	err := u.pauseAll()
+	err := b.pauseAll()
 	if err != nil {
 		log.Fatalln("Unable to pause BESS:", err)
 	}
 
 	// const ueip, teid, enbip = 0x10000001, 0xf0000000, 0x0b010181
-	ueip := u.simInfo.StartUEIP
-	enbip := u.simInfo.StartENBIP
-	aupfip := u.simInfo.StartAUPFIP
-	n9appip := u.simInfo.N9AppIP
-	n3TEID := hex2int(u.simInfo.StartN3TEID)
-	n9TEID := hex2int(u.simInfo.StartN9TEID)
+	ueip := b.simInfo.StartUEIP
+	enbip := b.simInfo.StartENBIP
+	aupfip := b.simInfo.StartAUPFIP
+	n9appip := b.simInfo.N9AppIP
+	n3TEID := hex2int(b.simInfo.StartN3TEID)
+	n9TEID := hex2int(b.simInfo.StartN9TEID)
 
 	const ng4tMaxUeRan, ng4tMaxEnbRan = 500000, 80
 
-	for i := uint32(0); i < u.maxSessions; i++ {
+	for i := uint32(0); i < b.maxSessions; i++ {
 		// NG4T-based formula to calculate enodeB IP address against a given UE IP address
 		// il_trafficgen also uses the same scheme
 		// See SimuCPEnbv4Teid(...) in ngic code for more details
@@ -98,7 +269,7 @@ func (u *upf) sim(method string) {
 		pdrN9Down := pdr{
 			srcIface:     core,
 			tunnelTEID:   n9TEID + i,
-			tunnelIP4Dst: ip2int(u.coreIP),
+			tunnelIP4Dst: ip2int(b.coreIP),
 
 			srcIfaceMask:     0xFF,
 			tunnelTEIDMask:   0xFFFFFFFF,
@@ -115,7 +286,7 @@ func (u *upf) sim(method string) {
 		// create/delete uplink pdr
 		pdrN6Up := pdr{
 			srcIface:     access,
-			tunnelIP4Dst: ip2int(u.accessIP),
+			tunnelIP4Dst: ip2int(b.accessIP),
 			tunnelTEID:   n3TEID + i,
 			srcIP:        ip2int(ueip) + i,
 
@@ -134,7 +305,7 @@ func (u *upf) sim(method string) {
 
 		pdrN9Up := pdr{
 			srcIface:     access,
-			tunnelIP4Dst: ip2int(u.accessIP),
+			tunnelIP4Dst: ip2int(b.accessIP),
 			tunnelTEID:   n3TEID + i,
 			dstIP:        ip2int(n9appip),
 
@@ -160,7 +331,7 @@ func (u *upf) sim(method string) {
 
 			action:       farForwardD,
 			tunnelType:   0x1,
-			tunnelIP4Src: ip2int(u.accessIP),
+			tunnelIP4Src: ip2int(b.accessIP),
 			tunnelIP4Dst: ip2int(enbip) + enbIdx,
 			tunnelTEID:   n3TEID + i,
 			tunnelPort:   tunnelGTPUPort,
@@ -180,7 +351,7 @@ func (u *upf) sim(method string) {
 
 			action:       farForwardU,
 			tunnelType:   0x1,
-			tunnelIP4Src: ip2int(u.coreIP),
+			tunnelIP4Src: ip2int(b.coreIP),
 			tunnelIP4Dst: ip2int(aupfip),
 			tunnelTEID:   n9TEID + i,
 			tunnelPort:   tunnelGTPUPort,
@@ -190,160 +361,85 @@ func (u *upf) sim(method string) {
 
 		switch timeout := 100 * time.Millisecond; method {
 		case "create":
-			u.simcreateEntries(pdrs, fars, timeout)
+			b.simcreateEntries(pdrs, fars, timeout)
 
 		case "delete":
-			u.simdeleteEntries(pdrs, fars, timeout)
+			b.simdeleteEntries(pdrs, fars, timeout)
 
 		default:
 			log.Fatalln("Unsupported method", method)
 		}
 	}
-	err = u.resumeAll()
+	err = b.resumeAll()
 	if err != nil {
 		log.Fatalln("Unable to resume BESS:", err)
 	}
 
-	log.Println("Sessions/s:", float64(u.maxSessions)/time.Since(start).Seconds())
+	log.Println("Sessions/s:", float64(b.maxSessions)/time.Since(start).Seconds())
 }
 
-func (u *upf) simcreateEntries(pdrs []pdr, fars []far, timeout time.Duration) {
+func (b *bess) simcreateEntries(pdrs []pdr, fars []far, timeout time.Duration) {
 	calls := len(pdrs) + len(fars)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	done := make(chan bool)
 	for _, pdrv := range pdrs {
-		u.addPDR(ctx, done, pdrv)
+		b.addPDR(ctx, done, pdrv)
 	}
 
 	for _, farv := range fars {
-		u.addFAR(ctx, done, farv)
+		b.addFAR(ctx, done, farv)
 	}
 
-	rc := u.GRPCJoin(calls, timeout, done)
+	rc := b.GRPCJoin(calls, timeout, done)
 	if !rc {
 		log.Println("Unable to complete GRPC call(s). Deleting")
-		go u.simdeleteEntries(pdrs, fars, timeout)
+		go b.simdeleteEntries(pdrs, fars, timeout)
 	}
 }
 
-func (u *upf) simdeleteEntries(pdrs []pdr, fars []far, timeout time.Duration) {
+func (b *bess) simdeleteEntries(pdrs []pdr, fars []far, timeout time.Duration) {
 	calls := len(pdrs) + len(fars)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	done := make(chan bool)
 	for _, pdrv := range pdrs {
-		u.delPDR(ctx, done, pdrv)
+		b.delPDR(ctx, done, pdrv)
 	}
 
 	for _, farv := range fars {
-		u.delFAR(ctx, done, farv)
+		b.delFAR(ctx, done, farv)
 	}
 
-	rc := u.GRPCJoin(calls, timeout, done)
+	rc := b.GRPCJoin(calls, timeout, done)
 	if !rc {
 		log.Println("Unable to complete GRPC call(s)")
 	}
 }
 
-func (u *upf) sendMsgToUPF(method string, pdrs []pdr, fars []far) {
-	calls := len(pdrs) + len(fars)
-	if calls == 0 {
-		return
-	}
-
-	// create context
-	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
-	defer cancel()
-	done := make(chan bool)
-
-	// pause daemon, and then insert FAR(s), finally resume
-	err := u.pauseAll()
-	if err != nil {
-		log.Fatalln("Unable to pause BESS:", err)
-	}
-
-	for _, pdr := range pdrs {
-		pdr.printPDR()
-		switch method {
-		case "add":
-			u.addPDR(ctx, done, pdr)
-		case "del":
-			u.delPDR(ctx, done, pdr)
-		}
-	}
-
-	for _, far := range fars {
-		far.printFAR()
-		switch method {
-		case "add":
-			u.addFAR(ctx, done, far)
-		case "del":
-			u.delFAR(ctx, done, far)
-		}
-	}
-
-	rc := u.GRPCJoin(calls, Timeout, done)
-	if !rc {
-		log.Println("Unable to make GRPC calls")
-	}
-
-	err = u.resumeAll()
-	if err != nil {
-		log.Fatalln("Unable to resume BESS:", err)
-	}
-}
-
-func sendDeleteAllSessionsMsgtoUPF(upf *upf) {
-	/* create context, pause daemon, insert PDR(s), and resume daemon */
-	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
-	defer cancel()
-	done := make(chan bool)
-	calls := 5
-
-	err := upf.pauseAll()
-	if err != nil {
-		log.Fatalln("Unable to pause BESS:", err)
-	}
-	upf.removeAllPDRs(ctx, done)
-	upf.removeAllFARs(ctx, done)
-	upf.removeAllCounters(ctx, done, "preQoSCounter")
-	upf.removeAllCounters(ctx, done, "postDLQoSCounter")
-	upf.removeAllCounters(ctx, done, "postULQoSCounter")
-
-	rc := upf.GRPCJoin(calls, Timeout, done)
-	if !rc {
-		log.Println("Unable to make GRPC calls")
-	}
-	err = upf.resumeAll()
-	if err != nil {
-		log.Fatalln("Unable to resume BESS:", err)
-	}
-}
-
-func (u *upf) pauseAll() error {
+func (b *bess) pauseAll() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	_, err := u.client.PauseAll(ctx, &pb.EmptyRequest{})
+	_, err := b.client.PauseAll(ctx, &pb.EmptyRequest{})
 	return err
 }
 
-func (u *upf) resumeAll() error {
+func (b *bess) resumeAll() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	_, err := u.client.ResumeAll(ctx, &pb.EmptyRequest{})
+	_, err := b.client.ResumeAll(ctx, &pb.EmptyRequest{})
 	return err
 }
 
-func (u *upf) processPDR(ctx context.Context, any *anypb.Any, method string) {
+func (b *bess) processPDR(ctx context.Context, any *anypb.Any, method string) {
 	if method != "add" && method != "delete" && method != "clear" {
 		log.Println("Invalid method name: ", method)
 		return
 	}
 
-	_, err := u.client.ModuleCommand(ctx, &pb.CommandRequest{
+	_, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "pdrLookup",
 		Cmd:  method,
 		Arg:  any,
@@ -353,7 +449,7 @@ func (u *upf) processPDR(ctx context.Context, any *anypb.Any, method string) {
 	}
 }
 
-func (u *upf) addPDR(ctx context.Context, done chan<- bool, p pdr) {
+func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 	go func() {
 		var any *anypb.Any
 		var err error
@@ -394,12 +490,12 @@ func (u *upf) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 			return
 		}
 
-		u.processPDR(ctx, any, "add")
+		b.processPDR(ctx, any, "add")
 		done <- true
 	}()
 }
 
-func (u *upf) delPDR(ctx context.Context, done chan<- bool, p pdr) {
+func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 	go func() {
 		var any *anypb.Any
 		var err error
@@ -432,18 +528,18 @@ func (u *upf) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 			return
 		}
 
-		u.processPDR(ctx, any, "delete")
+		b.processPDR(ctx, any, "delete")
 		done <- true
 	}()
 }
 
-func (u *upf) processFAR(ctx context.Context, any *anypb.Any, method string) {
+func (b *bess) processFAR(ctx context.Context, any *anypb.Any, method string) {
 	if method != "add" && method != "delete" && method != "clear" {
 		log.Println("Invalid method name: ", method)
 		return
 	}
 
-	_, err := u.client.ModuleCommand(ctx, &pb.CommandRequest{
+	_, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "farLookup",
 		Cmd:  method,
 		Arg:  any,
@@ -453,7 +549,7 @@ func (u *upf) processFAR(ctx context.Context, any *anypb.Any, method string) {
 	}
 }
 
-func (u *upf) addFAR(ctx context.Context, done chan<- bool, far far) {
+func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 	go func() {
 		var any *anypb.Any
 		var err error
@@ -478,12 +574,12 @@ func (u *upf) addFAR(ctx context.Context, done chan<- bool, far far) {
 			log.Println("Error marshalling the rule", f, err)
 			return
 		}
-		u.processFAR(ctx, any, "add")
+		b.processFAR(ctx, any, "add")
 		done <- true
 	}()
 }
 
-func (u *upf) delFAR(ctx context.Context, done chan<- bool, far far) {
+func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 	go func() {
 		var any *anypb.Any
 		var err error
@@ -499,13 +595,13 @@ func (u *upf) delFAR(ctx context.Context, done chan<- bool, far far) {
 			log.Println("Error marshalling the rule", f, err)
 			return
 		}
-		u.processFAR(ctx, any, "delete")
+		b.processFAR(ctx, any, "delete")
 		done <- true
 	}()
 }
 
-func (u *upf) processCounters(ctx context.Context, any *anypb.Any, method string, counterName string) {
-	cr, err := u.client.ModuleCommand(ctx, &pb.CommandRequest{
+func (b *bess) processCounters(ctx context.Context, any *anypb.Any, method string, counterName string) {
+	cr, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: counterName,
 		Cmd:  method,
 		Arg:  any,
@@ -515,7 +611,7 @@ func (u *upf) processCounters(ctx context.Context, any *anypb.Any, method string
 	}
 }
 
-func (u *upf) addCounter(ctx context.Context, done chan<- bool, ctrID uint32, counterName string) {
+func (b *bess) addCounter(ctx context.Context, done chan<- bool, ctrID uint32, counterName string) {
 	go func() {
 		var any *anypb.Any
 		var err error
@@ -529,12 +625,12 @@ func (u *upf) addCounter(ctx context.Context, done chan<- bool, ctrID uint32, co
 			log.Println("Error marshalling the rule", f, err)
 			return
 		}
-		u.processCounters(ctx, any, "add", counterName)
+		b.processCounters(ctx, any, "add", counterName)
 		done <- true
 	}()
 }
 
-func (u *upf) delCounter(ctx context.Context, done chan<- bool, ctrID uint32, counterName string) {
+func (b *bess) delCounter(ctx context.Context, done chan<- bool, ctrID uint32, counterName string) {
 	go func() {
 		var any *anypb.Any
 		var err error
@@ -548,12 +644,12 @@ func (u *upf) delCounter(ctx context.Context, done chan<- bool, ctrID uint32, co
 			log.Println("Error marshalling the rule", f, err)
 			return
 		}
-		u.processCounters(ctx, any, "remove", counterName)
+		b.processCounters(ctx, any, "remove", counterName)
 		done <- true
 	}()
 }
 
-func (u *upf) removeAllPDRs(ctx context.Context, done chan<- bool) {
+func (b *bess) removeAllPDRs(ctx context.Context, done chan<- bool) {
 	go func() {
 		var any *anypb.Any
 		var err error
@@ -565,12 +661,12 @@ func (u *upf) removeAllPDRs(ctx context.Context, done chan<- bool) {
 			return
 		}
 
-		u.processPDR(ctx, any, "clear")
+		b.processPDR(ctx, any, "clear")
 		done <- true
 	}()
 }
 
-func (u *upf) removeAllFARs(ctx context.Context, done chan<- bool) {
+func (b *bess) removeAllFARs(ctx context.Context, done chan<- bool) {
 	go func() {
 		var any *anypb.Any
 		var err error
@@ -582,12 +678,12 @@ func (u *upf) removeAllFARs(ctx context.Context, done chan<- bool) {
 			return
 		}
 
-		u.processFAR(ctx, any, "clear")
+		b.processFAR(ctx, any, "clear")
 		done <- true
 	}()
 }
 
-func (u *upf) removeAllCounters(ctx context.Context, done chan<- bool, name string) {
+func (b *bess) removeAllCounters(ctx context.Context, done chan<- bool, name string) {
 	go func() {
 		var any *anypb.Any
 		var err error
@@ -599,13 +695,13 @@ func (u *upf) removeAllCounters(ctx context.Context, done chan<- bool, name stri
 			return
 		}
 
-		u.processCounters(ctx, any, "removeAll", name)
+		b.processCounters(ctx, any, "removeAll", name)
 
 		done <- true
 	}()
 }
 
-func (u *upf) measure(ifName string, f *pb.MeasureCommandGetSummaryArg) *pb.MeasureCommandGetSummaryResponse {
+func (b *bess) measure(ifName string, f *pb.MeasureCommandGetSummaryArg) *pb.MeasureCommandGetSummaryResponse {
 	modName := func() string {
 		return ifName + "_measure"
 	}
@@ -617,7 +713,7 @@ func (u *upf) measure(ifName string, f *pb.MeasureCommandGetSummaryArg) *pb.Meas
 	}
 
 	ctx := context.Background()
-	modRes, err := u.client.ModuleCommand(ctx, &pb.CommandRequest{
+	modRes, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: modName(),
 		Cmd:  "get_summary",
 		Arg:  any,
@@ -637,12 +733,12 @@ func (u *upf) measure(ifName string, f *pb.MeasureCommandGetSummaryArg) *pb.Meas
 	return &res
 }
 
-func (u *upf) portStats(ifname string) *pb.GetPortStatsResponse {
+func (b *bess) portStats(ifname string) *pb.GetPortStatsResponse {
 	req := &pb.GetPortStatsRequest{
 		Name: ifname + "Fast",
 	}
 	ctx := context.Background()
-	res, err := u.client.GetPortStats(ctx, req)
+	res, err := b.client.GetPortStats(ctx, req)
 	if err != nil || res.GetError() != nil {
 		log.Println("Error calling GetPortStats", ifname, err, res.GetError().Errmsg)
 		return nil
@@ -650,7 +746,7 @@ func (u *upf) portStats(ifname string) *pb.GetPortStatsResponse {
 	return res
 }
 
-func (u *upf) GRPCJoin(calls int, timeout time.Duration, done chan bool) bool {
+func (b *bess) GRPCJoin(calls int, timeout time.Duration, done chan bool) bool {
 	boom := time.After(timeout)
 
 	for {
