@@ -11,7 +11,7 @@ import (
 type fastPath interface {
 	exit()
 	setUpfInfo(u *upf, conf *Conf)
-	setInfo(udpConn *net.UDPConn, updAddr net.Addr, pconn *PFCPConn)
+	setInfo(udpConn *net.UDPConn, udpAddr net.Addr, pconn *PFCPConn)
 	sim(u *upf, method string)
 	sendMsgToUPF(method string, pdrs []pdr, fars []far) uint8
 	sendDeleteAllSessionsMsgtoUPF()

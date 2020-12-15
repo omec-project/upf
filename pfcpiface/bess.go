@@ -27,7 +27,7 @@ type bess struct {
 	conn   *grpc.ClientConn
 }
 
-func (b *bess) setInfo(udpConn *net.UDPConn, updAddr net.Addr, pconn *PFCPConn) {
+func (b *bess) setInfo(udpConn *net.UDPConn, udpAddr net.Addr, pconn *PFCPConn) {
 	log.Println("bess setUdpConn not handled")
 }
 
