@@ -48,6 +48,10 @@ func sendDeleteAllSessionsMsgtoUPF(u *upf) {
 	u.intf.sendDeleteAllSessionsMsgtoUPF()
 }
 
+func (u *upf) isConnected() bool {
+	return u.intf.isConnected(&u.accessIP)
+}
+
 func (u *upf) exit() {
 	u.intf.exit()
 }
@@ -58,4 +62,8 @@ func (u *upf) sim(method string) {
 
 func (u *upf) setUpfInfo(conf *Conf) {
 	u.intf.setUpfInfo(u, conf)
+}
+
+func (u *upf) setInfo(udpConn *net.UDPConn, udpAddr net.Addr, pconn *PFCPConn) {
+	u.intf.setInfo(udpConn, udpAddr, pconn)
 }

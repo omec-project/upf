@@ -48,10 +48,21 @@
     "": "Whether to enable Network Token Functions",
     "enable_ntf": false,
 
+    "": "Whether to enable P4Runtime feature",
+    "enable_p4rt": false,
+    
     "": "Control plane controller settings",
     "cpiface": {
-        "nb_dst_ip": "172.17.0.1",
-        "" : "nb_dst_ip: CPHostname",
-        "hostname": "ngic-skx2"
+	"nb_dst_ip": "172.17.0.1",
+	"" : "nb_dst_ip: CPHostname",
+	"hostname": "spgwc"
+    },
+    
+    "": "p4rtc interface settings",
+    "p4rtciface": {
+    "access_ip": "172.17.0.1/32",
+    "p4rtc_server": "onos",
+    "p4rtc_port": "51001",
+    "ue_ip_pool": "10.250.0.0/24"
     }
 }
