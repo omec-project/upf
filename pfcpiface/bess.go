@@ -34,10 +34,14 @@ func (b *bess) setInfo(udpConn *net.UDPConn, udpAddr net.Addr, pconn *PFCPConn) 
 func (b *bess) sendMsgToUPF(method string, pdrs []pdr, fars []far) uint8 {
 	// create context
 	var cause uint8 = ie.CauseRequestAccepted
+	calls := len(pdrs) + len(fars)
+	if calls == 0 {
+		return cause
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
 	done := make(chan bool)
-	calls := len(pdrs) + len(fars)
 
 	log.Println("upf : ", b.client)
 	log.Println("conn : ", b.conn)
