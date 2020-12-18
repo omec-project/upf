@@ -35,7 +35,7 @@ func (i *IE) SuggestedBufferingPacketsCount() (uint8, error) {
 		return 0, ErrIENotFound
 	case UpdateBARWithinSessionReportResponse,
 		UpdateBARWithinSessionModificationRequest:
-		ies, err := i.CreateBAR()
+		ies, err := i.UpdateBAR()
 		if err != nil {
 			return 0, err
 		}

@@ -15,8 +15,8 @@ func NewUpdateBARWithinSessionModificationRequest(ies ...*IE) *IE {
 }
 
 // NewUpdateBARWithinSessionReportResponse creates a new UpdateBARWithinSessionReportResponse IE.
-func NewUpdateBARWithinSessionReportResponse(bar, delay, duration, dlCount, bufCount *IE) *IE {
-	return NewUpdateBAR(UpdateBARWithinSessionReportResponse, bar, delay, duration, dlCount, bufCount)
+func NewUpdateBARWithinSessionReportResponse(ies ...*IE) *IE {
+	return NewUpdateBAR(UpdateBARWithinSessionReportResponse, ies...)
 }
 
 // UpdateBAR returns the IEs above UpdateBAR if the type of IE matches.

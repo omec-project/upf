@@ -55,7 +55,7 @@
     "cpiface": {
 	"nb_dst_ip": "172.17.0.1",
 	"" : "nb_dst_ip: CPHostname",
-	"hostname": "ngic-skx2"
+	"hostname": "spgwc"
     },
     
     "": "p4rtc interface settings",

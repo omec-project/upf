@@ -7,52 +7,9 @@ import (
 	"encoding/binary"
 	"log"
 	"net"
-	"runtime"
 	"strconv"
 	"strings"
 )
-
-func PrintMemUsage() {
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-	/*
-		// For info on each, see: https://golang.org/pkg/runtime/#MemStats
-		log.Printf("Alloc = %v MiB, %v", bToMb(m.Alloc), m.Alloc)
-		log.Printf("MAllocs = %v", m.Mallocs)
-		log.Printf("Frees = %v", m.Frees)
-		log.Printf("\tTotalAlloc = %v MiB, %v", bToMb(m.TotalAlloc), m.TotalAlloc)
-		log.Printf("\tSys = %v MiBi, %v", bToMb(m.Sys), m.Sys)
-		log.Printf("\tNumGC = %v\n", m.NumGC)*/
-}
-
-func has2ndBit(f uint8) bool {
-	return (f&0x02)>>1 == 1
-}
-
-func has1stBit(f uint8) bool {
-	return (f & 0x01) == 1
-}
-
-/*
-func bToMb(b uint64) uint64 {
-	return b / 1024 / 1024
-}
-
-func deleteFromSlice([]r) {
-    for _, x := range s {
-        if isValid(x) {
-            // copy and increment index
-            s[i] = x
-            i++
-        }
-    }
-    // Prevent memory leak by erasing truncated values
-    // (not needed if values don't contain pointers, directly or indirectly)
-    for j := i; j < len(s); j++ {
-        s[j] = nil
-    }
-    s = s[:i]
-}*/
 
 func ip2int(ip net.IP) uint32 {
 	if len(ip) == 16 {
@@ -103,12 +60,4 @@ func getLocalIP(dstIP string) net.IP {
 	defer conn.Close()
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 	return localAddr.IP
-}
-
-func mySEID(peerSEID uint64) uint64 {
-	return (peerSEID >> 2)
-}
-
-func peerSEID(mySEID uint64) uint64 {
-	return (mySEID << 2)
 }

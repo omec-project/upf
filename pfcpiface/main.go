@@ -6,13 +6,13 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"github.com/wmnsk/go-pfcp/message"
 	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"os"
-	"time"
+
+	fqdn "github.com/Showmax/go-fqdn"
 )
 
 const (
@@ -29,6 +29,7 @@ var (
 	configPath      = flag.String("config", "upf.json", "path to upf config")
 	httpAddr        = flag.String("http", "0.0.0.0:8080", "http IP/port combo")
 	simulate        = flag.String("simulate", "", "create|delete simulated sessions")
+	pfcpsim         = flag.Bool("pfcpsim", false, "simulate PFCP")
 	n4SrcIPStr      = flag.String("n4SrcIPStr", "", "N4Interface IP")
 	p4RtcServerIP   = flag.String("p4RtcServerIP", "", "P4 Server ip")
 	p4RtcServerPort = flag.String("p4RtcServerPort", "", "P4 Server port")
@@ -75,26 +76,6 @@ type P4rtcInfo struct {
 // IfaceType : Gateway interface struct
 type IfaceType struct {
 	IfName string `json:"ifname"`
-}
-
-type common interface {
-	exit()
-	parseFunc(conf *Conf)
-	addUsageReports(sdRes *message.SessionDeletionResponse, seidKey uint64)
-	handleVolQuotaExceed(uint32, uint64)
-	setUpfInfo(conf *Conf)
-	getUpf() *upf
-	readCounterVal()
-	sendURRForReporting(recItem *reportRecord)
-	setUdpConn(udpConn *net.UDPConn, updAddr net.Addr)
-	handleCounterEntry(ce *IntfCounterEntry)
-	getAccessIPStr(val *string)
-	getAccessIP() net.IP
-	getCoreIP(val *string)
-	getN4SrcIP(val *string)
-	handleChannelStatus() bool
-	sendMsgToUPF(method string, pdrs []pdr, fars []far, urrs []urr) uint8
-	sendDeleteAllSessionsMsgtoUPF()
 }
 
 // ParseJSON : parse json file and populate corresponding struct
@@ -150,62 +131,13 @@ func ParseIP(name string, iface string) net.IP {
 	return ip
 }
 
-func setSwitchInfo(p4rtClient *P4rtClient) (net.IP, net.IPMask, error) {
-	log.Println("Set Switch Info")
-	log.Println("device id ", (*p4rtClient).DeviceID)
-	p4InfoPath := "/bin/p4info.txt"
-	deviceConfigPath := "/bin/bmv2.json"
-
-	errin := p4rtClient.GetForwardingPipelineConfig()
-	if errin != nil {
-		errin = p4rtClient.SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath)
-		if errin != nil {
-			log.Println("set forwarding pipeling config failed. ", errin)
-			return nil, nil, errin
-		}
-	}
-
-	intfEntry := IntfTableEntry{
-		SrcIntf:   "ACCESS",
-		Direction: "UPLINK",
-	}
-
-	errin = p4rtClient.ReadInterfaceTable(&intfEntry)
-	if errin != nil {
-		log.Println("Read Interface table failed ", errin)
-		return nil, nil, errin
-	}
-
-	log.Println("accessip after read intf ", intfEntry.IP)
-	accessIP := net.IP(intfEntry.IP)
-	accessIPMask := net.CIDRMask(intfEntry.PrefixLen, 32)
-	log.Println("AccessIP: ", accessIP, ", AccessIPMask: ", accessIPMask)
-
-	return accessIP, accessIPMask, errin
-}
-
-func schedule(f func(), interval time.Duration, done <-chan bool) *time.Ticker {
-	ticker := time.NewTicker(interval)
-	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				f()
-			case <-done:
-				return
-			}
-		}
-	}()
-	return ticker
-}
-
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	// cmdline args
 	flag.Parse()
 	var conf Conf
-	var intf common
+	var intf fastPath
 	// read and parse json startup file
 	ParseJSON(configPath, &conf)
 	log.Println(conf)
@@ -218,20 +150,45 @@ func main() {
 		intf = bessSt
 	}
 
-	intf.parseFunc(&conf)
-	intf.setUpfInfo(&conf)
+	// fetch fqdn. Prefer json field
+	fqdnh := conf.CPIface.FQDNHost
+	if fqdnh == "" {
+		fqdnh = fqdn.Get()
+	}
 
-	var n4srcIP string
-	var accessIP string
-	var coreIP string
-	intf.getN4SrcIP(&n4srcIP)
-	intf.getAccessIPStr(&accessIP)
-	intf.getCoreIP(&coreIP)
-	log.Println("n4srcip ", n4srcIP)
-	log.Println("accessip ", accessIP)
-	log.Println("coreip ", coreIP)
-	go pfcpifaceMainLoop(intf, accessIP, coreIP, n4srcIP, conf.CPIface.DestIP)
-	setupProm(intf)
+	upf := &upf{
+		accessIface: conf.AccessIface.IfName,
+		coreIface:   conf.CoreIface.IfName,
+		fqdnHost:    fqdnh,
+		maxSessions: conf.MaxSessions,
+		intf:        intf,
+	}
+
+	upf.setUpfInfo(&conf)
+
+	if *pfcpsim {
+		pfcpSim()
+		return
+	}
+
+	if *simulate != "" {
+		if *simulate != "create" && *simulate != "delete" {
+			log.Fatalln("Invalid simulate method", simulate)
+		}
+
+		log.Println(*simulate, "sessions:", conf.MaxSessions)
+		upf.sim(*simulate)
+		return
+	}
+	log.Println("N4 local IP: ", upf.n4SrcIP.String())
+	log.Println("Access IP: ", upf.accessIP.String())
+	log.Println("Core IP: ", upf.coreIP.String())
+
+	go pfcpifaceMainLoop(upf, upf.accessIP.String(),
+		upf.coreIP.String(), upf.n4SrcIP.String(),
+		conf.CPIface.DestIP)
+
+	setupProm(upf)
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))
-	intf.exit()
+	upf.exit()
 }
