@@ -4,7 +4,7 @@
 PROJECT_NAME             := upf-epc
 VERSION                  ?= $(shell cat ./VERSION)
 
-# Note that we set the target platform of Docker images to native
+# Note that we set the target CPU of Docker images to native
 # For a more portable image set CPU=haswell
 CPU                      ?= native
 
