@@ -297,10 +297,10 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 			ie.NewCause(ie.CauseRequestRejected), /* accept it blindly for the time being */
 		).Marshal()
 		if err != nil {
-			log.Fatalln("Unable to create session establishment response", err)
+			log.Fatalln("Unable to create session modification response", err)
 		}
 
-		log.Println("Sending session establishment response to: ", addr)
+		log.Println("Sending session modification response to: ", addr)
 		return smres
 	}
 
@@ -342,19 +342,29 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 
 	for _, uPDR := range smreq.UpdatePDR {
 		var p pdr
-		if err := p.parsePDR(uPDR, localSEID, pc.mgr.appPFDs); err != nil {
+		var err error
+		if err = p.parsePDR(uPDR, localSEID, pc.mgr.appPFDs); err != nil {
 			return sendError(err)
 		}
-		session.UpdatePDR(p)
+		err = session.UpdatePDR(p)
+		if err != nil {
+			log.Println("session PDR update failed ", err)
+			continue
+		}
 		addPDRs = append(addPDRs, p)
 	}
 
 	for _, uFAR := range smreq.UpdateFAR {
 		var f far
+		var err error
 		if err := f.parseFAR(uFAR, localSEID, upf, update); err != nil {
 			return sendError(err)
 		}
-		session.UpdateFAR(f)
+		err = session.UpdateFAR(f)
+		if err != nil {
+			log.Println("session PDR update failed ", err)
+			continue
+		}
 		addFARs = append(addFARs, f)
 	}
 

@@ -112,7 +112,10 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 
 			if fields[i+1] != "to" {
 				i++
-				ipf.src.parsePort(fields[i])
+				err = ipf.src.parsePort(fields[i])
+				if err != nil {
+					log.Println("src port parse failed ", err)
+				}
 			}
 		case "to":
 			i++
@@ -124,7 +127,10 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 
 			if i < len(fields)-1 {
 				i++
-				ipf.dst.parsePort(fields[i])
+				err = ipf.dst.parsePort(fields[i])
+				if err != nil {
+					log.Println("dst port parse failed ", err)
+				}
 			}
 		}
 	}
