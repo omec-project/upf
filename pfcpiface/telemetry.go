@@ -6,7 +6,6 @@ package main
 import (
 	"net/http"
 
-	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -80,99 +79,11 @@ func (uc *upfCollector) Collect(ch chan<- prometheus.Metric) {
 
 func (uc *upfCollector) portStats(ch chan<- prometheus.Metric) {
 	// When operating in sim mode there are no BESS ports
-	if uc.upf.simInfo != nil {
-		return
-	}
-
-	portstats := func(ifaceLabel, ifaceName string) {
-		packets := func(packets uint64, direction string) {
-			p := prometheus.MustNewConstMetric(
-				uc.packets,
-				prometheus.CounterValue,
-				float64(packets),
-				ifaceLabel, direction,
-			)
-			ch <- p
-		}
-		bytes := func(bytes uint64, direction string) {
-			p := prometheus.MustNewConstMetric(
-				uc.bytes,
-				prometheus.CounterValue,
-				float64(bytes),
-				ifaceLabel, direction,
-			)
-			ch <- p
-		}
-		dropped := func(dropped uint64, direction string) {
-			p := prometheus.MustNewConstMetric(
-				uc.dropped,
-				prometheus.CounterValue,
-				float64(dropped),
-				ifaceLabel, direction,
-			)
-			ch <- p
-		}
-
-		res := uc.upf.portStats(ifaceName)
-		if res == nil {
-			return
-		}
-
-		packets(res.Inc.Packets, "rx")
-		packets(res.Out.Packets, "tx")
-
-		bytes(res.Inc.Bytes, "rx")
-		bytes(res.Out.Bytes, "tx")
-
-		dropped(res.Inc.Dropped, "rx")
-		dropped(res.Out.Dropped, "tx")
-
-	}
-
-	portstats("Access", uc.upf.accessIface)
-	portstats("Core", uc.upf.coreIface)
+	uc.upf.intf.portStats(uc, ch)
 }
 
 func (uc *upfCollector) summaryLatencyJitter(ch chan<- prometheus.Metric) {
-	measureIface := func(ifaceLabel, ifaceName string) {
-		req := &pb.MeasureCommandGetSummaryArg{
-			Clear:              true,
-			LatencyPercentiles: getPctiles(),
-			JitterPercentiles:  getPctiles(),
-		}
-		res := uc.upf.measure(ifaceName, req)
-		if res == nil {
-			return
-		}
-
-		latencies := res.GetLatency().GetPercentileValuesNs()
-		if latencies != nil {
-			l := prometheus.MustNewConstSummary(
-				uc.latency,
-				res.Packets,
-				float64(res.Latency.GetTotalNs()),
-				makeBuckets(latencies),
-				ifaceLabel,
-			)
-
-			ch <- l
-		}
-
-		jitters := res.GetJitter().GetPercentileValuesNs()
-		if jitters != nil {
-			j := prometheus.MustNewConstSummary(
-				uc.jitter,
-				res.Packets,
-				float64(res.Jitter.GetTotalNs()),
-				makeBuckets(jitters),
-				ifaceLabel,
-			)
-
-			ch <- j
-		}
-	}
-	measureIface("Access", uc.upf.accessIface)
-	measureIface("Core", uc.upf.coreIface)
+	uc.upf.intf.summaryLatencyJitter(uc, ch)
 }
 
 func setupProm(upf *upf) {
