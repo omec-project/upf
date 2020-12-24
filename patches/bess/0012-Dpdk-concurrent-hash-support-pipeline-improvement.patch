@@ -358,7 +358,7 @@ index 85deeafc..a76cec4c 100644
 -
 +struct rte_hash_parameters dpdk_params1{
 +      .name= "test2",
-+      .entries = 1<<20,
++      .entries = 1<<17,
 +      .reserved = 0,
 +      .key_len = sizeof(wm_hkey_t),
 +      .hash_func = rte_hash_crc,
