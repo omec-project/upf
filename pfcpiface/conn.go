@@ -18,8 +18,8 @@ const (
 	PktBufSz    = 1500
 	PFCPPort    = "8805"
 	MaxItems    = 10
-	Timeout     = 1000 * time.Millisecond
-	readTimeout = 25 * time.Second
+	Timeout     = 1000000 * time.Millisecond
+	readTimeout = 600 * time.Second
 )
 
 // PFCPConn represents a PFCP connection

@@ -102,6 +102,9 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 			} else if dstIface == ie.DstInterfaceCore {
 				f.action = farForwardU
 				f.tunnelIP4Src = ip2int(upf.coreIP)
+			} else {
+				f.action = farForwardU
+				f.tunnelIP4Src = ip2int(upf.coreIP)
 			}
 		}
 	}
