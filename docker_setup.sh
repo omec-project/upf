@@ -158,7 +158,7 @@ docker run --name bess -td --restart unless-stopped \
 	--net container:pause \
 	$PRIVS \
 	$DEVICES \
-	upf-epc-bess:"$(<VERSION)" -m 4096 -grpc-url=0.0.0.0:$bessd_port
+	upf-epc-bess:"$(<VERSION)" -grpc-url=0.0.0.0:$bessd_port
 
 docker logs bess
 
