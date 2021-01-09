@@ -11,6 +11,19 @@ import (
 	"strings"
 )
 
+//grpc channel state
+const (
+	Ready = 2 //grpc channel state Ready
+)
+
+type Bits uint8
+
+func Set(b, flag Bits) Bits { return b | flag }
+
+//func Clear(b, flag Bits) Bits  { return b &^ flag }
+//func Toggle(b, flag Bits) Bits { return b ^ flag }
+//func Has(b, flag Bits) bool { return b&flag != 0 }
+
 func ip2int(ip net.IP) uint32 {
 	if len(ip) == 16 {
 		return binary.BigEndian.Uint32(ip[12:16])

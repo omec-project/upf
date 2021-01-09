@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"math"
 	"net"
@@ -22,6 +23,10 @@ var intEnc = func(u uint64) *pb.FieldData {
 	return &pb.FieldData{Encoding: &pb.FieldData_ValueInt{ValueInt: u}}
 }
 
+var (
+	bessIP = flag.String("bess", "localhost:10514", "BESS IP/port combo")
+)
+
 type bess struct {
 	client pb.BESSControlClient
 	conn   *grpc.ClientConn
@@ -29,6 +34,14 @@ type bess struct {
 
 func (b *bess) setInfo(udpConn *net.UDPConn, udpAddr net.Addr, pconn *PFCPConn) {
 	log.Println("bess setUdpConn not handled")
+}
+
+func (b *bess) isConnected(accessIP *net.IP) bool {
+	if (b.conn == nil) || (int(b.conn.GetState()) != Ready) {
+		return false
+	}
+
+	return true
 }
 
 func (b *bess) sendMsgToUPF(method string, pdrs []pdr, fars []far) uint8 {

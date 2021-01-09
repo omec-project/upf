@@ -20,7 +20,6 @@ const (
 )
 
 var (
-	bessIP     = flag.String("bess", "localhost:10514", "BESS IP/port combo")
 	configPath = flag.String("config", "upf.json", "path to upf config")
 	httpAddr   = flag.String("http", "0.0.0.0:8080", "http IP/port combo")
 	simulate   = flag.String("simulate", "", "create|delete simulated sessions")
@@ -35,6 +34,8 @@ type Conf struct {
 	AccessIface IfaceType   `json:"access"`
 	CoreIface   IfaceType   `json:"core"`
 	CPIface     CPIfaceInfo `json:"cpiface"`
+	P4rtcIface  P4rtcInfo   `json:"p4rtciface"`
+	EnableP4rt  bool        `json:"enable_p4rt"`
 	SimInfo     SimModeInfo `json:"sim"`
 }
 
@@ -83,6 +84,16 @@ func ParseJSON(filepath *string, conf *Conf) {
 	}
 }
 
+// ParseStrIP : parse IP address from config
+func ParseStrIP(n3name string) (net.IP, net.IPMask) {
+	ip, ipNet, err := net.ParseCIDR(n3name)
+	if err != nil {
+		log.Fatalln("Unable to parse IP: ", err)
+	}
+	log.Println("IP: ", ip)
+	return ip, (ipNet).Mask
+}
+
 // ParseIP : parse IP address from the interface name
 func ParseIP(name string, iface string) net.IP {
 	byNameInterface, err := net.InterfaceByName(name)
@@ -115,8 +126,11 @@ func main() {
 	ParseJSON(configPath, &conf)
 	log.Println(conf)
 
-	bessSt := &bess{}
-	intf = bessSt
+	if conf.EnableP4rt {
+		intf = &p4rtc{}
+	} else {
+		intf = &bess{}
+	}
 
 	// fetch fqdn. Prefer json field
 	fqdnh := conf.CPIface.FQDNHost
