@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2021-present Open Networking Foundation
+
 package main
 
 import (
@@ -277,7 +280,7 @@ func (c *P4rtClient) WriteFarTable(
 		te.Params[7].Value[0] = val[0]
 	}
 
-	var prio int32 = 0
+	var prio int32
 	return c.InsertTableEntry(te, funcType, prio)
 }
 
@@ -297,7 +300,7 @@ func (c *P4rtClient) WritePdrTable(
 	te.Fields[0].Name = "src_iface"
 	enumName := "InterfaceType"
 	var srcIntfStr string
-	var decapVal uint8 = 0
+	var decapVal uint8
 	if pdrEntry.srcIface == access {
 		srcIntfStr = "ACCESS"
 		decapVal = 1
@@ -402,7 +405,7 @@ func (c *P4rtClient) WriteInterfaceTable(
 	}
 	te.Params[1].Value = val
 
-	var prio int32 = 0
+	var prio int32
 	return c.InsertTableEntry(te, funcType, prio)
 }
 
@@ -432,9 +435,9 @@ func (c *P4rtClient) getFieldValue(entity *p4.Entity,
 		return nil, err
 	}
 
-	var matchType p4ConfigV1.MatchField_MatchType = 0
-	var fieldID uint32 = 0
-	var paramID uint32 = 0
+	var matchType p4ConfigV1.MatchField_MatchType
+	var fieldID uint32
+	var paramID uint32
 	for _, tables := range c.P4Info.Tables {
 		if tables.Preamble.Id == tableID {
 			for _, fields := range tables.MatchFields {
@@ -670,7 +673,7 @@ func (c *P4rtClient) ClearFarTable() error {
 		TableName: "PreQosPipe.load_far_attributes",
 	}
 
-	var prio int32 = 0
+	var prio int32
 	readRes, err := c.ReadTableEntry(te, prio)
 	if err != nil {
 		log.Println("Read Interface table failed ", err)
@@ -702,7 +705,7 @@ func (c *P4rtClient) ClearPdrTable() error {
 		TableName: "PreQosPipe.pdrs",
 	}
 
-	var prio int32 = 0
+	var prio int32
 	readRes, err := c.ReadTableEntry(te, prio)
 	if err != nil {
 		log.Println("Read Pdr table failed ", err)
@@ -760,7 +763,7 @@ func (c *P4rtClient) ReadInterfaceTable(
 	}
 	te.Params[1].Value = val
 
-	var prio int32 = 0
+	var prio int32
 	readRes, err := c.ReadTableEntry(te, prio)
 	if err != nil {
 		log.Println("Read Interface table failed ", err)
@@ -785,7 +788,7 @@ func (c *P4rtClient) ReadInterfaceTable(
 	return err
 }
 
-//ReadTableEntry .. Read table Entry
+//ReadTableEntry ... Read table Entry
 func (c *P4rtClient) ReadTableEntry(
 	tableEntry AppTableEntry, prio int32) (*p4.ReadResponse, error) {
 
@@ -804,6 +807,7 @@ func (c *P4rtClient) ReadTableEntry(
 	return c.ReadReq(entity)
 }
 
+//ReadReqEntities ... Read request Entity
 func (c *P4rtClient) ReadReqEntities(entities []*p4.Entity) (*p4.ReadResponse, error) {
 	req := &p4.ReadRequest{
 		DeviceId: c.DeviceID,
@@ -916,6 +920,7 @@ func (c *P4rtClient) WriteReq(update *p4.Update) error {
 	return err
 }
 
+// GetForwardingPipelineConfig ... Get Pipeline config from switch
 func (c *P4rtClient) GetForwardingPipelineConfig() (err error) {
 	log.Println("GetForwardingPipelineConfig")
 	pipeline, err := GetPipelineConfig(c.Client, c.DeviceID)
@@ -928,7 +933,7 @@ func (c *P4rtClient) GetForwardingPipelineConfig() (err error) {
 	return
 }
 
-// SetPipelineConfig ... Set pipeline config
+// GetPipelineConfig ... Set pipeline config
 func GetPipelineConfig(client p4.P4RuntimeClient, deviceID uint64) (*p4.GetForwardingPipelineConfigResponse, error) {
 	req := &p4.GetForwardingPipelineConfigRequest{
 		DeviceId:     deviceID,

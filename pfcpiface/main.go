@@ -52,9 +52,11 @@ type SimModeInfo struct {
 
 // CPIfaceInfo : CPIface interface settings
 type CPIfaceInfo struct {
-	DestIP   string `json:"nb_dst_ip"`
-	SrcIP    string `json:"nb_src_ip"`
-	FQDNHost string `json:"hostname"`
+	DestIP          string `json:"nb_dst_ip"`
+	SrcIP           string `json:"nb_src_ip"`
+	FQDNHost        string `json:"hostname"`
+	EnableUeIPAlloc bool   `json:"enable_ue_ip_alloc"`
+	UeIPPool        string `json:"ue_ip_pool"`
 }
 
 // IfaceType : Gateway interface struct
@@ -139,11 +141,12 @@ func main() {
 	}
 
 	upf := &upf{
-		accessIface: conf.AccessIface.IfName,
-		coreIface:   conf.CoreIface.IfName,
-		fqdnHost:    fqdnh,
-		maxSessions: conf.MaxSessions,
-		intf:        intf,
+		accessIface:     conf.AccessIface.IfName,
+		coreIface:       conf.CoreIface.IfName,
+		fqdnHost:        fqdnh,
+		maxSessions:     conf.MaxSessions,
+		intf:            intf,
+		enableUeIPAlloc: conf.CPIface.EnableUeIPAlloc,
 	}
 
 	upf.setUpfInfo(&conf)

@@ -15,7 +15,7 @@ import (
 
 func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 	{
-		var seq uint32 = 0
+		var seq uint32
 		hbreq, err := message.NewHeartbeatRequest(
 			seq,
 			ie.NewRecoveryTimeStamp(time.Now()),

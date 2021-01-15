@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright(c) 2020 Intel Corporation
+// Copyright 2021-present Open Networking Foundation
 
 package main
 
@@ -217,23 +217,23 @@ func initCounter(p *p4rtc) error {
 
 func (p *p4rtc) isConnected(accessIP *net.IP) bool {
 	var errin error
-	if p.p4client == nil || p.p4client.CheckStatus() != Ready {
+	if p.p4client == nil {
 		p.p4client, errin = p.channelSetup()
 		if errin != nil {
 			log.Println("create channel failed : ", errin)
 			return false
-		} else {
-			if accessIP != nil {
-				*accessIP = p.accessIP
-			}
-			errin = p.p4client.ClearPdrTable()
-			if errin != nil {
-				log.Println("clear PDR table failed : ", errin)
-			}
-			errin = p.p4client.ClearFarTable()
-			if errin != nil {
-				log.Println("clear FAR table failed : ", errin)
-			}
+		}
+
+		if accessIP != nil {
+			*accessIP = p.accessIP
+		}
+		errin = p.p4client.ClearPdrTable()
+		if errin != nil {
+			log.Println("clear PDR table failed : ", errin)
+		}
+		errin = p.p4client.ClearFarTable()
+		if errin != nil {
+			log.Println("clear FAR table failed : ", errin)
 		}
 
 		errin = initCounter(p)

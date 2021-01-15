@@ -16,13 +16,37 @@ const (
 	Ready = 2 //grpc channel state Ready
 )
 
+// Bits type
 type Bits uint8
 
+// Set Bits
 func Set(b, flag Bits) Bits { return b | flag }
 
 //func Clear(b, flag Bits) Bits  { return b &^ flag }
 //func Toggle(b, flag Bits) Bits { return b ^ flag }
 //func Has(b, flag Bits) bool { return b&flag != 0 }
+func setUeipFeature(features ...uint8) {
+	if len(features) >= 3 {
+		features[2] = features[2] | 0x04
+	}
+}
+
+func has2ndBit(f uint8) bool {
+	return (f&0x02)>>1 == 1
+}
+
+func has5thBit(f uint8) bool {
+	return (f & 0x010) == 1
+}
+
+func inc(ip net.IP) {
+	for j := len(ip) - 1; j >= 0; j-- {
+		ip[j]++
+		if ip[j] > 0 {
+			break
+		}
+	}
+}
 
 func ip2int(ip net.IP) uint32 {
 	if len(ip) == 16 {

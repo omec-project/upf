@@ -13,15 +13,21 @@ import (
 type operation int
 
 const (
-	FwdIE_OuterHeaderCreation Bits = 1 << iota
-	FwdIE_DestinationIntf
+	//FwdIEOuterHeaderCreation ...
+	FwdIEOuterHeaderCreation Bits = 1 << iota
+	//FwdIEDestinationIntf ...
+	FwdIEDestinationIntf
 )
 
 const (
-	Action_Forward = 0x2
-	Action_Drop    = 0x1
-	Action_Buffer  = 0x4
-	Action_Notify  = 0x8
+	//ActionForward ...
+	ActionForward = 0x2
+	//ActionDrop ...
+	ActionDrop = 0x1
+	//ActionBuffer ...
+	ActionBuffer = 0x4
+	//ActionNotify ...
+	ActionNotify = 0x8
 )
 
 const (
@@ -59,27 +65,21 @@ func (f *far) printFAR() {
 }
 
 func (f *far) setActionValue() uint8 {
-	if (f.applyAction & Action_Forward) != 0 {
+	if (f.applyAction & ActionForward) != 0 {
 		if f.dstIntf == ie.DstInterfaceAccess {
-			log.Println("Set Action forwardD")
 			return farForwardD
 		} else if f.dstIntf == ie.DstInterfaceCore {
-			log.Println("Set Action forwardU")
 			return farForwardU
 		}
-	} else if (f.applyAction & Action_Drop) != 0 {
-		log.Println("Set Action drop")
+	} else if (f.applyAction & ActionDrop) != 0 {
 		return farDrop
-	} else if (f.applyAction & Action_Buffer) != 0 {
-		log.Println("Set Action buffer")
+	} else if (f.applyAction & ActionBuffer) != 0 {
 		return farBuffer
-	} else if (f.applyAction & Action_Notify) != 0 {
-		log.Println("Set Action notify")
+	} else if (f.applyAction & ActionNotify) != 0 {
 		return farNotify
 	}
 
 	//default action
-	log.Println("Set Action drop default")
 	return farDrop
 }
 
@@ -117,7 +117,7 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 	for _, fwdIE := range fwdIEs {
 		switch fwdIE.Type {
 		case ie.OuterHeaderCreation:
-			fields = Set(fields, FwdIE_OuterHeaderCreation)
+			fields = Set(fields, FwdIEOuterHeaderCreation)
 			ohcFields, err := fwdIE.OuterHeaderCreation()
 			if err != nil {
 				log.Println("Unable to parse OuterHeaderCreationFields!")
@@ -128,7 +128,7 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 			f.tunnelType = uint8(1)
 			f.tunnelPort = tunnelGTPUPort
 		case ie.DestinationInterface:
-			fields = Set(fields, FwdIE_DestinationIntf)
+			fields = Set(fields, FwdIEDestinationIntf)
 			f.dstIntf, err = fwdIE.DestinationInterface()
 			if err != nil {
 				log.Println("Unable to parse DestinationInterface field")
