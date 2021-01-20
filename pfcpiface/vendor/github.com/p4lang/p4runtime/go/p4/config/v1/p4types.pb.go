@@ -457,7 +457,8 @@ type P4BitstringLikeTypeSpec struct {
 	// Useful to identify well-known types, such as IP address or Ethernet MAC
 	// address.
 	Annotations []string `protobuf:"bytes,4,rep,name=annotations,proto3" json:"annotations,omitempty"`
-	// The location of `annotations[i]` is given by `annotation_locations[i]`.
+	// Optional. If present, the location of `annotations[i]` is given by
+	// `annotation_locations[i]`.
 	AnnotationLocations   []*SourceLocation       `protobuf:"bytes,5,rep,name=annotation_locations,json=annotationLocations,proto3" json:"annotation_locations,omitempty"`
 	StructuredAnnotations []*StructuredAnnotation `protobuf:"bytes,6,rep,name=structured_annotations,json=structuredAnnotations,proto3" json:"structured_annotations,omitempty"`
 	XXX_NoUnkeyedLiteral  struct{}                `json:"-"`
@@ -731,7 +732,8 @@ func (m *P4TupleTypeSpec) GetMembers() []*P4DataTypeSpec {
 type P4StructTypeSpec struct {
 	Members     []*P4StructTypeSpec_Member `protobuf:"bytes,1,rep,name=members,proto3" json:"members,omitempty"`
 	Annotations []string                   `protobuf:"bytes,2,rep,name=annotations,proto3" json:"annotations,omitempty"`
-	// The location of `annotations[i]` is given by `annotation_locations[i]`.
+	// Optional. If present, the location of `annotations[i]` is given by
+	// `annotation_locations[i]`.
 	AnnotationLocations   []*SourceLocation       `protobuf:"bytes,3,rep,name=annotation_locations,json=annotationLocations,proto3" json:"annotation_locations,omitempty"`
 	StructuredAnnotations []*StructuredAnnotation `protobuf:"bytes,4,rep,name=structured_annotations,json=structuredAnnotations,proto3" json:"structured_annotations,omitempty"`
 	XXX_NoUnkeyedLiteral  struct{}                `json:"-"`
@@ -842,7 +844,8 @@ func (m *P4StructTypeSpec_Member) GetTypeSpec() *P4DataTypeSpec {
 type P4HeaderTypeSpec struct {
 	Members     []*P4HeaderTypeSpec_Member `protobuf:"bytes,1,rep,name=members,proto3" json:"members,omitempty"`
 	Annotations []string                   `protobuf:"bytes,2,rep,name=annotations,proto3" json:"annotations,omitempty"`
-	// The location of `annotations[i]` is given by `annotation_locations[i]`.
+	// Optional. If present, the location of `annotations[i]` is given by
+	// `annotation_locations[i]`.
 	AnnotationLocations   []*SourceLocation       `protobuf:"bytes,3,rep,name=annotation_locations,json=annotationLocations,proto3" json:"annotation_locations,omitempty"`
 	StructuredAnnotations []*StructuredAnnotation `protobuf:"bytes,4,rep,name=structured_annotations,json=structuredAnnotations,proto3" json:"structured_annotations,omitempty"`
 	XXX_NoUnkeyedLiteral  struct{}                `json:"-"`
@@ -953,7 +956,8 @@ func (m *P4HeaderTypeSpec_Member) GetTypeSpec() *P4BitstringLikeTypeSpec {
 type P4HeaderUnionTypeSpec struct {
 	Members     []*P4HeaderUnionTypeSpec_Member `protobuf:"bytes,1,rep,name=members,proto3" json:"members,omitempty"`
 	Annotations []string                        `protobuf:"bytes,2,rep,name=annotations,proto3" json:"annotations,omitempty"`
-	// The location of `annotations[i]` is given by `annotation_locations[i]`.
+	// Optional. If present, the location of `annotations[i]` is given by
+	// `annotation_locations[i]`.
 	AnnotationLocations   []*SourceLocation       `protobuf:"bytes,3,rep,name=annotation_locations,json=annotationLocations,proto3" json:"annotation_locations,omitempty"`
 	StructuredAnnotations []*StructuredAnnotation `protobuf:"bytes,4,rep,name=structured_annotations,json=structuredAnnotations,proto3" json:"structured_annotations,omitempty"`
 	XXX_NoUnkeyedLiteral  struct{}                `json:"-"`
@@ -1381,7 +1385,7 @@ type StructuredAnnotation struct {
 	//	*StructuredAnnotation_ExpressionList
 	//	*StructuredAnnotation_KvPairList
 	Body isStructuredAnnotation_Body `protobuf_oneof:"body"`
-	// Location of the '@' symbol of this annotation in the source code.
+	// Optional. Location of the '@' symbol of this annotation in the source code.
 	SourceLocation       *SourceLocation `protobuf:"bytes,4,opt,name=source_location,json=sourceLocation,proto3" json:"source_location,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}        `json:"-"`
 	XXX_unrecognized     []byte          `json:"-"`
@@ -1535,7 +1539,8 @@ func (m *SourceLocation) GetColumn() int32 {
 type P4EnumTypeSpec struct {
 	Members     []*P4EnumTypeSpec_Member `protobuf:"bytes,1,rep,name=members,proto3" json:"members,omitempty"`
 	Annotations []string                 `protobuf:"bytes,2,rep,name=annotations,proto3" json:"annotations,omitempty"`
-	// The location of `annotations[i]` is given by `annotation_locations[i]`.
+	// Optional. If present, the location of `annotations[i]` is given by
+	// `annotation_locations[i]`.
 	AnnotationLocations   []*SourceLocation       `protobuf:"bytes,4,rep,name=annotation_locations,json=annotationLocations,proto3" json:"annotation_locations,omitempty"`
 	StructuredAnnotations []*StructuredAnnotation `protobuf:"bytes,3,rep,name=structured_annotations,json=structuredAnnotations,proto3" json:"structured_annotations,omitempty"`
 	XXX_NoUnkeyedLiteral  struct{}                `json:"-"`
@@ -1599,7 +1604,8 @@ func (m *P4EnumTypeSpec) GetStructuredAnnotations() []*StructuredAnnotation {
 type P4EnumTypeSpec_Member struct {
 	Name        string   `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Annotations []string `protobuf:"bytes,2,rep,name=annotations,proto3" json:"annotations,omitempty"`
-	// The location of `annotations[i]` is given by `annotation_locations[i]`.
+	// Optional. If present, the location of `annotations[i]` is given by
+	// `annotation_locations[i]`.
 	AnnotationLocations   []*SourceLocation       `protobuf:"bytes,4,rep,name=annotation_locations,json=annotationLocations,proto3" json:"annotation_locations,omitempty"`
 	StructuredAnnotations []*StructuredAnnotation `protobuf:"bytes,3,rep,name=structured_annotations,json=structuredAnnotations,proto3" json:"structured_annotations,omitempty"`
 	XXX_NoUnkeyedLiteral  struct{}                `json:"-"`
@@ -1667,7 +1673,8 @@ type P4SerializableEnumTypeSpec struct {
 	UnderlyingType *P4BitTypeSpec                       `protobuf:"bytes,1,opt,name=underlying_type,json=underlyingType,proto3" json:"underlying_type,omitempty"`
 	Members        []*P4SerializableEnumTypeSpec_Member `protobuf:"bytes,2,rep,name=members,proto3" json:"members,omitempty"`
 	Annotations    []string                             `protobuf:"bytes,3,rep,name=annotations,proto3" json:"annotations,omitempty"`
-	// The location of `annotations[i]` is given by `annotation_locations[i]`.
+	// Optional. If present, the location of `annotations[i]` is given by
+	// `annotation_locations[i]`.
 	AnnotationLocations   []*SourceLocation       `protobuf:"bytes,5,rep,name=annotation_locations,json=annotationLocations,proto3" json:"annotation_locations,omitempty"`
 	StructuredAnnotations []*StructuredAnnotation `protobuf:"bytes,4,rep,name=structured_annotations,json=structuredAnnotations,proto3" json:"structured_annotations,omitempty"`
 	XXX_NoUnkeyedLiteral  struct{}                `json:"-"`
@@ -1739,7 +1746,8 @@ type P4SerializableEnumTypeSpec_Member struct {
 	Name        string   `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Value       []byte   `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
 	Annotations []string `protobuf:"bytes,3,rep,name=annotations,proto3" json:"annotations,omitempty"`
-	// The location of `annotations[i]` is given by `annotation_locations[i]`.
+	// Optional. If present, the location of `annotations[i]` is given by
+	// `annotation_locations[i]`.
 	AnnotationLocations   []*SourceLocation       `protobuf:"bytes,5,rep,name=annotation_locations,json=annotationLocations,proto3" json:"annotation_locations,omitempty"`
 	StructuredAnnotations []*StructuredAnnotation `protobuf:"bytes,4,rep,name=structured_annotations,json=structuredAnnotations,proto3" json:"structured_annotations,omitempty"`
 	XXX_NoUnkeyedLiteral  struct{}                `json:"-"`
@@ -1982,7 +1990,8 @@ type P4NewTypeSpec struct {
 	Representation isP4NewTypeSpec_Representation `protobuf_oneof:"representation"`
 	// for other annotations (not @p4runtime_translation)
 	Annotations []string `protobuf:"bytes,3,rep,name=annotations,proto3" json:"annotations,omitempty"`
-	// The location of `annotations[i]` is given by `annotation_locations[i]`.
+	// Optional. If present, the location of `annotations[i]` is given by
+	// `annotation_locations[i]`.
 	AnnotationLocations   []*SourceLocation       `protobuf:"bytes,5,rep,name=annotation_locations,json=annotationLocations,proto3" json:"annotation_locations,omitempty"`
 	StructuredAnnotations []*StructuredAnnotation `protobuf:"bytes,4,rep,name=structured_annotations,json=structuredAnnotations,proto3" json:"structured_annotations,omitempty"`
 	XXX_NoUnkeyedLiteral  struct{}                `json:"-"`
