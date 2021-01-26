@@ -18,6 +18,13 @@ const (
 )
 
 const (
+	Action_Forward = 0x2
+	Action_Drop    = 0x1
+	Action_Buffer  = 0x4
+	Action_Notify  = 0x8
+)
+
+const (
 	create operation = iota
 	update
 )
@@ -27,7 +34,7 @@ type far struct {
 	fseID   uint32
 	fseidIP uint32
 
-	action       uint8
+	dstIntf      uint8
 	applyAction  uint8
 	tunnelType   uint8
 	tunnelIP4Src uint32
@@ -41,7 +48,7 @@ func (f *far) printFAR() {
 	log.Println("FAR ID:", f.farID)
 	log.Println("fseID:", f.fseID)
 	log.Println("fseIDIP:", f.fseidIP)
-	log.Println("action:", f.action)
+	log.Println("dstIntf:", f.dstIntf)
 	log.Println("applyAction:", f.applyAction)
 	log.Println("tunnelType:", f.tunnelType)
 	log.Println("tunnelIP4Src:", f.tunnelIP4Src)
@@ -49,6 +56,31 @@ func (f *far) printFAR() {
 	log.Println("tunnelTEID:", f.tunnelTEID)
 	log.Println("tunnelPort:", f.tunnelPort)
 	log.Println("--------------------------------------------")
+}
+
+func (f *far) setActionValue() uint8 {
+	if (f.applyAction & Action_Forward) != 0 {
+		if f.dstIntf == ie.DstInterfaceAccess {
+			log.Println("Set Action forwardD")
+			return farForwardD
+		} else if f.dstIntf == ie.DstInterfaceCore {
+			log.Println("Set Action forwardU")
+			return farForwardU
+		}
+	} else if (f.applyAction & Action_Drop) != 0 {
+		log.Println("Set Action drop")
+		return farDrop
+	} else if (f.applyAction & Action_Buffer) != 0 {
+		log.Println("Set Action buffer")
+		return farBuffer
+	} else if (f.applyAction & Action_Notify) != 0 {
+		log.Println("Set Action notify")
+		return farNotify
+	}
+
+	//default action
+	log.Println("Set Action drop default")
+	return farDrop
 }
 
 func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error {
@@ -63,13 +95,6 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 	action, err := farIE.ApplyAction()
 	if err != nil {
 		return err
-	}
-
-	if (action&0x02)>>1 == 0 {
-		log.Println("Handling forward action only")
-		// TODO: Handle buffer
-		f.action = farDrop
-		return nil
 	}
 
 	f.applyAction = action
@@ -104,16 +129,14 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 			f.tunnelPort = tunnelGTPUPort
 		case ie.DestinationInterface:
 			fields = Set(fields, FwdIE_DestinationIntf)
-			dstIface, err := fwdIE.DestinationInterface()
+			f.dstIntf, err = fwdIE.DestinationInterface()
 			if err != nil {
 				log.Println("Unable to parse DestinationInterface field")
 				continue
 			}
-			if dstIface == ie.DstInterfaceAccess {
-				f.action = farForwardD
+			if f.dstIntf == ie.DstInterfaceAccess {
 				f.tunnelIP4Src = ip2int(upf.accessIP)
-			} else if dstIface == ie.DstInterfaceCore {
-				f.action = farForwardU
+			} else if f.dstIntf == ie.DstInterfaceCore {
 				f.tunnelIP4Src = ip2int(upf.coreIP)
 			}
 		}

@@ -23,6 +23,7 @@ GTPUEncap = 1
 farForwardUAction = 0
 farForwardDAction = 1
 farDropAction = 2
+farBufferAction = 3
 farNotifyCPAction = 4
 pdrFailGate = 2
 farFailGate = 2
@@ -216,6 +217,7 @@ pdrLookup:pdrFailGate -> pdrLookupFail::Sink()
 farLookup:farFailGate -> farLookupFail::Sink()
 executeFAR:farDropAction -> farDrop::Sink()
 executeFAR:farNotifyCPAction -> farNotifyCP::Sink()
+executeFAR:farBufferAction -> farBuffer::Sink()
 gtpuEncap:0 -> gtpuEncapFail::Sink()
 
 # Set default gates for relevant modules
