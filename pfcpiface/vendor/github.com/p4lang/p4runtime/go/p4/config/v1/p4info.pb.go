@@ -454,7 +454,8 @@ type PkgInfo struct {
 	Doc *Documentation `protobuf:"bytes,3,opt,name=doc,proto3" json:"doc,omitempty"`
 	// Miscellaneous metadata, free-form; a way to extend PkgInfo
 	Annotations []string `protobuf:"bytes,4,rep,name=annotations,proto3" json:"annotations,omitempty"`
-	// The location of `annotations[i]` is given by `annotation_locations[i]`.
+	// Optional. If present, the location of `annotations[i]` is given by
+	// `annotation_locations[i]`.
 	AnnotationLocations []*SourceLocation `protobuf:"bytes,10,rep,name=annotation_locations,json=annotationLocations,proto3" json:"annotation_locations,omitempty"`
 	// the target architecture, e.g. "psa"
 	Arch string `protobuf:"bytes,5,opt,name=arch,proto3" json:"arch,omitempty"`
@@ -621,7 +622,8 @@ type Preamble struct {
 	// object (TBD).
 	Alias       string   `protobuf:"bytes,3,opt,name=alias,proto3" json:"alias,omitempty"`
 	Annotations []string `protobuf:"bytes,4,rep,name=annotations,proto3" json:"annotations,omitempty"`
-	// The location of `annotations[i]` is given by `annotation_locations[i]`.
+	// Optional. If present, the location of `annotations[i]` is given by
+	// `annotation_locations[i]`.
 	AnnotationLocations []*SourceLocation `protobuf:"bytes,7,rep,name=annotation_locations,json=annotationLocations,proto3" json:"annotation_locations,omitempty"`
 	// Documentation of the entity
 	Doc                   *Documentation          `protobuf:"bytes,5,opt,name=doc,proto3" json:"doc,omitempty"`
@@ -816,7 +818,8 @@ type MatchField struct {
 	Id          uint32   `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name        string   `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	Annotations []string `protobuf:"bytes,3,rep,name=annotations,proto3" json:"annotations,omitempty"`
-	// The location of `annotations[i]` is given by `annotation_locations[i]`.
+	// Optional. If present, the location of `annotations[i]` is given by
+	// `annotation_locations[i]`.
 	AnnotationLocations []*SourceLocation `protobuf:"bytes,10,rep,name=annotation_locations,json=annotationLocations,proto3" json:"annotation_locations,omitempty"`
 	Bitwidth            int32             `protobuf:"varint,4,opt,name=bitwidth,proto3" json:"bitwidth,omitempty"`
 	// Types that are valid to be assigned to Match:
@@ -1091,7 +1094,8 @@ type ActionRef struct {
 	Id          uint32          `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
 	Scope       ActionRef_Scope `protobuf:"varint,3,opt,name=scope,proto3,enum=p4.config.v1.ActionRef_Scope" json:"scope,omitempty"`
 	Annotations []string        `protobuf:"bytes,2,rep,name=annotations,proto3" json:"annotations,omitempty"`
-	// The location of `annotations[i]` is given by `annotation_locations[i]`.
+	// Optional. If present, the location of `annotations[i]` is given by
+	// `annotation_locations[i]`.
 	AnnotationLocations   []*SourceLocation       `protobuf:"bytes,5,rep,name=annotation_locations,json=annotationLocations,proto3" json:"annotation_locations,omitempty"`
 	StructuredAnnotations []*StructuredAnnotation `protobuf:"bytes,4,rep,name=structured_annotations,json=structuredAnnotations,proto3" json:"structured_annotations,omitempty"`
 	XXX_NoUnkeyedLiteral  struct{}                `json:"-"`
@@ -1210,7 +1214,8 @@ type Action_Param struct {
 	Id          uint32   `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name        string   `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	Annotations []string `protobuf:"bytes,3,rep,name=annotations,proto3" json:"annotations,omitempty"`
-	// The location of `annotations[i]` is given by `annotation_locations[i]`.
+	// Optional. If present, the location of `annotations[i]` is given by
+	// `annotation_locations[i]`.
 	AnnotationLocations []*SourceLocation `protobuf:"bytes,8,rep,name=annotation_locations,json=annotationLocations,proto3" json:"annotation_locations,omitempty"`
 	Bitwidth            int32             `protobuf:"varint,4,opt,name=bitwidth,proto3" json:"bitwidth,omitempty"`
 	// Documentation of the Param
@@ -1764,7 +1769,8 @@ type ControllerPacketMetadata_Metadata struct {
 	// to e.g. Action.Param.name.
 	Name        string   `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	Annotations []string `protobuf:"bytes,3,rep,name=annotations,proto3" json:"annotations,omitempty"`
-	// The location of `annotations[i]` is given by `annotation_locations[i]`.
+	// Optional. If present, the location of `annotations[i]` is given by
+	// `annotation_locations[i]`.
 	AnnotationLocations []*SourceLocation `protobuf:"bytes,7,rep,name=annotation_locations,json=annotationLocations,proto3" json:"annotation_locations,omitempty"`
 	Bitwidth            int32             `protobuf:"varint,4,opt,name=bitwidth,proto3" json:"bitwidth,omitempty"`
 	// unset if not user-defined type
