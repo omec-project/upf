@@ -16,7 +16,7 @@ github.com/grpc-ecosystem/go-grpc-middleware/util/backoffutils
 github.com/grpc-ecosystem/go-grpc-middleware/util/metautils
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
 github.com/matttproud/golang_protobuf_extensions/pbutil
-# github.com/p4lang/p4runtime v1.2.0
+# github.com/p4lang/p4runtime v1.3.0
 github.com/p4lang/p4runtime/go/p4/config/v1
 github.com/p4lang/p4runtime/go/p4/v1
 # github.com/prometheus/client_golang v1.9.0
