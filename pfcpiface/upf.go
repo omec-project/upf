@@ -38,6 +38,8 @@ const (
 	farForwardU = 0x0
 	farForwardD = 0x1
 	farDrop     = 0x2
+	farBuffer   = 0x3
+	farNotify   = 0x4
 )
 
 func (u *upf) sendMsgToUPF(method string, pdrs []pdr, fars []far) uint8 {

@@ -417,7 +417,8 @@ func (b *bess) sim(u *upf, method string) {
 			farID: n3,
 			fseID: n3TEID + i,
 
-			action:       farForwardD,
+			applyAction:  Action_Forward,
+			dstIntf:      access,
 			tunnelType:   0x1,
 			tunnelIP4Src: ip2int(u.accessIP),
 			tunnelIP4Dst: ip2int(enbip) + enbIdx,
@@ -430,14 +431,16 @@ func (b *bess) sim(u *upf, method string) {
 			farID: n6,
 			fseID: n3TEID + i,
 
-			action: farForwardU,
+			applyAction: Action_Forward,
+			dstIntf:     core,
 		}
 
 		farN9Up := far{
 			farID: n9,
 			fseID: n3TEID + i,
 
-			action:       farForwardU,
+			applyAction:  Action_Forward,
+			dstIntf:      core,
 			tunnelType:   0x1,
 			tunnelIP4Src: ip2int(u.coreIP),
 			tunnelIP4Dst: ip2int(aupfip),
@@ -641,7 +644,7 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 	go func() {
 		var any *anypb.Any
 		var err error
-
+		var action uint8 = far.setActionValue()
 		f := &pb.ExactMatchCommandAddArg{
 			Gate: uint64(far.tunnelType),
 			Fields: []*pb.FieldData{
@@ -649,7 +652,7 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 				intEnc(uint64(far.fseID)), /* fseid */
 			},
 			Values: []*pb.FieldData{
-				intEnc(uint64(far.action)),       /* action */
+				intEnc(uint64(action)),           /* action */
 				intEnc(uint64(far.tunnelType)),   /* tunnel_out_type */
 				intEnc(uint64(far.tunnelIP4Src)), /* access-ip */
 				intEnc(uint64(far.tunnelIP4Dst)), /* enb ip */
