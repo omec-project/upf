@@ -531,7 +531,34 @@ controller_packet_metadata {
     bitwidth: 7
   }
 }
+digests {
+  preamble {
+    id: 396224266
+    name: "ddn_digest_t"
+    alias: "ddn_digest_t"
+  }
+  type_spec {
+    struct {
+      name: "ddn_digest_t"
+    }
+  }
+}
 type_info {
+  structs {
+    key: "ddn_digest_t"
+    value {
+      members {
+        name: "fseid"
+        type_spec {
+          bitstring {
+            bit {
+              bitwidth: 96
+            }
+          }
+        }
+      }
+    }
+  }
   serializable_enums {
     key: "Direction"
     value {

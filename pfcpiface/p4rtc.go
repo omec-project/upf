@@ -78,12 +78,13 @@ type AppTableEntry struct {
 
 // P4rtClient ... P4 Runtime client object
 type P4rtClient struct {
-	Client     p4.P4RuntimeClient
-	Conn       *grpc.ClientConn
-	P4Info     p4ConfigV1.P4Info
-	Stream     p4.P4Runtime_StreamChannelClient
-	DeviceID   uint64
-	ElectionID p4.Uint128
+	Client       p4.P4RuntimeClient
+	Conn         *grpc.ClientConn
+	P4Info       p4ConfigV1.P4Info
+	Stream       p4.P4Runtime_StreamChannelClient
+	DeviceID     uint64
+	ElectionID   p4.Uint128
+	reportDigest chan []byte
 }
 
 func (c *P4rtClient) tableID(name string) uint32 {
@@ -157,6 +158,7 @@ func (c *P4rtClient) Init(timeout uint32) (err error) {
 	//ctx, cancel := context.WithTimeout(context.Background(),
 	//                                   time.Duration(timeout) * time.Second)
 	//defer cancel()
+	c.reportDigest = make(chan []byte, 1024)
 	c.Stream, err = c.Client.StreamChannel(
 		context.Background(),
 		grpcRetry.WithMax(3),
@@ -176,6 +178,21 @@ func (c *P4rtClient) Init(timeout uint32) (err error) {
 					log.Println("client is master")
 				} else {
 					log.Println("client is not master")
+				}
+			} else if dig := res.GetDigest(); dig != nil {
+				log.Println("Received Digest")
+				for _, p4d := range dig.GetData() {
+					if fseid := p4d.GetBitstring(); fseid != nil {
+						log.Println("fseid data in digest")
+						c.reportDigest <- fseid
+					}
+					/*if structVal := p4d.GetStruct(); structVal != nil {
+						log.Println("Struct data in digest")
+						for _, memberVal := range structVal.GetMembers() {
+							fseid := memberVal.GetBitstring()
+							c.reportDigest <- fseid
+						}
+					}*/
 				}
 			} else {
 				log.Println("stream recv: ", res)
@@ -213,7 +230,7 @@ func (c *P4rtClient) WriteFarTable(
 	te.Fields[1].Name = "session_id"
 	fseidVal := make([]byte, 12)
 	binary.BigEndian.PutUint32(fseidVal[:4], farEntry.fseidIP)
-	binary.BigEndian.PutUint32(fseidVal[4:], farEntry.fseID)
+	binary.BigEndian.PutUint64(fseidVal[4:], farEntry.fseID)
 	te.Fields[1].Value = make([]byte, 12)
 	copy(te.Fields[1].Value, fseidVal)
 
@@ -362,7 +379,7 @@ func (c *P4rtClient) WritePdrTable(
 		te.Params[1].Name = "fseid"
 		fseidVal := make([]byte, 12)
 		binary.BigEndian.PutUint32(fseidVal[:4], pdrEntry.fseidIP)
-		binary.BigEndian.PutUint32(fseidVal[4:], pdrEntry.fseID)
+		binary.BigEndian.PutUint64(fseidVal[4:], pdrEntry.fseID)
 		te.Params[1].Value = make([]byte, 12)
 		copy(te.Params[1].Value, fseidVal)
 

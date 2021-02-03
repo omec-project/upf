@@ -228,6 +228,34 @@ func (pc *PFCPConn) handlePFDMgmtRequest(upf *upf, msg message.Message, addr net
 	return pfdres
 }
 
+func (pc *PFCPConn) handleSessionReportResponse(upf *upf, msg message.Message, addr net.Addr) {
+	log.Println("Got session report response from: ", addr)
+	srres, ok := msg.(*message.SessionReportResponse)
+	if !ok {
+		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
+		return
+	}
+
+	cause := srres.Cause.Payload[0]
+	if cause == ie.CauseRequestAccepted {
+		log.Println("session req accepted seq : ", srres.SequenceNumber)
+	} else {
+		log.Println("session req not accepted seq : ", srres.SequenceNumber)
+		if cause == ie.CauseSessionContextNotFound {
+			log.Println("context not found. Delete session locally")
+			sessItem := pc.mgr.sessions[srres.SEID()]
+
+			cause := upf.sendMsgToUPF("del", sessItem.pdrs, sessItem.fars)
+			if cause == ie.CauseRequestRejected {
+				log.Println("Write to FastPath failed")
+				return
+			}
+
+			pc.mgr.RemoveSession(srres.SEID())
+		}
+	}
+}
+
 func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.Addr, sourceIP string) []byte {
 	sereq, ok := msg.(*message.SessionEstablishmentRequest)
 	if !ok {

@@ -4,6 +4,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"flag"
 	"fmt"
 	"log"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/wmnsk/go-pfcp/ie"
+	"github.com/wmnsk/go-pfcp/message"
 )
 
 var (
@@ -45,6 +47,7 @@ type p4rtc struct {
 	host         string
 	deviceID     uint64
 	timeout      uint32
+	msgSeq       uint32
 	accessIPMask net.IPMask
 	accessIP     net.IP
 	p4rtcServer  string
@@ -118,6 +121,20 @@ func setCounterSize(p *p4rtc, counterID uint8, name string) error {
 	return errin
 }
 
+func (p *p4rtc) readReportDigest() {
+	log.Println("report digest start")
+	for {
+		select {
+		case d := <-p.p4client.reportDigest:
+			fseid := binary.BigEndian.Uint64(d[4:])
+			p.handleDigestReport(fseid)
+			log.Println("handled DDN from p4 - fseid : ", fseid)
+
+		default:
+			time.Sleep(2 * time.Second)
+		}
+	}
+}
 func (p *p4rtc) setInfo(conn *net.UDPConn, addr net.Addr, pconn *PFCPConn) {
 	log.Println("setUDP Conn ", conn)
 	p.udpConn = conn
@@ -130,6 +147,52 @@ func resetCounterVal(p *p4rtc, counterID uint8, val uint64) {
 	//p.counters[counterID].allocated[val]=nil
 	delete(p.counters[counterID].allocated, val)
 	//p.counters[counterID].free[val] = 1
+}
+
+func (p *p4rtc) handleDigestReport(fseid uint64) {
+	session, ok := p.pfcpConn.mgr.sessions[fseid]
+	if !ok {
+		log.Println("No session found for fseid : ", fseid)
+		return
+	}
+
+	serep := message.NewSessionReportRequest(0, /* MO?? <-- what's this */
+		0,                            /* FO <-- what's this? */
+		0,                            /* seid */
+		p.msgSeq,                     /* seq # */
+		0,                            /* priority */
+		ie.NewReportType(0, 0, 0, 1), /*upir, erir, usar, dldr int*/
+	)
+	serep.Header.SEID = session.remoteSEID
+	var pdrID uint32
+	for _, pdr := range session.pdrs {
+		if pdr.srcIface == core {
+			pdrID = pdr.pdrID
+			break
+		}
+	}
+
+	log.Println("Pdr iD : ", pdrID)
+	if pdrID == 0 {
+		log.Println("No Pdr found for downlink")
+		return
+	}
+
+	serep.DownlinkDataReport = ie.NewDownlinkDataReport(
+		ie.NewPDRID(uint16(pdrID)))
+
+	ret, err := serep.Marshal()
+	if err != nil {
+		log.Println("Marshal function failed for SM resp ", err)
+	}
+
+	// send the report req out
+	if ret != nil {
+		if _, err := p.udpConn.WriteTo(ret, p.udpAddr); err != nil {
+			log.Fatalln("Unable to transmit Report req", err)
+		}
+		p.msgSeq++
+	}
 }
 
 func getCounterVal(p *p4rtc, counterID uint8, pdrID uint32) (uint64, error) {
@@ -236,6 +299,8 @@ func (p *p4rtc) isConnected(accessIP *net.IP) bool {
 			log.Println("clear FAR table failed : ", errin)
 		}
 
+		go p.readReportDigest()
+
 		errin = initCounter(p)
 		if errin != nil {
 			log.Println("Counter Init failed. : ", errin)
@@ -300,6 +365,8 @@ func (p *p4rtc) setUpfInfo(u *upf, conf *Conf) {
 		if errin != nil {
 			log.Println("clear FAR table failed : ", errin)
 		}
+
+		go p.readReportDigest()
 	}
 
 	errin = initCounter(p)

@@ -299,7 +299,7 @@ func (b *bess) sim(u *upf, method string) {
 
 			precedence: 255,
 
-			fseID:     n3TEID + i,
+			fseID:     uint64(n3TEID + i),
 			ctrID:     i,
 			farID:     n3,
 			needDecap: 0,
@@ -316,7 +316,7 @@ func (b *bess) sim(u *upf, method string) {
 
 			precedence: 1,
 
-			fseID:     n3TEID + i,
+			fseID:     uint64(n3TEID + i),
 			ctrID:     i,
 			farID:     n3,
 			needDecap: 1,
@@ -336,7 +336,7 @@ func (b *bess) sim(u *upf, method string) {
 
 			precedence: 255,
 
-			fseID:     n3TEID + i,
+			fseID:     uint64(n3TEID + i),
 			ctrID:     i,
 			farID:     n6,
 			needDecap: 1,
@@ -355,7 +355,7 @@ func (b *bess) sim(u *upf, method string) {
 
 			precedence: 1,
 
-			fseID:     n3TEID + i,
+			fseID:     uint64(n3TEID + i),
 			ctrID:     i,
 			farID:     n9,
 			needDecap: 1,
@@ -366,7 +366,7 @@ func (b *bess) sim(u *upf, method string) {
 		// create/delete downlink far
 		farDown := far{
 			farID: n3,
-			fseID: n3TEID + i,
+			fseID: uint64(n3TEID + i),
 
 			applyAction:  ActionForward,
 			dstIntf:      ie.DstInterfaceAccess,
@@ -380,7 +380,7 @@ func (b *bess) sim(u *upf, method string) {
 		// create/delete uplink far
 		farN6Up := far{
 			farID: n6,
-			fseID: n3TEID + i,
+			fseID: uint64(n3TEID + i),
 
 			applyAction: ActionForward,
 			dstIntf:     ie.DstInterfaceCore,
@@ -388,7 +388,7 @@ func (b *bess) sim(u *upf, method string) {
 
 		farN9Up := far{
 			farID: n9,
-			fseID: n3TEID + i,
+			fseID: uint64(n3TEID + i),
 
 			applyAction:  ActionForward,
 			dstIntf:      ie.DstInterfaceCore,

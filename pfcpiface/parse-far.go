@@ -37,7 +37,7 @@ const (
 
 type far struct {
 	farID   uint32
-	fseID   uint32
+	fseID   uint64
 	fseidIP uint32
 
 	dstIntf      uint8
@@ -84,7 +84,7 @@ func (f *far) setActionValue() uint8 {
 }
 
 func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error {
-	f.fseID = uint32(fseid)
+	f.fseID = (fseid)
 
 	farID, err := farIE.FARID()
 	if err != nil {
