@@ -31,7 +31,7 @@ type pdr struct {
 
 	precedence  uint32
 	pdrID       uint32
-	fseID       uint32
+	fseID       uint64
 	fseidIP     uint32
 	ctrID       uint32
 	farID       uint32
@@ -274,9 +274,9 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, upf *
 
 	p.precedence = precedence
 	p.pdrID = uint32(pdrID)
-	p.fseID = uint32(seid) // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-	p.ctrID = 0            // ctrID currently not being set <--- FIXIT/TODO/XXX
-	p.farID = farID        // farID currently not being set <--- FIXIT/TODO/XXX
+	p.fseID = (seid) // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
+	p.ctrID = 0      // ctrID currently not being set <--- FIXIT/TODO/XXX
+	p.farID = farID  // farID currently not being set <--- FIXIT/TODO/XXX
 	p.needDecap = outerHeaderRemoval
 
 	return nil

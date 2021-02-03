@@ -174,6 +174,8 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 		case message.MsgTypeAssociationReleaseRequest:
 			outgoingMessage = handleAssociationReleaseRequest(upf, msg, addr, sourceIP, accessIP, upf.recoveryTime)
 			cleanupSessions()
+		case message.MsgTypeSessionReportResponse:
+			pconn.handleSessionReportResponse(upf, msg, addr)
 		default:
 			log.Println("Message type: ", msg.MessageTypeName(), " is currently not supported")
 			continue
