@@ -9,13 +9,18 @@ ARG CPU=native
 RUN apt-get update && \
     apt-get -y install --no-install-recommends \
         ca-certificates \
-        libelf-dev
-
+        libelf-dev \
+        python3-pip \
+        python3-setuptools
+RUN pip3 install --no-cache-dir \
+        meson \
+        ninja
+        
 ARG MAKEFLAGS
 
 # linux ver should match target machine's kernel
 WORKDIR /libbpf
-ARG LIBBPF_VER=v0.1.0
+ARG LIBBPF_VER=v0.3
 RUN curl -L https://github.com/libbpf/libbpf/tarball/${LIBBPF_VER} | \
     tar xz -C . --strip-components=1 && \
     cp include/uapi/linux/if_xdp.h /usr/include/linux && \
@@ -25,7 +30,7 @@ RUN curl -L https://github.com/libbpf/libbpf/tarball/${LIBBPF_VER} | \
 
 # BESS pre-reqs
 WORKDIR /bess
-ARG BESS_COMMIT=master
+ARG BESS_COMMIT=dpdk-2011
 RUN curl -L https://github.com/NetSys/bess/tarball/${BESS_COMMIT} | \
     tar xz -C . --strip-components=1
 

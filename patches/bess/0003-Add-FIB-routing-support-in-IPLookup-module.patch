@@ -5,24 +5,10 @@ Subject: [PATCH] Add FIB routing support in IPLookup module.
 
 Signed-off-by: Muhammad Asim Jamshed <muhammad.jamshed@intel.com>
 ---
- build.py                  |  2 +-
  core/modules/ip_lookup.cc | 61 +++++++++++++++++++++++++++++++++++++--
  core/modules/ip_lookup.h  | 14 +++++++++
  3 files changed, 74 insertions(+), 3 deletions(-)
 
-diff --git a/build.py b/build.py
-index 3fac9064..d0f16cc7 100755
---- a/build.py
-+++ b/build.py
-@@ -95,5 +95,5 @@ DPDK_TARGET = 'x86_64-native-linuxapp-gcc'
- kernel_release = cmd('uname -r', quiet=True).strip()
-
- DPDK_DIR = '%s/%s' % (DEPS_DIR, DPDK_VER)
--DPDK_CFLAGS = '"-g -w"'
-+DPDK_CFLAGS = '"-g -w -DALLOW_EXPERIMENTAL_API"'
- DPDK_CONFIG = '%s/build/.config' % DPDK_DIR
-
- extra_libs = set()
 diff --git a/core/modules/ip_lookup.cc b/core/modules/ip_lookup.cc
 index 3c8b1157..7e976d41 100644
 --- a/core/modules/ip_lookup.cc
