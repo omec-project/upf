@@ -53,9 +53,11 @@
     
     "": "Control plane controller settings",
     "cpiface": {
-	"nb_dst_ip": "172.17.0.1",
-	"" : "nb_dst_ip: CPHostname",
-	"hostname": "spgwc"
+        "enable_ue_ip_alloc": false,
+        "ue_ip_pool": "10.250.0.0/16",
+        "nb_dst_ip": "172.17.0.1",
+        "" : "nb_dst_ip: CPHostname",
+	    "hostname": "spgwc"
     },
     
     "": "p4rtc interface settings",

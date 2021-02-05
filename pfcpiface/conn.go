@@ -69,6 +69,9 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 
 	// cleanup the pipeline
 	cleanupSessions := func() {
+		if upf.simInfo != nil {
+			return
+		}
 		sendDeleteAllSessionsMsgtoUPF(upf)
 		cpConnected = false
 	}

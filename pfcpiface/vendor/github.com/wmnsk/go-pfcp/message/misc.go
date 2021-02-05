@@ -4,8 +4,6 @@
 
 package message
 
-import "encoding/hex"
-
 func uint24To32(b []byte) uint32 {
 	if len(b) != 3 {
 		return 0
@@ -17,34 +15,7 @@ func uint32To24(n uint32) []byte {
 	return []byte{uint8(n >> 16), uint8(n >> 8), uint8(n)}
 }
 
-func strToSwappedBytes(s, filler string) ([]byte, error) {
-	var raw []byte
-	var err error
-	if len(s)%2 == 0 {
-		raw, err = hex.DecodeString(s)
-	} else {
-		raw, err = hex.DecodeString(s + filler)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	return swap(raw), nil
-}
-
-func swappedBytesToStr(raw []byte, cutLastDigit bool) string {
-	if len(raw) == 0 {
-		return ""
-	}
-
-	s := hex.EncodeToString(swap(raw))
-	if cutLastDigit {
-		s = s[:len(s)-1]
-	}
-
-	return s
-}
-
+/*
 func swap(raw []byte) []byte {
 	var swapped []byte
 	for n := range raw {
@@ -73,6 +44,7 @@ func has5thBit(f uint8) bool {
 func has4thBit(f uint8) bool {
 	return (f&0x08)>>3 == 1
 }
+*/
 
 func has3rdBit(f uint8) bool {
 	return (f&0x04)>>2 == 1

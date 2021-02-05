@@ -57,7 +57,7 @@ func (pc *PFCPConn) handleAssociationSetupRequest(upf *upf, msg message.Message,
 
 	// Build response message
 	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
-	asres, err := message.NewAssociationSetupResponse(asreq.SequenceNumber,
+	asresmsg := message.NewAssociationSetupResponse(asreq.SequenceNumber,
 		ie.NewRecoveryTimeStamp(time.Now()),
 		ie.NewNodeID(sourceIP, "", ""), /* node id (IPv4) */
 		ie.NewCause(cause),             /* accept it blindly for the time being */
@@ -65,7 +65,15 @@ func (pc *PFCPConn) handleAssociationSetupRequest(upf *upf, msg message.Message,
 		//      = 01000001
 		ie.NewUserPlaneIPResourceInformation(0x41, 0, upf.accessIP.String(), "", "", ie.SrcInterfaceAccess),
 		// ie.NewUserPlaneIPResourceInformation(0x41, 0, coreIP, "", "", ie.SrcInterfaceCore),
-	).Marshal() /* userplane ip resource info */
+	) /* userplane ip resource info */
+
+	if upf.enableUeIPAlloc {
+		features := make([]uint8, 4)
+		setUeipFeature(features...)
+		asresmsg.UPFunctionFeatures =
+			ie.NewUPFunctionFeatures(features...)
+	}
+	asres, err := asresmsg.Marshal()
 	if err != nil {
 		log.Fatalln("Unable to create association setup response", err)
 	}
@@ -218,7 +226,7 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 		return nil
 	}
 	remoteSEID := fseid.SEID
-	var fseidIP uint32 = ip2int(fseid.IPv4Address)
+	fseidIP := ip2int(fseid.IPv4Address)
 
 	sendError := func(err error) []byte {
 		log.Println(err)
@@ -247,7 +255,7 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 	session := pc.mgr.sessions[localSEID]
 	for _, cPDR := range sereq.CreatePDR {
 		var p pdr
-		if err := p.parsePDR(cPDR, session.localSEID, pc.mgr.appPFDs); err != nil {
+		if err := p.parsePDR(cPDR, session.localSEID, pc.mgr.appPFDs, upf); err != nil {
 			return sendError(err)
 		}
 		p.fseidIP = fseidIP
@@ -270,7 +278,7 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 	}
 
 	// Build response message
-	seres, err := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
+	seresMsg := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
 		0,                                    /* FO <-- what's this? */
 		session.remoteSEID,                   /* seid */
 		sereq.SequenceNumber,                 /* seq # */
@@ -278,7 +286,10 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 		ie.NewNodeID(sourceIP, "", ""),       /* node id (IPv4) */
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 		ie.NewFSEID(session.localSEID, net.ParseIP(sourceIP), nil, nil),
-	).Marshal()
+	)
+
+	addPdrInfo(seresMsg, &session)
+	seres, err := seresMsg.Marshal()
 	if err != nil {
 		log.Fatalln("Unable to create session establishment response", err)
 	}
@@ -336,7 +347,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 	addFARs := make([]far, 0, MaxItems)
 	for _, cPDR := range smreq.CreatePDR {
 		var p pdr
-		if err := p.parsePDR(cPDR, localSEID, pc.mgr.appPFDs); err != nil {
+		if err := p.parsePDR(cPDR, localSEID, pc.mgr.appPFDs, upf); err != nil {
 			return sendError(err)
 		}
 		p.fseidIP = fseidIP
@@ -357,7 +368,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 	for _, uPDR := range smreq.UpdatePDR {
 		var p pdr
 		var err error
-		if err = p.parsePDR(uPDR, localSEID, pc.mgr.appPFDs); err != nil {
+		if err = p.parsePDR(uPDR, localSEID, pc.mgr.appPFDs, upf); err != nil {
 			return sendError(err)
 		}
 		err = session.UpdatePDR(p)
@@ -477,6 +488,7 @@ func (pc *PFCPConn) handleSessionDeletionRequest(upf *upf, msg message.Message, 
 		return sendError(errors.New("Write to FastPath failed"))
 	}
 
+	releaseAllocatedIPs(upf, &session)
 	/* delete sessionRecord */
 	delete(pc.mgr.sessions, localSEID)
 

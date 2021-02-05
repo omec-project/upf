@@ -192,7 +192,7 @@ func ParseUEIPAddressFields(b []byte) (*UEIPAddressFields, error) {
 // UnmarshalBinary parses b into IE.
 func (f *UEIPAddressFields) UnmarshalBinary(b []byte) error {
 	l := len(b)
-	if l < 2 {
+	if l < 1 {
 		return io.ErrUnexpectedEOF
 	}
 

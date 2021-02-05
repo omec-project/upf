@@ -29,13 +29,21 @@ type pdr struct {
 	dstPortMask      uint16
 	protoMask        uint8
 
-	precedence uint32
-	pdrID      uint32
-	fseID      uint32
-	fseidIP    uint32
-	ctrID      uint32
-	farID      uint32
-	needDecap  uint8
+	precedence  uint32
+	pdrID       uint32
+	fseID       uint32
+	fseidIP     uint32
+	ctrID       uint32
+	farID       uint32
+	needDecap   uint8
+	allocIPFlag bool
+}
+
+func needAllocIP(ueIPaddr *ie.UEIPAddressFields) bool {
+	if has2ndBit(ueIPaddr.Flags) && !has5thBit(ueIPaddr.Flags) {
+		return false
+	}
+	return true
 }
 
 func (p *pdr) printPDR() {
@@ -62,10 +70,11 @@ func (p *pdr) printPDR() {
 	log.Println("ctrID:", p.ctrID)
 	log.Println("farID:", p.farID)
 	log.Println("needDecap:", p.needDecap)
+	log.Println("allocIPFlag:", p.allocIPFlag)
 	log.Println("--------------------------------------------")
 }
 
-func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD) error {
+func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, upf *upf) error {
 	var ueIP4 net.IP
 
 	for _, pdiIE := range pdiIEs {
@@ -77,7 +86,20 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD) error {
 				continue
 			}
 
-			ueIP4 = ueIPaddr.IPv4Address
+			if needAllocIP(ueIPaddr) {
+				/* alloc IPV6 if CHV6 is enabled : TBD */
+				log.Println("UPF should alloc UE IP. CHV4 flag set")
+				ueIP4, err = upf.ippool.allocIPV4()
+				if err != nil {
+					log.Println("failed to allocate UE IP")
+					return err
+				}
+				p.allocIPFlag = true
+				log.Println("ueipv4 : ", ueIP4.String())
+			} else {
+				log.Println("CP has allocated UE IP.")
+				ueIP4 = ueIPaddr.IPv4Address
+			}
 		case ie.SourceInterface:
 			srcIface, err := pdiIE.SourceInterface()
 			if err != nil {
@@ -212,7 +234,7 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD) error {
 	return nil
 }
 
-func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD) error {
+func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, upf *upf) error {
 	/* reset outerHeaderRemoval to begin with */
 	outerHeaderRemoval := uint8(0)
 
@@ -239,7 +261,7 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD) error
 		outerHeaderRemoval = 1
 	}
 
-	err = p.parsePDI(pdi, appPFDs)
+	err = p.parsePDI(pdi, appPFDs, upf)
 	if err != nil && err != errBadFilterDesc {
 		return err
 	}

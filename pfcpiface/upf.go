@@ -8,15 +8,18 @@ import (
 )
 
 type upf struct {
-	accessIface string
-	coreIface   string
-	accessIP    net.IP
-	coreIP      net.IP
-	n4SrcIP     net.IP
-	fqdnHost    string
-	maxSessions uint32
-	simInfo     *SimModeInfo
-	intf        fastPath
+	enableUeIPAlloc bool
+	accessIface     string
+	coreIface       string
+	ippoolCidr      string
+	accessIP        net.IP
+	coreIP          net.IP
+	n4SrcIP         net.IP
+	fqdnHost        string
+	maxSessions     uint32
+	simInfo         *SimModeInfo
+	intf            fastPath
+	ippool          ipPool
 }
 
 // to be replaced with go-pfcp structs
