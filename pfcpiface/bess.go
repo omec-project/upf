@@ -58,11 +58,6 @@ func (b *bess) sendMsgToUPF(method string, pdrs []pdr, fars []far) uint8 {
 
 	log.Println("upf : ", b.client)
 	log.Println("conn : ", b.conn)
-	// pause daemon, and then insert FAR(s), finally resume
-	err := b.pauseAll()
-	if err != nil {
-		log.Fatalln("Unable to pause BESS:", err)
-	}
 	for _, pdr := range pdrs {
 		switch method {
 		case "add":
@@ -87,25 +82,14 @@ func (b *bess) sendMsgToUPF(method string, pdrs []pdr, fars []far) uint8 {
 	if !rc {
 		log.Println("Unable to make GRPC calls")
 	}
-	err = b.resumeAll()
-	if err != nil {
-		log.Fatalln("Unable to resume BESS:", err)
-	}
-
 	return cause
 }
 
 func (b *bess) sendDeleteAllSessionsMsgtoUPF() {
-	/* create context, pause daemon, insert PDR(s), and resume daemon */
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
 	done := make(chan bool)
 	calls := 5
-
-	err := b.pauseAll()
-	if err != nil {
-		log.Fatalln("Unable to pause BESS:", err)
-	}
 	b.removeAllPDRs(ctx, done)
 	b.removeAllFARs(ctx, done)
 	b.removeAllCounters(ctx, done, "preQoSCounter")
@@ -115,10 +99,6 @@ func (b *bess) sendDeleteAllSessionsMsgtoUPF() {
 	rc := b.GRPCJoin(calls, Timeout, done)
 	if !rc {
 		log.Println("Unable to make GRPC calls")
-	}
-	err = b.resumeAll()
-	if err != nil {
-		log.Fatalln("Unable to resume BESS:", err)
 	}
 }
 
@@ -317,13 +297,6 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 
 func (b *bess) sim(u *upf, method string) {
 	start := time.Now()
-
-	// Pause workers before
-	err := b.pauseAll()
-	if err != nil {
-		log.Fatalln("Unable to pause BESS:", err)
-	}
-
 	// const ueip, teid, enbip = 0x10000001, 0xf0000000, 0x0b010181
 	ueip := u.simInfo.StartUEIP
 	enbip := u.simInfo.StartENBIP
@@ -466,11 +439,6 @@ func (b *bess) sim(u *upf, method string) {
 			log.Fatalln("Unsupported method", method)
 		}
 	}
-	err = b.resumeAll()
-	if err != nil {
-		log.Fatalln("Unable to resume BESS:", err)
-	}
-
 	log.Println("Sessions/s:", float64(u.maxSessions)/time.Since(start).Seconds())
 }
 
@@ -513,20 +481,6 @@ func (b *bess) simdeleteEntries(pdrs []pdr, fars []far, timeout time.Duration) {
 	if !rc {
 		log.Println("Unable to complete GRPC call(s)")
 	}
-}
-
-func (b *bess) pauseAll() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-	_, err := b.client.PauseAll(ctx, &pb.EmptyRequest{})
-	return err
-}
-
-func (b *bess) resumeAll() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-	_, err := b.client.ResumeAll(ctx, &pb.EmptyRequest{})
-	return err
 }
 
 func (b *bess) processPDR(ctx context.Context, any *anypb.Any, method string) {
