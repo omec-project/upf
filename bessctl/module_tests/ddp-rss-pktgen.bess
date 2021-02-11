@@ -1,0 +1,52 @@
+import scapy.all as s
+from scapy.contrib.gtp import *
+
+def gen_inet_packet(size, src_mac, dst_mac, src_ip, dst_ip):
+    eth = s.Ether(src=src_mac, dst=dst_mac)
+    ip = s.IP(src=src_ip, dst=dst_ip)
+    udp = s.UDP(sport=10001, dport=10002)
+    payload = ('hello' + '0123456789' * 200)[:size-len(eth/ip/udp)]
+    pkt = eth/ip/udp/payload
+    return bytes(pkt)
+
+def gen_gtpu_packet(size, src_mac, dst_mac, src_ip, dst_ip, inner_src_ip, inner_dst_ip, teid):
+    eth = s.Ether(src=src_mac, dst=dst_mac)
+    ip = s.IP(src=src_ip, dst=dst_ip)
+    udp = s.UDP(sport=2152, dport=2152)
+    inet_p = s.IP(src=inner_src_ip, dst=inner_dst_ip) / \
+        s.UDP(sport=10001, dport=10002)
+    payload = ('hello' + '0123456789' * 200)[:size-len(eth/ip/udp/inet_p)]
+    pkt = eth/ip/udp/GTP_U_Header(teid=teid)/inet_p/payload
+    return bytes(pkt)
+
+# flow create 0 ingress pattern eth / ipv4 / udp / gtpu / ipv4 / end actions rss types ipv4 l3-src-only end key_len 0 queues end / end
+n3_pkts = [
+           gen_gtpu_packet(128, "22:53:7a:15:58:50", "9e:b2:d3:34:ab:27", "198.19.0.100", "198.19.0.200", "192.168.0.1", "192.168.10.2", 0x123456),
+           gen_gtpu_packet(128, "22:53:7a:15:58:50", "9e:b2:d3:34:ab:27", "198.19.0.100", "198.19.0.200", "192.168.0.2", "192.168.10.2", 0x112233),
+           gen_gtpu_packet(128, "22:53:7a:15:58:50", "9e:b2:d3:34:ab:27", "198.19.0.100", "198.19.0.200", "192.168.0.3", "192.168.10.2", 0x445566),
+           gen_gtpu_packet(128, "22:53:7a:15:58:50", "9e:b2:d3:34:ab:27", "198.19.0.100", "198.19.0.200", "192.168.0.4", "192.168.10.2", 0x778899),
+
+          ]
+
+# flow create 1 ingress pattern eth / ipv4 / udp / gtpu / ipv4 / end actions rss types ipv4 l3-dst-only end key_len 0 queues end / end
+n9_pkts = [
+           gen_gtpu_packet(128, "22:53:7a:15:58:50", "c2:9c:55:d4:8a:f6", "198.19.0.201", "198.19.0.200", "192.168.10.2", "192.168.0.1", 0x123456),
+           gen_gtpu_packet(128, "22:53:7a:15:58:50", "c2:9c:55:d4:8a:f6", "198.19.0.201", "198.19.0.200", "192.168.10.2", "192.168.0.2", 0x112233),
+           gen_gtpu_packet(128, "22:53:7a:15:58:50", "c2:9c:55:d4:8a:f6", "198.19.0.201", "198.19.0.200", "192.168.10.2", "192.168.0.3", 0x445566),
+           gen_gtpu_packet(128, "22:53:7a:15:58:50", "c2:9c:55:d4:8a:f6", "198.19.0.201", "198.19.0.200", "192.168.10.2", "192.168.0.4", 0x778899),
+          ]
+
+#flow create 1 ingress pattern eth / ipv4 / end actions rss types ipv4 l3-dst-only end key_len 0 queues end / end
+n6_pkts = [
+           gen_inet_packet(128, "22:53:7a:15:58:50", "c2:9c:55:d4:8a:f6", "192.168.10.2", "192.168.0.1"),
+           gen_inet_packet(128, "22:53:7a:15:58:50", "c2:9c:55:d4:8a:f6", "192.168.10.2", "192.168.0.2"),
+           gen_inet_packet(128, "22:53:7a:15:58:50", "c2:9c:55:d4:8a:f6", "192.168.10.2", "192.168.0.3"),
+           gen_inet_packet(128, "22:53:7a:15:58:50", "c2:9c:55:d4:8a:f6", "192.168.10.2", "192.168.0.4"),
+          ]
+
+p = PMDPort(port_id=0)
+pout::PortOut(port=p.name)
+Source() -> Rewrite(templates=n3_pkts) -> pout
+Source() -> Rewrite(templates=n9_pkts) -> pout
+Source() -> Rewrite(templates=n6_pkts) -> pout
+

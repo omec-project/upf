@@ -1,14 +1,15 @@
-From 6e7af10aa5ed7d82813ec783d28f25931bc3fbeb Mon Sep 17 00:00:00 2001
+From 76348988556d4b2b8275139172c78210b1147501 Mon Sep 17 00:00:00 2001
 From: Muhammad Asim Jamshed <muhammad.jamshed@intel.com>
 Date: Fri, 17 Jul 2020 17:07:29 -0700
 Subject: [PATCH] Enable hardware checksum offload.
 
 ---
- core/drivers/pmd.cc | 7 +++++++
- 1 file changed, 7 insertions(+)
+ core/drivers/pmd.cc           | 7 +++++++
+ protobuf/ports/port_msg.proto | 1 +
+ 2 files changed, 8 insertions(+)
 
 diff --git a/core/drivers/pmd.cc b/core/drivers/pmd.cc
-index a516a82d..669563d1 100644
+index 9b29fc85..1501ea94 100644
 --- a/core/drivers/pmd.cc
 +++ b/core/drivers/pmd.cc
 @@ -245,9 +245,16 @@ CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
@@ -28,6 +29,18 @@ index a516a82d..669563d1 100644
      return CommandFailure(-ret, "rte_eth_dev_configure() failed");
    }
  
+diff --git a/protobuf/ports/port_msg.proto b/protobuf/ports/port_msg.proto
+index 853380e1..e25f0943 100644
+--- a/protobuf/ports/port_msg.proto
++++ b/protobuf/ports/port_msg.proto
+@@ -51,6 +51,7 @@ message PMDPortArg {
+     int32 socket_id = 8;
+   }
+   bool promiscuous_mode = 9;
++  bool hwcksum = 10;
+ }
+ 
+ message UnixSocketPortArg {
 -- 
-2.17.1
+2.25.1
 
