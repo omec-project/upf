@@ -37,7 +37,7 @@ index 1e8b6af8..853380e1 100644
    oneof socket {
      int32 socket_id = 8;
    }
-+  bool promiscuous_mode = 9; bool hwcksum = 10;
++  bool promiscuous_mode = 9;
  }
 
  message UnixSocketPortArg {

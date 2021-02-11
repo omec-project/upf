@@ -1,0 +1,148 @@
+From 20cc60f7ba595eb214fb61ab48cd1ee3263fe554 Mon Sep 17 00:00:00 2001
+From: Saikrishna Edupuganti <saikrishna.edupuganti@intel.com>
+Date: Thu, 11 Feb 2021 14:09:00 +0000
+Subject: [PATCH] Use rte_flow_create to do GTPU RSS
+
+Equivalent of these testpmd commands:
+
+flow create 0 ingress pattern eth / ipv4 / udp / gtpu / ipv4 / end actions rss types ipv4 l3-src-only end key_len 0 queues end / end
+
+flow create 1 ingress pattern eth / ipv4 / udp / gtpu / ipv4 / end actions rss types ipv4 l3-dst-only end key_len 0 queues end / end
+
+flow create 1 ingress pattern eth / ipv4 / end actions rss types ipv4 l3-dst-only end key_len 0 queues end / end
+
+Signed-off-by: Saikrishna Edupuganti <saikrishna.edupuganti@intel.com>
+---
+ core/drivers/pmd.cc           | 86 +++++++++++++++++++++++++++++++++++
+ protobuf/ports/port_msg.proto |  4 ++
+ 2 files changed, 90 insertions(+)
+
+diff --git a/core/drivers/pmd.cc b/core/drivers/pmd.cc
+index 7822e7ef..913dbc73 100644
+--- a/core/drivers/pmd.cc
++++ b/core/drivers/pmd.cc
+@@ -32,6 +32,7 @@
+ 
+ #include <rte_bus_pci.h>
+ #include <rte_ethdev.h>
++#include <rte_flow.h>
+ 
+ #include "../utils/ether.h"
+ #include "../utils/format.h"
+@@ -206,6 +207,82 @@ static CommandResponse find_dpdk_vdev(const std::string &vdev,
+   return CommandSuccess();
+ }
+ 
++CommandResponse flow_create(dpdk_port_t port_id, const uint32_t &flow_profile){
++  struct rte_flow_item patterns[6];
++  memset(patterns, 0, sizeof(patterns));
++  /* Ethernet */
++  patterns[0].type = RTE_FLOW_ITEM_TYPE_ETH;
++  patterns[0].spec = nullptr;
++  patterns[0].mask = nullptr;
++  /* IPv4 */
++  patterns[1].type = RTE_FLOW_ITEM_TYPE_IPV4;
++  patterns[1].spec = nullptr;
++  patterns[1].mask = nullptr;
++  /* UDP */
++  patterns[2].type = RTE_FLOW_ITEM_TYPE_UDP;
++  patterns[2].spec = nullptr;
++  patterns[2].mask = nullptr;
++  /* GTP */
++  patterns[3].type = RTE_FLOW_ITEM_TYPE_GTPU;
++  patterns[3].spec = nullptr;
++  patterns[3].mask = nullptr;
++  /* IPv4 */
++  patterns[4].type = RTE_FLOW_ITEM_TYPE_IPV4;
++  patterns[4].spec = nullptr;
++  patterns[4].mask = nullptr;
++  /* END the pattern array */
++  patterns[5].type = RTE_FLOW_ITEM_TYPE_END;
++
++  struct rte_flow *handle;
++  struct rte_flow_error err;
++  memset(&err, 0, sizeof(err));
++
++  struct rte_flow_action actions[2];
++  memset(actions, 0, sizeof(actions));
++
++  struct rte_flow_attr attributes;
++  memset(&attributes, 0, sizeof(attributes));
++  attributes.ingress = 1;
++
++  struct rte_flow_action_rss action_rss;
++  memset(&action_rss, 0, sizeof(action_rss));
++  action_rss.func = RTE_ETH_HASH_FUNCTION_DEFAULT;
++  action_rss.key_len = 0;
++
++  actions[0].type = RTE_FLOW_ACTION_TYPE_RSS;
++  actions[0].conf = &action_rss;
++  actions[1].type = RTE_FLOW_ACTION_TYPE_END;
++
++  switch (flow_profile)
++  {
++  case 3:
++    action_rss.types = ETH_RSS_IPV4 | ETH_RSS_L3_SRC_ONLY;
++    break;
++  case 6:
++    action_rss.types = ETH_RSS_IPV4 | ETH_RSS_L3_DST_ONLY;
++    patterns[2].type = RTE_FLOW_ITEM_TYPE_END;
++    break;
++  case 9:
++    action_rss.types = ETH_RSS_IPV4 | ETH_RSS_L3_DST_ONLY;
++    break;
++  default:
++    return CommandFailure(EINVAL, "Unknown flow profile %u", flow_profile);
++  }
++
++  int ret = rte_flow_validate(port_id, &attributes, patterns, actions, &err);
++  if(ret)
++    return CommandFailure(EINVAL, "Port %u: Failed to validate flow profile %u %s",
++                          port_id, flow_profile, err.message);
++
++
++  handle = rte_flow_create(port_id, &attributes, patterns, actions, &err);
++  if(handle == nullptr)
++    return CommandFailure(EINVAL, "Port %u: Failed to create flow %s",
++                          port_id, err.message);
++
++  return CommandSuccess();
++}
++
+ CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
+   dpdk_port_t ret_port_id = DPDK_PORT_UNKNOWN;
+ 
+@@ -364,6 +441,15 @@ CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
+ 
+   driver_ = dev_info.driver_name ?: "unknown";
+ 
++  if (arg.flow_profiles_size() > 0){
++    for (int i = 0; i < arg.flow_profiles_size(); ++i) {
++      err = flow_create(ret_port_id, arg.flow_profiles(i));
++      if (err.error().code() != 0) {
++        return err;
++      }
++    }
++  }
++
+   return CommandSuccess();
+ }
+ 
+diff --git a/protobuf/ports/port_msg.proto b/protobuf/ports/port_msg.proto
+index e25f0943..3768bed8 100644
+--- a/protobuf/ports/port_msg.proto
++++ b/protobuf/ports/port_msg.proto
+@@ -52,6 +52,10 @@ message PMDPortArg {
+   }
+   bool promiscuous_mode = 9;
+   bool hwcksum = 10;
++
++  // N3 -> 3; N6 -> 6; N9 -> 9
++  // [3] or [6, 9]
++  repeated uint32 flow_profiles = 11;
+ }
+ 
+ message UnixSocketPortArg {
+-- 
+2.25.1
+
