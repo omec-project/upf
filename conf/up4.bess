@@ -122,8 +122,12 @@ for idx, iface in enumerate(interfaces):
     if p.name in ports:
         continue
 
+    if parser.ddp:
+        p.configure_flow_profiles(iface)
+
     # initialize port with the configured driver
-    p.init_port(idx, parser.mode, parser.workers)
+    p.workers = [i for i in range(len(workers))]
+    p.init_port(idx, parser.mode)
 
     # setup port module with auxiliary modules
     if parser.mode == 'sim':

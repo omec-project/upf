@@ -26,6 +26,8 @@ class Parser:
         self.conf = get_json_conf(self.name, False)
         self.max_ip_defrag_flows = None
         self.ip_frag_with_eth_mtu = None
+        self.hwcksum = False
+        self.ddp = False
         self.measure = False
         self.mode = None
         self.sim_core = None
@@ -63,6 +65,22 @@ class Parser:
                 'Invalid value for ip_frag_with_eth_mtu. Not installing IP4Frag module.')
         except KeyError:
             print('ip_frag_with_eth_mtu value not set. Not installing IP4Frag module.')
+
+        # Enable hardware checksum
+        try:
+            self.hwcksum = bool(self.conf["hwcksum"])
+        except ValueError:
+            print('Invalid value for hwcksum. Not enabling.')
+        except KeyError:
+            print('hwcksum not set, using default software fallback')
+
+        # Enable DDP
+        try:
+            self.ddp = bool(self.conf["ddp"])
+        except ValueError:
+            print('Invalid value for ddp. Not enabling.')
+        except KeyError:
+            pass
 
         # Telemtrics
         # See this link for details:
