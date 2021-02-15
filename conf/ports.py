@@ -45,7 +45,9 @@ def scan_dpdk_ports():
 class Port:
     def __init__(self, name, ext_addrs):
         self.name = name
-        self.wid = None
+        self.flow_profiles = []
+        self.workers = None
+        self.num_q = 1
         self.fpi = None
         self.fpo = None
         self.bpf = None
@@ -73,12 +75,28 @@ class Port:
             mode = 'linux'
         return mode
 
+    def configure_flow_profiles(self, iface):
+        if iface == "access":
+            self.flow_profiles = [3]
+        if iface == "core":
+            self.flow_profiles = [6, 9]
+
     def init_fastpath(self, **kwargs):
         # Initialize PMDPort and RX/TX modules
         name = self.name
         fast = PMDPort(name="{}Fast".format(name), **kwargs)
-        self.fpi = PortInc(name="{}FastPI".format(name), port=fast.name)
-        self.fpo = PortOut(name="{}FastPO".format(name), port=fast.name)
+        self.fpi = Merge(name="{}PortMerge".format(name))
+        self.fpo = WorkerSplit(name="{}QSplit".format(name))
+
+        for qid in range(self.num_q):
+            fpi = QueueInc(name="{}Q{}FastPI".format(name, qid), port=fast.name, qid=qid)
+            fpi.connect(next_mod=self.fpi)
+            # Attach fastpath to worker's root TC
+            fpi.attach_task(wid=qid)
+
+            fpo = QueueOut(name="{}Q{}FastPO".format(name, qid), port=fast.name, qid=qid)
+            self.fpo.connect(next_mod=fpo, ogate=qid)
+
 
         # Initialize BPF to classify incoming traffic to go to kernel and/or pipeline
         self.bpf = BPF(name="{}FastBPF".format(name))
@@ -92,16 +110,12 @@ class Port:
         s = Sink(name="{}bad_route".format(name))
         self.rtr.connect(next_mod=s, ogate=MAX_GATES-1)
 
-        # Attach fastpath to worker's root TC
-        self.fpi.attach_task(wid=self.wid)
-
-    def init_port(self, idx, conf_mode, conf_workers):
-        # Pick the worker handling this port
-        self.wid = idx % conf_workers
+    def init_port(self, idx, conf_mode):
 
         name = self.name
-        wid = self.wid
-        print('Setting up port {} on worker {}'.format(name,wid))
+        num_q = len(self.workers)
+        self.num_q = num_q
+        print('Setting up port {} on worker ids {}'.format(name, self.workers))
 
         # Detect the mode of this interface - DPDK/AF_XDP/AF_PACKET
         if conf_mode is None:
@@ -115,7 +129,7 @@ class Port:
                 # Initialize kernel fastpath.
                 # AF_XDP requires that num_rx_qs == num_tx_qs
                 kwargs = {"vdev" : "net_af_xdp{},iface={},start_queue=0,queue_count={}"
-                          .format(idx, name, conf_workers), "num_out_q": conf_workers, "num_inc_q": conf_workers}
+                          .format(idx, name, num_q), "num_out_q": num_q, "num_inc_q": num_q}
                 self.init_fastpath(**kwargs)
             except:
                 if conf_mode == 'linux':
@@ -128,7 +142,8 @@ class Port:
         if conf_mode == 'af_packet':
             try:
                 # Initialize kernel fastpath
-                kwargs = {"vdev" : "net_af_packet{},iface={},qpairs={}".format(idx, name, conf_workers), "num_out_q": conf_workers}
+                kwargs = {"vdev" : "net_af_packet{},iface={},qpairs={}"
+                          .format(idx, name, num_q), "num_out_q": num_q, "num_inc_q": num_q}
                 self.init_fastpath(**kwargs)
             except:
                 print('Failed to create AF_PACKET socket for {}. Exiting...'.format(name))
@@ -141,13 +156,13 @@ class Port:
             self.bpf.clear()
 
             # Attach fastpath to worker's root TC
-            self.fpi.attach_task(wid=self.wid)
+            self.fpi.attach_task(wid=0)
 
         if conf_mode == 'dpdk':
             kwargs = None
             pci = alias_by_interface(name)
             if pci is not None:
-                kwargs = {"pci": pci, "num_out_q": conf_workers, "hwcksum": True}
+                kwargs = {"pci": pci, "num_out_q": num_q, "num_inc_q": num_q, "hwcksum": self.hwcksum, "flow_profiles": self.flow_profiles}
                 try:
                     self.init_fastpath(**kwargs)
                     self.hwcksum = True
@@ -166,17 +181,8 @@ class Port:
                 if fidx is None:
                     raise Exception(
                         'Registered port for {} not detected!'.format(name))
-                kwargs = {"port_id": fidx, "num_out_q": conf_workers,  "hwcksum": True}
-                try:
-                    self.init_fastpath(**kwargs)
-                    self.hwcksum = True
-                except:
-                    # Try setting hwcksum to False & re-init DPDK fastpath
-                    # if everything else fails
-                    print('Unable to initialize {} fastpath with hardware checksum,\
-                    offloading. Falling back to SW-based cksum'.format(name))
-                    kwargs = {"port_id": fidx, "num_out_q": conf_workers,  "hwcksum": False}
-                    self.init_fastpath(**kwargs)
+                kwargs = {"port_id": fidx, "num_out_q": num_q, "num_inc_q": num_q, "hwcksum": self.hwcksum, "flow_profiles": self.flow_profiles}
+                self.init_fastpath(**kwargs)
 
             # Initialize kernel slowpath port and RX/TX modules
             try:
@@ -203,9 +209,9 @@ class Port:
                 # Direct control traffic from kernel to DPDK
                 spi.connect(next_mod=self.fpo)
 
-                tc = 'slow{}'.format(wid)
+                tc = 'slow{}'.format(0)
                 try:
-                    bess.add_tc(tc, policy='round_robin', wid=wid)
+                    bess.add_tc(tc, policy='round_robin', wid=0)
                 except Exception as e:
                     if e.errmsg == "Name '{}' already exists".format(tc):
                         pass

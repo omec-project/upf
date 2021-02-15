@@ -16,10 +16,9 @@ struct SessionStats {
 
 class Counter final : public Module {
  public:
-  Counter() : counters() {}
+  Counter() : counters() { max_allowed_workers_ = Worker::kMaxWorkers; }
 
   static const Commands cmds;
-  static const gate_idx_t kNumIGates = 10;
   CommandResponse AddCounter(const bess::pb::CounterAddArg &arg);
   CommandResponse RemoveCounter(const bess::pb::CounterRemoveArg &arg);
   CommandResponse RemoveAllCounters(const bess::pb::EmptyArg &);

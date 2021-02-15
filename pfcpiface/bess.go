@@ -252,11 +252,7 @@ func (b *bess) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metri
 
 func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 	log.Println("setUpfInfo bess")
-	var simInfo *SimModeInfo
-	if conf.Mode == modeSim {
-		simInfo = &conf.SimInfo
-		u.simInfo = simInfo
-	}
+	u.simInfo = &conf.SimInfo
 
 	u.ippoolCidr = conf.CPIface.UeIPPool
 	log.Println("IP pool : ", u.ippoolCidr)
