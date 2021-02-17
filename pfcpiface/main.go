@@ -15,10 +15,6 @@ import (
 	fqdn "github.com/Showmax/go-fqdn"
 )
 
-const (
-	modeSim = "sim"
-)
-
 var (
 	configPath = flag.String("config", "upf.json", "path to upf config")
 	httpAddr   = flag.String("http", "0.0.0.0:8080", "http IP/port combo")
@@ -57,6 +53,7 @@ type CPIfaceInfo struct {
 	FQDNHost        string `json:"hostname"`
 	EnableUeIPAlloc bool   `json:"enable_ue_ip_alloc"`
 	UeIPPool        string `json:"ue_ip_pool"`
+	PromPort        string `json:"prom_port"`
 }
 
 // IfaceType : Gateway interface struct
@@ -168,7 +165,11 @@ func main() {
 	log.Println("N4 local IP: ", upf.n4SrcIP.String())
 	log.Println("Access IP: ", upf.accessIP.String())
 	log.Println("Core IP: ", upf.coreIP.String())
+	if conf.CPIface.PromPort != "" {
+		*httpAddr = string("0.0.0.0:") + conf.CPIface.PromPort
+	}
 
+	log.Println("httpAddr: ", httpAddr)
 	go pfcpifaceMainLoop(upf, upf.accessIP.String(),
 		upf.coreIP.String(), upf.n4SrcIP.String(),
 		conf.CPIface.DestIP)
