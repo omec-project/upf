@@ -21,7 +21,7 @@ def gen_inet_packet(size, src_mac, dst_mac, src_ip, dst_ip):
     return bytes(pkt)
 
 
-def get_inet_sequpdate_args(max_session, start_ue_ip):
+def gen_inet_sequpdate_args(max_session, start_ue_ip):
     kwargs = {"fields": [
         {'offset': 30, 'size': 4, 'min': ip2long(start_ue_ip),
          'max': ip2long(start_ue_ip)+max_session-1}]}
