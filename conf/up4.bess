@@ -70,7 +70,7 @@ if parser.mode == 'sim':
                                 parser.sim_start_n3_teid))
 
     n3_seq = sim.gen_gtpu_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip, 62, parser.sim_start_n3_teid)
-    n6_seq = sim.get_inet_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip)
+    n6_seq = sim.gen_inet_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip)
     n9_seq = sim.gen_gtpu_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip, 66, parser.sim_start_n9_teid)
 
     if parser.sim_core == "n6":
