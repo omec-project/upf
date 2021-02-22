@@ -68,12 +68,12 @@ RUN ./build_bess.sh && \
     cp -a protobuf /protobuf
 
 # Stage pip: compile psutil
-FROM python:3.8-slim AS pip
+FROM python:3.9.2-slim AS pip
 RUN apt-get update && apt-get install -y gcc
 RUN pip install --no-cache-dir psutil
 
 # Stage bess: creates the runtime image of BESS
-FROM python:3.8-slim AS bess
+FROM python:3.9.2-slim AS bess
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         libgraph-easy-perl \
