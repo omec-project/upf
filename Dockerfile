@@ -89,7 +89,7 @@ RUN apt-get update && \
         protobuf \
         pyroute2 \
         scapy
-COPY --from=pip /usr/local/lib/python3.8/site-packages/psutil /usr/local/lib/python3.8/site-packages/psutil
+COPY --from=pip /usr/local/lib/python3*/site-packages/psutil /usr/local/lib/python3*/site-packages/psutil
 COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin/bessd
 COPY --from=bess-build /bin/modules /bin/modules
