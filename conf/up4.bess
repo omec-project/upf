@@ -118,7 +118,7 @@ for idx, iface in enumerate(interfaces):
     except TypeError:
         ext_addrs = None
 
-    p = port.Port(parser.interfaces[iface]["ifname"], ext_addrs)
+    p = port.Port(parser.interfaces[iface]["ifname"], parser.hwcksum, ext_addrs)
     if p.name in ports:
         continue
 
@@ -242,14 +242,9 @@ if ports[parser.core_ifname].ext_addrs is not None:
 
 
 # 1. Build initial DL pipeline here
-if ports[parser.core_ifname].hwcksum == True:
-    coreFastBPF:UEGate \
-        -> coreRxIPCksum::IPChecksum(verify=True, hw=True) \
-        -> coreRxUDPCksum::L4Checksum(verify=True, hw=True)
-else:
-    coreFastBPF:UEGate \
-        -> coreRxIPCksum::IPChecksum(verify=True) \
-        -> coreRxUDPCksum::L4Checksum(verify=True)
+coreFastBPF:UEGate \
+    -> coreRxIPCksum::IPChecksum(verify=True, hw=parser.hwcksum) \
+    -> coreRxUDPCksum::L4Checksum(verify=True, hw=parser.hwcksum)
 
 # Record last module to chain up optional modules
 _in = coreRxUDPCksum
@@ -320,14 +315,9 @@ GTPUGate = 0
 
 
 # 1. Build initial UL pipeline here
-if ports[parser.access_ifname].hwcksum == True:
-    accessFastBPF:GTPUGate \
-        -> accessRxIPCksum::IPChecksum(verify=True, hw=True) \
-        -> accessRxUDPCksum::L4Checksum(verify=True, hw=True)
-else:
-    accessFastBPF:GTPUGate \
-        -> accessRxIPCksum::IPChecksum(verify=True) \
-        -> accessRxUDPCksum::L4Checksum(verify=True)
+accessFastBPF:GTPUGate \
+    -> accessRxIPCksum::IPChecksum(verify=True, hw=parser.hwcksum) \
+    -> accessRxUDPCksum::L4Checksum(verify=True, hw=parser.hwcksum)
 
 # Record last module to chain up option modules
 _in = accessRxUDPCksum
