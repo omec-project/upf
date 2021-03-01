@@ -43,7 +43,7 @@ def scan_dpdk_ports():
 
 
 class Port:
-    def __init__(self, name, ext_addrs):
+    def __init__(self, name, hwcksum, ext_addrs):
         self.name = name
         self.flow_profiles = []
         self.workers = None
@@ -57,7 +57,7 @@ class Port:
         self.nat = None
         self.ext_addrs = ext_addrs
         self.mode = None
-        self.hwcksum = False
+        self.hwcksum = hwcksum
 
     def bpf_gate(self):
         if self.bpfgate < MAX_GATES - 2:
@@ -165,7 +165,6 @@ class Port:
                 kwargs = {"pci": pci, "num_out_q": num_q, "num_inc_q": num_q, "hwcksum": self.hwcksum, "flow_profiles": self.flow_profiles}
                 try:
                     self.init_fastpath(**kwargs)
-                    self.hwcksum = True
                 except:
                     kwargs = None
                     print('Unable to initialize {} fastpath using alias {},\
