@@ -64,7 +64,10 @@ Control program(s) to dynamically configure BESS modules
 
 ## Testing
 
-### Simulation mode
+### Microbenchmarks
+
+#### Simulation mode
+
 UPF-EPC has a simulation mode that enables testing the pipeline on a single machine.
 
 To start UPF-EPC in simulation mode:
@@ -100,7 +103,7 @@ index 086ad2f..79d81bd 100755
  #
 ```
 
-2. Start DP pipeline
+2. Start UPF
 
 ```bash
  ./docker_setup.sh
@@ -125,23 +128,37 @@ index 086ad2f..79d81bd 100755
 
 4. (optional) [Observe DP pipeline](#observe-dp-pipeline)
 
+#### [Pktgen](conf/pktgen.bess)
 
-### Microbenchmarks
+1. Configure the mode/cores/memory/devices as per your environment and start UPF
 
-UPF-EPC has been tested against 2 microbenchmark applications (on an Intel Xeon Platinum 8170 @ 2.10GHz)
+```bash
+ ./docker_setup.sh
+```
 
-#### [il_trafficgen](https://github.com/omec-project/il_trafficgen)
-<!-- Baseline performance of the dataplane is ~5 Mpps per CPU -->
-* Tested with up to 30K subscribers
-* 128B Ethernet frame size
-* 1 default bearer per session
+2. Insert rules into relevant PDR and FAR tables
 
-#### Spirent Landslide 17.5.0 GA testcases
+```bash
+docker exec bess-pfcpiface pfcpiface -config /conf/upf.json -simulate create
+```
 
-* Tested with up to 10K subscribers
-* 64B Ethernet frame size
-* 1 default bearer per session
-* 100 transactions/sec
+3. On the same machine using an extra VF or from a different machine run pktgen instance
+
+```bash
+docker run --name pktgen -td --restart unless-stopped \
+           --cpuset-cpus=2-5 --ulimit memlock=-1 --cap-add IPC_LOCK \
+           -v /dev/hugepages:/dev/hugepages -v "$PWD/conf":/opt/bess/bessctl/conf \
+           --device=/dev/vfio/vfio --device=/dev/vfio/176 \
+           upf-epc-bess:"$(<VERSION)" -grpc-url=0.0.0.0:10514
+```
+
+4. Customize [pktgen.bess](conf/pktgen.bess) to match [sim config](conf/upf.json) used in step 2
+
+5. Start pktgen
+
+```bash
+docker exec -it pktgen ./bessctl run pktgen
+```
 
 ## Observe DP Pipeline
 
