@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
 
 	fqdn "github.com/Showmax/go-fqdn"
 )
@@ -54,6 +55,7 @@ type CPIfaceInfo struct {
 	EnableUeIPAlloc bool   `json:"enable_ue_ip_alloc"`
 	UeIPPool        string `json:"ue_ip_pool"`
 	PromPort        string `json:"prom_port"`
+	Dnn             string `json:"dnn"`
 }
 
 // IfaceType : Gateway interface struct
@@ -144,6 +146,8 @@ func main() {
 		maxSessions:     conf.MaxSessions,
 		intf:            intf,
 		enableUeIPAlloc: conf.CPIface.EnableUeIPAlloc,
+		recoveryTime:    time.Now(),
+		dnn:             conf.CPIface.Dnn,
 	}
 
 	upf.setUpfInfo(&conf)

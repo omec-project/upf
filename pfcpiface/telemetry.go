@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// PfcpStats ... Prometheus metrics
 type PfcpStats struct {
 	messages *prometheus.CounterVec
 	sessions *prometheus.GaugeVec

@@ -142,9 +142,6 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, upf *upf) err
 		if p.srcIface == core {
 			p.dstIP = ip2int(ueIP4)
 			p.dstIPMask = 0xffffffff // /32
-		} else if p.srcIface == access {
-			p.srcIP = ip2int(ueIP4)
-			p.srcIPMask = 0xffffffff // /32
 		}
 	}
 

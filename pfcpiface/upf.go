@@ -5,6 +5,7 @@ package main
 
 import (
 	"net"
+	"time"
 )
 
 type upf struct {
@@ -20,6 +21,8 @@ type upf struct {
 	simInfo         *SimModeInfo
 	intf            fastPath
 	ippool          ipPool
+	recoveryTime    time.Time
+	dnn             string
 }
 
 // to be replaced with go-pfcp structs

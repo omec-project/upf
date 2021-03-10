@@ -62,6 +62,12 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 		return
 	}
 
+	ips, err := net.LookupIP("upf")
+	if err == nil {
+		sourceIP = ips[0].String()
+		log.Println("Service IP : ", sourceIP)
+	}
+
 	// flag to check SMF/SPGW-C is connected
 	// cpConnected is true if upf received request from control plane or
 	// if upf receives +ve response for upf initiated setup request
@@ -80,7 +86,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 	manageConnection := false
 	if smfName != "" {
 		manageConnection = true
-		go pconn.manageSmfConnection(sourceIP, accessIP, smfName, conn, cpConnectionStatus)
+		go pconn.manageSmfConnection(sourceIP, accessIP, smfName, conn, cpConnectionStatus, upf.recoveryTime)
 	}
 
 	// Initialize pkt buf
@@ -151,11 +157,11 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 		case message.MsgTypeSessionModificationRequest:
 			outgoingMessage = pconn.handleSessionModificationRequest(upf, msg, addr, sourceIP)
 		case message.MsgTypeHeartbeatRequest:
-			outgoingMessage = handleHeartbeatRequest(msg, addr)
+			outgoingMessage = handleHeartbeatRequest(msg, addr, upf.recoveryTime)
 		case message.MsgTypeSessionDeletionRequest:
 			outgoingMessage = pconn.handleSessionDeletionRequest(upf, msg, addr, sourceIP)
 		case message.MsgTypeAssociationReleaseRequest:
-			outgoingMessage = handleAssociationReleaseRequest(msg, addr, sourceIP, accessIP)
+			outgoingMessage = handleAssociationReleaseRequest(msg, addr, sourceIP, accessIP, upf.recoveryTime)
 			cleanupSessions()
 		default:
 			log.Println("Message type: ", msg.MessageTypeName(), " is currently not supported")

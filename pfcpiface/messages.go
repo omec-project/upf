@@ -8,13 +8,14 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
 )
 
-func handleHeartbeatRequest(msg message.Message, addr net.Addr) []byte {
+func handleHeartbeatRequest(msg message.Message, addr net.Addr, rTime time.Time) []byte {
 	hbreq, ok := msg.(*message.HeartbeatRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -25,7 +26,7 @@ func handleHeartbeatRequest(msg message.Message, addr net.Addr) []byte {
 
 	// Build response message
 	hbres, err := message.NewHeartbeatResponse(hbreq.SequenceNumber,
-		ie.NewRecoveryTimeStamp(time.Now()), /* ts */
+		ie.NewRecoveryTimeStamp(rTime), /* ts */
 	).Marshal()
 	if err != nil {
 		log.Fatalln("Unable to create heartbeat response", err)
@@ -66,13 +67,19 @@ func (pc *PFCPConn) handleAssociationSetupRequest(upf *upf, msg message.Message,
 
 	// Build response message
 	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
+	flags := uint8(0x41)
+	log.Println("Dnn info : ", upf.dnn)
+	if len(upf.dnn) != 0 {
+		//add ASSONI flag to set network instance.
+		flags = uint8(0x61)
+	}
 	asresmsg := message.NewAssociationSetupResponse(asreq.SequenceNumber,
-		ie.NewRecoveryTimeStamp(time.Now()),
+		ie.NewRecoveryTimeStamp(upf.recoveryTime),
 		ie.NewNodeID(sourceIP, "", ""), /* node id (IPv4) */
 		ie.NewCause(cause),             /* accept it blindly for the time being */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
-		ie.NewUserPlaneIPResourceInformation(0x41, 0, upf.accessIP.String(), "", "", ie.SrcInterfaceAccess),
+		ie.NewUserPlaneIPResourceInformation(flags, 0, upf.accessIP.String(), "", upf.dnn, ie.SrcInterfaceAccess),
 		// ie.NewUserPlaneIPResourceInformation(0x41, 0, coreIP, "", "", ie.SrcInterfaceCore),
 	) /* userplane ip resource info */
 
@@ -118,7 +125,7 @@ func handleAssociationSetupResponse(msg message.Message, addr net.Addr, sourceIP
 	return true
 }
 
-func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceIP string, accessIP string) []byte {
+func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceIP string, accessIP string, rTime time.Time) []byte {
 	arreq, ok := msg.(*message.AssociationReleaseRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -130,7 +137,7 @@ func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceI
 	// Build response message
 	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
 	arres, err := message.NewAssociationReleaseResponse(arreq.SequenceNumber,
-		ie.NewRecoveryTimeStamp(time.Now()),
+		ie.NewRecoveryTimeStamp(rTime),
 		ie.NewNodeID(sourceIP, "", ""),       /* node id (IPv4) */
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
@@ -246,7 +253,7 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 	remoteSEID := fseid.SEID
 	fseidIP := ip2int(fseid.IPv4Address)
 
-	sendError := func(err error) []byte {
+	sendError := func(err error, cause uint8) []byte {
 		pfcpStats.messages.WithLabelValues(string(nodeID), "Pfcp_Establishment_Response", "Outgoing", "Failure").Inc()
 		log.Println(err)
 		// Build response message
@@ -256,7 +263,7 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 			sereq.SequenceNumber,           /* seq # */
 			0,                              /* priority */
 			ie.NewNodeID(sourceIP, "", ""), /* node id (IPv4) */
-			ie.NewCause(ie.CauseRequestRejected),
+			ie.NewCause(cause),
 		).Marshal()
 		if err != nil {
 			log.Fatalln("Unable to create session establishment response", err)
@@ -266,16 +273,23 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 		return seres
 	}
 
+	if strings.Compare(nodeID, pc.mgr.nodeID) != 0 {
+		log.Println("Association not found for Establishment request, nodeID: ", nodeID, ", Association NodeID: ", pc.mgr.nodeID)
+		return sendError(errors.New("No Association found for NodeID"),
+			ie.CauseNoEstablishedPFCPAssociation)
+	}
+
 	/* Read CreatePDRs and CreateFARs from payload */
 	localSEID := pc.mgr.NewPFCPSession(remoteSEID)
 	if localSEID == 0 {
-		sendError(errors.New("Unable to allocate new PFCP session"))
+		sendError(errors.New("Unable to allocate new PFCP session"),
+			ie.CauseNoResourcesAvailable)
 	}
 	session := pc.mgr.sessions[localSEID]
 	for _, cPDR := range sereq.CreatePDR {
 		var p pdr
 		if err := p.parsePDR(cPDR, session.localSEID, pc.mgr.appPFDs, upf); err != nil {
-			return sendError(err)
+			return sendError(err, ie.CauseRequestRejected)
 		}
 		p.fseidIP = fseidIP
 		session.CreatePDR(p)
@@ -284,7 +298,7 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 	for _, cFAR := range sereq.CreateFAR {
 		var f far
 		if err := f.parseFAR(cFAR, session.localSEID, upf, create); err != nil {
-			return sendError(err)
+			return sendError(err, ie.CauseRequestRejected)
 		}
 		f.fseidIP = fseidIP
 		session.CreateFAR(f)
@@ -293,7 +307,8 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 	cause := upf.sendMsgToUPF("add", session.pdrs, session.fars)
 	if cause == ie.CauseRequestRejected {
 		pc.mgr.RemoveSession(session.localSEID)
-		return sendError(errors.New("Write to FastPath failed"))
+		return sendError(errors.New("Write to FastPath failed"),
+			ie.CauseRequestRejected)
 	}
 
 	// Build response message
@@ -395,6 +410,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 		if err = p.parsePDR(uPDR, localSEID, pc.mgr.appPFDs, upf); err != nil {
 			return sendError(err)
 		}
+		p.fseidIP = fseidIP
 		err = session.UpdatePDR(p)
 		if err != nil {
 			log.Println("session PDR update failed ", err)
@@ -497,10 +513,10 @@ func (pc *PFCPConn) handleSessionDeletionRequest(upf *upf, msg message.Message, 
 			ie.NewCause(ie.CauseRequestRejected), /* accept it blindly for the time being */
 		).Marshal()
 		if err != nil {
-			log.Fatalln("Unable to create session establishment response", err)
+			log.Fatalln("Unable to create session deletion response", err)
 		}
 
-		log.Println("Sending session establishment response to: ", addr)
+		log.Println("Sending session deletion response to: ", addr)
 		return smres
 	}
 
@@ -518,7 +534,6 @@ func (pc *PFCPConn) handleSessionDeletionRequest(upf *upf, msg message.Message, 
 
 	releaseAllocatedIPs(upf, &session)
 	/* delete sessionRecord */
-	//delete(pc.mgr.sessions, localSEID)
 	pc.mgr.RemoveSession(localSEID)
 
 	// Build response message
@@ -539,7 +554,7 @@ func (pc *PFCPConn) handleSessionDeletionRequest(upf *upf, msg message.Message, 
 	return smres
 }
 
-func (pc *PFCPConn) manageSmfConnection(n4LocalIP string, n3ip string, n4Dst string, conn *net.UDPConn, cpConnectionStatus chan bool) {
+func (pc *PFCPConn) manageSmfConnection(n4LocalIP string, n3ip string, n4Dst string, conn *net.UDPConn, cpConnectionStatus chan bool, rTime time.Time) {
 	cpConnected := false
 
 	initiatePfcpConnection := func() {
@@ -548,7 +563,7 @@ func (pc *PFCPConn) manageSmfConnection(n4LocalIP string, n3ip string, n4Dst str
 		log.Println("SPGWC/SMF address IP inside manageSmfConnection ", n4DstIP.String())
 		// initiate request if we have control plane address available
 		if n4DstIP.String() != "0.0.0.0" {
-			pc.generateAssociationRequest(n4LocalIP, n3ip, n4DstIP.String(), conn)
+			pc.generateAssociationRequest(n4LocalIP, n3ip, n4DstIP.String(), conn, rTime)
 		}
 		// no worry. Looks like control plane is still not up
 	}
@@ -591,11 +606,11 @@ func (pc *PFCPConn) manageSmfConnection(n4LocalIP string, n3ip string, n4Dst str
 	}
 }
 
-func (pc *PFCPConn) generateAssociationRequest(n4LocalIP string, n3ip string, n4DstIP string, conn *net.UDPConn) {
+func (pc *PFCPConn) generateAssociationRequest(n4LocalIP string, n3ip string, n4DstIP string, conn *net.UDPConn, rTime time.Time) {
 	seq := pc.getSeqNum()
 	log.Println("n4DstIp ", n4DstIP)
 	// Build request message
-	asreq, err := message.NewAssociationSetupRequest(seq, ie.NewRecoveryTimeStamp(time.Now()),
+	asreq, err := message.NewAssociationSetupRequest(seq, ie.NewRecoveryTimeStamp(rTime),
 		ie.NewNodeID(n4LocalIP, "", ""), /* node id (IPv4) */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
