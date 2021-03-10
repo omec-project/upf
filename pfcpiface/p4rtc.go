@@ -217,9 +217,17 @@ func (c *P4rtClient) WriteFarTable(
 	te.Fields[1].Value = make([]byte, 12)
 	copy(te.Fields[1].Value, fseidVal)
 
+	var prio int32
 	if funcType == FunctionTypeDelete {
 		te.ActionName = "NoAction"
 		te.ParamSize = 0
+		go func() {
+			ret := c.InsertTableEntry(te, funcType, prio)
+			if ret != nil {
+				log.Println("Insert Table entry error : ", ret)
+			}
+		}()
+		return nil
 	} else if funcType == FunctionTypeInsert {
 		te.ActionName = "PreQosPipe.load_normal_far_attributes"
 		te.ParamSize = 2
@@ -280,7 +288,6 @@ func (c *P4rtClient) WriteFarTable(
 		te.Params[7].Value[0] = val[0]
 	}
 
-	var prio int32
 	return c.InsertTableEntry(te, funcType, prio)
 }
 
@@ -333,9 +340,17 @@ func (c *P4rtClient) WritePdrTable(
 		binary.BigEndian.PutUint32(te.Fields[1].Mask, pdrEntry.dstIPMask)
 	}
 
+	var prio int32 = 2
 	if funcType == FunctionTypeDelete {
 		te.ActionName = "NoAction"
 		te.ParamSize = 0
+		go func() {
+			ret := c.InsertTableEntry(te, funcType, prio)
+			if ret != nil {
+				log.Println("Insert Table entry error : ", ret)
+			}
+		}()
+		return nil
 	} else if funcType == FunctionTypeInsert {
 
 		te.ParamSize = 5
@@ -364,7 +379,6 @@ func (c *P4rtClient) WritePdrTable(
 		te.Params[4].Value[0] = byte(decapVal)
 	}
 
-	var prio int32 = 2
 	return c.InsertTableEntry(te, funcType, prio)
 }
 
@@ -668,7 +682,7 @@ func (c *P4rtClient) ReadCounterEntry(ce *IntfCounterEntry) (*p4.ReadResponse, e
 //ClearFarTable ... Clear FAR Table
 func (c *P4rtClient) ClearFarTable() error {
 
-	log.Println("ReadFarTable.")
+	log.Println("ClearFarTable.")
 	te := AppTableEntry{
 		TableName: "PreQosPipe.load_far_attributes",
 	}
@@ -676,10 +690,11 @@ func (c *P4rtClient) ClearFarTable() error {
 	var prio int32
 	readRes, err := c.ReadTableEntry(te, prio)
 	if err != nil {
-		log.Println("Read Interface table failed ", err)
+		log.Println("Read FAR table failed ", err)
 		return err
 	}
 
+	updates := make([]*p4.Update, len(readRes.GetEntities()))
 	for _, ent := range readRes.GetEntities() {
 		updateType := p4.Update_DELETE
 		update := &p4.Update{
@@ -687,12 +702,15 @@ func (c *P4rtClient) ClearFarTable() error {
 			Entity: ent,
 		}
 
-		//log.Println(proto.MarshalTextString(update))
-		errin := c.WriteReq(update)
-		if errin != nil {
-			log.Println("pdr delete write failed ", errin)
-		}
+		updates = append(updates, update)
 	}
+
+	go func() {
+		errin := c.WriteBatchReq(updates)
+		if errin != nil {
+			log.Println("far delete write failed ", errin)
+		}
+	}()
 
 	return nil
 }
@@ -700,7 +718,7 @@ func (c *P4rtClient) ClearFarTable() error {
 //ClearPdrTable ... Clear PDR Table
 func (c *P4rtClient) ClearPdrTable() error {
 
-	log.Println("ReadPdrTable.")
+	log.Println("ClearPdrTable.")
 	te := AppTableEntry{
 		TableName: "PreQosPipe.pdrs",
 	}
@@ -712,6 +730,7 @@ func (c *P4rtClient) ClearPdrTable() error {
 		return err
 	}
 
+	updates := make([]*p4.Update, len(readRes.GetEntities()))
 	for _, ent := range readRes.GetEntities() {
 		updateType := p4.Update_DELETE
 		update := &p4.Update{
@@ -719,12 +738,15 @@ func (c *P4rtClient) ClearPdrTable() error {
 			Entity: ent,
 		}
 
-		//log.Println(proto.MarshalTextString(update))
-		errin := c.WriteReq(update)
+		updates = append(updates, update)
+	}
+
+	go func() {
+		errin := c.WriteBatchReq(updates)
 		if errin != nil {
 			log.Println("pdr delete write failed ", errin)
 		}
-	}
+	}()
 
 	return nil
 }
@@ -916,7 +938,19 @@ func (c *P4rtClient) WriteReq(update *p4.Update) error {
 		Updates:    []*p4.Update{update},
 	}
 	_, err := c.Client.Write(context.Background(), req)
-	log.Println("write error ", err)
+	return err
+}
+
+func (c *P4rtClient) WriteBatchReq(updates []*p4.Update) error {
+	req := &p4.WriteRequest{
+		DeviceId:   c.DeviceID,
+		ElectionId: &c.ElectionID,
+	}
+
+	req.Updates = append(req.Updates, updates...)
+
+	//log.Println(proto.MarshalTextString(req))
+	_, err := c.Client.Write(context.Background(), req)
 	return err
 }
 
