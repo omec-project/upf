@@ -123,7 +123,8 @@ COPY --from=cpiface-build /bin/zmq-cpiface /bin
 
 # Stage build bess golang pb
 FROM golang AS protoc-gen
-RUN go get github.com/golang/protobuf/protoc-gen-go
+# Fixme: https://github.com/omec-project/upf-epc/issues/234
+RUN go get github.com/golang/protobuf/protoc-gen-go@v1.4.3
 
 FROM bess-build AS go-pb
 COPY --from=protoc-gen /go/bin/protoc-gen-go /bin
