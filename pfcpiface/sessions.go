@@ -35,7 +35,7 @@ func NewPFCPSessionMgr(maxRetries int) *PFCPSessionMgr {
 // RemoveSession removes session using id
 func (mgr *PFCPSessionMgr) RemoveSession(id uint64) {
 	delete(mgr.sessions, id)
-	pfcpStats.sessions.WithLabelValues(mgr.nodeID).Set(float64(len(mgr.sessions)))
+	globalPfcpStats.sessions.WithLabelValues(mgr.nodeID).Set(float64(len(mgr.sessions)))
 }
 
 // PFCPSession implements one PFCP session
@@ -62,7 +62,7 @@ func (mgr *PFCPSessionMgr) NewPFCPSession(rseid uint64) uint64 {
 			fars:       make([]far, 0, MaxItems),
 		}
 		mgr.sessions[lseid] = s
-		pfcpStats.sessions.WithLabelValues(mgr.nodeID).Set(float64(len(mgr.sessions)))
+		globalPfcpStats.sessions.WithLabelValues(mgr.nodeID).Set(float64(len(mgr.sessions)))
 		return lseid
 	}
 	return 0

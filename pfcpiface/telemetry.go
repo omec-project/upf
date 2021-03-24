@@ -11,15 +11,16 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-type PfcpStats struct {
+// PfcpStats ... Prometheus metrics
+type pfcpStats struct {
 	messages *prometheus.CounterVec
 	sessions *prometheus.GaugeVec
 }
 
-var pfcpStats *PfcpStats
+var globalPfcpStats *pfcpStats
 
-func newPFCPStats() *PfcpStats {
-	return &PfcpStats{
+func newPFCPStats() *pfcpStats {
+	return &pfcpStats{
 		messages: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "pfcp_messages_total",
 			Help: "Counter for incoming and outgoing PFCP messages",
@@ -32,7 +33,7 @@ func newPFCPStats() *PfcpStats {
 	}
 }
 
-func (ps *PfcpStats) register() error {
+func (ps *pfcpStats) register() error {
 	if err := prometheus.Register(ps.messages); err != nil {
 		return err
 	}
@@ -121,9 +122,9 @@ func (uc *upfCollector) summaryLatencyJitter(ch chan<- prometheus.Metric) {
 
 func setupProm(upf *upf) {
 	uc := newUpfCollector(upf)
-	pfcpStats = newPFCPStats()
+	globalPfcpStats = newPFCPStats()
 	prometheus.MustRegister(uc)
-	if err := pfcpStats.register(); err != nil {
+	if err := globalPfcpStats.register(); err != nil {
 		log.Panicln("Pfcp Stats register failed")
 	}
 	http.Handle("/metrics", promhttp.Handler())
