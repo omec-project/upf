@@ -29,10 +29,10 @@
     "": "ip_frag_with_eth_mtu: 1518",
 
     "": "Enable hardware offload of checksum. Might disable vector PMD",
-    "": "hwcksum: True",
+    "hwcksum": false,
 
     "": "Enable Intel Dynamic Device Personalization (DDP)",
-    "": "ddp: True",
+    "ddp": true,
 
     "": "Telemetrics-See this link for details: https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py",
     "measure": true,
@@ -64,7 +64,7 @@
         "nb_dst_ip": "172.17.0.1",
         "" : "nb_dst_ip: CPHostname",
         "hostname": "spgwc",
-        "prom_port": "8089"
+        "prom_port": "8080"
     },
     
     "": "p4rtc interface settings",

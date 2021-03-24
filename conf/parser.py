@@ -68,13 +68,13 @@ class Parser:
 
         # Enable hardware checksum
         try:
-            self.hwcksum = bool(self.conf["hwcksum"] == 'True' or self.conf["hwcksum"] == 'true')
+            self.hwcksum = bool(self.conf["hwcksum"])
         except KeyError:
             print('hwcksum not set, using default software fallback')
 
         # Enable DDP
         try:
-            self.ddp = bool(self.conf["ddp"] == 'True' or self.conf["ddp"] == 'true')
+            self.ddp = bool(self.conf["ddp"])
         except KeyError:
             print('ddp not set, using default software fallback')
 
@@ -82,7 +82,7 @@ class Parser:
         # See this link for details:
         # https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py
         try:
-            self.measure = bool(self.conf["measure"] == 'True' or self.conf["measure"] == 'true')
+            self.measure = self.conf["measure"]
         except KeyError:
             print('measure value not set. Not installing Measure module.')
 
@@ -142,6 +142,6 @@ class Parser:
 
         # Network Token Function
         try:
-            self.enable_ntf = bool(self.conf['enable_ntf'] == 'True' or self.conf['enable_ntf'] == 'true')
+            self.enable_ntf = bool(self.conf['enable_ntf'])
         except KeyError:
             print('Network Token Function disabled')

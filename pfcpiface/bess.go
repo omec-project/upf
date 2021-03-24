@@ -153,11 +153,6 @@ func (b *bess) getPortStats(ifname string) *pb.GetPortStatsResponse {
 }
 
 func (b *bess) portStats(uc *upfCollector, ch chan<- prometheus.Metric) {
-	// When operating in sim mode there are no BESS ports
-	if uc.upf.simInfo != nil {
-		return
-	}
-
 	portstats := func(ifaceLabel, ifaceName string) {
 		packets := func(packets uint64, direction string) {
 			p := prometheus.MustNewConstMetric(
