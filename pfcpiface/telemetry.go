@@ -122,8 +122,8 @@ func (uc *upfCollector) summaryLatencyJitter(ch chan<- prometheus.Metric) {
 
 func setupProm(upf *upf) {
 	uc := newUpfCollector(upf)
-	globalPfcpStats = newPFCPStats()
 	prometheus.MustRegister(uc)
+	globalPfcpStats = newPFCPStats()
 	if err := globalPfcpStats.register(); err != nil {
 		log.Panicln("Pfcp Stats register failed")
 	}
