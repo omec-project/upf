@@ -15,7 +15,7 @@ import (
 	"github.com/wmnsk/go-pfcp/message"
 )
 
-func handleHeartbeatRequest(msg message.Message, addr net.Addr) []byte {
+func handleHeartbeatRequest(msg message.Message, addr net.Addr, rTime time.Time) []byte {
 	hbreq, ok := msg.(*message.HeartbeatRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -26,7 +26,7 @@ func handleHeartbeatRequest(msg message.Message, addr net.Addr) []byte {
 
 	// Build response message
 	hbres, err := message.NewHeartbeatResponse(hbreq.SequenceNumber,
-		ie.NewRecoveryTimeStamp(time.Now()), /* ts */
+		ie.NewRecoveryTimeStamp(rTime), /* ts */
 	).Marshal()
 	if err != nil {
 		log.Fatalln("Unable to create heartbeat response", err)
@@ -68,7 +68,7 @@ func (pc *PFCPConn) handleAssociationSetupRequest(upf *upf, msg message.Message,
 	// Build response message
 	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
 	asresmsg := message.NewAssociationSetupResponse(asreq.SequenceNumber,
-		ie.NewRecoveryTimeStamp(time.Now()),
+		ie.NewRecoveryTimeStamp(upf.recoveryTime),
 		ie.NewNodeID(sourceIP, "", ""), /* node id (IPv4) */
 		ie.NewCause(cause),             /* accept it blindly for the time being */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
@@ -119,7 +119,7 @@ func handleAssociationSetupResponse(msg message.Message, addr net.Addr, sourceIP
 	return true
 }
 
-func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceIP string, accessIP string) []byte {
+func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceIP string, accessIP string, rTime time.Time) []byte {
 	arreq, ok := msg.(*message.AssociationReleaseRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -131,7 +131,7 @@ func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceI
 	// Build response message
 	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
 	arres, err := message.NewAssociationReleaseResponse(arreq.SequenceNumber,
-		ie.NewRecoveryTimeStamp(time.Now()),
+		ie.NewRecoveryTimeStamp(rTime),
 		ie.NewNodeID(sourceIP, "", ""),       /* node id (IPv4) */
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
@@ -548,7 +548,7 @@ func (pc *PFCPConn) handleSessionDeletionRequest(upf *upf, msg message.Message, 
 	return smres
 }
 
-func (pc *PFCPConn) manageSmfConnection(n4LocalIP string, n3ip string, n4Dst string, conn *net.UDPConn, cpConnectionStatus chan bool) {
+func (pc *PFCPConn) manageSmfConnection(n4LocalIP string, n3ip string, n4Dst string, conn *net.UDPConn, cpConnectionStatus chan bool, rTime time.Time) {
 	cpConnected := false
 
 	initiatePfcpConnection := func() {
@@ -557,7 +557,7 @@ func (pc *PFCPConn) manageSmfConnection(n4LocalIP string, n3ip string, n4Dst str
 		log.Println("SPGWC/SMF address IP inside manageSmfConnection ", n4DstIP.String())
 		// initiate request if we have control plane address available
 		if n4DstIP.String() != "0.0.0.0" {
-			pc.generateAssociationRequest(n4LocalIP, n3ip, n4DstIP.String(), conn)
+			pc.generateAssociationRequest(n4LocalIP, n3ip, n4DstIP.String(), conn, rTime)
 		}
 		// no worry. Looks like control plane is still not up
 	}
@@ -600,11 +600,11 @@ func (pc *PFCPConn) manageSmfConnection(n4LocalIP string, n3ip string, n4Dst str
 	}
 }
 
-func (pc *PFCPConn) generateAssociationRequest(n4LocalIP string, n3ip string, n4DstIP string, conn *net.UDPConn) {
+func (pc *PFCPConn) generateAssociationRequest(n4LocalIP string, n3ip string, n4DstIP string, conn *net.UDPConn, rTime time.Time) {
 	seq := pc.getSeqNum()
 	log.Println("n4DstIp ", n4DstIP)
 	// Build request message
-	asreq, err := message.NewAssociationSetupRequest(seq, ie.NewRecoveryTimeStamp(time.Now()),
+	asreq, err := message.NewAssociationSetupRequest(seq, ie.NewRecoveryTimeStamp(rTime),
 		ie.NewNodeID(n4LocalIP, "", ""), /* node id (IPv4) */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
