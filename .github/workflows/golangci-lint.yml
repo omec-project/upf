@@ -15,5 +15,6 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2.5.2
         with:
-          version: v1.29
+          version: latest
           working-directory: pfcpiface
+          args: -v --enable-all --disable=nlreturn --max-same-issues=0 --max-issues-per-linter=0
