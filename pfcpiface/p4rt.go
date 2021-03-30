@@ -192,7 +192,7 @@ func initCounter(p *p4rtc) error {
 	log.Println("Initialize counters for p4client.")
 	var errin error
 	if p.p4client == nil {
-		errin = fmt.Errorf("Can't initialize counter. P4client null.")
+		errin = fmt.Errorf("can't initialize counter. P4client null")
 		return errin
 	}
 

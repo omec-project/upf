@@ -535,7 +535,7 @@ func (c *P4rtClient) getFieldValue(entity *p4.Entity,
 		}
 	}
 
-	err := fmt.Errorf("getField Value failed.\n")
+	err := fmt.Errorf("getField Value failed")
 	return nil, err
 }
 
@@ -941,6 +941,7 @@ func (c *P4rtClient) WriteReq(update *p4.Update) error {
 	return err
 }
 
+// WriteBatchReq ... Write batch Request to up4
 func (c *P4rtClient) WriteBatchReq(updates []*p4.Update) error {
 	req := &p4.WriteRequest{
 		DeviceId:   c.DeviceID,

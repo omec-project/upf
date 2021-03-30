@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
 
 	fqdn "github.com/Showmax/go-fqdn"
 )
@@ -144,6 +145,7 @@ func main() {
 		maxSessions:     conf.MaxSessions,
 		intf:            intf,
 		enableUeIPAlloc: conf.CPIface.EnableUeIPAlloc,
+		recoveryTime:    time.Now(),
 	}
 
 	upf.setUpfInfo(&conf)
