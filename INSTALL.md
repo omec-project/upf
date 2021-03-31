@@ -68,7 +68,12 @@ Control program(s) to dynamically configure BESS modules
 
 #### Simulation mode
 
-UPF-EPC has a simulation mode that enables testing the pipeline on a single machine.
+UPF-EPC has a simulation mode that enables testing the pipeline on a single machine,
+without the need for external interfaces.
+
+> Note: This mode does not support multiple workers currently.
+
+![ubench-sim](docs/images/ubench-sim.svg)
 
 To start UPF-EPC in simulation mode:
 
@@ -129,6 +134,11 @@ index 086ad2f..79d81bd 100755
 4. (optional) [Observe DP pipeline](#observe-dp-pipeline)
 
 #### [Pktgen](conf/pktgen.bess)
+
+Pktgen allows us to test the upf pipeline with external fastpath interfaces.
+This can be done either using a single machine or two machines
+
+![ubench-pktgen](docs/images/ubench-pktgen.svg)
 
 1. Configure the mode/cores/memory/devices as per your environment and start UPF
 
