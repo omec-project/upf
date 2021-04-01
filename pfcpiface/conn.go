@@ -33,6 +33,17 @@ type sequenceNumber struct {
 	mux sync.Mutex
 }
 
+type rcvdPacket struct {
+	Buf      [1500]byte
+	Pkt_size int
+	Address  net.Addr
+}
+
+type parsedPacket struct {
+	Msg     *message.Message
+	Address net.Addr
+}
+
 func (c *PFCPConn) getSeqNum() uint32 {
 	c.seqNum.mux.Lock()
 	defer c.seqNum.mux.Unlock()
@@ -84,53 +95,73 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 	}
 
 	// Initialize pkt buf
-	buf := make([]byte, PktBufSz)
+	pfcpRcvdPktsChan := make(chan *rcvdPacket, 1000)
+	pfcpParsedPktsChan := make(chan *parsedPacket, 1000)
 	// Initialize pkt header
 
-	for {
-		err := conn.SetReadDeadline(time.Now().Add(readTimeout))
-		if err != nil {
-			log.Fatalln("Unable to set deadline for read:", err)
-		}
-		// blocking read
-		n, addr, err := conn.ReadFrom(buf)
-		if err != nil {
-			if err, ok := err.(net.Error); ok && err.Timeout() {
-				// do nothing for the time being
-				log.Println(err)
-				cpConnected = false
-				if manageConnection {
-					cpConnectionStatus <- cpConnected
-				}
-				cleanupSessions()
-				continue
+	pfcpPacketReader := func(pfcpRcvdPkts chan *rcvdPacket) {
+
+		for {
+			err := conn.SetReadDeadline(time.Now().Add(readTimeout))
+			if err != nil {
+				log.Fatalln("Unable to set deadline for read:", err)
 			}
-			log.Fatalln("Read error:", err)
+			pkt := new(rcvdPacket)
+			// blocking read
+			n, addr, err := conn.ReadFrom(pkt.Buf[:1500])
+			if err != nil {
+				if err, ok := err.(net.Error); ok && err.Timeout() {
+					// do nothing for the time being
+					log.Println(err)
+					cpConnected = false
+					if manageConnection {
+						cpConnectionStatus <- cpConnected
+					}
+					cleanupSessions()
+					continue
+				}
+				log.Fatalln("Read error:", err)
+			}
+			pkt.Pkt_size = n
+			pkt.Address = addr
+			pfcpRcvdPktsChan <- pkt
 		}
+	}
+
+	pfcpPacketParsing := func(pkt *rcvdPacket, pfcpParsedPktsChan chan *parsedPacket) {
 
 		// use wmnsk lib to parse the pfcp message
-		msg, err := message.Parse(buf[:n])
+		msg, err := message.Parse(pkt.Buf[:pkt.Pkt_size])
 		if err != nil {
-			log.Println("Ignoring undecodable message: ", buf[:n], " error: ", err)
-			continue
+			log.Println("Ignoring undecodable message size ", pkt.Pkt_size)
+			log.Println("Ignoring undecodable message: ", pkt.Buf[:pkt.Pkt_size], " error: ", err)
+			return
 		}
 
 		// if sourceIP is not set, fetch it from the msg header
 		if sourceIP == "0.0.0.0" {
-			addrString := strings.Split(addr.String(), ":")
+			addrString := strings.Split(pkt.Address.String(), ":")
 			sourceIP = getLocalIP(addrString[0]).String()
 			log.Println("Source IP address is now: ", sourceIP)
 		}
+		pPkt := new(parsedPacket)
+		pPkt.Msg = &msg
+		pPkt.Address = pkt.Address
+		pfcpParsedPktsChan <- pPkt
+	}
 
-		// log.Println("Message: ", msg)
+	// log.Println("Message: ", msg)
+	pfcpPacketProcessing := func(pPkt *parsedPacket) {
+
+		msg := *pPkt.Msg
 
 		// handle message
 		var outgoingMessage []byte
 		switch msg.MessageType() {
 		case message.MsgTypeAssociationSetupRequest:
 			cleanupSessions()
-			upf.setInfo(conn, addr, &pconn)
-			outgoingMessage = pconn.handleAssociationSetupRequest(upf, msg, addr, sourceIP, accessIP, coreIP)
+			upf.setInfo(conn, pPkt.Address, &pconn)
+			outgoingMessage = pconn.handleAssociationSetupRequest(upf, msg, pPkt.Address, sourceIP, accessIP, coreIP)
 			if outgoingMessage != nil {
 				cpConnected = true
 				if manageConnection {
@@ -139,35 +170,49 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 				}
 			}
 		case message.MsgTypeAssociationSetupResponse:
-			cpConnected = handleAssociationSetupResponse(msg, addr, sourceIP, accessIP)
+			cpConnected = handleAssociationSetupResponse(msg, pPkt.Address, sourceIP, accessIP)
 			if manageConnection {
 				// pass on information to go routine that result of association response
 				cpConnectionStatus <- cpConnected
 			}
 		case message.MsgTypePFDManagementRequest:
-			outgoingMessage = pconn.handlePFDMgmtRequest(upf, msg, addr, sourceIP)
+			outgoingMessage = pconn.handlePFDMgmtRequest(upf, msg, pPkt.Address, sourceIP)
 		case message.MsgTypeSessionEstablishmentRequest:
-			outgoingMessage = pconn.handleSessionEstablishmentRequest(upf, msg, addr, sourceIP)
+			outgoingMessage = pconn.handleSessionEstablishmentRequest(upf, msg, pPkt.Address, sourceIP)
 		case message.MsgTypeSessionModificationRequest:
-			outgoingMessage = pconn.handleSessionModificationRequest(upf, msg, addr, sourceIP)
+			outgoingMessage = pconn.handleSessionModificationRequest(upf, msg, pPkt.Address, sourceIP)
 		case message.MsgTypeHeartbeatRequest:
-			outgoingMessage = handleHeartbeatRequest(msg, addr, upf.recoveryTime)
+			outgoingMessage = handleHeartbeatRequest(msg, pPkt.Address, upf.recoveryTime)
 		case message.MsgTypeSessionDeletionRequest:
-			outgoingMessage = pconn.handleSessionDeletionRequest(upf, msg, addr, sourceIP)
+			outgoingMessage = pconn.handleSessionDeletionRequest(upf, msg, pPkt.Address, sourceIP)
 		case message.MsgTypeAssociationReleaseRequest:
-			outgoingMessage = handleAssociationReleaseRequest(msg, addr, sourceIP, accessIP, upf.recoveryTime)
+			outgoingMessage = handleAssociationReleaseRequest(msg, pPkt.Address, sourceIP, accessIP, upf.recoveryTime)
 			cleanupSessions()
 		default:
 			log.Println("Message type: ", msg.MessageTypeName(), " is currently not supported")
-			continue
+			return
 		}
 
 		// send the response out
 		if outgoingMessage != nil {
-			if _, err := conn.WriteTo(outgoingMessage, addr); err != nil {
+			if _, err := conn.WriteTo(outgoingMessage, pPkt.Address); err != nil {
 				log.Fatalln("Unable to transmit association setup response", err)
 			}
 		}
+	}
+	go pfcpPacketReader(pfcpRcvdPktsChan)
+	for {
+		select {
+		// create goroutine for each packet parsing
+		case rPkt := <-pfcpRcvdPktsChan:
+			go pfcpPacketParsing(rPkt, pfcpParsedPktsChan)
 
+		// only 1 function to process packet.
+		// assumption is that Parsing is heavy and
+		// packet processing is light
+		case pPkt := <-pfcpParsedPktsChan:
+			pfcpPacketProcessing(pPkt)
+
+		}
 	}
 }

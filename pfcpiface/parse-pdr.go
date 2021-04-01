@@ -97,7 +97,7 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, upf *upf) err
 				p.allocIPFlag = true
 				log.Println("ueipv4 : ", ueIP4.String())
 			} else {
-				log.Println("CP has allocated UE IP.")
+				//log.Println("CP has allocated UE IP.")
 				ueIP4 = ueIPaddr.IPv4Address
 			}
 		case ie.SourceInterface:
@@ -130,7 +130,7 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, upf *upf) err
 				p.tunnelTEIDMask = 0xFFFFFFFF
 				p.tunnelIP4Dst = ip2int(tunnelIPv4Address)
 				p.tunnelIP4DstMask = 0xFFFFFFFF
-				log.Println("TunnelIPv4Address:", tunnelIPv4Address)
+				//log.Println("TunnelIPv4Address:", tunnelIPv4Address)
 			}
 		case ie.QFI:
 			// Do nothing for the time being
@@ -204,7 +204,7 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, upf *upf) err
 				// TODO: Implement referencing SDF ID
 				continue
 			}
-			log.Println("Flow Description is:", flowDesc)
+			//log.Println("Flow Description is:", flowDesc)
 
 			var ipf ipFilterRule
 			err = ipf.parseFlowDesc(flowDesc, ueIP4.String())

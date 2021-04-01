@@ -56,8 +56,8 @@ func (b *bess) sendMsgToUPF(method string, pdrs []pdr, fars []far) uint8 {
 	defer cancel()
 	done := make(chan bool)
 
-	log.Println("upf : ", b.client)
-	log.Println("conn : ", b.conn)
+	//log.Println("upf : ", b.client)
+	//log.Println("conn : ", b.conn)
 	for _, pdr := range pdrs {
 		switch method {
 		case "add":

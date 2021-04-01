@@ -6,14 +6,14 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	fqdn "github.com/Showmax/go-fqdn"
 	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"time"
-
-	fqdn "github.com/Showmax/go-fqdn"
 )
 
 var (

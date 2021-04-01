@@ -7,17 +7,17 @@ import (
 	"errors"
 	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
-	"log"
+	//"log"
 	"net"
 )
 
 // Release allocated IPs
 func releaseAllocatedIPs(upf *upf, session *PFCPSession) {
-	log.Println("release allocated IPs")
+	//log.Println("release allocated IPs")
 	for _, pdr := range session.pdrs {
 		if (pdr.allocIPFlag) && (pdr.srcIface == core) {
 			var ueIP net.IP = int2ip(pdr.dstIP)
-			log.Println("pdrID : ", pdr.pdrID, ", ueIP : ", ueIP.String())
+			//log.Println("pdrID : ", pdr.pdrID, ", ueIP : ", ueIP.String())
 			upf.ippool.deallocIPV4(ueIP)
 		}
 	}
@@ -25,13 +25,13 @@ func releaseAllocatedIPs(upf *upf, session *PFCPSession) {
 
 func addPdrInfo(msg *message.SessionEstablishmentResponse,
 	session *PFCPSession) {
-	log.Println("Add PDRs with UPF alloc IPs to Establishment response")
+	//log.Println("Add PDRs with UPF alloc IPs to Establishment response")
 	for _, pdr := range session.pdrs {
 		if (pdr.allocIPFlag) && (pdr.srcIface == core) {
-			log.Println("pdrID : ", pdr.pdrID)
+			//log.Println("pdrID : ", pdr.pdrID)
 			var flags uint8 = 0x02
 			var ueIP net.IP = int2ip(pdr.dstIP)
-			log.Println("ueIP : ", ueIP.String())
+			//log.Println("ueIP : ", ueIP.String())
 			msg.CreatedPDR = append(msg.CreatedPDR,
 				ie.NewCreatedPDR(
 					ie.NewPDRID(uint16(pdr.pdrID)),

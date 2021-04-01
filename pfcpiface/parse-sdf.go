@@ -5,7 +5,7 @@ package main
 
 import (
 	"errors"
-	"fmt"
+	//"fmt"
 	"log"
 	"net"
 	"strconv"
@@ -27,7 +27,7 @@ type endpoint struct {
 
 func (ep *endpoint) parseNet(ipnet string) error {
 	ipNetFields := strings.Split(ipnet, "/")
-	log.Println(ipNetFields)
+	//log.Println(ipNetFields)
 	switch len(ipNetFields) {
 	case 1:
 		ipnet = ipNetFields[0] + "/32"
@@ -85,7 +85,7 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 
 	// bring to common intermediate representation
 	xform := func(i int) {
-		log.Println(fields)
+		//log.Println(fields)
 		switch fields[i] {
 		case "any":
 			fields[i] = "0.0.0.0/0"
@@ -96,11 +96,11 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 				fields[i] = "0.0.0.0/0"
 			}
 		}
-		log.Println(fields)
+		//log.Println(fields)
 	}
 
 	for i := 3; i < len(fields); i++ {
-		log.Println(fields[i])
+		//log.Println(fields[i])
 		switch fields[i] {
 		case "from":
 			i++
@@ -135,7 +135,7 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 		}
 	}
 
-	fmt.Println(ipf)
+	//fmt.Println(ipf)
 	return nil
 }
 
