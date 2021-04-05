@@ -67,15 +67,11 @@ RUN ./build_bess.sh && \
     cp -r core/pb /pb && \
     cp -a protobuf /protobuf
 
-# Stage pip: compile psutil
-FROM python:3.9.3-slim AS pip
-RUN apt-get update && apt-get install -y gcc
-RUN pip install --no-cache-dir psutil
-
 # Stage bess: creates the runtime image of BESS
 FROM python:3.9.3-slim AS bess
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+        gcc \
         libgraph-easy-perl \
         iproute2 \
         iptables \
@@ -87,9 +83,11 @@ RUN apt-get update && \
         grpcio \
         iptools \
         protobuf \
+        psutil \
         pyroute2 \
-        scapy
-COPY --from=pip /usr/local/lib/python3.8/site-packages/psutil /usr/local/lib/python3.8/site-packages/psutil
+        scapy && \
+    apt-get --purge remove -y \
+        gcc
 COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin/bessd
 COPY --from=bess-build /bin/modules /bin/modules
