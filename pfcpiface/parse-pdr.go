@@ -29,14 +29,17 @@ type pdr struct {
 	dstPortMask      uint16
 	protoMask        uint8
 
-	precedence  uint32
-	pdrID       uint32
-	fseID       uint32
-	fseidIP     uint32
-	ctrID       uint32
-	farID       uint32
-	needDecap   uint8
-	allocIPFlag bool
+	precedence         uint32
+	pdrID              uint32
+	fseID              uint32
+	fseidIP            uint32
+	ctrID              uint32
+	farID              uint32
+	qerID              uint32
+	qci                uint32
+	schedulingPriority uint32
+	needDecap          uint8
+	allocIPFlag        bool
 }
 
 func needAllocIP(ueIPaddr *ie.UEIPAddressFields) bool {
@@ -69,6 +72,8 @@ func (p *pdr) printPDR() {
 	log.Println("fseidIP", p.fseidIP)
 	log.Println("ctrID:", p.ctrID)
 	log.Println("farID:", p.farID)
+	log.Println("qerID:", p.qerID)
+	log.Println("qci:", p.qci)
 	log.Println("needDecap:", p.needDecap)
 	log.Println("allocIPFlag:", p.allocIPFlag)
 	log.Println("--------------------------------------------")
@@ -97,7 +102,7 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, upf *upf) err
 				p.allocIPFlag = true
 				log.Println("ueipv4 : ", ueIP4.String())
 			} else {
-				log.Println("CP has allocated UE IP.")
+				//log.Println("CP has allocated UE IP.")
 				ueIP4 = ueIPaddr.IPv4Address
 			}
 		case ie.SourceInterface:
@@ -133,7 +138,14 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, upf *upf) err
 				log.Println("TunnelIPv4Address:", tunnelIPv4Address)
 			}
 		case ie.QFI:
-			// Do nothing for the time being
+			qfi, err := pdiIE.QFI()
+			if err != nil {
+				log.Println("Failed to parse QFI IE")
+				p.qci = 0
+			}
+
+			log.Println("Pdr QFI IE : ", qfi)
+			p.qci = uint32(qfi)
 		}
 	}
 
@@ -272,11 +284,18 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, upf *
 		return nil
 	}
 
+	qerID, err := ie1.QERID()
+	if err != nil {
+		log.Println("Could not read QER ID!")
+		return nil
+	}
+
 	p.precedence = precedence
 	p.pdrID = uint32(pdrID)
 	p.fseID = uint32(seid) // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
 	p.ctrID = 0            // ctrID currently not being set <--- FIXIT/TODO/XXX
 	p.farID = farID        // farID currently not being set <--- FIXIT/TODO/XXX
+	p.qerID = qerID
 	p.needDecap = outerHeaderRemoval
 
 	return nil

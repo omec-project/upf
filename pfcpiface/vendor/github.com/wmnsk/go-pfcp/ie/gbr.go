@@ -6,6 +6,7 @@ package ie
 
 import (
 	"encoding/binary"
+    "log"
 	"io"
 )
 
@@ -55,22 +56,28 @@ func (i *IE) GBR() ([]byte, error) {
 	}
 }
 
-// GBRUL returns GBRUL in uint32 if the type of IE matches.
-func (i *IE) GBRUL() (uint32, error) {
+// GBRUL returns GBRUL in uint64 if the type of IE matches.
+func (i *IE) GBRUL() (uint64, error) {
 	v, err := i.GBR()
 	if err != nil {
 		return 0, err
 	}
 
-	return binary.BigEndian.Uint32(v[0:4]), nil
+    var mySlice = []byte{0, 0, 0, v[0], v[1], v[2], v[3], v[4]}
+	num := binary.BigEndian.Uint64(mySlice)
+    log.Println(num)
+    return num, nil
 }
 
-// GBRDL returns GBRDL in uint32 if the type of IE matches.
-func (i *IE) GBRDL() (uint32, error) {
+// GBRDL returns GBRDL in uint64 if the type of IE matches.
+func (i *IE) GBRDL() (uint64, error) {
 	v, err := i.GBR()
 	if err != nil {
 		return 0, err
 	}
 
-	return binary.BigEndian.Uint32(v[4:8]), nil
+    var mySlice = []byte{0, 0, 0, v[5], v[6], v[7], v[8], v[9]}
+	num := binary.BigEndian.Uint64(mySlice)
+    log.Println(num)
+    return num, nil
 }

@@ -298,7 +298,7 @@ func (c *P4rtClient) WritePdrTable(
 	log.Println("WritePdrTable.")
 	te := AppTableEntry{
 		TableName:  "PreQosPipe.pdrs",
-		ActionName: "PreQosPipe.set_pdr_attributes",
+		ActionName: "PreQosPipe.set_pdr_attributes_qos",
 	}
 
 	te.FieldSize = 4
@@ -353,7 +353,7 @@ func (c *P4rtClient) WritePdrTable(
 		return nil
 	} else if funcType == FunctionTypeInsert {
 
-		te.ParamSize = 5
+		te.ParamSize = 6
 		te.Params = make([]ActionParam, te.ParamSize)
 		te.Params[0].Name = "id"
 		te.Params[0].Value = make([]byte, 4)
@@ -374,9 +374,13 @@ func (c *P4rtClient) WritePdrTable(
 		te.Params[3].Value = make([]byte, 4)
 		binary.BigEndian.PutUint32(te.Params[3].Value, uint32(pdrEntry.farID))
 
-		te.Params[4].Name = "needs_gtpu_decap"
-		te.Params[4].Value = make([]byte, 1)
-		te.Params[4].Value[0] = byte(decapVal)
+		te.Params[4].Name = "scheduling_priority"
+		te.Params[4].Value = make([]byte, 4)
+		binary.BigEndian.PutUint32(te.Params[4].Value, uint32(pdrEntry.schedulingPriority))
+
+		te.Params[5].Name = "needs_gtpu_decap"
+		te.Params[5].Value = make([]byte, 1)
+		te.Params[5].Value[0] = byte(decapVal)
 	}
 
 	return c.InsertTableEntry(te, funcType, prio)
@@ -881,7 +885,7 @@ func (c *P4rtClient) InsertTableEntry(
 		ActionId: actionID,
 	}
 
-	log.Println("adding action params.")
+	log.Println("adding action params.", actionID)
 	for _, p := range tableEntry.Params {
 		err := c.addActionValue(directAction, p, actionID)
 		if err != nil {

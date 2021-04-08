@@ -6,6 +6,7 @@ package ie
 
 import (
 	"encoding/binary"
+    "log"
 	"io"
 )
 
@@ -56,21 +57,33 @@ func (i *IE) MBR() ([]byte, error) {
 }
 
 // MBRUL returns MBRUL in uint32 if the type of IE matches.
-func (i *IE) MBRUL() (uint32, error) {
+func (i *IE) MBRUL() (uint64, error) {
+    //var v = make([]byte, 10)
+    //var p = make([]byte, 10)
+    //var err error
 	v, err := i.MBR()
+    //copy(v,p)
 	if err != nil {
 		return 0, err
 	}
 
-	return binary.BigEndian.Uint32(v[0:4]), nil
+    var mySlice = []byte{0, 0, 0, v[0], v[1], v[2], v[3], v[4]}
+	//num := binary.BigEndian.Uint64(mySlice)
+	num := binary.BigEndian.Uint64(mySlice)
+    log.Println(num)
+    return num, nil
 }
 
 // MBRDL returns MBRDL in uint32 if the type of IE matches.
-func (i *IE) MBRDL() (uint32, error) {
+func (i *IE) MBRDL() (uint64, error) {
 	v, err := i.MBR()
 	if err != nil {
 		return 0, err
 	}
 
-	return binary.BigEndian.Uint32(v[4:8]), nil
+    //log.Println(v[0],v[1],v[2],v[3],v[4],v[5],v[6],v[7],v[8],v[9])
+    var mySlice = []byte{0, 0, 0, v[5], v[6], v[7], v[8], v[9]}
+	num := binary.BigEndian.Uint64(mySlice)
+    log.Println(num)
+    return num, nil
 }

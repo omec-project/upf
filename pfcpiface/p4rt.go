@@ -22,10 +22,24 @@ var (
 
 // P4rtcInfo : P4 runtime interface settings
 type P4rtcInfo struct {
-	AccessIP    string `json:"access_ip"`
-	P4rtcServer string `json:"p4rtc_server"`
-	P4rtcPort   string `json:"p4rtc_port"`
-	UEIP        string `json:"ue_ip_pool"`
+	AccessIP       string       `json:"access_ip"`
+	P4rtcServer    string       `json:"p4rtc_server"`
+	P4rtcPort      string       `json:"p4rtc_port"`
+	UEIP           string       `json:"ue_ip_pool"`
+	QciPriorityMap QciMapStruct `json:"qci_to_priority_map"`
+}
+
+// QciMapStruct :  Qci to priority config struct
+type QciMapStruct struct {
+	Qci5  uint32 `json:"qci_ngbr_5"`
+	Qci6  uint32 `json:"qci_ngbr_6"`
+	Qci7  uint32 `json:"qci_ngbr_7"`
+	Qci8  uint32 `json:"qci_ngbr_8"`
+	Qci9  uint32 `json:"qci_ngbr_9"`
+	Qci69 uint32 `json:"qci_ngbr_69"`
+	Qci70 uint32 `json:"qci_ngbr_70"`
+	Qci79 uint32 `json:"qci_ngbr_79"`
+	Qci80 uint32 `json:"qci_ngbr_80"`
 }
 
 //ctrType
@@ -54,6 +68,7 @@ type p4rtc struct {
 	pfcpConn     *PFCPConn
 	udpConn      *net.UDPConn
 	udpAddr      net.Addr
+	qciToPrioMap map[uint32]uint32
 }
 
 func (p *p4rtc) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric) {
@@ -250,7 +265,7 @@ func (p *p4rtc) sendDeleteAllSessionsMsgtoUPF() {
 	log.Println("Loop through sessions and delete all entries p4")
 	if (p.pfcpConn != nil) && (p.pfcpConn.mgr != nil) {
 		for seidKey, value := range p.pfcpConn.mgr.sessions {
-			p.sendMsgToUPF("del", value.pdrs, value.fars)
+			p.sendMsgToUPF("del", value.pdrs, value.fars, nil)
 			p.pfcpConn.mgr.RemoveSession(seidKey)
 		}
 	}
@@ -258,6 +273,19 @@ func (p *p4rtc) sendDeleteAllSessionsMsgtoUPF() {
 
 func (p *p4rtc) sim(u *upf, method string) {
 	log.Println("simulator mode in p4rt not supported")
+}
+
+func (p *p4rtc) initQciToPrioMap(conf *Conf) {
+	p.qciToPrioMap = make(map[uint32]uint32)
+	p.qciToPrioMap[5] = conf.P4rtcIface.QciPriorityMap.Qci5
+	p.qciToPrioMap[6] = conf.P4rtcIface.QciPriorityMap.Qci6
+	p.qciToPrioMap[7] = conf.P4rtcIface.QciPriorityMap.Qci7
+	p.qciToPrioMap[8] = conf.P4rtcIface.QciPriorityMap.Qci8
+	p.qciToPrioMap[9] = conf.P4rtcIface.QciPriorityMap.Qci9
+	p.qciToPrioMap[69] = conf.P4rtcIface.QciPriorityMap.Qci69
+	p.qciToPrioMap[70] = conf.P4rtcIface.QciPriorityMap.Qci70
+	p.qciToPrioMap[79] = conf.P4rtcIface.QciPriorityMap.Qci79
+	p.qciToPrioMap[80] = conf.P4rtcIface.QciPriorityMap.Qci80
 }
 
 func (p *p4rtc) setUpfInfo(u *upf, conf *Conf) {
@@ -284,6 +312,7 @@ func (p *p4rtc) setUpfInfo(u *upf, conf *Conf) {
 		u.n4SrcIP = net.ParseIP("0.0.0.0")
 	}
 
+	p.initQciToPrioMap(conf)
 	u.coreIP = net.ParseIP("0.0.0.0")
 	log.Println("onos server ip ", p.p4rtcServer)
 	log.Println("onos server port ", p.p4rtcPort)
@@ -315,7 +344,7 @@ func (p *p4rtc) setUpfInfo(u *upf, conf *Conf) {
 }
 
 func (p *p4rtc) sendMsgToUPF(method string, pdrs []pdr,
-	fars []far) uint8 {
+	fars []far, qers []qer) uint8 {
 	log.Println("sendMsgToUPF p4")
 	var funcType uint8
 	var err error
@@ -338,6 +367,7 @@ func (p *p4rtc) sendMsgToUPF(method string, pdrs []pdr,
 					return cause
 				}
 				pdrs[i].ctrID = uint32(val)
+				pdrs[i].schedulingPriority = p.qciToPrioMap[pdrs[i].qci]
 			}
 		}
 	case "del":
@@ -360,6 +390,7 @@ func (p *p4rtc) sendMsgToUPF(method string, pdrs []pdr,
 	}
 
 	for _, pdr := range pdrs {
+		pdr.printPDR()
 		errin := p.p4client.WritePdrTable(pdr, funcType)
 		if errin != nil {
 			resetCounterVal(p, preQosPdrCounter, uint64(pdr.ctrID))
@@ -378,6 +409,9 @@ func (p *p4rtc) sendMsgToUPF(method string, pdrs []pdr,
 		}
 	}
 
+	for _, qer := range qers {
+		qer.printQER()
+	}
 	cause = ie.CauseRequestAccepted
 	return cause
 }

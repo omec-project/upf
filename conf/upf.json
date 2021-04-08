@@ -56,7 +56,7 @@
 
     "": "Whether to enable P4Runtime feature",
     "enable_p4rt": false,
-    
+
     "": "Control plane controller settings",
     "cpiface": {
         "enable_ue_ip_alloc": false,
@@ -69,6 +69,17 @@
     
     "": "p4rtc interface settings",
     "p4rtciface": {
+    "qci_to_priority_map": {
+        "qci_ngbr_5": 1,
+        "qci_ngbr_6": 6,
+        "qci_ngbr_7": 7,
+        "qci_ngbr_8": 8,
+        "qci_ngbr_9": 9,
+        "qci_ngbr_69": 1,
+        "qci_ngbr_70": 6,
+        "qci_ngbr_79": 7,
+        "qci_ngbr_80": 7
+    },
     "access_ip": "172.17.0.1/32",
     "p4rtc_server": "onos",
     "p4rtc_port": "51001",

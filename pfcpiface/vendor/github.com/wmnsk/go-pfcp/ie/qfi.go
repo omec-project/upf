@@ -92,6 +92,18 @@ func (i *IE) QFI() (uint8, error) {
 			}
 		}
 		return 0, ErrIENotFound
+	case PDI:
+		ies, err := i.PDI()
+		if err != nil {
+			return 0, err
+		}
+		for _, x := range ies {
+			switch x.Type {
+			case QFI, RedundantTransmissionParameters:
+				return x.QFI()
+			}
+		}
+		return 0, ErrIENotFound
 	default:
 		return 0, &InvalidTypeError{Type: i.Type}
 	}
