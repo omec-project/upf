@@ -5,7 +5,7 @@ on: [pull_request]
 jobs:
   build:
     env:
-      DOCKER_REGISTRY: "docker.pkg.github.com/omec-project/"
+      DOCKER_REGISTRY: "ghcr.io/omec-project/"
       DOCKER_REPOSITORY: "upf-epc/"
       VERSION: "PR-${{ github.event.pull_request.number }}"
     runs-on: ubuntu-latest
@@ -63,12 +63,11 @@ jobs:
           branch: ${{ github.event.pull_request.head.ref }}
           author: "Github Actions <actions@github>"
           commit-message: "Actions: Updated with changes from CI"
-      - name: Docker login GH packages
-        env:
-          USERNAME: ${{ github.actor }}
-          PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo $PASSWORD | docker login https://docker.pkg.github.com -u $USERNAME --password-stdin
+      - uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.CR_PAT }}
       - name: Push Docker image
         run: |
           make docker-push
