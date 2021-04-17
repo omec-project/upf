@@ -1,4 +1,4 @@
-From 20cc60f7ba595eb214fb61ab48cd1ee3263fe554 Mon Sep 17 00:00:00 2001
+From cbe643b07b2dbc2115a802f7b39c76f9c0e5e86c Mon Sep 17 00:00:00 2001
 From: Saikrishna Edupuganti <saikrishna.edupuganti@intel.com>
 Date: Thu, 11 Feb 2021 14:09:00 +0000
 Subject: [PATCH] Use rte_flow_create to do GTPU RSS
@@ -6,19 +6,21 @@ Subject: [PATCH] Use rte_flow_create to do GTPU RSS
 Equivalent of these testpmd commands:
 
 flow create 0 ingress pattern eth / ipv4 / udp / gtpu / ipv4 / end actions rss types ipv4 l3-src-only end key_len 0 queues end / end
+flow create 0 ingress pattern eth / ipv4 / udp / gtpu / gtp_psc / ipv4 / end actions rss types ipv4 l3-src-only end key_len 0 queues end / end
 
 flow create 1 ingress pattern eth / ipv4 / udp / gtpu / ipv4 / end actions rss types ipv4 l3-dst-only end key_len 0 queues end / end
+flow create 1 ingress pattern eth / ipv4 / udp / gtpu / gtp_psc / ipv4 / end actions rss types ipv4 l3-dst-only end key_len 0 queues end / end
 
 flow create 1 ingress pattern eth / ipv4 / end actions rss types ipv4 l3-dst-only end key_len 0 queues end / end
 
 Signed-off-by: Saikrishna Edupuganti <saikrishna.edupuganti@intel.com>
 ---
- core/drivers/pmd.cc           | 86 +++++++++++++++++++++++++++++++++++
- protobuf/ports/port_msg.proto |  4 ++
- 2 files changed, 90 insertions(+)
+ core/drivers/pmd.cc           | 126 ++++++++++++++++++++++++++++++++++
+ protobuf/ports/port_msg.proto |   4 ++
+ 2 files changed, 130 insertions(+)
 
 diff --git a/core/drivers/pmd.cc b/core/drivers/pmd.cc
-index 7822e7ef..913dbc73 100644
+index 7822e7ef..003bf7ff 100644
 --- a/core/drivers/pmd.cc
 +++ b/core/drivers/pmd.cc
 @@ -32,6 +32,7 @@
@@ -29,35 +31,22 @@ index 7822e7ef..913dbc73 100644
  
  #include "../utils/ether.h"
  #include "../utils/format.h"
-@@ -206,6 +207,82 @@ static CommandResponse find_dpdk_vdev(const std::string &vdev,
+@@ -206,6 +207,122 @@ static CommandResponse find_dpdk_vdev(const std::string &vdev,
    return CommandSuccess();
  }
  
-+CommandResponse flow_create(dpdk_port_t port_id, const uint32_t &flow_profile){
-+  struct rte_flow_item patterns[6];
-+  memset(patterns, 0, sizeof(patterns));
-+  /* Ethernet */
-+  patterns[0].type = RTE_FLOW_ITEM_TYPE_ETH;
-+  patterns[0].spec = nullptr;
-+  patterns[0].mask = nullptr;
-+  /* IPv4 */
-+  patterns[1].type = RTE_FLOW_ITEM_TYPE_IPV4;
-+  patterns[1].spec = nullptr;
-+  patterns[1].mask = nullptr;
-+  /* UDP */
-+  patterns[2].type = RTE_FLOW_ITEM_TYPE_UDP;
-+  patterns[2].spec = nullptr;
-+  patterns[2].mask = nullptr;
-+  /* GTP */
-+  patterns[3].type = RTE_FLOW_ITEM_TYPE_GTPU;
-+  patterns[3].spec = nullptr;
-+  patterns[3].mask = nullptr;
-+  /* IPv4 */
-+  patterns[4].type = RTE_FLOW_ITEM_TYPE_IPV4;
-+  patterns[4].spec = nullptr;
-+  patterns[4].mask = nullptr;
-+  /* END the pattern array */
-+  patterns[5].type = RTE_FLOW_ITEM_TYPE_END;
++CommandResponse flow_create_one(dpdk_port_t port_id,
++                                const uint32_t &flow_profile, int size,
++                                uint64_t rss_types,
++                                rte_flow_item_type *pattern) {
++  struct rte_flow_item items[size];
++  memset(items, 0, sizeof(items));
++
++  for (int i = 0; i < size; i++) {
++    items[i].type = pattern[i];
++    items[i].spec = nullptr;
++    items[i].mask = nullptr;
++  }
 +
 +  struct rte_flow *handle;
 +  struct rte_flow_error err;
@@ -74,45 +63,98 @@ index 7822e7ef..913dbc73 100644
 +  memset(&action_rss, 0, sizeof(action_rss));
 +  action_rss.func = RTE_ETH_HASH_FUNCTION_DEFAULT;
 +  action_rss.key_len = 0;
++  action_rss.types = rss_types;
 +
 +  actions[0].type = RTE_FLOW_ACTION_TYPE_RSS;
 +  actions[0].conf = &action_rss;
 +  actions[1].type = RTE_FLOW_ACTION_TYPE_END;
 +
-+  switch (flow_profile)
-+  {
-+  case 3:
-+    action_rss.types = ETH_RSS_IPV4 | ETH_RSS_L3_SRC_ONLY;
-+    break;
-+  case 6:
-+    action_rss.types = ETH_RSS_IPV4 | ETH_RSS_L3_DST_ONLY;
-+    patterns[2].type = RTE_FLOW_ITEM_TYPE_END;
-+    break;
-+  case 9:
-+    action_rss.types = ETH_RSS_IPV4 | ETH_RSS_L3_DST_ONLY;
-+    break;
-+  default:
-+    return CommandFailure(EINVAL, "Unknown flow profile %u", flow_profile);
-+  }
-+
-+  int ret = rte_flow_validate(port_id, &attributes, patterns, actions, &err);
-+  if(ret)
-+    return CommandFailure(EINVAL, "Port %u: Failed to validate flow profile %u %s",
++  int ret = rte_flow_validate(port_id, &attributes, items, actions, &err);
++  if (ret)
++    return CommandFailure(EINVAL,
++                          "Port %u: Failed to validate flow profile %u %s",
 +                          port_id, flow_profile, err.message);
 +
-+
-+  handle = rte_flow_create(port_id, &attributes, patterns, actions, &err);
-+  if(handle == nullptr)
-+    return CommandFailure(EINVAL, "Port %u: Failed to create flow %s",
-+                          port_id, err.message);
++  handle = rte_flow_create(port_id, &attributes, items, actions, &err);
++  if (handle == nullptr)
++    return CommandFailure(EINVAL, "Port %u: Failed to create flow %s", port_id,
++                          err.message);
 +
 +  return CommandSuccess();
++}
++
++#define NUM_ELEMENTS(x) (sizeof(x) / sizeof((x)[0]))
++
++enum FlowProfile : uint32_t
++{
++  profileN3 = 3,
++  profileN6 = 6,
++  profileN9 = 9,
++};
++
++CommandResponse flow_create(dpdk_port_t port_id, const uint32_t &flow_profile) {
++  CommandResponse err;
++
++  rte_flow_item_type N39_NSA[] = {
++      RTE_FLOW_ITEM_TYPE_ETH, RTE_FLOW_ITEM_TYPE_IPV4, RTE_FLOW_ITEM_TYPE_UDP,
++      RTE_FLOW_ITEM_TYPE_GTPU, RTE_FLOW_ITEM_TYPE_IPV4,
++      RTE_FLOW_ITEM_TYPE_END};
++
++  rte_flow_item_type N39_SA[] = {
++      RTE_FLOW_ITEM_TYPE_ETH, RTE_FLOW_ITEM_TYPE_IPV4, RTE_FLOW_ITEM_TYPE_UDP,
++      RTE_FLOW_ITEM_TYPE_GTPU, RTE_FLOW_ITEM_TYPE_GTP_PSC,
++      RTE_FLOW_ITEM_TYPE_IPV4,
++      RTE_FLOW_ITEM_TYPE_END};
++
++  rte_flow_item_type N6[] = {
++      RTE_FLOW_ITEM_TYPE_ETH, RTE_FLOW_ITEM_TYPE_IPV4,
++      RTE_FLOW_ITEM_TYPE_END};
++
++  switch (flow_profile) {
++    uint64_t rss_types;
++    // N3 traffic with and without PDU Session container
++    case profileN3:
++      rss_types = ETH_RSS_IPV4 | ETH_RSS_L3_SRC_ONLY;
++      err = flow_create_one(port_id, flow_profile, NUM_ELEMENTS(N39_NSA),
++                            rss_types, N39_NSA);
++      if (err.error().code() != 0) {
++        return err;
++      }
++
++      err = flow_create_one(port_id, flow_profile, NUM_ELEMENTS(N39_SA),
++                            rss_types, N39_SA);
++      break;
++
++    // N6 traffic
++    case profileN6:
++      rss_types = ETH_RSS_IPV4 | ETH_RSS_L3_DST_ONLY;
++      err = flow_create_one(port_id, flow_profile, NUM_ELEMENTS(N6),
++                            rss_types, N6);
++      break;
++
++    // N9 traffic with and without PDU Session container
++    case profileN9:
++      rss_types = ETH_RSS_IPV4 | ETH_RSS_L3_DST_ONLY;
++      err = flow_create_one(port_id, flow_profile, NUM_ELEMENTS(N39_NSA),
++                            rss_types, N39_NSA);
++      if (err.error().code() != 0) {
++        return err;
++      }
++
++      err = flow_create_one(port_id, flow_profile, NUM_ELEMENTS(N39_SA),
++                            rss_types, N39_SA);
++      break;
++
++    default:
++      return CommandFailure(EINVAL, "Unknown flow profile %u", flow_profile);
++  }
++  return err;
 +}
 +
  CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
    dpdk_port_t ret_port_id = DPDK_PORT_UNKNOWN;
  
-@@ -364,6 +441,15 @@ CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
+@@ -364,6 +481,15 @@ CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
  
    driver_ = dev_info.driver_name ?: "unknown";
  
