@@ -1,29 +1,30 @@
-From 0bd568524fc36ee714d5a5e2751834b33b94746a Mon Sep 17 00:00:00 2001
+From 433c2ade397f7a1a024887e7fabe61011ac00a3f Mon Sep 17 00:00:00 2001
 From: Amar Sri <amarsri28@gmail.com>
-Date: Mon, 15 Mar 2021 08:26:42 -0700
-Subject: [PATCH] Exact match bulk support
+Date: Mon, 19 Apr 2021 03:59:12 -0700
+Subject: [PATCH] Hash Improvements
 
 ---
- core/modules/exact_match.cc    |  19 ++--
- core/modules/wildcard_match.cc | 197 ++++++++++++++++++++++++++-------
- core/modules/wildcard_match.h  |  26 ++++-
- core/utils/cuckoo_map.h        | 140 ++++++++++++++++++++++-
- core/utils/exact_match_table.h |  85 +++++++++-----
- 5 files changed, 376 insertions(+), 91 deletions(-)
+ core/modules/exact_match.cc    |  20 ++--
+ core/modules/wildcard_match.cc | 196 +++++++++++++++++++++++++--------
+ core/modules/wildcard_match.h  |  15 ++-
+ core/utils/cuckoo_map.h        | 133 ++++++++++++++++++++--
+ core/utils/exact_match_table.h |  80 ++++++++------
+ 5 files changed, 345 insertions(+), 99 deletions(-)
 
 diff --git a/core/modules/exact_match.cc b/core/modules/exact_match.cc
-index 1ca0fd4e..e8229623 100644
+index 1ca0fd4e..758c0202 100644
 --- a/core/modules/exact_match.cc
 +++ b/core/modules/exact_match.cc
-@@ -312,7 +312,6 @@ void ExactMatch::setValues(bess::Packet *pkt, ExactMatchKey &action) {
- void ExactMatch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
-   gate_idx_t default_gate;
-   ExactMatchKey keys[bess::PacketBatch::kMaxBurst] __ymm_aligned;
--
-   default_gate = ACCESS_ONCE(default_gate_);
+@@ -134,7 +134,7 @@ CommandResponse ExactMatch::Init(const bess::pb::ExactMatchArg &arg) {
+   }
  
-   const auto buffer_fn = [&](bess::Packet *pkt, const ExactMatchField &f) {
-@@ -326,17 +325,15 @@ void ExactMatch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
+   default_gate_ = DROP_GATE;
+-
++  table_.Init();
+   return CommandSuccess();
+ }
+ 
+@@ -326,17 +326,15 @@ void ExactMatch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
  
    int cnt = batch->cnt();
    Value default_value(default_gate);
@@ -36,7 +37,7 @@ index 1ca0fd4e..e8229623 100644
 -      /* setting respecive values */
 -      setValues(pkt, res.action);
 +  ValueTuple *res[cnt];
-+  uint64_t hit_mask = table_.Find(&keys[0], &res[0], cnt);
++  uint64_t hit_mask = table_.Find(keys, res, cnt);
 +  for (int j = 0; j < cnt; j++) {
 +    if ((hit_mask & (1ULL << j)) == 0)
 +      EmitPacket(ctx, batch->pkts()[j], default_gate);
@@ -50,10 +51,10 @@ index 1ca0fd4e..e8229623 100644
  }
  
 diff --git a/core/modules/wildcard_match.cc b/core/modules/wildcard_match.cc
-index ec639a7b..6a8d2350 100644
+index ec639a7b..9383c35c 100644
 --- a/core/modules/wildcard_match.cc
 +++ b/core/modules/wildcard_match.cc
-@@ -40,13 +40,29 @@ using bess::metadata::Attribute;
+@@ -40,13 +40,28 @@ using bess::metadata::Attribute;
  enum { FieldType = 0, ValueType };
  
  // dst = src & mask. len must be a multiple of sizeof(uint64_t)
@@ -80,25 +81,22 @@ index ec639a7b..6a8d2350 100644
 +    for (i = 0; i < len / 8; i++) {
 +      dst1[j].u64_arr[i] = src[j].u64_arr[i] & mask.u64_arr[i];
 +    }
-+    memset(&dst1[j].u64_arr[i], 0, sizeof(wm_hkey_t) - len);
 +    dstptr[j] = &dst1[j];
    }
  }
  
-@@ -56,6 +72,12 @@ static inline int is_valid_gate(gate_idx_t gate) {
-   return (gate < MAX_GATES || gate == DROP_GATE);
- }
+@@ -130,10 +145,8 @@ CommandResponse WildcardMatch::Init(const bess::pb::WildcardMatchArg &arg) {
  
-+void WildcardMatch::Initkeys(wm_hkey_t *keys) {
-+  int i = sizeof(wm_hkey_t) - total_key_size_;
-+  if (i)
-+    memset(&keys->u64_arr[total_key_size_ / sizeof(keys->u64_arr[0])], 0, i);
-+}
-+
- const Commands WildcardMatch::cmds = {
-     {"get_initial_arg", "EmptyArg",
-      MODULE_CMD_FUNC(&WildcardMatch::GetInitialArg), Command::THREAD_SAFE},
-@@ -162,18 +184,15 @@ inline gate_idx_t WildcardMatch::LookupEntry(const wm_hkey_t &key,
+     size_acc += f.size;
+   }
+-
+   default_gate_ = DROP_GATE;
+   total_key_size_ = align_ceil(size_acc, sizeof(uint64_t));
+-
+   // reset size_acc
+   size_acc = 0;
+   for (int i = 0; i < arg.values_size(); i++) {
+@@ -162,18 +175,14 @@ inline gate_idx_t WildcardMatch::LookupEntry(const wm_hkey_t &key,
                                               bess::Packet *pkt) {
    struct WmData result = {
        .priority = INT_MIN, .ogate = def_gate, .keyv = {{0}}};
@@ -116,51 +114,54 @@ index ec639a7b..6a8d2350 100644
 -      result = entry->second;
 +    mask(key_masked, key, tuple.mask, total_key_size_);
 +    WmData *entry = nullptr;
-+    Initkeys(&key_masked);
 +    ht->find_dpdk(&key_masked, ((void **)&entry));
 +    if (entry && entry->priority >= result.priority) {
 +      result = *entry;
      }
    }
  
-@@ -232,11 +251,105 @@ inline gate_idx_t WildcardMatch::LookupEntry(const wm_hkey_t &key,
+@@ -232,20 +241,113 @@ inline gate_idx_t WildcardMatch::LookupEntry(const wm_hkey_t &key,
    return result.ogate;
  }
  
 +inline bool WildcardMatch::LookupBulkEntry(wm_hkey_t *key, gate_idx_t def_gate,
-+                                           int packeti,
-+                                           gate_idx_t (*Outgate)[32], int cnt,
-+                                           bess::PacketBatch *batch) {
++                                           int packeti, gate_idx_t *Outgate,
++                                           int cnt, bess::PacketBatch *batch) {
 +  bess::Packet *pkt = nullptr;
-+  struct WmData result[cnt];
++  struct WmData *result[cnt];
++  uint64_t prev_hitmask = 0;
 +  uint64_t hitmask = 0;
-+  wm_hkey_t *key_masked = new wm_hkey_t[cnt];
-+  WmData **entry = new WmData *[cnt];
-+  wm_hkey_t **key_ptr = new wm_hkey_t *[cnt];
-+  int count = 0;
-+  for (int i = 0; i < cnt; i++)
-+    result[i] = {.priority = INT_MIN, .ogate = def_gate, .keyv = {{0}}};
++  wm_hkey_t key_masked[cnt];
++  WmData *entry[cnt];
++  wm_hkey_t **key_ptr[cnt];
 +
-+  for (auto &tuple : tuples_) {
-+    const auto &ht = tuple.ht;
-+    mask_bulk(key, key_masked, (void **)key_ptr, tuple.mask, cnt,
++  for (auto tuple = tuples_.begin(); tuple != tuples_.end(); ++tuple) {
++    const auto &ht = tuple->ht;
++    mask_bulk(key, key_masked, (void **)key_ptr, tuple->mask, cnt,
 +              total_key_size_);
 +    int num = ht->lookup_bulk_data((const void **)key_ptr, cnt, &hitmask,
-+                                   (void **)&entry[0]);
++                                   (void **)entry);
 +    if (num == 0)
 +      continue;
 +
-+    for (int init = 0; init < cnt; init++) {
-+      if ((hitmask & (1ULL << init)) &&
-+          (entry[init]->priority >= result[init].priority)) {
-+        result[init] = *entry[init];
++    for (int init = 0; (init < cnt) && (num); init++) {
++      if ((hitmask & (1ULL << init))) {
++        if ((prev_hitmask & (1 << init)) == 0)
++          result[init] = entry[init];
++        else if ((prev_hitmask & (1 << init)) &&
++                 (entry[init]->priority >= result[init]->priority)) {
++          result[init] = entry[init];
++        }
++
++        num--;
 +      }
 +    }
-+    count++;
++    prev_hitmask = prev_hitmask | hitmask;
 +  }
++
 +  for (int init = 0; init < cnt; init++) {
 +    /* if lookup was successful, then set values (if possible) */
-+    if (result[init].ogate != default_gate_) {
++    if (prev_hitmask && (prev_hitmask & (1 << init))) {
 +      pkt = batch->pkts()[packeti + init];
 +      size_t num_values_ = values_.size();
 +      for (size_t i = 0; i < num_values_; i++) {
@@ -174,13 +175,13 @@ index ec639a7b..6a8d2350 100644
 +                   << std::endl;
 +        if (value_attr_id < 0) { /* if it is offset-based */
 +          memcpy(data,
-+                 reinterpret_cast<uint8_t *>(&result[init].keyv) + value_pos,
++                 reinterpret_cast<uint8_t *>(&result[init]->keyv) + value_pos,
 +                 value_size);
 +        } else { /* if it is attribute-based */
 +          typedef struct {
 +            uint8_t bytes[bess::metadata::kMetadataAttrMaxSize];
 +          } value_t;
-+          uint8_t *buf = (uint8_t *)&result[init].keyv + value_pos;
++          uint8_t *buf = (uint8_t *)&result[init]->keyv + value_pos;
 +
 +          DLOG(INFO) << "Setting value " << std::hex
 +                     << *(reinterpret_cast<uint64_t *>(buf))
@@ -212,43 +213,45 @@ index ec639a7b..6a8d2350 100644
 +          }
 +        }
 +      }
-+    }
-+
-+    (*Outgate)[init] = result[init].ogate;
++      Outgate[init] = result[init]->ogate;
++    } else
++      Outgate[init] = def_gate;
 +  }
-+  delete[] entry;
-+  delete[] key_masked;
-+  delete[] key_ptr;
 +  return 1;
 +}
 +
  void WildcardMatch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
    gate_idx_t default_gate;
 -
-+  gate_idx_t Outgate[32];
    wm_hkey_t keys[bess::PacketBatch::kMaxBurst] __ymm_aligned;
 -
    int cnt = batch->cnt();
++  gate_idx_t Outgate[cnt];
  
    // Initialize the padding with zero
-@@ -272,9 +385,13 @@ void WildcardMatch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
+   for (int i = 0; i < cnt; i++) {
+     keys[i].u64_arr[(total_key_size_ - 1) / 8] = 0;
+   }
+-
+   default_gate = ACCESS_ONCE(default_gate_);
+-
+   for (const auto &field : fields_) {
+     int offset;
+     int pos = field.pos;
+@@ -272,9 +374,9 @@ void WildcardMatch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
      }
    }
  
 -  for (int i = 0; i < cnt; i++) {
 -    bess::Packet *pkt = batch->pkts()[i];
 -    EmitPacket(ctx, pkt, LookupEntry(keys[i], default_gate, pkt));
-+  for (int i = 0; i < cnt;) {
-+    int num = (cnt - i >= 32) ? 32 : cnt - i;
-+    LookupBulkEntry(&keys[i], default_gate, i, &Outgate, num, batch);
-+    for (int j = i; j < (i + num); j++) {
-+      EmitPacket(ctx, batch->pkts()[j], Outgate[j]);
-+    }
-+    i = i + num;
++  LookupBulkEntry(keys, default_gate, 0, Outgate, cnt, batch);
++  for (int j = 0; j < cnt; j++) {
++    EmitPacket(ctx, batch->pkts()[j], Outgate[j]);
    }
  }
  
-@@ -282,7 +399,7 @@ std::string WildcardMatch::GetDesc() const {
+@@ -282,7 +384,7 @@ std::string WildcardMatch::GetDesc() const {
    int num_rules = 0;
  
    for (const auto &tuple : tuples_) {
@@ -257,7 +260,20 @@ index ec639a7b..6a8d2350 100644
    }
  
    return bess::utils::Format("%zu fields, %d rules", fields_.size(), num_rules);
-@@ -412,29 +529,25 @@ int WildcardMatch::AddTuple(wm_hkey_t *mask) {
+@@ -406,35 +508,36 @@ int WildcardMatch::AddTuple(wm_hkey_t *mask) {
+   tuples_.emplace_back();
+   struct WmTuple &tuple = tuples_.back();
+   bess::utils::Copy(&tuple.mask, mask, sizeof(*mask));
+-
++  std::ostringstream address;
++  address << (void const *)&(tuple.ht);
++  std::string name = "wildcard" + address.str();
++  dpdk_params1.name = name.c_str();
++  dpdk_params1.key_len = total_key_size_;
++  tuple.ht = new CuckooMap<wm_hkey_t, struct WmData, wm_hash, wm_eq>(
++      0, 0, &dpdk_params1);
+   return int(tuples_.size() - 1);
+ }
  
  bool WildcardMatch::DelEntry(int idx, wm_hkey_t *key) {
    struct WmTuple &tuple = tuples_[idx];
@@ -265,7 +281,6 @@ index ec639a7b..6a8d2350 100644
 -      tuple.ht.Remove(*key, wm_hash(total_key_size_), wm_eq(total_key_size_));
 -  if (!ret) {
 -    return ret;
-+  Initkeys(key);
 +  int ret =
 +      tuple.ht->Remove(*key, wm_hash(total_key_size_), wm_eq(total_key_size_));
 +  if (ret >= 0) {
@@ -294,7 +309,7 @@ index ec639a7b..6a8d2350 100644
    CommandResponse err = ExtractKeyMask(arg, &key, &mask);
    if (err.error().code() != 0) {
      return err;
-@@ -444,14 +557,13 @@ CommandResponse WildcardMatch::CommandAdd(
+@@ -444,14 +547,13 @@ CommandResponse WildcardMatch::CommandAdd(
      return CommandFailure(EINVAL, "Invalid gate: %hu", gate);
    }
  
@@ -310,7 +325,7 @@ index ec639a7b..6a8d2350 100644
    int idx = FindTuple(&mask);
    if (idx < 0) {
      idx = AddTuple(&mask);
-@@ -459,13 +571,11 @@ CommandResponse WildcardMatch::CommandAdd(
+@@ -459,13 +561,10 @@ CommandResponse WildcardMatch::CommandAdd(
        return CommandFailure(-idx, "failed to add a new wildcard pattern");
      }
    }
@@ -318,7 +333,6 @@ index ec639a7b..6a8d2350 100644
 -  auto *ret = tuples_[idx].ht.Insert(key, data, wm_hash(total_key_size_),
 -                                     wm_eq(total_key_size_));
 -  if (ret == nullptr) {
-+  Initkeys(&key);
 +  struct WmData *data_t = new WmData(data);
 +  int ret = tuples_[idx].ht->insert_dpdk(&key, data_t);
 +  if (ret < 0)
@@ -328,7 +342,7 @@ index ec639a7b..6a8d2350 100644
    return CommandSuccess();
  }
  
-@@ -485,7 +595,7 @@ CommandResponse WildcardMatch::CommandDelete(
+@@ -485,7 +584,7 @@ CommandResponse WildcardMatch::CommandDelete(
    }
  
    int ret = DelEntry(idx, &key);
@@ -337,7 +351,7 @@ index ec639a7b..6a8d2350 100644
      return CommandFailure(-ret, "failed to delete a rule");
    }
  
-@@ -499,7 +609,7 @@ CommandResponse WildcardMatch::CommandClear(const bess::pb::EmptyArg &) {
+@@ -499,7 +598,7 @@ CommandResponse WildcardMatch::CommandClear(const bess::pb::EmptyArg &) {
  
  void WildcardMatch::Clear() {
    for (auto &tuple : tuples_) {
@@ -346,7 +360,7 @@ index ec639a7b..6a8d2350 100644
    }
  }
  
-@@ -521,9 +631,12 @@ CommandResponse WildcardMatch::GetInitialArg(const bess::pb::EmptyArg &) {
+@@ -521,9 +620,12 @@ CommandResponse WildcardMatch::GetInitialArg(const bess::pb::EmptyArg &) {
  // Retrieves a WildcardMatchConfig that would restore this module's
  // runtime configuration.
  CommandResponse WildcardMatch::GetRuntimeConfig(const bess::pb::EmptyArg &) {
@@ -360,12 +374,12 @@ index ec639a7b..6a8d2350 100644
    resp.set_default_gate(default_gate_);
  
    // Each tuple provides a single mask, which may have many data-matches.
-@@ -531,7 +644,11 @@ CommandResponse WildcardMatch::GetRuntimeConfig(const bess::pb::EmptyArg &) {
+@@ -531,7 +633,11 @@ CommandResponse WildcardMatch::GetRuntimeConfig(const bess::pb::EmptyArg &) {
      wm_hkey_t mask = tuple.mask;
      // Each entry in the hash table has priority, ogate, and the data
      // (one datum per field, under the mask for this field).
 -    for (auto &entry : tuple.ht) {
-+    //  for (auto &entry : tuple.ht)
++    //  using rte method
 +    while ((tuple.ht->Iterate((const void **)&key, (void **)&data, next)) >=
 +           (int)0) {
 +      entry.first = *key;
@@ -374,7 +388,7 @@ index ec639a7b..6a8d2350 100644
        rule_t *rule = resp.add_rules();
        rule->set_priority(entry.second.priority);
 diff --git a/core/modules/wildcard_match.h b/core/modules/wildcard_match.h
-index 85deeafc..9626c290 100644
+index 85deeafc..34295764 100644
 --- a/core/modules/wildcard_match.h
 +++ b/core/modules/wildcard_match.h
 @@ -45,6 +45,7 @@ using bess::utils::HashResult;
@@ -385,37 +399,24 @@ index 85deeafc..9626c290 100644
  static_assert(MAX_FIELD_SIZE <= sizeof(uint64_t),
                "field cannot be larger than 8 bytes");
  
-@@ -128,7 +129,12 @@ class wm_hash {
+@@ -128,6 +129,12 @@ class wm_hash {
   private:
    size_t len_;
  };
--
 +struct rte_hash_parameters dpdk_params1 {
-+  .name = "test2", .entries = 1 << 19, .reserved = 0,
++  .name = "test2", .entries = 1 << 20, .reserved = 0,
 +  .key_len = sizeof(wm_hkey_t), .hash_func = rte_hash_crc,
 +  .hash_func_init_val = 0, .socket_id = (int)rte_socket_id(),
 +  .extra_flag = RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY
 +};
+ 
  class WildcardMatch final : public Module {
   public:
-   static const gate_idx_t kNumOGates = MAX_GATES;
-@@ -161,16 +167,29 @@ class WildcardMatch final : public Module {
-   CommandResponse CommandClear(const bess::pb::EmptyArg &arg);
-   CommandResponse CommandSetDefaultGate(
-       const bess::pb::WildcardMatchCommandSetDefaultGateArg &arg);
-+  void Initkeys(wm_hkey_t *keys);
+@@ -164,13 +171,16 @@ class WildcardMatch final : public Module {
  
   private:
    struct WmTuple {
 -    CuckooMap<wm_hkey_t, struct WmData, wm_hash, wm_eq> ht;
-+    WmTuple() {
-+      std::ostringstream address;
-+      address << (void const *)this;
-+      std::string name = "wildcard" + address.str();
-+      dpdk_params1.name = name.c_str();
-+      ht = new CuckooMap<wm_hkey_t, struct WmData, wm_hash, wm_eq>(
-+          0, 0, &dpdk_params1);
-+    }
 +    CuckooMap<wm_hkey_t, struct WmData, wm_hash, wm_eq> *ht;
      wm_hkey_t mask;
    };
@@ -424,13 +425,12 @@ index 85deeafc..9626c290 100644
                           bess::Packet *pkt);
  
 +  bool LookupBulkEntry(wm_hkey_t *key, gate_idx_t def_gate, int i,
-+                       gate_idx_t (*Outgate)[32], int cnt,
-+                       bess::PacketBatch *batch);
++                       gate_idx_t *Outgate, int cnt, bess::PacketBatch *batch);
 +
    CommandResponse AddFieldOne(const bess::pb::Field &field, struct WmField *f,
                                uint8_t type);
  
-@@ -182,9 +201,7 @@ class WildcardMatch final : public Module {
+@@ -182,9 +192,7 @@ class WildcardMatch final : public Module {
    int FindTuple(wm_hkey_t *mask);
    int AddTuple(wm_hkey_t *mask);
    bool DelEntry(int idx, wm_hkey_t *key);
@@ -440,7 +440,7 @@ index 85deeafc..9626c290 100644
    gate_idx_t default_gate_;
  
    size_t total_key_size_;   /* a multiple of sizeof(uint64_t) */
-@@ -194,6 +211,7 @@ class WildcardMatch final : public Module {
+@@ -194,6 +202,7 @@ class WildcardMatch final : public Module {
    std::vector<struct WmField> fields_;
    std::vector<struct WmField> values_;
    std::vector<struct WmTuple> tuples_;
@@ -449,7 +449,7 @@ index 85deeafc..9626c290 100644
  
  #endif  // BESS_MODULES_WILDCARDMATCH_H_
 diff --git a/core/utils/cuckoo_map.h b/core/utils/cuckoo_map.h
-index c855b93d..24c69334 100644
+index c855b93d..b8975ae7 100644
 --- a/core/utils/cuckoo_map.h
 +++ b/core/utils/cuckoo_map.h
 @@ -50,6 +50,8 @@
@@ -474,7 +474,7 @@ index c855b93d..24c69334 100644
   public:
    typedef std::pair<K, V> Entry;
  
-@@ -149,20 +157,39 @@ class CuckooMap {
+@@ -149,20 +157,30 @@ class CuckooMap {
    };
  
    CuckooMap(size_t reserve_buckets = kInitNumBucket,
@@ -490,9 +490,7 @@ index c855b93d..24c69334 100644
 +    if (dpdk_params) {
 +      if (hash == NULL) {
 +        rt = *((rte_hash_parameters*)dpdk_params);
-+        key_len = rt.key_len;
 +        hash = rte_hash_create(&rt);
-+
 +        if (hash == NULL)
 +          throw std::runtime_error(
 +              "DPDK rte_hash_create() returned null , cant proceed further");
@@ -509,17 +507,11 @@ index c855b93d..24c69334 100644
 +      }
      }
    }
- 
-+  ~CuckooMap() {
-+    if (hash != nullptr) {
-+      rte_hash_free(hash);
-+      hash = nullptr;
-+    }
-+  }
+-
    // Not allowing copying for now
    CuckooMap(CuckooMap&) = delete;
    CuckooMap& operator=(CuckooMap&) = delete;
-@@ -176,6 +203,16 @@ class CuckooMap {
+@@ -176,6 +194,16 @@ class CuckooMap {
  
    template <typename... Args>
    Entry* DoEmplace(const K& key, const H& hasher, const E& eq, Args&&... args) {
@@ -536,7 +528,7 @@ index c855b93d..24c69334 100644
      Entry* entry;
      HashResult primary = Hash(key, hasher);
  
-@@ -220,6 +257,50 @@ class CuckooMap {
+@@ -220,6 +248,50 @@ class CuckooMap {
      return DoEmplace(key, hasher, eq, std::move(value));
    }
  
@@ -587,7 +579,7 @@ index c855b93d..24c69334 100644
    // Emplace/update-in-place a key value pair
    // On success returns a pointer to the inserted entry, nullptr otherwise.
    // NOTE: when Emplace() returns nullptr, the constructor of `V` may not be
-@@ -242,6 +323,16 @@ class CuckooMap {
+@@ -242,6 +314,16 @@ class CuckooMap {
    // const version of Find()
    const Entry* Find(const K& key, const H& hasher = H(),
                      const E& eq = E()) const {
@@ -604,7 +596,7 @@ index c855b93d..24c69334 100644
      EntryIndex idx = FindWithHash(Hash(key, hasher), key, eq);
      if (idx == kInvalidEntryIdx) {
        return nullptr;
-@@ -255,6 +346,13 @@ class CuckooMap {
+@@ -255,6 +337,13 @@ class CuckooMap {
    // Remove the stored entry by the key
    // Return false if not exist.
    bool Remove(const K& key, const H& hasher = H(), const E& eq = E()) {
@@ -618,7 +610,7 @@ index c855b93d..24c69334 100644
      HashResult pri = Hash(key, hasher);
      if (RemoveFromBucket(pri, pri & bucket_mask_, key, eq)) {
        return true;
-@@ -267,6 +365,17 @@ class CuckooMap {
+@@ -267,6 +356,17 @@ class CuckooMap {
    }
  
    void Clear() {
@@ -636,7 +628,7 @@ index c855b93d..24c69334 100644
      buckets_.clear();
      entries_.clear();
  
-@@ -286,7 +395,26 @@ class CuckooMap {
+@@ -286,7 +386,26 @@ class CuckooMap {
    }
  
    // Return the number of stored entries
@@ -665,10 +657,10 @@ index c855b93d..24c69334 100644
   protected:
    // Tunable macros
 diff --git a/core/utils/exact_match_table.h b/core/utils/exact_match_table.h
-index 7c0cfda4..fd472fdd 100644
+index 7c0cfda4..e6d909f5 100644
 --- a/core/utils/exact_match_table.h
 +++ b/core/utils/exact_match_table.h
-@@ -155,15 +155,31 @@ typedef std::vector<std::vector<uint8_t>> ExactMatchRuleFields;
+@@ -155,15 +155,17 @@ typedef std::vector<std::vector<uint8_t>> ExactMatchRuleFields;
  template <typename T>
  class ExactMatchTable {
   public:
@@ -688,25 +680,11 @@ index 7c0cfda4..fd472fdd 100644
 -        num_fields_(),
 -        fields_(),
 -        table_() {}
-+      : raw_key_size_(), total_key_size_(), num_fields_(), fields_() {
-+    std::ostringstream address;
-+    address << (void const *)this;
-+    std::string name = "Exactmatch" + address.str();
-+    dpdk_params.name = name.c_str();
-+    table_.reset(
-+        new CuckooMap<ExactMatchKey, T, ExactMatchKeyHash, ExactMatchKeyEq>(
-+            0, 0, &dpdk_params));
-+  }
-+
-+  void Initkeys(ExactMatchKey *keys) {
-+    int i = sizeof(ExactMatchKey) - total_key_size_;
-+    if (i)
-+      memset(&keys->u64_arr[total_key_size_ / sizeof(keys->u64_arr[0])], 0, i);
-+  }
++      : raw_key_size_(), total_key_size_(), num_fields_(), fields_() {}
  
    // Add a new rule.
    //
-@@ -183,10 +199,10 @@ class ExactMatchTable {
+@@ -183,10 +185,9 @@ class ExactMatchTable {
      if ((err = gather_key(fields, &key)).first != 0) {
        return err;
      }
@@ -714,18 +692,15 @@ index 7c0cfda4..fd472fdd 100644
 -    table_.Insert(key, val, ExactMatchKeyHash(total_key_size_),
 -                  ExactMatchKeyEq(total_key_size_));
 -
-+    Initkeys(&key);
 +    const void *Key_t = (const void *)&key;
 +    T *val_t = new T(val);
 +    table_->insert_dpdk(Key_t, val_t);
      return MakeError(0);
    }
  
-@@ -206,9 +222,10 @@ class ExactMatchTable {
-     if ((err = gather_key(fields, &key)).first != 0) {
+@@ -207,8 +208,8 @@ class ExactMatchTable {
        return err;
      }
-+    Initkeys(&key);
  
 -    bool ret = table_.Remove(key, ExactMatchKeyHash(total_key_size_),
 -                             ExactMatchKeyEq(total_key_size_));
@@ -734,7 +709,7 @@ index 7c0cfda4..fd472fdd 100644
      if (!ret) {
        return MakeError(ENOENT, "rule doesn't exist");
      }
-@@ -217,9 +234,9 @@ class ExactMatchTable {
+@@ -217,9 +218,9 @@ class ExactMatchTable {
    }
  
    // Remove all rules from the table.
@@ -746,15 +721,13 @@ index 7c0cfda4..fd472fdd 100644
  
    // Extract an ExactMatchKey from `buf` based on the fields that have been
    // added to this table.
-@@ -272,23 +289,31 @@ class ExactMatchTable {
+@@ -272,23 +273,27 @@ class ExactMatchTable {
    // Returns the value if `key` matches a rule, otherwise `default_value`.
    T Find(const ExactMatchKey &key, const T &default_value) const {
      const auto &table = table_;
 -    const auto *entry = table.Find(key, ExactMatchKeyHash(total_key_size_),
 -                                   ExactMatchKeyEq(total_key_size_));
 -    return entry ? entry->second : default_value;
-+    ExactMatchKey &t1 = const_cast<ExactMatchKey &>(key);
-+    const_cast<ExactMatchTable *>(this)->Initkeys(&t1);
 +    void *data = nullptr;
 +    table->find_dpdk(&key, &data);
 +    if (data) {
@@ -776,32 +749,51 @@ index 7c0cfda4..fd472fdd 100644
 -          table.Find(keys[i], ExactMatchKeyHash(total_key_size_),
 -                     ExactMatchKeyEq(total_key_size_));
 -      vals[i] = entry ? entry->second : default_value;
+-    }
 +    uint64_t hit_mask = 0;
 +    ExactMatchKey *key_ptr[n];
-+    for (int h = 0; h < n; h++) {
++    for (int h = 0; h < n; h++)
 +      key_ptr[h] = &keys[h];
-+      Initkeys(&keys[h]);
-     }
 +    table->lookup_bulk_data((const void **)&key_ptr, n, &hit_mask,
-+                            (void **)&vals[0]);
++                            (void **)vals);
 +    return hit_mask;
    }
  
    uint32_t total_key_size() const { return total_key_size_; }
-@@ -318,9 +343,9 @@ class ExactMatchTable {
+@@ -318,9 +323,20 @@ class ExactMatchTable {
    // Returns the ith field.
    const ExactMatchField &get_field(size_t i) const { return fields_[i]; }
  
 -  typename EmTable::iterator begin() { return table_.begin(); }
 +  typename EmTable::iterator begin() { return table_->begin(); }
++
++  typename EmTable::iterator end() { return table_->end(); }
  
 -  typename EmTable::iterator end() { return table_.end(); }
-+  typename EmTable::iterator end() { return table_->end(); }
++  void Init() {
++    std::ostringstream address;
++    address << &table_;
++    std::string name = "Exactmatch" + address.str();
++    dpdk_params.name = name.c_str();
++    dpdk_params.key_len = total_key_size();
++    table_.reset(
++        new CuckooMap<ExactMatchKey, T, ExactMatchKeyHash, ExactMatchKeyEq>(
++            0, 0, &dpdk_params));
++  }
  
   private:
    Error MakeError(int code, const std::string &msg = "") {
-@@ -447,14 +472,14 @@ class ExactMatchTable {
+@@ -438,23 +454,21 @@ class ExactMatchTable {
+     f->pos = raw_key_size_;
+     raw_key_size_ += f->size;
+     total_key_size_ = align_ceil(raw_key_size_, sizeof(uint64_t));
+-
+     return MakeError(0);
+   }
  
+   // unaligend key size, used as an accumulator for calls to AddField()
+   size_t raw_key_size_;
+-
    // aligned total key size
    size_t total_key_size_;
 -
