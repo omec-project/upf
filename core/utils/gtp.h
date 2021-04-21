@@ -28,12 +28,9 @@ struct [[gnu::packed]] Gtpv1 {
     const uint8_t *pktptr = (const uint8_t *)this;
     size_t len = sizeof(Gtpv1);
 
-    if (gtph->seq) /* TODO: Sequence # len set to 4B; verify this! */
-      len += 4;    /* See section 9.3 of 3GPP TS 29.060 (Release 13) */
-    if (gtph->pdn)
+    if (gtph->seq || gtph->pdn || gtph->ex)
       len += 4;
     if (gtph->ex) {
-      len += 4;
       /* Probe till the last extension header */
       /* calculate total len of gtp header (with options) */
       while (pktptr[len - 1])
