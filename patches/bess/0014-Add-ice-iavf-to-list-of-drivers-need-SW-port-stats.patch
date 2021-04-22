@@ -1,0 +1,44 @@
+From d8cb6e1c0fbbc4bb4728c7e379f65b0b8b47cb96 Mon Sep 17 00:00:00 2001
+From: Saikrishna Edupuganti <saikrishna.edupuganti@intel.com>
+Date: Thu, 22 Apr 2021 02:15:36 +0000
+Subject: [PATCH] Add ice/iavf to list of drivers need SW port stats
+
+Now BESS is able to report bytes and packet counts
+
+```
+ 02:10:38.741198       INC     Mbps      Mpps   dropped          OUT     Mbps      Mpps   Dropped
+ ------------------------------------------------------------------------------------------------
+ accessFastPMDPort          49237.4     1.201   4671498               35814.6     4.165         0
+ accessSlowPMDPort              0.0     0.000         0                   0.0     0.000         0
+ coreFastPMDPort            49633.4     4.164   1744421                9968.8     1.200         0
+ coreSlowPMDPort                0.0     0.000         0                   0.0     0.000         0
+ ------------------------------------------------------------------------------------------------
+ Total                      98868.1     5.365   6415826               45782.9     5.366         0
+```
+
+Signed-off-by: Saikrishna Edupuganti <saikrishna.edupuganti@intel.com>
+---
+ core/drivers/pmd.cc | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/core/drivers/pmd.cc b/core/drivers/pmd.cc
+index 003bf7ff..db7b170e 100644
+--- a/core/drivers/pmd.cc
++++ b/core/drivers/pmd.cc
+@@ -599,9 +599,10 @@ void PMDPort::CollectStats(bool reset) {
+ 
+   port_stats_.inc.dropped = stats.imissed;
+ 
+-  // i40e/net_e1000_igb PMD drivers, ixgbevf and net_bonding vdevs don't support
+-  // per-queue stats
+-  if (driver_ == "net_i40e" || driver_ == "net_i40e_vf" ||
++  // ice/i40e/net_e1000_igb PMD drivers, ixgbevf and net_bonding vdevs don't
++  // support per-queue stats
++  if (driver_ == "net_ice" || driver_ == "net_iavf" ||
++      driver_ == "net_i40e" || driver_ == "net_i40e_vf" ||
+       driver_ == "net_ixgbe_vf" || driver_ == "net_bonding" ||
+       driver_ == "net_e1000_igb") {
+     // NOTE:
+-- 
+2.25.1
+
