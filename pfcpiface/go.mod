@@ -5,7 +5,7 @@ go 1.13
 require (
 	github.com/Showmax/go-fqdn v1.0.0
 	github.com/golang/protobuf v1.5.2
-	github.com/grpc-ecosystem/go-grpc-middleware v1.2.2
+	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/p4lang/p4runtime v1.3.0
 	github.com/prometheus/client_golang v1.10.0
 	github.com/wmnsk/go-pfcp v0.0.9-0.20210129064645-e1b1f34ebd9f
