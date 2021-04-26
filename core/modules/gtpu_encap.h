@@ -33,6 +33,7 @@ class GtpuEncap final : public Module {
   CommandResponse Init(const bess::pb::EmptyArg &);
 
  private:
+  int pdu_type_attr = -1;
   int tout_sip_attr = -1;
   int tout_dip_attr = -1;
   int tout_teid = -1;

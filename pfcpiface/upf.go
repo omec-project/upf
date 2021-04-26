@@ -40,8 +40,8 @@ const (
 	n9 = 0x2
 
 	// far-action specific values
-	farForwardU = 0x0
-	farForwardD = 0x1
+	farForwardD = 0x0
+	farForwardU = 0x1
 	farDrop     = 0x2
 	farBuffer   = 0x3
 	farNotify   = 0x4
