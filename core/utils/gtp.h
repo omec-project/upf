@@ -49,12 +49,12 @@ struct [[gnu::packed]] Gtpv1SeqPDUExt {
 };
 
 struct [[gnu::packed]] Gtpv1PDUSessExt {
-  uint8_t hlen; /*Extension header length*/
-  uint8_t spare1 : 4,
-      pdu_type : 4; /* PDU type 0=DL/1=UL*/
-  uint8_t qfi : 6,  /* QoS Flow Identifier*/
-      spare2 : 2;
-  uint8_t next_type; /* Next extension header type */
+  uint8_t hlen;       /* Extension header length */
+  uint8_t spare1 : 4, /* Spare */
+      pdu_type : 4;   /* PDU type 0=DL/1=UL*/
+  uint8_t qfi : 6,    /* QoS Flow Identifier*/
+      spare2 : 2;     /* Spare */
+  uint8_t next_type;  /* Next extension header type */
 
   size_t header_length() const { return sizeof(Gtpv1PDUSessExt) >> 2; }
 

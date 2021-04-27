@@ -31,6 +31,9 @@
     "": "Enable hardware offload of checksum. Might disable vector PMD",
     "hwcksum": false,
 
+    "": "Enable PDU Session Container extension",
+    "gtppsc": false,
+
     "": "Enable Intel Dynamic Device Personalization (DDP)",
     "ddp": false,
 

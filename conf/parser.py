@@ -27,6 +27,7 @@ class Parser:
         self.max_ip_defrag_flows = None
         self.ip_frag_with_eth_mtu = None
         self.hwcksum = False
+        self.gtppsc = False
         self.ddp = False
         self.measure = False
         self.mode = None
@@ -65,6 +66,12 @@ class Parser:
                 'Invalid value for ip_frag_with_eth_mtu. Not installing IP4Frag module.')
         except KeyError:
             print('ip_frag_with_eth_mtu value not set. Not installing IP4Frag module.')
+
+        # Enable PDU Session container
+        try:
+            self.gtppsc = bool(self.conf["gtppsc"])
+        except KeyError:
+            print('gtppsc not set. Default: Not adding PDU Session Container extension header')
 
         # Enable hardware checksum
         try:

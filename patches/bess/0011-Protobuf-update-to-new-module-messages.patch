@@ -1,15 +1,15 @@
-From 364c89c235da6343a0aad0ee7853f11345ca9c18 Mon Sep 17 00:00:00 2001
+From c3f322ede44bf7911f9317bc7bd02d3c9305bb0a Mon Sep 17 00:00:00 2001
 From: Muhammad Asim Jamshed <muhammad.jamshed@intel.com>
 Date: Fri, 17 Jul 2020 17:31:50 -0700
 Subject: [PATCH] Protobuf update to new module messages.
 
 Signed-off-by: Muhammad Asim Jamshed <muhammad.jamshed@intel.com>
 ---
- protobuf/module_msg.proto | 75 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 75 insertions(+)
+ protobuf/module_msg.proto | 85 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 85 insertions(+)
 
 diff --git a/protobuf/module_msg.proto b/protobuf/module_msg.proto
-index e00a463a..1544260f 100644
+index e00a463a..25dfc81e 100644
 --- a/protobuf/module_msg.proto
 +++ b/protobuf/module_msg.proto
 @@ -69,6 +69,7 @@ message BPFCommandClearArg {
@@ -45,7 +45,7 @@ index e00a463a..1544260f 100644
  }
  
  /**
-@@ -1009,6 +1014,75 @@ message IPChecksumArg {
+@@ -1009,6 +1014,85 @@ message IPChecksumArg {
  */
  message L4ChecksumArg {
   bool verify = 1; /// check checksum
@@ -118,10 +118,20 @@ index e00a463a..1544260f 100644
 +  string name_id = 1; /// Name of the counter_id
 +  bool check_exist = 2; /// verify each counter pre-exists before any operation (default = False)
 +  uint32 total = 3; /// Total number of entries it can support
++}
++
++/**
++ * The GtpuEncap module inserts GTP header in an ethernet frame
++ *
++ * __Input Gates__: 1
++ * __Output Gates__: 1
++*/
++message GtpuEncapArg {
++  bool add_psc = 1; /// Add PDU session container in encap (default = False)
  }
  
  /**
-@@ -1151,6 +1225,7 @@ message VXLANEncapArg {
+@@ -1151,6 +1235,7 @@ message VXLANEncapArg {
   */
  message WildcardMatchArg {
    repeated Field fields = 1; /// A list of WildcardMatch fields.
@@ -130,5 +140,5 @@ index e00a463a..1544260f 100644
  
  /**
 -- 
-2.17.1
+2.25.1
 
