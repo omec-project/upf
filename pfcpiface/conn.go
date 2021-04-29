@@ -90,7 +90,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 	manageConnection := false
 	if smfName != "" {
 		manageConnection = true
-		go pconn.manageSmfConnection(sourceIP, accessIP, smfName, conn, cpConnectionStatus, upf.recoveryTime)
+		go pconn.manageSmfConnection(upf.nodeIP.String(), accessIP, smfName, conn, cpConnectionStatus, upf.recoveryTime)
 	}
 
 	// Initialize pkt buf
@@ -132,6 +132,13 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 			log.Println("Source IP address is now: ", sourceIP)
 		}
 
+		// if nodeIP is not set, fetch it from the msg header
+		if upf.nodeIP.String() == "0.0.0.0" {
+			addrString := strings.Split(addr.String(), ":")
+			upf.nodeIP = getLocalIP(addrString[0])
+			log.Println("Node IP address is now: ", upf.nodeIP.String())
+		}
+
 		// log.Println("Message: ", msg)
 
 		// handle message
@@ -165,7 +172,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 		case message.MsgTypeSessionDeletionRequest:
 			outgoingMessage = pconn.handleSessionDeletionRequest(upf, msg, addr, sourceIP)
 		case message.MsgTypeAssociationReleaseRequest:
-			outgoingMessage = handleAssociationReleaseRequest(msg, addr, sourceIP, accessIP, upf.recoveryTime)
+			outgoingMessage = handleAssociationReleaseRequest(upf, msg, addr, sourceIP, accessIP, upf.recoveryTime)
 			cleanupSessions()
 		default:
 			log.Println("Message type: ", msg.MessageTypeName(), " is currently not supported")

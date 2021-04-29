@@ -257,24 +257,7 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 	}
 	u.accessIP = ParseIP(conf.AccessIface.IfName, "Access")
 	u.coreIP = ParseIP(conf.CoreIface.IfName, "Core")
-	if *n4SrcIPStr != "" {
-		u.n4SrcIP = net.ParseIP(*n4SrcIPStr)
-	} else {
-		u.n4SrcIP = net.ParseIP("0.0.0.0")
-	}
 
-	if conf.CPIface.SrcIP == "" {
-		if conf.CPIface.DestIP != "" {
-			log.Println("Dest address ", conf.CPIface.DestIP)
-			u.n4SrcIP = getLocalIP(conf.CPIface.DestIP)
-			log.Println("SPGWU/UPF address IP: ", u.n4SrcIP.String())
-		}
-	} else {
-		addrs, errin := net.LookupHost(conf.CPIface.SrcIP)
-		if errin == nil {
-			u.n4SrcIP = net.ParseIP(addrs[0])
-		}
-	}
 	// get bess grpc client
 	log.Println("bessIP ", *bessIP)
 
