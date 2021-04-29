@@ -278,12 +278,6 @@ func (p *p4rtc) setUpfInfo(u *upf, conf *Conf) {
 		p.p4rtcPort = *p4RtcServerPort
 	}
 
-	if *n4SrcIPStr != "" {
-		u.n4SrcIP = net.ParseIP(*n4SrcIPStr)
-	} else {
-		u.n4SrcIP = net.ParseIP("0.0.0.0")
-	}
-
 	u.coreIP = net.ParseIP("0.0.0.0")
 	log.Println("onos server ip ", p.p4rtcServer)
 	log.Println("onos server port ", p.p4rtcPort)

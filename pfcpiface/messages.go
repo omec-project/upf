@@ -75,8 +75,8 @@ func (pc *PFCPConn) handleAssociationSetupRequest(upf *upf, msg message.Message,
 	}
 	asresmsg := message.NewAssociationSetupResponse(asreq.SequenceNumber,
 		ie.NewRecoveryTimeStamp(upf.recoveryTime),
-		ie.NewNodeID(sourceIP, "", ""), /* node id (IPv4) */
-		ie.NewCause(cause),             /* accept it blindly for the time being */
+		ie.NewNodeID(upf.nodeIP.String(), "", ""), /* node id (IPv4) */
+		ie.NewCause(cause),                        /* accept it blindly for the time being */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
 		ie.NewUserPlaneIPResourceInformation(flags, 0, upf.accessIP.String(), "", upf.dnn, ie.SrcInterfaceAccess),
@@ -125,7 +125,7 @@ func handleAssociationSetupResponse(msg message.Message, addr net.Addr, sourceIP
 	return true
 }
 
-func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceIP string, accessIP string, rTime time.Time) []byte {
+func handleAssociationReleaseRequest(upf *upf, msg message.Message, addr net.Addr, sourceIP string, accessIP string, rTime time.Time) []byte {
 	arreq, ok := msg.(*message.AssociationReleaseRequest)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -138,8 +138,8 @@ func handleAssociationReleaseRequest(msg message.Message, addr net.Addr, sourceI
 	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
 	arres, err := message.NewAssociationReleaseResponse(arreq.SequenceNumber,
 		ie.NewRecoveryTimeStamp(rTime),
-		ie.NewNodeID(sourceIP, "", ""),       /* node id (IPv4) */
-		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
+		ie.NewNodeID(upf.nodeIP.String(), "", ""), /* node id (IPv4) */
+		ie.NewCause(ie.CauseRequestAccepted),      /* accept it blindly for the time being */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
 		ie.NewUserPlaneIPResourceInformation(0x41, 0, accessIP, "", "", ie.SrcInterfaceAccess),
@@ -258,11 +258,11 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 		log.Println(err)
 		// Build response message
 		seres, err := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
-			0,                              /* FO <-- what's this? */
-			remoteSEID,                     /* seid */
-			sereq.SequenceNumber,           /* seq # */
-			0,                              /* priority */
-			ie.NewNodeID(sourceIP, "", ""), /* node id (IPv4) */
+			0,                    /* FO <-- what's this? */
+			remoteSEID,           /* seid */
+			sereq.SequenceNumber, /* seq # */
+			0,                    /* priority */
+			ie.NewNodeID(upf.nodeIP.String(), "", ""), /* node id (IPv4) */
 			ie.NewCause(cause),
 		).Marshal()
 		if err != nil {
@@ -313,12 +313,12 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 
 	// Build response message
 	seresMsg := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
-		0,                                    /* FO <-- what's this? */
-		session.remoteSEID,                   /* seid */
-		sereq.SequenceNumber,                 /* seq # */
-		0,                                    /* priority */
-		ie.NewNodeID(sourceIP, "", ""),       /* node id (IPv4) */
-		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
+		0,                    /* FO <-- what's this? */
+		session.remoteSEID,   /* seid */
+		sereq.SequenceNumber, /* seq # */
+		0,                    /* priority */
+		ie.NewNodeID(upf.nodeIP.String(), "", ""), /* node id (IPv4) */
+		ie.NewCause(ie.CauseRequestAccepted),      /* accept it blindly for the time being */
 		ie.NewFSEID(session.localSEID, net.ParseIP(sourceIP), nil, nil),
 	)
 

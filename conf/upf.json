@@ -68,9 +68,9 @@
         "ue_ip_pool": "10.250.0.0/16",
         "nb_dst_ip": "172.17.0.1",
         "" : "nb_dst_ip: CPHostname",
-        "hostname": "spgwc",
+        "" : "hostname: upf",
         "prom_port": "8080",
-        "" : "dnn:internet",
+        "" : "dnn:internet"
     },
     
     "": "p4rtc interface settings",

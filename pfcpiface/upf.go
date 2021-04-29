@@ -4,6 +4,7 @@
 package main
 
 import (
+	"log"
 	"net"
 	"time"
 )
@@ -16,6 +17,7 @@ type upf struct {
 	accessIP        net.IP
 	coreIP          net.IP
 	n4SrcIP         net.IP
+	nodeIP          net.IP
 	fqdnHost        string
 	maxSessions     uint32
 	connTimeout     time.Duration
@@ -71,6 +73,30 @@ func (u *upf) sim(method string) {
 }
 
 func (u *upf) setUpfInfo(conf *Conf) {
+	u.n4SrcIP = net.ParseIP("0.0.0.0")
+	u.nodeIP = net.ParseIP("0.0.0.0")
+
+	if conf.CPIface.SrcIP == "" {
+		if conf.CPIface.DestIP != "" {
+			log.Println("Dest address ", conf.CPIface.DestIP)
+			u.n4SrcIP = getLocalIP(conf.CPIface.DestIP)
+			log.Println("SPGWU/UPF address IP: ", u.n4SrcIP.String())
+		}
+	} else {
+		addrs, errin := net.LookupHost(conf.CPIface.SrcIP)
+		if errin == nil {
+			u.n4SrcIP = net.ParseIP(addrs[0])
+		}
+	}
+
+	if conf.CPIface.FQDNHost != "" {
+		ips, err := net.LookupHost(conf.CPIface.FQDNHost)
+		if err == nil {
+			u.nodeIP = net.ParseIP(ips[0])
+		}
+	}
+	log.Println("UPF Node IP : ", u.nodeIP.String())
+	log.Println("UPF Local IP : ", u.n4SrcIP.String())
 	u.intf.setUpfInfo(u, conf)
 }
 
