@@ -18,9 +18,11 @@ const (
 	PktBufSz    = 1500
 	PFCPPort    = "8805"
 	MaxItems    = 10
-	Timeout     = 1000 * time.Millisecond
 	readTimeout = 25 * time.Second
 )
+
+//Timeout : connection timeout
+var Timeout = 1000 * time.Millisecond
 
 // PFCPConn represents a PFCP connection
 type PFCPConn struct {
@@ -43,7 +45,15 @@ func (c *PFCPConn) getSeqNum() uint32 {
 func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 	var pconn PFCPConn
 	pconn.mgr = NewPFCPSessionMgr(100)
+	rTimeout := readTimeout
+	if upf.readTimeout != 0 {
+		rTimeout = time.Duration(upf.readTimeout)
+	}
+	if upf.connTimeout != 0 {
+		Timeout = upf.connTimeout
+	}
 
+	log.Println("timeout : ", Timeout, ", readTimeout : ", rTimeout)
 	log.Println("pfcpifaceMainLoop@" + upf.fqdnHost + " says hello!!!")
 
 	cpConnectionStatus := make(chan bool)
@@ -88,7 +98,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 	// Initialize pkt header
 
 	for {
-		err := conn.SetReadDeadline(time.Now().Add(readTimeout))
+		err := conn.SetReadDeadline(time.Now().Add(rTimeout))
 		if err != nil {
 			log.Fatalln("Unable to set deadline for read:", err)
 		}
