@@ -56,6 +56,7 @@ type CPIfaceInfo struct {
 	EnableUeIPAlloc bool   `json:"enable_ue_ip_alloc"`
 	UeIPPool        string `json:"ue_ip_pool"`
 	PromPort        string `json:"prom_port"`
+	Dnn             string `json:"dnn"`
 }
 
 // IfaceType : Gateway interface struct
@@ -147,6 +148,7 @@ func main() {
 		intf:            intf,
 		enableUeIPAlloc: conf.CPIface.EnableUeIPAlloc,
 		recoveryTime:    time.Now(),
+		dnn:             conf.CPIface.Dnn,
 		connTimeout:     time.Duration(conf.ConnTimeout) * time.Millisecond,
 		readTimeout:     time.Duration(conf.ReadTimeout) * time.Second,
 	}
