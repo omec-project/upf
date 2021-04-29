@@ -18,6 +18,8 @@ type upf struct {
 	n4SrcIP         net.IP
 	fqdnHost        string
 	maxSessions     uint32
+	connTimeout     time.Duration
+	readTimeout     time.Duration
 	simInfo         *SimModeInfo
 	intf            fastPath
 	ippool          ipPool

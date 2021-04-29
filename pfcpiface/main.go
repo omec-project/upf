@@ -21,7 +21,6 @@ var (
 	httpAddr   = flag.String("http", "0.0.0.0:8080", "http IP/port combo")
 	simulate   = flag.String("simulate", "", "create|delete simulated sessions")
 	pfcpsim    = flag.Bool("pfcpsim", false, "simulate PFCP")
-	n4SrcIPStr = flag.String("n4SrcIPStr", "", "N4Interface IP")
 )
 
 // Conf : Json conf struct
@@ -34,6 +33,8 @@ type Conf struct {
 	P4rtcIface  P4rtcInfo   `json:"p4rtciface"`
 	EnableP4rt  bool        `json:"enable_p4rt"`
 	SimInfo     SimModeInfo `json:"sim"`
+	ConnTimeout uint32      `json:"conn_timeout"`
+	ReadTimeout uint32      `json:"read_timeout"`
 }
 
 // SimModeInfo : Sim mode attributes
@@ -146,6 +147,8 @@ func main() {
 		intf:            intf,
 		enableUeIPAlloc: conf.CPIface.EnableUeIPAlloc,
 		recoveryTime:    time.Now(),
+		connTimeout:     time.Duration(conf.ConnTimeout) * time.Millisecond,
+		readTimeout:     time.Duration(conf.ReadTimeout) * time.Second,
 	}
 
 	upf.setUpfInfo(&conf)

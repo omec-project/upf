@@ -59,6 +59,8 @@
 
     "": "Whether to enable P4Runtime feature",
     "enable_p4rt": false,
+    "" : "conn_timeout: 1000",
+    "" : "read_timeout: 25",
     
     "": "Control plane controller settings",
     "cpiface": {
