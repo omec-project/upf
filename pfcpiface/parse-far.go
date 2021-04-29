@@ -102,7 +102,9 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 
 	switch op {
 	case create:
-		fwdIEs, err = farIE.ForwardingParameters()
+		if (f.applyAction & ActionForward) != 0 {
+			fwdIEs, err = farIE.ForwardingParameters()
+		}
 	case update:
 		fwdIEs, err = farIE.UpdateForwardingParameters()
 	default:
