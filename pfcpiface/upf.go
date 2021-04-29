@@ -24,6 +24,7 @@ type upf struct {
 	intf            fastPath
 	ippool          ipPool
 	recoveryTime    time.Time
+	dnn             string
 }
 
 // to be replaced with go-pfcp structs

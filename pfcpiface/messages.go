@@ -67,13 +67,19 @@ func (pc *PFCPConn) handleAssociationSetupRequest(upf *upf, msg message.Message,
 
 	// Build response message
 	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
+	flags := uint8(0x41)
+	log.Println("Dnn info : ", upf.dnn)
+	if len(upf.dnn) != 0 {
+		//add ASSONI flag to set network instance.
+		flags = uint8(0x61)
+	}
 	asresmsg := message.NewAssociationSetupResponse(asreq.SequenceNumber,
 		ie.NewRecoveryTimeStamp(upf.recoveryTime),
 		ie.NewNodeID(sourceIP, "", ""), /* node id (IPv4) */
 		ie.NewCause(cause),             /* accept it blindly for the time being */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
-		ie.NewUserPlaneIPResourceInformation(0x41, 0, upf.accessIP.String(), "", "", ie.SrcInterfaceAccess),
+		ie.NewUserPlaneIPResourceInformation(flags, 0, upf.accessIP.String(), "", upf.dnn, ie.SrcInterfaceAccess),
 		// ie.NewUserPlaneIPResourceInformation(0x41, 0, coreIP, "", "", ie.SrcInterfaceCore),
 	) /* userplane ip resource info */
 
