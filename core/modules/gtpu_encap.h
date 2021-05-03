@@ -30,9 +30,12 @@ class GtpuEncap final : public Module {
   static const gate_idx_t kNumOGates = 2;
 
   void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
-  CommandResponse Init(const bess::pb::EmptyArg &);
+  CommandResponse Init(const bess::pb::GtpuEncapArg &arg);
 
  private:
+  bool add_psc;
+  int encap_size;
+  int pdu_type_attr = -1;
   int tout_sip_attr = -1;
   int tout_dip_attr = -1;
   int tout_teid = -1;

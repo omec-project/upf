@@ -26,6 +26,8 @@ using bess::utils::be16_t;
 using bess::utils::be32_t;
 using bess::utils::Ethernet;
 using bess::utils::Gtpv1;
+using bess::utils::Gtpv1PDUSessExt;
+using bess::utils::Gtpv1SeqPDUExt;
 using bess::utils::Ipv4;
 using bess::utils::ToIpv4Address;
 using bess::utils::Udp;
@@ -37,12 +39,22 @@ struct [[gnu::packed]] PacketTemplate {
   Ipv4 iph;
   Udp udph;
   Gtpv1 gtph;
+  Gtpv1SeqPDUExt speh;
+  Gtpv1PDUSessExt psch;
 
   PacketTemplate() {
+    psch.qfi = 0;  // to fill in
+    psch.spare2 = 0;
+    psch.spare1 = 0;
+    psch.pdu_type = 0;  // to fill in
+    psch.hlen = psch.header_length();
+    speh.ext = psch.type();
+    speh.npdu = 0;
+    speh.seqnum = (be16_t)0;
     gtph.version = GTPU_VERSION;
     gtph.pt = GTP_PROTOCOL_TYPE_GTP;
     gtph.spare = 0;
-    gtph.ex = 0;
+    gtph.ex = 0;  // conditionally set this
     gtph.seq = 0;
     gtph.pdn = 0;
     gtph.type = GTP_GPDU;
@@ -76,8 +88,12 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     bess::Packet *p = batch->pkts()[i];
 
     /* check attributes' values now */
+    uint8_t at_pdu_type;
+    bess::metadata::mt_offset_t off = attr_offset(pdu_type_attr);
+    at_pdu_type = get_attr_with_offset<uint8_t>(off, p);
+
     uint32_t at_tout_sip;
-    bess::metadata::mt_offset_t off = attr_offset(tout_sip_attr);
+    off = attr_offset(tout_sip_attr);
     at_tout_sip = get_attr_with_offset<uint32_t>(off, p);
 
     uint32_t at_tout_dip;
@@ -93,17 +109,17 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     at_tout_uport = get_attr_with_offset<uint16_t>(off, p);
 
     /* checking values now */
-    DLOG(INFO) << "tunnel out sip: " << at_tout_sip
+    DLOG(INFO) << "pdu type: " << static_cast<uint16_t>(at_pdu_type)
+               << ", tunnel out sip: " << at_tout_sip
                << ", tunnel out dip: " << at_tout_dip
                << ", tunnel out teid: " << at_tout_teid
                << ", tunnel out udp port: " << at_tout_uport << std::endl;
 
-    uint16_t pkt_len = p->total_len();
+    uint16_t pkt_len = p->total_len() - sizeof(Ethernet);
     Ethernet *eth = p->head_data<Ethernet *>();
 
     /* pre-allocate space for encaped header(s) */
-    char *new_p = static_cast<char *>(
-        p->prepend(sizeof(Udp) + sizeof(Gtpv1) + sizeof(Ipv4)));
+    char *new_p = static_cast<char *>(p->prepend(encap_size));
     if (new_p == NULL) {
       /* failed to prepend header space for encaped packet */
       EmitPacket(ctx, p, DEFAULT_GATE);
@@ -114,37 +130,59 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     /* setting Ethernet header */
     memcpy(new_p, eth, sizeof(Ethernet));
 
-    /* setting IPv4 header */
+    /* get pointers to header offsets */
     Ipv4 *iph = (Ipv4 *)(new_p + sizeof(Ethernet));
 
-    /* setting GTPU pointer */
-    Gtpv1 *gtph =
-        (Gtpv1 *)(new_p + sizeof(Ethernet) + sizeof(Ipv4) + sizeof(Udp));
+    Udp *udph = (Udp *)(new_p + sizeof(Ethernet) + sizeof(Ipv4));
+
+    Gtpv1 *gtph = (Gtpv1 *)((uint8_t *)iph + offsetof(PacketTemplate, gtph));
+
+    Gtpv1PDUSessExt *psch =
+        (Gtpv1PDUSessExt *)((uint8_t *)iph + offsetof(PacketTemplate, psch));
 
     /* copying template content */
-    bess::utils::Copy(iph, &outer_ip_template, sizeof(outer_ip_template));
+    bess::utils::Copy(iph, &outer_ip_template, encap_size);
+
+    /* setting gtp psc extension header*/
+    if (add_psc) {
+      gtph->ex = 1;
+      psch->pdu_type = at_pdu_type;
+    }
+
+    /* calculate lengths */
+    uint16_t gtplen =
+        pkt_len + encap_size - sizeof(Gtpv1) - sizeof(Udp) - sizeof(Ipv4);
+    uint16_t udplen = gtplen + sizeof(Gtpv1) + sizeof(Udp);
+    uint16_t iplen = udplen + sizeof(Ipv4);
 
     /* setting gtpu header */
-    gtph->length = (be16_t)(pkt_len - sizeof(Ethernet));
+    gtph->length = (be16_t)(gtplen);
     gtph->teid = (be32_t)(at_tout_teid);
 
     /* setting outer UDP header */
-    Udp *udph = (Udp *)(new_p + sizeof(Ethernet) + sizeof(Ipv4));
-    udph->length =
-        (be16_t)(pkt_len + sizeof(Gtpv1) + sizeof(Udp) - sizeof(Ethernet));
+    udph->length = (be16_t)(udplen);
     udph->src_port = udph->dst_port = (be16_t)(at_tout_uport);
 
     /* setting outer IP header */
-    iph->length = (be16_t)(pkt_len + sizeof(Gtpv1) + sizeof(Udp) +
-                           sizeof(Ipv4) - sizeof(Ethernet));
+    iph->length = (be16_t)(iplen);
     iph->src = (be32_t)(at_tout_sip);
     iph->dst = (be32_t)(at_tout_dip);
+
     EmitPacket(ctx, p, FORWARD_GATE);
   }
 }
 /*----------------------------------------------------------------------------------*/
-CommandResponse GtpuEncap::Init(const bess::pb::EmptyArg &) {
+CommandResponse GtpuEncap::Init(const bess::pb::GtpuEncapArg &arg) {
+  add_psc = arg.add_psc();
+  if (add_psc)
+    encap_size = sizeof(outer_ip_template);
+  else
+    encap_size = sizeof(outer_ip_template) - sizeof(Gtpv1SeqPDUExt) -
+                 sizeof(Gtpv1SeqPDUExt);
+
   using AccessMode = bess::metadata::Attribute::AccessMode;
+  pdu_type_attr = AddMetadataAttr("action", sizeof(uint8_t), AccessMode::kRead);
+  DLOG(INFO) << "tout_sip_attr: " << tout_sip_attr << std::endl;
   tout_sip_attr = AddMetadataAttr("tunnel_out_src_ip4addr", sizeof(uint32_t),
                                   AccessMode::kRead);
   DLOG(INFO) << "tout_sip_attr: " << tout_sip_attr << std::endl;

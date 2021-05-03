@@ -10,6 +10,8 @@
 namespace bess {
 namespace utils {
 
+#define EXT_TYPE_PDU_SESSION_CONTAINER 0x85
+
 struct [[gnu::packed]] Gtpv1 {
   uint8_t pdn : 1, /* N-PDU number */
       seq : 1,     /* Sequence number */
@@ -39,6 +41,26 @@ struct [[gnu::packed]] Gtpv1 {
     return len;
   }
 };
+
+struct [[gnu::packed]] Gtpv1SeqPDUExt {
+  be16_t seqnum; /* Sequence Number*/
+  uint8_t npdu;  /* N-PDU number*/
+  uint8_t ext;   /* Extension type */
+};
+
+struct [[gnu::packed]] Gtpv1PDUSessExt {
+  uint8_t hlen;       /* Extension header length */
+  uint8_t spare1 : 4, /* Spare */
+      pdu_type : 4;   /* PDU type 0=DL/1=UL*/
+  uint8_t qfi : 6,    /* QoS Flow Identifier*/
+      spare2 : 2;     /* Spare */
+  uint8_t next_type;  /* Next extension header type */
+
+  size_t header_length() const { return sizeof(Gtpv1PDUSessExt) >> 2; }
+
+  uint8_t type() const { return EXT_TYPE_PDU_SESSION_CONTAINER; }
+};
+
 }  // namespace utils
 }  // namespace bess
 

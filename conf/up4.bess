@@ -20,8 +20,8 @@ noGTPUDecap = 0
 GTPUDecap = 1
 noGTPUEncap = 0
 GTPUEncap = 1
-farForwardUAction = 0
-farForwardDAction = 1
+farForwardDAction = 0
+farForwardUAction = 1
 farDropAction = 2
 farBufferAction = 3
 farNotifyCPAction = 4
@@ -210,7 +210,7 @@ pdrLookup:GTPUDecap \
 
 # Add logical pipeline when gtpuencap is needed
 farLookup:GTPUEncap \
-    -> gtpuEncap::GtpuEncap():1 \
+    -> gtpuEncap::GtpuEncap(add_psc=parser.gtppsc):1 \
     -> outerUDPCsum::L4Checksum() \
     -> outerIPCsum::IPChecksum() \
     -> farMerge
