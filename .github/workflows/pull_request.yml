@@ -63,7 +63,7 @@ jobs:
           branch: ${{ github.event.pull_request.head.ref }}
           author: "Github Actions <actions@github>"
           commit-message: "Actions: Updated with changes from CI"
-      - uses: docker/login-action@v1
+      - uses: docker/login-action@v1.9.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
