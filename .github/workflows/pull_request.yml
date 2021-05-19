@@ -32,7 +32,7 @@ jobs:
         run: |
           SRC=$(git ls-tree --full-tree -r HEAD | grep -v vendor/ | grep -e "\.\(c\|h\|cc\|hh\|hpp\|cpp\)\$" | cut -f 2)
           wget https://raw.githubusercontent.com/NetSys/bess/master/core/.clang-format
-          clang-format-9 -style=file -i $SRC
+          clang-format -style=file -i $SRC
           rm .clang-format
       - name: Shell Format
         run: |
