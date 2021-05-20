@@ -96,7 +96,6 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 	// Initialize pkt buf
 	buf := make([]byte, PktBufSz)
 	// Initialize pkt header
-
 	for {
 		err := conn.SetReadDeadline(time.Now().Add(rTimeout))
 		if err != nil {
@@ -146,6 +145,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 		switch msg.MessageType() {
 		case message.MsgTypeAssociationSetupRequest:
 			cleanupSessions()
+			go readReportNotification(upf.reportNotifyChan, &pconn, conn, addr)
 			upf.setInfo(conn, addr, &pconn)
 			outgoingMessage = pconn.handleAssociationSetupRequest(upf, msg, addr, sourceIP, accessIP, coreIP)
 			if outgoingMessage != nil {

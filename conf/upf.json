@@ -61,6 +61,8 @@
     "enable_p4rt": false,
     "" : "conn_timeout: 1000",
     "" : "read_timeout: 25",
+    "" : "notify_sockaddr: /tmp/notifycp",
+    "" : "endmarker_sockaddr: /tmp/pfcpport",
     
     "": "Control plane controller settings",
     "cpiface": {

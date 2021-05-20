@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"flag"
 	"log"
 	"math"
@@ -17,6 +18,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/anypb"
 )
+
+// SockAddr : Unix Socket path to read bess notification from
+const SockAddr = "/tmp/notifycp"
 
 var intEnc = func(u uint64) *pb.FieldData {
 	return &pb.FieldData{Encoding: &pb.FieldData_ValueInt{ValueInt: u}}
@@ -32,7 +36,6 @@ type bess struct {
 }
 
 func (b *bess) setInfo(udpConn *net.UDPConn, udpAddr net.Addr, pconn *PFCPConn) {
-	log.Println("bess setUdpConn not handled")
 }
 
 func (b *bess) isConnected(accessIP *net.IP) bool {
@@ -55,9 +58,8 @@ func (b *bess) sendMsgToUPF(method string, pdrs []pdr, fars []far) uint8 {
 	defer cancel()
 	done := make(chan bool)
 
-	log.Println("upf : ", b.client)
-	log.Println("conn : ", b.conn)
 	for _, pdr := range pdrs {
+		pdr.printPDR()
 		switch method {
 		case "add":
 			fallthrough
@@ -68,6 +70,7 @@ func (b *bess) sendMsgToUPF(method string, pdrs []pdr, fars []far) uint8 {
 		}
 	}
 	for _, far := range fars {
+		far.printFAR()
 		switch method {
 		case "add":
 			fallthrough
@@ -244,6 +247,30 @@ func (b *bess) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metri
 
 }
 
+func (b *bess) notifyListen(notifySockAddr string, reportNotifyChan chan<- uint64) {
+	if notifySockAddr == "" {
+		notifySockAddr = SockAddr
+	}
+	unixConn, err := net.Dial("unixpacket", notifySockAddr)
+	if err != nil {
+		log.Println("dial error:", err)
+		return
+	}
+	defer unixConn.Close()
+
+	for {
+		buf := make([]byte, 512)
+		_, err := unixConn.Read(buf)
+		if err != nil {
+			return
+		}
+
+		d := buf[0:8]
+		fseid := binary.LittleEndian.Uint64(d)
+		reportNotifyChan <- fseid
+	}
+}
+
 func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 	log.Println("setUpfInfo bess")
 	u.simInfo = &conf.SimInfo
@@ -266,6 +293,7 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 	}
 
 	b.client = pb.NewBESSControlClient(b.conn)
+	go b.notifyListen(conf.NotifySockAddr, u.reportNotifyChan)
 }
 
 func (b *bess) sim(u *upf, method string) {

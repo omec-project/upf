@@ -237,23 +237,27 @@ func (pc *PFCPConn) handleSessionReportResponse(upf *upf, msg message.Message, a
 	}
 
 	cause := srres.Cause.Payload[0]
-	if cause == ie.CauseRequestAccepted {
-		log.Println("session req accepted seq : ", srres.SequenceNumber)
-	} else {
+	if cause != ie.CauseRequestAccepted {
+		seid := srres.SEID()
 		log.Println("session req not accepted seq : ", srres.SequenceNumber)
 		if cause == ie.CauseSessionContextNotFound {
+			sessItem, ok := pc.mgr.sessions[seid]
+			if !ok {
+				log.Println("context not found locally or remote. SEID : ", seid)
+				return
+			}
 			log.Println("context not found. Delete session locally")
-			sessItem := pc.mgr.sessions[srres.SEID()]
-
+			pc.mgr.RemoveSession(srres.SEID())
 			cause := upf.sendMsgToUPF("del", sessItem.pdrs, sessItem.fars)
 			if cause == ie.CauseRequestRejected {
 				log.Println("Write to FastPath failed")
-				return
 			}
 
-			pc.mgr.RemoveSession(srres.SEID())
+			return
 		}
 	}
+
+	log.Println("session req accepted seq : ", srres.SequenceNumber)
 }
 
 func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Message, addr net.Addr, sourceIP string) []byte {
@@ -350,7 +354,7 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 		ie.NewFSEID(session.localSEID, net.ParseIP(sourceIP), nil, nil),
 	)
 
-	addPdrInfo(seresMsg, &session)
+	addPdrInfo(seresMsg, session)
 	seres, err := seresMsg.Marshal()
 	if err != nil {
 		log.Fatalln("Unable to create session establishment response", err)
@@ -358,7 +362,6 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 
 	log.Println("Sending session establishment response to: ", addr)
 	globalPfcpStats.messages.WithLabelValues(string(nodeID), "Pfcp_Establishment_Response", "Outgoing", "Success").Inc()
-	pc.mgr.sessions[localSEID] = session
 	return seres
 }
 
@@ -462,6 +465,9 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 		addFARs = append(addFARs, f)
 	}
 
+	if session.getNotifyFlag() {
+		session.updateNotifyFlag()
+	}
 	cause := upf.sendMsgToUPF("mod", addPDRs, addFARs)
 	if cause == ie.CauseRequestRejected {
 		return sendError(errors.New("Write to FastPath failed"))
@@ -515,7 +521,6 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 
 	globalPfcpStats.messages.WithLabelValues(string(nodeID), "Pfcp_Modification_Response", "Outgoing", "Success").Inc()
 	log.Println("Sent session modification response to: ", addr)
-	pc.mgr.sessions[localSEID] = session
 	return smres
 }
 
@@ -560,7 +565,7 @@ func (pc *PFCPConn) handleSessionDeletionRequest(upf *upf, msg message.Message, 
 		return sendError(errors.New("Write to FastPath failed"))
 	}
 
-	releaseAllocatedIPs(upf, &session)
+	releaseAllocatedIPs(upf, session)
 	/* delete sessionRecord */
 	pc.mgr.RemoveSession(localSEID)
 
@@ -658,5 +663,74 @@ func (pc *PFCPConn) generateAssociationRequest(n4LocalIP string, n3ip string, n4
 
 	if _, err := conn.WriteTo(asreq, smfAddr); err != nil {
 		log.Fatalln("Unable to transmit association setup request ", err)
+	}
+}
+
+func readReportNotification(rn <-chan uint64, pfcpConn *PFCPConn,
+	udpConn *net.UDPConn, udpAddr net.Addr) {
+	log.Println("read report notification start")
+	for {
+		select {
+		case fseid := <-rn:
+			handleDigestReport(fseid, pfcpConn, udpConn, udpAddr)
+
+		default:
+			time.Sleep(2 * time.Second)
+		}
+	}
+}
+
+func handleDigestReport(fseid uint64,
+	pfcpConn *PFCPConn,
+	udpConn *net.UDPConn,
+	udpAddr net.Addr) {
+	session, ok := pfcpConn.mgr.sessions[fseid]
+	if !ok {
+		log.Println("No session found for fseid : ", fseid)
+		return
+	}
+
+	/* Number of Outstanding Notifies per session is 1 */
+	if session.getNotifyFlag() {
+		return
+	}
+
+	session.setNotifyFlag(true)
+	seq := pfcpConn.getSeqNum()
+	serep := message.NewSessionReportRequest(0, /* MO?? <-- what's this */
+		0,                            /* FO <-- what's this? */
+		0,                            /* seid */
+		seq,                          /* seq # */
+		0,                            /* priority */
+		ie.NewReportType(0, 0, 0, 1), /*upir, erir, usar, dldr int*/
+	)
+	serep.Header.SEID = session.remoteSEID
+	var pdrID uint32
+	for _, pdr := range session.pdrs {
+		if pdr.srcIface == core {
+			pdrID = pdr.pdrID
+			break
+		}
+	}
+
+	log.Println("Pdr iD : ", pdrID)
+	if pdrID == 0 {
+		log.Println("No Pdr found for downlink")
+		return
+	}
+
+	serep.DownlinkDataReport = ie.NewDownlinkDataReport(
+		ie.NewPDRID(uint16(pdrID)))
+
+	ret, err := serep.Marshal()
+	if err != nil {
+		log.Println("Marshal function failed for SM resp ", err)
+	}
+
+	// send the report req out
+	if ret != nil {
+		if _, err := udpConn.WriteTo(ret, udpAddr); err != nil {
+			log.Fatalln("Unable to transmit Report req", err)
+		}
 	}
 }

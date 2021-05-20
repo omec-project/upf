@@ -10,23 +10,24 @@ import (
 )
 
 type upf struct {
-	enableUeIPAlloc bool
-	accessIface     string
-	coreIface       string
-	ippoolCidr      string
-	accessIP        net.IP
-	coreIP          net.IP
-	n4SrcIP         net.IP
-	nodeIP          net.IP
-	fqdnHost        string
-	maxSessions     uint32
-	connTimeout     time.Duration
-	readTimeout     time.Duration
-	simInfo         *SimModeInfo
-	intf            fastPath
-	ippool          ipPool
-	recoveryTime    time.Time
-	dnn             string
+	enableUeIPAlloc  bool
+	accessIface      string
+	coreIface        string
+	ippoolCidr       string
+	accessIP         net.IP
+	coreIP           net.IP
+	n4SrcIP          net.IP
+	nodeIP           net.IP
+	fqdnHost         string
+	maxSessions      uint32
+	connTimeout      time.Duration
+	readTimeout      time.Duration
+	simInfo          *SimModeInfo
+	intf             fastPath
+	ippool           ipPool
+	recoveryTime     time.Time
+	dnn              string
+	reportNotifyChan chan uint64
 }
 
 // to be replaced with go-pfcp structs
@@ -73,6 +74,7 @@ func (u *upf) sim(method string) {
 }
 
 func (u *upf) setUpfInfo(conf *Conf) {
+	u.reportNotifyChan = make(chan uint64, 1024)
 	u.n4SrcIP = net.ParseIP("0.0.0.0")
 	u.nodeIP = net.ParseIP("0.0.0.0")
 
