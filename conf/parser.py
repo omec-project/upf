@@ -47,6 +47,8 @@ class Parser:
         self.core_ifname = None
         self.interfaces = dict()
         self.enable_ntf = False
+        self.notify_sockaddr = "/tmp/notifycp"
+        self.endmarker_sockaddr = "/tmp/pfcpport"
 
     def parse(self, ifaces):
         # Maximum number of flows to manage ip4 frags for re-assembly
@@ -147,6 +149,19 @@ class Parser:
             print('Can\'t parse interface name(s)! Setting it to default values ({}, {})'.format(
                 "access", "core"))
 
+        # UnixPort Paths
+        try:
+            self.notify_sockaddr = self.conf["notify_sockaddr"]
+        except KeyError:
+            print('Can\'t parse unix socket paths for notify! Setting it to default values ({})'.format(
+                "/tmp/notifycp"))
+
+        # UnixPort Paths
+        try:
+            self.endmarker_sockaddr = self.conf["endmarker_sockaddr"]
+        except KeyError:
+            print('Can\'t parse unix socket paths for end marker! Setting it to default values ({})'.format(
+                "/tmp/pfcpport"))
         # Network Token Function
         try:
             self.enable_ntf = bool(self.conf['enable_ntf'])

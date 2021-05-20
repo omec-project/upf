@@ -23,6 +23,32 @@ func (s *PFCPSession) UpdateFAR(f far) error {
 	return errors.New("FAR not found")
 }
 
+func (s *PFCPSession) setNotifyFlag(flag bool) {
+	s.notificationFlag.mux.Lock()
+	defer s.notificationFlag.mux.Unlock()
+	s.notificationFlag.flag = flag
+}
+
+func (s *PFCPSession) getNotifyFlag() bool {
+	s.notificationFlag.mux.Lock()
+	defer s.notificationFlag.mux.Unlock()
+	return s.notificationFlag.flag
+}
+
+// UpdateFAR updates existing far in the session
+func (s *PFCPSession) updateNotifyFlag() {
+	var unset bool = true
+	for _, v := range s.fars {
+		if v.applyAction&ActionNotify != 0 {
+			unset = false
+		}
+	}
+
+	if unset {
+		s.setNotifyFlag(false)
+	}
+}
+
 // RemoveFAR removes far from existing list of FARs in the session
 func (s *PFCPSession) RemoveFAR(id uint32) (*far, error) {
 	for idx, v := range s.fars {

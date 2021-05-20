@@ -181,7 +181,7 @@ linkMerge::Merge() \
                                         {'attr_name':'dst_port', 'num_bytes':2}, \
                                         {'attr_name':'ip_proto', 'num_bytes':1}], \
                                 values=[{'attr_name':'pdr_id', 'num_bytes':4}, \
-                                        {'attr_name':'fseid', 'num_bytes':4}, \
+                                        {'attr_name':'fseid', 'num_bytes':8}, \
                                         {'attr_name':'ctr_id', 'num_bytes':4}, \
                                         {'attr_name':'far_id', 'num_bytes':4}]):noGTPUDecap \
     -> preQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions)
@@ -193,7 +193,7 @@ if ntf:
   _in = ntf
 
 _in -> farLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
-                                     {'attr_name':'fseid', 'num_bytes':4}], \
+                                     {'attr_name':'fseid', 'num_bytes':8}], \
                              values=[{'attr_name':'action', 'num_bytes':1}, \
                                      {'attr_name':'tunnel_out_type', 'num_bytes':1}, \
                                      {'attr_name':'tunnel_out_src_ip4addr', 'num_bytes':4}, \
@@ -215,12 +215,16 @@ farLookup:GTPUEncap \
     -> outerIPCsum::IPChecksum() \
     -> farMerge
 
+notify = UnixSocketPort(name='notifyCP', path=parser.notify_sockaddr)
+pfcpPort = UnixSocketPort(name='pfcpPort', path=parser.endmarker_sockaddr)
+PortInc(port='pfcpPort') -> ports[parser.access_ifname].rtr
+executeFAR:farNotifyCPAction -> GenericEncap(fields=[ {'size': 8, 'attribute': 'fseid'}]) \
+                             -> farNotifyCP::PortOut(port='notifyCP')
 # Drop unknown packets
 pktParse:0 -> badPkts::Sink()
 pdrLookup:pdrFailGate -> pdrLookupFail::Sink()
 farLookup:farFailGate -> farLookupFail::Sink()
 executeFAR:farDropAction -> farDrop::Sink()
-executeFAR:farNotifyCPAction -> farNotifyCP::Sink()
 executeFAR:farBufferAction -> farBuffer::Sink()
 gtpuEncap:0 -> gtpuEncapFail::Sink()
 

@@ -5,6 +5,7 @@ package main
 
 import (
 	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -14,7 +15,7 @@ type PFCPSessionMgr struct {
 	nodeID     string
 	maxRetries int
 	appPFDs    map[string]appPFD
-	sessions   map[uint64]PFCPSession
+	sessions   map[uint64]*PFCPSession
 }
 
 // PFD holds the switch level application IDs
@@ -28,7 +29,7 @@ func NewPFCPSessionMgr(maxRetries int) *PFCPSessionMgr {
 	return &PFCPSessionMgr{
 		rng:        rand.New(rand.NewSource(time.Now().UnixNano())),
 		maxRetries: maxRetries,
-		sessions:   make(map[uint64]PFCPSession),
+		sessions:   make(map[uint64]*PFCPSession),
 	}
 }
 
@@ -38,12 +39,18 @@ func (mgr *PFCPSessionMgr) RemoveSession(id uint64) {
 	globalPfcpStats.sessions.WithLabelValues(mgr.nodeID).Set(float64(len(mgr.sessions)))
 }
 
+type notifyFlag struct {
+	flag bool
+	mux  sync.Mutex
+}
+
 // PFCPSession implements one PFCP session
 type PFCPSession struct {
-	localSEID  uint64
-	remoteSEID uint64
-	pdrs       []pdr
-	fars       []far
+	localSEID        uint64
+	remoteSEID       uint64
+	notificationFlag notifyFlag
+	pdrs             []pdr
+	fars             []far
 }
 
 // NewPFCPSession allocates an session with ID
@@ -61,7 +68,7 @@ func (mgr *PFCPSessionMgr) NewPFCPSession(rseid uint64) uint64 {
 			pdrs:       make([]pdr, 0, MaxItems),
 			fars:       make([]far, 0, MaxItems),
 		}
-		mgr.sessions[lseid] = s
+		mgr.sessions[lseid] = &s
 		globalPfcpStats.sessions.WithLabelValues(mgr.nodeID).Set(float64(len(mgr.sessions)))
 		return lseid
 	}

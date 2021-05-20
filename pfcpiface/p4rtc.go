@@ -78,13 +78,12 @@ type AppTableEntry struct {
 
 // P4rtClient ... P4 Runtime client object
 type P4rtClient struct {
-	Client       p4.P4RuntimeClient
-	Conn         *grpc.ClientConn
-	P4Info       p4ConfigV1.P4Info
-	Stream       p4.P4Runtime_StreamChannelClient
-	DeviceID     uint64
-	ElectionID   p4.Uint128
-	reportDigest chan []byte
+	Client     p4.P4RuntimeClient
+	Conn       *grpc.ClientConn
+	P4Info     p4ConfigV1.P4Info
+	Stream     p4.P4Runtime_StreamChannelClient
+	DeviceID   uint64
+	ElectionID p4.Uint128
 }
 
 func (c *P4rtClient) tableID(name string) uint32 {
@@ -153,12 +152,11 @@ func (c *P4rtClient) SetMastership(electionID p4.Uint128) (err error) {
 }
 
 // Init .. Initialize Client
-func (c *P4rtClient) Init(timeout uint32) (err error) {
+func (c *P4rtClient) Init(timeout uint32, reportNotifyChan chan<- uint64) (err error) {
 	// Initialize stream for mastership and packet I/O
 	//ctx, cancel := context.WithTimeout(context.Background(),
 	//                                   time.Duration(timeout) * time.Second)
 	//defer cancel()
-	c.reportDigest = make(chan []byte, 1024)
 	c.Stream, err = c.Client.StreamChannel(
 		context.Background(),
 		grpcRetry.WithMax(3),
@@ -182,9 +180,10 @@ func (c *P4rtClient) Init(timeout uint32) (err error) {
 			} else if dig := res.GetDigest(); dig != nil {
 				log.Println("Received Digest")
 				for _, p4d := range dig.GetData() {
-					if fseid := p4d.GetBitstring(); fseid != nil {
+					if fseidStr := p4d.GetBitstring(); fseidStr != nil {
 						log.Println("fseid data in digest")
-						c.reportDigest <- fseid
+						fseid := binary.BigEndian.Uint64(fseidStr[4:])
+						reportNotifyChan <- fseid
 					}
 					/*if structVal := p4d.GetStruct(); structVal != nil {
 						log.Println("Struct data in digest")
@@ -1089,7 +1088,10 @@ func LoadDeviceConfig(deviceConfigPath string) (P4DeviceConfig, error) {
 }
 
 //CreateChannel ... Create p4runtime client channel
-func CreateChannel(host string, deviceID uint64, timeout uint32) (*P4rtClient, error) {
+func CreateChannel(host string,
+	deviceID uint64,
+	timeout uint32,
+	reportNotifyChan chan<- uint64) (*P4rtClient, error) {
 	log.Println("create channel")
 	// Second, check to see if we can reuse the gRPC connection for a new P4RT client
 	conn, err := GetConnection(host)
@@ -1104,7 +1106,7 @@ func CreateChannel(host string, deviceID uint64, timeout uint32) (*P4rtClient, e
 		DeviceID: deviceID,
 	}
 
-	err = client.Init(timeout)
+	err = client.Init(timeout, reportNotifyChan)
 	if err != nil {
 		log.Println("Client Init error: ", err)
 		return nil, err
