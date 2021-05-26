@@ -1,0 +1,32 @@
+# This is a basic workflow that is manually triggered
+
+name: BESS Build Base Image
+
+# Controls when the action will run. Workflow runs when manually triggered using the UI
+# or API.
+on:
+  schedule:
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+jobs:
+  build:
+    env:
+      REPO: "ghcr.io/omec-project/upf-epc/bess_build"
+      TAG: "latest"
+      BESS_DPDK_BRANCH: "dpdk-2011"
+    runs-on: ubuntu-latest
+    steps:
+    - name: docker build
+      run: |
+        git clone -b dpdk-2011 https://github.com/NetSys/bess.git
+        cd bess/env
+        yes n | ./rebuild_images.py bionic64
+        docker tag nefelinetworks/bess_build:latest ${{ env.REPO }}:${{ env.TAG }}
+    - uses: docker/login-action@v1.9.0
+      with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.CR_PAT }}
+    - name: docker push
+      run: |
+        docker push ${{ env.REPO }}:${{ env.TAG }}
