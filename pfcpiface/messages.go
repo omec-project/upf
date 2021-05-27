@@ -85,12 +85,17 @@ func (pc *PFCPConn) handleAssociationSetupRequest(upf *upf, msg message.Message,
 
 	pc.mgr.nodeID = nodeID
 	log.Println("Association setup NodeID : ", pc.mgr.nodeID)
+	features := make([]uint8, 4)
 	if upf.enableUeIPAlloc {
-		features := make([]uint8, 4)
 		setUeipFeature(features...)
-		asresmsg.UPFunctionFeatures =
-			ie.NewUPFunctionFeatures(features...)
 	}
+
+	if upf.enableEndMarker {
+		setEndMarkerFeature(features...)
+	}
+
+	asresmsg.UPFunctionFeatures =
+		ie.NewUPFunctionFeatures(features...)
 	asres, err := asresmsg.Marshal()
 	if err != nil {
 		log.Fatalln("Unable to create association setup response", err)
@@ -415,6 +420,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 
 	addPDRs := make([]pdr, 0, MaxItems)
 	addFARs := make([]far, 0, MaxItems)
+	endMarkerList := make([][]byte, 0, MaxItems)
 	for _, cPDR := range smreq.CreatePDR {
 		var p pdr
 		if err := p.parsePDR(cPDR, localSEID, pc.mgr.appPFDs, upf); err != nil {
@@ -457,7 +463,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 			return sendError(err)
 		}
 		f.fseidIP = fseidIP
-		err = session.UpdateFAR(f)
+		err = session.UpdateFAR(&f, &endMarkerList)
 		if err != nil {
 			log.Println("session PDR update failed ", err)
 			continue
@@ -471,6 +477,13 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 	cause := upf.sendMsgToUPF("mod", addPDRs, addFARs)
 	if cause == ie.CauseRequestRejected {
 		return sendError(errors.New("Write to FastPath failed"))
+	}
+
+	if upf.enableEndMarker {
+		err := upf.sendEndMarkers(&endMarkerList)
+		if err != nil {
+			log.Println("Sending End Markers Failed : ", err)
+		}
 	}
 
 	delPDRs := make([]pdr, 0, MaxItems)

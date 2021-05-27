@@ -31,6 +31,12 @@ func setUeipFeature(features ...uint8) {
 	}
 }
 
+func setEndMarkerFeature(features ...uint8) {
+	if len(features) >= 2 {
+		features[1] = features[1] | 0x01
+	}
+}
+
 func has2ndBit(f uint8) bool {
 	return (f&0x02)>>1 == 1
 }

@@ -35,6 +35,8 @@ type Conf struct {
 	SimInfo           SimModeInfo `json:"sim"`
 	ConnTimeout       uint32      `json:"conn_timeout"`
 	ReadTimeout       uint32      `json:"read_timeout"`
+	EnableNotifyBess  bool        `json:"enable_notify_bess"`
+	EnableEndMarker   bool        `json:"enable_end_marker"`
 	NotifySockAddr    string      `json:"notify_sockaddr"`
 	EndMarkerSockAddr string      `json:"endmarker_sockaddr"`
 }
@@ -151,6 +153,7 @@ func main() {
 		enableUeIPAlloc: conf.CPIface.EnableUeIPAlloc,
 		recoveryTime:    time.Now(),
 		dnn:             conf.CPIface.Dnn,
+		enableEndMarker: conf.EnableEndMarker,
 		connTimeout:     time.Duration(conf.ConnTimeout) * time.Millisecond,
 		readTimeout:     time.Duration(conf.ReadTimeout) * time.Second,
 	}

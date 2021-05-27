@@ -19,6 +19,8 @@ type fastPath interface {
 	sim(u *upf, method string)
 	/* write pdr/far/qer to fastpath */
 	sendMsgToUPF(method string, pdrs []pdr, fars []far) uint8
+	/* write endMarker to fastpath */
+	sendEndMarkers(endMarkerList *[][]byte) error
 	/* delete all pdrs/fars/qers/ installed in fastpath tabled */
 	sendDeleteAllSessionsMsgtoUPF()
 	/* check of communication channel to fastpath is setup */
