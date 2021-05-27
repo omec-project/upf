@@ -303,6 +303,10 @@ func (p *p4rtc) setUpfInfo(u *upf, conf *Conf) {
 	}
 }
 
+func (p *p4rtc) sendEndMarkers(endMarkerList *[][]byte) error {
+	return nil
+}
+
 func (p *p4rtc) sendMsgToUPF(method string, pdrs []pdr, fars []far) uint8 {
 	log.Println("sendMsgToUPF p4")
 	var funcType uint8

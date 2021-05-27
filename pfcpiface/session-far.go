@@ -5,6 +5,10 @@ package main
 
 import (
 	"errors"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"log"
+	"net"
 )
 
 // CreateFAR appends far to existing list of FARs in the session
@@ -12,11 +16,67 @@ func (s *PFCPSession) CreateFAR(f far) {
 	s.fars = append(s.fars, f)
 }
 
+func addEndMarker(farItem far, endMarkerList *[][]byte) {
+	// This time lets fill out some information
+	log.Println("Adding end Marker for farID : ", farItem.farID)
+	options := gopacket.SerializeOptions{
+		ComputeChecksums: true,
+		FixLengths:       true,
+	}
+	buffer := gopacket.NewSerializeBuffer()
+	ipLayer := &layers.IPv4{
+		Version:  4,
+		TTL:      64,
+		SrcIP:    int2ip(farItem.tunnelIP4Src),
+		DstIP:    int2ip(farItem.tunnelIP4Dst),
+		Protocol: layers.IPProtocolUDP,
+	}
+	ethernetLayer := &layers.Ethernet{
+		SrcMAC:       net.HardwareAddr{0xFF, 0xAA, 0xFA, 0xAA, 0xFF, 0xAA},
+		DstMAC:       net.HardwareAddr{0xBD, 0xBD, 0xBD, 0xBD, 0xBD, 0xBD},
+		EthernetType: layers.EthernetTypeIPv4,
+	}
+	udpLayer := &layers.UDP{
+		SrcPort: layers.UDPPort(2152),
+		DstPort: layers.UDPPort(2152),
+	}
+
+	err := udpLayer.SetNetworkLayerForChecksum(ipLayer)
+	if err != nil {
+		log.Println("set checksum for UDP layer in endmarker failed")
+		return
+	}
+
+	gtpLayer := &layers.GTPv1U{
+		Version:      1,
+		MessageType:  254,
+		ProtocolType: farItem.tunnelType,
+		TEID:         farItem.tunnelTEID,
+	}
+	// And create the packet with the layers
+	err = gopacket.SerializeLayers(buffer, options,
+		ethernetLayer,
+		ipLayer,
+		udpLayer,
+		gtpLayer,
+	)
+
+	if err == nil {
+		outgoingPacket := buffer.Bytes()
+		*endMarkerList = append(*endMarkerList, outgoingPacket)
+	} else {
+		log.Println("go packet serialize failed : ", err)
+	}
+}
+
 // UpdateFAR updates existing far in the session
-func (s *PFCPSession) UpdateFAR(f far) error {
+func (s *PFCPSession) UpdateFAR(f *far, endMarkerList *[][]byte) error {
 	for idx, v := range s.fars {
 		if v.farID == f.farID {
-			s.fars[idx] = f
+			if f.sendEndMarker {
+				addEndMarker(v, endMarkerList)
+			}
+			s.fars[idx] = *f
 			return nil
 		}
 	}
@@ -37,7 +97,7 @@ func (s *PFCPSession) getNotifyFlag() bool {
 
 // UpdateFAR updates existing far in the session
 func (s *PFCPSession) updateNotifyFlag() {
-	var unset bool = true
+	unset := true
 	for _, v := range s.fars {
 		if v.applyAction&ActionNotify != 0 {
 			unset = false

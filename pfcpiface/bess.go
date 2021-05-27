@@ -22,6 +22,9 @@ import (
 // SockAddr : Unix Socket path to read bess notification from
 const SockAddr = "/tmp/notifycp"
 
+// PfcpAddr : Unix Socket path to send end marker packet
+const PfcpAddr = "/tmp/pfcpport"
+
 var intEnc = func(u uint64) *pb.FieldData {
 	return &pb.FieldData{Encoding: &pb.FieldData_ValueInt{ValueInt: u}}
 }
@@ -31,8 +34,11 @@ var (
 )
 
 type bess struct {
-	client pb.BESSControlClient
-	conn   *grpc.ClientConn
+	client           pb.BESSControlClient
+	conn             *grpc.ClientConn
+	endMarkerSocket  net.Conn
+	notifyBessSocket net.Conn
+	endMarkerChan    chan []byte
 }
 
 func (b *bess) setInfo(udpConn *net.UDPConn, udpAddr net.Addr, pconn *PFCPConn) {
@@ -44,6 +50,14 @@ func (b *bess) isConnected(accessIP *net.IP) bool {
 	}
 
 	return true
+}
+
+func (b *bess) sendEndMarkers(endMarkerList *[][]byte) error {
+	for _, eMarker := range *endMarkerList {
+		b.endMarkerChan <- eMarker
+	}
+
+	return nil
 }
 
 func (b *bess) sendMsgToUPF(method string, pdrs []pdr, fars []far) uint8 {
@@ -249,20 +263,20 @@ func (b *bess) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metri
 
 }
 
-func (b *bess) notifyListen(notifySockAddr string, reportNotifyChan chan<- uint64) {
-	if notifySockAddr == "" {
-		notifySockAddr = SockAddr
+func (b *bess) endMarkerSendLoop(endMarkerChan chan []byte) {
+	for outPacket := range endMarkerChan {
+		_, err := b.endMarkerSocket.Write(outPacket)
+		if err != nil {
+			log.Println("end marker write failed")
+		}
 	}
-	unixConn, err := net.Dial("unixpacket", notifySockAddr)
-	if err != nil {
-		log.Println("dial error:", err)
-		return
-	}
-	defer unixConn.Close()
+}
+
+func (b *bess) notifyListen(reportNotifyChan chan<- uint64) {
 
 	for {
 		buf := make([]byte, 512)
-		_, err := unixConn.Read(buf)
+		_, err := b.notifyBessSocket.Read(buf)
 		if err != nil {
 			return
 		}
@@ -288,6 +302,7 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 
 	// get bess grpc client
 	log.Println("bessIP ", *bessIP)
+	b.endMarkerChan = make(chan []byte, 1024)
 
 	b.conn, errin = grpc.Dial(*bessIP, grpc.WithInsecure())
 	if errin != nil {
@@ -295,7 +310,32 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 	}
 
 	b.client = pb.NewBESSControlClient(b.conn)
-	go b.notifyListen(conf.NotifySockAddr, u.reportNotifyChan)
+	if conf.EnableNotifyBess {
+		notifySockAddr := conf.NotifySockAddr
+		if notifySockAddr == "" {
+			notifySockAddr = SockAddr
+		}
+		b.notifyBessSocket, errin = net.Dial("unixpacket", notifySockAddr)
+		if errin != nil {
+			log.Println("dial error:", errin)
+			return
+		}
+		go b.notifyListen(u.reportNotifyChan)
+	}
+
+	if conf.EnableEndMarker {
+		pfcpCommAddr := conf.EndMarkerSockAddr
+		if pfcpCommAddr == "" {
+			pfcpCommAddr = PfcpAddr
+		}
+		b.endMarkerSocket, errin = net.Dial("unixpacket", pfcpCommAddr)
+		if errin != nil {
+			log.Println("dial error:", errin)
+			return
+		}
+		log.Println("Starting end marker loop")
+		go b.endMarkerSendLoop(b.endMarkerChan)
+	}
 }
 
 func (b *bess) sim(u *upf, method string) {

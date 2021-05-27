@@ -11,6 +11,7 @@ import (
 
 type upf struct {
 	enableUeIPAlloc  bool
+	enableEndMarker  bool
 	accessIface      string
 	coreIface        string
 	ippoolCidr       string
@@ -55,6 +56,10 @@ const (
 
 func (u *upf) sendMsgToUPF(method string, pdrs []pdr, fars []far) uint8 {
 	return u.intf.sendMsgToUPF(method, pdrs, fars)
+}
+
+func (u *upf) sendEndMarkers(endMarkerList *[][]byte) error {
+	return u.intf.sendEndMarkers(endMarkerList)
 }
 
 func sendDeleteAllSessionsMsgtoUPF(u *upf) {

@@ -17,6 +17,8 @@ const (
 	FwdIEOuterHeaderCreation Bits = 1 << iota
 	//FwdIEDestinationIntf ...
 	FwdIEDestinationIntf
+	//FwdIEPfcpSMReqFlags ...
+	FwdIEPfcpSMReqFlags
 )
 
 const (
@@ -40,13 +42,14 @@ type far struct {
 	fseID   uint64
 	fseidIP uint32
 
-	dstIntf      uint8
-	applyAction  uint8
-	tunnelType   uint8
-	tunnelIP4Src uint32
-	tunnelIP4Dst uint32
-	tunnelTEID   uint32
-	tunnelPort   uint16
+	dstIntf       uint8
+	sendEndMarker bool
+	applyAction   uint8
+	tunnelType    uint8
+	tunnelIP4Src  uint32
+	tunnelIP4Dst  uint32
+	tunnelTEID    uint32
+	tunnelPort    uint16
 }
 
 func (f *far) printFAR() {
@@ -61,6 +64,7 @@ func (f *far) printFAR() {
 	log.Println("tunnelIP4Dst:", f.tunnelIP4Dst)
 	log.Println("tunnelTEID:", f.tunnelTEID)
 	log.Println("tunnelPort:", f.tunnelPort)
+	log.Println("sendEndMarker:", f.sendEndMarker)
 	log.Println("--------------------------------------------")
 }
 
@@ -115,6 +119,7 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 		return err
 	}
 
+	f.sendEndMarker = false
 	var fields Bits
 	for _, fwdIE := range fwdIEs {
 		switch fwdIE.Type {
@@ -125,6 +130,7 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 				log.Println("Unable to parse OuterHeaderCreationFields!")
 				continue
 			}
+
 			f.tunnelTEID = ohcFields.TEID
 			f.tunnelIP4Dst = ip2int(ohcFields.IPv4Address)
 			f.tunnelType = uint8(1)
@@ -140,6 +146,16 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 				f.tunnelIP4Src = ip2int(upf.accessIP)
 			} else if f.dstIntf == ie.DstInterfaceCore {
 				f.tunnelIP4Src = ip2int(upf.coreIP)
+			}
+		case ie.PFCPSMReqFlags:
+			fields = Set(fields, FwdIEPfcpSMReqFlags)
+			smReqFlags, err := fwdIE.PFCPSMReqFlags()
+			if err != nil {
+				log.Println("Unable to parse PFCPSMReqFlags!")
+				continue
+			}
+			if has2ndBit(smReqFlags) {
+				f.sendEndMarker = true
 			}
 		}
 	}

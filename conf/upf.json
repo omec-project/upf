@@ -57,6 +57,12 @@
     "": "Whether to enable Network Token Functions",
     "enable_ntf": false,
 
+    "": "Whether to enable End Marker Support",
+    "": "enable_end_marker: false",
+    
+    "": "Whether to enable Notify BESS feature",
+    "": "enable_notify_bess: false",
+    
     "": "Whether to enable P4Runtime feature",
     "enable_p4rt": false,
     "" : "conn_timeout: 1000",
