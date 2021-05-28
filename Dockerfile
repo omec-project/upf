@@ -4,17 +4,12 @@
 
 # Multi-stage Dockerfile
 # Stage bess-build: builds bess with its dependencies
-FROM nefelinetworks/bess_build AS bess-build
+FROM ghcr.io/omec-project/upf-epc/bess_build AS bess-build
 ARG CPU=native
 RUN apt-get update && \
     apt-get -y install --no-install-recommends \
         ca-certificates \
-        libelf-dev \
-        python3-pip \
-        python3-setuptools
-RUN pip3 install --no-cache-dir \
-        meson \
-        ninja
+        libelf-dev
         
 ARG MAKEFLAGS
 
@@ -98,7 +93,7 @@ ENV PYTHONPATH="/opt/bess"
 WORKDIR /opt/bess/bessctl
 ENTRYPOINT ["bessd", "-f"]
 
-FROM nefelinetworks/bess_build  AS cpiface-build
+FROM ghcr.io/omec-project/upf-epc/bess_build  AS cpiface-build
 ARG MAKEFLAGS
 ARG CPU=native
 RUN apt-get update -y && apt-get install -y libzmq3-dev libjsoncpp-dev
