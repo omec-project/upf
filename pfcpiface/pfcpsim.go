@@ -4,7 +4,6 @@
 package main
 
 import (
-	"flag"
 	"log"
 	"net"
 	"time"
@@ -299,12 +298,7 @@ func deletePFCP(conn *net.UDPConn, raddr *net.UDPAddr, seid uint64) {
 }
 
 func pfcpSim() {
-	var (
-		server = flag.String("-s", "127.0.0.1:8805", "server's addr/port")
-	)
-	flag.Parse()
-
-	raddr, err := net.ResolveUDPAddr("udp", *server)
+	raddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:"+PFCPPort)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -315,10 +309,10 @@ func pfcpSim() {
 	}
 
 	seid := createPFCP(conn, raddr)
-	time.Sleep(20 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	modifyPFCP(conn, raddr, seid)
-	time.Sleep(20 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	deletePFCP(conn, raddr, seid)
 
