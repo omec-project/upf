@@ -1,15 +1,15 @@
-From 433c2ade397f7a1a024887e7fabe61011ac00a3f Mon Sep 17 00:00:00 2001
+From 9f762576e06c194708a8f9977a1992fcf43f7a0e Mon Sep 17 00:00:00 2001
 From: Amar Sri <amarsri28@gmail.com>
-Date: Mon, 19 Apr 2021 03:59:12 -0700
-Subject: [PATCH] Hash Improvements
+Date: Thu, 3 Jun 2021 00:56:00 -0700
+Subject: [PATCH] Enabling concurrency & resolving issues
 
 ---
- core/modules/exact_match.cc    |  20 ++--
- core/modules/wildcard_match.cc | 196 +++++++++++++++++++++++++--------
- core/modules/wildcard_match.h  |  15 ++-
- core/utils/cuckoo_map.h        | 133 ++++++++++++++++++++--
- core/utils/exact_match_table.h |  80 ++++++++------
- 5 files changed, 345 insertions(+), 99 deletions(-)
+ core/modules/exact_match.cc    |  20 ++-
+ core/modules/wildcard_match.cc | 241 +++++++++++++++++++++++++--------
+ core/modules/wildcard_match.h  |  28 +++-
+ core/utils/cuckoo_map.h        | 128 ++++++++++++++++-
+ core/utils/exact_match_table.h |  80 ++++++-----
+ 5 files changed, 384 insertions(+), 113 deletions(-)
 
 diff --git a/core/modules/exact_match.cc b/core/modules/exact_match.cc
 index 1ca0fd4e..758c0202 100644
@@ -51,7 +51,7 @@ index 1ca0fd4e..758c0202 100644
  }
  
 diff --git a/core/modules/wildcard_match.cc b/core/modules/wildcard_match.cc
-index ec639a7b..9383c35c 100644
+index ec639a7b..06f6173c 100644
 --- a/core/modules/wildcard_match.cc
 +++ b/core/modules/wildcard_match.cc
 @@ -40,13 +40,28 @@ using bess::metadata::Attribute;
@@ -96,12 +96,14 @@ index ec639a7b..9383c35c 100644
    // reset size_acc
    size_acc = 0;
    for (int i = 0; i < arg.values_size(); i++) {
-@@ -162,18 +175,14 @@ inline gate_idx_t WildcardMatch::LookupEntry(const wm_hkey_t &key,
+@@ -162,18 +175,16 @@ inline gate_idx_t WildcardMatch::LookupEntry(const wm_hkey_t &key,
                                               bess::Packet *pkt) {
    struct WmData result = {
        .priority = INT_MIN, .ogate = def_gate, .keyv = {{0}}};
 -
    for (auto &tuple : tuples_) {
++    if (tuple.occupied == 0)
++      continue;
      const auto &ht = tuple.ht;
      wm_hkey_t key_masked;
 -
@@ -120,7 +122,7 @@ index ec639a7b..9383c35c 100644
      }
    }
  
-@@ -232,20 +241,113 @@ inline gate_idx_t WildcardMatch::LookupEntry(const wm_hkey_t &key,
+@@ -232,20 +243,115 @@ inline gate_idx_t WildcardMatch::LookupEntry(const wm_hkey_t &key,
    return result.ogate;
  }
  
@@ -136,6 +138,8 @@ index ec639a7b..9383c35c 100644
 +  wm_hkey_t **key_ptr[cnt];
 +
 +  for (auto tuple = tuples_.begin(); tuple != tuples_.end(); ++tuple) {
++    if (tuple->occupied == 0)
++      continue;
 +    const auto &ht = tuple->ht;
 +    mask_bulk(key, key_masked, (void **)key_ptr, tuple->mask, cnt,
 +              total_key_size_);
@@ -238,7 +242,7 @@ index ec639a7b..9383c35c 100644
    for (const auto &field : fields_) {
      int offset;
      int pos = field.pos;
-@@ -272,9 +374,9 @@ void WildcardMatch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
+@@ -272,9 +378,9 @@ void WildcardMatch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
      }
    }
  
@@ -251,45 +255,86 @@ index ec639a7b..9383c35c 100644
    }
  }
  
-@@ -282,7 +384,7 @@ std::string WildcardMatch::GetDesc() const {
+@@ -282,7 +388,9 @@ std::string WildcardMatch::GetDesc() const {
    int num_rules = 0;
  
    for (const auto &tuple : tuples_) {
 -    num_rules += tuple.ht.Count();
++    if (tuple.occupied == 0)
++      continue;
 +    num_rules += tuple.ht->Count();
    }
  
    return bess::utils::Format("%zu fields, %d rules", fields_.size(), num_rules);
-@@ -406,35 +508,36 @@ int WildcardMatch::AddTuple(wm_hkey_t *mask) {
-   tuples_.emplace_back();
-   struct WmTuple &tuple = tuples_.back();
-   bess::utils::Copy(&tuple.mask, mask, sizeof(*mask));
+@@ -387,10 +495,9 @@ CommandResponse WildcardMatch::ExtractValue(const T &arg, wm_hkey_t *keyv) {
+ }
+ 
+ int WildcardMatch::FindTuple(wm_hkey_t *mask) {
+-  int i = 0;
 -
-+  std::ostringstream address;
-+  address << (void const *)&(tuple.ht);
-+  std::string name = "wildcard" + address.str();
-+  dpdk_params1.name = name.c_str();
-+  dpdk_params1.key_len = total_key_size_;
-+  tuple.ht = new CuckooMap<wm_hkey_t, struct WmData, wm_hash, wm_eq>(
-+      0, 0, &dpdk_params1);
-   return int(tuples_.size() - 1);
+-  for (const auto &tuple : tuples_) {
+-    if (memcmp(&tuple.mask, mask, total_key_size_) == 0) {
++  for (auto i = 0; i < MAX_TUPLES; i++) {
++    if ((tuples_[i].occupied) &&
++        (memcmp(&tuples_[i].mask, mask, total_key_size_) == 0)) {
+       return i;
+     }
+     i++;
+@@ -399,42 +506,52 @@ int WildcardMatch::FindTuple(wm_hkey_t *mask) {
+ }
+ 
+ int WildcardMatch::AddTuple(wm_hkey_t *mask) {
+-  if (tuples_.size() >= MAX_TUPLES) {
+-    return -ENOSPC;
++  CuckooMap<wm_hkey_t, struct WmData, wm_hash, wm_eq> *temp = nullptr;
++  for (int i = 0; i < MAX_TUPLES; i++) {
++    if (tuples_[i].occupied == 0) {
++      bess::utils::Copy(&tuples_[i].mask, mask, sizeof(*mask));
++      tuples_[i].params.key_len = total_key_size_;
++      temp = new CuckooMap<wm_hkey_t, struct WmData, wm_hash, wm_eq>(
++          0, 0, &tuples_[i].params);
++      if (temp == nullptr)
++        return -ENOSPC;
++      if (temp->hash == 0) {
++        delete temp;
++        return -ENOSPC;
++      }
++      void *temp1 = tuples_[i].ht;
++      tuples_[i].ht = temp;
++      if (temp1)
++        delete (
++            static_cast<CuckooMap<wm_hkey_t, struct WmData, wm_hash, wm_eq> *>(
++                temp1));
++      tuples_[i].occupied = 1;
++      return i;
++    }
+   }
+-
+-  tuples_.emplace_back();
+-  struct WmTuple &tuple = tuples_.back();
+-  bess::utils::Copy(&tuple.mask, mask, sizeof(*mask));
+-
+-  return int(tuples_.size() - 1);
++  return -ENOSPC;
  }
  
  bool WildcardMatch::DelEntry(int idx, wm_hkey_t *key) {
-   struct WmTuple &tuple = tuples_[idx];
+-  struct WmTuple &tuple = tuples_[idx];
 -  bool ret =
 -      tuple.ht.Remove(*key, wm_hash(total_key_size_), wm_eq(total_key_size_));
 -  if (!ret) {
 -    return ret;
-+  int ret =
-+      tuple.ht->Remove(*key, wm_hash(total_key_size_), wm_eq(total_key_size_));
++  int ret = tuples_[idx].ht->Remove(*key, wm_hash(total_key_size_),
++                                    wm_eq(total_key_size_));
 +  if (ret >= 0) {
 +    return true;
    }
 -
 -  if (tuple.ht.Count() == 0) {
-+  if (tuple.ht->Count() == 0) {
-     tuples_.erase(tuples_.begin() + idx);
+-    tuples_.erase(tuples_.begin() + idx);
++  if (tuples_[idx].ht->Count() == 0) {
++    tuples_[idx].occupied = 0;
++    tuples_[idx].ht->Clear();
    }
 -
 -  return true;
@@ -309,7 +354,7 @@ index ec639a7b..9383c35c 100644
    CommandResponse err = ExtractKeyMask(arg, &key, &mask);
    if (err.error().code() != 0) {
      return err;
-@@ -444,14 +547,13 @@ CommandResponse WildcardMatch::CommandAdd(
+@@ -444,14 +561,13 @@ CommandResponse WildcardMatch::CommandAdd(
      return CommandFailure(EINVAL, "Invalid gate: %hu", gate);
    }
  
@@ -325,7 +370,7 @@ index ec639a7b..9383c35c 100644
    int idx = FindTuple(&mask);
    if (idx < 0) {
      idx = AddTuple(&mask);
-@@ -459,13 +561,10 @@ CommandResponse WildcardMatch::CommandAdd(
+@@ -459,13 +575,10 @@ CommandResponse WildcardMatch::CommandAdd(
        return CommandFailure(-idx, "failed to add a new wildcard pattern");
      }
    }
@@ -342,7 +387,7 @@ index ec639a7b..9383c35c 100644
    return CommandSuccess();
  }
  
-@@ -485,7 +584,7 @@ CommandResponse WildcardMatch::CommandDelete(
+@@ -485,7 +598,7 @@ CommandResponse WildcardMatch::CommandDelete(
    }
  
    int ret = DelEntry(idx, &key);
@@ -351,16 +396,19 @@ index ec639a7b..9383c35c 100644
      return CommandFailure(-ret, "failed to delete a rule");
    }
  
-@@ -499,7 +598,7 @@ CommandResponse WildcardMatch::CommandClear(const bess::pb::EmptyArg &) {
+@@ -499,7 +612,10 @@ CommandResponse WildcardMatch::CommandClear(const bess::pb::EmptyArg &) {
  
  void WildcardMatch::Clear() {
    for (auto &tuple : tuples_) {
 -    tuple.ht.Clear();
-+    tuple.ht->Clear();
++    if (tuple.occupied) {
++      tuple.occupied = 0;
++      tuple.ht->Clear();
++    }
    }
  }
  
-@@ -521,9 +620,12 @@ CommandResponse WildcardMatch::GetInitialArg(const bess::pb::EmptyArg &) {
+@@ -521,17 +637,26 @@ CommandResponse WildcardMatch::GetInitialArg(const bess::pb::EmptyArg &) {
  // Retrieves a WildcardMatchConfig that would restore this module's
  // runtime configuration.
  CommandResponse WildcardMatch::GetRuntimeConfig(const bess::pb::EmptyArg &) {
@@ -374,7 +422,9 @@ index ec639a7b..9383c35c 100644
    resp.set_default_gate(default_gate_);
  
    // Each tuple provides a single mask, which may have many data-matches.
-@@ -531,7 +633,11 @@ CommandResponse WildcardMatch::GetRuntimeConfig(const bess::pb::EmptyArg &) {
+   for (auto &tuple : tuples_) {
++    if (tuple.occupied == 0)
++      continue;
      wm_hkey_t mask = tuple.mask;
      // Each entry in the hash table has priority, ogate, and the data
      // (one datum per field, under the mask for this field).
@@ -388,7 +438,7 @@ index ec639a7b..9383c35c 100644
        rule_t *rule = resp.add_rules();
        rule->set_priority(entry.second.priority);
 diff --git a/core/modules/wildcard_match.h b/core/modules/wildcard_match.h
-index 85deeafc..34295764 100644
+index 85deeafc..b6b2f728 100644
 --- a/core/modules/wildcard_match.h
 +++ b/core/modules/wildcard_match.h
 @@ -45,6 +45,7 @@ using bess::utils::HashResult;
@@ -412,13 +462,31 @@ index 85deeafc..34295764 100644
  
  class WildcardMatch final : public Module {
   public:
-@@ -164,13 +171,16 @@ class WildcardMatch final : public Module {
+@@ -144,6 +151,7 @@ class WildcardMatch final : public Module {
+         values_(),
+         tuples_() {
+     max_allowed_workers_ = Worker::kMaxWorkers;
++    { tuples_.resize(MAX_TUPLES); }
+   }
+ 
+   CommandResponse Init(const bess::pb::WildcardMatchArg &arg);
+@@ -164,13 +172,26 @@ class WildcardMatch final : public Module {
  
   private:
    struct WmTuple {
 -    CuckooMap<wm_hkey_t, struct WmData, wm_hash, wm_eq> ht;
++    bool occupied;
 +    CuckooMap<wm_hkey_t, struct WmData, wm_hash, wm_eq> *ht;
      wm_hkey_t mask;
++    struct rte_hash_parameters params;
++    std::string hash_name;
++    WmTuple() : occupied(0), ht(0) {
++      params = dpdk_params1;
++      std::ostringstream address;
++      address << this;
++      hash_name = "Wild" + address.str();
++      params.name = hash_name.c_str();
++    }
    };
  
    gate_idx_t LookupEntry(const wm_hkey_t &key, gate_idx_t def_gate,
@@ -430,7 +498,7 @@ index 85deeafc..34295764 100644
    CommandResponse AddFieldOne(const bess::pb::Field &field, struct WmField *f,
                                uint8_t type);
  
-@@ -182,9 +192,7 @@ class WildcardMatch final : public Module {
+@@ -182,9 +203,7 @@ class WildcardMatch final : public Module {
    int FindTuple(wm_hkey_t *mask);
    int AddTuple(wm_hkey_t *mask);
    bool DelEntry(int idx, wm_hkey_t *key);
@@ -440,16 +508,18 @@ index 85deeafc..34295764 100644
    gate_idx_t default_gate_;
  
    size_t total_key_size_;   /* a multiple of sizeof(uint64_t) */
-@@ -194,6 +202,7 @@ class WildcardMatch final : public Module {
+@@ -193,7 +212,8 @@ class WildcardMatch final : public Module {
+   // TODO(melvinw): this can be refactored to use ExactMatchTable
    std::vector<struct WmField> fields_;
    std::vector<struct WmField> values_;
-   std::vector<struct WmTuple> tuples_;
+-  std::vector<struct WmTuple> tuples_;
++  std::vector<struct WmTuple> tuples_;  //[MAX_TUPLES];
 +  std::vector<struct WmData> data_;
  };
  
  #endif  // BESS_MODULES_WILDCARDMATCH_H_
 diff --git a/core/utils/cuckoo_map.h b/core/utils/cuckoo_map.h
-index c855b93d..b8975ae7 100644
+index c855b93d..b37524e1 100644
 --- a/core/utils/cuckoo_map.h
 +++ b/core/utils/cuckoo_map.h
 @@ -50,6 +50,8 @@
@@ -461,20 +531,21 @@ index c855b93d..b8975ae7 100644
  
  namespace bess {
  namespace utils {
-@@ -74,6 +76,12 @@ typedef uint32_t EntryIndex;
+@@ -74,7 +76,13 @@ typedef uint32_t EntryIndex;
  template <typename K, typename V, typename H = std::hash<K>,
            typename E = std::equal_to<K>>
  class CuckooMap {
 + private:
-+  struct rte_hash* hash = nullptr;
 +  bool IsDpdk = false;
 +  uint32_t key_len = 0;
 +  rte_hash_parameters rt;
 +
   public:
++  struct rte_hash* hash = nullptr;
    typedef std::pair<K, V> Entry;
  
-@@ -149,20 +157,30 @@ class CuckooMap {
+   class iterator {
+@@ -149,20 +157,29 @@ class CuckooMap {
    };
  
    CuckooMap(size_t reserve_buckets = kInitNumBucket,
@@ -492,8 +563,7 @@ index c855b93d..b8975ae7 100644
 +        rt = *((rte_hash_parameters*)dpdk_params);
 +        hash = rte_hash_create(&rt);
 +        if (hash == NULL)
-+          throw std::runtime_error(
-+              "DPDK rte_hash_create() returned null , cant proceed further");
++          return;
 +      }
 +      IsDpdk = true;
 +    } else {
@@ -511,7 +581,7 @@ index c855b93d..b8975ae7 100644
    // Not allowing copying for now
    CuckooMap(CuckooMap&) = delete;
    CuckooMap& operator=(CuckooMap&) = delete;
-@@ -176,6 +194,16 @@ class CuckooMap {
+@@ -176,6 +193,16 @@ class CuckooMap {
  
    template <typename... Args>
    Entry* DoEmplace(const K& key, const H& hasher, const E& eq, Args&&... args) {
@@ -528,7 +598,7 @@ index c855b93d..b8975ae7 100644
      Entry* entry;
      HashResult primary = Hash(key, hasher);
  
-@@ -220,6 +248,50 @@ class CuckooMap {
+@@ -220,6 +247,50 @@ class CuckooMap {
      return DoEmplace(key, hasher, eq, std::move(value));
    }
  
@@ -579,7 +649,7 @@ index c855b93d..b8975ae7 100644
    // Emplace/update-in-place a key value pair
    // On success returns a pointer to the inserted entry, nullptr otherwise.
    // NOTE: when Emplace() returns nullptr, the constructor of `V` may not be
-@@ -242,6 +314,16 @@ class CuckooMap {
+@@ -242,6 +313,16 @@ class CuckooMap {
    // const version of Find()
    const Entry* Find(const K& key, const H& hasher = H(),
                      const E& eq = E()) const {
@@ -596,7 +666,7 @@ index c855b93d..b8975ae7 100644
      EntryIndex idx = FindWithHash(Hash(key, hasher), key, eq);
      if (idx == kInvalidEntryIdx) {
        return nullptr;
-@@ -255,6 +337,13 @@ class CuckooMap {
+@@ -255,6 +336,13 @@ class CuckooMap {
    // Remove the stored entry by the key
    // Return false if not exist.
    bool Remove(const K& key, const H& hasher = H(), const E& eq = E()) {
@@ -610,7 +680,7 @@ index c855b93d..b8975ae7 100644
      HashResult pri = Hash(key, hasher);
      if (RemoveFromBucket(pri, pri & bucket_mask_, key, eq)) {
        return true;
-@@ -267,6 +356,17 @@ class CuckooMap {
+@@ -267,6 +355,13 @@ class CuckooMap {
    }
  
    void Clear() {
@@ -618,17 +688,13 @@ index c855b93d..b8975ae7 100644
 +      if (hash) {
 +        rte_hash_free(hash);
 +        hash = nullptr;
-+        hash = rte_hash_create(&rt);
-+        if (hash == NULL)
-+          throw std::runtime_error(
-+              "DPDK rte_hash_create() returned null , cant proceed further");
 +      }
 +      return;
 +    }
      buckets_.clear();
      entries_.clear();
  
-@@ -286,7 +386,26 @@ class CuckooMap {
+@@ -286,7 +381,26 @@ class CuckooMap {
    }
  
    // Return the number of stored entries
