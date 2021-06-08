@@ -59,7 +59,8 @@ func (b *bess) sendMsgToUPF(method string, pdrs []pdr, fars []far) uint8 {
 	done := make(chan bool)
 
 	for _, pdr := range pdrs {
-		pdr.printPDR()
+		// TODO: https://github.com/omec-project/upf-epc/issues/251
+		// pdr.printPDR()
 		switch method {
 		case "add":
 			fallthrough
@@ -70,7 +71,8 @@ func (b *bess) sendMsgToUPF(method string, pdrs []pdr, fars []far) uint8 {
 		}
 	}
 	for _, far := range fars {
-		far.printFAR()
+		// TODO: https://github.com/omec-project/upf-epc/issues/251
+		// far.printFAR()
 		switch method {
 		case "add":
 			fallthrough
