@@ -429,59 +429,18 @@ func (b *bess) sim(u *upf, method string) {
 
 		fars := []far{farDown, farN6Up, farN9Up}
 
-		switch timeout := 100 * time.Millisecond; method {
+		switch method {
 		case "create":
-			b.simcreateEntries(pdrs, fars, timeout)
+			b.sendMsgToUPF("add", pdrs, fars)
 
 		case "delete":
-			b.simdeleteEntries(pdrs, fars, timeout)
+			b.sendMsgToUPF("del", pdrs, fars)
 
 		default:
 			log.Fatalln("Unsupported method", method)
 		}
 	}
 	log.Println("Sessions/s:", float64(u.maxSessions)/time.Since(start).Seconds())
-}
-
-func (b *bess) simcreateEntries(pdrs []pdr, fars []far, timeout time.Duration) {
-	calls := len(pdrs) + len(fars)
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	done := make(chan bool)
-	for _, pdrv := range pdrs {
-		b.addPDR(ctx, done, pdrv)
-	}
-
-	for _, farv := range fars {
-		b.addFAR(ctx, done, farv)
-	}
-
-	rc := b.GRPCJoin(calls, timeout, done)
-	if !rc {
-		log.Println("Unable to complete GRPC call(s). Deleting")
-		go b.simdeleteEntries(pdrs, fars, timeout)
-	}
-}
-
-func (b *bess) simdeleteEntries(pdrs []pdr, fars []far, timeout time.Duration) {
-	calls := len(pdrs) + len(fars)
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	done := make(chan bool)
-	for _, pdrv := range pdrs {
-		b.delPDR(ctx, done, pdrv)
-	}
-
-	for _, farv := range fars {
-		b.delFAR(ctx, done, farv)
-	}
-
-	rc := b.GRPCJoin(calls, timeout, done)
-	if !rc {
-		log.Println("Unable to complete GRPC call(s)")
-	}
 }
 
 func (b *bess) processPDR(ctx context.Context, any *anypb.Any, method string) {
