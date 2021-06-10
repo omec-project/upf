@@ -1,15 +1,15 @@
-From 9f762576e06c194708a8f9977a1992fcf43f7a0e Mon Sep 17 00:00:00 2001
+From 82a661d06d62d80d43af3c55725539ec77c20583 Mon Sep 17 00:00:00 2001
 From: Amar Sri <amarsri28@gmail.com>
-Date: Thu, 3 Jun 2021 00:56:00 -0700
-Subject: [PATCH] Enabling concurrency & resolving issues
+Date: Thu, 10 Jun 2021 02:29:17 -0700
+Subject: [PATCH] bug #282 resolved
 
 ---
  core/modules/exact_match.cc    |  20 ++-
- core/modules/wildcard_match.cc | 241 +++++++++++++++++++++++++--------
+ core/modules/wildcard_match.cc | 242 +++++++++++++++++++++++++--------
  core/modules/wildcard_match.h  |  28 +++-
  core/utils/cuckoo_map.h        | 128 ++++++++++++++++-
  core/utils/exact_match_table.h |  80 ++++++-----
- 5 files changed, 384 insertions(+), 113 deletions(-)
+ 5 files changed, 384 insertions(+), 114 deletions(-)
 
 diff --git a/core/modules/exact_match.cc b/core/modules/exact_match.cc
 index 1ca0fd4e..758c0202 100644
@@ -51,7 +51,7 @@ index 1ca0fd4e..758c0202 100644
  }
  
 diff --git a/core/modules/wildcard_match.cc b/core/modules/wildcard_match.cc
-index ec639a7b..06f6173c 100644
+index ec639a7b..f5678905 100644
 --- a/core/modules/wildcard_match.cc
 +++ b/core/modules/wildcard_match.cc
 @@ -40,13 +40,28 @@ using bess::metadata::Attribute;
@@ -266,7 +266,7 @@ index ec639a7b..06f6173c 100644
    }
  
    return bess::utils::Format("%zu fields, %d rules", fields_.size(), num_rules);
-@@ -387,10 +495,9 @@ CommandResponse WildcardMatch::ExtractValue(const T &arg, wm_hkey_t *keyv) {
+@@ -387,54 +495,62 @@ CommandResponse WildcardMatch::ExtractValue(const T &arg, wm_hkey_t *keyv) {
  }
  
  int WildcardMatch::FindTuple(wm_hkey_t *mask) {
@@ -279,8 +279,9 @@ index ec639a7b..06f6173c 100644
 +        (memcmp(&tuples_[i].mask, mask, total_key_size_) == 0)) {
        return i;
      }
-     i++;
-@@ -399,42 +506,52 @@ int WildcardMatch::FindTuple(wm_hkey_t *mask) {
+-    i++;
+   }
+   return -ENOENT;
  }
  
  int WildcardMatch::AddTuple(wm_hkey_t *mask) {
@@ -354,7 +355,7 @@ index ec639a7b..06f6173c 100644
    CommandResponse err = ExtractKeyMask(arg, &key, &mask);
    if (err.error().code() != 0) {
      return err;
-@@ -444,14 +561,13 @@ CommandResponse WildcardMatch::CommandAdd(
+@@ -444,14 +560,13 @@ CommandResponse WildcardMatch::CommandAdd(
      return CommandFailure(EINVAL, "Invalid gate: %hu", gate);
    }
  
@@ -370,7 +371,7 @@ index ec639a7b..06f6173c 100644
    int idx = FindTuple(&mask);
    if (idx < 0) {
      idx = AddTuple(&mask);
-@@ -459,13 +575,10 @@ CommandResponse WildcardMatch::CommandAdd(
+@@ -459,13 +574,10 @@ CommandResponse WildcardMatch::CommandAdd(
        return CommandFailure(-idx, "failed to add a new wildcard pattern");
      }
    }
@@ -387,7 +388,7 @@ index ec639a7b..06f6173c 100644
    return CommandSuccess();
  }
  
-@@ -485,7 +598,7 @@ CommandResponse WildcardMatch::CommandDelete(
+@@ -485,7 +597,7 @@ CommandResponse WildcardMatch::CommandDelete(
    }
  
    int ret = DelEntry(idx, &key);
@@ -396,7 +397,7 @@ index ec639a7b..06f6173c 100644
      return CommandFailure(-ret, "failed to delete a rule");
    }
  
-@@ -499,7 +612,10 @@ CommandResponse WildcardMatch::CommandClear(const bess::pb::EmptyArg &) {
+@@ -499,7 +611,10 @@ CommandResponse WildcardMatch::CommandClear(const bess::pb::EmptyArg &) {
  
  void WildcardMatch::Clear() {
    for (auto &tuple : tuples_) {
@@ -408,7 +409,7 @@ index ec639a7b..06f6173c 100644
    }
  }
  
-@@ -521,17 +637,26 @@ CommandResponse WildcardMatch::GetInitialArg(const bess::pb::EmptyArg &) {
+@@ -521,17 +636,26 @@ CommandResponse WildcardMatch::GetInitialArg(const bess::pb::EmptyArg &) {
  // Retrieves a WildcardMatchConfig that would restore this module's
  // runtime configuration.
  CommandResponse WildcardMatch::GetRuntimeConfig(const bess::pb::EmptyArg &) {
