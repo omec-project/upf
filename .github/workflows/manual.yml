@@ -14,7 +14,7 @@ jobs:
       REPO: "ghcr.io/omec-project/upf-epc/bess_build"
       TAG: "latest"
       BESS_DPDK_BRANCH: "dpdk-2011"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
     - name: docker build
       run: |
