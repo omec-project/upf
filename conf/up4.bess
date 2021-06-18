@@ -126,7 +126,7 @@ for idx, iface in enumerate(interfaces):
     except TypeError:
         vlan = None
 
-    p = port.Port(parser.interfaces[iface]["ifname"], vlan, ext_addrs)
+    p = port.Port(parser.interfaces[iface]["ifname"], parser.hwcksum, vlan, ext_addrs)
     if p.name in ports:
         continue
 
