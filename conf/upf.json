@@ -42,11 +42,13 @@
 
     "": "Gateway interfaces",
     "access": {
+        "": "vlan: 1",
         "ifname": "ens803f2"
     },
 
     "": "UE IP Natting. Update the line below to `\"ip_masquerade\": \"<ip> [or <ip>]\"` to enable",
     "core": {
+        "": "vlan: 2",
         "ifname": "ens803f3",
         "": "ip_masquerade: 18.0.0.1 or 18.0.0.2 or 18.0.0.3"
     },
