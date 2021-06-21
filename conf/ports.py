@@ -230,13 +230,17 @@ class Port:
         # Finall set conf mode
         self.mode = conf_mode
 
-    def setup_port(self, conf_frag_mtu, conf_measure, type_of_packets = "", **seq_kwargs):
+    def setup_port(self, conf_frag_mtu, conf_defrag_flows, conf_measure, type_of_packets = "", **seq_kwargs):
         out = self.fpo
+        inc = self.fpi
+        gate = 0
+
         # enable frag module (if enabled) to control port MTU size
         if conf_frag_mtu is not None:
             frag = IPFrag(name="{}IP4Frag".format(self.name), mtu=conf_frag_mtu)
+            s = Sink(name="{}IP4FragFail".format(self.name))
+            frag.connect(next_mod=s)
             frag.connect(next_mod=out, ogate=1)
-            frag.connect(next_mod=Sink())
             out = frag
 
         # create rewrite module if mode == 'sim'
@@ -251,22 +255,29 @@ class Port:
             update.connect(next_mod=udpcsum)
             udpcsum.connect(next_mod=ipcsum)
 
+            inc = ipcsum
+
         # enable telemetrics (if enabled) (how many bytes seen in and out of port)
         if conf_measure:
             t = Timestamp(name="{}_timestamp".format(self.name))
-            if self.mode == 'sim':
-                ipcsum.connect(next_mod=t)
-            else:
-                self.fpi.connect(next_mod=t)
-            t.connect(next_mod=self.bpf)
+            inc.connect(next_mod=t)
+
             m = Measure(name="{}_measure".format(self.name))
             m.connect(next_mod=out)
+
             out = m
-        else:
-            if self.mode == 'sim':
-                ipcsum.connect(next_mod=self.bpf)   # ---> pass
-            else:
-                self.fpi.connect(next_mod=self.bpf)
+            inc = t
+
+        if conf_defrag_flows is not None:
+            defrag = IPDefrag(name="{}IP4Defrag".format(self.name), num_flows=conf_defrag_flows, numa=-1)
+            s = Sink(name="{}DefragFail".format(self.name))
+            defrag.connect(next_mod=s)
+            inc.connect(next_mod=defrag)
+            inc = defrag
+            gate = 1
+
+        # Connect inc to bpf
+        inc.connect(next_mod=self.bpf, ogate=gate)
 
         # Attach nat module (if enabled)
         if self.ext_addrs is not None:
