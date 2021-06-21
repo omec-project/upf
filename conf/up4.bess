@@ -131,9 +131,9 @@ for idx, iface in enumerate(interfaces):
 
     # setup port module with auxiliary modules
     if parser.mode == 'sim':
-        p.setup_port(parser.ip_frag_with_eth_mtu, parser.measure, packet_generator[iface], **seq_kwargs[iface])
+        p.setup_port(parser.ip_frag_with_eth_mtu, parser.max_ip_defrag_flows, parser.measure, packet_generator[iface], **seq_kwargs[iface])
     else:
-        p.setup_port(parser.ip_frag_with_eth_mtu, parser.measure)
+        p.setup_port(parser.ip_frag_with_eth_mtu, parser.max_ip_defrag_flows, parser.measure)
 
     # Finally add entry to ports list
     ports[p.name] = p
@@ -260,14 +260,6 @@ if ports[parser.core_ifname].nat is not None:
     _in = ports[parser.core_ifname].nat
     gate = 0
 
-# Append coreIP4Defrag module (if enabled)
-if parser.max_ip_defrag_flows is not None:
-    _in:gate -> coreIP4Defrag::IPDefrag(num_flows=parser.max_ip_defrag_flows, numa=0)
-    _in = coreIP4Defrag
-    gate = 1
-    # Drop pkts that are unable to be fragmented
-    coreIP4Defrag:0 -> coreIP4DefragFail::Sink()
-
 # 2. Build the remaining first half of the DL pipeline before entering the shared pipeline
 #ports[parser.core_ifname].rewrite \
 _in:gate \
@@ -326,14 +318,6 @@ accessFastBPF:GTPUGate \
 # Record last module to chain up option modules
 _in = accessRxUDPCksum
 gate = 0
-
-# Append accessIP4Defrag module (if enabled)
-if parser.max_ip_defrag_flows is not None:
-    _in:gate ->accessIP4Defrag::IPDefrag(num_flows=parser.max_ip_defrag_flows, numa=0)
-    _in = accessIP4Defrag
-    gate = 1
-    # Drop pkts that are unable to be fragmented
-    accessIP4Defrag:0 -> accessIP4DefragFail::Sink()
 
 # 2. Build the remaining first half of the UL pipeline before entering the shard pipeline
 #ports[parser.access_ifname].rewrite \
