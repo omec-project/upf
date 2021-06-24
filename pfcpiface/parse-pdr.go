@@ -35,6 +35,7 @@ type pdr struct {
 	fseidIP     uint32
 	ctrID       uint32
 	farID       uint32
+	qerID       uint32
 	needDecap   uint8
 	allocIPFlag bool
 }
@@ -69,6 +70,7 @@ func (p *pdr) printPDR() {
 	log.Println("fseidIP", p.fseidIP)
 	log.Println("ctrID:", p.ctrID)
 	log.Println("farID:", p.farID)
+	log.Println("qerID:", p.qerID)
 	log.Println("needDecap:", p.needDecap)
 	log.Println("allocIPFlag:", p.allocIPFlag)
 	log.Println("--------------------------------------------")
@@ -97,7 +99,6 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, upf *upf) err
 				p.allocIPFlag = true
 				log.Println("ueipv4 : ", ueIP4.String())
 			} else {
-				log.Println("CP has allocated UE IP.")
 				ueIP4 = ueIPaddr.IPv4Address
 			}
 		case ie.SourceInterface:
@@ -272,11 +273,17 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, upf *
 		return nil
 	}
 
+	qerID, err := ie1.QERID()
+	if err != nil {
+		log.Println("Could not read QER ID!")
+	}
+
 	p.precedence = precedence
 	p.pdrID = uint32(pdrID)
 	p.fseID = (seid) // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
 	p.ctrID = 0      // ctrID currently not being set <--- FIXIT/TODO/XXX
 	p.farID = farID  // farID currently not being set <--- FIXIT/TODO/XXX
+	p.qerID = qerID
 	p.needDecap = outerHeaderRemoval
 
 	return nil

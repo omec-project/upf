@@ -54,8 +54,8 @@ const (
 	farNotify   = 0x4
 )
 
-func (u *upf) sendMsgToUPF(method string, pdrs []pdr, fars []far) uint8 {
-	return u.intf.sendMsgToUPF(method, pdrs, fars)
+func (u *upf) sendMsgToUPF(method string, pdrs []pdr, fars []far, qers []qer) uint8 {
+	return u.intf.sendMsgToUPF(method, pdrs, fars, qers)
 }
 
 func (u *upf) sendEndMarkers(endMarkerList *[][]byte) error {

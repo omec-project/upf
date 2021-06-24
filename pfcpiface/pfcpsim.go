@@ -117,6 +117,7 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 				),
 				ie.NewOuterHeaderRemoval(0, 0),
 				ie.NewFARID(1),
+				ie.NewQERID(1),
 			),
 			// Uplink N6
 			ie.NewCreatePDR(
@@ -131,6 +132,7 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 				),
 				ie.NewOuterHeaderRemoval(0, 0),
 				ie.NewFARID(2),
+				ie.NewQERID(2),
 			),
 			// Downlink N9
 			ie.NewCreatePDR(
@@ -142,6 +144,7 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 				),
 				ie.NewOuterHeaderRemoval(0, 0),
 				ie.NewFARID(3),
+				ie.NewQERID(3),
 			),
 			// Downlink N6
 			ie.NewCreatePDR(
@@ -180,6 +183,30 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 				//	ie.NewDestinationInterface(ie.DstInterfaceAccess),
 				//	ie.NewOuterHeaderCreation(0x100, 0x00000001, "11.1.1.129", "", 0, 0, 0),
 				//),
+			),
+			// Uplink N9
+			ie.NewCreateQER(
+				ie.NewQERID(1),
+				ie.NewQFI(0x09),
+				ie.NewGateStatus(0, 0),
+				ie.NewMBR(50000, 50000),
+				ie.NewGBR(30000, 30000),
+			),
+			// Uplink N6
+			ie.NewCreateQER(
+				ie.NewQERID(2),
+				ie.NewQFI(0x08),
+				ie.NewGateStatus(0, 0),
+				ie.NewMBR(50000, 50000),
+				ie.NewGBR(30000, 30000),
+			),
+			// Downlink
+			ie.NewCreateQER(
+				ie.NewQERID(3),
+				ie.NewQFI(0x07),
+				ie.NewGateStatus(0, 0),
+				ie.NewMBR(50000, 50000),
+				ie.NewGBR(30000, 30000),
 			),
 		).Marshal()
 		if err != nil {
@@ -233,6 +260,7 @@ func modifyPFCP(conn *net.UDPConn, raddr *net.UDPAddr, seid uint64) {
 				),
 				ie.NewOuterHeaderRemoval(0, 0),
 				ie.NewFARID(3),
+				ie.NewQERID(3),
 			),
 			// Downlink N6
 			ie.NewUpdatePDR(
@@ -244,6 +272,7 @@ func modifyPFCP(conn *net.UDPConn, raddr *net.UDPAddr, seid uint64) {
 					ie.NewSDFFilter("permit out ip from any to assigned", "", "", "", 1),
 				),
 				ie.NewFARID(3),
+				ie.NewQERID(3),
 			),
 			// Downlink
 			ie.NewUpdateFAR(
@@ -253,6 +282,13 @@ func modifyPFCP(conn *net.UDPConn, raddr *net.UDPAddr, seid uint64) {
 					ie.NewDestinationInterface(ie.DstInterfaceAccess),
 					ie.NewOuterHeaderCreation(0x100, 0x00000001, "11.1.1.129", "", 0, 0, 0),
 				),
+			),
+			ie.NewUpdateQER(
+				ie.NewQERID(3),
+				ie.NewQFI(0x06),
+				ie.NewGateStatus(0, 0),
+				ie.NewMBR(50000, 50000),
+				ie.NewGBR(30000, 30000),
 			),
 		).Marshal()
 		if err != nil {
