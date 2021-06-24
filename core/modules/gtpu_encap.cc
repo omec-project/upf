@@ -92,6 +92,10 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     bess::metadata::mt_offset_t off = attr_offset(pdu_type_attr);
     at_pdu_type = get_attr_with_offset<uint8_t>(off, p);
 
+    uint8_t at_qfi;
+    off = attr_offset(qfi_attr);
+    at_qfi = get_attr_with_offset<uint8_t>(off, p);
+
     uint32_t at_tout_sip;
     off = attr_offset(tout_sip_attr);
     at_tout_sip = get_attr_with_offset<uint32_t>(off, p);
@@ -110,6 +114,7 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 
     /* checking values now */
     DLOG(INFO) << "pdu type: " << static_cast<uint16_t>(at_pdu_type)
+               << ", tunnel qfi: " << at_qfi
                << ", tunnel out sip: " << at_tout_sip
                << ", tunnel out dip: " << at_tout_dip
                << ", tunnel out teid: " << at_tout_teid
@@ -146,6 +151,7 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     /* setting gtp psc extension header*/
     if (add_psc) {
       gtph->ex = 1;
+      psch->qfi = at_qfi;
       psch->pdu_type = at_pdu_type;
     }
 
@@ -195,6 +201,9 @@ CommandResponse GtpuEncap::Init(const bess::pb::GtpuEncapArg &arg) {
   tout_uport = AddMetadataAttr("tunnel_out_udp_port", sizeof(uint16_t),
                                AccessMode::kRead);
   DLOG(INFO) << "tout_uport: " << tout_uport << std::endl;
+  qfi_attr =
+      AddMetadataAttr("qfi", sizeof(uint8_t), AccessMode::kRead);
+  DLOG(INFO) << "qfi_attr: " << qfi_attr << std::endl;
 
   return CommandSuccess();
 }
