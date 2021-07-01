@@ -151,6 +151,19 @@ func (c *P4rtClient) SetMastership(electionID p4.Uint128) (err error) {
 	return
 }
 
+// SendPacketOut .. send packet out p4 server.
+func (c *P4rtClient) SendPacketOut(packet []byte) (err error) {
+	pktOutReq := &p4.StreamMessageRequest{
+		Update: &p4.StreamMessageRequest_Packet{
+			Packet: &p4.PacketOut{
+				Payload: packet,
+			},
+		},
+	}
+	err = c.Stream.Send(pktOutReq)
+	return err
+}
+
 // Init .. Initialize Client
 func (c *P4rtClient) Init(timeout uint32, reportNotifyChan chan<- uint64) (err error) {
 	// Initialize stream for mastership and packet I/O

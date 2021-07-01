@@ -53,6 +53,7 @@ type p4rtc struct {
 	counters         []counter
 	pfcpConn         *PFCPConn
 	reportNotifyChan chan<- uint64
+	endMarkerChan    chan []byte
 }
 
 func (p *p4rtc) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric) {
@@ -301,12 +302,28 @@ func (p *p4rtc) setUpfInfo(u *upf, conf *Conf) {
 	if errin != nil {
 		log.Println("Counter Init failed. : ", errin)
 	}
+	if conf.EnableEndMarker {
+		log.Println("Starting end marker loop")
+		p.endMarkerChan = make(chan []byte, 1024)
+		go p.endMarkerSendLoop(p.endMarkerChan)
+	}
 }
 
 func (p *p4rtc) sendEndMarkers(endMarkerList *[][]byte) error {
+	for _, eMarker := range *endMarkerList {
+		p.endMarkerChan <- eMarker
+	}
 	return nil
 }
 
+func (p *p4rtc) endMarkerSendLoop(endMarkerChan chan []byte) {
+	for outPacket := range endMarkerChan {
+		err := p.p4client.SendPacketOut(outPacket)
+		if err != nil {
+			log.Println("end marker write failed")
+		}
+	}
+}
 func (p *p4rtc) sendMsgToUPF(method string, pdrs []pdr,
 	fars []far, qers []qer) uint8 {
 	log.Println("sendMsgToUPF p4")
