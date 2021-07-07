@@ -202,6 +202,9 @@ tables {
     id: 31939583
   }
   action_refs {
+    id: 21822813
+  }
+  action_refs {
     id: 21257015
     annotations: "@defaultonly"
     scope: DEFAULT_ONLY
@@ -297,11 +300,16 @@ actions {
   }
   params {
     id: 1
-    name: "dst_mac"
+    name: "src_mac"
     bitwidth: 48
   }
   params {
     id: 2
+    name: "dst_mac"
+    bitwidth: 48
+  }
+  params {
+    id: 3
     name: "egress_port"
     bitwidth: 9
   }
@@ -384,6 +392,43 @@ actions {
   }
   params {
     id: 5
+    name: "needs_gtpu_decap"
+    bitwidth: 1
+  }
+}
+actions {
+  preamble {
+    id: 21822813
+    name: "PreQosPipe.set_pdr_attributes_qos"
+    alias: "set_pdr_attributes_qos"
+  }
+  params {
+    id: 1
+    name: "id"
+    bitwidth: 32
+  }
+  params {
+    id: 2
+    name: "fseid"
+    bitwidth: 96
+  }
+  params {
+    id: 3
+    name: "ctr_id"
+    bitwidth: 32
+  }
+  params {
+    id: 4
+    name: "far_id"
+    bitwidth: 32
+  }
+  params {
+    id: 5
+    name: "scheduling_priority"
+    bitwidth: 32
+  }
+  params {
+    id: 6
     name: "needs_gtpu_decap"
     bitwidth: 1
   }
@@ -504,13 +549,8 @@ controller_packet_metadata {
   }
   metadata {
     id: 1
-    name: "egress_port"
-    bitwidth: 9
-  }
-  metadata {
-    id: 2
-    name: "_pad"
-    bitwidth: 7
+    name: "reserved"
+    bitwidth: 8
   }
 }
 controller_packet_metadata {
