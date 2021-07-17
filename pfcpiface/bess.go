@@ -19,11 +19,21 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-// SockAddr : Unix Socket path to read bess notification from.
-const SockAddr = "/tmp/notifycp"
+const (
+	// DefaultBurstSize for cbs, pbs required for dpdk  metering.
+	DefaultBurstSize = 2048
+	// SockAddr : Unix Socket path to read bess notification from.
+	SockAddr = "/tmp/notifycp"
+	// PfcpAddr : Unix Socket path to send end marker packet.
+	PfcpAddr = "/tmp/pfcpport"
+)
 
-// PfcpAddr : Unix Socket path to send end marker packet.
-const PfcpAddr = "/tmp/pfcpport"
+const (
+	// Internal gates for QER.
+	qerGateMeter      uint64 = iota
+	qerGateStatusDrop        = iota + 4
+	qerGateUnmeter
+)
 
 var intEnc = func(u uint64) *pb.FieldData {
 	return &pb.FieldData{Encoding: &pb.FieldData_ValueInt{ValueInt: u}}
@@ -37,6 +47,7 @@ type bess struct {
 	endMarkerSocket  net.Conn
 	notifyBessSocket net.Conn
 	endMarkerChan    chan []byte
+	qciQosMap        map[uint8]*QosConfigVal
 }
 
 func (b *bess) setInfo(udpConn *net.UDPConn, udpAddr net.Addr, pconn *PFCPConn) {
@@ -128,6 +139,7 @@ func (b *bess) sendDeleteAllSessionsMsgtoUPF() {
 
 	b.removeAllPDRs(ctx, done)
 	b.removeAllFARs(ctx, done)
+	b.removeAllQERs(ctx, done)
 	b.removeAllCounters(ctx, done, "preQoSCounter")
 	b.removeAllCounters(ctx, done, "postDLQoSCounter")
 	b.removeAllCounters(ctx, done, "postULQoSCounter")
@@ -308,6 +320,20 @@ func (b *bess) notifyListen(reportNotifyChan chan<- uint64) {
 	}
 }
 
+func (b *bess) readQciQosMap(conf *Conf) {
+	b.qciQosMap = make(map[uint8]*QosConfigVal)
+
+	for _, qosVal := range conf.QciQosConfig {
+		qosConfigVal := &QosConfigVal{
+			cbs:              qosVal.CBS,
+			ebs:              qosVal.EBS,
+			pbs:              qosVal.PBS,
+			schedulePriority: qosVal.SchedulingPriority,
+		}
+		b.qciQosMap[qosVal.QCI] = qosConfigVal
+	}
+}
+
 func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 	log.Println("setUpfInfo bess")
 
@@ -324,6 +350,7 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 	u.accessIP = ParseIP(conf.AccessIface.IfName, "Access")
 	u.coreIP = ParseIP(conf.CoreIface.IfName, "Core")
 
+	b.readQciQosMap(conf)
 	// get bess grpc client
 	log.Println("bessIP ", *bessIP)
 
@@ -403,7 +430,7 @@ func (b *bess) sim(u *upf, method string) {
 			fseID:     uint64(n3TEID + i),
 			ctrID:     i,
 			farID:     n3,
-			qerID:     n3,
+			qerID:     n6,
 			needDecap: 0,
 		}
 
@@ -421,7 +448,7 @@ func (b *bess) sim(u *upf, method string) {
 			fseID:     uint64(n3TEID + i),
 			ctrID:     i,
 			farID:     n3,
-			qerID:     n3,
+			qerID:     n9,
 			needDecap: 1,
 		}
 
@@ -507,44 +534,27 @@ func (b *bess) sim(u *upf, method string) {
 		fars := []far{farDown, farN6Up, farN9Up}
 
 		// create/delete uplink qer
-		qerDown := qer{
-			qerID: n3,
+		qerN6 := qer{
+			qerID: n6,
 			fseID: uint64(n3TEID + i),
-
-			qfi:      9,
-			ulStatus: 0,
-			dlStatus: 0,
-			ulMbr:    50000,
-			dlMbr:    50000,
-			ulGbr:    50000,
-			dlGbr:    50000,
+			qfi:   9,
+			ulGbr: 50000,
+			ulMbr: 90000,
+			dlGbr: 60000,
+			dlMbr: 80000,
 		}
 
-		qerN6Up := qer{
-			qerID:    n6,
-			fseID:    uint64(n3TEID + i),
-			qfi:      8,
-			ulStatus: 0,
-			dlStatus: 0,
-			ulMbr:    50000,
-			dlMbr:    50000,
-			ulGbr:    50000,
-			dlGbr:    50000,
+		qerN9 := qer{
+			qerID: n9,
+			fseID: uint64(n3TEID + i),
+			qfi:   8,
+			ulGbr: 50000,
+			ulMbr: 60000,
+			dlGbr: 70000,
+			dlMbr: 90000,
 		}
 
-		qerN9Up := qer{
-			qerID:    n9,
-			fseID:    uint64(n3TEID + i),
-			qfi:      7,
-			ulStatus: 0,
-			dlStatus: 0,
-			ulMbr:    50000,
-			dlMbr:    50000,
-			ulGbr:    50000,
-			dlGbr:    50000,
-		}
-
-		qers := []qer{qerDown, qerN6Up, qerN9Up}
+		qers := []qer{qerN6, qerN9}
 
 		switch method {
 		case "create":
@@ -690,24 +700,93 @@ func (b *bess) processQER(ctx context.Context, any *anypb.Any, method upfMsgType
 func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 	go func() {
 		var (
-			any *anypb.Any
-			err error
+			any                           *anypb.Any
+			err                           error
+			cir, pir, cbs, ebs, pbs, gate uint64
+			srcIface                      uint8
 		)
 
-		q := &pb.ExactMatchCommandAddArg{
-			Gate: uint64(0),
+		if qosVal, ok := b.qciQosMap[qer.qfi]; ok {
+			cbs = uint64(qosVal.cbs)
+			ebs = uint64(qosVal.ebs)
+			pbs = uint64(qosVal.pbs)
+		} else {
+			log.Println("No config for qfi/qci : ", qer.qfi,
+				". Using default burst size.")
+			cbs = uint64(DefaultBurstSize)
+			ebs = uint64(DefaultBurstSize)
+			pbs = uint64(DefaultBurstSize)
+		}
+
+		// Uplink QER
+		srcIface = access
+
+		if qer.ulStatus == ie.GateStatusClosed {
+			gate = qerGateStatusDrop
+		} else if qer.ulMbr != 0 || qer.ulGbr != 0 {
+			/* MBR/GBR is received in Kilobits/sec.
+			   CIR/PIR is sent in bytes */
+			cir = maxUint64(((qer.ulGbr * 1000) / 8), 1)
+			pir = maxUint64(((qer.ulMbr * 1000) / 8), cir)
+			gate = qerGateMeter
+		} else {
+			gate = qerGateUnmeter
+		}
+
+		q := &pb.QosCommandAddArg{
+			Gate: gate,
+			Cir:  cir, /* committed info rate */
+			Pir:  pir, /* peak info rate */
+			Cbs:  cbs, /* committed burst size */
+			Pbs:  pbs, /* Peak burst size */
+			Ebs:  ebs, /* Excess burst size */
 			Fields: []*pb.FieldData{
-				intEnc(uint64(qer.qerID)), /* far_id */
+				intEnc(uint64(srcIface)),  /* Src Intf */
+				intEnc(uint64(qer.qerID)), /* qer_id */
 				intEnc(qer.fseID),         /* fseid */
 			},
 			Values: []*pb.FieldData{
-				intEnc(uint64(qer.qfi)),      /* action */
-				intEnc(uint64(qer.ulStatus)), /* QFI */
-				intEnc(uint64(qer.dlStatus)), /* tunnel_out_type */
-				intEnc(qer.ulMbr),            /* access-ip */
-				intEnc(qer.dlMbr),            /* enb ip */
-				intEnc(qer.ulGbr),            /* enb teid */
-				intEnc(qer.dlGbr),            /* udp gtpu port */
+				intEnc(uint64(qer.qfi)), /* QFI */
+			},
+		}
+
+		any, err = anypb.New(q)
+		if err != nil {
+			log.Println("Error marshalling the rule", q, err)
+			return
+		}
+
+		b.processQER(ctx, any, upfMsgTypeAdd)
+
+		// Downlink QER
+		srcIface = core
+
+		if qer.dlStatus == ie.GateStatusClosed {
+			gate = qerGateStatusDrop
+		} else if qer.dlMbr != 0 || qer.dlGbr != 0 {
+			/* MBR/GBR is received in Kilobits/sec.
+			   CIR/PIR is sent in bytes */
+			cir = maxUint64(((qer.dlGbr * 1000) / 8), 1)
+			pir = maxUint64(((qer.dlMbr * 1000) / 8), cir)
+			gate = qerGateMeter
+		} else {
+			gate = qerGateUnmeter
+		}
+
+		q = &pb.QosCommandAddArg{
+			Gate: gate,
+			Cir:  cir, /* committed info rate */
+			Pir:  pir, /* peak info rate */
+			Cbs:  cbs, /* committed burst size */
+			Pbs:  pbs, /* Peak burst size */
+			Ebs:  ebs, /* Excess burst size */
+			Fields: []*pb.FieldData{
+				intEnc(uint64(srcIface)),  /* Src Intf */
+				intEnc(uint64(qer.qerID)), /* qer_id */
+				intEnc(qer.fseID),         /* fseid */
+			},
+			Values: []*pb.FieldData{
+				intEnc(uint64(qer.qfi)), /* QFI */
 			},
 		}
 
@@ -725,12 +804,36 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 func (b *bess) delQER(ctx context.Context, done chan<- bool, qer qer) {
 	go func() {
 		var (
-			any *anypb.Any
-			err error
+			any      *anypb.Any
+			err      error
+			srcIface uint8
 		)
 
-		q := &pb.ExactMatchCommandDeleteArg{
+		// Uplink QER
+		srcIface = access
+
+		q := &pb.QosCommandDeleteArg{
 			Fields: []*pb.FieldData{
+				intEnc(uint64(srcIface)),  /* Src Intf */
+				intEnc(uint64(qer.qerID)), /* qer_id */
+				intEnc(qer.fseID),         /* fseid */
+			},
+		}
+
+		any, err = anypb.New(q)
+		if err != nil {
+			log.Println("Error marshalling the rule", q, err)
+			return
+		}
+
+		b.processQER(ctx, any, upfMsgTypeDel)
+
+		// Downlink QER
+		srcIface = core
+
+		q = &pb.QosCommandDeleteArg{
+			Fields: []*pb.FieldData{
+				intEnc(uint64(srcIface)),  /* Src Intf */
 				intEnc(uint64(qer.qerID)), /* qer_id */
 				intEnc(qer.fseID),         /* fseid */
 			},
@@ -918,6 +1021,26 @@ func (b *bess) removeAllFARs(ctx context.Context, done chan<- bool) {
 		}
 
 		b.processFAR(ctx, any, upfMsgTypeClear)
+		done <- true
+	}()
+}
+
+func (b *bess) removeAllQERs(ctx context.Context, done chan<- bool) {
+	go func() {
+		var (
+			any *anypb.Any
+			err error
+		)
+
+		f := &pb.EmptyArg{}
+
+		any, err = anypb.New(f)
+		if err != nil {
+			log.Println("Error marshalling the rule", f, err)
+			return
+		}
+
+		b.processQER(ctx, any, upfMsgTypeClear)
 		done <- true
 	}()
 }
