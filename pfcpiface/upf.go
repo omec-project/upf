@@ -9,6 +9,14 @@ import (
 	"time"
 )
 
+// QosConfigVal : Qos configured value
+type QosConfigVal struct {
+	cbs              uint32
+	pbs              uint32
+	ebs              uint32
+	schedulePriority uint32
+}
+
 type upf struct {
 	enableUeIPAlloc  bool
 	enableEndMarker  bool
