@@ -1,4 +1,4 @@
-// Copyright 2019-2020 go-pfcp authors. All rights reserved.
+// Copyright 2019-2021 go-pfcp authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -246,22 +246,22 @@ func (f *SDFFilterFields) MarshalTo(b []byte) error {
 
 	if f.HasFD() {
 		binary.BigEndian.PutUint16(b[offset:offset+2], f.FDLength)
-		copy(b[offset+2:offset+2+int(f.FDLength)], []byte(f.FlowDescription))
+		copy(b[offset+2:offset+2+int(f.FDLength)], f.FlowDescription)
 		offset += 2 + int(f.FDLength)
 	}
 
 	if f.HasTTC() {
-		copy(b[offset:offset+2], []byte(f.ToSTrafficClass))
+		copy(b[offset:offset+2], f.ToSTrafficClass)
 		offset += 2
 	}
 
 	if f.HasSPI() {
-		copy(b[offset:offset+4], []byte(f.SecurityParameterIndex))
+		copy(b[offset:offset+4], f.SecurityParameterIndex)
 		offset += 4
 	}
 
 	if f.HasFL() {
-		copy(b[offset:offset+3], []byte(f.FlowLabel))
+		copy(b[offset:offset+3], f.FlowLabel)
 		offset += 3
 	}
 

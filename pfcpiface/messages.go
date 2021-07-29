@@ -365,7 +365,7 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 		0,                    /* priority */
 		ie.NewNodeID(upf.nodeIP.String(), "", ""), /* node id (IPv4) */
 		ie.NewCause(ie.CauseRequestAccepted),      /* accept it blindly for the time being */
-		ie.NewFSEID(session.localSEID, net.ParseIP(sourceIP), nil, nil),
+		ie.NewFSEID(session.localSEID, net.ParseIP(sourceIP), nil),
 	)
 
 	addPdrInfo(seresMsg, session)

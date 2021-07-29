@@ -1,4 +1,4 @@
-// Copyright 2019-2020 go-pfcp authors. All rights reserved.
+// Copyright 2019-2021 go-pfcp authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -69,7 +69,7 @@ func NewTraceInformationFields(mcc, mnc, id string, events []byte, depth uint8, 
 		return f
 	}
 
-	//IPv6
+	// IPv6
 	f.IPAddressOfTraceCollectionEntityLength = 16
 	f.IPAddressOfTraceCollectionEntity = ip
 	return f
@@ -103,7 +103,7 @@ func (f *TraceInformationFields) UnmarshalBinary(b []byte) error {
 		return io.ErrUnexpectedEOF
 	}
 	f.TriggeringEventsLength = b[offset]
-	offset += 1
+	offset++
 
 	if l < offset+int(f.TriggeringEventsLength) {
 		return io.ErrUnexpectedEOF
@@ -115,13 +115,13 @@ func (f *TraceInformationFields) UnmarshalBinary(b []byte) error {
 		return io.ErrUnexpectedEOF
 	}
 	f.SessionTraceDepth = b[offset]
-	offset += 1
+	offset++
 
 	if l < offset {
 		return io.ErrUnexpectedEOF
 	}
 	f.ListOfInterfacesLength = b[offset]
-	offset += 1
+	offset++
 
 	if l < offset+int(f.ListOfInterfacesLength) {
 		return io.ErrUnexpectedEOF
@@ -133,7 +133,7 @@ func (f *TraceInformationFields) UnmarshalBinary(b []byte) error {
 		return io.ErrUnexpectedEOF
 	}
 	f.IPAddressOfTraceCollectionEntityLength = b[offset]
-	offset += 1
+	offset++
 
 	if l < offset+int(f.IPAddressOfTraceCollectionEntityLength) {
 		return io.ErrUnexpectedEOF
@@ -164,14 +164,14 @@ func (f *TraceInformationFields) MarshalTo(b []byte) error {
 		return err
 	}
 	copy(b[0:3], plmn)
-	copy(b[3:6], []byte(f.TraceID))
+	copy(b[3:6], f.TraceID)
 	offset := 6
 
 	if l < offset {
 		return io.ErrUnexpectedEOF
 	}
 	b[offset] = f.TriggeringEventsLength
-	offset += 1
+	offset++
 
 	if l < offset+int(f.TriggeringEventsLength) {
 		return io.ErrUnexpectedEOF
@@ -183,13 +183,13 @@ func (f *TraceInformationFields) MarshalTo(b []byte) error {
 		return io.ErrUnexpectedEOF
 	}
 	b[offset] = f.SessionTraceDepth
-	offset += 1
+	offset++
 
 	if l < offset {
 		return io.ErrUnexpectedEOF
 	}
 	b[offset] = f.ListOfInterfacesLength
-	offset += 1
+	offset++
 
 	if l < offset+int(f.ListOfInterfacesLength) {
 		return io.ErrUnexpectedEOF
@@ -201,7 +201,7 @@ func (f *TraceInformationFields) MarshalTo(b []byte) error {
 		return io.ErrUnexpectedEOF
 	}
 	b[offset] = f.IPAddressOfTraceCollectionEntityLength
-	offset += 1
+	offset++
 
 	if l < offset+int(f.IPAddressOfTraceCollectionEntityLength) {
 		return io.ErrUnexpectedEOF

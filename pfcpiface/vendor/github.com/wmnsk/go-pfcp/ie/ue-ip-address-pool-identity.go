@@ -1,4 +1,4 @@
-// Copyright 2019-2020 go-pfcp authors. All rights reserved.
+// Copyright 2019-2021 go-pfcp authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -12,7 +12,7 @@ func NewUEIPAddressPoolIdentity(id string) *IE {
 	i := New(UEIPAddressPoolIdentity, make([]byte, 1+l))
 
 	i.Payload[0] = uint8(l)
-	copy(i.Payload[1:], []byte(id))
+	copy(i.Payload[1:], id)
 
 	return i
 }

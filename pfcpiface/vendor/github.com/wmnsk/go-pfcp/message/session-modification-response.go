@@ -1,4 +1,4 @@
-// Copyright 2019-2020 go-pfcp authors. All rights reserved.
+// Copyright 2019-2021 go-pfcp authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -27,6 +27,7 @@ type SessionModificationResponse struct {
 	CreatedBridgeInfoForTSC           *ie.IE
 	ATSSSControlParameters            *ie.IE
 	UpdatedPDR                        []*ie.IE
+	PacketRateStatusReport            []*ie.IE
 	IEs                               []*ie.IE
 }
 
@@ -66,6 +67,8 @@ func NewSessionModificationResponse(mp, fo uint8, seid uint64, seq uint32, pri u
 			m.ATSSSControlParameters = i
 		case ie.UpdatedPDR:
 			m.UpdatedPDR = append(m.UpdatedPDR, i)
+		case ie.PacketRateStatusReport:
+			m.PacketRateStatusReport = append(m.PacketRateStatusReport, i)
 		default:
 			m.IEs = append(m.IEs, i)
 		}
@@ -165,6 +168,12 @@ func (m *SessionModificationResponse) MarshalTo(b []byte) error {
 		}
 		offset += i.MarshalLen()
 	}
+	for _, i := range m.PacketRateStatusReport {
+		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
+			return err
+		}
+		offset += i.MarshalLen()
+	}
 
 	for _, ie := range m.IEs {
 		if ie == nil {
@@ -231,6 +240,8 @@ func (m *SessionModificationResponse) UnmarshalBinary(b []byte) error {
 			m.ATSSSControlParameters = i
 		case ie.UpdatedPDR:
 			m.UpdatedPDR = append(m.UpdatedPDR, i)
+		case ie.PacketRateStatusReport:
+			m.PacketRateStatusReport = append(m.PacketRateStatusReport, i)
 		default:
 			m.IEs = append(m.IEs, i)
 		}
@@ -277,6 +288,9 @@ func (m *SessionModificationResponse) MarshalLen() int {
 		l += i.MarshalLen()
 	}
 	for _, i := range m.UpdatedPDR {
+		l += i.MarshalLen()
+	}
+	for _, i := range m.PacketRateStatusReport {
 		l += i.MarshalLen()
 	}
 

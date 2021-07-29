@@ -1,4 +1,4 @@
-// Copyright 2019-2020 go-pfcp authors. All rights reserved.
+// Copyright 2019-2021 go-pfcp authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -11,8 +11,8 @@ import (
 )
 
 // NewFSEID creates a new FSEID IE.
-func NewFSEID(teid uint64, v4, v6 net.IP, chid []byte) *IE {
-	fields := NewFSEIDFields(teid, v4, v6, chid)
+func NewFSEID(seid uint64, v4, v6 net.IP) *IE {
+	fields := NewFSEIDFields(seid, v4, v6)
 
 	b, err := fields.Marshal()
 	if err != nil {
@@ -42,56 +42,25 @@ type FSEIDFields struct {
 	SEID        uint64
 	IPv4Address net.IP
 	IPv6Address net.IP
-	ChooseID    []byte
 }
 
 // NewFSEIDFields creates a new NewFSEIDFields.
-func NewFSEIDFields(teid uint64, v4, v6 net.IP, chid []byte) *FSEIDFields {
-	var fields *FSEIDFields
-	if chid != nil {
-		fields = &FSEIDFields{
-			IPv4Address: v4,
-			IPv6Address: v6,
-			ChooseID:    chid,
-		}
-		fields.SetChIDFlag()
-
-	} else {
-		fields = &FSEIDFields{
-			SEID:        teid,
-			IPv4Address: v4,
-			IPv6Address: v6,
-		}
+func NewFSEIDFields(seid uint64, v4, v6 net.IP) *FSEIDFields {
+	f := &FSEIDFields{
+		SEID:        seid,
+		IPv4Address: v4,
+		IPv6Address: v6,
 	}
 
 	if v4 != nil {
-		fields.SetIPv4Flag()
+		f.SetIPv4Flag()
 	}
+
 	if v6 != nil {
-		fields.SetIPv6Flag()
+		f.SetIPv6Flag()
 	}
 
-	return fields
-}
-
-// HasChID reports whether CHID flag is set.
-func (f *FSEIDFields) HasChID() bool {
-	return has4thBit(f.Flags)
-}
-
-// SetChIDFlag sets CHID flag in FSEID.
-func (f *FSEIDFields) SetChIDFlag() {
-	f.Flags |= 0x08
-}
-
-// HasCh reports whether CH flag is set.
-func (f *FSEIDFields) HasCh() bool {
-	return has3rdBit(f.Flags)
-}
-
-// SetChFlag sets CH flag in FSEID.
-func (f *FSEIDFields) SetChFlag() {
-	f.Flags |= 0x04
+	return f
 }
 
 // HasIPv4 reports whether IPv4 flag is set.
@@ -126,40 +95,13 @@ func ParseFSEIDFields(b []byte) (*FSEIDFields, error) {
 // UnmarshalBinary parses b into IE.
 func (f *FSEIDFields) UnmarshalBinary(b []byte) error {
 	l := len(b)
-	if l < 2 {
+	if l < 9 {
 		return io.ErrUnexpectedEOF
 	}
 
 	f.Flags = b[0]
 	offset := 1
 
-	if f.HasChID() || f.HasCh() {
-		if f.HasIPv4() {
-			if l < offset+4 {
-				return io.ErrUnexpectedEOF
-			}
-			f.IPv4Address = net.IP(b[offset : offset+4])
-			offset += 4
-		}
-		if f.HasIPv6() {
-			if l < offset+16 {
-				return io.ErrUnexpectedEOF
-			}
-			f.IPv6Address = net.IP(b[offset : offset+16])
-			offset += 16
-		}
-
-		if l <= offset {
-			return nil
-		}
-
-		f.ChooseID = b[offset:]
-		return nil
-	}
-
-	if l < offset+4 {
-		return nil
-	}
 	f.SEID = binary.BigEndian.Uint64(b[offset : offset+8])
 	offset += 8
 
@@ -170,6 +112,7 @@ func (f *FSEIDFields) UnmarshalBinary(b []byte) error {
 		f.IPv4Address = net.IP(b[offset : offset+4])
 		offset += 4
 	}
+
 	if f.HasIPv6() {
 		if l < offset+16 {
 			return io.ErrUnexpectedEOF
@@ -192,47 +135,25 @@ func (f *FSEIDFields) Marshal() ([]byte, error) {
 // MarshalTo puts the byte sequence in the byte array given as b.
 func (f *FSEIDFields) MarshalTo(b []byte) error {
 	l := len(b)
-	if l < 1 {
+	if l < 9 {
 		return io.ErrUnexpectedEOF
 	}
 
 	b[0] = f.Flags
 	offset := 1
 
-	if f.HasChID() || f.HasCh() {
-		if f.IPv4Address != nil {
-			if l < offset+4 {
-				return io.ErrUnexpectedEOF
-			}
-			copy(b[offset:offset+4], f.IPv4Address.To4())
-			offset += 4
-		}
-		if f.IPv6Address != nil {
-			if l < offset+16 {
-				return io.ErrUnexpectedEOF
-			}
-			copy(b[offset:offset+16], f.IPv6Address.To16())
-			offset += 16
-		}
-
-		copy(b[offset:], f.ChooseID)
-		return nil
-	}
-
-	if l < offset+4 {
-		return io.ErrUnexpectedEOF
-	}
 	binary.BigEndian.PutUint64(b[offset:offset+8], f.SEID)
 	offset += 8
 
-	if f.IPv4Address != nil {
+	if f.HasIPv4() && f.IPv4Address != nil {
 		if l < offset+4 {
 			return io.ErrUnexpectedEOF
 		}
 		copy(b[offset:offset+4], f.IPv4Address.To4())
 		offset += 4
 	}
-	if f.IPv6Address != nil {
+
+	if f.HasIPv6() && f.IPv6Address != nil {
 		if l < offset+16 {
 			return io.ErrUnexpectedEOF
 		}
@@ -244,18 +165,15 @@ func (f *FSEIDFields) MarshalTo(b []byte) error {
 
 // MarshalLen returns field length in integer.
 func (f *FSEIDFields) MarshalLen() int {
-	l := 1
+	l := 9
+
 	if f.IPv4Address != nil {
 		l += 4
 	}
+
 	if f.IPv6Address != nil {
 		l += 16
 	}
 
-	if f.HasChID() || f.HasCh() {
-		l += len(f.ChooseID)
-		return l
-	}
-
-	return l + 8
+	return l
 }

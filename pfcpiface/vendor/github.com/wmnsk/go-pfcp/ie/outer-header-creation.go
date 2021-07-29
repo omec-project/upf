@@ -1,4 +1,4 @@
-// Copyright 2019-2020 go-pfcp authors. All rights reserved.
+// Copyright 2019-2021 go-pfcp authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -135,6 +135,12 @@ func (i *IE) HasIPv4() bool {
 			return false
 		}
 		return v.HasIPv4()
+	case IPVersion:
+		v, err := i.IPVersion()
+		if err != nil {
+			return false
+		}
+		return has2ndBit(v)
 	default:
 		return false
 	}
@@ -173,6 +179,12 @@ func (i *IE) HasIPv6() bool {
 			return false
 		}
 		return v.HasIPv6()
+	case IPVersion:
+		v, err := i.IPVersion()
+		if err != nil {
+			return false
+		}
+		return has1stBit(v)
 	default:
 		return false
 	}

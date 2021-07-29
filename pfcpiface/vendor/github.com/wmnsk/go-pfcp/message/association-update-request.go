@@ -1,4 +1,4 @@
-// Copyright 2019-2020 go-pfcp authors. All rights reserved.
+// Copyright 2019-2021 go-pfcp authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -21,6 +21,7 @@ type AssociationUpdateRequest struct {
 	ClockDriftControlInformation  []*ie.IE
 	UEIPAddressPoolInformation    []*ie.IE
 	GTPUPathQoSControlInformation []*ie.IE
+	UEIPAddressUsageInformation   []*ie.IE
 	IEs                           []*ie.IE
 }
 
@@ -56,6 +57,8 @@ func NewAssociationUpdateRequest(seq uint32, ies ...*ie.IE) *AssociationUpdateRe
 			m.UEIPAddressPoolInformation = append(m.UEIPAddressPoolInformation, i)
 		case ie.GTPUPathQoSControlInformation:
 			m.GTPUPathQoSControlInformation = append(m.GTPUPathQoSControlInformation, i)
+		case ie.UEIPAddressUsageInformation:
+			m.UEIPAddressUsageInformation = append(m.UEIPAddressUsageInformation, i)
 		default:
 			m.IEs = append(m.IEs, i)
 		}
@@ -143,6 +146,12 @@ func (m *AssociationUpdateRequest) MarshalTo(b []byte) error {
 		}
 		offset += i.MarshalLen()
 	}
+	for _, i := range m.UEIPAddressUsageInformation {
+		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
+			return err
+		}
+		offset += i.MarshalLen()
+	}
 
 	for _, ie := range m.IEs {
 		if ie == nil {
@@ -205,6 +214,8 @@ func (m *AssociationUpdateRequest) UnmarshalBinary(b []byte) error {
 			m.UEIPAddressPoolInformation = append(m.UEIPAddressPoolInformation, i)
 		case ie.GTPUPathQoSControlInformation:
 			m.GTPUPathQoSControlInformation = append(m.GTPUPathQoSControlInformation, i)
+		case ie.UEIPAddressUsageInformation:
+			m.UEIPAddressUsageInformation = append(m.UEIPAddressUsageInformation, i)
 		default:
 			m.IEs = append(m.IEs, i)
 		}
@@ -245,6 +256,9 @@ func (m *AssociationUpdateRequest) MarshalLen() int {
 		l += i.MarshalLen()
 	}
 	for _, i := range m.GTPUPathQoSControlInformation {
+		l += i.MarshalLen()
+	}
+	for _, i := range m.UEIPAddressUsageInformation {
 		l += i.MarshalLen()
 	}
 

@@ -1,4 +1,4 @@
-// Copyright 2019-2020 go-pfcp authors. All rights reserved.
+// Copyright 2019-2021 go-pfcp authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -9,49 +9,47 @@ import (
 )
 
 // SessionModificationRequest is a SessionModificationRequest formed PFCP Header and its IEs above.
-//
-// TODO: add Query Packet Rate Status IE
-//
-// TODO: rename PortManagementInformationForTSC => TSCManagementInformation
 type SessionModificationRequest struct {
 	*Header
-	CPFSEID                         *ie.IE
-	RemovePDR                       []*ie.IE
-	RemoveFAR                       []*ie.IE
-	RemoveURR                       []*ie.IE
-	RemoveQER                       []*ie.IE
-	RemoveBAR                       *ie.IE
-	RemoveTrafficEndpoint           []*ie.IE
-	CreatePDR                       []*ie.IE
-	CreateFAR                       []*ie.IE
-	CreateURR                       []*ie.IE
-	CreateQER                       []*ie.IE
-	CreateBAR                       *ie.IE
-	CreateTrafficEndpoint           []*ie.IE
-	UpdatePDR                       []*ie.IE
-	UpdateFAR                       []*ie.IE
-	UpdateURR                       []*ie.IE
-	UpdateQER                       []*ie.IE
-	UpdateBAR                       *ie.IE
-	UpdateTrafficEndpoint           []*ie.IE
-	PFCPSMReqFlags                  *ie.IE
-	QueryURR                        []*ie.IE
-	FQCSID                          *ie.IE
-	UserPlaneInactivityTimer        *ie.IE
-	QueryURRReference               *ie.IE
-	TraceInformation                *ie.IE
-	RemoveMAR                       []*ie.IE
-	UpdateMAR                       []*ie.IE
-	CreateMAR                       []*ie.IE
-	NodeID                          *ie.IE
-	PortManagementInformationForTSC *ie.IE
-	RemoveSRR                       []*ie.IE
-	CreateSRR                       []*ie.IE
-	UpdateSRR                       []*ie.IE
-	ProvideATSSSControlInformation  *ie.IE
-	EthernetContextInformation      *ie.IE
-	AccessAvailabilityInformation   []*ie.IE
-	IEs                             []*ie.IE
+	CPFSEID                        *ie.IE
+	RemovePDR                      []*ie.IE
+	RemoveFAR                      []*ie.IE
+	RemoveURR                      []*ie.IE
+	RemoveQER                      []*ie.IE
+	RemoveBAR                      *ie.IE
+	RemoveTrafficEndpoint          []*ie.IE
+	CreatePDR                      []*ie.IE
+	CreateFAR                      []*ie.IE
+	CreateURR                      []*ie.IE
+	CreateQER                      []*ie.IE
+	CreateBAR                      *ie.IE
+	CreateTrafficEndpoint          []*ie.IE
+	UpdatePDR                      []*ie.IE
+	UpdateFAR                      []*ie.IE
+	UpdateURR                      []*ie.IE
+	UpdateQER                      []*ie.IE
+	UpdateBAR                      *ie.IE
+	UpdateTrafficEndpoint          []*ie.IE
+	PFCPSMReqFlags                 *ie.IE
+	QueryURR                       []*ie.IE
+	FQCSID                         *ie.IE
+	UserPlaneInactivityTimer       *ie.IE
+	QueryURRReference              *ie.IE
+	TraceInformation               *ie.IE
+	RemoveMAR                      []*ie.IE
+	UpdateMAR                      []*ie.IE
+	CreateMAR                      []*ie.IE
+	NodeID                         *ie.IE
+	TSCManagementInformation       *ie.IE
+	RemoveSRR                      []*ie.IE
+	CreateSRR                      []*ie.IE
+	UpdateSRR                      []*ie.IE
+	ProvideATSSSControlInformation *ie.IE
+	EthernetContextInformation     *ie.IE
+	AccessAvailabilityInformation  []*ie.IE
+	QueryPacketRateStatus          []*ie.IE
+	SNSSAI                         *ie.IE
+	IEs                            []*ie.IE
 }
 
 // NewSessionModificationRequest creates a new SessionModificationRequest.
@@ -124,8 +122,8 @@ func NewSessionModificationRequest(mp, fo uint8, seid uint64, seq uint32, pri ui
 			m.CreateMAR = append(m.CreateMAR, i)
 		case ie.NodeID:
 			m.NodeID = i
-		case ie.PortManagementInformationForTSCWithinSessionModificationRequest:
-			m.PortManagementInformationForTSC = i
+		case ie.TSCManagementInformationWithinSessionModificationRequest:
+			m.TSCManagementInformation = i
 		case ie.RemoveSRR:
 			m.RemoveSRR = append(m.RemoveSRR, i)
 		case ie.CreateSRR:
@@ -138,6 +136,10 @@ func NewSessionModificationRequest(mp, fo uint8, seid uint64, seq uint32, pri ui
 			m.EthernetContextInformation = i
 		case ie.AccessAvailabilityInformation:
 			m.AccessAvailabilityInformation = append(m.AccessAvailabilityInformation, i)
+		case ie.QueryPacketRateStatusWithinSessionModificationRequest:
+			m.QueryPacketRateStatus = append(m.QueryPacketRateStatus, i)
+		case ie.SNSSAI:
+			m.SNSSAI = i
 		default:
 			m.IEs = append(m.IEs, i)
 		}
@@ -339,7 +341,7 @@ func (m *SessionModificationRequest) MarshalTo(b []byte) error {
 		}
 		offset += i.MarshalLen()
 	}
-	if i := m.PortManagementInformationForTSC; i != nil {
+	if i := m.TSCManagementInformation; i != nil {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
@@ -376,6 +378,18 @@ func (m *SessionModificationRequest) MarshalTo(b []byte) error {
 		offset += i.MarshalLen()
 	}
 	for _, i := range m.AccessAvailabilityInformation {
+		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
+			return err
+		}
+		offset += i.MarshalLen()
+	}
+	for _, i := range m.QueryPacketRateStatus {
+		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
+			return err
+		}
+		offset += i.MarshalLen()
+	}
+	if i := m.SNSSAI; i != nil {
 		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
 			return err
 		}
@@ -481,8 +495,8 @@ func (m *SessionModificationRequest) UnmarshalBinary(b []byte) error {
 			m.CreateMAR = append(m.CreateMAR, i)
 		case ie.NodeID:
 			m.NodeID = i
-		case ie.PortManagementInformationForTSCWithinSessionModificationRequest:
-			m.PortManagementInformationForTSC = i
+		case ie.TSCManagementInformationWithinSessionModificationRequest:
+			m.TSCManagementInformation = i
 		case ie.RemoveSRR:
 			m.RemoveSRR = append(m.RemoveSRR, i)
 		case ie.CreateSRR:
@@ -495,6 +509,10 @@ func (m *SessionModificationRequest) UnmarshalBinary(b []byte) error {
 			m.EthernetContextInformation = i
 		case ie.AccessAvailabilityInformation:
 			m.AccessAvailabilityInformation = append(m.AccessAvailabilityInformation, i)
+		case ie.QueryPacketRateStatusWithinSessionModificationRequest:
+			m.QueryPacketRateStatus = append(m.QueryPacketRateStatus, i)
+		case ie.SNSSAI:
+			m.SNSSAI = i
 		default:
 			m.IEs = append(m.IEs, i)
 		}
@@ -594,7 +612,7 @@ func (m *SessionModificationRequest) MarshalLen() int {
 	if i := m.NodeID; i != nil {
 		l += i.MarshalLen()
 	}
-	if i := m.PortManagementInformationForTSC; i != nil {
+	if i := m.TSCManagementInformation; i != nil {
 		l += i.MarshalLen()
 	}
 	for _, i := range m.RemoveSRR {
@@ -613,6 +631,12 @@ func (m *SessionModificationRequest) MarshalLen() int {
 		l += i.MarshalLen()
 	}
 	for _, i := range m.AccessAvailabilityInformation {
+		l += i.MarshalLen()
+	}
+	for _, i := range m.QueryPacketRateStatus {
+		l += i.MarshalLen()
+	}
+	if i := m.SNSSAI; i != nil {
 		l += i.MarshalLen()
 	}
 

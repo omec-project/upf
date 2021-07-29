@@ -1,4 +1,4 @@
-// Copyright 2019-2020 go-pfcp authors. All rights reserved.
+// Copyright 2019-2021 go-pfcp authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -14,10 +14,10 @@ func (i *IE) PortManagementInformationContainer() (string, error) {
 	switch i.Type {
 	case PortManagementInformationContainer:
 		return string(i.Payload), nil
-	case PortManagementInformationForTSCWithinSessionModificationRequest,
-		PortManagementInformationForTSCWithinSessionModificationResponse,
-		PortManagementInformationForTSCWithinSessionReportRequest:
-		ies, err := i.PortManagementInformationForTSC()
+	case TSCManagementInformationWithinSessionModificationRequest,
+		TSCManagementInformationWithinSessionModificationResponse,
+		TSCManagementInformationWithinSessionReportRequest:
+		ies, err := i.TSCManagementInformation()
 		if err != nil {
 			return "", err
 		}

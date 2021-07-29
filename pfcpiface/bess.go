@@ -662,8 +662,7 @@ func (b *bess) processQER(ctx context.Context, any *anypb.Any, method string) {
 		return
 	}
 
-	log.Println("processQER ", method)
-	val, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
+	_, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "qerLookup",
 		Cmd:  method,
 		Arg:  any,
@@ -671,7 +670,7 @@ func (b *bess) processQER(ctx context.Context, any *anypb.Any, method string) {
 	if err != nil {
 		log.Println("qerLookup method failed!:", err)
 	}
-	log.Println("process QER : ", val)
+	//log.Println("process QER : ", val)
 }
 
 func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {

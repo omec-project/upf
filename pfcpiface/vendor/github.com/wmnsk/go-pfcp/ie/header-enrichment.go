@@ -1,4 +1,4 @@
-// Copyright 2019-2020 go-pfcp authors. All rights reserved.
+// Copyright 2019-2021 go-pfcp authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -141,13 +141,13 @@ func (f *HeaderEnrichmentFields) MarshalTo(b []byte) error {
 	b[1] = f.NameLength
 	offset := 2
 
-	copy(b[offset:offset+int(f.NameLength)], []byte(f.HeaderFieldName))
+	copy(b[offset:offset+int(f.NameLength)], f.HeaderFieldName)
 	offset += int(f.NameLength)
 
 	b[offset] = f.ValueLength
 	offset++
 
-	copy(b[offset:offset+int(f.ValueLength)], []byte(f.HeaderFieldValue))
+	copy(b[offset:offset+int(f.ValueLength)], f.HeaderFieldValue)
 
 	return nil
 }

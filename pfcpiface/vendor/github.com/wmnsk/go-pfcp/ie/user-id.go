@@ -1,4 +1,4 @@
-// Copyright 2019-2020 go-pfcp authors. All rights reserved.
+// Copyright 2019-2021 go-pfcp authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -225,7 +225,7 @@ func (f *UserIDFields) MarshalTo(b []byte) error {
 		b[offset] = f.NAILength
 		offset++
 
-		copy(b[offset:offset+int(f.NAILength)], []byte(f.NAI))
+		copy(b[offset:offset+int(f.NAILength)], f.NAI)
 	}
 
 	return nil

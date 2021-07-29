@@ -1,4 +1,4 @@
-// Copyright 2019-2020 go-pfcp authors. All rights reserved.
+// Copyright 2019-2021 go-pfcp authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -378,31 +378,31 @@ func (f *PFDContentsFields) MarshalTo(b []byte) error {
 
 	if f.HasFD() {
 		binary.BigEndian.PutUint16(b[offset:offset+2], f.FDLength)
-		copy(b[offset+2:offset+2+int(f.FDLength)], []byte(f.FlowDescription))
+		copy(b[offset+2:offset+2+int(f.FDLength)], f.FlowDescription)
 		offset += 2 + int(f.FDLength)
 	}
 
 	if f.HasURL() {
 		binary.BigEndian.PutUint16(b[offset:offset+2], f.URLLength)
-		copy(b[offset+2:offset+2+int(f.URLLength)], []byte(f.URL))
+		copy(b[offset+2:offset+2+int(f.URLLength)], f.URL)
 		offset += 2 + int(f.URLLength)
 	}
 
 	if f.HasDN() {
 		binary.BigEndian.PutUint16(b[offset:offset+2], f.DNLength)
-		copy(b[offset+2:offset+2+int(f.DNLength)], []byte(f.DomainName))
+		copy(b[offset+2:offset+2+int(f.DNLength)], f.DomainName)
 		offset += 2 + int(f.DNLength)
 	}
 
 	if f.HasCP() {
 		binary.BigEndian.PutUint16(b[offset:offset+2], f.CPLength)
-		copy(b[offset+2:offset+2+int(f.CPLength)], []byte(f.CustomPFDContent))
+		copy(b[offset+2:offset+2+int(f.CPLength)], f.CustomPFDContent)
 		offset += 2 + int(f.CPLength)
 	}
 
 	if f.HasDNP() {
 		binary.BigEndian.PutUint16(b[offset:offset+2], f.DNPLength)
-		copy(b[offset+2:offset+2+int(f.DNPLength)], []byte(f.DomainNameProtocol))
+		copy(b[offset+2:offset+2+int(f.DNPLength)], f.DomainNameProtocol)
 		offset += 2 + int(f.DNPLength)
 	}
 
@@ -412,7 +412,7 @@ func (f *PFDContentsFields) MarshalTo(b []byte) error {
 		for _, a := range f.AdditionalFlowDescription {
 			l := len([]byte(a))
 			binary.BigEndian.PutUint16(b[offset:offset+2], uint16(l))
-			copy(b[offset+2:offset+2+l], []byte(a))
+			copy(b[offset+2:offset+2+l], a)
 			offset += 2 + l
 		}
 	}
@@ -423,7 +423,7 @@ func (f *PFDContentsFields) MarshalTo(b []byte) error {
 		for _, a := range f.AdditionalURL {
 			l := len([]byte(a))
 			binary.BigEndian.PutUint16(b[offset:offset+2], uint16(l))
-			copy(b[offset+2:offset+2+l], []byte(a))
+			copy(b[offset+2:offset+2+l], a)
 			offset += 2 + l
 		}
 	}
@@ -434,7 +434,7 @@ func (f *PFDContentsFields) MarshalTo(b []byte) error {
 		for _, a := range f.AdditionalDomainNameAndProtocol {
 			l := len([]byte(a))
 			binary.BigEndian.PutUint16(b[offset:offset+2], uint16(l))
-			copy(b[offset+2:offset+2+l], []byte(a))
+			copy(b[offset+2:offset+2+l], a)
 			offset += 2 + l
 		}
 	}

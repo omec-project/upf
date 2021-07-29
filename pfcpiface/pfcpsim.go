@@ -103,7 +103,7 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 			seq,
 			0,
 			ie.NewNodeID("127.0.0.1", "", ""),
-			ie.NewFSEID(0x0000000000000001, net.ParseIP("127.0.0.1"), nil, nil),
+			ie.NewFSEID(0x0000000000000001, net.ParseIP("127.0.0.1"), nil),
 			ie.NewPDNType(ie.PDNTypeIPv4),
 			// Uplink N9
 			ie.NewCreatePDR(
@@ -111,7 +111,7 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 				ie.NewPrecedence(100),
 				ie.NewPDI(
 					ie.NewSourceInterface(ie.SrcInterfaceAccess),
-					ie.NewFTEID(0x30000000, net.ParseIP("198.18.0.1"), nil, nil),
+					ie.NewFTEID(0x01, 0x30000000, net.ParseIP("198.18.0.1"), nil, 0),
 					ie.NewUEIPAddress(0x2, "16.0.0.1", "", 0, 0),
 					ie.NewSDFFilter("permit out ip from any to assigned", "", "", "", 1),
 				),
@@ -125,7 +125,7 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 				ie.NewPrecedence(50),
 				ie.NewPDI(
 					ie.NewSourceInterface(ie.SrcInterfaceAccess),
-					ie.NewFTEID(0x30000000, net.ParseIP("198.18.0.1"), nil, nil),
+					ie.NewFTEID(0x01, 0x30000000, net.ParseIP("198.18.0.1"), nil, 0),
 					ie.NewUEIPAddress(0x2, "16.0.0.1", "", 0, 0),
 					//ie.NewSDFFilter("permit out ip from 6.6.6.6/32 to assigned", "", "", "", 2),
 					ie.NewApplicationID("1000"),
@@ -140,7 +140,7 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 				ie.NewPrecedence(100),
 				ie.NewPDI(
 					ie.NewSourceInterface(ie.SrcInterfaceCore),
-					ie.NewFTEID(0x90000000, net.ParseIP("198.19.0.1"), nil, nil),
+					ie.NewFTEID(0x01, 0x90000000, net.ParseIP("198.19.0.1"), nil, 0),
 				),
 				ie.NewOuterHeaderRemoval(0, 0),
 				ie.NewFARID(3),
@@ -248,7 +248,7 @@ func modifyPFCP(conn *net.UDPConn, raddr *net.UDPAddr, seid uint64) {
 			seid,
 			seq,
 			0,
-			//ie.NewFSEID(0x0000000000000001, net.ParseIP("127.0.0.1"), nil, nil),
+			//ie.NewFSEID(0x0000000000000001, net.ParseIP("127.0.0.1"), nil),
 			ie.NewPDNType(ie.PDNTypeIPv4),
 			// Downlink N9
 			ie.NewUpdatePDR(
@@ -256,7 +256,7 @@ func modifyPFCP(conn *net.UDPConn, raddr *net.UDPAddr, seid uint64) {
 				ie.NewPrecedence(100),
 				ie.NewPDI(
 					ie.NewSourceInterface(ie.SrcInterfaceCore),
-					ie.NewFTEID(0x90000000, net.ParseIP("198.19.0.1"), nil, nil),
+					ie.NewFTEID(0x01, 0x90000000, net.ParseIP("198.19.0.1"), nil, 0),
 				),
 				ie.NewOuterHeaderRemoval(0, 0),
 				ie.NewFARID(3),

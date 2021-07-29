@@ -1,4 +1,4 @@
-// Copyright 2019-2020 go-pfcp authors. All rights reserved.
+// Copyright 2019-2021 go-pfcp authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -164,7 +164,7 @@ func (f *RedirectInformationFields) MarshalTo(b []byte) error {
 	binary.BigEndian.PutUint16(b[1:3], f.ServerAddrLength)
 	offset += 2
 
-	copy(b[offset:offset+int(f.ServerAddrLength)], []byte(f.RedirectServerAddress))
+	copy(b[offset:offset+int(f.ServerAddrLength)], f.RedirectServerAddress)
 	offset += int(f.ServerAddrLength)
 
 	if f.OtherRedirectServerAddress == "" {
@@ -179,7 +179,7 @@ func (f *RedirectInformationFields) MarshalTo(b []byte) error {
 	binary.BigEndian.PutUint16(b[offset:offset+2], f.OtherServerAddrLength)
 	offset += 2
 
-	copy(b[offset:offset+int(f.OtherServerAddrLength)], []byte(f.OtherRedirectServerAddress))
+	copy(b[offset:offset+int(f.OtherServerAddrLength)], f.OtherRedirectServerAddress)
 	return nil
 }
 
