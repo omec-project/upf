@@ -1,4 +1,4 @@
-// Copyright 2019-2020 go-pfcp authors. All rights reserved.
+// Copyright 2019-2021 go-pfcp authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -48,7 +48,7 @@ func (i *IE) HasIMMER() bool {
 
 	switch i.Type {
 	case UsageReportTrigger:
-		u8 := uint8(i.Payload[0])
+		u8 := i.Payload[0]
 		return has8thBit(u8)
 	case UsageReportWithinSessionModificationResponse,
 		UsageReportWithinSessionDeletionResponse,
@@ -76,7 +76,7 @@ func (i *IE) HasMONIT() bool {
 
 	switch i.Type {
 	case UsageReportTrigger:
-		u8 := uint8(i.Payload[1])
+		u8 := i.Payload[1]
 		return has5thBit(u8)
 	case UsageReportWithinSessionModificationResponse,
 		UsageReportWithinSessionDeletionResponse,
@@ -104,7 +104,7 @@ func (i *IE) HasTERMR() bool {
 
 	switch i.Type {
 	case UsageReportTrigger:
-		u8 := uint8(i.Payload[1])
+		u8 := i.Payload[1]
 		return has4thBit(u8)
 	case UsageReportWithinSessionModificationResponse,
 		UsageReportWithinSessionDeletionResponse,

@@ -1,4 +1,4 @@
-// Copyright 2019-2020 go-pfcp authors. All rights reserved.
+// Copyright 2019-2021 go-pfcp authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -169,12 +169,12 @@ func (f *MACAddressesDetectedFields) MarshalTo(b []byte) error {
 	}
 
 	b[offset] = f.CTAGLength
-	offset += 1
+	offset++
 	copy(b[offset:offset+int(f.CTAGLength)], f.CTAG)
 	offset += int(f.CTAGLength)
 
 	b[offset] = f.STAGLength
-	offset += 1
+	offset++
 	copy(b[offset:offset+int(f.STAGLength)], f.STAG)
 
 	return nil

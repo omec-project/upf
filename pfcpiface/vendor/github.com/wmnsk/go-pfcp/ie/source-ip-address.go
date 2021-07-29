@@ -1,4 +1,4 @@
-// Copyright 2019-2020 go-pfcp authors. All rights reserved.
+// Copyright 2019-2021 go-pfcp authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -239,7 +239,7 @@ func (f *SourceIPAddressFields) MarshalLen() int {
 		l += 16
 	}
 	if f.HasMPL() {
-		l += 1
+		l++
 	}
 
 	return l

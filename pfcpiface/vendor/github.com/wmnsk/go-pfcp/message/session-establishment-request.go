@@ -1,4 +1,4 @@
-// Copyright 2019-2020 go-pfcp authors. All rights reserved.
+// Copyright 2019-2021 go-pfcp authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -13,27 +13,29 @@ import (
 // TODO: add S-NSSAI and Provide RDS configuration information.
 type SessionEstablishmentRequest struct {
 	*Header
-	NodeID                         *ie.IE
-	CPFSEID                        *ie.IE
-	CreatePDR                      []*ie.IE
-	CreateFAR                      []*ie.IE
-	CreateURR                      []*ie.IE
-	CreateQER                      []*ie.IE
-	CreateBAR                      *ie.IE
-	CreateTrafficEndpoint          []*ie.IE
-	PDNType                        *ie.IE
-	FQCSID                         *ie.IE
-	UserPlaneInactivityTimer       *ie.IE
-	UserID                         *ie.IE
-	TraceInformation               *ie.IE
-	APNDNN                         *ie.IE
-	CreateMAR                      []*ie.IE
-	PFCPSEReqFlags                 *ie.IE
-	CreateBridgeInfoForTSC         *ie.IE
-	CreateSRR                      []*ie.IE
-	ProvideATSSSControlInformation *ie.IE
-	RecoveryTimeStamp              *ie.IE
-	IEs                            []*ie.IE
+	NodeID                             *ie.IE
+	CPFSEID                            *ie.IE
+	CreatePDR                          []*ie.IE
+	CreateFAR                          []*ie.IE
+	CreateURR                          []*ie.IE
+	CreateQER                          []*ie.IE
+	CreateBAR                          *ie.IE
+	CreateTrafficEndpoint              []*ie.IE
+	PDNType                            *ie.IE
+	FQCSID                             *ie.IE
+	UserPlaneInactivityTimer           *ie.IE
+	UserID                             *ie.IE
+	TraceInformation                   *ie.IE
+	APNDNN                             *ie.IE
+	CreateMAR                          []*ie.IE
+	PFCPSEReqFlags                     *ie.IE
+	CreateBridgeInfoForTSC             *ie.IE
+	CreateSRR                          []*ie.IE
+	ProvideATSSSControlInformation     *ie.IE
+	RecoveryTimeStamp                  *ie.IE
+	SNSSAI                             *ie.IE
+	ProvideRDSConfigurationInformation *ie.IE
+	IEs                                []*ie.IE
 }
 
 // NewSessionEstablishmentRequest creates a new SessionEstablishmentRequest.
@@ -88,6 +90,10 @@ func NewSessionEstablishmentRequest(mp, fo uint8, seid uint64, seq uint32, pri u
 			m.ProvideATSSSControlInformation = i
 		case ie.RecoveryTimeStamp:
 			m.RecoveryTimeStamp = i
+		case ie.SNSSAI:
+			m.SNSSAI = i
+		case ie.ProvideRDSConfigurationInformation:
+			m.ProvideRDSConfigurationInformation = i
 		default:
 			m.IEs = append(m.IEs, i)
 		}
@@ -235,6 +241,18 @@ func (m *SessionEstablishmentRequest) MarshalTo(b []byte) error {
 		}
 		offset += i.MarshalLen()
 	}
+	if i := m.SNSSAI; i != nil {
+		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
+			return err
+		}
+		offset += i.MarshalLen()
+	}
+	if i := m.ProvideRDSConfigurationInformation; i != nil {
+		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
+			return err
+		}
+		offset += i.MarshalLen()
+	}
 
 	for _, ie := range m.IEs {
 		if ie == nil {
@@ -317,6 +335,10 @@ func (m *SessionEstablishmentRequest) UnmarshalBinary(b []byte) error {
 			m.ProvideATSSSControlInformation = i
 		case ie.RecoveryTimeStamp:
 			m.RecoveryTimeStamp = i
+		case ie.SNSSAI:
+			m.SNSSAI = i
+		case ie.ProvideRDSConfigurationInformation:
+			m.ProvideRDSConfigurationInformation = i
 		default:
 			m.IEs = append(m.IEs, i)
 		}
@@ -387,6 +409,12 @@ func (m *SessionEstablishmentRequest) MarshalLen() int {
 		l += i.MarshalLen()
 	}
 	if i := m.RecoveryTimeStamp; i != nil {
+		l += i.MarshalLen()
+	}
+	if i := m.SNSSAI; i != nil {
+		l += i.MarshalLen()
+	}
+	if i := m.ProvideRDSConfigurationInformation; i != nil {
 		l += i.MarshalLen()
 	}
 
