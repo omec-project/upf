@@ -1,4 +1,4 @@
-// Copyright 2019-2020 go-pfcp authors. All rights reserved.
+// Copyright 2019-2021 go-pfcp authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -59,13 +59,13 @@ func (i *IE) HasLIUSA() bool {
 			return false
 		}
 
-		u8 := uint8(i.Payload[0])
+		u8 := i.Payload[0]
 		return has8thBit(u8)
 	case UsageReportTrigger:
 		if len(i.Payload) < 2 {
 			return false
 		}
-		u8 := uint8(i.Payload[1])
+		u8 := i.Payload[1]
 		return has3rdBit(u8)
 	default:
 		return false
@@ -80,7 +80,7 @@ func (i *IE) HasDROTH() bool {
 
 	switch i.Type {
 	case ReportingTriggers, UsageReportTrigger:
-		u8 := uint8(i.Payload[0])
+		u8 := i.Payload[0]
 		return has7thBit(u8)
 	default:
 		return false
@@ -95,7 +95,7 @@ func (i *IE) HasSTOPT() bool {
 
 	switch i.Type {
 	case ReportingTriggers, UsageReportTrigger:
-		u8 := uint8(i.Payload[0])
+		u8 := i.Payload[0]
 		return has6thBit(u8)
 	default:
 		return false
@@ -110,7 +110,7 @@ func (i *IE) HasSTART() bool {
 
 	switch i.Type {
 	case ReportingTriggers, UsageReportTrigger:
-		u8 := uint8(i.Payload[0])
+		u8 := i.Payload[0]
 		return has5thBit(u8)
 	default:
 		return false
@@ -125,7 +125,7 @@ func (i *IE) HasQUHTI() bool {
 
 	switch i.Type {
 	case ReportingTriggers, UsageReportTrigger:
-		u8 := uint8(i.Payload[0])
+		u8 := i.Payload[0]
 		return has4thBit(u8)
 	default:
 		return false
@@ -140,7 +140,7 @@ func (i *IE) HasTIMTH() bool {
 
 	switch i.Type {
 	case ReportingTriggers, UsageReportTrigger:
-		u8 := uint8(i.Payload[0])
+		u8 := i.Payload[0]
 		return has3rdBit(u8)
 	default:
 		return false
@@ -155,7 +155,7 @@ func (i *IE) HasVOLTH() bool {
 
 	switch i.Type {
 	case ReportingTriggers, UsageReportTrigger:
-		u8 := uint8(i.Payload[0])
+		u8 := i.Payload[0]
 		return has2ndBit(u8)
 	default:
 		return false
@@ -170,10 +170,10 @@ func (i *IE) HasPERIO() bool {
 
 	switch i.Type {
 	case ReportingTriggers, UsageReportTrigger:
-		u8 := uint8(i.Payload[0])
+		u8 := i.Payload[0]
 		return has1stBit(u8)
 	case ReportingFrequency:
-		u8 := uint8(i.Payload[0])
+		u8 := i.Payload[0]
 		return has2ndBit(u8)
 	default:
 		return false
@@ -188,14 +188,14 @@ func (i *IE) HasEVEQU() bool {
 			return false
 		}
 
-		u8 := uint8(i.Payload[1])
+		u8 := i.Payload[1]
 		return has6thBit(u8)
 	case UsageReportTrigger:
 		if len(i.Payload) < 3 {
 			return false
 		}
 
-		u8 := uint8(i.Payload[2])
+		u8 := i.Payload[2]
 		return has1stBit(u8)
 	default:
 		return false
@@ -210,10 +210,10 @@ func (i *IE) HasEVETH() bool {
 
 	switch i.Type {
 	case ReportingTriggers:
-		u8 := uint8(i.Payload[1])
+		u8 := i.Payload[1]
 		return has5thBit(u8)
 	case UsageReportTrigger:
-		u8 := uint8(i.Payload[1])
+		u8 := i.Payload[1]
 		return has8thBit(u8)
 	default:
 		return false
@@ -228,10 +228,10 @@ func (i *IE) HasMACAR() bool {
 
 	switch i.Type {
 	case ReportingTriggers:
-		u8 := uint8(i.Payload[1])
+		u8 := i.Payload[1]
 		return has4thBit(u8)
 	case UsageReportTrigger:
-		u8 := uint8(i.Payload[1])
+		u8 := i.Payload[1]
 		return has7thBit(u8)
 	default:
 		return false
@@ -246,10 +246,10 @@ func (i *IE) HasENVCL() bool {
 
 	switch i.Type {
 	case ReportingTriggers:
-		u8 := uint8(i.Payload[1])
+		u8 := i.Payload[1]
 		return has3rdBit(u8)
 	case UsageReportTrigger:
-		u8 := uint8(i.Payload[1])
+		u8 := i.Payload[1]
 		return has6thBit(u8)
 	default:
 		return false
@@ -264,7 +264,7 @@ func (i *IE) HasTIMQU() bool {
 
 	switch i.Type {
 	case ReportingTriggers, UsageReportTrigger:
-		u8 := uint8(i.Payload[1])
+		u8 := i.Payload[1]
 		return has2ndBit(u8)
 	default:
 		return false
@@ -279,7 +279,7 @@ func (i *IE) HasVOLQU() bool {
 
 	switch i.Type {
 	case ReportingTriggers, UsageReportTrigger:
-		u8 := uint8(i.Payload[1])
+		u8 := i.Payload[1]
 		return has1stBit(u8)
 	default:
 		return false

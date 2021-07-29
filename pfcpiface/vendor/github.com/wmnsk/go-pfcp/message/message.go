@@ -1,4 +1,4 @@
-// Copyright 2019-2020 go-pfcp authors. All rights reserved.
+// Copyright 2019-2021 go-pfcp authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -56,7 +56,7 @@ type Message interface {
 
 // Parse parses the given bytes as Message.
 func Parse(b []byte) (Message, error) {
-	if len(b) < 1 {
+	if len(b) < 2 {
 		return nil, io.ErrUnexpectedEOF
 	}
 

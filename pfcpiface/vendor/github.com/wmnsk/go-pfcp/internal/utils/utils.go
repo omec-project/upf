@@ -1,4 +1,4 @@
-// Copyright 2019-2020 go-pfcp authors. All rights reserved.
+// Copyright 2019-2021 go-pfcp authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -7,6 +7,7 @@ package utils
 import (
 	"encoding/binary"
 	"encoding/hex"
+	"strings"
 )
 
 // StrToSwappedBytes returns swapped bits from a byte.
@@ -47,10 +48,10 @@ func SwappedBytesToStr(raw []byte, cutLastDigit bool) string {
 }
 
 func swap(raw []byte) []byte {
-	var swapped []byte
+	swapped := make([]byte, len(raw))
 	for n := range raw {
 		t := ((raw[n] >> 4) & 0xf) + ((raw[n] << 4) & 0xf0)
-		swapped = append(swapped, t)
+		swapped[n] = t
 	}
 	return swapped
 }
@@ -127,7 +128,47 @@ func DecodePLMN(b []byte) (mcc, mnc string, err error) {
 func ParseECI(eci uint32) (enbID uint32, cellID uint8, err error) {
 	buf := make([]byte, 4)
 	binary.BigEndian.PutUint32(buf, eci)
-	cellID = uint8(buf[3])
+	cellID = buf[3]
 	enbID = binary.BigEndian.Uint32([]byte{0, buf[0], buf[1], buf[2]})
 	return
+}
+
+// EncodeFQDN encodes the given string as the Name Syntax defined
+// in RFC 2181, RFC 1035 and RFC 1123.
+func EncodeFQDN(fqdn string) []byte {
+	b := make([]byte, len(fqdn)+1)
+
+	var offset = 0
+	for _, label := range strings.Split(fqdn, ".") {
+		l := len(label)
+		b[offset] = uint8(l)
+		copy(b[offset+1:], label)
+		offset += l + 1
+	}
+
+	return b
+}
+
+// DecodeFQDN decodes the given Name Syntax-encoded []byte as
+// a string.
+func DecodeFQDN(b []byte) string {
+	var (
+		fqdn   []string
+		offset int
+	)
+
+	max := len(b)
+	for {
+		if offset >= max {
+			break
+		}
+		l := int(b[offset])
+		if offset+l+1 > max {
+			break
+		}
+		fqdn = append(fqdn, string(b[offset+1:offset+l+1]))
+		offset += l + 1
+	}
+
+	return strings.Join(fqdn, ".")
 }

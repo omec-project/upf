@@ -1,4 +1,4 @@
-// Copyright 2019-2020 go-pfcp authors. All rights reserved.
+// Copyright 2019-2021 go-pfcp authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -23,6 +23,7 @@ type AssociationSetupRequest struct {
 	GTPUPathQoSControlInformation   []*ie.IE
 	ClockDriftControlInformation    []*ie.IE
 	UPFInstanceID                   *ie.IE
+	PFCPASReqFlags                  *ie.IE
 	IEs                             []*ie.IE
 }
 
@@ -62,6 +63,8 @@ func NewAssociationSetupRequest(seq uint32, ies ...*ie.IE) *AssociationSetupRequ
 			m.ClockDriftControlInformation = append(m.ClockDriftControlInformation, i)
 		case ie.NFInstanceID:
 			m.UPFInstanceID = i
+		case ie.PFCPASReqFlags:
+			m.PFCPASReqFlags = i
 		default:
 			m.IEs = append(m.IEs, i)
 		}
@@ -161,6 +164,12 @@ func (m *AssociationSetupRequest) MarshalTo(b []byte) error {
 		}
 		offset += i.MarshalLen()
 	}
+	if i := m.PFCPASReqFlags; i != nil {
+		if err := i.MarshalTo(m.Payload[offset:]); err != nil {
+			return err
+		}
+		offset += i.MarshalLen()
+	}
 
 	for _, ie := range m.IEs {
 		if ie == nil {
@@ -227,6 +236,8 @@ func (m *AssociationSetupRequest) UnmarshalBinary(b []byte) error {
 			m.ClockDriftControlInformation = append(m.ClockDriftControlInformation, i)
 		case ie.NFInstanceID:
 			m.UPFInstanceID = i
+		case ie.PFCPASReqFlags:
+			m.PFCPASReqFlags = i
 		default:
 			m.IEs = append(m.IEs, i)
 		}
@@ -273,6 +284,9 @@ func (m *AssociationSetupRequest) MarshalLen() int {
 		l += i.MarshalLen()
 	}
 	if i := m.UPFInstanceID; i != nil {
+		l += i.MarshalLen()
+	}
+	if i := m.PFCPASReqFlags; i != nil {
 		l += i.MarshalLen()
 	}
 

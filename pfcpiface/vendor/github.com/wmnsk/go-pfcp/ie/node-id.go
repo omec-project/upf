@@ -1,4 +1,4 @@
-// Copyright 2019-2020 go-pfcp authors. All rights reserved.
+// Copyright 2019-2021 go-pfcp authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -8,6 +8,8 @@ import (
 	"io"
 	"net"
 	"strings"
+
+	"github.com/wmnsk/go-pfcp/internal/utils"
 )
 
 // NodeID definitions.
@@ -24,28 +26,20 @@ const (
 func NewNodeID(ipv4, ipv6, fqdn string) *IE {
 	var p []byte
 
-	if ipv4 != "" {
+	switch {
+	case ipv4 != "":
 		p = make([]byte, 5)
 		p[0] = NodeIDIPv4Address
 		copy(p[1:], net.ParseIP(ipv4).To4())
-	} else if ipv6 != "" {
+	case ipv6 != "":
 		p = make([]byte, 17)
 		p[0] = NodeIDIPv6Address
 		copy(p[1:], net.ParseIP(ipv6).To16())
-	} else if fqdn != "" {
+	case fqdn != "":
 		p = make([]byte, 2+len([]byte(fqdn)))
-
 		p[0] = NodeIDFQDN
-
-		offset := 1
-		for _, label := range strings.Split(fqdn, ".") {
-			l := len(label)
-			p[offset] = uint8(l)
-			copy(p[offset+1:], []byte(label))
-			offset += l + 1
-		}
-
-	} else { // all params are empty
+		copy(p[1:], utils.EncodeFQDN(fqdn))
+	default: // all params are empty
 		return nil
 	}
 

@@ -1,4 +1,4 @@
-// Copyright 2019-2020 go-pfcp authors. All rights reserved.
+// Copyright 2019-2021 go-pfcp authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -20,7 +20,8 @@ func NewUserPlaneIPResourceInformation(flags uint8, tRange uint8, v4, v6, ni str
 	return New(UserPlaneIPResourceInformation, b)
 }
 
-// UserPlaneIPResourceInformation returns UserPlaneIPResourceInformation in *UserPlaneIPResourceInformationFields if the type of IE matches.
+// UserPlaneIPResourceInformation returns UserPlaneIPResourceInformation in
+// *UserPlaneIPResourceInformationFields if the type of IE matches.
 func (i *IE) UserPlaneIPResourceInformation() (*UserPlaneIPResourceInformationFields, error) {
 	if i.Type != UserPlaneIPResourceInformation {
 		return nil, &InvalidTypeError{Type: i.Type}
@@ -127,7 +128,7 @@ func (f *UserPlaneIPResourceInformationFields) UnmarshalBinary(b []byte) error {
 			return io.ErrUnexpectedEOF
 		}
 		f.TEIDRange = b[offset]
-		offset += 1
+		offset++
 	}
 
 	if has1stBit(f.Flags) {
@@ -188,7 +189,7 @@ func (f *UserPlaneIPResourceInformationFields) MarshalTo(b []byte) error {
 
 	if (f.Flags>>2)&0x07 != 0 {
 		b[offset] = f.TEIDRange
-		offset += 1
+		offset++
 	}
 
 	if has1stBit(f.Flags) {
@@ -202,7 +203,7 @@ func (f *UserPlaneIPResourceInformationFields) MarshalTo(b []byte) error {
 	}
 	if has6thBit(f.Flags) {
 		n := len([]byte(f.NetworkInstance))
-		copy(b[offset:offset+n], []byte(f.NetworkInstance))
+		copy(b[offset:offset+n], f.NetworkInstance)
 		offset += n
 	}
 
