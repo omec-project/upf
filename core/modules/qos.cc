@@ -260,7 +260,7 @@ CommandResponse Qos::ExtractKey(const T &arg, MeteringKey *key) {
     bess::pb::FieldData fieldsdata = arg.fields(i);
     if (fieldsdata.encoding_case() == bess::pb::FieldData::kValueInt) {
       if (!bess::utils::uint64_to_bin(&k, fieldsdata.value_int(), field_size,
-                                      false)) {
+                                      true)) {
         return CommandFailure(EINVAL, "idx %zu: not a correct %d-byte mask", i,
                               field_size);
       }
@@ -294,7 +294,7 @@ CommandResponse Qos::ExtractKeyMask(const T &arg, MeteringKey *key,
     bess::pb::FieldData fieldsdata = arg.fields(i);
     if (fieldsdata.encoding_case() == bess::pb::FieldData::kValueInt) {
       if (!bess::utils::uint64_to_bin(&k, fieldsdata.value_int(), field_size,
-                                      false)) {
+                                      true)) {
         return CommandFailure(EINVAL, "idx %zu: not a correct %d-byte mask", i,
                               field_size);
       }

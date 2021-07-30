@@ -28,12 +28,12 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-Metering::Qos(fields=[{'attr_name':'inport', 'num_bytes':4},{'attr_name':'outport', 'num_bytes':8}], values=[{'offset':28, 'num_bytes':1},{'offset':29, 'num_bytes':4},{'offset':33, 'num_bytes':4},{'offset':37, 'num_bytes':4},{'offset':41, 'num_bytes':4},{'offset':45, 'num_bytes':4}])
+Metering::Qos(fields=[{'attr_name':'inport', 'num_bytes':4},{'attr_name':'outport', 'num_bytes':4}], values=[{'offset':28, 'num_bytes':1},{'offset':29, 'num_bytes':4},{'offset':33, 'num_bytes':4},{'offset':37, 'num_bytes':4},{'offset':41, 'num_bytes':4},{'offset':45, 'num_bytes':4}])
 
-Source() -> SetMetadata(attrs=[{'name': 'inport', 'size': 4, 'value_int': 6}, {'name': 'outport', 'size':8, 'value_int':5}]) -> Metering
+Source() -> SetMetadata(attrs=[{'name': 'inport', 'size': 4, 'value_int': 6}, {'name': 'outport', 'size':4, 'value_int':5}]) -> Metering
 
 Metering:0 -> Sink() 
 Metering:1 -> Sink()   # used as default gate
 
-Metering.add(fields=[{'value_int':100663296}, {'value_int':83886080}], gate=0,values=[{'value_int':30},{'value_int':46000000},{'value_int':50},{'value_int':2048},{'value_int':2048},{'value_int':80}])
+Metering.add(fields=[{'value_int':6}, {'value_int':5}], gate=0,values=[{'value_int':30},{'value_int':46000000},{'value_int':50},{'value_int':2048},{'value_int':2048},{'value_int':80}])
 Metering.set_default_gate(gate=1)
