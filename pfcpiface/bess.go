@@ -52,6 +52,15 @@ func (b *bess) isConnected(accessIP *net.IP) bool {
 	return true
 }
 
+func (b *bess) setGlobalFarIDMapInfo(u *upf, conf *Conf) error {
+	u.globalFarIDMap.maxSize = uint64(conf.CPIface.GlobalFarIDSize)
+	if conf.CPIface.GlobalFarIDSize == 0 {
+		log.Println("No Config found for globalFarIdSize. Set to default size : ", DefaultGlobalFarSize)
+		u.globalFarIDMap.maxSize = DefaultGlobalFarSize
+	}
+	return nil
+}
+
 func (b *bess) sendEndMarkers(endMarkerList *[][]byte) error {
 	for _, eMarker := range *endMarkerList {
 		b.endMarkerChan <- eMarker
@@ -74,7 +83,7 @@ func (b *bess) sendMsgToUPF(method string, pdrs []pdr, fars []far, qers []qer) u
 
 	for _, pdr := range pdrs {
 		// TODO: https://github.com/omec-project/upf-epc/issues/251
-		// pdr.printPDR()
+		pdr.printPDR()
 		switch method {
 		case "add":
 			fallthrough
@@ -86,7 +95,7 @@ func (b *bess) sendMsgToUPF(method string, pdrs []pdr, fars []far, qers []qer) u
 	}
 	for _, far := range fars {
 		// TODO: https://github.com/omec-project/upf-epc/issues/251
-		// far.printFAR()
+		far.printFAR()
 		switch method {
 		case "add":
 			fallthrough
@@ -380,11 +389,12 @@ func (b *bess) sim(u *upf, method string) {
 
 			precedence: 255,
 
-			fseID:     uint64(n3TEID + i),
-			ctrID:     i,
-			farID:     n3,
-			qerID:     n3,
-			needDecap: 0,
+			fseID:       uint64(n3TEID + i),
+			ctrID:       i,
+			farID:       n3,
+			globalFarID: n3,
+			qerID:       n3,
+			needDecap:   0,
 		}
 
 		pdrN9Down := pdr{
@@ -398,11 +408,12 @@ func (b *bess) sim(u *upf, method string) {
 
 			precedence: 1,
 
-			fseID:     uint64(n3TEID + i),
-			ctrID:     i,
-			farID:     n3,
-			qerID:     n3,
-			needDecap: 1,
+			fseID:       uint64(n3TEID + i),
+			ctrID:       i,
+			farID:       n3,
+			globalFarID: n3,
+			qerID:       n3,
+			needDecap:   1,
 		}
 
 		// create/delete uplink pdr
@@ -419,11 +430,12 @@ func (b *bess) sim(u *upf, method string) {
 
 			precedence: 255,
 
-			fseID:     uint64(n3TEID + i),
-			ctrID:     i,
-			farID:     n6,
-			qerID:     n6,
-			needDecap: 1,
+			fseID:       uint64(n3TEID + i),
+			ctrID:       i,
+			farID:       n6,
+			globalFarID: n6,
+			qerID:       n6,
+			needDecap:   1,
 		}
 
 		pdrN9Up := pdr{
@@ -439,19 +451,20 @@ func (b *bess) sim(u *upf, method string) {
 
 			precedence: 1,
 
-			fseID:     uint64(n3TEID + i),
-			ctrID:     i,
-			farID:     n9,
-			qerID:     n9,
-			needDecap: 1,
+			fseID:       uint64(n3TEID + i),
+			ctrID:       i,
+			farID:       n9,
+			globalFarID: n9,
+			qerID:       n9,
+			needDecap:   1,
 		}
 
 		pdrs := []pdr{pdrN6Down, pdrN9Down, pdrN6Up, pdrN9Up}
 
 		// create/delete downlink far
 		farDown := far{
-			farID: n3,
-			fseID: uint64(n3TEID + i),
+			farID:       n3,
+			globalFarID: n3,
 
 			applyAction:  ActionForward,
 			dstIntf:      ie.DstInterfaceAccess,
@@ -464,16 +477,16 @@ func (b *bess) sim(u *upf, method string) {
 
 		// create/delete uplink far
 		farN6Up := far{
-			farID: n6,
-			fseID: uint64(n3TEID + i),
+			farID:       n6,
+			globalFarID: n6,
 
 			applyAction: ActionForward,
 			dstIntf:     ie.DstInterfaceCore,
 		}
 
 		farN9Up := far{
-			farID: n9,
-			fseID: uint64(n3TEID + i),
+			farID:       n9,
+			globalFarID: n9,
 
 			applyAction:  ActionForward,
 			dstIntf:      ie.DstInterfaceCore,
@@ -584,11 +597,11 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 				intEnc(uint64(p.protoMask)),        /* proto id-mask */
 			},
 			Valuesv: []*pb.FieldData{
-				intEnc(uint64(p.pdrID)), /* pdr-id */
-				intEnc(uint64(p.fseID)), /* fseid */
-				intEnc(uint64(p.ctrID)), /* ctr_id */
-				intEnc(uint64(p.qerID)), /* qer_id */
-				intEnc(uint64(p.farID)), /* far_id */
+				intEnc(uint64(p.pdrID)),       /* pdr-id */
+				intEnc(uint64(p.fseID)),       /* fseid */
+				intEnc(uint64(p.ctrID)),       /* ctr_id */
+				intEnc(uint64(p.qerID)),       /* qer_id */
+				intEnc(uint64(p.globalFarID)), /* far_id */
 			},
 		}
 		any, err = anypb.New(f)
@@ -731,8 +744,7 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 		f := &pb.ExactMatchCommandAddArg{
 			Gate: uint64(far.tunnelType),
 			Fields: []*pb.FieldData{
-				intEnc(uint64(far.farID)), /* far_id */
-				intEnc(uint64(far.fseID)), /* fseid */
+				intEnc(uint64(far.globalFarID)), /* far_id */
 			},
 			Values: []*pb.FieldData{
 				intEnc(uint64(action)),           /* action */
@@ -760,8 +772,7 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 
 		f := &pb.ExactMatchCommandDeleteArg{
 			Fields: []*pb.FieldData{
-				intEnc(uint64(far.farID)), /* far_id */
-				intEnc(uint64(far.fseID)), /* fseid */
+				intEnc(uint64(far.globalFarID)), /* far_id */
 			},
 		}
 		any, err = anypb.New(f)

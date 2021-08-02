@@ -38,9 +38,10 @@ const (
 )
 
 type far struct {
-	farID   uint32
-	fseID   uint64
-	fseidIP uint32
+	farID       uint32
+	fseID       uint64
+	globalFarID uint64
+	fseidIP     uint32
 
 	dstIntf       uint8
 	sendEndMarker bool
@@ -55,6 +56,7 @@ type far struct {
 func (f *far) printFAR() {
 	log.Println("------------------ FAR ---------------------")
 	log.Println("FAR ID:", f.farID)
+	log.Println("Global FAR ID:", f.globalFarID)
 	log.Println("fseID:", f.fseID)
 	log.Println("fseIDIP:", f.fseidIP)
 	log.Println("dstIntf:", f.dstIntf)

@@ -32,6 +32,7 @@ type pdr struct {
 	precedence  uint32
 	pdrID       uint32
 	fseID       uint64
+	globalFarID uint64
 	fseidIP     uint32
 	ctrID       uint32
 	farID       uint32
@@ -67,6 +68,7 @@ func (p *pdr) printPDR() {
 	log.Println("proto Mask:", p.protoMask)
 	log.Println("pdrID:", p.pdrID)
 	log.Println("fseID", p.fseID)
+	log.Println("globaFarID", p.globalFarID)
 	log.Println("fseidIP", p.fseidIP)
 	log.Println("ctrID:", p.ctrID)
 	log.Println("farID:", p.farID)

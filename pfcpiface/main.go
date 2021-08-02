@@ -61,6 +61,7 @@ type CPIfaceInfo struct {
 	UeIPPool        string `json:"ue_ip_pool"`
 	PromPort        string `json:"prom_port"`
 	Dnn             string `json:"dnn"`
+	GlobalFarIDSize uint32 `json:"global_far_id_size"`
 }
 
 // IfaceType : Gateway interface struct

@@ -73,6 +73,7 @@ func addEndMarker(farItem far, endMarkerList *[][]byte) {
 func (s *PFCPSession) UpdateFAR(f *far, endMarkerList *[][]byte) error {
 	for idx, v := range s.fars {
 		if v.farID == f.farID {
+			f.globalFarID = v.globalFarID
 			if f.sendEndMarker {
 				addEndMarker(v, endMarkerList)
 			}

@@ -13,6 +13,8 @@ type fastPath interface {
 	exit()
 	/* setup internal parameters and channel with fastPath */
 	setUpfInfo(u *upf, conf *Conf)
+	/* set global far ID map Info */
+	setGlobalFarIDMapInfo(u *upf, conf *Conf) error
 	/* set udp and pfcp conn parameters in interface */
 	setInfo(udpConn *net.UDPConn, udpAddr net.Addr, pconn *PFCPConn)
 	/* simulator mode setup */

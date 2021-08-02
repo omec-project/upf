@@ -237,7 +237,7 @@ func (c *P4rtClient) WriteFarTable(
 	te.Fields[0].Name = "far_id"
 
 	te.Fields[0].Value = make([]byte, 4)
-	binary.BigEndian.PutUint32(te.Fields[0].Value, uint32(farEntry.farID))
+	binary.BigEndian.PutUint32(te.Fields[0].Value, uint32(farEntry.globalFarID))
 
 	te.Fields[1].Name = "session_id"
 	fseidVal := make([]byte, 12)
@@ -401,7 +401,7 @@ func (c *P4rtClient) WritePdrTable(
 
 		te.Params[3].Name = "far_id"
 		te.Params[3].Value = make([]byte, 4)
-		binary.BigEndian.PutUint32(te.Params[3].Value, uint32(pdrEntry.farID))
+		binary.BigEndian.PutUint32(te.Params[3].Value, uint32(pdrEntry.globalFarID))
 
 		te.Params[4].Name = "needs_gtpu_decap"
 		te.Params[4].Value = make([]byte, 1)

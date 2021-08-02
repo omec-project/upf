@@ -13,14 +13,36 @@ import (
 
 // Release allocated IPs
 func releaseAllocatedIPs(upf *upf, session *PFCPSession) {
-	log.Println("release allocated IPs")
+	//log.Println("release allocated IPs")
 	for _, pdr := range session.pdrs {
 		if (pdr.allocIPFlag) && (pdr.srcIface == core) {
 			var ueIP net.IP = int2ip(pdr.dstIP)
 			log.Println("pdrID : ", pdr.pdrID, ", ueIP : ", ueIP.String())
 			upf.ippool.deallocIPV4(ueIP)
 		}
+		upf.resetGlobalFarID(pdr.globalFarID)
 	}
+}
+
+func updateGlobalIds(upf *upf, session *PFCPSession) error {
+	log.Println("Add global Ids in PDR")
+	for pdrKey, pdr := range session.pdrs {
+		for farKey, far := range session.fars {
+			if pdr.farID == far.farID {
+				globalFarID, err := upf.getGlobalFarID()
+				if err != nil {
+					return err
+				}
+				session.fars[farKey].globalFarID = globalFarID
+				session.pdrs[pdrKey].globalFarID = globalFarID
+				log.Println("pdrID : ", pdr.pdrID)
+				log.Println("farID : ", pdr.farID)
+				log.Println("GlobalFarID : ", globalFarID)
+			}
+		}
+	}
+
+	return nil
 }
 
 func addPdrInfo(msg *message.SessionEstablishmentResponse,
@@ -47,10 +69,11 @@ func (s *PFCPSession) CreatePDR(p pdr) {
 }
 
 // UpdatePDR updates existing pdr in the session
-func (s *PFCPSession) UpdatePDR(p pdr) error {
+func (s *PFCPSession) UpdatePDR(p *pdr) error {
 	for idx, v := range s.pdrs {
 		if v.pdrID == p.pdrID {
-			s.pdrs[idx] = p
+			p.globalFarID = v.globalFarID
+			s.pdrs[idx] = *p
 			return nil
 		}
 	}

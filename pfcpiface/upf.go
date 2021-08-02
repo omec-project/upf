@@ -4,7 +4,9 @@
 package main
 
 import (
+	"errors"
 	"log"
+	"math/rand"
 	"net"
 	"time"
 )
@@ -28,7 +30,13 @@ type upf struct {
 	ippool           ipPool
 	recoveryTime     time.Time
 	dnn              string
+	globalFarIDMap   globalFars
 	reportNotifyChan chan uint64
+}
+
+type globalFars struct {
+	maxSize   uint64
+	allocated map[uint64]uint64
 }
 
 // to be replaced with go-pfcp structs
@@ -47,11 +55,12 @@ const (
 	n9 = 0x2
 
 	// far-action specific values
-	farForwardD = 0x0
-	farForwardU = 0x1
-	farDrop     = 0x2
-	farBuffer   = 0x3
-	farNotify   = 0x4
+	farForwardD          = 0x0
+	farForwardU          = 0x1
+	farDrop              = 0x2
+	farBuffer            = 0x3
+	farNotify            = 0x4
+	DefaultGlobalFarSize = 100000
 )
 
 func (u *upf) sendMsgToUPF(method string, pdrs []pdr, fars []far, qers []qer) uint8 {
@@ -78,8 +87,31 @@ func (u *upf) sim(method string) {
 	u.intf.sim(u, method)
 }
 
+func (u *upf) resetGlobalFarID(val uint64) {
+	log.Println("delete global FAR ID ", val)
+	delete(u.globalFarIDMap.allocated, val)
+}
+
+func (u *upf) getGlobalFarID() (uint64, error) {
+	farGMap := &u.globalFarIDMap
+	var val uint64
+	for i := 0; i < int(farGMap.maxSize); i++ {
+		rand.Seed(time.Now().UnixNano())
+		val = uint64(rand.Intn(int(farGMap.maxSize)-1) + 1)
+		if _, ok := farGMap.allocated[val]; !ok {
+			log.Println("Far ID not in allocated map ", val)
+			farGMap.allocated[val] = 1
+			return val, nil
+		}
+	}
+
+	errin := errors.New("Global FAR ID alloc fail")
+	return 0, errin
+}
+
 func (u *upf) setUpfInfo(conf *Conf) {
 	u.reportNotifyChan = make(chan uint64, 1024)
+	u.globalFarIDMap.allocated = make(map[uint64]uint64)
 	u.n4SrcIP = net.ParseIP("0.0.0.0")
 	u.nodeIP = net.ParseIP("0.0.0.0")
 
@@ -105,6 +137,7 @@ func (u *upf) setUpfInfo(conf *Conf) {
 	log.Println("UPF Node IP : ", u.nodeIP.String())
 	log.Println("UPF Local IP : ", u.n4SrcIP.String())
 	u.intf.setUpfInfo(u, conf)
+	_ = u.intf.setGlobalFarIDMapInfo(u, conf)
 }
 
 func (u *upf) setInfo(udpConn *net.UDPConn, udpAddr net.Addr, pconn *PFCPConn) {

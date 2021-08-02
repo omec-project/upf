@@ -350,6 +350,11 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 		session.CreateQER(q)
 	}
 
+	err = updateGlobalIds(upf, session)
+	if err != nil {
+		pc.mgr.RemoveSession(session.localSEID)
+		return sendError(err, ie.CauseNoResourcesAvailable)
+	}
 	cause := upf.sendMsgToUPF("add", session.pdrs, session.fars, session.qers)
 	if cause == ie.CauseRequestRejected {
 		pc.mgr.RemoveSession(session.localSEID)
@@ -468,7 +473,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 			return sendError(err)
 		}
 		p.fseidIP = fseidIP
-		err = session.UpdatePDR(p)
+		err = session.UpdatePDR(&p)
 		if err != nil {
 			log.Println("session PDR update failed ", err)
 			continue

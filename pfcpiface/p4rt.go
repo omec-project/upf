@@ -100,6 +100,23 @@ func (c *counter) init() {
 	c.allocated = make(map[uint64]uint64)
 }
 
+func (p *p4rtc) setGlobalFarIDMapInfo(u *upf, conf *Conf) error {
+	if p.p4client != nil {
+		for _, tab := range p.p4client.P4Info.Tables {
+			if tab.Preamble.Name == "PreQosPipe.load_far_attributes" {
+				log.Println("maxsize : ", tab.Size)
+				log.Println("Table ID : ", tab.Preamble.Id)
+				u.globalFarIDMap.maxSize = uint64(tab.Size)
+				return nil
+			}
+		}
+	}
+
+	log.Println("No Table found in P4 with name PreQosPipe.load_far_attributes. Set to Default size : ", DefaultGlobalFarSize)
+	u.globalFarIDMap.maxSize = uint64(DefaultGlobalFarSize)
+	return nil
+}
+
 func setCounterSize(p *p4rtc, counterID uint8, name string) error {
 	if p.p4client != nil {
 		for _, ctr := range p.p4client.P4Info.Counters {
@@ -183,6 +200,32 @@ func (p *p4rtc) channelSetup() (*P4rtClient, error) {
 	return localclient, nil
 }
 
+func initGlobalFarIDs(p *p4rtc) error {
+	log.Println("Initialize global Far IDs for p4client.")
+	var errin error
+	if p.p4client == nil {
+		errin = fmt.Errorf("can't initialize Global FAR IDs. P4client null")
+		return errin
+	}
+
+	p.counters = make([]counter, 2)
+	errin = setCounterSize(p, preQosPdrCounter,
+		"PreQosPipe.pre_qos_pdr_counter")
+	if errin != nil {
+		log.Println("preQosPdrCounter counter not found : ", errin)
+	}
+	errin = setCounterSize(p, postQosPdrCounter,
+		"PostQosPipe.post_qos_pdr_counter")
+	if errin != nil {
+		log.Println("postQosPdrCounter counter not found : ", errin)
+	}
+	for i := range p.counters {
+		log.Println("init maps for counters.")
+		p.counters[i].init()
+	}
+
+	return nil
+}
 func initCounter(p *p4rtc) error {
 	log.Println("Initialize counters for p4client.")
 	var errin error
@@ -227,6 +270,11 @@ func (p *p4rtc) isConnected(accessIP *net.IP) bool {
 			log.Println("clear PDR table failed : ", errin)
 		}
 		errin = p.p4client.ClearFarTable()
+		if errin != nil {
+			log.Println("clear FAR table failed : ", errin)
+		}
+
+		errin = initGlobalFarIDs(p)
 		if errin != nil {
 			log.Println("clear FAR table failed : ", errin)
 		}
@@ -298,6 +346,10 @@ func (p *p4rtc) setUpfInfo(u *upf, conf *Conf) {
 		}
 	}
 
+	errin = initGlobalFarIDs(p)
+	if errin != nil {
+		log.Println("clear FAR table failed : ", errin)
+	}
 	errin = initCounter(p)
 	if errin != nil {
 		log.Println("Counter Init failed. : ", errin)
