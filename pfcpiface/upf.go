@@ -4,9 +4,10 @@
 package main
 
 import (
-	"log"
 	"net"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type upf struct {

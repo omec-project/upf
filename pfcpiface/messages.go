@@ -6,11 +6,11 @@ package main
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"strings"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
 )
