@@ -5,8 +5,9 @@ package main
 
 import (
 	"errors"
-	"log"
 	"net"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type ipPool struct {

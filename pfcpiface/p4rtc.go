@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"time"
 
@@ -18,6 +17,7 @@ import (
 	grpcRetry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	p4ConfigV1 "github.com/p4lang/p4runtime/go/p4/config/v1"
 	p4 "github.com/p4lang/p4runtime/go/p4/v1"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/genproto/googleapis/rpc/code"
 	"google.golang.org/grpc"
 )
@@ -460,7 +460,7 @@ func (c *P4rtClient) getCounterValue(entity *p4.Entity,
 	pktCount := uint64(entry.GetData().PacketCount)
 	ce.ByteCount[index] = byteCount
 	ce.PktCount[index] = pktCount
-	//log.Println("index , bytecount, pktcount ", index, byteCount, pktCount)
+	log.Traceln("index , bytecount, pktcount ", index, byteCount, pktCount)
 	return nil
 }
 
@@ -474,7 +474,7 @@ func (c *P4rtClient) getFieldValue(entity *p4.Entity,
 	inputParam := te.Params[0]
 	if (entry.TableId != tableID) ||
 		(entry.Action.GetAction().ActionId != actionID) {
-		err := log.Output(1, "Inavlid tableID / ActionID.")
+		err := fmt.Errorf("Invalid tableID / ActionID.")
 		return nil, err
 	}
 
@@ -570,7 +570,7 @@ func (c *P4rtClient) getFieldValue(entity *p4.Entity,
 
 func (c *P4rtClient) addFieldValue(entry *p4.TableEntry, field MatchField,
 	tableID uint32) error {
-	//log.Println("add Match field")
+	log.Traceln("add Match field")
 	fieldVal := &p4.FieldMatch{
 		FieldId: 0,
 	}
@@ -579,7 +579,7 @@ func (c *P4rtClient) addFieldValue(entry *p4.TableEntry, field MatchField,
 		if tables.Preamble.Id == tableID {
 			for _, fields := range tables.MatchFields {
 				if fields.Name == field.Name {
-					//log.Println("field name match found.")
+					log.Traceln("field name match found.")
 					fieldVal.FieldId = fields.Id
 					switch fields.GetMatchType() {
 					case p4ConfigV1.MatchField_EXACT:
@@ -634,7 +634,7 @@ func (c *P4rtClient) addFieldValue(entry *p4.TableEntry, field MatchField,
 
 func (c *P4rtClient) addActionValue(action *p4.Action, param ActionParam,
 	actionID uint32) error {
-	//log.Println("add action param value")
+	log.Traceln("add action param value")
 
 	for _, actions := range c.P4Info.Actions {
 		if actions.Preamble.Id == actionID {
@@ -666,7 +666,7 @@ func (c *P4rtClient) ReadCounter(ce *IntfCounterEntry) error {
 		return err
 	}
 
-	//log.Println(proto.MarshalTextString(readRes))
+	log.Traceln(proto.MarshalTextString(readRes))
 	for _, ent := range readRes.GetEntities() {
 		err := c.getCounterValue(ent, ce)
 		if err != nil {
@@ -681,7 +681,7 @@ func (c *P4rtClient) ReadCounter(ce *IntfCounterEntry) error {
 //ReadCounterEntry .. Read counter Entry
 func (c *P4rtClient) ReadCounterEntry(ce *IntfCounterEntry) (*p4.ReadResponse, error) {
 
-	//log.Println("Read Counter Entry")
+	log.Traceln("Read Counter Entry")
 
 	var index p4.Index
 	index.Index = int64(ce.Index)
@@ -704,7 +704,7 @@ func (c *P4rtClient) ReadCounterEntry(ce *IntfCounterEntry) (*p4.ReadResponse, e
 		entity := &p4.Entity{
 			Entity: &p4.Entity_CounterEntry{CounterEntry: entry},
 		}*/
-	//log.Println(proto.MarshalTextString(&entity))
+	log.Traceln(proto.MarshalTextString(&entity))
 	return c.ReadReq(&entity)
 }
 
@@ -854,7 +854,7 @@ func (c *P4rtClient) ReadTableEntry(
 	entity := &p4.Entity{
 		Entity: &p4.Entity_TableEntry{TableEntry: entry},
 	}
-	//log.Println(proto.MarshalTextString(entity))
+	log.Traceln(proto.MarshalTextString(entity))
 	return c.ReadReq(entity)
 }
 
@@ -864,12 +864,12 @@ func (c *P4rtClient) ReadReqEntities(entities []*p4.Entity) (*p4.ReadResponse, e
 		DeviceId: c.DeviceID,
 		Entities: entities,
 	}
-	//log.Println(proto.MarshalTextString(req))
+	log.Traceln(proto.MarshalTextString(req))
 	readClient, err := c.Client.Read(context.Background(), req)
 	if err == nil {
 		readRes, err := readClient.Recv()
 		if err == nil {
-			//log.Println(proto.MarshalTextString(readRes))
+			log.Traceln(proto.MarshalTextString(readRes))
 			return readRes, nil
 		}
 	}
@@ -886,12 +886,12 @@ func (c *P4rtClient) ReadReq(entity *p4.Entity) (*p4.ReadResponse, error) {
 		2*time.Second)
 	defer cancel()
 
-	//log.Println(proto.MarshalTextString(&req))
+	log.Traceln(proto.MarshalTextString(&req))
 	readClient, err := c.Client.Read(ctx, &req)
 	if err == nil {
 		readRes, err := readClient.Recv()
 		if err == nil {
-			//log.Println(proto.MarshalTextString(readRes))
+			log.Traceln(proto.MarshalTextString(readRes))
 			return readRes, nil
 		}
 	}
@@ -955,7 +955,7 @@ func (c *P4rtClient) InsertTableEntry(
 		},
 	}
 
-	//log.Println(proto.MarshalTextString(update))
+	log.Traceln(proto.MarshalTextString(update))
 	return c.WriteReq(update)
 }
 
@@ -979,7 +979,7 @@ func (c *P4rtClient) WriteBatchReq(updates []*p4.Update) error {
 
 	req.Updates = append(req.Updates, updates...)
 
-	//log.Println(proto.MarshalTextString(req))
+	log.Traceln(proto.MarshalTextString(req))
 	_, err := c.Client.Write(context.Background(), req)
 	return err
 }

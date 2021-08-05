@@ -4,12 +4,12 @@
 package main
 
 import (
-	"log"
 	"net"
 	"strings"
 	"sync"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/message"
 )
 
@@ -138,7 +138,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 			log.Println("Node IP address is now: ", upf.nodeIP.String())
 		}
 
-		// log.Println("Message: ", msg)
+		log.Traceln("Message: ", msg)
 
 		// handle message
 		var outgoingMessage []byte

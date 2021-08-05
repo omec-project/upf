@@ -5,10 +5,11 @@ package main
 
 import (
 	"errors"
+	"net"
+
+	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
-	"log"
-	"net"
 )
 
 // Release allocated IPs

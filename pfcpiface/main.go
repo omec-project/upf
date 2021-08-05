@@ -7,13 +7,13 @@ import (
 	"encoding/json"
 	"flag"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"os"
 	"time"
 
 	fqdn "github.com/Showmax/go-fqdn"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -39,6 +39,7 @@ type Conf struct {
 	EnableEndMarker   bool        `json:"enable_end_marker"`
 	NotifySockAddr    string      `json:"notify_sockaddr"`
 	EndMarkerSockAddr string      `json:"endmarker_sockaddr"`
+	LogLevel          string      `json:"log_level"`
 }
 
 // SimModeInfo : Sim mode attributes
@@ -88,6 +89,11 @@ func ParseJSON(filepath *string, conf *Conf) {
 	if err != nil {
 		log.Fatalln("Unable to unmarshal conf attributes:", err)
 	}
+
+	// Set default log level
+	if conf.LogLevel == "" {
+		conf.LogLevel = "info"
+	}
 }
 
 // ParseStrIP : parse IP address from config
@@ -122,15 +128,24 @@ func ParseIP(name string, iface string) net.IP {
 }
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-
 	// cmdline args
 	flag.Parse()
 	var conf Conf
 	var intf fastPath
 	// read and parse json startup file
 	ParseJSON(configPath, &conf)
-	log.Println(conf)
+
+	// Set up logger
+	log.SetReportCaller(true)
+	log.SetFormatter(&log.TextFormatter{
+		FullTimestamp: true,
+	})
+	if level, err := log.ParseLevel(conf.LogLevel); err != nil {
+		log.Fatalln(err)
+	} else {
+		log.SetLevel(level)
+	}
+	log.Infoln(conf)
 
 	if conf.EnableP4rt {
 		intf = &p4rtc{}
@@ -182,9 +197,11 @@ func main() {
 	}
 
 	log.Println("httpAddr: ", httpAddr)
-	go pfcpifaceMainLoop(upf, upf.accessIP.String(),
+	go pfcpifaceMainLoop(
+		upf, upf.accessIP.String(),
 		upf.coreIP.String(), upf.n4SrcIP.String(),
-		conf.CPIface.DestIP)
+		conf.CPIface.DestIP,
+	)
 
 	setupProm(upf)
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))

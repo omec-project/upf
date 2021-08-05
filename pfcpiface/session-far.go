@@ -5,10 +5,11 @@ package main
 
 import (
 	"errors"
+	"net"
+
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"log"
-	"net"
+	log "github.com/sirupsen/logrus"
 )
 
 // CreateFAR appends far to existing list of FARs in the session

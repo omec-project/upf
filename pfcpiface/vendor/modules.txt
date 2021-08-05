@@ -36,6 +36,8 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
+# github.com/sirupsen/logrus v1.8.1
+github.com/sirupsen/logrus
 # github.com/wmnsk/go-pfcp v0.0.9-0.20210129064645-e1b1f34ebd9f
 github.com/wmnsk/go-pfcp/ie
 github.com/wmnsk/go-pfcp/internal/logger
