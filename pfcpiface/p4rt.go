@@ -370,6 +370,8 @@ func (p *p4rtc) sendMsgToUPF(method string, pdrs []pdr,
 	}
 
 	for _, pdr := range pdrs {
+		log.Traceln(pdr)
+		log.Traceln("write pdr funcType : ", funcType)
 		errin := p.p4client.WritePdrTable(pdr, funcType)
 		if errin != nil {
 			resetCounterVal(p, preQosPdrCounter, uint64(pdr.ctrID))
@@ -379,8 +381,8 @@ func (p *p4rtc) sendMsgToUPF(method string, pdrs []pdr,
 	}
 
 	for _, far := range fars {
-		far.printFAR()
-		log.Println("write far funcType : ", funcType)
+		log.Traceln(far)
+		log.Traceln("write far funcType : ", funcType)
 		errin := p.p4client.WriteFarTable(far, funcType)
 		if errin != nil {
 			log.Println("far entry function failed ", errin)

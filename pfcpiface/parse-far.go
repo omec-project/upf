@@ -5,6 +5,8 @@ package main
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -52,20 +54,22 @@ type far struct {
 	tunnelPort    uint16
 }
 
-func (f *far) printFAR() {
-	log.Println("------------------ FAR ---------------------")
-	log.Println("FAR ID:", f.farID)
-	log.Println("fseID:", f.fseID)
-	log.Println("fseIDIP:", f.fseidIP)
-	log.Println("dstIntf:", f.dstIntf)
-	log.Println("applyAction:", f.applyAction)
-	log.Println("tunnelType:", f.tunnelType)
-	log.Println("tunnelIP4Src:", f.tunnelIP4Src)
-	log.Println("tunnelIP4Dst:", f.tunnelIP4Dst)
-	log.Println("tunnelTEID:", f.tunnelTEID)
-	log.Println("tunnelPort:", f.tunnelPort)
-	log.Println("sendEndMarker:", f.sendEndMarker)
-	log.Println("--------------------------------------------")
+// Satisfies the fmt.Stringer interface
+func (f far) String() string {
+	var b = strings.Builder{}
+	fmt.Fprintf(&b, "\n")
+	fmt.Fprintf(&b, "farID: %v\n", f.farID)
+	fmt.Fprintf(&b, "fseID: %x\n", f.fseID)
+	fmt.Fprintf(&b, "fseIDIP: %v\n", int2ip(f.fseidIP))
+	fmt.Fprintf(&b, "dstIntf: %v\n", f.dstIntf)
+	fmt.Fprintf(&b, "applyAction: %v\n", f.applyAction)
+	fmt.Fprintf(&b, "tunnelType: %v\n", f.tunnelType)
+	fmt.Fprintf(&b, "tunnelIP4Src: %v\n", int2ip(f.tunnelIP4Src))
+	fmt.Fprintf(&b, "tunnelIP4Dst: %v\n", int2ip(f.tunnelIP4Dst))
+	fmt.Fprintf(&b, "tunnelTEID: %x\n", f.tunnelTEID)
+	fmt.Fprintf(&b, "tunnelPort: %v\n", f.tunnelPort)
+	fmt.Fprintf(&b, "sendEndMarker: %v\n", f.sendEndMarker)
+	return b.String()
 }
 
 func (f *far) setActionValue() uint8 {

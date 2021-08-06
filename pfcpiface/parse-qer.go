@@ -4,6 +4,9 @@
 package main
 
 import (
+	"fmt"
+	"strings"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
 )
@@ -21,20 +24,23 @@ type qer struct {
 	fseidIP  uint32
 }
 
-func (q *qer) printQER() {
-	log.Println("------------------ QER ---------------------")
-	log.Println("QER ID:", q.qerID)
-	log.Println("fseID:", q.fseID)
-	log.Println("QFI:", q.qfi)
-	log.Println("fseIDIP:", int2ip(q.fseidIP))
-	log.Println("Uplink Status:", q.ulStatus)
-	log.Println("Downling Status:", q.dlStatus)
-	log.Println("Uplink MBR:", q.ulMbr)
-	log.Println("Downlink MBR:", q.dlMbr)
-	log.Println("Uplink GBR:", q.ulGbr)
-	log.Println("Downlink GBR:", q.dlGbr)
-	log.Println("--------------------------------------------")
+// Satisfies the fmt.Stringer interface
+func (q qer) String() string {
+	var b = strings.Builder{}
+	fmt.Fprintf(&b, "\n")
+	fmt.Fprintf(&b, "qerID: %v\n", q.qerID)
+	fmt.Fprintf(&b, "fseID: %x\n", q.fseID)
+	fmt.Fprintf(&b, "qfi: %v\n", q.qfi)
+	fmt.Fprintf(&b, "fseIDIP: %v\n", int2ip(q.fseidIP))
+	fmt.Fprintf(&b, "uplinkStatus: %v\n", q.ulStatus)
+	fmt.Fprintf(&b, "downlinkStatus: %v\n", q.dlStatus)
+	fmt.Fprintf(&b, "uplinkMBR: %v\n", q.ulMbr)
+	fmt.Fprintf(&b, "downlinkMBR: %v\n", q.dlMbr)
+	fmt.Fprintf(&b, "uplinkGBR: %v\n", q.ulGbr)
+	fmt.Fprintf(&b, "downlinkGBR: %v\n", q.dlGbr)
+	return b.String()
 }
+
 func (q *qer) parseQER(ie1 *ie.IE, seid uint64, upf *upf) error {
 
 	qerID, err := ie1.QERID()
