@@ -93,28 +93,6 @@ ENV PYTHONPATH="/opt/bess"
 WORKDIR /opt/bess/bessctl
 ENTRYPOINT ["bessd", "-f"]
 
-FROM ghcr.io/omec-project/upf-epc/bess_build  AS cpiface-build
-ARG MAKEFLAGS
-ARG CPU=native
-RUN apt-get update -y && apt-get install -y libzmq3-dev libjsoncpp-dev
-WORKDIR /cpiface
-COPY cpiface .
-COPY --from=bess-build /pb pb
-# Copying explicitly since symlinks don't work
-COPY core/utils/gtp_common.h .
-RUN make $MAKEFLAGS && \
-    cp zmq-cpiface /bin
-
-# Stage cpiface: creates runtime image of cpiface
-FROM ubuntu:bionic AS cpiface
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        libgoogle-glog0v5 \
-        libzmq5 && \
-    rm -rf /var/lib/apt/lists/*
-
-COPY --from=cpiface-build /bin/zmq-cpiface /bin
-
 # Stage build bess golang pb
 FROM golang AS protoc-gen
 # Fixme: https://github.com/omec-project/upf-epc/issues/234
@@ -147,5 +125,5 @@ COPY --from=go-pb /bess_pb /bess_pb
 # Stage binaries: dummy stage for collecting artifacts
 FROM scratch AS artifacts
 COPY --from=bess /bin/bessd /
-COPY --from=cpiface /bin/zmq-cpiface /
 COPY --from=pfcpiface /bin/pfcpiface /
+# COPY --from=bess-build /bess /
