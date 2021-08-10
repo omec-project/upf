@@ -212,7 +212,7 @@ func (pc *PFCPConn) handlePFDMgmtRequest(upf *upf, msg message.Message, addr net
 				return sendError(err, appIDPFD)
 			}
 			if fields.FlowDescription == "" {
-				return sendError(errors.New("Flow Description not found"), appIDPFD)
+				return sendError(errors.New("flow description not found"), appIDPFD)
 			}
 			appPFD.flowDescs = append(appPFD.flowDescs, fields.FlowDescription)
 		}
@@ -312,14 +312,14 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 
 	if strings.Compare(nodeID, pc.mgr.nodeID) != 0 {
 		log.Println("Association not found for Establishment request, nodeID: ", nodeID, ", Association NodeID: ", pc.mgr.nodeID)
-		return sendError(errors.New("No Association found for NodeID"),
+		return sendError(errors.New("no association found for NodeID"),
 			ie.CauseNoEstablishedPFCPAssociation)
 	}
 
 	/* Read CreatePDRs and CreateFARs from payload */
 	localSEID := pc.mgr.NewPFCPSession(remoteSEID)
 	if localSEID == 0 {
-		sendError(errors.New("Unable to allocate new PFCP session"),
+		sendError(errors.New("unable to allocate new PFCP session"),
 			ie.CauseNoResourcesAvailable)
 	}
 	session := pc.mgr.sessions[localSEID]
@@ -353,7 +353,7 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 	cause := upf.sendMsgToUPF(upfMsgTypeAdd, session.pdrs, session.fars, session.qers)
 	if cause == ie.CauseRequestRejected {
 		pc.mgr.RemoveSession(session.localSEID)
-		return sendError(errors.New("Write to FastPath failed"),
+		return sendError(errors.New("write to FastPath failed"),
 			ie.CauseRequestRejected)
 	}
 
@@ -413,7 +413,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 	localSEID := smreq.SEID()
 	session, ok := pc.mgr.sessions[localSEID]
 	if !ok {
-		return sendError(fmt.Errorf("Session not found: %v", localSEID))
+		return sendError(fmt.Errorf("session not found: %v", localSEID))
 	}
 
 	var fseidIP uint32
@@ -512,7 +512,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 
 	cause := upf.sendMsgToUPF(upfMsgTypeMod, addPDRs, addFARs, addQERs)
 	if cause == ie.CauseRequestRejected {
-		return sendError(errors.New("Write to FastPath failed"))
+		return sendError(errors.New("write to FastPath failed"))
 	}
 
 	if upf.enableEndMarker {
@@ -567,7 +567,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 
 	cause = upf.sendMsgToUPF(upfMsgTypeDel, delPDRs, delFARs, delQERs)
 	if cause == ie.CauseRequestRejected {
-		return sendError(errors.New("Write to FastPath failed"))
+		return sendError(errors.New("write to FastPath failed"))
 	}
 
 	// Build response message
@@ -620,12 +620,12 @@ func (pc *PFCPConn) handleSessionDeletionRequest(upf *upf, msg message.Message, 
 	localSEID := sdreq.SEID()
 	session, ok := pc.mgr.sessions[localSEID]
 	if !ok {
-		return sendError(fmt.Errorf("Session not found: %v", localSEID))
+		return sendError(fmt.Errorf("session not found: %v", localSEID))
 	}
 
 	cause := upf.sendMsgToUPF(upfMsgTypeDel, session.pdrs, session.fars, session.qers)
 	if cause == ie.CauseRequestRejected {
-		return sendError(errors.New("Write to FastPath failed"))
+		return sendError(errors.New("write to FastPath failed"))
 	}
 
 	releaseAllocatedIPs(upf, session)

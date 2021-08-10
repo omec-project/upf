@@ -117,7 +117,7 @@ func (c *P4rtClient) getEnumVal(enumName string,
 	valName string) ([]byte, error) {
 	enumVal, ok := c.P4Info.TypeInfo.SerializableEnums[enumName]
 	if !ok {
-		err := fmt.Errorf("Enum Not found with name %s", enumName)
+		err := fmt.Errorf("enum not found with name %s", enumName)
 		return nil, err
 	}
 
@@ -474,7 +474,7 @@ func (c *P4rtClient) getFieldValue(entity *p4.Entity,
 	inputParam := te.Params[0]
 	if (entry.TableId != tableID) ||
 		(entry.Action.GetAction().ActionId != actionID) {
-		err := fmt.Errorf("Invalid tableID / ActionID.")
+		err := fmt.Errorf("invalid tableID / ActionID")
 		return nil, err
 	}
 
@@ -553,7 +553,7 @@ func (c *P4rtClient) getFieldValue(entity *p4.Entity,
 						}
 					default:
 						log.Println("Unknown MatchType.")
-						err := fmt.Errorf("Unknown MatchType for FieldMatch")
+						err := fmt.Errorf("unknown MatchType for FieldMatch")
 						return nil, err
 					}
 
@@ -617,7 +617,7 @@ func (c *P4rtClient) addFieldValue(entry *p4.TableEntry, field MatchField,
 						}
 					default:
 						log.Println("Unknown MatchType.")
-						err := fmt.Errorf("Unknown MatchType for FieldMatch")
+						err := fmt.Errorf("unknown MatchType for FieldMatch")
 						return err
 					}
 

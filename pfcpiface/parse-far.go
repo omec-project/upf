@@ -109,7 +109,7 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 	case update:
 		fwdIEs, err = farIE.UpdateForwardingParameters()
 	default:
-		return errors.New("Invalid op specified")
+		return errors.New("invalid op specified")
 	}
 
 	if err != nil {
