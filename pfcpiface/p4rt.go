@@ -113,7 +113,7 @@ func setCounterSize(p *p4rtc, counterID uint8, name string) error {
 		}
 	}
 
-	errin := fmt.Errorf("Countername not found %s", name)
+	errin := fmt.Errorf("countername not found %s", name)
 	return errin
 }
 

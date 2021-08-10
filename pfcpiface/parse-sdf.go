@@ -17,7 +17,7 @@ const (
 )
 
 var (
-	errBadFilterDesc = errors.New("Unsupported Filter Description format")
+	errBadFilterDesc = errors.New("unsupported Filter Description format")
 )
 
 type endpoint struct {
@@ -33,13 +33,13 @@ func (ep *endpoint) parseNet(ipnet string) error {
 		ipnet = ipNetFields[0] + "/32"
 	case 2:
 	default:
-		return errors.New("Incorrect network string")
+		return errors.New("incorrect network string")
 	}
 
 	var err error
 	_, ep.IPNet, err = net.ParseCIDR(ipnet)
 	if err != nil {
-		return errors.New("Unable to ParseCIDR")
+		return errors.New("unable to ParseCIDR")
 	}
 	return nil
 }
