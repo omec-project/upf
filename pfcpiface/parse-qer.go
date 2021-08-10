@@ -26,7 +26,7 @@ type qer struct {
 
 // Satisfies the fmt.Stringer interface.
 func (q qer) String() string {
-	var b = strings.Builder{}
+	b := strings.Builder{}
 	fmt.Fprintf(&b, "\n")
 	fmt.Fprintf(&b, "qerID: %v\n", q.qerID)
 	fmt.Fprintf(&b, "fseID: %x\n", q.fseID)
@@ -42,7 +42,6 @@ func (q qer) String() string {
 }
 
 func (q *qer) parseQER(ie1 *ie.IE, seid uint64, upf *upf) error {
-
 	qerID, err := ie1.QERID()
 	if err != nil {
 		log.Println("Could not read QER ID!")

@@ -29,9 +29,7 @@ var intEnc = func(u uint64) *pb.FieldData {
 	return &pb.FieldData{Encoding: &pb.FieldData_ValueInt{ValueInt: u}}
 }
 
-var (
-	bessIP = flag.String("bess", "localhost:10514", "BESS IP/port combo")
-)
+var bessIP = flag.String("bess", "localhost:10514", "BESS IP/port combo")
 
 type bess struct {
 	client           pb.BESSControlClient
@@ -222,7 +220,6 @@ func (b *bess) portStats(uc *upfCollector, ch chan<- prometheus.Metric) {
 
 		dropped(res.Inc.Dropped, "rx")
 		dropped(res.Out.Dropped, "tx")
-
 	}
 
 	portstats("Access", uc.upf.accessIface)
@@ -269,7 +266,6 @@ func (b *bess) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metri
 	}
 	measureIface("Access", uc.upf.accessIface)
 	measureIface("Core", uc.upf.coreIface)
-
 }
 
 func (b *bess) endMarkerSendLoop(endMarkerChan chan []byte) {
@@ -282,7 +278,6 @@ func (b *bess) endMarkerSendLoop(endMarkerChan chan []byte) {
 }
 
 func (b *bess) notifyListen(reportNotifyChan chan<- uint64) {
-
 	for {
 		buf := make([]byte, 512)
 		_, err := b.notifyBessSocket.Read(buf)

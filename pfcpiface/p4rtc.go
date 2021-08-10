@@ -658,7 +658,6 @@ func (c *P4rtClient) addActionValue(action *p4.Action, param ActionParam,
 
 // ReadCounter ... Read Counter entry.
 func (c *P4rtClient) ReadCounter(ce *IntfCounterEntry) error {
-
 	log.Println("ReadCounter ID : ", ce.CounterID)
 
 	readRes, err := c.ReadCounterEntry(ce)
@@ -681,7 +680,6 @@ func (c *P4rtClient) ReadCounter(ce *IntfCounterEntry) error {
 
 // ReadCounterEntry .. Read counter Entry.
 func (c *P4rtClient) ReadCounterEntry(ce *IntfCounterEntry) (*p4.ReadResponse, error) {
-
 	log.Traceln("Read Counter Entry")
 
 	var index p4.Index
@@ -711,7 +709,6 @@ func (c *P4rtClient) ReadCounterEntry(ce *IntfCounterEntry) (*p4.ReadResponse, e
 
 // ClearFarTable ... Clear FAR Table.
 func (c *P4rtClient) ClearFarTable() error {
-
 	log.Println("ClearFarTable.")
 	te := AppTableEntry{
 		TableName: "PreQosPipe.load_far_attributes",
@@ -747,7 +744,6 @@ func (c *P4rtClient) ClearFarTable() error {
 
 // ClearPdrTable ... Clear PDR Table.
 func (c *P4rtClient) ClearPdrTable() error {
-
 	log.Println("ClearPdrTable.")
 	te := AppTableEntry{
 		TableName: "PreQosPipe.pdrs",

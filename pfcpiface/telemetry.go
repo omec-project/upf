@@ -96,7 +96,6 @@ func newUpfCollector(upf *upf) *upfCollector {
 
 // Describe writes all descriptors to the prometheus desc channel.
 func (uc *upfCollector) Describe(ch chan<- *prometheus.Desc) {
-
 	ch <- uc.packets
 	ch <- uc.bytes
 	ch <- uc.dropped

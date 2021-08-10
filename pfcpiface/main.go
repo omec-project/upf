@@ -73,7 +73,6 @@ type IfaceType struct {
 func ParseJSON(filepath *string, conf *Conf) {
 	/* Open up file */
 	jsonFile, err := os.Open(*filepath)
-
 	if err != nil {
 		log.Fatalln("Error opening file: ", err)
 	}
@@ -109,7 +108,6 @@ func ParseStrIP(n3name string) (net.IP, net.IPMask) {
 // ParseIP : parse IP address from the interface name.
 func ParseIP(name string, iface string) net.IP {
 	byNameInterface, err := net.InterfaceByName(name)
-
 	if err != nil {
 		log.Fatalln("Unable to get info on interface name:", name, err)
 	}
