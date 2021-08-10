@@ -55,14 +55,14 @@ func (pc *PFCPConn) handleAssociationSetupRequest(upf *upf, msg message.Message,
 		return nil
 	}
 	log.Println("Got an association setup request with TS: ", ts, " from: ", addr)
-	globalPfcpStats.messages.WithLabelValues(string(nodeID), "Association_Setup_Request", "Incoming", "Success").Inc()
+	globalPfcpStats.messages.WithLabelValues(nodeID, "Association_Setup_Request", "Incoming", "Success").Inc()
 
 	cause := ie.CauseRequestAccepted
 	if !upf.isConnected() {
 		cause = ie.CauseRequestRejected
-		globalPfcpStats.messages.WithLabelValues(string(nodeID), "Association_Setup_Response", "Outgoing", "Failure").Inc()
+		globalPfcpStats.messages.WithLabelValues(nodeID, "Association_Setup_Response", "Outgoing", "Failure").Inc()
 	} else {
-		globalPfcpStats.messages.WithLabelValues(string(nodeID), "Association_Setup_Response", "Outgoing", "Success").Inc()
+		globalPfcpStats.messages.WithLabelValues(nodeID, "Association_Setup_Response", "Outgoing", "Success").Inc()
 	}
 
 	// Build response message
@@ -279,7 +279,7 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 	}
 
 	log.Println("Got a session establishment request from: ", addr)
-	globalPfcpStats.messages.WithLabelValues(string(nodeID), "Pfcp_Establishment_Request", "Incoming", "Success").Inc()
+	globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Establishment_Request", "Incoming", "Success").Inc()
 
 	/* Read fseid from the IE */
 	fseid, err := sereq.CPFSEID.FSEID()
@@ -291,7 +291,7 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 	fseidIP := ip2int(fseid.IPv4Address)
 
 	sendError := func(err error, cause uint8) []byte {
-		globalPfcpStats.messages.WithLabelValues(string(nodeID), "Pfcp_Establishment_Response", "Outgoing", "Failure").Inc()
+		globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Establishment_Response", "Outgoing", "Failure").Inc()
 		log.Println(err)
 		// Build response message
 		seres, err := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
@@ -375,7 +375,7 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 	}
 
 	log.Println("Sending session establishment response to: ", addr)
-	globalPfcpStats.messages.WithLabelValues(string(nodeID), "Pfcp_Establishment_Response", "Outgoing", "Success").Inc()
+	globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Establishment_Response", "Outgoing", "Success").Inc()
 	return seres
 }
 
@@ -389,11 +389,11 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 	nodeID := pc.mgr.nodeID
 
 	log.Println("Got a session modification request from: ", addr)
-	globalPfcpStats.messages.WithLabelValues(string(nodeID), "Pfcp_Modification_Request", "Incoming", "Success").Inc()
+	globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Modification_Request", "Incoming", "Success").Inc()
 
 	var remoteSEID uint64
 	sendError := func(err error) []byte {
-		globalPfcpStats.messages.WithLabelValues(string(nodeID), "Pfcp_Modification_Response", "Outgoing", "Failure").Inc()
+		globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Modification_Response", "Outgoing", "Failure").Inc()
 		log.Println(err)
 		smres, err := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */
 			0,                                    /* FO <-- what's this? */
@@ -582,7 +582,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 		log.Fatalln("Unable to create session modification response", err)
 	}
 
-	globalPfcpStats.messages.WithLabelValues(string(nodeID), "Pfcp_Modification_Response", "Outgoing", "Success").Inc()
+	globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Modification_Response", "Outgoing", "Success").Inc()
 	log.Println("Sent session modification response to: ", addr)
 	return smres
 }
@@ -596,11 +596,11 @@ func (pc *PFCPConn) handleSessionDeletionRequest(upf *upf, msg message.Message, 
 
 	nodeID := pc.mgr.nodeID
 	log.Println("Got a session deletion request from: ", addr)
-	globalPfcpStats.messages.WithLabelValues(string(nodeID), "Pfcp_Deletion_Request", "Incoming", "Success").Inc()
+	globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Deletion_Request", "Incoming", "Success").Inc()
 
 	sendError := func(err error) []byte {
 		log.Println(err)
-		globalPfcpStats.messages.WithLabelValues(string(nodeID), "Pfcp_Deletion_Response", "Outgoing", "Failure").Inc()
+		globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Deletion_Response", "Outgoing", "Failure").Inc()
 		smres, err := message.NewSessionDeletionResponse(0, /* MO?? <-- what's this */
 			0,                                    /* FO <-- what's this? */
 			0,                                    /* seid */
@@ -645,7 +645,7 @@ func (pc *PFCPConn) handleSessionDeletionRequest(upf *upf, msg message.Message, 
 	}
 
 	log.Println("Sent session deletion response to: ", addr)
-	globalPfcpStats.messages.WithLabelValues(string(nodeID), "Pfcp_Deletion_Response", "Outgoing", "Success").Inc()
+	globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Deletion_Response", "Outgoing", "Success").Inc()
 
 	return smres
 }

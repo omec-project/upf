@@ -579,7 +579,7 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 			},
 			Valuesv: []*pb.FieldData{
 				intEnc(uint64(p.pdrID)), /* pdr-id */
-				intEnc(uint64(p.fseID)), /* fseid */
+				intEnc(p.fseID),         /* fseid */
 				intEnc(uint64(p.ctrID)), /* ctr_id */
 				intEnc(uint64(p.qerID)), /* qer_id */
 				intEnc(uint64(p.farID)), /* far_id */
@@ -659,16 +659,16 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 			Gate: uint64(0),
 			Fields: []*pb.FieldData{
 				intEnc(uint64(qer.qerID)), /* far_id */
-				intEnc(uint64(qer.fseID)), /* fseid */
+				intEnc(qer.fseID),         /* fseid */
 			},
 			Values: []*pb.FieldData{
 				intEnc(uint64(qer.qfi)),      /* action */
 				intEnc(uint64(qer.ulStatus)), /* QFI */
 				intEnc(uint64(qer.dlStatus)), /* tunnel_out_type */
-				intEnc(uint64(qer.ulMbr)),    /* access-ip */
-				intEnc(uint64(qer.dlMbr)),    /* enb ip */
-				intEnc(uint64(qer.ulGbr)),    /* enb teid */
-				intEnc(uint64(qer.dlGbr)),    /* udp gtpu port */
+				intEnc(qer.ulMbr),            /* access-ip */
+				intEnc(qer.dlMbr),            /* enb ip */
+				intEnc(qer.ulGbr),            /* enb teid */
+				intEnc(qer.dlGbr),            /* udp gtpu port */
 			},
 		}
 		any, err = anypb.New(q)
@@ -689,7 +689,7 @@ func (b *bess) delQER(ctx context.Context, done chan<- bool, qer qer) {
 		q := &pb.ExactMatchCommandDeleteArg{
 			Fields: []*pb.FieldData{
 				intEnc(uint64(qer.qerID)), /* qer_id */
-				intEnc(uint64(qer.fseID)), /* fseid */
+				intEnc(qer.fseID),         /* fseid */
 			},
 		}
 		any, err = anypb.New(q)
@@ -728,7 +728,7 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 			Gate: uint64(far.tunnelType),
 			Fields: []*pb.FieldData{
 				intEnc(uint64(far.farID)), /* far_id */
-				intEnc(uint64(far.fseID)), /* fseid */
+				intEnc(far.fseID),         /* fseid */
 			},
 			Values: []*pb.FieldData{
 				intEnc(uint64(action)),           /* action */
@@ -757,7 +757,7 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 		f := &pb.ExactMatchCommandDeleteArg{
 			Fields: []*pb.FieldData{
 				intEnc(uint64(far.farID)), /* far_id */
-				intEnc(uint64(far.fseID)), /* fseid */
+				intEnc(far.fseID),         /* fseid */
 			},
 		}
 		any, err = anypb.New(f)

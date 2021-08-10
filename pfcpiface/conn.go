@@ -47,7 +47,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 	pconn.mgr = NewPFCPSessionMgr(100)
 	rTimeout := readTimeout
 	if upf.readTimeout != 0 {
-		rTimeout = time.Duration(upf.readTimeout)
+		rTimeout = upf.readTimeout
 	}
 	if upf.connTimeout != 0 {
 		Timeout = upf.connTimeout

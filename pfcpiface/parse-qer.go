@@ -83,15 +83,15 @@ func (q *qer) parseQER(ie1 *ie.IE, seid uint64, upf *upf) error {
 		log.Println("Could not read GBRDL!")
 	}
 
-	q.qerID = uint32(qerID)
-	q.qfi = uint8(qfi)
-	q.ulStatus = uint8(gsUL)
-	q.dlStatus = uint8(gsDL)
+	q.qerID = qerID
+	q.qfi = qfi
+	q.ulStatus = gsUL
+	q.dlStatus = gsDL
 	q.ulMbr = uint64(mbrUL)
 	q.dlMbr = uint64(mbrDL)
 	q.ulGbr = uint64(gbrUL)
 	q.dlGbr = uint64(gbrDL)
-	q.fseID = (seid) // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
+	q.fseID = seid
 
 	return nil
 }
