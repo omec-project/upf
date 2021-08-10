@@ -34,20 +34,20 @@ type upf struct {
 
 // to be replaced with go-pfcp structs
 
-// Don't change these values
+// Don't change these values.
 const (
 	tunnelGTPUPort = 2152
 
-	// src-iface consts
+	// src-iface consts.
 	core   = 0x2
 	access = 0x1
 
-	// far-id specific directions
+	// far-id specific directions.
 	n3 = 0x0
 	n6 = 0x1
 	n9 = 0x2
 
-	// far-action specific values
+	// far-action specific values.
 	farForwardD = 0x0
 	farForwardU = 0x1
 	farDrop     = 0x2

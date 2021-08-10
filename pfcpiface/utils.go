@@ -12,20 +12,21 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// grpc channel state
+// grpc channel state.
 const (
 	Ready = 2
 )
 
-// Bits type
+// Bits type.
 type Bits uint8
 
-// Set Bits
+// Set Bits.
 func Set(b, flag Bits) Bits { return b | flag }
 
 // func Clear(b, flag Bits) Bits  { return b &^ flag }
 // func Toggle(b, flag Bits) Bits { return b ^ flag }
 // func Has(b, flag Bits) bool { return b&flag != 0 }
+
 func setUeipFeature(features ...uint8) {
 	if len(features) >= 3 {
 		features[2] = features[2] | 0x04

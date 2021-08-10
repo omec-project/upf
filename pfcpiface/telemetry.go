@@ -11,7 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// PfcpStats ... Prometheus metrics
+// PfcpStats ... Prometheus metrics.
 type pfcpStats struct {
 	messages *prometheus.CounterVec
 	sessions *prometheus.GaugeVec
@@ -56,7 +56,7 @@ func makeBuckets(values []uint64) map[float64]float64 {
 	return buckets
 }
 
-// upfCollector provides all UPF metrics
+// upfCollector provides all UPF metrics.
 type upfCollector struct {
 	packets *prometheus.Desc
 	bytes   *prometheus.Desc
@@ -105,7 +105,7 @@ func (uc *upfCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- uc.jitter
 }
 
-// Collect writes all metrics to prometheus metric channel
+// Collect writes all metrics to prometheus metric channel.
 func (uc *upfCollector) Collect(ch chan<- prometheus.Metric) {
 	uc.summaryLatencyJitter(ch)
 	uc.portStats(ch)

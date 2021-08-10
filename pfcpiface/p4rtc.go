@@ -22,19 +22,19 @@ import (
 	"google.golang.org/grpc"
 )
 
-// P4DeviceConfig ... Device config
+// P4DeviceConfig ... Device config.
 type P4DeviceConfig []byte
 
 const invalidID = 0
 
-// Table Entry Function Type
+// Table Entry Function Type.
 const (
 	FunctionTypeInsert uint8 = 1 // Insert table Entry Function
 	FunctionTypeUpdate uint8 = 2 // Update table Entry Function
 	FunctionTypeDelete uint8 = 3 // Delete table Entry Function
 )
 
-// IntfTableEntry ... Interface Table Entry API
+// IntfTableEntry ... Interface Table Entry API.
 type IntfTableEntry struct {
 	IP        []byte
 	PrefixLen int
@@ -42,14 +42,14 @@ type IntfTableEntry struct {
 	Direction string
 }
 
-// ActionParam ... Action Param API
+// ActionParam ... Action Param API.
 type ActionParam struct {
 	Len   uint32
 	Name  string
 	Value []byte
 }
 
-// MatchField .. Match Field API
+// MatchField .. Match Field API.
 type MatchField struct {
 	Len       uint32
 	PrefixLen uint32
@@ -58,7 +58,7 @@ type MatchField struct {
 	Mask      []byte
 }
 
-// IntfCounterEntry .. Counter entry function API
+// IntfCounterEntry .. Counter entry function API.
 type IntfCounterEntry struct {
 	CounterID uint64
 	Index     uint64
@@ -66,7 +66,7 @@ type IntfCounterEntry struct {
 	PktCount  []uint64
 }
 
-// AppTableEntry .. Table entry function API
+// AppTableEntry .. Table entry function API.
 type AppTableEntry struct {
 	FieldSize  uint32
 	ParamSize  uint32
@@ -76,7 +76,7 @@ type AppTableEntry struct {
 	Params     []ActionParam
 }
 
-// P4rtClient ... P4 Runtime client object
+// P4rtClient ... P4 Runtime client object.
 type P4rtClient struct {
 	Client     p4.P4RuntimeClient
 	Conn       *grpc.ClientConn
@@ -104,6 +104,7 @@ func (c *P4rtClient) tableID(name string) uint32 {
 	return invalidID
 }
 */
+
 func (c *P4rtClient) actionID(name string) uint32 {
 	for _, action := range c.P4Info.Actions {
 		if action.Preamble.Name == name {
@@ -131,12 +132,12 @@ func (c *P4rtClient) getEnumVal(enumName string,
 	return nil, err
 }
 
-// CheckStatus ... Check client connection status
+// CheckStatus ... Check client connection status.
 func (c *P4rtClient) CheckStatus() (state int) {
 	return int(c.Conn.GetState())
 }
 
-// SetMastership .. API
+// SetMastership .. API.
 func (c *P4rtClient) SetMastership(electionID p4.Uint128) (err error) {
 	c.ElectionID = electionID
 	mastershipReq := &p4.StreamMessageRequest{
@@ -164,7 +165,7 @@ func (c *P4rtClient) SendPacketOut(packet []byte) (err error) {
 	return err
 }
 
-// Init .. Initialize Client
+// Init .. Initialize Client.
 func (c *P4rtClient) Init(timeout uint32, reportNotifyChan chan<- uint64) (err error) {
 	// Initialize stream for mastership and packet I/O
 	// ctx, cancel := context.WithTimeout(context.Background(),
@@ -223,7 +224,7 @@ func (c *P4rtClient) Init(timeout uint32, reportNotifyChan chan<- uint64) (err e
 	return
 }
 
-// WriteFarTable .. Write far table entry API
+// WriteFarTable .. Write far table entry API.
 func (c *P4rtClient) WriteFarTable(
 	farEntry far, funcType uint8) error {
 
@@ -320,7 +321,7 @@ func (c *P4rtClient) WriteFarTable(
 	return c.InsertTableEntry(te, funcType, prio)
 }
 
-// WritePdrTable .. Write pdr table entry API
+// WritePdrTable .. Write pdr table entry API.
 func (c *P4rtClient) WritePdrTable(
 	pdrEntry pdr, funcType uint8) error {
 
@@ -411,7 +412,7 @@ func (c *P4rtClient) WritePdrTable(
 	return c.InsertTableEntry(te, funcType, prio)
 }
 
-// WriteInterfaceTable ... Write Interface table Entry
+// WriteInterfaceTable ... Write Interface table Entry.
 func (c *P4rtClient) WriteInterfaceTable(
 	intfEntry IntfTableEntry,
 	funcType uint8) error {
@@ -655,7 +656,7 @@ func (c *P4rtClient) addActionValue(action *p4.Action, param ActionParam,
 	return err
 }
 
-// ReadCounter ... Read Counter entry
+// ReadCounter ... Read Counter entry.
 func (c *P4rtClient) ReadCounter(ce *IntfCounterEntry) error {
 
 	log.Println("ReadCounter ID : ", ce.CounterID)
@@ -678,7 +679,7 @@ func (c *P4rtClient) ReadCounter(ce *IntfCounterEntry) error {
 	return nil
 }
 
-// ReadCounterEntry .. Read counter Entry
+// ReadCounterEntry .. Read counter Entry.
 func (c *P4rtClient) ReadCounterEntry(ce *IntfCounterEntry) (*p4.ReadResponse, error) {
 
 	log.Traceln("Read Counter Entry")
@@ -708,7 +709,7 @@ func (c *P4rtClient) ReadCounterEntry(ce *IntfCounterEntry) (*p4.ReadResponse, e
 	return c.ReadReq(&entity)
 }
 
-// ClearFarTable ... Clear FAR Table
+// ClearFarTable ... Clear FAR Table.
 func (c *P4rtClient) ClearFarTable() error {
 
 	log.Println("ClearFarTable.")
@@ -744,7 +745,7 @@ func (c *P4rtClient) ClearFarTable() error {
 	return nil
 }
 
-// ClearPdrTable ... Clear PDR Table
+// ClearPdrTable ... Clear PDR Table.
 func (c *P4rtClient) ClearPdrTable() error {
 
 	log.Println("ClearPdrTable.")
@@ -780,7 +781,7 @@ func (c *P4rtClient) ClearPdrTable() error {
 	return nil
 }
 
-// ReadInterfaceTable ... Read Interface table Entry
+// ReadInterfaceTable ... Read Interface table Entry.
 func (c *P4rtClient) ReadInterfaceTable(
 	intfEntry *IntfTableEntry) error {
 
@@ -839,7 +840,7 @@ func (c *P4rtClient) ReadInterfaceTable(
 	return err
 }
 
-// ReadTableEntry ... Read table Entry
+// ReadTableEntry ... Read table Entry.
 func (c *P4rtClient) ReadTableEntry(
 	tableEntry AppTableEntry, prio int32) (*p4.ReadResponse, error) {
 
@@ -858,7 +859,7 @@ func (c *P4rtClient) ReadTableEntry(
 	return c.ReadReq(entity)
 }
 
-// ReadReqEntities ... Read request Entity
+// ReadReqEntities ... Read request Entity.
 func (c *P4rtClient) ReadReqEntities(entities []*p4.Entity) (*p4.ReadResponse, error) {
 	req := &p4.ReadRequest{
 		DeviceId: c.DeviceID,
@@ -876,7 +877,7 @@ func (c *P4rtClient) ReadReqEntities(entities []*p4.Entity) (*p4.ReadResponse, e
 	return nil, err
 }
 
-// ReadReq ... Read Request
+// ReadReq ... Read Request.
 func (c *P4rtClient) ReadReq(entity *p4.Entity) (*p4.ReadResponse, error) {
 	var req p4.ReadRequest
 	req.DeviceId = c.DeviceID
@@ -898,7 +899,7 @@ func (c *P4rtClient) ReadReq(entity *p4.Entity) (*p4.ReadResponse, error) {
 	return nil, err
 }
 
-// InsertTableEntry .. Insert table Entry
+// InsertTableEntry .. Insert table Entry.
 func (c *P4rtClient) InsertTableEntry(
 	tableEntry AppTableEntry,
 	funcType uint8, prio int32) error {
@@ -959,7 +960,7 @@ func (c *P4rtClient) InsertTableEntry(
 	return c.WriteReq(update)
 }
 
-// WriteReq ... Write Request
+// WriteReq ... Write Request.
 func (c *P4rtClient) WriteReq(update *p4.Update) error {
 	req := &p4.WriteRequest{
 		DeviceId:   c.DeviceID,
@@ -970,7 +971,7 @@ func (c *P4rtClient) WriteReq(update *p4.Update) error {
 	return err
 }
 
-// WriteBatchReq ... Write batch Request to up4
+// WriteBatchReq ... Write batch Request to up4.
 func (c *P4rtClient) WriteBatchReq(updates []*p4.Update) error {
 	req := &p4.WriteRequest{
 		DeviceId:   c.DeviceID,
@@ -984,7 +985,7 @@ func (c *P4rtClient) WriteBatchReq(updates []*p4.Update) error {
 	return err
 }
 
-// GetForwardingPipelineConfig ... Get Pipeline config from switch
+// GetForwardingPipelineConfig ... Get Pipeline config from switch.
 func (c *P4rtClient) GetForwardingPipelineConfig() (err error) {
 	log.Println("GetForwardingPipelineConfig")
 	pipeline, err := GetPipelineConfig(c.Client, c.DeviceID)
@@ -997,7 +998,7 @@ func (c *P4rtClient) GetForwardingPipelineConfig() (err error) {
 	return
 }
 
-// GetPipelineConfig ... Set pipeline config
+// GetPipelineConfig ... Set pipeline config.
 func GetPipelineConfig(client p4.P4RuntimeClient, deviceID uint64) (*p4.GetForwardingPipelineConfigResponse, error) {
 	req := &p4.GetForwardingPipelineConfigRequest{
 		DeviceId:     deviceID,
@@ -1048,7 +1049,7 @@ func (c *P4rtClient) SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath st
 	return
 }
 
-// SetPipelineConfig ... Set pipeline config
+// SetPipelineConfig ... Set pipeline config.
 func SetPipelineConfig(client p4.P4RuntimeClient, deviceID uint64, electionID *p4.Uint128, config *p4.ForwardingPipelineConfig) error {
 	req := &p4.SetForwardingPipelineConfigRequest{
 		DeviceId:   deviceID,
@@ -1064,7 +1065,7 @@ func SetPipelineConfig(client p4.P4RuntimeClient, deviceID uint64, electionID *p
 	return err
 }
 
-// GetConnection ... Get Grpc connection
+// GetConnection ... Get Grpc connection.
 func GetConnection(host string) (conn *grpc.ClientConn, err error) {
 	/* get connection */
 	log.Println("Get connection.")
@@ -1076,7 +1077,7 @@ func GetConnection(host string) (conn *grpc.ClientConn, err error) {
 	return
 }
 
-// LoadDeviceConfig : Load Device config
+// LoadDeviceConfig : Load Device config.
 func LoadDeviceConfig(deviceConfigPath string) (P4DeviceConfig, error) {
 	log.Println("BMv2 JSON: ", deviceConfigPath)
 
@@ -1100,7 +1101,7 @@ func LoadDeviceConfig(deviceConfigPath string) (P4DeviceConfig, error) {
 	return bin, nil
 }
 
-// CreateChannel ... Create p4runtime client channel
+// CreateChannel ... Create p4runtime client channel.
 func CreateChannel(host string,
 	deviceID uint64,
 	timeout uint32,

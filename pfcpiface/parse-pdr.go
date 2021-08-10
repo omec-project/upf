@@ -49,7 +49,7 @@ func needAllocIP(ueIPaddr *ie.UEIPAddressFields) bool {
 	return true
 }
 
-// Satisfies the fmt.Stringer interface
+// Satisfies the fmt.Stringer interface.
 func (p pdr) String() string {
 	var b = strings.Builder{}
 	fmt.Fprintf(&b, "\n")

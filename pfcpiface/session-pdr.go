@@ -12,7 +12,7 @@ import (
 	"github.com/wmnsk/go-pfcp/message"
 )
 
-// Release allocated IPs
+// Release allocated IPs.
 func releaseAllocatedIPs(upf *upf, session *PFCPSession) {
 	log.Println("release allocated IPs")
 	for _, pdr := range session.pdrs {
@@ -42,12 +42,12 @@ func addPdrInfo(msg *message.SessionEstablishmentResponse,
 	}
 }
 
-// CreatePDR appends pdr to existing list of PDRs in the session
+// CreatePDR appends pdr to existing list of PDRs in the session.
 func (s *PFCPSession) CreatePDR(p pdr) {
 	s.pdrs = append(s.pdrs, p)
 }
 
-// UpdatePDR updates existing pdr in the session
+// UpdatePDR updates existing pdr in the session.
 func (s *PFCPSession) UpdatePDR(p pdr) error {
 	for idx, v := range s.pdrs {
 		if v.pdrID == p.pdrID {
@@ -58,7 +58,7 @@ func (s *PFCPSession) UpdatePDR(p pdr) error {
 	return errors.New("PDR not found")
 }
 
-// RemovePDR removes pdr from existing list of PDRs in the session
+// RemovePDR removes pdr from existing list of PDRs in the session.
 func (s *PFCPSession) RemovePDR(id uint32) (*pdr, error) {
 	for idx, v := range s.pdrs {
 		if v.pdrID == id {

@@ -24,7 +24,7 @@ type qer struct {
 	fseidIP  uint32
 }
 
-// Satisfies the fmt.Stringer interface
+// Satisfies the fmt.Stringer interface.
 func (q qer) String() string {
 	var b = strings.Builder{}
 	fmt.Fprintf(&b, "\n")

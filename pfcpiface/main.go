@@ -23,7 +23,7 @@ var (
 	pfcpsim    = flag.Bool("pfcpsim", false, "simulate PFCP")
 )
 
-// Conf : Json conf struct
+// Conf : Json conf struct.
 type Conf struct {
 	Mode              string      `json:"mode"`
 	MaxSessions       uint32      `json:"max_sessions"`
@@ -42,7 +42,7 @@ type Conf struct {
 	LogLevel          string      `json:"log_level"`
 }
 
-// SimModeInfo : Sim mode attributes
+// SimModeInfo : Sim mode attributes.
 type SimModeInfo struct {
 	StartUEIP   net.IP `json:"start_ue_ip"`
 	StartENBIP  net.IP `json:"start_enb_ip"`
@@ -53,7 +53,7 @@ type SimModeInfo struct {
 	StartN9TEID string `json:"start_n9_teid"`
 }
 
-// CPIfaceInfo : CPIface interface settings
+// CPIfaceInfo : CPIface interface settings.
 type CPIfaceInfo struct {
 	DestIP          string `json:"nb_dst_ip"`
 	SrcIP           string `json:"nb_src_ip"`
@@ -64,12 +64,12 @@ type CPIfaceInfo struct {
 	Dnn             string `json:"dnn"`
 }
 
-// IfaceType : Gateway interface struct
+// IfaceType : Gateway interface struct.
 type IfaceType struct {
 	IfName string `json:"ifname"`
 }
 
-// ParseJSON : parse json file and populate corresponding struct
+// ParseJSON : parse json file and populate corresponding struct.
 func ParseJSON(filepath *string, conf *Conf) {
 	/* Open up file */
 	jsonFile, err := os.Open(*filepath)
@@ -96,7 +96,7 @@ func ParseJSON(filepath *string, conf *Conf) {
 	}
 }
 
-// ParseStrIP : parse IP address from config
+// ParseStrIP : parse IP address from config.
 func ParseStrIP(n3name string) (net.IP, net.IPMask) {
 	ip, ipNet, err := net.ParseCIDR(n3name)
 	if err != nil {
@@ -106,7 +106,7 @@ func ParseStrIP(n3name string) (net.IP, net.IPMask) {
 	return ip, (ipNet).Mask
 }
 
-// ParseIP : parse IP address from the interface name
+// ParseIP : parse IP address from the interface name.
 func ParseIP(name string, iface string) net.IP {
 	byNameInterface, err := net.InterfaceByName(name)
 
