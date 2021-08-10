@@ -286,7 +286,7 @@ func (p *p4rtc) setUpfInfo(u *upf, conf *Conf) {
 	p.p4client, errin = p.channelSetup()
 	u.accessIP = p.accessIP
 	if errin != nil {
-		fmt.Printf("create channel failed : %v\n", errin)
+		log.Println("create channel failed : ", errin)
 	} else {
 		errin = p.p4client.ClearPdrTable()
 		if errin != nil {

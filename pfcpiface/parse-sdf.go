@@ -5,7 +5,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -136,7 +135,7 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 		}
 	}
 
-	fmt.Println(ipf)
+	log.Println(ipf)
 	return nil
 }
 

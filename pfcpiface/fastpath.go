@@ -4,8 +4,9 @@
 package main
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
 	"net"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type fastPath interface {
