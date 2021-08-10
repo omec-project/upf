@@ -87,7 +87,7 @@ func int2ip(nn uint32) net.IP {
 func getRemoteIP(dstIP string) net.IP {
 	conn, err := net.Dial("udp", dstIP+":"+PFCPPort)
 	if err != nil {
-		ip := "0.0.0.0"
+		ip := net.IPv4zero.String()
 		return net.ParseIP(ip)
 	}
 	defer conn.Close()

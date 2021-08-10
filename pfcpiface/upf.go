@@ -55,7 +55,7 @@ const (
 	farNotify   = 0x4
 )
 
-func (u *upf) sendMsgToUPF(method string, pdrs []pdr, fars []far, qers []qer) uint8 {
+func (u *upf) sendMsgToUPF(method upfMsgType, pdrs []pdr, fars []far, qers []qer) uint8 {
 	return u.intf.sendMsgToUPF(method, pdrs, fars, qers)
 }
 
@@ -81,8 +81,8 @@ func (u *upf) sim(method string) {
 
 func (u *upf) setUpfInfo(conf *Conf) {
 	u.reportNotifyChan = make(chan uint64, 1024)
-	u.n4SrcIP = net.ParseIP("0.0.0.0")
-	u.nodeIP = net.ParseIP("0.0.0.0")
+	u.n4SrcIP = net.ParseIP(net.IPv4zero.String())
+	u.nodeIP = net.ParseIP(net.IPv4zero.String())
 
 	if conf.CPIface.SrcIP == "" {
 		if conf.CPIface.DestIP != "" {

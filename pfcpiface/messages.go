@@ -253,7 +253,7 @@ func (pc *PFCPConn) handleSessionReportResponse(upf *upf, msg message.Message, a
 			}
 			log.Println("context not found. Delete session locally")
 			pc.mgr.RemoveSession(srres.SEID())
-			cause := upf.sendMsgToUPF("del", sessItem.pdrs, sessItem.fars, sessItem.qers)
+			cause := upf.sendMsgToUPF(upfMsgTypeDel, sessItem.pdrs, sessItem.fars, sessItem.qers)
 			if cause == ie.CauseRequestRejected {
 				log.Println("Write to FastPath failed")
 			}
@@ -350,7 +350,7 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 		session.CreateQER(q)
 	}
 
-	cause := upf.sendMsgToUPF("add", session.pdrs, session.fars, session.qers)
+	cause := upf.sendMsgToUPF(upfMsgTypeAdd, session.pdrs, session.fars, session.qers)
 	if cause == ie.CauseRequestRejected {
 		pc.mgr.RemoveSession(session.localSEID)
 		return sendError(errors.New("Write to FastPath failed"),
@@ -510,7 +510,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 		session.updateNotifyFlag()
 	}
 
-	cause := upf.sendMsgToUPF("mod", addPDRs, addFARs, addQERs)
+	cause := upf.sendMsgToUPF(upfMsgTypeMod, addPDRs, addFARs, addQERs)
 	if cause == ie.CauseRequestRejected {
 		return sendError(errors.New("Write to FastPath failed"))
 	}
@@ -565,7 +565,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 		delQERs = append(delQERs, *q)
 	}
 
-	cause = upf.sendMsgToUPF("del", delPDRs, delFARs, delQERs)
+	cause = upf.sendMsgToUPF(upfMsgTypeDel, delPDRs, delFARs, delQERs)
 	if cause == ie.CauseRequestRejected {
 		return sendError(errors.New("Write to FastPath failed"))
 	}
@@ -623,7 +623,7 @@ func (pc *PFCPConn) handleSessionDeletionRequest(upf *upf, msg message.Message, 
 		return sendError(fmt.Errorf("Session not found: %v", localSEID))
 	}
 
-	cause := upf.sendMsgToUPF("del", session.pdrs, session.fars, session.qers)
+	cause := upf.sendMsgToUPF(upfMsgTypeDel, session.pdrs, session.fars, session.qers)
 	if cause == ie.CauseRequestRejected {
 		return sendError(errors.New("Write to FastPath failed"))
 	}
@@ -658,7 +658,7 @@ func (pc *PFCPConn) manageSmfConnection(n4LocalIP string, n3ip string, n4Dst str
 		n4DstIP := getRemoteIP(n4Dst)
 		log.Println("SPGWC/SMF address IP inside manageSmfConnection ", n4DstIP.String())
 		// initiate request if we have control plane address available
-		if n4DstIP.String() != "0.0.0.0" {
+		if n4DstIP.String() != net.IPv4zero.String() {
 			pc.generateAssociationRequest(n4LocalIP, n3ip, n4DstIP.String(), conn, rTime)
 		}
 		// no worry. Looks like control plane is still not up
