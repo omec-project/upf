@@ -210,7 +210,6 @@ func (c *P4rtClient) Init(timeout uint32, reportNotifyChan chan<- uint64) (err e
 			} else {
 				log.Println("stream recv: ", res)
 			}
-
 		}
 	}()
 
@@ -225,9 +224,7 @@ func (c *P4rtClient) Init(timeout uint32, reportNotifyChan chan<- uint64) (err e
 }
 
 // WriteFarTable .. Write far table entry API.
-func (c *P4rtClient) WriteFarTable(
-	farEntry far, funcType uint8) error {
-
+func (c *P4rtClient) WriteFarTable(farEntry far, funcType uint8) error {
 	log.Println("WriteFarTable.")
 	te := AppTableEntry{
 		TableName: "PreQosPipe.load_far_attributes",
@@ -269,7 +266,6 @@ func (c *P4rtClient) WriteFarTable(
 		te.Params[1].Value = make([]byte, 1)
 		te.Params[1].Value[0] = farEntry.applyAction & 0x08
 	} else if funcType == FunctionTypeUpdate {
-
 		te.ActionName = "PreQosPipe.load_tunnel_far_attributes"
 		te.ParamSize = 8
 		te.Params = make([]ActionParam, te.ParamSize)
@@ -322,9 +318,7 @@ func (c *P4rtClient) WriteFarTable(
 }
 
 // WritePdrTable .. Write pdr table entry API.
-func (c *P4rtClient) WritePdrTable(
-	pdrEntry pdr, funcType uint8) error {
-
+func (c *P4rtClient) WritePdrTable(pdrEntry pdr, funcType uint8) error {
 	log.Println("WritePdrTable.")
 	te := AppTableEntry{
 		TableName:  "PreQosPipe.pdrs",
@@ -382,7 +376,6 @@ func (c *P4rtClient) WritePdrTable(
 		}()
 		return nil
 	} else if funcType == FunctionTypeInsert {
-
 		te.ParamSize = 5
 		te.Params = make([]ActionParam, te.ParamSize)
 		te.Params[0].Name = "id"
@@ -413,10 +406,7 @@ func (c *P4rtClient) WritePdrTable(
 }
 
 // WriteInterfaceTable ... Write Interface table Entry.
-func (c *P4rtClient) WriteInterfaceTable(
-	intfEntry IntfTableEntry,
-	funcType uint8) error {
-
+func (c *P4rtClient) WriteInterfaceTable(intfEntry IntfTableEntry, funcType uint8) error {
 	log.Println("WriteInterfaceTable.")
 	te := AppTableEntry{
 		TableName:  "PreQosPipe.source_iface_lookup",
@@ -778,9 +768,7 @@ func (c *P4rtClient) ClearPdrTable() error {
 }
 
 // ReadInterfaceTable ... Read Interface table Entry.
-func (c *P4rtClient) ReadInterfaceTable(
-	intfEntry *IntfTableEntry) error {
-
+func (c *P4rtClient) ReadInterfaceTable(intfEntry *IntfTableEntry) error {
 	log.Println("ReadInterfaceTable.")
 	te := AppTableEntry{
 		TableName:  "PreQosPipe.source_iface_lookup",
@@ -837,9 +825,7 @@ func (c *P4rtClient) ReadInterfaceTable(
 }
 
 // ReadTableEntry ... Read table Entry.
-func (c *P4rtClient) ReadTableEntry(
-	tableEntry AppTableEntry, prio int32) (*p4.ReadResponse, error) {
-
+func (c *P4rtClient) ReadTableEntry(tableEntry AppTableEntry, prio int32) (*p4.ReadResponse, error) {
 	log.Println("Read Table Entry for Table ", tableEntry.TableName)
 	tableID := c.tableID(tableEntry.TableName)
 
@@ -896,10 +882,7 @@ func (c *P4rtClient) ReadReq(entity *p4.Entity) (*p4.ReadResponse, error) {
 }
 
 // InsertTableEntry .. Insert table Entry.
-func (c *P4rtClient) InsertTableEntry(
-	tableEntry AppTableEntry,
-	funcType uint8, prio int32) error {
-
+func (c *P4rtClient) InsertTableEntry(tableEntry AppTableEntry, funcType uint8, prio int32) error {
 	log.Println("Insert Table Entry for Table ", tableEntry.TableName)
 	tableID := c.tableID(tableEntry.TableName)
 	actionID := c.actionID(tableEntry.ActionName)
