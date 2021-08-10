@@ -39,16 +39,19 @@ func (c *PFCPConn) getSeqNum() uint32 {
 	c.seqNum.mux.Lock()
 	defer c.seqNum.mux.Unlock()
 	c.seqNum.seq++
+
 	return c.seqNum.seq
 }
 
 func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 	var pconn PFCPConn
 	pconn.mgr = NewPFCPSessionMgr(100)
+
 	rTimeout := readTimeout
 	if upf.readTimeout != 0 {
 		rTimeout = upf.readTimeout
 	}
+
 	if upf.connTimeout != 0 {
 		Timeout = upf.connTimeout
 	}
@@ -82,14 +85,18 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 		if upf.simInfo != nil {
 			return
 		}
+
 		sendDeleteAllSessionsMsgtoUPF(upf)
+
 		cpConnected = false
 	}
 	// initiate connection if smf address available
 	log.Println("calling manageSmfConnection smf service name ", smfName)
+
 	manageConnection := false
 	if smfName != "" {
 		manageConnection = true
+
 		go pconn.manageSmfConnection(upf.nodeIP.String(), accessIP, smfName, conn, cpConnectionStatus, upf.recoveryTime)
 	}
 
@@ -107,13 +114,18 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 			if err, ok := err.(net.Error); ok && err.Timeout() {
 				// do nothing for the time being
 				log.Println(err)
+
 				cpConnected = false
+
 				if manageConnection {
 					cpConnectionStatus <- cpConnected
 				}
+
 				cleanupSessions()
+
 				continue
 			}
+
 			log.Fatalln("Read error:", err)
 		}
 
@@ -142,14 +154,19 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 
 		// handle message
 		var outgoingMessage []byte
+
 		switch msg.MessageType() {
 		case message.MsgTypeAssociationSetupRequest:
 			cleanupSessions()
+
 			go readReportNotification(upf.reportNotifyChan, &pconn, conn, addr)
+
 			upf.setInfo(conn, addr, &pconn)
+
 			outgoingMessage = pconn.handleAssociationSetupRequest(upf, msg, addr, sourceIP, accessIP, coreIP)
 			if outgoingMessage != nil {
 				cpConnected = true
+
 				if manageConnection {
 					// if we initiated connection, inform go routine
 					cpConnectionStatus <- cpConnected
@@ -157,6 +174,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 			}
 		case message.MsgTypeAssociationSetupResponse:
 			cpConnected = handleAssociationSetupResponse(msg, addr, sourceIP, accessIP)
+
 			if manageConnection {
 				// pass on information to go routine that result of association response
 				cpConnectionStatus <- cpConnected
@@ -173,6 +191,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 			outgoingMessage = pconn.handleSessionDeletionRequest(upf, msg, addr, sourceIP)
 		case message.MsgTypeAssociationReleaseRequest:
 			outgoingMessage = handleAssociationReleaseRequest(upf, msg, addr, sourceIP, accessIP, upf.recoveryTime)
+
 			cleanupSessions()
 		case message.MsgTypeSessionReportResponse:
 			pconn.handleSessionReportResponse(upf, msg, addr)

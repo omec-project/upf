@@ -46,6 +46,7 @@ func needAllocIP(ueIPaddr *ie.UEIPAddressFields) bool {
 	if has2ndBit(ueIPaddr.Flags) && !has5thBit(ueIPaddr.Flags) {
 		return false
 	}
+
 	return true
 }
 
@@ -77,6 +78,7 @@ func (p pdr) String() string {
 	fmt.Fprintf(&b, "qerID: %v\n", p.qerID)
 	fmt.Fprintf(&b, "needDecap: %v\n", p.needDecap)
 	fmt.Fprintf(&b, "allocIPFlag: %v\n", p.allocIPFlag)
+
 	return b.String()
 }
 
@@ -95,13 +97,16 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, upf *upf) err
 			if needAllocIP(ueIPaddr) {
 				/* alloc IPV6 if CHV6 is enabled : TBD */
 				log.Println("UPF should alloc UE IP. CHV4 flag set")
+
 				ueIP4, err = upf.ippool.allocIPV4()
 				if err != nil {
 					log.Println("failed to allocate UE IP")
 					return err
 				}
-				p.allocIPFlag = true
+
 				log.Println("ueipv4 : ", ueIP4.String())
+
+				p.allocIPFlag = true
 			} else {
 				ueIP4 = ueIPaddr.IPv4Address
 			}
@@ -127,6 +132,7 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, upf *upf) err
 				log.Println("Failed to parse FTEID IE")
 				continue
 			}
+
 			teid := fteid.TEID
 			tunnelIPv4Address := fteid.IPv4Address
 
@@ -135,10 +141,12 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, upf *upf) err
 				p.tunnelTEIDMask = 0xFFFFFFFF
 				p.tunnelIP4Dst = ip2int(tunnelIPv4Address)
 				p.tunnelIP4DstMask = 0xFFFFFFFF
+
 				log.Println("TunnelIPv4Address:", tunnelIPv4Address)
 			}
 		case ie.QFI:
 			// Do nothing for the time being
+			continue
 		}
 	}
 
@@ -156,7 +164,6 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, upf *upf) err
 	for _, ie2 := range pdiIEs {
 		switch ie2.Type {
 		case ie.ApplicationID:
-
 			appID, err := ie2.ApplicationID()
 			if err != nil {
 				log.Println("Unable to parse Application ID", err)
@@ -168,13 +175,18 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, upf *upf) err
 				log.Println("Unable to find Application ID", err)
 				continue
 			}
+
 			if appID != apfd.appID {
 				log.Fatalln("Mismatch in App ID", appID, apfd.appID)
 			}
+
 			log.Println("inside application id", apfd.appID, apfd.flowDescs)
+
 			for _, flowDesc := range apfd.flowDescs {
 				log.Println("flow desc", flowDesc)
+
 				var ipf ipFilterRule
+
 				err = ipf.parseFlowDesc(flowDesc, ueIP4.String())
 				if err != nil {
 					return errBadFilterDesc
@@ -182,6 +194,7 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, upf *upf) err
 
 				if (p.srcIface == access && ipf.direction == "out") || (p.srcIface == core && ipf.direction == "in") {
 					log.Println("Found a match", p.srcIface, flowDesc)
+
 					if ipf.proto != reservedProto {
 						p.proto = ipf.proto
 						p.protoMask = reservedProto
@@ -209,9 +222,11 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, upf *upf) err
 				// TODO: Implement referencing SDF ID
 				continue
 			}
+
 			log.Println("Flow Description is:", flowDesc)
 
 			var ipf ipFilterRule
+
 			err = ipf.parseFlowDesc(flowDesc, ueIP4.String())
 			if err != nil {
 				return errBadFilterDesc

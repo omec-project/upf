@@ -61,6 +61,7 @@ func (b *bess) sendEndMarkers(endMarkerList *[][]byte) error {
 func (b *bess) sendMsgToUPF(method upfMsgType, pdrs []pdr, fars []far, qers []qer) uint8 {
 	// create context
 	var cause uint8 = ie.CauseRequestAccepted
+
 	calls := len(pdrs) + len(fars) + len(qers)
 	if calls == 0 {
 		return cause
@@ -68,10 +69,12 @@ func (b *bess) sendMsgToUPF(method upfMsgType, pdrs []pdr, fars []far, qers []qe
 
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
+
 	done := make(chan bool)
 
 	for _, pdr := range pdrs {
 		log.Traceln(pdr)
+
 		switch method {
 		case upfMsgTypeAdd:
 			fallthrough
@@ -81,8 +84,10 @@ func (b *bess) sendMsgToUPF(method upfMsgType, pdrs []pdr, fars []far, qers []qe
 			b.delPDR(ctx, done, pdr)
 		}
 	}
+
 	for _, far := range fars {
 		log.Traceln(far)
+
 		switch method {
 		case upfMsgTypeAdd:
 			fallthrough
@@ -92,8 +97,10 @@ func (b *bess) sendMsgToUPF(method upfMsgType, pdrs []pdr, fars []far, qers []qe
 			b.delFAR(ctx, done, far)
 		}
 	}
+
 	for _, qer := range qers {
 		log.Traceln(qer)
+
 		switch method {
 		case upfMsgTypeAdd:
 			fallthrough
@@ -103,18 +110,22 @@ func (b *bess) sendMsgToUPF(method upfMsgType, pdrs []pdr, fars []far, qers []qe
 			b.delQER(ctx, done, qer)
 		}
 	}
+
 	rc := b.GRPCJoin(calls, Timeout, done)
 	if !rc {
 		log.Println("Unable to make GRPC calls")
 	}
+
 	return cause
 }
 
 func (b *bess) sendDeleteAllSessionsMsgtoUPF() {
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
+
 	done := make(chan bool)
 	calls := 5
+
 	b.removeAllPDRs(ctx, done)
 	b.removeAllFARs(ctx, done)
 	b.removeAllCounters(ctx, done, "preQoSCounter")
@@ -144,6 +155,7 @@ func (b *bess) measure(ifName string, f *pb.MeasureCommandGetSummaryArg) *pb.Mea
 	}
 
 	ctx := context.Background()
+
 	modRes, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: modName(),
 		Cmd:  "get_summary",
@@ -155,6 +167,7 @@ func (b *bess) measure(ifName string, f *pb.MeasureCommandGetSummaryArg) *pb.Mea
 	}
 
 	var res pb.MeasureCommandGetSummaryResponse
+
 	err = modRes.GetData().UnmarshalTo(&res)
 	if err != nil {
 		log.Println("Error unmarshalling the response", modName(), err)
@@ -165,15 +178,17 @@ func (b *bess) measure(ifName string, f *pb.MeasureCommandGetSummaryArg) *pb.Mea
 }
 
 func (b *bess) getPortStats(ifname string) *pb.GetPortStatsResponse {
+	ctx := context.Background()
 	req := &pb.GetPortStatsRequest{
 		Name: ifname + "Fast",
 	}
-	ctx := context.Background()
+
 	res, err := b.client.GetPortStats(ctx, req)
 	if err != nil || res.GetError() != nil {
 		log.Println("Error calling GetPortStats", ifname, err, res.GetError().Errmsg)
 		return nil
 	}
+
 	return res
 }
 
@@ -233,6 +248,7 @@ func (b *bess) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metri
 			LatencyPercentiles: getPctiles(),
 			JitterPercentiles:  getPctiles(),
 		}
+
 		res := b.measure(ifaceName, req)
 		if res == nil {
 			return
@@ -280,6 +296,7 @@ func (b *bess) endMarkerSendLoop(endMarkerChan chan []byte) {
 func (b *bess) notifyListen(reportNotifyChan chan<- uint64) {
 	for {
 		buf := make([]byte, 512)
+
 		_, err := b.notifyBessSocket.Read(buf)
 		if err != nil {
 			return
@@ -293,19 +310,23 @@ func (b *bess) notifyListen(reportNotifyChan chan<- uint64) {
 
 func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 	log.Println("setUpfInfo bess")
-	u.simInfo = &conf.SimInfo
 
+	u.simInfo = &conf.SimInfo
 	u.ippoolCidr = conf.CPIface.UeIPPool
+
 	log.Println("IP pool : ", u.ippoolCidr)
+
 	errin := u.ippool.initPool(u.ippoolCidr)
 	if errin != nil {
 		log.Println("ip pool init failed")
 	}
+
 	u.accessIP = ParseIP(conf.AccessIface.IfName, "Access")
 	u.coreIP = ParseIP(conf.CoreIface.IfName, "Core")
 
 	// get bess grpc client
 	log.Println("bessIP ", *bessIP)
+
 	b.endMarkerChan = make(chan []byte, 1024)
 
 	b.conn, errin = grpc.Dial(*bessIP, grpc.WithInsecure())
@@ -314,16 +335,19 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 	}
 
 	b.client = pb.NewBESSControlClient(b.conn)
+
 	if conf.EnableNotifyBess {
 		notifySockAddr := conf.NotifySockAddr
 		if notifySockAddr == "" {
 			notifySockAddr = SockAddr
 		}
+
 		b.notifyBessSocket, errin = net.Dial("unixpacket", notifySockAddr)
 		if errin != nil {
 			log.Println("dial error:", errin)
 			return
 		}
+
 		go b.notifyListen(u.reportNotifyChan)
 	}
 
@@ -332,12 +356,15 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 		if pfcpCommAddr == "" {
 			pfcpCommAddr = PfcpAddr
 		}
+
 		b.endMarkerSocket, errin = net.Dial("unixpacket", pfcpCommAddr)
 		if errin != nil {
 			log.Println("dial error:", errin)
 			return
 		}
+
 		log.Println("Starting end marker loop")
+
 		go b.endMarkerSendLoop(b.endMarkerChan)
 	}
 }
@@ -518,6 +545,7 @@ func (b *bess) sim(u *upf, method string) {
 		}
 
 		qers := []qer{qerDown, qerN6Up, qerN9Up}
+
 		switch method {
 		case "create":
 			b.sendMsgToUPF(upfMsgTypeAdd, pdrs, fars, qers)
@@ -539,6 +567,7 @@ func (b *bess) processPDR(ctx context.Context, any *anypb.Any, method upfMsgType
 	}
 
 	methods := [...]string{"add", "add", "delete", "clear"}
+
 	_, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "pdrLookup",
 		Cmd:  methods[method],
@@ -551,8 +580,10 @@ func (b *bess) processPDR(ctx context.Context, any *anypb.Any, method upfMsgType
 
 func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 	go func() {
-		var any *anypb.Any
-		var err error
+		var (
+			any *anypb.Any
+			err error
+		)
 
 		f := &pb.WildcardMatchCommandAddArg{
 			Gate:     uint64(p.needDecap),
@@ -585,6 +616,7 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 				intEnc(uint64(p.farID)), /* far_id */
 			},
 		}
+
 		any, err = anypb.New(f)
 		if err != nil {
 			log.Println("Error marshalling the rule", f, err)
@@ -598,8 +630,10 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 	go func() {
-		var any *anypb.Any
-		var err error
+		var (
+			any *anypb.Any
+			err error
+		)
 
 		f := &pb.WildcardMatchCommandDeleteArg{
 			Values: []*pb.FieldData{
@@ -623,6 +657,7 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 				intEnc(uint64(p.protoMask)),        /* proto id-mask */
 			},
 		}
+
 		any, err = anypb.New(f)
 		if err != nil {
 			log.Println("Error marshalling the rule", f, err)
@@ -641,6 +676,7 @@ func (b *bess) processQER(ctx context.Context, any *anypb.Any, method upfMsgType
 	}
 
 	methods := [...]string{"add", "add", "delete", "clear"}
+
 	_, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "qerLookup",
 		Cmd:  methods[method],
@@ -653,8 +689,11 @@ func (b *bess) processQER(ctx context.Context, any *anypb.Any, method upfMsgType
 
 func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 	go func() {
-		var any *anypb.Any
-		var err error
+		var (
+			any *anypb.Any
+			err error
+		)
+
 		q := &pb.ExactMatchCommandAddArg{
 			Gate: uint64(0),
 			Fields: []*pb.FieldData{
@@ -671,11 +710,13 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 				intEnc(qer.dlGbr),            /* udp gtpu port */
 			},
 		}
+
 		any, err = anypb.New(q)
 		if err != nil {
 			log.Println("Error marshalling the rule", q, err)
 			return
 		}
+
 		b.processQER(ctx, any, upfMsgTypeAdd)
 		done <- true
 	}()
@@ -683,8 +724,10 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 
 func (b *bess) delQER(ctx context.Context, done chan<- bool, qer qer) {
 	go func() {
-		var any *anypb.Any
-		var err error
+		var (
+			any *anypb.Any
+			err error
+		)
 
 		q := &pb.ExactMatchCommandDeleteArg{
 			Fields: []*pb.FieldData{
@@ -692,11 +735,13 @@ func (b *bess) delQER(ctx context.Context, done chan<- bool, qer qer) {
 				intEnc(qer.fseID),         /* fseid */
 			},
 		}
+
 		any, err = anypb.New(q)
 		if err != nil {
 			log.Println("Error marshalling the rule", q, err)
 			return
 		}
+
 		b.processQER(ctx, any, upfMsgTypeDel)
 		done <- true
 	}()
@@ -709,6 +754,7 @@ func (b *bess) processFAR(ctx context.Context, any *anypb.Any, method upfMsgType
 	}
 
 	methods := [...]string{"add", "add", "delete", "clear"}
+
 	_, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "farLookup",
 		Cmd:  methods[method],
@@ -721,8 +767,11 @@ func (b *bess) processFAR(ctx context.Context, any *anypb.Any, method upfMsgType
 
 func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 	go func() {
-		var any *anypb.Any
-		var err error
+		var (
+			any *anypb.Any
+			err error
+		)
+
 		action := far.setActionValue()
 		f := &pb.ExactMatchCommandAddArg{
 			Gate: uint64(far.tunnelType),
@@ -739,11 +788,13 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 				intEnc(uint64(far.tunnelPort)),   /* udp gtpu port */
 			},
 		}
+
 		any, err = anypb.New(f)
 		if err != nil {
 			log.Println("Error marshalling the rule", f, err)
 			return
 		}
+
 		b.processFAR(ctx, any, upfMsgTypeAdd)
 		done <- true
 	}()
@@ -751,8 +802,10 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 
 func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 	go func() {
-		var any *anypb.Any
-		var err error
+		var (
+			any *anypb.Any
+			err error
+		)
 
 		f := &pb.ExactMatchCommandDeleteArg{
 			Fields: []*pb.FieldData{
@@ -760,11 +813,13 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 				intEnc(far.fseID),         /* fseid */
 			},
 		}
+
 		any, err = anypb.New(f)
 		if err != nil {
 			log.Println("Error marshalling the rule", f, err)
 			return
 		}
+
 		b.processFAR(ctx, any, upfMsgTypeDel)
 		done <- true
 	}()
@@ -772,6 +827,7 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 
 func (b *bess) processCounters(ctx context.Context, any *anypb.Any, method upfMsgType, counterName string) {
 	methods := [...]string{"add", "add", "remove", "removeAll"}
+
 	_, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: counterName,
 		Cmd:  methods[method],
@@ -784,8 +840,10 @@ func (b *bess) processCounters(ctx context.Context, any *anypb.Any, method upfMs
 
 func (b *bess) addCounter(ctx context.Context, done chan<- bool, ctrID uint32, counterName string) {
 	go func() {
-		var any *anypb.Any
-		var err error
+		var (
+			any *anypb.Any
+			err error
+		)
 
 		f := &pb.CounterAddArg{
 			CtrId: ctrID,
@@ -796,6 +854,7 @@ func (b *bess) addCounter(ctx context.Context, done chan<- bool, ctrID uint32, c
 			log.Println("Error marshalling the rule", f, err)
 			return
 		}
+
 		b.processCounters(ctx, any, upfMsgTypeAdd, counterName)
 		done <- true
 	}()
@@ -803,8 +862,10 @@ func (b *bess) addCounter(ctx context.Context, done chan<- bool, ctrID uint32, c
 
 func (b *bess) delCounter(ctx context.Context, done chan<- bool, ctrID uint32, counterName string) {
 	go func() {
-		var any *anypb.Any
-		var err error
+		var (
+			any *anypb.Any
+			err error
+		)
 
 		f := &pb.CounterRemoveArg{
 			CtrId: ctrID,
@@ -815,6 +876,7 @@ func (b *bess) delCounter(ctx context.Context, done chan<- bool, ctrID uint32, c
 			log.Println("Error marshalling the rule", f, err)
 			return
 		}
+
 		b.processCounters(ctx, any, upfMsgTypeDel, counterName)
 		done <- true
 	}()
@@ -822,10 +884,13 @@ func (b *bess) delCounter(ctx context.Context, done chan<- bool, ctrID uint32, c
 
 func (b *bess) removeAllPDRs(ctx context.Context, done chan<- bool) {
 	go func() {
-		var any *anypb.Any
-		var err error
+		var (
+			any *anypb.Any
+			err error
+		)
 
 		f := &pb.EmptyArg{}
+
 		any, err = anypb.New(f)
 		if err != nil {
 			log.Println("Error marshalling the rule", f, err)
@@ -839,10 +904,13 @@ func (b *bess) removeAllPDRs(ctx context.Context, done chan<- bool) {
 
 func (b *bess) removeAllFARs(ctx context.Context, done chan<- bool) {
 	go func() {
-		var any *anypb.Any
-		var err error
+		var (
+			any *anypb.Any
+			err error
+		)
 
 		f := &pb.EmptyArg{}
+
 		any, err = anypb.New(f)
 		if err != nil {
 			log.Println("Error marshalling the rule", f, err)
@@ -856,10 +924,13 @@ func (b *bess) removeAllFARs(ctx context.Context, done chan<- bool) {
 
 func (b *bess) removeAllCounters(ctx context.Context, done chan<- bool, name string) {
 	go func() {
-		var any *anypb.Any
-		var err error
+		var (
+			any *anypb.Any
+			err error
+		)
 
 		f := &pb.EmptyArg{}
+
 		any, err = anypb.New(f)
 		if err != nil {
 			log.Println("Error marshalling the rule", f, err)
@@ -867,7 +938,6 @@ func (b *bess) removeAllCounters(ctx context.Context, done chan<- bool, name str
 		}
 
 		b.processCounters(ctx, any, upfMsgTypeClear, name)
-
 		done <- true
 	}()
 }
@@ -882,6 +952,7 @@ func (b *bess) GRPCJoin(calls int, timeout time.Duration, done chan bool) bool {
 				log.Println("Error making GRPC calls")
 				return false
 			}
+
 			calls--
 			if calls == 0 {
 				return true

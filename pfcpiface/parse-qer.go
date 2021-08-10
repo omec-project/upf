@@ -38,6 +38,7 @@ func (q qer) String() string {
 	fmt.Fprintf(&b, "downlinkMBR: %v\n", q.dlMbr)
 	fmt.Fprintf(&b, "uplinkGBR: %v\n", q.ulGbr)
 	fmt.Fprintf(&b, "downlinkGBR: %v\n", q.dlGbr)
+
 	return b.String()
 }
 

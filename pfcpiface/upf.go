@@ -103,8 +103,10 @@ func (u *upf) setUpfInfo(conf *Conf) {
 			u.nodeIP = net.ParseIP(ips[0])
 		}
 	}
+
 	log.Println("UPF Node IP : ", u.nodeIP.String())
 	log.Println("UPF Local IP : ", u.n4SrcIP.String())
+
 	u.intf.setUpfInfo(u, conf)
 }
 

@@ -37,6 +37,7 @@ func (ps *pfcpStats) register() error {
 	if err := prometheus.Register(ps.messages); err != nil {
 		return err
 	}
+
 	if err := prometheus.Register(ps.sessions); err != nil {
 		return err
 	}
@@ -53,6 +54,7 @@ func makeBuckets(values []uint64) map[float64]float64 {
 	for idx, pctile := range getPctiles() {
 		buckets[pctile] = float64(values[idx])
 	}
+
 	return buckets
 }
 
@@ -122,9 +124,11 @@ func (uc *upfCollector) summaryLatencyJitter(ch chan<- prometheus.Metric) {
 func setupProm(upf *upf) {
 	uc := newUpfCollector(upf)
 	prometheus.MustRegister(uc)
+
 	globalPfcpStats = newPFCPStats()
 	if err := globalPfcpStats.register(); err != nil {
 		log.Panicln("Pfcp Stats register failed")
 	}
+
 	http.Handle("/metrics", promhttp.Handler())
 }

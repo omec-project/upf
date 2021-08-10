@@ -92,6 +92,7 @@ func (c *P4rtClient) tableID(name string) uint32 {
 			return table.Preamble.Id
 		}
 	}
+
 	return invalidID
 }
 
@@ -111,6 +112,7 @@ func (c *P4rtClient) actionID(name string) uint32 {
 			return action.Preamble.Id
 		}
 	}
+
 	return invalidID
 }
 
@@ -128,8 +130,7 @@ func (c *P4rtClient) getEnumVal(enumName string,
 		}
 	}
 
-	err := fmt.Errorf("EnumVal not found")
-	return nil, err
+	return nil, fmt.Errorf("EnumVal not found")
 }
 
 // CheckStatus ... Check client connection status.
@@ -149,6 +150,7 @@ func (c *P4rtClient) SetMastership(electionID p4.Uint128) (err error) {
 		},
 	}
 	err = c.Stream.Send(mastershipReq)
+
 	return
 }
 
@@ -162,6 +164,7 @@ func (c *P4rtClient) SendPacketOut(packet []byte) (err error) {
 		},
 	}
 	err = c.Stream.Send(pktOutReq)
+
 	return err
 }
 
@@ -179,6 +182,7 @@ func (c *P4rtClient) Init(timeout uint32, reportNotifyChan chan<- uint64) (err e
 		log.Println("stream channel error: ", err)
 		return
 	}
+
 	go func() {
 		for {
 			res, err := c.Stream.Recv()
@@ -214,18 +218,21 @@ func (c *P4rtClient) Init(timeout uint32, reportNotifyChan chan<- uint64) (err e
 	}()
 
 	/*
-		    select {
-		   	    case <-ctx.Done():
-				log.Println(ctx.Err()) // prints "context deadline exceeded"
-			}*/
+		select {
+			case <-ctx.Done():
+			log.Println(ctx.Err()) // prints "context deadline exceeded"
+		}
+	*/
 
 	log.Println("exited from recv thread.")
+
 	return
 }
 
 // WriteFarTable .. Write far table entry API.
 func (c *P4rtClient) WriteFarTable(farEntry far, funcType uint8) error {
 	log.Println("WriteFarTable.")
+
 	te := AppTableEntry{
 		TableName: "PreQosPipe.load_far_attributes",
 	}
@@ -238,22 +245,27 @@ func (c *P4rtClient) WriteFarTable(farEntry far, funcType uint8) error {
 	binary.BigEndian.PutUint32(te.Fields[0].Value, farEntry.farID)
 
 	te.Fields[1].Name = "session_id"
+	te.Fields[1].Value = make([]byte, 12)
+
 	fseidVal := make([]byte, 12)
 	binary.BigEndian.PutUint32(fseidVal[:4], farEntry.fseidIP)
 	binary.BigEndian.PutUint64(fseidVal[4:], farEntry.fseID)
-	te.Fields[1].Value = make([]byte, 12)
+
 	copy(te.Fields[1].Value, fseidVal)
 
 	var prio int32
+
 	if funcType == FunctionTypeDelete {
 		te.ActionName = "NoAction"
 		te.ParamSize = 0
+
 		go func() {
 			ret := c.InsertTableEntry(te, funcType, prio)
 			if ret != nil {
 				log.Println("Insert Table entry error : ", ret)
 			}
 		}()
+
 		return nil
 	} else if funcType == FunctionTypeInsert {
 		te.ActionName = "PreQosPipe.load_normal_far_attributes"
@@ -320,6 +332,7 @@ func (c *P4rtClient) WriteFarTable(farEntry far, funcType uint8) error {
 // WritePdrTable .. Write pdr table entry API.
 func (c *P4rtClient) WritePdrTable(pdrEntry pdr, funcType uint8) error {
 	log.Println("WritePdrTable.")
+
 	te := AppTableEntry{
 		TableName:  "PreQosPipe.pdrs",
 		ActionName: "PreQosPipe.set_pdr_attributes",
@@ -330,8 +343,12 @@ func (c *P4rtClient) WritePdrTable(pdrEntry pdr, funcType uint8) error {
 	te.FieldSize = 2
 	te.Fields[0].Name = "src_iface"
 	enumName := "InterfaceType"
-	var srcIntfStr string
-	var decapVal uint8
+
+	var (
+		srcIntfStr string
+		decapVal   uint8
+	)
+
 	if pdrEntry.srcIface == access {
 		srcIntfStr = "ACCESS"
 		decapVal = 1
@@ -365,15 +382,18 @@ func (c *P4rtClient) WritePdrTable(pdrEntry pdr, funcType uint8) error {
 	}
 
 	var prio int32 = 2
+
 	if funcType == FunctionTypeDelete {
 		te.ActionName = "NoAction"
 		te.ParamSize = 0
+
 		go func() {
 			ret := c.InsertTableEntry(te, funcType, prio)
 			if ret != nil {
 				log.Println("Insert Table entry error : ", ret)
 			}
 		}()
+
 		return nil
 	} else if funcType == FunctionTypeInsert {
 		te.ParamSize = 5
@@ -408,6 +428,7 @@ func (c *P4rtClient) WritePdrTable(pdrEntry pdr, funcType uint8) error {
 // WriteInterfaceTable ... Write Interface table Entry.
 func (c *P4rtClient) WriteInterfaceTable(intfEntry IntfTableEntry, funcType uint8) error {
 	log.Println("WriteInterfaceTable.")
+
 	te := AppTableEntry{
 		TableName:  "PreQosPipe.source_iface_lookup",
 		ActionName: "PreQosPipe.set_source_iface",
@@ -423,23 +444,27 @@ func (c *P4rtClient) WriteInterfaceTable(intfEntry IntfTableEntry, funcType uint
 	te.Params = make([]ActionParam, 2)
 	te.Params[0].Name = "src_iface"
 	enumName := "InterfaceType"
+
 	val, err := c.getEnumVal(enumName, intfEntry.SrcIntf)
 	if err != nil {
 		log.Println("Could not find enum val ", err)
 		return err
 	}
-	te.Params[0].Value = val
 
+	te.Params[0].Value = val
 	te.Params[1].Name = "direction"
 	enumName = "Direction"
+
 	val, err = c.getEnumVal(enumName, intfEntry.Direction)
 	if err != nil {
 		log.Println("Could not find enum val ", err)
 		return nil
 	}
+
 	te.Params[1].Value = val
 
 	var prio int32
+
 	return c.InsertTableEntry(te, funcType, prio)
 }
 
@@ -452,33 +477,40 @@ func (c *P4rtClient) getCounterValue(entity *p4.Entity,
 	ce.ByteCount[index] = byteCount
 	ce.PktCount[index] = pktCount
 	log.Traceln("index , bytecount, pktcount ", index, byteCount, pktCount)
+
 	return nil
 }
 
-func (c *P4rtClient) getFieldValue(entity *p4.Entity,
-	te AppTableEntry) (*MatchField, error) {
+func (c *P4rtClient) getFieldValue(entity *p4.Entity, te AppTableEntry) (*MatchField, error) {
 	log.Println("get Field Value")
+
 	entry := entity.GetTableEntry()
 	tableID := c.tableID(te.TableName)
 	actionID := c.actionID(te.ActionName)
 	inputField := te.Fields[0]
 	inputParam := te.Params[0]
+
 	if (entry.TableId != tableID) ||
 		(entry.Action.GetAction().ActionId != actionID) {
 		err := fmt.Errorf("invalid tableID / ActionID")
 		return nil, err
 	}
 
-	var matchType p4ConfigV1.MatchField_MatchType
-	var fieldID uint32
-	var paramID uint32
+	var (
+		matchType p4ConfigV1.MatchField_MatchType
+		fieldID   uint32
+		paramID   uint32
+	)
+
 	for _, tables := range c.P4Info.Tables {
 		if tables.Preamble.Id == tableID {
 			for _, fields := range tables.MatchFields {
 				if fields.Name == inputField.Name {
 					log.Println("field name match found.")
+
 					matchType = fields.GetMatchType()
 					fieldID = fields.Id
+
 					break
 				}
 			}
@@ -494,7 +526,9 @@ func (c *P4rtClient) getFieldValue(entity *p4.Entity,
 			for _, params := range actions.Params {
 				if params.Name == inputParam.Name {
 					log.Println("field name match found.")
+
 					paramID = params.Id
+
 					break
 				}
 			}
@@ -506,16 +540,20 @@ func (c *P4rtClient) getFieldValue(entity *p4.Entity,
 	}
 
 	log.Println("ParamId FieldID ", paramID, fieldID)
+
 	for _, params := range entry.Action.GetAction().Params {
 		log.Println("ParamId recvd ", params.ParamId)
 		log.Println("Param value ", params.Value)
 		log.Println("inputParam value ", inputParam.Value)
+
 		if params.ParamId == paramID &&
 			(bytes.Equal(params.Value, inputParam.Value)) {
 			log.Println("Param matched")
+
 			for _, fields := range entry.Match {
 				if fields.FieldId == fieldID {
 					log.Println("field name match found ", inputField.Name)
+
 					switch matchType {
 					case p4ConfigV1.MatchField_EXACT:
 						{
@@ -544,24 +582,23 @@ func (c *P4rtClient) getFieldValue(entity *p4.Entity,
 						}
 					default:
 						log.Println("Unknown MatchType.")
-						err := fmt.Errorf("unknown MatchType for FieldMatch")
-						return nil, err
+						return nil, fmt.Errorf("unknown MatchType for FieldMatch")
 					}
 
 					log.Println("Field value found.")
+
 					return &inputField, nil
 				}
 			}
 		}
 	}
 
-	err := fmt.Errorf("getField Value failed")
-	return nil, err
+	return nil, fmt.Errorf("getField Value failed")
 }
 
-func (c *P4rtClient) addFieldValue(entry *p4.TableEntry, field MatchField,
-	tableID uint32) error {
+func (c *P4rtClient) addFieldValue(entry *p4.TableEntry, field MatchField, tableID uint32) error {
 	log.Traceln("add Match field")
+
 	fieldVal := &p4.FieldMatch{
 		FieldId: 0,
 	}
@@ -571,7 +608,9 @@ func (c *P4rtClient) addFieldValue(entry *p4.TableEntry, field MatchField,
 			for _, fields := range tables.MatchFields {
 				if fields.Name == field.Name {
 					log.Traceln("field name match found.")
+
 					fieldVal.FieldId = fields.Id
+
 					switch fields.GetMatchType() {
 					case p4ConfigV1.MatchField_EXACT:
 						{
@@ -608,19 +647,18 @@ func (c *P4rtClient) addFieldValue(entry *p4.TableEntry, field MatchField,
 						}
 					default:
 						log.Println("Unknown MatchType.")
-						err := fmt.Errorf("unknown MatchType for FieldMatch")
-						return err
+						return fmt.Errorf("unknown MatchType for FieldMatch")
 					}
 
 					entry.Match = append(entry.Match, fieldVal)
+
 					return nil
 				}
 			}
 		}
 	}
 
-	err := fmt.Errorf("addField Value failed")
-	return err
+	return fmt.Errorf("addField Value failed")
 }
 
 func (c *P4rtClient) addActionValue(action *p4.Action, param ActionParam,
@@ -636,14 +674,14 @@ func (c *P4rtClient) addActionValue(action *p4.Action, param ActionParam,
 						Value:   param.Value,
 					}
 					action.Params = append(action.Params, paramVal)
+
 					return nil
 				}
 			}
 		}
 	}
 
-	err := fmt.Errorf("addAction Value failed")
-	return err
+	return fmt.Errorf("addAction Value failed")
 }
 
 // ReadCounter ... Read Counter entry.
@@ -657,6 +695,7 @@ func (c *P4rtClient) ReadCounter(ce *IntfCounterEntry) error {
 	}
 
 	log.Traceln(proto.MarshalTextString(readRes))
+
 	for _, ent := range readRes.GetEntities() {
 		err := c.getCounterValue(ent, ce)
 		if err != nil {
@@ -672,13 +711,16 @@ func (c *P4rtClient) ReadCounter(ce *IntfCounterEntry) error {
 func (c *P4rtClient) ReadCounterEntry(ce *IntfCounterEntry) (*p4.ReadResponse, error) {
 	log.Traceln("Read Counter Entry")
 
-	var index p4.Index
+	var (
+		index    p4.Index
+		entry    p4.CounterEntry
+		entity   p4.Entity
+		ctrEntry p4.Entity_CounterEntry
+	)
+
 	index.Index = int64(ce.Index)
-	var entry p4.CounterEntry
 	entry.CounterId = uint32(ce.CounterID)
 	// entry.Index = &index
-	var entity p4.Entity
-	var ctrEntry p4.Entity_CounterEntry
 	ctrEntry.CounterEntry = &entry
 	entity.Entity = &ctrEntry
 	/*
@@ -694,17 +736,20 @@ func (c *P4rtClient) ReadCounterEntry(ce *IntfCounterEntry) (*p4.ReadResponse, e
 			Entity: &p4.Entity_CounterEntry{CounterEntry: entry},
 		}*/
 	log.Traceln(proto.MarshalTextString(&entity))
+
 	return c.ReadReq(&entity)
 }
 
 // ClearFarTable ... Clear FAR Table.
 func (c *P4rtClient) ClearFarTable() error {
 	log.Println("ClearFarTable.")
+
 	te := AppTableEntry{
 		TableName: "PreQosPipe.load_far_attributes",
 	}
 
 	var prio int32
+
 	readRes, err := c.ReadTableEntry(te, prio)
 	if err != nil {
 		log.Println("Read FAR table failed ", err)
@@ -712,6 +757,7 @@ func (c *P4rtClient) ClearFarTable() error {
 	}
 
 	updates := make([]*p4.Update, len(readRes.GetEntities()))
+
 	for _, ent := range readRes.GetEntities() {
 		updateType := p4.Update_DELETE
 		update := &p4.Update{
@@ -734,12 +780,14 @@ func (c *P4rtClient) ClearFarTable() error {
 
 // ClearPdrTable ... Clear PDR Table.
 func (c *P4rtClient) ClearPdrTable() error {
-	log.Println("ClearPdrTable.")
+	log.Println("ClearPdrTable")
+
 	te := AppTableEntry{
 		TableName: "PreQosPipe.pdrs",
 	}
 
 	var prio int32
+
 	readRes, err := c.ReadTableEntry(te, prio)
 	if err != nil {
 		log.Println("Read Pdr table failed ", err)
@@ -747,6 +795,7 @@ func (c *P4rtClient) ClearPdrTable() error {
 	}
 
 	updates := make([]*p4.Update, len(readRes.GetEntities()))
+
 	for _, ent := range readRes.GetEntities() {
 		updateType := p4.Update_DELETE
 		update := &p4.Update{
@@ -770,6 +819,7 @@ func (c *P4rtClient) ClearPdrTable() error {
 // ReadInterfaceTable ... Read Interface table Entry.
 func (c *P4rtClient) ReadInterfaceTable(intfEntry *IntfTableEntry) error {
 	log.Println("ReadInterfaceTable.")
+
 	te := AppTableEntry{
 		TableName:  "PreQosPipe.source_iface_lookup",
 		ActionName: "PreQosPipe.set_source_iface",
@@ -783,23 +833,27 @@ func (c *P4rtClient) ReadInterfaceTable(intfEntry *IntfTableEntry) error {
 	te.Params = make([]ActionParam, 2)
 	te.Params[0].Name = "src_iface"
 	enumName := "InterfaceType"
+
 	val, err := c.getEnumVal(enumName, intfEntry.SrcIntf)
 	if err != nil {
 		log.Println("Could not find enum val ", err)
 		return err
 	}
-	te.Params[0].Value = val
 
+	te.Params[0].Value = val
 	te.Params[1].Name = "direction"
 	enumName = "Direction"
+
 	val, err = c.getEnumVal(enumName, intfEntry.Direction)
 	if err != nil {
 		log.Println("Could not find enum val ", err)
 		return err
 	}
+
 	te.Params[1].Value = val
 
 	var prio int32
+
 	readRes, err := c.ReadTableEntry(te, prio)
 	if err != nil {
 		log.Println("Read Interface table failed ", err)
@@ -817,11 +871,11 @@ func (c *P4rtClient) ReadInterfaceTable(intfEntry *IntfTableEntry) error {
 		copy(intfEntry.IP, field.Value)
 		log.Println("ip , fieldval ", intfEntry.IP, field.Value)
 		intfEntry.PrefixLen = int(field.PrefixLen)
+
 		return nil
 	}
 
-	err = fmt.Errorf("ReadInterfaceTable failed")
-	return err
+	return fmt.Errorf("ReadInterfaceTable failed")
 }
 
 // ReadTableEntry ... Read table Entry.
@@ -838,6 +892,7 @@ func (c *P4rtClient) ReadTableEntry(tableEntry AppTableEntry, prio int32) (*p4.R
 		Entity: &p4.Entity_TableEntry{TableEntry: entry},
 	}
 	log.Traceln(proto.MarshalTextString(entity))
+
 	return c.ReadReq(entity)
 }
 
@@ -848,6 +903,7 @@ func (c *P4rtClient) ReadReqEntities(entities []*p4.Entity) (*p4.ReadResponse, e
 		Entities: entities,
 	}
 	log.Traceln(proto.MarshalTextString(req))
+
 	readClient, err := c.Client.Read(context.Background(), req)
 	if err == nil {
 		readRes, err := readClient.Recv()
@@ -856,6 +912,7 @@ func (c *P4rtClient) ReadReqEntities(entities []*p4.Entity) (*p4.ReadResponse, e
 			return readRes, nil
 		}
 	}
+
 	return nil, err
 }
 
@@ -870,6 +927,7 @@ func (c *P4rtClient) ReadReq(entity *p4.Entity) (*p4.ReadResponse, error) {
 	defer cancel()
 
 	log.Traceln(proto.MarshalTextString(&req))
+
 	readClient, err := c.Client.Read(ctx, &req)
 	if err == nil {
 		readRes, err := readClient.Recv()
@@ -878,6 +936,7 @@ func (c *P4rtClient) ReadReq(entity *p4.Entity) (*p4.ReadResponse, error) {
 			return readRes, nil
 		}
 	}
+
 	return nil, err
 }
 
@@ -891,6 +950,7 @@ func (c *P4rtClient) InsertTableEntry(tableEntry AppTableEntry, funcType uint8, 
 	}
 
 	log.Println("adding action params.")
+
 	for _, p := range tableEntry.Params {
 		err := c.addActionValue(directAction, p, actionID)
 		if err != nil {
@@ -913,6 +973,7 @@ func (c *P4rtClient) InsertTableEntry(tableEntry AppTableEntry, funcType uint8, 
 		if uint32(count) >= tableEntry.FieldSize {
 			break
 		}
+
 		err := c.addFieldValue(entry, mf, tableID)
 		if err != nil {
 			return err
@@ -936,6 +997,7 @@ func (c *P4rtClient) InsertTableEntry(tableEntry AppTableEntry, funcType uint8, 
 	}
 
 	log.Traceln(proto.MarshalTextString(update))
+
 	return c.WriteReq(update)
 }
 
@@ -947,6 +1009,7 @@ func (c *P4rtClient) WriteReq(update *p4.Update) error {
 		Updates:    []*p4.Update{update},
 	}
 	_, err := c.Client.Write(context.Background(), req)
+
 	return err
 }
 
@@ -961,12 +1024,14 @@ func (c *P4rtClient) WriteBatchReq(updates []*p4.Update) error {
 
 	log.Traceln(proto.MarshalTextString(req))
 	_, err := c.Client.Write(context.Background(), req)
+
 	return err
 }
 
 // GetForwardingPipelineConfig ... Get Pipeline config from switch.
 func (c *P4rtClient) GetForwardingPipelineConfig() (err error) {
 	log.Println("GetForwardingPipelineConfig")
+
 	pipeline, err := GetPipelineConfig(c.Client, c.DeviceID)
 	if err != nil {
 		log.Println("set pipeline config error ", err)
@@ -974,6 +1039,7 @@ func (c *P4rtClient) GetForwardingPipelineConfig() (err error) {
 	}
 
 	c.P4Info = *pipeline.Config.P4Info
+
 	return
 }
 
@@ -989,6 +1055,7 @@ func GetPipelineConfig(client p4.P4RuntimeClient, deviceID uint64) (*p4.GetForwa
 		log.Println("get forwarding pipeline returned error ", err)
 		return nil, err
 	}
+
 	return configRes, nil
 }
 
@@ -1003,6 +1070,7 @@ func (c *P4rtClient) SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath st
 	}
 
 	var p4info p4ConfigV1.P4Info
+
 	err = proto.UnmarshalText(string(p4infoBytes), &p4info)
 	if err != nil {
 		log.Println("Unmarshal test failed for p4info ", err)
@@ -1010,6 +1078,7 @@ func (c *P4rtClient) SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath st
 	}
 
 	c.P4Info = p4info
+
 	deviceConfig, err := LoadDeviceConfig(deviceConfigPath)
 	if err != nil {
 		log.Println("bmv2 json read failed ", err)
@@ -1025,6 +1094,7 @@ func (c *P4rtClient) SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath st
 		log.Println("set pipeline config error ", err)
 		return
 	}
+
 	return
 }
 
@@ -1037,10 +1107,12 @@ func SetPipelineConfig(client p4.P4RuntimeClient, deviceID uint64, electionID *p
 		Action:     p4.SetForwardingPipelineConfigRequest_VERIFY_AND_COMMIT,
 		Config:     config,
 	}
+
 	_, err := client.SetForwardingPipelineConfig(context.Background(), req)
 	if err != nil {
 		log.Println("set forwarding pipeline returned error ", err)
 	}
+
 	return err
 }
 
@@ -1048,11 +1120,13 @@ func SetPipelineConfig(client p4.P4RuntimeClient, deviceID uint64, electionID *p
 func GetConnection(host string) (conn *grpc.ClientConn, err error) {
 	/* get connection */
 	log.Println("Get connection.")
+
 	conn, err = grpc.Dial(host, grpc.WithInsecure())
 	if err != nil {
 		log.Println("grpc dial err: ", err)
 		return nil, err
 	}
+
 	return
 }
 
@@ -1065,6 +1139,7 @@ func LoadDeviceConfig(deviceConfigPath string) (P4DeviceConfig, error) {
 		return nil, fmt.Errorf("open %s: %v", deviceConfigPath, err)
 	}
 	defer deviceConfig.Close()
+
 	bmv2Info, err := deviceConfig.Stat()
 	if err != nil {
 		return nil, fmt.Errorf("stat %s: %v", deviceConfigPath, err)

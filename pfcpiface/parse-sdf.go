@@ -26,6 +26,7 @@ type endpoint struct {
 func (ep *endpoint) parseNet(ipnet string) error {
 	ipNetFields := strings.Split(ipnet, "/")
 	log.Println(ipNetFields)
+
 	switch len(ipNetFields) {
 	case 1:
 		ipnet = ipNetFields[0] + "/32"
@@ -35,10 +36,12 @@ func (ep *endpoint) parseNet(ipnet string) error {
 	}
 
 	var err error
+
 	_, ep.IPNet, err = net.ParseCIDR(ipnet)
 	if err != nil {
 		return errors.New("unable to ParseCIDR")
 	}
+
 	return nil
 }
 
@@ -47,7 +50,9 @@ func (ep *endpoint) parsePort(port string) error {
 	if err != nil {
 		return err
 	}
+
 	ep.Port = uint16(p)
+
 	return nil
 }
 
@@ -72,18 +77,20 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 	if err := parseAction(fields[0]); err != nil {
 		return err
 	}
+
 	ipf.action = fields[0]
 
 	if err := parseDirection(fields[1]); err != nil {
 		return err
 	}
-	ipf.direction = fields[1]
 
+	ipf.direction = fields[1]
 	ipf.proto = parseProto(fields[2])
 
 	// bring to common intermediate representation
 	xform := func(i int) {
 		log.Println(fields)
+
 		switch fields[i] {
 		case "any":
 			fields[i] = "0.0.0.0/0"
@@ -94,15 +101,18 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 				fields[i] = "0.0.0.0/0"
 			}
 		}
+
 		log.Println(fields)
 	}
 
 	for i := 3; i < len(fields); i++ {
 		log.Println(fields[i])
+
 		switch fields[i] {
 		case "from":
 			i++
 			xform(i)
+
 			err := ipf.src.parseNet(fields[i])
 			if err != nil {
 				log.Println(err)
@@ -110,6 +120,7 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 
 			if fields[i+1] != "to" {
 				i++
+
 				err = ipf.src.parsePort(fields[i])
 				if err != nil {
 					log.Println("src port parse failed ", err)
@@ -118,6 +129,7 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 		case "to":
 			i++
 			xform(i)
+
 			err := ipf.dst.parseNet(fields[i])
 			if err != nil {
 				log.Println(err)
@@ -125,6 +137,7 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 
 			if i < len(fields)-1 {
 				i++
+
 				err = ipf.dst.parsePort(fields[i])
 				if err != nil {
 					log.Println("dst port parse failed ", err)
@@ -134,6 +147,7 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 	}
 
 	log.Println(ipf)
+
 	return nil
 }
 
@@ -144,6 +158,7 @@ func parseAction(action string) error {
 	default:
 		return errBadFilterDesc
 	}
+
 	return nil
 }
 
@@ -154,6 +169,7 @@ func parseDirection(dir string) error {
 	default:
 		return errBadFilterDesc
 	}
+
 	return nil
 }
 
@@ -162,6 +178,7 @@ func parseProto(proto string) uint8 {
 	if err == nil {
 		return uint8(p)
 	}
+
 	switch proto {
 	case "udp":
 		return 17

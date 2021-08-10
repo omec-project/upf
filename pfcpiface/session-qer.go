@@ -20,6 +20,7 @@ func (s *PFCPSession) UpdateQER(q qer) error {
 			return nil
 		}
 	}
+
 	return errors.New("QER not found")
 }
 
@@ -31,5 +32,6 @@ func (s *PFCPSession) RemoveQER(id uint32) (*qer, error) {
 			return &v, nil
 		}
 	}
+
 	return nil, errors.New("QER not found")
 }

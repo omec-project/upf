@@ -310,6 +310,7 @@ func modifyPFCP(conn *net.UDPConn, raddr *net.UDPAddr, seid uint64) {
 
 func deletePFCP(conn *net.UDPConn, raddr *net.UDPAddr, seid uint64) {
 	var seq uint32 = 5
+
 	sdreq, err := message.NewSessionDeletionRequest(
 		0,
 		0,
@@ -324,9 +325,11 @@ func deletePFCP(conn *net.UDPConn, raddr *net.UDPAddr, seid uint64) {
 	if _, err := conn.Write(sdreq); err != nil {
 		log.Fatal(err)
 	}
+
 	log.Printf("sent session deletion request to: %s", raddr)
 
 	buf := make([]byte, 1500)
+
 	_, _, err = conn.ReadFrom(buf)
 	if err != nil {
 		log.Fatal(err)
@@ -345,10 +348,10 @@ func pfcpSim() {
 	}
 
 	seid := createPFCP(conn, raddr)
-	time.Sleep(10 * time.Second)
 
+	time.Sleep(10 * time.Second)
 	modifyPFCP(conn, raddr, seid)
-	time.Sleep(10 * time.Second)
 
+	time.Sleep(10 * time.Second)
 	deletePFCP(conn, raddr, seid)
 }

@@ -72,8 +72,10 @@ func (mgr *PFCPSessionMgr) NewPFCPSession(rseid uint64) uint64 {
 		}
 		mgr.sessions[lseid] = &s
 		globalPfcpStats.sessions.WithLabelValues(mgr.nodeID).Set(float64(len(mgr.sessions)))
+
 		return lseid
 	}
+
 	return 0
 }
 
