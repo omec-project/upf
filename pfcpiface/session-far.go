@@ -20,6 +20,7 @@ func (s *PFCPSession) CreateFAR(f far) {
 func addEndMarker(farItem far, endMarkerList *[][]byte) {
 	// This time lets fill out some information
 	log.Println("Adding end Marker for farID : ", farItem.farID)
+
 	options := gopacket.SerializeOptions{
 		ComputeChecksums: true,
 		FixLengths:       true,
@@ -77,10 +78,13 @@ func (s *PFCPSession) UpdateFAR(f *far, endMarkerList *[][]byte) error {
 			if f.sendEndMarker {
 				addEndMarker(v, endMarkerList)
 			}
+
 			s.fars[idx] = *f
+
 			return nil
 		}
 	}
+
 	return errors.New("FAR not found")
 }
 
@@ -93,12 +97,14 @@ func (s *PFCPSession) setNotifyFlag(flag bool) {
 func (s *PFCPSession) getNotifyFlag() bool {
 	s.notificationFlag.mux.Lock()
 	defer s.notificationFlag.mux.Unlock()
+
 	return s.notificationFlag.flag
 }
 
 // UpdateFAR updates existing far in the session.
 func (s *PFCPSession) updateNotifyFlag() {
 	unset := true
+
 	for _, v := range s.fars {
 		if v.applyAction&ActionNotify != 0 {
 			unset = false
@@ -118,5 +124,6 @@ func (s *PFCPSession) RemoveFAR(id uint32) (*far, error) {
 			return &v, nil
 		}
 	}
+
 	return nil, errors.New("FAR not found")
 }

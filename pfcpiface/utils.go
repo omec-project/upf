@@ -60,6 +60,7 @@ func ip2int(ip net.IP) uint32 {
 	if len(ip) == 16 {
 		return binary.BigEndian.Uint32(ip[12:16])
 	}
+
 	return binary.BigEndian.Uint32(ip)
 }
 
@@ -67,6 +68,7 @@ func ipMask2int(ip net.IPMask) uint32 {
 	if len(ip) == 16 {
 		return binary.BigEndian.Uint32(ip[12:16])
 	}
+
 	return binary.BigEndian.Uint32(ip)
 }
 
@@ -76,12 +78,14 @@ func hex2int(hexStr string) uint32 {
 
 	// base 16 for hexadecimal
 	result, _ := strconv.ParseUint(cleaned, 16, 32)
+
 	return uint32(result)
 }
 
 func int2ip(nn uint32) net.IP {
 	ip := make(net.IP, 4)
 	binary.BigEndian.PutUint32(ip, nn)
+
 	return ip
 }
 
@@ -104,5 +108,6 @@ func getLocalIP(dstIP string) net.IP {
 	}
 	defer conn.Close()
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
 	return localAddr.IP
 }

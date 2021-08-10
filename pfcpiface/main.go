@@ -101,7 +101,9 @@ func ParseStrIP(n3name string) (net.IP, net.IPMask) {
 	if err != nil {
 		log.Fatalln("Unable to parse IP: ", err)
 	}
+
 	log.Println("IP: ", ip)
+
 	return ip, (ipNet).Mask
 }
 
@@ -121,15 +123,21 @@ func ParseIP(name string, iface string) net.IP {
 	if err != nil {
 		log.Fatalln("Unable to parse", iface, " IP: ", err)
 	}
+
 	log.Println(iface, " IP: ", ip)
+
 	return ip
 }
 
 func main() {
 	// cmdline args
 	flag.Parse()
-	var conf Conf
-	var intf fastPath
+
+	var (
+		conf Conf
+		intf fastPath
+	)
+
 	// read and parse json startup file
 	ParseJSON(configPath, &conf)
 
@@ -138,11 +146,13 @@ func main() {
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp: true,
 	})
+
 	if level, err := log.ParseLevel(conf.LogLevel); err != nil {
 		log.Fatalln(err)
 	} else {
 		log.SetLevel(level)
 	}
+
 	log.Infoln(conf)
 
 	if conf.EnableP4rt {
@@ -185,16 +195,20 @@ func main() {
 
 		log.Println(*simulate, "sessions:", conf.MaxSessions)
 		upf.sim(*simulate)
+
 		return
 	}
+
 	log.Println("N4 local IP: ", upf.n4SrcIP.String())
 	log.Println("Access IP: ", upf.accessIP.String())
 	log.Println("Core IP: ", upf.coreIP.String())
+
 	if conf.CPIface.PromPort != "" {
 		*httpAddr = string("0.0.0.0:") + conf.CPIface.PromPort
 	}
 
 	log.Println("httpAddr: ", httpAddr)
+
 	go pfcpifaceMainLoop(
 		upf, upf.accessIP.String(),
 		upf.coreIP.String(), upf.n4SrcIP.String(),

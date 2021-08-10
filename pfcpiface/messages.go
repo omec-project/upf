@@ -49,17 +49,21 @@ func (pc *PFCPConn) handleAssociationSetupRequest(upf *upf, msg message.Message,
 		log.Println("Got an association setup request with invalid NodeID: ", err, " from: ", addr)
 		return nil
 	}
+
 	ts, err := asreq.RecoveryTimeStamp.RecoveryTimeStamp()
 	if err != nil {
 		log.Println("Got an association setup request with invalid TS: ", err, " from: ", addr)
 		return nil
 	}
+
 	log.Println("Got an association setup request with TS: ", ts, " from: ", addr)
+
 	globalPfcpStats.messages.WithLabelValues(nodeID, "Association_Setup_Request", "Incoming", "Success").Inc()
 
 	cause := ie.CauseRequestAccepted
 	if !upf.isConnected() {
 		cause = ie.CauseRequestRejected
+
 		globalPfcpStats.messages.WithLabelValues(nodeID, "Association_Setup_Response", "Outgoing", "Failure").Inc()
 	} else {
 		globalPfcpStats.messages.WithLabelValues(nodeID, "Association_Setup_Response", "Outgoing", "Success").Inc()
@@ -67,12 +71,15 @@ func (pc *PFCPConn) handleAssociationSetupRequest(upf *upf, msg message.Message,
 
 	// Build response message
 	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
-	flags := uint8(0x41)
 	log.Println("Dnn info : ", upf.dnn)
+
+	flags := uint8(0x41)
+
 	if len(upf.dnn) != 0 {
 		// add ASSONI flag to set network instance.
 		flags = uint8(0x61)
 	}
+
 	asresmsg := message.NewAssociationSetupResponse(asreq.SequenceNumber,
 		ie.NewRecoveryTimeStamp(upf.recoveryTime),
 		ie.NewNodeID(upf.nodeIP.String(), "", ""), /* node id (IPv4) */
@@ -85,7 +92,9 @@ func (pc *PFCPConn) handleAssociationSetupRequest(upf *upf, msg message.Message,
 
 	pc.mgr.nodeID = nodeID
 	log.Println("Association setup NodeID : ", pc.mgr.nodeID)
+
 	features := make([]uint8, 4)
+
 	if upf.enableUeIPAlloc {
 		setUeipFeature(features...)
 	}
@@ -94,8 +103,8 @@ func (pc *PFCPConn) handleAssociationSetupRequest(upf *upf, msg message.Message,
 		setEndMarkerFeature(features...)
 	}
 
-	asresmsg.UPFunctionFeatures =
-		ie.NewUPFunctionFeatures(features...)
+	asresmsg.UPFunctionFeatures = ie.NewUPFunctionFeatures(features...)
+
 	asres, err := asresmsg.Marshal()
 	if err != nil {
 		log.Fatalln("Unable to create association setup response", err)
@@ -118,6 +127,7 @@ func handleAssociationSetupResponse(msg message.Message, addr net.Addr, sourceIP
 		log.Println("Got an association setup response with invalid TS: ", err, " from: ", addr)
 		return false
 	}
+
 	log.Println("Received a PFCP association setup response with TS: ", ts, " from: ", addr)
 
 	cause, err := asres.Cause.Cause()
@@ -127,6 +137,7 @@ func handleAssociationSetupResponse(msg message.Message, addr net.Addr, sourceIP
 	}
 
 	log.Println("PFCP Association formed with Control Plane - ", addr)
+
 	return true
 }
 
@@ -174,9 +185,9 @@ func (pc *PFCPConn) handlePFDMgmtRequest(upf *upf, msg message.Message, addr net
 	pc.mgr.ResetAppPFDs()
 
 	sendError := func(err error, offendingIE *ie.IE) []byte {
+		log.Println(err)
 		// Revert the map to original contents
 		pc.mgr.appPFDs = currentAppPFDs
-		log.Println(err)
 		// Build response message
 		pfdres, err := message.NewPFDManagementResponse(pfdmreq.SequenceNumber,
 			ie.NewCause(ie.CauseRequestRejected),
@@ -187,6 +198,7 @@ func (pc *PFCPConn) handlePFDMgmtRequest(upf *upf, msg message.Message, addr net
 		}
 
 		log.Println("Sending PFD management error response to: ", addr)
+
 		return pfdres
 	}
 
@@ -211,11 +223,14 @@ func (pc *PFCPConn) handlePFDMgmtRequest(upf *upf, msg message.Message, addr net
 				pc.mgr.RemoveAppPFD(id)
 				return sendError(err, appIDPFD)
 			}
+
 			if fields.FlowDescription == "" {
 				return sendError(errors.New("flow description not found"), appIDPFD)
 			}
+
 			appPFD.flowDescs = append(appPFD.flowDescs, fields.FlowDescription)
 		}
+
 		pc.mgr.appPFDs[id] = appPFD
 		log.Println("Flow descriptions for AppID", id, ":", appPFD.flowDescs)
 	}
@@ -230,11 +245,13 @@ func (pc *PFCPConn) handlePFDMgmtRequest(upf *upf, msg message.Message, addr net
 	}
 
 	log.Println("Sending PFD management response to: ", addr)
+
 	return pfdres
 }
 
 func (pc *PFCPConn) handleSessionReportResponse(upf *upf, msg message.Message, addr net.Addr) {
 	log.Println("Got session report response from: ", addr)
+
 	srres, ok := msg.(*message.SessionReportResponse)
 	if !ok {
 		log.Println("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
@@ -245,14 +262,18 @@ func (pc *PFCPConn) handleSessionReportResponse(upf *upf, msg message.Message, a
 	if cause != ie.CauseRequestAccepted {
 		seid := srres.SEID()
 		log.Println("session req not accepted seq : ", srres.SequenceNumber)
+
 		if cause == ie.CauseSessionContextNotFound {
 			sessItem, ok := pc.mgr.sessions[seid]
 			if !ok {
 				log.Println("context not found locally or remote. SEID : ", seid)
 				return
 			}
+
 			log.Println("context not found. Delete session locally")
+
 			pc.mgr.RemoveSession(srres.SEID())
+
 			cause := upf.sendMsgToUPF(upfMsgTypeDel, sessItem.pdrs, sessItem.fars, sessItem.qers)
 			if cause == ie.CauseRequestRejected {
 				log.Println("Write to FastPath failed")
@@ -287,6 +308,7 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 		log.Println("Failed to parse FSEID from session establishment request")
 		return nil
 	}
+
 	remoteSEID := fseid.SEID
 	fseidIP := ip2int(fseid.IPv4Address)
 
@@ -307,6 +329,7 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 		}
 
 		log.Println("Sending session establishment response to: ", addr)
+
 		return seres
 	}
 
@@ -322,12 +345,15 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 		sendError(errors.New("unable to allocate new PFCP session"),
 			ie.CauseNoResourcesAvailable)
 	}
+
 	session := pc.mgr.sessions[localSEID]
+
 	for _, cPDR := range sereq.CreatePDR {
 		var p pdr
 		if err := p.parsePDR(cPDR, session.localSEID, pc.mgr.appPFDs, upf); err != nil {
 			return sendError(err, ie.CauseRequestRejected)
 		}
+
 		p.fseidIP = fseidIP
 		session.CreatePDR(p)
 	}
@@ -337,6 +363,7 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 		if err := f.parseFAR(cFAR, session.localSEID, upf, create); err != nil {
 			return sendError(err, ie.CauseRequestRejected)
 		}
+
 		f.fseidIP = fseidIP
 		session.CreateFAR(f)
 	}
@@ -346,6 +373,7 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 		if err := q.parseQER(cQER, session.localSEID, upf); err != nil {
 			return sendError(err, ie.CauseRequestRejected)
 		}
+
 		q.fseidIP = fseidIP
 		session.CreateQER(q)
 	}
@@ -369,13 +397,16 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 	)
 
 	addPdrInfo(seresMsg, session)
+
 	seres, err := seresMsg.Marshal()
 	if err != nil {
 		log.Fatalln("Unable to create session establishment response", err)
 	}
 
 	log.Println("Sending session establishment response to: ", addr)
+
 	globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Establishment_Response", "Outgoing", "Success").Inc()
+
 	return seres
 }
 
@@ -392,9 +423,11 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 	globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Modification_Request", "Incoming", "Success").Inc()
 
 	var remoteSEID uint64
+
 	sendError := func(err error) []byte {
 		globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Modification_Response", "Outgoing", "Failure").Inc()
 		log.Println(err)
+
 		smres, err := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */
 			0,                                    /* FO <-- what's this? */
 			remoteSEID,                           /* seid */
@@ -407,36 +440,44 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 		}
 
 		log.Println("Sending session modification response to: ", addr)
+
 		return smres
 	}
 
 	localSEID := smreq.SEID()
+
 	session, ok := pc.mgr.sessions[localSEID]
 	if !ok {
 		return sendError(fmt.Errorf("session not found: %v", localSEID))
 	}
 
 	var fseidIP uint32
+
 	if smreq.CPFSEID != nil {
 		fseid, err := smreq.CPFSEID.FSEID()
 		if err == nil {
 			session.remoteSEID = fseid.SEID
 			fseidIP = ip2int(fseid.IPv4Address)
+
 			log.Println("Updated FSEID from session modification request")
 		}
 	}
+
 	remoteSEID = session.remoteSEID
 
 	addPDRs := make([]pdr, 0, MaxItems)
 	addFARs := make([]far, 0, MaxItems)
 	addQERs := make([]qer, 0, MaxItems)
 	endMarkerList := make([][]byte, 0, MaxItems)
+
 	for _, cPDR := range smreq.CreatePDR {
 		var p pdr
 		if err := p.parsePDR(cPDR, localSEID, pc.mgr.appPFDs, upf); err != nil {
 			return sendError(err)
 		}
+
 		p.fseidIP = fseidIP
+
 		session.CreatePDR(p)
 		addPDRs = append(addPDRs, p)
 	}
@@ -446,7 +487,9 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 		if err := f.parseFAR(cFAR, localSEID, upf, create); err != nil {
 			return sendError(err)
 		}
+
 		f.fseidIP = fseidIP
+
 		session.CreateFAR(f)
 		addFARs = append(addFARs, f)
 	}
@@ -456,53 +499,73 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 		if err := q.parseQER(cQER, localSEID, upf); err != nil {
 			return sendError(err)
 		}
+
 		q.fseidIP = fseidIP
+
 		session.CreateQER(q)
 		addQERs = append(addQERs, q)
 	}
 
 	for _, uPDR := range smreq.UpdatePDR {
-		var p pdr
-		var err error
+		var (
+			p   pdr
+			err error
+		)
+
 		if err = p.parsePDR(uPDR, localSEID, pc.mgr.appPFDs, upf); err != nil {
 			return sendError(err)
 		}
+
 		p.fseidIP = fseidIP
+
 		err = session.UpdatePDR(p)
 		if err != nil {
 			log.Println("session PDR update failed ", err)
 			continue
 		}
+
 		addPDRs = append(addPDRs, p)
 	}
 
 	for _, uFAR := range smreq.UpdateFAR {
-		var f far
-		var err error
+		var (
+			f   far
+			err error
+		)
+
 		if err = f.parseFAR(uFAR, localSEID, upf, update); err != nil {
 			return sendError(err)
 		}
+
 		f.fseidIP = fseidIP
+
 		err = session.UpdateFAR(&f, &endMarkerList)
 		if err != nil {
 			log.Println("session PDR update failed ", err)
 			continue
 		}
+
 		addFARs = append(addFARs, f)
 	}
 
 	for _, uQER := range smreq.UpdateQER {
-		var q qer
-		var err error
+		var (
+			q   qer
+			err error
+		)
+
 		if err = q.parseQER(uQER, localSEID, upf); err != nil {
 			return sendError(err)
 		}
+
 		q.fseidIP = fseidIP
+
 		err = session.UpdateQER(q)
 		if err != nil {
 			log.Println("session QER update failed ", err)
 			continue
 		}
+
 		addQERs = append(addQERs, q)
 	}
 
@@ -536,6 +599,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 		if err != nil {
 			return sendError(err)
 		}
+
 		delPDRs = append(delPDRs, *p)
 	}
 
@@ -549,6 +613,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 		if err != nil {
 			return sendError(err)
 		}
+
 		delFARs = append(delFARs, *f)
 	}
 
@@ -562,6 +627,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 		if err != nil {
 			return sendError(err)
 		}
+
 		delQERs = append(delQERs, *q)
 	}
 
@@ -584,6 +650,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 
 	globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Modification_Response", "Outgoing", "Success").Inc()
 	log.Println("Sent session modification response to: ", addr)
+
 	return smres
 }
 
@@ -595,12 +662,14 @@ func (pc *PFCPConn) handleSessionDeletionRequest(upf *upf, msg message.Message, 
 	}
 
 	nodeID := pc.mgr.nodeID
-	log.Println("Got a session deletion request from: ", addr)
 	globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Deletion_Request", "Incoming", "Success").Inc()
+
+	log.Println("Got a session deletion request from: ", addr)
 
 	sendError := func(err error) []byte {
 		log.Println(err)
 		globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Deletion_Response", "Outgoing", "Failure").Inc()
+
 		smres, err := message.NewSessionDeletionResponse(0, /* MO?? <-- what's this */
 			0,                                    /* FO <-- what's this? */
 			0,                                    /* seid */
@@ -613,11 +682,13 @@ func (pc *PFCPConn) handleSessionDeletionRequest(upf *upf, msg message.Message, 
 		}
 
 		log.Println("Sending session deletion response to: ", addr)
+
 		return smres
 	}
 
 	/* retrieve sessionRecord */
 	localSEID := sdreq.SEID()
+
 	session, ok := pc.mgr.sessions[localSEID]
 	if !ok {
 		return sendError(fmt.Errorf("session not found: %v", localSEID))
@@ -661,16 +732,18 @@ func (pc *PFCPConn) manageSmfConnection(n4LocalIP string, n3ip string, n4Dst str
 		if n4DstIP.String() != net.IPv4zero.String() {
 			pc.generateAssociationRequest(n4LocalIP, n3ip, n4DstIP.String(), conn, rTime)
 		}
-		// no worry. Looks like control plane is still not up
 	}
+
 	updateSmfStatus := func(msg bool) {
 		log.Println("cpConnected : ", cpConnected, "msg ", msg)
 		// events from main Loop
 		if cpConnected && !msg {
 			log.Println("CP disconnected ")
+
 			cpConnected = false
 		} else if !cpConnected && msg {
 			log.Println("CP Connected ")
+
 			cpConnected = true
 		} else {
 			log.Println("cpConnected ", cpConnected, "msg - ", msg)
@@ -681,11 +754,13 @@ func (pc *PFCPConn) manageSmfConnection(n4LocalIP string, n3ip string, n4Dst str
 
 	connHelathTicker := time.NewTicker(5000 * time.Millisecond)
 	pfcpResponseTicker := time.NewTicker(2000 * time.Millisecond)
+
 	for {
 		select {
 		case msg := <-cpConnectionStatus:
 			// events from main Loop
 			updateSmfStatus(msg)
+
 			if cpConnected {
 				pfcpResponseTicker.Stop()
 			}
@@ -695,16 +770,17 @@ func (pc *PFCPConn) manageSmfConnection(n4LocalIP string, n3ip string, n4Dst str
 				initiatePfcpConnection()
 			}
 		case <-pfcpResponseTicker.C:
+			// we will attempt new connection after next recheck
 			log.Println("PFCP session setup timeout ")
 			pfcpResponseTicker.Stop()
-			// we will attempt new connection after next recheck
 		}
 	}
 }
 
 func (pc *PFCPConn) generateAssociationRequest(n4LocalIP string, n3ip string, n4DstIP string, conn *net.UDPConn, rTime time.Time) {
-	seq := pc.getSeqNum()
 	log.Println("n4DstIp ", n4DstIP)
+
+	seq := pc.getSeqNum()
 	// Build request message
 	asreq, err := message.NewAssociationSetupRequest(seq, ie.NewRecoveryTimeStamp(rTime),
 		ie.NewNodeID(n4LocalIP, "", ""), /* node id (IPv4) */
@@ -732,6 +808,7 @@ func (pc *PFCPConn) generateAssociationRequest(n4LocalIP string, n3ip string, n4
 func readReportNotification(rn <-chan uint64, pfcpConn *PFCPConn,
 	udpConn *net.UDPConn, udpAddr net.Addr) {
 	log.Println("read report notification start")
+
 	for {
 		select {
 		case fseid := <-rn:
@@ -759,6 +836,7 @@ func handleDigestReport(fseid uint64,
 	}
 
 	session.setNotifyFlag(true)
+
 	seq := pfcpConn.getSeqNum()
 	serep := message.NewSessionReportRequest(0, /* MO?? <-- what's this */
 		0,                            /* FO <-- what's this? */
@@ -768,7 +846,9 @@ func handleDigestReport(fseid uint64,
 		ie.NewReportType(0, 0, 0, 1), /*upir, erir, usar, dldr int*/
 	)
 	serep.Header.SEID = session.remoteSEID
+
 	var pdrID uint32
+
 	for _, pdr := range session.pdrs {
 		if pdr.srcIface == core {
 			pdrID = pdr.pdrID
@@ -777,6 +857,7 @@ func handleDigestReport(fseid uint64,
 	}
 
 	log.Println("Pdr iD : ", pdrID)
+
 	if pdrID == 0 {
 		log.Println("No Pdr found for downlink")
 		return

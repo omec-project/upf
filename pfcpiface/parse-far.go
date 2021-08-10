@@ -62,6 +62,7 @@ func (f far) String() string {
 	fmt.Fprintf(&b, "tunnelTEID: %x\n", f.tunnelTEID)
 	fmt.Fprintf(&b, "tunnelPort: %v\n", f.tunnelPort)
 	fmt.Fprintf(&b, "sendEndMarker: %v\n", f.sendEndMarker)
+
 	return b.String()
 }
 
@@ -91,6 +92,7 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 	if err != nil {
 		return err
 	}
+
 	f.farID = farID
 
 	action, err := farIE.ApplyAction()
@@ -99,6 +101,7 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 	}
 
 	f.applyAction = action
+
 	var fwdIEs []*ie.IE
 
 	switch op {
@@ -117,11 +120,14 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 	}
 
 	f.sendEndMarker = false
+
 	var fields Bits
+
 	for _, fwdIE := range fwdIEs {
 		switch fwdIE.Type {
 		case ie.OuterHeaderCreation:
 			fields = Set(fields, FwdIEOuterHeaderCreation)
+
 			ohcFields, err := fwdIE.OuterHeaderCreation()
 			if err != nil {
 				log.Println("Unable to parse OuterHeaderCreationFields!")
@@ -134,11 +140,13 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 			f.tunnelPort = tunnelGTPUPort
 		case ie.DestinationInterface:
 			fields = Set(fields, FwdIEDestinationIntf)
+
 			f.dstIntf, err = fwdIE.DestinationInterface()
 			if err != nil {
 				log.Println("Unable to parse DestinationInterface field")
 				continue
 			}
+
 			if f.dstIntf == ie.DstInterfaceAccess {
 				f.tunnelIP4Src = ip2int(upf.accessIP)
 			} else if f.dstIntf == ie.DstInterfaceCore {
@@ -146,11 +154,13 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 			}
 		case ie.PFCPSMReqFlags:
 			fields = Set(fields, FwdIEPfcpSMReqFlags)
+
 			smReqFlags, err := fwdIE.PFCPSMReqFlags()
 			if err != nil {
 				log.Println("Unable to parse PFCPSMReqFlags!")
 				continue
 			}
+
 			if has2ndBit(smReqFlags) {
 				f.sendEndMarker = true
 			}
