@@ -15,23 +15,16 @@ import (
 type operation int
 
 const (
-	//FwdIEOuterHeaderCreation ...
 	FwdIEOuterHeaderCreation Bits = 1 << iota
-	//FwdIEDestinationIntf ...
 	FwdIEDestinationIntf
-	//FwdIEPfcpSMReqFlags ...
 	FwdIEPfcpSMReqFlags
 )
 
 const (
-	//ActionForward ...
 	ActionForward = 0x2
-	//ActionDrop ...
-	ActionDrop = 0x1
-	//ActionBuffer ...
-	ActionBuffer = 0x4
-	//ActionNotify ...
-	ActionNotify = 0x8
+	ActionDrop    = 0x1
+	ActionBuffer  = 0x4
+	ActionNotify  = 0x8
 )
 
 const (
@@ -87,7 +80,7 @@ func (f *far) setActionValue() uint8 {
 		return farNotify
 	}
 
-	//default action
+	// default action
 	return farDrop
 }
 

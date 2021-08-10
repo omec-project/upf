@@ -28,17 +28,17 @@ type P4rtcInfo struct {
 	UEIP        string `json:"ue_ip_pool"`
 }
 
-//ctrType
+// ctrType
 const (
-	preQosPdrCounter  uint8 = 0 //Pre qos pdr ctr
-	postQosPdrCounter uint8 = 1 //Post qos pdr ctr
+	preQosPdrCounter  uint8 = 0 // Pre qos pdr ctr
+	postQosPdrCounter uint8 = 1 // Post qos pdr ctr
 )
 
 type counter struct {
 	maxSize   uint64
 	counterID uint64
 	allocated map[uint64]uint64
-	//free      map[uint64]uint64
+	// free      map[uint64]uint64
 }
 
 type p4rtc struct {

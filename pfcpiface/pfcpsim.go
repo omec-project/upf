@@ -127,7 +127,7 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 					ie.NewSourceInterface(ie.SrcInterfaceAccess),
 					ie.NewFTEID(0x30000000, net.ParseIP("198.18.0.1"), nil, nil),
 					ie.NewUEIPAddress(0x2, "16.0.0.1", "", 0, 0),
-					//ie.NewSDFFilter("permit out ip from 6.6.6.6/32 to assigned", "", "", "", 2),
+					// ie.NewSDFFilter("permit out ip from 6.6.6.6/32 to assigned", "", "", "", 2),
 					ie.NewApplicationID("1000"),
 				),
 				ie.NewOuterHeaderRemoval(0, 0),
@@ -178,11 +178,11 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 			ie.NewCreateFAR(
 				ie.NewFARID(3),
 				ie.NewApplyAction(0x0c),
-				//ie.NewApplyAction(0x02),
-				//ie.NewForwardingParameters(
-				//	ie.NewDestinationInterface(ie.DstInterfaceAccess),
-				//	ie.NewOuterHeaderCreation(0x100, 0x00000001, "11.1.1.129", "", 0, 0, 0),
-				//),
+				// ie.NewApplyAction(0x02),
+				// ie.NewForwardingParameters(
+				// 	 ie.NewDestinationInterface(ie.DstInterfaceAccess),
+				// 	 ie.NewOuterHeaderCreation(0x100, 0x00000001, "11.1.1.129", "", 0, 0, 0),
+				// ),
 			),
 			// Uplink N9
 			ie.NewCreateQER(
@@ -248,7 +248,7 @@ func modifyPFCP(conn *net.UDPConn, raddr *net.UDPAddr, seid uint64) {
 			seid,
 			seq,
 			0,
-			//ie.NewFSEID(0x0000000000000001, net.ParseIP("127.0.0.1"), nil, nil),
+			// ie.NewFSEID(0x0000000000000001, net.ParseIP("127.0.0.1"), nil, nil),
 			ie.NewPDNType(ie.PDNTypeIPv4),
 			// Downlink N9
 			ie.NewUpdatePDR(

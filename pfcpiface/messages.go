@@ -70,7 +70,7 @@ func (pc *PFCPConn) handleAssociationSetupRequest(upf *upf, msg message.Message,
 	flags := uint8(0x41)
 	log.Println("Dnn info : ", upf.dnn)
 	if len(upf.dnn) != 0 {
-		//add ASSONI flag to set network instance.
+		// add ASSONI flag to set network instance.
 		flags = uint8(0x61)
 	}
 	asresmsg := message.NewAssociationSetupResponse(asreq.SequenceNumber,
