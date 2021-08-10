@@ -60,7 +60,7 @@ func (b *bess) sendEndMarkers(endMarkerList *[][]byte) error {
 	return nil
 }
 
-func (b *bess) sendMsgToUPF(method string, pdrs []pdr, fars []far, qers []qer) uint8 {
+func (b *bess) sendMsgToUPF(method upfMsgType, pdrs []pdr, fars []far, qers []qer) uint8 {
 	// create context
 	var cause uint8 = ie.CauseRequestAccepted
 	calls := len(pdrs) + len(fars) + len(qers)
@@ -75,33 +75,33 @@ func (b *bess) sendMsgToUPF(method string, pdrs []pdr, fars []far, qers []qer) u
 	for _, pdr := range pdrs {
 		log.Traceln(pdr)
 		switch method {
-		case "add":
+		case upfMsgTypeAdd:
 			fallthrough
-		case "mod":
+		case upfMsgTypeMod:
 			b.addPDR(ctx, done, pdr)
-		case "del":
+		case upfMsgTypeDel:
 			b.delPDR(ctx, done, pdr)
 		}
 	}
 	for _, far := range fars {
 		log.Traceln(far)
 		switch method {
-		case "add":
+		case upfMsgTypeAdd:
 			fallthrough
-		case "mod":
+		case upfMsgTypeMod:
 			b.addFAR(ctx, done, far)
-		case "del":
+		case upfMsgTypeDel:
 			b.delFAR(ctx, done, far)
 		}
 	}
 	for _, qer := range qers {
 		log.Traceln(qer)
 		switch method {
-		case "add":
+		case upfMsgTypeAdd:
 			fallthrough
-		case "mod":
+		case upfMsgTypeMod:
 			b.addQER(ctx, done, qer)
-		case "del":
+		case upfMsgTypeDel:
 			b.delQER(ctx, done, qer)
 		}
 	}
@@ -525,10 +525,10 @@ func (b *bess) sim(u *upf, method string) {
 		qers := []qer{qerDown, qerN6Up, qerN9Up}
 		switch method {
 		case "create":
-			b.sendMsgToUPF("add", pdrs, fars, qers)
+			b.sendMsgToUPF(upfMsgTypeAdd, pdrs, fars, qers)
 
 		case "delete":
-			b.sendMsgToUPF("del", pdrs, fars, qers)
+			b.sendMsgToUPF(upfMsgTypeDel, pdrs, fars, qers)
 
 		default:
 			log.Fatalln("Unsupported method", method)
@@ -537,15 +537,16 @@ func (b *bess) sim(u *upf, method string) {
 	log.Println("Sessions/s:", float64(u.maxSessions)/time.Since(start).Seconds())
 }
 
-func (b *bess) processPDR(ctx context.Context, any *anypb.Any, method string) {
-	if method != "add" && method != "delete" && method != "clear" {
+func (b *bess) processPDR(ctx context.Context, any *anypb.Any, method upfMsgType) {
+	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
 		log.Println("Invalid method name: ", method)
 		return
 	}
 
+	methods := [...]string{"add", "add", "delete", "clear"}
 	_, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "pdrLookup",
-		Cmd:  method,
+		Cmd:  methods[method],
 		Arg:  any,
 	})
 	if err != nil {
@@ -595,7 +596,7 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 			return
 		}
 
-		b.processPDR(ctx, any, "add")
+		b.processPDR(ctx, any, upfMsgTypeAdd)
 		done <- true
 	}()
 }
@@ -633,20 +634,21 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 			return
 		}
 
-		b.processPDR(ctx, any, "delete")
+		b.processPDR(ctx, any, upfMsgTypeDel)
 		done <- true
 	}()
 }
 
-func (b *bess) processQER(ctx context.Context, any *anypb.Any, method string) {
-	if method != "add" && method != "delete" && method != "clear" {
+func (b *bess) processQER(ctx context.Context, any *anypb.Any, method upfMsgType) {
+	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
 		log.Println("Invalid method name: ", method)
 		return
 	}
 
+	methods := [...]string{"add", "add", "delete", "clear"}
 	_, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "qerLookup",
-		Cmd:  method,
+		Cmd:  methods[method],
 		Arg:  any,
 	})
 	if err != nil {
@@ -679,7 +681,7 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 			log.Println("Error marshalling the rule", q, err)
 			return
 		}
-		b.processQER(ctx, any, "add")
+		b.processQER(ctx, any, upfMsgTypeAdd)
 		done <- true
 	}()
 }
@@ -700,20 +702,21 @@ func (b *bess) delQER(ctx context.Context, done chan<- bool, qer qer) {
 			log.Println("Error marshalling the rule", q, err)
 			return
 		}
-		b.processQER(ctx, any, "delete")
+		b.processQER(ctx, any, upfMsgTypeDel)
 		done <- true
 	}()
 }
 
-func (b *bess) processFAR(ctx context.Context, any *anypb.Any, method string) {
-	if method != "add" && method != "delete" && method != "clear" {
+func (b *bess) processFAR(ctx context.Context, any *anypb.Any, method upfMsgType) {
+	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
 		log.Println("Invalid method name: ", method)
 		return
 	}
 
+	methods := [...]string{"add", "add", "delete", "clear"}
 	_, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "farLookup",
-		Cmd:  method,
+		Cmd:  methods[method],
 		Arg:  any,
 	})
 	if err != nil {
@@ -746,7 +749,7 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 			log.Println("Error marshalling the rule", f, err)
 			return
 		}
-		b.processFAR(ctx, any, "add")
+		b.processFAR(ctx, any, upfMsgTypeAdd)
 		done <- true
 	}()
 }
@@ -767,15 +770,16 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 			log.Println("Error marshalling the rule", f, err)
 			return
 		}
-		b.processFAR(ctx, any, "delete")
+		b.processFAR(ctx, any, upfMsgTypeDel)
 		done <- true
 	}()
 }
 
-func (b *bess) processCounters(ctx context.Context, any *anypb.Any, method string, counterName string) {
+func (b *bess) processCounters(ctx context.Context, any *anypb.Any, method upfMsgType, counterName string) {
+	methods := [...]string{"add", "add", "remove", "removeAll"}
 	_, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: counterName,
-		Cmd:  method,
+		Cmd:  methods[method],
 		Arg:  any,
 	})
 	if err != nil {
@@ -797,7 +801,7 @@ func (b *bess) addCounter(ctx context.Context, done chan<- bool, ctrID uint32, c
 			log.Println("Error marshalling the rule", f, err)
 			return
 		}
-		b.processCounters(ctx, any, "add", counterName)
+		b.processCounters(ctx, any, upfMsgTypeAdd, counterName)
 		done <- true
 	}()
 }
@@ -816,7 +820,7 @@ func (b *bess) delCounter(ctx context.Context, done chan<- bool, ctrID uint32, c
 			log.Println("Error marshalling the rule", f, err)
 			return
 		}
-		b.processCounters(ctx, any, "remove", counterName)
+		b.processCounters(ctx, any, upfMsgTypeDel, counterName)
 		done <- true
 	}()
 }
@@ -833,7 +837,7 @@ func (b *bess) removeAllPDRs(ctx context.Context, done chan<- bool) {
 			return
 		}
 
-		b.processPDR(ctx, any, "clear")
+		b.processPDR(ctx, any, upfMsgTypeClear)
 		done <- true
 	}()
 }
@@ -850,7 +854,7 @@ func (b *bess) removeAllFARs(ctx context.Context, done chan<- bool) {
 			return
 		}
 
-		b.processFAR(ctx, any, "clear")
+		b.processFAR(ctx, any, upfMsgTypeClear)
 		done <- true
 	}()
 }
@@ -867,7 +871,7 @@ func (b *bess) removeAllCounters(ctx context.Context, done chan<- bool, name str
 			return
 		}
 
-		b.processCounters(ctx, any, "removeAll", name)
+		b.processCounters(ctx, any, upfMsgTypeClear, name)
 
 		done <- true
 	}()

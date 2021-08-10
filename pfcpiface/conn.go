@@ -125,14 +125,14 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 		}
 
 		// if sourceIP is not set, fetch it from the msg header
-		if sourceIP == "0.0.0.0" {
+		if sourceIP == net.IPv4zero.String() {
 			addrString := strings.Split(addr.String(), ":")
 			sourceIP = getLocalIP(addrString[0]).String()
 			log.Println("Source IP address is now: ", sourceIP)
 		}
 
 		// if nodeIP is not set, fetch it from the msg header
-		if upf.nodeIP.String() == "0.0.0.0" {
+		if upf.nodeIP.String() == net.IPv4zero.String() {
 			addrString := strings.Split(addr.String(), ":")
 			upf.nodeIP = getLocalIP(addrString[0])
 			log.Println("Node IP address is now: ", upf.nodeIP.String())

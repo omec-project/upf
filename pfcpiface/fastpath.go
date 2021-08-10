@@ -9,6 +9,15 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+type upfMsgType int
+
+const (
+	upfMsgTypeAdd upfMsgType = iota
+	upfMsgTypeMod
+	upfMsgTypeDel
+	upfMsgTypeClear
+)
+
 type fastPath interface {
 	/* Close any pending sessions */
 	exit()
@@ -21,7 +30,7 @@ type fastPath interface {
 	/* write endMarker to fastpath */
 	sendEndMarkers(endMarkerList *[][]byte) error
 	/* write pdr/far/qer to fastpath */
-	sendMsgToUPF(method string, pdrs []pdr, fars []far, qers []qer) uint8
+	sendMsgToUPF(method upfMsgType, pdrs []pdr, fars []far, qers []qer) uint8
 	/* delete all pdrs/fars/qers/ installed in fastpath tabled */
 	sendDeleteAllSessionsMsgtoUPF()
 	/* check of communication channel to fastpath is setup */
