@@ -174,7 +174,6 @@ func (p *p4rtc) channelSetup() (*P4rtClient, error) {
 		}
 
 		log.Println("accessIP, Mask ", p.accessIP, p.accessIPMask)
-
 	} else {
 		log.Println("p4runtime client is null.")
 		return nil, errin

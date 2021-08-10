@@ -187,6 +187,5 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 				log.Fatalln("Unable to transmit association setup response", err)
 			}
 		}
-
 	}
 }
