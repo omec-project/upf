@@ -49,7 +49,7 @@ type far struct {
 
 // Satisfies the fmt.Stringer interface.
 func (f far) String() string {
-	var b = strings.Builder{}
+	b := strings.Builder{}
 	fmt.Fprintf(&b, "\n")
 	fmt.Fprintf(&b, "farID: %v\n", f.farID)
 	fmt.Fprintf(&b, "fseID: %x\n", f.fseID)

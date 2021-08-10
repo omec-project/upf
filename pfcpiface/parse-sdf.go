@@ -16,9 +16,7 @@ const (
 	reservedProto = uint8(0xff)
 )
 
-var (
-	errBadFilterDesc = errors.New("unsupported Filter Description format")
-)
+var errBadFilterDesc = errors.New("unsupported Filter Description format")
 
 type endpoint struct {
 	IPNet *net.IPNet
