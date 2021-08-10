@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// PFCPSessionMgr manages PFCP sessions
+// PFCPSessionMgr manages PFCP sessions.
 type PFCPSessionMgr struct {
 	rng        *rand.Rand
 	nodeID     string
@@ -18,13 +18,13 @@ type PFCPSessionMgr struct {
 	sessions   map[uint64]*PFCPSession
 }
 
-// PFD holds the switch level application IDs
+// PFD holds the switch level application IDs.
 type appPFD struct {
 	appID     string
 	flowDescs []string
 }
 
-// NewPFCPSessionMgr initializes a manager struct with RNG and map of id/sessions
+// NewPFCPSessionMgr initializes a manager struct with RNG and map of id/sessions.
 func NewPFCPSessionMgr(maxRetries int) *PFCPSessionMgr {
 	return &PFCPSessionMgr{
 		rng:        rand.New(rand.NewSource(time.Now().UnixNano())),
@@ -33,7 +33,7 @@ func NewPFCPSessionMgr(maxRetries int) *PFCPSessionMgr {
 	}
 }
 
-// RemoveSession removes session using id
+// RemoveSession removes session using id.
 func (mgr *PFCPSessionMgr) RemoveSession(id uint64) {
 	delete(mgr.sessions, id)
 	globalPfcpStats.sessions.WithLabelValues(mgr.nodeID).Set(float64(len(mgr.sessions)))
@@ -44,7 +44,7 @@ type notifyFlag struct {
 	mux  sync.Mutex
 }
 
-// PFCPSession implements one PFCP session
+// PFCPSession implements one PFCP session.
 type PFCPSession struct {
 	localSEID        uint64
 	remoteSEID       uint64
@@ -54,7 +54,7 @@ type PFCPSession struct {
 	qers             []qer
 }
 
-// NewPFCPSession allocates an session with ID
+// NewPFCPSession allocates an session with ID.
 func (mgr *PFCPSessionMgr) NewPFCPSession(rseid uint64) uint64 {
 	for i := 0; i < mgr.maxRetries; i++ {
 		lseid := mgr.rng.Uint64()
@@ -77,12 +77,12 @@ func (mgr *PFCPSessionMgr) NewPFCPSession(rseid uint64) uint64 {
 	return 0
 }
 
-// ResetAppPFDs resets the map of application PFDs
+// ResetAppPFDs resets the map of application PFDs.
 func (mgr *PFCPSessionMgr) ResetAppPFDs() {
 	mgr.appPFDs = make(map[string]appPFD)
 }
 
-// NewAppPFD stores app PFD in session mgr
+// NewAppPFD stores app PFD in session mgr.
 func (mgr *PFCPSessionMgr) NewAppPFD(appID string) {
 	mgr.appPFDs[appID] = appPFD{
 		appID:     appID,
@@ -90,7 +90,7 @@ func (mgr *PFCPSessionMgr) NewAppPFD(appID string) {
 	}
 }
 
-// RemoveAppPFD removes appPFD using appID
+// RemoveAppPFD removes appPFD using appID.
 func (mgr *PFCPSessionMgr) RemoveAppPFD(appID string) {
 	delete(mgr.appPFDs, appID)
 }

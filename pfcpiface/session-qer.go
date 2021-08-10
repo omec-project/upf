@@ -7,12 +7,12 @@ import (
 	"errors"
 )
 
-// CreateQER appends qer to existing list of QERs in the session
+// CreateQER appends qer to existing list of QERs in the session.
 func (s *PFCPSession) CreateQER(q qer) {
 	s.qers = append(s.qers, q)
 }
 
-// UpdateQER updates existing qer in the session
+// UpdateQER updates existing qer in the session.
 func (s *PFCPSession) UpdateQER(q qer) error {
 	for idx, v := range s.qers {
 		if v.qerID == q.qerID {
@@ -23,7 +23,7 @@ func (s *PFCPSession) UpdateQER(q qer) error {
 	return errors.New("QER not found")
 }
 
-// RemoveQER removes qer from existing list of QERs in the session
+// RemoveQER removes qer from existing list of QERs in the session.
 func (s *PFCPSession) RemoveQER(id uint32) (*qer, error) {
 	for idx, v := range s.qers {
 		if v.qerID == id {

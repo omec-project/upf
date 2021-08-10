@@ -47,7 +47,7 @@ type far struct {
 	tunnelPort    uint16
 }
 
-// Satisfies the fmt.Stringer interface
+// Satisfies the fmt.Stringer interface.
 func (f far) String() string {
 	var b = strings.Builder{}
 	fmt.Fprintf(&b, "\n")

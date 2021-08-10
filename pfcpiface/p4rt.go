@@ -20,7 +20,7 @@ var (
 	p4RtcServerPort = flag.String("p4RtcServerPort", "", "P4 Server port")
 )
 
-// P4rtcInfo : P4 runtime interface settings
+// P4rtcInfo : P4 runtime interface settings.
 type P4rtcInfo struct {
 	AccessIP    string `json:"access_ip"`
 	P4rtcServer string `json:"p4rtc_server"`
@@ -28,7 +28,7 @@ type P4rtcInfo struct {
 	UEIP        string `json:"ue_ip_pool"`
 }
 
-// ctrType
+// TODO: convert uint8 to enum.
 const (
 	preQosPdrCounter  uint8 = 0 // Pre qos pdr ctr
 	postQosPdrCounter uint8 = 1 // Post qos pdr ctr

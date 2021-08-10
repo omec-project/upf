@@ -19,10 +19,10 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-// SockAddr : Unix Socket path to read bess notification from
+// SockAddr : Unix Socket path to read bess notification from.
 const SockAddr = "/tmp/notifycp"
 
-// PfcpAddr : Unix Socket path to send end marker packet
+// PfcpAddr : Unix Socket path to send end marker packet.
 const PfcpAddr = "/tmp/pfcpport"
 
 var intEnc = func(u uint64) *pb.FieldData {

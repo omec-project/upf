@@ -12,7 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// CreateFAR appends far to existing list of FARs in the session
+// CreateFAR appends far to existing list of FARs in the session.
 func (s *PFCPSession) CreateFAR(f far) {
 	s.fars = append(s.fars, f)
 }
@@ -70,7 +70,7 @@ func addEndMarker(farItem far, endMarkerList *[][]byte) {
 	}
 }
 
-// UpdateFAR updates existing far in the session
+// UpdateFAR updates existing far in the session.
 func (s *PFCPSession) UpdateFAR(f *far, endMarkerList *[][]byte) error {
 	for idx, v := range s.fars {
 		if v.farID == f.farID {
@@ -96,7 +96,7 @@ func (s *PFCPSession) getNotifyFlag() bool {
 	return s.notificationFlag.flag
 }
 
-// UpdateFAR updates existing far in the session
+// UpdateFAR updates existing far in the session.
 func (s *PFCPSession) updateNotifyFlag() {
 	unset := true
 	for _, v := range s.fars {
@@ -110,7 +110,7 @@ func (s *PFCPSession) updateNotifyFlag() {
 	}
 }
 
-// RemoveFAR removes far from existing list of FARs in the session
+// RemoveFAR removes far from existing list of FARs in the session.
 func (s *PFCPSession) RemoveFAR(id uint32) (*far, error) {
 	for idx, v := range s.fars {
 		if v.farID == id {

@@ -13,7 +13,7 @@ import (
 	"github.com/wmnsk/go-pfcp/message"
 )
 
-// PktBufSz : buffer size for incoming pkt
+// PktBufSz : buffer size for incoming pkt.
 const (
 	PktBufSz    = 1500
 	PFCPPort    = "8805"
@@ -21,10 +21,10 @@ const (
 	readTimeout = 25 * time.Second
 )
 
-// Timeout : connection timeout
+// Timeout : connection timeout.
 var Timeout = 1000 * time.Millisecond
 
-// PFCPConn represents a PFCP connection
+// PFCPConn represents a PFCP connection.
 type PFCPConn struct {
 	seqNum sequenceNumber
 	mgr    *PFCPSessionMgr
