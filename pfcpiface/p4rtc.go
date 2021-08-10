@@ -238,7 +238,7 @@ func (c *P4rtClient) WriteFarTable(
 	te.Fields[0].Name = "far_id"
 
 	te.Fields[0].Value = make([]byte, 4)
-	binary.BigEndian.PutUint32(te.Fields[0].Value, uint32(farEntry.farID))
+	binary.BigEndian.PutUint32(te.Fields[0].Value, farEntry.farID)
 
 	te.Fields[1].Name = "session_id"
 	fseidVal := make([]byte, 12)
@@ -264,10 +264,10 @@ func (c *P4rtClient) WriteFarTable(
 		te.Params = make([]ActionParam, te.ParamSize)
 		te.Params[0].Name = "needs_dropping"
 		te.Params[0].Value = make([]byte, 1)
-		te.Params[0].Value[0] = byte(farEntry.applyAction & 0x01)
+		te.Params[0].Value[0] = farEntry.applyAction & 0x01
 		te.Params[1].Name = "notify_cp"
 		te.Params[1].Value = make([]byte, 1)
-		te.Params[1].Value[0] = byte(farEntry.applyAction & 0x08)
+		te.Params[1].Value[0] = farEntry.applyAction & 0x08
 	} else if funcType == FunctionTypeUpdate {
 
 		te.ActionName = "PreQosPipe.load_tunnel_far_attributes"
@@ -275,7 +275,7 @@ func (c *P4rtClient) WriteFarTable(
 		te.Params = make([]ActionParam, te.ParamSize)
 		te.Params[0].Name = "needs_dropping"
 		te.Params[0].Value = make([]byte, 1)
-		te.Params[0].Value[0] = byte(farEntry.applyAction & 0x01)
+		te.Params[0].Value[0] = farEntry.applyAction & 0x01
 		te.Params[1].Name = "notify_cp"
 		te.Params[1].Value = make([]byte, 1)
 		if (farEntry.applyAction & 0x08) != 0 {
@@ -402,11 +402,11 @@ func (c *P4rtClient) WritePdrTable(
 
 		te.Params[3].Name = "far_id"
 		te.Params[3].Value = make([]byte, 4)
-		binary.BigEndian.PutUint32(te.Params[3].Value, uint32(pdrEntry.farID))
+		binary.BigEndian.PutUint32(te.Params[3].Value, pdrEntry.farID)
 
 		te.Params[4].Name = "needs_gtpu_decap"
 		te.Params[4].Value = make([]byte, 1)
-		te.Params[4].Value[0] = byte(decapVal)
+		te.Params[4].Value[0] = decapVal
 	}
 
 	return c.InsertTableEntry(te, funcType, prio)
