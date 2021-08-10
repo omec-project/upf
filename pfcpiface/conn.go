@@ -21,7 +21,7 @@ const (
 	readTimeout = 25 * time.Second
 )
 
-//Timeout : connection timeout
+// Timeout : connection timeout
 var Timeout = 1000 * time.Millisecond
 
 // PFCPConn represents a PFCP connection

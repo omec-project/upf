@@ -22,16 +22,16 @@ import (
 	"google.golang.org/grpc"
 )
 
-//P4DeviceConfig ... Device config
+// P4DeviceConfig ... Device config
 type P4DeviceConfig []byte
 
 const invalidID = 0
 
-//Table Entry Function Type
+// Table Entry Function Type
 const (
-	FunctionTypeInsert uint8 = 1 //Insert table Entry Function
-	FunctionTypeUpdate uint8 = 2 //Update table Entry Function
-	FunctionTypeDelete uint8 = 3 //Delete table Entry Function
+	FunctionTypeInsert uint8 = 1 // Insert table Entry Function
+	FunctionTypeUpdate uint8 = 2 // Update table Entry Function
+	FunctionTypeDelete uint8 = 3 // Delete table Entry Function
 )
 
 // IntfTableEntry ... Interface Table Entry API
@@ -58,7 +58,7 @@ type MatchField struct {
 	Mask      []byte
 }
 
-//IntfCounterEntry .. Counter entry function API
+// IntfCounterEntry .. Counter entry function API
 type IntfCounterEntry struct {
 	CounterID uint64
 	Index     uint64
@@ -66,7 +66,7 @@ type IntfCounterEntry struct {
 	PktCount  []uint64
 }
 
-//AppTableEntry .. Table entry function API
+// AppTableEntry .. Table entry function API
 type AppTableEntry struct {
 	FieldSize  uint32
 	ParamSize  uint32
@@ -167,9 +167,9 @@ func (c *P4rtClient) SendPacketOut(packet []byte) (err error) {
 // Init .. Initialize Client
 func (c *P4rtClient) Init(timeout uint32, reportNotifyChan chan<- uint64) (err error) {
 	// Initialize stream for mastership and packet I/O
-	//ctx, cancel := context.WithTimeout(context.Background(),
+	// ctx, cancel := context.WithTimeout(context.Background(),
 	//                                   time.Duration(timeout) * time.Second)
-	//defer cancel()
+	// defer cancel()
 	c.Stream, err = c.Client.StreamChannel(
 		context.Background(),
 		grpcRetry.WithMax(3),
@@ -354,7 +354,7 @@ func (c *P4rtClient) WritePdrTable(
 		binary.BigEndian.PutUint32(te.Fields[1].Value, pdrEntry.tunnelTEID)
 		te.Fields[1].Mask = make([]byte, 4)
 		binary.BigEndian.PutUint32(te.Fields[1].Mask, pdrEntry.tunnelTEIDMask)
-		//te.Fields[2].Mask =  b
+		// te.Fields[2].Mask =  b
 
 		te.Fields[2].Name = "tunnel_ipv4_dst"
 		te.Fields[2].Value = make([]byte, 4)
@@ -411,7 +411,7 @@ func (c *P4rtClient) WritePdrTable(
 	return c.InsertTableEntry(te, funcType, prio)
 }
 
-//WriteInterfaceTable ... Write Interface table Entry
+// WriteInterfaceTable ... Write Interface table Entry
 func (c *P4rtClient) WriteInterfaceTable(
 	intfEntry IntfTableEntry,
 	funcType uint8) error {
@@ -655,7 +655,7 @@ func (c *P4rtClient) addActionValue(action *p4.Action, param ActionParam,
 	return err
 }
 
-//ReadCounter ... Read Counter entry
+// ReadCounter ... Read Counter entry
 func (c *P4rtClient) ReadCounter(ce *IntfCounterEntry) error {
 
 	log.Println("ReadCounter ID : ", ce.CounterID)
@@ -678,7 +678,7 @@ func (c *P4rtClient) ReadCounter(ce *IntfCounterEntry) error {
 	return nil
 }
 
-//ReadCounterEntry .. Read counter Entry
+// ReadCounterEntry .. Read counter Entry
 func (c *P4rtClient) ReadCounterEntry(ce *IntfCounterEntry) (*p4.ReadResponse, error) {
 
 	log.Traceln("Read Counter Entry")
@@ -687,7 +687,7 @@ func (c *P4rtClient) ReadCounterEntry(ce *IntfCounterEntry) (*p4.ReadResponse, e
 	index.Index = int64(ce.Index)
 	var entry p4.CounterEntry
 	entry.CounterId = uint32(ce.CounterID)
-	//entry.Index = &index
+	// entry.Index = &index
 	var entity p4.Entity
 	var ctrEntry p4.Entity_CounterEntry
 	ctrEntry.CounterEntry = &entry
@@ -708,7 +708,7 @@ func (c *P4rtClient) ReadCounterEntry(ce *IntfCounterEntry) (*p4.ReadResponse, e
 	return c.ReadReq(&entity)
 }
 
-//ClearFarTable ... Clear FAR Table
+// ClearFarTable ... Clear FAR Table
 func (c *P4rtClient) ClearFarTable() error {
 
 	log.Println("ClearFarTable.")
@@ -744,7 +744,7 @@ func (c *P4rtClient) ClearFarTable() error {
 	return nil
 }
 
-//ClearPdrTable ... Clear PDR Table
+// ClearPdrTable ... Clear PDR Table
 func (c *P4rtClient) ClearPdrTable() error {
 
 	log.Println("ClearPdrTable.")
@@ -780,7 +780,7 @@ func (c *P4rtClient) ClearPdrTable() error {
 	return nil
 }
 
-//ReadInterfaceTable ... Read Interface table Entry
+// ReadInterfaceTable ... Read Interface table Entry
 func (c *P4rtClient) ReadInterfaceTable(
 	intfEntry *IntfTableEntry) error {
 
@@ -839,7 +839,7 @@ func (c *P4rtClient) ReadInterfaceTable(
 	return err
 }
 
-//ReadTableEntry ... Read table Entry
+// ReadTableEntry ... Read table Entry
 func (c *P4rtClient) ReadTableEntry(
 	tableEntry AppTableEntry, prio int32) (*p4.ReadResponse, error) {
 
@@ -858,7 +858,7 @@ func (c *P4rtClient) ReadTableEntry(
 	return c.ReadReq(entity)
 }
 
-//ReadReqEntities ... Read request Entity
+// ReadReqEntities ... Read request Entity
 func (c *P4rtClient) ReadReqEntities(entities []*p4.Entity) (*p4.ReadResponse, error) {
 	req := &p4.ReadRequest{
 		DeviceId: c.DeviceID,
@@ -898,7 +898,7 @@ func (c *P4rtClient) ReadReq(entity *p4.Entity) (*p4.ReadResponse, error) {
 	return nil, err
 }
 
-//InsertTableEntry .. Insert table Entry
+// InsertTableEntry .. Insert table Entry
 func (c *P4rtClient) InsertTableEntry(
 	tableEntry AppTableEntry,
 	funcType uint8, prio int32) error {
@@ -1012,7 +1012,7 @@ func GetPipelineConfig(client p4.P4RuntimeClient, deviceID uint64) (*p4.GetForwa
 	return configRes, nil
 }
 
-//SetForwardingPipelineConfig ..
+// SetForwardingPipelineConfig ..
 func (c *P4rtClient) SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath string) (err error) {
 	log.Println("P4 Info: ", p4InfoPath)
 
@@ -1064,7 +1064,7 @@ func SetPipelineConfig(client p4.P4RuntimeClient, deviceID uint64, electionID *p
 	return err
 }
 
-//GetConnection ... Get Grpc connection
+// GetConnection ... Get Grpc connection
 func GetConnection(host string) (conn *grpc.ClientConn, err error) {
 	/* get connection */
 	log.Println("Get connection.")
@@ -1100,7 +1100,7 @@ func LoadDeviceConfig(deviceConfigPath string) (P4DeviceConfig, error) {
 	return bin, nil
 }
 
-//CreateChannel ... Create p4runtime client channel
+// CreateChannel ... Create p4runtime client channel
 func CreateChannel(host string,
 	deviceID uint64,
 	timeout uint32,

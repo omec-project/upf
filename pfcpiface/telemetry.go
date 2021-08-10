@@ -56,7 +56,7 @@ func makeBuckets(values []uint64) map[float64]float64 {
 	return buckets
 }
 
-//upfCollector provides all UPF metrics
+// upfCollector provides all UPF metrics
 type upfCollector struct {
 	packets *prometheus.Desc
 	bytes   *prometheus.Desc
@@ -94,7 +94,7 @@ func newUpfCollector(upf *upf) *upfCollector {
 	}
 }
 
-//Describe writes all descriptors to the prometheus desc channel.
+// Describe writes all descriptors to the prometheus desc channel.
 func (uc *upfCollector) Describe(ch chan<- *prometheus.Desc) {
 
 	ch <- uc.packets
@@ -105,7 +105,7 @@ func (uc *upfCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- uc.jitter
 }
 
-//Collect writes all metrics to prometheus metric channel
+// Collect writes all metrics to prometheus metric channel
 func (uc *upfCollector) Collect(ch chan<- prometheus.Metric) {
 	uc.summaryLatencyJitter(ch)
 	uc.portStats(ch)
