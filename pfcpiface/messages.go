@@ -73,6 +73,7 @@ func (pc *PFCPConn) handleAssociationSetupRequest(upf *upf, msg message.Message,
 	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
 	log.Println("Dnn info : ", upf.dnn)
 
+	networkInstance := string(ie.NewNetworkInstanceFQDN(upf.dnn).Payload)
 	flags := uint8(0x41)
 
 	if len(upf.dnn) != 0 {
@@ -86,7 +87,7 @@ func (pc *PFCPConn) handleAssociationSetupRequest(upf *upf, msg message.Message,
 		ie.NewCause(cause),                        /* accept it blindly for the time being */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
-		ie.NewUserPlaneIPResourceInformation(flags, 0, upf.accessIP.String(), "", upf.dnn, ie.SrcInterfaceAccess),
+		ie.NewUserPlaneIPResourceInformation(flags, 0, upf.accessIP.String(), "", networkInstance, ie.SrcInterfaceAccess),
 		// ie.NewUserPlaneIPResourceInformation(0x41, 0, coreIP, "", "", ie.SrcInterfaceCore),
 	) /* userplane ip resource info */
 

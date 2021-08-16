@@ -29,9 +29,11 @@ const invalidID = 0
 
 // Table Entry Function Type.
 const (
-	FunctionTypeInsert uint8 = 1 // Insert table Entry Function
-	FunctionTypeUpdate uint8 = 2 // Update table Entry Function
-	FunctionTypeDelete uint8 = 3 // Delete table Entry Function
+	FunctionTypeInsert uint8  = 1               // Insert table Entry Function
+	FunctionTypeUpdate uint8  = 2               // Update table Entry Function
+	FunctionTypeDelete uint8  = 3               // Delete table Entry Function
+	SrcIfaceStr        string = "src_iface"     // Src Interface field name
+	InterfaceTypeStr   string = "InterfaceType" // Interface Type field name"
 )
 
 // IntfTableEntry ... Interface Table Entry API.
@@ -341,8 +343,8 @@ func (c *P4rtClient) WritePdrTable(pdrEntry pdr, funcType uint8) error {
 	te.FieldSize = 4
 	te.Fields = make([]MatchField, te.FieldSize)
 	te.FieldSize = 2
-	te.Fields[0].Name = "src_iface"
-	enumName := "InterfaceType"
+	te.Fields[0].Name = SrcIfaceStr
+	enumName := InterfaceTypeStr
 
 	var (
 		srcIntfStr string
@@ -442,8 +444,8 @@ func (c *P4rtClient) WriteInterfaceTable(intfEntry IntfTableEntry, funcType uint
 
 	te.ParamSize = 2
 	te.Params = make([]ActionParam, 2)
-	te.Params[0].Name = "src_iface"
-	enumName := "InterfaceType"
+	te.Params[0].Name = SrcIfaceStr
+	enumName := InterfaceTypeStr
 
 	val, err := c.getEnumVal(enumName, intfEntry.SrcIntf)
 	if err != nil {
@@ -831,8 +833,8 @@ func (c *P4rtClient) ReadInterfaceTable(intfEntry *IntfTableEntry) error {
 
 	te.ParamSize = 2
 	te.Params = make([]ActionParam, 2)
-	te.Params[0].Name = "src_iface"
-	enumName := "InterfaceType"
+	te.Params[0].Name = SrcIfaceStr
+	enumName := InterfaceTypeStr
 
 	val, err := c.getEnumVal(enumName, intfEntry.SrcIntf)
 	if err != nil {

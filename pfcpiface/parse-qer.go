@@ -88,10 +88,10 @@ func (q *qer) parseQER(ie1 *ie.IE, seid uint64, upf *upf) error {
 	q.qfi = qfi
 	q.ulStatus = gsUL
 	q.dlStatus = gsDL
-	q.ulMbr = uint64(mbrUL)
-	q.dlMbr = uint64(mbrDL)
-	q.ulGbr = uint64(gbrUL)
-	q.dlGbr = uint64(gbrDL)
+	q.ulMbr = mbrUL
+	q.dlMbr = mbrDL
+	q.ulGbr = gbrUL
+	q.dlGbr = gbrDL
 	q.fseID = seid
 
 	return nil
