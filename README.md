@@ -70,11 +70,11 @@ reading from file /tmp/tmpUBTGau, link-type EN10MB (Ethernet)
 * Support for UE IP NAT
 * Service Data Flow (SDF) configuration via N4/PFCP.
 * I-UPF/A-UPF ULCL/Branching i.e., simultaneous N6/N9 support within PFCP session
+* Downlink Data Notification (DDN) - notification only
 
 ### In Progress
 
 * Usage Reporting Rules (URR)
-* Downlink Data Notification (DDN)
 * Application Detection and Control (ADC) configuration via N4/PFCP.
 
 ### Pending
@@ -82,6 +82,7 @@ reading from file /tmp/tmpUBTGau, link-type EN10MB (Ethernet)
 * PCC (Policy Control and Charging) rules configuration.
 * SDF and APN based Qos Metering for MBR.
 * Sponsored Domain Name support
+* Buffering of downlink data
 
 ## Installation
 
