@@ -103,8 +103,8 @@ function move_ifaces() {
 }
 
 # Stop previous instances of bess* before restarting
-docker stop pause bess bess-routectl bess-web bess-cpiface bess-pfcpiface || true
-docker rm -f pause bess bess-routectl bess-web bess-cpiface bess-pfcpiface || true
+docker stop pause bess bess-routectl bess-web bess-pfcpiface || true
+docker rm -f pause bess bess-routectl bess-web bess-pfcpiface || true
 sudo rm -rf /var/run/netns/pause
 
 # Build
@@ -191,10 +191,3 @@ docker run --name bess-routectl -td --restart unless-stopped \
 	--net container:pause --pid container:bess \
 	--entrypoint /route_control.py \
 	upf-epc-bess:"$(<VERSION)" -i "${ifaces[@]}"
-
-# Run bess-cpiface
-docker run --name bess-cpiface -td --restart unless-stopped \
-	--net container:pause \
-	--entrypoint zmq-cpiface \
-	-v "$PWD/conf":/tmp/conf \
-	upf-epc-cpiface:"$(<VERSION)" --json_config /tmp/conf/upf.json
