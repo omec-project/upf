@@ -111,3 +111,11 @@ func getLocalIP(dstIP string) net.IP {
 
 	return localAddr.IP
 }
+
+func maxUint64(x, y uint64) uint64 {
+	if x < y {
+		return y
+	}
+
+	return x
+}
