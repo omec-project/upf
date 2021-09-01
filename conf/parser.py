@@ -49,6 +49,10 @@ class Parser:
         self.enable_ntf = False
         self.notify_sockaddr = "/tmp/notifycp"
         self.endmarker_sockaddr = "/tmp/pfcpport"
+        self.slice_uplink_rate_limit_bps = None
+        self.slice_downlink_rate_limit_bps = None
+        self.slice_uplink_burst_bits = None
+        self.slice_downlink_burst_bits = None
 
     def parse(self, ifaces):
         # Maximum number of flows to manage ip4 frags for re-assembly
@@ -148,6 +152,18 @@ class Parser:
             self.core_ifname = "core"
             print('Can\'t parse interface name(s)! Setting it to default values ({}, {})'.format(
                 "access", "core"))
+
+        # Slice rate limits
+        try:
+            self.slice_uplink_rate_limit_bps = self.conf["slice_rate_limit_config"]["uplink_bps"]
+            self.slice_uplink_burst_bits = self.conf["slice_rate_limit_config"]["uplink_burst_bits"]
+        except KeyError:
+            print("No slice uplink rate limit! Disabling rate limit.")
+        try:
+            self.slice_downlink_rate_limit_bps = self.conf["slice_rate_limit_config"]["downlink_bps"]
+            self.slice_downlink_burst_bits = self.conf["slice_rate_limit_config"]["downlink_burst_bits"]
+        except KeyError:
+            print("No slice downlink rate limit! Disabling rate limit.")
 
         # UnixPort Paths
         try:

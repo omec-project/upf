@@ -89,6 +89,14 @@
             "priority": 5
         }
     ],
+
+    "slice_rate_limit_config": {
+        "uplink_bps": 500000000,
+        "uplink_burst_bits": 12000,
+        "downlink_bps": 500000000,
+        "downlink_burst_bits": 12000
+    },
+
     "": "Control plane controller settings",
     "cpiface": {
         "enable_ue_ip_alloc": false,

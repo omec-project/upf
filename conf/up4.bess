@@ -289,7 +289,17 @@ _in:gate \
 # 3. Complete the last part of the DL pipeline
 executeFAR:farForwardDAction \
     -> postDLQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
+    -> dlRateLimiter::Queue(size=128) \
     -> ports[parser.access_ifname].rtr
+
+if parser.slice_downlink_rate_limit_bps is not None:
+    burst = None
+    if parser.slice_downlink_burst_bits is not None:
+        burst = {'bit': parser.slice_downlink_burst_bits}
+    bess.add_tc('dl_rate_limiter', policy='rate_limit', resource='bit',
+                limit={'bit': parser.slice_downlink_rate_limit_bps},
+                max_burst=burst)
+    dlRateLimiter.attach_task(parent='dl_rate_limiter')
 
 # Drop unknown packets
 coreRxIPCksum:1 -> coreRxIPCksumFail::Sink()
@@ -347,7 +357,17 @@ _in:gate \
 # 3. Complete the last part of the UL pipeline
 executeFAR:farForwardUAction \
     -> postULQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
+    -> ulRateLimiter::Queue(size=128) \
     -> ports[parser.core_ifname].rtr
+
+if parser.slice_uplink_rate_limit_bps is not None:
+    burst = None
+    if parser.slice_uplink_burst_bits is not None:
+        burst = {'bit': parser.slice_uplink_burst_bits}
+    bess.add_tc('ul_rate_limiter', policy='rate_limit', resource='bit',
+                limit={'bit': parser.slice_uplink_rate_limit_bps},
+                max_burst=burst)
+    ulRateLimiter.attach_task(parent='ul_rate_limiter')
 
 # 4. GTP Echo response pipeline
 accessFastBPF:GTPUEchoGate \
