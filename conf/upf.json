@@ -92,9 +92,9 @@
 
     "slice_rate_limit_config": {
         "uplink_bps": 500000000,
-        "uplink_burst_bits": 12000,
+        "uplink_burst_bytes": 3000,
         "downlink_bps": 500000000,
-        "downlink_burst_bits": 12000
+        "downlink_burst_bytes": 3000
     },
 
     "": "Control plane controller settings",

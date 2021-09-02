@@ -204,6 +204,42 @@ _in -> qerLookup::Qos(fields=[ {'attr_name':'src_iface', 'num_bytes':1}, \
                                {'attr_name':'fseid', 'num_bytes':8}], \
                              values=[{'attr_name':'qfi', 'num_bytes':1}])
 
+executeFAR::Split(size=1, attribute='action')
+afterFarMerge = executeFAR
+if parser.slice_uplink_rate_limit_bytes_per_second is not None or parser.slice_downlink_rate_limit_bytes_per_second is not None:
+    # sliceMeter enforces a per slice, per direction meter rate limit
+    sliceMeter::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}])
+    # Reserved gates, reject rule adds with gate=1/2/3
+    m_meter  = 0 # Placeholder gate not connected. Will meter if lookup result returns this gate
+    m_green  = 1 # For green traffic
+    m_yellow = 2 # For yellow traffic
+    m_red    = 3 # For red traffic
+    # User defined gates
+    m_fail   = 4 # For lookup failure traffic
+    # Admit green and yellow, drop red
+    sliceMeter:m_green -> executeFAR
+    sliceMeter:m_yellow -> executeFAR
+    sliceMeter:m_red -> red::Sink()
+    sliceMeter:m_fail -> fail::Sink()
+    sliceMeter.set_default_gate(gate=m_fail)
+    # Add two static slice meter entries for uplink and downlink.
+    # cir and pir are equal, meaning we have no yellow packets.
+    if parser.slice_uplink_rate_limit_bytes_per_second is not None:
+        sliceMeter.add(fields=[{'value_int': Access}],
+                       gate=m_meter,
+                       cir=parser.slice_uplink_rate_limit_bytes_per_second,
+                       pir=parser.slice_uplink_rate_limit_bytes_per_second,
+                       cbs=parser.slice_uplink_burst_bytes,
+                       pbs=parser.slice_uplink_burst_bytes)
+    if parser.slice_downlink_rate_limit_bytes_per_second is not None:
+        sliceMeter.add(fields=[{'value_int': Core}],
+                       gate=m_meter,
+                       cir=parser.slice_downlink_rate_limit_bytes_per_second,
+                       pir=parser.slice_downlink_rate_limit_bytes_per_second,
+                       cbs=parser.slice_downlink_burst_bytes,
+                       pbs=parser.slice_downlink_burst_bytes)
+    afterFarMerge = sliceMeter
+
 farLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
                                      {'attr_name':'fseid', 'num_bytes':8}], \
                              values=[{'attr_name':'action', 'num_bytes':1}, \
@@ -213,7 +249,7 @@ farLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
                                      {'attr_name':'tunnel_out_teid', 'num_bytes':4}, \
                                      {'attr_name':'tunnel_out_udp_port', 'num_bytes':2}]):noGTPUEncap \
     -> farMerge::Merge() \
-    -> executeFAR::Split(size=1, attribute='action')
+    -> afterFarMerge
 
 # Add logical pipeline when gtpudecap is needed
 pdrLookup:GTPUDecap \
@@ -289,17 +325,7 @@ _in:gate \
 # 3. Complete the last part of the DL pipeline
 executeFAR:farForwardDAction \
     -> postDLQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
-    -> dlRateLimiter::Queue(size=128) \
     -> ports[parser.access_ifname].rtr
-
-if parser.slice_downlink_rate_limit_bps is not None:
-    burst = None
-    if parser.slice_downlink_burst_bits is not None:
-        burst = {'bit': parser.slice_downlink_burst_bits}
-    bess.add_tc('dl_rate_limiter', policy='rate_limit', resource='bit',
-                limit={'bit': parser.slice_downlink_rate_limit_bps},
-                max_burst=burst)
-    dlRateLimiter.attach_task(parent='dl_rate_limiter')
 
 # Drop unknown packets
 coreRxIPCksum:1 -> coreRxIPCksumFail::Sink()
@@ -348,7 +374,7 @@ accessFastBPF:GTPUGate \
 _in = accessRxUDPCksum
 gate = 0
 
-# 2. Build the remaining first half of the UL pipeline before entering the shard pipeline
+# 2. Build the remaining first half of the UL pipeline before entering the shared pipeline
 #ports[parser.access_ifname].rewrite \
 _in:gate \
     -> SetMetadata(attrs=[{'name':'src_iface', 'size':1, 'value_int':Access}]) \
@@ -357,17 +383,7 @@ _in:gate \
 # 3. Complete the last part of the UL pipeline
 executeFAR:farForwardUAction \
     -> postULQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
-    -> ulRateLimiter::Queue(size=128) \
     -> ports[parser.core_ifname].rtr
-
-if parser.slice_uplink_rate_limit_bps is not None:
-    burst = None
-    if parser.slice_uplink_burst_bits is not None:
-        burst = {'bit': parser.slice_uplink_burst_bits}
-    bess.add_tc('ul_rate_limiter', policy='rate_limit', resource='bit',
-                limit={'bit': parser.slice_uplink_rate_limit_bps},
-                max_burst=burst)
-    ulRateLimiter.attach_task(parent='ul_rate_limiter')
 
 # 4. GTP Echo response pipeline
 accessFastBPF:GTPUEchoGate \
