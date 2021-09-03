@@ -10,6 +10,8 @@
 #include "utils/endian.h"
 /* for ToIpv4Address() */
 #include "utils/ip.h"
+/* for CalculateIpv4Checksum() */
+#include "utils/checksum.h"
 /* for eth header */
 #include "utils/ether.h"
 /*----------------------------------------------------------------------------------*/
@@ -65,12 +67,10 @@ bess::Packet *IPDefrag::IPReassemble(Context *ctx, bess::Packet *p) {
       }
     }
   }
-  /*
-   * Reset checksum. This will be computed by a later module in line (if needed)
-   * COMMENTING THIS OUT AS IP CHECKSUM IS NOT COMPUTED OTHERWISE DOWN THE
-   * PIPELINE
-   */
-  // iph->checksum = 0;
+
+  // Recalculate checksum
+  iph->checksum = 0;
+  iph->checksum = CalculateIpv4Checksum(*iph);
 
   return p;
 }
