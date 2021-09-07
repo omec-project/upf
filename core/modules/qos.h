@@ -84,11 +84,7 @@ class Qos final : public Module {
 
   static const Commands cmds;
 
-  Qos()
-      : Module(),
-        default_gate_(),
-        total_key_size_(),
-        fields_() {
+  Qos() : Module(), default_gate_(), total_key_size_(), fields_() {
     max_allowed_workers_ = Worker::kMaxWorkers;
     size_t len = sizeof(mask) / sizeof(uint64_t);
     for (size_t i = 0; i < len; i++)
