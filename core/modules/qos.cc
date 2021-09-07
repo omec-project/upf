@@ -31,14 +31,11 @@
 
 #include "qos.h"
 #include "utils/endian.h"
-#include "utils/ether.h"
 #include "utils/format.h"
 
 #include <rte_cycles.h>
 #include <string>
 #include <vector>
-
-using bess::utils::Ethernet;
 
 typedef enum { FIELD_TYPE = 0, VALUE_TYPE } Type;
 using bess::metadata::Attribute;
@@ -130,6 +127,9 @@ CommandResponse Qos::Init(const bess::pb::QosArg &arg) {
   }
 
   table_.Init(total_key_size_);
+
+  adjust_meter_packet_length_ = arg.adjust_meter_packet_length();
+
   return CommandSuccess();
 }
 
@@ -190,7 +190,7 @@ void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     // meter if ogate is 0
     if (ogate == METER_GATE) {
       uint64_t time = rte_rdtsc();
-      uint32_t pkt_len = pkt->total_len() - sizeof(Ethernet);
+      uint32_t pkt_len = pkt->total_len() + adjust_meter_packet_length_;
       uint8_t color = rte_meter_trtcm_color_blind_check(&val[j]->m, &val[j]->p,
                                                         time, pkt_len);
 

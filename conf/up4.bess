@@ -6,6 +6,7 @@
 from conf.parser import *
 import conf.ports as port
 import conf.sim as sim
+from scapy.all import Ether
 
 port.setup_globals()
 
@@ -199,10 +200,11 @@ if ntf:
   _in -> ntf
   _in = ntf
 
-_in -> qerLookup::Qos(fields=[ {'attr_name':'src_iface', 'num_bytes':1}, \
-                               {'attr_name':'qer_id', 'num_bytes':4}, \
-                               {'attr_name':'fseid', 'num_bytes':8}], \
-                             values=[{'attr_name':'qfi', 'num_bytes':1}])
+_in -> qerLookup::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
+                              {'attr_name':'qer_id', 'num_bytes':4}, \
+                              {'attr_name':'fseid', 'num_bytes':8}], \
+                      values=[{'attr_name':'qfi', 'num_bytes':1}],
+                      adjust_meter_packet_length=-len(Ether()))
 
 executeFAR::Split(size=1, attribute='action')
 afterFarMerge = executeFAR
