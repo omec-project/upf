@@ -19,7 +19,6 @@ index 25dfc81e..1f7058cd 100644
 +message QosArg {
 +  repeated Field fields = 1;
 +  repeated Field values = 2;
-+  int64 adjust_meter_packet_length = 3;
 +}
 +
 +message QosCommandAddArg {
@@ -29,6 +28,7 @@ index 25dfc81e..1f7058cd 100644
 +  uint64 cbs = 4;
 +  uint64 pbs = 5;
 +  uint64 ebs = 6;
++  int64 adjust_meter_packet_length = 9;
 +  repeated FieldData fields = 7;
 +  repeated FieldData values = 8;
 +}

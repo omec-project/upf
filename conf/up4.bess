@@ -6,7 +6,8 @@
 from conf.parser import *
 import conf.ports as port
 import conf.sim as sim
-from scapy.all import Ether
+from scapy.all import Ether, IP, UDP
+from scapy.contrib.gtp import GTP_U_Header
 
 port.setup_globals()
 
@@ -203,11 +204,10 @@ if ntf:
 _in -> qerLookup::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
                               {'attr_name':'qer_id', 'num_bytes':4}, \
                               {'attr_name':'fseid', 'num_bytes':8}], \
-                      values=[{'attr_name':'qfi', 'num_bytes':1}],
-                      adjust_meter_packet_length=-len(Ether()))
+                      values=[{'attr_name':'qfi', 'num_bytes':1}])
 
 executeFAR::Split(size=1, attribute='action')
-afterFarMerge = executeFAR
+farOrSliceMeter = executeFAR
 if parser.slice_uplink_rate_limit_bytes_per_second is not None or parser.slice_downlink_rate_limit_bytes_per_second is not None:
     # sliceMeter enforces a per slice, per direction meter rate limit
     sliceMeter::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}])
@@ -232,15 +232,17 @@ if parser.slice_uplink_rate_limit_bytes_per_second is not None or parser.slice_d
                        cir=parser.slice_uplink_rate_limit_bytes_per_second,
                        pir=parser.slice_uplink_rate_limit_bytes_per_second,
                        cbs=parser.slice_uplink_burst_bytes,
-                       pbs=parser.slice_uplink_burst_bytes)
+                       pbs=parser.slice_uplink_burst_bytes,
+                       adjust_meter_packet_length=-len(Ether()))  # Don't count link-level headers
     if parser.slice_downlink_rate_limit_bytes_per_second is not None:
         sliceMeter.add(fields=[{'value_int': Core}],
                        gate=m_meter,
                        cir=parser.slice_downlink_rate_limit_bytes_per_second,
                        pir=parser.slice_downlink_rate_limit_bytes_per_second,
                        cbs=parser.slice_downlink_burst_bytes,
-                       pbs=parser.slice_downlink_burst_bytes)
-    afterFarMerge = sliceMeter
+                       pbs=parser.slice_downlink_burst_bytes,
+                       adjust_meter_packet_length=-len(Ether()/IP()/UDP()/GTP_U_Header()))  # Don't count link-level and encapsulation headers
+    farOrSliceMeter = sliceMeter
 
 farLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
                                      {'attr_name':'fseid', 'num_bytes':8}], \
@@ -251,7 +253,7 @@ farLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
                                      {'attr_name':'tunnel_out_teid', 'num_bytes':4}, \
                                      {'attr_name':'tunnel_out_udp_port', 'num_bytes':2}]):noGTPUEncap \
     -> farMerge::Merge() \
-    -> afterFarMerge
+    -> farOrSliceMeter
 
 # Add logical pipeline when gtpudecap is needed
 pdrLookup:GTPUDecap \

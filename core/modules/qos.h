@@ -67,6 +67,7 @@ struct value {
   uint64_t cbs;
   uint64_t pbs;
   uint64_t ebs;
+  int64_t adjust_meter_packet_length;
   struct rte_meter_trtcm_profile p;
   struct rte_meter_trtcm m;
   MeteringKey Data;
@@ -87,8 +88,7 @@ class Qos final : public Module {
       : Module(),
         default_gate_(),
         total_key_size_(),
-        fields_(),
-        adjust_meter_packet_length_() {
+        fields_() {
     max_allowed_workers_ = Worker::kMaxWorkers;
     size_t len = sizeof(mask) / sizeof(uint64_t);
     for (size_t i = 0; i < len; i++)
@@ -123,7 +123,6 @@ class Qos final : public Module {
   std::vector<struct MeteringField> values_;
   Metering<value> table_;
   uint64_t mask[MAX_FIELDS];
-  int adjust_meter_packet_length_;
 };
 
 #endif  // BESS_MODULES_QOS_H

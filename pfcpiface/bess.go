@@ -746,6 +746,7 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 			Cbs:  cbs, /* committed burst size */
 			Pbs:  pbs, /* Peak burst size */
 			Ebs:  ebs, /* Excess burst size */
+			AdjustMeterPacketLength: 14, /* Exclude Ethernet header */
 			Fields: []*pb.FieldData{
 				intEnc(uint64(srcIface)),  /* Src Intf */
 				intEnc(uint64(qer.qerID)), /* qer_id */
@@ -786,6 +787,7 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 			Cbs:  cbs, /* committed burst size */
 			Pbs:  pbs, /* Peak burst size */
 			Ebs:  ebs, /* Excess burst size */
+			AdjustMeterPacketLength: 14, /* Exclude Ethernet header */
 			Fields: []*pb.FieldData{
 				intEnc(uint64(srcIface)),  /* Src Intf */
 				intEnc(uint64(qer.qerID)), /* qer_id */

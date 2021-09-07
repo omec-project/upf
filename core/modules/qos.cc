@@ -127,9 +127,6 @@ CommandResponse Qos::Init(const bess::pb::QosArg &arg) {
   }
 
   table_.Init(total_key_size_);
-
-  adjust_meter_packet_length_ = arg.adjust_meter_packet_length();
-
   return CommandSuccess();
 }
 
@@ -140,7 +137,7 @@ void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   default_gate = ACCESS_ONCE(default_gate_);
 
   int cnt = batch->cnt();
-  struct value *val[cnt];
+  value *val[cnt];
 
   for (const auto &field : fields_) {
     int offset;
@@ -190,7 +187,7 @@ void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     // meter if ogate is 0
     if (ogate == METER_GATE) {
       uint64_t time = rte_rdtsc();
-      uint32_t pkt_len = pkt->total_len() + adjust_meter_packet_length_;
+      uint32_t pkt_len = pkt->total_len() + val[j]->adjust_meter_packet_length;
       uint8_t color = rte_meter_trtcm_color_blind_check(&val[j]->m, &val[j]->p,
                                                         time, pkt_len);
 
@@ -377,7 +374,7 @@ CommandResponse Qos::CommandAdd(const bess::pb::QosCommandAddArg &arg) {
   MeteringKey key = {{0}};
 
   MKey l;
-  struct value v;
+  value v;
   v.ogate = gate;
   CommandResponse err = ExtractKeyMask(arg, &key, &v.Data, &l);
 
@@ -391,6 +388,7 @@ CommandResponse Qos::CommandAdd(const bess::pb::QosCommandAddArg &arg) {
     v.cbs = arg.cbs();
     v.pbs = arg.pbs();
     v.ebs = arg.ebs();
+    v.adjust_meter_packet_length = arg.adjust_meter_packet_length();
 
     DLOG(INFO) << "Adding entry"
                << " cir: " << v.cir << " pir: " << v.pir << " cbs: " << v.cbs
