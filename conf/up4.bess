@@ -219,8 +219,8 @@ if parser.slice_uplink_rate_limit_bytes_per_second is not None or parser.slice_d
     # Admit green and yellow, drop red
     sliceMeter:m_green -> executeFAR
     sliceMeter:m_yellow -> executeFAR
-    sliceMeter:m_red -> red::Sink()
-    sliceMeter:m_fail -> fail::Sink()
+    sliceMeter:m_red -> sliceMeterRed::Sink()
+    sliceMeter:m_fail -> sliceMeterLookupFail::Sink()
     sliceMeter.set_default_gate(gate=m_fail)
     # Add two static slice meter entries for uplink and downlink.
     # cir and pir are equal, meaning we have no yellow packets.

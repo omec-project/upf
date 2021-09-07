@@ -90,6 +90,7 @@
         }
     ],
 
+    "": "Optional slice-wide meter rate limits",
     "slice_rate_limit_config": {
         "uplink_bps": 500000000,
         "uplink_burst_bytes": 3000,
