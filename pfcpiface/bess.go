@@ -41,6 +41,13 @@ const (
 	qerGateUnmeter
 )
 
+const (
+	// Internal gates for Slice meter.
+	sliceMeterGateMeter      uint64 = iota
+	sliceMeterGateLookupFail        = iota + 4
+	sliceMeterGateUnmeter
+)
+
 var intEnc = func(u uint64) *pb.FieldData {
 	return &pb.FieldData{Encoding: &pb.FieldData_ValueInt{ValueInt: u}}
 }
@@ -399,6 +406,17 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 		log.Println("Starting end marker loop")
 
 		go b.endMarkerSendLoop(b.endMarkerChan)
+	}
+
+	if conf.SliceMeterConfig.UplinkRateBps > 0 || conf.SliceMeterConfig.DownlinkRateBps > 0 {
+		ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+		defer cancel()
+		done := make(chan bool)
+		b.addSliceMeter(ctx, done, conf.SliceMeterConfig)
+		rc := b.GRPCJoin(1, Timeout, done)
+		if !rc {
+			log.Errorln("Unable to make GRPC calls")
+		}
 	}
 }
 
@@ -1008,6 +1026,109 @@ func (b *bess) delCounter(ctx context.Context, done chan<- bool, ctrID uint32, c
 		}
 
 		b.processCounters(ctx, any, upfMsgTypeDel, counterName)
+		done <- true
+	}()
+}
+
+func (b *bess) processSliceMeter(ctx context.Context, any *anypb.Any, method upfMsgType) {
+	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
+		log.Errorln("Invalid method name: ", method)
+		return
+	}
+
+	methods := [...]string{"add", "add", "delete", "clear"}
+
+	_, err := b.client.ModuleCommand(
+		ctx, &pb.CommandRequest{
+			Name: "sliceMeter",
+			Cmd:  methods[method],
+			Arg:  any,
+		},
+	)
+	if err != nil {
+		log.Errorln("sliceMeter method failed!:", err)
+	}
+}
+
+func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig SliceMeterConfig) {
+	go func() {
+		var (
+			any                           *anypb.Any
+			err                           error
+			cir, pir, cbs, ebs, pbs, gate uint64
+		)
+
+		// Uplink slice meter config
+		if meterConfig.UplinkRateBps != 0 {
+			gate = sliceMeterGateMeter
+			cir = 1                             // Mark all traffic as yellow
+			pir = meterConfig.UplinkRateBps / 8 // bit/s to byte/s
+		} else {
+			gate = sliceMeterGateUnmeter
+		}
+		if meterConfig.UplinkBurstBytes != 0 {
+			cbs = 1 // Mark all traffic as yellow
+			pbs = meterConfig.UplinkBurstBytes
+			ebs = 0 // Unused
+		} else {
+			cbs = DefaultBurstSize
+			pbs = DefaultBurstSize
+			ebs = 0 // Unused
+		}
+		q := &pb.QosCommandAddArg{
+			Gate:                    gate,
+			Cir:                     cir, /* committed info rate */
+			Pir:                     pir, /* peak info rate */
+			Cbs:                     cbs, /* committed burst size */
+			Pbs:                     pbs, /* Peak burst size */
+			Ebs:                     ebs, /* Excess burst size */
+			AdjustMeterPacketLength: -14, /* Exclude Ethernet header */
+			Fields: []*pb.FieldData{
+				intEnc(uint64(access)), /* Source interface */
+			},
+		}
+		any, err = anypb.New(q)
+		if err != nil {
+			log.Errorln("Error marshalling the rule", q, err)
+			return
+		}
+		b.processSliceMeter(ctx, any, upfMsgTypeAdd)
+
+		// Downlink slice meter config
+		if meterConfig.DownlinkRateBps != 0 {
+			gate = sliceMeterGateMeter
+			cir = 1                               // Mark all traffic as yellow
+			pir = meterConfig.DownlinkRateBps / 8 // bit/s to byte/s
+		} else {
+			gate = sliceMeterGateUnmeter
+		}
+		if meterConfig.DownlinkBurstBytes != 0 {
+			cbs = 1 // Mark all traffic as yellow
+			pbs = meterConfig.DownlinkBurstBytes
+			ebs = 0 // Unused
+		} else {
+			cbs = DefaultBurstSize
+			pbs = DefaultBurstSize
+			ebs = 0 // Unused
+		}
+		q = &pb.QosCommandAddArg{
+			Gate:                    gate,
+			Cir:                     cir, /* committed info rate */
+			Pir:                     pir, /* peak info rate */
+			Cbs:                     cbs, /* committed burst size */
+			Pbs:                     pbs, /* Peak burst size */
+			Ebs:                     ebs, /* Excess burst size */
+			AdjustMeterPacketLength: -50, /* Exclude Ethernet,IP,UDP,GTP header */
+			Fields: []*pb.FieldData{
+				intEnc(uint64(core)), /* Source interface */
+			},
+		}
+		any, err = anypb.New(q)
+		if err != nil {
+			log.Errorln("Error marshalling the rule", q, err)
+			return
+		}
+		b.processSliceMeter(ctx, any, upfMsgTypeAdd)
 		done <- true
 	}()
 }

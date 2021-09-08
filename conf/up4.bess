@@ -218,30 +218,14 @@ if parser.slice_uplink_rate_limit_bytes_per_second is not None or parser.slice_d
     m_red    = 3 # For red traffic
     # User defined gates
     m_fail   = 4 # For lookup failure traffic
+    m_unmeter = 5 # For unmetered traffic
     # Admit green and yellow, drop red
     sliceMeter:m_green -> executeFAR
     sliceMeter:m_yellow -> executeFAR
     sliceMeter:m_red -> sliceMeterRed::Sink()
     sliceMeter:m_fail -> sliceMeterLookupFail::Sink()
+    sliceMeter:m_unmeter -> executeFAR
     sliceMeter.set_default_gate(gate=m_fail)
-    # Add two static slice meter entries for uplink and downlink.
-    # cir and pir are equal, meaning we have no yellow packets.
-    if parser.slice_uplink_rate_limit_bytes_per_second is not None:
-        sliceMeter.add(fields=[{'value_int': Access}],
-                       gate=m_meter,
-                       cir=parser.slice_uplink_rate_limit_bytes_per_second,
-                       pir=parser.slice_uplink_rate_limit_bytes_per_second,
-                       cbs=parser.slice_uplink_burst_bytes,
-                       pbs=parser.slice_uplink_burst_bytes,
-                       adjust_meter_packet_length=-len(Ether()))  # Don't count link-level headers
-    if parser.slice_downlink_rate_limit_bytes_per_second is not None:
-        sliceMeter.add(fields=[{'value_int': Core}],
-                       gate=m_meter,
-                       cir=parser.slice_downlink_rate_limit_bytes_per_second,
-                       pir=parser.slice_downlink_rate_limit_bytes_per_second,
-                       cbs=parser.slice_downlink_burst_bytes,
-                       pbs=parser.slice_downlink_burst_bytes,
-                       adjust_meter_packet_length=-len(Ether()/IP()/UDP()/GTP_U_Header()))  # Don't count link-level and encapsulation headers
     farOrSliceMeter = sliceMeter
 
 farLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \

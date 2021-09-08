@@ -25,22 +25,23 @@ var (
 
 // Conf : Json conf struct.
 type Conf struct {
-	Mode              string         `json:"mode"`
-	MaxSessions       uint32         `json:"max_sessions"`
-	AccessIface       IfaceType      `json:"access"`
-	CoreIface         IfaceType      `json:"core"`
-	CPIface           CPIfaceInfo    `json:"cpiface"`
-	P4rtcIface        P4rtcInfo      `json:"p4rtciface"`
-	EnableP4rt        bool           `json:"enable_p4rt"`
-	SimInfo           SimModeInfo    `json:"sim"`
-	ConnTimeout       uint32         `json:"conn_timeout"`
-	ReadTimeout       uint32         `json:"read_timeout"`
-	EnableNotifyBess  bool           `json:"enable_notify_bess"`
-	EnableEndMarker   bool           `json:"enable_end_marker"`
-	NotifySockAddr    string         `json:"notify_sockaddr"`
-	EndMarkerSockAddr string         `json:"endmarker_sockaddr"`
-	LogLevel          string         `json:"log_level"`
-	QciQosConfig      []QciQosConfig `json:"qci_qos_config"`
+	Mode              string           `json:"mode"`
+	MaxSessions       uint32           `json:"max_sessions"`
+	AccessIface       IfaceType        `json:"access"`
+	CoreIface         IfaceType        `json:"core"`
+	CPIface           CPIfaceInfo      `json:"cpiface"`
+	P4rtcIface        P4rtcInfo        `json:"p4rtciface"`
+	EnableP4rt        bool             `json:"enable_p4rt"`
+	SimInfo           SimModeInfo      `json:"sim"`
+	ConnTimeout       uint32           `json:"conn_timeout"`
+	ReadTimeout       uint32           `json:"read_timeout"`
+	EnableNotifyBess  bool             `json:"enable_notify_bess"`
+	EnableEndMarker   bool             `json:"enable_end_marker"`
+	NotifySockAddr    string           `json:"notify_sockaddr"`
+	EndMarkerSockAddr string           `json:"endmarker_sockaddr"`
+	LogLevel          string           `json:"log_level"`
+	QciQosConfig      []QciQosConfig   `json:"qci_qos_config"`
+	SliceMeterConfig  SliceMeterConfig `json:"slice_rate_limit_config"`
 }
 
 // QciQosConfig : Qos configured attributes.
@@ -50,6 +51,13 @@ type QciQosConfig struct {
 	PBS                uint32 `json:"pbs"`
 	EBS                uint32 `json:"ebs"`
 	SchedulingPriority uint32 `json:"priority"`
+}
+
+type SliceMeterConfig struct {
+	UplinkRateBps      uint64 `json:"uplink_bps"`
+	UplinkBurstBytes   uint64 `json:"uplink_burst_bytes"`
+	DownlinkRateBps    uint64 `json:"downlink_bps"`
+	DownlinkBurstBytes uint64 `json:"downlink_burst_bytes"`
 }
 
 // SimModeInfo : Sim mode attributes.
