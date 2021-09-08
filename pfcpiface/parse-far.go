@@ -66,25 +66,6 @@ func (f far) String() string {
 	return b.String()
 }
 
-func (f *far) setActionValue() uint8 {
-	if (f.applyAction & ActionForward) != 0 {
-		if f.dstIntf == ie.DstInterfaceAccess {
-			return farForwardD
-		} else if (f.dstIntf == ie.DstInterfaceCore) || (f.dstIntf == ie.DstInterfaceSGiLANN6LAN) {
-			return farForwardU
-		}
-	} else if (f.applyAction & ActionDrop) != 0 {
-		return farDrop
-	} else if (f.applyAction & ActionBuffer) != 0 {
-		return farBuffer
-	} else if (f.applyAction & ActionNotify) != 0 {
-		return farNotify
-	}
-
-	// default action
-	return farDrop
-}
-
 func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error {
 	f.fseID = (fseid)
 

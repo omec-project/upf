@@ -6,6 +6,7 @@ package main
 import (
 	"errors"
 	"net"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -99,6 +100,20 @@ func (s *PFCPSession) getNotifyFlag() bool {
 	defer s.notificationFlag.mux.Unlock()
 
 	return s.notificationFlag.flag
+}
+
+func (s *PFCPSession) runTimerForDDNNotify(timeout time.Duration) {
+	endTime := time.After(timeout)
+
+	for {
+		select {
+		case <-endTime:
+			log.Println("DDN notify send timeout")
+			s.setNotifyFlag(false)
+
+			return
+		}
+	}
 }
 
 // UpdateFAR updates existing far in the session.
