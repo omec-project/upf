@@ -66,27 +66,31 @@ Metering.add(fields=[{'value_int': 1},
                      {'value_bin': convert('L', 2)},
                      {'value_bin': convert('Q', 4)}],
              values=[{'value_int': 1}], # S:1
-             gate=m_meter, cir=1 * MPPS , pir=1 * MPPS, cbs=2048, pbs=2048)
+             gate=m_meter, cir=1 * MPPS , pir=1 * MPPS, cbs=2048, pbs=2048,
+             adjust_meter_packet_length=-14])
 
 Metering.add(fields=[{'value_int': 1},
                      {'value_bin': convert('L', 3)},
                      {'value_bin': convert('Q', 6)}],
              values=[{'value_int': 2}], # S:2
-             gate=m_meter, cir=5 * MPPS, pir=5 * MPPS, cbs=2048, pbs=2048)
+             gate=m_meter, cir=5 * MPPS, pir=5 * MPPS, cbs=2048, pbs=2048,
+             adjust_meter_packet_length=-14)
 
 # GBR/MBR
 Metering.add(fields=[{'value_int': 1},
                      {'value_bin': convert('L', 4)},
                      {'value_bin': convert('Q', 8)}],
              values=[{'value_int': 3}], # S:3
-             gate=m_meter, cir=3 * MPPS, pir=6 * MPPS, cbs=2048, pbs=2048)
+             gate=m_meter, cir=3 * MPPS, pir=6 * MPPS, cbs=2048, pbs=2048,
+             adjust_meter_packet_length=-14)
 
 # MBR only
 Metering.add(fields=[{'value_int': 1},
                      {'value_bin': convert('L', 5)},
                      {'value_bin': convert('Q', 10)}],
              values=[{'value_int': 4}], # S:4
-             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2048, pbs=2048)
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2048, pbs=2048,
+             adjust_meter_packet_length=-14)
 
 # Unmeter
 Metering.add(fields=[{'value_int': 1},
