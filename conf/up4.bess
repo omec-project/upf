@@ -208,7 +208,7 @@ _in -> qerLookup::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
 
 executeFAR::Split(size=1, attribute='action')
 farOrSliceMeter = executeFAR
-if parser.slice_uplink_rate_limit_bytes_per_second is not None or parser.slice_downlink_rate_limit_bytes_per_second is not None:
+if parser.enable_slice_metering:
     # sliceMeter enforces a per slice, per direction meter rate limit
     sliceMeter::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}])
     # Reserved gates, reject rule adds with gate=1/2/3

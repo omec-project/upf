@@ -49,10 +49,7 @@ class Parser:
         self.enable_ntf = False
         self.notify_sockaddr = "/tmp/notifycp"
         self.endmarker_sockaddr = "/tmp/pfcpport"
-        self.slice_uplink_rate_limit_bytes_per_second = None
-        self.slice_downlink_rate_limit_bytes_per_second = None
-        self.slice_uplink_burst_bytes = None
-        self.slice_downlink_burst_bytes = None
+        self.enable_slice_metering = False
 
     def parse(self, ifaces):
         # Maximum number of flows to manage ip4 frags for re-assembly
@@ -155,19 +152,10 @@ class Parser:
 
         # Slice rate limits
         try:
-            self.slice_uplink_rate_limit_bytes_per_second = int(self.conf["slice_rate_limit_config"]["uplink_bps"] / 8)
-            self.slice_uplink_burst_bytes = self.conf["slice_rate_limit_config"]["uplink_burst_bytes"]
+            self.conf["slice_rate_limit_config"]
+            self.enable_slice_metering = True
         except KeyError:
-            self.slice_uplink_rate_limit_bytes_per_second = None
-            self.slice_uplink_burst_bytes = None
-            print("No slice uplink rate limit! Disabling rate limit.")
-        try:
-            self.slice_downlink_rate_limit_bytes_per_second = int(self.conf["slice_rate_limit_config"]["downlink_bps"] / 8)
-            self.slice_downlink_burst_bytes = self.conf["slice_rate_limit_config"]["downlink_burst_bytes"]
-        except KeyError:
-            self.slice_downlink_rate_limit_bytes_per_second = None
-            self.slice_downlink_burst_bytes = None
-            print("No slice downlink rate limit! Disabling rate limit.")
+            print("No slice rate limit! Disabling meter.")
 
         # UnixPort Paths
         try:
