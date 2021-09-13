@@ -15,6 +15,95 @@ import (
 	"github.com/wmnsk/go-pfcp/message"
 )
 
+func sendHeartBeatRequest(upf *upf, conn *net.UDPConn, pfcpConn *PFCPConn) {
+	seq := pfcpConn.getSeqNum()
+
+	// Send heart beat request
+	hbreq, err := message.NewHeartbeatRequest(
+		seq,
+		ie.NewRecoveryTimeStamp(upf.recoveryTime),
+		nil,
+	).Marshal()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if _, err := conn.Write(hbreq); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func (pc *PFCPConn) handleHeartBeats(upf *upf, conn *net.UDPConn, addr *net.UDPAddr) (errC chan bool) {
+	log.Printf("Remote UDP Addr %v", addr)
+
+	hbErrorC := make(chan bool)
+
+	go func() {
+		// Acts as heartbeat interval timer as well as response timer
+		heartBeatTimer := time.NewTimer(upf.hbInterval)
+		hbRespTimerRunning := false
+		retryCount := 0
+
+		for {
+			select {
+			case status := <-pc.hbStatus:
+				heartBeatTimer.Stop() // stop response timer
+				hbRespTimerRunning = false
+				retryCount = 0 // reset retry count
+
+				if status {
+					log.Println("HeartBeat Response Received")
+					// Start the hb interval timer
+					heartBeatTimer = time.NewTimer(upf.hbInterval)
+				} else {
+					log.Println("Conn Error Indication")
+					return
+				}
+
+			case <-heartBeatTimer.C:
+				log.Println("HeartBeatTimer Expired")
+				if !hbRespTimerRunning {
+					// Send heart beat request
+					_, err := conn.WriteToUDP([]byte("HEART-BEAT REQUEST"), addr)
+					if err != nil {
+						log.Printf("Couldn't send response %v", err)
+					}
+
+					// start response timer
+					log.Println("Started HB Response timer")
+					heartBeatTimer = time.NewTimer(upf.hbRespDuration)
+					hbRespTimerRunning = true
+				} else {
+					if retryCount < int(upf.maxRetries) {
+						retryCount++
+
+						_, err := conn.WriteToUDP([]byte("HEART-BEAT REQUEST"), addr)
+						if err != nil {
+							log.Printf("Couldn't send response %v", err)
+						}
+
+						// start response timer
+						log.Printf("Started HB Response timer. RetryCount: %d", retryCount)
+
+						heartBeatTimer = time.NewTimer(upf.hbRespDuration)
+						hbRespTimerRunning = true
+
+					} else {
+						heartBeatTimer.Stop() // stop ticker, wait for main loop to start timer again
+						log.Println("HeartBeat Response Timer Expired. Inform pfcp main loop to cleanup session")
+						hbErrorC <- false
+						return
+					}
+				}
+
+			}
+		}
+	}()
+
+	return hbErrorC
+}
+
 func handleHeartbeatRequest(msg message.Message, addr net.Addr, rTime time.Time) []byte {
 	hbreq, ok := msg.(*message.HeartbeatRequest)
 	if !ok {

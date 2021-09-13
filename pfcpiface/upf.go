@@ -38,6 +38,9 @@ type upf struct {
 	recoveryTime     time.Time
 	dnn              string
 	reportNotifyChan chan uint64
+	maxRetries       uint8
+	hbInterval       time.Duration
+	hbRespDuration   time.Duration
 }
 
 // to be replaced with go-pfcp structs

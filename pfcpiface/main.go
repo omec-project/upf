@@ -25,22 +25,25 @@ var (
 
 // Conf : Json conf struct.
 type Conf struct {
-	Mode              string         `json:"mode"`
-	MaxSessions       uint32         `json:"max_sessions"`
-	AccessIface       IfaceType      `json:"access"`
-	CoreIface         IfaceType      `json:"core"`
-	CPIface           CPIfaceInfo    `json:"cpiface"`
-	P4rtcIface        P4rtcInfo      `json:"p4rtciface"`
-	EnableP4rt        bool           `json:"enable_p4rt"`
-	SimInfo           SimModeInfo    `json:"sim"`
-	ConnTimeout       uint32         `json:"conn_timeout"`
-	ReadTimeout       uint32         `json:"read_timeout"`
-	EnableNotifyBess  bool           `json:"enable_notify_bess"`
-	EnableEndMarker   bool           `json:"enable_end_marker"`
-	NotifySockAddr    string         `json:"notify_sockaddr"`
-	EndMarkerSockAddr string         `json:"endmarker_sockaddr"`
-	LogLevel          string         `json:"log_level"`
-	QciQosConfig      []QciQosConfig `json:"qci_qos_config"`
+	Mode                  string         `json:"mode"`
+	MaxSessions           uint32         `json:"max_sessions"`
+	AccessIface           IfaceType      `json:"access"`
+	CoreIface             IfaceType      `json:"core"`
+	CPIface               CPIfaceInfo    `json:"cpiface"`
+	P4rtcIface            P4rtcInfo      `json:"p4rtciface"`
+	EnableP4rt            bool           `json:"enable_p4rt"`
+	SimInfo               SimModeInfo    `json:"sim"`
+	ConnTimeout           uint32         `json:"conn_timeout"`
+	ReadTimeout           uint32         `json:"read_timeout"`
+	EnableNotifyBess      bool           `json:"enable_notify_bess"`
+	EnableEndMarker       bool           `json:"enable_end_marker"`
+	NotifySockAddr        string         `json:"notify_sockaddr"`
+	EndMarkerSockAddr     string         `json:"endmarker_sockaddr"`
+	LogLevel              string         `json:"log_level"`
+	QciQosConfig          []QciQosConfig `json:"qci_qos_config"`
+	MaxRetries            uint8          `json:"max_retries"`
+	HeartBeatInterval     int            `json:"heart_beart_interval"`
+	HeartBeatRespDuration int            `json:"heart_beat_resp_dur"`
 }
 
 // QciQosConfig : Qos configured attributes.
@@ -189,6 +192,9 @@ func main() {
 		enableEndMarker: conf.EnableEndMarker,
 		connTimeout:     time.Duration(conf.ConnTimeout) * time.Millisecond,
 		readTimeout:     time.Duration(conf.ReadTimeout) * time.Second,
+		maxRetries:      conf.MaxRetries,
+		hbInterval:      time.Duration(conf.HeartBeatInterval) * time.Millisecond,
+		hbRespDuration:  time.Duration(conf.HeartBeatRespDuration) * time.Millisecond,
 	}
 
 	upf.setUpfInfo(&conf)
