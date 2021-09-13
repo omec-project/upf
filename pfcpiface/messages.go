@@ -65,10 +65,7 @@ func (pc *PFCPConn) handleHeartBeats(upf *upf, conn *net.UDPConn, addr *net.UDPA
 				log.Println("HeartBeatTimer Expired")
 				if !hbRespTimerRunning {
 					// Send heart beat request
-					_, err := conn.WriteToUDP([]byte("HEART-BEAT REQUEST"), addr)
-					if err != nil {
-						log.Printf("Couldn't send response %v", err)
-					}
+					sendHeartBeatRequest(upf, conn, pc)
 
 					// start response timer
 					log.Println("Started HB Response timer")
@@ -78,10 +75,7 @@ func (pc *PFCPConn) handleHeartBeats(upf *upf, conn *net.UDPConn, addr *net.UDPA
 					if retryCount < int(upf.maxRetries) {
 						retryCount++
 
-						_, err := conn.WriteToUDP([]byte("HEART-BEAT REQUEST"), addr)
-						if err != nil {
-							log.Printf("Couldn't send response %v", err)
-						}
+						sendHeartBeatRequest(upf, conn, pc)
 
 						// start response timer
 						log.Printf("Started HB Response timer. RetryCount: %d", retryCount)
@@ -90,7 +84,7 @@ func (pc *PFCPConn) handleHeartBeats(upf *upf, conn *net.UDPConn, addr *net.UDPA
 						hbRespTimerRunning = true
 
 					} else {
-						heartBeatTimer.Stop() // stop ticker, wait for main loop to start timer again
+						heartBeatTimer.Stop() // stop timer, wait for main loop to start timer again
 						log.Println("HeartBeat Response Timer Expired. Inform pfcp main loop to cleanup session")
 						hbErrorC <- false
 						return

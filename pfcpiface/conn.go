@@ -282,6 +282,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 			case status := <-hbErrCh:
 				hbTimerRunning = false
 				log.Printf("Received %v", status)
+				cleanupSessions(upf)
 			}
 		}
 
