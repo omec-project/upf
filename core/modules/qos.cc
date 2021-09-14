@@ -176,7 +176,7 @@ void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 
   for (int j = 0; j < cnt; j++) {
     pkt = batch->pkts()[j];
-    if ((hit_mask & (1ULL << j)) == 0) {
+    if ((hit_mask & ((uint64_t)1ULL << j)) == 0) {
       EmitPacket(ctx, pkt, default_gate);
       continue;
     }
