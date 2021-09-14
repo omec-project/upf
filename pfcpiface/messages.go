@@ -34,7 +34,7 @@ func sendHeartBeatRequest(upf *upf, conn *net.UDPConn, pfcpConn *PFCPConn) {
 	}
 }
 
-func (pc *PFCPConn) handleHeartBeats(upf *upf, conn *net.UDPConn, addr *net.UDPAddr) (errC chan bool) {
+func (pc *PFCPConn) handleHeartBeats(upf *upf, conn *net.UDPConn, addr *net.UDPAddr, hbStatus chan bool) (errC chan bool) {
 	log.Printf("Remote UDP Addr %v", addr)
 
 	hbErrorC := make(chan bool)
@@ -47,7 +47,7 @@ func (pc *PFCPConn) handleHeartBeats(upf *upf, conn *net.UDPConn, addr *net.UDPA
 
 		for {
 			select {
-			case status := <-pc.hbStatus:
+			case status := <-hbStatus:
 				heartBeatTimer.Stop() // stop response timer
 				hbRespTimerRunning = false
 				retryCount = 0 // reset retry count

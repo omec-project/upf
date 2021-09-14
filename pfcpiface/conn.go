@@ -26,9 +26,8 @@ var Timeout = 1000 * time.Millisecond
 
 // PFCPConn represents a PFCP connection.
 type PFCPConn struct {
-	seqNum   sequenceNumber
-	mgr      *PFCPSessionMgr
-	hbStatus chan bool
+	seqNum sequenceNumber
+	mgr    *PFCPSessionMgr
 }
 
 type sequenceNumber struct {
@@ -48,6 +47,21 @@ type PFCPNodeInfo struct {
 	accessIP *string
 }
 
+type PFCPConnStatus struct {
+	// flag to check SMF/SPGW-C is connected
+	// cpConnected is true if upf received request from control plane or
+	// if upf receives +ve response for upf initiated setup request
+	cpConnected bool
+
+	// set to true if smf is configured
+	// UPF initiates PFCP Assoc to SMF in this case
+	manageConnection   bool
+	cpConnectionStatus chan bool
+
+	// Sends HB Success/ failure Indication  to hb tmr routine
+	hbStatus chan bool
+}
+
 func (c *PFCPConn) getSeqNum() uint32 {
 	c.seqNum.mux.Lock()
 	defer c.seqNum.mux.Unlock()
@@ -64,7 +78,7 @@ func cleanupSessions(upf *upf) {
 	sendDeleteAllSessionsMsgtoUPF(upf)
 }
 
-func handleIncomingPfcpMsg(upf *upf, pconn *PFCPConn, conn *net.UDPConn, packet PfcpMessage, pfcpNodeIP *PFCPNodeInfo, cpConnected bool, manageConnection bool, cpConnectionStatus chan bool) (bool, bool) {
+func handleIncomingPfcpMsg(upf *upf, pconn *PFCPConn, conn *net.UDPConn, packet *PfcpMessage, pfcpNodeIP *PFCPNodeInfo, pfcpConnStatus *PFCPConnStatus) bool {
 	// flag to indicate if assoc setup is received
 	connReset := false
 	// process packets
@@ -93,19 +107,19 @@ func handleIncomingPfcpMsg(upf *upf, pconn *PFCPConn, conn *net.UDPConn, packet 
 
 		outgoingMessage = pconn.handleAssociationSetupRequest(upf, packet.buffer, packet.srcAddr, *pfcpNodeIP.sourceIP, *pfcpNodeIP.accessIP, *pfcpNodeIP.coreIP)
 		if outgoingMessage != nil {
-			cpConnected = true
-			if manageConnection {
+			pfcpConnStatus.cpConnected = true
+			if pfcpConnStatus.manageConnection {
 				// pass on information to go routine that result of association response
-				cpConnectionStatus <- cpConnected
+				pfcpConnStatus.cpConnectionStatus <- pfcpConnStatus.cpConnected
 			}
 			connReset = true
 		}
 	case message.MsgTypeAssociationSetupResponse:
-		cpConnected = handleAssociationSetupResponse(packet.buffer, packet.srcAddr, *pfcpNodeIP.sourceIP, *pfcpNodeIP.accessIP)
+		pfcpConnStatus.cpConnected = handleAssociationSetupResponse(packet.buffer, packet.srcAddr, *pfcpNodeIP.sourceIP, *pfcpNodeIP.accessIP)
 
-		if manageConnection {
+		if pfcpConnStatus.manageConnection {
 			// pass on information to go routine that result of association response
-			cpConnectionStatus <- cpConnected
+			pfcpConnStatus.cpConnectionStatus <- pfcpConnStatus.cpConnected
 		}
 	case message.MsgTypePFDManagementRequest:
 		outgoingMessage = pconn.handlePFDMgmtRequest(upf, packet.buffer, packet.srcAddr, *pfcpNodeIP.sourceIP)
@@ -119,13 +133,13 @@ func handleIncomingPfcpMsg(upf *upf, pconn *PFCPConn, conn *net.UDPConn, packet 
 		outgoingMessage = pconn.handleSessionDeletionRequest(upf, packet.buffer, packet.srcAddr, *pfcpNodeIP.sourceIP)
 	case message.MsgTypeAssociationReleaseRequest:
 		outgoingMessage = handleAssociationReleaseRequest(upf, packet.buffer, packet.srcAddr, *pfcpNodeIP.sourceIP, *pfcpNodeIP.accessIP, upf.recoveryTime)
-		cpConnected = false
+		pfcpConnStatus.cpConnected = false
 		cleanupSessions(upf)
 	case message.MsgTypeSessionReportResponse:
 		pconn.handleSessionReportResponse(upf, packet.buffer, packet.srcAddr)
 	case message.MsgTypeHeartbeatResponse:
 		log.Println("HeartBeat response received")
-		pconn.hbStatus <- true
+		pfcpConnStatus.hbStatus <- true
 	default:
 		log.Println("Message type: ", packet.buffer.MessageTypeName(), " is currently not supported")
 	}
@@ -136,13 +150,35 @@ func handleIncomingPfcpMsg(upf *upf, pconn *PFCPConn, conn *net.UDPConn, packet 
 			log.Fatalln("Unable to transmit association setup response", err)
 		}
 	}
-	return cpConnected, connReset
+	return connReset
+}
+
+func handlePFCPConnError(upf *upf, pconnStatus *PFCPConnStatus) {
+	// inform smf connection mgmt routine
+	pconnStatus.cpConnected = false
+
+	if pconnStatus.manageConnection {
+		pconnStatus.cpConnectionStatus <- pconnStatus.cpConnected
+	}
+
+	cleanupSessions(upf)
 }
 
 func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 	var pconn PFCPConn
 	pconn.mgr = NewPFCPSessionMgr(100)
-	pconn.hbStatus = make(chan bool)
+
+	pconnStatus := PFCPConnStatus{
+		cpConnected:        false,
+		manageConnection:   false,
+		cpConnectionStatus: make(chan bool),
+		hbStatus:           make(chan bool),
+	}
+
+	pfcpNodeIP := PFCPNodeInfo{
+		sourceIP: &sourceIP,
+		coreIP:   &coreIP,
+		accessIP: &accessIP}
 
 	rTimeout := readTimeout
 	if upf.readTimeout != 0 {
@@ -155,8 +191,6 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 
 	log.Println("timeout : ", Timeout, ", readTimeout : ", rTimeout)
 	log.Println("pfcpifaceMainLoop@" + upf.fqdnHost + " says hello!!!")
-
-	cpConnectionStatus := make(chan bool)
 
 	// Verify IP + Port binding
 	laddr, err := net.ResolveUDPAddr("udp", sourceIP+":"+PFCPPort)
@@ -171,20 +205,13 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 		log.Fatalln("Unable to bind to listening port!", err)
 		return
 	}
-
-	// flag to check SMF/SPGW-C is connected
-	// cpConnected is true if upf received request from control plane or
-	// if upf receives +ve response for upf initiated setup request
-	cpConnected := false
-
 	// initiate connection if smf address available
 	log.Println("calling manageSmfConnection smf service name ", smfName)
 
-	manageConnection := false
 	if smfName != "" {
-		manageConnection = true
+		pconnStatus.manageConnection = true
 
-		go pconn.manageSmfConnection(upf.nodeIP.String(), accessIP, smfName, conn, cpConnectionStatus, upf.recoveryTime)
+		go pconn.manageSmfConnection(upf.nodeIP.String(), accessIP, smfName, conn, pconnStatus.cpConnectionStatus, upf.recoveryTime)
 	}
 
 	readChannel := make(chan PfcpMessage)
@@ -194,25 +221,28 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 	buf := make([]byte, PktBufSz)
 	// Initialize pkt header
 
-	go func() (err error) {
-		defer func() { readErr <- err }()
+	readFn := func() {
 		for {
 			err := conn.SetReadDeadline(time.Now().Add(rTimeout))
 			if err != nil {
 				log.Printf("Unable to set deadline for read: %v\n", err)
-				return err
+				readErr <- err
+				return
 			}
 			// blocking read
 			n, addr, err := conn.ReadFrom(buf)
 			if err != nil {
-				log.Printf("Read error: %v\n", err)
-				return err
+				if err, ok := err.(net.Error); ok && err.Timeout() {
+					readErr <- err
+					continue
+				}
+				readErr <- err
+				return
 			}
-
 			// use wmnsk lib to parse the pfcp message
-			msg, err := message.Parse(buf)
+			msg, err := message.Parse(buf[:n])
 			if err != nil {
-				log.Println("Ignoring undecodable message: ", buf, " error: ", err)
+				log.Println("Ignoring undecodable message: ", buf[:n], " error: ", err)
 				continue
 			}
 
@@ -225,64 +255,53 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 
 			readChannel <- pfcpMessage
 		}
-	}()
+	}
 
 	hbTimerRunning := false // indicates if hb timer routine is running
 	var hbErrCh chan bool   // chan used by hb timer routine to send status back to pfpc main loop
 
-	pfcpNodeIP := PFCPNodeInfo{
-		sourceIP: &sourceIP,
-		coreIP:   &coreIP,
-		accessIP: &accessIP}
+	go readFn()
 
 	for {
 		if !hbTimerRunning {
 			select {
 			case err := <-readErr:
-				// inform smf connection mgmt routine
-				cpConnected = false
+				if err, ok := err.(net.Error); ok && err.Timeout() {
+					handlePFCPConnError(upf, &pconnStatus)
 
-				if manageConnection {
-					cpConnectionStatus <- cpConnected
+				} else {
+					log.Fatalln("Read error:", err)
 				}
-
-				cleanupSessions(upf)
-				log.Fatalln("Read error:", err)
 			case packet := <-readChannel:
-				connSetup := false
-
-				cpConnected, connSetup = handleIncomingPfcpMsg(upf, &pconn, conn, packet, &pfcpNodeIP, cpConnected, manageConnection, cpConnectionStatus)
+				connSetup := handleIncomingPfcpMsg(upf, &pconn, conn, &packet, &pfcpNodeIP, &pconnStatus)
 
 				if connSetup {
-					hbErrCh = pconn.handleHeartBeats(upf, conn, packet.srcAddr.(*net.UDPAddr))
+					hbErrCh = pconn.handleHeartBeats(upf, conn, packet.srcAddr.(*net.UDPAddr), pconnStatus.hbStatus)
 					hbTimerRunning = true
 				}
 			}
 		} else {
 			select {
 			case err := <-readErr:
-				// inform smf connection mgmt routine
-				cpConnected = false
+				if err, ok := err.(net.Error); ok && err.Timeout() {
+					handlePFCPConnError(upf, &pconnStatus)
 
-				if manageConnection {
-					cpConnectionStatus <- cpConnected
+				} else {
+					log.Fatalln("Read error:", err)
 				}
-
-				cleanupSessions(upf)
-				log.Fatalln("Read error:", err)
 			case packet := <-readChannel:
-				connReset := false
-
-				cpConnected, connReset = handleIncomingPfcpMsg(upf, &pconn, conn, packet, &pfcpNodeIP, cpConnected, manageConnection, cpConnectionStatus)
+				connReset := handleIncomingPfcpMsg(upf, &pconn, conn, &packet, &pfcpNodeIP, &pconnStatus)
 
 				if connReset {
-					pconn.hbStatus <- false
-					hbErrCh = pconn.handleHeartBeats(upf, conn, packet.srcAddr.(*net.UDPAddr))
+					pconnStatus.hbStatus <- false                                                                    // abort the old timer routine
+					hbErrCh = pconn.handleHeartBeats(upf, conn, packet.srcAddr.(*net.UDPAddr), pconnStatus.hbStatus) // start new hb timer
 				}
 			case status := <-hbErrCh:
+				// heartbeat timeout
 				hbTimerRunning = false
 				log.Printf("Received %v", status)
-				cleanupSessions(upf)
+
+				handlePFCPConnError(upf, &pconnStatus)
 			}
 		}
 
