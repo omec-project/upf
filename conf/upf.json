@@ -92,10 +92,12 @@
 
     "": "Optional slice-wide meter rate limits",
     "slice_rate_limit_config": {
-        "uplink_bps": 500000000,
-        "uplink_burst_bytes": 3000,
-        "downlink_bps": 500000000,
-        "downlink_burst_bytes": 3000
+        "": "uplink policer",
+        "n6_bps": 500000000,
+        "n6_burst_bytes": 3000,
+        "": "downlink policer",
+        "n3_bps": 500000000,
+        "n3_burst_bytes": 3000
     },
 
     "": "Control plane controller settings",

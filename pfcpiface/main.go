@@ -54,10 +54,10 @@ type QciQosConfig struct {
 }
 
 type SliceMeterConfig struct {
-	UplinkRateBps      uint64 `json:"uplink_bps"`
-	UplinkBurstBytes   uint64 `json:"uplink_burst_bytes"`
-	DownlinkRateBps    uint64 `json:"downlink_bps"`
-	DownlinkBurstBytes uint64 `json:"downlink_burst_bytes"`
+	N6RateBps    uint64 `json:"n6_bps"`
+	N6BurstBytes uint64 `json:"n6_burst_bytes"`
+	N3RateBps    uint64 `json:"n3_bps"`
+	N3BurstBytes uint64 `json:"n3_burst_bytes"`
 }
 
 // SimModeInfo : Sim mode attributes.

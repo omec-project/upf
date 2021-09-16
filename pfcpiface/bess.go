@@ -408,7 +408,7 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 		go b.endMarkerSendLoop(b.endMarkerChan)
 	}
 
-	if conf.SliceMeterConfig.UplinkRateBps > 0 || conf.SliceMeterConfig.DownlinkRateBps > 0 {
+	if conf.SliceMeterConfig.N6RateBps > 0 || conf.SliceMeterConfig.N3RateBps > 0 {
 		ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 		defer cancel()
 		done := make(chan bool)
@@ -1058,17 +1058,17 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 			cir, pir, cbs, ebs, pbs, gate uint64
 		)
 
-		// Uplink slice meter config
-		if meterConfig.UplinkRateBps != 0 {
+		// Uplink N6 slice meter config
+		if meterConfig.N6RateBps != 0 {
 			gate = sliceMeterGateMeter
-			cir = 1                             // Mark all traffic as yellow
-			pir = meterConfig.UplinkRateBps / 8 // bit/s to byte/s
+			cir = 1                         // Mark all traffic as yellow
+			pir = meterConfig.N6RateBps / 8 // bit/s to byte/s
 		} else {
 			gate = sliceMeterGateUnmeter
 		}
-		if meterConfig.UplinkBurstBytes != 0 {
+		if meterConfig.N6BurstBytes != 0 {
 			cbs = 1 // Mark all traffic as yellow
-			pbs = meterConfig.UplinkBurstBytes
+			pbs = meterConfig.N6BurstBytes
 			ebs = 0 // Unused
 		} else {
 			cbs = DefaultBurstSize
@@ -1082,7 +1082,7 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 			Cbs:       cbs, /* committed burst size */
 			Pbs:       pbs, /* Peak burst size */
 			Ebs:       ebs, /* Excess burst size */
-			DeductLen: 14, /* Exclude Ethernet header */
+			DeductLen: 14,  /* Exclude Ethernet header */
 			Fields: []*pb.FieldData{
 				intEnc(uint64(access)), /* Source interface */
 			},
@@ -1094,17 +1094,17 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 		}
 		b.processSliceMeter(ctx, any, upfMsgTypeAdd)
 
-		// Downlink slice meter config
-		if meterConfig.DownlinkRateBps != 0 {
+		// Downlink N3 slice meter config
+		if meterConfig.N3RateBps != 0 {
 			gate = sliceMeterGateMeter
-			cir = 1                               // Mark all traffic as yellow
-			pir = meterConfig.DownlinkRateBps / 8 // bit/s to byte/s
+			cir = 1                         // Mark all traffic as yellow
+			pir = meterConfig.N3RateBps / 8 // bit/s to byte/s
 		} else {
 			gate = sliceMeterGateUnmeter
 		}
-		if meterConfig.DownlinkBurstBytes != 0 {
+		if meterConfig.N3BurstBytes != 0 {
 			cbs = 1 // Mark all traffic as yellow
-			pbs = meterConfig.DownlinkBurstBytes
+			pbs = meterConfig.N3BurstBytes
 			ebs = 0 // Unused
 		} else {
 			cbs = DefaultBurstSize
@@ -1118,7 +1118,7 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 			Cbs:       cbs, /* committed burst size */
 			Pbs:       pbs, /* Peak burst size */
 			Ebs:       ebs, /* Excess burst size */
-			DeductLen: 50, /* Exclude Ethernet,IP,UDP,GTP header */
+			DeductLen: 50,  /* Exclude Ethernet,IP,UDP,GTP header */
 			Fields: []*pb.FieldData{
 				intEnc(uint64(core)), /* Source interface */
 			},
