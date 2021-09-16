@@ -213,6 +213,7 @@ farLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
                                      {'attr_name':'tunnel_out_teid', 'num_bytes':4}, \
                                      {'attr_name':'tunnel_out_udp_port', 'num_bytes':2}]):noGTPUEncap \
     -> farMerge::Merge() \
+    -> sched::MyModule() \
     -> executeFAR::Split(size=1, attribute='action')
 
 # Add logical pipeline when gtpudecap is needed
