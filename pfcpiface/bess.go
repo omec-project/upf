@@ -758,13 +758,13 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 		}
 
 		q := &pb.QosCommandAddArg{
-			Gate:                    gate,
-			Cir:                     cir, /* committed info rate */
-			Pir:                     pir, /* peak info rate */
-			Cbs:                     cbs, /* committed burst size */
-			Pbs:                     pbs, /* Peak burst size */
-			Ebs:                     ebs, /* Excess burst size */
-			AdjustMeterPacketLength: -14, /* Exclude Ethernet header */
+			Gate:      gate,
+			Cir:       cir, /* committed info rate */
+			Pir:       pir, /* peak info rate */
+			Cbs:       cbs, /* committed burst size */
+			Pbs:       pbs, /* Peak burst size */
+			Ebs:       ebs, /* Excess burst size */
+			DeductLen: 14,  /* Exclude Ethernet header */
 			Fields: []*pb.FieldData{
 				intEnc(uint64(srcIface)),  /* Src Intf */
 				intEnc(uint64(qer.qerID)), /* qer_id */
@@ -799,13 +799,13 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 		}
 
 		q = &pb.QosCommandAddArg{
-			Gate:                    gate,
-			Cir:                     cir, /* committed info rate */
-			Pir:                     pir, /* peak info rate */
-			Cbs:                     cbs, /* committed burst size */
-			Pbs:                     pbs, /* Peak burst size */
-			Ebs:                     ebs, /* Excess burst size */
-			AdjustMeterPacketLength: -14, /* Exclude Ethernet header */
+			Gate:      gate,
+			Cir:       cir, /* committed info rate */
+			Pir:       pir, /* peak info rate */
+			Cbs:       cbs, /* committed burst size */
+			Pbs:       pbs, /* Peak burst size */
+			Ebs:       ebs, /* Excess burst size */
+			DeductLen: 14,  /* Exclude Ethernet header */
 			Fields: []*pb.FieldData{
 				intEnc(uint64(srcIface)),  /* Src Intf */
 				intEnc(uint64(qer.qerID)), /* qer_id */
@@ -1076,13 +1076,13 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 			ebs = 0 // Unused
 		}
 		q := &pb.QosCommandAddArg{
-			Gate:                    gate,
-			Cir:                     cir, /* committed info rate */
-			Pir:                     pir, /* peak info rate */
-			Cbs:                     cbs, /* committed burst size */
-			Pbs:                     pbs, /* Peak burst size */
-			Ebs:                     ebs, /* Excess burst size */
-			AdjustMeterPacketLength: -14, /* Exclude Ethernet header */
+			Gate:      gate,
+			Cir:       cir, /* committed info rate */
+			Pir:       pir, /* peak info rate */
+			Cbs:       cbs, /* committed burst size */
+			Pbs:       pbs, /* Peak burst size */
+			Ebs:       ebs, /* Excess burst size */
+			DeductLen: 14, /* Exclude Ethernet header */
 			Fields: []*pb.FieldData{
 				intEnc(uint64(access)), /* Source interface */
 			},
@@ -1112,13 +1112,13 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 			ebs = 0 // Unused
 		}
 		q = &pb.QosCommandAddArg{
-			Gate:                    gate,
-			Cir:                     cir, /* committed info rate */
-			Pir:                     pir, /* peak info rate */
-			Cbs:                     cbs, /* committed burst size */
-			Pbs:                     pbs, /* Peak burst size */
-			Ebs:                     ebs, /* Excess burst size */
-			AdjustMeterPacketLength: -50, /* Exclude Ethernet,IP,UDP,GTP header */
+			Gate:      gate,
+			Cir:       cir, /* committed info rate */
+			Pir:       pir, /* peak info rate */
+			Cbs:       cbs, /* committed burst size */
+			Pbs:       pbs, /* Peak burst size */
+			Ebs:       ebs, /* Excess burst size */
+			DeductLen: 50, /* Exclude Ethernet,IP,UDP,GTP header */
 			Fields: []*pb.FieldData{
 				intEnc(uint64(core)), /* Source interface */
 			},

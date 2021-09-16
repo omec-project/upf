@@ -187,7 +187,7 @@ void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     // meter if ogate is 0
     if (ogate == METER_GATE) {
       uint64_t time = rte_rdtsc();
-      uint32_t pkt_len = pkt->total_len() + val[j]->adjust_meter_packet_length;
+      uint32_t pkt_len = pkt->total_len() - val[j]->deduct_len;
       uint8_t color = rte_meter_trtcm_color_blind_check(&val[j]->m, &val[j]->p,
                                                         time, pkt_len);
 
@@ -388,7 +388,7 @@ CommandResponse Qos::CommandAdd(const bess::pb::QosCommandAddArg &arg) {
     v.cbs = arg.cbs();
     v.pbs = arg.pbs();
     v.ebs = arg.ebs();
-    v.adjust_meter_packet_length = arg.adjust_meter_packet_length();
+    v.deduct_len = arg.deduct_len();
 
     DLOG(INFO) << "Adding entry"
                << " cir: " << v.cir << " pir: " << v.pir << " cbs: " << v.cbs

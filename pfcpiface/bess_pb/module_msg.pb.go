@@ -5955,15 +5955,15 @@ type QosCommandAddArg struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Gate                    uint64       `protobuf:"varint,1,opt,name=gate,proto3" json:"gate,omitempty"`
-	Cir                     uint64       `protobuf:"varint,2,opt,name=cir,proto3" json:"cir,omitempty"`
-	Pir                     uint64       `protobuf:"varint,3,opt,name=pir,proto3" json:"pir,omitempty"`
-	Cbs                     uint64       `protobuf:"varint,4,opt,name=cbs,proto3" json:"cbs,omitempty"`
-	Pbs                     uint64       `protobuf:"varint,5,opt,name=pbs,proto3" json:"pbs,omitempty"`
-	Ebs                     uint64       `protobuf:"varint,6,opt,name=ebs,proto3" json:"ebs,omitempty"`
-	AdjustMeterPacketLength int64        `protobuf:"varint,9,opt,name=adjust_meter_packet_length,json=adjustMeterPacketLength,proto3" json:"adjust_meter_packet_length,omitempty"`
-	Fields                  []*FieldData `protobuf:"bytes,7,rep,name=fields,proto3" json:"fields,omitempty"`
-	Values                  []*FieldData `protobuf:"bytes,8,rep,name=values,proto3" json:"values,omitempty"`
+	Gate      uint64       `protobuf:"varint,1,opt,name=gate,proto3" json:"gate,omitempty"`
+	Cir       uint64       `protobuf:"varint,2,opt,name=cir,proto3" json:"cir,omitempty"`
+	Pir       uint64       `protobuf:"varint,3,opt,name=pir,proto3" json:"pir,omitempty"`
+	Cbs       uint64       `protobuf:"varint,4,opt,name=cbs,proto3" json:"cbs,omitempty"`
+	Pbs       uint64       `protobuf:"varint,5,opt,name=pbs,proto3" json:"pbs,omitempty"`
+	Ebs       uint64       `protobuf:"varint,6,opt,name=ebs,proto3" json:"ebs,omitempty"`
+	DeductLen uint64       `protobuf:"varint,9,opt,name=deduct_len,json=DeductLen,proto3" json:"deduct_len,omitempty"`
+	Fields    []*FieldData `protobuf:"bytes,7,rep,name=fields,proto3" json:"fields,omitempty"`
+	Values    []*FieldData `protobuf:"bytes,8,rep,name=values,proto3" json:"values,omitempty"`
 }
 
 func (x *QosCommandAddArg) Reset() {
@@ -6040,9 +6040,9 @@ func (x *QosCommandAddArg) GetEbs() uint64 {
 	return 0
 }
 
-func (x *QosCommandAddArg) GetAdjustMeterPacketLength() int64 {
+func (x *QosCommandAddArg) GetDeductLen() uint64 {
 	if x != nil {
-		return x.AdjustMeterPacketLength
+		return x.DeductLen
 	}
 	return 0
 }

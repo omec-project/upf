@@ -28,7 +28,7 @@ index 25dfc81e..1f7058cd 100644
 +  uint64 cbs = 4;
 +  uint64 pbs = 5;
 +  uint64 ebs = 6;
-+  int64 adjust_meter_packet_length = 9;
++  uint64 deduct_len = 9;
 +  repeated FieldData fields = 7;
 +  repeated FieldData values = 8;
 +}
