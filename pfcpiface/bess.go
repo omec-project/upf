@@ -1082,9 +1082,10 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 			Cbs:       cbs, /* committed burst size */
 			Pbs:       pbs, /* Peak burst size */
 			Ebs:       ebs, /* Excess burst size */
-			DeductLen: 14,  /* Exclude Ethernet header */
+			DeductLen: 0,   /* Exclude Ethernet header */
 			Fields: []*pb.FieldData{
-				intEnc(uint64(access)), /* Source interface */
+				intEnc(uint64(farForwardU)), /* Action */
+				intEnc(uint64(0)),           /* tunnel_out_type */
 			},
 		}
 		any, err = anypb.New(q)
@@ -1120,7 +1121,8 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 			Ebs:       ebs, /* Excess burst size */
 			DeductLen: 50,  /* Exclude Ethernet,IP,UDP,GTP header */
 			Fields: []*pb.FieldData{
-				intEnc(uint64(core)), /* Source interface */
+				intEnc(uint64(farForwardD)), /* Action */
+				intEnc(uint64(1)),           /* tunnel_out_type */
 			},
 		}
 		any, err = anypb.New(q)
