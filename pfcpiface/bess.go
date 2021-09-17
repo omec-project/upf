@@ -758,12 +758,12 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 		}
 
 		q := &pb.QosCommandAddArg{
-			Gate:              gate,
-			Cir:               cir,                                /* committed info rate */
-			Pir:               pir,                                /* peak info rate */
-			Cbs:               cbs,                                /* committed burst size */
-			Pbs:               pbs,                                /* Peak burst size */
-			Ebs:               ebs,                                /* Excess burst size */
+			Gate: gate,
+			Cir:  cir, /* committed info rate */
+			Pir:  pir, /* peak info rate */
+			Cbs:  cbs, /* committed burst size */
+			Pbs:  pbs, /* Peak burst size */
+			Ebs:  ebs, /* Excess burst size */
 			Fields: []*pb.FieldData{
 				intEnc(uint64(srcIface)),  /* Src Intf */
 				intEnc(uint64(qer.qerID)), /* qer_id */
@@ -798,12 +798,12 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 		}
 
 		q = &pb.QosCommandAddArg{
-			Gate:              gate,
-			Cir:               cir,                                /* committed info rate */
-			Pir:               pir,                                /* peak info rate */
-			Cbs:               cbs,                                /* committed burst size */
-			Pbs:               pbs,                                /* Peak burst size */
-			Ebs:               ebs,                                /* Excess burst size */
+			Gate: gate,
+			Cir:  cir, /* committed info rate */
+			Pir:  pir, /* peak info rate */
+			Cbs:  cbs, /* committed burst size */
+			Pbs:  pbs, /* Peak burst size */
+			Ebs:  ebs, /* Excess burst size */
 			Fields: []*pb.FieldData{
 				intEnc(uint64(srcIface)),  /* Src Intf */
 				intEnc(uint64(qer.qerID)), /* qer_id */
