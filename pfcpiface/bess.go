@@ -1095,6 +1095,43 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 		}
 		b.processSliceMeter(ctx, any, upfMsgTypeAdd)
 
+		// Uplink N9 slice meter config
+		if meterConfig.N9RateBps != 0 {
+			gate = sliceMeterGateMeter
+			cir = 1                         // Mark all traffic as yellow
+			pir = meterConfig.N9RateBps / 8 // bit/s to byte/s
+		} else {
+			gate = sliceMeterGateUnmeter
+		}
+		if meterConfig.N9BurstBytes != 0 {
+			cbs = 1 // Mark all traffic as yellow
+			pbs = meterConfig.N9BurstBytes
+			ebs = 0 // Unused
+		} else {
+			cbs = DefaultBurstSize
+			pbs = DefaultBurstSize
+			ebs = 0 // Unused
+		}
+		q = &pb.QosCommandAddArg{
+			Gate:      gate,
+			Cir:       cir, /* committed info rate */
+			Pir:       pir, /* peak info rate */
+			Cbs:       cbs, /* committed burst size */
+			Pbs:       pbs, /* Peak burst size */
+			Ebs:       ebs, /* Excess burst size */
+			DeductLen: 0,   /* Exclude Ethernet header */
+			Fields: []*pb.FieldData{
+				intEnc(uint64(farForwardU)), /* Action */
+				intEnc(uint64(1)),           /* tunnel_out_type */
+			},
+		}
+		any, err = anypb.New(q)
+		if err != nil {
+			log.Errorln("Error marshalling the rule", q, err)
+			return
+		}
+		b.processSliceMeter(ctx, any, upfMsgTypeAdd)
+
 		// Downlink N3 slice meter config
 		if meterConfig.N3RateBps != 0 {
 			gate = sliceMeterGateMeter
