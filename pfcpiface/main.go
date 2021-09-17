@@ -56,8 +56,8 @@ type QciQosConfig struct {
 type SliceMeterConfig struct {
 	N6RateBps    uint64 `json:"n6_bps"`
 	N6BurstBytes uint64 `json:"n6_burst_bytes"`
-	N9RateBps          uint64 `json:"n9_bps"`
-	N9BurstBytes       uint64 `json:"n9_burst_bytes"`
+	N9RateBps    uint64 `json:"n9_bps"`
+	N9BurstBytes uint64 `json:"n9_burst_bytes"`
 	N3RateBps    uint64 `json:"n3_bps"`
 	N3BurstBytes uint64 `json:"n3_burst_bytes"`
 }
