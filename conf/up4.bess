@@ -6,8 +6,6 @@
 from conf.parser import *
 import conf.ports as port
 import conf.sim as sim
-from scapy.all import Ether, IP, UDP
-from scapy.contrib.gtp import GTP_U_Header
 
 port.setup_globals()
 
