@@ -95,8 +95,6 @@
         "": "uplink policer",
         "n6_bps": 500000000,
         "n6_burst_bytes": 3000,
-        "n9_bps": 500000000,
-        "n9_burst_bytes": 3000,
         "": "downlink policer",
         "n3_bps": 500000000,
         "n3_burst_bytes": 3000
