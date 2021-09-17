@@ -1110,6 +1110,7 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 			pbs = DefaultBurstSize
 			ebs = 0 // Unused
 		}
+		// TODO: packet deduction should take GTPU extension header into account
 		q = &pb.QosCommandAddArg{
 			Gate:              gate,
 			Cir:               cir,                                /* committed info rate */
