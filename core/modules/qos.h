@@ -67,7 +67,7 @@ struct value {
   uint64_t cbs;
   uint64_t pbs;
   uint64_t ebs;
-  uint64_t deduct_len;
+  int64_t deduct_len;
   struct rte_meter_trtcm_profile p;
   struct rte_meter_trtcm m;
   MeteringKey Data;
