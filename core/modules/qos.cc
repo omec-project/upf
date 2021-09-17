@@ -388,7 +388,12 @@ CommandResponse Qos::CommandAdd(const bess::pb::QosCommandAddArg &arg) {
     v.cbs = arg.cbs();
     v.pbs = arg.pbs();
     v.ebs = arg.ebs();
-    v.deduct_len = arg.deduct_len();
+    if (arg.optional_deduct_len_case() ==
+        bess::pb::QosCommandAddArg::OPTIONAL_DEDUCT_LEN_NOT_SET) {
+      v.deduct_len = 14;  // Exclude Ethernet header by default
+    } else {
+      v.deduct_len = arg.deduct_len();
+    }
 
     DLOG(INFO) << "Adding entry"
                << " cir: " << v.cir << " pir: " << v.pir << " cbs: " << v.cbs
