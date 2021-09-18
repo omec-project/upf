@@ -11,27 +11,49 @@ import conf.sim as sim
 pkt_size = 128
 flows = 5000
 workers=[2, 3, 4, 5]
+gtppsc = False
+qfi = 9
+smac = "22:53:7a:15:58:50"
+dmac_access = "9e:b2:d3:34:ab:27"
+dmac_core = "c2:9c:55:d4:8a:f6"
 
-# flow create 0 ingress pattern eth / ipv4 / udp / gtpu / ipv4 / end actions rss types ipv4 l3-src-only end key_len 0 queues end / end
-n39_pkts = [sim.gen_gtpu_packet(pkt_size, "22:53:7a:15:58:50", "9e:b2:d3:34:ab:27", "11.1.1.129", "198.18.0.1", "16.0.0.1", "9.9.9.9", 0x30000000),]
-n36_pkts = [sim.gen_gtpu_packet(pkt_size, "22:53:7a:15:58:50", "9e:b2:d3:34:ab:27", "11.1.1.129", "198.18.0.1", "16.0.0.1", "6.6.6.6", 0x30000000),]
+if gtppsc:
+    # flow create 0 ingress pattern eth / ipv4 / udp / gtpu / gtp_psc / ipv4 / end actions rss types ipv4 l3-src-only end key_len 0 queues end / end
+    n39_pkts = [sim.gen_gtpu_packet(pkt_size, smac, dmac_access, "11.1.1.129", "198.18.0.1", "16.0.0.1", "9.9.9.9", 0x30000000, 1, qfi),]
+    n36_pkts = [sim.gen_gtpu_packet(pkt_size, smac, dmac_access, "11.1.1.129", "198.18.0.1", "16.0.0.1", "6.6.6.6", 0x30000000, 1, qfi),]
 
-# flow create 1 ingress pattern eth / ipv4 / udp / gtpu / ipv4 / end actions rss types ipv4 l3-dst-only end key_len 0 queues end / end
-n9_pkts = [sim.gen_gtpu_packet(pkt_size, "22:53:7a:15:58:50", "c2:9c:55:d4:8a:f6", "13.1.1.199", "198.19.0.1", "9.9.9.9", "16.0.0.1", 0x90000000),]
+    # flow create 1 ingress pattern eth / ipv4 / udp / gtpu / gtp_psc / ipv4 / end actions rss types ipv4 l3-dst-only end key_len 0 queues end / end
+    n9_pkts = [sim.gen_gtpu_packet(pkt_size, smac, dmac_core, "13.1.1.199", "198.19.0.1", "9.9.9.9", "16.0.0.1", 0x90000000, 0, qfi),]
+
+    n3seq_offset = 70
+    n9seq_offset = 74
+
+else:
+    # flow create 0 ingress pattern eth / ipv4 / udp / gtpu / ipv4 / end actions rss types ipv4 l3-src-only end key_len 0 queues end / end
+    n39_pkts = [sim.gen_gtpu_packet(pkt_size, smac, dmac_access, "11.1.1.129", "198.18.0.1", "16.0.0.1", "9.9.9.9", 0x30000000),]
+    n36_pkts = [sim.gen_gtpu_packet(pkt_size, smac, dmac_access, "11.1.1.129", "198.18.0.1", "16.0.0.1", "6.6.6.6", 0x30000000),]
+
+    # flow create 1 ingress pattern eth / ipv4 / udp / gtpu / ipv4 / end actions rss types ipv4 l3-dst-only end key_len 0 queues end / end
+    n9_pkts = [sim.gen_gtpu_packet(pkt_size, smac, dmac_core, "13.1.1.199", "198.19.0.1", "9.9.9.9", "16.0.0.1", 0x90000000),]
+
+    n3seq_offset = 62
+    n9seq_offset = 66
 
 #flow create 1 ingress pattern eth / ipv4 / end actions rss types ipv4 l3-dst-only end key_len 0 queues end / end
-n6_pkts = [sim.gen_inet_packet(pkt_size, "22:53:7a:15:58:50", "c2:9c:55:d4:8a:f6", "6.6.6.6", "16.0.0.1"),]
+n6_pkts = [sim.gen_inet_packet(pkt_size, smac, dmac_core, "6.6.6.6", "16.0.0.1"),]
 
 for wid in range(len(workers)):
     bess.add_worker(wid=wid, core=int(workers[wid % len(workers)]))
 
 num_q = len(workers)
-kwargs = {'num_inc_q': num_q,
+kwargs = {'size_inc_q': 512,
+          'size_out_q': 512,
+          'num_inc_q': num_q,
           'num_out_q': num_q}
 p = PMDPort(port_id=0, **kwargs)
 
-n3seq_kwargs = sim.gen_gtpu_sequpdate_args(flows, "16.0.0.1", 62, 0x30000000)
-n9seq_kwargs = sim.gen_gtpu_sequpdate_args(flows, "16.0.0.1", 66, 0x90000000)
+n3seq_kwargs = sim.gen_gtpu_sequpdate_args(flows, "16.0.0.1", n3seq_offset, 0x30000000)
+n9seq_kwargs = sim.gen_gtpu_sequpdate_args(flows, "16.0.0.1", n9seq_offset, 0x90000000)
 n6seq_kwargs = sim.gen_inet_sequpdate_args(flows, "16.0.0.1")
 
 # 25 Gbps each to saturate 100 Gbps
@@ -51,4 +73,3 @@ src36.attach_task(parent='36_limit')
 
 src9.attach_task(parent='9_limit')
 src6.attach_task(parent='6_limit')
-
