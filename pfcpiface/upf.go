@@ -57,13 +57,6 @@ const (
 	n3 = 0x0
 	n6 = 0x1
 	n9 = 0x2
-
-	// far-action specific values.
-	farForwardD = 0x0
-	farForwardU = 0x1
-	farDrop     = 0x2
-	farBuffer   = 0x3
-	farNotify   = 0x4
 )
 
 func (u *upf) sendMsgToUPF(method upfMsgType, pdrs []pdr, fars []far, qers []qer) uint8 {

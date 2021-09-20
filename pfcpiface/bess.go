@@ -26,6 +26,12 @@ const (
 	SockAddr = "/tmp/notifycp"
 	// PfcpAddr : Unix Socket path to send end marker packet.
 	PfcpAddr = "/tmp/pfcpport"
+	// far-action specific values.
+	farForwardD = 0x0
+	farForwardU = 0x1
+	farDrop     = 0x2
+	farBuffer   = 0x3
+	farNotify   = 0x4
 )
 
 const (
@@ -868,6 +874,25 @@ func (b *bess) processFAR(ctx context.Context, any *anypb.Any, method upfMsgType
 	}
 }
 
+func (b *bess) setActionValue(f far) uint8 {
+	if (f.applyAction & ActionForward) != 0 {
+		if f.dstIntf == ie.DstInterfaceAccess {
+			return farForwardD
+		} else if (f.dstIntf == ie.DstInterfaceCore) || (f.dstIntf == ie.DstInterfaceSGiLANN6LAN) {
+			return farForwardU
+		}
+	} else if (f.applyAction & ActionDrop) != 0 {
+		return farDrop
+	} else if (f.applyAction & ActionBuffer) != 0 {
+		return farNotify
+	} else if (f.applyAction & ActionNotify) != 0 {
+		return farNotify
+	}
+
+	// default action
+	return farDrop
+}
+
 func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 	go func() {
 		var (
@@ -875,7 +900,7 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 			err error
 		)
 
-		action := far.setActionValue()
+		action := b.setActionValue(far)
 		f := &pb.ExactMatchCommandAddArg{
 			Gate: uint64(far.tunnelType),
 			Fields: []*pb.FieldData{

@@ -15,6 +15,11 @@ import (
 	"github.com/wmnsk/go-pfcp/message"
 )
 
+const (
+	// Default timeout for DDN.
+	DefaultDDNTimeout = 20
+)
+
 func sendHeartBeatRequest(upf *upf, conn *net.UDPConn, pfcpConn *PFCPConn) {
 	seq := pfcpConn.getSeqNum()
 
@@ -653,13 +658,13 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 		addQERs = append(addQERs, q)
 	}
 
-	if session.getNotifyFlag() {
-		session.updateNotifyFlag()
-	}
-
 	cause := upf.sendMsgToUPF(upfMsgTypeMod, addPDRs, addFARs, addQERs)
 	if cause == ie.CauseRequestRejected {
 		return sendError(errors.New("write to FastPath failed"))
+	}
+
+	if session.getNotifyFlag() {
+		session.updateNotifyFlag()
 	}
 
 	if upf.enableEndMarker {
@@ -914,12 +919,10 @@ func handleDigestReport(fseid uint64,
 		return
 	}
 
-	/* Number of Outstanding Notifies per session is 1 */
+	/* Check if notify is already sent in current time interval */
 	if session.getNotifyFlag() {
 		return
 	}
-
-	session.setNotifyFlag(true)
 
 	seq := pfcpConn.getSeqNum()
 	serep := message.NewSessionReportRequest(0, /* MO?? <-- what's this */
@@ -933,19 +936,36 @@ func handleDigestReport(fseid uint64,
 
 	var pdrID uint32
 
+	var farID uint32
+
 	for _, pdr := range session.pdrs {
 		if pdr.srcIface == core {
 			pdrID = pdr.pdrID
+
+			farID = pdr.farID
+
 			break
 		}
 	}
 
-	log.Println("Pdr iD : ", pdrID)
+	for _, far := range session.fars {
+		if far.farID == farID {
+			if far.applyAction&ActionNotify == 0 {
+				log.Println("packet recieved for forwarding far. discard")
+				return
+			}
+		}
+	}
 
 	if pdrID == 0 {
 		log.Println("No Pdr found for downlink")
+
 		return
 	}
+
+	go session.runTimerForDDNNotify(DefaultDDNTimeout)
+
+	session.setNotifyFlag(true)
 
 	serep.DownlinkDataReport = ie.NewDownlinkDataReport(
 		ie.NewPDRID(uint16(pdrID)))
