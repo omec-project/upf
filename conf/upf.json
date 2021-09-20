@@ -89,6 +89,17 @@
             "priority": 5
         }
     ],
+
+    "": "Optional slice-wide meter rate limits",
+    "slice_rate_limit_config": {
+        "": "uplink policer",
+        "n6_bps": 500000000,
+        "n6_burst_bytes": 3000,
+        "": "downlink policer",
+        "n3_bps": 500000000,
+        "n3_burst_bytes": 3000
+    },
+
     "": "Control plane controller settings",
     "cpiface": {
         "enable_ue_ip_alloc": false,

@@ -49,6 +49,7 @@ class Parser:
         self.enable_ntf = False
         self.notify_sockaddr = "/tmp/notifycp"
         self.endmarker_sockaddr = "/tmp/pfcpport"
+        self.enable_slice_metering = False
 
     def parse(self, ifaces):
         # Maximum number of flows to manage ip4 frags for re-assembly
@@ -148,6 +149,13 @@ class Parser:
             self.core_ifname = "core"
             print('Can\'t parse interface name(s)! Setting it to default values ({}, {})'.format(
                 "access", "core"))
+
+        # Slice rate limits
+        try:
+            self.conf["slice_rate_limit_config"]
+            self.enable_slice_metering = True
+        except KeyError:
+            print("No slice rate limit! Disabling meter.")
 
         # UnixPort Paths
         try:
