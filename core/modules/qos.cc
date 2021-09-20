@@ -31,14 +31,11 @@
 
 #include "qos.h"
 #include "utils/endian.h"
-#include "utils/ether.h"
 #include "utils/format.h"
 
 #include <rte_cycles.h>
 #include <string>
 #include <vector>
-
-using bess::utils::Ethernet;
 
 typedef enum { FIELD_TYPE = 0, VALUE_TYPE } Type;
 using bess::metadata::Attribute;
@@ -140,7 +137,7 @@ void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   default_gate = ACCESS_ONCE(default_gate_);
 
   int cnt = batch->cnt();
-  struct value *val[cnt];
+  value *val[cnt];
 
   for (const auto &field : fields_) {
     int offset;
@@ -190,7 +187,7 @@ void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     // meter if ogate is 0
     if (ogate == METER_GATE) {
       uint64_t time = rte_rdtsc();
-      uint32_t pkt_len = pkt->total_len() - sizeof(Ethernet);
+      uint32_t pkt_len = pkt->total_len() - val[j]->deduct_len;
       uint8_t color = rte_meter_trtcm_color_blind_check(&val[j]->m, &val[j]->p,
                                                         time, pkt_len);
 
@@ -377,7 +374,7 @@ CommandResponse Qos::CommandAdd(const bess::pb::QosCommandAddArg &arg) {
   MeteringKey key = {{0}};
 
   MKey l;
-  struct value v;
+  value v;
   v.ogate = gate;
   CommandResponse err = ExtractKeyMask(arg, &key, &v.Data, &l);
 
@@ -391,6 +388,12 @@ CommandResponse Qos::CommandAdd(const bess::pb::QosCommandAddArg &arg) {
     v.cbs = arg.cbs();
     v.pbs = arg.pbs();
     v.ebs = arg.ebs();
+    if (arg.optional_deduct_len_case() ==
+        bess::pb::QosCommandAddArg::OPTIONAL_DEDUCT_LEN_NOT_SET) {
+      v.deduct_len = 14;  // Exclude Ethernet header by default
+    } else {
+      v.deduct_len = arg.deduct_len();
+    }
 
     DLOG(INFO) << "Adding entry"
                << " cir: " << v.cir << " pir: " << v.pir << " cbs: " << v.cbs

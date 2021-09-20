@@ -11,7 +11,7 @@ diff --git a/protobuf/module_msg.proto b/protobuf/module_msg.proto
 index 25dfc81e..1f7058cd 100644
 --- a/protobuf/module_msg.proto
 +++ b/protobuf/module_msg.proto
-@@ -1291,3 +1291,38 @@ message MplsPopArg {
+@@ -1291,3 +1291,41 @@ message MplsPopArg {
  message WorkerSplitArg {
    map<uint32, uint32> worker_gates = 1; // ogate -> worker mask
  }
@@ -28,6 +28,9 @@ index 25dfc81e..1f7058cd 100644
 +  uint64 cbs = 4;
 +  uint64 pbs = 5;
 +  uint64 ebs = 6;
++  oneof optional_deduct_len {
++    int64 deduct_len = 9;
++  }
 +  repeated FieldData fields = 7;
 +  repeated FieldData values = 8;
 +}
@@ -50,6 +53,6 @@ index 25dfc81e..1f7058cd 100644
 +message QosCommandSetDefaultGateArg {
 +  uint64 gate = 1;
 +}
--- 
+--
 2.17.1
 
