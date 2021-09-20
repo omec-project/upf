@@ -25,25 +25,26 @@ var (
 
 // Conf : Json conf struct.
 type Conf struct {
-	Mode                  string         `json:"mode"`
-	MaxSessions           uint32         `json:"max_sessions"`
-	AccessIface           IfaceType      `json:"access"`
-	CoreIface             IfaceType      `json:"core"`
-	CPIface               CPIfaceInfo    `json:"cpiface"`
-	P4rtcIface            P4rtcInfo      `json:"p4rtciface"`
-	EnableP4rt            bool           `json:"enable_p4rt"`
-	SimInfo               SimModeInfo    `json:"sim"`
-	ConnTimeout           uint32         `json:"conn_timeout"`
-	ReadTimeout           uint32         `json:"read_timeout"`
-	EnableNotifyBess      bool           `json:"enable_notify_bess"`
-	EnableEndMarker       bool           `json:"enable_end_marker"`
-	NotifySockAddr        string         `json:"notify_sockaddr"`
-	EndMarkerSockAddr     string         `json:"endmarker_sockaddr"`
-	LogLevel              string         `json:"log_level"`
-	QciQosConfig          []QciQosConfig `json:"qci_qos_config"`
-	MaxRetries            uint8          `json:"max_retries"`
-	HeartBeatInterval     int            `json:"heart_beart_interval"`
-	HeartBeatRespDuration int            `json:"heart_beat_resp_dur"`
+	Mode                  string           `json:"mode"`
+	MaxSessions           uint32           `json:"max_sessions"`
+	AccessIface           IfaceType        `json:"access"`
+	CoreIface             IfaceType        `json:"core"`
+	CPIface               CPIfaceInfo      `json:"cpiface"`
+	P4rtcIface            P4rtcInfo        `json:"p4rtciface"`
+	EnableP4rt            bool             `json:"enable_p4rt"`
+	SimInfo               SimModeInfo      `json:"sim"`
+	ConnTimeout           uint32           `json:"conn_timeout"`
+	ReadTimeout           uint32           `json:"read_timeout"`
+	EnableNotifyBess      bool             `json:"enable_notify_bess"`
+	EnableEndMarker       bool             `json:"enable_end_marker"`
+	NotifySockAddr        string           `json:"notify_sockaddr"`
+	EndMarkerSockAddr     string           `json:"endmarker_sockaddr"`
+	LogLevel              string           `json:"log_level"`
+	QciQosConfig          []QciQosConfig   `json:"qci_qos_config"`
+	SliceMeterConfig      SliceMeterConfig `json:"slice_rate_limit_config"`
+	MaxRetries            uint8            `json:"max_retries"`
+	HeartBeatInterval     int              `json:"heart_beart_interval"`
+	HeartBeatRespDuration int              `json:"heart_beat_resp_dur"`
 }
 
 // QciQosConfig : Qos configured attributes.
@@ -53,6 +54,13 @@ type QciQosConfig struct {
 	PBS                uint32 `json:"pbs"`
 	EBS                uint32 `json:"ebs"`
 	SchedulingPriority uint32 `json:"priority"`
+}
+
+type SliceMeterConfig struct {
+	N6RateBps    uint64 `json:"n6_bps"`
+	N6BurstBytes uint64 `json:"n6_burst_bytes"`
+	N3RateBps    uint64 `json:"n3_bps"`
+	N3BurstBytes uint64 `json:"n3_burst_bytes"`
 }
 
 // SimModeInfo : Sim mode attributes.
