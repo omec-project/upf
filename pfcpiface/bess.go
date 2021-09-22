@@ -7,6 +7,8 @@ import (
 	"context"
 	"encoding/binary"
 	"flag"
+	"fmt"
+	"google.golang.org/protobuf/proto"
 	"math"
 	"net"
 	"time"
@@ -105,11 +107,13 @@ func (b *bess) addSliceInfo(sliceInfo *SliceInfo) error {
 	return nil
 }
 
-func (b *bess) sendMsgToUPF(method upfMsgType, pdrs []pdr, fars []far, qers []qer) uint8 {
+func (b *bess) sendMsgToUPF(
+	method upfMsgType, pdrs []pdr, fars []far, qers []qer, sessionQers []qer,
+) uint8 {
 	// create context
 	var cause uint8 = ie.CauseRequestAccepted
 
-	calls := len(pdrs) + len(fars) + len(qers)
+	calls := len(pdrs) + len(fars) + len(qers) + len(sessionQers)
 	if calls == 0 {
 		return cause
 	}
@@ -146,15 +150,28 @@ func (b *bess) sendMsgToUPF(method upfMsgType, pdrs []pdr, fars []far, qers []qe
 	}
 
 	for _, qer := range qers {
-		log.Traceln(qer)
+		log.Traceln("Application qer:", qer)
 
 		switch method {
 		case upfMsgTypeAdd:
 			fallthrough
 		case upfMsgTypeMod:
-			b.addQER(ctx, done, qer)
+			b.addApplicationQER(ctx, done, qer)
 		case upfMsgTypeDel:
-			b.delQER(ctx, done, qer)
+			b.delApplicationQER(ctx, done, qer)
+		}
+	}
+
+	for _, qer := range sessionQers {
+		log.Traceln("Session qer:", qer)
+
+		switch method {
+		case upfMsgTypeAdd:
+			fallthrough
+		case upfMsgTypeMod:
+			b.addSessionQER(ctx, done, qer)
+		case upfMsgTypeDel:
+			b.delSessionQER(ctx, done, qer)
 		}
 	}
 
@@ -171,11 +188,12 @@ func (b *bess) sendDeleteAllSessionsMsgtoUPF() {
 	defer cancel()
 
 	done := make(chan bool)
-	calls := 5
+	calls := 6
 
 	b.removeAllPDRs(ctx, done)
 	b.removeAllFARs(ctx, done)
-	b.removeAllQERs(ctx, done)
+	b.removeAllApplicationQERs(ctx, done)
+	b.removeAllSessionQERs(ctx, done)
 	b.removeAllCounters(ctx, done, "preQoSCounter")
 	b.removeAllCounters(ctx, done, "postDLQoSCounter")
 	b.removeAllCounters(ctx, done, "postULQoSCounter")
@@ -618,12 +636,24 @@ func (b *bess) sim(u *upf, method string) {
 
 		qers := []qer{qerN6, qerN9}
 
+		// create/delete session qers
+		sessionQer := qer{
+			qerID: 0,
+			fseID: uint64(n3TEID + i),
+			qfi:   0,
+			ulGbr: 0,
+			ulMbr: 1000,
+			dlGbr: 0,
+			dlMbr: 1000,
+		}
+		sessionQers := []qer{sessionQer}
+
 		switch method {
 		case "create":
-			b.sendMsgToUPF(upfMsgTypeAdd, pdrs, fars, qers)
+			b.sendMsgToUPF(upfMsgTypeAdd, pdrs, fars, qers, sessionQers)
 
 		case "delete":
-			b.sendMsgToUPF(upfMsgTypeDel, pdrs, fars, qers)
+			b.sendMsgToUPF(upfMsgTypeDel, pdrs, fars, qers, sessionQers)
 
 		default:
 			log.Fatalln("Unsupported method", method)
@@ -732,7 +762,7 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 		any, err = anypb.New(f)
 		if err != nil {
-			log.Println("Error marshalling the rule", f, err)
+			log.Errorln("Error marshalling the rule", f, err)
 			return
 		}
 
@@ -741,25 +771,25 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 	}()
 }
 
-func (b *bess) processQER(ctx context.Context, any *anypb.Any, method upfMsgType) {
+func (b *bess) processApplicationQER(ctx context.Context, any *anypb.Any, method upfMsgType) {
 	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
-		log.Println("Invalid method name: ", method)
+		log.Errorln("Invalid method name: ", method)
 		return
 	}
 
 	methods := [...]string{"add", "add", "delete", "clear"}
 
 	_, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
-		Name: "qerLookup",
+		Name: "appQERLookup",
 		Cmd:  methods[method],
 		Arg:  any,
 	})
 	if err != nil {
-		log.Println("qerLookup method failed!:", err)
+		log.Errorf("appQERLookup %v for qer %v failed with error: %v", methods[method], any, err)
 	}
 }
 
-func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
+func (b *bess) addApplicationQER(ctx context.Context, done chan<- bool, qer qer) {
 	go func() {
 		var (
 			any                           *anypb.Any
@@ -812,11 +842,11 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 
 		any, err = anypb.New(q)
 		if err != nil {
-			log.Println("Error marshalling the rule", q, err)
+			log.Errorln("Error marshalling the rule", q, err)
 			return
 		}
 
-		b.processQER(ctx, any, upfMsgTypeAdd)
+		b.processApplicationQER(ctx, any, upfMsgTypeAdd)
 
 		// Downlink QER
 		srcIface = core
@@ -862,16 +892,16 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 
 		any, err = anypb.New(q)
 		if err != nil {
-			log.Println("Error marshalling the rule", q, err)
+			log.Errorln("Error marshalling the rule", q, err)
 			return
 		}
 
-		b.processQER(ctx, any, upfMsgTypeAdd)
+		b.processApplicationQER(ctx, any, upfMsgTypeAdd)
 		done <- true
 	}()
 }
 
-func (b *bess) delQER(ctx context.Context, done chan<- bool, qer qer) {
+func (b *bess) delApplicationQER(ctx context.Context, done chan<- bool, qer qer) {
 	go func() {
 		var (
 			any      *anypb.Any
@@ -896,7 +926,7 @@ func (b *bess) delQER(ctx context.Context, done chan<- bool, qer qer) {
 			return
 		}
 
-		b.processQER(ctx, any, upfMsgTypeDel)
+		b.processApplicationQER(ctx, any, upfMsgTypeDel)
 
 		// Downlink QER
 		srcIface = core
@@ -915,7 +945,7 @@ func (b *bess) delQER(ctx context.Context, done chan<- bool, qer qer) {
 			return
 		}
 
-		b.processQER(ctx, any, upfMsgTypeDel)
+		b.processApplicationQER(ctx, any, upfMsgTypeDel)
 		done <- true
 	}()
 }
@@ -1187,6 +1217,155 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 	}()
 }
 
+func (b *bess) processSessionQER(ctx context.Context, proto proto.Message, method upfMsgType) error {
+	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
+		return fmt.Errorf("invalid method name: %v", method)
+	}
+
+	methods := [...]string{"add", "add", "delete", "clear"}
+
+	any, err := anypb.New(proto)
+	if err != nil {
+		return err
+	}
+
+	_, err = b.client.ModuleCommand(ctx, &pb.CommandRequest{
+		Name: "sessionQERLookup",
+		Cmd:  methods[method],
+		Arg:  any,
+	})
+	if err != nil {
+		log.Errorf("sessionQERLookup %v for qer %v failed with error: %v", methods[method], proto, err)
+		return err
+	}
+	return nil
+}
+
+func (b *bess) addSessionQER(ctx context.Context, done chan<- bool, qer qer) {
+	go func() {
+		var (
+			cir, pir, cbs, ebs, pbs, gate uint64
+			srcIface                      uint8
+		)
+
+		if qosVal, ok := b.qciQosMap[qer.qfi]; ok {
+			cbs = uint64(qosVal.cbs)
+			ebs = uint64(qosVal.ebs)
+			pbs = uint64(qosVal.pbs)
+		} else {
+			log.Println("No config for qfi/qci : ", qer.qfi,
+				". Using default burst size.")
+			cbs = uint64(DefaultBurstSize)
+			ebs = uint64(DefaultBurstSize)
+			pbs = uint64(DefaultBurstSize)
+		}
+
+		// Uplink session QER
+		srcIface = access
+
+		if qer.ulStatus == ie.GateStatusClosed {
+			gate = qerGateStatusDrop
+		} else if qer.ulMbr != 0 || qer.ulGbr != 0 {
+			/* MBR/GBR is received in Kilobits/sec.
+			   CIR/PIR is sent in bytes */
+			cir = maxUint64((qer.ulGbr*1000)/8, 1)
+			pir = maxUint64((qer.ulMbr*1000)/8, cir)
+			gate = qerGateMeter
+		} else {
+			gate = qerGateUnmeter
+		}
+
+		q := &pb.QosCommandAddArg{
+			Gate: gate,
+			Cir:  cir, /* committed info rate */
+			Pir:  pir, /* peak info rate */
+			Cbs:  cbs, /* committed burst size */
+			Pbs:  pbs, /* Peak burst size */
+			Ebs:  ebs, /* Excess burst size */
+			Fields: []*pb.FieldData{
+				intEnc(uint64(srcIface)), /* Src Intf */
+				intEnc(qer.fseID),        /* fseid */
+			},
+		}
+
+		if err := b.processSessionQER(ctx, q, upfMsgTypeAdd); err != nil {
+			log.Errorln("Error adding uplink session qer %v:", q, err)
+		}
+
+		// Downlink session QER
+		srcIface = core
+
+		if qer.dlStatus == ie.GateStatusClosed {
+			gate = qerGateStatusDrop
+		} else if qer.dlMbr != 0 || qer.dlGbr != 0 {
+			/* MBR/GBR is received in Kilobits/sec.
+			   CIR/PIR is sent in bytes */
+			cir = maxUint64((qer.dlGbr*1000)/8, 1)
+			pir = maxUint64((qer.dlMbr*1000)/8, cir)
+			gate = qerGateMeter
+		} else {
+			gate = qerGateUnmeter
+		}
+
+		q = &pb.QosCommandAddArg{
+			Gate: gate,
+			Cir:  cir, /* committed info rate */
+			Pir:  pir, /* peak info rate */
+			Cbs:  cbs, /* committed burst size */
+			Pbs:  pbs, /* Peak burst size */
+			Ebs:  ebs, /* Excess burst size */
+			Fields: []*pb.FieldData{
+				intEnc(uint64(srcIface)), /* Src Intf */
+				intEnc(qer.fseID),        /* fseid */
+			},
+		}
+
+		if err := b.processSessionQER(ctx, q, upfMsgTypeAdd); err != nil {
+			log.Errorln("Error adding downlink session qer %v:", q, err)
+		}
+
+		done <- true
+	}()
+}
+
+func (b *bess) delSessionQER(ctx context.Context, done chan<- bool, qer qer) {
+	go func() {
+		var (
+			srcIface uint8
+		)
+
+		// Uplink session QER
+		srcIface = access
+
+		q := &pb.QosCommandDeleteArg{
+			Fields: []*pb.FieldData{
+				intEnc(uint64(srcIface)), /* Src Intf */
+				intEnc(qer.fseID),        /* fseid */
+			},
+		}
+
+		if err := b.processSessionQER(ctx, q, upfMsgTypeDel); err != nil {
+			log.Errorln("Error deleting uplink session qer %v:", q, err)
+		}
+
+		// Downlink session QER
+		srcIface = core
+
+		q = &pb.QosCommandDeleteArg{
+			Fields: []*pb.FieldData{
+				intEnc(uint64(srcIface)), /* Src Intf */
+				intEnc(qer.fseID),        /* fseid */
+			},
+		}
+
+		if err := b.processSessionQER(ctx, q, upfMsgTypeDel); err != nil {
+			log.Errorln("Error deleting downlink session qer %v:", q, err)
+		}
+
+		done <- true
+	}()
+}
+
 func (b *bess) removeAllPDRs(ctx context.Context, done chan<- bool) {
 	go func() {
 		var (
@@ -1227,7 +1406,7 @@ func (b *bess) removeAllFARs(ctx context.Context, done chan<- bool) {
 	}()
 }
 
-func (b *bess) removeAllQERs(ctx context.Context, done chan<- bool) {
+func (b *bess) removeAllApplicationQERs(ctx context.Context, done chan<- bool) {
 	go func() {
 		var (
 			any *anypb.Any
@@ -1242,7 +1421,18 @@ func (b *bess) removeAllQERs(ctx context.Context, done chan<- bool) {
 			return
 		}
 
-		b.processQER(ctx, any, upfMsgTypeClear)
+		b.processApplicationQER(ctx, any, upfMsgTypeClear)
+		done <- true
+	}()
+}
+
+func (b *bess) removeAllSessionQERs(ctx context.Context, done chan<- bool) {
+	go func() {
+		f := &pb.EmptyArg{}
+		if err := b.processSessionQER(ctx, f, upfMsgTypeClear); err != nil {
+			log.Errorln("Error clearing session qers:", err)
+		}
+
 		done <- true
 	}()
 }

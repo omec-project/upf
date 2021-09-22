@@ -199,10 +199,10 @@ if ntf:
   _in -> ntf
   _in = ntf
 
-_in -> qerLookup::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
-                              {'attr_name':'qer_id', 'num_bytes':4}, \
-                              {'attr_name':'fseid', 'num_bytes':8}], \
-                      values=[{'attr_name':'qfi', 'num_bytes':1}])
+_in -> appQERLookup::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
+                                 {'attr_name':'qer_id', 'num_bytes':4}, \
+                                 {'attr_name':'fseid', 'num_bytes':8}], \
+                         values=[{'attr_name':'qfi', 'num_bytes':1}])
 
 executeFAR::Split(size=1, attribute='action')
 _in = executeFAR
@@ -238,6 +238,17 @@ farLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
     -> farMerge::Merge() \
     -> _in
 
+# sessionQERLookup enforces a per UE, per direction meter rate limit
+sessionQERLookup::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
+                              {'attr_name':'fseid', 'num_bytes':8}])
+# Admit green, yellow and misses, drop red
+sessionQERLookup:qerGreenGate -> farLookup
+sessionQERLookup:qerYellowGate -> farLookup
+sessionQERLookup:qerRedGate -> sessionQERLookupRed::Sink()
+sessionQERLookup:qerUnmeteredGate -> farLookup
+sessionQERLookup:qerFailGate -> farLookup
+sessionQERLookup.set_default_gate(gate=qerFailGate)
+
 # Add logical pipeline when gtpudecap is needed
 pdrLookup:GTPUDecap \
     -> gtpuDecap::GtpuDecap() \
@@ -257,14 +268,14 @@ executeFAR:farNotifyCPAction -> pfcpDetails::GenericEncap(fields=[ {'size': 8, '
                              -> farNotifyCP::PortOut(port='notifyCP')
 # Drop unknown packets
 pktParse:0 -> badPkts::Sink()
-qerLookup:qerGreenGate -> farLookup
-qerLookup:qerYellowGate -> farLookup
-qerLookup:qerRedGate -> qerMeterRed::Sink()
-qerLookup:qerStatusDropGate -> qerStatusDrop::Sink()
-qerLookup:qerUnmeteredGate -> farLookup
+appQERLookup:qerGreenGate -> sessionQERLookup
+appQERLookup:qerYellowGate -> sessionQERLookup
+appQERLookup:qerRedGate -> qerMeterRed::Sink()
+appQERLookup:qerStatusDropGate -> qerStatusDrop::Sink()
+appQERLookup:qerUnmeteredGate -> sessionQERLookup
 pdrLookup:pdrFailGate -> pdrLookupFail::Sink()
 farLookup:farFailGate -> farLookupFail::Sink()
-qerLookup:qerFailGate -> qerLookupFail::Sink()
+appQERLookup:qerFailGate -> appQERLookupFail::Sink()
 executeFAR:farDropAction -> farDrop::Sink()
 executeFAR:farBufferAction -> farBuffer::Sink()
 gtpuEncap:0 -> gtpuEncapFail::Sink()
@@ -272,7 +283,7 @@ gtpuEncap:0 -> gtpuEncapFail::Sink()
 # Set default gates for relevant modules
 pdrLookup.set_default_gate(gate=pdrFailGate)
 farLookup.set_default_gate(gate=farFailGate)
-qerLookup.set_default_gate(gate=qerFailGate)
+appQERLookup.set_default_gate(gate=qerFailGate)
 
 
 # ====================================================

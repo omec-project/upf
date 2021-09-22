@@ -263,7 +263,7 @@ func (p *p4rtc) sendDeleteAllSessionsMsgtoUPF() {
 
 	if (p.pfcpConn != nil) && (p.pfcpConn.mgr != nil) {
 		for seidKey, value := range p.pfcpConn.mgr.sessions {
-			p.sendMsgToUPF(upfMsgTypeDel, value.pdrs, value.fars, nil)
+			p.sendMsgToUPF(upfMsgTypeDel, value.pdrs, value.fars, nil, nil)
 			p.pfcpConn.mgr.RemoveSession(seidKey)
 		}
 	}
@@ -351,7 +351,9 @@ func (p *p4rtc) endMarkerSendLoop(endMarkerChan chan []byte) {
 	}
 }
 
-func (p *p4rtc) sendMsgToUPF(method upfMsgType, pdrs []pdr, fars []far, qers []qer) uint8 {
+func (p *p4rtc) sendMsgToUPF(
+	method upfMsgType, pdrs []pdr, fars []far, qers []qer, sessionQers []qer,
+) uint8 {
 	log.Println("sendMsgToUPF p4")
 
 	var (

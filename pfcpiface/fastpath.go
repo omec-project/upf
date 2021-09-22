@@ -32,7 +32,7 @@ type fastPath interface {
 	/* write endMarker to fastpath */
 	sendEndMarkers(endMarkerList *[][]byte) error
 	/* write pdr/far/qer to fastpath */
-	sendMsgToUPF(method upfMsgType, pdrs []pdr, fars []far, qers []qer) uint8
+	sendMsgToUPF(method upfMsgType, pdrs []pdr, fars []far, qers []qer, sessionQers []qer) uint8
 	/* delete all pdrs/fars/qers/ installed in fastpath tabled */
 	sendDeleteAllSessionsMsgtoUPF()
 	/* check of communication channel to fastpath is setup */

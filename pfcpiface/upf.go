@@ -73,8 +73,10 @@ const (
 	n9 = 0x2
 )
 
-func (u *upf) sendMsgToUPF(method upfMsgType, pdrs []pdr, fars []far, qers []qer) uint8 {
-	return u.intf.sendMsgToUPF(method, pdrs, fars, qers)
+func (u *upf) sendMsgToUPF(
+	method upfMsgType, pdrs []pdr, fars []far, qers []qer, sessionQers []qer,
+) uint8 {
+	return u.intf.sendMsgToUPF(method, pdrs, fars, qers, sessionQers)
 }
 
 func (u *upf) sendEndMarkers(endMarkerList *[][]byte) error {

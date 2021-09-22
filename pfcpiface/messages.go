@@ -280,7 +280,9 @@ func (pc *PFCPConn) handleSessionReportResponse(upf *upf, msg message.Message, a
 
 			pc.mgr.RemoveSession(srres.SEID())
 
-			cause := upf.sendMsgToUPF(upfMsgTypeDel, sessItem.pdrs, sessItem.fars, sessItem.qers)
+			cause := upf.sendMsgToUPF(
+				upfMsgTypeDel, sessItem.pdrs, sessItem.fars, sessItem.qers, nil,
+			)
 			if cause == ie.CauseRequestRejected {
 				log.Println("Write to FastPath failed")
 			}
@@ -384,7 +386,7 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 		session.CreateQER(q)
 	}
 
-	cause := upf.sendMsgToUPF(upfMsgTypeAdd, session.pdrs, session.fars, session.qers)
+	cause := upf.sendMsgToUPF(upfMsgTypeAdd, session.pdrs, session.fars, session.qers, nil)
 	if cause == ie.CauseRequestRejected {
 		pc.mgr.RemoveSession(session.localSEID)
 		return sendError(errors.New("write to FastPath failed"),
@@ -575,7 +577,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 		addQERs = append(addQERs, q)
 	}
 
-	cause := upf.sendMsgToUPF(upfMsgTypeMod, addPDRs, addFARs, addQERs)
+	cause := upf.sendMsgToUPF(upfMsgTypeMod, addPDRs, addFARs, addQERs, nil)
 	if cause == ie.CauseRequestRejected {
 		return sendError(errors.New("write to FastPath failed"))
 	}
@@ -637,7 +639,7 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 		delQERs = append(delQERs, *q)
 	}
 
-	cause = upf.sendMsgToUPF(upfMsgTypeDel, delPDRs, delFARs, delQERs)
+	cause = upf.sendMsgToUPF(upfMsgTypeDel, delPDRs, delFARs, delQERs, nil)
 	if cause == ie.CauseRequestRejected {
 		return sendError(errors.New("write to FastPath failed"))
 	}
@@ -700,7 +702,7 @@ func (pc *PFCPConn) handleSessionDeletionRequest(upf *upf, msg message.Message, 
 		return sendError(fmt.Errorf("session not found: %v", localSEID))
 	}
 
-	cause := upf.sendMsgToUPF(upfMsgTypeDel, session.pdrs, session.fars, session.qers)
+	cause := upf.sendMsgToUPF(upfMsgTypeDel, session.pdrs, session.fars, session.qers, nil)
 	if cause == ie.CauseRequestRejected {
 		return sendError(errors.New("write to FastPath failed"))
 	}
