@@ -82,6 +82,29 @@ func (b *bess) sendEndMarkers(endMarkerList *[][]byte) error {
 	return nil
 }
 
+func (b *bess) addSliceInfo(sliceInfo *SliceInfo) error {
+	var sliceMeterConfig SliceMeterConfig
+	sliceMeterConfig.N6RateBps = sliceInfo.uplinkMbr
+	sliceMeterConfig.N3RateBps = sliceInfo.downlinkMbr
+	sliceMeterConfig.N6BurstBytes = sliceInfo.ulBurstBytes
+	sliceMeterConfig.N3BurstBytes = sliceInfo.dlBurstBytes
+
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel()
+
+	done := make(chan bool)
+
+	b.addSliceMeter(ctx, done, sliceMeterConfig)
+
+	rc := b.GRPCJoin(1, Timeout, done)
+
+	if !rc {
+		log.Errorln("Unable to make GRPC calls")
+	}
+
+	return nil
+}
+
 func (b *bess) sendMsgToUPF(method upfMsgType, pdrs []pdr, fars []far, qers []qer) uint8 {
 	// create context
 	var cause uint8 = ie.CauseRequestAccepted
@@ -408,11 +431,15 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 		go b.endMarkerSendLoop(b.endMarkerChan)
 	}
 
-	if conf.SliceMeterConfig.N6RateBps > 0 || conf.SliceMeterConfig.N3RateBps > 0 {
+	if (conf.SliceMeterConfig.N6RateBps > 0) ||
+		(conf.SliceMeterConfig.N3RateBps > 0) {
 		ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 		defer cancel()
+
 		done := make(chan bool)
+
 		b.addSliceMeter(ctx, done, conf.SliceMeterConfig)
+
 		rc := b.GRPCJoin(1, Timeout, done)
 		if !rc {
 			log.Errorln("Unable to make GRPC calls")
@@ -1064,6 +1091,7 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 		} else {
 			gate = sliceMeterGateUnmeter
 		}
+
 		if meterConfig.N6BurstBytes != 0 {
 			cbs = 1 // Mark all traffic as yellow
 			pbs = meterConfig.N6BurstBytes
@@ -1073,6 +1101,7 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 			pbs = DefaultBurstSize
 			ebs = 0 // Unused
 		}
+
 		q := &pb.QosCommandAddArg{
 			Gate:              gate,
 			Cir:               cir,                               /* committed info rate */
@@ -1086,11 +1115,13 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 				intEnc(uint64(0)),           /* tunnel_out_type */
 			},
 		}
+
 		any, err = anypb.New(q)
 		if err != nil {
 			log.Errorln("Error marshalling the rule", q, err)
 			return
 		}
+
 		b.processSliceMeter(ctx, any, upfMsgTypeAdd)
 
 		// Downlink N3 slice meter config
@@ -1101,6 +1132,7 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 		} else {
 			gate = sliceMeterGateUnmeter
 		}
+
 		if meterConfig.N3BurstBytes != 0 {
 			cbs = 1 // Mark all traffic as yellow
 			pbs = meterConfig.N3BurstBytes
@@ -1124,11 +1156,13 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 				intEnc(uint64(1)),           /* tunnel_out_type */
 			},
 		}
+
 		any, err = anypb.New(q)
 		if err != nil {
 			log.Errorln("Error marshalling the rule", q, err)
 			return
 		}
+
 		b.processSliceMeter(ctx, any, upfMsgTypeAdd)
 		done <- true
 	}()

@@ -56,6 +56,11 @@ type p4rtc struct {
 	endMarkerChan    chan []byte
 }
 
+func (p *p4rtc) addSliceInfo(sliceInfo *SliceInfo) error {
+	log.Errorln("Slice Info not supported in P4")
+	return nil
+}
+
 func (p *p4rtc) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric) {
 }
 
