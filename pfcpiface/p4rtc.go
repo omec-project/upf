@@ -1138,18 +1138,18 @@ func LoadDeviceConfig(deviceConfigPath string) (P4DeviceConfig, error) {
 
 	deviceConfig, err := os.Open(deviceConfigPath)
 	if err != nil {
-		return nil, fmt.Errorf("open %s: %v", deviceConfigPath, err)
+		return nil, fmt.Errorf("open %s: %w", deviceConfigPath, err)
 	}
 	defer deviceConfig.Close()
 
 	bmv2Info, err := deviceConfig.Stat()
 	if err != nil {
-		return nil, fmt.Errorf("stat %s: %v", deviceConfigPath, err)
+		return nil, fmt.Errorf("stat %s: %w", deviceConfigPath, err)
 	}
 
 	bin := make([]byte, int(bmv2Info.Size()))
 	if b, err := deviceConfig.Read(bin); err != nil {
-		return nil, fmt.Errorf("read %s: %v", deviceConfigPath, err)
+		return nil, fmt.Errorf("read %s: %w", deviceConfigPath, err)
 	} else if b != int(bmv2Info.Size()) {
 		return nil, errors.New("bmv2 bin copy failed")
 	}

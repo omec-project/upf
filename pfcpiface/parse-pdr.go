@@ -4,6 +4,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -282,7 +283,7 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, upf *
 	}
 
 	err = p.parsePDI(pdi, appPFDs, upf)
-	if err != nil && err != errBadFilterDesc {
+	if err != nil && !errors.Is(err, errBadFilterDesc) {
 		return err
 	}
 
