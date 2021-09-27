@@ -7,7 +7,6 @@
 /*----------------------------------------------------------------------------------*/
 #include "../module.h"
 #include "../pb/module_msg.pb.h"
-#include "../utils/gtp_common.h"
 #include <rte_hash.h>
 /*----------------------------------------------------------------------------------*/
 class GtpuDecap final : public Module {
