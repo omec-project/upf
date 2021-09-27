@@ -25,7 +25,7 @@ RUN curl -L https://github.com/libbpf/libbpf/tarball/${LIBBPF_VER} | \
 
 # BESS pre-reqs
 WORKDIR /bess
-ARG BESS_COMMIT=dpdk-2011
+ARG BESS_COMMIT=dpdk-2011-focal
 RUN curl -L https://github.com/NetSys/bess/tarball/${BESS_COMMIT} | \
     tar xz -C . --strip-components=1
 

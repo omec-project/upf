@@ -105,7 +105,7 @@ index 072a0333..1ca0fd4e 100644
 +  ValueTuple t;
 +
 +  /* clear value tuple  */
-+  memset(&t, 0, sizeof(t));
++  memset(&t.action, 0, sizeof(t.action));
 +  /* set gate */
 +  t.gate = gate;
 +  RuleFieldsFromPb(arg.fields(), &rule, FIELD_TYPE);
