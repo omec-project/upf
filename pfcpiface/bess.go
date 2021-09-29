@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	// DefaultBurstSize for cbs, pbs required for dpdk  metering.
-	DefaultBurstSize = 2048
+	// DefaultBurstDurationMs for cbs, pbs required for dpdk metering.
+	DefaultBurstDurationMs = 10
 	// SockAddr : Unix Socket path to read bess notification from.
 	SockAddr = "/tmp/notifycp"
 	// PfcpAddr : Unix Socket path to send end marker packet.
@@ -730,20 +730,19 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 			srcIface                      uint8
 		)
 
+		// Uplink QER
+		srcIface = access
+
 		if qosVal, ok := b.qciQosMap[qer.qfi]; ok {
 			cbs = uint64(qosVal.cbs)
 			ebs = uint64(qosVal.ebs)
 			pbs = uint64(qosVal.pbs)
 		} else {
-			log.Println("No config for qfi/qci : ", qer.qfi,
-				". Using default burst size.")
-			cbs = uint64(DefaultBurstSize)
-			ebs = uint64(DefaultBurstSize)
-			pbs = uint64(DefaultBurstSize)
+			cbs = maxUint64(calcBurstSizeFromRate(qer.ulGbr, DefaultBurstDurationMs), 1)
+			ebs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, DefaultBurstDurationMs), 1)
+			pbs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, DefaultBurstDurationMs), 1)
+			log.Infof("No config for qfi/qci: %v. Using dynamic burst sizes: cbs %v, ebs %v, pbs %v", qer.qfi, ebs, ebs, pbs)
 		}
-
-		// Uplink QER
-		srcIface = access
 
 		if qer.ulStatus == ie.GateStatusClosed {
 			gate = qerGateStatusDrop
@@ -784,6 +783,17 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 
 		// Downlink QER
 		srcIface = core
+
+		if qosVal, ok := b.qciQosMap[qer.qfi]; ok {
+			cbs = uint64(qosVal.cbs)
+			ebs = uint64(qosVal.ebs)
+			pbs = uint64(qosVal.pbs)
+		} else {
+			cbs = maxUint64(calcBurstSizeFromRate(qer.dlGbr, DefaultBurstDurationMs), 1)
+			ebs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, DefaultBurstDurationMs), 1)
+			pbs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, DefaultBurstDurationMs), 1)
+			log.Infof("No config for qfi/qci: %v. Using dynamic burst sizes: cbs %v, ebs %v, pbs %v", qer.qfi, ebs, ebs, pbs)
+		}
 
 		if qer.dlStatus == ie.GateStatusClosed {
 			gate = qerGateStatusDrop
@@ -1069,8 +1079,8 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 			pbs = meterConfig.N6BurstBytes
 			ebs = 0 // Unused
 		} else {
-			cbs = DefaultBurstSize
-			pbs = DefaultBurstSize
+			cbs = 1
+			pbs = calcBurstSizeFromRate(meterConfig.N6RateBps/1000, DefaultBurstDurationMs)
 			ebs = 0 // Unused
 		}
 		q := &pb.QosCommandAddArg{
@@ -1106,8 +1116,8 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 			pbs = meterConfig.N3BurstBytes
 			ebs = 0 // Unused
 		} else {
-			cbs = DefaultBurstSize
-			pbs = DefaultBurstSize
+			cbs = 1
+			pbs = calcBurstSizeFromRate(meterConfig.N3RateBps/1000, DefaultBurstDurationMs)
 			ebs = 0 // Unused
 		}
 		// TODO: packet deduction should take GTPU extension header into account
