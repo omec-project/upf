@@ -62,6 +62,7 @@ type upf struct {
 // Don't change these values.
 const (
 	tunnelGTPUPort = 2152
+	invalidQerID   = 0xFFFFFFFF
 
 	// src-iface consts.
 	core   = 0x2
@@ -74,9 +75,8 @@ const (
 )
 
 func (u *upf) sendMsgToUPF(
-	method upfMsgType, pdrs []pdr, fars []far, qers []qer, sessionQers []qer,
-) uint8 {
-	return u.intf.sendMsgToUPF(method, pdrs, fars, qers, sessionQers)
+	method upfMsgType, pdrs []pdr, fars []far, qers []qer) uint8 {
+	return u.intf.sendMsgToUPF(method, pdrs, fars, qers)
 }
 
 func (u *upf) sendEndMarkers(endMarkerList *[][]byte) error {

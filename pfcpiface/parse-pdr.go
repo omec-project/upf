@@ -38,7 +38,7 @@ type pdr struct {
 	fseidIP     uint32
 	ctrID       uint32
 	farID       uint32
-	qerID       uint32
+	qerIDList   []uint32
 	needDecap   uint8
 	allocIPFlag bool
 }
@@ -76,7 +76,11 @@ func (p pdr) String() string {
 	fmt.Fprintf(&b, "fseidIP: %v\n", int2ip(p.fseidIP))
 	fmt.Fprintf(&b, "ctrID: %v\n", p.ctrID)
 	fmt.Fprintf(&b, "farID: %v\n", p.farID)
-	fmt.Fprintf(&b, "qerID: %v\n", p.qerID)
+
+	for _, qer := range p.qerIDList {
+		fmt.Fprintf(&b, "qerID: %v\n", qer)
+	}
+
 	fmt.Fprintf(&b, "needDecap: %v\n", p.needDecap)
 	fmt.Fprintf(&b, "allocIPFlag: %v\n", p.allocIPFlag)
 
@@ -258,23 +262,24 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, upf *upf) err
 func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, upf *upf) error {
 	/* reset outerHeaderRemoval to begin with */
 	outerHeaderRemoval := uint8(0)
+	p.qerIDList = make([]uint32, 0)
 
 	pdrID, err := ie1.PDRID()
 	if err != nil {
 		log.Println("Could not read PDR ID!")
-		return nil
+		return err
 	}
 
 	precedence, err := ie1.Precedence()
 	if err != nil {
 		log.Println("Could not read Precedence!")
-		return nil
+		return err
 	}
 
 	pdi, err := ie1.PDI()
 	if err != nil {
 		log.Println("Could not read PDI!")
-		return nil
+		return err
 	}
 
 	res, err := ie1.OuterHeaderRemovalDescription()
@@ -290,20 +295,51 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, upf *
 	farID, err := ie1.FARID()
 	if err != nil {
 		log.Println("Could not read FAR ID!")
-		return nil
+		return err
 	}
 
-	qerID, err := ie1.QERID()
+	/* Multiple instances of QERID can be present in CreatePDR/UpdatePDR
+	   go-pfcp currently support API to return list of QERIDs. So, we
+	   are parsing the IE list in Application code.*/
+	var ies []*ie.IE
+
+	var errin error
+
+	switch ie1.Type {
+	case ie.CreatePDR:
+		ies, errin = ie1.CreatePDR()
+		if errin != nil {
+			return errin
+		}
+	case ie.UpdatePDR:
+		ies, errin = ie1.UpdatePDR()
+		if errin != nil {
+			return errin
+		}
+	}
+
+	for _, x := range ies {
+		if x.Type == ie.QERID {
+			qerID, errRead := x.QERID()
+			if errRead != nil {
+				log.Errorln("qerID read failed")
+				continue
+			} else {
+				p.qerIDList = append(p.qerIDList, qerID)
+			}
+		}
+	}
+	/*qerID, err := ie1.QERID()
 	if err != nil {
 		log.Println("Could not read QER ID!")
-	}
+	}*/
 
 	p.precedence = precedence
 	p.pdrID = uint32(pdrID)
 	p.fseID = (seid) // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
 	p.ctrID = 0      // ctrID currently not being set <--- FIXIT/TODO/XXX
 	p.farID = farID  // farID currently not being set <--- FIXIT/TODO/XXX
-	p.qerID = qerID
+	/*p.qerID = qerID*/
 	p.needDecap = outerHeaderRemoval
 
 	return nil

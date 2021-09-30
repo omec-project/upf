@@ -13,6 +13,7 @@ import (
 
 type qer struct {
 	qerID    uint32
+	qosLevel QosLevel
 	qfi      uint8
 	ulStatus uint8
 	dlStatus uint8

@@ -244,7 +244,8 @@ sessionQERLookup::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
 # Admit green, yellow and misses, drop red
 sessionQERLookup:qerGreenGate -> farLookup
 sessionQERLookup:qerYellowGate -> farLookup
-sessionQERLookup:qerRedGate -> sessionQERLookupRed::Sink()
+sessionQERLookup:qerRedGate -> sessionQERMeterRed::Sink()
+sessionQERLookup:qerStatusDropGate -> sessionQERStatusDrop::Sink()
 sessionQERLookup:qerUnmeteredGate -> farLookup
 sessionQERLookup:qerFailGate -> farLookup
 sessionQERLookup.set_default_gate(gate=qerFailGate)
@@ -270,8 +271,8 @@ executeFAR:farNotifyCPAction -> pfcpDetails::GenericEncap(fields=[ {'size': 8, '
 pktParse:0 -> badPkts::Sink()
 appQERLookup:qerGreenGate -> sessionQERLookup
 appQERLookup:qerYellowGate -> sessionQERLookup
-appQERLookup:qerRedGate -> qerMeterRed::Sink()
-appQERLookup:qerStatusDropGate -> qerStatusDrop::Sink()
+appQERLookup:qerRedGate -> appQERMeterRed::Sink()
+appQERLookup:qerStatusDropGate -> appQERStatusDrop::Sink()
 appQERLookup:qerUnmeteredGate -> sessionQERLookup
 pdrLookup:pdrFailGate -> pdrLookupFail::Sink()
 farLookup:farFailGate -> farLookupFail::Sink()
