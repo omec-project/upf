@@ -20,6 +20,7 @@ DOCKER_IMAGENAME         := ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}${PROJECT_NAME
 DOCKER_BUILDKIT          ?= 1
 DOCKER_BUILD_ARGS        ?= --build-arg MAKEFLAGS=-j$(shell nproc) --build-arg CPU
 DOCKER_BUILD_ARGS        += --build-arg ENABLE_NTF=$(ENABLE_NTF)
+DOCKER_PULL              ?= --pull
 
 ## Docker labels. Only set ref and commit date if committed
 DOCKER_LABEL_VCS_URL     ?= $(shell git remote get-url $(shell git remote))
@@ -32,7 +33,7 @@ DOCKER_TARGETS           ?= bess pfcpiface
 # https://docs.docker.com/engine/reference/commandline/build/#specifying-target-build-stage---target
 docker-build:
 	for target in $(DOCKER_TARGETS); do \
-		DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build --pull $(DOCKER_BUILD_ARGS) \
+		DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) \
 			--target $$target \
 			--tag ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}upf-epc-$$target:${DOCKER_TAG} \
 			--label org.opencontainers.image.source="https://github.com/omec-project/upf-epc" \
