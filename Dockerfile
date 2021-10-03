@@ -10,7 +10,7 @@ RUN apt-get update && \
     apt-get -y install --no-install-recommends \
         ca-certificates \
         libelf-dev
-        
+
 ARG MAKEFLAGS
 
 # linux ver should match target machine's kernel
