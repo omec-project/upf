@@ -744,6 +744,8 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 			ebs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 			pbs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 		} else {
+			log.Infof("No config for qfi/qci: %v. Using default burst size %v.",
+				qer.qfi, DefaultBurstSize)
 			cbs = DefaultBurstSize
 			ebs = DefaultBurstSize
 			pbs = DefaultBurstSize
@@ -799,6 +801,8 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 			ebs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 			pbs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 		} else {
+			log.Infof("No config for qfi/qci: %v. Using default burst size %v.",
+				qer.qfi, DefaultBurstSize)
 			cbs = DefaultBurstSize
 			ebs = DefaultBurstSize
 			pbs = DefaultBurstSize
