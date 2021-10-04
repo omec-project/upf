@@ -126,4 +126,4 @@ COPY --from=go-pb /bess_pb /bess_pb
 FROM scratch AS artifacts
 COPY --from=bess /bin/bessd /
 COPY --from=pfcpiface /bin/pfcpiface /
-# COPY --from=bess-build /bess /
+COPY --from=bess-build /bess /bess

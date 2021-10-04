@@ -252,7 +252,7 @@ farLookup:GTPUEncap \
 
 notify = UnixSocketPort(name='notifyCP', path=parser.notify_sockaddr)
 pfcpPort = UnixSocketPort(name='pfcpPort', path=parser.endmarker_sockaddr)
-pfcpPI::PortInc(port='pfcpPort') -> ports[parser.access_ifname].rtr
+pfcpPI::PortInc(port='pfcpPort') -> pfcpPI_timestamp::Timestamp() -> ports[parser.access_ifname].rtr
 executeFAR:farNotifyCPAction -> pfcpDetails::GenericEncap(fields=[ {'size': 8, 'attribute': 'fseid'}]) \
                              -> farNotifyCP::PortOut(port='notifyCP')
 # Drop unknown packets
