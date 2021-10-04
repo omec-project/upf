@@ -95,15 +95,14 @@ ENTRYPOINT ["bessd", "-f"]
 
 # Stage build bess golang pb
 FROM golang AS protoc-gen
-# Fixme: https://github.com/omec-project/upf-epc/issues/234
-RUN go get github.com/golang/protobuf/protoc-gen-go@v1.4.3
+RUN go get github.com/golang/protobuf/protoc-gen-go
 
 FROM bess-build AS go-pb
 COPY --from=protoc-gen /go/bin/protoc-gen-go /bin
 RUN mkdir /bess_pb && \
     protoc -I /usr/include -I /protobuf/ \
         /protobuf/*.proto /protobuf/ports/*.proto \
-        --go_out=plugins=grpc:/bess_pb
+        --go_opt=paths=source_relative --go_out=plugins=grpc:/bess_pb
 
 FROM golang AS pfcpiface-build
 WORKDIR /pfcpiface
@@ -126,4 +125,4 @@ COPY --from=go-pb /bess_pb /bess_pb
 FROM scratch AS artifacts
 COPY --from=bess /bin/bessd /
 COPY --from=pfcpiface /bin/pfcpiface /
-# COPY --from=bess-build /bess /
+COPY --from=bess-build /bess /bess

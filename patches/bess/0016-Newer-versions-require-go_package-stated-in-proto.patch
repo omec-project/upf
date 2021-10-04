@@ -1,0 +1,100 @@
+From c3aa30679fa06766b1790972480d1cd9ffaf3246 Mon Sep 17 00:00:00 2001
+From: Saikrishna Edupuganti <saikrishna.edupuganti@intel.com>
+Date: Mon, 4 Oct 2021 07:07:05 +0000
+Subject: [PATCH] Newer versions require go_package stated in proto
+
+https://github.com/golang/protobuf/issues/1294
+https://github.com/golang/protobuf/issues/1297
+
+Signed-off-by: Saikrishna Edupuganti <saikrishna.edupuganti@intel.com>
+---
+ protobuf/bess_msg.proto       | 2 ++
+ protobuf/error.proto          | 2 ++
+ protobuf/module_msg.proto     | 3 +++
+ protobuf/ports/port_msg.proto | 2 ++
+ protobuf/service.proto        | 2 ++
+ protobuf/util_msg.proto       | 2 ++
+ 6 files changed, 13 insertions(+)
+
+diff --git a/protobuf/bess_msg.proto b/protobuf/bess_msg.proto
+index 9e1b79a3..9b30de34 100644
+--- a/protobuf/bess_msg.proto
++++ b/protobuf/bess_msg.proto
+@@ -42,6 +42,8 @@ import "error.proto";
+ 
+ package bess.pb;
+ 
++option go_package = "github.com/omec-project/upf-epc/pfcpiface/bess_pb";
++
+ message EmptyRequest {
+ }
+ 
+diff --git a/protobuf/error.proto b/protobuf/error.proto
+index a018ee8e..04b352c5 100644
+--- a/protobuf/error.proto
++++ b/protobuf/error.proto
+@@ -31,6 +31,8 @@ syntax = "proto3";
+ 
+ package bess.pb;
+ 
++option go_package = "github.com/omec-project/upf-epc/pfcpiface/bess_pb";
++
+ message Error {
+   int32 code = 1;  // 0 for success, errno (>0) for failure
+   string errmsg = 2;
+diff --git a/protobuf/module_msg.proto b/protobuf/module_msg.proto
+index e00a463a..23d3fc18 100644
+--- a/protobuf/module_msg.proto
++++ b/protobuf/module_msg.proto
+@@ -31,6 +31,9 @@
+ syntax = "proto3";
+ 
+ package bess.pb;
++
++option go_package = "github.com/omec-project/upf-epc/pfcpiface/bess_pb";
++
+ import "util_msg.proto";
+ 
+ // Module-specific messages.
+diff --git a/protobuf/ports/port_msg.proto b/protobuf/ports/port_msg.proto
+index ff6e65ed..3e2cff2b 100644
+--- a/protobuf/ports/port_msg.proto
++++ b/protobuf/ports/port_msg.proto
+@@ -31,6 +31,8 @@ syntax = "proto3";
+ 
+ package bess.pb;
+ 
++option go_package = "github.com/omec-project/upf-epc/pfcpiface/bess_pb";
++
+ message PCAPPortArg {
+   string dev = 1;
+ }
+diff --git a/protobuf/service.proto b/protobuf/service.proto
+index ae1aba05..706a283a 100644
+--- a/protobuf/service.proto
++++ b/protobuf/service.proto
+@@ -33,6 +33,8 @@ import "bess_msg.proto";
+ 
+ package bess.pb;
+ 
++option go_package = "github.com/omec-project/upf-epc/pfcpiface/bess_pb";
++
+ service BESSControl {
+ 
+   //  -------------------------------------------------------------------------
+diff --git a/protobuf/util_msg.proto b/protobuf/util_msg.proto
+index b1050abf..4df01fc6 100644
+--- a/protobuf/util_msg.proto
++++ b/protobuf/util_msg.proto
+@@ -32,6 +32,8 @@ syntax="proto3";
+ 
+ package bess.pb;
+ 
++option go_package = "github.com/omec-project/upf-epc/pfcpiface/bess_pb";
++
+ /// The Field message represents one field in a packet -- either stored in metadata or in the packet body.
+ message Field {
+   oneof position {
+-- 
+2.25.1
+
