@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	// DefaultBurstDurationMs for cbs, pbs required for dpdk metering.
-	DefaultBurstDurationMs = 10
+	// DefaultBurstSize for cbs, pbs required for dpdk metering. 32 MTUs.
+	DefaultBurstSize = 32 * 1514
 	// SockAddr : Unix Socket path to read bess notification from.
 	SockAddr = "/tmp/notifycp"
 	// PfcpAddr : Unix Socket path to send end marker packet.
@@ -364,6 +364,7 @@ func (b *bess) readQciQosMap(conf *Conf) {
 			cbs:              qosVal.CBS,
 			ebs:              qosVal.EBS,
 			pbs:              qosVal.PBS,
+			burstDurationMs:  qosVal.BurstDurationMs,
 			schedulePriority: qosVal.SchedulingPriority,
 		}
 		b.qciQosMap[qosVal.QCI] = qosConfigVal
@@ -760,15 +761,19 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 		// Uplink QER
 		srcIface = access
 
+		// Lookup QCI from QFI, else try default QCI, otherwise fallback to constant.
 		if qosVal, ok := b.qciQosMap[qer.qfi]; ok {
 			cbs = uint64(qosVal.cbs)
 			ebs = uint64(qosVal.ebs)
 			pbs = uint64(qosVal.pbs)
+		} else if qosVal, ok := b.qciQosMap[0]; ok {
+			cbs = maxUint64(calcBurstSizeFromRate(qer.ulGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
+			ebs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
+			pbs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 		} else {
-			cbs = maxUint64(calcBurstSizeFromRate(qer.ulGbr, DefaultBurstDurationMs), 1)
-			ebs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, DefaultBurstDurationMs), 1)
-			pbs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, DefaultBurstDurationMs), 1)
-			log.Infof("No config for qfi/qci: %v. Using dynamic burst sizes: cbs %v, ebs %v, pbs %v", qer.qfi, ebs, ebs, pbs)
+			cbs = DefaultBurstSize
+			ebs = DefaultBurstSize
+			pbs = DefaultBurstSize
 		}
 
 		if qer.ulStatus == ie.GateStatusClosed {
@@ -811,15 +816,19 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 		// Downlink QER
 		srcIface = core
 
+		// Lookup QCI from QFI, else try default QCI, otherwise fallback to constant.
 		if qosVal, ok := b.qciQosMap[qer.qfi]; ok {
 			cbs = uint64(qosVal.cbs)
 			ebs = uint64(qosVal.ebs)
 			pbs = uint64(qosVal.pbs)
+		} else if qosVal, ok := b.qciQosMap[0]; ok {
+			cbs = maxUint64(calcBurstSizeFromRate(qer.ulGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
+			ebs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
+			pbs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 		} else {
-			cbs = maxUint64(calcBurstSizeFromRate(qer.dlGbr, DefaultBurstDurationMs), 1)
-			ebs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, DefaultBurstDurationMs), 1)
-			pbs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, DefaultBurstDurationMs), 1)
-			log.Infof("No config for qfi/qci: %v. Using dynamic burst sizes: cbs %v, ebs %v, pbs %v", qer.qfi, ebs, ebs, pbs)
+			cbs = DefaultBurstSize
+			ebs = DefaultBurstSize
+			pbs = DefaultBurstSize
 		}
 
 		if qer.dlStatus == ie.GateStatusClosed {
@@ -1107,8 +1116,8 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 			pbs = meterConfig.N6BurstBytes
 			ebs = 0 // Unused
 		} else {
-			cbs = 1
-			pbs = calcBurstSizeFromRate(meterConfig.N6RateBps/1000, DefaultBurstDurationMs)
+			cbs = 1 // Mark all traffic as yellow
+			pbs = DefaultBurstSize
 			ebs = 0 // Unused
 		}
 
@@ -1148,8 +1157,8 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 			pbs = meterConfig.N3BurstBytes
 			ebs = 0 // Unused
 		} else {
-			cbs = 1
-			pbs = calcBurstSizeFromRate(meterConfig.N3RateBps/1000, DefaultBurstDurationMs)
+			cbs = 1 // Mark all traffic as yellow
+			pbs = DefaultBurstSize
 			ebs = 0 // Unused
 		}
 		// TODO: packet deduction should take GTPU extension header into account
