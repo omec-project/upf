@@ -15,6 +15,7 @@ type QosConfigVal struct {
 	cbs              uint32
 	pbs              uint32
 	ebs              uint32
+	burstDurationMs  uint32
 	schedulePriority uint32
 }
 
