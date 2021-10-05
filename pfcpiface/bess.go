@@ -369,6 +369,16 @@ func (b *bess) readQciQosMap(conf *Conf) {
 		}
 		b.qciQosMap[qosVal.QCI] = qosConfigVal
 	}
+
+	if _, ok := b.qciQosMap[0]; !ok {
+		b.qciQosMap[0] = &QosConfigVal{
+			cbs:              DefaultBurstSize,
+			ebs:              DefaultBurstSize,
+			pbs:              DefaultBurstSize,
+			burstDurationMs:  10,
+			schedulePriority: 7,
+		}
+	}
 }
 
 func (b *bess) setUpfInfo(u *upf, conf *Conf) {
@@ -761,21 +771,16 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 		// Uplink QER
 		srcIface = access
 
-		// Lookup QCI from QFI, else try default QCI, otherwise fallback to constant.
+		// Lookup QCI from QFI, else try default QCI.
 		if qosVal, ok := b.qciQosMap[qer.qfi]; ok {
 			cbs = uint64(qosVal.cbs)
 			ebs = uint64(qosVal.ebs)
 			pbs = uint64(qosVal.pbs)
-		} else if qosVal, ok := b.qciQosMap[0]; ok {
+		} else {
+			qosVal := b.qciQosMap[0]
 			cbs = maxUint64(calcBurstSizeFromRate(qer.ulGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
 			ebs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 			pbs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
-		} else {
-			log.Infof("No config for qfi/qci: %v. Using default burst size %v.",
-				qer.qfi, DefaultBurstSize)
-			cbs = DefaultBurstSize
-			ebs = DefaultBurstSize
-			pbs = DefaultBurstSize
 		}
 
 		if qer.ulStatus == ie.GateStatusClosed {
@@ -818,21 +823,16 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 		// Downlink QER
 		srcIface = core
 
-		// Lookup QCI from QFI, else try default QCI, otherwise fallback to constant.
+		// Lookup QCI from QFI, else try default QCI.
 		if qosVal, ok := b.qciQosMap[qer.qfi]; ok {
 			cbs = uint64(qosVal.cbs)
 			ebs = uint64(qosVal.ebs)
 			pbs = uint64(qosVal.pbs)
-		} else if qosVal, ok := b.qciQosMap[0]; ok {
-			cbs = maxUint64(calcBurstSizeFromRate(qer.ulGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
-			ebs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
-			pbs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 		} else {
-			log.Infof("No config for qfi/qci: %v. Using default burst size %v.",
-				qer.qfi, DefaultBurstSize)
-			cbs = DefaultBurstSize
-			ebs = DefaultBurstSize
-			pbs = DefaultBurstSize
+			qosVal := b.qciQosMap[0]
+			cbs = maxUint64(calcBurstSizeFromRate(qer.dlGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
+			ebs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
+			pbs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 		}
 
 		if qer.dlStatus == ie.GateStatusClosed {
