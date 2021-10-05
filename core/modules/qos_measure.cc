@@ -31,13 +31,6 @@ CommandResponse QosMeasure::Init(const bess::pb::EmptyArg &arg) {
   LOG(INFO) << "FSEID attr ID " << fseid_attr_id_;
   LOG(INFO) << "PDR attr ID " << pdr_attr_id_;
 
-  const auto &attrs = all_attrs();
-  for (const auto &attribute : attrs) {
-    LOG(WARNING) << attribute.name << ": size " << attribute.size
-                 << " access mode " << static_cast<int>(attribute.mode)
-                 << " scope id " << attribute.scope_id;
-  }
-
   return CommandSuccess();
 }
 /*----------------------------------------------------------------------------------*/
@@ -63,19 +56,21 @@ void QosMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     if (now_ns < ts_ns) {
       continue;
     }
-    uint64_t diff = now_ns - ts_ns;
+    uint64_t diff_ns = now_ns - ts_ns;
+    // TODO: use better key.
     uint64_t index = fseid ^ static_cast<uint64_t>(pdr);
-    SessionStats &stat = stats_[index];
+    SessionStats &stat = stats_[index];  // Find or insert.
     if (stat.last_latency == 0) {
-      stat.last_latency = diff;
+      stat.last_latency = diff_ns;
     }
-    uint64_t jitter = absdiff(stat.last_latency, diff);
-    stat.last_latency = diff;
-    stat.latency_histogram.Insert(diff);
-    stat.jitter_histogram.Insert(jitter);
+    uint64_t jitter_ns = absdiff(stat.last_latency, diff_ns);
+    stat.last_latency = diff_ns;
+    stat.latency_histogram.Insert(diff_ns);
+    stat.jitter_histogram.Insert(jitter_ns);
     stat.pkt_count += 1;
     stat.byte_count += batch->pkts()[i]->total_len();
-    LOG_EVERY_N(WARNING, 100'000) << diff << ", " << fseid << ", " << pdr;
+    LOG_EVERY_N(WARNING, 100'000)
+        << "FSEID: " << fseid << ", PDR: " << pdr << ": " << diff_ns << "ns.";
   }
 
   RunNextModule(ctx, batch);
@@ -85,6 +80,7 @@ void QosMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 CommandResponse QosMeasure::CommandReadStats(
     const bess::pb::QosMeasureReadArg &arg) {
   bess::pb::QosMeasureReadResponse resp;
+  auto t_start = std::chrono::high_resolution_clock::now();
   for (auto &e : stats_) {
     const auto &index = e.first;
     SessionStats &session_stat = e.second;
@@ -106,13 +102,16 @@ CommandResponse QosMeasure::CommandReadStats(
     stat.set_total_packets(session_stat.pkt_count);
     stat.set_total_bytes(session_stat.byte_count);
     *resp.add_statistics() = stat;
-    if (arg.clear()) {
-      session_stat.pkt_count = 0;
-      session_stat.byte_count = 0;
-      session_stat.last_latency = 0;
-      session_stat.latency_histogram.Reset();
-      session_stat.jitter_histogram.Reset();
-    }
+  }
+
+  if (arg.clear()) {
+    stats_.clear();
+  }
+
+  auto t_done = std::chrono::high_resolution_clock::now();
+  if (VLOG_IS_ON(1)) {
+    std::chrono::duration<double> diff = t_done - t_start;
+    VLOG(1) << "CommandReadStats took " << diff.count() << "s.";
   }
 
   return CommandSuccess(resp);
