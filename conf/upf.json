@@ -115,7 +115,7 @@
         "ue_ip_pool": "10.250.0.0/16",
         "" : "nb_dst_ip: CPHostname",
         "" : "hostname: upf",
-        "prom_port": "8080",
+        "http_port": "8080",
         "" : "dnn:internet"
     },
 

@@ -79,7 +79,7 @@ type CPIfaceInfo struct {
 	FQDNHost        string `json:"hostname"`
 	EnableUeIPAlloc bool   `json:"enable_ue_ip_alloc"`
 	UeIPPool        string `json:"ue_ip_pool"`
-	PromPort        string `json:"prom_port"`
+	HTTPPort        string `json:"http_port"`
 	Dnn             string `json:"dnn"`
 }
 
@@ -222,8 +222,8 @@ func main() {
 	log.Println("Access IP: ", upf.accessIP.String())
 	log.Println("Core IP: ", upf.coreIP.String())
 
-	if conf.CPIface.PromPort != "" {
-		*httpAddr = string("0.0.0.0:") + conf.CPIface.PromPort
+	if conf.CPIface.HTTPPort != "" {
+		*httpAddr = string("0.0.0.0:") + conf.CPIface.HTTPPort
 	}
 
 	log.Println("httpAddr: ", httpAddr)
@@ -234,6 +234,7 @@ func main() {
 		conf.CPIface.DestIP,
 	)
 
+	setupConfigHandler(upf)
 	setupProm(upf)
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))
 	upf.exit()

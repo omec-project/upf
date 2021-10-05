@@ -4,6 +4,7 @@
 package main
 
 import (
+	"errors"
 	"net"
 	"time"
 
@@ -17,6 +18,20 @@ type QosConfigVal struct {
 	ebs              uint32
 	burstDurationMs  uint32
 	schedulePriority uint32
+}
+
+type SliceInfo struct {
+	name         string
+	uplinkMbr    uint64
+	downlinkMbr  uint64
+	ulBurstBytes uint64
+	dlBurstBytes uint64
+	ueResList    []UeResource
+}
+
+type UeResource struct {
+	name string
+	dnn  string
 }
 
 type upf struct {
@@ -39,6 +54,7 @@ type upf struct {
 	recoveryTime     time.Time
 	dnn              string
 	reportNotifyChan chan uint64
+	sliceInfo        *SliceInfo
 }
 
 // to be replaced with go-pfcp structs
@@ -75,6 +91,16 @@ func (u *upf) isConnected() bool {
 
 func (u *upf) exit() {
 	u.intf.exit()
+}
+
+func (u *upf) addSliceInfo(sliceInfo *SliceInfo) error {
+	if sliceInfo == nil {
+		return errors.New("invalid slice")
+	}
+
+	u.sliceInfo = sliceInfo
+
+	return u.intf.addSliceInfo(sliceInfo)
 }
 
 func (u *upf) sim(method string) {
