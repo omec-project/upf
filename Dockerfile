@@ -63,7 +63,7 @@ RUN ./build_bess.sh && \
     cp -a protobuf /protobuf
 
 # Stage bess: creates the runtime image of BESS
-FROM python:3.9.7-slim AS bess
+FROM python:3.10.0-slim AS bess
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         gcc \
