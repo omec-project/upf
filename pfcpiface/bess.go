@@ -772,16 +772,14 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 		srcIface = access
 
 		// Lookup QCI from QFI, else try default QCI.
-		if qosVal, ok := b.qciQosMap[qer.qfi]; ok {
-			cbs = uint64(qosVal.cbs)
-			ebs = uint64(qosVal.ebs)
-			pbs = uint64(qosVal.pbs)
-		} else {
-			qosVal := b.qciQosMap[0]
-			cbs = maxUint64(calcBurstSizeFromRate(qer.ulGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
-			ebs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
-			pbs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
+		qosVal, ok := b.qciQosMap[qer.qfi]
+		if !ok {
+			log.Debug("No config for qfi/qci : ", qer.qfi, ". Using default burst size.")
+			qosVal = b.qciQosMap[0]
 		}
+		cbs = maxUint64(calcBurstSizeFromRate(qer.ulGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
+		ebs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
+		pbs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 
 		if qer.ulStatus == ie.GateStatusClosed {
 			gate = qerGateStatusDrop
@@ -824,16 +822,14 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 		srcIface = core
 
 		// Lookup QCI from QFI, else try default QCI.
-		if qosVal, ok := b.qciQosMap[qer.qfi]; ok {
-			cbs = uint64(qosVal.cbs)
-			ebs = uint64(qosVal.ebs)
-			pbs = uint64(qosVal.pbs)
-		} else {
-			qosVal := b.qciQosMap[0]
-			cbs = maxUint64(calcBurstSizeFromRate(qer.dlGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
-			ebs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
-			pbs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
+		qosVal, ok = b.qciQosMap[qer.qfi]
+		if !ok {
+			log.Debug("No config for qfi/qci : ", qer.qfi, ". Using default burst size.")
+			qosVal = b.qciQosMap[0]
 		}
+		cbs = maxUint64(calcBurstSizeFromRate(qer.dlGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
+		ebs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
+		pbs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 
 		if qer.dlStatus == ie.GateStatusClosed {
 			gate = qerGateStatusDrop
