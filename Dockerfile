@@ -66,7 +66,7 @@ RUN ./build_bess.sh && \
 FROM python:3.10.0-slim AS bess
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        gcc \
+        g++ \
         libgraph-easy-perl \
         iproute2 \
         iptables \
@@ -83,7 +83,7 @@ RUN apt-get update && \
         pyroute2 \
         scapy && \
     apt-get --purge remove -y \
-        gcc
+        g++
 COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin/bessd
 COPY --from=bess-build /bin/modules /bin/modules
