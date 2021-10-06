@@ -84,6 +84,15 @@
 
     "qci_qos_config": [
         {
+            "": "Default values for QERs with QCI/QFI not listed below",
+            "qci": 0,
+            "cbs": 50000,
+            "ebs": 50000,
+            "pbs": 50000,
+            "burst_duration_ms": 10,
+            "priority": 7
+        },
+        {
             "qci": 9,
             "cbs": 2048,
             "ebs": 2048,
@@ -103,10 +112,10 @@
     "slice_rate_limit_config": {
         "": "uplink policer",
         "n6_bps": 500000000,
-        "n6_burst_bytes": 3000,
+        "n6_burst_bytes": 625000,
         "": "downlink policer",
         "n3_bps": 500000000,
-        "n3_burst_bytes": 3000
+        "n3_burst_bytes": 625000
     },
 
     "": "Control plane controller settings",

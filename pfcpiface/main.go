@@ -53,6 +53,7 @@ type QciQosConfig struct {
 	CBS                uint32 `json:"cbs"`
 	PBS                uint32 `json:"pbs"`
 	EBS                uint32 `json:"ebs"`
+	BurstDurationMs    uint32 `json:"burst_duration_ms"`
 	SchedulingPriority uint32 `json:"priority"`
 }
 

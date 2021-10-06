@@ -119,3 +119,8 @@ func maxUint64(x, y uint64) uint64 {
 
 	return x
 }
+
+// Returns the bandwidth delay product for a given rate in kbps and duration in ms.
+func calcBurstSizeFromRate(kbps uint64, ms uint64) uint64 {
+	return uint64((float64(kbps) * 1000 / 8) * (float64(ms) / 1000))
+}
