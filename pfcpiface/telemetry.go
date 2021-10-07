@@ -67,10 +67,11 @@ type upfCollector struct {
 	latency *prometheus.Desc
 	jitter  *prometheus.Desc
 
-	sessionLatency       *prometheus.Desc
-	sessionDropRate      *prometheus.Desc
-	sessionThroughputBps *prometheus.Desc
-	sessionThroughputPps *prometheus.Desc
+	sessionLatency             *prometheus.Desc
+	sessionDropRate            *prometheus.Desc
+	sessionThroughputBps       *prometheus.Desc
+	sessionThroughputPps       *prometheus.Desc
+	sessionObservationDuration *prometheus.Desc
 
 	upf *upf
 }
@@ -110,6 +111,10 @@ func newUpfCollector(upf *upf) *upfCollector {
 			[]string{"fseid", "pdr"}, nil,
 		),
 		sessionThroughputPps: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "throughput_pps"),
+			"Shows todo in UPF",
+			[]string{"fseid", "pdr"}, nil,
+		),
+		sessionObservationDuration: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "observation_duration_ns"),
 			"Shows todo in UPF",
 			[]string{"fseid", "pdr"}, nil,
 		),

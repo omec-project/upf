@@ -391,26 +391,35 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 			dropRate := 1 - (float64(statsOut.TotalPackets) / float64(statsIn.TotalPackets))
 			bitsPerSecond := float64(statsOut.TotalBytes*8) / (float64(statsOut.ObservationDurationNs) / (1000 * 1000 * 1000))
 			packetsPerSecond := float64(statsOut.TotalPackets) / (float64(statsOut.ObservationDurationNs) / (1000 * 1000 * 1000))
+			fseidString := strconv.FormatUint(statsOut.Fseid, 10)
+			pdrString := strconv.FormatUint(statsOut.Pdr, 10)
 			ch <- prometheus.MustNewConstMetric(
 				uc.sessionDropRate,
 				prometheus.GaugeValue,
 				dropRate,
-				strconv.FormatUint(statsOut.Fseid, 10),
-				strconv.FormatUint(statsOut.Pdr, 10),
+				fseidString,
+				pdrString,
 			)
 			ch <- prometheus.MustNewConstMetric(
 				uc.sessionThroughputBps,
 				prometheus.GaugeValue,
 				bitsPerSecond,
-				strconv.FormatUint(statsOut.Fseid, 10),
-				strconv.FormatUint(statsOut.Pdr, 10),
+				fseidString,
+				pdrString,
 			)
 			ch <- prometheus.MustNewConstMetric(
 				uc.sessionThroughputPps,
 				prometheus.GaugeValue,
 				packetsPerSecond,
-				strconv.FormatUint(statsOut.Fseid, 10),
-				strconv.FormatUint(statsOut.Pdr, 10),
+				fseidString,
+				pdrString,
+			)
+			ch <- prometheus.MustNewConstMetric(
+				uc.sessionObservationDuration,
+				prometheus.GaugeValue,
+				float64(statsOut.ObservationDurationNs),
+				fseidString,
+				pdrString,
 			)
 		}
 		for _, v := range qosStatsOutResp.Statistics[:3] {
