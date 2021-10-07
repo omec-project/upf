@@ -47,13 +47,15 @@ CommandResponse QosMeasure::Init(const bess::pb::EmptyArg &arg) {
   table_a_ = rte_hash_find_existing(hash_params.name);
   if (!table_a_) {
     table_a_ = rte_hash_create(&hash_params);
-    if (!table_a_) return CommandFailure(rte_errno, "could not create hashamp");
+    if (!table_a_)
+      return CommandFailure(rte_errno, "could not create hashamp");
   }
   hash_params.name = "qos_measure_table_b";
   table_b_ = rte_hash_find_existing(hash_params.name);
   if (!table_b_) {
     table_b_ = rte_hash_create(&hash_params);
-    if (!table_b_) return CommandFailure(rte_errno, "could not create hashamp");
+    if (!table_b_)
+      return CommandFailure(rte_errno, "could not create hashamp");
   }
 
   LOG(INFO) << "TableKey size: " << sizeof(TableKey)
