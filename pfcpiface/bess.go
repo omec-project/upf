@@ -353,23 +353,69 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
 	resp, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
-		Name: "qosMeasure",
+		Name: "qosMeasureIn",
 		Cmd:  "read",
 		Arg:  any,
 	})
 	if err != nil {
-		log.Errorln("qosMeasure read failed!:", err)
+		log.Errorln("qosMeasureIn read failed!:", err)
 		return
 	}
-	qosStatsResp := &pb.QosMeasureReadResponse{}
-	if err = resp.Data.UnmarshalTo(qosStatsResp); err != nil {
+	qosStatsInResp := &pb.QosMeasureReadResponse{}
+	if err = resp.Data.UnmarshalTo(qosStatsInResp); err != nil {
 		log.Errorln(err)
 		return
 	}
-	if len(qosStatsResp.Statistics) > 3 {
-		for _, v := range qosStatsResp.Statistics[:3] {
+	resp, err = b.client.ModuleCommand(ctx, &pb.CommandRequest{
+		Name: "qosMeasureOut",
+		Cmd:  "read",
+		Arg:  any,
+	})
+	if err != nil {
+		log.Errorln("qosMeasureOut read failed!:", err)
+		return
+	}
+	qosStatsOutResp := &pb.QosMeasureReadResponse{}
+	if err = resp.Data.UnmarshalTo(qosStatsOutResp); err != nil {
+		log.Errorln(err)
+		return
+	}
+	if len(qosStatsInResp.Statistics) > 3 && len(qosStatsOutResp.Statistics) > 3 {
+		for i := 0; i < 3; /*len(qosStatsInResp.Statistics) && i < len(qosStatsOutResp.Statistics)*/ i++ {
+			statsIn := qosStatsInResp.Statistics[i]
+			statsOut := qosStatsOutResp.Statistics[i]
+			// FIXME
+			if statsIn.Fseid != statsOut.Fseid || statsIn.Pdr != statsOut.Pdr {
+				continue
+			}
+			dropRate := 1 - (float64(statsOut.TotalPackets) / float64(statsIn.TotalPackets))
+			bitsPerSecond := float64(statsOut.TotalBytes*8) / (float64(statsOut.ObservationDurationNs) / (1000 * 1000 * 1000))
+			packetsPerSecond := float64(statsOut.TotalPackets) / (float64(statsOut.ObservationDurationNs) / (1000 * 1000 * 1000))
+			ch <- prometheus.MustNewConstMetric(
+				uc.sessionDropRate,
+				prometheus.GaugeValue,
+				dropRate,
+				strconv.FormatUint(statsOut.Fseid, 10),
+				strconv.FormatUint(statsOut.Pdr, 10),
+			)
+			ch <- prometheus.MustNewConstMetric(
+				uc.sessionThroughputBps,
+				prometheus.GaugeValue,
+				bitsPerSecond,
+				strconv.FormatUint(statsOut.Fseid, 10),
+				strconv.FormatUint(statsOut.Pdr, 10),
+			)
+			ch <- prometheus.MustNewConstMetric(
+				uc.sessionThroughputPps,
+				prometheus.GaugeValue,
+				packetsPerSecond,
+				strconv.FormatUint(statsOut.Fseid, 10),
+				strconv.FormatUint(statsOut.Pdr, 10),
+			)
+		}
+		for _, v := range qosStatsOutResp.Statistics[:3] {
 			ch <- prometheus.MustNewConstSummary(
-				uc.session,
+				uc.sessionLatency,
 				v.TotalPackets,
 				0,
 				map[float64]float64{

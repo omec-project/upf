@@ -67,7 +67,10 @@ type upfCollector struct {
 	latency *prometheus.Desc
 	jitter  *prometheus.Desc
 
-	session *prometheus.Desc
+	sessionLatency       *prometheus.Desc
+	sessionDropRate      *prometheus.Desc
+	sessionThroughputBps *prometheus.Desc
+	sessionThroughputPps *prometheus.Desc
 
 	upf *upf
 }
@@ -94,7 +97,19 @@ func newUpfCollector(upf *upf) *upfCollector {
 			"Shows the packet processing jitter percentiles in UPF",
 			[]string{"iface"}, nil,
 		),
-		session: prometheus.NewDesc(prometheus.BuildFQName("upf", "session_latency", "ns"),
+		sessionLatency: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "latency_ns"),
+			"Shows todo in UPF",
+			[]string{"fseid", "pdr"}, nil,
+		),
+		sessionDropRate: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "drop_rate"),
+			"Shows todo in UPF",
+			[]string{"fseid", "pdr"}, nil,
+		),
+		sessionThroughputBps: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "throughput_bps"),
+			"Shows todo in UPF",
+			[]string{"fseid", "pdr"}, nil,
+		),
+		sessionThroughputPps: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "throughput_pps"),
 			"Shows todo in UPF",
 			[]string{"fseid", "pdr"}, nil,
 		),

@@ -192,10 +192,11 @@ linkMerge::Merge() \
                                         {'attr_name':'qer_id', 'num_bytes':4}, \
                                         {'attr_name':'far_id', 'num_bytes':4}],\
                                 entries=parser.table_size_pdr_lookup):noGTPUDecap \
-    -> preQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions)
+    -> preQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
+    -> qosMeasureIn::QosMeasure()
 
 # Insert NTF module, if enabled
-_in = preQoSCounter
+_in = qosMeasureIn
 if ntf:
   _in -> ntf
   _in = ntf
@@ -206,10 +207,10 @@ _in -> appQERLookup::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
                          values=[{'attr_name':'qfi', 'num_bytes':1}],\
                          entries = parser.table_size_app_qer_lookup)
 
-qosMeasure::QosMeasure()
+qosMeasureOut::QosMeasure()
 executeFAR::Split(size=1, attribute='action')
-_in = qosMeasure
-qosMeasure -> executeFAR
+_in = qosMeasureOut
+qosMeasureOut -> executeFAR
 if parser.enable_slice_metering:
     # sliceMeter enforces a per slice, per direction meter rate limit
     sliceMeter::Qos(fields=[{'attr_name':'action', 'num_bytes':1}, \
@@ -224,11 +225,11 @@ if parser.enable_slice_metering:
     m_fail   = 4 # For lookup failure traffic
     m_unmeter = 5 # For unmetered traffic
     # Admit green and yellow, drop red
-    sliceMeter:m_green -> qosMeasure
-    sliceMeter:m_yellow -> qosMeasure
+    sliceMeter:m_green -> qosMeasureOut
+    sliceMeter:m_yellow -> qosMeasureOut
     sliceMeter:m_red -> sliceMeterRed::Sink()
     sliceMeter:m_fail -> sliceMeterLookupFail::Sink()
-    sliceMeter:m_unmeter -> qosMeasure
+    sliceMeter:m_unmeter -> qosMeasureOut
     sliceMeter.set_default_gate(gate=m_fail)
     _in = sliceMeter
 
