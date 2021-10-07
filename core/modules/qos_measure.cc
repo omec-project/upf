@@ -5,12 +5,15 @@
 
 #include "qos_measure.h"
 
+#include <rte_errno.h>
+#include <rte_jhash.h>
+
 #include "../core/utils/common.h"
 
 /*----------------------------------------------------------------------------------*/
 const Commands QosMeasure::cmds = {
     {"read", "QosMeasureReadArg",
-     MODULE_CMD_FUNC(&QosMeasure::CommandReadStats), Command::THREAD_UNSAFE},
+     MODULE_CMD_FUNC(&QosMeasure::CommandReadStats), Command::THREAD_SAFE},
 };
 /*----------------------------------------------------------------------------------*/
 CommandResponse QosMeasure::Init(const bess::pb::EmptyArg &arg) {
@@ -30,6 +33,38 @@ CommandResponse QosMeasure::Init(const bess::pb::EmptyArg &arg) {
   LOG(INFO) << "TS attr ID " << ts_attr_id_;
   LOG(INFO) << "FSEID attr ID " << fseid_attr_id_;
   LOG(INFO) << "PDR attr ID " << pdr_attr_id_;
+
+  rte_hash_parameters hash_params = {};
+  hash_params.entries = kMaxNumEntries;
+  hash_params.key_len = sizeof(TableKey);
+  hash_params.hash_func = rte_jhash;
+  hash_params.socket_id = (int)rte_socket_id();
+  hash_params.extra_flag = RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY;
+
+  // Find existing tables or create new ones.
+  // TODO: only needed in global design, remove otherwise.
+  hash_params.name = "qos_measure_table_a";
+  table_a_ = rte_hash_find_existing(hash_params.name);
+  if (!table_a_) {
+    table_a_ = rte_hash_create(&hash_params);
+    if (!table_a_) return CommandFailure(rte_errno, "could not create hashamp");
+  }
+  hash_params.name = "qos_measure_table_b";
+  table_b_ = rte_hash_find_existing(hash_params.name);
+  if (!table_b_) {
+    table_b_ = rte_hash_create(&hash_params);
+    if (!table_b_) return CommandFailure(rte_errno, "could not create hashamp");
+  }
+
+  LOG(INFO) << "TableKey size: " << sizeof(TableKey)
+            << ", SessionStats size: " << sizeof(SessionStats) << ".";
+
+  // resize() would require a copyable object.
+  std::vector<SessionStats> tmp_a(kMaxNumEntries);
+  std::vector<SessionStats> tmp_b(kMaxNumEntries);
+  table_data_a_.swap(tmp_a);
+  table_data_b_.swap(tmp_b);
+  LOG(INFO) << "Tables created successfully.";
 
   return CommandSuccess();
 }
@@ -57,9 +92,22 @@ void QosMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
       continue;
     }
     uint64_t diff_ns = now_ns - ts_ns;
-    // TODO: use better key.
-    uint64_t index = fseid ^ static_cast<uint64_t>(pdr);
-    SessionStats &stat = stats_[index];  // Find or insert.
+    TableKey key(fseid, pdr);
+    // Find or create session.
+    int32_t ret = rte_hash_lookup(table_a_, &key);
+    if (ret == -ENOENT) {
+      ret = rte_hash_add_key(table_a_, &key);
+    }
+    if (ret < 0) {
+      LOG(ERROR) << "Failed to lookup or insert session stats for key "
+                 << key.ToString() << ": " << ret << ", "
+                 << rte_strerror(rte_errno);
+      continue;
+    }
+    LOG_EVERY_N(WARNING, 100'001) << "rte_hash_lookup/insert = " << ret;
+    // Update stats.
+    SessionStats &stat = table_data_a_.at(ret);
+    const std::lock_guard<std::mutex> lock(stat.mutex);
     if (stat.last_latency == 0) {
       stat.last_latency = diff_ns;
     }
@@ -69,7 +117,7 @@ void QosMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     stat.jitter_histogram.Insert(jitter_ns);
     stat.pkt_count += 1;
     stat.byte_count += batch->pkts()[i]->total_len();
-    LOG_EVERY_N(WARNING, 100'000)
+    LOG_EVERY_N(WARNING, 100'001)
         << "FSEID: " << fseid << ", PDR: " << pdr << ": " << diff_ns << "ns.";
   }
 
@@ -81,16 +129,24 @@ CommandResponse QosMeasure::CommandReadStats(
     const bess::pb::QosMeasureReadArg &arg) {
   bess::pb::QosMeasureReadResponse resp;
   auto t_start = std::chrono::high_resolution_clock::now();
-  for (auto &e : stats_) {
-    const auto &index = e.first;
-    SessionStats &session_stat = e.second;
-    bess::pb::QosMeasureReadResponse::Statistic stat;
+  const void *key = nullptr;
+  void *data = nullptr;
+  uint32_t next = 0;
+  int32_t ret = 0;
+  while (ret = rte_hash_iterate(table_a_, &key, &data, &next), ret >= 0) {
+    LOG_EVERY_N(WARNING, 1'001)
+        << ret << ", key " << key << ", data " << data << ", next " << next;
+    const TableKey *table_key = reinterpret_cast<const TableKey *>(key);
+    const SessionStats &session_stat = table_data_a_.at(ret);
+    const std::lock_guard<std::mutex> lock(session_stat.mutex);
     const auto lat_summary =
         session_stat.latency_histogram.Summarize({50., 90., 99., 99.9});
     const auto jitter_summary =
         session_stat.jitter_histogram.Summarize({50., 90., 99., 99.9});
-    LOG(WARNING) << SummaryToString(lat_summary);
-    stat.set_fseid(index);
+    LOG_EVERY_N(WARNING, 1'001) << SummaryToString(lat_summary);
+    bess::pb::QosMeasureReadResponse::Statistic stat;
+    stat.set_fseid(table_key->fseid);
+    stat.set_pdr(table_key->pdr);
     stat.set_latency_50_ns(lat_summary.percentile_values[0]);
     stat.set_latency_90_ns(lat_summary.percentile_values[1]);
     stat.set_latency_99_ns(lat_summary.percentile_values[2]);
@@ -105,7 +161,20 @@ CommandResponse QosMeasure::CommandReadStats(
   }
 
   if (arg.clear()) {
-    stats_.clear();
+    LOG(WARNING) << "1";
+    rte_hash_reset(table_a_);
+    rte_hash_reset(table_b_);
+    // TODO: this is quite slow
+    LOG(WARNING) << "2";
+    for (auto &stat : table_data_a_) {
+      const std::lock_guard<std::mutex> lock(stat.mutex);
+      stat.reset();
+    }
+    for (auto &stat : table_data_b_) {
+      const std::lock_guard<std::mutex> lock(stat.mutex);
+      stat.reset();
+    }
+    LOG(WARNING) << "3";
   }
 
   auto t_done = std::chrono::high_resolution_clock::now();
