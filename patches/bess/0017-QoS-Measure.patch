@@ -2,11 +2,14 @@ diff --git a/protobuf/module_msg.proto b/protobuf/module_msg.proto
 index c435437a..a6e606f4 100644
 --- a/protobuf/module_msg.proto
 +++ b/protobuf/module_msg.proto
-@@ -1332,3 +1332,24 @@ message QosCommandClearArg {
+@@ -1332,3 +1332,28 @@ message QosCommandClearArg {
  message QosCommandSetDefaultGateArg {
    uint64 gate = 1;
  }
 +
++message QosMeasureInitArg {
++  bool counter_only = 1; // If true, latency and jitter are not measured
++}
 +message QosMeasureReadArg {
 +  bool clear = 1; // If true, the data will be all cleared after read
 +}
@@ -24,6 +27,7 @@ index c435437a..a6e606f4 100644
 +    uint64 jitter_99_9_ns = 10;
 +    uint64 total_bytes = 11;
 +    uint64 total_packets = 12;
++    uint64 observation_duration_ns = 13;
 +  }
 +  repeated Statistic statistics = 1;
 +}

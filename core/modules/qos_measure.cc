@@ -16,7 +16,7 @@ const Commands QosMeasure::cmds = {
      MODULE_CMD_FUNC(&QosMeasure::CommandReadStats), Command::THREAD_SAFE},
 };
 /*----------------------------------------------------------------------------------*/
-CommandResponse QosMeasure::Init(const bess::pb::EmptyArg &arg) {
+CommandResponse QosMeasure::Init(const bess::pb::QosMeasureInitArg &arg) {
   (void)arg;
   using AccessMode = bess::metadata::Attribute::AccessMode;
   ts_attr_id_ =
@@ -128,7 +128,7 @@ void QosMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   RunNextModule(ctx, batch);
 }
 /*----------------------------------------------------------------------------------*/
-// command module qosMeasure read QosMeasureReadArg {'clear': False}
+// command module qosMeasureOut read QosMeasureReadArg {'clear': False}
 CommandResponse QosMeasure::CommandReadStats(
     const bess::pb::QosMeasureReadArg &arg) {
   bess::pb::QosMeasureReadResponse resp;
@@ -143,11 +143,15 @@ CommandResponse QosMeasure::CommandReadStats(
     const TableKey *table_key = reinterpret_cast<const TableKey *>(key);
     const SessionStats &session_stat = table_data_a_.at(ret);
     const std::lock_guard<std::mutex> lock(session_stat.mutex);
+    uint64_t now = tsc_to_ns(rdtsc());
     const auto lat_summary =
         session_stat.latency_histogram.Summarize({50., 90., 99., 99.9});
     const auto jitter_summary =
         session_stat.jitter_histogram.Summarize({50., 90., 99., 99.9});
-    LOG_EVERY_N(WARNING, 1'001) << SummaryToString(lat_summary);
+    LOG_EVERY_N(WARNING, 1'001)
+        << SummaryToString(lat_summary) << ", observation duration: "
+        << (now - session_stat.last_clear_time) / 1'000'000 << "ms (" << now
+        << " - " << session_stat.last_clear_time << ").";
     bess::pb::QosMeasureReadResponse::Statistic stat;
     stat.set_fseid(table_key->fseid);
     stat.set_pdr(table_key->pdr);
@@ -161,6 +165,7 @@ CommandResponse QosMeasure::CommandReadStats(
     stat.set_jitter_99_9_ns(jitter_summary.percentile_values[3]);
     stat.set_total_packets(session_stat.pkt_count);
     stat.set_total_bytes(session_stat.byte_count);
+    stat.set_observation_duration_ns(now - session_stat.last_clear_time);
     *resp.add_statistics() = stat;
   }
 
