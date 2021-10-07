@@ -21,7 +21,8 @@ class QosMeasure final : public Module {
         ts_attr_id_(-1),
         fseid_attr_id_(-1),
         pdr_attr_id_(-1) {
-    max_allowed_workers_ = Worker::kMaxWorkers;
+    // Multi-writer support is not enabled on the hash maps.
+    max_allowed_workers_ = 1;
   }
 
   static constexpr uint32_t kMaxNumEntries = 1 << 15;
