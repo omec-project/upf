@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"strconv"
 	"time"
 
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
@@ -340,6 +341,48 @@ func (b *bess) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metri
 	}
 	measureIface("Access", uc.upf.accessIface)
 	measureIface("Core", uc.upf.coreIface)
+}
+
+func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err error) {
+	req := &pb.QosMeasureReadArg{}
+	any, err := anypb.New(req)
+	if err != nil {
+		log.Errorln("Error marshalling request", req, err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel()
+	resp, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
+		Name: "qosMeasure",
+		Cmd:  "read",
+		Arg:  any,
+	})
+	if err != nil {
+		log.Errorln("qosMeasure read failed!:", err)
+		return
+	}
+	qosStatsResp := &pb.QosMeasureReadResponse{}
+	if err = resp.Data.UnmarshalTo(qosStatsResp); err != nil {
+		log.Errorln(err)
+		return
+	}
+	if len(qosStatsResp.Statistics) > 3 {
+		for _, v := range qosStatsResp.Statistics[:3] {
+			ch <- prometheus.MustNewConstSummary(
+				uc.session,
+				v.TotalPackets,
+				0,
+				map[float64]float64{
+					50.0: float64(v.Latency_50Ns),
+					99.0: float64(v.Latency_99Ns),
+					99.9: float64(v.Latency_99_9Ns),
+				},
+				strconv.FormatUint(v.Fseid, 10),
+				strconv.FormatUint(v.Pdr, 10),
+			)
+		}
+	}
+	return
 }
 
 func (b *bess) endMarkerSendLoop(endMarkerChan chan []byte) {

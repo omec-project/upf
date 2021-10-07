@@ -67,6 +67,8 @@ type upfCollector struct {
 	latency *prometheus.Desc
 	jitter  *prometheus.Desc
 
+	session *prometheus.Desc
+
 	upf *upf
 }
 
@@ -92,6 +94,10 @@ func newUpfCollector(upf *upf) *upfCollector {
 			"Shows the packet processing jitter percentiles in UPF",
 			[]string{"iface"}, nil,
 		),
+		session: prometheus.NewDesc(prometheus.BuildFQName("upf", "session_latency", "ns"),
+			"Shows todo in UPF",
+			[]string{"fseid", "pdr"}, nil,
+		),
 		upf: upf,
 	}
 }
@@ -110,6 +116,9 @@ func (uc *upfCollector) Describe(ch chan<- *prometheus.Desc) {
 func (uc *upfCollector) Collect(ch chan<- prometheus.Metric) {
 	uc.summaryLatencyJitter(ch)
 	uc.portStats(ch)
+	if err := uc.sessionStats(ch); err != nil {
+		log.Error(err)
+	}
 }
 
 func (uc *upfCollector) portStats(ch chan<- prometheus.Metric) {
@@ -119,6 +128,10 @@ func (uc *upfCollector) portStats(ch chan<- prometheus.Metric) {
 
 func (uc *upfCollector) summaryLatencyJitter(ch chan<- prometheus.Metric) {
 	uc.upf.intf.summaryLatencyJitter(uc, ch)
+}
+
+func (uc *upfCollector) sessionStats(ch chan<- prometheus.Metric) error {
+	return uc.upf.intf.sessionStats(uc, ch)
 }
 
 func setupProm(upf *upf) {
