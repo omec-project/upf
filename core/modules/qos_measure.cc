@@ -38,28 +38,42 @@ CommandResponse QosMeasure::Init(const bess::pb::QosMeasureInitArg &arg) {
   hash_params.entries = kMaxNumEntries;
   hash_params.key_len = sizeof(TableKey);
   hash_params.hash_func = rte_jhash;
-  hash_params.socket_id = (int)rte_socket_id();
+  hash_params.socket_id = static_cast<int>(rte_socket_id());
   hash_params.extra_flag = RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY;
 
   // Find existing tables or create new ones.
+  std::string name_a =
+      name() + "_table_a_" + std::to_string(hash_params.socket_id);
+  if (name_a.size() > RTE_HASH_NAMESIZE - 1) {
+    return CommandFailure(EINVAL, "invalid hash name");
+  }
+  hash_params.name = name_a.c_str();
+  VLOG(1) << "Finding table " << hash_params.name << " ...";
   // TODO: only needed in global design, remove otherwise.
-  hash_params.name = "qos_measure_table_a";
   table_a_ = rte_hash_find_existing(hash_params.name);
   if (!table_a_) {
+    VLOG(1) << "Table " << hash_params.name << " does not exist, creating it.";
     table_a_ = rte_hash_create(&hash_params);
   }
   if (!table_a_) {
-    return CommandFailure(rte_errno, "could not create hashamp");
+    return CommandFailure(rte_errno, "could not create hashmap");
   }
-  hash_params.name = "qos_measure_table_b";
+  std::string name_b =
+      name() + "_table_b_" + std::to_string(hash_params.socket_id);
+  hash_params.name = name_b.c_str();
+  if (name_b.size() > RTE_HASH_NAMESIZE - 1) {
+    return CommandFailure(EINVAL, "invalid hash name");
+  }
+  VLOG(1) << "Finding table " << hash_params.name << " ...";
+  // TODO: only needed in global design, remove otherwise.
   table_b_ = rte_hash_find_existing(hash_params.name);
   if (!table_b_) {
+    VLOG(1) << "Table " << hash_params.name << " does not exist, creating it.";
     table_b_ = rte_hash_create(&hash_params);
   }
   if (!table_b_) {
-    return CommandFailure(rte_errno, "could not create hashamp");
+    return CommandFailure(rte_errno, "could not create hashmap");
   }
-
   LOG(INFO) << "TableKey size: " << sizeof(TableKey)
             << ", SessionStats size: " << sizeof(SessionStats) << ".";
 
@@ -92,7 +106,7 @@ void QosMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     uint64_t fseid = get_attr<uint64_t>(this, fseid_attr_id_, batch->pkts()[i]);
     uint32_t pdr = get_attr<uint32_t>(this, pdr_attr_id_, batch->pkts()[i]);
     // Discard invalid timestamps.
-    if (now_ns < ts_ns) {
+    if (!ts_ns || now_ns < ts_ns) {
       continue;
     }
     uint64_t diff_ns = now_ns - ts_ns;
@@ -104,8 +118,7 @@ void QosMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     }
     if (ret < 0) {
       LOG(ERROR) << "Failed to lookup or insert session stats for key "
-                 << key.ToString() << ": " << ret << ", "
-                 << rte_strerror(rte_errno);
+                 << key.ToString() << ": " << ret << ", " << rte_strerror(ret);
       continue;
     }
     LOG_EVERY_N(WARNING, 100'001) << "rte_hash_lookup/insert = " << ret;

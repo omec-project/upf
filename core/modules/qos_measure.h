@@ -34,8 +34,9 @@ class QosMeasure final : public Module {
 
  private:
   // TableKey encapsulates all information used to identify a flow and is used
-  // as the lookup key in the hash tables.
-  struct TableKey {
+  // as the lookup key in the hash tables. It is packed and aligned to
+  // calculating a hash over the raw bytes of the struct is ok.
+  struct __attribute__((packed, aligned(16))) TableKey {
     uint64_t fseid;
     uint64_t pdr;
     TableKey(uint64_t fseid, uint64_t pdr) : fseid(fseid), pdr(pdr) {}
