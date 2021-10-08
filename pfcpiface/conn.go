@@ -297,6 +297,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 					hbTimerRunning = false
 					if upf.enableHBTimer {
 						hbErrCh = pconn.handleHeartBeats(upf, conn, packet.srcAddr.(*net.UDPAddr), pconnStatus.hbStatus) // start new hb timer
+						hbTimerRunning = true
 					}
 				}
 			case status := <-hbErrCh:
