@@ -275,7 +275,7 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 			case packet := <-readChannel:
 				connSetup := handleIncomingPfcpMsg(upf, &pconn, conn, &packet, &pfcpNodeIP, &pconnStatus)
 
-				if connSetup {
+				if upf.enableHBTimer && connSetup {
 					hbErrCh = pconn.handleHeartBeats(upf, conn, packet.srcAddr.(*net.UDPAddr), pconnStatus.hbStatus)
 					hbTimerRunning = true
 				}
@@ -293,8 +293,11 @@ func pfcpifaceMainLoop(upf *upf, accessIP, coreIP, sourceIP, smfName string) {
 				connReset := handleIncomingPfcpMsg(upf, &pconn, conn, &packet, &pfcpNodeIP, &pconnStatus)
 
 				if connReset {
-					pconnStatus.hbStatus <- false                                                                    // abort the old timer routine
-					hbErrCh = pconn.handleHeartBeats(upf, conn, packet.srcAddr.(*net.UDPAddr), pconnStatus.hbStatus) // start new hb timer
+					pconnStatus.hbStatus <- false // abort the old timer routine
+					hbTimerRunning = false
+					if upf.enableHBTimer {
+						hbErrCh = pconn.handleHeartBeats(upf, conn, packet.srcAddr.(*net.UDPAddr), pconnStatus.hbStatus) // start new hb timer
+					}
 				}
 			case status := <-hbErrCh:
 				// heartbeat timeout

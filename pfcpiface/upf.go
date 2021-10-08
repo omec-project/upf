@@ -55,7 +55,8 @@ type upf struct {
 	dnn              string
 	reportNotifyChan chan uint64
 	sliceInfo        *SliceInfo
-	maxRetries       uint8
+	enableHBTimer    bool
+	hbMaxRetries     uint8
 	hbInterval       time.Duration
 	hbRespDuration   time.Duration
 }

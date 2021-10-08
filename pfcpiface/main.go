@@ -42,8 +42,9 @@ type Conf struct {
 	LogLevel              string           `json:"log_level"`
 	QciQosConfig          []QciQosConfig   `json:"qci_qos_config"`
 	SliceMeterConfig      SliceMeterConfig `json:"slice_rate_limit_config"`
-	MaxRetries            uint8            `json:"max_retries"`
-	HeartBeatInterval     int              `json:"heart_beart_interval"`
+	EnableHBTimer         bool             `json:"enable_hbTimer"`
+	HbMaxRetries          uint8            `json:"hb_max_retries"`
+	HeartBeatInterval     int              `json:"heart_beat_interval"`
 	HeartBeatRespDuration int              `json:"heart_beat_resp_dur"`
 }
 
@@ -201,7 +202,8 @@ func main() {
 		enableEndMarker: conf.EnableEndMarker,
 		connTimeout:     time.Duration(conf.ConnTimeout) * time.Millisecond,
 		readTimeout:     time.Duration(conf.ReadTimeout) * time.Second,
-		maxRetries:      conf.MaxRetries,
+		enableHBTimer:   conf.EnableHBTimer,
+		hbMaxRetries:    conf.HbMaxRetries,
 		hbInterval:      time.Duration(conf.HeartBeatInterval) * time.Millisecond,
 		hbRespDuration:  time.Duration(conf.HeartBeatRespDuration) * time.Millisecond,
 	}

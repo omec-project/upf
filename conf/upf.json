@@ -7,15 +7,6 @@
     "": "max UE sessions",
     "max_sessions": 50000,
 
-    "": "max retries",
-    "max_retries": 5,
-
-    "": "heart beat interval",
-    "heart_beart_interval": 5000,
-
-    "": "heart beat resp duration",
-    "heart_beat_resp_dur": 2000,
-
     "": "Set the log level to one of \"panic\", \"fatal\", \"error\", \"warning\", \"info\", \"debug\", \"trace\"",
     "log_level": "info",
 
@@ -81,6 +72,12 @@
     "" : "read_timeout: 25",
     "" : "notify_sockaddr: /tmp/notifycp",
     "" : "endmarker_sockaddr: /tmp/pfcpport",
+
+    "": "Whether to enable UPF HeartBeatTimer feature",
+    "enable_hbTimer": false,
+    "": "hb_max_retries: 5",
+    "": "heart_beat_interval: 5000",
+    "": "heart_beat_resp_dur: 2000",
 
     "qci_qos_config": [
         {

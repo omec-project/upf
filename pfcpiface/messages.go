@@ -20,7 +20,7 @@ const (
 	DefaultDDNTimeout = 20
 )
 
-func sendHeartBeatRequest(upf *upf, conn *net.UDPConn, pfcpConn *PFCPConn) {
+func sendHeartBeatRequest(upf *upf, conn *net.UDPConn, pfcpConn *PFCPConn, addr *net.UDPAddr) {
 	seq := pfcpConn.getSeqNum()
 
 	// Send heart beat request
@@ -34,9 +34,13 @@ func sendHeartBeatRequest(upf *upf, conn *net.UDPConn, pfcpConn *PFCPConn) {
 		log.Fatal(err)
 	}
 
-	if _, err := conn.Write(hbreq); err != nil {
-		log.Fatal(err)
+	if hbreq != nil {
+		if _, err := conn.WriteTo(hbreq, addr); err != nil {
+			log.Fatal(err)
+		}
 	}
+	log.Println("Sent Heart Beat Request to ", addr)
+
 }
 
 func (pc *PFCPConn) handleHeartBeats(upf *upf, conn *net.UDPConn, addr *net.UDPAddr, hbStatus chan bool) (errC chan bool) {
@@ -70,17 +74,17 @@ func (pc *PFCPConn) handleHeartBeats(upf *upf, conn *net.UDPConn, addr *net.UDPA
 				log.Println("HeartBeatTimer Expired")
 				if !hbRespTimerRunning {
 					// Send heart beat request
-					sendHeartBeatRequest(upf, conn, pc)
+					sendHeartBeatRequest(upf, conn, pc, addr)
 
 					// start response timer
 					log.Println("Started HB Response timer")
 					heartBeatTimer = time.NewTimer(upf.hbRespDuration)
 					hbRespTimerRunning = true
 				} else {
-					if retryCount < int(upf.maxRetries) {
+					if retryCount < int(upf.hbMaxRetries) {
 						retryCount++
 
-						sendHeartBeatRequest(upf, conn, pc)
+						sendHeartBeatRequest(upf, conn, pc, addr)
 
 						// start response timer
 						log.Printf("Started HB Response timer. RetryCount: %d", retryCount)
