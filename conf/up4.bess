@@ -190,7 +190,8 @@ linkMerge::Merge() \
                                         {'attr_name':'fseid', 'num_bytes':8}, \
                                         {'attr_name':'ctr_id', 'num_bytes':4}, \
                                         {'attr_name':'qer_id', 'num_bytes':4}, \
-                                        {'attr_name':'far_id', 'num_bytes':4}]):noGTPUDecap \
+                                        {'attr_name':'far_id', 'num_bytes':4}],\
+                                entries=parser.table_size_pdr_lookup):noGTPUDecap \
     -> preQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions)
 
 # Insert NTF module, if enabled
@@ -202,14 +203,16 @@ if ntf:
 _in -> appQERLookup::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
                                  {'attr_name':'qer_id', 'num_bytes':4}, \
                                  {'attr_name':'fseid', 'num_bytes':8}], \
-                         values=[{'attr_name':'qfi', 'num_bytes':1}])
+                         values=[{'attr_name':'qfi', 'num_bytes':1}],\
+                         entries = parser.table_size_app_qer_lookup)
 
 executeFAR::Split(size=1, attribute='action')
 _in = executeFAR
 if parser.enable_slice_metering:
     # sliceMeter enforces a per slice, per direction meter rate limit
     sliceMeter::Qos(fields=[{'attr_name':'action', 'num_bytes':1}, \
-                            {'attr_name':'tunnel_out_type', 'num_bytes':1}])
+                            {'attr_name':'tunnel_out_type', 'num_bytes':1}],\
+                            entries=8)
     # Reserved gates, reject rule adds with gate=1/2/3
     m_meter  = 0 # Placeholder gate not connected. Will meter if lookup result returns this gate
     m_green  = 1 # For green traffic
@@ -234,13 +237,15 @@ farLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
                                      {'attr_name':'tunnel_out_src_ip4addr', 'num_bytes':4}, \
                                      {'attr_name':'tunnel_out_dst_ip4addr', 'num_bytes':4}, \
                                      {'attr_name':'tunnel_out_teid', 'num_bytes':4}, \
-                                     {'attr_name':'tunnel_out_udp_port', 'num_bytes':2}]):noGTPUEncap \
+                                     {'attr_name':'tunnel_out_udp_port', 'num_bytes':2}],\
+                      entries=parser.table_size_far_lookup):noGTPUEncap \
     -> farMerge::Merge() \
     -> _in
 
 # sessionQERLookup enforces a per UE, per direction meter rate limit
 sessionQERLookup::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
-                              {'attr_name':'fseid', 'num_bytes':8}])
+                              {'attr_name':'fseid', 'num_bytes':8}],\
+                      entries=parser.table_size_session_qer_lookup)
 # Admit green, yellow and misses, drop red
 sessionQERLookup:qerGreenGate -> farLookup
 sessionQERLookup:qerYellowGate -> farLookup

@@ -27,9 +27,9 @@ const (
 	SockAddr = "/tmp/notifycp"
 	// PfcpAddr : Unix Socket path to send end marker packet.
 	PfcpAddr = "/tmp/pfcpport"
-	// AppQerLookup: Application Qos table Name
+	// AppQerLookup: Application Qos table Name.
 	AppQerLookup = "appQERLookup"
-	// SessQerLookup: Session Qos table Name
+	// SessQerLookup: Session Qos table Name.
 	SessQerLookup = "sessionQERLookup"
 	// far-action specific values.
 	farForwardD = 0x0

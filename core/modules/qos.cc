@@ -126,7 +126,7 @@ CommandResponse Qos::Init(const bess::pb::QosArg &arg) {
     cs[i] = 0xff;
   }
 
-  table_.Init(total_key_size_);
+  table_.Init(total_key_size_, arg.entries());
   return CommandSuccess();
 }
 

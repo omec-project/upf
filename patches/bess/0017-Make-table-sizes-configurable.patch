@@ -1,0 +1,114 @@
+diff --git a/core/modules/exact_match.cc b/core/modules/exact_match.cc
+index 6240262e..90a8f3ad 100644
+--- a/core/modules/exact_match.cc
++++ b/core/modules/exact_match.cc
+@@ -134,7 +134,7 @@ CommandResponse ExactMatch::Init(const bess::pb::ExactMatchArg &arg) {
+   }
+
+   default_gate_ = DROP_GATE;
+-  table_.Init();
++  table_.Init(arg.entries());
+   return CommandSuccess();
+ }
+
+diff --git a/core/modules/wildcard_match.cc b/core/modules/wildcard_match.cc
+index 3c8425e4..be9d6b04 100644
+--- a/core/modules/wildcard_match.cc
++++ b/core/modules/wildcard_match.cc
+@@ -147,6 +147,7 @@ CommandResponse WildcardMatch::Init(const bess::pb::WildcardMatchArg &arg) {
+   }
+   default_gate_ = DROP_GATE;
+   total_key_size_ = align_ceil(size_acc, sizeof(uint64_t));
++  entries_ = arg.entries();
+   // reset size_acc
+   size_acc = 0;
+   for (int i = 0; i < arg.values_size(); i++) {
+@@ -510,6 +511,9 @@ int WildcardMatch::AddTuple(wm_hkey_t *mask) {
+     if (tuples_[i].occupied == 0) {
+       bess::utils::Copy(&tuples_[i].mask, mask, sizeof(*mask));
+       tuples_[i].params.key_len = total_key_size_;
++      if (entries_) {
++        tuples_[i].params.entries = entries_;
++      }
+       temp = new CuckooMap<wm_hkey_t, struct WmData, wm_hash, wm_eq>(
+           0, 0, &tuples_[i].params);
+       if (temp == nullptr)
+diff --git a/core/modules/wildcard_match.h b/core/modules/wildcard_match.h
+index 0bd85f6b..09c41b58 100644
+--- a/core/modules/wildcard_match.h
++++ b/core/modules/wildcard_match.h
+@@ -130,7 +130,7 @@ class wm_hash {
+   size_t len_;
+ };
+ struct rte_hash_parameters dpdk_params1 {
+-  .name = "test2", .entries = 1 << 20, .reserved = 0,
++  .name = "test2", .entries = 1 << 15, .reserved = 0,
+   .key_len = sizeof(wm_hkey_t), .hash_func = rte_hash_crc,
+   .hash_func_init_val = 0, .socket_id = (int)rte_socket_id(),
+   .extra_flag = RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY
+@@ -210,6 +210,7 @@ class WildcardMatch final : public Module {
+
+   size_t total_key_size_;   /* a multiple of sizeof(uint64_t) */
+   size_t total_value_size_; /* a multiple of sizeof(uint64_t) */
++  size_t entries_;           /* a power of 2 */
+
+   // TODO(melvinw): this can be refactored to use ExactMatchTable
+   std::vector<struct WmField> fields_;
+diff --git a/core/utils/exact_match_table.h b/core/utils/exact_match_table.h
+index ac87e090..475efbd1 100644
+--- a/core/utils/exact_match_table.h
++++ b/core/utils/exact_match_table.h
+@@ -156,7 +156,7 @@ template <typename T>
+ class ExactMatchTable {
+  public:
+   struct rte_hash_parameters dpdk_params {
+-    .name = "test1", .entries = 1 << 20, .reserved = 0,
++    .name = "test1", .entries = 1 << 15, .reserved = 0,
+     .key_len = sizeof(ExactMatchKey), .hash_func = rte_hash_crc,
+     .hash_func_init_val = 0, .socket_id = (int)rte_socket_id(),
+     .extra_flag = RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY
+@@ -329,12 +329,15 @@ class ExactMatchTable {
+
+   typename EmTable::iterator end() { return table_->end(); }
+
+-  void Init() {
++  void Init(uint32_t entries) {
+     std::ostringstream address;
+     address << &table_;
+     std::string name = "Exactmatch" + address.str();
+     dpdk_params.name = name.c_str();
+     dpdk_params.key_len = total_key_size();
++    if (entries) {
++      dpdk_params.entries = entries;
++    }
+     table_.reset(
+         new CuckooMap<ExactMatchKey, T, ExactMatchKeyHash, ExactMatchKeyEq>(
+             0, 0, &dpdk_params));
+diff --git a/protobuf/module_msg.proto b/protobuf/module_msg.proto
+index c435437a..6758ffbf 100644
+--- a/protobuf/module_msg.proto
++++ b/protobuf/module_msg.proto
+@@ -508,6 +508,7 @@ message ExactMatchArg {
+   repeated FieldData masks = 2; /// mask(i) corresponds to the mask for field(i)
+   repeated Field values = 3; /// A list of ExactMatch Values
+   repeated FieldData masksv = 4; /// mask(i) corresponds to the mask for value(i)
++  uint64 entries = 5;
+ }
+
+ /**
+@@ -1239,6 +1240,7 @@ message VXLANEncapArg {
+ message WildcardMatchArg {
+   repeated Field fields = 1; /// A list of WildcardMatch fields.
+   repeated Field values = 2; /// A list of WildcardMatch values.
++  uint64 entries = 3;
+ }
+
+ /**
+@@ -1298,6 +1300,7 @@ message WorkerSplitArg {
+ message QosArg {
+   repeated Field fields = 1;
+   repeated Field values = 2;
++  uint64 entries = 3;
+ }
+
+ message QosCommandAddArg {
