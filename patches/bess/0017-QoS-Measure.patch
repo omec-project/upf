@@ -7,10 +7,10 @@ index c435437a..a6e606f4 100644
    uint64 gate = 1;
  }
 +
-+message QosMeasureInitArg {
++message QosMeasureArg {
 +  bool counter_only = 1; // If true, latency and jitter are not measured
 +}
-+message QosMeasureReadArg {
++message QosMeasureCommandReadArg {
 +  bool clear = 1; // If true, the data will be all cleared after read
 +}
 +message QosMeasureReadResponse {

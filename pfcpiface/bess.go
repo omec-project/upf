@@ -344,7 +344,7 @@ func (b *bess) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metri
 }
 
 func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err error) {
-	req := &pb.QosMeasureReadArg{}
+	req := &pb.QosMeasureCommandReadArg{}
 	any, err := anypb.New(req)
 	if err != nil {
 		log.Errorln("Error marshalling request", req, err)

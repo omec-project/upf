@@ -27,10 +27,10 @@ class QosMeasure final : public Module {
 
   static constexpr uint32_t kMaxNumEntries = 1 << 15;
   static const Commands cmds;
-  CommandResponse Init(const bess::pb::QosMeasureInitArg &arg);
+  CommandResponse Init(const bess::pb::QosMeasureArg &arg);
   void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
   std::string GetDesc() const override { return ""; };
-  CommandResponse CommandReadStats(const bess::pb::QosMeasureReadArg &arg);
+  CommandResponse CommandReadStats(const bess::pb::QosMeasureCommandReadArg &arg);
 
  private:
   // TableKey encapsulates all information used to identify a flow and is used

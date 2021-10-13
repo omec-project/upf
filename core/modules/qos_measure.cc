@@ -12,11 +12,11 @@
 
 /*----------------------------------------------------------------------------------*/
 const Commands QosMeasure::cmds = {
-    {"read", "QosMeasureReadArg",
+    {"read", "QosMeasureCommandReadArg",
      MODULE_CMD_FUNC(&QosMeasure::CommandReadStats), Command::THREAD_SAFE},
 };
 /*----------------------------------------------------------------------------------*/
-CommandResponse QosMeasure::Init(const bess::pb::QosMeasureInitArg &arg) {
+CommandResponse QosMeasure::Init(const bess::pb::QosMeasureArg &arg) {
   (void)arg;
   using AccessMode = bess::metadata::Attribute::AccessMode;
   ts_attr_id_ =
@@ -141,9 +141,9 @@ void QosMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   RunNextModule(ctx, batch);
 }
 /*----------------------------------------------------------------------------------*/
-// command module qosMeasureOut read QosMeasureReadArg {'clear': False}
+// command module qosMeasureOut read QosMeasureCommandReadArg {'clear': False}
 CommandResponse QosMeasure::CommandReadStats(
-    const bess::pb::QosMeasureReadArg &arg) {
+    const bess::pb::QosMeasureCommandReadArg &arg) {
   bess::pb::QosMeasureReadResponse resp;
   auto t_start = std::chrono::high_resolution_clock::now();
   const void *key = nullptr;
