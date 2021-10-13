@@ -670,11 +670,12 @@ func (b *bess) processPDR(ctx context.Context, any *anypb.Any, method upfMsgType
 
 	methods := [...]string{"add", "add", "delete", "clear"}
 
-	_, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
+	resp, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "pdrLookup",
 		Cmd:  methods[method],
 		Arg:  any,
 	})
+	log.Warnln(resp)
 	if err != nil {
 		log.Println("pdrLookup method failed!:", err)
 	}

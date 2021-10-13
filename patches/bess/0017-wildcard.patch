@@ -1,0 +1,78 @@
+diff --git a/core/modules/wildcard_match.cc b/core/modules/wildcard_match.cc
+index 3c8425e4..6936b01e 100644
+--- a/core/modules/wildcard_match.cc
++++ b/core/modules/wildcard_match.cc
+@@ -512,10 +512,13 @@ int WildcardMatch::AddTuple(wm_hkey_t *mask) {
+       tuples_[i].params.key_len = total_key_size_;
+       temp = new CuckooMap<wm_hkey_t, struct WmData, wm_hash, wm_eq>(
+           0, 0, &tuples_[i].params);
+-      if (temp == nullptr)
++      if (temp == nullptr) {
++        LOG(WARNING) << "1";
+         return -ENOSPC;
++      }
+       if (temp->hash == 0) {
+         delete temp;
++        LOG(WARNING) << "2";
+         return -ENOSPC;
+       }
+       void *temp1 = tuples_[i].ht;
+@@ -528,6 +531,7 @@ int WildcardMatch::AddTuple(wm_hkey_t *mask) {
+       return i;
+     }
+   }
++  LOG(WARNING) << "3";
+   return -ENOSPC;
+ }
+ 
+@@ -544,6 +548,7 @@ bool WildcardMatch::DelEntry(int idx, wm_hkey_t *key) {
+ 
+ CommandResponse WildcardMatch::CommandAdd(
+     const bess::pb::WildcardMatchCommandAddArg &arg) {
++  LOG(WARNING) << "WildcardMatchCommandAddArg " << arg.DebugString();
+   gate_idx_t gate = arg.gate();
+   int priority = arg.priority();
+   wm_hkey_t key = {{0}};
+@@ -566,6 +571,10 @@ CommandResponse WildcardMatch::CommandAdd(
+   data.priority = priority;
+   data.ogate = gate;
+   int idx = FindTuple(&mask);
++  LOG(WARNING) << "idx " << idx;
++  for (int i = 0; i < MAX_FIELDS; i++) {
++    LOG(WARNING) << "mask " << i << ": " << mask.u64_arr[i];
++  }
+   if (idx < 0) {
+     idx = AddTuple(&mask);
+     if (idx < 0) {
+@@ -719,12 +728,12 @@ CommandResponse WildcardMatch::SetRuntimeConfig(
+ }
+ 
+ void WildcardMatch::DeInit() {
+-    for (auto &tuple : tuples_) {
+-        if (!tuple.ht)
+-            continue;
+-        tuple.ht->DeInit();
+-        tuple.ht = NULL;
+-    }
++  for (auto &tuple : tuples_) {
++    if (!tuple.ht)
++      continue;
++    tuple.ht->DeInit();
++    tuple.ht = NULL;
++  }
+ }
+ 
+ ADD_MODULE(WildcardMatch, "wm",
+diff --git a/core/modules/wildcard_match.h b/core/modules/wildcard_match.h
+index 0bd85f6b..f76bf335 100644
+--- a/core/modules/wildcard_match.h
++++ b/core/modules/wildcard_match.h
+@@ -130,7 +130,7 @@ class wm_hash {
+   size_t len_;
+ };
+ struct rte_hash_parameters dpdk_params1 {
+-  .name = "test2", .entries = 1 << 20, .reserved = 0,
++  .name = "test2", .entries = 1 << 15, .reserved = 0,
+   .key_len = sizeof(wm_hkey_t), .hash_func = rte_hash_crc,
+   .hash_func_init_val = 0, .socket_id = (int)rte_socket_id(),
+   .extra_flag = RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY
