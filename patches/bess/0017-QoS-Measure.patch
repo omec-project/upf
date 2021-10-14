@@ -2,7 +2,7 @@ diff --git a/protobuf/module_msg.proto b/protobuf/module_msg.proto
 index c435437a..a6e606f4 100644
 --- a/protobuf/module_msg.proto
 +++ b/protobuf/module_msg.proto
-@@ -1332,3 +1332,28 @@ message QosCommandClearArg {
+@@ -1332,3 +1332,36 @@ message QosCommandClearArg {
  message QosCommandSetDefaultGateArg {
    uint64 gate = 1;
  }
@@ -30,4 +30,12 @@ index c435437a..a6e606f4 100644
 +    uint64 observation_duration_ns = 13;
 +  }
 +  repeated Statistic statistics = 1;
++}
++message DoubleBufferFlaggerArg {
++    string attr_name = 1;
++    uint64 size = 2;
++    uint64 value = 3;
++}
++message DoubleBufferCommandSetNewFlagValueArg {
++    uint64 new_flag = 1;
 +}

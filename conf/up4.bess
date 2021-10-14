@@ -177,6 +177,7 @@ if parser.enable_ntf:
 #   - proto_id
 
 linkMerge::Merge() \
+    -> flag::DoubleBufferFlagger(attr_name="buffer_flag", size=8, value=1) \
     -> pktParse::GtpuParser():1 \
     -> pdrLookup::WildcardMatch(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
                                         {'attr_name':'tunnel_ipv4_dst', 'num_bytes':4}, \
