@@ -383,11 +383,12 @@ CommandResponse Qos::CommandAdd(const bess::pb::QosCommandAddArg &arg) {
   }
 
   if (gate == METER_GATE) {
-    v.cir = arg.cir();
-    v.pir = arg.pir();
-    v.cbs = arg.cbs();
-    v.pbs = arg.pbs();
-    v.ebs = arg.ebs();
+    uint64_t cir = arg.cir();
+    uint64_t pir = arg.pir();
+    uint64_t cbs = arg.cbs();
+    uint64_t pbs = arg.pbs();
+    uint64_t ebs = arg.ebs();
+
     if (arg.optional_deduct_len_case() ==
         bess::pb::QosCommandAddArg::OPTIONAL_DEDUCT_LEN_NOT_SET) {
       v.deduct_len = 14;  // Exclude Ethernet header by default
@@ -396,11 +397,11 @@ CommandResponse Qos::CommandAdd(const bess::pb::QosCommandAddArg &arg) {
     }
 
     DLOG(INFO) << "Adding entry"
-               << " cir: " << v.cir << " pir: " << v.pir << " cbs: " << v.cbs
-               << " pbs: " << v.pbs << " ebs: " << v.ebs << std::endl;
+               << " cir: " << cir << " pir: " << pir << " cbs: " << cbs
+               << " pbs: " << pbs << " ebs: " << ebs << std::endl;
 
     struct rte_meter_trtcm_params app_trtcm_params = {
-        .cir = v.cir, .pir = v.pir, .cbs = v.cbs, .pbs = v.pbs};
+        .cir = cir, .pir = pir, .cbs = cbs, .pbs = pbs};
 
     int ret = rte_meter_trtcm_profile_config(&v.p, &app_trtcm_params);
     if (ret)
