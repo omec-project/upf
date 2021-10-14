@@ -188,7 +188,7 @@ void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     if (ogate == METER_GATE) {
       uint64_t time = rte_rdtsc();
       uint32_t pkt_len = pkt->total_len() - val[j]->deduct_len;
-      uint8_t color = rte_meter_trtcm_color_blind_check(&val[j]->m, &val[j]->p,
+      uint8_t color = rte_meter_trtcm_color_blind_check(&val[j]->m, val[j]->p,
                                                         time, pkt_len);
 
       DLOG(INFO) << "color : " << color << std::endl;
@@ -403,12 +403,28 @@ CommandResponse Qos::CommandAdd(const bess::pb::QosCommandAddArg &arg) {
     struct rte_meter_trtcm_params app_trtcm_params = {
         .cir = cir, .pir = pir, .cbs = cbs, .pbs = pbs};
 
-    int ret = rte_meter_trtcm_profile_config(&v.p, &app_trtcm_params);
-    if (ret)
-      return CommandFailure(
-          ret, "Insert Failed - rte_meter_trtcm_profile_config failed");
+    auto *result = params_map_.Find(app_trtcm_params);
 
-    ret = rte_meter_trtcm_config(&v.m, &v.p);
+    if (result == nullptr) {
+      struct rte_meter_trtcm_profile p;
+
+      int ret = rte_meter_trtcm_profile_config(&p, &app_trtcm_params);
+      if (ret)
+        return CommandFailure(
+            ret,
+            "Insert Failed - rte_meter_trtcm_profile_config creation failed");
+
+      result = params_map_.Insert(app_trtcm_params, p);
+      if (result == nullptr) {
+        return CommandFailure(
+            ret,
+            "Insert Failed - rte_meter_trtcm_profile_config map insert failed");
+      }
+    }
+
+    v.p = &result->second;
+
+    int ret = rte_meter_trtcm_config(&v.m, v.p);
     if (ret) {
       return CommandFailure(ret,
                             "Insert Failed - rte_meter_trtcm_config failed");
@@ -434,6 +450,7 @@ CommandResponse Qos::CommandClear(__attribute__((unused))
 
 void Qos::Clear() {
   table_.Clear();
+  params_map_.Clear();
 }
 
 void Qos::DeInit() {
