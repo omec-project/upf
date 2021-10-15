@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/binary"
 	"flag"
+	"fmt"
 	"math"
 	"net"
 	"time"
@@ -26,6 +27,10 @@ const (
 	SockAddr = "/tmp/notifycp"
 	// PfcpAddr : Unix Socket path to send end marker packet.
 	PfcpAddr = "/tmp/pfcpport"
+	// AppQerLookup: Application Qos table Name.
+	AppQerLookup = "appQERLookup"
+	// SessQerLookup: Session Qos table Name.
+	SessQerLookup = "sessionQERLookup"
 	// far-action specific values.
 	farForwardD = 0x0
 	farForwardU = 0x1
@@ -105,7 +110,8 @@ func (b *bess) addSliceInfo(sliceInfo *SliceInfo) error {
 	return nil
 }
 
-func (b *bess) sendMsgToUPF(method upfMsgType, pdrs []pdr, fars []far, qers []qer) uint8 {
+func (b *bess) sendMsgToUPF(
+	method upfMsgType, pdrs []pdr, fars []far, qers []qer) uint8 {
 	// create context
 	var cause uint8 = ie.CauseRequestAccepted
 
@@ -146,7 +152,7 @@ func (b *bess) sendMsgToUPF(method upfMsgType, pdrs []pdr, fars []far, qers []qe
 	}
 
 	for _, qer := range qers {
-		log.Traceln(qer)
+		log.Traceln("qer:", qer)
 
 		switch method {
 		case upfMsgTypeAdd:
@@ -171,7 +177,7 @@ func (b *bess) sendDeleteAllSessionsMsgtoUPF() {
 	defer cancel()
 
 	done := make(chan bool)
-	calls := 5
+	calls := 6
 
 	b.removeAllPDRs(ctx, done)
 	b.removeAllFARs(ctx, done)
@@ -492,7 +498,7 @@ func (b *bess) sim(u *upf, method string) {
 			fseID:     uint64(n3TEID + i),
 			ctrID:     i,
 			farID:     n3,
-			qerID:     n6,
+			qerIDList: []uint32{n6, 1},
 			needDecap: 0,
 		}
 
@@ -510,7 +516,7 @@ func (b *bess) sim(u *upf, method string) {
 			fseID:     uint64(n3TEID + i),
 			ctrID:     i,
 			farID:     n3,
-			qerID:     n9,
+			qerIDList: []uint32{n9, 1},
 			needDecap: 1,
 		}
 
@@ -531,7 +537,7 @@ func (b *bess) sim(u *upf, method string) {
 			fseID:     uint64(n3TEID + i),
 			ctrID:     i,
 			farID:     n6,
-			qerID:     n6,
+			qerIDList: []uint32{n6, 1},
 			needDecap: 1,
 		}
 
@@ -551,7 +557,7 @@ func (b *bess) sim(u *upf, method string) {
 			fseID:     uint64(n3TEID + i),
 			ctrID:     i,
 			farID:     n9,
-			qerID:     n9,
+			qerIDList: []uint32{n9, 1},
 			needDecap: 1,
 		}
 
@@ -618,6 +624,20 @@ func (b *bess) sim(u *upf, method string) {
 
 		qers := []qer{qerN6, qerN9}
 
+		// create/delete session qers
+		sessionQer := qer{
+			qerID:    1,
+			fseID:    uint64(n3TEID + i),
+			qosLevel: SessionQos,
+			qfi:      0,
+			ulGbr:    0,
+			ulMbr:    100000,
+			dlGbr:    0,
+			dlMbr:    500000,
+		}
+
+		qers = append(qers, sessionQer)
+
 		switch method {
 		case "create":
 			b.sendMsgToUPF(upfMsgTypeAdd, pdrs, fars, qers)
@@ -640,13 +660,16 @@ func (b *bess) processPDR(ctx context.Context, any *anypb.Any, method upfMsgType
 
 	methods := [...]string{"add", "add", "delete", "clear"}
 
-	_, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
+	resp, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "pdrLookup",
 		Cmd:  methods[method],
 		Arg:  any,
 	})
-	if err != nil {
-		log.Println("pdrLookup method failed!:", err)
+
+	log.Traceln("pdrlookup resp : ", resp)
+
+	if err != nil || resp.GetError() != nil {
+		log.Errorf("pdrLookup method failed with resp: %v, err: %v\n", resp, err)
 	}
 }
 
@@ -656,6 +679,13 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 			any *anypb.Any
 			err error
 		)
+
+		var qerID uint32
+
+		for _, qer := range p.qerIDList {
+			qerID = qer
+			break
+		}
 
 		f := &pb.WildcardMatchCommandAddArg{
 			Gate:     uint64(p.needDecap),
@@ -684,7 +714,7 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 				intEnc(uint64(p.pdrID)), /* pdr-id */
 				intEnc(p.fseID),         /* fseid */
 				intEnc(uint64(p.ctrID)), /* ctr_id */
-				intEnc(uint64(p.qerID)), /* qer_id */
+				intEnc(uint64(qerID)),   /* qer_id */
 				intEnc(uint64(p.farID)), /* far_id */
 			},
 		}
@@ -732,7 +762,7 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 		any, err = anypb.New(f)
 		if err != nil {
-			log.Println("Error marshalling the rule", f, err)
+			log.Errorln("Error marshalling the rule", f, err)
 			return
 		}
 
@@ -741,29 +771,9 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 	}()
 }
 
-func (b *bess) processQER(ctx context.Context, any *anypb.Any, method upfMsgType) {
-	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
-		log.Println("Invalid method name: ", method)
-		return
-	}
-
-	methods := [...]string{"add", "add", "delete", "clear"}
-
-	_, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
-		Name: "qerLookup",
-		Cmd:  methods[method],
-		Arg:  any,
-	})
-	if err != nil {
-		log.Println("qerLookup method failed!:", err)
-	}
-}
-
 func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 	go func() {
 		var (
-			any                           *anypb.Any
-			err                           error
 			cir, pir, cbs, ebs, pbs, gate uint64
 			srcIface                      uint8
 		)
@@ -775,8 +785,10 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 		qosVal, ok := b.qciQosMap[qer.qfi]
 		if !ok {
 			log.Debug("No config for qfi/qci : ", qer.qfi, ". Using default burst size.")
+
 			qosVal = b.qciQosMap[0]
 		}
+
 		cbs = maxUint64(calcBurstSizeFromRate(qer.ulGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
 		ebs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 		pbs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
@@ -793,30 +805,11 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 			gate = qerGateUnmeter
 		}
 
-		q := &pb.QosCommandAddArg{
-			Gate: gate,
-			Cir:  cir, /* committed info rate */
-			Pir:  pir, /* peak info rate */
-			Cbs:  cbs, /* committed burst size */
-			Pbs:  pbs, /* Peak burst size */
-			Ebs:  ebs, /* Excess burst size */
-			Fields: []*pb.FieldData{
-				intEnc(uint64(srcIface)),  /* Src Intf */
-				intEnc(uint64(qer.qerID)), /* qer_id */
-				intEnc(qer.fseID),         /* fseid */
-			},
-			Values: []*pb.FieldData{
-				intEnc(uint64(qer.qfi)), /* QFI */
-			},
+		if qer.qosLevel == ApplicationQos {
+			b.addApplicationQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
+		} else if qer.qosLevel == SessionQos {
+			b.addSessionQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
 		}
-
-		any, err = anypb.New(q)
-		if err != nil {
-			log.Println("Error marshalling the rule", q, err)
-			return
-		}
-
-		b.processQER(ctx, any, upfMsgTypeAdd)
 
 		// Downlink QER
 		srcIface = core
@@ -825,8 +818,10 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 		qosVal, ok = b.qciQosMap[qer.qfi]
 		if !ok {
 			log.Debug("No config for qfi/qci : ", qer.qfi, ". Using default burst size.")
+
 			qosVal = b.qciQosMap[0]
 		}
+
 		cbs = maxUint64(calcBurstSizeFromRate(qer.dlGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
 		ebs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 		pbs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
@@ -843,81 +838,108 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 			gate = qerGateUnmeter
 		}
 
-		q = &pb.QosCommandAddArg{
-			Gate: gate,
-			Cir:  cir, /* committed info rate */
-			Pir:  pir, /* peak info rate */
-			Cbs:  cbs, /* committed burst size */
-			Pbs:  pbs, /* Peak burst size */
-			Ebs:  ebs, /* Excess burst size */
-			Fields: []*pb.FieldData{
-				intEnc(uint64(srcIface)),  /* Src Intf */
-				intEnc(uint64(qer.qerID)), /* qer_id */
-				intEnc(qer.fseID),         /* fseid */
-			},
-			Values: []*pb.FieldData{
-				intEnc(uint64(qer.qfi)), /* QFI */
-			},
+		if qer.qosLevel == ApplicationQos {
+			b.addApplicationQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
+		} else if qer.qosLevel == SessionQos {
+			b.addSessionQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
 		}
 
-		any, err = anypb.New(q)
-		if err != nil {
-			log.Println("Error marshalling the rule", q, err)
-			return
-		}
-
-		b.processQER(ctx, any, upfMsgTypeAdd)
 		done <- true
 	}()
 }
 
+func (b *bess) addApplicationQER(ctx context.Context, gate uint64, srcIface uint8,
+	cir uint64, pir uint64, cbs uint64, pbs uint64,
+	ebs uint64, qer qer) {
+	var (
+		any *anypb.Any
+		err error
+	)
+
+	q := &pb.QosCommandAddArg{
+		Gate: gate,
+		Cir:  cir, /* committed info rate */
+		Pir:  pir, /* peak info rate */
+		Cbs:  cbs, /* committed burst size */
+		Pbs:  pbs, /* Peak burst size */
+		Ebs:  ebs, /* Excess burst size */
+		Fields: []*pb.FieldData{
+			intEnc(uint64(srcIface)),  /* Src Intf */
+			intEnc(uint64(qer.qerID)), /* qer_id */
+			intEnc(qer.fseID),         /* fseid */
+		},
+		Values: []*pb.FieldData{
+			intEnc(uint64(qer.qfi)), /* QFI */
+		},
+	}
+
+	any, err = anypb.New(q)
+	if err != nil {
+		log.Errorln("Error marshalling the rule", q, err)
+		return
+	}
+
+	qosTableName := AppQerLookup
+
+	err = b.processQER(ctx, any, upfMsgTypeAdd, qosTableName)
+	if err != nil {
+		log.Errorln("process QER failed for appQERLookup add operation")
+	}
+}
+
 func (b *bess) delQER(ctx context.Context, done chan<- bool, qer qer) {
 	go func() {
-		var (
-			any      *anypb.Any
-			err      error
-			srcIface uint8
-		)
+		var srcIface uint8
 
 		// Uplink QER
 		srcIface = access
 
-		q := &pb.QosCommandDeleteArg{
-			Fields: []*pb.FieldData{
-				intEnc(uint64(srcIface)),  /* Src Intf */
-				intEnc(uint64(qer.qerID)), /* qer_id */
-				intEnc(qer.fseID),         /* fseid */
-			},
+		if qer.qosLevel == ApplicationQos {
+			b.delApplicationQER(ctx, srcIface, qer)
+		} else if qer.qosLevel == SessionQos {
+			b.delSessionQER(ctx, srcIface, qer)
 		}
-
-		any, err = anypb.New(q)
-		if err != nil {
-			log.Println("Error marshalling the rule", q, err)
-			return
-		}
-
-		b.processQER(ctx, any, upfMsgTypeDel)
 
 		// Downlink QER
 		srcIface = core
 
-		q = &pb.QosCommandDeleteArg{
-			Fields: []*pb.FieldData{
-				intEnc(uint64(srcIface)),  /* Src Intf */
-				intEnc(uint64(qer.qerID)), /* qer_id */
-				intEnc(qer.fseID),         /* fseid */
-			},
+		if qer.qosLevel == ApplicationQos {
+			b.delApplicationQER(ctx, srcIface, qer)
+		} else if qer.qosLevel == SessionQos {
+			b.delSessionQER(ctx, srcIface, qer)
 		}
 
-		any, err = anypb.New(q)
-		if err != nil {
-			log.Println("Error marshalling the rule", q, err)
-			return
-		}
-
-		b.processQER(ctx, any, upfMsgTypeDel)
 		done <- true
 	}()
+}
+
+func (b *bess) delApplicationQER(
+	ctx context.Context, srcIface uint8, qer qer) {
+	var (
+		any *anypb.Any
+		err error
+	)
+
+	q := &pb.QosCommandDeleteArg{
+		Fields: []*pb.FieldData{
+			intEnc(uint64(srcIface)),  /* Src Intf */
+			intEnc(uint64(qer.qerID)), /* qer_id */
+			intEnc(qer.fseID),         /* fseid */
+		},
+	}
+
+	any, err = anypb.New(q)
+	if err != nil {
+		log.Println("Error marshalling the rule", q, err)
+		return
+	}
+
+	qosTableName := AppQerLookup
+
+	err = b.processQER(ctx, any, upfMsgTypeDel, qosTableName)
+	if err != nil {
+		log.Errorln("process QER failed for appQERLookup del operation")
+	}
 }
 
 func (b *bess) processFAR(ctx context.Context, any *anypb.Any, method upfMsgType) {
@@ -928,13 +950,16 @@ func (b *bess) processFAR(ctx context.Context, any *anypb.Any, method upfMsgType
 
 	methods := [...]string{"add", "add", "delete", "clear"}
 
-	_, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
+	resp, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "farLookup",
 		Cmd:  methods[method],
 		Arg:  any,
 	})
-	if err != nil {
-		log.Println("farLookup method failed!:", err)
+
+	log.Traceln("farlookup resp : ", resp)
+
+	if err != nil || resp.GetError() != nil {
+		log.Errorf("farLookup method failed with resp: %v, err: %v\n", resp, err)
 	}
 }
 
@@ -1187,6 +1212,91 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 	}()
 }
 
+func (b *bess) processQER(ctx context.Context, any *anypb.Any, method upfMsgType, qosTableName string) error {
+	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
+		return fmt.Errorf("invalid method name: %v", method)
+	}
+
+	methods := [...]string{"add", "add", "delete", "clear"}
+
+	resp, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
+		Name: qosTableName,
+		Cmd:  methods[method],
+		Arg:  any,
+	})
+
+	log.Traceln("qerlookup resp : ", resp)
+
+	if err != nil || resp.GetError() != nil {
+		log.Errorf("%v for qer %v failed with resp: %v, error: %v", qosTableName, methods[method], resp, err)
+		return err
+	}
+
+	return nil
+}
+
+func (b *bess) addSessionQER(ctx context.Context, gate uint64, srcIface uint8,
+	cir uint64, pir uint64, cbs uint64,
+	pbs uint64, ebs uint64, qer qer) {
+	var (
+		any *anypb.Any
+		err error
+	)
+
+	q := &pb.QosCommandAddArg{
+		Gate: gate,
+		Cir:  cir, /* committed info rate */
+		Pir:  pir, /* peak info rate */
+		Cbs:  cbs, /* committed burst size */
+		Pbs:  pbs, /* Peak burst size */
+		Ebs:  ebs, /* Excess burst size */
+		Fields: []*pb.FieldData{
+			intEnc(uint64(srcIface)), /* Src Intf */
+			intEnc(qer.fseID),        /* fseid */
+		},
+	}
+
+	any, err = anypb.New(q)
+	if err != nil {
+		log.Errorln("Error marshalling the rule", q, err)
+		return
+	}
+
+	qosTableName := SessQerLookup
+
+	err = b.processQER(ctx, any, upfMsgTypeAdd, qosTableName)
+	if err != nil {
+		log.Errorln("process QER failed for sessionQERLookup add operation")
+	}
+}
+
+func (b *bess) delSessionQER(ctx context.Context, srcIface uint8, qer qer) {
+	var (
+		any *anypb.Any
+		err error
+	)
+
+	q := &pb.QosCommandDeleteArg{
+		Fields: []*pb.FieldData{
+			intEnc(uint64(srcIface)), /* Src Intf */
+			intEnc(qer.fseID),        /* fseid */
+		},
+	}
+
+	any, err = anypb.New(q)
+	if err != nil {
+		log.Println("Error marshalling the rule", q, err)
+		return
+	}
+
+	qosTableName := SessQerLookup
+
+	err = b.processQER(ctx, any, upfMsgTypeDel, qosTableName)
+	if err != nil {
+		log.Errorln("process QER failed for sessionQERLookup del operation")
+	}
+}
+
 func (b *bess) removeAllPDRs(ctx context.Context, done chan<- bool) {
 	go func() {
 		var (
@@ -1242,7 +1352,19 @@ func (b *bess) removeAllQERs(ctx context.Context, done chan<- bool) {
 			return
 		}
 
-		b.processQER(ctx, any, upfMsgTypeClear)
+		qosTableName := AppQerLookup
+
+		err = b.processQER(ctx, any, upfMsgTypeClear, qosTableName)
+		if err != nil {
+			log.Errorln("process QER failed for appQERLookup clear operation")
+		}
+
+		qosTableName = SessQerLookup
+
+		err = b.processQER(ctx, any, upfMsgTypeClear, qosTableName)
+		if err != nil {
+			log.Errorln("process QER failed for sessionQERLookup clear operation")
+		}
 		done <- true
 	}()
 }

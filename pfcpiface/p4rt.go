@@ -351,7 +351,8 @@ func (p *p4rtc) endMarkerSendLoop(endMarkerChan chan []byte) {
 	}
 }
 
-func (p *p4rtc) sendMsgToUPF(method upfMsgType, pdrs []pdr, fars []far, qers []qer) uint8 {
+func (p *p4rtc) sendMsgToUPF(
+	method upfMsgType, pdrs []pdr, fars []far, qers []qer) uint8 {
 	log.Println("sendMsgToUPF p4")
 
 	var (

@@ -7,6 +7,18 @@
     "": "max UE sessions",
     "max_sessions": 50000,
 
+    "table_sizes": {
+        "": "Example sizes based on sim mode and 50K sessions. Customize as per your control plane",
+        "": "50K per unique tuple, we send 4 unique PDR patterns",
+        "pdrLookup": 50000,
+        "": "there are 2 QERs and 2 entries per QER",
+        "appQERLookup": 200000,
+        "": "there is 1 session QER and 2 entries per session QER",
+        "sessionQERLookup": 100000,
+        "": "there are 3 FARs",
+        "farLookup": 150000
+    },
+
     "": "Set the log level to one of \"panic\", \"fatal\", \"error\", \"warning\", \"info\", \"debug\", \"trace\"",
     "log_level": "info",
 

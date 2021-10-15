@@ -50,6 +50,10 @@ class Parser:
         self.notify_sockaddr = "/tmp/notifycp"
         self.endmarker_sockaddr = "/tmp/pfcpport"
         self.enable_slice_metering = False
+        self.table_size_pdr_lookup = 0
+        self.table_size_app_qer_lookup = 0
+        self.table_size_session_qer_lookup = 0
+        self.table_size_far_lookup = 0
 
     def parse(self, ifaces):
         # Maximum number of flows to manage ip4 frags for re-assembly
@@ -175,3 +179,12 @@ class Parser:
             self.enable_ntf = bool(self.conf['enable_ntf'])
         except KeyError:
             print('Network Token Function disabled')
+
+        # Table sizes
+        try:
+            self.table_size_pdr_lookup = self.conf["table_sizes"]["pdrLookup"]
+            self.table_size_app_qer_lookup = self.conf["table_sizes"]["appQERLookup"]
+            self.table_size_session_qer_lookup = self.conf["table_sizes"]["sessionQERLookup"]
+            self.table_size_far_lookup = self.conf["table_sizes"]["farLookup"]
+        except KeyError:
+            print("No explicit table sizes")
