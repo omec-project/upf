@@ -56,7 +56,6 @@ class QosMeasure final : public Module {
     uint64_t pkt_count;
     uint64_t byte_count;
     uint64_t last_latency;
-    uint64_t last_clear_time;
     Histogram<uint64_t> latency_histogram;
     Histogram<uint64_t> jitter_histogram;
     mutable std::mutex mutex;
@@ -66,7 +65,6 @@ class QosMeasure final : public Module {
         : pkt_count(0),
           byte_count(0),
           last_latency(0),
-          last_clear_time(tsc_to_ns(rdtsc())),
           latency_histogram(kNumBuckets, kBucketWidthNs),
           jitter_histogram(kNumBuckets, kBucketWidthNs) {}
     // Move allowed, copy not allowed.
@@ -78,7 +76,6 @@ class QosMeasure final : public Module {
       pkt_count = 0;
       byte_count = 0;
       last_latency = 0;
-      last_clear_time = tsc_to_ns(rdtsc());
       latency_histogram.Reset();
       jitter_histogram.Reset();
     }

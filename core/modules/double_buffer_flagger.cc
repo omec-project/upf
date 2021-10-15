@@ -52,10 +52,21 @@ void DoubleBufferFlagger::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 // 12}
 CommandResponse DoubleBufferFlagger::CommandSetNewFlagValue(
     const bess::pb::DoubleBufferCommandSetNewFlagValueArg &arg) {
-  const std::lock_guard<std::mutex> lock(mutex_);
-  current_flag_value_ = arg.new_flag();
+  bess::pb::DoubleBufferCommandSetNewFlagValueResponse resp;
+  uint64_t duration_ns = 0;
+  {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    uint64_t now = tsc_to_ns(rdtsc());
+    current_flag_value_ = arg.new_flag();
+    duration_ns = now - last_flag_flip_ts_ns_;
+    last_flag_flip_ts_ns_ = now;
+  }
+  resp.set_observation_duration_ns(duration_ns);
+  LOG(WARNING) << "DoubleBufferCommandSetNewFlagValueArg " << arg.DebugString()
+               << ", DoubleBufferCommandSetNewFlagValueResponse "
+               << resp.DebugString();
 
-  return CommandSuccess();
+  return CommandSuccess(resp);
 }
 /*----------------------------------------------------------------------------------*/
 CommandResponse DoubleBufferFlagger::CommandReadFlagValue(

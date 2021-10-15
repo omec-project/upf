@@ -12,7 +12,10 @@
 
 class DoubleBufferFlagger final : public Module {
  public:
-  DoubleBufferFlagger() : flag_attr_id_(-1), current_flag_value_() {
+  DoubleBufferFlagger()
+      : flag_attr_id_(-1),
+        current_flag_value_(),
+        last_flag_flip_ts_ns_(tsc_to_ns(rdtsc())) {
     max_allowed_workers_ = Worker::kMaxWorkers;
   }
 
@@ -29,6 +32,7 @@ class DoubleBufferFlagger final : public Module {
   mutable std::mutex mutex_;
   int flag_attr_id_;
   bess::pb::BufferFlag current_flag_value_;
+  uint64_t last_flag_flip_ts_ns_;
 };
 
 #endif  // BESS_MODULES_DOUBLEBUFFER_H_

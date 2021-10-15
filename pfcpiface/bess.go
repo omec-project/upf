@@ -368,14 +368,14 @@ func (b *bess) readCurrentFlag(ctx context.Context) (f pb.BufferFlag, err error)
 	return
 }
 
-func (b *bess) flipFlag(ctx context.Context, newFlag pb.BufferFlag) (err error) {
+func (b *bess) flipFlag(ctx context.Context, newFlag pb.BufferFlag) (durationNs uint64, err error) {
 	req := &pb.DoubleBufferCommandSetNewFlagValueArg{NewFlag: newFlag}
 	any, err := anypb.New(req)
 	if err != nil {
 		log.Errorln("Error marshalling request", req, err)
 		return
 	}
-	_, err = b.client.ModuleCommand(
+	resp, err := b.client.ModuleCommand(
 		ctx, &pb.CommandRequest{
 			Name: "flag",
 			Cmd:  "set",
@@ -385,6 +385,12 @@ func (b *bess) flipFlag(ctx context.Context, newFlag pb.BufferFlag) (err error) 
 		log.Errorln("flag read failed!:", err)
 		return
 	}
+	flagSetResp := &pb.DoubleBufferCommandSetNewFlagValueResponse{}
+	if err = resp.Data.UnmarshalTo(flagSetResp); err != nil {
+		log.Errorln(err)
+		return
+	}
+	durationNs = flagSetResp.ObservationDurationNs
 	return
 }
 
@@ -404,7 +410,8 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 	}
 	log.Warnln("old flag:", oldFlag, "new flag:", newFlag)
 	// Flip flag and wait for pipeline to flush
-	if err = b.flipFlag(ctx, newFlag); err != nil {
+	observationDurationNs, err := b.flipFlag(ctx, newFlag)
+	if err != nil {
 		return err
 	}
 	time.Sleep(50 * time.Millisecond)
@@ -452,8 +459,8 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 				continue
 			}
 			dropRate := 1 - (float64(statsOut.TotalPackets) / float64(statsIn.TotalPackets))
-			bitsPerSecond := float64(statsOut.TotalBytes*8) / (float64(statsOut.ObservationDurationNs) / (1000 * 1000 * 1000))
-			packetsPerSecond := float64(statsOut.TotalPackets) / (float64(statsOut.ObservationDurationNs) / (1000 * 1000 * 1000))
+			bitsPerSecond := float64(statsOut.TotalBytes*8) / (float64(observationDurationNs) / (1000 * 1000 * 1000))
+			packetsPerSecond := float64(statsOut.TotalPackets) / (float64(observationDurationNs) / (1000 * 1000 * 1000))
 			fseidString := strconv.FormatUint(statsOut.Fseid, 10)
 			pdrString := strconv.FormatUint(statsOut.Pdr, 10)
 			ch <- prometheus.MustNewConstMetric(
@@ -480,7 +487,7 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 			ch <- prometheus.MustNewConstMetric(
 				uc.sessionObservationDuration,
 				prometheus.GaugeValue,
-				float64(statsOut.ObservationDurationNs),
+				float64(observationDurationNs),
 				fseidString,
 				pdrString,
 			)
