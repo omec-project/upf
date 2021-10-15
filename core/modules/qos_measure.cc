@@ -119,8 +119,7 @@ void QosMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
       continue;
     }
     auto f = bess::pb::BufferFlag(flag);
-    LOG_EVERY_N(WARNING, 100'001)
-        << "flag: " << bess::pb::BufferFlag_Name(f);
+    LOG_EVERY_N(WARNING, 100'001) << "flag: " << bess::pb::BufferFlag_Name(f);
     // Discard invalid timestamps.
     if (!ts_ns || now_ns < ts_ns) {
       continue;

@@ -388,7 +388,6 @@ func (b *bess) flipFlag(ctx context.Context, newFlag pb.BufferFlag) (err error) 
 	return
 }
 
-
 func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
