@@ -2,16 +2,24 @@ diff --git a/protobuf/module_msg.proto b/protobuf/module_msg.proto
 index c435437a..a6e606f4 100644
 --- a/protobuf/module_msg.proto
 +++ b/protobuf/module_msg.proto
-@@ -1332,3 +1332,36 @@ message QosCommandClearArg {
+@@ -1332,3 +1332,46 @@ message QosCommandClearArg {
  message QosCommandSetDefaultGateArg {
    uint64 gate = 1;
  }
 +
 +message QosMeasureArg {
-+  bool counter_only = 1; // If true, latency and jitter are not measured
++  string flag_attr_name = 1;
++  uint64 entries = 2;
++  bool counter_only = 3; // If true, latency and jitter are not measured
++}
++enum BufferFlag {
++  FLAG_VALUE_INVALID = 0;
++  FLAG_VALUE_A = 1;
++  FLAG_VALUE_B = 2;
 +}
 +message QosMeasureCommandReadArg {
 +  bool clear = 1; // If true, the data will be all cleared after read
++  BufferFlag flag = 2; // Which buffer side to read
 +}
 +message QosMeasureReadResponse {
 +  message Statistic {
@@ -33,9 +41,11 @@ index c435437a..a6e606f4 100644
 +}
 +message DoubleBufferFlaggerArg {
 +    string attr_name = 1;
-+    uint64 size = 2;
-+    uint64 value = 3;
++    BufferFlag value = 3;
 +}
 +message DoubleBufferCommandSetNewFlagValueArg {
-+    uint64 new_flag = 1;
++    BufferFlag new_flag = 1;
++}
++message DoubleBufferCommandReadFlagValueResponse {
++    BufferFlag current_flag = 1;
 +}

@@ -177,7 +177,7 @@ if parser.enable_ntf:
 #   - proto_id
 
 linkMerge::Merge() \
-    -> flag::DoubleBufferFlagger(attr_name="buffer_flag", size=8, value=1) \
+    -> flag::DoubleBufferFlagger(attr_name="buffer_flag", value=1) \
     -> pktParse::GtpuParser():1 \
     -> pdrLookup::WildcardMatch(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
                                         {'attr_name':'tunnel_ipv4_dst', 'num_bytes':4}, \
@@ -194,7 +194,7 @@ linkMerge::Merge() \
                                         {'attr_name':'far_id', 'num_bytes':4}],\
                                 entries=parser.table_size_pdr_lookup):noGTPUDecap \
     -> preQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
-    -> qosMeasureIn::QosMeasure()
+    -> qosMeasureIn::QosMeasure(flag_attr_name="buffer_flag")
 
 # Insert NTF module, if enabled
 _in = qosMeasureIn
@@ -208,7 +208,7 @@ _in -> appQERLookup::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
                          values=[{'attr_name':'qfi', 'num_bytes':1}],\
                          entries = parser.table_size_app_qer_lookup)
 
-qosMeasureOut::QosMeasure()
+qosMeasureOut::QosMeasure(flag_attr_name="buffer_flag")
 executeFAR::Split(size=1, attribute='action')
 _in = qosMeasureOut
 qosMeasureOut -> executeFAR

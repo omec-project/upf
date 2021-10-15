@@ -25,7 +25,7 @@ class QosMeasure final : public Module {
     max_allowed_workers_ = 1;
   }
 
-  static constexpr uint32_t kMaxNumEntries = 1 << 15;
+  static constexpr uint32_t kDefaultNumEntries = 1 << 15;
   static const Commands cmds;
   CommandResponse Init(const bess::pb::QosMeasureArg &arg);
   void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
@@ -90,6 +90,7 @@ class QosMeasure final : public Module {
   int ts_attr_id_;
   int fseid_attr_id_;
   int pdr_attr_id_;
+  int buffer_flag_attr_id_;
 };
 
 #endif  // BESS_MODULES_QOS_MEASURE_H_

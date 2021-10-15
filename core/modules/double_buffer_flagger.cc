@@ -12,6 +12,9 @@ const Commands DoubleBufferFlagger::cmds = {
     {"set", "DoubleBufferCommandSetNewFlagValueArg",
      MODULE_CMD_FUNC(&DoubleBufferFlagger::CommandSetNewFlagValue),
      Command::THREAD_SAFE},
+    {"read", "EmptyArg",
+     MODULE_CMD_FUNC(&DoubleBufferFlagger::CommandReadFlagValue),
+     Command::THREAD_SAFE},
 };
 /*----------------------------------------------------------------------------------*/
 CommandResponse DoubleBufferFlagger::Init(
@@ -20,10 +23,6 @@ CommandResponse DoubleBufferFlagger::Init(
 
   if (arg.attr_name().empty()) {
     return CommandFailure(EINVAL, "invalid metadata name");
-  }
-
-  if (!arg.size() || arg.size() > kMaxAttributeSize) {
-    return CommandFailure(EINVAL, "invalid metadata size");
   }
 
   using AccessMode = bess::metadata::Attribute::AccessMode;
@@ -57,6 +56,15 @@ CommandResponse DoubleBufferFlagger::CommandSetNewFlagValue(
   current_flag_value_ = arg.new_flag();
 
   return CommandSuccess();
+}
+/*----------------------------------------------------------------------------------*/
+CommandResponse DoubleBufferFlagger::CommandReadFlagValue(
+    const bess::pb::EmptyArg &) {
+  const std::lock_guard<std::mutex> lock(mutex_);
+  bess::pb::DoubleBufferCommandReadFlagValueResponse resp;
+  resp.set_current_flag(current_flag_value_);
+
+  return CommandSuccess(resp);
 }
 /*----------------------------------------------------------------------------------*/
 ADD_MODULE(DoubleBufferFlagger, "double_buffer_flag",

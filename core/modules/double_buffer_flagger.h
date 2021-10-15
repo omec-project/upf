@@ -12,7 +12,7 @@
 
 class DoubleBufferFlagger final : public Module {
  public:
-  DoubleBufferFlagger() : flag_attr_id_(-1), current_flag_value_(-1) {
+  DoubleBufferFlagger() : flag_attr_id_(-1), current_flag_value_() {
     max_allowed_workers_ = Worker::kMaxWorkers;
   }
 
@@ -22,12 +22,13 @@ class DoubleBufferFlagger final : public Module {
   std::string GetDesc() const override { return ""; };
   CommandResponse CommandSetNewFlagValue(
       const bess::pb::DoubleBufferCommandSetNewFlagValueArg &arg);
+  CommandResponse CommandReadFlagValue(const bess::pb::EmptyArg &arg);
 
  private:
   static constexpr size_t kMaxAttributeSize = 8;
   mutable std::mutex mutex_;
   int flag_attr_id_;
-  int current_flag_value_;
+  bess::pb::BufferFlag current_flag_value_;
 };
 
 #endif  // BESS_MODULES_DOUBLEBUFFER_H_

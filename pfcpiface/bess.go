@@ -343,15 +343,79 @@ func (b *bess) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metri
 	measureIface("Core", uc.upf.coreIface)
 }
 
-func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err error) {
-	req := &pb.QosMeasureCommandReadArg{}
+func (b *bess) readCurrentFlag(ctx context.Context) (f pb.BufferFlag, err error) {
+	any, err := anypb.New(&pb.EmptyArg{})
+	if err != nil {
+		log.Errorln("Error marshalling request", err)
+		return
+	}
+	resp, err := b.client.ModuleCommand(
+		ctx, &pb.CommandRequest{
+			Name: "flag",
+			Cmd:  "read",
+			Arg:  any,
+		})
+	if err != nil {
+		log.Errorln("flag read failed!:", err)
+		return
+	}
+	flagReadResp := &pb.DoubleBufferCommandReadFlagValueResponse{}
+	if err = resp.Data.UnmarshalTo(flagReadResp); err != nil {
+		log.Errorln(err)
+		return
+	}
+	f = flagReadResp.CurrentFlag
+	return
+}
+
+func (b *bess) flipFlag(ctx context.Context, newFlag pb.BufferFlag) (err error) {
+	req := &pb.DoubleBufferCommandSetNewFlagValueArg{NewFlag: newFlag}
 	any, err := anypb.New(req)
 	if err != nil {
 		log.Errorln("Error marshalling request", req, err)
 		return
 	}
+	_, err = b.client.ModuleCommand(
+		ctx, &pb.CommandRequest{
+			Name: "flag",
+			Cmd:  "set",
+			Arg:  any,
+		})
+	if err != nil {
+		log.Errorln("flag read failed!:", err)
+		return
+	}
+	return
+}
+
+
+func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
+	// Read current flag
+	oldFlag, err := b.readCurrentFlag(ctx)
+	if err != nil {
+		return err
+	}
+	var newFlag pb.BufferFlag
+	if oldFlag == pb.BufferFlag_FLAG_VALUE_A {
+		newFlag = pb.BufferFlag_FLAG_VALUE_B
+	} else {
+		newFlag = pb.BufferFlag_FLAG_VALUE_A
+	}
+	log.Warnln("old flag:", oldFlag, "new flag:", newFlag)
+	// Flip flag and wait for pipeline to flush
+	if err = b.flipFlag(ctx, newFlag); err != nil {
+		return err
+	}
+	time.Sleep(50 * time.Millisecond)
+	// Read stats from the now inactive side, and clear if needed
+	req := &pb.QosMeasureCommandReadArg{Flag: oldFlag, Clear: true}
+	any, err := anypb.New(req)
+	if err != nil {
+		log.Errorln("Error marshalling request", req, err)
+		return
+	}
 	resp, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "qosMeasureIn",
 		Cmd:  "read",
