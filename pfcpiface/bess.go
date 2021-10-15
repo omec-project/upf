@@ -409,12 +409,11 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 		newFlag = pb.BufferFlag_FLAG_VALUE_A
 	}
 	log.Warnln("old flag:", oldFlag, "new flag:", newFlag)
-	// Flip flag and wait for pipeline to flush
+	// Flip flag, also waits for pipeline to flush
 	observationDurationNs, err := b.flipFlag(ctx, newFlag)
 	if err != nil {
 		return err
 	}
-	time.Sleep(50 * time.Millisecond)
 	// Read stats from the now inactive side, and clear if needed
 	req := &pb.QosMeasureCommandReadArg{Flag: oldFlag, Clear: true}
 	any, err := anypb.New(req)

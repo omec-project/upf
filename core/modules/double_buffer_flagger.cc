@@ -5,7 +5,8 @@
 
 #include "double_buffer_flagger.h"
 
-// #include "../core/utils/common.h"
+#include <chrono>
+#include <thread>
 
 /*----------------------------------------------------------------------------------*/
 const Commands DoubleBufferFlagger::cmds = {
@@ -65,6 +66,8 @@ CommandResponse DoubleBufferFlagger::CommandSetNewFlagValue(
   LOG(WARNING) << "DoubleBufferCommandSetNewFlagValueArg " << arg.DebugString()
                << ", DoubleBufferCommandSetNewFlagValueResponse "
                << resp.DebugString();
+  // Wait for pipeline to flush packets with old flag value.
+  std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
   return CommandSuccess(resp);
 }
