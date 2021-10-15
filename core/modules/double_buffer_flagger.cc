@@ -49,7 +49,8 @@ void DoubleBufferFlagger::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   RunNextModule(ctx, batch);
 }
 /*----------------------------------------------------------------------------------*/
-// command module flag set DoubleBufferCommandSetNewFlagValueArg {'new_flag': 12}
+// command module flag set DoubleBufferCommandSetNewFlagValueArg {'new_flag':
+// 12}
 CommandResponse DoubleBufferFlagger::CommandSetNewFlagValue(
     const bess::pb::DoubleBufferCommandSetNewFlagValueArg &arg) {
   const std::lock_guard<std::mutex> lock(mutex_);
