@@ -13,13 +13,14 @@ import (
 
 type qer struct {
 	qerID    uint32
+	qosLevel QosLevel
 	qfi      uint8
 	ulStatus uint8
 	dlStatus uint8
-	ulMbr    uint64
-	dlMbr    uint64
-	ulGbr    uint64
-	dlGbr    uint64
+	ulMbr    uint64 // in kilobits/sec
+	dlMbr    uint64 // in kilobits/sec
+	ulGbr    uint64 // in kilobits/sec
+	dlGbr    uint64 // in kilobits/sec
 	fseID    uint64
 	fseidIP  uint32
 }

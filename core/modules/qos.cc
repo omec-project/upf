@@ -126,7 +126,7 @@ CommandResponse Qos::Init(const bess::pb::QosArg &arg) {
     cs[i] = 0xff;
   }
 
-  table_.Init(total_key_size_);
+  table_.Init(total_key_size_, arg.entries());
   return CommandSuccess();
 }
 
@@ -188,7 +188,7 @@ void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     if (ogate == METER_GATE) {
       uint64_t time = rte_rdtsc();
       uint32_t pkt_len = pkt->total_len() - val[j]->deduct_len;
-      uint8_t color = rte_meter_trtcm_color_blind_check(&val[j]->m, &val[j]->p,
+      uint8_t color = rte_meter_trtcm_color_blind_check(&val[j]->m, val[j]->p,
                                                         time, pkt_len);
 
       DLOG(INFO) << "color : " << color << std::endl;
@@ -383,11 +383,12 @@ CommandResponse Qos::CommandAdd(const bess::pb::QosCommandAddArg &arg) {
   }
 
   if (gate == METER_GATE) {
-    v.cir = arg.cir();
-    v.pir = arg.pir();
-    v.cbs = arg.cbs();
-    v.pbs = arg.pbs();
-    v.ebs = arg.ebs();
+    uint64_t cir = arg.cir();
+    uint64_t pir = arg.pir();
+    uint64_t cbs = arg.cbs();
+    uint64_t pbs = arg.pbs();
+    uint64_t ebs = arg.ebs();
+
     if (arg.optional_deduct_len_case() ==
         bess::pb::QosCommandAddArg::OPTIONAL_DEDUCT_LEN_NOT_SET) {
       v.deduct_len = 14;  // Exclude Ethernet header by default
@@ -396,18 +397,34 @@ CommandResponse Qos::CommandAdd(const bess::pb::QosCommandAddArg &arg) {
     }
 
     DLOG(INFO) << "Adding entry"
-               << " cir: " << v.cir << " pir: " << v.pir << " cbs: " << v.cbs
-               << " pbs: " << v.pbs << " ebs: " << v.ebs << std::endl;
+               << " cir: " << cir << " pir: " << pir << " cbs: " << cbs
+               << " pbs: " << pbs << " ebs: " << ebs << std::endl;
 
     struct rte_meter_trtcm_params app_trtcm_params = {
-        .cir = v.cir, .pir = v.pir, .cbs = v.cbs, .pbs = v.pbs};
+        .cir = cir, .pir = pir, .cbs = cbs, .pbs = pbs};
 
-    int ret = rte_meter_trtcm_profile_config(&v.p, &app_trtcm_params);
-    if (ret)
-      return CommandFailure(
-          ret, "Insert Failed - rte_meter_trtcm_profile_config failed");
+    auto *result = params_map_.Find(app_trtcm_params);
 
-    ret = rte_meter_trtcm_config(&v.m, &v.p);
+    if (result == nullptr) {
+      struct rte_meter_trtcm_profile p;
+
+      int ret = rte_meter_trtcm_profile_config(&p, &app_trtcm_params);
+      if (ret)
+        return CommandFailure(
+            ret,
+            "Insert Failed - rte_meter_trtcm_profile_config creation failed");
+
+      result = params_map_.Insert(app_trtcm_params, p);
+      if (result == nullptr) {
+        return CommandFailure(
+            ret,
+            "Insert Failed - rte_meter_trtcm_profile_config map insert failed");
+      }
+    }
+
+    v.p = &result->second;
+
+    int ret = rte_meter_trtcm_config(&v.m, v.p);
     if (ret) {
       return CommandFailure(ret,
                             "Insert Failed - rte_meter_trtcm_config failed");
@@ -433,6 +450,7 @@ CommandResponse Qos::CommandClear(__attribute__((unused))
 
 void Qos::Clear() {
   table_.Clear();
+  params_map_.Clear();
 }
 
 void Qos::DeInit() {

@@ -132,7 +132,7 @@ To start UPF-EPC in simulation mode:
     gRPC sim mode
 
     ```bash
-    docker exec bess-pfcpiface pfcpiface -config /conf/upf.json -simulate create
+    docker exec -ti bess-pfcpiface pfcpiface -config /conf/upf.json -simulate create
     ```
 
     OR
@@ -140,7 +140,7 @@ To start UPF-EPC in simulation mode:
     PFCP sim mode
 
     ```bash
-    docker exec bess-pfcpiface pfcpiface -config /conf/upf.json -pfcpsim
+    docker exec -ti bess-pfcpiface pfcpiface -config /conf/upf.json -pfcpsim
     ```
 
 4. (optional) Observe the pipeline in GUI
@@ -163,7 +163,7 @@ This can be done either using a single machine or two machines.
 2. Insert rules into relevant PDR and FAR tables
 
     ```bash
-    docker exec bess-pfcpiface pfcpiface -config /conf/upf.json -simulate create
+    docker exec -ti bess-pfcpiface pfcpiface -config /conf/upf.json -simulate create
     ```
 
 3. On the same machine using an extra VF or from a different machine run pktgen instance

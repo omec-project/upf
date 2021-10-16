@@ -126,7 +126,7 @@ template <typename T>
 class Metering {
  public:
   struct rte_hash_parameters dpdk_params {
-    .name = "Metering", .entries = 1 << 20, .reserved = 0,
+    .name = "Metering", .entries = 1 << 15, .reserved = 0,
     .key_len = sizeof(MeteringKey), .hash_func = rte_hash_crc,
     .hash_func_init_val = 0, .socket_id = (int)rte_socket_id(),
     .extra_flag = RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY
@@ -189,12 +189,15 @@ class Metering {
 
   uint32_t Total_key_size() const { return total_key_size_; }
 
-  void Init(int size) {
+  void Init(int size, int entries) {
     std::ostringstream address;
     total_key_size_ = size;
     address << &table_;
     std::string name = "Metering" + address.str();
     dpdk_params.name = name.c_str();
+    if (entries) {
+      dpdk_params.entries = entries;
+    }
     dpdk_params.key_len = size;
     table_.reset(new CuckooMap<MeteringKey, T, MeteringKeyHash, MeteringKeyEq>(
         0, 0, &dpdk_params));

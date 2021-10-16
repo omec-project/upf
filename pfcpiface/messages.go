@@ -367,7 +367,8 @@ func (pc *PFCPConn) handleSessionReportResponse(upf *upf, msg message.Message, a
 
 			pc.mgr.RemoveSession(srres.SEID())
 
-			cause := upf.sendMsgToUPF(upfMsgTypeDel, sessItem.pdrs, sessItem.fars, sessItem.qers)
+			cause := upf.sendMsgToUPF(
+				upfMsgTypeDel, sessItem.pdrs, sessItem.fars, sessItem.qers)
 			if cause == ie.CauseRequestRejected {
 				log.Println("Write to FastPath failed")
 			}
@@ -470,6 +471,8 @@ func (pc *PFCPConn) handleSessionEstablishmentRequest(upf *upf, msg message.Mess
 		q.fseidIP = fseidIP
 		session.CreateQER(q)
 	}
+
+	session.MarkSessionQer()
 
 	cause := upf.sendMsgToUPF(upfMsgTypeAdd, session.pdrs, session.fars, session.qers)
 	if cause == ie.CauseRequestRejected {
@@ -661,6 +664,8 @@ func (pc *PFCPConn) handleSessionModificationRequest(upf *upf, msg message.Messa
 
 		addQERs = append(addQERs, q)
 	}
+
+	session.MarkSessionQer()
 
 	cause := upf.sendMsgToUPF(upfMsgTypeMod, addPDRs, addFARs, addQERs)
 	if cause == ie.CauseRequestRejected {
