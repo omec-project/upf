@@ -23,7 +23,7 @@ jobs:
         cd bess/env
         yes n | ./rebuild_images.py focal64
         docker tag nefelinetworks/bess_build:latest ${{ env.REPO }}:${{ env.TAG }}
-    - uses: actions/checkout@v2.3.4
+    - uses: actions/checkout@v2.3.5
     - name: Build UPF with new base
       run: |
         make docker-build
