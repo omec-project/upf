@@ -354,7 +354,8 @@ func (b *bess) readCurrentFlag(ctx context.Context) (f pb.BufferFlag, err error)
 			Name: "flag",
 			Cmd:  "read",
 			Arg:  any,
-		})
+		},
+	)
 	if err != nil {
 		log.Errorln("flag read failed!:", err)
 		return
@@ -368,7 +369,21 @@ func (b *bess) readCurrentFlag(ctx context.Context) (f pb.BufferFlag, err error)
 	return
 }
 
-func (b *bess) flipFlag(ctx context.Context, newFlag pb.BufferFlag) (durationNs uint64, err error) {
+func (b *bess) flipFlag(ctx context.Context) (durationNs uint64, oldFlag pb.BufferFlag, err error) {
+	// Read current flag
+	oldFlag, err = b.readCurrentFlag(ctx)
+	if err != nil {
+		return
+	}
+	// Determine new flag
+	var newFlag pb.BufferFlag
+	if oldFlag == pb.BufferFlag_FLAG_VALUE_A {
+		newFlag = pb.BufferFlag_FLAG_VALUE_B
+	} else {
+		newFlag = pb.BufferFlag_FLAG_VALUE_A
+	}
+	log.Traceln("old flag:", oldFlag, "new flag:", newFlag)
+	// Set new flag
 	req := &pb.DoubleBufferCommandSetNewFlagValueArg{NewFlag: newFlag}
 	any, err := anypb.New(req)
 	if err != nil {
@@ -380,9 +395,10 @@ func (b *bess) flipFlag(ctx context.Context, newFlag pb.BufferFlag) (durationNs 
 			Name: "flag",
 			Cmd:  "set",
 			Arg:  any,
-		})
+		},
+	)
 	if err != nil {
-		log.Errorln("flag read failed!:", err)
+		log.Errorln("flag set failed!:", err)
 		return
 	}
 	flagSetResp := &pb.DoubleBufferCommandSetNewFlagValueResponse{}
@@ -394,117 +410,105 @@ func (b *bess) flipFlag(ctx context.Context, newFlag pb.BufferFlag) (durationNs 
 	return
 }
 
-func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err error) {
-	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
-	defer cancel()
-	// Read current flag
-	oldFlag, err := b.readCurrentFlag(ctx)
-	if err != nil {
-		return err
-	}
-	var newFlag pb.BufferFlag
-	if oldFlag == pb.BufferFlag_FLAG_VALUE_A {
-		newFlag = pb.BufferFlag_FLAG_VALUE_B
-	} else {
-		newFlag = pb.BufferFlag_FLAG_VALUE_A
-	}
-	log.Warnln("old flag:", oldFlag, "new flag:", newFlag)
-	// Flip flag, also waits for pipeline to flush
-	observationDurationNs, err := b.flipFlag(ctx, newFlag)
-	if err != nil {
-		return err
-	}
-	// Read stats from the now inactive side, and clear if needed
-	req := &pb.QosMeasureCommandReadArg{Flag: oldFlag, Clear: true}
+func (b *bess) readMeasurement(
+	ctx context.Context, module string, flag pb.BufferFlag, clear bool,
+) (stats pb.QosMeasureReadResponse, err error) {
+	req := &pb.QosMeasureCommandReadArg{Flag: flag, Clear: clear}
 	any, err := anypb.New(req)
 	if err != nil {
 		log.Errorln("Error marshalling request", req, err)
 		return
 	}
-	resp, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
-		Name: "qosMeasureIn",
-		Cmd:  "read",
-		Arg:  any,
-	})
+	resp, err := b.client.ModuleCommand(
+		ctx, &pb.CommandRequest{
+			Name: module,
+			Cmd:  "read",
+			Arg:  any,
+		},
+	)
 	if err != nil {
 		log.Errorln("qosMeasureIn read failed!:", err)
 		return
 	}
-	qosStatsInResp := &pb.QosMeasureReadResponse{}
-	if err = resp.Data.UnmarshalTo(qosStatsInResp); err != nil {
+	if err = resp.Data.UnmarshalTo(&stats); err != nil {
 		log.Errorln(err)
 		return
 	}
-	resp, err = b.client.ModuleCommand(ctx, &pb.CommandRequest{
-		Name: "qosMeasureOut",
-		Cmd:  "read",
-		Arg:  any,
-	})
+	return
+}
+
+func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel()
+	// Flip flag, automatically waits for pipeline to flush packets with previous mark
+	observationDurationNs, oldFlag, err := b.flipFlag(ctx)
+	if err != nil {
+		return err
+	}
+	// Read stats from the now inactive side, and clear if needed
+	qosStatsInResp, err := b.readMeasurement(ctx, "qosMeasureIn", oldFlag, true)
+	if err != nil {
+		log.Errorln("qosMeasureIn read failed!:", err)
+		return
+	}
+	qosStatsOutResp, err := b.readMeasurement(ctx, "qosMeasureOut", oldFlag, true)
 	if err != nil {
 		log.Errorln("qosMeasureOut read failed!:", err)
 		return
 	}
-	qosStatsOutResp := &pb.QosMeasureReadResponse{}
-	if err = resp.Data.UnmarshalTo(qosStatsOutResp); err != nil {
-		log.Errorln(err)
-		return
-	}
-	if len(qosStatsInResp.Statistics) > 3 && len(qosStatsOutResp.Statistics) > 3 {
-		for i := 0; i < 3; /*len(qosStatsInResp.Statistics) && i < len(qosStatsOutResp.Statistics)*/ i++ {
-			statsIn := qosStatsInResp.Statistics[i]
-			statsOut := qosStatsOutResp.Statistics[i]
-			// FIXME
-			if statsIn.Fseid != statsOut.Fseid || statsIn.Pdr != statsOut.Pdr {
-				continue
-			}
-			dropRate := 1 - (float64(statsOut.TotalPackets) / float64(statsIn.TotalPackets))
-			bitsPerSecond := float64(statsOut.TotalBytes*8) / (float64(observationDurationNs) / (1000 * 1000 * 1000))
-			packetsPerSecond := float64(statsOut.TotalPackets) / (float64(observationDurationNs) / (1000 * 1000 * 1000))
-			fseidString := strconv.FormatUint(statsOut.Fseid, 10)
-			pdrString := strconv.FormatUint(statsOut.Pdr, 10)
-			ch <- prometheus.MustNewConstMetric(
-				uc.sessionDropRate,
-				prometheus.GaugeValue,
-				dropRate,
-				fseidString,
-				pdrString,
-			)
-			ch <- prometheus.MustNewConstMetric(
-				uc.sessionThroughputBps,
-				prometheus.GaugeValue,
-				bitsPerSecond,
-				fseidString,
-				pdrString,
-			)
-			ch <- prometheus.MustNewConstMetric(
-				uc.sessionThroughputPps,
-				prometheus.GaugeValue,
-				packetsPerSecond,
-				fseidString,
-				pdrString,
-			)
-			ch <- prometheus.MustNewConstMetric(
-				uc.sessionObservationDuration,
-				prometheus.GaugeValue,
-				float64(observationDurationNs),
-				fseidString,
-				pdrString,
-			)
+	// Prepare prometheus stats
+	for i := 0; i < len(qosStatsInResp.Statistics) && i < len(qosStatsOutResp.Statistics); i++ {
+		statsIn := qosStatsInResp.Statistics[i]
+		statsOut := qosStatsOutResp.Statistics[i]
+		// FIXME
+		if statsIn.Fseid != statsOut.Fseid || statsIn.Pdr != statsOut.Pdr {
+			continue
 		}
-		for _, v := range qosStatsOutResp.Statistics[:3] {
-			ch <- prometheus.MustNewConstSummary(
-				uc.sessionLatency,
-				v.TotalPackets,
-				0,
-				map[float64]float64{
-					50.0: float64(v.Latency_50Ns),
-					99.0: float64(v.Latency_99Ns),
-					99.9: float64(v.Latency_99_9Ns),
-				},
-				strconv.FormatUint(v.Fseid, 10),
-				strconv.FormatUint(v.Pdr, 10),
-			)
-		}
+		dropRate := 1 - (float64(statsOut.TotalPackets) / float64(statsIn.TotalPackets))
+		bitsPerSecond := float64(statsOut.TotalBytes*8) / (float64(observationDurationNs) / (1000 * 1000 * 1000))
+		packetsPerSecond := float64(statsOut.TotalPackets) / (float64(observationDurationNs) / (1000 * 1000 * 1000))
+		fseidString := strconv.FormatUint(statsOut.Fseid, 10)
+		pdrString := strconv.FormatUint(statsOut.Pdr, 10)
+		ch <- prometheus.MustNewConstMetric(
+			uc.sessionDropRate,
+			prometheus.GaugeValue,
+			dropRate,
+			fseidString,
+			pdrString,
+		)
+		ch <- prometheus.MustNewConstMetric(
+			uc.sessionThroughputBps,
+			prometheus.GaugeValue,
+			bitsPerSecond,
+			fseidString,
+			pdrString,
+		)
+		ch <- prometheus.MustNewConstMetric(
+			uc.sessionThroughputPps,
+			prometheus.GaugeValue,
+			packetsPerSecond,
+			fseidString,
+			pdrString,
+		)
+		ch <- prometheus.MustNewConstMetric(
+			uc.sessionObservationDuration,
+			prometheus.GaugeValue,
+			float64(observationDurationNs),
+			fseidString,
+			pdrString,
+		)
+		ch <- prometheus.MustNewConstSummary(
+			uc.sessionLatency,
+			statsOut.TotalPackets,
+			0,
+			map[float64]float64{
+				50.0: float64(statsOut.Latency_50Ns),
+				99.0: float64(statsOut.Latency_99Ns),
+				99.9: float64(statsOut.Latency_99_9Ns),
+			},
+			fseidString,
+			pdrString,
+		)
 	}
 	return
 }
