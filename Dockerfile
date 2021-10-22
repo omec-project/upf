@@ -13,6 +13,8 @@ RUN apt-get update && \
         
 ARG MAKEFLAGS
 
+ENV PKG_CONFIG_PATH=/usr/lib64/pkgconfig
+
 # linux ver should match target machine's kernel
 WORKDIR /libbpf
 ARG LIBBPF_VER=v0.3
@@ -34,9 +36,6 @@ COPY patches/dpdk/* deps/
 COPY patches/bess patches
 RUN cat patches/* | patch -p1 && \
     ./build.py dpdk
-
-# Hack to get static version linked
-RUN rm -f /usr/lib64/libbpf.so*
 
 # Plugins
 RUN mkdir -p plugins
