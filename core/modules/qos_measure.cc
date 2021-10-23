@@ -242,5 +242,11 @@ CommandResponse QosMeasure::CommandReadStats(
 
   return CommandSuccess(resp);
 }
+
+void QosMeasure::DeInit() {
+  rte_hash_free(table_a_);
+  rte_hash_free(table_b_);
+}
+
 /*----------------------------------------------------------------------------------*/
 ADD_MODULE(QosMeasure, "qos_measure", "Measures QoS metrics")

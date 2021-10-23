@@ -11,6 +11,8 @@
         "": "Example sizes based on sim mode and 50K sessions. Customize as per your control plane",
         "": "50K per unique tuple, we send 4 unique PDR patterns",
         "pdrLookup": 50000,
+        "": "4 PDRs per session",
+        "qosMeasure": 200000,
         "": "there are 2 QERs and 2 entries per QER",
         "appQERLookup": 200000,
         "": "there is 1 session QER and 2 entries per session QER",

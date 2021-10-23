@@ -51,6 +51,7 @@ class Parser:
         self.endmarker_sockaddr = "/tmp/pfcpport"
         self.enable_slice_metering = False
         self.table_size_pdr_lookup = 0
+        self.table_size_qos_measure = 0
         self.table_size_app_qer_lookup = 0
         self.table_size_session_qer_lookup = 0
         self.table_size_far_lookup = 0
@@ -183,6 +184,7 @@ class Parser:
         # Table sizes
         try:
             self.table_size_pdr_lookup = self.conf["table_sizes"]["pdrLookup"]
+            self.table_size_qos_measure = self.conf["table_sizes"]["qosMeasure"]
             self.table_size_app_qer_lookup = self.conf["table_sizes"]["appQERLookup"]
             self.table_size_session_qer_lookup = self.conf["table_sizes"]["sessionQERLookup"]
             self.table_size_far_lookup = self.conf["table_sizes"]["farLookup"]

@@ -28,6 +28,7 @@ class QosMeasure final : public Module {
   static constexpr uint32_t kDefaultNumEntries = 1 << 15;
   static const Commands cmds;
   CommandResponse Init(const bess::pb::QosMeasureArg &arg);
+  void DeInit() override;
   void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
   std::string GetDesc() const override { return ""; };
   CommandResponse CommandReadStats(
