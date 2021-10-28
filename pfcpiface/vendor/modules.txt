@@ -17,6 +17,8 @@ github.com/google/gopacket/layers
 github.com/grpc-ecosystem/go-grpc-middleware/retry
 github.com/grpc-ecosystem/go-grpc-middleware/util/backoffutils
 github.com/grpc-ecosystem/go-grpc-middleware/util/metautils
+# github.com/libp2p/go-reuseport v0.1.0
+github.com/libp2p/go-reuseport
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
 github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/p4lang/p4runtime v1.3.0

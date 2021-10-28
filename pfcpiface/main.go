@@ -4,12 +4,14 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"time"
 
 	fqdn "github.com/Showmax/go-fqdn"
@@ -222,20 +224,36 @@ func main() {
 	log.Println("Access IP: ", upf.accessIP.String())
 	log.Println("Core IP: ", upf.coreIP.String())
 
+	setupConfigHandler(upf)
+	setupProm(upf)
+
 	if conf.CPIface.HTTPPort != "" {
 		*httpAddr = string("0.0.0.0:") + conf.CPIface.HTTPPort
 	}
 
 	log.Println("httpAddr: ", httpAddr)
 
-	go pfcpifaceMainLoop(
-		upf, upf.accessIP.String(),
-		upf.coreIP.String(), upf.n4SrcIP.String(),
-		conf.CPIface.DestIP,
-	)
+	httpSrv := &http.Server{Addr: *httpAddr, Handler: nil}
 
-	setupConfigHandler(upf)
-	setupProm(upf)
-	log.Fatal(http.ListenAndServe(*httpAddr, nil))
+	go func() {
+		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalln("http server failed", err)
+		}
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	node := NewPFCPNode(ctx, upf)
+	go node.Serve()
+
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt)
+	<-sig
+
+	cancel()
+
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	httpSrv.Shutdown(ctx)
 	upf.exit()
 }
