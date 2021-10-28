@@ -83,7 +83,7 @@ func (s *PFCPSession) MarkSessionQer() {
 	}
 
 	// loop around all pdrs and find matching qers.
-	for i, _ := range s.pdrs {
+	for i := range s.pdrs {
 		// match every qer in searchlist in pdr's qer list
 		sList := Intersect(sessQerIDList, s.pdrs[i].qerIDList)
 		if len(sList) == 0 {
@@ -129,7 +129,7 @@ func (s *PFCPSession) MarkSessionQer() {
 
 	s.qers[sessionIdx].qosLevel = SessionQos
 
-	for i, _ := range s.pdrs {
+	for i := range s.pdrs {
 		// remove common qerID from pdr's qer list
 		idx := findItemIndex(s.pdrs[i].qerIDList, sessQerID)
 		if idx != len(s.pdrs[i].qerIDList) {
