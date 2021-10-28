@@ -6,6 +6,7 @@ package main
 import (
 	"encoding/json"
 	"io/ioutil"
+	"math"
 	"net/http"
 
 	log "github.com/sirupsen/logrus"
@@ -22,6 +23,7 @@ type NetworkSlice struct {
 type SliceQos struct {
 	UplinkMbr    uint64 `json:"uplinkMbr"`
 	DownlinkMbr  uint64 `json:"downlinkMbr"`
+	BitrateUnit  string `json:"bitrateUnit"`
 	UlBurstBytes uint64 `json:"uplinkBurstSize"`
 	DlBurstBytes uint64 `json:"downlinkBurstSize"`
 }
@@ -96,13 +98,41 @@ func sendHTTPResp(status int, w http.ResponseWriter) {
 	}
 }
 
+// calculateBitRates : Default bit rate is Mbps.
+func calculateBitRates(mbr uint64, rate string) uint64 {
+	var val int64
+
+	switch rate {
+	case "bps":
+		return mbr
+	case "Kbps":
+		val = int64(mbr) * KB
+	case "Gbps":
+		val = int64(mbr) * GB
+	case "Mbps":
+		fallthrough
+	default:
+		val = int64(mbr) * MB
+	}
+
+	if val > 0 {
+		return uint64(val)
+	} else {
+		return uint64(math.MaxInt64)
+	}
+}
+
 func handleSliceConfig(nwSlice *NetworkSlice, upf *upf) {
 	log.Infoln("handle slice config : ", nwSlice.SliceName)
 
+	ulMbr := calculateBitRates(nwSlice.SliceQos.UplinkMbr,
+		nwSlice.SliceQos.BitrateUnit)
+	dlMbr := calculateBitRates(nwSlice.SliceQos.DownlinkMbr,
+		nwSlice.SliceQos.BitrateUnit)
 	sliceInfo := SliceInfo{
 		name:         nwSlice.SliceName,
-		uplinkMbr:    nwSlice.SliceQos.UplinkMbr,
-		downlinkMbr:  nwSlice.SliceQos.DownlinkMbr,
+		uplinkMbr:    ulMbr,
+		downlinkMbr:  dlMbr,
 		ulBurstBytes: nwSlice.SliceQos.UlBurstBytes,
 		dlBurstBytes: nwSlice.SliceQos.DlBurstBytes,
 	}
