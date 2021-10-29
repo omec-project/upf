@@ -5,928 +5,112 @@ package main
 
 import (
 	"errors"
-	"fmt"
-	"net"
-	"strings"
-	"time"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
 )
 
-const (
-	// Default timeout for DDN.
-	DefaultDDNTimeout = 20
-)
+var errMsgUnexpectedType = errors.New("unable to parse message as type specified")
 
-func (pConn *PFCPConn) handleHeartbeatRequest(msg message.Message) []byte {
-	addr := pConn.RemoteAddr().String()
-	rTime := pConn.upf.recoveryTime
-
-	hbreq, ok := msg.(*message.HeartbeatRequest)
-	if !ok {
-		log.Errorln("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
-		return nil
-	}
-
-	log.Traceln("Got a heartbeat request from: ", addr)
-
-	// Build response message
-	hbres, err := message.NewHeartbeatResponse(hbreq.SequenceNumber,
-		ie.NewRecoveryTimeStamp(rTime), /* ts */
-	).Marshal()
-	if err != nil {
-		log.Errorln("Unable to create heartbeat response", err)
-	}
-
-	log.Traceln("Sent heartbeat response to: ", addr)
-
-	return hbres
+type HandlePFCPMsgError struct {
+	Op  string
+	Err error
 }
 
-func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) []byte {
-	addr := pConn.RemoteAddr().String()
-	upf := pConn.upf
-
-	asreq, ok := msg.(*message.AssociationSetupRequest)
-	if !ok {
-		log.Errorln("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
-		return nil
-	}
-
-	nodeID, err := asreq.NodeID.NodeID()
-	if err != nil {
-		log.Errorln("Got an association setup request with invalid NodeID: ", err, " from: ", addr)
-		return nil
-	}
-
-	ts, err := asreq.RecoveryTimeStamp.RecoveryTimeStamp()
-	if err != nil {
-		log.Errorln("Got an association setup request with invalid TS: ", err, " from: ", addr)
-		return nil
-	}
-
-	log.Traceln("Got an association setup request with TS: ", ts, " from: ", addr)
-
-	globalPfcpStats.messages.WithLabelValues(nodeID, "Association_Setup_Request", "Incoming", "Success").Inc()
-
-	cause := ie.CauseRequestAccepted
-	if !upf.isConnected() {
-		cause = ie.CauseRequestRejected
-
-		globalPfcpStats.messages.WithLabelValues(nodeID, "Association_Setup_Response", "Outgoing", "Failure").Inc()
-	} else {
-		globalPfcpStats.messages.WithLabelValues(nodeID, "Association_Setup_Response", "Outgoing", "Success").Inc()
-	}
-
-	// Build response message
-	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
-	log.Traceln("Dnn info : ", upf.dnn)
-
-	networkInstance := string(ie.NewNetworkInstanceFQDN(upf.dnn).Payload)
-	flags := uint8(0x41)
-
-	if len(upf.dnn) != 0 {
-		// add ASSONI flag to set network instance.
-		flags = uint8(0x61)
-	}
-
-	asresmsg := message.NewAssociationSetupResponse(asreq.SequenceNumber,
-		ie.NewRecoveryTimeStamp(upf.recoveryTime),
-		ie.NewNodeID(upf.nodeIP.String(), "", ""), /* node id (IPv4) */
-		ie.NewCause(cause),                        /* accept it blindly for the time being */
-		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
-		//      = 01000001
-		ie.NewUserPlaneIPResourceInformation(flags, 0, upf.accessIP.String(), "", networkInstance, ie.SrcInterfaceAccess),
-		// ie.NewUserPlaneIPResourceInformation(0x41, 0, coreIP, "", "", ie.SrcInterfaceCore),
-	) /* userplane ip resource info */
-
-	pConn.mgr.nodeID = nodeID
-	log.Traceln("Association setup NodeID : ", pConn.mgr.nodeID)
-
-	features := make([]uint8, 4)
-
-	if upf.enableUeIPAlloc {
-		setUeipFeature(features...)
-	}
-
-	if upf.enableEndMarker {
-		setEndMarkerFeature(features...)
-	}
-
-	asresmsg.UPFunctionFeatures = ie.NewUPFunctionFeatures(features...)
-
-	asres, err := asresmsg.Marshal()
-	if err != nil {
-		log.Fatalln("Unable to create association setup response", err)
-	}
-
-	log.Traceln("Sent association setup response to: ", addr)
-
-	return asres
+func (e *HandlePFCPMsgError) Error() string {
+	return "Error during " + e.Op + e.Err.Error()
 }
 
-func (pConn *PFCPConn) handleAssociationSetupResponse(msg message.Message) bool {
-	addr := pConn.RemoteAddr().String()
-
-	asres, ok := msg.(*message.AssociationSetupResponse)
-	if !ok {
-		log.Errorln("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
-		return false
-	}
-
-	ts, err := asres.RecoveryTimeStamp.RecoveryTimeStamp()
-	if err != nil {
-		log.Errorln("Got an association setup response with invalid TS: ", err, " from: ", addr)
-		return false
-	}
-
-	log.Traceln("Received a PFCP association setup response with TS: ", ts, " from: ", addr)
-
-	cause, err := asres.Cause.Cause()
-	if err != nil {
-		log.Errorln("Got an association setup response without cause ", err, " from: ", addr, "Cause ", cause)
-		return false
-	}
-
-	log.Traceln("PFCP Association formed with Control Plane - ", addr)
-
-	return true
+func errUnmarshal(err error) *HandlePFCPMsgError {
+	return &HandlePFCPMsgError{Op: "Unmarshal", Err: err}
 }
 
-func (pConn *PFCPConn) handleAssociationReleaseRequest(msg message.Message) []byte {
-	addr := pConn.RemoteAddr().String()
-	upf := pConn.upf
-	rTime := upf.recoveryTime
-
-	arreq, ok := msg.(*message.AssociationReleaseRequest)
-	if !ok {
-		log.Errorln("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
-		return nil
-	}
-
-	log.Traceln("Got an association release request from: ", addr)
-
-	// Build response message
-	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
-	arres, err := message.NewAssociationReleaseResponse(arreq.SequenceNumber,
-		ie.NewRecoveryTimeStamp(rTime),
-		ie.NewNodeID(upf.nodeIP.String(), "", ""), /* node id (IPv4) */
-		ie.NewCause(ie.CauseRequestAccepted),      /* accept it blindly for the time being */
-		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
-		//      = 01000001
-		ie.NewUserPlaneIPResourceInformation(0x41, 0, upf.accessIP.String(), "", "", ie.SrcInterfaceAccess),
-	).Marshal() /* userplane ip resource info */
-	if err != nil {
-		log.Errorln("Unable to create association release response", err)
-	}
-
-	log.Traceln("Sent association release response to: ", addr)
-
-	return arres
+func errProcess(err error) *HandlePFCPMsgError {
+	return &HandlePFCPMsgError{Op: "Process", Err: err}
 }
 
-func (pConn *PFCPConn) handlePFDMgmtRequest(msg message.Message) []byte {
-	addr := pConn.RemoteAddr().String()
+// HandlePFCPMsg handles different types of PFCP messages.
+func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
+	var reply message.Message
+	var err error
 
-	pfdmreq, ok := msg.(*message.PFDManagementRequest)
-	if !ok {
-		log.Errorln("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
-		return nil
-	}
-
-	log.Traceln("Got a PFD management request from: ", addr)
-
-	currentAppPFDs := pConn.mgr.appPFDs
-
-	// On every PFD management request reset existing contents
-	// TODO: Analyse impact on PDRs referencing these IDs
-	pConn.mgr.ResetAppPFDs()
-
-	sendError := func(err error, offendingIE *ie.IE) []byte {
-		log.Errorln(err)
-		// Revert the map to original contents
-		pConn.mgr.appPFDs = currentAppPFDs
-		// Build response message
-		pfdres, err := message.NewPFDManagementResponse(pfdmreq.SequenceNumber,
-			ie.NewCause(ie.CauseRequestRejected),
-			offendingIE,
-		).Marshal()
-		if err != nil {
-			log.Fatalln("Unable to create PFD management response", err)
-		}
-
-		log.Traceln("Sending PFD management error response to: ", addr)
-
-		return pfdres
-	}
-
-	for _, appIDPFD := range pfdmreq.ApplicationIDsPFDs {
-		id, err := appIDPFD.ApplicationID()
-		if err != nil {
-			return sendError(err, appIDPFD)
-		}
-
-		pConn.mgr.NewAppPFD(id)
-		appPFD := pConn.mgr.appPFDs[id]
-
-		pfdCtx, err := appIDPFD.PFDContext()
-		if err != nil {
-			pConn.mgr.RemoveAppPFD(id)
-			return sendError(err, appIDPFD)
-		}
-
-		for _, pfdContent := range pfdCtx {
-			fields, err := pfdContent.PFDContents()
-			if err != nil {
-				pConn.mgr.RemoveAppPFD(id)
-				return sendError(err, appIDPFD)
-			}
-
-			if fields.FlowDescription == "" {
-				return sendError(errors.New("flow description not found"), appIDPFD)
-			}
-
-			appPFD.flowDescs = append(appPFD.flowDescs, fields.FlowDescription)
-		}
-
-		pConn.mgr.appPFDs[id] = appPFD
-		log.Traceln("Flow descriptions for AppID", id, ":", appPFD.flowDescs)
-	}
-
-	// Build response message
-	pfdres, err := message.NewPFDManagementResponse(pfdmreq.SequenceNumber,
-		ie.NewCause(ie.CauseRequestAccepted),
-		nil,
-	).Marshal()
+	msg, err := message.Parse(buf)
 	if err != nil {
-		log.Fatalln("Unable to create PFD management response", err)
-	}
-
-	log.Traceln("Sending PFD management response to: ", addr)
-
-	return pfdres
-}
-
-func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) {
-	addr := pConn.RemoteAddr().String()
-	upf := pConn.upf
-
-	log.Traceln("Got session report response from: ", addr)
-
-	srres, ok := msg.(*message.SessionReportResponse)
-	if !ok {
-		log.Errorln("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
+		log.Errorln("Ignoring undecodable message: ", buf, " error: ", err)
 		return
 	}
 
-	cause := srres.Cause.Payload[0]
-	if cause != ie.CauseRequestAccepted {
-		seid := srres.SEID()
-		log.Warnln("session req not accepted seq : ", srres.SequenceNumber)
+	addr := pConn.RemoteAddr().String()
+	msgType := msg.MessageTypeName()
 
-		if cause == ie.CauseSessionContextNotFound {
-			sessItem, ok := pConn.mgr.sessions[seid]
-			if !ok {
-				log.Warnln("context not found locally or remote. SEID : ", seid)
-				return
-			}
+	log.Traceln("Received", msgType, "from", addr)
 
-			log.Warnln("context not found. Delete session locally")
+	switch msg.MessageType() {
+	// Connection related messages
+	case message.MsgTypeHeartbeatRequest:
+		reply, err = pConn.handleHeartbeatRequest(msg)
+	case message.MsgTypeHeartbeatResponse:
+		reply, err = pConn.handleHeartbeatResponse(msg)
+	case message.MsgTypePFDManagementRequest:
+		reply, err = pConn.handlePFDMgmtRequest(msg)
+	case message.MsgTypeAssociationSetupRequest:
+		reply, err = pConn.handleAssociationSetupRequest(msg)
+		// TODO: Cleanup sessions
+		// TODO: start heartbeats
+	case message.MsgTypeAssociationSetupResponse:
+		reply, err = pConn.handleAssociationSetupResponse(msg)
+		// TODO: Cleanup sessions
+		// TODO: start heartbeats
+	case message.MsgTypeAssociationReleaseRequest:
+		reply, err = pConn.handleAssociationReleaseRequest(msg)
+		// TODO: Cleanup sessions
+		// TODO: stop heartbeats
+		defer pConn.Shutdown()
 
-			pConn.mgr.RemoveSession(srres.SEID())
+	// Session related messages
+	case message.MsgTypeSessionEstablishmentRequest:
+		reply, err = pConn.handleSessionEstablishmentRequest(msg)
+	case message.MsgTypeSessionModificationRequest:
+		reply, err = pConn.handleSessionModificationRequest(msg)
+	case message.MsgTypeSessionDeletionRequest:
+		reply, err = pConn.handleSessionDeletionRequest(msg)
+	case message.MsgTypeSessionReportResponse:
+		pConn.handleSessionReportResponse(msg)
+	default:
+		log.Errorln("Message type: ", msgType, " is currently not supported")
+		return
+	}
 
-			cause := upf.sendMsgToUPF(
-				upfMsgTypeDel, sessItem.pdrs, sessItem.fars, sessItem.qers)
-			if cause == ie.CauseRequestRejected {
-				log.Errorln("Write to FastPath failed")
-			}
+	nodeID := pConn.mgr.nodeID
+	//nodeID := addr
 
+	// Check for errors in handling the message
+	if err != nil {
+		globalPfcpStats.messages.WithLabelValues(nodeID, msgType, "Incoming", "Failure").Inc()
+		log.Errorln("Error handling PFCP message type", msgType, "from", addr, err)
+	} else {
+		globalPfcpStats.messages.WithLabelValues(nodeID, msgType, "Incoming", "Success").Inc()
+		log.Traceln("Successfully processed", msgType, "from", addr)
+	}
+
+	// Marshal and send reply message
+	if reply != nil {
+		out := make([]byte, reply.MarshalLen())
+		replyType := reply.MessageTypeName()
+
+		if err := reply.MarshalTo(out); err != nil {
+			globalPfcpStats.messages.WithLabelValues(nodeID, replyType, "Outgoing", "Failure").Inc()
+			log.Errorln("Failed to marshal", replyType, "for", addr, err)
 			return
 		}
-	}
 
-	log.Traceln("session req accepted seq : ", srres.SequenceNumber)
-}
-
-func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) []byte {
-	addr := pConn.RemoteAddr().String()
-	upf := pConn.upf
-
-	sereq, ok := msg.(*message.SessionEstablishmentRequest)
-	if !ok {
-		log.Errorln("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
-		return nil
-	}
-
-	nodeID, err := sereq.NodeID.NodeID()
-	if err != nil {
-		log.Errorln("Failed to parse NodeID from session establishment request")
-		return nil
-	}
-
-	log.Traceln("Got a session establishment request from: ", addr)
-	globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Establishment_Request", "Incoming", "Success").Inc()
-
-	/* Read fseid from the IE */
-	fseid, err := sereq.CPFSEID.FSEID()
-	if err != nil {
-		log.Errorln("Failed to parse FSEID from session establishment request")
-		return nil
-	}
-
-	remoteSEID := fseid.SEID
-	fseidIP := ip2int(fseid.IPv4Address)
-
-	sendError := func(err error, cause uint8) []byte {
-		globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Establishment_Response", "Outgoing", "Failure").Inc()
-		log.Errorln(err)
-		// Build response message
-		seres, err := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
-			0,                    /* FO <-- what's this? */
-			remoteSEID,           /* seid */
-			sereq.SequenceNumber, /* seq # */
-			0,                    /* priority */
-			ie.NewNodeID(upf.nodeIP.String(), "", ""), /* node id (IPv4) */
-			ie.NewCause(cause),
-		).Marshal()
-		if err != nil {
-			log.Errorln("Unable to create session establishment response", err)
+		if _, err := pConn.Write(out); err != nil {
+			globalPfcpStats.messages.WithLabelValues(nodeID, replyType, "Outgoing", "Failure").Inc()
+			log.Errorln("Failed to transmit", replyType, "to", addr, err)
+			return
 		}
 
-		log.Traceln("Sending session establishment response to: ", addr)
-
-		return seres
-	}
-
-	if strings.Compare(nodeID, pConn.mgr.nodeID) != 0 {
-		log.Warnln("Association not found for Establishment request, nodeID: ", nodeID, ", Association NodeID: ", pConn.mgr.nodeID)
-		return sendError(errors.New("no association found for NodeID"),
-			ie.CauseNoEstablishedPFCPAssociation)
-	}
-
-	/* Read CreatePDRs and CreateFARs from payload */
-	localSEID := pConn.mgr.NewPFCPSession(remoteSEID)
-	if localSEID == 0 {
-		sendError(errors.New("unable to allocate new PFCP session"),
-			ie.CauseNoResourcesAvailable)
-	}
-
-	session := pConn.mgr.sessions[localSEID]
-
-	for _, cPDR := range sereq.CreatePDR {
-		var p pdr
-		if err := p.parsePDR(cPDR, session.localSEID, pConn.mgr.appPFDs, upf); err != nil {
-			return sendError(err, ie.CauseRequestRejected)
-		}
-
-		p.fseidIP = fseidIP
-		session.CreatePDR(p)
-	}
-
-	for _, cFAR := range sereq.CreateFAR {
-		var f far
-		if err := f.parseFAR(cFAR, session.localSEID, upf, create); err != nil {
-			return sendError(err, ie.CauseRequestRejected)
-		}
-
-		f.fseidIP = fseidIP
-		session.CreateFAR(f)
-	}
-
-	for _, cQER := range sereq.CreateQER {
-		var q qer
-		if err := q.parseQER(cQER, session.localSEID, upf); err != nil {
-			return sendError(err, ie.CauseRequestRejected)
-		}
-
-		q.fseidIP = fseidIP
-		session.CreateQER(q)
-	}
-
-	session.MarkSessionQer()
-
-	cause := upf.sendMsgToUPF(upfMsgTypeAdd, session.pdrs, session.fars, session.qers)
-	if cause == ie.CauseRequestRejected {
-		pConn.mgr.RemoveSession(session.localSEID)
-		return sendError(errors.New("write to FastPath failed"),
-			ie.CauseRequestRejected)
-	}
-
-	// Build response message
-	seresMsg := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
-		0,                    /* FO <-- what's this? */
-		session.remoteSEID,   /* seid */
-		sereq.SequenceNumber, /* seq # */
-		0,                    /* priority */
-		ie.NewNodeID(upf.nodeIP.String(), "", ""), /* node id (IPv4) */
-		ie.NewCause(ie.CauseRequestAccepted),      /* accept it blindly for the time being */
-		ie.NewFSEID(session.localSEID, net.ParseIP(pConn.LocalAddr().String()), nil),
-	)
-
-	addPdrInfo(seresMsg, session)
-
-	seres, err := seresMsg.Marshal()
-	if err != nil {
-		log.Fatalln("Unable to create session establishment response", err)
-	}
-
-	log.Traceln("Sending session establishment response to: ", addr)
-
-	globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Establishment_Response", "Outgoing", "Success").Inc()
-
-	return seres
-}
-
-func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) []byte {
-	addr := pConn.RemoteAddr().String()
-	upf := pConn.upf
-
-	smreq, ok := msg.(*message.SessionModificationRequest)
-	if !ok {
-		log.Errorln("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
-		return nil
-	}
-
-	nodeID := pConn.mgr.nodeID
-
-	log.Traceln("Got a session modification request from: ", addr)
-	globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Modification_Request", "Incoming", "Success").Inc()
-
-	var remoteSEID uint64
-
-	sendError := func(err error) []byte {
-		globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Modification_Response", "Outgoing", "Failure").Inc()
-		log.Errorln(err)
-
-		smres, err := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */
-			0,                                    /* FO <-- what's this? */
-			remoteSEID,                           /* seid */
-			smreq.SequenceNumber,                 /* seq # */
-			0,                                    /* priority */
-			ie.NewCause(ie.CauseRequestRejected), /* accept it blindly for the time being */
-		).Marshal()
-		if err != nil {
-			log.Fatalln("Unable to create session modification response", err)
-		}
-
-		log.Traceln("Sending session modification response to: ", addr)
-
-		return smres
-	}
-
-	localSEID := smreq.SEID()
-
-	session, ok := pConn.mgr.sessions[localSEID]
-	if !ok {
-		return sendError(fmt.Errorf("session not found: %v", localSEID))
-	}
-
-	var fseidIP uint32
-
-	if smreq.CPFSEID != nil {
-		fseid, err := smreq.CPFSEID.FSEID()
-		if err == nil {
-			session.remoteSEID = fseid.SEID
-			fseidIP = ip2int(fseid.IPv4Address)
-
-			log.Traceln("Updated FSEID from session modification request")
-		}
-	}
-
-	remoteSEID = session.remoteSEID
-
-	addPDRs := make([]pdr, 0, MaxItems)
-	addFARs := make([]far, 0, MaxItems)
-	addQERs := make([]qer, 0, MaxItems)
-	endMarkerList := make([][]byte, 0, MaxItems)
-
-	for _, cPDR := range smreq.CreatePDR {
-		var p pdr
-		if err := p.parsePDR(cPDR, localSEID, pConn.mgr.appPFDs, upf); err != nil {
-			return sendError(err)
-		}
-
-		p.fseidIP = fseidIP
-
-		session.CreatePDR(p)
-		addPDRs = append(addPDRs, p)
-	}
-
-	for _, cFAR := range smreq.CreateFAR {
-		var f far
-		if err := f.parseFAR(cFAR, localSEID, upf, create); err != nil {
-			return sendError(err)
-		}
-
-		f.fseidIP = fseidIP
-
-		session.CreateFAR(f)
-		addFARs = append(addFARs, f)
-	}
-
-	for _, cQER := range smreq.CreateQER {
-		var q qer
-		if err := q.parseQER(cQER, localSEID, upf); err != nil {
-			return sendError(err)
-		}
-
-		q.fseidIP = fseidIP
-
-		session.CreateQER(q)
-		addQERs = append(addQERs, q)
-	}
-
-	for _, uPDR := range smreq.UpdatePDR {
-		var (
-			p   pdr
-			err error
-		)
-
-		if err = p.parsePDR(uPDR, localSEID, pConn.mgr.appPFDs, upf); err != nil {
-			return sendError(err)
-		}
-
-		p.fseidIP = fseidIP
-
-		err = session.UpdatePDR(p)
-		if err != nil {
-			log.Errorln("session PDR update failed ", err)
-			continue
-		}
-
-		addPDRs = append(addPDRs, p)
-	}
-
-	for _, uFAR := range smreq.UpdateFAR {
-		var (
-			f   far
-			err error
-		)
-
-		if err = f.parseFAR(uFAR, localSEID, upf, update); err != nil {
-			return sendError(err)
-		}
-
-		f.fseidIP = fseidIP
-
-		err = session.UpdateFAR(&f, &endMarkerList)
-		if err != nil {
-			log.Errorln("session PDR update failed ", err)
-			continue
-		}
-
-		addFARs = append(addFARs, f)
-	}
-
-	for _, uQER := range smreq.UpdateQER {
-		var (
-			q   qer
-			err error
-		)
-
-		if err = q.parseQER(uQER, localSEID, upf); err != nil {
-			return sendError(err)
-		}
-
-		q.fseidIP = fseidIP
-
-		err = session.UpdateQER(q)
-		if err != nil {
-			log.Errorln("session QER update failed ", err)
-			continue
-		}
-
-		addQERs = append(addQERs, q)
-	}
-
-	session.MarkSessionQer()
-
-	cause := upf.sendMsgToUPF(upfMsgTypeMod, addPDRs, addFARs, addQERs)
-	if cause == ie.CauseRequestRejected {
-		return sendError(errors.New("write to FastPath failed"))
-	}
-
-	if session.getNotifyFlag() {
-		session.updateNotifyFlag()
-	}
-
-	if upf.enableEndMarker {
-		err := upf.sendEndMarkers(&endMarkerList)
-		if err != nil {
-			log.Errorln("Sending End Markers Failed : ", err)
-		}
-	}
-
-	delPDRs := make([]pdr, 0, MaxItems)
-	delFARs := make([]far, 0, MaxItems)
-	delQERs := make([]qer, 0, MaxItems)
-
-	for _, rPDR := range smreq.RemovePDR {
-		pdrID, err := rPDR.PDRID()
-		if err != nil {
-			return sendError(err)
-		}
-
-		p, err := session.RemovePDR(uint32(pdrID))
-		if err != nil {
-			return sendError(err)
-		}
-
-		delPDRs = append(delPDRs, *p)
-	}
-
-	for _, dFAR := range smreq.RemoveFAR {
-		farID, err := dFAR.FARID()
-		if err != nil {
-			return sendError(err)
-		}
-
-		f, err := session.RemoveFAR(farID)
-		if err != nil {
-			return sendError(err)
-		}
-
-		delFARs = append(delFARs, *f)
-	}
-
-	for _, dQER := range smreq.RemoveQER {
-		qerID, err := dQER.QERID()
-		if err != nil {
-			return sendError(err)
-		}
-
-		q, err := session.RemoveQER(qerID)
-		if err != nil {
-			return sendError(err)
-		}
-
-		delQERs = append(delQERs, *q)
-	}
-
-	cause = upf.sendMsgToUPF(upfMsgTypeDel, delPDRs, delFARs, delQERs)
-	if cause == ie.CauseRequestRejected {
-		return sendError(errors.New("write to FastPath failed"))
-	}
-
-	// Build response message
-	smres, err := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */
-		0,                                    /* FO <-- what's this? */
-		remoteSEID,                           /* seid */
-		smreq.SequenceNumber,                 /* seq # */
-		0,                                    /* priority */
-		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
-	).Marshal()
-	if err != nil {
-		log.Fatalln("Unable to create session modification response", err)
-	}
-
-	globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Modification_Response", "Outgoing", "Success").Inc()
-	log.Traceln("Sent session modification response to: ", addr)
-
-	return smres
-}
-
-func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) []byte {
-	addr := pConn.RemoteAddr().String()
-	upf := pConn.upf
-
-	sdreq, ok := msg.(*message.SessionDeletionRequest)
-	if !ok {
-		log.Errorln("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
-		return nil
-	}
-
-	nodeID := pConn.mgr.nodeID
-	globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Deletion_Request", "Incoming", "Success").Inc()
-
-	log.Traceln("Got a session deletion request from: ", addr)
-
-	sendError := func(err error) []byte {
-		log.Errorln(err)
-		globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Deletion_Response", "Outgoing", "Failure").Inc()
-
-		smres, err := message.NewSessionDeletionResponse(0, /* MO?? <-- what's this */
-			0,                                    /* FO <-- what's this? */
-			0,                                    /* seid */
-			sdreq.SequenceNumber,                 /* seq # */
-			0,                                    /* priority */
-			ie.NewCause(ie.CauseRequestRejected), /* accept it blindly for the time being */
-		).Marshal()
-		if err != nil {
-			log.Fatalln("Unable to create session deletion response", err)
-		}
-
-		log.Traceln("Sending session deletion response to: ", addr)
-
-		return smres
-	}
-
-	/* retrieve sessionRecord */
-	localSEID := sdreq.SEID()
-
-	session, ok := pConn.mgr.sessions[localSEID]
-	if !ok {
-		return sendError(fmt.Errorf("session not found: %v", localSEID))
-	}
-
-	cause := upf.sendMsgToUPF(upfMsgTypeDel, session.pdrs, session.fars, session.qers)
-	if cause == ie.CauseRequestRejected {
-		return sendError(errors.New("write to FastPath failed"))
-	}
-
-	releaseAllocatedIPs(upf, session)
-	/* delete sessionRecord */
-	pConn.mgr.RemoveSession(localSEID)
-
-	// Build response message
-	smres, err := message.NewSessionDeletionResponse(0, /* MO?? <-- what's this */
-		0,                                    /* FO <-- what's this? */
-		session.remoteSEID,                   /* seid */
-		sdreq.SequenceNumber,                 /* seq # */
-		0,                                    /* priority */
-		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
-	).Marshal()
-	if err != nil {
-		log.Fatalln("Unable to create session deletion response", err)
-	}
-
-	log.Traceln("Sent session deletion response to: ", addr)
-	globalPfcpStats.messages.WithLabelValues(nodeID, "Pfcp_Deletion_Response", "Outgoing", "Success").Inc()
-
-	return smres
-}
-
-func (pConn *PFCPConn) manageSmfConnection(n4LocalIP string, n3ip string, n4Dst string, conn *net.UDPConn, cpConnectionStatus chan bool, rTime time.Time) {
-	cpConnected := false
-
-	initiatePfcpConnection := func() {
-		log.Traceln("SPGWC/SMF hostname ", n4Dst)
-		n4DstIP := getRemoteIP(n4Dst)
-		log.Traceln("SPGWC/SMF address IP inside manageSmfConnection ", n4DstIP.String())
-		// initiate request if we have control plane address available
-		if n4DstIP.String() != net.IPv4zero.String() {
-			pConn.generateAssociationRequest(n4LocalIP, n3ip, n4DstIP.String(), conn, rTime)
-		}
-	}
-
-	updateSmfStatus := func(msg bool) {
-		log.Traceln("cpConnected : ", cpConnected, "msg ", msg)
-		// events from main Loop
-		if cpConnected && !msg {
-			log.Warnln("CP disconnected ")
-
-			cpConnected = false
-		} else if !cpConnected && msg {
-			log.Infoln("CP Connected ")
-
-			cpConnected = true
-		} else {
-			log.Infoln("cpConnected ", cpConnected, "msg - ", msg)
-		}
-	}
-
-	initiatePfcpConnection()
-
-	connHelathTicker := time.NewTicker(5000 * time.Millisecond)
-	pfcpResponseTicker := time.NewTicker(2000 * time.Millisecond)
-
-	for {
-		select {
-		case msg := <-cpConnectionStatus:
-			// events from main Loop
-			updateSmfStatus(msg)
-
-			if cpConnected {
-				pfcpResponseTicker.Stop()
-			}
-		case <-connHelathTicker.C:
-			if !cpConnected {
-				log.Infoln("Retry pfcp connection setup ", n4Dst)
-				initiatePfcpConnection()
-			}
-		case <-pfcpResponseTicker.C:
-			// we will attempt new connection after next recheck
-			log.Warnln("PFCP session setup timeout ")
-			pfcpResponseTicker.Stop()
-		}
-	}
-}
-
-func (pConn *PFCPConn) generateAssociationRequest(n4LocalIP string, n3ip string, n4DstIP string, conn *net.UDPConn, rTime time.Time) {
-	log.Infoln("n4DstIp ", n4DstIP)
-
-	seq := pConn.getSeqNum()
-	// Build request message
-	asreq, err := message.NewAssociationSetupRequest(seq, ie.NewRecoveryTimeStamp(rTime),
-		ie.NewNodeID(n4LocalIP, "", ""), /* node id (IPv4) */
-		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
-		//      = 01000001
-		ie.NewUserPlaneIPResourceInformation(0x41, 0, n3ip, "", "", ie.SrcInterfaceAccess),
-	).Marshal() /* userplane ip resource info */
-	if err != nil {
-		log.Errorln("Unable to create association setup response", err)
-	}
-
-	smfAddr, err := net.ResolveUDPAddr("udp", n4DstIP+":"+PFCPPort)
-	if err != nil {
-		log.Errorln("Unable to resolve udp addr!", err)
-		return
-	}
-
-	log.Infoln("SMF address ", smfAddr)
-
-	if _, err := conn.WriteTo(asreq, smfAddr); err != nil {
-		log.Errorln("Unable to transmit association setup request ", err)
-	}
-}
-
-func readReportNotification(rn <-chan uint64, pfcpConn *PFCPConn,
-	udpConn *net.UDPConn, udpAddr net.Addr) {
-	log.Traceln("read report notification start")
-
-	for {
-		select {
-		case fseid := <-rn:
-			handleDigestReport(fseid, pfcpConn, udpConn, udpAddr)
-
-		default:
-			time.Sleep(2 * time.Second)
-		}
-	}
-}
-
-func handleDigestReport(fseid uint64,
-	pfcpConn *PFCPConn,
-	udpConn *net.UDPConn,
-	udpAddr net.Addr) {
-	session, ok := pfcpConn.mgr.sessions[fseid]
-	if !ok {
-		log.Warnln("No session found for fseid : ", fseid)
-		return
-	}
-
-	/* Check if notify is already sent in current time interval */
-	if session.getNotifyFlag() {
-		return
-	}
-
-	seq := pfcpConn.getSeqNum()
-	serep := message.NewSessionReportRequest(0, /* MO?? <-- what's this */
-		0,                            /* FO <-- what's this? */
-		0,                            /* seid */
-		seq,                          /* seq # */
-		0,                            /* priority */
-		ie.NewReportType(0, 0, 0, 1), /*upir, erir, usar, dldr int*/
-	)
-	serep.Header.SEID = session.remoteSEID
-
-	var pdrID uint32
-
-	var farID uint32
-
-	for _, pdr := range session.pdrs {
-		if pdr.srcIface == core {
-			pdrID = pdr.pdrID
-
-			farID = pdr.farID
-
-			break
-		}
-	}
-
-	for _, far := range session.fars {
-		if far.farID == farID {
-			if far.applyAction&ActionNotify == 0 {
-				log.Errorln("packet recieved for forwarding far. discard")
-				return
-			}
-		}
-	}
-
-	if pdrID == 0 {
-		log.Errorln("No Pdr found for downlink")
-
-		return
-	}
-
-	go session.runTimerForDDNNotify(DefaultDDNTimeout)
-
-	session.setNotifyFlag(true)
-
-	serep.DownlinkDataReport = ie.NewDownlinkDataReport(
-		ie.NewPDRID(uint16(pdrID)))
-
-	ret, err := serep.Marshal()
-	if err != nil {
-		log.Errorln("Marshal function failed for SM resp ", err)
-	}
-
-	// send the report req out
-	if ret != nil {
-		if _, err := udpConn.WriteTo(ret, udpAddr); err != nil {
-			log.Errorln("Unable to transmit Report req", err)
-		}
+		globalPfcpStats.messages.WithLabelValues(nodeID, replyType, "Outgoing", "Success").Inc()
+		log.Traceln("Sent", replyType, "to", addr)
 	}
 }

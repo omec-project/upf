@@ -12,7 +12,6 @@ import (
 
 	reuse "github.com/libp2p/go-reuseport"
 	log "github.com/sirupsen/logrus"
-	"github.com/wmnsk/go-pfcp/message"
 )
 
 // PktBufSz : buffer size for incoming pkt.
@@ -94,51 +93,6 @@ func (pConn *PFCPConn) Shutdown() error {
 
 	log.Infoln("PFCPConn: Shutdown complete", pConn.RemoteAddr().String())
 	return nil
-}
-
-// HandlePFCPMsg handles different types of PFCP messages.
-func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
-	var outgoingMessage []byte
-
-	msg, err := message.Parse(buf)
-	if err != nil {
-		log.Errorln("Ignoring undecodable message: ", buf, " error: ", err)
-		return
-	}
-
-	switch msg.MessageType() {
-	case message.MsgTypeAssociationSetupRequest:
-		// Cleanup my session
-		outgoingMessage = pConn.handleAssociationSetupRequest(msg)
-	case message.MsgTypeAssociationSetupResponse:
-		pConn.handleAssociationSetupResponse(msg)
-		// start heartbeats
-	case message.MsgTypePFDManagementRequest:
-		outgoingMessage = pConn.handlePFDMgmtRequest(msg)
-	case message.MsgTypeSessionEstablishmentRequest:
-		outgoingMessage = pConn.handleSessionEstablishmentRequest(msg)
-	case message.MsgTypeSessionModificationRequest:
-		outgoingMessage = pConn.handleSessionModificationRequest(msg)
-	case message.MsgTypeHeartbeatRequest:
-		outgoingMessage = pConn.handleHeartbeatRequest(msg)
-	case message.MsgTypeSessionDeletionRequest:
-		outgoingMessage = pConn.handleSessionDeletionRequest(msg)
-	case message.MsgTypeAssociationReleaseRequest:
-		outgoingMessage = pConn.handleAssociationReleaseRequest(msg)
-		// Cleanup my sessions
-	case message.MsgTypeSessionReportResponse:
-		pConn.handleSessionReportResponse(msg)
-	default:
-		log.Errorln("Message type: ", msg.MessageTypeName(), " is currently not supported")
-		return
-	}
-
-	// send the response out
-	if outgoingMessage != nil {
-		if _, err := pConn.Write(outgoingMessage); err != nil {
-			log.Errorln("Unable to transmit association setup response", err)
-		}
-	}
 }
 
 func (c *PFCPConn) getSeqNum() uint32 {
