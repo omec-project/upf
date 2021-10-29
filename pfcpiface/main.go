@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 
 	fqdn "github.com/Showmax/go-fqdn"
@@ -239,6 +240,8 @@ func main() {
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalln("http server failed", err)
 		}
+
+		log.Infoln("http server closed")
 	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -247,13 +250,14 @@ func main() {
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
+	signal.Notify(sig, syscall.SIGTERM)
 	<-sig
 
 	cancel()
 
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	if err := httpSrv.Shutdown(context.Background()); err != nil {
+		log.Errorln("Failed to shutdown http: %v", err)
+	}
 
-	httpSrv.Shutdown(ctx)
 	upf.exit()
 }

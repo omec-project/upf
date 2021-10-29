@@ -40,52 +40,58 @@ func NewPFCPNode(ctx context.Context, upf *upf) *PFCPNode {
 	}
 }
 
+func (node *PFCPNode) serve() {
+	lAddrStr := node.LocalAddr().String()
+
+	for {
+		buf := make([]byte, 1024)
+
+		n, rAddr, err := node.ReadFrom(buf)
+		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
+			continue
+		}
+
+		rAddrStr := rAddr.String()
+
+		_, ok := node.pconns[rAddrStr]
+		if ok {
+			log.Warnln("Drop packet for existing PFCPconn received from", rAddrStr)
+			continue
+		}
+
+		log.Infoln(lAddrStr, "received new connection from", rAddrStr)
+
+		p := NewPFCPConn(node.ctx, node.upf, node.done, lAddrStr, rAddrStr)
+		node.pconns[rAddrStr] = p
+		p.HandlePFCPMsg(buf[:n])
+
+		go p.Serve()
+	}
+}
+
+func (node *PFCPNode) waitPFCPConnCompletions() {
+	for {
+		select {
+		case rAddr := <-node.done:
+			log.Infoln("Removing connection to", rAddr)
+			delete(node.pconns, rAddr)
+		case <-node.ctx.Done():
+			log.Infoln("Stop waiting for PFCPConn completions")
+			return
+		}
+	}
+}
+
 // Serve listens for the first packet from a new PFCP peer and creates PFCPConn.
 func (node *PFCPNode) Serve() {
 	log.Infoln("listening for new PFCP connections on", node.LocalAddr().String())
 
-	go func() {
-		lAddrStr := node.LocalAddr().String()
+	go node.serve()
 
-		for {
-			buf := make([]byte, 1024)
-
-			n, rAddr, err := node.ReadFrom(buf)
-			if err != nil {
-				if errors.Is(err, net.ErrClosed) {
-					return
-				}
-				continue
-			}
-
-			rAddrStr := rAddr.String()
-
-			_, ok := node.pconns[rAddrStr]
-			if ok {
-				log.Warnln("Dropping packet for existing PFCPconn received from", rAddrStr)
-				continue
-			}
-
-			log.Infoln(lAddrStr, "received new connection from", rAddrStr)
-
-			p := NewPFCPConn(node.ctx, node.upf, node.done, lAddrStr, rAddrStr)
-			node.pconns[rAddrStr] = p
-			p.HandlePFCPMsg(buf[:n])
-
-			go p.Serve()
-		}
-	}()
-
-	go func(ctx context.Context) {
-		for {
-			select {
-			case rAddr := <-node.done:
-				delete(node.pconns, rAddr)
-			case <-ctx.Done():
-				return
-			}
-		}
-	}(node.ctx)
+	go node.waitPFCPConnCompletions()
 
 	<-node.ctx.Done()
 	node.Shutdown()
