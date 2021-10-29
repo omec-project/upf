@@ -27,8 +27,6 @@ type fastPath interface {
 	setInfo(udpConn *net.UDPConn, udpAddr net.Addr, pconn *PFCPConn)
 	/* set up slice info */
 	addSliceInfo(sliceInfo *SliceInfo) error
-	/* simulator mode setup */
-	sim(u *upf, method string)
 	/* write endMarker to fastpath */
 	sendEndMarkers(endMarkerList *[][]byte) error
 	/* write pdr/far/qer to fastpath */

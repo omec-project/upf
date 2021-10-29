@@ -114,11 +114,11 @@ func (uc *upfCollector) Collect(ch chan<- prometheus.Metric) {
 
 func (uc *upfCollector) portStats(ch chan<- prometheus.Metric) {
 	// When operating in sim mode there are no BESS ports
-	uc.upf.intf.portStats(uc, ch)
+	uc.upf.portStats(uc, ch)
 }
 
 func (uc *upfCollector) summaryLatencyJitter(ch chan<- prometheus.Metric) {
-	uc.upf.intf.summaryLatencyJitter(uc, ch)
+	uc.upf.summaryLatencyJitter(uc, ch)
 }
 
 func setupProm(upf *upf) {

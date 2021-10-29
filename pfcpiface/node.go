@@ -14,8 +14,10 @@ type PFCPNode struct {
 	ctx context.Context
 	// listening socket for new "PFCP connections"
 	net.PacketConn
+	// done is closed to signal shutdown complete
+	done chan struct{}
 	// channel for PFCPConn to signal exit by sending their remote address
-	done chan string
+	pConnDone chan string
 	// map of existing connections
 	pconns map[string]*PFCPConn
 	// upf
@@ -34,7 +36,8 @@ func NewPFCPNode(ctx context.Context, upf *upf) *PFCPNode {
 	return &PFCPNode{
 		ctx:        ctx,
 		PacketConn: conn,
-		done:       make(chan string, 100),
+		done:       make(chan struct{}),
+		pConnDone:  make(chan string, 100),
 		pconns:     make(map[string]*PFCPConn),
 		upf:        upf,
 	}
@@ -64,7 +67,7 @@ func (node *PFCPNode) serve() {
 
 		log.Infoln(lAddrStr, "received new connection from", rAddrStr)
 
-		p := NewPFCPConn(node.ctx, node.upf, node.done, lAddrStr, rAddrStr)
+		p := NewPFCPConn(node.ctx, node.upf, node.pConnDone, lAddrStr, rAddrStr)
 		node.pconns[rAddrStr] = p
 		p.HandlePFCPMsg(buf[:n])
 
@@ -75,7 +78,7 @@ func (node *PFCPNode) serve() {
 func (node *PFCPNode) waitPFCPConnCompletions() {
 	for {
 		select {
-		case rAddr := <-node.done:
+		case rAddr := <-node.pConnDone:
 			log.Infoln("Removing connection to", rAddr)
 			delete(node.pconns, rAddr)
 		case <-node.ctx.Done():
@@ -97,12 +100,20 @@ func (node *PFCPNode) Serve() {
 	node.Shutdown()
 }
 
-// Shutdown closes it's connection and issues shutdown to all PFCPConn.
+// Shutdown closes it's connection and issues delete all sessions to fastpath
 func (node *PFCPNode) Shutdown() {
 	err := node.Close()
 	if err != nil {
 		log.Errorln("Error closing Conn", err)
 	}
 
+	node.upf.sendDeleteAllSessionsMsgtoUPF()
+	close(node.done)
+}
+
+// Done waits for Shutdown() to complete
+func (node *PFCPNode) Done() {
+	<-node.done
 	log.Infoln("PFCPNode: Shutdown complete")
+	return
 }
