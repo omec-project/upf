@@ -82,7 +82,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 	/* Read CreatePDRs and CreateFARs from payload */
 	localSEID := pConn.mgr.NewPFCPSession(remoteSEID)
 	if localSEID == 0 {
-		errProcessReply(errAllocateSession,
+		return errProcessReply(errAllocateSession,
 			ie.CauseNoResourcesAvailable)
 	}
 
