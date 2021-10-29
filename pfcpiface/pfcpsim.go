@@ -316,30 +316,55 @@ func modifyPFCP(conn *net.UDPConn, raddr *net.UDPAddr, seid uint64) {
 }
 
 func deletePFCP(conn *net.UDPConn, raddr *net.UDPAddr, seid uint64) {
-	var seq uint32 = 5
+	{
+		var seq uint32 = 5
 
-	sdreq, err := message.NewSessionDeletionRequest(
-		0,
-		0,
-		seid,
-		seq,
-		0,
-	).Marshal()
-	if err != nil {
-		log.Fatal(err)
+		sdreq, err := message.NewSessionDeletionRequest(
+			0,
+			0,
+			seid,
+			seq,
+			0,
+		).Marshal()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if _, err := conn.Write(sdreq); err != nil {
+			log.Fatal(err)
+		}
+
+		log.Printf("sent session deletion request to: %s", raddr)
+
+		buf := make([]byte, 1500)
+
+		_, _, err = conn.ReadFrom(buf)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
-	if _, err := conn.Write(sdreq); err != nil {
-		log.Fatal(err)
-	}
+	{
+		var seq uint32 = 6
+		arreq, err := message.NewAssociationReleaseRequest(
+			seq,
+			ie.NewNodeID("127.0.0.1", "", ""),
+		).Marshal()
+		if err != nil {
+			log.Fatal(err)
+		}
 
-	log.Printf("sent session deletion request to: %s", raddr)
+		if _, err := conn.Write(arreq); err != nil {
+			log.Fatal(err)
+		}
 
-	buf := make([]byte, 1500)
+		log.Printf("sent association release request to: %s", raddr)
 
-	_, _, err = conn.ReadFrom(buf)
-	if err != nil {
-		log.Fatal(err)
+		buf := make([]byte, 1500)
+		_, _, err = conn.ReadFrom(buf)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 }
 
