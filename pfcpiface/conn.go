@@ -84,14 +84,15 @@ func (pConn *PFCPConn) Serve() {
 
 // Shutdown stops connection backing PFCPConn.
 func (pConn *PFCPConn) Shutdown() error {
-	pConn.done <- pConn.LocalAddr().String()
+	rAddr := pConn.RemoteAddr().String()
+	pConn.done <- rAddr
 
 	err := pConn.Close()
 	if err != nil {
 		return err
 	}
 
-	log.Infoln("PFCPConn: Shutdown complete", pConn.RemoteAddr().String())
+	log.Infoln("PFCPConn: Shutdown complete for", rAddr)
 	return nil
 }
 

@@ -269,10 +269,6 @@ func (p *p4rtc) sendDeleteAllSessionsMsgtoUPF() {
 	}
 }
 
-func (p *p4rtc) sim(u *upf, method string) {
-	log.Println("simulator mode in p4rt not supported")
-}
-
 func (p *p4rtc) setUpfInfo(u *upf, conf *Conf) {
 	log.Println("setUpfInfo p4rtc")
 

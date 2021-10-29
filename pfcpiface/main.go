@@ -157,7 +157,7 @@ func main() {
 
 	var (
 		conf Conf
-		intf fastPath
+		fp   fastPath
 	)
 
 	// read and parse json startup file
@@ -178,9 +178,9 @@ func main() {
 	log.Infoln(conf)
 
 	if conf.EnableP4rt {
-		intf = &p4rtc{}
+		fp = &p4rtc{}
 	} else {
-		intf = &bess{}
+		fp = &bess{}
 	}
 
 	// fetch fqdn. Prefer json field
@@ -194,7 +194,7 @@ func main() {
 		coreIface:       conf.CoreIface.IfName,
 		fqdnHost:        fqdnh,
 		maxSessions:     conf.MaxSessions,
-		intf:            intf,
+		fastPath:        fp,
 		enableUeIPAlloc: conf.CPIface.EnableUeIPAlloc,
 		recoveryTime:    time.Now(),
 		dnn:             conf.CPIface.Dnn,
@@ -254,6 +254,9 @@ func main() {
 	<-sig
 
 	cancel()
+
+	// Wait for node shutdown before http shutdown
+	node.Done()
 
 	if err := httpSrv.Shutdown(context.Background()); err != nil {
 		log.Errorln("Failed to shutdown http: %v", err)
