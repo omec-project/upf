@@ -29,7 +29,6 @@ var (
 // Conf : Json conf struct.
 type Conf struct {
 	Mode              string           `json:"mode"`
-	MaxSessions       uint32           `json:"max_sessions"`
 	AccessIface       IfaceType        `json:"access"`
 	CoreIface         IfaceType        `json:"core"`
 	CPIface           CPIfaceInfo      `json:"cpiface"`
@@ -66,6 +65,7 @@ type SliceMeterConfig struct {
 
 // SimModeInfo : Sim mode attributes.
 type SimModeInfo struct {
+	MaxSessions uint32 `json:"max_sessions"`
 	StartUEIP   net.IP `json:"start_ue_ip"`
 	StartENBIP  net.IP `json:"start_enb_ip"`
 	StartAUPFIP net.IP `json:"start_aupf_ip"`
@@ -193,7 +193,6 @@ func main() {
 		accessIface:     conf.AccessIface.IfName,
 		coreIface:       conf.CoreIface.IfName,
 		fqdnHost:        fqdnh,
-		maxSessions:     conf.MaxSessions,
 		fastPath:        fp,
 		enableUeIPAlloc: conf.CPIface.EnableUeIPAlloc,
 		recoveryTime:    time.Now(),
@@ -215,8 +214,7 @@ func main() {
 			log.Fatalln("Invalid simulate method", simulate)
 		}
 
-		log.Println(*simulate, "sessions:", conf.MaxSessions)
-		upf.sim(*simulate)
+		upf.sim(*simulate, &conf.SimInfo)
 
 		return
 	}

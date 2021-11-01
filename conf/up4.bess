@@ -192,19 +192,27 @@ linkMerge::Merge() \
                                         {'attr_name':'qer_id', 'num_bytes':4}, \
                                         {'attr_name':'far_id', 'num_bytes':4}],\
                                 entries=parser.table_size_pdr_lookup):noGTPUDecap \
-    -> preQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions)
 
-# Insert NTF module, if enabled
-_in = preQoSCounter
-if ntf:
-  _in -> ntf
-  _in = ntf
-
-_in -> appQERLookup::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
+appQERLookup::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
                                  {'attr_name':'qer_id', 'num_bytes':4}, \
                                  {'attr_name':'fseid', 'num_bytes':8}], \
                          values=[{'attr_name':'qfi', 'num_bytes':1}],\
                          entries = parser.table_size_app_qer_lookup)
+# Insert NTF module, if enabled
+_in = pdrLookup
+_out = appQERLookup
+
+if ntf:
+  _in -> ntf
+  _in = ntf
+  _out = ntf
+
+_in -> appQERLookup
+
+# Add logical pipeline when gtpudecap is needed
+pdrLookup:GTPUDecap \
+    -> gtpuDecap::GtpuDecap() \
+    -> _out
 
 executeFAR::Split(size=1, attribute='action')
 _in = executeFAR
@@ -254,11 +262,6 @@ sessionQERLookup:qerStatusDropGate -> sessionQERStatusDrop::Sink()
 sessionQERLookup:qerUnmeteredGate -> farLookup
 sessionQERLookup:qerFailGate -> farLookup
 sessionQERLookup.set_default_gate(gate=qerFailGate)
-
-# Add logical pipeline when gtpudecap is needed
-pdrLookup:GTPUDecap \
-    -> gtpuDecap::GtpuDecap() \
-    -> preQoSCounter
 
 # Add logical pipeline when gtpuencap is needed
 farLookup:GTPUEncap \
@@ -328,7 +331,6 @@ _in:gate \
 
 # 3. Complete the last part of the DL pipeline
 executeFAR:farForwardDAction \
-    -> postDLQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
     -> ports[parser.access_ifname].rtr
 
 # Drop unknown packets
@@ -386,7 +388,6 @@ _in:gate \
 
 # 3. Complete the last part of the UL pipeline
 executeFAR:farForwardUAction \
-    -> postULQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
     -> ports[parser.core_ifname].rtr
 
 # 4. GTP Echo response pipeline

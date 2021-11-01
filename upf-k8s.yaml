@@ -52,7 +52,6 @@ data:
       },
       "measure": true,
       "workers": "1",
-      "max_sessions": 50000
     }
 ---
 apiVersion: v1

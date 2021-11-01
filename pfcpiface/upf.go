@@ -49,7 +49,6 @@ type upf struct {
 	maxSessions      uint32
 	connTimeout      time.Duration
 	readTimeout      time.Duration
-	simInfo          *SimModeInfo
 	ippool           ipPool
 	recoveryTime     time.Time
 	dnn              string
@@ -125,19 +124,20 @@ func (u *upf) setInfo(udpConn *net.UDPConn, udpAddr net.Addr, pconn *PFCPConn) {
 	u.fastPath.setInfo(udpConn, udpAddr, pconn)
 }
 
-func (u *upf) sim(method string) {
+func (u *upf) sim(method string, s *SimModeInfo) {
+	log.Println(*simulate, "sessions:", s.MaxSessions)
 	start := time.Now()
 	// const ueip, teid, enbip = 0x10000001, 0xf0000000, 0x0b010181
-	ueip := u.simInfo.StartUEIP
-	enbip := u.simInfo.StartENBIP
-	aupfip := u.simInfo.StartAUPFIP
-	n9appip := u.simInfo.N9AppIP
-	n3TEID := hex2int(u.simInfo.StartN3TEID)
-	n9TEID := hex2int(u.simInfo.StartN9TEID)
+	ueip := s.StartUEIP
+	enbip := s.StartENBIP
+	aupfip := s.StartAUPFIP
+	n9appip := s.N9AppIP
+	n3TEID := hex2int(s.StartN3TEID)
+	n9TEID := hex2int(s.StartN9TEID)
 
 	const ng4tMaxUeRan, ng4tMaxEnbRan = 500000, 80
 
-	for i := uint32(0); i < u.maxSessions; i++ {
+	for i := uint32(0); i < s.MaxSessions; i++ {
 		// NG4T-based formula to calculate enodeB IP address against a given UE IP address
 		// il_trafficgen also uses the same scheme
 		// See SimuCPEnbv4Teid(...) in ngic code for more details
@@ -310,5 +310,5 @@ func (u *upf) sim(method string) {
 			log.Fatalln("Unsupported method", method)
 		}
 	}
-	log.Println("Sessions/s:", float64(u.maxSessions)/time.Since(start).Seconds())
+	log.Println("Sessions/s:", float64(s.MaxSessions)/time.Since(start).Seconds())
 }
