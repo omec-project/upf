@@ -51,7 +51,6 @@ type p4rtc struct {
 	p4rtcPort        string
 	p4client         *P4rtClient
 	counters         []counter
-	pfcpConn         *PFCPConn
 	reportNotifyChan chan<- uint64
 	endMarkerChan    chan []byte
 }
@@ -123,12 +122,6 @@ func setCounterSize(p *p4rtc, counterID uint8, name string) error {
 	errin := fmt.Errorf("countername not found %s", name)
 
 	return errin
-}
-
-func (p *p4rtc) setInfo(conn *net.UDPConn, addr net.Addr, pconn *PFCPConn) {
-	log.Println("setUDP Conn ", conn)
-
-	p.pfcpConn = pconn
 }
 
 func resetCounterVal(p *p4rtc, counterID uint8, val uint64) {
@@ -256,17 +249,6 @@ func (p *p4rtc) isConnected(accessIP *net.IP) bool {
 	}
 
 	return true
-}
-
-func (p *p4rtc) sendDeleteAllSessionsMsgtoUPF() {
-	log.Println("Loop through sessions and delete all entries p4")
-
-	if (p.pfcpConn != nil) && (p.pfcpConn.mgr != nil) {
-		for seidKey, value := range p.pfcpConn.mgr.sessions {
-			p.sendMsgToUPF(upfMsgTypeDel, value.pdrs, value.fars, nil)
-			p.pfcpConn.mgr.RemoveSession(seidKey)
-		}
-	}
 }
 
 func (p *p4rtc) setUpfInfo(u *upf, conf *Conf) {

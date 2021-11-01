@@ -120,10 +120,6 @@ func (u *upf) setUpfInfo(conf *Conf) {
 	u.fastPath.setUpfInfo(u, conf)
 }
 
-func (u *upf) setInfo(udpConn *net.UDPConn, udpAddr net.Addr, pconn *PFCPConn) {
-	u.fastPath.setInfo(udpConn, udpAddr, pconn)
-}
-
 func (u *upf) sim(method string, s *SimModeInfo) {
 	log.Println(*simulate, "sessions:", s.MaxSessions)
 	start := time.Now()

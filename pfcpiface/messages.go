@@ -63,8 +63,6 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 		// TODO: start heartbeats
 	case message.MsgTypeAssociationReleaseRequest:
 		reply, err = pConn.handleAssociationReleaseRequest(msg)
-		// TODO: Cleanup sessions
-		// TODO: stop heartbeats
 		defer pConn.Shutdown()
 
 	// Session related messages
