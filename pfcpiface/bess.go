@@ -72,9 +72,6 @@ type bess struct {
 	qciQosMap        map[uint8]*QosConfigVal
 }
 
-func (b *bess) setInfo(udpConn *net.UDPConn, udpAddr net.Addr, pconn *PFCPConn) {
-}
-
 func (b *bess) isConnected(accessIP *net.IP) bool {
 	if (b.conn == nil) || (int(b.conn.GetState()) != Ready) {
 		return false

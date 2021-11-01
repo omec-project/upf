@@ -19,7 +19,7 @@ type PFCPNode struct {
 	// channel for PFCPConn to signal exit by sending their remote address
 	pConnDone chan string
 	// map of existing connections
-	pconns map[string]*PFCPConn
+	pConns map[string]*PFCPConn
 	// upf
 	upf *upf
 }
@@ -38,13 +38,14 @@ func NewPFCPNode(ctx context.Context, upf *upf) *PFCPNode {
 		PacketConn: conn,
 		done:       make(chan struct{}),
 		pConnDone:  make(chan string, 100),
-		pconns:     make(map[string]*PFCPConn),
+		pConns:     make(map[string]*PFCPConn),
 		upf:        upf,
 	}
 }
 
-func (node *PFCPNode) serve() {
+func (node *PFCPNode) handleNewPeers() {
 	lAddrStr := node.LocalAddr().String()
+	log.Infoln("listening for new PFCP connections on", lAddrStr)
 
 	for {
 		buf := make([]byte, 1024)
@@ -59,7 +60,7 @@ func (node *PFCPNode) serve() {
 
 		rAddrStr := rAddr.String()
 
-		_, ok := node.pconns[rAddrStr]
+		_, ok := node.pConns[rAddrStr]
 		if ok {
 			log.Warnln("Drop packet for existing PFCPconn received from", rAddrStr)
 			continue
@@ -68,52 +69,54 @@ func (node *PFCPNode) serve() {
 		log.Infoln(lAddrStr, "received new connection from", rAddrStr)
 
 		p := NewPFCPConn(node.ctx, node.upf, node.pConnDone, lAddrStr, rAddrStr)
-		node.pconns[rAddrStr] = p
+		node.pConns[rAddrStr] = p
 		p.HandlePFCPMsg(buf[:n])
 
 		go p.Serve()
 	}
 }
 
-func (node *PFCPNode) waitPFCPConnCompletions() {
-	for {
-		select {
-		case rAddr := <-node.pConnDone:
-			log.Infoln("Removing connection to", rAddr)
-			delete(node.pconns, rAddr)
-		case <-node.ctx.Done():
-			log.Infoln("Stop waiting for PFCPConn completions")
-			return
-		}
-	}
-}
-
 // Serve listens for the first packet from a new PFCP peer and creates PFCPConn.
 func (node *PFCPNode) Serve() {
-	log.Infoln("listening for new PFCP connections on", node.LocalAddr().String())
+	go node.handleNewPeers()
 
-	go node.serve()
+	shutdown := false
+	done := make(chan struct{})
 
-	go node.waitPFCPConnCompletions()
+	go func() {
+		for {
+			rAddr := <-node.pConnDone
+			delete(node.pConns, rAddr)
+			log.Infoln("Removed connection to", rAddr)
+
+			// Check if every pconn has been accounted
+			if shutdown && len(node.pConns) == 0 {
+				log.Infoln("Exiting PFCPConn completions")
+
+				close(node.pConnDone)
+				close(done)
+
+				return
+			}
+		}
+	}()
 
 	<-node.ctx.Done()
-	node.Shutdown()
-}
+	shutdown = true
+	log.Infoln("Entering Shutdown")
 
-// Shutdown closes it's connection and issues delete all sessions to fastpath
-func (node *PFCPNode) Shutdown() {
 	err := node.Close()
 	if err != nil {
-		log.Errorln("Error closing Conn", err)
+		log.Errorln("Error closing PFCPNode Conn", err)
 	}
 
-	node.upf.sendDeleteAllSessionsMsgtoUPF()
+	<-done
 	close(node.done)
 }
 
 // Done waits for Shutdown() to complete
 func (node *PFCPNode) Done() {
 	<-node.done
-	log.Infoln("PFCPNode: Shutdown complete")
+	log.Infoln("Shutdown complete")
 	return
 }
