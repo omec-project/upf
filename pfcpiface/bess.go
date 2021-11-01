@@ -394,7 +394,6 @@ func (b *bess) readQciQosMap(conf *Conf) {
 func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 	log.Println("setUpfInfo bess")
 
-	u.simInfo = &conf.SimInfo
 	u.ippoolCidr = conf.CPIface.UeIPPool
 
 	log.Println("IP pool : ", u.ippoolCidr)
