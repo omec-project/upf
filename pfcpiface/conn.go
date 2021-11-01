@@ -40,7 +40,7 @@ type PFCPConn struct {
 	upf    *upf
 	// channel to signal PFCPNode on exit
 	done     chan<- string
-	shutdown bool
+	shutdown chan struct{}
 }
 
 // NewPFCPConn creates a connected UDP socket to the rAddr PFCP peer specified.
@@ -53,18 +53,19 @@ func NewPFCPConn(ctx context.Context, upf *upf, done chan<- string, lAddr, rAddr
 	log.Infoln("Created PFCPConn for", conn.RemoteAddr().String())
 
 	return &PFCPConn{
-		ctx:  ctx,
-		Conn: conn,
-		mgr:  NewPFCPSessionMgr(100),
-		upf:  upf,
-		done: done,
+		ctx:      ctx,
+		Conn:     conn,
+		mgr:      NewPFCPSessionMgr(100),
+		upf:      upf,
+		done:     done,
+		shutdown: make(chan struct{}),
 	}
 }
 
 // Serve serves forever a single PFCP peer.
 func (pConn *PFCPConn) Serve() {
 	go func() {
-		for !pConn.shutdown {
+		for {
 			buf := make([]byte, 1024)
 
 			n, err := pConn.Read(buf)
@@ -81,13 +82,20 @@ func (pConn *PFCPConn) Serve() {
 
 	// TODO: Sender goroutine
 
-	<-pConn.ctx.Done()
-	pConn.Shutdown()
+	for {
+		select {
+		case <-pConn.ctx.Done():
+			pConn.Shutdown()
+			return
+		case <-pConn.shutdown:
+			return
+		}
+	}
 }
 
 // Shutdown stops connection backing PFCPConn.
 func (pConn *PFCPConn) Shutdown() error {
-	pConn.shutdown = true
+	close(pConn.shutdown)
 
 	// Cleanup all sessions in this conn
 	for seid, sess := range pConn.mgr.sessions {
