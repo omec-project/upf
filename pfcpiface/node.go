@@ -81,36 +81,33 @@ func (node *PFCPNode) Serve() {
 	go node.handleNewPeers()
 
 	shutdown := false
-	done := make(chan struct{})
 
-	go func() {
-		for {
-			rAddr := <-node.pConnDone
+	for !shutdown {
+		select {
+		case rAddr := <-node.pConnDone:
 			delete(node.pConns, rAddr)
 			log.Infoln("Removed connection to", rAddr)
+		case <-node.ctx.Done():
+			shutdown = true
+			log.Infoln("Entering node shutdown")
 
-			// Check if every pconn has been accounted
-			if shutdown && len(node.pConns) == 0 {
-				log.Infoln("Exiting PFCPConn completions")
-
-				close(node.pConnDone)
-				close(done)
-
-				return
+			err := node.Close()
+			if err != nil {
+				log.Errorln("Error closing PFCPNode Conn", err)
 			}
+
+			// Clear out the remaining pconn completions
+			for len(node.pConns) > 0 {
+				rAddr := <-node.pConnDone
+				delete(node.pConns, rAddr)
+				log.Infoln("Removed connection to", rAddr)
+			}
+
+			close(node.pConnDone)
+			log.Infoln("Done waiting for PFCPConn completions")
 		}
-	}()
-
-	<-node.ctx.Done()
-	shutdown = true
-	log.Infoln("Entering Shutdown")
-
-	err := node.Close()
-	if err != nil {
-		log.Errorln("Error closing PFCPNode Conn", err)
 	}
 
-	<-done
 	close(node.done)
 }
 
