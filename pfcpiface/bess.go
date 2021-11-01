@@ -173,26 +173,6 @@ func (b *bess) sendMsgToUPF(
 	return cause
 }
 
-func (b *bess) sendDeleteAllSessionsMsgtoUPF() {
-	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
-	defer cancel()
-
-	done := make(chan bool)
-	calls := 6
-
-	b.removeAllPDRs(ctx, done)
-	b.removeAllFARs(ctx, done)
-	b.removeAllQERs(ctx, done)
-	b.removeAllCounters(ctx, done, "preQoSCounter")
-	b.removeAllCounters(ctx, done, "postDLQoSCounter")
-	b.removeAllCounters(ctx, done, "postULQoSCounter")
-
-	rc := b.GRPCJoin(calls, Timeout, done)
-	if !rc {
-		log.Println("Unable to make GRPC calls")
-	}
-}
-
 func (b *bess) exit() {
 	log.Println("Exit function Bess")
 	b.conn.Close()
@@ -1113,98 +1093,6 @@ func (b *bess) delSessionQER(ctx context.Context, srcIface uint8, qer qer) {
 	if err != nil {
 		log.Errorln("process QER failed for sessionQERLookup del operation")
 	}
-}
-
-func (b *bess) removeAllPDRs(ctx context.Context, done chan<- bool) {
-	go func() {
-		var (
-			any *anypb.Any
-			err error
-		)
-
-		f := &pb.EmptyArg{}
-
-		any, err = anypb.New(f)
-		if err != nil {
-			log.Println("Error marshalling the rule", f, err)
-			return
-		}
-
-		b.processPDR(ctx, any, upfMsgTypeClear)
-		done <- true
-	}()
-}
-
-func (b *bess) removeAllFARs(ctx context.Context, done chan<- bool) {
-	go func() {
-		var (
-			any *anypb.Any
-			err error
-		)
-
-		f := &pb.EmptyArg{}
-
-		any, err = anypb.New(f)
-		if err != nil {
-			log.Println("Error marshalling the rule", f, err)
-			return
-		}
-
-		b.processFAR(ctx, any, upfMsgTypeClear)
-		done <- true
-	}()
-}
-
-func (b *bess) removeAllQERs(ctx context.Context, done chan<- bool) {
-	go func() {
-		var (
-			any *anypb.Any
-			err error
-		)
-
-		f := &pb.EmptyArg{}
-
-		any, err = anypb.New(f)
-		if err != nil {
-			log.Println("Error marshalling the rule", f, err)
-			return
-		}
-
-		qosTableName := AppQerLookup
-
-		err = b.processQER(ctx, any, upfMsgTypeClear, qosTableName)
-		if err != nil {
-			log.Errorln("process QER failed for appQERLookup clear operation")
-		}
-
-		qosTableName = SessQerLookup
-
-		err = b.processQER(ctx, any, upfMsgTypeClear, qosTableName)
-		if err != nil {
-			log.Errorln("process QER failed for sessionQERLookup clear operation")
-		}
-		done <- true
-	}()
-}
-
-func (b *bess) removeAllCounters(ctx context.Context, done chan<- bool, name string) {
-	go func() {
-		var (
-			any *anypb.Any
-			err error
-		)
-
-		f := &pb.EmptyArg{}
-
-		any, err = anypb.New(f)
-		if err != nil {
-			log.Println("Error marshalling the rule", f, err)
-			return
-		}
-
-		b.processCounters(ctx, any, upfMsgTypeClear, name)
-		done <- true
-	}()
 }
 
 func (b *bess) GRPCJoin(calls int, timeout time.Duration, done chan bool) bool {
