@@ -422,14 +422,14 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 	return smres, nil
 }
 
-func readReportNotification(rn <-chan uint64, pfcpConn *PFCPConn,
+func readReportNotification(rn <-chan uint64, pConn *PFCPConn,
 	udpConn *net.UDPConn, udpAddr net.Addr) {
 	log.Traceln("read report notification start")
 
 	for {
 		select {
 		case fseid := <-rn:
-			handleDigestReport(fseid, pfcpConn, udpConn, udpAddr)
+			handleDigestReport(fseid, pConn, udpConn, udpAddr)
 
 		default:
 			time.Sleep(2 * time.Second)
