@@ -126,10 +126,10 @@ func (pConn *PFCPConn) Shutdown() error {
 	return nil
 }
 
-func (c *PFCPConn) getSeqNum() uint32 {
-	c.seqNum.mux.Lock()
-	defer c.seqNum.mux.Unlock()
-	c.seqNum.seq++
+func (pConn *PFCPConn) getSeqNum() uint32 {
+	pConn.seqNum.mux.Lock()
+	defer pConn.seqNum.mux.Unlock()
+	pConn.seqNum.seq++
 
-	return c.seqNum.seq
+	return pConn.seqNum.seq
 }
