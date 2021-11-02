@@ -6,46 +6,72 @@ package main
 import (
 	"errors"
 	"net"
+	"sync"
 
 	log "github.com/sirupsen/logrus"
 )
 
-type ipPool struct {
-	freePool []string
+type IPPool struct {
+	mu       sync.Mutex
+	freePool []net.IP
+	// inventory makes note if IP is allocated
+	inventory map[string]bool
 }
 
-func (ipp *ipPool) deallocIPV4(element net.IP) {
-	ipp.freePool = append(ipp.freePool, element.String()) // Simply append to enqueue.
-	log.Println("Enqueued:", element.String())
+func (i *IPPool) DeallocIP(ip net.IP) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	isAllocated, ok := i.inventory[ip.String()]
+	if !ok {
+		log.Warnln("Attempt to dealloc non-existent IP", ip)
+		return
+	}
+
+	if !isAllocated {
+		log.Warnln("Attempt to dealloc a free IP", ip)
+		return
+	}
+
+	i.inventory[ip.String()] = false
+	i.freePool = append(i.freePool, ip) // Simply append to enqueue.
+	log.Traceln("Deallocated IP:", ip)
 }
 
-func (ipp *ipPool) allocIPV4() (net.IP, error) {
-	if len(ipp.freePool) == 0 {
+func (i *IPPool) AllocIP() (net.IP, error) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	if len(i.freePool) == 0 {
 		err := errors.New("ip pool empty")
 		return nil, err
 	}
 
-	element := ipp.freePool[0] // The first element is the one to be dequeued.
-	log.Println("Dequeued:", element)
+	ip := i.freePool[0]
+	i.inventory[ip.String()] = true
+	i.freePool = i.freePool[1:] // Slice off the element once it is dequeued.
 
-	ipp.freePool = ipp.freePool[1:] // Slice off the element once it is dequeued.
-	ipVal := net.ParseIP(element).To4()
-
-	return ipVal, nil
+	log.Traceln("Allocated IP:", ip)
+	return ip, nil
 }
 
-func (ipp *ipPool) initPool(cidr string) error {
+func NewIPPool(cidr string) (*IPPool, error) {
 	ip, ipnet, err := net.ParseCIDR(cidr)
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	i := &IPPool{
+		inventory: make(map[string]bool),
 	}
 
 	for ip := ip.Mask(ipnet.Mask); ipnet.Contains(ip); inc(ip) {
-		ipp.freePool = append(ipp.freePool, ip.String())
+		i.inventory[ip.String()] = false
+		i.freePool = append(i.freePool, ip)
 	}
 
 	// remove network address and broadcast address
-	ipp.freePool = ipp.freePool[1 : len(ipp.freePool)-1]
+	i.freePool = i.freePool[1 : len(i.freePool)-1]
 
-	return nil
+	return i, nil
 }

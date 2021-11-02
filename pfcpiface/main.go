@@ -151,6 +151,14 @@ func ParseIP(name string, iface string) net.IP {
 	return ip
 }
 
+func init() {
+	// Set up logger
+	log.SetReportCaller(true)
+	log.SetFormatter(&log.TextFormatter{
+		FullTimestamp: true,
+	})
+}
+
 func main() {
 	// cmdline args
 	flag.Parse()
@@ -162,12 +170,6 @@ func main() {
 
 	// read and parse json startup file
 	ParseJSON(configPath, &conf)
-
-	// Set up logger
-	log.SetReportCaller(true)
-	log.SetFormatter(&log.TextFormatter{
-		FullTimestamp: true,
-	})
 
 	if level, err := log.ParseLevel(conf.LogLevel); err != nil {
 		log.Fatalln(err)
@@ -198,8 +200,6 @@ func main() {
 		recoveryTime:    time.Now(),
 		dnn:             conf.CPIface.Dnn,
 		enableEndMarker: conf.EnableEndMarker,
-		connTimeout:     time.Duration(conf.ConnTimeout) * time.Millisecond,
-		readTimeout:     time.Duration(conf.ReadTimeout) * time.Second,
 	}
 
 	upf.setUpfInfo(&conf)
