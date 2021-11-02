@@ -434,14 +434,14 @@ func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
 	}
 
 	seq := pConn.getSeqNum()
-	serep := message.NewSessionReportRequest(0, /* MO?? <-- what's this */
+	srreq := message.NewSessionReportRequest(0, /* MO?? <-- what's this */
 		0,                            /* FO <-- what's this? */
 		0,                            /* seid */
 		seq,                          /* seq # */
 		0,                            /* priority */
 		ie.NewReportType(0, 0, 0, 1), /*upir, erir, usar, dldr int*/
 	)
-	serep.Header.SEID = session.remoteSEID
+	srreq.Header.SEID = session.remoteSEID
 
 	var pdrID uint32
 
@@ -476,20 +476,10 @@ func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
 
 	session.setNotifyFlag(true)
 
-	serep.DownlinkDataReport = ie.NewDownlinkDataReport(
+	srreq.DownlinkDataReport = ie.NewDownlinkDataReport(
 		ie.NewPDRID(uint16(pdrID)))
 
-	ret, err := serep.Marshal()
-	if err != nil {
-		log.Errorln("Marshal function failed for SM resp ", err)
-	}
-
-	// send the report req out
-	if ret != nil {
-		if _, err := pConn.Write(ret); err != nil {
-			log.Errorln("Unable to transmit Report req", err)
-		}
-	}
+	pConn.SendPFCPMsg(srreq)
 }
 
 func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) (message.Message, error) {
