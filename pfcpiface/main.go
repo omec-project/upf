@@ -13,7 +13,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	fqdn "github.com/Showmax/go-fqdn"
 	log "github.com/sirupsen/logrus"
@@ -197,7 +196,6 @@ func main() {
 		fqdnHost:        fqdnh,
 		fastPath:        fp,
 		enableUeIPAlloc: conf.CPIface.EnableUeIPAlloc,
-		recoveryTime:    time.Now(),
 		dnn:             conf.CPIface.Dnn,
 		enableEndMarker: conf.EnableEndMarker,
 	}

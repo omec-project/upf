@@ -30,11 +30,17 @@ type sequenceNumber struct {
 	mux sync.Mutex
 }
 
+type recoveryTS struct {
+	local  time.Time
+	remote time.Time
+}
+
 // PFCPConn represents a PFCP connection with a unique PFCP peer.
 type PFCPConn struct {
 	ctx context.Context
 	// child socket for all subsequent packets from an "established PFCP connection"
 	net.Conn
+	ts     recoveryTS
 	seqNum sequenceNumber
 	mgr    *PFCPSessionMgr
 	upf    *upf
@@ -52,9 +58,14 @@ func NewPFCPConn(ctx context.Context, upf *upf, done chan<- string, lAddr, rAddr
 
 	log.Infoln("Created PFCPConn for", conn.RemoteAddr().String())
 
+	ts := recoveryTS{
+		local: time.Now(),
+	}
+
 	return &PFCPConn{
 		ctx:      ctx,
 		Conn:     conn,
+		ts:       ts,
 		mgr:      NewPFCPSessionMgr(100),
 		upf:      upf,
 		done:     done,
