@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -422,25 +421,7 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 	return smres, nil
 }
 
-func readReportNotification(rn <-chan uint64, pConn *PFCPConn,
-	udpConn *net.UDPConn, udpAddr net.Addr) {
-	log.Traceln("read report notification start")
-
-	for {
-		select {
-		case fseid := <-rn:
-			handleDigestReport(fseid, pConn, udpConn, udpAddr)
-
-		default:
-			time.Sleep(2 * time.Second)
-		}
-	}
-}
-
-func handleDigestReport(fseid uint64,
-	pConn *PFCPConn,
-	udpConn *net.UDPConn,
-	udpAddr net.Addr) {
+func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
 	session, ok := pConn.mgr.sessions[fseid]
 	if !ok {
 		log.Warnln("No session found for fseid : ", fseid)
@@ -505,7 +486,7 @@ func handleDigestReport(fseid uint64,
 
 	// send the report req out
 	if ret != nil {
-		if _, err := udpConn.WriteTo(ret, udpAddr); err != nil {
+		if _, err := pConn.Write(ret); err != nil {
 			log.Errorln("Unable to transmit Report req", err)
 		}
 	}
