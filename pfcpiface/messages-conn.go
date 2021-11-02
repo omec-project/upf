@@ -17,16 +17,16 @@ var errFlowDescAbsent = errors.New("flow description not present")
 var errFastpathDown = errors.New("fastpath down")
 
 func (pConn *PFCPConn) handleHeartbeatRequest(msg message.Message) (message.Message, error) {
-	rTime := pConn.upf.recoveryTime
-
 	hbreq, ok := msg.(*message.HeartbeatRequest)
 	if !ok {
 		return nil, errUnmarshal(errMsgUnexpectedType)
 	}
 
+	// TODO: Check and update remote recovery timestamp
+
 	// Build response message
 	hbres := message.NewHeartbeatResponse(hbreq.SequenceNumber,
-		ie.NewRecoveryTimeStamp(rTime), /* ts */
+		ie.NewRecoveryTimeStamp(pConn.ts.local), /* ts */
 	)
 
 	return hbres, nil
@@ -34,6 +34,7 @@ func (pConn *PFCPConn) handleHeartbeatRequest(msg message.Message) (message.Mess
 
 func (pConn *PFCPConn) handleHeartbeatResponse(msg message.Message) (message.Message, error) {
 	// TODO: Handle timers
+	// TODO: Check and update remote recovery timestamp
 	return nil, nil
 }
 
@@ -58,7 +59,14 @@ func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (messa
 		return nil, errUnmarshal(err)
 	}
 
-	log.Infoln("Association Setup Request from", addr, "with recovery timestamp:", ts)
+	if pConn.ts.remote.IsZero() {
+		pConn.ts.remote = ts
+		log.Infoln("Association Setup Request from", addr, "with recovery timestamp:", ts)
+	} else if ts.After(pConn.ts.remote) {
+		old := pConn.ts.remote
+		pConn.ts.remote = ts
+		log.Warnln("Association Setup Request from", addr, "with newer recovery timestamp:", ts, "older:", old)
+	}
 
 	// Build response message
 	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
@@ -73,7 +81,7 @@ func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (messa
 	}
 
 	asres := message.NewAssociationSetupResponse(asreq.SequenceNumber,
-		ie.NewRecoveryTimeStamp(upf.recoveryTime),
+		ie.NewRecoveryTimeStamp(pConn.ts.local),
 		ie.NewNodeID(upf.nodeIP.String(), "", ""), /* node id (IPv4) */
 		ie.NewCause(ie.CauseRequestAccepted),      /* accept it blindly for the time being */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
@@ -117,7 +125,14 @@ func (pConn *PFCPConn) handleAssociationSetupResponse(msg message.Message) (mess
 		return nil, errUnmarshal(err)
 	}
 
-	log.Traceln("Received a PFCP association setup response with TS: ", ts, " from: ", addr)
+	if pConn.ts.remote.IsZero() {
+		pConn.ts.remote = ts
+		log.Infoln("Association Setup Response from", addr, "with recovery timestamp:", ts)
+	} else if ts.After(pConn.ts.remote) {
+		old := pConn.ts.remote
+		pConn.ts.remote = ts
+		log.Warnln("Association Setup Response from", addr, "with newer recovery timestamp:", ts, "older:", old)
+	}
 
 	_, err = asres.Cause.Cause()
 	if err != nil {
@@ -129,7 +144,6 @@ func (pConn *PFCPConn) handleAssociationSetupResponse(msg message.Message) (mess
 
 func (pConn *PFCPConn) handleAssociationReleaseRequest(msg message.Message) (message.Message, error) {
 	upf := pConn.upf
-	rTime := upf.recoveryTime
 
 	arreq, ok := msg.(*message.AssociationReleaseRequest)
 	if !ok {
@@ -139,7 +153,7 @@ func (pConn *PFCPConn) handleAssociationReleaseRequest(msg message.Message) (mes
 	// Build response message
 	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
 	arres := message.NewAssociationReleaseResponse(arreq.SequenceNumber,
-		ie.NewRecoveryTimeStamp(rTime),
+		ie.NewRecoveryTimeStamp(pConn.ts.local),
 		ie.NewNodeID(upf.nodeIP.String(), "", ""), /* node id (IPv4) */
 		ie.NewCause(ie.CauseRequestAccepted),      /* accept it blindly for the time being */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)

@@ -47,7 +47,6 @@ type upf struct {
 	nodeIP           net.IP
 	fqdnHost         string
 	ippool           *IPPool
-	recoveryTime     time.Time
 	dnn              string
 	reportNotifyChan chan uint64
 	sliceInfo        *SliceInfo
