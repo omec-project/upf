@@ -5,8 +5,6 @@ package main
 
 import (
 	"errors"
-	"net"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -15,6 +13,7 @@ import (
 
 var errFlowDescAbsent = errors.New("flow description not present")
 var errFastpathDown = errors.New("fastpath down")
+var errReqRejected = errors.New("request rejected")
 
 func (pConn *PFCPConn) handleHeartbeatRequest(msg message.Message) (message.Message, error) {
 	hbreq, ok := msg.(*message.HeartbeatRequest)
@@ -38,6 +37,56 @@ func (pConn *PFCPConn) handleHeartbeatResponse(msg message.Message) (message.Mes
 	return nil, nil
 }
 
+func (pConn *PFCPConn) associationIEs() []*ie.IE {
+	upf := pConn.upf
+	networkInstance := string(ie.NewNetworkInstanceFQDN(upf.dnn).Payload)
+	flags := uint8(0x41)
+
+	if len(upf.dnn) != 0 {
+		log.Infoln("Association Setup with DNN:", upf.dnn)
+		// add ASSONI flag to set network instance.
+		flags = uint8(0x61)
+	}
+
+	features := make([]uint8, 4)
+
+	if upf.enableUeIPAlloc {
+		setUeipFeature(features...)
+	}
+
+	if upf.enableEndMarker {
+		setEndMarkerFeature(features...)
+	}
+
+	ies := []*ie.IE{
+		ie.NewRecoveryTimeStamp(pConn.ts.local),
+		ie.NewNodeID(upf.nodeIP.String(), "", ""), /* node id (IPv4) */
+		ie.NewCause(ie.CauseRequestAccepted),      /* accept it blindly for the time being */
+		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
+		//      = 01000001
+		ie.NewUserPlaneIPResourceInformation(flags, 0, upf.accessIP.String(), "", networkInstance, ie.SrcInterfaceAccess),
+		// ie.NewUserPlaneIPResourceInformation(0x41, 0, coreIP, "", "", ie.SrcInterfaceCore),
+		ie.NewUPFunctionFeatures(features...),
+	}
+	return ies
+}
+
+func (pConn *PFCPConn) sendAssociationRequest() error {
+	upf := pConn.upf
+
+	if !upf.isConnected() {
+		return errFastpathDown
+	}
+
+	// Build request message
+	asreq := message.NewAssociationSetupRequest(pConn.getSeqNum(),
+		pConn.associationIEs()...,
+	)
+
+	pConn.SendPFCPMsg(asreq)
+	return nil
+}
+
 func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (message.Message, error) {
 	addr := pConn.RemoteAddr().String()
 	upf := pConn.upf
@@ -59,6 +108,14 @@ func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (messa
 		return nil, errUnmarshal(err)
 	}
 
+	if !upf.isConnected() {
+		asres := message.NewAssociationSetupResponse(asreq.SequenceNumber)
+		asres.Cause = ie.NewCause(ie.CauseRequestRejected)
+		return asres, errProcess(errFastpathDown)
+	}
+
+	pConn.mgr.nodeID = nodeID
+
 	if pConn.ts.remote.IsZero() {
 		pConn.ts.remote = ts
 		log.Infoln("Association Setup Request from", addr, "with recovery timestamp:", ts)
@@ -70,44 +127,8 @@ func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (messa
 
 	// Build response message
 	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
-
-	networkInstance := string(ie.NewNetworkInstanceFQDN(upf.dnn).Payload)
-	flags := uint8(0x41)
-
-	if len(upf.dnn) != 0 {
-		log.Infoln("Association Setup Response to", addr, "with DNN:", upf.dnn)
-		// add ASSONI flag to set network instance.
-		flags = uint8(0x61)
-	}
-
 	asres := message.NewAssociationSetupResponse(asreq.SequenceNumber,
-		ie.NewRecoveryTimeStamp(pConn.ts.local),
-		ie.NewNodeID(upf.nodeIP.String(), "", ""), /* node id (IPv4) */
-		ie.NewCause(ie.CauseRequestAccepted),      /* accept it blindly for the time being */
-		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
-		//      = 01000001
-		ie.NewUserPlaneIPResourceInformation(flags, 0, upf.accessIP.String(), "", networkInstance, ie.SrcInterfaceAccess),
-		// ie.NewUserPlaneIPResourceInformation(0x41, 0, coreIP, "", "", ie.SrcInterfaceCore),
-	) /* userplane ip resource info */
-
-	if !upf.isConnected() {
-		asres.Cause = ie.NewCause(ie.CauseRequestRejected)
-		return asres, errProcess(errFastpathDown)
-	}
-
-	pConn.mgr.nodeID = nodeID
-
-	features := make([]uint8, 4)
-
-	if upf.enableUeIPAlloc {
-		setUeipFeature(features...)
-	}
-
-	if upf.enableEndMarker {
-		setEndMarkerFeature(features...)
-	}
-
-	asres.UPFunctionFeatures = ie.NewUPFunctionFeatures(features...)
+		pConn.associationIEs()...)
 
 	return asres, nil
 }
@@ -119,6 +140,23 @@ func (pConn *PFCPConn) handleAssociationSetupResponse(msg message.Message) (mess
 	if !ok {
 		return nil, errUnmarshal(errMsgUnexpectedType)
 	}
+
+	cause, err := asres.Cause.Cause()
+	if err != nil {
+		return nil, errUnmarshal(err)
+	}
+
+	if cause != ie.CauseRequestAccepted {
+		log.Errorln("Association Setup Response from", addr, "with Cause:", cause)
+		return nil, errReqRejected
+	}
+
+	nodeID, err := asres.NodeID.NodeID()
+	if err != nil {
+		return nil, errUnmarshal(err)
+	}
+
+	pConn.mgr.nodeID = nodeID
 
 	ts, err := asres.RecoveryTimeStamp.RecoveryTimeStamp()
 	if err != nil {
@@ -132,11 +170,6 @@ func (pConn *PFCPConn) handleAssociationSetupResponse(msg message.Message) (mess
 		old := pConn.ts.remote
 		pConn.ts.remote = ts
 		log.Warnln("Association Setup Response from", addr, "with newer recovery timestamp:", ts, "older:", old)
-	}
-
-	_, err = asres.Cause.Cause()
-	if err != nil {
-		return nil, errUnmarshal(err)
 	}
 
 	return nil, nil
@@ -228,88 +261,4 @@ func (pConn *PFCPConn) handlePFDMgmtRequest(msg message.Message) (message.Messag
 	)
 
 	return pfdres, nil
-}
-
-func (pConn *PFCPConn) manageSmfConnection(n4LocalIP string, n3ip string, n4Dst string, conn *net.UDPConn, cpConnectionStatus chan bool, rTime time.Time) {
-	cpConnected := false
-
-	initiatePfcpConnection := func() {
-		log.Traceln("SPGWC/SMF hostname ", n4Dst)
-		n4DstIP := getRemoteIP(n4Dst)
-		log.Traceln("SPGWC/SMF address IP inside manageSmfConnection ", n4DstIP.String())
-		// initiate request if we have control plane address available
-		if n4DstIP.String() != net.IPv4zero.String() {
-			pConn.generateAssociationRequest(n4LocalIP, n3ip, n4DstIP.String(), conn, rTime)
-		}
-	}
-
-	updateSmfStatus := func(msg bool) {
-		log.Traceln("cpConnected : ", cpConnected, "msg ", msg)
-		// events from main Loop
-		if cpConnected && !msg {
-			log.Warnln("CP disconnected ")
-
-			cpConnected = false
-		} else if !cpConnected && msg {
-			log.Infoln("CP Connected ")
-
-			cpConnected = true
-		} else {
-			log.Infoln("cpConnected ", cpConnected, "msg - ", msg)
-		}
-	}
-
-	initiatePfcpConnection()
-
-	connHelathTicker := time.NewTicker(5000 * time.Millisecond)
-	pfcpResponseTicker := time.NewTicker(2000 * time.Millisecond)
-
-	for {
-		select {
-		case msg := <-cpConnectionStatus:
-			// events from main Loop
-			updateSmfStatus(msg)
-
-			if cpConnected {
-				pfcpResponseTicker.Stop()
-			}
-		case <-connHelathTicker.C:
-			if !cpConnected {
-				log.Infoln("Retry pfcp connection setup ", n4Dst)
-				initiatePfcpConnection()
-			}
-		case <-pfcpResponseTicker.C:
-			// we will attempt new connection after next recheck
-			log.Warnln("PFCP session setup timeout ")
-			pfcpResponseTicker.Stop()
-		}
-	}
-}
-
-func (pConn *PFCPConn) generateAssociationRequest(n4LocalIP string, n3ip string, n4DstIP string, conn *net.UDPConn, rTime time.Time) {
-	log.Infoln("n4DstIp ", n4DstIP)
-
-	seq := pConn.getSeqNum()
-	// Build request message
-	asreq, err := message.NewAssociationSetupRequest(seq, ie.NewRecoveryTimeStamp(rTime),
-		ie.NewNodeID(n4LocalIP, "", ""), /* node id (IPv4) */
-		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
-		//      = 01000001
-		ie.NewUserPlaneIPResourceInformation(0x41, 0, n3ip, "", "", ie.SrcInterfaceAccess),
-	).Marshal() /* userplane ip resource info */
-	if err != nil {
-		log.Errorln("Unable to create association setup response", err)
-	}
-
-	smfAddr, err := net.ResolveUDPAddr("udp", n4DstIP+":"+PFCPPort)
-	if err != nil {
-		log.Errorln("Unable to resolve udp addr!", err)
-		return
-	}
-
-	log.Infoln("SMF address ", smfAddr)
-
-	if _, err := conn.WriteTo(asreq, smfAddr); err != nil {
-		log.Errorln("Unable to transmit association setup request ", err)
-	}
 }

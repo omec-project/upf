@@ -91,24 +91,30 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 		log.Traceln("Successfully processed", msgType, "from", addr)
 	}
 
-	// Marshal and send reply message
 	if reply != nil {
-		out := make([]byte, reply.MarshalLen())
-		replyType := reply.MessageTypeName()
-
-		if err := reply.MarshalTo(out); err != nil {
-			globalPfcpStats.messages.WithLabelValues(nodeID, replyType, "Outgoing", "Failure").Inc()
-			log.Errorln("Failed to marshal", replyType, "for", addr, err)
-			return
-		}
-
-		if _, err := pConn.Write(out); err != nil {
-			globalPfcpStats.messages.WithLabelValues(nodeID, replyType, "Outgoing", "Failure").Inc()
-			log.Errorln("Failed to transmit", replyType, "to", addr, err)
-			return
-		}
-
-		globalPfcpStats.messages.WithLabelValues(nodeID, replyType, "Outgoing", "Success").Inc()
-		log.Traceln("Sent", replyType, "to", addr)
+		pConn.SendPFCPMsg(reply)
 	}
+}
+
+func (pConn *PFCPConn) SendPFCPMsg(msg message.Message) {
+	addr := pConn.RemoteAddr().String()
+	nodeID := pConn.mgr.nodeID
+
+	out := make([]byte, msg.MarshalLen())
+	replyType := msg.MessageTypeName()
+
+	if err := msg.MarshalTo(out); err != nil {
+		globalPfcpStats.messages.WithLabelValues(nodeID, replyType, "Outgoing", "Failure").Inc()
+		log.Errorln("Failed to marshal", replyType, "for", addr, err)
+		return
+	}
+
+	if _, err := pConn.Write(out); err != nil {
+		globalPfcpStats.messages.WithLabelValues(nodeID, replyType, "Outgoing", "Failure").Inc()
+		log.Errorln("Failed to transmit", replyType, "to", addr, err)
+		return
+	}
+
+	globalPfcpStats.messages.WithLabelValues(nodeID, replyType, "Outgoing", "Success").Inc()
+	log.Traceln("Sent", replyType, "to", addr)
 }
