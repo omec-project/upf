@@ -43,6 +43,25 @@ func NewPFCPNode(ctx context.Context, upf *upf) *PFCPNode {
 	}
 }
 
+func (node *PFCPNode) readReportNotification() {
+	log.Traceln("read report notification start")
+
+	for {
+		select {
+		case fseid := <-node.upf.reportNotifyChan:
+			// TODO: Logic to distinguish PFCPConn based on SEID
+			for _, pConn := range node.pConns {
+				pConn.handleDigestReport(fseid)
+				break
+			}
+
+		case <-node.ctx.Done():
+			log.Traceln("Done waiting for report notification")
+			return
+		}
+	}
+}
+
 func (node *PFCPNode) handleNewPeers() {
 	lAddrStr := node.LocalAddr().String()
 	log.Infoln("listening for new PFCP connections on", lAddrStr)
@@ -68,6 +87,7 @@ func (node *PFCPNode) handleNewPeers() {
 
 		log.Infoln(lAddrStr, "received new connection from", rAddrStr)
 
+		// TODO: Logic to distinguish PFCPConn based on SEID
 		p := NewPFCPConn(node.ctx, node.upf, node.pConnDone, lAddrStr, rAddrStr)
 		node.pConns[rAddrStr] = p
 		p.HandlePFCPMsg(buf[:n])
@@ -79,6 +99,7 @@ func (node *PFCPNode) handleNewPeers() {
 // Serve listens for the first packet from a new PFCP peer and creates PFCPConn.
 func (node *PFCPNode) Serve() {
 	go node.handleNewPeers()
+	go node.readReportNotification()
 
 	shutdown := false
 
