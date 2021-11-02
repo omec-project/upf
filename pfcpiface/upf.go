@@ -46,10 +46,7 @@ type upf struct {
 	n4SrcIP          net.IP
 	nodeIP           net.IP
 	fqdnHost         string
-	maxSessions      uint32
-	connTimeout      time.Duration
-	readTimeout      time.Duration
-	ippool           ipPool
+	ippool           *IPPool
 	recoveryTime     time.Time
 	dnn              string
 	reportNotifyChan chan uint64
@@ -90,6 +87,8 @@ func (u *upf) addSliceInfo(sliceInfo *SliceInfo) error {
 }
 
 func (u *upf) setUpfInfo(conf *Conf) {
+	var err error
+
 	u.reportNotifyChan = make(chan uint64, 1024)
 	u.n4SrcIP = net.ParseIP(net.IPv4zero.String())
 	u.nodeIP = net.ParseIP(net.IPv4zero.String())
@@ -101,8 +100,8 @@ func (u *upf) setUpfInfo(conf *Conf) {
 			log.Println("SPGWU/UPF address IP: ", u.n4SrcIP.String())
 		}
 	} else {
-		addrs, errin := net.LookupHost(conf.CPIface.SrcIP)
-		if errin == nil {
+		addrs, err := net.LookupHost(conf.CPIface.SrcIP)
+		if err == nil {
 			u.n4SrcIP = net.ParseIP(addrs[0])
 		}
 	}
@@ -116,6 +115,18 @@ func (u *upf) setUpfInfo(conf *Conf) {
 
 	log.Println("UPF Node IP : ", u.nodeIP.String())
 	log.Println("UPF Local IP : ", u.n4SrcIP.String())
+
+	u.ippoolCidr = conf.CPIface.UeIPPool
+
+	log.Println("IP pool : ", u.ippoolCidr)
+
+	u.ippool, err = NewIPPool(u.ippoolCidr)
+	if err != nil {
+		log.Println("ip pool init failed")
+	}
+
+	u.accessIP = ParseIP(conf.AccessIface.IfName, "Access")
+	u.coreIP = ParseIP(conf.CoreIface.IfName, "Core")
 
 	u.fastPath.setUpfInfo(u, conf)
 }

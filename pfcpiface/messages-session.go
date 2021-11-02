@@ -90,7 +90,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 	for _, cPDR := range sereq.CreatePDR {
 		var p pdr
-		if err := p.parsePDR(cPDR, session.localSEID, pConn.mgr.appPFDs, upf); err != nil {
+		if err := p.parsePDR(cPDR, session.localSEID, pConn.mgr.appPFDs, upf.ippool); err != nil {
 			return errProcessReply(err, ie.CauseRequestRejected)
 		}
 
@@ -195,7 +195,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 
 	for _, cPDR := range smreq.CreatePDR {
 		var p pdr
-		if err := p.parsePDR(cPDR, localSEID, pConn.mgr.appPFDs, upf); err != nil {
+		if err := p.parsePDR(cPDR, localSEID, pConn.mgr.appPFDs, upf.ippool); err != nil {
 			return sendError(err)
 		}
 
@@ -235,7 +235,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 			err error
 		)
 
-		if err = p.parsePDR(uPDR, localSEID, pConn.mgr.appPFDs, upf); err != nil {
+		if err = p.parsePDR(uPDR, localSEID, pConn.mgr.appPFDs, upf.ippool); err != nil {
 			return sendError(err)
 		}
 
@@ -406,7 +406,7 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 		return sendError(errors.New("write to FastPath failed"))
 	}
 
-	releaseAllocatedIPs(upf, session)
+	releaseAllocatedIPs(upf.ippool, session)
 	/* delete sessionRecord */
 	pConn.mgr.RemoveSession(localSEID)
 

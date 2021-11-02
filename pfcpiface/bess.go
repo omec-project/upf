@@ -369,19 +369,9 @@ func (b *bess) readQciQosMap(conf *Conf) {
 }
 
 func (b *bess) setUpfInfo(u *upf, conf *Conf) {
+	var err error
+
 	log.Println("setUpfInfo bess")
-
-	u.ippoolCidr = conf.CPIface.UeIPPool
-
-	log.Println("IP pool : ", u.ippoolCidr)
-
-	errin := u.ippool.initPool(u.ippoolCidr)
-	if errin != nil {
-		log.Println("ip pool init failed")
-	}
-
-	u.accessIP = ParseIP(conf.AccessIface.IfName, "Access")
-	u.coreIP = ParseIP(conf.CoreIface.IfName, "Core")
 
 	b.readQciQosMap(conf)
 	// get bess grpc client
@@ -389,9 +379,9 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 
 	b.endMarkerChan = make(chan []byte, 1024)
 
-	b.conn, errin = grpc.Dial(*bessIP, grpc.WithInsecure())
-	if errin != nil {
-		log.Fatalln("did not connect:", errin)
+	b.conn, err = grpc.Dial(*bessIP, grpc.WithInsecure())
+	if err != nil {
+		log.Fatalln("did not connect:", err)
 	}
 
 	b.client = pb.NewBESSControlClient(b.conn)
@@ -402,9 +392,9 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 			notifySockAddr = SockAddr
 		}
 
-		b.notifyBessSocket, errin = net.Dial("unixpacket", notifySockAddr)
-		if errin != nil {
-			log.Println("dial error:", errin)
+		b.notifyBessSocket, err = net.Dial("unixpacket", notifySockAddr)
+		if err != nil {
+			log.Println("dial error:", err)
 			return
 		}
 
@@ -417,9 +407,9 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 			pfcpCommAddr = PfcpAddr
 		}
 
-		b.endMarkerSocket, errin = net.Dial("unixpacket", pfcpCommAddr)
-		if errin != nil {
-			log.Println("dial error:", errin)
+		b.endMarkerSocket, err = net.Dial("unixpacket", pfcpCommAddr)
+		if err != nil {
+			log.Println("dial error:", err)
 			return
 		}
 
