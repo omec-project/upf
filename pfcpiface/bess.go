@@ -824,63 +824,6 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 	}()
 }
 
-func (b *bess) processCounters(ctx context.Context, any *anypb.Any, method upfMsgType, counterName string) {
-	methods := [...]string{"add", "add", "remove", "removeAll"}
-
-	_, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
-		Name: counterName,
-		Cmd:  methods[method],
-		Arg:  any,
-	})
-	if err != nil {
-		log.Println("counter method failed!:", err)
-	}
-}
-
-func (b *bess) addCounter(ctx context.Context, done chan<- bool, ctrID uint32, counterName string) {
-	go func() {
-		var (
-			any *anypb.Any
-			err error
-		)
-
-		f := &pb.CounterAddArg{
-			CtrId: ctrID,
-		}
-
-		any, err = anypb.New(f)
-		if err != nil {
-			log.Println("Error marshalling the rule", f, err)
-			return
-		}
-
-		b.processCounters(ctx, any, upfMsgTypeAdd, counterName)
-		done <- true
-	}()
-}
-
-func (b *bess) delCounter(ctx context.Context, done chan<- bool, ctrID uint32, counterName string) {
-	go func() {
-		var (
-			any *anypb.Any
-			err error
-		)
-
-		f := &pb.CounterRemoveArg{
-			CtrId: ctrID,
-		}
-
-		any, err = anypb.New(f)
-		if err != nil {
-			log.Println("Error marshalling the rule", f, err)
-			return
-		}
-
-		b.processCounters(ctx, any, upfMsgTypeDel, counterName)
-		done <- true
-	}()
-}
-
 func (b *bess) processSliceMeter(ctx context.Context, any *anypb.Any, method upfMsgType) {
 	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
 		log.Errorln("Invalid method name: ", method)
