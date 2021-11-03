@@ -61,7 +61,6 @@ func (pConn *PFCPConn) associationIEs() []*ie.IE {
 	ies := []*ie.IE{
 		ie.NewRecoveryTimeStamp(pConn.ts.local),
 		ie.NewNodeID(upf.nodeIP.String(), "", ""), /* node id (IPv4) */
-		ie.NewCause(ie.CauseRequestAccepted),      /* accept it blindly for the time being */
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
 		ie.NewUserPlaneIPResourceInformation(flags, 0, upf.accessIP.String(), "", networkInstance, ie.SrcInterfaceAccess),
@@ -108,8 +107,11 @@ func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (messa
 		return nil, errUnmarshal(err)
 	}
 
+	// Build response message
+	asres := message.NewAssociationSetupResponse(asreq.SequenceNumber,
+		pConn.associationIEs()...)
+
 	if !upf.isConnected() {
-		asres := message.NewAssociationSetupResponse(asreq.SequenceNumber)
 		asres.Cause = ie.NewCause(ie.CauseRequestRejected)
 		return asres, errProcess(errFastpathDown)
 	}
@@ -125,11 +127,7 @@ func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (messa
 		log.Warnln("Association Setup Request from", addr, "with newer recovery timestamp:", ts, "older:", old)
 	}
 
-	// Build response message
-	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
-	asres := message.NewAssociationSetupResponse(asreq.SequenceNumber,
-		pConn.associationIEs()...)
-
+	asres.Cause = ie.NewCause(ie.CauseRequestAccepted)
 	return asres, nil
 }
 
