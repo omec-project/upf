@@ -26,9 +26,7 @@ type PFCPNode struct {
 
 // NewPFCPNode create a new PFCPNode listening on local address.
 func NewPFCPNode(ctx context.Context, upf *upf) *PFCPNode {
-	lAddr := upf.n4SrcIP.String() + ":" + PFCPPort
-
-	conn, err := reuse.ListenPacket("udp", lAddr)
+	conn, err := reuse.ListenPacket("udp", ":"+PFCPPort)
 	if err != nil {
 		log.Fatalln("ListenUDP failed", err)
 	}
@@ -65,8 +63,6 @@ func (node *PFCPNode) handleNewPeers() {
 			log.Warnln("Drop packet for existing PFCPconn received from", rAddrStr)
 			continue
 		}
-
-		log.Infoln(lAddrStr, "received new connection from", rAddrStr)
 
 		// TODO: Logic to distinguish PFCPConn based on SEID
 		p := NewPFCPConn(node.ctx, node.upf, node.pConnDone, lAddrStr, rAddrStr)

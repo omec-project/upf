@@ -276,7 +276,6 @@ func (p *p4rtc) setUpfInfo(u *upf, conf *Conf) {
 
 	log.Println("onos server ip ", p.p4rtcServer)
 	log.Println("onos server port ", p.p4rtcPort)
-	log.Println("n4 ip ", u.n4SrcIP.String())
 
 	p.host = p.p4rtcServer + ":" + p.p4rtcPort
 	log.Println("server name: ", p.host)

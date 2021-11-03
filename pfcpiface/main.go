@@ -14,7 +14,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	fqdn "github.com/Showmax/go-fqdn"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -76,13 +75,13 @@ type SimModeInfo struct {
 
 // CPIfaceInfo : CPIface interface settings.
 type CPIfaceInfo struct {
-	DestIP          string `json:"nb_dst_ip"`
-	SrcIP           string `json:"nb_src_ip"`
-	FQDNHost        string `json:"hostname"`
-	EnableUeIPAlloc bool   `json:"enable_ue_ip_alloc"`
-	UeIPPool        string `json:"ue_ip_pool"`
-	HTTPPort        string `json:"http_port"`
-	Dnn             string `json:"dnn"`
+	Peers           []string `json:"peers"`
+	UseFQDN         bool     `json:"use_fqdn"`
+	NodeID          string   `json:"node_id"`
+	EnableUeIPAlloc bool     `json:"enable_ue_ip_alloc"`
+	UEIPPool        string   `json:"ue_ip_pool"`
+	HTTPPort        string   `json:"http_port"`
+	Dnn             string   `json:"dnn"`
 }
 
 // IfaceType : Gateway interface struct.
@@ -184,23 +183,7 @@ func main() {
 		fp = &bess{}
 	}
 
-	// fetch fqdn. Prefer json field
-	fqdnh := conf.CPIface.FQDNHost
-	if fqdnh == "" {
-		fqdnh = fqdn.Get()
-	}
-
-	upf := &upf{
-		accessIface:     conf.AccessIface.IfName,
-		coreIface:       conf.CoreIface.IfName,
-		fqdnHost:        fqdnh,
-		fastPath:        fp,
-		enableUeIPAlloc: conf.CPIface.EnableUeIPAlloc,
-		dnn:             conf.CPIface.Dnn,
-		enableEndMarker: conf.EnableEndMarker,
-	}
-
-	upf.setUpfInfo(&conf)
+	upf := NewUPF(&conf, fp)
 
 	if *pfcpsim {
 		pfcpSim()
@@ -217,20 +200,15 @@ func main() {
 		return
 	}
 
-	log.Println("N4 local IP: ", upf.n4SrcIP.String())
-	log.Println("Access IP: ", upf.accessIP.String())
-	log.Println("Core IP: ", upf.coreIP.String())
-
 	setupConfigHandler(upf)
 	setupProm(upf)
 
+	httpPort := "8080"
 	if conf.CPIface.HTTPPort != "" {
-		*httpAddr = string("0.0.0.0:") + conf.CPIface.HTTPPort
+		httpPort = conf.CPIface.HTTPPort
 	}
 
-	log.Println("httpAddr: ", httpAddr)
-
-	httpSrv := &http.Server{Addr: *httpAddr, Handler: nil}
+	httpSrv := &http.Server{Addr: ":" + httpPort, Handler: nil}
 
 	go func() {
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {

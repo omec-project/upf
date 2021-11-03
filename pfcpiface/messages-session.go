@@ -62,34 +62,35 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 		// Build response message
 		seres := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
-			0,                    /* FO <-- what's this? */
-			remoteSEID,           /* seid */
-			sereq.SequenceNumber, /* seq # */
-			0,                    /* priority */
-			ie.NewNodeID(upf.nodeIP.String(), "", ""), /* node id (IPv4) */
+			0,                                        /* FO <-- what's this? */
+			remoteSEID,                               /* seid */
+			sereq.SequenceNumber,                     /* seq # */
+			0,                                        /* priority */
+			ie.NewNodeID(pConn.nodeID.local, "", ""), /* node id (IPv4) */
 			ie.NewCause(cause),
 		)
 
 		return seres, errProcess(err)
 	}
 
-	if strings.Compare(nodeID, pConn.mgr.nodeID) != 0 {
-		log.Warnln("Association not found for Establishment request, nodeID: ", nodeID, ", Association NodeID: ", pConn.mgr.nodeID)
+	if strings.Compare(nodeID, pConn.nodeID.remote) != 0 {
+		log.Warnln("Association not found for Establishment request",
+			"with nodeID: ", nodeID, ", Association NodeID: ", pConn.nodeID.remote)
 		return errProcessReply(errAssocNotFound, ie.CauseNoEstablishedPFCPAssociation)
 	}
 
 	/* Read CreatePDRs and CreateFARs from payload */
-	localSEID := pConn.mgr.NewPFCPSession(remoteSEID)
+	localSEID := pConn.NewPFCPSession(remoteSEID)
 	if localSEID == 0 {
 		return errProcessReply(errAllocateSession,
 			ie.CauseNoResourcesAvailable)
 	}
 
-	session := pConn.mgr.sessions[localSEID]
+	session := pConn.sessions[localSEID]
 
 	for _, cPDR := range sereq.CreatePDR {
 		var p pdr
-		if err := p.parsePDR(cPDR, session.localSEID, pConn.mgr.appPFDs, upf.ippool); err != nil {
+		if err := p.parsePDR(cPDR, session.localSEID, pConn.appPFDs, upf.ippool); err != nil {
 			return errProcessReply(err, ie.CauseRequestRejected)
 		}
 
@@ -121,19 +122,19 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 	cause := upf.sendMsgToUPF(upfMsgTypeAdd, session.pdrs, session.fars, session.qers)
 	if cause == ie.CauseRequestRejected {
-		pConn.mgr.RemoveSession(session.localSEID)
+		pConn.RemoveSession(session.localSEID)
 		return errProcessReply(errors.New("write to FastPath failed"),
 			ie.CauseRequestRejected)
 	}
 
 	// Build response message
 	seres := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
-		0,                    /* FO <-- what's this? */
-		session.remoteSEID,   /* seid */
-		sereq.SequenceNumber, /* seq # */
-		0,                    /* priority */
-		ie.NewNodeID(upf.nodeIP.String(), "", ""), /* node id (IPv4) */
-		ie.NewCause(ie.CauseRequestAccepted),      /* accept it blindly for the time being */
+		0,                                        /* FO <-- what's this? */
+		session.remoteSEID,                       /* seid */
+		sereq.SequenceNumber,                     /* seq # */
+		0,                                        /* priority */
+		ie.NewNodeID(pConn.nodeID.local, "", ""), /* node id (IPv4) */
+		ie.NewCause(ie.CauseRequestAccepted),     /* accept it blindly for the time being */
 		ie.NewFSEID(session.localSEID, net.ParseIP(pConn.LocalAddr().String()), nil),
 	)
 
@@ -168,7 +169,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 
 	localSEID := smreq.SEID()
 
-	session, ok := pConn.mgr.sessions[localSEID]
+	session, ok := pConn.sessions[localSEID]
 	if !ok {
 		return sendError(fmt.Errorf("session not found: %v", localSEID))
 	}
@@ -194,7 +195,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 
 	for _, cPDR := range smreq.CreatePDR {
 		var p pdr
-		if err := p.parsePDR(cPDR, localSEID, pConn.mgr.appPFDs, upf.ippool); err != nil {
+		if err := p.parsePDR(cPDR, localSEID, pConn.appPFDs, upf.ippool); err != nil {
 			return sendError(err)
 		}
 
@@ -234,7 +235,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 			err error
 		)
 
-		if err = p.parsePDR(uPDR, localSEID, pConn.mgr.appPFDs, upf.ippool); err != nil {
+		if err = p.parsePDR(uPDR, localSEID, pConn.appPFDs, upf.ippool); err != nil {
 			return sendError(err)
 		}
 
@@ -395,7 +396,7 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 	/* retrieve sessionRecord */
 	localSEID := sdreq.SEID()
 
-	session, ok := pConn.mgr.sessions[localSEID]
+	session, ok := pConn.sessions[localSEID]
 	if !ok {
 		return sendError(fmt.Errorf("session not found: %v", localSEID))
 	}
@@ -407,7 +408,7 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 
 	releaseAllocatedIPs(upf.ippool, session)
 	/* delete sessionRecord */
-	pConn.mgr.RemoveSession(localSEID)
+	pConn.RemoveSession(localSEID)
 
 	// Build response message
 	smres := message.NewSessionDeletionResponse(0, /* MO?? <-- what's this */
@@ -422,7 +423,7 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 }
 
 func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
-	session, ok := pConn.mgr.sessions[fseid]
+	session, ok := pConn.sessions[fseid]
 	if !ok {
 		log.Warnln("No session found for fseid : ", fseid)
 		return
@@ -500,7 +501,7 @@ func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) (message
 	seid := srres.SEID()
 
 	if cause == ie.CauseSessionContextNotFound {
-		sessItem, ok := pConn.mgr.sessions[seid]
+		sessItem, ok := pConn.sessions[seid]
 		if !ok {
 			return nil, errProcess(
 				fmt.Errorf("context not found locally or remote. SEID : %v", seid))
@@ -508,7 +509,7 @@ func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) (message
 
 		log.Warnln("context not found, deleting session locally")
 
-		pConn.mgr.RemoveSession(seid)
+		pConn.RemoveSession(seid)
 
 		cause := upf.sendMsgToUPF(
 			upfMsgTypeDel, sessItem.pdrs, sessItem.fars, sessItem.qers)
