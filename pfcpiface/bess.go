@@ -37,6 +37,10 @@ const (
 	farDrop     = 0x2
 	farBuffer   = 0x3
 	farNotify   = 0x4
+	// Bit Rates.
+	KB = 1000
+	MB = 1000000
+	GB = 1000000000
 )
 
 const (
@@ -1146,6 +1150,9 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 			ebs = 0 // Unused
 		}
 
+		log.Traceln("uplink slice : cir: ", cir, ", pir: ", pir,
+			", cbs: ", cbs, ", pbs: ", pbs)
+
 		q := &pb.QosCommandAddArg{
 			Gate:              gate,
 			Cir:               cir,                               /* committed info rate */
@@ -1186,6 +1193,9 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 			pbs = DefaultBurstSize
 			ebs = 0 // Unused
 		}
+
+		log.Traceln("downlink slice : cir: ", cir, ", pir: ", pir,
+			", cbs: ", cbs, ", pbs: ", pbs)
 		// TODO: packet deduction should take GTPU extension header into account
 		q = &pb.QosCommandAddArg{
 			Gate:              gate,
