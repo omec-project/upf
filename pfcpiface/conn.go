@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"net"
 	"sync"
 	"time"
@@ -35,15 +36,24 @@ type recoveryTS struct {
 	remote time.Time
 }
 
+type nodeID struct {
+	local  string
+	remote string
+}
+
 // PFCPConn represents a PFCP connection with a unique PFCP peer.
 type PFCPConn struct {
 	ctx context.Context
 	// child socket for all subsequent packets from an "established PFCP connection"
 	net.Conn
-	ts     recoveryTS
-	seqNum sequenceNumber
-	mgr    *PFCPSessionMgr
-	upf    *upf
+	ts         recoveryTS
+	seqNum     sequenceNumber
+	rng        *rand.Rand
+	maxRetries int
+	appPFDs    map[string]appPFD
+	sessions   map[uint64]*PFCPSession
+	nodeID     nodeID
+	upf        *upf
 	// channel to signal PFCPNode on exit
 	done     chan<- string
 	shutdown chan struct{}
@@ -56,20 +66,22 @@ func NewPFCPConn(ctx context.Context, upf *upf, done chan<- string, lAddr, rAddr
 		log.Errorln("dial socket failed", err)
 	}
 
-	log.Infoln("Created PFCPConn for", conn.RemoteAddr().String())
-
 	ts := recoveryTS{
 		local: time.Now(),
 	}
 
+	log.Infoln("Created PFCPConn from:", conn.LocalAddr(), "to:", conn.RemoteAddr())
+
 	return &PFCPConn{
-		ctx:      ctx,
-		Conn:     conn,
-		ts:       ts,
-		mgr:      NewPFCPSessionMgr(100),
-		upf:      upf,
-		done:     done,
-		shutdown: make(chan struct{}),
+		ctx:        ctx,
+		Conn:       conn,
+		ts:         ts,
+		rng:        rand.New(rand.NewSource(time.Now().UnixNano())),
+		maxRetries: 100,
+		sessions:   make(map[uint64]*PFCPSession),
+		upf:        upf,
+		done:       done,
+		shutdown:   make(chan struct{}),
 	}
 }
 
@@ -109,9 +121,9 @@ func (pConn *PFCPConn) Shutdown() error {
 	close(pConn.shutdown)
 
 	// Cleanup all sessions in this conn
-	for seid, sess := range pConn.mgr.sessions {
+	for seid, sess := range pConn.sessions {
 		pConn.upf.sendMsgToUPF(upfMsgTypeDel, sess.pdrs, sess.fars, sess.qers)
-		pConn.mgr.RemoveSession(seid)
+		pConn.RemoveSession(seid)
 	}
 
 	rAddr := pConn.RemoteAddr().String()

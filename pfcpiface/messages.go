@@ -79,7 +79,7 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 		return
 	}
 
-	nodeID := pConn.mgr.nodeID
+	nodeID := pConn.nodeID.remote
 	//nodeID := addr
 
 	// Check for errors in handling the message
@@ -98,7 +98,7 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 
 func (pConn *PFCPConn) SendPFCPMsg(msg message.Message) {
 	addr := pConn.RemoteAddr().String()
-	nodeID := pConn.mgr.nodeID
+	nodeID := pConn.nodeID.remote
 
 	out := make([]byte, msg.MarshalLen())
 	replyType := msg.MessageTypeName()

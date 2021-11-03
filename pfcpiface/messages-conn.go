@@ -5,6 +5,7 @@ package main
 
 import (
 	"errors"
+	"net"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -58,9 +59,23 @@ func (pConn *PFCPConn) associationIEs() []*ie.IE {
 		setEndMarkerFeature(features...)
 	}
 
+	// Use nodeID if provided in conf, else conn.LocalAddr
+	var nodeIDIE *ie.IE
+	localIP := pConn.LocalAddr().(*net.UDPAddr).IP
+	if upf.nodeID != "" {
+		pConn.nodeID.local = upf.nodeID
+		nodeIDIE = ie.NewNodeID("", "", upf.nodeID)
+	} else if localIP.To4() != nil {
+		pConn.nodeID.local = localIP.String()
+		nodeIDIE = ie.NewNodeID(localIP.String(), "", "")
+	} else {
+		pConn.nodeID.local = localIP.String()
+		nodeIDIE = ie.NewNodeID("", localIP.String(), "")
+	}
+
 	ies := []*ie.IE{
 		ie.NewRecoveryTimeStamp(pConn.ts.local),
-		ie.NewNodeID(upf.nodeIP.String(), "", ""), /* node id (IPv4) */
+		nodeIDIE,
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
 		ie.NewUserPlaneIPResourceInformation(flags, 0, upf.accessIP.String(), "", networkInstance, ie.SrcInterfaceAccess),
@@ -100,8 +115,6 @@ func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (messa
 		return nil, errUnmarshal(err)
 	}
 
-	log.Infoln("Association Setup Request from", addr, "with nodeID", nodeID)
-
 	ts, err := asreq.RecoveryTimeStamp.RecoveryTimeStamp()
 	if err != nil {
 		return nil, errUnmarshal(err)
@@ -116,18 +129,22 @@ func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (messa
 		return asres, errProcess(errFastpathDown)
 	}
 
-	pConn.mgr.nodeID = nodeID
-
 	if pConn.ts.remote.IsZero() {
 		pConn.ts.remote = ts
-		log.Infoln("Association Setup Request from", addr, "with recovery timestamp:", ts)
+		log.Infoln("Association Setup Request from", addr,
+			"with recovery timestamp:", ts)
 	} else if ts.After(pConn.ts.remote) {
 		old := pConn.ts.remote
 		pConn.ts.remote = ts
-		log.Warnln("Association Setup Request from", addr, "with newer recovery timestamp:", ts, "older:", old)
+		log.Warnln("Association Setup Request from", addr,
+			"with newer recovery timestamp:", ts, "older:", old)
 	}
 
+	pConn.nodeID.remote = nodeID
 	asres.Cause = ie.NewCause(ie.CauseRequestAccepted)
+	log.Infoln("Association setup done between nodes",
+		"local:", pConn.nodeID.local, "remote:", pConn.nodeID.remote)
+
 	return asres, nil
 }
 
@@ -145,7 +162,8 @@ func (pConn *PFCPConn) handleAssociationSetupResponse(msg message.Message) (mess
 	}
 
 	if cause != ie.CauseRequestAccepted {
-		log.Errorln("Association Setup Response from", addr, "with Cause:", cause)
+		log.Errorln("Association Setup Response from", addr,
+			"with Cause:", cause)
 		return nil, errReqRejected
 	}
 
@@ -154,8 +172,6 @@ func (pConn *PFCPConn) handleAssociationSetupResponse(msg message.Message) (mess
 		return nil, errUnmarshal(err)
 	}
 
-	pConn.mgr.nodeID = nodeID
-
 	ts, err := asres.RecoveryTimeStamp.RecoveryTimeStamp()
 	if err != nil {
 		return nil, errUnmarshal(err)
@@ -163,33 +179,33 @@ func (pConn *PFCPConn) handleAssociationSetupResponse(msg message.Message) (mess
 
 	if pConn.ts.remote.IsZero() {
 		pConn.ts.remote = ts
-		log.Infoln("Association Setup Response from", addr, "with recovery timestamp:", ts)
+		log.Infoln("Association Setup Response from", addr,
+			"with recovery timestamp:", ts)
 	} else if ts.After(pConn.ts.remote) {
 		old := pConn.ts.remote
 		pConn.ts.remote = ts
-		log.Warnln("Association Setup Response from", addr, "with newer recovery timestamp:", ts, "older:", old)
+		log.Warnln("Association Setup Response from", addr,
+			"with newer recovery timestamp:", ts, "older:", old)
 	}
+
+	pConn.nodeID.remote = nodeID
+	log.Infoln("Association setup done between nodes",
+		"local:", pConn.nodeID.local, "remote:", pConn.nodeID.remote)
 
 	return nil, nil
 }
 
 func (pConn *PFCPConn) handleAssociationReleaseRequest(msg message.Message) (message.Message, error) {
-	upf := pConn.upf
-
 	arreq, ok := msg.(*message.AssociationReleaseRequest)
 	if !ok {
 		return nil, errUnmarshal(errMsgUnexpectedType)
 	}
 
 	// Build response message
-	// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
 	arres := message.NewAssociationReleaseResponse(arreq.SequenceNumber,
 		ie.NewRecoveryTimeStamp(pConn.ts.local),
-		ie.NewNodeID(upf.nodeIP.String(), "", ""), /* node id (IPv4) */
-		ie.NewCause(ie.CauseRequestAccepted),      /* accept it blindly for the time being */
-		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
-		//      = 01000001
-		ie.NewUserPlaneIPResourceInformation(0x41, 0, upf.accessIP.String(), "", "", ie.SrcInterfaceAccess),
+		ie.NewNodeID(pConn.nodeID.local, "", ""),
+		ie.NewCause(ie.CauseRequestAccepted),
 	)
 
 	return arres, nil
@@ -201,15 +217,15 @@ func (pConn *PFCPConn) handlePFDMgmtRequest(msg message.Message) (message.Messag
 		return nil, errUnmarshal(errMsgUnexpectedType)
 	}
 
-	currentAppPFDs := pConn.mgr.appPFDs
+	currentAppPFDs := pConn.appPFDs
 
 	// On every PFD management request reset existing contents
 	// TODO: Analyse impact on PDRs referencing these IDs
-	pConn.mgr.ResetAppPFDs()
+	pConn.ResetAppPFDs()
 
 	errUnmarshalReply := func(err error, offendingIE *ie.IE) (message.Message, error) {
 		// Revert the map to original contents
-		pConn.mgr.appPFDs = currentAppPFDs
+		pConn.appPFDs = currentAppPFDs
 		// Build response message
 		pfdres := message.NewPFDManagementResponse(pfdmreq.SequenceNumber,
 			ie.NewCause(ie.CauseRequestRejected),
@@ -225,19 +241,19 @@ func (pConn *PFCPConn) handlePFDMgmtRequest(msg message.Message) (message.Messag
 			return errUnmarshalReply(err, appIDPFD)
 		}
 
-		pConn.mgr.NewAppPFD(id)
-		appPFD := pConn.mgr.appPFDs[id]
+		pConn.NewAppPFD(id)
+		appPFD := pConn.appPFDs[id]
 
 		pfdCtx, err := appIDPFD.PFDContext()
 		if err != nil {
-			pConn.mgr.RemoveAppPFD(id)
+			pConn.RemoveAppPFD(id)
 			return errUnmarshalReply(err, appIDPFD)
 		}
 
 		for _, pfdContent := range pfdCtx {
 			fields, err := pfdContent.PFDContents()
 			if err != nil {
-				pConn.mgr.RemoveAppPFD(id)
+				pConn.RemoveAppPFD(id)
 				return errUnmarshalReply(err, appIDPFD)
 			}
 
@@ -248,7 +264,7 @@ func (pConn *PFCPConn) handlePFDMgmtRequest(msg message.Message) (message.Messag
 			appPFD.flowDescs = append(appPFD.flowDescs, fields.FlowDescription)
 		}
 
-		pConn.mgr.appPFDs[id] = appPFD
+		pConn.appPFDs[id] = appPFD
 		log.Traceln("Flow descriptions for AppID", id, ":", appPFD.flowDescs)
 	}
 

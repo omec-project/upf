@@ -8,8 +8,6 @@ import (
 	"net"
 	"strconv"
 	"strings"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // grpc channel state.
@@ -87,29 +85,6 @@ func int2ip(nn uint32) net.IP {
 	binary.BigEndian.PutUint32(ip, nn)
 
 	return ip
-}
-
-func getRemoteIP(dstIP string) net.IP {
-	conn, err := net.Dial("udp", dstIP+":"+PFCPPort)
-	if err != nil {
-		ip := net.IPv4zero.String()
-		return net.ParseIP(ip)
-	}
-	defer conn.Close()
-	remoteAddr := conn.RemoteAddr().(*net.UDPAddr)
-
-	return remoteAddr.IP
-}
-
-func getLocalIP(dstIP string) net.IP {
-	conn, err := net.Dial("udp", dstIP+":"+PFCPPort)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer conn.Close()
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
-
-	return localAddr.IP
 }
 
 func maxUint64(x, y uint64) uint64 {

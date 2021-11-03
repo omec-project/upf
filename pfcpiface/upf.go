@@ -8,6 +8,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/Showmax/go-fqdn"
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
 )
@@ -43,9 +44,7 @@ type upf struct {
 	ippoolCidr       string
 	accessIP         net.IP
 	coreIP           net.IP
-	n4SrcIP          net.IP
-	nodeIP           net.IP
-	fqdnHost         string
+	nodeID           string
 	ippool           *IPPool
 	dnn              string
 	reportNotifyChan chan uint64
@@ -85,49 +84,46 @@ func (u *upf) addSliceInfo(sliceInfo *SliceInfo) error {
 	return u.fastPath.addSliceInfo(sliceInfo)
 }
 
-func (u *upf) setUpfInfo(conf *Conf) {
-	var err error
+func NewUPF(conf *Conf, fp fastPath) *upf {
+	var (
+		err    error
+		nodeID string
+	)
 
-	u.reportNotifyChan = make(chan uint64, 1024)
-	u.n4SrcIP = net.ParseIP(net.IPv4zero.String())
-	u.nodeIP = net.ParseIP(net.IPv4zero.String())
-
-	if conf.CPIface.SrcIP == "" {
-		if conf.CPIface.DestIP != "" {
-			log.Println("Dest address ", conf.CPIface.DestIP)
-			u.n4SrcIP = getLocalIP(conf.CPIface.DestIP)
-			log.Println("SPGWU/UPF address IP: ", u.n4SrcIP.String())
-		}
-	} else {
-		addrs, err := net.LookupHost(conf.CPIface.SrcIP)
-		if err == nil {
-			u.n4SrcIP = net.ParseIP(addrs[0])
+	if conf.CPIface.UseFQDN {
+		if nodeID = conf.CPIface.NodeID; nodeID == "" {
+			nodeID, err = fqdn.FqdnHostname()
+			if err != nil {
+				log.Fatalln("Unable to get hostname", err)
+			}
 		}
 	}
 
-	if conf.CPIface.FQDNHost != "" {
-		ips, err := net.LookupHost(conf.CPIface.FQDNHost)
-		if err == nil {
-			u.nodeIP = net.ParseIP(ips[0])
-		}
-	}
-
-	log.Println("UPF Node IP : ", u.nodeIP.String())
-	log.Println("UPF Local IP : ", u.n4SrcIP.String())
-
-	u.ippoolCidr = conf.CPIface.UeIPPool
-
-	log.Println("IP pool : ", u.ippoolCidr)
-
-	u.ippool, err = NewIPPool(u.ippoolCidr)
-	if err != nil {
-		log.Println("ip pool init failed")
+	u := &upf{
+		enableUeIPAlloc:  conf.CPIface.EnableUeIPAlloc,
+		enableEndMarker:  conf.EnableEndMarker,
+		accessIface:      conf.AccessIface.IfName,
+		coreIface:        conf.CoreIface.IfName,
+		ippoolCidr:       conf.CPIface.UEIPPool,
+		nodeID:           nodeID,
+		fastPath:         fp,
+		dnn:              conf.CPIface.Dnn,
+		reportNotifyChan: make(chan uint64, 1024),
 	}
 
 	u.accessIP = ParseIP(conf.AccessIface.IfName, "Access")
 	u.coreIP = ParseIP(conf.CoreIface.IfName, "Core")
 
+	if u.enableUeIPAlloc {
+		u.ippool, err = NewIPPool(u.ippoolCidr)
+		if err != nil {
+			log.Fatalln("ip pool init failed")
+		}
+	}
+
 	u.fastPath.setUpfInfo(u, conf)
+
+	return u
 }
 
 func (u *upf) sim(method string, s *SimModeInfo) {
