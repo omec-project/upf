@@ -127,7 +127,7 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 }
 
 func (u *upf) sim(method string, s *SimModeInfo) {
-	log.Println(*simulate, "sessions:", s.MaxSessions)
+	log.Infoln(*simulate, "sessions:", s.MaxSessions)
 	start := time.Now()
 	// const ueip, teid, enbip = 0x10000001, 0xf0000000, 0x0b010181
 	ueip := s.StartUEIP
@@ -312,5 +312,5 @@ func (u *upf) sim(method string, s *SimModeInfo) {
 			log.Fatalln("Unsupported method", method)
 		}
 	}
-	log.Println("Sessions/s:", float64(s.MaxSessions)/time.Since(start).Seconds())
+	log.Infoln("Sessions/s:", float64(s.MaxSessions)/time.Since(start).Seconds())
 }
