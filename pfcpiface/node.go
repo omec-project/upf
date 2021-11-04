@@ -7,6 +7,8 @@ import (
 
 	reuse "github.com/libp2p/go-reuseport"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/omec-project/upf-epc/pfcpiface/metrics"
 )
 
 // PFCPNode represents a PFCP endpoint of the UPF.
@@ -22,6 +24,8 @@ type PFCPNode struct {
 	pConns map[string]*PFCPConn
 	// upf
 	upf *upf
+	// metrics for PFCP messages and sessions
+	metrics metrics.InstrumentPFCP
 }
 
 // NewPFCPNode create a new PFCPNode listening on local address.
@@ -31,6 +35,11 @@ func NewPFCPNode(ctx context.Context, upf *upf) *PFCPNode {
 		log.Fatalln("ListenUDP failed", err)
 	}
 
+	metrics, err := metrics.NewPrometheusService()
+	if err != nil {
+		log.Fatalln("prom metrics service init failed", err)
+	}
+
 	return &PFCPNode{
 		ctx:        ctx,
 		PacketConn: conn,
@@ -38,6 +47,7 @@ func NewPFCPNode(ctx context.Context, upf *upf) *PFCPNode {
 		pConnDone:  make(chan string, 100),
 		pConns:     make(map[string]*PFCPConn),
 		upf:        upf,
+		metrics:    metrics,
 	}
 }
 
@@ -65,7 +75,7 @@ func (node *PFCPNode) handleNewPeers() {
 		}
 
 		// TODO: Logic to distinguish PFCPConn based on SEID
-		p := NewPFCPConn(node.ctx, node.upf, node.pConnDone, lAddrStr, rAddrStr)
+		p := node.NewPFCPConn(lAddrStr, rAddrStr)
 		node.pConns[rAddrStr] = p
 		p.HandlePFCPMsg(buf[:n])
 

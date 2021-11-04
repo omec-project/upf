@@ -5,6 +5,8 @@ package main
 
 import (
 	"sync"
+
+	"github.com/omec-project/upf-epc/pfcpiface/metrics"
 )
 
 type notifyFlag struct {
@@ -20,6 +22,7 @@ type PFCPSession struct {
 	pdrs             []pdr
 	fars             []far
 	qers             []qer
+	metrics          *metrics.Session
 }
 
 // NewPFCPSession allocates an session with ID.
@@ -39,7 +42,10 @@ func (pConn *PFCPConn) NewPFCPSession(rseid uint64) uint64 {
 			qers:       make([]qer, 0, MaxItems),
 		}
 		pConn.sessions[lseid] = &s
-		globalPfcpStats.sessions.WithLabelValues(pConn.nodeID.remote).Set(float64(len(pConn.sessions)))
+
+		// Metrics update
+		s.metrics = metrics.NewSession(pConn.nodeID.remote)
+		pConn.SaveSessions(s.metrics)
 
 		return lseid
 	}
@@ -47,8 +53,16 @@ func (pConn *PFCPConn) NewPFCPSession(rseid uint64) uint64 {
 	return 0
 }
 
-// RemoveSession removes session using id.
-func (pConn *PFCPConn) RemoveSession(id uint64) {
-	delete(pConn.sessions, id)
-	globalPfcpStats.sessions.WithLabelValues(pConn.nodeID.remote).Set(float64(len(pConn.sessions)))
+// RemoveSession removes session using lseid.
+func (pConn *PFCPConn) RemoveSession(lseid uint64) {
+	s, ok := pConn.sessions[lseid]
+	if !ok {
+		return
+	}
+
+	// Metrics update
+	s.metrics.Delete()
+	pConn.SaveSessions(s.metrics)
+
+	delete(pConn.sessions, lseid)
 }
