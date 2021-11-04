@@ -14,30 +14,7 @@ import (
 
 func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 	{
-		var seq uint32
-		hbreq, err := message.NewHeartbeatRequest(
-			seq,
-			ie.NewRecoveryTimeStamp(time.Now()),
-			nil,
-		).Marshal()
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		if _, err := conn.Write(hbreq); err != nil {
-			log.Fatal(err)
-		}
-		log.Printf("sent heartbeat request to: %s", raddr)
-
-		buf := make([]byte, 1500)
-		_, _, err = conn.ReadFrom(buf)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	{
-		var seq uint32 = 1
+		var seq uint32 = 0
 		asreq, err := message.NewAssociationSetupRequest(
 			seq,
 			ie.NewRecoveryTimeStamp(time.Now()),
@@ -51,6 +28,29 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 			log.Fatal(err)
 		}
 		log.Printf("sent association setup request to: %s", raddr)
+
+		buf := make([]byte, 1500)
+		_, _, err = conn.ReadFrom(buf)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	{
+		var seq uint32 = 1
+		hbreq, err := message.NewHeartbeatRequest(
+			seq,
+			ie.NewRecoveryTimeStamp(time.Now()),
+			nil,
+		).Marshal()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if _, err := conn.Write(hbreq); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("sent heartbeat request to: %s", raddr)
 
 		buf := make([]byte, 1500)
 		_, _, err = conn.ReadFrom(buf)

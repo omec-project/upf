@@ -115,7 +115,7 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 	if u.enableUeIPAlloc {
 		u.ippool, err = NewIPPool(u.ippoolCidr)
 		if err != nil {
-			log.Fatalln("ip pool init failed")
+			log.Fatalln("ip pool init failed", err)
 		}
 	}
 

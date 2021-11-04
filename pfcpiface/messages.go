@@ -8,6 +8,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/message"
+
+	"github.com/omec-project/upf-epc/pfcpiface/metrics"
 )
 
 var errMsgUnexpectedType = errors.New("unable to parse message as type specified")
@@ -42,8 +44,7 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 
 	addr := pConn.RemoteAddr().String()
 	msgType := msg.MessageTypeName()
-
-	log.Traceln("Received", msgType, "from", addr)
+	m := metrics.NewMessage(msgType, "Incoming")
 
 	switch msg.MessageType() {
 	// Connection related messages
@@ -80,16 +81,16 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 	}
 
 	nodeID := pConn.nodeID.remote
-	//nodeID := addr
-
 	// Check for errors in handling the message
 	if err != nil {
-		globalPfcpStats.messages.WithLabelValues(nodeID, msgType, "Incoming", "Failure").Inc()
-		log.Errorln("Error handling PFCP message type", msgType, "from", addr, err)
+		m.Finish(nodeID, "Failure")
+		log.Errorln("Error handling PFCP message type", msgType, "from:", addr, "nodeID:", nodeID, err)
 	} else {
-		globalPfcpStats.messages.WithLabelValues(nodeID, msgType, "Incoming", "Success").Inc()
-		log.Traceln("Successfully processed", msgType, "from", addr)
+		m.Finish(nodeID, "Success")
+		log.Traceln("Successfully processed", msgType, "from", addr, "nodeID:", nodeID)
 	}
+
+	pConn.SaveMessages(m)
 
 	if reply != nil {
 		pConn.SendPFCPMsg(reply)
@@ -99,22 +100,25 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 func (pConn *PFCPConn) SendPFCPMsg(msg message.Message) {
 	addr := pConn.RemoteAddr().String()
 	nodeID := pConn.nodeID.remote
+	msgType := msg.MessageTypeName()
+
+	m := metrics.NewMessage(msgType, "Outgoing")
+	defer pConn.SaveMessages(m)
 
 	out := make([]byte, msg.MarshalLen())
-	replyType := msg.MessageTypeName()
 
 	if err := msg.MarshalTo(out); err != nil {
-		globalPfcpStats.messages.WithLabelValues(nodeID, replyType, "Outgoing", "Failure").Inc()
-		log.Errorln("Failed to marshal", replyType, "for", addr, err)
+		m.Finish(nodeID, "Failure")
+		log.Errorln("Failed to marshal", msgType, "for", addr, err)
 		return
 	}
 
 	if _, err := pConn.Write(out); err != nil {
-		globalPfcpStats.messages.WithLabelValues(nodeID, replyType, "Outgoing", "Failure").Inc()
-		log.Errorln("Failed to transmit", replyType, "to", addr, err)
+		m.Finish(nodeID, "Failure")
+		log.Errorln("Failed to transmit", msgType, "to", addr, err)
 		return
 	}
 
-	globalPfcpStats.messages.WithLabelValues(nodeID, replyType, "Outgoing", "Success").Inc()
-	log.Traceln("Sent", replyType, "to", addr)
+	m.Finish(nodeID, "Success")
+	log.Traceln("Sent", msgType, "to", addr)
 }

@@ -13,6 +13,8 @@ import (
 
 	reuse "github.com/libp2p/go-reuseport"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/omec-project/upf-epc/pfcpiface/metrics"
 )
 
 // PktBufSz : buffer size for incoming pkt.
@@ -57,10 +59,12 @@ type PFCPConn struct {
 	// channel to signal PFCPNode on exit
 	done     chan<- string
 	shutdown chan struct{}
+
+	metrics.InstrumentPFCP
 }
 
 // NewPFCPConn creates a connected UDP socket to the rAddr PFCP peer specified.
-func NewPFCPConn(ctx context.Context, upf *upf, done chan<- string, lAddr, rAddr string) *PFCPConn {
+func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string) *PFCPConn {
 	conn, err := reuse.Dial("udp", lAddr, rAddr)
 	if err != nil {
 		log.Errorln("dial socket failed", err)
@@ -73,15 +77,16 @@ func NewPFCPConn(ctx context.Context, upf *upf, done chan<- string, lAddr, rAddr
 	log.Infoln("Created PFCPConn from:", conn.LocalAddr(), "to:", conn.RemoteAddr())
 
 	return &PFCPConn{
-		ctx:        ctx,
-		Conn:       conn,
-		ts:         ts,
-		rng:        rand.New(rand.NewSource(time.Now().UnixNano())),
-		maxRetries: 100,
-		sessions:   make(map[uint64]*PFCPSession),
-		upf:        upf,
-		done:       done,
-		shutdown:   make(chan struct{}),
+		ctx:            node.ctx,
+		Conn:           conn,
+		ts:             ts,
+		rng:            rand.New(rand.NewSource(time.Now().UnixNano())),
+		maxRetries:     100,
+		sessions:       make(map[uint64]*PFCPSession),
+		upf:            node.upf,
+		done:           node.pConnDone,
+		shutdown:       make(chan struct{}),
+		InstrumentPFCP: node.metrics,
 	}
 }
 

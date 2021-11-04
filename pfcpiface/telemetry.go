@@ -8,42 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	log "github.com/sirupsen/logrus"
 )
-
-// PfcpStats ... Prometheus metrics.
-type pfcpStats struct {
-	messages *prometheus.CounterVec
-	sessions *prometheus.GaugeVec
-}
-
-var globalPfcpStats *pfcpStats
-
-func newPFCPStats() *pfcpStats {
-	return &pfcpStats{
-		messages: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "pfcp_messages_total",
-			Help: "Counter for incoming and outgoing PFCP messages",
-		}, []string{"node_id", "message_type", "direction", "result"}),
-
-		sessions: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Name: "pfcp_sessions",
-			Help: "Number of PFCP sessions currently in the UPF",
-		}, []string{"node_id"}),
-	}
-}
-
-func (ps *pfcpStats) register() error {
-	if err := prometheus.Register(ps.messages); err != nil {
-		return err
-	}
-
-	if err := prometheus.Register(ps.sessions); err != nil {
-		return err
-	}
-
-	return nil
-}
 
 func getPctiles() []float64 {
 	return []float64{50, 75, 90, 95, 99, 99.9, 99.99, 99.999, 99.9999, 100}
@@ -124,11 +89,6 @@ func (uc *upfCollector) summaryLatencyJitter(ch chan<- prometheus.Metric) {
 func setupProm(upf *upf) {
 	uc := newUpfCollector(upf)
 	prometheus.MustRegister(uc)
-
-	globalPfcpStats = newPFCPStats()
-	if err := globalPfcpStats.register(); err != nil {
-		log.Panicln("Pfcp Stats register failed")
-	}
 
 	http.Handle("/metrics", promhttp.Handler())
 }
