@@ -194,10 +194,10 @@ linkMerge::Merge() \
                                         {'attr_name':'far_id', 'num_bytes':4}],\
                                 entries=parser.table_size_pdr_lookup):noGTPUDecap \
     -> preQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
-    -> qosMeasureIn::QosMeasure(flag_attr_name="buffer_flag", entries=parser.table_size_qos_measure)
+    -> preQosMeasure::QosMeasure(flag_attr_name="buffer_flag", entries=parser.table_size_qos_measure)
 
 # Insert NTF module, if enabled
-_in = qosMeasureIn
+_in = preQosMeasure
 if ntf:
   _in -> ntf
   _in = ntf

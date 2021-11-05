@@ -448,9 +448,9 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 		return err
 	}
 	// Read stats from the now inactive side, and clear if needed.
-	qosStatsInResp, err := b.readMeasurement(ctx, "qosMeasureIn", oldFlag, true)
+	qosStatsInResp, err := b.readMeasurement(ctx, "preQosMeasure", oldFlag, true)
 	if err != nil {
-		log.Errorln("qosMeasureIn read failed!:", err)
+		log.Errorln("preQosMeasure read failed!:", err)
 		return
 	}
 	postDlQosStatsResp, err := b.readMeasurement(ctx, "postDLQoSMeasure", oldFlag, true)
