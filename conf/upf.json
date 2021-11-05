@@ -126,7 +126,7 @@
         "enable_ue_ip_alloc": false,
         "ue_ip_pool": "10.250.0.0/16",
         "" : "use_fqdn: true",
-        "" : "node_id: upf-0"
+        "" : "hostname: upf-0"
     },
 
     "": "p4rtc interface settings",
