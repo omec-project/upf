@@ -127,6 +127,14 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 			ie.CauseRequestRejected)
 	}
 
+	var localFSEID *ie.IE
+	localIP := pConn.LocalAddr().(*net.UDPAddr).IP
+	if localIP.To4() != nil {
+		localFSEID = ie.NewFSEID(session.localSEID, localIP, nil)
+	} else {
+		localFSEID = ie.NewFSEID(session.localSEID, nil, localIP)
+	}
+
 	// Build response message
 	seres := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
 		0,                                        /* FO <-- what's this? */
@@ -135,7 +143,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 		0,                                        /* priority */
 		ie.NewNodeID(pConn.nodeID.local, "", ""), /* node id (IPv4) */
 		ie.NewCause(ie.CauseRequestAccepted),     /* accept it blindly for the time being */
-		ie.NewFSEID(session.localSEID, net.ParseIP(pConn.LocalAddr().String()), nil),
+		localFSEID,
 	)
 
 	addPdrInfo(seres, session)
