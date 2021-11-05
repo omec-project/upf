@@ -427,7 +427,7 @@ func (b *bess) readMeasurement(
 		},
 	)
 	if err != nil {
-		log.Errorln("qosMeasureIn read failed!:", err)
+		log.Errorln(module, "read failed!:", err)
 		return
 	}
 	if err = resp.Data.UnmarshalTo(&stats); err != nil {
@@ -438,37 +438,39 @@ func (b *bess) readMeasurement(
 }
 
 func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err error) {
-	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	// Clearing table data with large tables is slow, let's wait for a little longer since this is
+	// non-blocking anyway.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	// Flip flag, automatically waits for pipeline to flush packets with previous mark
+	// Flip flag, automatically waits for pipeline to flush packets with previous mark.
 	observationDurationNs, oldFlag, err := b.flipFlag(ctx)
 	if err != nil {
 		return err
 	}
-	// Read stats from the now inactive side, and clear if needed
+	// Read stats from the now inactive side, and clear if needed.
 	qosStatsInResp, err := b.readMeasurement(ctx, "qosMeasureIn", oldFlag, true)
 	if err != nil {
 		log.Errorln("qosMeasureIn read failed!:", err)
 		return
 	}
-	qosStatsOutResp, err := b.readMeasurement(ctx, "qosMeasureOut", oldFlag, true)
+	postDlQosStatsResp, err := b.readMeasurement(ctx, "postDLQoSMeasure", oldFlag, true)
 	if err != nil {
-		log.Errorln("qosMeasureOut read failed!:", err)
+		log.Errorln("postDLQoSMeasure read failed!:", err)
 		return
 	}
-	// Prepare prometheus stats
-	for i := 0; i < len(qosStatsInResp.Statistics) && i < len(qosStatsOutResp.Statistics); i++ {
-		statsIn := qosStatsInResp.Statistics[i]
-		statsOut := qosStatsOutResp.Statistics[i]
-		// FIXME
-		if statsIn.Fseid != statsOut.Fseid || statsIn.Pdr != statsOut.Pdr {
-			continue
-		}
-		dropRate := 1 - (float64(statsOut.TotalPackets) / float64(statsIn.TotalPackets))
-		bitsPerSecond := float64(statsOut.TotalBytes*8) / (float64(observationDurationNs) / (1000 * 1000 * 1000))
-		packetsPerSecond := float64(statsOut.TotalPackets) / (float64(observationDurationNs) / (1000 * 1000 * 1000))
-		fseidString := strconv.FormatUint(statsOut.Fseid, 10)
-		pdrString := strconv.FormatUint(statsOut.Pdr, 10)
+	postUlQosStatsResp, err := b.readMeasurement(ctx, "postULQoSMeasure", oldFlag, true)
+	if err != nil {
+		log.Errorln("postULQoSMeasure read failed!:", err)
+		return
+	}
+
+	// Prepare prometheus stats.
+	createStats := func(pre, post *pb.QosMeasureReadResponse_Statistic, ch chan<- prometheus.Metric) {
+		dropRate := 1 - (float64(post.TotalPackets) / float64(pre.TotalPackets))
+		bitsPerSecond := float64(post.TotalBytes*8) / (float64(observationDurationNs) / (1000 * 1000 * 1000))
+		packetsPerSecond := float64(post.TotalPackets) / (float64(observationDurationNs) / (1000 * 1000 * 1000))
+		fseidString := strconv.FormatUint(post.Fseid, 10)
+		pdrString := strconv.FormatUint(post.Pdr, 10)
 		ch <- prometheus.MustNewConstMetric(
 			uc.sessionDropRate,
 			prometheus.GaugeValue,
@@ -499,17 +501,41 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 		)
 		ch <- prometheus.MustNewConstSummary(
 			uc.sessionLatency,
-			statsOut.TotalPackets,
+			post.TotalPackets,
 			0,
 			map[float64]float64{
-				50.0: float64(statsOut.Latency_50Ns),
-				99.0: float64(statsOut.Latency_99Ns),
-				99.9: float64(statsOut.Latency_99_9Ns),
+				50.0: float64(post.Latency_50Ns),
+				99.0: float64(post.Latency_99Ns),
+				99.9: float64(post.Latency_99_9Ns),
 			},
 			fseidString,
 			pdrString,
 		)
 	}
+
+	for i := 0; i < len(postUlQosStatsResp.Statistics); i++ {
+		ulPostStats := postUlQosStatsResp.Statistics[i]
+		var preStats *pb.QosMeasureReadResponse_Statistic
+		// Find preQos values.
+		for _, v := range qosStatsInResp.Statistics {
+			if ulPostStats.Pdr == v.Pdr && ulPostStats.Fseid == v.Fseid {
+				preStats = v
+			}
+		}
+		createStats(preStats, ulPostStats, ch)
+	}
+	for i := 0; i < len(postDlQosStatsResp.Statistics); i++ {
+		dlPostStats := postDlQosStatsResp.Statistics[i]
+		var preStats *pb.QosMeasureReadResponse_Statistic
+		// Find preQos values.
+		for _, v := range qosStatsInResp.Statistics {
+			if dlPostStats.Pdr == v.Pdr && dlPostStats.Fseid == v.Fseid {
+				preStats = v
+			}
+		}
+		createStats(preStats, dlPostStats, ch)
+	}
+
 	return
 }
 

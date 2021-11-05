@@ -35,10 +35,6 @@ CommandResponse QosMeasure::Init(const bess::pb::QosMeasureArg &arg) {
   if (buffer_flag_attr_id_ < 0)
     return CommandFailure(EINVAL, "invalid flag attribute name");
 
-  LOG(INFO) << "TS attr ID " << ts_attr_id_;
-  LOG(INFO) << "FSEID attr ID " << fseid_attr_id_;
-  LOG(INFO) << "PDR attr ID " << pdr_attr_id_;
-
   rte_hash_parameters hash_params = {};
   hash_params.entries = kDefaultNumEntries;
   hash_params.key_len = sizeof(TableKey);
@@ -48,20 +44,14 @@ CommandResponse QosMeasure::Init(const bess::pb::QosMeasureArg &arg) {
   if (arg.entries()) {
     hash_params.entries = arg.entries();
   }
-  // Find existing tables or create new ones.
+  // Create both hash tables.
   std::string name_a =
       name() + "_table_a_" + std::to_string(hash_params.socket_id);
   if (name_a.size() > RTE_HASH_NAMESIZE - 1) {
     return CommandFailure(EINVAL, "invalid hash name");
   }
   hash_params.name = name_a.c_str();
-  VLOG(1) << "Finding table " << hash_params.name << " ...";
-  // TODO: only needed in global design, remove otherwise.
-  table_a_ = rte_hash_find_existing(hash_params.name);
-  if (!table_a_) {
-    VLOG(1) << "Table " << hash_params.name << " does not exist, creating it.";
-    table_a_ = rte_hash_create(&hash_params);
-  }
+  table_a_ = rte_hash_create(&hash_params);
   if (!table_a_) {
     return CommandFailure(rte_errno, "could not create hashmap");
   }
@@ -71,41 +61,21 @@ CommandResponse QosMeasure::Init(const bess::pb::QosMeasureArg &arg) {
   if (name_b.size() > RTE_HASH_NAMESIZE - 1) {
     return CommandFailure(EINVAL, "invalid hash name");
   }
-  VLOG(1) << "Finding table " << hash_params.name << " ...";
-  // TODO: only needed in global design, remove otherwise.
-  table_b_ = rte_hash_find_existing(hash_params.name);
-  if (!table_b_) {
-    VLOG(1) << "Table " << hash_params.name << " does not exist, creating it.";
-    table_b_ = rte_hash_create(&hash_params);
-  }
+  table_b_ = rte_hash_create(&hash_params);
   if (!table_b_) {
     return CommandFailure(rte_errno, "could not create hashmap");
   }
-  LOG(INFO) << "TableKey size: " << sizeof(TableKey)
-            << ", SessionStats size: " << sizeof(SessionStats) << ".";
 
   // resize() would require a copyable object.
   std::vector<SessionStats> tmp_a(hash_params.entries);
   std::vector<SessionStats> tmp_b(hash_params.entries);
   table_data_a_.swap(tmp_a);
   table_data_b_.swap(tmp_b);
-  LOG(INFO) << "Tables created successfully.";
+  VLOG(1) << name() << ": Tables created successfully.";
 
   return CommandSuccess();
 }
 /*----------------------------------------------------------------------------------*/
-namespace {
-std::string SummaryToString(const Histogram<uint64_t>::Summary &summary) {
-  std::stringstream ss;
-  ss << "count " << summary.count << ", above_range " << summary.above_range
-     << ", avg " << summary.avg << ", total " << summary.total;
-  for (const auto percentile : summary.percentile_values) {
-    ss << "\n\tpercentile: " << percentile;
-  }
-  return ss.str();
-}
-}  // namespace
-
 void QosMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   uint64_t now_ns = tsc_to_ns(rdtsc());
   for (int i = 0; i < batch->cnt(); ++i) {
@@ -118,8 +88,6 @@ void QosMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
       LOG_EVERY_N(WARNING, 100'001) << "Encountered invalid flag: " << flag;
       continue;
     }
-    auto f = bess::pb::BufferFlag(flag);
-    LOG_EVERY_N(WARNING, 100'001) << "flag: " << bess::pb::BufferFlag_Name(f);
     // Discard invalid timestamps.
     if (!ts_ns || now_ns < ts_ns) {
       continue;
@@ -152,7 +120,6 @@ void QosMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
                  << key.ToString() << ": " << ret << ", " << rte_strerror(ret);
       continue;
     }
-    LOG_EVERY_N(WARNING, 100'001) << "rte_hash_lookup/insert = " << ret;
     // Update stats.
     SessionStats &stat = current_data->at(ret);
     const std::lock_guard<std::mutex> lock(stat.mutex);
@@ -165,14 +132,11 @@ void QosMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     stat.jitter_histogram.Insert(jitter_ns);
     stat.pkt_count += 1;
     stat.byte_count += batch->pkts()[i]->total_len();
-    LOG_EVERY_N(WARNING, 100'001)
-        << "FSEID: " << fseid << ", PDR: " << pdr << ": " << diff_ns << "ns.";
   }
 
   RunNextModule(ctx, batch);
 }
 /*----------------------------------------------------------------------------------*/
-// command module qosMeasureOut read QosMeasureCommandReadArg {'clear': False}
 CommandResponse QosMeasure::CommandReadStats(
     const bess::pb::QosMeasureCommandReadArg &arg) {
   bess::pb::QosMeasureReadResponse resp;
@@ -196,8 +160,6 @@ CommandResponse QosMeasure::CommandReadStats(
   uint32_t next = 0;
   int32_t ret = 0;
   while (ret = rte_hash_iterate(current_hash, &key, &data, &next), ret >= 0) {
-    LOG_EVERY_N(WARNING, 1'001)
-        << ret << ", key " << key << ", data " << data << ", next " << next;
     const TableKey *table_key = reinterpret_cast<const TableKey *>(key);
     const SessionStats &session_stat = current_data->at(ret);
     const std::lock_guard<std::mutex> lock(session_stat.mutex);
@@ -205,7 +167,6 @@ CommandResponse QosMeasure::CommandReadStats(
         session_stat.latency_histogram.Summarize({50., 90., 99., 99.9});
     const auto jitter_summary =
         session_stat.jitter_histogram.Summarize({50., 90., 99., 99.9});
-    LOG_EVERY_N(WARNING, 1'001) << SummaryToString(lat_summary) << ".";
     bess::pb::QosMeasureReadResponse::Statistic stat;
     stat.set_fseid(table_key->fseid);
     stat.set_pdr(table_key->pdr);
@@ -223,21 +184,21 @@ CommandResponse QosMeasure::CommandReadStats(
   }
 
   if (arg.clear()) {
-    LOG(WARNING) << "starting hash table clear...";
+    VLOG(1) << name() << ": starting hash table clear...";
     rte_hash_reset(current_hash);
     // TODO: this is quite slow
-    LOG(WARNING) << "hash table clear done, clearing table data...";
+    VLOG(1) << name() << ": hash table clear done, clearing table data...";
     for (auto &stat : *current_data) {
       const std::lock_guard<std::mutex> lock(stat.mutex);
       stat.reset();
     }
-    LOG(WARNING) << "table data clear done.";
+    VLOG(1) << name() << ": table data clear done.";
   }
 
   auto t_done = std::chrono::high_resolution_clock::now();
   if (VLOG_IS_ON(1)) {
     std::chrono::duration<double> diff = t_done - t_start;
-    VLOG(1) << "CommandReadStats took " << diff.count() << "s.";
+    VLOG(1) << name() << ": CommandReadStats took " << diff.count() << "s.";
   }
 
   return CommandSuccess(resp);

@@ -208,10 +208,8 @@ _in -> appQERLookup::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
                          values=[{'attr_name':'qfi', 'num_bytes':1}],\
                          entries = parser.table_size_app_qer_lookup)
 
-qosMeasureOut::QosMeasure(flag_attr_name="buffer_flag", entries=parser.table_size_qos_measure)
 executeFAR::Split(size=1, attribute='action')
-_in = qosMeasureOut
-qosMeasureOut -> executeFAR
+_in = executeFAR
 if parser.enable_slice_metering:
     # sliceMeter enforces a per slice, per direction meter rate limit
     sliceMeter::Qos(fields=[{'attr_name':'action', 'num_bytes':1}, \
@@ -226,11 +224,11 @@ if parser.enable_slice_metering:
     m_fail   = 4 # For lookup failure traffic
     m_unmeter = 5 # For unmetered traffic
     # Admit green and yellow, drop red
-    sliceMeter:m_green -> qosMeasureOut
-    sliceMeter:m_yellow -> qosMeasureOut
+    sliceMeter:m_green -> executeFAR
+    sliceMeter:m_yellow -> executeFAR
     sliceMeter:m_red -> sliceMeterRed::Sink()
     sliceMeter:m_fail -> sliceMeterLookupFail::Sink()
-    sliceMeter:m_unmeter -> qosMeasureOut
+    sliceMeter:m_unmeter -> executeFAR
     sliceMeter.set_default_gate(gate=m_fail)
     _in = sliceMeter
 
@@ -333,6 +331,7 @@ _in:gate \
 # 3. Complete the last part of the DL pipeline
 executeFAR:farForwardDAction \
     -> postDLQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
+    -> postDLQoSMeasure::QosMeasure(flag_attr_name="buffer_flag", entries=parser.table_size_qos_measure) \
     -> ports[parser.access_ifname].rtr
 
 # Drop unknown packets
@@ -391,6 +390,7 @@ _in:gate \
 # 3. Complete the last part of the UL pipeline
 executeFAR:farForwardUAction \
     -> postULQoSCounter::Counter(name_id='ctr_id', check_exist=True, total=parser.max_sessions) \
+    -> postULQoSMeasure::QosMeasure(flag_attr_name="buffer_flag", entries=parser.table_size_qos_measure) \
     -> ports[parser.core_ifname].rtr
 
 # 4. GTP Echo response pipeline
