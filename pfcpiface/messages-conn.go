@@ -64,7 +64,9 @@ func (pConn *PFCPConn) associationIEs() []*ie.IE {
 	localIP := pConn.LocalAddr().(*net.UDPAddr).IP
 	if upf.nodeID != "" {
 		pConn.nodeID.local = upf.nodeID
-		nodeIDIE = ie.NewNodeID("", "", upf.nodeID)
+		// TODO: Revert the below line once CI config is fixed
+		// nodeIDIE = ie.NewNodeID("", "", upf.nodeID)
+		nodeIDIE = ie.NewNodeID(upf.nodeID, "", "")
 	} else if localIP.To4() != nil {
 		pConn.nodeID.local = localIP.String()
 		nodeIDIE = ie.NewNodeID(localIP.String(), "", "")

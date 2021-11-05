@@ -88,13 +88,22 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 		nodeID string
 	)
 
-	if conf.CPIface.UseFQDN {
-		if nodeID = conf.CPIface.NodeID; nodeID == "" {
-			nodeID, err = fqdn.FqdnHostname()
-			if err != nil {
-				log.Fatalln("Unable to get hostname", err)
-			}
+	nodeID = conf.CPIface.NodeID
+	if conf.CPIface.UseFQDN && nodeID == "" {
+		nodeID, err = fqdn.FqdnHostname()
+		if err != nil {
+			log.Fatalln("Unable to get hostname", err)
 		}
+	}
+
+	// TODO: Delete this once CI config is fixed
+	if nodeID != "" {
+		hosts, err := net.LookupHost(nodeID)
+		if err != nil {
+			log.Fatalln("Unable to resolve hostname", nodeID, err)
+		}
+
+		nodeID = hosts[0]
 	}
 
 	u := &upf{

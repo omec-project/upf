@@ -77,7 +77,7 @@ type SimModeInfo struct {
 type CPIfaceInfo struct {
 	Peers           []string `json:"peers"`
 	UseFQDN         bool     `json:"use_fqdn"`
-	NodeID          string   `json:"node_id"`
+	NodeID          string   `json:"hostname"`
 	EnableUeIPAlloc bool     `json:"enable_ue_ip_alloc"`
 	UEIPPool        string   `json:"ue_ip_pool"`
 	HTTPPort        string   `json:"http_port"`
