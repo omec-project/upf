@@ -62,11 +62,11 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 		// Build response message
 		seres := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
-			0,                                        /* FO <-- what's this? */
-			remoteSEID,                               /* seid */
-			sereq.SequenceNumber,                     /* seq # */
-			0,                                        /* priority */
-			ie.NewNodeID(pConn.nodeID.local, "", ""), /* node id (IPv4) */
+			0,                    /* FO <-- what's this? */
+			remoteSEID,           /* seid */
+			sereq.SequenceNumber, /* seq # */
+			0,                    /* priority */
+			pConn.nodeID.localIE,
 			ie.NewCause(cause),
 		)
 
@@ -137,12 +137,12 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 	// Build response message
 	seres := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
-		0,                                        /* FO <-- what's this? */
-		session.remoteSEID,                       /* seid */
-		sereq.SequenceNumber,                     /* seq # */
-		0,                                        /* priority */
-		ie.NewNodeID(pConn.nodeID.local, "", ""), /* node id (IPv4) */
-		ie.NewCause(ie.CauseRequestAccepted),     /* accept it blindly for the time being */
+		0,                                    /* FO <-- what's this? */
+		session.remoteSEID,                   /* seid */
+		sereq.SequenceNumber,                 /* seq # */
+		0,                                    /* priority */
+		pConn.nodeID.localIE,                 /* node id */
+		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 		localFSEID,
 	)
 
