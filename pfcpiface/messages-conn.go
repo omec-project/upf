@@ -5,7 +5,6 @@ package main
 
 import (
 	"errors"
-	"net"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -59,25 +58,9 @@ func (pConn *PFCPConn) associationIEs() []*ie.IE {
 		setEndMarkerFeature(features...)
 	}
 
-	// Use nodeID if provided in conf, else conn.LocalAddr
-	var nodeIDIE *ie.IE
-	localIP := pConn.LocalAddr().(*net.UDPAddr).IP
-	if upf.nodeID != "" {
-		pConn.nodeID.local = upf.nodeID
-		// TODO: Revert the below line once CI config is fixed
-		// nodeIDIE = ie.NewNodeID("", "", upf.nodeID)
-		nodeIDIE = ie.NewNodeID(upf.nodeID, "", "")
-	} else if localIP.To4() != nil {
-		pConn.nodeID.local = localIP.String()
-		nodeIDIE = ie.NewNodeID(localIP.String(), "", "")
-	} else {
-		pConn.nodeID.local = localIP.String()
-		nodeIDIE = ie.NewNodeID("", localIP.String(), "")
-	}
-
 	ies := []*ie.IE{
 		ie.NewRecoveryTimeStamp(pConn.ts.local),
-		nodeIDIE,
+		pConn.nodeID.localIE,
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
 		ie.NewUserPlaneIPResourceInformation(flags, 0, upf.accessIP.String(), "", networkInstance, ie.SrcInterfaceAccess),
@@ -206,7 +189,7 @@ func (pConn *PFCPConn) handleAssociationReleaseRequest(msg message.Message) (mes
 	// Build response message
 	arres := message.NewAssociationReleaseResponse(arreq.SequenceNumber,
 		ie.NewRecoveryTimeStamp(pConn.ts.local),
-		ie.NewNodeID(pConn.nodeID.local, "", ""),
+		pConn.nodeID.localIE,
 		ie.NewCause(ie.CauseRequestAccepted),
 	)
 
