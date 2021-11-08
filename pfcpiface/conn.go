@@ -66,7 +66,8 @@ type PFCPConn struct {
 }
 
 // NewPFCPConn creates a connected UDP socket to the rAddr PFCP peer specified.
-func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string) *PFCPConn {
+// buf is the first message received from the peer, nil if we are initiating.
+func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 	conn, err := reuse.Dial("udp", lAddr, rAddr)
 	if err != nil {
 		log.Errorln("dial socket failed", err)
@@ -94,6 +95,16 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string) *PFCPConn {
 	}
 
 	p.setLocalNodeID(node.upf.nodeID)
+
+	if buf != nil {
+		// TODO: Check if the first msg is Association Setup Request
+		p.HandlePFCPMsg(buf)
+	}
+
+	// Update map of connections
+	node.pConns[rAddr] = p
+
+	go p.Serve()
 
 	return p
 }
