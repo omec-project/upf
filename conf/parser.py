@@ -32,6 +32,7 @@ class Parser:
         self.measure = False
         self.mode = None
         self.sim_core = None
+        self.sim_max_sessions = None
         self.sim_start_ue_ip = None
         self.sim_start_enb_ip = None
         self.sim_start_aupf_ip = None
@@ -42,7 +43,6 @@ class Parser:
         self.sim_pkt_size = None
         self.sim_total_flows = None
         self.workers = 1
-        self.max_sessions = None
         self.access_ifname = None
         self.core_ifname = None
         self.interfaces = dict()
@@ -119,6 +119,7 @@ class Parser:
         # params for simulation
         try:
             self.sim_core = self.conf["sim"]["core"]
+            self.sim_max_sessions = self.conf["sim"]["max_sessions"]
             self.sim_start_ue_ip = self.conf["sim"]["start_ue_ip"]
             self.sim_start_enb_ip = self.conf["sim"]["start_enb_ip"]
             self.sim_start_aupf_ip = self.conf["sim"]["start_aupf_ip"]
@@ -138,12 +139,6 @@ class Parser:
             self.workers = int(self.conf["workers"])
         except ValueError:
             print('Invalid workers value! Re-setting # of workers to 1.')
-
-        # Maximum number of sessions to manage
-        try:
-            self.max_sessions = int(self.conf["max_sessions"])
-        except ValueError:
-            print('Invalid max_sessions value!')
 
         # Interface names
         try:

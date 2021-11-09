@@ -6,8 +6,8 @@ package main
 import (
 	"errors"
 	"net"
-	"time"
 
+	"github.com/Showmax/go-fqdn"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -42,19 +42,13 @@ type upf struct {
 	ippoolCidr       string
 	accessIP         net.IP
 	coreIP           net.IP
-	n4SrcIP          net.IP
-	nodeIP           net.IP
-	fqdnHost         string
-	maxSessions      uint32
-	connTimeout      time.Duration
-	readTimeout      time.Duration
-	simInfo          *SimModeInfo
-	intf             fastPath
-	ippool           ipPool
-	recoveryTime     time.Time
+	nodeID           string
+	ippool           *IPPool
 	dnn              string
 	reportNotifyChan chan uint64
 	sliceInfo        *SliceInfo
+
+	fastPath
 }
 
 // to be replaced with go-pfcp structs
@@ -74,25 +68,8 @@ const (
 	n9 = 0x2
 )
 
-func (u *upf) sendMsgToUPF(
-	method upfMsgType, pdrs []pdr, fars []far, qers []qer) uint8 {
-	return u.intf.sendMsgToUPF(method, pdrs, fars, qers)
-}
-
-func (u *upf) sendEndMarkers(endMarkerList *[][]byte) error {
-	return u.intf.sendEndMarkers(endMarkerList)
-}
-
-func sendDeleteAllSessionsMsgtoUPF(u *upf) {
-	u.intf.sendDeleteAllSessionsMsgtoUPF()
-}
-
 func (u *upf) isConnected() bool {
-	return u.intf.isConnected(&u.accessIP)
-}
-
-func (u *upf) exit() {
-	u.intf.exit()
+	return u.fastPath.isConnected(&u.accessIP)
 }
 
 func (u *upf) addSliceInfo(sliceInfo *SliceInfo) error {
@@ -102,44 +79,56 @@ func (u *upf) addSliceInfo(sliceInfo *SliceInfo) error {
 
 	u.sliceInfo = sliceInfo
 
-	return u.intf.addSliceInfo(sliceInfo)
+	return u.fastPath.addSliceInfo(sliceInfo)
 }
 
-func (u *upf) sim(method string) {
-	u.intf.sim(u, method)
-}
+func NewUPF(conf *Conf, fp fastPath) *upf {
+	var (
+		err    error
+		nodeID string
+	)
 
-func (u *upf) setUpfInfo(conf *Conf) {
-	u.reportNotifyChan = make(chan uint64, 1024)
-	u.n4SrcIP = net.ParseIP(net.IPv4zero.String())
-	u.nodeIP = net.ParseIP(net.IPv4zero.String())
-
-	if conf.CPIface.SrcIP == "" {
-		if conf.CPIface.DestIP != "" {
-			log.Println("Dest address ", conf.CPIface.DestIP)
-			u.n4SrcIP = getLocalIP(conf.CPIface.DestIP)
-			log.Println("SPGWU/UPF address IP: ", u.n4SrcIP.String())
-		}
-	} else {
-		addrs, errin := net.LookupHost(conf.CPIface.SrcIP)
-		if errin == nil {
-			u.n4SrcIP = net.ParseIP(addrs[0])
+	nodeID = conf.CPIface.NodeID
+	if conf.CPIface.UseFQDN && nodeID == "" {
+		nodeID, err = fqdn.FqdnHostname()
+		if err != nil {
+			log.Fatalln("Unable to get hostname", err)
 		}
 	}
 
-	if conf.CPIface.FQDNHost != "" {
-		ips, err := net.LookupHost(conf.CPIface.FQDNHost)
-		if err == nil {
-			u.nodeIP = net.ParseIP(ips[0])
+	// TODO: Delete this once CI config is fixed
+	if nodeID != "" {
+		hosts, err := net.LookupHost(nodeID)
+		if err != nil {
+			log.Fatalln("Unable to resolve hostname", nodeID, err)
+		}
+
+		nodeID = hosts[0]
+	}
+
+	u := &upf{
+		enableUeIPAlloc:  conf.CPIface.EnableUeIPAlloc,
+		enableEndMarker:  conf.EnableEndMarker,
+		accessIface:      conf.AccessIface.IfName,
+		coreIface:        conf.CoreIface.IfName,
+		ippoolCidr:       conf.CPIface.UEIPPool,
+		nodeID:           nodeID,
+		fastPath:         fp,
+		dnn:              conf.CPIface.Dnn,
+		reportNotifyChan: make(chan uint64, 1024),
+	}
+
+	u.accessIP = ParseIP(conf.AccessIface.IfName, "Access")
+	u.coreIP = ParseIP(conf.CoreIface.IfName, "Core")
+
+	if u.enableUeIPAlloc {
+		u.ippool, err = NewIPPool(u.ippoolCidr)
+		if err != nil {
+			log.Fatalln("ip pool init failed", err)
 		}
 	}
 
-	log.Println("UPF Node IP : ", u.nodeIP.String())
-	log.Println("UPF Local IP : ", u.n4SrcIP.String())
+	u.fastPath.setUpfInfo(u, conf)
 
-	u.intf.setUpfInfo(u, conf)
-}
-
-func (u *upf) setInfo(udpConn *net.UDPConn, udpAddr net.Addr, pconn *PFCPConn) {
-	u.intf.setInfo(udpConn, udpAddr, pconn)
+	return u
 }

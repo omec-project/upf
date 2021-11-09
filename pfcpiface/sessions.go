@@ -4,40 +4,10 @@
 package main
 
 import (
-	"math/rand"
 	"sync"
-	"time"
+
+	"github.com/omec-project/upf-epc/pfcpiface/metrics"
 )
-
-// PFCPSessionMgr manages PFCP sessions.
-type PFCPSessionMgr struct {
-	rng        *rand.Rand
-	nodeID     string
-	maxRetries int
-	appPFDs    map[string]appPFD
-	sessions   map[uint64]*PFCPSession
-}
-
-// PFD holds the switch level application IDs.
-type appPFD struct {
-	appID     string
-	flowDescs []string
-}
-
-// NewPFCPSessionMgr initializes a manager struct with RNG and map of id/sessions.
-func NewPFCPSessionMgr(maxRetries int) *PFCPSessionMgr {
-	return &PFCPSessionMgr{
-		rng:        rand.New(rand.NewSource(time.Now().UnixNano())),
-		maxRetries: maxRetries,
-		sessions:   make(map[uint64]*PFCPSession),
-	}
-}
-
-// RemoveSession removes session using id.
-func (mgr *PFCPSessionMgr) RemoveSession(id uint64) {
-	delete(mgr.sessions, id)
-	globalPfcpStats.sessions.WithLabelValues(mgr.nodeID).Set(float64(len(mgr.sessions)))
-}
 
 type notifyFlag struct {
 	flag bool
@@ -52,14 +22,15 @@ type PFCPSession struct {
 	pdrs             []pdr
 	fars             []far
 	qers             []qer
+	metrics          *metrics.Session
 }
 
 // NewPFCPSession allocates an session with ID.
-func (mgr *PFCPSessionMgr) NewPFCPSession(rseid uint64) uint64 {
-	for i := 0; i < mgr.maxRetries; i++ {
-		lseid := mgr.rng.Uint64()
+func (pConn *PFCPConn) NewPFCPSession(rseid uint64) uint64 {
+	for i := 0; i < pConn.maxRetries; i++ {
+		lseid := pConn.rng.Uint64()
 		// Check if it already exists
-		if _, ok := mgr.sessions[lseid]; ok {
+		if _, ok := pConn.sessions[lseid]; ok {
 			continue
 		}
 
@@ -70,8 +41,11 @@ func (mgr *PFCPSessionMgr) NewPFCPSession(rseid uint64) uint64 {
 			fars:       make([]far, 0, MaxItems),
 			qers:       make([]qer, 0, MaxItems),
 		}
-		mgr.sessions[lseid] = &s
-		globalPfcpStats.sessions.WithLabelValues(mgr.nodeID).Set(float64(len(mgr.sessions)))
+		pConn.sessions[lseid] = &s
+
+		// Metrics update
+		s.metrics = metrics.NewSession(pConn.nodeID.remote)
+		pConn.SaveSessions(s.metrics)
 
 		return lseid
 	}
@@ -79,20 +53,16 @@ func (mgr *PFCPSessionMgr) NewPFCPSession(rseid uint64) uint64 {
 	return 0
 }
 
-// ResetAppPFDs resets the map of application PFDs.
-func (mgr *PFCPSessionMgr) ResetAppPFDs() {
-	mgr.appPFDs = make(map[string]appPFD)
-}
-
-// NewAppPFD stores app PFD in session mgr.
-func (mgr *PFCPSessionMgr) NewAppPFD(appID string) {
-	mgr.appPFDs[appID] = appPFD{
-		appID:     appID,
-		flowDescs: make([]string, 0, MaxItems),
+// RemoveSession removes session using lseid.
+func (pConn *PFCPConn) RemoveSession(lseid uint64) {
+	s, ok := pConn.sessions[lseid]
+	if !ok {
+		return
 	}
-}
 
-// RemoveAppPFD removes appPFD using appID.
-func (mgr *PFCPSessionMgr) RemoveAppPFD(appID string) {
-	delete(mgr.appPFDs, appID)
+	// Metrics update
+	s.metrics.Delete()
+	pConn.SaveSessions(s.metrics)
+
+	delete(pConn.sessions, lseid)
 }

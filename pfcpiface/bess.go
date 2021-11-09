@@ -73,9 +73,6 @@ type bess struct {
 	qciQosMap        map[uint8]*QosConfigVal
 }
 
-func (b *bess) setInfo(udpConn *net.UDPConn, udpAddr net.Addr, pconn *PFCPConn) {
-}
-
 func (b *bess) isConnected(accessIP *net.IP) bool {
 	if (b.conn == nil) || (int(b.conn.GetState()) != Ready) {
 		return false
@@ -175,26 +172,6 @@ func (b *bess) sendMsgToUPF(
 	}
 
 	return cause
-}
-
-func (b *bess) sendDeleteAllSessionsMsgtoUPF() {
-	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
-	defer cancel()
-
-	done := make(chan bool)
-	calls := 6
-
-	b.removeAllPDRs(ctx, done)
-	b.removeAllFARs(ctx, done)
-	b.removeAllQERs(ctx, done)
-	b.removeAllCounters(ctx, done, "preQoSCounter")
-	b.removeAllCounters(ctx, done, "postDLQoSCounter")
-	b.removeAllCounters(ctx, done, "postULQoSCounter")
-
-	rc := b.GRPCJoin(calls, Timeout, done)
-	if !rc {
-		log.Println("Unable to make GRPC calls")
-	}
 }
 
 func (b *bess) exit() {
@@ -589,20 +566,9 @@ func (b *bess) readQciQosMap(conf *Conf) {
 }
 
 func (b *bess) setUpfInfo(u *upf, conf *Conf) {
+	var err error
+
 	log.Println("setUpfInfo bess")
-
-	u.simInfo = &conf.SimInfo
-	u.ippoolCidr = conf.CPIface.UeIPPool
-
-	log.Println("IP pool : ", u.ippoolCidr)
-
-	errin := u.ippool.initPool(u.ippoolCidr)
-	if errin != nil {
-		log.Println("ip pool init failed")
-	}
-
-	u.accessIP = ParseIP(conf.AccessIface.IfName, "Access")
-	u.coreIP = ParseIP(conf.CoreIface.IfName, "Core")
 
 	b.readQciQosMap(conf)
 	// get bess grpc client
@@ -610,9 +576,9 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 
 	b.endMarkerChan = make(chan []byte, 1024)
 
-	b.conn, errin = grpc.Dial(*bessIP, grpc.WithInsecure())
-	if errin != nil {
-		log.Fatalln("did not connect:", errin)
+	b.conn, err = grpc.Dial(*bessIP, grpc.WithInsecure())
+	if err != nil {
+		log.Fatalln("did not connect:", err)
 	}
 
 	b.client = pb.NewBESSControlClient(b.conn)
@@ -623,9 +589,9 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 			notifySockAddr = SockAddr
 		}
 
-		b.notifyBessSocket, errin = net.Dial("unixpacket", notifySockAddr)
-		if errin != nil {
-			log.Println("dial error:", errin)
+		b.notifyBessSocket, err = net.Dial("unixpacket", notifySockAddr)
+		if err != nil {
+			log.Println("dial error:", err)
 			return
 		}
 
@@ -638,9 +604,9 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 			pfcpCommAddr = PfcpAddr
 		}
 
-		b.endMarkerSocket, errin = net.Dial("unixpacket", pfcpCommAddr)
-		if errin != nil {
-			log.Println("dial error:", errin)
+		b.endMarkerSocket, err = net.Dial("unixpacket", pfcpCommAddr)
+		if err != nil {
+			log.Println("dial error:", err)
 			return
 		}
 
@@ -663,198 +629,6 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 			log.Errorln("Unable to make GRPC calls")
 		}
 	}
-}
-
-func (b *bess) sim(u *upf, method string) {
-	start := time.Now()
-	// const ueip, teid, enbip = 0x10000001, 0xf0000000, 0x0b010181
-	ueip := u.simInfo.StartUEIP
-	enbip := u.simInfo.StartENBIP
-	aupfip := u.simInfo.StartAUPFIP
-	n9appip := u.simInfo.N9AppIP
-	n3TEID := hex2int(u.simInfo.StartN3TEID)
-	n9TEID := hex2int(u.simInfo.StartN9TEID)
-
-	const ng4tMaxUeRan, ng4tMaxEnbRan = 500000, 80
-
-	for i := uint32(0); i < u.maxSessions; i++ {
-		// NG4T-based formula to calculate enodeB IP address against a given UE IP address
-		// il_trafficgen also uses the same scheme
-		// See SimuCPEnbv4Teid(...) in ngic code for more details
-		ueOfRan := i % ng4tMaxUeRan
-		ran := i / ng4tMaxUeRan
-		enbOfRan := ueOfRan % ng4tMaxEnbRan
-		enbIdx := ran*ng4tMaxEnbRan + enbOfRan
-
-		// create/delete downlink pdr
-		pdrN6Down := pdr{
-			srcIface: core,
-			dstIP:    ip2int(ueip) + i,
-
-			srcIfaceMask: 0xFF,
-			dstIPMask:    0xFFFFFFFF,
-
-			precedence: 255,
-
-			pdrID:     1,
-			fseID:     uint64(n3TEID + i),
-			ctrID:     i,
-			farID:     n3,
-			qerIDList: []uint32{n6, 1},
-			needDecap: 0,
-		}
-
-		pdrN9Down := pdr{
-			srcIface:     core,
-			tunnelTEID:   n9TEID + i,
-			tunnelIP4Dst: ip2int(u.coreIP),
-
-			srcIfaceMask:     0xFF,
-			tunnelTEIDMask:   0xFFFFFFFF,
-			tunnelIP4DstMask: 0xFFFFFFFF,
-
-			precedence: 1,
-
-			pdrID:     2,
-			fseID:     uint64(n3TEID + i),
-			ctrID:     i,
-			farID:     n3,
-			qerIDList: []uint32{n9, 1},
-			needDecap: 1,
-		}
-
-		// create/delete uplink pdr
-		pdrN6Up := pdr{
-			srcIface:     access,
-			tunnelIP4Dst: ip2int(u.accessIP),
-			tunnelTEID:   n3TEID + i,
-			srcIP:        ip2int(ueip) + i,
-
-			srcIfaceMask:     0xFF,
-			tunnelIP4DstMask: 0xFFFFFFFF,
-			tunnelTEIDMask:   0xFFFFFFFF,
-			srcIPMask:        0xFFFFFFFF,
-
-			precedence: 255,
-
-			pdrID:     3,
-			fseID:     uint64(n3TEID + i),
-			ctrID:     i,
-			farID:     n6,
-			qerIDList: []uint32{n6, 1},
-			needDecap: 1,
-		}
-
-		pdrN9Up := pdr{
-			srcIface:     access,
-			tunnelIP4Dst: ip2int(u.accessIP),
-			tunnelTEID:   n3TEID + i,
-			dstIP:        ip2int(n9appip),
-
-			srcIfaceMask:     0xFF,
-			tunnelIP4DstMask: 0xFFFFFFFF,
-			tunnelTEIDMask:   0xFFFFFFFF,
-			dstIPMask:        0xFFFFFFFF,
-
-			precedence: 1,
-
-			pdrID:     4,
-			fseID:     uint64(n3TEID + i),
-			ctrID:     i,
-			farID:     n9,
-			qerIDList: []uint32{n9, 1},
-			needDecap: 1,
-		}
-
-		pdrs := []pdr{pdrN6Down, pdrN9Down, pdrN6Up, pdrN9Up}
-
-		// create/delete downlink far
-		farDown := far{
-			farID: n3,
-			fseID: uint64(n3TEID + i),
-
-			applyAction:  ActionForward,
-			dstIntf:      ie.DstInterfaceAccess,
-			tunnelType:   0x1,
-			tunnelIP4Src: ip2int(u.accessIP),
-			tunnelIP4Dst: ip2int(enbip) + enbIdx,
-			tunnelTEID:   n3TEID + i,
-			tunnelPort:   tunnelGTPUPort,
-		}
-
-		// create/delete uplink far
-		farN6Up := far{
-			farID: n6,
-			fseID: uint64(n3TEID + i),
-
-			applyAction: ActionForward,
-			dstIntf:     ie.DstInterfaceCore,
-		}
-
-		farN9Up := far{
-			farID: n9,
-			fseID: uint64(n3TEID + i),
-
-			applyAction:  ActionForward,
-			dstIntf:      ie.DstInterfaceCore,
-			tunnelType:   0x1,
-			tunnelIP4Src: ip2int(u.coreIP),
-			tunnelIP4Dst: ip2int(aupfip),
-			tunnelTEID:   n9TEID + i,
-			tunnelPort:   tunnelGTPUPort,
-		}
-
-		fars := []far{farDown, farN6Up, farN9Up}
-
-		// create/delete uplink qer
-		qerN6 := qer{
-			qerID: n6,
-			fseID: uint64(n3TEID + i),
-			qfi:   9,
-			ulGbr: 50000,
-			ulMbr: 90000,
-			dlGbr: 60000,
-			dlMbr: 80000,
-		}
-
-		qerN9 := qer{
-			qerID: n9,
-			fseID: uint64(n3TEID + i),
-			qfi:   8,
-			ulGbr: 50000,
-			ulMbr: 60000,
-			dlGbr: 70000,
-			dlMbr: 90000,
-		}
-
-		qers := []qer{qerN6, qerN9}
-
-		// create/delete session qers
-		sessionQer := qer{
-			qerID:    1,
-			fseID:    uint64(n3TEID + i),
-			qosLevel: SessionQos,
-			qfi:      0,
-			ulGbr:    0,
-			ulMbr:    100000,
-			dlGbr:    0,
-			dlMbr:    500000,
-		}
-
-		qers = append(qers, sessionQer)
-
-		switch method {
-		case "create":
-			b.sendMsgToUPF(upfMsgTypeAdd, pdrs, fars, qers)
-
-		case "delete":
-			b.sendMsgToUPF(upfMsgTypeDel, pdrs, fars, qers)
-
-		default:
-			log.Fatalln("Unsupported method", method)
-		}
-	}
-	log.Println("Sessions/s:", float64(u.maxSessions)/time.Since(start).Seconds())
 }
 
 func (b *bess) processPDR(ctx context.Context, any *anypb.Any, method upfMsgType) {
@@ -1247,63 +1021,6 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 	}()
 }
 
-func (b *bess) processCounters(ctx context.Context, any *anypb.Any, method upfMsgType, counterName string) {
-	methods := [...]string{"add", "add", "remove", "removeAll"}
-
-	_, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
-		Name: counterName,
-		Cmd:  methods[method],
-		Arg:  any,
-	})
-	if err != nil {
-		log.Println("counter method failed!:", err)
-	}
-}
-
-func (b *bess) addCounter(ctx context.Context, done chan<- bool, ctrID uint32, counterName string) {
-	go func() {
-		var (
-			any *anypb.Any
-			err error
-		)
-
-		f := &pb.CounterAddArg{
-			CtrId: ctrID,
-		}
-
-		any, err = anypb.New(f)
-		if err != nil {
-			log.Println("Error marshalling the rule", f, err)
-			return
-		}
-
-		b.processCounters(ctx, any, upfMsgTypeAdd, counterName)
-		done <- true
-	}()
-}
-
-func (b *bess) delCounter(ctx context.Context, done chan<- bool, ctrID uint32, counterName string) {
-	go func() {
-		var (
-			any *anypb.Any
-			err error
-		)
-
-		f := &pb.CounterRemoveArg{
-			CtrId: ctrID,
-		}
-
-		any, err = anypb.New(f)
-		if err != nil {
-			log.Println("Error marshalling the rule", f, err)
-			return
-		}
-
-		b.processCounters(ctx, any, upfMsgTypeDel, counterName)
-		done <- true
-	}()
-}
-
 func (b *bess) processSliceMeter(ctx context.Context, any *anypb.Any, method upfMsgType) {
 	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
 		log.Errorln("Invalid method name: ", method)
@@ -1506,98 +1223,6 @@ func (b *bess) delSessionQER(ctx context.Context, srcIface uint8, qer qer) {
 	if err != nil {
 		log.Errorln("process QER failed for sessionQERLookup del operation")
 	}
-}
-
-func (b *bess) removeAllPDRs(ctx context.Context, done chan<- bool) {
-	go func() {
-		var (
-			any *anypb.Any
-			err error
-		)
-
-		f := &pb.EmptyArg{}
-
-		any, err = anypb.New(f)
-		if err != nil {
-			log.Println("Error marshalling the rule", f, err)
-			return
-		}
-
-		b.processPDR(ctx, any, upfMsgTypeClear)
-		done <- true
-	}()
-}
-
-func (b *bess) removeAllFARs(ctx context.Context, done chan<- bool) {
-	go func() {
-		var (
-			any *anypb.Any
-			err error
-		)
-
-		f := &pb.EmptyArg{}
-
-		any, err = anypb.New(f)
-		if err != nil {
-			log.Println("Error marshalling the rule", f, err)
-			return
-		}
-
-		b.processFAR(ctx, any, upfMsgTypeClear)
-		done <- true
-	}()
-}
-
-func (b *bess) removeAllQERs(ctx context.Context, done chan<- bool) {
-	go func() {
-		var (
-			any *anypb.Any
-			err error
-		)
-
-		f := &pb.EmptyArg{}
-
-		any, err = anypb.New(f)
-		if err != nil {
-			log.Println("Error marshalling the rule", f, err)
-			return
-		}
-
-		qosTableName := AppQerLookup
-
-		err = b.processQER(ctx, any, upfMsgTypeClear, qosTableName)
-		if err != nil {
-			log.Errorln("process QER failed for appQERLookup clear operation")
-		}
-
-		qosTableName = SessQerLookup
-
-		err = b.processQER(ctx, any, upfMsgTypeClear, qosTableName)
-		if err != nil {
-			log.Errorln("process QER failed for sessionQERLookup clear operation")
-		}
-		done <- true
-	}()
-}
-
-func (b *bess) removeAllCounters(ctx context.Context, done chan<- bool, name string) {
-	go func() {
-		var (
-			any *anypb.Any
-			err error
-		)
-
-		f := &pb.EmptyArg{}
-
-		any, err = anypb.New(f)
-		if err != nil {
-			log.Println("Error marshalling the rule", f, err)
-			return
-		}
-
-		b.processCounters(ctx, any, upfMsgTypeClear, name)
-		done <- true
-	}()
 }
 
 func (b *bess) GRPCJoin(calls int, timeout time.Duration, done chan bool) bool {
