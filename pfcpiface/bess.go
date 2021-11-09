@@ -442,84 +442,72 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 	}
 
 	// Prepare prometheus stats.
-	createStats := func(pre, post *pb.QosMeasureReadResponse_Statistic, ch chan<- prometheus.Metric) {
-		dropRate := 1 - (float64(post.TotalPackets) / float64(pre.TotalPackets))
-		bitsPerSecond := float64(post.TotalBytes*8) / (float64(observationDurationNs) / (1000 * 1000 * 1000))
-		packetsPerSecond := float64(post.TotalPackets) / (float64(observationDurationNs) / (1000 * 1000 * 1000))
-		fseidString := strconv.FormatUint(post.Fseid, 10)
-		pdrString := strconv.FormatUint(post.Pdr, 10)
-		ch <- prometheus.MustNewConstMetric(
-			uc.sessionDropRate,
-			prometheus.GaugeValue,
-			dropRate,
-			fseidString,
-			pdrString,
-		)
-		ch <- prometheus.MustNewConstMetric(
-			uc.sessionThroughputBps,
-			prometheus.GaugeValue,
-			bitsPerSecond,
-			fseidString,
-			pdrString,
-		)
-		ch <- prometheus.MustNewConstMetric(
-			uc.sessionThroughputPps,
-			prometheus.GaugeValue,
-			packetsPerSecond,
-			fseidString,
-			pdrString,
-		)
-		ch <- prometheus.MustNewConstMetric(
-			uc.sessionObservationDuration,
-			prometheus.GaugeValue,
-			float64(observationDurationNs),
-			fseidString,
-			pdrString,
-		)
-		ch <- prometheus.MustNewConstSummary(
-			uc.sessionLatency,
-			post.TotalPackets,
-			0,
-			map[float64]float64{
-				50.0: float64(post.Latency_50Ns),
-				99.0: float64(post.Latency_99Ns),
-				99.9: float64(post.Latency_99_9Ns),
-			},
-			fseidString,
-			pdrString,
-		)
+	createStats := func(preResp, postResp *pb.QosMeasureReadResponse, ch chan<- prometheus.Metric) {
+		for i := 0; i < len(postResp.Statistics); i++ {
+			post := postResp.Statistics[i]
+			var pre *pb.QosMeasureReadResponse_Statistic
+			// Find preQos values.
+			for _, v := range preResp.Statistics {
+				if post.Pdr == v.Pdr && post.Fseid == v.Fseid {
+					pre = v
+					break
+				}
+			}
+			if pre == nil {
+				log.Infof("Found no pre QoS statistics for PDR %v FSEID %v", post.Pdr, post.Fseid)
+				continue
+			}
+
+			dropRate := 1 - (float64(post.TotalPackets) / float64(pre.TotalPackets))
+			bitsPerSecond := float64(post.TotalBytes*8) / (float64(observationDurationNs) / (1000 * 1000 * 1000))
+			packetsPerSecond := float64(post.TotalPackets) / (float64(observationDurationNs) / (1000 * 1000 * 1000))
+			fseidString := strconv.FormatUint(post.Fseid, 10)
+			pdrString := strconv.FormatUint(post.Pdr, 10)
+			ch <- prometheus.MustNewConstMetric(
+				uc.sessionDropRate,
+				prometheus.GaugeValue,
+				dropRate,
+				fseidString,
+				pdrString,
+			)
+			ch <- prometheus.MustNewConstMetric(
+				uc.sessionThroughputBps,
+				prometheus.GaugeValue,
+				bitsPerSecond,
+				fseidString,
+				pdrString,
+			)
+			ch <- prometheus.MustNewConstMetric(
+				uc.sessionThroughputPps,
+				prometheus.GaugeValue,
+				packetsPerSecond,
+				fseidString,
+				pdrString,
+			)
+			ch <- prometheus.MustNewConstMetric(
+				uc.sessionObservationDuration,
+				prometheus.GaugeValue,
+				float64(observationDurationNs),
+				fseidString,
+				pdrString,
+			)
+			ch <- prometheus.MustNewConstSummary(
+				uc.sessionLatency,
+				post.TotalPackets,
+				0,
+				map[float64]float64{
+					50.0: float64(post.Latency_50Ns),
+					99.0: float64(post.Latency_99Ns),
+					99.9: float64(post.Latency_99_9Ns),
+				},
+				fseidString,
+				pdrString,
+			)
+		}
 	}
 
-	for i := 0; i < len(postUlQosStatsResp.Statistics); i++ {
-		ulPostStats := postUlQosStatsResp.Statistics[i]
-		var preStats *pb.QosMeasureReadResponse_Statistic
-		// Find preQos values.
-		for _, v := range qosStatsInResp.Statistics {
-			if ulPostStats.Pdr == v.Pdr && ulPostStats.Fseid == v.Fseid {
-				preStats = v
-				break
-			}
-		}
-		if preStats == nil {
-			continue
-		}
-		createStats(preStats, ulPostStats, ch)
-	}
-	for i := 0; i < len(postDlQosStatsResp.Statistics); i++ {
-		dlPostStats := postDlQosStatsResp.Statistics[i]
-		var preStats *pb.QosMeasureReadResponse_Statistic
-		// Find preQos values.
-		for _, v := range qosStatsInResp.Statistics {
-			if dlPostStats.Pdr == v.Pdr && dlPostStats.Fseid == v.Fseid {
-				preStats = v
-				break
-			}
-		}
-		if preStats == nil {
-			continue
-		}
-		createStats(preStats, dlPostStats, ch)
-	}
+	createStats(&qosStatsInResp, &postUlQosStatsResp, ch)
+	createStats(&qosStatsInResp, &postDlQosStatsResp, ch)
 
 	return
 }
