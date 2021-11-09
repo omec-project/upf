@@ -192,8 +192,7 @@ linkMerge::Merge() \
                                         {'attr_name':'ctr_id', 'num_bytes':4}, \
                                         {'attr_name':'qer_id', 'num_bytes':4}, \
                                         {'attr_name':'far_id', 'num_bytes':4}],\
-                                entries=parser.table_size_pdr_lookup):noGTPUDecap \
-    -> preQosMeasure::QosMeasure(flag_attr_name="buffer_flag", entries=parser.table_size_qos_measure)
+                                entries=parser.table_size_pdr_lookup):noGTPUDecap
 
 appQERLookup::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
                                  {'attr_name':'qer_id', 'num_bytes':4}, \
@@ -201,13 +200,19 @@ appQERLookup::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
                          values=[{'attr_name':'qfi', 'num_bytes':1}],\
                          entries = parser.table_size_app_qer_lookup)
 # Insert NTF module, if enabled
-_in = preQosMeasure
+_in = pdrLookup
 _out = appQERLookup
 
 if ntf:
   _in -> ntf
   _in = ntf
   _out = ntf
+
+# if session_stats:
+preQosMeasure::QosMeasure(flag_attr_name="buffer_flag", entries=parser.table_size_qos_measure)
+_in -> preQosMeasure
+_in = preQosMeasure
+_out = preQosMeasure
 
 _in -> appQERLookup
 
