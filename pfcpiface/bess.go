@@ -219,8 +219,8 @@ func (b *bess) getPortStats(ifname string) *pb.GetPortStatsResponse {
 	}
 
 	res, err := b.client.GetPortStats(ctx, req)
-	if err != nil || res.GetError() != nil {
-		log.Println("Error calling GetPortStats", ifname, err, res.GetError().Errmsg)
+	if err != nil {
+		log.Println("Error calling GetPortStats", ifname, err, res)
 		return nil
 	}
 
