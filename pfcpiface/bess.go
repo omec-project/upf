@@ -497,7 +497,11 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 		for _, v := range qosStatsInResp.Statistics {
 			if ulPostStats.Pdr == v.Pdr && ulPostStats.Fseid == v.Fseid {
 				preStats = v
+				break
 			}
+		}
+		if preStats == nil {
+			continue
 		}
 		createStats(preStats, ulPostStats, ch)
 	}
@@ -508,7 +512,11 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 		for _, v := range qosStatsInResp.Statistics {
 			if dlPostStats.Pdr == v.Pdr && dlPostStats.Fseid == v.Fseid {
 				preStats = v
+				break
 			}
+		}
+		if preStats == nil {
+			continue
 		}
 		createStats(preStats, dlPostStats, ch)
 	}
