@@ -74,12 +74,7 @@ func (node *PFCPNode) handleNewPeers() {
 			continue
 		}
 
-		// TODO: Logic to distinguish PFCPConn based on SEID
-		p := node.NewPFCPConn(lAddrStr, rAddrStr)
-		node.pConns[rAddrStr] = p
-		p.HandlePFCPMsg(buf[:n])
-
-		go p.Serve()
+		node.NewPFCPConn(lAddrStr, rAddrStr, buf[:n])
 	}
 }
 
