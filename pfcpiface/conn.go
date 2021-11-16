@@ -13,6 +13,7 @@ import (
 
 	reuse "github.com/libp2p/go-reuseport"
 	log "github.com/sirupsen/logrus"
+	"github.com/wmnsk/go-pfcp/ie"
 
 	"github.com/omec-project/upf-epc/pfcpiface/metrics"
 )
@@ -39,8 +40,9 @@ type recoveryTS struct {
 }
 
 type nodeID struct {
-	local  string
-	remote string
+	localIE *ie.IE
+	local   string
+	remote  string
 }
 
 // PFCPConn represents a PFCP connection with a unique PFCP peer.
@@ -64,7 +66,8 @@ type PFCPConn struct {
 }
 
 // NewPFCPConn creates a connected UDP socket to the rAddr PFCP peer specified.
-func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string) *PFCPConn {
+// buf is the first message received from the peer, nil if we are initiating.
+func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 	conn, err := reuse.Dial("udp", lAddr, rAddr)
 	if err != nil {
 		log.Errorln("dial socket failed", err)
@@ -74,9 +77,11 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string) *PFCPConn {
 		local: time.Now(),
 	}
 
+	// TODO: Get SEID range from PFCPNode for this PFCPConn
+
 	log.Infoln("Created PFCPConn from:", conn.LocalAddr(), "to:", conn.RemoteAddr())
 
-	return &PFCPConn{
+	p := &PFCPConn{
 		ctx:            node.ctx,
 		Conn:           conn,
 		ts:             ts,
@@ -87,6 +92,45 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string) *PFCPConn {
 		done:           node.pConnDone,
 		shutdown:       make(chan struct{}),
 		InstrumentPFCP: node.metrics,
+	}
+
+	p.setLocalNodeID(node.upf.nodeID)
+
+	if buf != nil {
+		// TODO: Check if the first msg is Association Setup Request
+		p.HandlePFCPMsg(buf)
+	}
+
+	// Update map of connections
+	node.pConns[rAddr] = p
+
+	go p.Serve()
+
+	return p
+}
+
+func (pConn *PFCPConn) setLocalNodeID(id string) {
+	nodeIP := net.ParseIP(id)
+
+	// NodeID - FQDN
+	if id != "" && nodeIP == nil {
+		pConn.nodeID.localIE = ie.NewNodeID("", "", id)
+		pConn.nodeID.local = id
+		return
+	}
+
+	// NodeID provided is not an IP, use local address
+	if nodeIP == nil {
+		nodeIP = pConn.LocalAddr().(*net.UDPAddr).IP
+	}
+
+	pConn.nodeID.local = nodeIP.String()
+
+	// NodeID - IPv4 vs IPv6
+	if nodeIP.To4() != nil {
+		pConn.nodeID.localIE = ie.NewNodeID(pConn.nodeID.local, "", "")
+	} else {
+		pConn.nodeID.localIE = ie.NewNodeID("", pConn.nodeID.local, "")
 	}
 }
 
@@ -101,6 +145,7 @@ func (pConn *PFCPConn) Serve() {
 				if errors.Is(err, net.ErrClosed) {
 					return
 				}
+
 				continue
 			}
 
@@ -140,6 +185,7 @@ func (pConn *PFCPConn) Shutdown() error {
 	}
 
 	log.Infoln("Shutdown complete for", rAddr)
+
 	return nil
 }
 
