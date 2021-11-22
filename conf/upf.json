@@ -56,7 +56,7 @@
     "measure_upf": true,
 
     "": "Whether to enable flow measurement feature",
-    "measure_flow": true,
+    "measure_flow": false,
 
     "": "Gateway interfaces",
     "access": {
