@@ -13,7 +13,7 @@ import (
 )
 
 // Release allocated IPs.
-func releaseAllocatedIPs(upf *upf, session *PFCPSession) {
+func releaseAllocatedIPs(ippool *IPPool, session *PFCPSession) {
 	log.Println("release allocated IPs")
 
 	for _, pdr := range session.pdrs {
@@ -22,7 +22,7 @@ func releaseAllocatedIPs(upf *upf, session *PFCPSession) {
 
 			log.Println("pdrID : ", pdr.pdrID, ", ueIP : ", ueIP.String())
 
-			upf.ippool.deallocIPV4(ueIP)
+			ippool.DeallocIP(ueIP)
 		}
 	}
 }

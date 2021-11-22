@@ -4,15 +4,16 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
-	"time"
+	"os/signal"
+	"syscall"
 
-	fqdn "github.com/Showmax/go-fqdn"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -26,7 +27,6 @@ var (
 // Conf : Json conf struct.
 type Conf struct {
 	Mode                  string           `json:"mode"`
-	MaxSessions           uint32           `json:"max_sessions"`
 	AccessIface           IfaceType        `json:"access"`
 	CoreIface             IfaceType        `json:"core"`
 	CPIface               CPIfaceInfo      `json:"cpiface"`
@@ -67,6 +67,7 @@ type SliceMeterConfig struct {
 
 // SimModeInfo : Sim mode attributes.
 type SimModeInfo struct {
+	MaxSessions uint32 `json:"max_sessions"`
 	StartUEIP   net.IP `json:"start_ue_ip"`
 	StartENBIP  net.IP `json:"start_enb_ip"`
 	StartAUPFIP net.IP `json:"start_aupf_ip"`
@@ -78,13 +79,13 @@ type SimModeInfo struct {
 
 // CPIfaceInfo : CPIface interface settings.
 type CPIfaceInfo struct {
-	DestIP          string `json:"nb_dst_ip"`
-	SrcIP           string `json:"nb_src_ip"`
-	FQDNHost        string `json:"hostname"`
-	EnableUeIPAlloc bool   `json:"enable_ue_ip_alloc"`
-	UeIPPool        string `json:"ue_ip_pool"`
-	HTTPPort        string `json:"http_port"`
-	Dnn             string `json:"dnn"`
+	Peers           []string `json:"peers"`
+	UseFQDN         bool     `json:"use_fqdn"`
+	NodeID          string   `json:"hostname"`
+	EnableUeIPAlloc bool     `json:"enable_ue_ip_alloc"`
+	UEIPPool        string   `json:"ue_ip_pool"`
+	HTTPPort        string   `json:"http_port"`
+	Dnn             string   `json:"dnn"`
 }
 
 // IfaceType : Gateway interface struct.
@@ -152,23 +153,25 @@ func ParseIP(name string, iface string) net.IP {
 	return ip
 }
 
+func init() {
+	// Set up logger
+	log.SetReportCaller(true)
+	log.SetFormatter(&log.TextFormatter{
+		FullTimestamp: true,
+	})
+}
+
 func main() {
 	// cmdline args
 	flag.Parse()
 
 	var (
 		conf Conf
-		intf fastPath
+		fp   fastPath
 	)
 
 	// read and parse json startup file
 	ParseJSON(configPath, &conf)
-
-	// Set up logger
-	log.SetReportCaller(true)
-	log.SetFormatter(&log.TextFormatter{
-		FullTimestamp: true,
-	})
 
 	if level, err := log.ParseLevel(conf.LogLevel); err != nil {
 		log.Fatalln(err)
@@ -179,36 +182,12 @@ func main() {
 	log.Infoln(conf)
 
 	if conf.EnableP4rt {
-		intf = &p4rtc{}
+		fp = &p4rtc{}
 	} else {
-		intf = &bess{}
+		fp = &bess{}
 	}
 
-	// fetch fqdn. Prefer json field
-	fqdnh := conf.CPIface.FQDNHost
-	if fqdnh == "" {
-		fqdnh = fqdn.Get()
-	}
-
-	upf := &upf{
-		accessIface:     conf.AccessIface.IfName,
-		coreIface:       conf.CoreIface.IfName,
-		fqdnHost:        fqdnh,
-		maxSessions:     conf.MaxSessions,
-		intf:            intf,
-		enableUeIPAlloc: conf.CPIface.EnableUeIPAlloc,
-		recoveryTime:    time.Now(),
-		dnn:             conf.CPIface.Dnn,
-		enableEndMarker: conf.EnableEndMarker,
-		connTimeout:     time.Duration(conf.ConnTimeout) * time.Millisecond,
-		readTimeout:     time.Duration(conf.ReadTimeout) * time.Second,
-		enableHBTimer:   conf.EnableHBTimer,
-		hbMaxRetries:    conf.HbMaxRetries,
-		hbInterval:      time.Duration(conf.HeartBeatInterval) * time.Millisecond,
-		hbRespDuration:  time.Duration(conf.HeartBeatRespDuration) * time.Millisecond,
-	}
-
-	upf.setUpfInfo(&conf)
+	upf := NewUPF(&conf, fp)
 
 	if *pfcpsim {
 		pfcpSim()
@@ -220,30 +199,46 @@ func main() {
 			log.Fatalln("Invalid simulate method", simulate)
 		}
 
-		log.Println(*simulate, "sessions:", conf.MaxSessions)
-		upf.sim(*simulate)
+		upf.sim(*simulate, &conf.SimInfo)
 
 		return
 	}
 
-	log.Println("N4 local IP: ", upf.n4SrcIP.String())
-	log.Println("Access IP: ", upf.accessIP.String())
-	log.Println("Core IP: ", upf.coreIP.String())
-
-	if conf.CPIface.HTTPPort != "" {
-		*httpAddr = string("0.0.0.0:") + conf.CPIface.HTTPPort
-	}
-
-	log.Println("httpAddr: ", httpAddr)
-
-	go pfcpifaceMainLoop(
-		upf, upf.accessIP.String(),
-		upf.coreIP.String(), upf.n4SrcIP.String(),
-		conf.CPIface.DestIP,
-	)
-
 	setupConfigHandler(upf)
 	setupProm(upf)
-	log.Fatal(http.ListenAndServe(*httpAddr, nil))
+
+	httpPort := "8080"
+	if conf.CPIface.HTTPPort != "" {
+		httpPort = conf.CPIface.HTTPPort
+	}
+
+	httpSrv := &http.Server{Addr: ":" + httpPort, Handler: nil}
+
+	go func() {
+		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalln("http server failed", err)
+		}
+
+		log.Infoln("http server closed")
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	node := NewPFCPNode(ctx, upf)
+	go node.Serve()
+
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt)
+	signal.Notify(sig, syscall.SIGTERM)
+	<-sig
+
+	cancel()
+
+	// Wait for node shutdown before http shutdown
+	node.Done()
+
+	if err := httpSrv.Shutdown(context.Background()); err != nil {
+		log.Errorln("Failed to shutdown http: %v", err)
+	}
+
 	upf.exit()
 }

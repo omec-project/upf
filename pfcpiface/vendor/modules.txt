@@ -17,6 +17,8 @@ github.com/google/gopacket/layers
 github.com/grpc-ecosystem/go-grpc-middleware/retry
 github.com/grpc-ecosystem/go-grpc-middleware/util/backoffutils
 github.com/grpc-ecosystem/go-grpc-middleware/util/metautils
+# github.com/libp2p/go-reuseport v0.1.0
+github.com/libp2p/go-reuseport
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
 github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/p4lang/p4runtime v1.3.0
@@ -62,7 +64,7 @@ golang.org/x/text/unicode/norm
 # google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013
 google.golang.org/genproto/googleapis/rpc/code
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.41.0
+# google.golang.org/grpc v1.42.0
 google.golang.org/grpc
 google.golang.org/grpc/attributes
 google.golang.org/grpc/backoff

@@ -56,7 +56,7 @@ func (c *ConfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			sendHTTPResp(http.StatusBadRequest, w)
 		}
 
-		log.Println(string(body))
+		log.Traceln(string(body))
 
 		var nwSlice NetworkSlice
 
