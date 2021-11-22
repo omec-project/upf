@@ -33,11 +33,11 @@ type upfCollector struct {
 	latency *prometheus.Desc
 	jitter  *prometheus.Desc
 
-	sessionLatency             *prometheus.Desc
-	sessionJitter              *prometheus.Desc
-	sessionTxPackets           *prometheus.Desc
-	sessionDroppedPackets      *prometheus.Desc
-	sessionTxBytes             *prometheus.Desc
+	sessionLatency        *prometheus.Desc
+	sessionJitter         *prometheus.Desc
+	sessionTxPackets      *prometheus.Desc
+	sessionDroppedPackets *prometheus.Desc
+	sessionTxBytes        *prometheus.Desc
 
 	upf *upf
 }

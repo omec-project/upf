@@ -6291,10 +6291,9 @@ type FlowMeasureArg struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	FlagAttrName   string `protobuf:"bytes,1,opt,name=flag_attr_name,json=flagAttrName,proto3" json:"flag_attr_name,omitempty"`
-	CtrIdxAttrName string `protobuf:"bytes,2,opt,name=ctr_idx_attr_name,json=ctrIdxAttrName,proto3" json:"ctr_idx_attr_name,omitempty"`
-	Entries        uint64 `protobuf:"varint,3,opt,name=entries,proto3" json:"entries,omitempty"`
-	Leader         bool   `protobuf:"varint,4,opt,name=leader,proto3" json:"leader,omitempty"` // If true, this module will decide the buffer side
+	FlagAttrName string `protobuf:"bytes,1,opt,name=flag_attr_name,json=flagAttrName,proto3" json:"flag_attr_name,omitempty"`
+	Entries      uint64 `protobuf:"varint,2,opt,name=entries,proto3" json:"entries,omitempty"`
+	Leader       bool   `protobuf:"varint,3,opt,name=leader,proto3" json:"leader,omitempty"` // If true, this module will decide the buffer side
 }
 
 func (x *FlowMeasureArg) Reset() {
@@ -6332,13 +6331,6 @@ func (*FlowMeasureArg) Descriptor() ([]byte, []int) {
 func (x *FlowMeasureArg) GetFlagAttrName() string {
 	if x != nil {
 		return x.FlagAttrName
-	}
-	return ""
-}
-
-func (x *FlowMeasureArg) GetCtrIdxAttrName() string {
-	if x != nil {
-		return x.CtrIdxAttrName
 	}
 	return ""
 }
@@ -6467,202 +6459,6 @@ func (x *FlowMeasureReadResponse) GetStatistics() []*FlowMeasureReadResponse_Sta
 	return nil
 }
 
-type DoubleBufferFlaggerArg struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	AttrName string     `protobuf:"bytes,1,opt,name=attr_name,json=attrName,proto3" json:"attr_name,omitempty"`
-	Value    BufferFlag `protobuf:"varint,3,opt,name=value,proto3,enum=bess.pb.BufferFlag" json:"value,omitempty"`
-}
-
-func (x *DoubleBufferFlaggerArg) Reset() {
-	*x = DoubleBufferFlaggerArg{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_module_msg_proto_msgTypes[110]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *DoubleBufferFlaggerArg) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DoubleBufferFlaggerArg) ProtoMessage() {}
-
-func (x *DoubleBufferFlaggerArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[110]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DoubleBufferFlaggerArg.ProtoReflect.Descriptor instead.
-func (*DoubleBufferFlaggerArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{110}
-}
-
-func (x *DoubleBufferFlaggerArg) GetAttrName() string {
-	if x != nil {
-		return x.AttrName
-	}
-	return ""
-}
-
-func (x *DoubleBufferFlaggerArg) GetValue() BufferFlag {
-	if x != nil {
-		return x.Value
-	}
-	return BufferFlag_FLAG_VALUE_INVALID
-}
-
-type DoubleBufferCommandSetNewFlagValueArg struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	NewFlag BufferFlag `protobuf:"varint,1,opt,name=new_flag,json=newFlag,proto3,enum=bess.pb.BufferFlag" json:"new_flag,omitempty"`
-}
-
-func (x *DoubleBufferCommandSetNewFlagValueArg) Reset() {
-	*x = DoubleBufferCommandSetNewFlagValueArg{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_module_msg_proto_msgTypes[111]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *DoubleBufferCommandSetNewFlagValueArg) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DoubleBufferCommandSetNewFlagValueArg) ProtoMessage() {}
-
-func (x *DoubleBufferCommandSetNewFlagValueArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[111]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DoubleBufferCommandSetNewFlagValueArg.ProtoReflect.Descriptor instead.
-func (*DoubleBufferCommandSetNewFlagValueArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{111}
-}
-
-func (x *DoubleBufferCommandSetNewFlagValueArg) GetNewFlag() BufferFlag {
-	if x != nil {
-		return x.NewFlag
-	}
-	return BufferFlag_FLAG_VALUE_INVALID
-}
-
-type DoubleBufferCommandSetNewFlagValueResponse struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	ObservationDurationNs uint64 `protobuf:"varint,2,opt,name=observation_duration_ns,json=observationDurationNs,proto3" json:"observation_duration_ns,omitempty"`
-}
-
-func (x *DoubleBufferCommandSetNewFlagValueResponse) Reset() {
-	*x = DoubleBufferCommandSetNewFlagValueResponse{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_module_msg_proto_msgTypes[112]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *DoubleBufferCommandSetNewFlagValueResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DoubleBufferCommandSetNewFlagValueResponse) ProtoMessage() {}
-
-func (x *DoubleBufferCommandSetNewFlagValueResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[112]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DoubleBufferCommandSetNewFlagValueResponse.ProtoReflect.Descriptor instead.
-func (*DoubleBufferCommandSetNewFlagValueResponse) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{112}
-}
-
-func (x *DoubleBufferCommandSetNewFlagValueResponse) GetObservationDurationNs() uint64 {
-	if x != nil {
-		return x.ObservationDurationNs
-	}
-	return 0
-}
-
-type DoubleBufferCommandReadFlagValueResponse struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	CurrentFlag BufferFlag `protobuf:"varint,1,opt,name=current_flag,json=currentFlag,proto3,enum=bess.pb.BufferFlag" json:"current_flag,omitempty"`
-}
-
-func (x *DoubleBufferCommandReadFlagValueResponse) Reset() {
-	*x = DoubleBufferCommandReadFlagValueResponse{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_module_msg_proto_msgTypes[113]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *DoubleBufferCommandReadFlagValueResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DoubleBufferCommandReadFlagValueResponse) ProtoMessage() {}
-
-func (x *DoubleBufferCommandReadFlagValueResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[113]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DoubleBufferCommandReadFlagValueResponse.ProtoReflect.Descriptor instead.
-func (*DoubleBufferCommandReadFlagValueResponse) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{113}
-}
-
-func (x *DoubleBufferCommandReadFlagValueResponse) GetCurrentFlag() BufferFlag {
-	if x != nil {
-		return x.CurrentFlag
-	}
-	return BufferFlag_FLAG_VALUE_INVALID
-}
-
 type L2ForwardCommandAddArg_Entry struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -6675,7 +6471,7 @@ type L2ForwardCommandAddArg_Entry struct {
 func (x *L2ForwardCommandAddArg_Entry) Reset() {
 	*x = L2ForwardCommandAddArg_Entry{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_module_msg_proto_msgTypes[114]
+		mi := &file_module_msg_proto_msgTypes[110]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -6688,7 +6484,7 @@ func (x *L2ForwardCommandAddArg_Entry) String() string {
 func (*L2ForwardCommandAddArg_Entry) ProtoMessage() {}
 
 func (x *L2ForwardCommandAddArg_Entry) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[114]
+	mi := &file_module_msg_proto_msgTypes[110]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6736,7 +6532,7 @@ type MeasureCommandGetSummaryResponse_Histogram struct {
 func (x *MeasureCommandGetSummaryResponse_Histogram) Reset() {
 	*x = MeasureCommandGetSummaryResponse_Histogram{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_module_msg_proto_msgTypes[115]
+		mi := &file_module_msg_proto_msgTypes[111]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -6749,7 +6545,7 @@ func (x *MeasureCommandGetSummaryResponse_Histogram) String() string {
 func (*MeasureCommandGetSummaryResponse_Histogram) ProtoMessage() {}
 
 func (x *MeasureCommandGetSummaryResponse_Histogram) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[115]
+	mi := &file_module_msg_proto_msgTypes[111]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6839,7 +6635,7 @@ type ACLArg_Rule struct {
 func (x *ACLArg_Rule) Reset() {
 	*x = ACLArg_Rule{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_module_msg_proto_msgTypes[116]
+		mi := &file_module_msg_proto_msgTypes[112]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -6852,7 +6648,7 @@ func (x *ACLArg_Rule) String() string {
 func (*ACLArg_Rule) ProtoMessage() {}
 
 func (x *ACLArg_Rule) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[116]
+	mi := &file_module_msg_proto_msgTypes[112]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6925,7 +6721,7 @@ type BPFArg_Filter struct {
 func (x *BPFArg_Filter) Reset() {
 	*x = BPFArg_Filter{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_module_msg_proto_msgTypes[117]
+		mi := &file_module_msg_proto_msgTypes[113]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -6938,7 +6734,7 @@ func (x *BPFArg_Filter) String() string {
 func (*BPFArg_Filter) ProtoMessage() {}
 
 func (x *BPFArg_Filter) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[117]
+	mi := &file_module_msg_proto_msgTypes[113]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6992,7 +6788,7 @@ type GenericEncapArg_EncapField struct {
 func (x *GenericEncapArg_EncapField) Reset() {
 	*x = GenericEncapArg_EncapField{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_module_msg_proto_msgTypes[118]
+		mi := &file_module_msg_proto_msgTypes[114]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -7005,7 +6801,7 @@ func (x *GenericEncapArg_EncapField) String() string {
 func (*GenericEncapArg_EncapField) ProtoMessage() {}
 
 func (x *GenericEncapArg_EncapField) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[118]
+	mi := &file_module_msg_proto_msgTypes[114]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7078,7 +6874,7 @@ type NATArg_PortRange struct {
 func (x *NATArg_PortRange) Reset() {
 	*x = NATArg_PortRange{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_module_msg_proto_msgTypes[122]
+		mi := &file_module_msg_proto_msgTypes[118]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -7091,7 +6887,7 @@ func (x *NATArg_PortRange) String() string {
 func (*NATArg_PortRange) ProtoMessage() {}
 
 func (x *NATArg_PortRange) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[122]
+	mi := &file_module_msg_proto_msgTypes[118]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7140,7 +6936,7 @@ type NATArg_ExternalAddress struct {
 func (x *NATArg_ExternalAddress) Reset() {
 	*x = NATArg_ExternalAddress{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_module_msg_proto_msgTypes[123]
+		mi := &file_module_msg_proto_msgTypes[119]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -7153,7 +6949,7 @@ func (x *NATArg_ExternalAddress) String() string {
 func (*NATArg_ExternalAddress) ProtoMessage() {}
 
 func (x *NATArg_ExternalAddress) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[123]
+	mi := &file_module_msg_proto_msgTypes[119]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7195,7 +6991,7 @@ type StaticNATArg_AddressRange struct {
 func (x *StaticNATArg_AddressRange) Reset() {
 	*x = StaticNATArg_AddressRange{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_module_msg_proto_msgTypes[124]
+		mi := &file_module_msg_proto_msgTypes[120]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -7208,7 +7004,7 @@ func (x *StaticNATArg_AddressRange) String() string {
 func (*StaticNATArg_AddressRange) ProtoMessage() {}
 
 func (x *StaticNATArg_AddressRange) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[124]
+	mi := &file_module_msg_proto_msgTypes[120]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7250,7 +7046,7 @@ type StaticNATArg_AddressRangePair struct {
 func (x *StaticNATArg_AddressRangePair) Reset() {
 	*x = StaticNATArg_AddressRangePair{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_module_msg_proto_msgTypes[125]
+		mi := &file_module_msg_proto_msgTypes[121]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -7263,7 +7059,7 @@ func (x *StaticNATArg_AddressRangePair) String() string {
 func (*StaticNATArg_AddressRangePair) ProtoMessage() {}
 
 func (x *StaticNATArg_AddressRangePair) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[125]
+	mi := &file_module_msg_proto_msgTypes[121]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7310,7 +7106,7 @@ type RandomUpdateArg_Field struct {
 func (x *RandomUpdateArg_Field) Reset() {
 	*x = RandomUpdateArg_Field{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_module_msg_proto_msgTypes[126]
+		mi := &file_module_msg_proto_msgTypes[122]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -7323,7 +7119,7 @@ func (x *RandomUpdateArg_Field) String() string {
 func (*RandomUpdateArg_Field) ProtoMessage() {}
 
 func (x *RandomUpdateArg_Field) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[126]
+	mi := &file_module_msg_proto_msgTypes[122]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7391,7 +7187,7 @@ type SetMetadataArg_Attribute struct {
 func (x *SetMetadataArg_Attribute) Reset() {
 	*x = SetMetadataArg_Attribute{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_module_msg_proto_msgTypes[127]
+		mi := &file_module_msg_proto_msgTypes[123]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -7404,7 +7200,7 @@ func (x *SetMetadataArg_Attribute) String() string {
 func (*SetMetadataArg_Attribute) ProtoMessage() {}
 
 func (x *SetMetadataArg_Attribute) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[127]
+	mi := &file_module_msg_proto_msgTypes[123]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7507,7 +7303,7 @@ type UpdateArg_Field struct {
 func (x *UpdateArg_Field) Reset() {
 	*x = UpdateArg_Field{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_module_msg_proto_msgTypes[128]
+		mi := &file_module_msg_proto_msgTypes[124]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -7520,7 +7316,7 @@ func (x *UpdateArg_Field) String() string {
 func (*UpdateArg_Field) ProtoMessage() {}
 
 func (x *UpdateArg_Field) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[128]
+	mi := &file_module_msg_proto_msgTypes[124]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7571,7 +7367,7 @@ type UrlFilterArg_Url struct {
 func (x *UrlFilterArg_Url) Reset() {
 	*x = UrlFilterArg_Url{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_module_msg_proto_msgTypes[129]
+		mi := &file_module_msg_proto_msgTypes[125]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -7584,7 +7380,7 @@ func (x *UrlFilterArg_Url) String() string {
 func (*UrlFilterArg_Url) ProtoMessage() {}
 
 func (x *UrlFilterArg_Url) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[129]
+	mi := &file_module_msg_proto_msgTypes[125]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7621,7 +7417,6 @@ type FlowMeasureReadResponse_Statistic struct {
 
 	Fseid        uint64                                       `protobuf:"varint,1,opt,name=fseid,proto3" json:"fseid,omitempty"`
 	Pdr          uint64                                       `protobuf:"varint,2,opt,name=pdr,proto3" json:"pdr,omitempty"`
-	Ctr          uint64                                       `protobuf:"varint,5,opt,name=ctr,proto3" json:"ctr,omitempty"`
 	Latency      *FlowMeasureReadResponse_Statistic_Histogram `protobuf:"bytes,3,opt,name=latency,proto3" json:"latency,omitempty"`
 	Jitter       *FlowMeasureReadResponse_Statistic_Histogram `protobuf:"bytes,4,opt,name=jitter,proto3" json:"jitter,omitempty"`
 	TotalBytes   uint64                                       `protobuf:"varint,11,opt,name=total_bytes,json=totalBytes,proto3" json:"total_bytes,omitempty"`
@@ -7631,7 +7426,7 @@ type FlowMeasureReadResponse_Statistic struct {
 func (x *FlowMeasureReadResponse_Statistic) Reset() {
 	*x = FlowMeasureReadResponse_Statistic{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_module_msg_proto_msgTypes[131]
+		mi := &file_module_msg_proto_msgTypes[127]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -7644,7 +7439,7 @@ func (x *FlowMeasureReadResponse_Statistic) String() string {
 func (*FlowMeasureReadResponse_Statistic) ProtoMessage() {}
 
 func (x *FlowMeasureReadResponse_Statistic) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[131]
+	mi := &file_module_msg_proto_msgTypes[127]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7670,13 +7465,6 @@ func (x *FlowMeasureReadResponse_Statistic) GetFseid() uint64 {
 func (x *FlowMeasureReadResponse_Statistic) GetPdr() uint64 {
 	if x != nil {
 		return x.Pdr
-	}
-	return 0
-}
-
-func (x *FlowMeasureReadResponse_Statistic) GetCtr() uint64 {
-	if x != nil {
-		return x.Ctr
 	}
 	return 0
 }
@@ -7727,7 +7515,7 @@ type FlowMeasureReadResponse_Statistic_Histogram struct {
 func (x *FlowMeasureReadResponse_Statistic_Histogram) Reset() {
 	*x = FlowMeasureReadResponse_Statistic_Histogram{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_module_msg_proto_msgTypes[132]
+		mi := &file_module_msg_proto_msgTypes[128]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -7740,7 +7528,7 @@ func (x *FlowMeasureReadResponse_Statistic_Histogram) String() string {
 func (*FlowMeasureReadResponse_Statistic_Histogram) ProtoMessage() {}
 
 func (x *FlowMeasureReadResponse_Statistic_Histogram) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[132]
+	mi := &file_module_msg_proto_msgTypes[128]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8411,99 +8199,71 @@ var file_module_msg_proto_rawDesc = []byte{
 	0x51, 0x6f, 0x73, 0x43, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64, 0x53, 0x65, 0x74, 0x44, 0x65, 0x66,
 	0x61, 0x75, 0x6c, 0x74, 0x47, 0x61, 0x74, 0x65, 0x41, 0x72, 0x67, 0x12, 0x12, 0x0a, 0x04, 0x67,
 	0x61, 0x74, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x04, 0x67, 0x61, 0x74, 0x65, 0x22,
-	0x93, 0x01, 0x0a, 0x0e, 0x46, 0x6c, 0x6f, 0x77, 0x4d, 0x65, 0x61, 0x73, 0x75, 0x72, 0x65, 0x41,
-	0x72, 0x67, 0x12, 0x24, 0x0a, 0x0e, 0x66, 0x6c, 0x61, 0x67, 0x5f, 0x61, 0x74, 0x74, 0x72, 0x5f,
-	0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0c, 0x66, 0x6c, 0x61, 0x67,
-	0x41, 0x74, 0x74, 0x72, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x29, 0x0a, 0x11, 0x63, 0x74, 0x72, 0x5f,
-	0x69, 0x64, 0x78, 0x5f, 0x61, 0x74, 0x74, 0x72, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x02, 0x20,
-	0x01, 0x28, 0x09, 0x52, 0x0e, 0x63, 0x74, 0x72, 0x49, 0x64, 0x78, 0x41, 0x74, 0x74, 0x72, 0x4e,
-	0x61, 0x6d, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x65, 0x6e, 0x74, 0x72, 0x69, 0x65, 0x73, 0x18, 0x03,
-	0x20, 0x01, 0x28, 0x04, 0x52, 0x07, 0x65, 0x6e, 0x74, 0x72, 0x69, 0x65, 0x73, 0x12, 0x16, 0x0a,
-	0x06, 0x6c, 0x65, 0x61, 0x64, 0x65, 0x72, 0x18, 0x04, 0x20, 0x01, 0x28, 0x08, 0x52, 0x06, 0x6c,
-	0x65, 0x61, 0x64, 0x65, 0x72, 0x22, 0x91, 0x01, 0x0a, 0x19, 0x46, 0x6c, 0x6f, 0x77, 0x4d, 0x65,
-	0x61, 0x73, 0x75, 0x72, 0x65, 0x43, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64, 0x52, 0x65, 0x61, 0x64,
-	0x41, 0x72, 0x67, 0x12, 0x14, 0x0a, 0x05, 0x63, 0x6c, 0x65, 0x61, 0x72, 0x18, 0x01, 0x20, 0x01,
-	0x28, 0x08, 0x52, 0x05, 0x63, 0x6c, 0x65, 0x61, 0x72, 0x12, 0x2f, 0x0a, 0x13, 0x6c, 0x61, 0x74,
-	0x65, 0x6e, 0x63, 0x79, 0x5f, 0x70, 0x65, 0x72, 0x63, 0x65, 0x6e, 0x74, 0x69, 0x6c, 0x65, 0x73,
-	0x18, 0x02, 0x20, 0x03, 0x28, 0x01, 0x52, 0x12, 0x6c, 0x61, 0x74, 0x65, 0x6e, 0x63, 0x79, 0x50,
-	0x65, 0x72, 0x63, 0x65, 0x6e, 0x74, 0x69, 0x6c, 0x65, 0x73, 0x12, 0x2d, 0x0a, 0x12, 0x6a, 0x69,
-	0x74, 0x74, 0x65, 0x72, 0x5f, 0x70, 0x65, 0x72, 0x63, 0x65, 0x6e, 0x74, 0x69, 0x6c, 0x65, 0x73,
-	0x18, 0x03, 0x20, 0x03, 0x28, 0x01, 0x52, 0x11, 0x6a, 0x69, 0x74, 0x74, 0x65, 0x72, 0x50, 0x65,
-	0x72, 0x63, 0x65, 0x6e, 0x74, 0x69, 0x6c, 0x65, 0x73, 0x22, 0x8d, 0x05, 0x0a, 0x17, 0x46, 0x6c,
-	0x6f, 0x77, 0x4d, 0x65, 0x61, 0x73, 0x75, 0x72, 0x65, 0x52, 0x65, 0x61, 0x64, 0x52, 0x65, 0x73,
-	0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x4a, 0x0a, 0x0a, 0x73, 0x74, 0x61, 0x74, 0x69, 0x73, 0x74,
-	0x69, 0x63, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x2a, 0x2e, 0x62, 0x65, 0x73, 0x73,
-	0x2e, 0x70, 0x62, 0x2e, 0x46, 0x6c, 0x6f, 0x77, 0x4d, 0x65, 0x61, 0x73, 0x75, 0x72, 0x65, 0x52,
-	0x65, 0x61, 0x64, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x2e, 0x53, 0x74, 0x61, 0x74,
-	0x69, 0x73, 0x74, 0x69, 0x63, 0x52, 0x0a, 0x73, 0x74, 0x61, 0x74, 0x69, 0x73, 0x74, 0x69, 0x63,
-	0x73, 0x1a, 0xa5, 0x04, 0x0a, 0x09, 0x53, 0x74, 0x61, 0x74, 0x69, 0x73, 0x74, 0x69, 0x63, 0x12,
-	0x14, 0x0a, 0x05, 0x66, 0x73, 0x65, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x05,
-	0x66, 0x73, 0x65, 0x69, 0x64, 0x12, 0x10, 0x0a, 0x03, 0x70, 0x64, 0x72, 0x18, 0x02, 0x20, 0x01,
-	0x28, 0x04, 0x52, 0x03, 0x70, 0x64, 0x72, 0x12, 0x10, 0x0a, 0x03, 0x63, 0x74, 0x72, 0x18, 0x05,
-	0x20, 0x01, 0x28, 0x04, 0x52, 0x03, 0x63, 0x74, 0x72, 0x12, 0x4e, 0x0a, 0x07, 0x6c, 0x61, 0x74,
-	0x65, 0x6e, 0x63, 0x79, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x34, 0x2e, 0x62, 0x65, 0x73,
-	0x73, 0x2e, 0x70, 0x62, 0x2e, 0x46, 0x6c, 0x6f, 0x77, 0x4d, 0x65, 0x61, 0x73, 0x75, 0x72, 0x65,
-	0x52, 0x65, 0x61, 0x64, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x2e, 0x53, 0x74, 0x61,
-	0x74, 0x69, 0x73, 0x74, 0x69, 0x63, 0x2e, 0x48, 0x69, 0x73, 0x74, 0x6f, 0x67, 0x72, 0x61, 0x6d,
-	0x52, 0x07, 0x6c, 0x61, 0x74, 0x65, 0x6e, 0x63, 0x79, 0x12, 0x4c, 0x0a, 0x06, 0x6a, 0x69, 0x74,
-	0x74, 0x65, 0x72, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x34, 0x2e, 0x62, 0x65, 0x73, 0x73,
-	0x2e, 0x70, 0x62, 0x2e, 0x46, 0x6c, 0x6f, 0x77, 0x4d, 0x65, 0x61, 0x73, 0x75, 0x72, 0x65, 0x52,
-	0x65, 0x61, 0x64, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x2e, 0x53, 0x74, 0x61, 0x74,
-	0x69, 0x73, 0x74, 0x69, 0x63, 0x2e, 0x48, 0x69, 0x73, 0x74, 0x6f, 0x67, 0x72, 0x61, 0x6d, 0x52,
-	0x06, 0x6a, 0x69, 0x74, 0x74, 0x65, 0x72, 0x12, 0x1f, 0x0a, 0x0b, 0x74, 0x6f, 0x74, 0x61, 0x6c,
-	0x5f, 0x62, 0x79, 0x74, 0x65, 0x73, 0x18, 0x0b, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0a, 0x74, 0x6f,
-	0x74, 0x61, 0x6c, 0x42, 0x79, 0x74, 0x65, 0x73, 0x12, 0x23, 0x0a, 0x0d, 0x74, 0x6f, 0x74, 0x61,
-	0x6c, 0x5f, 0x70, 0x61, 0x63, 0x6b, 0x65, 0x74, 0x73, 0x18, 0x0c, 0x20, 0x01, 0x28, 0x04, 0x52,
-	0x0c, 0x74, 0x6f, 0x74, 0x61, 0x6c, 0x50, 0x61, 0x63, 0x6b, 0x65, 0x74, 0x73, 0x1a, 0xf9, 0x01,
-	0x0a, 0x09, 0x48, 0x69, 0x73, 0x74, 0x6f, 0x67, 0x72, 0x61, 0x6d, 0x12, 0x14, 0x0a, 0x05, 0x63,
-	0x6f, 0x75, 0x6e, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x05, 0x63, 0x6f, 0x75, 0x6e,
-	0x74, 0x12, 0x1f, 0x0a, 0x0b, 0x61, 0x62, 0x6f, 0x76, 0x65, 0x5f, 0x72, 0x61, 0x6e, 0x67, 0x65,
-	0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0a, 0x61, 0x62, 0x6f, 0x76, 0x65, 0x52, 0x61, 0x6e,
-	0x67, 0x65, 0x12, 0x23, 0x0a, 0x0d, 0x72, 0x65, 0x73, 0x6f, 0x6c, 0x75, 0x74, 0x69, 0x6f, 0x6e,
-	0x5f, 0x6e, 0x73, 0x18, 0x08, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0c, 0x72, 0x65, 0x73, 0x6f, 0x6c,
-	0x75, 0x74, 0x69, 0x6f, 0x6e, 0x4e, 0x73, 0x12, 0x15, 0x0a, 0x06, 0x6d, 0x69, 0x6e, 0x5f, 0x6e,
-	0x73, 0x18, 0x03, 0x20, 0x01, 0x28, 0x04, 0x52, 0x05, 0x6d, 0x69, 0x6e, 0x4e, 0x73, 0x12, 0x15,
-	0x0a, 0x06, 0x61, 0x76, 0x67, 0x5f, 0x6e, 0x73, 0x18, 0x04, 0x20, 0x01, 0x28, 0x04, 0x52, 0x05,
-	0x61, 0x76, 0x67, 0x4e, 0x73, 0x12, 0x15, 0x0a, 0x06, 0x6d, 0x61, 0x78, 0x5f, 0x6e, 0x73, 0x18,
-	0x05, 0x20, 0x01, 0x28, 0x04, 0x52, 0x05, 0x6d, 0x61, 0x78, 0x4e, 0x73, 0x12, 0x19, 0x0a, 0x08,
-	0x74, 0x6f, 0x74, 0x61, 0x6c, 0x5f, 0x6e, 0x73, 0x18, 0x06, 0x20, 0x01, 0x28, 0x04, 0x52, 0x07,
-	0x74, 0x6f, 0x74, 0x61, 0x6c, 0x4e, 0x73, 0x12, 0x30, 0x0a, 0x14, 0x70, 0x65, 0x72, 0x63, 0x65,
-	0x6e, 0x74, 0x69, 0x6c, 0x65, 0x5f, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x73, 0x5f, 0x6e, 0x73, 0x18,
-	0x07, 0x20, 0x03, 0x28, 0x04, 0x52, 0x12, 0x70, 0x65, 0x72, 0x63, 0x65, 0x6e, 0x74, 0x69, 0x6c,
-	0x65, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x73, 0x4e, 0x73, 0x22, 0x60, 0x0a, 0x16, 0x44, 0x6f, 0x75,
-	0x62, 0x6c, 0x65, 0x42, 0x75, 0x66, 0x66, 0x65, 0x72, 0x46, 0x6c, 0x61, 0x67, 0x67, 0x65, 0x72,
-	0x41, 0x72, 0x67, 0x12, 0x1b, 0x0a, 0x09, 0x61, 0x74, 0x74, 0x72, 0x5f, 0x6e, 0x61, 0x6d, 0x65,
-	0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x61, 0x74, 0x74, 0x72, 0x4e, 0x61, 0x6d, 0x65,
-	0x12, 0x29, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0e, 0x32,
-	0x13, 0x2e, 0x62, 0x65, 0x73, 0x73, 0x2e, 0x70, 0x62, 0x2e, 0x42, 0x75, 0x66, 0x66, 0x65, 0x72,
-	0x46, 0x6c, 0x61, 0x67, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x22, 0x57, 0x0a, 0x25, 0x44,
-	0x6f, 0x75, 0x62, 0x6c, 0x65, 0x42, 0x75, 0x66, 0x66, 0x65, 0x72, 0x43, 0x6f, 0x6d, 0x6d, 0x61,
-	0x6e, 0x64, 0x53, 0x65, 0x74, 0x4e, 0x65, 0x77, 0x46, 0x6c, 0x61, 0x67, 0x56, 0x61, 0x6c, 0x75,
-	0x65, 0x41, 0x72, 0x67, 0x12, 0x2e, 0x0a, 0x08, 0x6e, 0x65, 0x77, 0x5f, 0x66, 0x6c, 0x61, 0x67,
-	0x18, 0x01, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x13, 0x2e, 0x62, 0x65, 0x73, 0x73, 0x2e, 0x70, 0x62,
-	0x2e, 0x42, 0x75, 0x66, 0x66, 0x65, 0x72, 0x46, 0x6c, 0x61, 0x67, 0x52, 0x07, 0x6e, 0x65, 0x77,
-	0x46, 0x6c, 0x61, 0x67, 0x22, 0x64, 0x0a, 0x2a, 0x44, 0x6f, 0x75, 0x62, 0x6c, 0x65, 0x42, 0x75,
-	0x66, 0x66, 0x65, 0x72, 0x43, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64, 0x53, 0x65, 0x74, 0x4e, 0x65,
-	0x77, 0x46, 0x6c, 0x61, 0x67, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
-	0x73, 0x65, 0x12, 0x36, 0x0a, 0x17, 0x6f, 0x62, 0x73, 0x65, 0x72, 0x76, 0x61, 0x74, 0x69, 0x6f,
-	0x6e, 0x5f, 0x64, 0x75, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x6e, 0x73, 0x18, 0x02, 0x20,
-	0x01, 0x28, 0x04, 0x52, 0x15, 0x6f, 0x62, 0x73, 0x65, 0x72, 0x76, 0x61, 0x74, 0x69, 0x6f, 0x6e,
-	0x44, 0x75, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x4e, 0x73, 0x22, 0x62, 0x0a, 0x28, 0x44, 0x6f,
-	0x75, 0x62, 0x6c, 0x65, 0x42, 0x75, 0x66, 0x66, 0x65, 0x72, 0x43, 0x6f, 0x6d, 0x6d, 0x61, 0x6e,
-	0x64, 0x52, 0x65, 0x61, 0x64, 0x46, 0x6c, 0x61, 0x67, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x52, 0x65,
-	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x36, 0x0a, 0x0c, 0x63, 0x75, 0x72, 0x72, 0x65, 0x6e,
-	0x74, 0x5f, 0x66, 0x6c, 0x61, 0x67, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x13, 0x2e, 0x62,
-	0x65, 0x73, 0x73, 0x2e, 0x70, 0x62, 0x2e, 0x42, 0x75, 0x66, 0x66, 0x65, 0x72, 0x46, 0x6c, 0x61,
-	0x67, 0x52, 0x0b, 0x63, 0x75, 0x72, 0x72, 0x65, 0x6e, 0x74, 0x46, 0x6c, 0x61, 0x67, 0x2a, 0x48,
-	0x0a, 0x0a, 0x42, 0x75, 0x66, 0x66, 0x65, 0x72, 0x46, 0x6c, 0x61, 0x67, 0x12, 0x16, 0x0a, 0x12,
-	0x46, 0x4c, 0x41, 0x47, 0x5f, 0x56, 0x41, 0x4c, 0x55, 0x45, 0x5f, 0x49, 0x4e, 0x56, 0x41, 0x4c,
-	0x49, 0x44, 0x10, 0x00, 0x12, 0x10, 0x0a, 0x0c, 0x46, 0x4c, 0x41, 0x47, 0x5f, 0x56, 0x41, 0x4c,
-	0x55, 0x45, 0x5f, 0x41, 0x10, 0x01, 0x12, 0x10, 0x0a, 0x0c, 0x46, 0x4c, 0x41, 0x47, 0x5f, 0x56,
-	0x41, 0x4c, 0x55, 0x45, 0x5f, 0x42, 0x10, 0x02, 0x42, 0x33, 0x5a, 0x31, 0x67, 0x69, 0x74, 0x68,
-	0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x6f, 0x6d, 0x65, 0x63, 0x2d, 0x70, 0x72, 0x6f, 0x6a,
-	0x65, 0x63, 0x74, 0x2f, 0x75, 0x70, 0x66, 0x2d, 0x65, 0x70, 0x63, 0x2f, 0x70, 0x66, 0x63, 0x70,
-	0x69, 0x66, 0x61, 0x63, 0x65, 0x2f, 0x62, 0x65, 0x73, 0x73, 0x5f, 0x70, 0x62, 0x62, 0x06, 0x70,
-	0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x68, 0x0a, 0x0e, 0x46, 0x6c, 0x6f, 0x77, 0x4d, 0x65, 0x61, 0x73, 0x75, 0x72, 0x65, 0x41, 0x72,
+	0x67, 0x12, 0x24, 0x0a, 0x0e, 0x66, 0x6c, 0x61, 0x67, 0x5f, 0x61, 0x74, 0x74, 0x72, 0x5f, 0x6e,
+	0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0c, 0x66, 0x6c, 0x61, 0x67, 0x41,
+	0x74, 0x74, 0x72, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x65, 0x6e, 0x74, 0x72, 0x69,
+	0x65, 0x73, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x07, 0x65, 0x6e, 0x74, 0x72, 0x69, 0x65,
+	0x73, 0x12, 0x16, 0x0a, 0x06, 0x6c, 0x65, 0x61, 0x64, 0x65, 0x72, 0x18, 0x03, 0x20, 0x01, 0x28,
+	0x08, 0x52, 0x06, 0x6c, 0x65, 0x61, 0x64, 0x65, 0x72, 0x22, 0x91, 0x01, 0x0a, 0x19, 0x46, 0x6c,
+	0x6f, 0x77, 0x4d, 0x65, 0x61, 0x73, 0x75, 0x72, 0x65, 0x43, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64,
+	0x52, 0x65, 0x61, 0x64, 0x41, 0x72, 0x67, 0x12, 0x14, 0x0a, 0x05, 0x63, 0x6c, 0x65, 0x61, 0x72,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x08, 0x52, 0x05, 0x63, 0x6c, 0x65, 0x61, 0x72, 0x12, 0x2f, 0x0a,
+	0x13, 0x6c, 0x61, 0x74, 0x65, 0x6e, 0x63, 0x79, 0x5f, 0x70, 0x65, 0x72, 0x63, 0x65, 0x6e, 0x74,
+	0x69, 0x6c, 0x65, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x01, 0x52, 0x12, 0x6c, 0x61, 0x74, 0x65,
+	0x6e, 0x63, 0x79, 0x50, 0x65, 0x72, 0x63, 0x65, 0x6e, 0x74, 0x69, 0x6c, 0x65, 0x73, 0x12, 0x2d,
+	0x0a, 0x12, 0x6a, 0x69, 0x74, 0x74, 0x65, 0x72, 0x5f, 0x70, 0x65, 0x72, 0x63, 0x65, 0x6e, 0x74,
+	0x69, 0x6c, 0x65, 0x73, 0x18, 0x03, 0x20, 0x03, 0x28, 0x01, 0x52, 0x11, 0x6a, 0x69, 0x74, 0x74,
+	0x65, 0x72, 0x50, 0x65, 0x72, 0x63, 0x65, 0x6e, 0x74, 0x69, 0x6c, 0x65, 0x73, 0x22, 0xfb, 0x04,
+	0x0a, 0x17, 0x46, 0x6c, 0x6f, 0x77, 0x4d, 0x65, 0x61, 0x73, 0x75, 0x72, 0x65, 0x52, 0x65, 0x61,
+	0x64, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x4a, 0x0a, 0x0a, 0x73, 0x74, 0x61,
+	0x74, 0x69, 0x73, 0x74, 0x69, 0x63, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x2a, 0x2e,
+	0x62, 0x65, 0x73, 0x73, 0x2e, 0x70, 0x62, 0x2e, 0x46, 0x6c, 0x6f, 0x77, 0x4d, 0x65, 0x61, 0x73,
+	0x75, 0x72, 0x65, 0x52, 0x65, 0x61, 0x64, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x2e,
+	0x53, 0x74, 0x61, 0x74, 0x69, 0x73, 0x74, 0x69, 0x63, 0x52, 0x0a, 0x73, 0x74, 0x61, 0x74, 0x69,
+	0x73, 0x74, 0x69, 0x63, 0x73, 0x1a, 0x93, 0x04, 0x0a, 0x09, 0x53, 0x74, 0x61, 0x74, 0x69, 0x73,
+	0x74, 0x69, 0x63, 0x12, 0x14, 0x0a, 0x05, 0x66, 0x73, 0x65, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x04, 0x52, 0x05, 0x66, 0x73, 0x65, 0x69, 0x64, 0x12, 0x10, 0x0a, 0x03, 0x70, 0x64, 0x72,
+	0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x03, 0x70, 0x64, 0x72, 0x12, 0x4e, 0x0a, 0x07, 0x6c,
+	0x61, 0x74, 0x65, 0x6e, 0x63, 0x79, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x34, 0x2e, 0x62,
+	0x65, 0x73, 0x73, 0x2e, 0x70, 0x62, 0x2e, 0x46, 0x6c, 0x6f, 0x77, 0x4d, 0x65, 0x61, 0x73, 0x75,
+	0x72, 0x65, 0x52, 0x65, 0x61, 0x64, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x2e, 0x53,
+	0x74, 0x61, 0x74, 0x69, 0x73, 0x74, 0x69, 0x63, 0x2e, 0x48, 0x69, 0x73, 0x74, 0x6f, 0x67, 0x72,
+	0x61, 0x6d, 0x52, 0x07, 0x6c, 0x61, 0x74, 0x65, 0x6e, 0x63, 0x79, 0x12, 0x4c, 0x0a, 0x06, 0x6a,
+	0x69, 0x74, 0x74, 0x65, 0x72, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x34, 0x2e, 0x62, 0x65,
+	0x73, 0x73, 0x2e, 0x70, 0x62, 0x2e, 0x46, 0x6c, 0x6f, 0x77, 0x4d, 0x65, 0x61, 0x73, 0x75, 0x72,
+	0x65, 0x52, 0x65, 0x61, 0x64, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x2e, 0x53, 0x74,
+	0x61, 0x74, 0x69, 0x73, 0x74, 0x69, 0x63, 0x2e, 0x48, 0x69, 0x73, 0x74, 0x6f, 0x67, 0x72, 0x61,
+	0x6d, 0x52, 0x06, 0x6a, 0x69, 0x74, 0x74, 0x65, 0x72, 0x12, 0x1f, 0x0a, 0x0b, 0x74, 0x6f, 0x74,
+	0x61, 0x6c, 0x5f, 0x62, 0x79, 0x74, 0x65, 0x73, 0x18, 0x0b, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0a,
+	0x74, 0x6f, 0x74, 0x61, 0x6c, 0x42, 0x79, 0x74, 0x65, 0x73, 0x12, 0x23, 0x0a, 0x0d, 0x74, 0x6f,
+	0x74, 0x61, 0x6c, 0x5f, 0x70, 0x61, 0x63, 0x6b, 0x65, 0x74, 0x73, 0x18, 0x0c, 0x20, 0x01, 0x28,
+	0x04, 0x52, 0x0c, 0x74, 0x6f, 0x74, 0x61, 0x6c, 0x50, 0x61, 0x63, 0x6b, 0x65, 0x74, 0x73, 0x1a,
+	0xf9, 0x01, 0x0a, 0x09, 0x48, 0x69, 0x73, 0x74, 0x6f, 0x67, 0x72, 0x61, 0x6d, 0x12, 0x14, 0x0a,
+	0x05, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x05, 0x63, 0x6f,
+	0x75, 0x6e, 0x74, 0x12, 0x1f, 0x0a, 0x0b, 0x61, 0x62, 0x6f, 0x76, 0x65, 0x5f, 0x72, 0x61, 0x6e,
+	0x67, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0a, 0x61, 0x62, 0x6f, 0x76, 0x65, 0x52,
+	0x61, 0x6e, 0x67, 0x65, 0x12, 0x23, 0x0a, 0x0d, 0x72, 0x65, 0x73, 0x6f, 0x6c, 0x75, 0x74, 0x69,
+	0x6f, 0x6e, 0x5f, 0x6e, 0x73, 0x18, 0x08, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0c, 0x72, 0x65, 0x73,
+	0x6f, 0x6c, 0x75, 0x74, 0x69, 0x6f, 0x6e, 0x4e, 0x73, 0x12, 0x15, 0x0a, 0x06, 0x6d, 0x69, 0x6e,
+	0x5f, 0x6e, 0x73, 0x18, 0x03, 0x20, 0x01, 0x28, 0x04, 0x52, 0x05, 0x6d, 0x69, 0x6e, 0x4e, 0x73,
+	0x12, 0x15, 0x0a, 0x06, 0x61, 0x76, 0x67, 0x5f, 0x6e, 0x73, 0x18, 0x04, 0x20, 0x01, 0x28, 0x04,
+	0x52, 0x05, 0x61, 0x76, 0x67, 0x4e, 0x73, 0x12, 0x15, 0x0a, 0x06, 0x6d, 0x61, 0x78, 0x5f, 0x6e,
+	0x73, 0x18, 0x05, 0x20, 0x01, 0x28, 0x04, 0x52, 0x05, 0x6d, 0x61, 0x78, 0x4e, 0x73, 0x12, 0x19,
+	0x0a, 0x08, 0x74, 0x6f, 0x74, 0x61, 0x6c, 0x5f, 0x6e, 0x73, 0x18, 0x06, 0x20, 0x01, 0x28, 0x04,
+	0x52, 0x07, 0x74, 0x6f, 0x74, 0x61, 0x6c, 0x4e, 0x73, 0x12, 0x30, 0x0a, 0x14, 0x70, 0x65, 0x72,
+	0x63, 0x65, 0x6e, 0x74, 0x69, 0x6c, 0x65, 0x5f, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x73, 0x5f, 0x6e,
+	0x73, 0x18, 0x07, 0x20, 0x03, 0x28, 0x04, 0x52, 0x12, 0x70, 0x65, 0x72, 0x63, 0x65, 0x6e, 0x74,
+	0x69, 0x6c, 0x65, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x73, 0x4e, 0x73, 0x2a, 0x48, 0x0a, 0x0a, 0x42,
+	0x75, 0x66, 0x66, 0x65, 0x72, 0x46, 0x6c, 0x61, 0x67, 0x12, 0x16, 0x0a, 0x12, 0x46, 0x4c, 0x41,
+	0x47, 0x5f, 0x56, 0x41, 0x4c, 0x55, 0x45, 0x5f, 0x49, 0x4e, 0x56, 0x41, 0x4c, 0x49, 0x44, 0x10,
+	0x00, 0x12, 0x10, 0x0a, 0x0c, 0x46, 0x4c, 0x41, 0x47, 0x5f, 0x56, 0x41, 0x4c, 0x55, 0x45, 0x5f,
+	0x41, 0x10, 0x01, 0x12, 0x10, 0x0a, 0x0c, 0x46, 0x4c, 0x41, 0x47, 0x5f, 0x56, 0x41, 0x4c, 0x55,
+	0x45, 0x5f, 0x42, 0x10, 0x02, 0x42, 0x33, 0x5a, 0x31, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e,
+	0x63, 0x6f, 0x6d, 0x2f, 0x6f, 0x6d, 0x65, 0x63, 0x2d, 0x70, 0x72, 0x6f, 0x6a, 0x65, 0x63, 0x74,
+	0x2f, 0x75, 0x70, 0x66, 0x2d, 0x65, 0x70, 0x63, 0x2f, 0x70, 0x66, 0x63, 0x70, 0x69, 0x66, 0x61,
+	0x63, 0x65, 0x2f, 0x62, 0x65, 0x73, 0x73, 0x5f, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74,
+	0x6f, 0x33,
 }
 
 var (
@@ -8519,7 +8279,7 @@ func file_module_msg_proto_rawDescGZIP() []byte {
 }
 
 var file_module_msg_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_module_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 133)
+var file_module_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 129)
 var file_module_msg_proto_goTypes = []interface{}{
 	(BufferFlag)(0),                                     // 0: bess.pb.BufferFlag
 	(*EmptyArg)(nil),                                    // 1: bess.pb.EmptyArg
@@ -8632,88 +8392,81 @@ var file_module_msg_proto_goTypes = []interface{}{
 	(*FlowMeasureArg)(nil),                              // 108: bess.pb.FlowMeasureArg
 	(*FlowMeasureCommandReadArg)(nil),                   // 109: bess.pb.FlowMeasureCommandReadArg
 	(*FlowMeasureReadResponse)(nil),                     // 110: bess.pb.FlowMeasureReadResponse
-	(*DoubleBufferFlaggerArg)(nil),                      // 111: bess.pb.DoubleBufferFlaggerArg
-	(*DoubleBufferCommandSetNewFlagValueArg)(nil),       // 112: bess.pb.DoubleBufferCommandSetNewFlagValueArg
-	(*DoubleBufferCommandSetNewFlagValueResponse)(nil),  // 113: bess.pb.DoubleBufferCommandSetNewFlagValueResponse
-	(*DoubleBufferCommandReadFlagValueResponse)(nil),    // 114: bess.pb.DoubleBufferCommandReadFlagValueResponse
-	(*L2ForwardCommandAddArg_Entry)(nil),                // 115: bess.pb.L2ForwardCommandAddArg.Entry
-	(*MeasureCommandGetSummaryResponse_Histogram)(nil),  // 116: bess.pb.MeasureCommandGetSummaryResponse.Histogram
-	(*ACLArg_Rule)(nil),                                 // 117: bess.pb.ACLArg.Rule
-	(*BPFArg_Filter)(nil),                               // 118: bess.pb.BPFArg.Filter
-	(*GenericEncapArg_EncapField)(nil),                  // 119: bess.pb.GenericEncapArg.EncapField
-	nil,                                                 // 120: bess.pb.MetadataTestArg.ReadEntry
-	nil,                                                 // 121: bess.pb.MetadataTestArg.WriteEntry
-	nil,                                                 // 122: bess.pb.MetadataTestArg.UpdateEntry
-	(*NATArg_PortRange)(nil),                            // 123: bess.pb.NATArg.PortRange
-	(*NATArg_ExternalAddress)(nil),                      // 124: bess.pb.NATArg.ExternalAddress
-	(*StaticNATArg_AddressRange)(nil),                   // 125: bess.pb.StaticNATArg.AddressRange
-	(*StaticNATArg_AddressRangePair)(nil),               // 126: bess.pb.StaticNATArg.AddressRangePair
-	(*RandomUpdateArg_Field)(nil),                       // 127: bess.pb.RandomUpdateArg.Field
-	(*SetMetadataArg_Attribute)(nil),                    // 128: bess.pb.SetMetadataArg.Attribute
-	(*UpdateArg_Field)(nil),                             // 129: bess.pb.UpdateArg.Field
-	(*UrlFilterArg_Url)(nil),                            // 130: bess.pb.UrlFilterArg.Url
-	nil,                                                 // 131: bess.pb.WorkerSplitArg.WorkerGatesEntry
-	(*FlowMeasureReadResponse_Statistic)(nil),           // 132: bess.pb.FlowMeasureReadResponse.Statistic
-	(*FlowMeasureReadResponse_Statistic_Histogram)(nil), // 133: bess.pb.FlowMeasureReadResponse.Statistic.Histogram
-	(*FieldData)(nil),                                   // 134: bess.pb.FieldData
-	(*Field)(nil),                                       // 135: bess.pb.Field
+	(*L2ForwardCommandAddArg_Entry)(nil),                // 111: bess.pb.L2ForwardCommandAddArg.Entry
+	(*MeasureCommandGetSummaryResponse_Histogram)(nil),  // 112: bess.pb.MeasureCommandGetSummaryResponse.Histogram
+	(*ACLArg_Rule)(nil),                                 // 113: bess.pb.ACLArg.Rule
+	(*BPFArg_Filter)(nil),                               // 114: bess.pb.BPFArg.Filter
+	(*GenericEncapArg_EncapField)(nil),                  // 115: bess.pb.GenericEncapArg.EncapField
+	nil,                                                 // 116: bess.pb.MetadataTestArg.ReadEntry
+	nil,                                                 // 117: bess.pb.MetadataTestArg.WriteEntry
+	nil,                                                 // 118: bess.pb.MetadataTestArg.UpdateEntry
+	(*NATArg_PortRange)(nil),                            // 119: bess.pb.NATArg.PortRange
+	(*NATArg_ExternalAddress)(nil),                      // 120: bess.pb.NATArg.ExternalAddress
+	(*StaticNATArg_AddressRange)(nil),                   // 121: bess.pb.StaticNATArg.AddressRange
+	(*StaticNATArg_AddressRangePair)(nil),               // 122: bess.pb.StaticNATArg.AddressRangePair
+	(*RandomUpdateArg_Field)(nil),                       // 123: bess.pb.RandomUpdateArg.Field
+	(*SetMetadataArg_Attribute)(nil),                    // 124: bess.pb.SetMetadataArg.Attribute
+	(*UpdateArg_Field)(nil),                             // 125: bess.pb.UpdateArg.Field
+	(*UrlFilterArg_Url)(nil),                            // 126: bess.pb.UrlFilterArg.Url
+	nil,                                                 // 127: bess.pb.WorkerSplitArg.WorkerGatesEntry
+	(*FlowMeasureReadResponse_Statistic)(nil),           // 128: bess.pb.FlowMeasureReadResponse.Statistic
+	(*FlowMeasureReadResponse_Statistic_Histogram)(nil), // 129: bess.pb.FlowMeasureReadResponse.Statistic.Histogram
+	(*FieldData)(nil),                                   // 130: bess.pb.FieldData
+	(*Field)(nil),                                       // 131: bess.pb.Field
 }
 var file_module_msg_proto_depIdxs = []int32{
-	134, // 0: bess.pb.ExactMatchCommandAddArg.fields:type_name -> bess.pb.FieldData
-	134, // 1: bess.pb.ExactMatchCommandAddArg.values:type_name -> bess.pb.FieldData
-	134, // 2: bess.pb.ExactMatchCommandDeleteArg.fields:type_name -> bess.pb.FieldData
-	135, // 3: bess.pb.HashLBCommandSetModeArg.fields:type_name -> bess.pb.Field
-	115, // 4: bess.pb.L2ForwardCommandAddArg.entries:type_name -> bess.pb.L2ForwardCommandAddArg.Entry
-	116, // 5: bess.pb.MeasureCommandGetSummaryResponse.latency:type_name -> bess.pb.MeasureCommandGetSummaryResponse.Histogram
-	116, // 6: bess.pb.MeasureCommandGetSummaryResponse.jitter:type_name -> bess.pb.MeasureCommandGetSummaryResponse.Histogram
-	134, // 7: bess.pb.WildcardMatchCommandAddArg.values:type_name -> bess.pb.FieldData
-	134, // 8: bess.pb.WildcardMatchCommandAddArg.masks:type_name -> bess.pb.FieldData
-	134, // 9: bess.pb.WildcardMatchCommandAddArg.valuesv:type_name -> bess.pb.FieldData
-	134, // 10: bess.pb.WildcardMatchCommandDeleteArg.values:type_name -> bess.pb.FieldData
-	134, // 11: bess.pb.WildcardMatchCommandDeleteArg.masks:type_name -> bess.pb.FieldData
-	117, // 12: bess.pb.ACLArg.rules:type_name -> bess.pb.ACLArg.Rule
-	118, // 13: bess.pb.BPFArg.filters:type_name -> bess.pb.BPFArg.Filter
-	135, // 14: bess.pb.ExactMatchArg.fields:type_name -> bess.pb.Field
-	134, // 15: bess.pb.ExactMatchArg.masks:type_name -> bess.pb.FieldData
-	135, // 16: bess.pb.ExactMatchArg.values:type_name -> bess.pb.Field
-	134, // 17: bess.pb.ExactMatchArg.masksv:type_name -> bess.pb.FieldData
+	130, // 0: bess.pb.ExactMatchCommandAddArg.fields:type_name -> bess.pb.FieldData
+	130, // 1: bess.pb.ExactMatchCommandAddArg.values:type_name -> bess.pb.FieldData
+	130, // 2: bess.pb.ExactMatchCommandDeleteArg.fields:type_name -> bess.pb.FieldData
+	131, // 3: bess.pb.HashLBCommandSetModeArg.fields:type_name -> bess.pb.Field
+	111, // 4: bess.pb.L2ForwardCommandAddArg.entries:type_name -> bess.pb.L2ForwardCommandAddArg.Entry
+	112, // 5: bess.pb.MeasureCommandGetSummaryResponse.latency:type_name -> bess.pb.MeasureCommandGetSummaryResponse.Histogram
+	112, // 6: bess.pb.MeasureCommandGetSummaryResponse.jitter:type_name -> bess.pb.MeasureCommandGetSummaryResponse.Histogram
+	130, // 7: bess.pb.WildcardMatchCommandAddArg.values:type_name -> bess.pb.FieldData
+	130, // 8: bess.pb.WildcardMatchCommandAddArg.masks:type_name -> bess.pb.FieldData
+	130, // 9: bess.pb.WildcardMatchCommandAddArg.valuesv:type_name -> bess.pb.FieldData
+	130, // 10: bess.pb.WildcardMatchCommandDeleteArg.values:type_name -> bess.pb.FieldData
+	130, // 11: bess.pb.WildcardMatchCommandDeleteArg.masks:type_name -> bess.pb.FieldData
+	113, // 12: bess.pb.ACLArg.rules:type_name -> bess.pb.ACLArg.Rule
+	114, // 13: bess.pb.BPFArg.filters:type_name -> bess.pb.BPFArg.Filter
+	131, // 14: bess.pb.ExactMatchArg.fields:type_name -> bess.pb.Field
+	130, // 15: bess.pb.ExactMatchArg.masks:type_name -> bess.pb.FieldData
+	131, // 16: bess.pb.ExactMatchArg.values:type_name -> bess.pb.Field
+	130, // 17: bess.pb.ExactMatchArg.masksv:type_name -> bess.pb.FieldData
 	3,   // 18: bess.pb.ExactMatchConfig.rules:type_name -> bess.pb.ExactMatchCommandAddArg
-	119, // 19: bess.pb.GenericEncapArg.fields:type_name -> bess.pb.GenericEncapArg.EncapField
-	135, // 20: bess.pb.HashLBArg.fields:type_name -> bess.pb.Field
-	120, // 21: bess.pb.MetadataTestArg.read:type_name -> bess.pb.MetadataTestArg.ReadEntry
-	121, // 22: bess.pb.MetadataTestArg.write:type_name -> bess.pb.MetadataTestArg.WriteEntry
-	122, // 23: bess.pb.MetadataTestArg.update:type_name -> bess.pb.MetadataTestArg.UpdateEntry
-	124, // 24: bess.pb.NATArg.ext_addrs:type_name -> bess.pb.NATArg.ExternalAddress
-	126, // 25: bess.pb.StaticNATArg.pairs:type_name -> bess.pb.StaticNATArg.AddressRangePair
-	127, // 26: bess.pb.RandomUpdateArg.fields:type_name -> bess.pb.RandomUpdateArg.Field
-	128, // 27: bess.pb.SetMetadataArg.attrs:type_name -> bess.pb.SetMetadataArg.Attribute
-	129, // 28: bess.pb.UpdateArg.fields:type_name -> bess.pb.UpdateArg.Field
-	130, // 29: bess.pb.UrlFilterArg.blacklist:type_name -> bess.pb.UrlFilterArg.Url
-	130, // 30: bess.pb.UrlFilterConfig.blacklist:type_name -> bess.pb.UrlFilterArg.Url
-	135, // 31: bess.pb.WildcardMatchArg.fields:type_name -> bess.pb.Field
-	135, // 32: bess.pb.WildcardMatchArg.values:type_name -> bess.pb.Field
+	115, // 19: bess.pb.GenericEncapArg.fields:type_name -> bess.pb.GenericEncapArg.EncapField
+	131, // 20: bess.pb.HashLBArg.fields:type_name -> bess.pb.Field
+	116, // 21: bess.pb.MetadataTestArg.read:type_name -> bess.pb.MetadataTestArg.ReadEntry
+	117, // 22: bess.pb.MetadataTestArg.write:type_name -> bess.pb.MetadataTestArg.WriteEntry
+	118, // 23: bess.pb.MetadataTestArg.update:type_name -> bess.pb.MetadataTestArg.UpdateEntry
+	120, // 24: bess.pb.NATArg.ext_addrs:type_name -> bess.pb.NATArg.ExternalAddress
+	122, // 25: bess.pb.StaticNATArg.pairs:type_name -> bess.pb.StaticNATArg.AddressRangePair
+	123, // 26: bess.pb.RandomUpdateArg.fields:type_name -> bess.pb.RandomUpdateArg.Field
+	124, // 27: bess.pb.SetMetadataArg.attrs:type_name -> bess.pb.SetMetadataArg.Attribute
+	125, // 28: bess.pb.UpdateArg.fields:type_name -> bess.pb.UpdateArg.Field
+	126, // 29: bess.pb.UrlFilterArg.blacklist:type_name -> bess.pb.UrlFilterArg.Url
+	126, // 30: bess.pb.UrlFilterConfig.blacklist:type_name -> bess.pb.UrlFilterArg.Url
+	131, // 31: bess.pb.WildcardMatchArg.fields:type_name -> bess.pb.Field
+	131, // 32: bess.pb.WildcardMatchArg.values:type_name -> bess.pb.Field
 	33,  // 33: bess.pb.WildcardMatchConfig.rules:type_name -> bess.pb.WildcardMatchCommandAddArg
-	131, // 34: bess.pb.WorkerSplitArg.worker_gates:type_name -> bess.pb.WorkerSplitArg.WorkerGatesEntry
-	135, // 35: bess.pb.QosArg.fields:type_name -> bess.pb.Field
-	135, // 36: bess.pb.QosArg.values:type_name -> bess.pb.Field
-	134, // 37: bess.pb.QosCommandAddArg.fields:type_name -> bess.pb.FieldData
-	134, // 38: bess.pb.QosCommandAddArg.values:type_name -> bess.pb.FieldData
-	134, // 39: bess.pb.QosCommandDeleteArg.fields:type_name -> bess.pb.FieldData
-	132, // 40: bess.pb.FlowMeasureReadResponse.statistics:type_name -> bess.pb.FlowMeasureReadResponse.Statistic
-	0,   // 41: bess.pb.DoubleBufferFlaggerArg.value:type_name -> bess.pb.BufferFlag
-	0,   // 42: bess.pb.DoubleBufferCommandSetNewFlagValueArg.new_flag:type_name -> bess.pb.BufferFlag
-	0,   // 43: bess.pb.DoubleBufferCommandReadFlagValueResponse.current_flag:type_name -> bess.pb.BufferFlag
-	134, // 44: bess.pb.GenericEncapArg.EncapField.value:type_name -> bess.pb.FieldData
-	123, // 45: bess.pb.NATArg.ExternalAddress.port_ranges:type_name -> bess.pb.NATArg.PortRange
-	125, // 46: bess.pb.StaticNATArg.AddressRangePair.int_range:type_name -> bess.pb.StaticNATArg.AddressRange
-	125, // 47: bess.pb.StaticNATArg.AddressRangePair.ext_range:type_name -> bess.pb.StaticNATArg.AddressRange
-	133, // 48: bess.pb.FlowMeasureReadResponse.Statistic.latency:type_name -> bess.pb.FlowMeasureReadResponse.Statistic.Histogram
-	133, // 49: bess.pb.FlowMeasureReadResponse.Statistic.jitter:type_name -> bess.pb.FlowMeasureReadResponse.Statistic.Histogram
-	50,  // [50:50] is the sub-list for method output_type
-	50,  // [50:50] is the sub-list for method input_type
-	50,  // [50:50] is the sub-list for extension type_name
-	50,  // [50:50] is the sub-list for extension extendee
-	0,   // [0:50] is the sub-list for field type_name
+	127, // 34: bess.pb.WorkerSplitArg.worker_gates:type_name -> bess.pb.WorkerSplitArg.WorkerGatesEntry
+	131, // 35: bess.pb.QosArg.fields:type_name -> bess.pb.Field
+	131, // 36: bess.pb.QosArg.values:type_name -> bess.pb.Field
+	130, // 37: bess.pb.QosCommandAddArg.fields:type_name -> bess.pb.FieldData
+	130, // 38: bess.pb.QosCommandAddArg.values:type_name -> bess.pb.FieldData
+	130, // 39: bess.pb.QosCommandDeleteArg.fields:type_name -> bess.pb.FieldData
+	128, // 40: bess.pb.FlowMeasureReadResponse.statistics:type_name -> bess.pb.FlowMeasureReadResponse.Statistic
+	130, // 41: bess.pb.GenericEncapArg.EncapField.value:type_name -> bess.pb.FieldData
+	119, // 42: bess.pb.NATArg.ExternalAddress.port_ranges:type_name -> bess.pb.NATArg.PortRange
+	121, // 43: bess.pb.StaticNATArg.AddressRangePair.int_range:type_name -> bess.pb.StaticNATArg.AddressRange
+	121, // 44: bess.pb.StaticNATArg.AddressRangePair.ext_range:type_name -> bess.pb.StaticNATArg.AddressRange
+	129, // 45: bess.pb.FlowMeasureReadResponse.Statistic.latency:type_name -> bess.pb.FlowMeasureReadResponse.Statistic.Histogram
+	129, // 46: bess.pb.FlowMeasureReadResponse.Statistic.jitter:type_name -> bess.pb.FlowMeasureReadResponse.Statistic.Histogram
+	47,  // [47:47] is the sub-list for method output_type
+	47,  // [47:47] is the sub-list for method input_type
+	47,  // [47:47] is the sub-list for extension type_name
+	47,  // [47:47] is the sub-list for extension extendee
+	0,   // [0:47] is the sub-list for field type_name
 }
 
 func init() { file_module_msg_proto_init() }
@@ -10044,54 +9797,6 @@ func file_module_msg_proto_init() {
 			}
 		}
 		file_module_msg_proto_msgTypes[110].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*DoubleBufferFlaggerArg); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_module_msg_proto_msgTypes[111].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*DoubleBufferCommandSetNewFlagValueArg); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_module_msg_proto_msgTypes[112].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*DoubleBufferCommandSetNewFlagValueResponse); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_module_msg_proto_msgTypes[113].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*DoubleBufferCommandReadFlagValueResponse); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_module_msg_proto_msgTypes[114].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*L2ForwardCommandAddArg_Entry); i {
 			case 0:
 				return &v.state
@@ -10103,7 +9808,7 @@ func file_module_msg_proto_init() {
 				return nil
 			}
 		}
-		file_module_msg_proto_msgTypes[115].Exporter = func(v interface{}, i int) interface{} {
+		file_module_msg_proto_msgTypes[111].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*MeasureCommandGetSummaryResponse_Histogram); i {
 			case 0:
 				return &v.state
@@ -10115,7 +9820,7 @@ func file_module_msg_proto_init() {
 				return nil
 			}
 		}
-		file_module_msg_proto_msgTypes[116].Exporter = func(v interface{}, i int) interface{} {
+		file_module_msg_proto_msgTypes[112].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*ACLArg_Rule); i {
 			case 0:
 				return &v.state
@@ -10127,7 +9832,7 @@ func file_module_msg_proto_init() {
 				return nil
 			}
 		}
-		file_module_msg_proto_msgTypes[117].Exporter = func(v interface{}, i int) interface{} {
+		file_module_msg_proto_msgTypes[113].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*BPFArg_Filter); i {
 			case 0:
 				return &v.state
@@ -10139,7 +9844,7 @@ func file_module_msg_proto_init() {
 				return nil
 			}
 		}
-		file_module_msg_proto_msgTypes[118].Exporter = func(v interface{}, i int) interface{} {
+		file_module_msg_proto_msgTypes[114].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*GenericEncapArg_EncapField); i {
 			case 0:
 				return &v.state
@@ -10151,7 +9856,7 @@ func file_module_msg_proto_init() {
 				return nil
 			}
 		}
-		file_module_msg_proto_msgTypes[122].Exporter = func(v interface{}, i int) interface{} {
+		file_module_msg_proto_msgTypes[118].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*NATArg_PortRange); i {
 			case 0:
 				return &v.state
@@ -10163,7 +9868,7 @@ func file_module_msg_proto_init() {
 				return nil
 			}
 		}
-		file_module_msg_proto_msgTypes[123].Exporter = func(v interface{}, i int) interface{} {
+		file_module_msg_proto_msgTypes[119].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*NATArg_ExternalAddress); i {
 			case 0:
 				return &v.state
@@ -10175,7 +9880,7 @@ func file_module_msg_proto_init() {
 				return nil
 			}
 		}
-		file_module_msg_proto_msgTypes[124].Exporter = func(v interface{}, i int) interface{} {
+		file_module_msg_proto_msgTypes[120].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*StaticNATArg_AddressRange); i {
 			case 0:
 				return &v.state
@@ -10187,7 +9892,7 @@ func file_module_msg_proto_init() {
 				return nil
 			}
 		}
-		file_module_msg_proto_msgTypes[125].Exporter = func(v interface{}, i int) interface{} {
+		file_module_msg_proto_msgTypes[121].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*StaticNATArg_AddressRangePair); i {
 			case 0:
 				return &v.state
@@ -10199,7 +9904,7 @@ func file_module_msg_proto_init() {
 				return nil
 			}
 		}
-		file_module_msg_proto_msgTypes[126].Exporter = func(v interface{}, i int) interface{} {
+		file_module_msg_proto_msgTypes[122].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*RandomUpdateArg_Field); i {
 			case 0:
 				return &v.state
@@ -10211,7 +9916,7 @@ func file_module_msg_proto_init() {
 				return nil
 			}
 		}
-		file_module_msg_proto_msgTypes[127].Exporter = func(v interface{}, i int) interface{} {
+		file_module_msg_proto_msgTypes[123].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*SetMetadataArg_Attribute); i {
 			case 0:
 				return &v.state
@@ -10223,7 +9928,7 @@ func file_module_msg_proto_init() {
 				return nil
 			}
 		}
-		file_module_msg_proto_msgTypes[128].Exporter = func(v interface{}, i int) interface{} {
+		file_module_msg_proto_msgTypes[124].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*UpdateArg_Field); i {
 			case 0:
 				return &v.state
@@ -10235,7 +9940,7 @@ func file_module_msg_proto_init() {
 				return nil
 			}
 		}
-		file_module_msg_proto_msgTypes[129].Exporter = func(v interface{}, i int) interface{} {
+		file_module_msg_proto_msgTypes[125].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*UrlFilterArg_Url); i {
 			case 0:
 				return &v.state
@@ -10247,7 +9952,7 @@ func file_module_msg_proto_init() {
 				return nil
 			}
 		}
-		file_module_msg_proto_msgTypes[131].Exporter = func(v interface{}, i int) interface{} {
+		file_module_msg_proto_msgTypes[127].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*FlowMeasureReadResponse_Statistic); i {
 			case 0:
 				return &v.state
@@ -10259,7 +9964,7 @@ func file_module_msg_proto_init() {
 				return nil
 			}
 		}
-		file_module_msg_proto_msgTypes[132].Exporter = func(v interface{}, i int) interface{} {
+		file_module_msg_proto_msgTypes[128].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*FlowMeasureReadResponse_Statistic_Histogram); i {
 			case 0:
 				return &v.state
@@ -10287,11 +9992,11 @@ func file_module_msg_proto_init() {
 	file_module_msg_proto_msgTypes[103].OneofWrappers = []interface{}{
 		(*QosCommandAddArg_DeductLen)(nil),
 	}
-	file_module_msg_proto_msgTypes[118].OneofWrappers = []interface{}{
+	file_module_msg_proto_msgTypes[114].OneofWrappers = []interface{}{
 		(*GenericEncapArg_EncapField_Attribute)(nil),
 		(*GenericEncapArg_EncapField_Value)(nil),
 	}
-	file_module_msg_proto_msgTypes[127].OneofWrappers = []interface{}{
+	file_module_msg_proto_msgTypes[123].OneofWrappers = []interface{}{
 		(*SetMetadataArg_Attribute_ValueInt)(nil),
 		(*SetMetadataArg_Attribute_ValueBin)(nil),
 	}
@@ -10301,7 +10006,7 @@ func file_module_msg_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_module_msg_proto_rawDesc,
 			NumEnums:      1,
-			NumMessages:   133,
+			NumMessages:   129,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
