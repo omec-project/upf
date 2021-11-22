@@ -34,10 +34,10 @@ type upfCollector struct {
 	jitter  *prometheus.Desc
 
 	sessionLatency             *prometheus.Desc
-	sessionDropRate            *prometheus.Desc
-	sessionThroughputBps       *prometheus.Desc
-	sessionThroughputPps       *prometheus.Desc
-	sessionObservationDuration *prometheus.Desc
+	sessionJitter              *prometheus.Desc
+	sessionTxPackets           *prometheus.Desc
+	sessionDroppedPackets      *prometheus.Desc
+	sessionTxBytes             *prometheus.Desc
 
 	upf *upf
 }
@@ -65,23 +65,23 @@ func newUpfCollector(upf *upf) *upfCollector {
 			[]string{"iface"}, nil,
 		),
 		sessionLatency: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "latency_ns"),
-			"Shows todo in UPF",
+			"Shows the latency of a session in UPF",
 			[]string{"fseid", "pdr"}, nil,
 		),
-		sessionDropRate: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "drop_rate"),
-			"Shows todo in UPF",
+		sessionJitter: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "jitter_ns"),
+			"Shows the jitter of a session in UPF",
 			[]string{"fseid", "pdr"}, nil,
 		),
-		sessionThroughputBps: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "throughput_bps"),
-			"Shows todo in UPF",
+		sessionTxPackets: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "tx_packets"),
+			"Shows the total number of packets for a given session in UPF",
 			[]string{"fseid", "pdr"}, nil,
 		),
-		sessionThroughputPps: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "throughput_pps"),
-			"Shows todo in UPF",
+		sessionDroppedPackets: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "dropped_packets"),
+			"Shows the number of packets dropped for a given session in UPF",
 			[]string{"fseid", "pdr"}, nil,
 		),
-		sessionObservationDuration: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "observation_duration_ns"),
-			"Shows todo in UPF",
+		sessionTxBytes: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "tx_bytes"),
+			"Shows the total number of bytes for a given session in UPF",
 			[]string{"fseid", "pdr"}, nil,
 		),
 		upf: upf,
@@ -102,8 +102,10 @@ func (uc *upfCollector) Describe(ch chan<- *prometheus.Desc) {
 func (uc *upfCollector) Collect(ch chan<- prometheus.Metric) {
 	uc.summaryLatencyJitter(ch)
 	uc.portStats(ch)
-	if err := uc.sessionStats(ch); err != nil {
-		log.Error(err)
+	if uc.upf.enableFlowMeasure {
+		if err := uc.sessionStats(ch); err != nil {
+			log.Error(err)
+		}
 	}
 }
 

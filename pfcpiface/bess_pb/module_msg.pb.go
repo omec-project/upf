@@ -6286,18 +6286,19 @@ func (x *QosCommandSetDefaultGateArg) GetGate() uint64 {
 	return 0
 }
 
-type QosMeasureArg struct {
+type FlowMeasureArg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	FlagAttrName string `protobuf:"bytes,1,opt,name=flag_attr_name,json=flagAttrName,proto3" json:"flag_attr_name,omitempty"`
-	Entries      uint64 `protobuf:"varint,2,opt,name=entries,proto3" json:"entries,omitempty"`
-	CounterOnly  bool   `protobuf:"varint,3,opt,name=counter_only,json=counterOnly,proto3" json:"counter_only,omitempty"` // If true, latency and jitter are not measured
+	FlagAttrName   string `protobuf:"bytes,1,opt,name=flag_attr_name,json=flagAttrName,proto3" json:"flag_attr_name,omitempty"`
+	CtrIdxAttrName string `protobuf:"bytes,2,opt,name=ctr_idx_attr_name,json=ctrIdxAttrName,proto3" json:"ctr_idx_attr_name,omitempty"`
+	Entries        uint64 `protobuf:"varint,3,opt,name=entries,proto3" json:"entries,omitempty"`
+	Leader         bool   `protobuf:"varint,4,opt,name=leader,proto3" json:"leader,omitempty"` // If true, this module will decide the buffer side
 }
 
-func (x *QosMeasureArg) Reset() {
-	*x = QosMeasureArg{}
+func (x *FlowMeasureArg) Reset() {
+	*x = FlowMeasureArg{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_module_msg_proto_msgTypes[107]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -6305,13 +6306,13 @@ func (x *QosMeasureArg) Reset() {
 	}
 }
 
-func (x *QosMeasureArg) String() string {
+func (x *FlowMeasureArg) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*QosMeasureArg) ProtoMessage() {}
+func (*FlowMeasureArg) ProtoMessage() {}
 
-func (x *QosMeasureArg) ProtoReflect() protoreflect.Message {
+func (x *FlowMeasureArg) ProtoReflect() protoreflect.Message {
 	mi := &file_module_msg_proto_msgTypes[107]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -6323,43 +6324,51 @@ func (x *QosMeasureArg) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use QosMeasureArg.ProtoReflect.Descriptor instead.
-func (*QosMeasureArg) Descriptor() ([]byte, []int) {
+// Deprecated: Use FlowMeasureArg.ProtoReflect.Descriptor instead.
+func (*FlowMeasureArg) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{107}
 }
 
-func (x *QosMeasureArg) GetFlagAttrName() string {
+func (x *FlowMeasureArg) GetFlagAttrName() string {
 	if x != nil {
 		return x.FlagAttrName
 	}
 	return ""
 }
 
-func (x *QosMeasureArg) GetEntries() uint64 {
+func (x *FlowMeasureArg) GetCtrIdxAttrName() string {
+	if x != nil {
+		return x.CtrIdxAttrName
+	}
+	return ""
+}
+
+func (x *FlowMeasureArg) GetEntries() uint64 {
 	if x != nil {
 		return x.Entries
 	}
 	return 0
 }
 
-func (x *QosMeasureArg) GetCounterOnly() bool {
+func (x *FlowMeasureArg) GetLeader() bool {
 	if x != nil {
-		return x.CounterOnly
+		return x.Leader
 	}
 	return false
 }
 
-type QosMeasureCommandReadArg struct {
+type FlowMeasureCommandReadArg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Clear bool       `protobuf:"varint,1,opt,name=clear,proto3" json:"clear,omitempty"`                       // If true, the data will be all cleared after read
-	Flag  BufferFlag `protobuf:"varint,2,opt,name=flag,proto3,enum=bess.pb.BufferFlag" json:"flag,omitempty"` // Which buffer side to read
+	Clear              bool      `protobuf:"varint,1,opt,name=clear,proto3" json:"clear,omitempty"`                                                             // If true, the data will be all cleared after read
+	LatencyPercentiles []float64 `protobuf:"fixed64,2,rep,packed,name=latency_percentiles,json=latencyPercentiles,proto3" json:"latency_percentiles,omitempty"` /// ascending list of real numbers in [0.0, 100.0]
+	JitterPercentiles  []float64 `protobuf:"fixed64,3,rep,packed,name=jitter_percentiles,json=jitterPercentiles,proto3" json:"jitter_percentiles,omitempty"`    /// ascending list of real numbers in [0.0, 100.0]
 }
 
-func (x *QosMeasureCommandReadArg) Reset() {
-	*x = QosMeasureCommandReadArg{}
+func (x *FlowMeasureCommandReadArg) Reset() {
+	*x = FlowMeasureCommandReadArg{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_module_msg_proto_msgTypes[108]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -6367,13 +6376,13 @@ func (x *QosMeasureCommandReadArg) Reset() {
 	}
 }
 
-func (x *QosMeasureCommandReadArg) String() string {
+func (x *FlowMeasureCommandReadArg) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*QosMeasureCommandReadArg) ProtoMessage() {}
+func (*FlowMeasureCommandReadArg) ProtoMessage() {}
 
-func (x *QosMeasureCommandReadArg) ProtoReflect() protoreflect.Message {
+func (x *FlowMeasureCommandReadArg) ProtoReflect() protoreflect.Message {
 	mi := &file_module_msg_proto_msgTypes[108]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -6385,35 +6394,42 @@ func (x *QosMeasureCommandReadArg) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use QosMeasureCommandReadArg.ProtoReflect.Descriptor instead.
-func (*QosMeasureCommandReadArg) Descriptor() ([]byte, []int) {
+// Deprecated: Use FlowMeasureCommandReadArg.ProtoReflect.Descriptor instead.
+func (*FlowMeasureCommandReadArg) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{108}
 }
 
-func (x *QosMeasureCommandReadArg) GetClear() bool {
+func (x *FlowMeasureCommandReadArg) GetClear() bool {
 	if x != nil {
 		return x.Clear
 	}
 	return false
 }
 
-func (x *QosMeasureCommandReadArg) GetFlag() BufferFlag {
+func (x *FlowMeasureCommandReadArg) GetLatencyPercentiles() []float64 {
 	if x != nil {
-		return x.Flag
+		return x.LatencyPercentiles
 	}
-	return BufferFlag_FLAG_VALUE_INVALID
+	return nil
 }
 
-type QosMeasureReadResponse struct {
+func (x *FlowMeasureCommandReadArg) GetJitterPercentiles() []float64 {
+	if x != nil {
+		return x.JitterPercentiles
+	}
+	return nil
+}
+
+type FlowMeasureReadResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Statistics []*QosMeasureReadResponse_Statistic `protobuf:"bytes,1,rep,name=statistics,proto3" json:"statistics,omitempty"`
+	Statistics []*FlowMeasureReadResponse_Statistic `protobuf:"bytes,1,rep,name=statistics,proto3" json:"statistics,omitempty"`
 }
 
-func (x *QosMeasureReadResponse) Reset() {
-	*x = QosMeasureReadResponse{}
+func (x *FlowMeasureReadResponse) Reset() {
+	*x = FlowMeasureReadResponse{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_module_msg_proto_msgTypes[109]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -6421,13 +6437,13 @@ func (x *QosMeasureReadResponse) Reset() {
 	}
 }
 
-func (x *QosMeasureReadResponse) String() string {
+func (x *FlowMeasureReadResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*QosMeasureReadResponse) ProtoMessage() {}
+func (*FlowMeasureReadResponse) ProtoMessage() {}
 
-func (x *QosMeasureReadResponse) ProtoReflect() protoreflect.Message {
+func (x *FlowMeasureReadResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_module_msg_proto_msgTypes[109]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -6439,12 +6455,12 @@ func (x *QosMeasureReadResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use QosMeasureReadResponse.ProtoReflect.Descriptor instead.
-func (*QosMeasureReadResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use FlowMeasureReadResponse.ProtoReflect.Descriptor instead.
+func (*FlowMeasureReadResponse) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{109}
 }
 
-func (x *QosMeasureReadResponse) GetStatistics() []*QosMeasureReadResponse_Statistic {
+func (x *FlowMeasureReadResponse) GetStatistics() []*FlowMeasureReadResponse_Statistic {
 	if x != nil {
 		return x.Statistics
 	}
@@ -7598,27 +7614,22 @@ func (x *UrlFilterArg_Url) GetPath() string {
 	return ""
 }
 
-type QosMeasureReadResponse_Statistic struct {
+type FlowMeasureReadResponse_Statistic struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Fseid          uint64 `protobuf:"varint,1,opt,name=fseid,proto3" json:"fseid,omitempty"`
-	Pdr            uint64 `protobuf:"varint,2,opt,name=pdr,proto3" json:"pdr,omitempty"`
-	Latency_50Ns   uint64 `protobuf:"varint,3,opt,name=latency_50_ns,json=latency50Ns,proto3" json:"latency_50_ns,omitempty"`
-	Latency_90Ns   uint64 `protobuf:"varint,4,opt,name=latency_90_ns,json=latency90Ns,proto3" json:"latency_90_ns,omitempty"`
-	Latency_99Ns   uint64 `protobuf:"varint,5,opt,name=latency_99_ns,json=latency99Ns,proto3" json:"latency_99_ns,omitempty"`
-	Latency_99_9Ns uint64 `protobuf:"varint,6,opt,name=latency_99_9_ns,json=latency999Ns,proto3" json:"latency_99_9_ns,omitempty"`
-	Jitter_50Ns    uint64 `protobuf:"varint,7,opt,name=jitter_50_ns,json=jitter50Ns,proto3" json:"jitter_50_ns,omitempty"`
-	Jitter_90Ns    uint64 `protobuf:"varint,8,opt,name=jitter_90_ns,json=jitter90Ns,proto3" json:"jitter_90_ns,omitempty"`
-	Jitter_99Ns    uint64 `protobuf:"varint,9,opt,name=jitter_99_ns,json=jitter99Ns,proto3" json:"jitter_99_ns,omitempty"`
-	Jitter_99_9Ns  uint64 `protobuf:"varint,10,opt,name=jitter_99_9_ns,json=jitter999Ns,proto3" json:"jitter_99_9_ns,omitempty"`
-	TotalBytes     uint64 `protobuf:"varint,11,opt,name=total_bytes,json=totalBytes,proto3" json:"total_bytes,omitempty"`
-	TotalPackets   uint64 `protobuf:"varint,12,opt,name=total_packets,json=totalPackets,proto3" json:"total_packets,omitempty"`
+	Fseid        uint64                                       `protobuf:"varint,1,opt,name=fseid,proto3" json:"fseid,omitempty"`
+	Pdr          uint64                                       `protobuf:"varint,2,opt,name=pdr,proto3" json:"pdr,omitempty"`
+	Ctr          uint64                                       `protobuf:"varint,5,opt,name=ctr,proto3" json:"ctr,omitempty"`
+	Latency      *FlowMeasureReadResponse_Statistic_Histogram `protobuf:"bytes,3,opt,name=latency,proto3" json:"latency,omitempty"`
+	Jitter       *FlowMeasureReadResponse_Statistic_Histogram `protobuf:"bytes,4,opt,name=jitter,proto3" json:"jitter,omitempty"`
+	TotalBytes   uint64                                       `protobuf:"varint,11,opt,name=total_bytes,json=totalBytes,proto3" json:"total_bytes,omitempty"`
+	TotalPackets uint64                                       `protobuf:"varint,12,opt,name=total_packets,json=totalPackets,proto3" json:"total_packets,omitempty"`
 }
 
-func (x *QosMeasureReadResponse_Statistic) Reset() {
-	*x = QosMeasureReadResponse_Statistic{}
+func (x *FlowMeasureReadResponse_Statistic) Reset() {
+	*x = FlowMeasureReadResponse_Statistic{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_module_msg_proto_msgTypes[131]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -7626,13 +7637,13 @@ func (x *QosMeasureReadResponse_Statistic) Reset() {
 	}
 }
 
-func (x *QosMeasureReadResponse_Statistic) String() string {
+func (x *FlowMeasureReadResponse_Statistic) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*QosMeasureReadResponse_Statistic) ProtoMessage() {}
+func (*FlowMeasureReadResponse_Statistic) ProtoMessage() {}
 
-func (x *QosMeasureReadResponse_Statistic) ProtoReflect() protoreflect.Message {
+func (x *FlowMeasureReadResponse_Statistic) ProtoReflect() protoreflect.Message {
 	mi := &file_module_msg_proto_msgTypes[131]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -7644,93 +7655,161 @@ func (x *QosMeasureReadResponse_Statistic) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use QosMeasureReadResponse_Statistic.ProtoReflect.Descriptor instead.
-func (*QosMeasureReadResponse_Statistic) Descriptor() ([]byte, []int) {
+// Deprecated: Use FlowMeasureReadResponse_Statistic.ProtoReflect.Descriptor instead.
+func (*FlowMeasureReadResponse_Statistic) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{109, 0}
 }
 
-func (x *QosMeasureReadResponse_Statistic) GetFseid() uint64 {
+func (x *FlowMeasureReadResponse_Statistic) GetFseid() uint64 {
 	if x != nil {
 		return x.Fseid
 	}
 	return 0
 }
 
-func (x *QosMeasureReadResponse_Statistic) GetPdr() uint64 {
+func (x *FlowMeasureReadResponse_Statistic) GetPdr() uint64 {
 	if x != nil {
 		return x.Pdr
 	}
 	return 0
 }
 
-func (x *QosMeasureReadResponse_Statistic) GetLatency_50Ns() uint64 {
+func (x *FlowMeasureReadResponse_Statistic) GetCtr() uint64 {
 	if x != nil {
-		return x.Latency_50Ns
+		return x.Ctr
 	}
 	return 0
 }
 
-func (x *QosMeasureReadResponse_Statistic) GetLatency_90Ns() uint64 {
+func (x *FlowMeasureReadResponse_Statistic) GetLatency() *FlowMeasureReadResponse_Statistic_Histogram {
 	if x != nil {
-		return x.Latency_90Ns
+		return x.Latency
 	}
-	return 0
+	return nil
 }
 
-func (x *QosMeasureReadResponse_Statistic) GetLatency_99Ns() uint64 {
+func (x *FlowMeasureReadResponse_Statistic) GetJitter() *FlowMeasureReadResponse_Statistic_Histogram {
 	if x != nil {
-		return x.Latency_99Ns
+		return x.Jitter
 	}
-	return 0
+	return nil
 }
 
-func (x *QosMeasureReadResponse_Statistic) GetLatency_99_9Ns() uint64 {
-	if x != nil {
-		return x.Latency_99_9Ns
-	}
-	return 0
-}
-
-func (x *QosMeasureReadResponse_Statistic) GetJitter_50Ns() uint64 {
-	if x != nil {
-		return x.Jitter_50Ns
-	}
-	return 0
-}
-
-func (x *QosMeasureReadResponse_Statistic) GetJitter_90Ns() uint64 {
-	if x != nil {
-		return x.Jitter_90Ns
-	}
-	return 0
-}
-
-func (x *QosMeasureReadResponse_Statistic) GetJitter_99Ns() uint64 {
-	if x != nil {
-		return x.Jitter_99Ns
-	}
-	return 0
-}
-
-func (x *QosMeasureReadResponse_Statistic) GetJitter_99_9Ns() uint64 {
-	if x != nil {
-		return x.Jitter_99_9Ns
-	}
-	return 0
-}
-
-func (x *QosMeasureReadResponse_Statistic) GetTotalBytes() uint64 {
+func (x *FlowMeasureReadResponse_Statistic) GetTotalBytes() uint64 {
 	if x != nil {
 		return x.TotalBytes
 	}
 	return 0
 }
 
-func (x *QosMeasureReadResponse_Statistic) GetTotalPackets() uint64 {
+func (x *FlowMeasureReadResponse_Statistic) GetTotalPackets() uint64 {
 	if x != nil {
 		return x.TotalPackets
 	}
 	return 0
+}
+
+type FlowMeasureReadResponse_Statistic_Histogram struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Count              uint64   `protobuf:"varint,1,opt,name=count,proto3" json:"count,omitempty"`                                   /// Total # of measured data points, including above_range
+	AboveRange         uint64   `protobuf:"varint,2,opt,name=above_range,json=aboveRange,proto3" json:"above_range,omitempty"`       /// # of data points for the "too large value" bucket
+	ResolutionNs       uint64   `protobuf:"varint,8,opt,name=resolution_ns,json=resolutionNs,proto3" json:"resolution_ns,omitempty"` /// resolution of measured data
+	MinNs              uint64   `protobuf:"varint,3,opt,name=min_ns,json=minNs,proto3" json:"min_ns,omitempty"`
+	AvgNs              uint64   `protobuf:"varint,4,opt,name=avg_ns,json=avgNs,proto3" json:"avg_ns,omitempty"`
+	MaxNs              uint64   `protobuf:"varint,5,opt,name=max_ns,json=maxNs,proto3" json:"max_ns,omitempty"`
+	TotalNs            uint64   `protobuf:"varint,6,opt,name=total_ns,json=totalNs,proto3" json:"total_ns,omitempty"`
+	PercentileValuesNs []uint64 `protobuf:"varint,7,rep,packed,name=percentile_values_ns,json=percentileValuesNs,proto3" json:"percentile_values_ns,omitempty"`
+}
+
+func (x *FlowMeasureReadResponse_Statistic_Histogram) Reset() {
+	*x = FlowMeasureReadResponse_Statistic_Histogram{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_module_msg_proto_msgTypes[132]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *FlowMeasureReadResponse_Statistic_Histogram) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FlowMeasureReadResponse_Statistic_Histogram) ProtoMessage() {}
+
+func (x *FlowMeasureReadResponse_Statistic_Histogram) ProtoReflect() protoreflect.Message {
+	mi := &file_module_msg_proto_msgTypes[132]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FlowMeasureReadResponse_Statistic_Histogram.ProtoReflect.Descriptor instead.
+func (*FlowMeasureReadResponse_Statistic_Histogram) Descriptor() ([]byte, []int) {
+	return file_module_msg_proto_rawDescGZIP(), []int{109, 0, 0}
+}
+
+func (x *FlowMeasureReadResponse_Statistic_Histogram) GetCount() uint64 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+func (x *FlowMeasureReadResponse_Statistic_Histogram) GetAboveRange() uint64 {
+	if x != nil {
+		return x.AboveRange
+	}
+	return 0
+}
+
+func (x *FlowMeasureReadResponse_Statistic_Histogram) GetResolutionNs() uint64 {
+	if x != nil {
+		return x.ResolutionNs
+	}
+	return 0
+}
+
+func (x *FlowMeasureReadResponse_Statistic_Histogram) GetMinNs() uint64 {
+	if x != nil {
+		return x.MinNs
+	}
+	return 0
+}
+
+func (x *FlowMeasureReadResponse_Statistic_Histogram) GetAvgNs() uint64 {
+	if x != nil {
+		return x.AvgNs
+	}
+	return 0
+}
+
+func (x *FlowMeasureReadResponse_Statistic_Histogram) GetMaxNs() uint64 {
+	if x != nil {
+		return x.MaxNs
+	}
+	return 0
+}
+
+func (x *FlowMeasureReadResponse_Statistic_Histogram) GetTotalNs() uint64 {
+	if x != nil {
+		return x.TotalNs
+	}
+	return 0
+}
+
+func (x *FlowMeasureReadResponse_Statistic_Histogram) GetPercentileValuesNs() []uint64 {
+	if x != nil {
+		return x.PercentileValuesNs
+	}
+	return nil
 }
 
 var File_module_msg_proto protoreflect.FileDescriptor
@@ -8332,84 +8411,99 @@ var file_module_msg_proto_rawDesc = []byte{
 	0x51, 0x6f, 0x73, 0x43, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64, 0x53, 0x65, 0x74, 0x44, 0x65, 0x66,
 	0x61, 0x75, 0x6c, 0x74, 0x47, 0x61, 0x74, 0x65, 0x41, 0x72, 0x67, 0x12, 0x12, 0x0a, 0x04, 0x67,
 	0x61, 0x74, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x04, 0x67, 0x61, 0x74, 0x65, 0x22,
-	0x72, 0x0a, 0x0d, 0x51, 0x6f, 0x73, 0x4d, 0x65, 0x61, 0x73, 0x75, 0x72, 0x65, 0x41, 0x72, 0x67,
-	0x12, 0x24, 0x0a, 0x0e, 0x66, 0x6c, 0x61, 0x67, 0x5f, 0x61, 0x74, 0x74, 0x72, 0x5f, 0x6e, 0x61,
-	0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0c, 0x66, 0x6c, 0x61, 0x67, 0x41, 0x74,
-	0x74, 0x72, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x65, 0x6e, 0x74, 0x72, 0x69, 0x65,
-	0x73, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x07, 0x65, 0x6e, 0x74, 0x72, 0x69, 0x65, 0x73,
-	0x12, 0x21, 0x0a, 0x0c, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x65, 0x72, 0x5f, 0x6f, 0x6e, 0x6c, 0x79,
-	0x18, 0x03, 0x20, 0x01, 0x28, 0x08, 0x52, 0x0b, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x65, 0x72, 0x4f,
-	0x6e, 0x6c, 0x79, 0x22, 0x59, 0x0a, 0x18, 0x51, 0x6f, 0x73, 0x4d, 0x65, 0x61, 0x73, 0x75, 0x72,
-	0x65, 0x43, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64, 0x52, 0x65, 0x61, 0x64, 0x41, 0x72, 0x67, 0x12,
-	0x14, 0x0a, 0x05, 0x63, 0x6c, 0x65, 0x61, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x08, 0x52, 0x05,
-	0x63, 0x6c, 0x65, 0x61, 0x72, 0x12, 0x27, 0x0a, 0x04, 0x66, 0x6c, 0x61, 0x67, 0x18, 0x02, 0x20,
-	0x01, 0x28, 0x0e, 0x32, 0x13, 0x2e, 0x62, 0x65, 0x73, 0x73, 0x2e, 0x70, 0x62, 0x2e, 0x42, 0x75,
-	0x66, 0x66, 0x65, 0x72, 0x46, 0x6c, 0x61, 0x67, 0x52, 0x04, 0x66, 0x6c, 0x61, 0x67, 0x22, 0xfd,
-	0x03, 0x0a, 0x16, 0x51, 0x6f, 0x73, 0x4d, 0x65, 0x61, 0x73, 0x75, 0x72, 0x65, 0x52, 0x65, 0x61,
-	0x64, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x49, 0x0a, 0x0a, 0x73, 0x74, 0x61,
-	0x74, 0x69, 0x73, 0x74, 0x69, 0x63, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x29, 0x2e,
-	0x62, 0x65, 0x73, 0x73, 0x2e, 0x70, 0x62, 0x2e, 0x51, 0x6f, 0x73, 0x4d, 0x65, 0x61, 0x73, 0x75,
-	0x72, 0x65, 0x52, 0x65, 0x61, 0x64, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x2e, 0x53,
-	0x74, 0x61, 0x74, 0x69, 0x73, 0x74, 0x69, 0x63, 0x52, 0x0a, 0x73, 0x74, 0x61, 0x74, 0x69, 0x73,
-	0x74, 0x69, 0x63, 0x73, 0x1a, 0x97, 0x03, 0x0a, 0x09, 0x53, 0x74, 0x61, 0x74, 0x69, 0x73, 0x74,
-	0x69, 0x63, 0x12, 0x14, 0x0a, 0x05, 0x66, 0x73, 0x65, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28,
-	0x04, 0x52, 0x05, 0x66, 0x73, 0x65, 0x69, 0x64, 0x12, 0x10, 0x0a, 0x03, 0x70, 0x64, 0x72, 0x18,
-	0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x03, 0x70, 0x64, 0x72, 0x12, 0x22, 0x0a, 0x0d, 0x6c, 0x61,
-	0x74, 0x65, 0x6e, 0x63, 0x79, 0x5f, 0x35, 0x30, 0x5f, 0x6e, 0x73, 0x18, 0x03, 0x20, 0x01, 0x28,
-	0x04, 0x52, 0x0b, 0x6c, 0x61, 0x74, 0x65, 0x6e, 0x63, 0x79, 0x35, 0x30, 0x4e, 0x73, 0x12, 0x22,
-	0x0a, 0x0d, 0x6c, 0x61, 0x74, 0x65, 0x6e, 0x63, 0x79, 0x5f, 0x39, 0x30, 0x5f, 0x6e, 0x73, 0x18,
-	0x04, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0b, 0x6c, 0x61, 0x74, 0x65, 0x6e, 0x63, 0x79, 0x39, 0x30,
-	0x4e, 0x73, 0x12, 0x22, 0x0a, 0x0d, 0x6c, 0x61, 0x74, 0x65, 0x6e, 0x63, 0x79, 0x5f, 0x39, 0x39,
-	0x5f, 0x6e, 0x73, 0x18, 0x05, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0b, 0x6c, 0x61, 0x74, 0x65, 0x6e,
-	0x63, 0x79, 0x39, 0x39, 0x4e, 0x73, 0x12, 0x25, 0x0a, 0x0f, 0x6c, 0x61, 0x74, 0x65, 0x6e, 0x63,
-	0x79, 0x5f, 0x39, 0x39, 0x5f, 0x39, 0x5f, 0x6e, 0x73, 0x18, 0x06, 0x20, 0x01, 0x28, 0x04, 0x52,
-	0x0c, 0x6c, 0x61, 0x74, 0x65, 0x6e, 0x63, 0x79, 0x39, 0x39, 0x39, 0x4e, 0x73, 0x12, 0x20, 0x0a,
-	0x0c, 0x6a, 0x69, 0x74, 0x74, 0x65, 0x72, 0x5f, 0x35, 0x30, 0x5f, 0x6e, 0x73, 0x18, 0x07, 0x20,
-	0x01, 0x28, 0x04, 0x52, 0x0a, 0x6a, 0x69, 0x74, 0x74, 0x65, 0x72, 0x35, 0x30, 0x4e, 0x73, 0x12,
-	0x20, 0x0a, 0x0c, 0x6a, 0x69, 0x74, 0x74, 0x65, 0x72, 0x5f, 0x39, 0x30, 0x5f, 0x6e, 0x73, 0x18,
-	0x08, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0a, 0x6a, 0x69, 0x74, 0x74, 0x65, 0x72, 0x39, 0x30, 0x4e,
-	0x73, 0x12, 0x20, 0x0a, 0x0c, 0x6a, 0x69, 0x74, 0x74, 0x65, 0x72, 0x5f, 0x39, 0x39, 0x5f, 0x6e,
-	0x73, 0x18, 0x09, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0a, 0x6a, 0x69, 0x74, 0x74, 0x65, 0x72, 0x39,
-	0x39, 0x4e, 0x73, 0x12, 0x23, 0x0a, 0x0e, 0x6a, 0x69, 0x74, 0x74, 0x65, 0x72, 0x5f, 0x39, 0x39,
-	0x5f, 0x39, 0x5f, 0x6e, 0x73, 0x18, 0x0a, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0b, 0x6a, 0x69, 0x74,
-	0x74, 0x65, 0x72, 0x39, 0x39, 0x39, 0x4e, 0x73, 0x12, 0x1f, 0x0a, 0x0b, 0x74, 0x6f, 0x74, 0x61,
-	0x6c, 0x5f, 0x62, 0x79, 0x74, 0x65, 0x73, 0x18, 0x0b, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0a, 0x74,
-	0x6f, 0x74, 0x61, 0x6c, 0x42, 0x79, 0x74, 0x65, 0x73, 0x12, 0x23, 0x0a, 0x0d, 0x74, 0x6f, 0x74,
-	0x61, 0x6c, 0x5f, 0x70, 0x61, 0x63, 0x6b, 0x65, 0x74, 0x73, 0x18, 0x0c, 0x20, 0x01, 0x28, 0x04,
-	0x52, 0x0c, 0x74, 0x6f, 0x74, 0x61, 0x6c, 0x50, 0x61, 0x63, 0x6b, 0x65, 0x74, 0x73, 0x22, 0x60,
-	0x0a, 0x16, 0x44, 0x6f, 0x75, 0x62, 0x6c, 0x65, 0x42, 0x75, 0x66, 0x66, 0x65, 0x72, 0x46, 0x6c,
-	0x61, 0x67, 0x67, 0x65, 0x72, 0x41, 0x72, 0x67, 0x12, 0x1b, 0x0a, 0x09, 0x61, 0x74, 0x74, 0x72,
-	0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x61, 0x74, 0x74,
-	0x72, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x29, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x03,
-	0x20, 0x01, 0x28, 0x0e, 0x32, 0x13, 0x2e, 0x62, 0x65, 0x73, 0x73, 0x2e, 0x70, 0x62, 0x2e, 0x42,
-	0x75, 0x66, 0x66, 0x65, 0x72, 0x46, 0x6c, 0x61, 0x67, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65,
-	0x22, 0x57, 0x0a, 0x25, 0x44, 0x6f, 0x75, 0x62, 0x6c, 0x65, 0x42, 0x75, 0x66, 0x66, 0x65, 0x72,
-	0x43, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64, 0x53, 0x65, 0x74, 0x4e, 0x65, 0x77, 0x46, 0x6c, 0x61,
-	0x67, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x41, 0x72, 0x67, 0x12, 0x2e, 0x0a, 0x08, 0x6e, 0x65, 0x77,
-	0x5f, 0x66, 0x6c, 0x61, 0x67, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x13, 0x2e, 0x62, 0x65,
-	0x73, 0x73, 0x2e, 0x70, 0x62, 0x2e, 0x42, 0x75, 0x66, 0x66, 0x65, 0x72, 0x46, 0x6c, 0x61, 0x67,
-	0x52, 0x07, 0x6e, 0x65, 0x77, 0x46, 0x6c, 0x61, 0x67, 0x22, 0x64, 0x0a, 0x2a, 0x44, 0x6f, 0x75,
-	0x62, 0x6c, 0x65, 0x42, 0x75, 0x66, 0x66, 0x65, 0x72, 0x43, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64,
-	0x53, 0x65, 0x74, 0x4e, 0x65, 0x77, 0x46, 0x6c, 0x61, 0x67, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x52,
-	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x36, 0x0a, 0x17, 0x6f, 0x62, 0x73, 0x65, 0x72,
-	0x76, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x64, 0x75, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f,
-	0x6e, 0x73, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x15, 0x6f, 0x62, 0x73, 0x65, 0x72, 0x76,
-	0x61, 0x74, 0x69, 0x6f, 0x6e, 0x44, 0x75, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x4e, 0x73, 0x22,
-	0x62, 0x0a, 0x28, 0x44, 0x6f, 0x75, 0x62, 0x6c, 0x65, 0x42, 0x75, 0x66, 0x66, 0x65, 0x72, 0x43,
-	0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64, 0x52, 0x65, 0x61, 0x64, 0x46, 0x6c, 0x61, 0x67, 0x56, 0x61,
-	0x6c, 0x75, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x36, 0x0a, 0x0c, 0x63,
-	0x75, 0x72, 0x72, 0x65, 0x6e, 0x74, 0x5f, 0x66, 0x6c, 0x61, 0x67, 0x18, 0x01, 0x20, 0x01, 0x28,
-	0x0e, 0x32, 0x13, 0x2e, 0x62, 0x65, 0x73, 0x73, 0x2e, 0x70, 0x62, 0x2e, 0x42, 0x75, 0x66, 0x66,
-	0x65, 0x72, 0x46, 0x6c, 0x61, 0x67, 0x52, 0x0b, 0x63, 0x75, 0x72, 0x72, 0x65, 0x6e, 0x74, 0x46,
-	0x6c, 0x61, 0x67, 0x2a, 0x48, 0x0a, 0x0a, 0x42, 0x75, 0x66, 0x66, 0x65, 0x72, 0x46, 0x6c, 0x61,
-	0x67, 0x12, 0x16, 0x0a, 0x12, 0x46, 0x4c, 0x41, 0x47, 0x5f, 0x56, 0x41, 0x4c, 0x55, 0x45, 0x5f,
-	0x49, 0x4e, 0x56, 0x41, 0x4c, 0x49, 0x44, 0x10, 0x00, 0x12, 0x10, 0x0a, 0x0c, 0x46, 0x4c, 0x41,
-	0x47, 0x5f, 0x56, 0x41, 0x4c, 0x55, 0x45, 0x5f, 0x41, 0x10, 0x01, 0x12, 0x10, 0x0a, 0x0c, 0x46,
-	0x4c, 0x41, 0x47, 0x5f, 0x56, 0x41, 0x4c, 0x55, 0x45, 0x5f, 0x42, 0x10, 0x02, 0x42, 0x33, 0x5a,
-	0x31, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x6f, 0x6d, 0x65, 0x63,
-	0x2d, 0x70, 0x72, 0x6f, 0x6a, 0x65, 0x63, 0x74, 0x2f, 0x75, 0x70, 0x66, 0x2d, 0x65, 0x70, 0x63,
-	0x2f, 0x70, 0x66, 0x63, 0x70, 0x69, 0x66, 0x61, 0x63, 0x65, 0x2f, 0x62, 0x65, 0x73, 0x73, 0x5f,
-	0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x93, 0x01, 0x0a, 0x0e, 0x46, 0x6c, 0x6f, 0x77, 0x4d, 0x65, 0x61, 0x73, 0x75, 0x72, 0x65, 0x41,
+	0x72, 0x67, 0x12, 0x24, 0x0a, 0x0e, 0x66, 0x6c, 0x61, 0x67, 0x5f, 0x61, 0x74, 0x74, 0x72, 0x5f,
+	0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0c, 0x66, 0x6c, 0x61, 0x67,
+	0x41, 0x74, 0x74, 0x72, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x29, 0x0a, 0x11, 0x63, 0x74, 0x72, 0x5f,
+	0x69, 0x64, 0x78, 0x5f, 0x61, 0x74, 0x74, 0x72, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x02, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x0e, 0x63, 0x74, 0x72, 0x49, 0x64, 0x78, 0x41, 0x74, 0x74, 0x72, 0x4e,
+	0x61, 0x6d, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x65, 0x6e, 0x74, 0x72, 0x69, 0x65, 0x73, 0x18, 0x03,
+	0x20, 0x01, 0x28, 0x04, 0x52, 0x07, 0x65, 0x6e, 0x74, 0x72, 0x69, 0x65, 0x73, 0x12, 0x16, 0x0a,
+	0x06, 0x6c, 0x65, 0x61, 0x64, 0x65, 0x72, 0x18, 0x04, 0x20, 0x01, 0x28, 0x08, 0x52, 0x06, 0x6c,
+	0x65, 0x61, 0x64, 0x65, 0x72, 0x22, 0x91, 0x01, 0x0a, 0x19, 0x46, 0x6c, 0x6f, 0x77, 0x4d, 0x65,
+	0x61, 0x73, 0x75, 0x72, 0x65, 0x43, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64, 0x52, 0x65, 0x61, 0x64,
+	0x41, 0x72, 0x67, 0x12, 0x14, 0x0a, 0x05, 0x63, 0x6c, 0x65, 0x61, 0x72, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x08, 0x52, 0x05, 0x63, 0x6c, 0x65, 0x61, 0x72, 0x12, 0x2f, 0x0a, 0x13, 0x6c, 0x61, 0x74,
+	0x65, 0x6e, 0x63, 0x79, 0x5f, 0x70, 0x65, 0x72, 0x63, 0x65, 0x6e, 0x74, 0x69, 0x6c, 0x65, 0x73,
+	0x18, 0x02, 0x20, 0x03, 0x28, 0x01, 0x52, 0x12, 0x6c, 0x61, 0x74, 0x65, 0x6e, 0x63, 0x79, 0x50,
+	0x65, 0x72, 0x63, 0x65, 0x6e, 0x74, 0x69, 0x6c, 0x65, 0x73, 0x12, 0x2d, 0x0a, 0x12, 0x6a, 0x69,
+	0x74, 0x74, 0x65, 0x72, 0x5f, 0x70, 0x65, 0x72, 0x63, 0x65, 0x6e, 0x74, 0x69, 0x6c, 0x65, 0x73,
+	0x18, 0x03, 0x20, 0x03, 0x28, 0x01, 0x52, 0x11, 0x6a, 0x69, 0x74, 0x74, 0x65, 0x72, 0x50, 0x65,
+	0x72, 0x63, 0x65, 0x6e, 0x74, 0x69, 0x6c, 0x65, 0x73, 0x22, 0x8d, 0x05, 0x0a, 0x17, 0x46, 0x6c,
+	0x6f, 0x77, 0x4d, 0x65, 0x61, 0x73, 0x75, 0x72, 0x65, 0x52, 0x65, 0x61, 0x64, 0x52, 0x65, 0x73,
+	0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x4a, 0x0a, 0x0a, 0x73, 0x74, 0x61, 0x74, 0x69, 0x73, 0x74,
+	0x69, 0x63, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x2a, 0x2e, 0x62, 0x65, 0x73, 0x73,
+	0x2e, 0x70, 0x62, 0x2e, 0x46, 0x6c, 0x6f, 0x77, 0x4d, 0x65, 0x61, 0x73, 0x75, 0x72, 0x65, 0x52,
+	0x65, 0x61, 0x64, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x2e, 0x53, 0x74, 0x61, 0x74,
+	0x69, 0x73, 0x74, 0x69, 0x63, 0x52, 0x0a, 0x73, 0x74, 0x61, 0x74, 0x69, 0x73, 0x74, 0x69, 0x63,
+	0x73, 0x1a, 0xa5, 0x04, 0x0a, 0x09, 0x53, 0x74, 0x61, 0x74, 0x69, 0x73, 0x74, 0x69, 0x63, 0x12,
+	0x14, 0x0a, 0x05, 0x66, 0x73, 0x65, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x05,
+	0x66, 0x73, 0x65, 0x69, 0x64, 0x12, 0x10, 0x0a, 0x03, 0x70, 0x64, 0x72, 0x18, 0x02, 0x20, 0x01,
+	0x28, 0x04, 0x52, 0x03, 0x70, 0x64, 0x72, 0x12, 0x10, 0x0a, 0x03, 0x63, 0x74, 0x72, 0x18, 0x05,
+	0x20, 0x01, 0x28, 0x04, 0x52, 0x03, 0x63, 0x74, 0x72, 0x12, 0x4e, 0x0a, 0x07, 0x6c, 0x61, 0x74,
+	0x65, 0x6e, 0x63, 0x79, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x34, 0x2e, 0x62, 0x65, 0x73,
+	0x73, 0x2e, 0x70, 0x62, 0x2e, 0x46, 0x6c, 0x6f, 0x77, 0x4d, 0x65, 0x61, 0x73, 0x75, 0x72, 0x65,
+	0x52, 0x65, 0x61, 0x64, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x2e, 0x53, 0x74, 0x61,
+	0x74, 0x69, 0x73, 0x74, 0x69, 0x63, 0x2e, 0x48, 0x69, 0x73, 0x74, 0x6f, 0x67, 0x72, 0x61, 0x6d,
+	0x52, 0x07, 0x6c, 0x61, 0x74, 0x65, 0x6e, 0x63, 0x79, 0x12, 0x4c, 0x0a, 0x06, 0x6a, 0x69, 0x74,
+	0x74, 0x65, 0x72, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x34, 0x2e, 0x62, 0x65, 0x73, 0x73,
+	0x2e, 0x70, 0x62, 0x2e, 0x46, 0x6c, 0x6f, 0x77, 0x4d, 0x65, 0x61, 0x73, 0x75, 0x72, 0x65, 0x52,
+	0x65, 0x61, 0x64, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x2e, 0x53, 0x74, 0x61, 0x74,
+	0x69, 0x73, 0x74, 0x69, 0x63, 0x2e, 0x48, 0x69, 0x73, 0x74, 0x6f, 0x67, 0x72, 0x61, 0x6d, 0x52,
+	0x06, 0x6a, 0x69, 0x74, 0x74, 0x65, 0x72, 0x12, 0x1f, 0x0a, 0x0b, 0x74, 0x6f, 0x74, 0x61, 0x6c,
+	0x5f, 0x62, 0x79, 0x74, 0x65, 0x73, 0x18, 0x0b, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0a, 0x74, 0x6f,
+	0x74, 0x61, 0x6c, 0x42, 0x79, 0x74, 0x65, 0x73, 0x12, 0x23, 0x0a, 0x0d, 0x74, 0x6f, 0x74, 0x61,
+	0x6c, 0x5f, 0x70, 0x61, 0x63, 0x6b, 0x65, 0x74, 0x73, 0x18, 0x0c, 0x20, 0x01, 0x28, 0x04, 0x52,
+	0x0c, 0x74, 0x6f, 0x74, 0x61, 0x6c, 0x50, 0x61, 0x63, 0x6b, 0x65, 0x74, 0x73, 0x1a, 0xf9, 0x01,
+	0x0a, 0x09, 0x48, 0x69, 0x73, 0x74, 0x6f, 0x67, 0x72, 0x61, 0x6d, 0x12, 0x14, 0x0a, 0x05, 0x63,
+	0x6f, 0x75, 0x6e, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x05, 0x63, 0x6f, 0x75, 0x6e,
+	0x74, 0x12, 0x1f, 0x0a, 0x0b, 0x61, 0x62, 0x6f, 0x76, 0x65, 0x5f, 0x72, 0x61, 0x6e, 0x67, 0x65,
+	0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0a, 0x61, 0x62, 0x6f, 0x76, 0x65, 0x52, 0x61, 0x6e,
+	0x67, 0x65, 0x12, 0x23, 0x0a, 0x0d, 0x72, 0x65, 0x73, 0x6f, 0x6c, 0x75, 0x74, 0x69, 0x6f, 0x6e,
+	0x5f, 0x6e, 0x73, 0x18, 0x08, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0c, 0x72, 0x65, 0x73, 0x6f, 0x6c,
+	0x75, 0x74, 0x69, 0x6f, 0x6e, 0x4e, 0x73, 0x12, 0x15, 0x0a, 0x06, 0x6d, 0x69, 0x6e, 0x5f, 0x6e,
+	0x73, 0x18, 0x03, 0x20, 0x01, 0x28, 0x04, 0x52, 0x05, 0x6d, 0x69, 0x6e, 0x4e, 0x73, 0x12, 0x15,
+	0x0a, 0x06, 0x61, 0x76, 0x67, 0x5f, 0x6e, 0x73, 0x18, 0x04, 0x20, 0x01, 0x28, 0x04, 0x52, 0x05,
+	0x61, 0x76, 0x67, 0x4e, 0x73, 0x12, 0x15, 0x0a, 0x06, 0x6d, 0x61, 0x78, 0x5f, 0x6e, 0x73, 0x18,
+	0x05, 0x20, 0x01, 0x28, 0x04, 0x52, 0x05, 0x6d, 0x61, 0x78, 0x4e, 0x73, 0x12, 0x19, 0x0a, 0x08,
+	0x74, 0x6f, 0x74, 0x61, 0x6c, 0x5f, 0x6e, 0x73, 0x18, 0x06, 0x20, 0x01, 0x28, 0x04, 0x52, 0x07,
+	0x74, 0x6f, 0x74, 0x61, 0x6c, 0x4e, 0x73, 0x12, 0x30, 0x0a, 0x14, 0x70, 0x65, 0x72, 0x63, 0x65,
+	0x6e, 0x74, 0x69, 0x6c, 0x65, 0x5f, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x73, 0x5f, 0x6e, 0x73, 0x18,
+	0x07, 0x20, 0x03, 0x28, 0x04, 0x52, 0x12, 0x70, 0x65, 0x72, 0x63, 0x65, 0x6e, 0x74, 0x69, 0x6c,
+	0x65, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x73, 0x4e, 0x73, 0x22, 0x60, 0x0a, 0x16, 0x44, 0x6f, 0x75,
+	0x62, 0x6c, 0x65, 0x42, 0x75, 0x66, 0x66, 0x65, 0x72, 0x46, 0x6c, 0x61, 0x67, 0x67, 0x65, 0x72,
+	0x41, 0x72, 0x67, 0x12, 0x1b, 0x0a, 0x09, 0x61, 0x74, 0x74, 0x72, 0x5f, 0x6e, 0x61, 0x6d, 0x65,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x61, 0x74, 0x74, 0x72, 0x4e, 0x61, 0x6d, 0x65,
+	0x12, 0x29, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0e, 0x32,
+	0x13, 0x2e, 0x62, 0x65, 0x73, 0x73, 0x2e, 0x70, 0x62, 0x2e, 0x42, 0x75, 0x66, 0x66, 0x65, 0x72,
+	0x46, 0x6c, 0x61, 0x67, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x22, 0x57, 0x0a, 0x25, 0x44,
+	0x6f, 0x75, 0x62, 0x6c, 0x65, 0x42, 0x75, 0x66, 0x66, 0x65, 0x72, 0x43, 0x6f, 0x6d, 0x6d, 0x61,
+	0x6e, 0x64, 0x53, 0x65, 0x74, 0x4e, 0x65, 0x77, 0x46, 0x6c, 0x61, 0x67, 0x56, 0x61, 0x6c, 0x75,
+	0x65, 0x41, 0x72, 0x67, 0x12, 0x2e, 0x0a, 0x08, 0x6e, 0x65, 0x77, 0x5f, 0x66, 0x6c, 0x61, 0x67,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x13, 0x2e, 0x62, 0x65, 0x73, 0x73, 0x2e, 0x70, 0x62,
+	0x2e, 0x42, 0x75, 0x66, 0x66, 0x65, 0x72, 0x46, 0x6c, 0x61, 0x67, 0x52, 0x07, 0x6e, 0x65, 0x77,
+	0x46, 0x6c, 0x61, 0x67, 0x22, 0x64, 0x0a, 0x2a, 0x44, 0x6f, 0x75, 0x62, 0x6c, 0x65, 0x42, 0x75,
+	0x66, 0x66, 0x65, 0x72, 0x43, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64, 0x53, 0x65, 0x74, 0x4e, 0x65,
+	0x77, 0x46, 0x6c, 0x61, 0x67, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
+	0x73, 0x65, 0x12, 0x36, 0x0a, 0x17, 0x6f, 0x62, 0x73, 0x65, 0x72, 0x76, 0x61, 0x74, 0x69, 0x6f,
+	0x6e, 0x5f, 0x64, 0x75, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x6e, 0x73, 0x18, 0x02, 0x20,
+	0x01, 0x28, 0x04, 0x52, 0x15, 0x6f, 0x62, 0x73, 0x65, 0x72, 0x76, 0x61, 0x74, 0x69, 0x6f, 0x6e,
+	0x44, 0x75, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x4e, 0x73, 0x22, 0x62, 0x0a, 0x28, 0x44, 0x6f,
+	0x75, 0x62, 0x6c, 0x65, 0x42, 0x75, 0x66, 0x66, 0x65, 0x72, 0x43, 0x6f, 0x6d, 0x6d, 0x61, 0x6e,
+	0x64, 0x52, 0x65, 0x61, 0x64, 0x46, 0x6c, 0x61, 0x67, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x52, 0x65,
+	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x36, 0x0a, 0x0c, 0x63, 0x75, 0x72, 0x72, 0x65, 0x6e,
+	0x74, 0x5f, 0x66, 0x6c, 0x61, 0x67, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x13, 0x2e, 0x62,
+	0x65, 0x73, 0x73, 0x2e, 0x70, 0x62, 0x2e, 0x42, 0x75, 0x66, 0x66, 0x65, 0x72, 0x46, 0x6c, 0x61,
+	0x67, 0x52, 0x0b, 0x63, 0x75, 0x72, 0x72, 0x65, 0x6e, 0x74, 0x46, 0x6c, 0x61, 0x67, 0x2a, 0x48,
+	0x0a, 0x0a, 0x42, 0x75, 0x66, 0x66, 0x65, 0x72, 0x46, 0x6c, 0x61, 0x67, 0x12, 0x16, 0x0a, 0x12,
+	0x46, 0x4c, 0x41, 0x47, 0x5f, 0x56, 0x41, 0x4c, 0x55, 0x45, 0x5f, 0x49, 0x4e, 0x56, 0x41, 0x4c,
+	0x49, 0x44, 0x10, 0x00, 0x12, 0x10, 0x0a, 0x0c, 0x46, 0x4c, 0x41, 0x47, 0x5f, 0x56, 0x41, 0x4c,
+	0x55, 0x45, 0x5f, 0x41, 0x10, 0x01, 0x12, 0x10, 0x0a, 0x0c, 0x46, 0x4c, 0x41, 0x47, 0x5f, 0x56,
+	0x41, 0x4c, 0x55, 0x45, 0x5f, 0x42, 0x10, 0x02, 0x42, 0x33, 0x5a, 0x31, 0x67, 0x69, 0x74, 0x68,
+	0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x6f, 0x6d, 0x65, 0x63, 0x2d, 0x70, 0x72, 0x6f, 0x6a,
+	0x65, 0x63, 0x74, 0x2f, 0x75, 0x70, 0x66, 0x2d, 0x65, 0x70, 0x63, 0x2f, 0x70, 0x66, 0x63, 0x70,
+	0x69, 0x66, 0x61, 0x63, 0x65, 0x2f, 0x62, 0x65, 0x73, 0x73, 0x5f, 0x70, 0x62, 0x62, 0x06, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -8425,166 +8519,167 @@ func file_module_msg_proto_rawDescGZIP() []byte {
 }
 
 var file_module_msg_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_module_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 132)
+var file_module_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 133)
 var file_module_msg_proto_goTypes = []interface{}{
-	(BufferFlag)(0),                                    // 0: bess.pb.BufferFlag
-	(*EmptyArg)(nil),                                   // 1: bess.pb.EmptyArg
-	(*BPFCommandClearArg)(nil),                         // 2: bess.pb.BPFCommandClearArg
-	(*ExactMatchCommandAddArg)(nil),                    // 3: bess.pb.ExactMatchCommandAddArg
-	(*ExactMatchCommandDeleteArg)(nil),                 // 4: bess.pb.ExactMatchCommandDeleteArg
-	(*ExactMatchCommandClearArg)(nil),                  // 5: bess.pb.ExactMatchCommandClearArg
-	(*ExactMatchCommandSetDefaultGateArg)(nil),         // 6: bess.pb.ExactMatchCommandSetDefaultGateArg
-	(*FlowGenCommandSetBurstArg)(nil),                  // 7: bess.pb.FlowGenCommandSetBurstArg
-	(*HashLBCommandSetModeArg)(nil),                    // 8: bess.pb.HashLBCommandSetModeArg
-	(*HashLBCommandSetGatesArg)(nil),                   // 9: bess.pb.HashLBCommandSetGatesArg
-	(*IPLookupCommandAddArg)(nil),                      // 10: bess.pb.IPLookupCommandAddArg
-	(*IPLookupCommandDeleteArg)(nil),                   // 11: bess.pb.IPLookupCommandDeleteArg
-	(*IPLookupCommandClearArg)(nil),                    // 12: bess.pb.IPLookupCommandClearArg
-	(*L2ForwardCommandAddArg)(nil),                     // 13: bess.pb.L2ForwardCommandAddArg
-	(*L2ForwardCommandDeleteArg)(nil),                  // 14: bess.pb.L2ForwardCommandDeleteArg
-	(*L2ForwardCommandSetDefaultGateArg)(nil),          // 15: bess.pb.L2ForwardCommandSetDefaultGateArg
-	(*L2ForwardCommandLookupArg)(nil),                  // 16: bess.pb.L2ForwardCommandLookupArg
-	(*L2ForwardCommandLookupResponse)(nil),             // 17: bess.pb.L2ForwardCommandLookupResponse
-	(*L2ForwardCommandPopulateArg)(nil),                // 18: bess.pb.L2ForwardCommandPopulateArg
-	(*MeasureCommandGetSummaryArg)(nil),                // 19: bess.pb.MeasureCommandGetSummaryArg
-	(*MeasureCommandGetSummaryResponse)(nil),           // 20: bess.pb.MeasureCommandGetSummaryResponse
-	(*DRRArg)(nil),                                     // 21: bess.pb.DRRArg
-	(*DRRQuantumArg)(nil),                              // 22: bess.pb.DRRQuantumArg
-	(*DRRMaxFlowQueueSizeArg)(nil),                     // 23: bess.pb.DRRMaxFlowQueueSizeArg
-	(*PortIncCommandSetBurstArg)(nil),                  // 24: bess.pb.PortIncCommandSetBurstArg
-	(*QueueIncCommandSetBurstArg)(nil),                 // 25: bess.pb.QueueIncCommandSetBurstArg
-	(*QueueCommandSetBurstArg)(nil),                    // 26: bess.pb.QueueCommandSetBurstArg
-	(*QueueCommandSetSizeArg)(nil),                     // 27: bess.pb.QueueCommandSetSizeArg
-	(*QueueCommandGetStatusArg)(nil),                   // 28: bess.pb.QueueCommandGetStatusArg
-	(*QueueCommandGetStatusResponse)(nil),              // 29: bess.pb.QueueCommandGetStatusResponse
-	(*RandomUpdateCommandClearArg)(nil),                // 30: bess.pb.RandomUpdateCommandClearArg
-	(*RewriteCommandClearArg)(nil),                     // 31: bess.pb.RewriteCommandClearArg
-	(*UpdateCommandClearArg)(nil),                      // 32: bess.pb.UpdateCommandClearArg
-	(*WildcardMatchCommandAddArg)(nil),                 // 33: bess.pb.WildcardMatchCommandAddArg
-	(*WildcardMatchCommandDeleteArg)(nil),              // 34: bess.pb.WildcardMatchCommandDeleteArg
-	(*WildcardMatchCommandClearArg)(nil),               // 35: bess.pb.WildcardMatchCommandClearArg
-	(*WildcardMatchCommandSetDefaultGateArg)(nil),      // 36: bess.pb.WildcardMatchCommandSetDefaultGateArg
-	(*ACLArg)(nil),                                     // 37: bess.pb.ACLArg
-	(*BPFArg)(nil),                                     // 38: bess.pb.BPFArg
-	(*BufferArg)(nil),                                  // 39: bess.pb.BufferArg
-	(*BypassArg)(nil),                                  // 40: bess.pb.BypassArg
-	(*DumpArg)(nil),                                    // 41: bess.pb.DumpArg
-	(*EtherEncapArg)(nil),                              // 42: bess.pb.EtherEncapArg
-	(*ExactMatchArg)(nil),                              // 43: bess.pb.ExactMatchArg
-	(*ExactMatchConfig)(nil),                           // 44: bess.pb.ExactMatchConfig
-	(*FlowGenArg)(nil),                                 // 45: bess.pb.FlowGenArg
-	(*GenericDecapArg)(nil),                            // 46: bess.pb.GenericDecapArg
-	(*GenericEncapArg)(nil),                            // 47: bess.pb.GenericEncapArg
-	(*HashLBArg)(nil),                                  // 48: bess.pb.HashLBArg
-	(*IPEncapArg)(nil),                                 // 49: bess.pb.IPEncapArg
-	(*IPLookupArg)(nil),                                // 50: bess.pb.IPLookupArg
-	(*L2ForwardArg)(nil),                               // 51: bess.pb.L2ForwardArg
-	(*MACSwapArg)(nil),                                 // 52: bess.pb.MACSwapArg
-	(*MeasureArg)(nil),                                 // 53: bess.pb.MeasureArg
-	(*MergeArg)(nil),                                   // 54: bess.pb.MergeArg
-	(*MetadataTestArg)(nil),                            // 55: bess.pb.MetadataTestArg
-	(*NATArg)(nil),                                     // 56: bess.pb.NATArg
-	(*StaticNATArg)(nil),                               // 57: bess.pb.StaticNATArg
-	(*NoOpArg)(nil),                                    // 58: bess.pb.NoOpArg
-	(*PortIncArg)(nil),                                 // 59: bess.pb.PortIncArg
-	(*PortOutArg)(nil),                                 // 60: bess.pb.PortOutArg
-	(*QueueIncArg)(nil),                                // 61: bess.pb.QueueIncArg
-	(*QueueOutArg)(nil),                                // 62: bess.pb.QueueOutArg
-	(*QueueArg)(nil),                                   // 63: bess.pb.QueueArg
-	(*RandomSplitArg)(nil),                             // 64: bess.pb.RandomSplitArg
-	(*RandomSplitCommandSetDroprateArg)(nil),           // 65: bess.pb.RandomSplitCommandSetDroprateArg
-	(*RandomSplitCommandSetGatesArg)(nil),              // 66: bess.pb.RandomSplitCommandSetGatesArg
-	(*RandomUpdateArg)(nil),                            // 67: bess.pb.RandomUpdateArg
-	(*RewriteArg)(nil),                                 // 68: bess.pb.RewriteArg
-	(*RoundRobinCommandSetGatesArg)(nil),               // 69: bess.pb.RoundRobinCommandSetGatesArg
-	(*RoundRobinCommandSetModeArg)(nil),                // 70: bess.pb.RoundRobinCommandSetModeArg
-	(*RoundRobinArg)(nil),                              // 71: bess.pb.RoundRobinArg
-	(*ReplicateArg)(nil),                               // 72: bess.pb.ReplicateArg
-	(*ReplicateCommandSetGatesArg)(nil),                // 73: bess.pb.ReplicateCommandSetGatesArg
-	(*SetMetadataArg)(nil),                             // 74: bess.pb.SetMetadataArg
-	(*SinkArg)(nil),                                    // 75: bess.pb.SinkArg
-	(*SourceCommandSetBurstArg)(nil),                   // 76: bess.pb.SourceCommandSetBurstArg
-	(*SourceCommandSetPktSizeArg)(nil),                 // 77: bess.pb.SourceCommandSetPktSizeArg
-	(*SourceArg)(nil),                                  // 78: bess.pb.SourceArg
-	(*IPChecksumArg)(nil),                              // 79: bess.pb.IPChecksumArg
-	(*L4ChecksumArg)(nil),                              // 80: bess.pb.L4ChecksumArg
-	(*GtpuEchoArg)(nil),                                // 81: bess.pb.GtpuEchoArg
-	(*IPDefragArg)(nil),                                // 82: bess.pb.IPDefragArg
-	(*IPFragArg)(nil),                                  // 83: bess.pb.IPFragArg
-	(*CounterAddArg)(nil),                              // 84: bess.pb.CounterAddArg
-	(*CounterRemoveArg)(nil),                           // 85: bess.pb.CounterRemoveArg
-	(*CounterArg)(nil),                                 // 86: bess.pb.CounterArg
-	(*GtpuEncapArg)(nil),                               // 87: bess.pb.GtpuEncapArg
-	(*SplitArg)(nil),                                   // 88: bess.pb.SplitArg
-	(*TimestampArg)(nil),                               // 89: bess.pb.TimestampArg
-	(*UpdateArg)(nil),                                  // 90: bess.pb.UpdateArg
-	(*UrlFilterArg)(nil),                               // 91: bess.pb.UrlFilterArg
-	(*UrlFilterConfig)(nil),                            // 92: bess.pb.UrlFilterConfig
-	(*VLANPopArg)(nil),                                 // 93: bess.pb.VLANPopArg
-	(*VLANPushArg)(nil),                                // 94: bess.pb.VLANPushArg
-	(*VLANSplitArg)(nil),                               // 95: bess.pb.VLANSplitArg
-	(*VXLANDecapArg)(nil),                              // 96: bess.pb.VXLANDecapArg
-	(*VXLANEncapArg)(nil),                              // 97: bess.pb.VXLANEncapArg
-	(*WildcardMatchArg)(nil),                           // 98: bess.pb.WildcardMatchArg
-	(*WildcardMatchConfig)(nil),                        // 99: bess.pb.WildcardMatchConfig
-	(*ArpResponderArg)(nil),                            // 100: bess.pb.ArpResponderArg
-	(*MplsPopArg)(nil),                                 // 101: bess.pb.MplsPopArg
-	(*WorkerSplitArg)(nil),                             // 102: bess.pb.WorkerSplitArg
-	(*QosArg)(nil),                                     // 103: bess.pb.QosArg
-	(*QosCommandAddArg)(nil),                           // 104: bess.pb.QosCommandAddArg
-	(*QosCommandDeleteArg)(nil),                        // 105: bess.pb.QosCommandDeleteArg
-	(*QosCommandClearArg)(nil),                         // 106: bess.pb.QosCommandClearArg
-	(*QosCommandSetDefaultGateArg)(nil),                // 107: bess.pb.QosCommandSetDefaultGateArg
-	(*QosMeasureArg)(nil),                              // 108: bess.pb.QosMeasureArg
-	(*QosMeasureCommandReadArg)(nil),                   // 109: bess.pb.QosMeasureCommandReadArg
-	(*QosMeasureReadResponse)(nil),                     // 110: bess.pb.QosMeasureReadResponse
-	(*DoubleBufferFlaggerArg)(nil),                     // 111: bess.pb.DoubleBufferFlaggerArg
-	(*DoubleBufferCommandSetNewFlagValueArg)(nil),      // 112: bess.pb.DoubleBufferCommandSetNewFlagValueArg
-	(*DoubleBufferCommandSetNewFlagValueResponse)(nil), // 113: bess.pb.DoubleBufferCommandSetNewFlagValueResponse
-	(*DoubleBufferCommandReadFlagValueResponse)(nil),   // 114: bess.pb.DoubleBufferCommandReadFlagValueResponse
-	(*L2ForwardCommandAddArg_Entry)(nil),               // 115: bess.pb.L2ForwardCommandAddArg.Entry
-	(*MeasureCommandGetSummaryResponse_Histogram)(nil), // 116: bess.pb.MeasureCommandGetSummaryResponse.Histogram
-	(*ACLArg_Rule)(nil),                                // 117: bess.pb.ACLArg.Rule
-	(*BPFArg_Filter)(nil),                              // 118: bess.pb.BPFArg.Filter
-	(*GenericEncapArg_EncapField)(nil),                 // 119: bess.pb.GenericEncapArg.EncapField
-	nil,                                                // 120: bess.pb.MetadataTestArg.ReadEntry
-	nil,                                                // 121: bess.pb.MetadataTestArg.WriteEntry
-	nil,                                                // 122: bess.pb.MetadataTestArg.UpdateEntry
-	(*NATArg_PortRange)(nil),                           // 123: bess.pb.NATArg.PortRange
-	(*NATArg_ExternalAddress)(nil),                     // 124: bess.pb.NATArg.ExternalAddress
-	(*StaticNATArg_AddressRange)(nil),                  // 125: bess.pb.StaticNATArg.AddressRange
-	(*StaticNATArg_AddressRangePair)(nil),              // 126: bess.pb.StaticNATArg.AddressRangePair
-	(*RandomUpdateArg_Field)(nil),                      // 127: bess.pb.RandomUpdateArg.Field
-	(*SetMetadataArg_Attribute)(nil),                   // 128: bess.pb.SetMetadataArg.Attribute
-	(*UpdateArg_Field)(nil),                            // 129: bess.pb.UpdateArg.Field
-	(*UrlFilterArg_Url)(nil),                           // 130: bess.pb.UrlFilterArg.Url
-	nil,                                                // 131: bess.pb.WorkerSplitArg.WorkerGatesEntry
-	(*QosMeasureReadResponse_Statistic)(nil),           // 132: bess.pb.QosMeasureReadResponse.Statistic
-	(*FieldData)(nil),                                  // 133: bess.pb.FieldData
-	(*Field)(nil),                                      // 134: bess.pb.Field
+	(BufferFlag)(0),                                     // 0: bess.pb.BufferFlag
+	(*EmptyArg)(nil),                                    // 1: bess.pb.EmptyArg
+	(*BPFCommandClearArg)(nil),                          // 2: bess.pb.BPFCommandClearArg
+	(*ExactMatchCommandAddArg)(nil),                     // 3: bess.pb.ExactMatchCommandAddArg
+	(*ExactMatchCommandDeleteArg)(nil),                  // 4: bess.pb.ExactMatchCommandDeleteArg
+	(*ExactMatchCommandClearArg)(nil),                   // 5: bess.pb.ExactMatchCommandClearArg
+	(*ExactMatchCommandSetDefaultGateArg)(nil),          // 6: bess.pb.ExactMatchCommandSetDefaultGateArg
+	(*FlowGenCommandSetBurstArg)(nil),                   // 7: bess.pb.FlowGenCommandSetBurstArg
+	(*HashLBCommandSetModeArg)(nil),                     // 8: bess.pb.HashLBCommandSetModeArg
+	(*HashLBCommandSetGatesArg)(nil),                    // 9: bess.pb.HashLBCommandSetGatesArg
+	(*IPLookupCommandAddArg)(nil),                       // 10: bess.pb.IPLookupCommandAddArg
+	(*IPLookupCommandDeleteArg)(nil),                    // 11: bess.pb.IPLookupCommandDeleteArg
+	(*IPLookupCommandClearArg)(nil),                     // 12: bess.pb.IPLookupCommandClearArg
+	(*L2ForwardCommandAddArg)(nil),                      // 13: bess.pb.L2ForwardCommandAddArg
+	(*L2ForwardCommandDeleteArg)(nil),                   // 14: bess.pb.L2ForwardCommandDeleteArg
+	(*L2ForwardCommandSetDefaultGateArg)(nil),           // 15: bess.pb.L2ForwardCommandSetDefaultGateArg
+	(*L2ForwardCommandLookupArg)(nil),                   // 16: bess.pb.L2ForwardCommandLookupArg
+	(*L2ForwardCommandLookupResponse)(nil),              // 17: bess.pb.L2ForwardCommandLookupResponse
+	(*L2ForwardCommandPopulateArg)(nil),                 // 18: bess.pb.L2ForwardCommandPopulateArg
+	(*MeasureCommandGetSummaryArg)(nil),                 // 19: bess.pb.MeasureCommandGetSummaryArg
+	(*MeasureCommandGetSummaryResponse)(nil),            // 20: bess.pb.MeasureCommandGetSummaryResponse
+	(*DRRArg)(nil),                                      // 21: bess.pb.DRRArg
+	(*DRRQuantumArg)(nil),                               // 22: bess.pb.DRRQuantumArg
+	(*DRRMaxFlowQueueSizeArg)(nil),                      // 23: bess.pb.DRRMaxFlowQueueSizeArg
+	(*PortIncCommandSetBurstArg)(nil),                   // 24: bess.pb.PortIncCommandSetBurstArg
+	(*QueueIncCommandSetBurstArg)(nil),                  // 25: bess.pb.QueueIncCommandSetBurstArg
+	(*QueueCommandSetBurstArg)(nil),                     // 26: bess.pb.QueueCommandSetBurstArg
+	(*QueueCommandSetSizeArg)(nil),                      // 27: bess.pb.QueueCommandSetSizeArg
+	(*QueueCommandGetStatusArg)(nil),                    // 28: bess.pb.QueueCommandGetStatusArg
+	(*QueueCommandGetStatusResponse)(nil),               // 29: bess.pb.QueueCommandGetStatusResponse
+	(*RandomUpdateCommandClearArg)(nil),                 // 30: bess.pb.RandomUpdateCommandClearArg
+	(*RewriteCommandClearArg)(nil),                      // 31: bess.pb.RewriteCommandClearArg
+	(*UpdateCommandClearArg)(nil),                       // 32: bess.pb.UpdateCommandClearArg
+	(*WildcardMatchCommandAddArg)(nil),                  // 33: bess.pb.WildcardMatchCommandAddArg
+	(*WildcardMatchCommandDeleteArg)(nil),               // 34: bess.pb.WildcardMatchCommandDeleteArg
+	(*WildcardMatchCommandClearArg)(nil),                // 35: bess.pb.WildcardMatchCommandClearArg
+	(*WildcardMatchCommandSetDefaultGateArg)(nil),       // 36: bess.pb.WildcardMatchCommandSetDefaultGateArg
+	(*ACLArg)(nil),                                      // 37: bess.pb.ACLArg
+	(*BPFArg)(nil),                                      // 38: bess.pb.BPFArg
+	(*BufferArg)(nil),                                   // 39: bess.pb.BufferArg
+	(*BypassArg)(nil),                                   // 40: bess.pb.BypassArg
+	(*DumpArg)(nil),                                     // 41: bess.pb.DumpArg
+	(*EtherEncapArg)(nil),                               // 42: bess.pb.EtherEncapArg
+	(*ExactMatchArg)(nil),                               // 43: bess.pb.ExactMatchArg
+	(*ExactMatchConfig)(nil),                            // 44: bess.pb.ExactMatchConfig
+	(*FlowGenArg)(nil),                                  // 45: bess.pb.FlowGenArg
+	(*GenericDecapArg)(nil),                             // 46: bess.pb.GenericDecapArg
+	(*GenericEncapArg)(nil),                             // 47: bess.pb.GenericEncapArg
+	(*HashLBArg)(nil),                                   // 48: bess.pb.HashLBArg
+	(*IPEncapArg)(nil),                                  // 49: bess.pb.IPEncapArg
+	(*IPLookupArg)(nil),                                 // 50: bess.pb.IPLookupArg
+	(*L2ForwardArg)(nil),                                // 51: bess.pb.L2ForwardArg
+	(*MACSwapArg)(nil),                                  // 52: bess.pb.MACSwapArg
+	(*MeasureArg)(nil),                                  // 53: bess.pb.MeasureArg
+	(*MergeArg)(nil),                                    // 54: bess.pb.MergeArg
+	(*MetadataTestArg)(nil),                             // 55: bess.pb.MetadataTestArg
+	(*NATArg)(nil),                                      // 56: bess.pb.NATArg
+	(*StaticNATArg)(nil),                                // 57: bess.pb.StaticNATArg
+	(*NoOpArg)(nil),                                     // 58: bess.pb.NoOpArg
+	(*PortIncArg)(nil),                                  // 59: bess.pb.PortIncArg
+	(*PortOutArg)(nil),                                  // 60: bess.pb.PortOutArg
+	(*QueueIncArg)(nil),                                 // 61: bess.pb.QueueIncArg
+	(*QueueOutArg)(nil),                                 // 62: bess.pb.QueueOutArg
+	(*QueueArg)(nil),                                    // 63: bess.pb.QueueArg
+	(*RandomSplitArg)(nil),                              // 64: bess.pb.RandomSplitArg
+	(*RandomSplitCommandSetDroprateArg)(nil),            // 65: bess.pb.RandomSplitCommandSetDroprateArg
+	(*RandomSplitCommandSetGatesArg)(nil),               // 66: bess.pb.RandomSplitCommandSetGatesArg
+	(*RandomUpdateArg)(nil),                             // 67: bess.pb.RandomUpdateArg
+	(*RewriteArg)(nil),                                  // 68: bess.pb.RewriteArg
+	(*RoundRobinCommandSetGatesArg)(nil),                // 69: bess.pb.RoundRobinCommandSetGatesArg
+	(*RoundRobinCommandSetModeArg)(nil),                 // 70: bess.pb.RoundRobinCommandSetModeArg
+	(*RoundRobinArg)(nil),                               // 71: bess.pb.RoundRobinArg
+	(*ReplicateArg)(nil),                                // 72: bess.pb.ReplicateArg
+	(*ReplicateCommandSetGatesArg)(nil),                 // 73: bess.pb.ReplicateCommandSetGatesArg
+	(*SetMetadataArg)(nil),                              // 74: bess.pb.SetMetadataArg
+	(*SinkArg)(nil),                                     // 75: bess.pb.SinkArg
+	(*SourceCommandSetBurstArg)(nil),                    // 76: bess.pb.SourceCommandSetBurstArg
+	(*SourceCommandSetPktSizeArg)(nil),                  // 77: bess.pb.SourceCommandSetPktSizeArg
+	(*SourceArg)(nil),                                   // 78: bess.pb.SourceArg
+	(*IPChecksumArg)(nil),                               // 79: bess.pb.IPChecksumArg
+	(*L4ChecksumArg)(nil),                               // 80: bess.pb.L4ChecksumArg
+	(*GtpuEchoArg)(nil),                                 // 81: bess.pb.GtpuEchoArg
+	(*IPDefragArg)(nil),                                 // 82: bess.pb.IPDefragArg
+	(*IPFragArg)(nil),                                   // 83: bess.pb.IPFragArg
+	(*CounterAddArg)(nil),                               // 84: bess.pb.CounterAddArg
+	(*CounterRemoveArg)(nil),                            // 85: bess.pb.CounterRemoveArg
+	(*CounterArg)(nil),                                  // 86: bess.pb.CounterArg
+	(*GtpuEncapArg)(nil),                                // 87: bess.pb.GtpuEncapArg
+	(*SplitArg)(nil),                                    // 88: bess.pb.SplitArg
+	(*TimestampArg)(nil),                                // 89: bess.pb.TimestampArg
+	(*UpdateArg)(nil),                                   // 90: bess.pb.UpdateArg
+	(*UrlFilterArg)(nil),                                // 91: bess.pb.UrlFilterArg
+	(*UrlFilterConfig)(nil),                             // 92: bess.pb.UrlFilterConfig
+	(*VLANPopArg)(nil),                                  // 93: bess.pb.VLANPopArg
+	(*VLANPushArg)(nil),                                 // 94: bess.pb.VLANPushArg
+	(*VLANSplitArg)(nil),                                // 95: bess.pb.VLANSplitArg
+	(*VXLANDecapArg)(nil),                               // 96: bess.pb.VXLANDecapArg
+	(*VXLANEncapArg)(nil),                               // 97: bess.pb.VXLANEncapArg
+	(*WildcardMatchArg)(nil),                            // 98: bess.pb.WildcardMatchArg
+	(*WildcardMatchConfig)(nil),                         // 99: bess.pb.WildcardMatchConfig
+	(*ArpResponderArg)(nil),                             // 100: bess.pb.ArpResponderArg
+	(*MplsPopArg)(nil),                                  // 101: bess.pb.MplsPopArg
+	(*WorkerSplitArg)(nil),                              // 102: bess.pb.WorkerSplitArg
+	(*QosArg)(nil),                                      // 103: bess.pb.QosArg
+	(*QosCommandAddArg)(nil),                            // 104: bess.pb.QosCommandAddArg
+	(*QosCommandDeleteArg)(nil),                         // 105: bess.pb.QosCommandDeleteArg
+	(*QosCommandClearArg)(nil),                          // 106: bess.pb.QosCommandClearArg
+	(*QosCommandSetDefaultGateArg)(nil),                 // 107: bess.pb.QosCommandSetDefaultGateArg
+	(*FlowMeasureArg)(nil),                              // 108: bess.pb.FlowMeasureArg
+	(*FlowMeasureCommandReadArg)(nil),                   // 109: bess.pb.FlowMeasureCommandReadArg
+	(*FlowMeasureReadResponse)(nil),                     // 110: bess.pb.FlowMeasureReadResponse
+	(*DoubleBufferFlaggerArg)(nil),                      // 111: bess.pb.DoubleBufferFlaggerArg
+	(*DoubleBufferCommandSetNewFlagValueArg)(nil),       // 112: bess.pb.DoubleBufferCommandSetNewFlagValueArg
+	(*DoubleBufferCommandSetNewFlagValueResponse)(nil),  // 113: bess.pb.DoubleBufferCommandSetNewFlagValueResponse
+	(*DoubleBufferCommandReadFlagValueResponse)(nil),    // 114: bess.pb.DoubleBufferCommandReadFlagValueResponse
+	(*L2ForwardCommandAddArg_Entry)(nil),                // 115: bess.pb.L2ForwardCommandAddArg.Entry
+	(*MeasureCommandGetSummaryResponse_Histogram)(nil),  // 116: bess.pb.MeasureCommandGetSummaryResponse.Histogram
+	(*ACLArg_Rule)(nil),                                 // 117: bess.pb.ACLArg.Rule
+	(*BPFArg_Filter)(nil),                               // 118: bess.pb.BPFArg.Filter
+	(*GenericEncapArg_EncapField)(nil),                  // 119: bess.pb.GenericEncapArg.EncapField
+	nil,                                                 // 120: bess.pb.MetadataTestArg.ReadEntry
+	nil,                                                 // 121: bess.pb.MetadataTestArg.WriteEntry
+	nil,                                                 // 122: bess.pb.MetadataTestArg.UpdateEntry
+	(*NATArg_PortRange)(nil),                            // 123: bess.pb.NATArg.PortRange
+	(*NATArg_ExternalAddress)(nil),                      // 124: bess.pb.NATArg.ExternalAddress
+	(*StaticNATArg_AddressRange)(nil),                   // 125: bess.pb.StaticNATArg.AddressRange
+	(*StaticNATArg_AddressRangePair)(nil),               // 126: bess.pb.StaticNATArg.AddressRangePair
+	(*RandomUpdateArg_Field)(nil),                       // 127: bess.pb.RandomUpdateArg.Field
+	(*SetMetadataArg_Attribute)(nil),                    // 128: bess.pb.SetMetadataArg.Attribute
+	(*UpdateArg_Field)(nil),                             // 129: bess.pb.UpdateArg.Field
+	(*UrlFilterArg_Url)(nil),                            // 130: bess.pb.UrlFilterArg.Url
+	nil,                                                 // 131: bess.pb.WorkerSplitArg.WorkerGatesEntry
+	(*FlowMeasureReadResponse_Statistic)(nil),           // 132: bess.pb.FlowMeasureReadResponse.Statistic
+	(*FlowMeasureReadResponse_Statistic_Histogram)(nil), // 133: bess.pb.FlowMeasureReadResponse.Statistic.Histogram
+	(*FieldData)(nil),                                   // 134: bess.pb.FieldData
+	(*Field)(nil),                                       // 135: bess.pb.Field
 }
 var file_module_msg_proto_depIdxs = []int32{
-	133, // 0: bess.pb.ExactMatchCommandAddArg.fields:type_name -> bess.pb.FieldData
-	133, // 1: bess.pb.ExactMatchCommandAddArg.values:type_name -> bess.pb.FieldData
-	133, // 2: bess.pb.ExactMatchCommandDeleteArg.fields:type_name -> bess.pb.FieldData
-	134, // 3: bess.pb.HashLBCommandSetModeArg.fields:type_name -> bess.pb.Field
+	134, // 0: bess.pb.ExactMatchCommandAddArg.fields:type_name -> bess.pb.FieldData
+	134, // 1: bess.pb.ExactMatchCommandAddArg.values:type_name -> bess.pb.FieldData
+	134, // 2: bess.pb.ExactMatchCommandDeleteArg.fields:type_name -> bess.pb.FieldData
+	135, // 3: bess.pb.HashLBCommandSetModeArg.fields:type_name -> bess.pb.Field
 	115, // 4: bess.pb.L2ForwardCommandAddArg.entries:type_name -> bess.pb.L2ForwardCommandAddArg.Entry
 	116, // 5: bess.pb.MeasureCommandGetSummaryResponse.latency:type_name -> bess.pb.MeasureCommandGetSummaryResponse.Histogram
 	116, // 6: bess.pb.MeasureCommandGetSummaryResponse.jitter:type_name -> bess.pb.MeasureCommandGetSummaryResponse.Histogram
-	133, // 7: bess.pb.WildcardMatchCommandAddArg.values:type_name -> bess.pb.FieldData
-	133, // 8: bess.pb.WildcardMatchCommandAddArg.masks:type_name -> bess.pb.FieldData
-	133, // 9: bess.pb.WildcardMatchCommandAddArg.valuesv:type_name -> bess.pb.FieldData
-	133, // 10: bess.pb.WildcardMatchCommandDeleteArg.values:type_name -> bess.pb.FieldData
-	133, // 11: bess.pb.WildcardMatchCommandDeleteArg.masks:type_name -> bess.pb.FieldData
+	134, // 7: bess.pb.WildcardMatchCommandAddArg.values:type_name -> bess.pb.FieldData
+	134, // 8: bess.pb.WildcardMatchCommandAddArg.masks:type_name -> bess.pb.FieldData
+	134, // 9: bess.pb.WildcardMatchCommandAddArg.valuesv:type_name -> bess.pb.FieldData
+	134, // 10: bess.pb.WildcardMatchCommandDeleteArg.values:type_name -> bess.pb.FieldData
+	134, // 11: bess.pb.WildcardMatchCommandDeleteArg.masks:type_name -> bess.pb.FieldData
 	117, // 12: bess.pb.ACLArg.rules:type_name -> bess.pb.ACLArg.Rule
 	118, // 13: bess.pb.BPFArg.filters:type_name -> bess.pb.BPFArg.Filter
-	134, // 14: bess.pb.ExactMatchArg.fields:type_name -> bess.pb.Field
-	133, // 15: bess.pb.ExactMatchArg.masks:type_name -> bess.pb.FieldData
-	134, // 16: bess.pb.ExactMatchArg.values:type_name -> bess.pb.Field
-	133, // 17: bess.pb.ExactMatchArg.masksv:type_name -> bess.pb.FieldData
+	135, // 14: bess.pb.ExactMatchArg.fields:type_name -> bess.pb.Field
+	134, // 15: bess.pb.ExactMatchArg.masks:type_name -> bess.pb.FieldData
+	135, // 16: bess.pb.ExactMatchArg.values:type_name -> bess.pb.Field
+	134, // 17: bess.pb.ExactMatchArg.masksv:type_name -> bess.pb.FieldData
 	3,   // 18: bess.pb.ExactMatchConfig.rules:type_name -> bess.pb.ExactMatchCommandAddArg
 	119, // 19: bess.pb.GenericEncapArg.fields:type_name -> bess.pb.GenericEncapArg.EncapField
-	134, // 20: bess.pb.HashLBArg.fields:type_name -> bess.pb.Field
+	135, // 20: bess.pb.HashLBArg.fields:type_name -> bess.pb.Field
 	120, // 21: bess.pb.MetadataTestArg.read:type_name -> bess.pb.MetadataTestArg.ReadEntry
 	121, // 22: bess.pb.MetadataTestArg.write:type_name -> bess.pb.MetadataTestArg.WriteEntry
 	122, // 23: bess.pb.MetadataTestArg.update:type_name -> bess.pb.MetadataTestArg.UpdateEntry
@@ -8595,29 +8690,30 @@ var file_module_msg_proto_depIdxs = []int32{
 	129, // 28: bess.pb.UpdateArg.fields:type_name -> bess.pb.UpdateArg.Field
 	130, // 29: bess.pb.UrlFilterArg.blacklist:type_name -> bess.pb.UrlFilterArg.Url
 	130, // 30: bess.pb.UrlFilterConfig.blacklist:type_name -> bess.pb.UrlFilterArg.Url
-	134, // 31: bess.pb.WildcardMatchArg.fields:type_name -> bess.pb.Field
-	134, // 32: bess.pb.WildcardMatchArg.values:type_name -> bess.pb.Field
+	135, // 31: bess.pb.WildcardMatchArg.fields:type_name -> bess.pb.Field
+	135, // 32: bess.pb.WildcardMatchArg.values:type_name -> bess.pb.Field
 	33,  // 33: bess.pb.WildcardMatchConfig.rules:type_name -> bess.pb.WildcardMatchCommandAddArg
 	131, // 34: bess.pb.WorkerSplitArg.worker_gates:type_name -> bess.pb.WorkerSplitArg.WorkerGatesEntry
-	134, // 35: bess.pb.QosArg.fields:type_name -> bess.pb.Field
-	134, // 36: bess.pb.QosArg.values:type_name -> bess.pb.Field
-	133, // 37: bess.pb.QosCommandAddArg.fields:type_name -> bess.pb.FieldData
-	133, // 38: bess.pb.QosCommandAddArg.values:type_name -> bess.pb.FieldData
-	133, // 39: bess.pb.QosCommandDeleteArg.fields:type_name -> bess.pb.FieldData
-	0,   // 40: bess.pb.QosMeasureCommandReadArg.flag:type_name -> bess.pb.BufferFlag
-	132, // 41: bess.pb.QosMeasureReadResponse.statistics:type_name -> bess.pb.QosMeasureReadResponse.Statistic
-	0,   // 42: bess.pb.DoubleBufferFlaggerArg.value:type_name -> bess.pb.BufferFlag
-	0,   // 43: bess.pb.DoubleBufferCommandSetNewFlagValueArg.new_flag:type_name -> bess.pb.BufferFlag
-	0,   // 44: bess.pb.DoubleBufferCommandReadFlagValueResponse.current_flag:type_name -> bess.pb.BufferFlag
-	133, // 45: bess.pb.GenericEncapArg.EncapField.value:type_name -> bess.pb.FieldData
-	123, // 46: bess.pb.NATArg.ExternalAddress.port_ranges:type_name -> bess.pb.NATArg.PortRange
-	125, // 47: bess.pb.StaticNATArg.AddressRangePair.int_range:type_name -> bess.pb.StaticNATArg.AddressRange
-	125, // 48: bess.pb.StaticNATArg.AddressRangePair.ext_range:type_name -> bess.pb.StaticNATArg.AddressRange
-	49,  // [49:49] is the sub-list for method output_type
-	49,  // [49:49] is the sub-list for method input_type
-	49,  // [49:49] is the sub-list for extension type_name
-	49,  // [49:49] is the sub-list for extension extendee
-	0,   // [0:49] is the sub-list for field type_name
+	135, // 35: bess.pb.QosArg.fields:type_name -> bess.pb.Field
+	135, // 36: bess.pb.QosArg.values:type_name -> bess.pb.Field
+	134, // 37: bess.pb.QosCommandAddArg.fields:type_name -> bess.pb.FieldData
+	134, // 38: bess.pb.QosCommandAddArg.values:type_name -> bess.pb.FieldData
+	134, // 39: bess.pb.QosCommandDeleteArg.fields:type_name -> bess.pb.FieldData
+	132, // 40: bess.pb.FlowMeasureReadResponse.statistics:type_name -> bess.pb.FlowMeasureReadResponse.Statistic
+	0,   // 41: bess.pb.DoubleBufferFlaggerArg.value:type_name -> bess.pb.BufferFlag
+	0,   // 42: bess.pb.DoubleBufferCommandSetNewFlagValueArg.new_flag:type_name -> bess.pb.BufferFlag
+	0,   // 43: bess.pb.DoubleBufferCommandReadFlagValueResponse.current_flag:type_name -> bess.pb.BufferFlag
+	134, // 44: bess.pb.GenericEncapArg.EncapField.value:type_name -> bess.pb.FieldData
+	123, // 45: bess.pb.NATArg.ExternalAddress.port_ranges:type_name -> bess.pb.NATArg.PortRange
+	125, // 46: bess.pb.StaticNATArg.AddressRangePair.int_range:type_name -> bess.pb.StaticNATArg.AddressRange
+	125, // 47: bess.pb.StaticNATArg.AddressRangePair.ext_range:type_name -> bess.pb.StaticNATArg.AddressRange
+	133, // 48: bess.pb.FlowMeasureReadResponse.Statistic.latency:type_name -> bess.pb.FlowMeasureReadResponse.Statistic.Histogram
+	133, // 49: bess.pb.FlowMeasureReadResponse.Statistic.jitter:type_name -> bess.pb.FlowMeasureReadResponse.Statistic.Histogram
+	50,  // [50:50] is the sub-list for method output_type
+	50,  // [50:50] is the sub-list for method input_type
+	50,  // [50:50] is the sub-list for extension type_name
+	50,  // [50:50] is the sub-list for extension extendee
+	0,   // [0:50] is the sub-list for field type_name
 }
 
 func init() { file_module_msg_proto_init() }
@@ -9912,7 +10008,7 @@ func file_module_msg_proto_init() {
 			}
 		}
 		file_module_msg_proto_msgTypes[107].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*QosMeasureArg); i {
+			switch v := v.(*FlowMeasureArg); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -9924,7 +10020,7 @@ func file_module_msg_proto_init() {
 			}
 		}
 		file_module_msg_proto_msgTypes[108].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*QosMeasureCommandReadArg); i {
+			switch v := v.(*FlowMeasureCommandReadArg); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -9936,7 +10032,7 @@ func file_module_msg_proto_init() {
 			}
 		}
 		file_module_msg_proto_msgTypes[109].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*QosMeasureReadResponse); i {
+			switch v := v.(*FlowMeasureReadResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -10152,7 +10248,19 @@ func file_module_msg_proto_init() {
 			}
 		}
 		file_module_msg_proto_msgTypes[131].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*QosMeasureReadResponse_Statistic); i {
+			switch v := v.(*FlowMeasureReadResponse_Statistic); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_module_msg_proto_msgTypes[132].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*FlowMeasureReadResponse_Statistic_Histogram); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -10193,7 +10301,7 @@ func file_module_msg_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_module_msg_proto_rawDesc,
 			NumEnums:      1,
-			NumMessages:   132,
+			NumMessages:   133,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

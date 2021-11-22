@@ -13,10 +13,12 @@
 #include "../core/utils/histogram.h"
 #include "../module.h"
 
-class QosMeasure final : public Module {
+class FlowMeasure final : public Module {
  public:
-  QosMeasure()
-      : table_a_(nullptr),
+  FlowMeasure()
+      : leader_(false),
+        current_flag_value_(),
+        table_a_(nullptr),
         table_b_(nullptr),
         ts_attr_id_(-1),
         fseid_attr_id_(-1),
@@ -27,12 +29,12 @@ class QosMeasure final : public Module {
 
   static constexpr uint32_t kDefaultNumEntries = 1 << 15;
   static const Commands cmds;
-  CommandResponse Init(const bess::pb::QosMeasureArg &arg);
+  CommandResponse Init(const bess::pb::FlowMeasureArg &arg);
   void DeInit() override;
   void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
   std::string GetDesc() const override { return ""; };
   CommandResponse CommandReadStats(
-      const bess::pb::QosMeasureCommandReadArg &arg);
+      const bess::pb::FlowMeasureCommandReadArg &arg);
 
  private:
   // TableKey encapsulates all information used to identify a flow and is used
@@ -81,6 +83,9 @@ class QosMeasure final : public Module {
       jitter_histogram.Reset();
     }
   };
+  bool leader_;
+  bess::pb::BufferFlag current_flag_value_;  // protected by flag_mutex_
+  mutable std::mutex flag_mutex_;
   rte_hash *table_a_;
   rte_hash *table_b_;
   std::vector<SessionStats> table_data_a_;

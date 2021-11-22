@@ -3,7 +3,7 @@
  * Copyright(c) 2021 Open Networking Foundation
  */
 
-#include "qos_measure.h"
+#include "flow_measure.h"
 
 #include <rte_errno.h>
 #include <rte_jhash.h>
@@ -11,14 +11,27 @@
 #include "../core/utils/common.h"
 
 /*----------------------------------------------------------------------------------*/
-const Commands QosMeasure::cmds = {
-    {"read", "QosMeasureCommandReadArg",
-     MODULE_CMD_FUNC(&QosMeasure::CommandReadStats), Command::THREAD_SAFE},
+const Commands FlowMeasure::cmds = {
+    {"read", "FlowMeasureCommandReadArg",
+     MODULE_CMD_FUNC(&FlowMeasure::CommandReadStats), Command::THREAD_SAFE},
 };
 /*----------------------------------------------------------------------------------*/
-CommandResponse QosMeasure::Init(const bess::pb::QosMeasureArg &arg) {
-  (void)arg;
+CommandResponse FlowMeasure::Init(const bess::pb::FlowMeasureArg &arg) {
   using AccessMode = bess::metadata::Attribute::AccessMode;
+  // Leader module decides which buffer side to use.
+  if (arg.leader()) {
+    const std::lock_guard<std::mutex> lock(flag_mutex_);
+    leader_ = true;
+    buffer_flag_attr_id_ = AddMetadataAttr(
+        arg.flag_attr_name(), sizeof(uint64_t), AccessMode::kWrite);
+    current_flag_value_ = bess::pb::BufferFlag::FLAG_VALUE_A;
+  } else {
+    leader_ = false;
+    buffer_flag_attr_id_ = AddMetadataAttr(arg.flag_attr_name(),
+                                           sizeof(uint64_t), AccessMode::kRead);
+  }
+  if (buffer_flag_attr_id_ < 0)
+    return CommandFailure(EINVAL, "invalid flag attribute name");
   ts_attr_id_ =
       AddMetadataAttr("timestamp", sizeof(uint64_t), AccessMode::kRead);
   if (ts_attr_id_ < 0)
@@ -30,10 +43,6 @@ CommandResponse QosMeasure::Init(const bess::pb::QosMeasureArg &arg) {
   pdr_attr_id_ = AddMetadataAttr("pdr_id", sizeof(uint32_t), AccessMode::kRead);
   if (pdr_attr_id_ < 0)
     return CommandFailure(EINVAL, "invalid metadata declaration");
-  buffer_flag_attr_id_ = AddMetadataAttr(arg.flag_attr_name(), sizeof(uint64_t),
-                                         AccessMode::kRead);
-  if (buffer_flag_attr_id_ < 0)
-    return CommandFailure(EINVAL, "invalid flag attribute name");
 
   rte_hash_parameters hash_params = {};
   hash_params.entries = kDefaultNumEntries;
@@ -45,25 +54,23 @@ CommandResponse QosMeasure::Init(const bess::pb::QosMeasureArg &arg) {
     hash_params.entries = arg.entries();
   }
   // Create both hash tables.
-  std::string name_a =
-      name() + "_table_a_" + std::to_string(hash_params.socket_id);
-  if (name_a.size() > RTE_HASH_NAMESIZE - 1) {
-    return CommandFailure(EINVAL, "invalid hash name");
+  std::string name_a = name() + "Ta" + std::to_string(hash_params.socket_id);
+  if (name_a.length() > 26 /*RTE_HASH_NAMESIZE - 1*/) {
+    return CommandFailure(EINVAL, "invalid hash name A");
   }
   hash_params.name = name_a.c_str();
   table_a_ = rte_hash_create(&hash_params);
   if (!table_a_) {
-    return CommandFailure(rte_errno, "could not create hashmap");
+    return CommandFailure(rte_errno, "could not create hashmap A");
   }
-  std::string name_b =
-      name() + "_table_b_" + std::to_string(hash_params.socket_id);
+  std::string name_b = name() + "Tb" + std::to_string(hash_params.socket_id);
+  if (name_b.length() > 26 /*RTE_HASH_NAMESIZE - 1*/) {
+    return CommandFailure(EINVAL, "invalid hash name B");
+  }
   hash_params.name = name_b.c_str();
-  if (name_b.size() > RTE_HASH_NAMESIZE - 1) {
-    return CommandFailure(EINVAL, "invalid hash name");
-  }
   table_b_ = rte_hash_create(&hash_params);
   if (!table_b_) {
-    return CommandFailure(rte_errno, "could not create hashmap");
+    return CommandFailure(rte_errno, "could not create hashmap B");
   }
 
   // resize() would require a copyable object.
@@ -76,27 +83,39 @@ CommandResponse QosMeasure::Init(const bess::pb::QosMeasureArg &arg) {
   return CommandSuccess();
 }
 /*----------------------------------------------------------------------------------*/
-void QosMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
+void FlowMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   uint64_t now_ns = tsc_to_ns(rdtsc());
   for (int i = 0; i < batch->cnt(); ++i) {
+    bess::pb::BufferFlag cached_current_flag;
+    if (leader_) {
+      const std::lock_guard<std::mutex> lock(flag_mutex_);
+      set_attr<uint64_t>(this, buffer_flag_attr_id_, batch->pkts()[i],
+                         current_flag_value_);
+      cached_current_flag = current_flag_value_;
+    } else {
+      const std::lock_guard<std::mutex> lock(flag_mutex_);
+      uint64_t flag =
+          get_attr<uint64_t>(this, buffer_flag_attr_id_, batch->pkts()[i]);
+      if (!bess::pb::BufferFlag_IsValid(flag)) {
+        LOG_EVERY_N(WARNING, 100'001) << "Encountered invalid flag: " << flag;
+        continue;
+      } else {
+        current_flag_value_ = static_cast<bess::pb::BufferFlag>(flag);
+        cached_current_flag = current_flag_value_;
+      }
+    }
+
     uint64_t ts_ns = get_attr<uint64_t>(this, ts_attr_id_, batch->pkts()[i]);
     uint64_t fseid = get_attr<uint64_t>(this, fseid_attr_id_, batch->pkts()[i]);
     uint32_t pdr = get_attr<uint32_t>(this, pdr_attr_id_, batch->pkts()[i]);
-    int32_t flag =
-        get_attr<uint64_t>(this, buffer_flag_attr_id_, batch->pkts()[i]);
-    if (!bess::pb::BufferFlag_IsValid(flag)) {
-      LOG_EVERY_N(WARNING, 100'001) << "Encountered invalid flag: " << flag;
-      continue;
-    }
     // Discard invalid timestamps.
     if (!ts_ns || now_ns < ts_ns) {
       continue;
     }
-    uint64_t diff_ns = now_ns - ts_ns;
     // Pick current side.
     rte_hash *current_hash = nullptr;
     std::vector<SessionStats> *current_data = nullptr;
-    switch (flag) {
+    switch (cached_current_flag) {
       case bess::pb::BufferFlag::FLAG_VALUE_A:
         current_hash = table_a_;
         current_data = &table_data_a_;
@@ -106,7 +125,9 @@ void QosMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
         current_data = &table_data_b_;
         break;
       default:
-        LOG_EVERY_N(ERROR, 100'001) << "Unknown flag value: " << flag << ".";
+        LOG_EVERY_N(ERROR, 100'001)
+            << "Unknown flag value: "
+            << bess::pb::BufferFlag_Name(cached_current_flag) << ".";
         continue;
     }
     // Find or create session.
@@ -117,12 +138,13 @@ void QosMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     }
     if (ret < 0) {
       LOG(ERROR) << "Failed to lookup or insert session stats for key "
-                 << key.ToString() << ": " << ret << ", " << rte_strerror(ret);
+                 << key.ToString() << ": " << ret << ", " << rte_strerror(-ret);
       continue;
     }
     // Update stats.
     SessionStats &stat = current_data->at(ret);
     const std::lock_guard<std::mutex> lock(stat.mutex);
+    uint64_t diff_ns = now_ns - ts_ns;
     if (stat.last_latency == 0) {
       stat.last_latency = diff_ns;
     }
@@ -137,20 +159,43 @@ void QosMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   RunNextModule(ctx, batch);
 }
 /*----------------------------------------------------------------------------------*/
-CommandResponse QosMeasure::CommandReadStats(
-    const bess::pb::QosMeasureCommandReadArg &arg) {
-  bess::pb::QosMeasureReadResponse resp;
+CommandResponse FlowMeasure::CommandReadStats(
+    const bess::pb::FlowMeasureCommandReadArg &arg) {
+  // Cache current flag so we don't block the dataplane while reading the stats.
+  bess::pb::BufferFlag cached_current_flag;
+  // Flip the flag if leader module.
+  if (leader_) {
+    {
+      const std::lock_guard<std::mutex> lock(flag_mutex_);
+      current_flag_value_ =
+          current_flag_value_ == bess::pb::BufferFlag::FLAG_VALUE_A
+              ? bess::pb::BufferFlag::FLAG_VALUE_B
+              : bess::pb::BufferFlag::FLAG_VALUE_A;
+      cached_current_flag = current_flag_value_;
+    }
+    VLOG(1) << name() << " Leader flipped the buffer flag to "
+            << bess::pb::BufferFlag_Name(cached_current_flag);
+    // Wait for pipeline to flush packets with old flag value.
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  } else {
+    const std::lock_guard<std::mutex> lock(flag_mutex_);
+    cached_current_flag = current_flag_value_;
+    VLOG(1) << name() << " Follower is using buffer flag "
+            << bess::pb::BufferFlag_Name(cached_current_flag);
+  }
+
+  bess::pb::FlowMeasureReadResponse resp;
   auto t_start = std::chrono::high_resolution_clock::now();
   rte_hash *current_hash = nullptr;
   std::vector<SessionStats> *current_data = nullptr;
-  switch (arg.flag()) {
+  switch (cached_current_flag) {  // Pick the offline buffer set.
     case bess::pb::BufferFlag::FLAG_VALUE_A:
-      current_hash = table_a_;
-      current_data = &table_data_a_;
-      break;
-    case bess::pb::BufferFlag::FLAG_VALUE_B:
       current_hash = table_b_;
       current_data = &table_data_b_;
+      break;
+    case bess::pb::BufferFlag::FLAG_VALUE_B:
+      current_hash = table_a_;
+      current_data = &table_data_a_;
       break;
     default:
       return CommandFailure(EINVAL, "invalid flag value");
@@ -163,21 +208,23 @@ CommandResponse QosMeasure::CommandReadStats(
     const TableKey *table_key = reinterpret_cast<const TableKey *>(key);
     const SessionStats &session_stat = current_data->at(ret);
     const std::lock_guard<std::mutex> lock(session_stat.mutex);
+    const std::vector<double> lat_percs(arg.latency_percentiles().begin(),
+                                        arg.latency_percentiles().end());
+    const std::vector<double> jitter_percs(arg.jitter_percentiles().begin(),
+                                           arg.jitter_percentiles().end());
     const auto lat_summary =
-        session_stat.latency_histogram.Summarize({50., 90., 99., 99.9});
+        session_stat.latency_histogram.Summarize(lat_percs);
     const auto jitter_summary =
-        session_stat.jitter_histogram.Summarize({50., 90., 99., 99.9});
-    bess::pb::QosMeasureReadResponse::Statistic stat;
+        session_stat.jitter_histogram.Summarize(jitter_percs);
+    bess::pb::FlowMeasureReadResponse::Statistic stat;
     stat.set_fseid(table_key->fseid);
     stat.set_pdr(table_key->pdr);
-    stat.set_latency_50_ns(lat_summary.percentile_values[0]);
-    stat.set_latency_90_ns(lat_summary.percentile_values[1]);
-    stat.set_latency_99_ns(lat_summary.percentile_values[2]);
-    stat.set_latency_99_9_ns(lat_summary.percentile_values[3]);
-    stat.set_jitter_50_ns(jitter_summary.percentile_values[0]);
-    stat.set_jitter_90_ns(jitter_summary.percentile_values[1]);
-    stat.set_jitter_99_ns(jitter_summary.percentile_values[2]);
-    stat.set_jitter_99_9_ns(jitter_summary.percentile_values[3]);
+    for (const auto &lat_perc : lat_summary.percentile_values) {
+      stat.mutable_latency()->add_percentile_values_ns(lat_perc);
+    }
+    for (const auto &jitter_perc : jitter_summary.percentile_values) {
+      stat.mutable_jitter()->add_percentile_values_ns(jitter_perc);
+    }
     stat.set_total_packets(session_stat.pkt_count);
     stat.set_total_bytes(session_stat.byte_count);
     *resp.add_statistics() = stat;
@@ -204,10 +251,10 @@ CommandResponse QosMeasure::CommandReadStats(
   return CommandSuccess(resp);
 }
 
-void QosMeasure::DeInit() {
+void FlowMeasure::DeInit() {
   rte_hash_free(table_a_);
   rte_hash_free(table_b_);
 }
 
 /*----------------------------------------------------------------------------------*/
-ADD_MODULE(QosMeasure, "qos_measure", "Measures QoS metrics")
+ADD_MODULE(FlowMeasure, "qos_measure", "Measures QoS metrics")

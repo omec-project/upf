@@ -137,9 +137,9 @@ for idx, iface in enumerate(interfaces):
 
     # setup port module with auxiliary modules
     if parser.mode == 'sim':
-        p.setup_port(parser.ip_frag_with_eth_mtu, parser.max_ip_defrag_flows, parser.measure, packet_generator[iface], **seq_kwargs[iface])
+        p.setup_port(parser.ip_frag_with_eth_mtu, parser.max_ip_defrag_flows, parser.measure_upf, packet_generator[iface], **seq_kwargs[iface])
     else:
-        p.setup_port(parser.ip_frag_with_eth_mtu, parser.max_ip_defrag_flows, parser.measure)
+        p.setup_port(parser.ip_frag_with_eth_mtu, parser.max_ip_defrag_flows, parser.measure_upf)
 
     # Finally add entry to ports list
     ports[p.name] = p
@@ -177,7 +177,6 @@ if parser.enable_ntf:
 #   - proto_id
 
 linkMerge::Merge() \
-    -> flag::DoubleBufferFlagger(attr_name="buffer_flag", value=1) \
     -> pktParse::GtpuParser():1 \
     -> pdrLookup::WildcardMatch(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
                                         {'attr_name':'tunnel_ipv4_dst', 'num_bytes':4}, \
@@ -208,11 +207,13 @@ if ntf:
   _in = ntf
   _out = ntf
 
-# if session_stats:
-preQosMeasure::QosMeasure(flag_attr_name="buffer_flag", entries=parser.table_size_qos_measure)
-_in -> preQosMeasure
-_in = preQosMeasure
-_out = preQosMeasure
+if parser.measure_flow:
+    preQosFlowMeasure::FlowMeasure(leader=True,
+                                   flag_attr_name="buffer_flag",
+                                   entries=parser.table_size_flow_measure)
+    _in -> preQosFlowMeasure
+    _in = preQosFlowMeasure
+    _out = preQosFlowMeasure
 
 _in -> appQERLookup
 
@@ -337,9 +338,15 @@ _in:gate \
 
 
 # 3. Complete the last part of the DL pipeline
-executeFAR:farForwardDAction \
-    -> postDLQoSMeasure::QosMeasure(flag_attr_name="buffer_flag", entries=parser.table_size_qos_measure) \
-    -> ports[parser.access_ifname].rtr
+if not parser.measure_flow:
+    executeFAR:farForwardDAction \
+        -> ports[parser.access_ifname].rtr
+else:
+    executeFAR:farForwardDAction \
+        -> postDLQosFlowMeasure::FlowMeasure(leader=False,
+                                             flag_attr_name="buffer_flag",
+                                             entries=parser.table_size_flow_measure) \
+        -> ports[parser.access_ifname].rtr
 
 # Drop unknown packets
 coreRxIPCksum:1 -> coreRxIPCksumFail::Sink()
@@ -395,9 +402,15 @@ _in:gate \
     -> linkMerge # Start of the shared pipeline
 
 # 3. Complete the last part of the UL pipeline
-executeFAR:farForwardUAction \
-    -> postULQoSMeasure::QosMeasure(flag_attr_name="buffer_flag", entries=parser.table_size_qos_measure) \
-    -> ports[parser.core_ifname].rtr
+if not parser.measure_flow:
+    executeFAR:farForwardUAction \
+        -> ports[parser.core_ifname].rtr
+else:
+    executeFAR:farForwardUAction \
+        -> postULQosFlowMeasure::FlowMeasure(leader=False,
+                                             flag_attr_name="buffer_flag",
+                                             entries=parser.table_size_flow_measure) \
+        -> ports[parser.core_ifname].rtr
 
 # 4. GTP Echo response pipeline
 accessFastBPF:GTPUEchoGate \

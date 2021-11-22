@@ -32,6 +32,12 @@ const (
 	AppQerLookup = "appQERLookup"
 	// SessQerLookup: Session Qos table Name.
 	SessQerLookup = "sessionQERLookup"
+	// PreQosFlowMeasure: Pre QoS measurement module name.
+	PreQosFlowMeasure = "preQosFlowMeasure"
+	// PostDlQosFlowMeasure: Post QoS measurement downlink module name.
+	PostDlQosFlowMeasure = "postDLQosFlowMeasure"
+	// PostUlQosFlowMeasure: Post QoS measurement uplink module name.
+	PostUlQosFlowMeasure = "postULQosFlowMeasure"
 	// far-action specific values.
 	farForwardD = 0x0
 	farForwardU = 0x1
@@ -179,7 +185,7 @@ func (b *bess) exit() {
 	b.conn.Close()
 }
 
-func (b *bess) measure(ifName string, f *pb.MeasureCommandGetSummaryArg) *pb.MeasureCommandGetSummaryResponse {
+func (b *bess) measureUpf(ifName string, f *pb.MeasureCommandGetSummaryArg) *pb.MeasureCommandGetSummaryResponse {
 	modName := func() string {
 		return ifName + "_measure"
 	}
@@ -289,7 +295,7 @@ func (b *bess) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metri
 			JitterPercentiles:  getPctiles(),
 		}
 
-		res := b.measure(ifaceName, req)
+		res := b.measureUpf(ifaceName, req)
 		if res == nil {
 			return
 		}
@@ -324,77 +330,14 @@ func (b *bess) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metri
 	measureIface("Core", uc.upf.coreIface)
 }
 
-func (b *bess) readCurrentFlag(ctx context.Context) (f pb.BufferFlag, err error) {
-	any, err := anypb.New(&pb.EmptyArg{})
-	if err != nil {
-		log.Errorln("Error marshalling request", err)
-		return
+func (b *bess) readFlowMeasurement(
+	ctx context.Context, module string, clear bool, q []float64,
+) (stats pb.FlowMeasureReadResponse, err error) {
+	req := &pb.FlowMeasureCommandReadArg{
+		Clear:              clear,
+		LatencyPercentiles: q,
+		JitterPercentiles:  q,
 	}
-	resp, err := b.client.ModuleCommand(
-		ctx, &pb.CommandRequest{
-			Name: "flag",
-			Cmd:  "read",
-			Arg:  any,
-		},
-	)
-	if err != nil {
-		log.Errorln("flag read failed!:", err)
-		return
-	}
-	flagReadResp := &pb.DoubleBufferCommandReadFlagValueResponse{}
-	if err = resp.Data.UnmarshalTo(flagReadResp); err != nil {
-		log.Errorln(err)
-		return
-	}
-	f = flagReadResp.CurrentFlag
-	return
-}
-
-func (b *bess) flipFlag(ctx context.Context) (durationNs uint64, oldFlag pb.BufferFlag, err error) {
-	// Read current flag
-	oldFlag, err = b.readCurrentFlag(ctx)
-	if err != nil {
-		return
-	}
-	// Determine new flag
-	var newFlag pb.BufferFlag
-	if oldFlag == pb.BufferFlag_FLAG_VALUE_A {
-		newFlag = pb.BufferFlag_FLAG_VALUE_B
-	} else {
-		newFlag = pb.BufferFlag_FLAG_VALUE_A
-	}
-	log.Traceln("old flag:", oldFlag, "new flag:", newFlag)
-	// Set new flag
-	req := &pb.DoubleBufferCommandSetNewFlagValueArg{NewFlag: newFlag}
-	any, err := anypb.New(req)
-	if err != nil {
-		log.Errorln("Error marshalling request", req, err)
-		return
-	}
-	resp, err := b.client.ModuleCommand(
-		ctx, &pb.CommandRequest{
-			Name: "flag",
-			Cmd:  "set",
-			Arg:  any,
-		},
-	)
-	if err != nil {
-		log.Errorln("flag set failed!:", err)
-		return
-	}
-	flagSetResp := &pb.DoubleBufferCommandSetNewFlagValueResponse{}
-	if err = resp.Data.UnmarshalTo(flagSetResp); err != nil {
-		log.Errorln(err)
-		return
-	}
-	durationNs = flagSetResp.ObservationDurationNs
-	return
-}
-
-func (b *bess) readMeasurement(
-	ctx context.Context, module string, flag pb.BufferFlag, clear bool,
-) (stats pb.QosMeasureReadResponse, err error) {
-	req := &pb.QosMeasureCommandReadArg{Flag: flag, Clear: clear}
 	any, err := anypb.New(req)
 	if err != nil {
 		log.Errorln("Error marshalling request", req, err)
@@ -420,36 +363,32 @@ func (b *bess) readMeasurement(
 
 func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err error) {
 	// Clearing table data with large tables is slow, let's wait for a little longer since this is
-	// non-blocking anyway.
+	// non-blocking for the dataplane anyway.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	// Flip flag, automatically waits for pipeline to flush packets with previous mark.
-	observationDurationNs, oldFlag, err := b.flipFlag(ctx)
+	// Read stats. This flips the buffer flag, reads from the now inactive side, and clear if needed.
+	q := []float64{50, 90, 99}
+	qosStatsInResp, err := b.readFlowMeasurement(ctx, PreQosFlowMeasure, true, q)
 	if err != nil {
-		return err
-	}
-	// Read stats from the now inactive side, and clear if needed.
-	qosStatsInResp, err := b.readMeasurement(ctx, "preQosMeasure", oldFlag, true)
-	if err != nil {
-		log.Errorln("preQosMeasure read failed!:", err)
+		log.Errorln(PreQosFlowMeasure, " read failed!:", err)
 		return
 	}
-	postDlQosStatsResp, err := b.readMeasurement(ctx, "postDLQoSMeasure", oldFlag, true)
+	postDlQosStatsResp, err := b.readFlowMeasurement(ctx, PostDlQosFlowMeasure, true, q)
 	if err != nil {
-		log.Errorln("postDLQoSMeasure read failed!:", err)
+		log.Errorln(PostDlQosFlowMeasure, " read failed!:", err)
 		return
 	}
-	postUlQosStatsResp, err := b.readMeasurement(ctx, "postULQoSMeasure", oldFlag, true)
+	postUlQosStatsResp, err := b.readFlowMeasurement(ctx, PostUlQosFlowMeasure, true, q)
 	if err != nil {
-		log.Errorln("postULQoSMeasure read failed!:", err)
+		log.Errorln(PostUlQosFlowMeasure, " read failed!:", err)
 		return
 	}
 
 	// Prepare prometheus stats.
-	createStats := func(preResp, postResp *pb.QosMeasureReadResponse, ch chan<- prometheus.Metric) {
+	createStats := func(preResp, postResp *pb.FlowMeasureReadResponse, ch chan<- prometheus.Metric) {
 		for i := 0; i < len(postResp.Statistics); i++ {
 			post := postResp.Statistics[i]
-			var pre *pb.QosMeasureReadResponse_Statistic
+			var pre *pb.FlowMeasureReadResponse_Statistic
 			// Find preQos values.
 			for _, v := range preResp.Statistics {
 				if post.Pdr == v.Pdr && post.Fseid == v.Fseid {
@@ -462,36 +401,26 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 				continue
 			}
 
-			dropRate := 1 - (float64(post.TotalPackets) / float64(pre.TotalPackets))
-			bitsPerSecond := float64(post.TotalBytes*8) / (float64(observationDurationNs) / (1000 * 1000 * 1000))
-			packetsPerSecond := float64(post.TotalPackets) / (float64(observationDurationNs) / (1000 * 1000 * 1000))
 			fseidString := strconv.FormatUint(post.Fseid, 10)
 			pdrString := strconv.FormatUint(post.Pdr, 10)
 			ch <- prometheus.MustNewConstMetric(
-				uc.sessionDropRate,
+				uc.sessionTxPackets,
 				prometheus.GaugeValue,
-				dropRate,
+				float64(post.TotalPackets),
 				fseidString,
 				pdrString,
 			)
 			ch <- prometheus.MustNewConstMetric(
-				uc.sessionThroughputBps,
+				uc.sessionDroppedPackets,
 				prometheus.GaugeValue,
-				bitsPerSecond,
+				float64(pre.TotalPackets-post.TotalPackets),
 				fseidString,
 				pdrString,
 			)
 			ch <- prometheus.MustNewConstMetric(
-				uc.sessionThroughputPps,
+				uc.sessionTxBytes,
 				prometheus.GaugeValue,
-				packetsPerSecond,
-				fseidString,
-				pdrString,
-			)
-			ch <- prometheus.MustNewConstMetric(
-				uc.sessionObservationDuration,
-				prometheus.GaugeValue,
-				float64(observationDurationNs),
+				float64(post.TotalBytes),
 				fseidString,
 				pdrString,
 			)
@@ -500,9 +429,21 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 				post.TotalPackets,
 				0,
 				map[float64]float64{
-					50.0: float64(post.Latency_50Ns),
-					99.0: float64(post.Latency_99Ns),
-					99.9: float64(post.Latency_99_9Ns),
+					50.0: float64(post.Latency.PercentileValuesNs[0]),
+					99.0: float64(post.Latency.PercentileValuesNs[1]),
+					99.9: float64(post.Latency.PercentileValuesNs[2]),
+				},
+				fseidString,
+				pdrString,
+			)
+			ch <- prometheus.MustNewConstSummary(
+				uc.sessionJitter,
+				post.TotalPackets,
+				0,
+				map[float64]float64{
+					50.0: float64(post.Jitter.PercentileValuesNs[0]),
+					99.0: float64(post.Jitter.PercentileValuesNs[1]),
+					99.9: float64(post.Jitter.PercentileValuesNs[2]),
 				},
 				fseidString,
 				pdrString,
