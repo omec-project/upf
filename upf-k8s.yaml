@@ -50,7 +50,7 @@ data:
       "sgi": {
         "ifname": "sgi"
       },
-      "measure": true,
+      "measure_upf": true,
       "workers": "1",
     }
 ---
@@ -149,7 +149,7 @@ spec:
     - name: hugepages
       mountPath: /dev/hugepages
   - name: web
-    image: omecproject/upf-epc-bess:master-latest 
+    image: omecproject/upf-epc-bess:master-latest
     command: ["bessctl"]
     args:
     - http
