@@ -37,6 +37,33 @@ class FlowMeasure final : public Module {
       const bess::pb::FlowMeasureCommandReadArg &arg);
 
  private:
+  // Flag represents a collection of possible values to select buffer sides.
+  enum class Flag {
+    FLAG_VALUE_INVALID = 0,
+    FLAG_VALUE_A,
+    FLAG_VALUE_B,
+    FLAG_VALUE_MAX = FLAG_VALUE_B,
+  };
+
+  template <typename T>
+  static constexpr bool Flag_IsValid(T value) {
+    Flag flag = static_cast<Flag>(value);
+    return flag >= Flag::FLAG_VALUE_INVALID && flag <= Flag::FLAG_VALUE_MAX;
+  }
+
+  static const std::string Flag_Name(const Flag &flag) {
+    switch (flag) {
+      case Flag::FLAG_VALUE_INVALID:
+        return "FLAG_VALUE_INVALID";
+      case Flag::FLAG_VALUE_A:
+        return "FLAG_VALUE_A";
+      case Flag::FLAG_VALUE_B:
+        return "FLAG_VALUE_B";
+      default:
+        return "";
+    }
+  }
+
   // TableKey encapsulates all information used to identify a flow and is used
   // as the lookup key in the hash tables. It is packed and aligned to
   // calculating a hash over the raw bytes of the struct is ok.
@@ -84,7 +111,7 @@ class FlowMeasure final : public Module {
     }
   };
   bool leader_;
-  bess::pb::BufferFlag current_flag_value_;  // protected by flag_mutex_
+  Flag current_flag_value_;  // protected by flag_mutex_
   mutable std::mutex flag_mutex_;
   rte_hash *table_a_;
   rte_hash *table_b_;

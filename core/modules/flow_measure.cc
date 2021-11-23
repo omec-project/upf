@@ -24,7 +24,7 @@ CommandResponse FlowMeasure::Init(const bess::pb::FlowMeasureArg &arg) {
     leader_ = true;
     buffer_flag_attr_id_ = AddMetadataAttr(
         arg.flag_attr_name(), sizeof(uint64_t), AccessMode::kWrite);
-    current_flag_value_ = bess::pb::BufferFlag::FLAG_VALUE_A;
+    current_flag_value_ = Flag::FLAG_VALUE_A;
   } else {
     leader_ = false;
     buffer_flag_attr_id_ = AddMetadataAttr(arg.flag_attr_name(),
@@ -86,21 +86,21 @@ CommandResponse FlowMeasure::Init(const bess::pb::FlowMeasureArg &arg) {
 void FlowMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   uint64_t now_ns = tsc_to_ns(rdtsc());
   for (int i = 0; i < batch->cnt(); ++i) {
-    bess::pb::BufferFlag cached_current_flag;
+    Flag cached_current_flag;
     if (leader_) {
       const std::lock_guard<std::mutex> lock(flag_mutex_);
       set_attr<uint64_t>(this, buffer_flag_attr_id_, batch->pkts()[i],
-                         current_flag_value_);
+                         static_cast<uint64_t>(current_flag_value_));
       cached_current_flag = current_flag_value_;
     } else {
       const std::lock_guard<std::mutex> lock(flag_mutex_);
       uint64_t flag =
           get_attr<uint64_t>(this, buffer_flag_attr_id_, batch->pkts()[i]);
-      if (!bess::pb::BufferFlag_IsValid(flag)) {
+      if (!Flag_IsValid(flag)) {
         LOG_EVERY_N(WARNING, 100'001) << "Encountered invalid flag: " << flag;
         continue;
       } else {
-        current_flag_value_ = static_cast<bess::pb::BufferFlag>(flag);
+        current_flag_value_ = static_cast<Flag>(flag);
         cached_current_flag = current_flag_value_;
       }
     }
@@ -116,18 +116,17 @@ void FlowMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     rte_hash *current_hash = nullptr;
     std::vector<SessionStats> *current_data = nullptr;
     switch (cached_current_flag) {
-      case bess::pb::BufferFlag::FLAG_VALUE_A:
+      case Flag::FLAG_VALUE_A:
         current_hash = table_a_;
         current_data = &table_data_a_;
         break;
-      case bess::pb::BufferFlag::FLAG_VALUE_B:
+      case Flag::FLAG_VALUE_B:
         current_hash = table_b_;
         current_data = &table_data_b_;
         break;
       default:
         LOG_EVERY_N(ERROR, 100'001)
-            << "Unknown flag value: "
-            << bess::pb::BufferFlag_Name(cached_current_flag) << ".";
+            << "Unknown flag value: " << Flag_Name(cached_current_flag) << ".";
         continue;
     }
     // Find or create session.
@@ -162,26 +161,25 @@ void FlowMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 CommandResponse FlowMeasure::CommandReadStats(
     const bess::pb::FlowMeasureCommandReadArg &arg) {
   // Cache current flag so we don't block the dataplane while reading the stats.
-  bess::pb::BufferFlag cached_current_flag;
+  Flag cached_current_flag;
   // Flip the flag if leader module.
   if (leader_) {
     {
       const std::lock_guard<std::mutex> lock(flag_mutex_);
-      current_flag_value_ =
-          current_flag_value_ == bess::pb::BufferFlag::FLAG_VALUE_A
-              ? bess::pb::BufferFlag::FLAG_VALUE_B
-              : bess::pb::BufferFlag::FLAG_VALUE_A;
+      current_flag_value_ = current_flag_value_ == Flag::FLAG_VALUE_A
+                                ? Flag::FLAG_VALUE_B
+                                : Flag::FLAG_VALUE_A;
       cached_current_flag = current_flag_value_;
     }
-    VLOG(1) << name() << " Leader flipped the buffer flag to "
-            << bess::pb::BufferFlag_Name(cached_current_flag);
+    VLOG(1) << name() << ": leader flipped the buffer flag to "
+            << Flag_Name(cached_current_flag);
     // Wait for pipeline to flush packets with old flag value.
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   } else {
     const std::lock_guard<std::mutex> lock(flag_mutex_);
     cached_current_flag = current_flag_value_;
-    VLOG(1) << name() << " Follower is using buffer flag "
-            << bess::pb::BufferFlag_Name(cached_current_flag);
+    VLOG(1) << name() << ": follower is seeing buffer flag "
+            << Flag_Name(cached_current_flag);
   }
 
   bess::pb::FlowMeasureReadResponse resp;
@@ -189,11 +187,11 @@ CommandResponse FlowMeasure::CommandReadStats(
   rte_hash *current_hash = nullptr;
   std::vector<SessionStats> *current_data = nullptr;
   switch (cached_current_flag) {  // Pick the offline buffer set.
-    case bess::pb::BufferFlag::FLAG_VALUE_A:
+    case Flag::FLAG_VALUE_A:
       current_hash = table_b_;
       current_data = &table_data_b_;
       break;
-    case bess::pb::BufferFlag::FLAG_VALUE_B:
+    case Flag::FLAG_VALUE_B:
       current_hash = table_a_;
       current_data = &table_data_a_;
       break;

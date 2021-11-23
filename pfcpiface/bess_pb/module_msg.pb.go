@@ -50,55 +50,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type BufferFlag int32
-
-const (
-	BufferFlag_FLAG_VALUE_INVALID BufferFlag = 0
-	BufferFlag_FLAG_VALUE_A       BufferFlag = 1
-	BufferFlag_FLAG_VALUE_B       BufferFlag = 2
-)
-
-// Enum value maps for BufferFlag.
-var (
-	BufferFlag_name = map[int32]string{
-		0: "FLAG_VALUE_INVALID",
-		1: "FLAG_VALUE_A",
-		2: "FLAG_VALUE_B",
-	}
-	BufferFlag_value = map[string]int32{
-		"FLAG_VALUE_INVALID": 0,
-		"FLAG_VALUE_A":       1,
-		"FLAG_VALUE_B":       2,
-	}
-)
-
-func (x BufferFlag) Enum() *BufferFlag {
-	p := new(BufferFlag)
-	*p = x
-	return p
-}
-
-func (x BufferFlag) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (BufferFlag) Descriptor() protoreflect.EnumDescriptor {
-	return file_module_msg_proto_enumTypes[0].Descriptor()
-}
-
-func (BufferFlag) Type() protoreflect.EnumType {
-	return &file_module_msg_proto_enumTypes[0]
-}
-
-func (x BufferFlag) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use BufferFlag.Descriptor instead.
-func (BufferFlag) EnumDescriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{0}
-}
-
 type EmptyArg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -8254,16 +8205,11 @@ var file_module_msg_proto_rawDesc = []byte{
 	0x52, 0x07, 0x74, 0x6f, 0x74, 0x61, 0x6c, 0x4e, 0x73, 0x12, 0x30, 0x0a, 0x14, 0x70, 0x65, 0x72,
 	0x63, 0x65, 0x6e, 0x74, 0x69, 0x6c, 0x65, 0x5f, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x73, 0x5f, 0x6e,
 	0x73, 0x18, 0x07, 0x20, 0x03, 0x28, 0x04, 0x52, 0x12, 0x70, 0x65, 0x72, 0x63, 0x65, 0x6e, 0x74,
-	0x69, 0x6c, 0x65, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x73, 0x4e, 0x73, 0x2a, 0x48, 0x0a, 0x0a, 0x42,
-	0x75, 0x66, 0x66, 0x65, 0x72, 0x46, 0x6c, 0x61, 0x67, 0x12, 0x16, 0x0a, 0x12, 0x46, 0x4c, 0x41,
-	0x47, 0x5f, 0x56, 0x41, 0x4c, 0x55, 0x45, 0x5f, 0x49, 0x4e, 0x56, 0x41, 0x4c, 0x49, 0x44, 0x10,
-	0x00, 0x12, 0x10, 0x0a, 0x0c, 0x46, 0x4c, 0x41, 0x47, 0x5f, 0x56, 0x41, 0x4c, 0x55, 0x45, 0x5f,
-	0x41, 0x10, 0x01, 0x12, 0x10, 0x0a, 0x0c, 0x46, 0x4c, 0x41, 0x47, 0x5f, 0x56, 0x41, 0x4c, 0x55,
-	0x45, 0x5f, 0x42, 0x10, 0x02, 0x42, 0x33, 0x5a, 0x31, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e,
-	0x63, 0x6f, 0x6d, 0x2f, 0x6f, 0x6d, 0x65, 0x63, 0x2d, 0x70, 0x72, 0x6f, 0x6a, 0x65, 0x63, 0x74,
-	0x2f, 0x75, 0x70, 0x66, 0x2d, 0x65, 0x70, 0x63, 0x2f, 0x70, 0x66, 0x63, 0x70, 0x69, 0x66, 0x61,
-	0x63, 0x65, 0x2f, 0x62, 0x65, 0x73, 0x73, 0x5f, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74,
-	0x6f, 0x33,
+	0x69, 0x6c, 0x65, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x73, 0x4e, 0x73, 0x42, 0x33, 0x5a, 0x31, 0x67,
+	0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x6f, 0x6d, 0x65, 0x63, 0x2d, 0x70,
+	0x72, 0x6f, 0x6a, 0x65, 0x63, 0x74, 0x2f, 0x75, 0x70, 0x66, 0x2d, 0x65, 0x70, 0x63, 0x2f, 0x70,
+	0x66, 0x63, 0x70, 0x69, 0x66, 0x61, 0x63, 0x65, 0x2f, 0x62, 0x65, 0x73, 0x73, 0x5f, 0x70, 0x62,
+	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -8278,190 +8224,188 @@ func file_module_msg_proto_rawDescGZIP() []byte {
 	return file_module_msg_proto_rawDescData
 }
 
-var file_module_msg_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_module_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 129)
 var file_module_msg_proto_goTypes = []interface{}{
-	(BufferFlag)(0),                                     // 0: bess.pb.BufferFlag
-	(*EmptyArg)(nil),                                    // 1: bess.pb.EmptyArg
-	(*BPFCommandClearArg)(nil),                          // 2: bess.pb.BPFCommandClearArg
-	(*ExactMatchCommandAddArg)(nil),                     // 3: bess.pb.ExactMatchCommandAddArg
-	(*ExactMatchCommandDeleteArg)(nil),                  // 4: bess.pb.ExactMatchCommandDeleteArg
-	(*ExactMatchCommandClearArg)(nil),                   // 5: bess.pb.ExactMatchCommandClearArg
-	(*ExactMatchCommandSetDefaultGateArg)(nil),          // 6: bess.pb.ExactMatchCommandSetDefaultGateArg
-	(*FlowGenCommandSetBurstArg)(nil),                   // 7: bess.pb.FlowGenCommandSetBurstArg
-	(*HashLBCommandSetModeArg)(nil),                     // 8: bess.pb.HashLBCommandSetModeArg
-	(*HashLBCommandSetGatesArg)(nil),                    // 9: bess.pb.HashLBCommandSetGatesArg
-	(*IPLookupCommandAddArg)(nil),                       // 10: bess.pb.IPLookupCommandAddArg
-	(*IPLookupCommandDeleteArg)(nil),                    // 11: bess.pb.IPLookupCommandDeleteArg
-	(*IPLookupCommandClearArg)(nil),                     // 12: bess.pb.IPLookupCommandClearArg
-	(*L2ForwardCommandAddArg)(nil),                      // 13: bess.pb.L2ForwardCommandAddArg
-	(*L2ForwardCommandDeleteArg)(nil),                   // 14: bess.pb.L2ForwardCommandDeleteArg
-	(*L2ForwardCommandSetDefaultGateArg)(nil),           // 15: bess.pb.L2ForwardCommandSetDefaultGateArg
-	(*L2ForwardCommandLookupArg)(nil),                   // 16: bess.pb.L2ForwardCommandLookupArg
-	(*L2ForwardCommandLookupResponse)(nil),              // 17: bess.pb.L2ForwardCommandLookupResponse
-	(*L2ForwardCommandPopulateArg)(nil),                 // 18: bess.pb.L2ForwardCommandPopulateArg
-	(*MeasureCommandGetSummaryArg)(nil),                 // 19: bess.pb.MeasureCommandGetSummaryArg
-	(*MeasureCommandGetSummaryResponse)(nil),            // 20: bess.pb.MeasureCommandGetSummaryResponse
-	(*DRRArg)(nil),                                      // 21: bess.pb.DRRArg
-	(*DRRQuantumArg)(nil),                               // 22: bess.pb.DRRQuantumArg
-	(*DRRMaxFlowQueueSizeArg)(nil),                      // 23: bess.pb.DRRMaxFlowQueueSizeArg
-	(*PortIncCommandSetBurstArg)(nil),                   // 24: bess.pb.PortIncCommandSetBurstArg
-	(*QueueIncCommandSetBurstArg)(nil),                  // 25: bess.pb.QueueIncCommandSetBurstArg
-	(*QueueCommandSetBurstArg)(nil),                     // 26: bess.pb.QueueCommandSetBurstArg
-	(*QueueCommandSetSizeArg)(nil),                      // 27: bess.pb.QueueCommandSetSizeArg
-	(*QueueCommandGetStatusArg)(nil),                    // 28: bess.pb.QueueCommandGetStatusArg
-	(*QueueCommandGetStatusResponse)(nil),               // 29: bess.pb.QueueCommandGetStatusResponse
-	(*RandomUpdateCommandClearArg)(nil),                 // 30: bess.pb.RandomUpdateCommandClearArg
-	(*RewriteCommandClearArg)(nil),                      // 31: bess.pb.RewriteCommandClearArg
-	(*UpdateCommandClearArg)(nil),                       // 32: bess.pb.UpdateCommandClearArg
-	(*WildcardMatchCommandAddArg)(nil),                  // 33: bess.pb.WildcardMatchCommandAddArg
-	(*WildcardMatchCommandDeleteArg)(nil),               // 34: bess.pb.WildcardMatchCommandDeleteArg
-	(*WildcardMatchCommandClearArg)(nil),                // 35: bess.pb.WildcardMatchCommandClearArg
-	(*WildcardMatchCommandSetDefaultGateArg)(nil),       // 36: bess.pb.WildcardMatchCommandSetDefaultGateArg
-	(*ACLArg)(nil),                                      // 37: bess.pb.ACLArg
-	(*BPFArg)(nil),                                      // 38: bess.pb.BPFArg
-	(*BufferArg)(nil),                                   // 39: bess.pb.BufferArg
-	(*BypassArg)(nil),                                   // 40: bess.pb.BypassArg
-	(*DumpArg)(nil),                                     // 41: bess.pb.DumpArg
-	(*EtherEncapArg)(nil),                               // 42: bess.pb.EtherEncapArg
-	(*ExactMatchArg)(nil),                               // 43: bess.pb.ExactMatchArg
-	(*ExactMatchConfig)(nil),                            // 44: bess.pb.ExactMatchConfig
-	(*FlowGenArg)(nil),                                  // 45: bess.pb.FlowGenArg
-	(*GenericDecapArg)(nil),                             // 46: bess.pb.GenericDecapArg
-	(*GenericEncapArg)(nil),                             // 47: bess.pb.GenericEncapArg
-	(*HashLBArg)(nil),                                   // 48: bess.pb.HashLBArg
-	(*IPEncapArg)(nil),                                  // 49: bess.pb.IPEncapArg
-	(*IPLookupArg)(nil),                                 // 50: bess.pb.IPLookupArg
-	(*L2ForwardArg)(nil),                                // 51: bess.pb.L2ForwardArg
-	(*MACSwapArg)(nil),                                  // 52: bess.pb.MACSwapArg
-	(*MeasureArg)(nil),                                  // 53: bess.pb.MeasureArg
-	(*MergeArg)(nil),                                    // 54: bess.pb.MergeArg
-	(*MetadataTestArg)(nil),                             // 55: bess.pb.MetadataTestArg
-	(*NATArg)(nil),                                      // 56: bess.pb.NATArg
-	(*StaticNATArg)(nil),                                // 57: bess.pb.StaticNATArg
-	(*NoOpArg)(nil),                                     // 58: bess.pb.NoOpArg
-	(*PortIncArg)(nil),                                  // 59: bess.pb.PortIncArg
-	(*PortOutArg)(nil),                                  // 60: bess.pb.PortOutArg
-	(*QueueIncArg)(nil),                                 // 61: bess.pb.QueueIncArg
-	(*QueueOutArg)(nil),                                 // 62: bess.pb.QueueOutArg
-	(*QueueArg)(nil),                                    // 63: bess.pb.QueueArg
-	(*RandomSplitArg)(nil),                              // 64: bess.pb.RandomSplitArg
-	(*RandomSplitCommandSetDroprateArg)(nil),            // 65: bess.pb.RandomSplitCommandSetDroprateArg
-	(*RandomSplitCommandSetGatesArg)(nil),               // 66: bess.pb.RandomSplitCommandSetGatesArg
-	(*RandomUpdateArg)(nil),                             // 67: bess.pb.RandomUpdateArg
-	(*RewriteArg)(nil),                                  // 68: bess.pb.RewriteArg
-	(*RoundRobinCommandSetGatesArg)(nil),                // 69: bess.pb.RoundRobinCommandSetGatesArg
-	(*RoundRobinCommandSetModeArg)(nil),                 // 70: bess.pb.RoundRobinCommandSetModeArg
-	(*RoundRobinArg)(nil),                               // 71: bess.pb.RoundRobinArg
-	(*ReplicateArg)(nil),                                // 72: bess.pb.ReplicateArg
-	(*ReplicateCommandSetGatesArg)(nil),                 // 73: bess.pb.ReplicateCommandSetGatesArg
-	(*SetMetadataArg)(nil),                              // 74: bess.pb.SetMetadataArg
-	(*SinkArg)(nil),                                     // 75: bess.pb.SinkArg
-	(*SourceCommandSetBurstArg)(nil),                    // 76: bess.pb.SourceCommandSetBurstArg
-	(*SourceCommandSetPktSizeArg)(nil),                  // 77: bess.pb.SourceCommandSetPktSizeArg
-	(*SourceArg)(nil),                                   // 78: bess.pb.SourceArg
-	(*IPChecksumArg)(nil),                               // 79: bess.pb.IPChecksumArg
-	(*L4ChecksumArg)(nil),                               // 80: bess.pb.L4ChecksumArg
-	(*GtpuEchoArg)(nil),                                 // 81: bess.pb.GtpuEchoArg
-	(*IPDefragArg)(nil),                                 // 82: bess.pb.IPDefragArg
-	(*IPFragArg)(nil),                                   // 83: bess.pb.IPFragArg
-	(*CounterAddArg)(nil),                               // 84: bess.pb.CounterAddArg
-	(*CounterRemoveArg)(nil),                            // 85: bess.pb.CounterRemoveArg
-	(*CounterArg)(nil),                                  // 86: bess.pb.CounterArg
-	(*GtpuEncapArg)(nil),                                // 87: bess.pb.GtpuEncapArg
-	(*SplitArg)(nil),                                    // 88: bess.pb.SplitArg
-	(*TimestampArg)(nil),                                // 89: bess.pb.TimestampArg
-	(*UpdateArg)(nil),                                   // 90: bess.pb.UpdateArg
-	(*UrlFilterArg)(nil),                                // 91: bess.pb.UrlFilterArg
-	(*UrlFilterConfig)(nil),                             // 92: bess.pb.UrlFilterConfig
-	(*VLANPopArg)(nil),                                  // 93: bess.pb.VLANPopArg
-	(*VLANPushArg)(nil),                                 // 94: bess.pb.VLANPushArg
-	(*VLANSplitArg)(nil),                                // 95: bess.pb.VLANSplitArg
-	(*VXLANDecapArg)(nil),                               // 96: bess.pb.VXLANDecapArg
-	(*VXLANEncapArg)(nil),                               // 97: bess.pb.VXLANEncapArg
-	(*WildcardMatchArg)(nil),                            // 98: bess.pb.WildcardMatchArg
-	(*WildcardMatchConfig)(nil),                         // 99: bess.pb.WildcardMatchConfig
-	(*ArpResponderArg)(nil),                             // 100: bess.pb.ArpResponderArg
-	(*MplsPopArg)(nil),                                  // 101: bess.pb.MplsPopArg
-	(*WorkerSplitArg)(nil),                              // 102: bess.pb.WorkerSplitArg
-	(*QosArg)(nil),                                      // 103: bess.pb.QosArg
-	(*QosCommandAddArg)(nil),                            // 104: bess.pb.QosCommandAddArg
-	(*QosCommandDeleteArg)(nil),                         // 105: bess.pb.QosCommandDeleteArg
-	(*QosCommandClearArg)(nil),                          // 106: bess.pb.QosCommandClearArg
-	(*QosCommandSetDefaultGateArg)(nil),                 // 107: bess.pb.QosCommandSetDefaultGateArg
-	(*FlowMeasureArg)(nil),                              // 108: bess.pb.FlowMeasureArg
-	(*FlowMeasureCommandReadArg)(nil),                   // 109: bess.pb.FlowMeasureCommandReadArg
-	(*FlowMeasureReadResponse)(nil),                     // 110: bess.pb.FlowMeasureReadResponse
-	(*L2ForwardCommandAddArg_Entry)(nil),                // 111: bess.pb.L2ForwardCommandAddArg.Entry
-	(*MeasureCommandGetSummaryResponse_Histogram)(nil),  // 112: bess.pb.MeasureCommandGetSummaryResponse.Histogram
-	(*ACLArg_Rule)(nil),                                 // 113: bess.pb.ACLArg.Rule
-	(*BPFArg_Filter)(nil),                               // 114: bess.pb.BPFArg.Filter
-	(*GenericEncapArg_EncapField)(nil),                  // 115: bess.pb.GenericEncapArg.EncapField
-	nil,                                                 // 116: bess.pb.MetadataTestArg.ReadEntry
-	nil,                                                 // 117: bess.pb.MetadataTestArg.WriteEntry
-	nil,                                                 // 118: bess.pb.MetadataTestArg.UpdateEntry
-	(*NATArg_PortRange)(nil),                            // 119: bess.pb.NATArg.PortRange
-	(*NATArg_ExternalAddress)(nil),                      // 120: bess.pb.NATArg.ExternalAddress
-	(*StaticNATArg_AddressRange)(nil),                   // 121: bess.pb.StaticNATArg.AddressRange
-	(*StaticNATArg_AddressRangePair)(nil),               // 122: bess.pb.StaticNATArg.AddressRangePair
-	(*RandomUpdateArg_Field)(nil),                       // 123: bess.pb.RandomUpdateArg.Field
-	(*SetMetadataArg_Attribute)(nil),                    // 124: bess.pb.SetMetadataArg.Attribute
-	(*UpdateArg_Field)(nil),                             // 125: bess.pb.UpdateArg.Field
-	(*UrlFilterArg_Url)(nil),                            // 126: bess.pb.UrlFilterArg.Url
-	nil,                                                 // 127: bess.pb.WorkerSplitArg.WorkerGatesEntry
-	(*FlowMeasureReadResponse_Statistic)(nil),           // 128: bess.pb.FlowMeasureReadResponse.Statistic
-	(*FlowMeasureReadResponse_Statistic_Histogram)(nil), // 129: bess.pb.FlowMeasureReadResponse.Statistic.Histogram
-	(*FieldData)(nil),                                   // 130: bess.pb.FieldData
-	(*Field)(nil),                                       // 131: bess.pb.Field
+	(*EmptyArg)(nil),                                    // 0: bess.pb.EmptyArg
+	(*BPFCommandClearArg)(nil),                          // 1: bess.pb.BPFCommandClearArg
+	(*ExactMatchCommandAddArg)(nil),                     // 2: bess.pb.ExactMatchCommandAddArg
+	(*ExactMatchCommandDeleteArg)(nil),                  // 3: bess.pb.ExactMatchCommandDeleteArg
+	(*ExactMatchCommandClearArg)(nil),                   // 4: bess.pb.ExactMatchCommandClearArg
+	(*ExactMatchCommandSetDefaultGateArg)(nil),          // 5: bess.pb.ExactMatchCommandSetDefaultGateArg
+	(*FlowGenCommandSetBurstArg)(nil),                   // 6: bess.pb.FlowGenCommandSetBurstArg
+	(*HashLBCommandSetModeArg)(nil),                     // 7: bess.pb.HashLBCommandSetModeArg
+	(*HashLBCommandSetGatesArg)(nil),                    // 8: bess.pb.HashLBCommandSetGatesArg
+	(*IPLookupCommandAddArg)(nil),                       // 9: bess.pb.IPLookupCommandAddArg
+	(*IPLookupCommandDeleteArg)(nil),                    // 10: bess.pb.IPLookupCommandDeleteArg
+	(*IPLookupCommandClearArg)(nil),                     // 11: bess.pb.IPLookupCommandClearArg
+	(*L2ForwardCommandAddArg)(nil),                      // 12: bess.pb.L2ForwardCommandAddArg
+	(*L2ForwardCommandDeleteArg)(nil),                   // 13: bess.pb.L2ForwardCommandDeleteArg
+	(*L2ForwardCommandSetDefaultGateArg)(nil),           // 14: bess.pb.L2ForwardCommandSetDefaultGateArg
+	(*L2ForwardCommandLookupArg)(nil),                   // 15: bess.pb.L2ForwardCommandLookupArg
+	(*L2ForwardCommandLookupResponse)(nil),              // 16: bess.pb.L2ForwardCommandLookupResponse
+	(*L2ForwardCommandPopulateArg)(nil),                 // 17: bess.pb.L2ForwardCommandPopulateArg
+	(*MeasureCommandGetSummaryArg)(nil),                 // 18: bess.pb.MeasureCommandGetSummaryArg
+	(*MeasureCommandGetSummaryResponse)(nil),            // 19: bess.pb.MeasureCommandGetSummaryResponse
+	(*DRRArg)(nil),                                      // 20: bess.pb.DRRArg
+	(*DRRQuantumArg)(nil),                               // 21: bess.pb.DRRQuantumArg
+	(*DRRMaxFlowQueueSizeArg)(nil),                      // 22: bess.pb.DRRMaxFlowQueueSizeArg
+	(*PortIncCommandSetBurstArg)(nil),                   // 23: bess.pb.PortIncCommandSetBurstArg
+	(*QueueIncCommandSetBurstArg)(nil),                  // 24: bess.pb.QueueIncCommandSetBurstArg
+	(*QueueCommandSetBurstArg)(nil),                     // 25: bess.pb.QueueCommandSetBurstArg
+	(*QueueCommandSetSizeArg)(nil),                      // 26: bess.pb.QueueCommandSetSizeArg
+	(*QueueCommandGetStatusArg)(nil),                    // 27: bess.pb.QueueCommandGetStatusArg
+	(*QueueCommandGetStatusResponse)(nil),               // 28: bess.pb.QueueCommandGetStatusResponse
+	(*RandomUpdateCommandClearArg)(nil),                 // 29: bess.pb.RandomUpdateCommandClearArg
+	(*RewriteCommandClearArg)(nil),                      // 30: bess.pb.RewriteCommandClearArg
+	(*UpdateCommandClearArg)(nil),                       // 31: bess.pb.UpdateCommandClearArg
+	(*WildcardMatchCommandAddArg)(nil),                  // 32: bess.pb.WildcardMatchCommandAddArg
+	(*WildcardMatchCommandDeleteArg)(nil),               // 33: bess.pb.WildcardMatchCommandDeleteArg
+	(*WildcardMatchCommandClearArg)(nil),                // 34: bess.pb.WildcardMatchCommandClearArg
+	(*WildcardMatchCommandSetDefaultGateArg)(nil),       // 35: bess.pb.WildcardMatchCommandSetDefaultGateArg
+	(*ACLArg)(nil),                                      // 36: bess.pb.ACLArg
+	(*BPFArg)(nil),                                      // 37: bess.pb.BPFArg
+	(*BufferArg)(nil),                                   // 38: bess.pb.BufferArg
+	(*BypassArg)(nil),                                   // 39: bess.pb.BypassArg
+	(*DumpArg)(nil),                                     // 40: bess.pb.DumpArg
+	(*EtherEncapArg)(nil),                               // 41: bess.pb.EtherEncapArg
+	(*ExactMatchArg)(nil),                               // 42: bess.pb.ExactMatchArg
+	(*ExactMatchConfig)(nil),                            // 43: bess.pb.ExactMatchConfig
+	(*FlowGenArg)(nil),                                  // 44: bess.pb.FlowGenArg
+	(*GenericDecapArg)(nil),                             // 45: bess.pb.GenericDecapArg
+	(*GenericEncapArg)(nil),                             // 46: bess.pb.GenericEncapArg
+	(*HashLBArg)(nil),                                   // 47: bess.pb.HashLBArg
+	(*IPEncapArg)(nil),                                  // 48: bess.pb.IPEncapArg
+	(*IPLookupArg)(nil),                                 // 49: bess.pb.IPLookupArg
+	(*L2ForwardArg)(nil),                                // 50: bess.pb.L2ForwardArg
+	(*MACSwapArg)(nil),                                  // 51: bess.pb.MACSwapArg
+	(*MeasureArg)(nil),                                  // 52: bess.pb.MeasureArg
+	(*MergeArg)(nil),                                    // 53: bess.pb.MergeArg
+	(*MetadataTestArg)(nil),                             // 54: bess.pb.MetadataTestArg
+	(*NATArg)(nil),                                      // 55: bess.pb.NATArg
+	(*StaticNATArg)(nil),                                // 56: bess.pb.StaticNATArg
+	(*NoOpArg)(nil),                                     // 57: bess.pb.NoOpArg
+	(*PortIncArg)(nil),                                  // 58: bess.pb.PortIncArg
+	(*PortOutArg)(nil),                                  // 59: bess.pb.PortOutArg
+	(*QueueIncArg)(nil),                                 // 60: bess.pb.QueueIncArg
+	(*QueueOutArg)(nil),                                 // 61: bess.pb.QueueOutArg
+	(*QueueArg)(nil),                                    // 62: bess.pb.QueueArg
+	(*RandomSplitArg)(nil),                              // 63: bess.pb.RandomSplitArg
+	(*RandomSplitCommandSetDroprateArg)(nil),            // 64: bess.pb.RandomSplitCommandSetDroprateArg
+	(*RandomSplitCommandSetGatesArg)(nil),               // 65: bess.pb.RandomSplitCommandSetGatesArg
+	(*RandomUpdateArg)(nil),                             // 66: bess.pb.RandomUpdateArg
+	(*RewriteArg)(nil),                                  // 67: bess.pb.RewriteArg
+	(*RoundRobinCommandSetGatesArg)(nil),                // 68: bess.pb.RoundRobinCommandSetGatesArg
+	(*RoundRobinCommandSetModeArg)(nil),                 // 69: bess.pb.RoundRobinCommandSetModeArg
+	(*RoundRobinArg)(nil),                               // 70: bess.pb.RoundRobinArg
+	(*ReplicateArg)(nil),                                // 71: bess.pb.ReplicateArg
+	(*ReplicateCommandSetGatesArg)(nil),                 // 72: bess.pb.ReplicateCommandSetGatesArg
+	(*SetMetadataArg)(nil),                              // 73: bess.pb.SetMetadataArg
+	(*SinkArg)(nil),                                     // 74: bess.pb.SinkArg
+	(*SourceCommandSetBurstArg)(nil),                    // 75: bess.pb.SourceCommandSetBurstArg
+	(*SourceCommandSetPktSizeArg)(nil),                  // 76: bess.pb.SourceCommandSetPktSizeArg
+	(*SourceArg)(nil),                                   // 77: bess.pb.SourceArg
+	(*IPChecksumArg)(nil),                               // 78: bess.pb.IPChecksumArg
+	(*L4ChecksumArg)(nil),                               // 79: bess.pb.L4ChecksumArg
+	(*GtpuEchoArg)(nil),                                 // 80: bess.pb.GtpuEchoArg
+	(*IPDefragArg)(nil),                                 // 81: bess.pb.IPDefragArg
+	(*IPFragArg)(nil),                                   // 82: bess.pb.IPFragArg
+	(*CounterAddArg)(nil),                               // 83: bess.pb.CounterAddArg
+	(*CounterRemoveArg)(nil),                            // 84: bess.pb.CounterRemoveArg
+	(*CounterArg)(nil),                                  // 85: bess.pb.CounterArg
+	(*GtpuEncapArg)(nil),                                // 86: bess.pb.GtpuEncapArg
+	(*SplitArg)(nil),                                    // 87: bess.pb.SplitArg
+	(*TimestampArg)(nil),                                // 88: bess.pb.TimestampArg
+	(*UpdateArg)(nil),                                   // 89: bess.pb.UpdateArg
+	(*UrlFilterArg)(nil),                                // 90: bess.pb.UrlFilterArg
+	(*UrlFilterConfig)(nil),                             // 91: bess.pb.UrlFilterConfig
+	(*VLANPopArg)(nil),                                  // 92: bess.pb.VLANPopArg
+	(*VLANPushArg)(nil),                                 // 93: bess.pb.VLANPushArg
+	(*VLANSplitArg)(nil),                                // 94: bess.pb.VLANSplitArg
+	(*VXLANDecapArg)(nil),                               // 95: bess.pb.VXLANDecapArg
+	(*VXLANEncapArg)(nil),                               // 96: bess.pb.VXLANEncapArg
+	(*WildcardMatchArg)(nil),                            // 97: bess.pb.WildcardMatchArg
+	(*WildcardMatchConfig)(nil),                         // 98: bess.pb.WildcardMatchConfig
+	(*ArpResponderArg)(nil),                             // 99: bess.pb.ArpResponderArg
+	(*MplsPopArg)(nil),                                  // 100: bess.pb.MplsPopArg
+	(*WorkerSplitArg)(nil),                              // 101: bess.pb.WorkerSplitArg
+	(*QosArg)(nil),                                      // 102: bess.pb.QosArg
+	(*QosCommandAddArg)(nil),                            // 103: bess.pb.QosCommandAddArg
+	(*QosCommandDeleteArg)(nil),                         // 104: bess.pb.QosCommandDeleteArg
+	(*QosCommandClearArg)(nil),                          // 105: bess.pb.QosCommandClearArg
+	(*QosCommandSetDefaultGateArg)(nil),                 // 106: bess.pb.QosCommandSetDefaultGateArg
+	(*FlowMeasureArg)(nil),                              // 107: bess.pb.FlowMeasureArg
+	(*FlowMeasureCommandReadArg)(nil),                   // 108: bess.pb.FlowMeasureCommandReadArg
+	(*FlowMeasureReadResponse)(nil),                     // 109: bess.pb.FlowMeasureReadResponse
+	(*L2ForwardCommandAddArg_Entry)(nil),                // 110: bess.pb.L2ForwardCommandAddArg.Entry
+	(*MeasureCommandGetSummaryResponse_Histogram)(nil),  // 111: bess.pb.MeasureCommandGetSummaryResponse.Histogram
+	(*ACLArg_Rule)(nil),                                 // 112: bess.pb.ACLArg.Rule
+	(*BPFArg_Filter)(nil),                               // 113: bess.pb.BPFArg.Filter
+	(*GenericEncapArg_EncapField)(nil),                  // 114: bess.pb.GenericEncapArg.EncapField
+	nil,                                                 // 115: bess.pb.MetadataTestArg.ReadEntry
+	nil,                                                 // 116: bess.pb.MetadataTestArg.WriteEntry
+	nil,                                                 // 117: bess.pb.MetadataTestArg.UpdateEntry
+	(*NATArg_PortRange)(nil),                            // 118: bess.pb.NATArg.PortRange
+	(*NATArg_ExternalAddress)(nil),                      // 119: bess.pb.NATArg.ExternalAddress
+	(*StaticNATArg_AddressRange)(nil),                   // 120: bess.pb.StaticNATArg.AddressRange
+	(*StaticNATArg_AddressRangePair)(nil),               // 121: bess.pb.StaticNATArg.AddressRangePair
+	(*RandomUpdateArg_Field)(nil),                       // 122: bess.pb.RandomUpdateArg.Field
+	(*SetMetadataArg_Attribute)(nil),                    // 123: bess.pb.SetMetadataArg.Attribute
+	(*UpdateArg_Field)(nil),                             // 124: bess.pb.UpdateArg.Field
+	(*UrlFilterArg_Url)(nil),                            // 125: bess.pb.UrlFilterArg.Url
+	nil,                                                 // 126: bess.pb.WorkerSplitArg.WorkerGatesEntry
+	(*FlowMeasureReadResponse_Statistic)(nil),           // 127: bess.pb.FlowMeasureReadResponse.Statistic
+	(*FlowMeasureReadResponse_Statistic_Histogram)(nil), // 128: bess.pb.FlowMeasureReadResponse.Statistic.Histogram
+	(*FieldData)(nil),                                   // 129: bess.pb.FieldData
+	(*Field)(nil),                                       // 130: bess.pb.Field
 }
 var file_module_msg_proto_depIdxs = []int32{
-	130, // 0: bess.pb.ExactMatchCommandAddArg.fields:type_name -> bess.pb.FieldData
-	130, // 1: bess.pb.ExactMatchCommandAddArg.values:type_name -> bess.pb.FieldData
-	130, // 2: bess.pb.ExactMatchCommandDeleteArg.fields:type_name -> bess.pb.FieldData
-	131, // 3: bess.pb.HashLBCommandSetModeArg.fields:type_name -> bess.pb.Field
-	111, // 4: bess.pb.L2ForwardCommandAddArg.entries:type_name -> bess.pb.L2ForwardCommandAddArg.Entry
-	112, // 5: bess.pb.MeasureCommandGetSummaryResponse.latency:type_name -> bess.pb.MeasureCommandGetSummaryResponse.Histogram
-	112, // 6: bess.pb.MeasureCommandGetSummaryResponse.jitter:type_name -> bess.pb.MeasureCommandGetSummaryResponse.Histogram
-	130, // 7: bess.pb.WildcardMatchCommandAddArg.values:type_name -> bess.pb.FieldData
-	130, // 8: bess.pb.WildcardMatchCommandAddArg.masks:type_name -> bess.pb.FieldData
-	130, // 9: bess.pb.WildcardMatchCommandAddArg.valuesv:type_name -> bess.pb.FieldData
-	130, // 10: bess.pb.WildcardMatchCommandDeleteArg.values:type_name -> bess.pb.FieldData
-	130, // 11: bess.pb.WildcardMatchCommandDeleteArg.masks:type_name -> bess.pb.FieldData
-	113, // 12: bess.pb.ACLArg.rules:type_name -> bess.pb.ACLArg.Rule
-	114, // 13: bess.pb.BPFArg.filters:type_name -> bess.pb.BPFArg.Filter
-	131, // 14: bess.pb.ExactMatchArg.fields:type_name -> bess.pb.Field
-	130, // 15: bess.pb.ExactMatchArg.masks:type_name -> bess.pb.FieldData
-	131, // 16: bess.pb.ExactMatchArg.values:type_name -> bess.pb.Field
-	130, // 17: bess.pb.ExactMatchArg.masksv:type_name -> bess.pb.FieldData
-	3,   // 18: bess.pb.ExactMatchConfig.rules:type_name -> bess.pb.ExactMatchCommandAddArg
-	115, // 19: bess.pb.GenericEncapArg.fields:type_name -> bess.pb.GenericEncapArg.EncapField
-	131, // 20: bess.pb.HashLBArg.fields:type_name -> bess.pb.Field
-	116, // 21: bess.pb.MetadataTestArg.read:type_name -> bess.pb.MetadataTestArg.ReadEntry
-	117, // 22: bess.pb.MetadataTestArg.write:type_name -> bess.pb.MetadataTestArg.WriteEntry
-	118, // 23: bess.pb.MetadataTestArg.update:type_name -> bess.pb.MetadataTestArg.UpdateEntry
-	120, // 24: bess.pb.NATArg.ext_addrs:type_name -> bess.pb.NATArg.ExternalAddress
-	122, // 25: bess.pb.StaticNATArg.pairs:type_name -> bess.pb.StaticNATArg.AddressRangePair
-	123, // 26: bess.pb.RandomUpdateArg.fields:type_name -> bess.pb.RandomUpdateArg.Field
-	124, // 27: bess.pb.SetMetadataArg.attrs:type_name -> bess.pb.SetMetadataArg.Attribute
-	125, // 28: bess.pb.UpdateArg.fields:type_name -> bess.pb.UpdateArg.Field
-	126, // 29: bess.pb.UrlFilterArg.blacklist:type_name -> bess.pb.UrlFilterArg.Url
-	126, // 30: bess.pb.UrlFilterConfig.blacklist:type_name -> bess.pb.UrlFilterArg.Url
-	131, // 31: bess.pb.WildcardMatchArg.fields:type_name -> bess.pb.Field
-	131, // 32: bess.pb.WildcardMatchArg.values:type_name -> bess.pb.Field
-	33,  // 33: bess.pb.WildcardMatchConfig.rules:type_name -> bess.pb.WildcardMatchCommandAddArg
-	127, // 34: bess.pb.WorkerSplitArg.worker_gates:type_name -> bess.pb.WorkerSplitArg.WorkerGatesEntry
-	131, // 35: bess.pb.QosArg.fields:type_name -> bess.pb.Field
-	131, // 36: bess.pb.QosArg.values:type_name -> bess.pb.Field
-	130, // 37: bess.pb.QosCommandAddArg.fields:type_name -> bess.pb.FieldData
-	130, // 38: bess.pb.QosCommandAddArg.values:type_name -> bess.pb.FieldData
-	130, // 39: bess.pb.QosCommandDeleteArg.fields:type_name -> bess.pb.FieldData
-	128, // 40: bess.pb.FlowMeasureReadResponse.statistics:type_name -> bess.pb.FlowMeasureReadResponse.Statistic
-	130, // 41: bess.pb.GenericEncapArg.EncapField.value:type_name -> bess.pb.FieldData
-	119, // 42: bess.pb.NATArg.ExternalAddress.port_ranges:type_name -> bess.pb.NATArg.PortRange
-	121, // 43: bess.pb.StaticNATArg.AddressRangePair.int_range:type_name -> bess.pb.StaticNATArg.AddressRange
-	121, // 44: bess.pb.StaticNATArg.AddressRangePair.ext_range:type_name -> bess.pb.StaticNATArg.AddressRange
-	129, // 45: bess.pb.FlowMeasureReadResponse.Statistic.latency:type_name -> bess.pb.FlowMeasureReadResponse.Statistic.Histogram
-	129, // 46: bess.pb.FlowMeasureReadResponse.Statistic.jitter:type_name -> bess.pb.FlowMeasureReadResponse.Statistic.Histogram
+	129, // 0: bess.pb.ExactMatchCommandAddArg.fields:type_name -> bess.pb.FieldData
+	129, // 1: bess.pb.ExactMatchCommandAddArg.values:type_name -> bess.pb.FieldData
+	129, // 2: bess.pb.ExactMatchCommandDeleteArg.fields:type_name -> bess.pb.FieldData
+	130, // 3: bess.pb.HashLBCommandSetModeArg.fields:type_name -> bess.pb.Field
+	110, // 4: bess.pb.L2ForwardCommandAddArg.entries:type_name -> bess.pb.L2ForwardCommandAddArg.Entry
+	111, // 5: bess.pb.MeasureCommandGetSummaryResponse.latency:type_name -> bess.pb.MeasureCommandGetSummaryResponse.Histogram
+	111, // 6: bess.pb.MeasureCommandGetSummaryResponse.jitter:type_name -> bess.pb.MeasureCommandGetSummaryResponse.Histogram
+	129, // 7: bess.pb.WildcardMatchCommandAddArg.values:type_name -> bess.pb.FieldData
+	129, // 8: bess.pb.WildcardMatchCommandAddArg.masks:type_name -> bess.pb.FieldData
+	129, // 9: bess.pb.WildcardMatchCommandAddArg.valuesv:type_name -> bess.pb.FieldData
+	129, // 10: bess.pb.WildcardMatchCommandDeleteArg.values:type_name -> bess.pb.FieldData
+	129, // 11: bess.pb.WildcardMatchCommandDeleteArg.masks:type_name -> bess.pb.FieldData
+	112, // 12: bess.pb.ACLArg.rules:type_name -> bess.pb.ACLArg.Rule
+	113, // 13: bess.pb.BPFArg.filters:type_name -> bess.pb.BPFArg.Filter
+	130, // 14: bess.pb.ExactMatchArg.fields:type_name -> bess.pb.Field
+	129, // 15: bess.pb.ExactMatchArg.masks:type_name -> bess.pb.FieldData
+	130, // 16: bess.pb.ExactMatchArg.values:type_name -> bess.pb.Field
+	129, // 17: bess.pb.ExactMatchArg.masksv:type_name -> bess.pb.FieldData
+	2,   // 18: bess.pb.ExactMatchConfig.rules:type_name -> bess.pb.ExactMatchCommandAddArg
+	114, // 19: bess.pb.GenericEncapArg.fields:type_name -> bess.pb.GenericEncapArg.EncapField
+	130, // 20: bess.pb.HashLBArg.fields:type_name -> bess.pb.Field
+	115, // 21: bess.pb.MetadataTestArg.read:type_name -> bess.pb.MetadataTestArg.ReadEntry
+	116, // 22: bess.pb.MetadataTestArg.write:type_name -> bess.pb.MetadataTestArg.WriteEntry
+	117, // 23: bess.pb.MetadataTestArg.update:type_name -> bess.pb.MetadataTestArg.UpdateEntry
+	119, // 24: bess.pb.NATArg.ext_addrs:type_name -> bess.pb.NATArg.ExternalAddress
+	121, // 25: bess.pb.StaticNATArg.pairs:type_name -> bess.pb.StaticNATArg.AddressRangePair
+	122, // 26: bess.pb.RandomUpdateArg.fields:type_name -> bess.pb.RandomUpdateArg.Field
+	123, // 27: bess.pb.SetMetadataArg.attrs:type_name -> bess.pb.SetMetadataArg.Attribute
+	124, // 28: bess.pb.UpdateArg.fields:type_name -> bess.pb.UpdateArg.Field
+	125, // 29: bess.pb.UrlFilterArg.blacklist:type_name -> bess.pb.UrlFilterArg.Url
+	125, // 30: bess.pb.UrlFilterConfig.blacklist:type_name -> bess.pb.UrlFilterArg.Url
+	130, // 31: bess.pb.WildcardMatchArg.fields:type_name -> bess.pb.Field
+	130, // 32: bess.pb.WildcardMatchArg.values:type_name -> bess.pb.Field
+	32,  // 33: bess.pb.WildcardMatchConfig.rules:type_name -> bess.pb.WildcardMatchCommandAddArg
+	126, // 34: bess.pb.WorkerSplitArg.worker_gates:type_name -> bess.pb.WorkerSplitArg.WorkerGatesEntry
+	130, // 35: bess.pb.QosArg.fields:type_name -> bess.pb.Field
+	130, // 36: bess.pb.QosArg.values:type_name -> bess.pb.Field
+	129, // 37: bess.pb.QosCommandAddArg.fields:type_name -> bess.pb.FieldData
+	129, // 38: bess.pb.QosCommandAddArg.values:type_name -> bess.pb.FieldData
+	129, // 39: bess.pb.QosCommandDeleteArg.fields:type_name -> bess.pb.FieldData
+	127, // 40: bess.pb.FlowMeasureReadResponse.statistics:type_name -> bess.pb.FlowMeasureReadResponse.Statistic
+	129, // 41: bess.pb.GenericEncapArg.EncapField.value:type_name -> bess.pb.FieldData
+	118, // 42: bess.pb.NATArg.ExternalAddress.port_ranges:type_name -> bess.pb.NATArg.PortRange
+	120, // 43: bess.pb.StaticNATArg.AddressRangePair.int_range:type_name -> bess.pb.StaticNATArg.AddressRange
+	120, // 44: bess.pb.StaticNATArg.AddressRangePair.ext_range:type_name -> bess.pb.StaticNATArg.AddressRange
+	128, // 45: bess.pb.FlowMeasureReadResponse.Statistic.latency:type_name -> bess.pb.FlowMeasureReadResponse.Statistic.Histogram
+	128, // 46: bess.pb.FlowMeasureReadResponse.Statistic.jitter:type_name -> bess.pb.FlowMeasureReadResponse.Statistic.Histogram
 	47,  // [47:47] is the sub-list for method output_type
 	47,  // [47:47] is the sub-list for method input_type
 	47,  // [47:47] is the sub-list for extension type_name
@@ -10005,14 +9949,13 @@ func file_module_msg_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_module_msg_proto_rawDesc,
-			NumEnums:      1,
+			NumEnums:      0,
 			NumMessages:   129,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_module_msg_proto_goTypes,
 		DependencyIndexes: file_module_msg_proto_depIdxs,
-		EnumInfos:         file_module_msg_proto_enumTypes,
 		MessageInfos:      file_module_msg_proto_msgTypes,
 	}.Build()
 	File_module_msg_proto = out.File

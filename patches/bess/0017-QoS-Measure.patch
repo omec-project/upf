@@ -2,7 +2,7 @@ diff --git a/protobuf/module_msg.proto b/protobuf/module_msg.proto
 index c435437a..a6e606f4 100644
 --- a/protobuf/module_msg.proto
 +++ b/protobuf/module_msg.proto
-@@ -1335,3 +1335,40 @@ message QosCommandClearArg {
+@@ -1335,3 +1335,35 @@ message QosCommandClearArg {
  message QosCommandSetDefaultGateArg {
    uint64 gate = 1;
  }
@@ -11,11 +11,6 @@ index c435437a..a6e606f4 100644
 +  string flag_attr_name = 1;
 +  uint64 entries = 2;
 +  bool leader = 3; // If true, this module will decide the buffer side
-+}
-+enum BufferFlag {
-+  FLAG_VALUE_INVALID = 0;
-+  FLAG_VALUE_A = 1;
-+  FLAG_VALUE_B = 2;
 +}
 +message FlowMeasureCommandReadArg {
 +  bool clear = 1; // If true, the data will be all cleared after read
