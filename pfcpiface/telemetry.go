@@ -8,6 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	log "github.com/sirupsen/logrus"
 )
 
 func getPctiles() []float64 {
@@ -31,6 +32,12 @@ type upfCollector struct {
 
 	latency *prometheus.Desc
 	jitter  *prometheus.Desc
+
+	sessionLatency        *prometheus.Desc
+	sessionJitter         *prometheus.Desc
+	sessionTxPackets      *prometheus.Desc
+	sessionDroppedPackets *prometheus.Desc
+	sessionTxBytes        *prometheus.Desc
 
 	upf *upf
 }
@@ -57,6 +64,26 @@ func newUpfCollector(upf *upf) *upfCollector {
 			"Shows the packet processing jitter percentiles in UPF",
 			[]string{"iface"}, nil,
 		),
+		sessionLatency: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "latency_ns"),
+			"Shows the latency of a session in UPF",
+			[]string{"fseid", "pdr"}, nil,
+		),
+		sessionJitter: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "jitter_ns"),
+			"Shows the jitter of a session in UPF",
+			[]string{"fseid", "pdr"}, nil,
+		),
+		sessionTxPackets: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "tx_packets"),
+			"Shows the total number of packets for a given session in UPF",
+			[]string{"fseid", "pdr"}, nil,
+		),
+		sessionDroppedPackets: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "dropped_packets"),
+			"Shows the number of packets dropped for a given session in UPF",
+			[]string{"fseid", "pdr"}, nil,
+		),
+		sessionTxBytes: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "tx_bytes"),
+			"Shows the total number of bytes for a given session in UPF",
+			[]string{"fseid", "pdr"}, nil,
+		),
 		upf: upf,
 	}
 }
@@ -75,6 +102,11 @@ func (uc *upfCollector) Describe(ch chan<- *prometheus.Desc) {
 func (uc *upfCollector) Collect(ch chan<- prometheus.Metric) {
 	uc.summaryLatencyJitter(ch)
 	uc.portStats(ch)
+	if uc.upf.enableFlowMeasure {
+		if err := uc.sessionStats(ch); err != nil {
+			log.Error(err)
+		}
+	}
 }
 
 func (uc *upfCollector) portStats(ch chan<- prometheus.Metric) {
@@ -84,6 +116,10 @@ func (uc *upfCollector) portStats(ch chan<- prometheus.Metric) {
 
 func (uc *upfCollector) summaryLatencyJitter(ch chan<- prometheus.Metric) {
 	uc.upf.summaryLatencyJitter(uc, ch)
+}
+
+func (uc *upfCollector) sessionStats(ch chan<- prometheus.Metric) error {
+	return uc.upf.sessionStats(uc, ch)
 }
 
 func setupProm(upf *upf) {

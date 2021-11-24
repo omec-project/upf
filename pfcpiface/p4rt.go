@@ -63,6 +63,10 @@ func (p *p4rtc) addSliceInfo(sliceInfo *SliceInfo) error {
 func (p *p4rtc) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric) {
 }
 
+func (p *p4rtc) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) error {
+	return nil
+}
+
 func (p *p4rtc) portStats(uc *upfCollector, ch chan<- prometheus.Metric) {
 }
 

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"strconv"
 	"time"
 
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
@@ -31,6 +32,12 @@ const (
 	AppQerLookup = "appQERLookup"
 	// SessQerLookup: Session Qos table Name.
 	SessQerLookup = "sessionQERLookup"
+	// PreQosFlowMeasure: Pre QoS measurement module name.
+	PreQosFlowMeasure = "preQosFlowMeasure"
+	// PostDlQosFlowMeasure: Post QoS measurement downlink module name.
+	PostDlQosFlowMeasure = "postDLQosFlowMeasure"
+	// PostUlQosFlowMeasure: Post QoS measurement uplink module name.
+	PostUlQosFlowMeasure = "postULQosFlowMeasure"
 	// far-action specific values.
 	farForwardD = 0x0
 	farForwardU = 0x1
@@ -178,7 +185,7 @@ func (b *bess) exit() {
 	b.conn.Close()
 }
 
-func (b *bess) measure(ifName string, f *pb.MeasureCommandGetSummaryArg) *pb.MeasureCommandGetSummaryResponse {
+func (b *bess) measureUpf(ifName string, f *pb.MeasureCommandGetSummaryArg) *pb.MeasureCommandGetSummaryResponse {
 	modName := func() string {
 		return ifName + "_measure"
 	}
@@ -288,7 +295,7 @@ func (b *bess) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metri
 			JitterPercentiles:  getPctiles(),
 		}
 
-		res := b.measure(ifaceName, req)
+		res := b.measureUpf(ifaceName, req)
 		if res == nil {
 			return
 		}
@@ -321,6 +328,133 @@ func (b *bess) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metri
 	}
 	measureIface("Access", uc.upf.accessIface)
 	measureIface("Core", uc.upf.coreIface)
+}
+
+func (b *bess) readFlowMeasurement(
+	ctx context.Context, module string, clear bool, q []float64,
+) (stats pb.FlowMeasureReadResponse, err error) {
+	req := &pb.FlowMeasureCommandReadArg{
+		Clear:              clear,
+		LatencyPercentiles: q,
+		JitterPercentiles:  q,
+	}
+	any, err := anypb.New(req)
+	if err != nil {
+		log.Errorln("Error marshalling request", req, err)
+		return
+	}
+	resp, err := b.client.ModuleCommand(
+		ctx, &pb.CommandRequest{
+			Name: module,
+			Cmd:  "read",
+			Arg:  any,
+		},
+	)
+	if err != nil {
+		log.Errorln(module, "read failed!:", err)
+		return
+	}
+	if err = resp.Data.UnmarshalTo(&stats); err != nil {
+		log.Errorln(err)
+		return
+	}
+	return
+}
+
+func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err error) {
+	// Clearing table data with large tables is slow, let's wait for a little longer since this is
+	// non-blocking for the dataplane anyway.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	// Read stats. This flips the buffer flag, reads from the now inactive side, and clear if needed.
+	q := []float64{50, 90, 99}
+	qosStatsInResp, err := b.readFlowMeasurement(ctx, PreQosFlowMeasure, true, q)
+	if err != nil {
+		log.Errorln(PreQosFlowMeasure, " read failed!:", err)
+		return
+	}
+	postDlQosStatsResp, err := b.readFlowMeasurement(ctx, PostDlQosFlowMeasure, true, q)
+	if err != nil {
+		log.Errorln(PostDlQosFlowMeasure, " read failed!:", err)
+		return
+	}
+	postUlQosStatsResp, err := b.readFlowMeasurement(ctx, PostUlQosFlowMeasure, true, q)
+	if err != nil {
+		log.Errorln(PostUlQosFlowMeasure, " read failed!:", err)
+		return
+	}
+
+	// Prepare prometheus stats.
+	createStats := func(preResp, postResp *pb.FlowMeasureReadResponse, ch chan<- prometheus.Metric) {
+		for i := 0; i < len(postResp.Statistics); i++ {
+			post := postResp.Statistics[i]
+			var pre *pb.FlowMeasureReadResponse_Statistic
+			// Find preQos values.
+			for _, v := range preResp.Statistics {
+				if post.Pdr == v.Pdr && post.Fseid == v.Fseid {
+					pre = v
+					break
+				}
+			}
+			if pre == nil {
+				log.Infof("Found no pre QoS statistics for PDR %v FSEID %v", post.Pdr, post.Fseid)
+				continue
+			}
+
+			fseidString := strconv.FormatUint(post.Fseid, 10)
+			pdrString := strconv.FormatUint(post.Pdr, 10)
+			ch <- prometheus.MustNewConstMetric(
+				uc.sessionTxPackets,
+				prometheus.GaugeValue,
+				float64(post.TotalPackets),
+				fseidString,
+				pdrString,
+			)
+			ch <- prometheus.MustNewConstMetric(
+				uc.sessionDroppedPackets,
+				prometheus.GaugeValue,
+				float64(pre.TotalPackets-post.TotalPackets),
+				fseidString,
+				pdrString,
+			)
+			ch <- prometheus.MustNewConstMetric(
+				uc.sessionTxBytes,
+				prometheus.GaugeValue,
+				float64(post.TotalBytes),
+				fseidString,
+				pdrString,
+			)
+			ch <- prometheus.MustNewConstSummary(
+				uc.sessionLatency,
+				post.TotalPackets,
+				0,
+				map[float64]float64{
+					50.0: float64(post.Latency.PercentileValuesNs[0]),
+					99.0: float64(post.Latency.PercentileValuesNs[1]),
+					99.9: float64(post.Latency.PercentileValuesNs[2]),
+				},
+				fseidString,
+				pdrString,
+			)
+			ch <- prometheus.MustNewConstSummary(
+				uc.sessionJitter,
+				post.TotalPackets,
+				0,
+				map[float64]float64{
+					50.0: float64(post.Jitter.PercentileValuesNs[0]),
+					99.0: float64(post.Jitter.PercentileValuesNs[1]),
+					99.9: float64(post.Jitter.PercentileValuesNs[2]),
+				},
+				fseidString,
+				pdrString,
+			)
+		}
+	}
+
+	createStats(&qosStatsInResp, &postUlQosStatsResp, ch)
+	createStats(&qosStatsInResp, &postDlQosStatsResp, ch)
+
+	return
 }
 
 func (b *bess) endMarkerSendLoop(endMarkerChan chan []byte) {

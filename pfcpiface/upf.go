@@ -36,18 +36,19 @@ type UeResource struct {
 }
 
 type upf struct {
-	enableUeIPAlloc  bool
-	enableEndMarker  bool
-	accessIface      string
-	coreIface        string
-	ippoolCidr       string
-	accessIP         net.IP
-	coreIP           net.IP
-	nodeID           string
-	ippool           *IPPool
-	dnn              string
-	reportNotifyChan chan uint64
-	sliceInfo        *SliceInfo
+	enableUeIPAlloc   bool
+	enableEndMarker   bool
+	enableFlowMeasure bool
+	accessIface       string
+	coreIface         string
+	ippoolCidr        string
+	accessIP          net.IP
+	coreIP            net.IP
+	nodeID            string
+	ippool            *IPPool
+	dnn               string
+	reportNotifyChan  chan uint64
+	sliceInfo         *SliceInfo
 
 	fastPath
 	recoveryTime   time.Time
