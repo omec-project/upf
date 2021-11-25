@@ -51,7 +51,6 @@ type upf struct {
 	sliceInfo         *SliceInfo
 
 	fastPath
-	recoveryTime   time.Time
 	enableHBTimer  bool
 	hbMaxRetries   uint8
 	hbInterval     time.Duration
@@ -73,6 +72,11 @@ const (
 	n3 = 0x0
 	n6 = 0x1
 	n9 = 0x2
+
+	// Heart Beat Parameters
+	maxHbRetries   = 5
+	hbReqInterval  = 5000
+	hbRespInterval = 2000
 )
 
 func (u *upf) isConnected() bool {
@@ -123,15 +127,28 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 		fastPath:         fp,
 		dnn:              conf.CPIface.Dnn,
 		reportNotifyChan: make(chan uint64, 1024),
-		recoveryTime:     time.Now(),
 		enableHBTimer:    conf.EnableHBTimer,
-		hbMaxRetries:     conf.HbMaxRetries,
-		hbInterval:       time.Duration(conf.HeartBeatInterval) * time.Millisecond,
-		hbRespDuration:   time.Duration(conf.HeartBeatRespDuration) * time.Millisecond,
 	}
 
 	u.accessIP = ParseIP(conf.AccessIface.IfName, "Access")
 	u.coreIP = ParseIP(conf.CoreIface.IfName, "Core")
+
+	if u.enableHBTimer {
+		u.hbMaxRetries = maxHbRetries
+		if conf.HbMaxRetries != 0 {
+			u.hbMaxRetries = conf.HbMaxRetries
+		}
+
+		u.hbInterval = time.Duration(hbReqInterval) * time.Millisecond
+		if conf.HeartBeatInterval != 0 {
+			u.hbInterval = time.Duration(conf.HeartBeatInterval) * time.Millisecond
+		}
+
+		u.hbRespDuration = time.Duration(hbRespInterval) * time.Millisecond
+		if conf.HeartBeatRespDuration != 0 {
+			u.hbRespDuration = time.Duration(conf.HeartBeatRespDuration) * time.Millisecond
+		}
+	}
 
 	if u.enableUeIPAlloc {
 		u.ippool, err = NewIPPool(u.ippoolCidr)

@@ -5,6 +5,7 @@ package main
 
 import (
 	"errors"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
@@ -19,7 +20,7 @@ func (pConn *PFCPConn) sendHeartBeatRequest() {
 
 	hbreq := message.NewHeartbeatRequest(
 		seq,
-		ie.NewRecoveryTimeStamp(pConn.upf.recoveryTime),
+		ie.NewRecoveryTimeStamp(pConn.ts.local),
 		nil,
 	)
 

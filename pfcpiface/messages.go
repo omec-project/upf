@@ -56,11 +56,9 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 		reply, err = pConn.handlePFDMgmtRequest(msg)
 	case message.MsgTypeAssociationSetupRequest:
 		reply, err = pConn.handleAssociationSetupRequest(msg)
-		if reply != nil {
+		if reply != nil && err == nil {
 			pConn.startHeartBeatMonitor()
 		}
-		// TODO: Cleanup sessions
-		// TODO: start heartbeats
 	case message.MsgTypeAssociationSetupResponse:
 		reply, err = pConn.handleAssociationSetupResponse(msg)
 		// TODO: Cleanup sessions
