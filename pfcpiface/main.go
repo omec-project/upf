@@ -83,6 +83,7 @@ type CPIfaceInfo struct {
 	UEIPPool        string   `json:"ue_ip_pool"`
 	HTTPPort        string   `json:"http_port"`
 	Dnn             string   `json:"dnn"`
+	TLSEnabled      bool     `json:"tls"`
 }
 
 // IfaceType : Gateway interface struct.
@@ -188,7 +189,7 @@ func main() {
 	upf := NewUPF(&conf, fp)
 
 	if *pfcpsim {
-		pfcpSim()
+		pfcpSim(conf.CPIface.TLSEnabled)
 		return
 	}
 
@@ -218,7 +219,7 @@ func main() {
 	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	node := NewPFCPNode(ctx, upf)
+	node := NewPFCPNode(ctx, conf.CPIface.TLSEnabled, upf)
 	go node.Serve()
 
 	sig := make(chan os.Signal, 1)

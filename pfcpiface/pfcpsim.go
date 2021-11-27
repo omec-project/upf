@@ -4,15 +4,20 @@
 package main
 
 import (
+	"crypto/tls"
 	"net"
 	"time"
 
+	dtls "github.com/pion/dtls/v2"
+	"github.com/pion/dtls/v2/examples/util"
+	"github.com/pion/dtls/v2/pkg/crypto/selfsign"
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
 )
 
-func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
+func createPFCP(conn net.Conn) uint64 {
+	raddr := conn.RemoteAddr()
 	{
 		var seq uint32 = 0
 		asreq, err := message.NewAssociationSetupRequest(
@@ -30,7 +35,7 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 		log.Printf("sent association setup request to: %s", raddr)
 
 		buf := make([]byte, 1500)
-		_, _, err = conn.ReadFrom(buf)
+		_, err = conn.Read(buf)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -53,7 +58,7 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 		log.Printf("sent heartbeat request to: %s", raddr)
 
 		buf := make([]byte, 1500)
-		_, _, err = conn.ReadFrom(buf)
+		_, err = conn.Read(buf)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -88,7 +93,7 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 		log.Printf("sent PFD management request to: %s", raddr)
 
 		buf := make([]byte, 1500)
-		_, _, err = conn.ReadFrom(buf)
+		_, err = conn.Read(buf)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -224,7 +229,7 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 		log.Printf("sent session establishment request to: %s", raddr)
 
 		buf := make([]byte, 1500)
-		n, addr, err := conn.ReadFrom(buf)
+		n, err := conn.Read(buf)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -234,7 +239,7 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 		}
 		seres, ok := msg.(*message.SessionEstablishmentResponse)
 		if !ok {
-			log.Fatalln("Got an unexpected message: ", msg.MessageTypeName(), " from: ", addr)
+			log.Fatalln("Got an unexpected message: ", msg.MessageTypeName(), " from: ", raddr)
 		}
 		fseid, err := seres.UPFSEID.FSEID()
 		if err != nil {
@@ -244,7 +249,8 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 	}
 }
 
-func modifyPFCP(conn *net.UDPConn, raddr *net.UDPAddr, seid uint64) {
+func modifyPFCP(conn net.Conn, seid uint64) {
+	raddr := conn.RemoteAddr()
 	{
 		var seq uint32 = 4
 		hbreq, err := message.NewSessionModificationRequest(
@@ -308,14 +314,15 @@ func modifyPFCP(conn *net.UDPConn, raddr *net.UDPAddr, seid uint64) {
 		log.Printf("sent session modification request to: %s", raddr)
 
 		buf := make([]byte, 1500)
-		_, _, err = conn.ReadFrom(buf)
+		_, err = conn.Read(buf)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 }
 
-func deletePFCP(conn *net.UDPConn, raddr *net.UDPAddr, seid uint64) {
+func deletePFCP(conn net.Conn, seid uint64) {
+	raddr := conn.RemoteAddr()
 	{
 		var seq uint32 = 5
 
@@ -338,7 +345,7 @@ func deletePFCP(conn *net.UDPConn, raddr *net.UDPAddr, seid uint64) {
 
 		buf := make([]byte, 1500)
 
-		_, _, err = conn.ReadFrom(buf)
+		_, err = conn.Read(buf)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -361,29 +368,41 @@ func deletePFCP(conn *net.UDPConn, raddr *net.UDPAddr, seid uint64) {
 		log.Printf("sent association release request to: %s", raddr)
 
 		buf := make([]byte, 1500)
-		_, _, err = conn.ReadFrom(buf)
+		_, err = conn.Read(buf)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 }
 
-func pfcpSim() {
-	raddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:"+PFCPPort)
+func pfcpSim(tlsEnabled bool) {
+
+	conn, err := net.Dial("udp", "127.0.0.1:"+PFCPPort)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	conn, err := net.DialUDP("udp", nil, raddr)
-	if err != nil {
-		log.Fatal(err)
+	if tlsEnabled {
+		certificate, genErr := selfsign.GenerateSelfSigned()
+		util.Check(genErr)
+		// Prepare the configuration of the DTLS connection
+		config := &dtls.Config{
+			Certificates:         []tls.Certificate{certificate},
+			InsecureSkipVerify:   true,
+			ExtendedMasterSecret: dtls.RequireExtendedMasterSecret,
+		}
+
+		conn, err = dtls.Client(conn, config)
+		if err != nil {
+			log.Fatalln("Unable to create dTLS from net.Conn", err)
+		}
 	}
 
-	seid := createPFCP(conn, raddr)
+	seid := createPFCP(conn)
 
 	time.Sleep(10 * time.Second)
-	modifyPFCP(conn, raddr, seid)
+	modifyPFCP(conn, seid)
 
 	time.Sleep(10 * time.Second)
-	deletePFCP(conn, raddr, seid)
+	deletePFCP(conn, seid)
 }

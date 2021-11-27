@@ -2,10 +2,14 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"net"
 
-	reuse "github.com/libp2p/go-reuseport"
+	"github.com/pion/dtls/v2"
+	"github.com/pion/dtls/v2/examples/util"
+	"github.com/pion/dtls/v2/pkg/crypto/selfsign"
+	"github.com/pion/udp"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/omec-project/upf-epc/pfcpiface/metrics"
@@ -15,7 +19,7 @@ import (
 type PFCPNode struct {
 	ctx context.Context
 	// listening socket for new "PFCP connections"
-	net.PacketConn
+	net.Listener
 	// done is closed to signal shutdown complete
 	done chan struct{}
 	// channel for PFCPConn to signal exit by sending their remote address
@@ -29,10 +33,31 @@ type PFCPNode struct {
 }
 
 // NewPFCPNode create a new PFCPNode listening on local address.
-func NewPFCPNode(ctx context.Context, upf *upf) *PFCPNode {
-	conn, err := reuse.ListenPacket("udp", ":"+PFCPPort)
+func NewPFCPNode(ctx context.Context, tlsEnabled bool, upf *upf) *PFCPNode {
+	addr, err := net.ResolveUDPAddr("udp", ":"+PFCPPort)
+	if err != nil {
+		log.Fatalln("Resolve local address failed", err)
+	}
+
+	listener, err := udp.Listen(addr.Network(), addr)
 	if err != nil {
 		log.Fatalln("ListenUDP failed", err)
+	}
+
+	if tlsEnabled {
+		certificate, genErr := selfsign.GenerateSelfSigned()
+		util.Check(genErr)
+		// Prepare the configuration of the DTLS connection
+		config := &dtls.Config{
+			Certificates:         []tls.Certificate{certificate},
+			InsecureSkipVerify:   true,
+			ExtendedMasterSecret: dtls.RequireExtendedMasterSecret,
+		}
+
+		listener, err = dtls.NewListener(listener, config)
+		if err != nil {
+			log.Fatalln("Unable to create dTLS listener", err)
+		}
 	}
 
 	metrics, err := metrics.NewPrometheusService()
@@ -41,24 +66,23 @@ func NewPFCPNode(ctx context.Context, upf *upf) *PFCPNode {
 	}
 
 	return &PFCPNode{
-		ctx:        ctx,
-		PacketConn: conn,
-		done:       make(chan struct{}),
-		pConnDone:  make(chan string, 100),
-		pConns:     make(map[string]*PFCPConn),
-		upf:        upf,
-		metrics:    metrics,
+		ctx:       ctx,
+		Listener:  listener,
+		done:      make(chan struct{}),
+		pConnDone: make(chan string, 100),
+		pConns:    make(map[string]*PFCPConn),
+		upf:       upf,
+		metrics:   metrics,
 	}
 }
 
 func (node *PFCPNode) handleNewPeers() {
-	lAddrStr := node.LocalAddr().String()
+	lAddrStr := node.Addr().String()
 	log.Infoln("listening for new PFCP connections on", lAddrStr)
 
 	for {
-		buf := make([]byte, 1024)
 
-		n, rAddr, err := node.ReadFrom(buf)
+		conn, err := node.Accept()
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
 				return
@@ -66,15 +90,7 @@ func (node *PFCPNode) handleNewPeers() {
 			continue
 		}
 
-		rAddrStr := rAddr.String()
-
-		_, ok := node.pConns[rAddrStr]
-		if ok {
-			log.Warnln("Drop packet for existing PFCPconn received from", rAddrStr)
-			continue
-		}
-
-		node.NewPFCPConn(lAddrStr, rAddrStr, buf[:n])
+		node.NewPFCPConn(conn)
 	}
 }
 

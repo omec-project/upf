@@ -126,6 +126,7 @@
 
     "": "Control plane controller settings",
     "cpiface": {
+        "tls": false,
         "dnn": "internet",
         "http_port": "8080",
         "enable_ue_ip_alloc": false,

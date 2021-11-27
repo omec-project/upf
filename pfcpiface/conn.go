@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	reuse "github.com/libp2p/go-reuseport"
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
 
@@ -65,12 +64,7 @@ type PFCPConn struct {
 
 // NewPFCPConn creates a connected UDP socket to the rAddr PFCP peer specified.
 // buf is the first message received from the peer, nil if we are initiating.
-func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
-	conn, err := reuse.Dial("udp", lAddr, rAddr)
-	if err != nil {
-		log.Errorln("dial socket failed", err)
-	}
-
+func (node *PFCPNode) NewPFCPConn(conn net.Conn) *PFCPConn {
 	ts := recoveryTS{
 		local: time.Now(),
 	}
@@ -94,13 +88,8 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 
 	p.setLocalNodeID(node.upf.nodeID)
 
-	if buf != nil {
-		// TODO: Check if the first msg is Association Setup Request
-		p.HandlePFCPMsg(buf)
-	}
-
 	// Update map of connections
-	node.pConns[rAddr] = p
+	node.pConns[conn.RemoteAddr().String()] = p
 
 	go p.Serve()
 
