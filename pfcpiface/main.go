@@ -32,6 +32,7 @@ type Conf struct {
 	CPIface           CPIfaceInfo      `json:"cpiface"`
 	P4rtcIface        P4rtcInfo        `json:"p4rtciface"`
 	EnableP4rt        bool             `json:"enable_p4rt"`
+	EnableFlowMeasure bool             `json:"measure_flow"`
 	SimInfo           SimModeInfo      `json:"sim"`
 	ConnTimeout       uint32           `json:"conn_timeout"`
 	ReadTimeout       uint32           `json:"read_timeout"`

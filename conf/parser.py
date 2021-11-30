@@ -29,7 +29,7 @@ class Parser:
         self.hwcksum = False
         self.gtppsc = False
         self.ddp = False
-        self.measure = False
+        self.measure_upf = False
         self.mode = None
         self.sim_core = None
         self.sim_max_sessions = None
@@ -50,7 +50,9 @@ class Parser:
         self.notify_sockaddr = "/tmp/notifycp"
         self.endmarker_sockaddr = "/tmp/pfcpport"
         self.enable_slice_metering = False
+        self.measure_flow = False
         self.table_size_pdr_lookup = 0
+        self.table_size_flow_measure = 0
         self.table_size_app_qer_lookup = 0
         self.table_size_session_qer_lookup = 0
         self.table_size_far_lookup = 0
@@ -96,9 +98,9 @@ class Parser:
         # See this link for details:
         # https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py
         try:
-            self.measure = self.conf["measure"]
+            self.measure_upf = self.conf["measure_upf"]
         except KeyError:
-            print('measure value not set. Not installing Measure module.')
+            print('measure_upf value not set. Not installing Measure module.')
 
         # Fetch interfaces
         for iface in ifaces:
@@ -175,9 +177,16 @@ class Parser:
         except KeyError:
             print('Network Token Function disabled')
 
+        # Flow measurements
+        try:
+            self.measure_flow = bool(self.conf['measure_flow'])
+        except KeyError:
+            print('Flow measurement function disabled')
+
         # Table sizes
         try:
             self.table_size_pdr_lookup = self.conf["table_sizes"]["pdrLookup"]
+            self.table_size_flow_measure = self.conf["table_sizes"]["flowMeasure"]
             self.table_size_app_qer_lookup = self.conf["table_sizes"]["appQERLookup"]
             self.table_size_session_qer_lookup = self.conf["table_sizes"]["sessionQERLookup"]
             self.table_size_far_lookup = self.conf["table_sizes"]["farLookup"]

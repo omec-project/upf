@@ -42,6 +42,7 @@ func (u *upf) sim(method string, s *SimModeInfo) {
 
 			precedence: 255,
 
+			pdrID:     1,
 			fseID:     uint64(n3TEID + i),
 			ctrID:     i,
 			farID:     n3,
@@ -60,6 +61,7 @@ func (u *upf) sim(method string, s *SimModeInfo) {
 
 			precedence: 1,
 
+			pdrID:     2,
 			fseID:     uint64(n3TEID + i),
 			ctrID:     i,
 			farID:     n3,
@@ -81,6 +83,7 @@ func (u *upf) sim(method string, s *SimModeInfo) {
 
 			precedence: 255,
 
+			pdrID:     3,
 			fseID:     uint64(n3TEID + i),
 			ctrID:     i,
 			farID:     n6,
@@ -101,6 +104,7 @@ func (u *upf) sim(method string, s *SimModeInfo) {
 
 			precedence: 1,
 
+			pdrID:     4,
 			fseID:     uint64(n3TEID + i),
 			ctrID:     i,
 			farID:     n9,

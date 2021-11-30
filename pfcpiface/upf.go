@@ -35,18 +35,19 @@ type UeResource struct {
 }
 
 type upf struct {
-	enableUeIPAlloc  bool
-	enableEndMarker  bool
-	accessIface      string
-	coreIface        string
-	ippoolCidr       string
-	accessIP         net.IP
-	coreIP           net.IP
-	nodeID           string
-	ippool           *IPPool
-	dnn              string
-	reportNotifyChan chan uint64
-	sliceInfo        *SliceInfo
+	enableUeIPAlloc   bool
+	enableEndMarker   bool
+	enableFlowMeasure bool
+	accessIface       string
+	coreIface         string
+	ippoolCidr        string
+	accessIP          net.IP
+	coreIP            net.IP
+	nodeID            string
+	ippool            *IPPool
+	dnn               string
+	reportNotifyChan  chan uint64
+	sliceInfo         *SliceInfo
 
 	fastPath
 }
@@ -107,15 +108,16 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 	}
 
 	u := &upf{
-		enableUeIPAlloc:  conf.CPIface.EnableUeIPAlloc,
-		enableEndMarker:  conf.EnableEndMarker,
-		accessIface:      conf.AccessIface.IfName,
-		coreIface:        conf.CoreIface.IfName,
-		ippoolCidr:       conf.CPIface.UEIPPool,
-		nodeID:           nodeID,
-		fastPath:         fp,
-		dnn:              conf.CPIface.Dnn,
-		reportNotifyChan: make(chan uint64, 1024),
+		enableUeIPAlloc:   conf.CPIface.EnableUeIPAlloc,
+		enableEndMarker:   conf.EnableEndMarker,
+		enableFlowMeasure: conf.EnableFlowMeasure,
+		accessIface:       conf.AccessIface.IfName,
+		coreIface:         conf.CoreIface.IfName,
+		ippoolCidr:        conf.CPIface.UEIPPool,
+		nodeID:            nodeID,
+		fastPath:          fp,
+		dnn:               conf.CPIface.Dnn,
+		reportNotifyChan:  make(chan uint64, 1024),
 	}
 
 	u.accessIP = ParseIP(conf.AccessIface.IfName, "Access")
