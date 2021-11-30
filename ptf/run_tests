@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Copyright 2021-present Open Networking Foundation
+# SPDX-License-Identifier: LicenseRef-ONF-Member-Only-1.0
+
+set -eux -o pipefail
+
+TEST_DIR="$(pwd)"
+
+while getopts 't:' flag; do
+  case "${flag}" in
+    t) testdir="${OPTARG}" ;;
+    *) error "Unexpected option ${flag}" ;;
+  esac
+done
+
+testName="${3:-""}"
+runName=ptf-${RANDOM}
+
+source .env
+echo "*** Starting tests in container (${runName})..."
+# Do not attach stdin if running in an environment without it (e.g., Jenkins)
+it=$(test -t 0 && echo "-it" || echo "-t")
+
+docker run --name "${runName}" "${it}" \
+    --privileged \
+    -v "${TEST_DIR}":/upf-tests/ \
+    "${TESTER_DOCKER_IMG}" \
+    python3 -u /upf-tests/lib/ptf_runner.py \
+    --ptf-dir /upf-tests/"${testdir}" \
+    --trex-address "${TREX_ADDR}" \
+    --bess-address "${UPF_ADDR}" \
+    --trex-config /upf-tests/trex-config/4-ports-with-l2.yaml \
+    "${testName}"

@@ -104,11 +104,12 @@ RUN mkdir /bess_pb && \
         --go_opt=paths=source_relative --go_out=plugins=grpc:/bess_pb
 
 FROM bess-build AS py-pb
-RUN apt-get install -y protobuf-compiler=3.6.1.3-2ubuntu5
+RUN pip install grpcio-tools==1.26
 RUN mkdir /bess_pb && \
-    protoc -I /usr/include -I /protobuf/ \
+    python -m grpc_tools.protoc -I /usr/include -I /protobuf/ \
         /protobuf/*.proto /protobuf/ports/*.proto \
-        --python_out=plugins=grpc:/bess_pb
+        --python_out=plugins=grpc:/bess_pb \
+        --grpc_python_out=/bess_pb
 
 FROM golang AS pfcpiface-build
 WORKDIR /pfcpiface

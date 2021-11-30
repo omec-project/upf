@@ -61,7 +61,7 @@ output:
 
 # Golang grpc/protobuf generation
 BESS_PB_DIR ?= pfcpiface
-PTF_PB_DIR ?= ${BESS_PB_DIR}/ptf
+PTF_PB_DIR ?= ptf/lib
 
 pb:
 	DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) \
@@ -76,6 +76,6 @@ py-pb:
 		--target ptf-pb \
 		--output output \
 		.;
-	cp -a output/bess_pb ${PTF_PB_DIR}
+	cp -a output/bess_pb/. ${PTF_PB_DIR}
 
 .PHONY: docker-build docker-push output pb
