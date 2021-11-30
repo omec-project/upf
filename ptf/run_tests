@@ -7,10 +7,10 @@ set -eux -o pipefail
 TEST_DIR="$(pwd)"
 
 while getopts 't:' flag; do
-  case "${flag}" in
-    t) testdir="${OPTARG}" ;;
-    *) error "Unexpected option ${flag}" ;;
-  esac
+	case "${flag}" in
+	t) testdir="${OPTARG}" ;;
+	*) error "Unexpected option ${flag}" ;;
+	esac
 done
 
 testName="${3:-""}"
@@ -22,12 +22,12 @@ echo "*** Starting tests in container (${runName})..."
 it=$(test -t 0 && echo "-it" || echo "-t")
 
 docker run --name "${runName}" "${it}" \
-    --privileged \
-    -v "${TEST_DIR}":/upf-tests/ \
-    "${TESTER_DOCKER_IMG}" \
-    python3 -u /upf-tests/lib/ptf_runner.py \
-    --ptf-dir /upf-tests/"${testdir}" \
-    --trex-address "${TREX_ADDR}" \
-    --bess-address "${UPF_ADDR}" \
-    --trex-config /upf-tests/trex-config/4-ports-with-l2.yaml \
-    "${testName}"
+	--privileged \
+	-v "${TEST_DIR}":/upf-tests/ \
+	"${TESTER_DOCKER_IMG}" \
+	python3 -u /upf-tests/lib/ptf_runner.py \
+	--ptf-dir /upf-tests/"${testdir}" \
+	--trex-address "${TREX_ADDR}" \
+	--bess-address "${UPF_ADDR}" \
+	--trex-config /upf-tests/trex-config/4-ports-with-l2.yaml \
+	"${testName}"
