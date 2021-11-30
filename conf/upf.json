@@ -72,6 +72,10 @@
     "": "Number of worker threads. Default: 1",
     "workers": 1,
 
+    "": "Parameters for handling outgoing requests",
+    "max_req_retries": 5,
+    "resp_timeout": 2000,
+
     "": "Whether to enable Network Token Functions",
     "enable_ntf": false,
 
@@ -90,9 +94,7 @@
 
     "": "Whether to enable UPF HeartBeatTimer feature",
     "enable_hbTimer": false,
-    "": "hb_max_retries: 5",
     "": "heart_beat_interval: 5000",
-    "": "heart_beat_resp_dur: 2000",
 
     "qci_qos_config": [
         {

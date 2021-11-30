@@ -51,10 +51,10 @@ type upf struct {
 	sliceInfo         *SliceInfo
 
 	fastPath
-	enableHBTimer  bool
-	hbMaxRetries   uint8
-	hbInterval     time.Duration
-	hbRespDuration time.Duration
+	maxReqRetries uint8
+	respTimeout   time.Duration
+	enableHBTimer bool
+	hbInterval    time.Duration
 }
 
 // to be replaced with go-pfcp structs
@@ -73,10 +73,12 @@ const (
 	n6 = 0x1
 	n9 = 0x2
 
-	// Heart Beat Parameters
-	maxHbRetries   = 5
-	hbReqInterval  = 5000
-	hbRespInterval = 2000
+	// Default values for outgoing requests
+	maxReqRetries = 5
+	respTimeout   = 2000
+
+	// Default value for Heart Beat Interval
+	hbInterval = 5000
 )
 
 func (u *upf) isConnected() bool {
@@ -118,35 +120,36 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 	}
 
 	u := &upf{
-		enableUeIPAlloc:  conf.CPIface.EnableUeIPAlloc,
-		enableEndMarker:  conf.EnableEndMarker,
-		accessIface:      conf.AccessIface.IfName,
-		coreIface:        conf.CoreIface.IfName,
-		ippoolCidr:       conf.CPIface.UEIPPool,
-		nodeID:           nodeID,
-		fastPath:         fp,
-		dnn:              conf.CPIface.Dnn,
-		reportNotifyChan: make(chan uint64, 1024),
-		enableHBTimer:    conf.EnableHBTimer,
+		enableUeIPAlloc:   conf.CPIface.EnableUeIPAlloc,
+		enableEndMarker:   conf.EnableEndMarker,
+		enableFlowMeasure: conf.EnableFlowMeasure,
+		accessIface:       conf.AccessIface.IfName,
+		coreIface:         conf.CoreIface.IfName,
+		ippoolCidr:        conf.CPIface.UEIPPool,
+		nodeID:            nodeID,
+		fastPath:          fp,
+		dnn:               conf.CPIface.Dnn,
+		reportNotifyChan:  make(chan uint64, 1024),
+		enableHBTimer:     conf.EnableHBTimer,
 	}
 
 	u.accessIP = ParseIP(conf.AccessIface.IfName, "Access")
 	u.coreIP = ParseIP(conf.CoreIface.IfName, "Core")
 
-	if u.enableHBTimer {
-		u.hbMaxRetries = maxHbRetries
-		if conf.HbMaxRetries != 0 {
-			u.hbMaxRetries = conf.HbMaxRetries
-		}
+	u.maxReqRetries = maxReqRetries
+	if conf.MaxReqRetries != 0 {
+		u.maxReqRetries = conf.MaxReqRetries
+	}
 
-		u.hbInterval = time.Duration(hbReqInterval) * time.Millisecond
+	u.respTimeout = time.Duration(respTimeout) * time.Millisecond
+	if conf.RespTimeout != 0 {
+		u.respTimeout = time.Duration(conf.RespTimeout) * time.Millisecond
+	}
+
+	if u.enableHBTimer {
+		u.hbInterval = time.Duration(hbInterval) * time.Millisecond
 		if conf.HeartBeatInterval != 0 {
 			u.hbInterval = time.Duration(conf.HeartBeatInterval) * time.Millisecond
-		}
-
-		u.hbRespDuration = time.Duration(hbRespInterval) * time.Millisecond
-		if conf.HeartBeatRespDuration != 0 {
-			u.hbRespDuration = time.Duration(conf.HeartBeatRespDuration) * time.Millisecond
 		}
 	}
 

@@ -26,26 +26,27 @@ var (
 
 // Conf : Json conf struct.
 type Conf struct {
-	Mode                  string           `json:"mode"`
-	AccessIface           IfaceType        `json:"access"`
-	CoreIface             IfaceType        `json:"core"`
-	CPIface               CPIfaceInfo      `json:"cpiface"`
-	P4rtcIface            P4rtcInfo        `json:"p4rtciface"`
-	EnableP4rt            bool             `json:"enable_p4rt"`
-	SimInfo               SimModeInfo      `json:"sim"`
-	ConnTimeout           uint32           `json:"conn_timeout"`
-	ReadTimeout           uint32           `json:"read_timeout"`
-	EnableNotifyBess      bool             `json:"enable_notify_bess"`
-	EnableEndMarker       bool             `json:"enable_end_marker"`
-	NotifySockAddr        string           `json:"notify_sockaddr"`
-	EndMarkerSockAddr     string           `json:"endmarker_sockaddr"`
-	LogLevel              string           `json:"log_level"`
-	QciQosConfig          []QciQosConfig   `json:"qci_qos_config"`
-	SliceMeterConfig      SliceMeterConfig `json:"slice_rate_limit_config"`
-	EnableHBTimer         bool             `json:"enable_hbTimer"`
-	HbMaxRetries          uint8            `json:"hb_max_retries"`
-	HeartBeatInterval     int              `json:"heart_beat_interval"`
-	HeartBeatRespDuration int              `json:"heart_beat_resp_dur"`
+	Mode              string           `json:"mode"`
+	AccessIface       IfaceType        `json:"access"`
+	CoreIface         IfaceType        `json:"core"`
+	CPIface           CPIfaceInfo      `json:"cpiface"`
+	P4rtcIface        P4rtcInfo        `json:"p4rtciface"`
+	EnableP4rt        bool             `json:"enable_p4rt"`
+	EnableFlowMeasure bool             `json:"measure_flow"`
+	SimInfo           SimModeInfo      `json:"sim"`
+	ConnTimeout       uint32           `json:"conn_timeout"`
+	ReadTimeout       uint32           `json:"read_timeout"`
+	EnableNotifyBess  bool             `json:"enable_notify_bess"`
+	EnableEndMarker   bool             `json:"enable_end_marker"`
+	NotifySockAddr    string           `json:"notify_sockaddr"`
+	EndMarkerSockAddr string           `json:"endmarker_sockaddr"`
+	LogLevel          string           `json:"log_level"`
+	QciQosConfig      []QciQosConfig   `json:"qci_qos_config"`
+	SliceMeterConfig  SliceMeterConfig `json:"slice_rate_limit_config"`
+	MaxReqRetries     uint8            `json:"max_req_retries"`
+	RespTimeout       int              `json:"resp_timeout"`
+	EnableHBTimer     bool             `json:"enable_hbTimer"`
+	HeartBeatInterval int              `json:"heart_beat_interval"`
 }
 
 // QciQosConfig : Qos configured attributes.

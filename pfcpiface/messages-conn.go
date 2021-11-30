@@ -15,7 +15,7 @@ var errFlowDescAbsent = errors.New("flow description not present")
 var errFastpathDown = errors.New("fastpath down")
 var errReqRejected = errors.New("request rejected")
 
-func (pConn *PFCPConn) sendHeartBeatRequest() {
+func (pConn *PFCPConn) sendHeartBeatRequest() *Request {
 	seq := pConn.getSeqNum()
 
 	hbreq := message.NewHeartbeatRequest(
@@ -28,6 +28,7 @@ func (pConn *PFCPConn) sendHeartBeatRequest() {
 		pConn.SendPFCPMsg(hbreq)
 	}
 
+	return newRequest(hbreq, pConn.shutdown, pConn.upf.respTimeout)
 }
 
 func (pConn *PFCPConn) handleHeartbeatRequest(msg message.Message) (message.Message, error) {
@@ -47,7 +48,8 @@ func (pConn *PFCPConn) handleHeartbeatRequest(msg message.Message) (message.Mess
 }
 
 func (pConn *PFCPConn) handleHeartbeatResponse(msg message.Message) (message.Message, error) {
-	// TODO: Handle timers
+	pConn.RemovePendingRequest(msg)
+
 	pConn.StartHeartBeatTimer()
 	// TODO: Check and update remote recovery timestamp
 	return nil, nil

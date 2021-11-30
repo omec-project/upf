@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wmnsk/go-pfcp/message"
+
 	reuse "github.com/libp2p/go-reuseport"
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -63,7 +65,8 @@ type PFCPConn struct {
 	shutdown chan struct{}
 
 	metrics.InstrumentPFCP
-	hbMonitor *hbMonitor
+	hbMonitor   *hbMonitor
+	pendingReqs sync.Map
 }
 
 type HbTimerStatus uint8
@@ -90,10 +93,8 @@ func (pConn *PFCPConn) startHeartBeatMonitor() {
 	pConn.hbMonitor = &hbMonitor{hbMonCh: hbCh}
 
 	go func() {
-		log.Infoln("Starting Hearbeat timer")
+		log.Infoln("Starting Heartbeat timer")
 		heartBeatTimer := time.NewTimer(pConn.upf.hbInterval)
-		hbRespTimerRunning := false
-		currRetries := 0
 
 		for {
 			select {
@@ -102,10 +103,6 @@ func (pConn *PFCPConn) startHeartBeatMonitor() {
 				return
 
 			case status := <-hbCh:
-				// Stop the hb timer
-				heartBeatTimer.Stop()
-				hbRespTimerRunning = false
-				currRetries = 0
 
 				if status == StartHbTimer {
 					log.Println("Start HeartBeat Timer")
@@ -117,32 +114,15 @@ func (pConn *PFCPConn) startHeartBeatMonitor() {
 				}
 
 			case <-heartBeatTimer.C:
-				log.Println("HeartBeatTimer Expired")
-				if !hbRespTimerRunning {
-					// Send heart beat request
-					pConn.sendHeartBeatRequest()
+				log.Println("HeartBeat Interval Timer Expired")
 
-					// start response timer
-					log.Println("Started HB Response timer")
-					heartBeatTimer = time.NewTimer(pConn.upf.hbRespDuration)
-					hbRespTimerRunning = true
-				} else {
-					if currRetries < int(pConn.upf.hbMaxRetries) {
-						currRetries++
+				r := pConn.sendHeartBeatRequest()
 
-						pConn.sendHeartBeatRequest()
-						// start response timer
-						log.Printf("Started HB Response timer. RetryCount: %d", currRetries)
-
-						heartBeatTimer = time.NewTimer(pConn.upf.hbRespDuration)
-						hbRespTimerRunning = true
-					} else {
-						heartBeatTimer.Stop()
-						log.Println("HeartBeat Response Timer Expired")
+				pConn.WaitForResponse(r, pConn.upf.maxReqRetries,
+					func(msg message.Message) bool {
 						pConn.Shutdown()
-						return
-					}
-				}
+						return true
+					})
 			}
 		}
 	}()

@@ -5,6 +5,7 @@ package main
 
 import (
 	"errors"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/message"
@@ -29,6 +30,34 @@ func errUnmarshal(err error) *HandlePFCPMsgError {
 
 func errProcess(err error) *HandlePFCPMsgError {
 	return &HandlePFCPMsgError{Op: "Process", Err: err}
+}
+
+type RequestTimeoutAction func(msg message.Message) bool
+
+type Request struct {
+	msg message.Message // Request message
+
+	reply chan uint8 // Cause
+
+	responseTimerDuration time.Duration
+
+	shutdown <-chan struct{}
+}
+
+func newRequest(msg message.Message, done <-chan struct{}, respDur time.Duration) *Request {
+	return &Request{msg: msg, reply: make(chan uint8, 1), shutdown: done, responseTimerDuration: respDur}
+}
+
+func (r *Request) GetResponse() (uint8, bool) {
+	select {
+	case <-r.shutdown:
+		log.Traceln("Exiting as invoker routine aborted")
+		return 0, false
+	case c := <-r.reply:
+		return c, false
+	case <-time.After(r.responseTimerDuration):
+		return 0, true
+	}
 }
 
 // HandlePFCPMsg handles different types of PFCP messages.
@@ -122,4 +151,51 @@ func (pConn *PFCPConn) SendPFCPMsg(msg message.Message) {
 
 	m.Finish(nodeID, "Success")
 	log.Traceln("Sent", msgType, "to", addr)
+}
+
+func (pConn *PFCPConn) WaitForResponse(r *Request, maxRetries uint8, timeoutHdlr RequestTimeoutAction) {
+	pConn.pendingReqs.Store(r.msg.Sequence(), r)
+
+	retriesLeft := maxRetries
+	for {
+		if _, rc := r.GetResponse(); rc {
+			log.Traceln("Request Timeout, retriesLeft:", retriesLeft)
+			if retriesLeft > 0 {
+				pConn.SendPFCPMsg(r.msg)
+				retriesLeft--
+			} else {
+				if timeoutHdlr != nil {
+					timeoutHdlr(r.msg)
+				}
+				break
+			}
+		} else {
+			log.Traceln("Exiting..")
+			break
+		}
+	}
+}
+
+func GetCause(msg message.Message) uint8 {
+	var cause uint8
+
+	switch msg.MessageType() {
+	case message.MsgTypeAssociationSetupResponse:
+		cause, _ = msg.(*message.AssociationSetupResponse).Cause.Cause()
+	case message.MsgTypeSessionReportResponse:
+		cause, _ = msg.(*message.SessionReportResponse).Cause.Cause()
+	}
+
+	return cause
+
+}
+
+func (pConn *PFCPConn) RemovePendingRequest(msg message.Message) {
+	req, ok := pConn.pendingReqs.Load(msg.Sequence())
+
+	if ok {
+		req.(*Request).reply <- GetCause(msg)
+		pConn.pendingReqs.Delete(msg.Sequence())
+	}
+
 }
