@@ -7,21 +7,23 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	log "github.com/sirupsen/logrus"
 )
 
 var (
-	configPath = flag.String("config", "upf.json", "path to upf config")
-	httpAddr   = flag.String("http", "0.0.0.0:8080", "http IP/port combo")
-	simulate   = flag.String("simulate", "", "create|delete simulated sessions")
-	pfcpsim    = flag.Bool("pfcpsim", false, "simulate PFCP")
+	configPath         = flag.String("config", "upf.json", "path to upf config")
+	httpAddr           = flag.String("http", "0.0.0.0:8080", "http IP/port combo")
+	pfcpsim            = flag.Bool("pfcpsim", false, "simulate PFCP")
+	simulate   simMode = ""
 )
 
 // Conf : Json conf struct.
@@ -90,6 +92,43 @@ type IfaceType struct {
 	IfName string `json:"ifname"`
 }
 
+// simMode : Type indicating the desired simulation mode.
+type simMode string
+
+func (s *simMode) String() string {
+	return string(*s)
+}
+
+func (s *simMode) Set(value string) error {
+	switch value {
+	case "create":
+		fallthrough
+	case "create_continue":
+		fallthrough
+	case "delete":
+		*s = simMode(value)
+	default:
+		return fmt.Errorf("unknown sim mode %v", value)
+	}
+	return nil
+}
+
+func (s *simMode) create() bool {
+	return strings.Contains(string(*s), "create")
+}
+
+func (s *simMode) delete() bool {
+	return strings.Contains(string(*s), "delete")
+}
+
+func (s *simMode) keepGoing() bool {
+	return strings.Contains(string(*s), "continue")
+}
+
+func (s *simMode) enable() bool {
+	return string(*s) != ""
+}
+
 // ParseJSON : parse json file and populate corresponding struct.
 func ParseJSON(filepath *string, conf *Conf) {
 	/* Open up file */
@@ -151,6 +190,7 @@ func ParseIP(name string, iface string) net.IP {
 }
 
 func init() {
+	flag.Var(&simulate, "simulate", "create|delete|create_continue simulated sessions")
 	// Set up logger
 	log.SetReportCaller(true)
 	log.SetFormatter(&log.TextFormatter{
@@ -191,14 +231,11 @@ func main() {
 		return
 	}
 
-	if *simulate != "" {
-		if *simulate != "create" && *simulate != "delete" {
-			log.Fatalln("Invalid simulate method", simulate)
+	if simulate.enable() {
+		upf.sim(simulate, &conf.SimInfo)
+		if !simulate.keepGoing() {
+			return
 		}
-
-		upf.sim(*simulate, &conf.SimInfo)
-
-		return
 	}
 
 	setupConfigHandler(upf)

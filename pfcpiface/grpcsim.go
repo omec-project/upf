@@ -10,8 +10,8 @@ import (
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
-func (u *upf) sim(method string, s *SimModeInfo) {
-	log.Infoln(*simulate, "sessions:", s.MaxSessions)
+func (u *upf) sim(mode simMode, s *SimModeInfo) {
+	log.Infoln(simulate.String(), "sessions:", s.MaxSessions)
 
 	start := time.Now()
 	ueip := s.StartUEIP
@@ -189,15 +189,12 @@ func (u *upf) sim(method string, s *SimModeInfo) {
 
 		qers = append(qers, sessionQer)
 
-		switch method {
-		case "create":
+		if mode.create() {
 			u.sendMsgToUPF(upfMsgTypeAdd, pdrs, fars, qers)
-
-		case "delete":
+		} else if mode.delete() {
 			u.sendMsgToUPF(upfMsgTypeDel, pdrs, fars, qers)
-
-		default:
-			log.Fatalln("Unsupported method", method)
+		} else {
+			log.Fatalln("Unsupported method", mode)
 		}
 	}
 
