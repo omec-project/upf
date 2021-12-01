@@ -5,22 +5,12 @@
 # SPDX-License-Identifier: LicenseRef-ONF-Member-Only-1.0 AND Apache-2.0
 
 import argparse
-import json
 import logging
 import os
-import queue
 import re
 import subprocess
 import sys
-import threading
-import time
-from collections import OrderedDict
 
-import google.protobuf.text_format
-import grpc
-
-# PTF-to-TestVector translation utils
-# https://github.com/stratum/testvectors/tree/master/utils/python
 from trex_stf_lib.trex_client import CTRexClient
 
 DUMMY_IFACE_NAME = "ptfdummy"
@@ -103,7 +93,6 @@ def remove_dummy_interface():
 
 def set_up_trex_server(trex_daemon_client, trex_address, trex_config):
     try:
-        # TODO: Generate TRex config based on port_map json file (e.g., include pci address in port map)
         info("Pushing TRex config %s to the server", trex_config)
         if not trex_daemon_client.push_files(trex_config):
             error("Unable to push %s to Trex server", trex_config)
@@ -153,14 +142,14 @@ def run_test(
     info("Executing PTF command: {}".format(" ".join(cmd)))
 
     try:
-        # we want the ptf output to be sent to stdout
+        # send ptf output to stdout.
         p = subprocess.Popen(cmd)
         p.wait()
     except Exception:
         error("Error when running PTF tests")
         return False
     finally:
-        # Always clean up the dummy interface.
+        # always clean up the dummy interface.
         remove_dummy_interface()
 
     return p.returncode == 0
