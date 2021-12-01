@@ -290,31 +290,31 @@ class GrpcTest(BaseTest):
             gate = pdr.needDecap,
             priority = 4294967295 - pdr.precedence, # XXX: golang max 32 bit uint
             values = [
-				util_msg.FieldData(value_int = pdr.srcIface),
-				util_msg.FieldData(value_int = pdr.tunnelIP4Dst),
-				util_msg.FieldData(value_int = pdr.tunnelTEID),
-				util_msg.FieldData(value_int = pdr.srcIP),
-				util_msg.FieldData(value_int = pdr.dstIP),
-				util_msg.FieldData(value_int = pdr.srcPort),
-				util_msg.FieldData(value_int = pdr.dstPort),
-				util_msg.FieldData(value_int = pdr.proto),
+                util_msg.FieldData(value_int = pdr.srcIface),
+                util_msg.FieldData(value_int = pdr.tunnelIP4Dst),
+                util_msg.FieldData(value_int = pdr.tunnelTEID),
+                util_msg.FieldData(value_int = pdr.srcIP),
+                util_msg.FieldData(value_int = pdr.dstIP),
+                util_msg.FieldData(value_int = pdr.srcPort),
+                util_msg.FieldData(value_int = pdr.dstPort),
+                util_msg.FieldData(value_int = pdr.proto),
             ],
             masks = [
-				util_msg.FieldData(value_int = pdr.srcIfaceMask),
-				util_msg.FieldData(value_int = pdr.tunnelIP4DstMask),
-				util_msg.FieldData(value_int = pdr.tunnelTEIDMask),
-				util_msg.FieldData(value_int = pdr.srcIPMask),
-				util_msg.FieldData(value_int = pdr.dstIPMask),
-				util_msg.FieldData(value_int = pdr.srcPortMask),
-				util_msg.FieldData(value_int = pdr.dstPortMask),
-				util_msg.FieldData(value_int = pdr.protoMask),
+                util_msg.FieldData(value_int = pdr.srcIfaceMask),
+                util_msg.FieldData(value_int = pdr.tunnelIP4DstMask),
+                util_msg.FieldData(value_int = pdr.tunnelTEIDMask),
+                util_msg.FieldData(value_int = pdr.srcIPMask),
+                util_msg.FieldData(value_int = pdr.dstIPMask),
+                util_msg.FieldData(value_int = pdr.srcPortMask),
+                util_msg.FieldData(value_int = pdr.dstPortMask),
+                util_msg.FieldData(value_int = pdr.protoMask),
             ],
             valuesv = [
-				util_msg.FieldData(value_int = pdr.pdrID),
-				util_msg.FieldData(value_int = pdr.fseID),
-				util_msg.FieldData(value_int = pdr.ctrID),
-				util_msg.FieldData(value_int = qerID),
-				util_msg.FieldData(value_int = pdr.farID),
+                util_msg.FieldData(value_int = pdr.pdrID),
+                util_msg.FieldData(value_int = pdr.fseID),
+                util_msg.FieldData(value_int = pdr.ctrID),
+                util_msg.FieldData(value_int = qerID),
+                util_msg.FieldData(value_int = pdr.farID),
             ],
         )
 
@@ -335,24 +335,24 @@ class GrpcTest(BaseTest):
         # parse params of pdr into WildcardMatchCommandDeleteArg
         f = module_msg.WildcardMatchCommandDeleteArg(
             values = [
-				util_msg.FieldData(value_int = pdr.srcIface),
-				util_msg.FieldData(value_int = pdr.tunnelIP4Dst),
-				util_msg.FieldData(value_int = pdr.tunnelTEID),
-				util_msg.FieldData(value_int = pdr.srcIP),
-				util_msg.FieldData(value_int = pdr.dstIP),
-				util_msg.FieldData(value_int = pdr.srcPort),
-				util_msg.FieldData(value_int = pdr.dstPort),
-				util_msg.FieldData(value_int = pdr.proto),
+                util_msg.FieldData(value_int = pdr.srcIface),
+                util_msg.FieldData(value_int = pdr.tunnelIP4Dst),
+                util_msg.FieldData(value_int = pdr.tunnelTEID),
+                util_msg.FieldData(value_int = pdr.srcIP),
+                util_msg.FieldData(value_int = pdr.dstIP),
+                util_msg.FieldData(value_int = pdr.srcPort),
+                util_msg.FieldData(value_int = pdr.dstPort),
+                util_msg.FieldData(value_int = pdr.proto),
             ],
             masks = [
-				util_msg.FieldData(value_int = pdr.srcIfaceMask),
-				util_msg.FieldData(value_int = pdr.tunnelIP4DstMask),
-				util_msg.FieldData(value_int = pdr.tunnelTEIDMask),
-				util_msg.FieldData(value_int = pdr.srcIPMask),
-				util_msg.FieldData(value_int = pdr.dstIPMask),
-				util_msg.FieldData(value_int = pdr.srcPortMask),
-				util_msg.FieldData(value_int = pdr.dstPortMask),
-				util_msg.FieldData(value_int = pdr.protoMask),
+                util_msg.FieldData(value_int = pdr.srcIfaceMask),
+                util_msg.FieldData(value_int = pdr.tunnelIP4DstMask),
+                util_msg.FieldData(value_int = pdr.tunnelTEIDMask),
+                util_msg.FieldData(value_int = pdr.srcIPMask),
+                util_msg.FieldData(value_int = pdr.dstIPMask),
+                util_msg.FieldData(value_int = pdr.srcPortMask),
+                util_msg.FieldData(value_int = pdr.dstPortMask),
+                util_msg.FieldData(value_int = pdr.protoMask),
             ],
         )
 
@@ -399,12 +399,12 @@ class GrpcTest(BaseTest):
                 util_msg.FieldData(value_int = far.fseID),
             ],
             values = [
-				util_msg.FieldData(value_int = action),
-				util_msg.FieldData(value_int = far.tunnelType),
-				util_msg.FieldData(value_int = far.tunnelIP4Src),
-				util_msg.FieldData(value_int = far.tunnelIP4Dst),
-				util_msg.FieldData(value_int = far.tunnelTEID),
-				util_msg.FieldData(value_int = far.tunnelPort),
+                util_msg.FieldData(value_int = action),
+                util_msg.FieldData(value_int = far.tunnelType),
+                util_msg.FieldData(value_int = far.tunnelIP4Src),
+                util_msg.FieldData(value_int = far.tunnelIP4Dst),
+                util_msg.FieldData(value_int = far.tunnelTEID),
+                util_msg.FieldData(value_int = far.tunnelPort),
             ],
         )
 
@@ -425,8 +425,8 @@ class GrpcTest(BaseTest):
         # parse params of far into ExactMatchCommandDeleteArg
         f = module_msg.ExactMatchCommandDeleteArg(
             fields = [
-				util_msg.FieldData(value_int = far.farID),
-				util_msg.FieldData(value_int = far.fseID),
+                util_msg.FieldData(value_int = far.farID),
+                util_msg.FieldData(value_int = far.fseID),
             ],
         )
 
