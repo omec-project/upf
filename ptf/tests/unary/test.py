@@ -91,8 +91,6 @@ class QerAppTest(TrexTest, GrpcTest):
         print()
 
         print("del qer response:")
-        # Testing purposes: verify bess fails to find QER when modified
-        # qer = qer._replace(qerID=self.n3)
         self.delApplicationQER(qer)
         print()
 
@@ -116,8 +114,6 @@ class QerSessionTest(TrexTest, GrpcTest):
         print()
 
         print("del qer response:")
-        # Testing purposes: verify bess fails to find QER when modified
-        qer = qer._replace(qerID=self.n9)
         self.delSessionQER(qer)
         print()
 
@@ -125,15 +121,14 @@ class SimpleTest(TrexTest, GrpcTest):
     def runTest(self):
         # define num UE sessions, start UEIP
         numSessions = 10
-        n3TEID = n9TEID = 0
+        n3TEID = 0
         tunnelGTPUPort = 2152
 
         startIP = IPv4Address('16.0.0.1')
         endIP = startIP + numSessions - 1
 
-        accessIP = coreIP = IPv4Address('10.128.13.29')
+        accessIP = IPv4Address('10.128.13.29')
         enbIP = IPv4Address('10.27.19.99') # arbitrary ip for nonexistent enodeB
-        # AUPFIP = IPv4Address('27.10.19.99') # ??
 
         # program UPF for downlink traffic by installing PDRs and FARs
         print("Installing PDRs and FARs...")
