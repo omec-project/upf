@@ -1,9 +1,8 @@
-From 51109b91cd780bbadbf5bf114f47def55579e2d5 Mon Sep 17 00:00:00 2001
+From ab485b4b9f0af85c9488476c5ad5dae95564f32c Mon Sep 17 00:00:00 2001
 From: Amar Sri <amarsri28@gmail.com>
-Date: Tue, 3 Aug 2021 09:09:48 -0700
-Subject: [PATCH] DPDK concurrent hash for EM WM
+Date: Mon, 13 Sep 2021 23:53:43 -0700
+Subject: [PATCH] Concurrent hash Support for Wildcard/ExactMatch & Resolving Bug #329
 
-Added DeInit
 ---
  core/modules/exact_match.cc    |  24 ++--
  core/modules/exact_match.h     |   3 +
@@ -14,7 +13,7 @@ Added DeInit
  6 files changed, 411 insertions(+), 114 deletions(-)
 
 diff --git a/core/modules/exact_match.cc b/core/modules/exact_match.cc
-index 1ca0fd4e..22269d0c 100644
+index 1ca0fd4e..bb17f5b8 100644
 --- a/core/modules/exact_match.cc
 +++ b/core/modules/exact_match.cc
 @@ -134,7 +134,7 @@ CommandResponse ExactMatch::Init(const bess::pb::ExactMatchArg &arg) {
@@ -41,7 +40,7 @@ index 1ca0fd4e..22269d0c 100644
 +  ValueTuple *res[cnt];
 +  uint64_t hit_mask = table_.Find(keys, res, cnt);
 +  for (int j = 0; j < cnt; j++) {
-+    if ((hit_mask & (1ULL << j)) == 0)
++    if ((hit_mask & ((uint64_t)1ULL << j)) == 0)
 +      EmitPacket(ctx, batch->pkts()[j], default_gate);
 +    else {
 +      setValues(batch->pkts()[j], res[j]->action);
@@ -76,7 +75,7 @@ index 99cb2654..d7e3531e 100644
    CommandResponse GetRuntimeConfig(const bess::pb::EmptyArg &arg);
    CommandResponse SetRuntimeConfig(const bess::pb::ExactMatchConfig &arg);
 diff --git a/core/modules/wildcard_match.cc b/core/modules/wildcard_match.cc
-index ec639a7b..3c8425e4 100644
+index ec639a7b..51e67c55 100644
 --- a/core/modules/wildcard_match.cc
 +++ b/core/modules/wildcard_match.cc
 @@ -40,13 +40,28 @@ using bess::metadata::Attribute;
@@ -174,10 +173,10 @@ index ec639a7b..3c8425e4 100644
 +      continue;
 +
 +    for (int init = 0; (init < cnt) && (num); init++) {
-+      if ((hitmask & (1ULL << init))) {
-+        if ((prev_hitmask & (1 << init)) == 0)
++      if ((hitmask & ((uint64_t)1 << init))) {
++        if ((prev_hitmask & ((uint64_t)1 << init)) == 0)
 +          result[init] = entry[init];
-+        else if ((prev_hitmask & (1 << init)) &&
++        else if ((prev_hitmask & ((uint64_t)1 << init)) &&
 +                 (entry[init]->priority >= result[init]->priority)) {
 +          result[init] = entry[init];
 +        }
@@ -190,7 +189,7 @@ index ec639a7b..3c8425e4 100644
 +
 +  for (int init = 0; init < cnt; init++) {
 +    /* if lookup was successful, then set values (if possible) */
-+    if (prev_hitmask && (prev_hitmask & (1 << init))) {
++    if (prev_hitmask && (prev_hitmask & ((uint64_t)1 << init))) {
 +      pkt = batch->pkts()[packeti + init];
 +      size_t num_values_ = values_.size();
 +      for (size_t i = 0; i < num_values_; i++) {
@@ -934,5 +933,5 @@ index 7c0cfda4..ac87e090 100644
  
  #endif  // BESS_UTILS_EXACT_MATCH_TABLE_H_
 -- 
-2.25.1
+2.17.1
 
