@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: LicenseRef-ONF-Member-Only-1.0
 
 from collections import namedtuple
+import time
 from ptf.base_tests import BaseTest
 import ptf.testutils as testutils
 from google.protobuf.any_pb2 import Any
@@ -29,7 +30,7 @@ class GrpcTest(BaseTest):
         self.actionBuffer = 0x4
         self.actionNotify = 0x8
 
-        self.gateMeter = 0x4
+        self.gateMeter = 0x0
         self.gateDrop = 0x5
         self.gateUnmeter = 0x6
 
@@ -38,12 +39,63 @@ class GrpcTest(BaseTest):
         self.channel = grpc.insecure_channel(target=bess_server_addr)
         self.bess_client = pb.BESSControlStub(self.channel)
     
+    """ API for getting metrics from BESS-UPF """
+
     def getPortStats(self, ifname):
+        # to get bess interface names:
+        # `docker exec -it bess ./bessctl`
+        # `$ show port`
         req = bess_msg.GetPortStatsRequest(
             name = ifname + "Fast",
         )
 
         print(self.bess_client.GetPortStats(req))
+    
+    # TODO: WIP
+    def readFlowMeasurement(self, module, clear, quantiles):
+        request = module_msg.FlowMeasureCommandReadArg(
+            clear=clear,
+            latency_percentiles=quantiles,
+            jitter_percentiles=quantiles,
+        )
+        any = Any()
+        any.Pack(request)
+
+        response = self.bess_client.ModuleCommand(
+            bess_msg.CommandRequest(
+                name = module,
+                cmd = "read",
+                arg = any,
+            )
+        )
+        print(response)
+
+    # TODO: WIP
+    def sessionStats(self):
+        # XXX: something about large tables from bess.go
+        time.sleep(5)
+
+        # Read stats
+        q = [50, 90, 99]
+        print("Pre-QoS measurement module")
+        qosStatsInResp = self.readFlowMeasurement(
+            module="preQosFlowMeasure",
+            clear=True,
+            quantiles=q,
+        )
+        print(qosStatsInResp)
+        # postDlQosStatsResp = self.readFlowMeasurement(
+        #     module="postDLQosFlowMeasure",
+        #     clear=True,
+        #     quantiles=q,
+        # )
+        # postUlQosStatsResp = self.readFlowMeasurement(
+        #     module="postULQosFlowMeasure",
+        #     clear=True,
+        #     quantiles=q,
+        # )
+
+    """ API for configuring BESS-UPF """
 
     def createPDR(
         self,
@@ -184,8 +236,8 @@ class GrpcTest(BaseTest):
 
     def createQER(
         self,
+        gate=0,
         qerID=0,
-        qosLevel=0,
         qfi=0,
         ulStatus=0,
         dlStatus=0,
@@ -195,10 +247,11 @@ class GrpcTest(BaseTest):
         dlGbr=0,
         fseID=0,
         fseidIP=0,
+        burstDurationMs=1000,
     ):
         fields = (
+            'gate',
             'qerID',
-            'qosLevel',
             'qfi',
             'ulStatus',
             'dlStatus',
@@ -208,10 +261,11 @@ class GrpcTest(BaseTest):
             'dlGbr',
             'fseID',
             'fseidIP',
+            'burstDurationMs',
         )
         defaults = [
+            gate,
             qerID,
-            qosLevel,
             qfi,
             ulStatus,
             dlStatus,
@@ -221,6 +275,7 @@ class GrpcTest(BaseTest):
             dlGbr, # Kbps
             fseID,
             fseidIP,
+            burstDurationMs,
         ]
         QER = namedtuple('QER', fields, defaults=defaults)
         return QER()
@@ -268,15 +323,13 @@ class GrpcTest(BaseTest):
         any.Pack(f)
 
         # send client module command with method add and arg stored Any()
-        response = self.bess_client.ModuleCommand(
+        return self.bess_client.ModuleCommand(
             bess_msg.CommandRequest(
                 name = "pdrLookup",
                 cmd = "add",
                 arg = any
             )
         )
-
-        return response
 
     def delPDR(self, pdr):
         # parse params of pdr into WildcardMatchCommandDeleteArg
@@ -308,15 +361,13 @@ class GrpcTest(BaseTest):
         any.Pack(f)
 
         # send client module command with method delete and arg stored Any()
-        response = self.bess_client.ModuleCommand(
+        return self.bess_client.ModuleCommand(
             bess_msg.CommandRequest(
                 name = "pdrLookup",
                 cmd = "delete",
                 arg = any
             )
         )
-
-        return response
     
     def _setActionValue(self, far):
         farForwardD = 0x0
@@ -362,15 +413,13 @@ class GrpcTest(BaseTest):
         any.Pack(f)
 
         # send client module command with method add and arg stored Any()
-        response = self.bess_client.ModuleCommand(
+        return self.bess_client.ModuleCommand(
             bess_msg.CommandRequest(
                 name = "farLookup",
                 cmd = "add",
                 arg = any
             )
         )
-
-        return response
 
     def delFAR(self, far):
         # parse params of far into ExactMatchCommandDeleteArg
@@ -386,7 +435,7 @@ class GrpcTest(BaseTest):
         any.Pack(f)
 
         # send client module command with method delete and arg stored Any()
-        response = self.bess_client.ModuleCommand(
+        return self.bess_client.ModuleCommand(
             bess_msg.CommandRequest(
                 name = "farLookup",
                 cmd = "delete",
@@ -394,82 +443,161 @@ class GrpcTest(BaseTest):
             )
         )
 
-        return response
+    def _calcRates(self, ulGbr, ulMbr, dlGbr, dlMbr, burstDuration):
+        # calculate uplink burst sizes
+        ulCbs = (float(ulGbr) * 1000 / 8) * (burstDuration / 1000)
+        ulPbs = (float(ulMbr) * 1000 / 8) * (burstDuration / 1000)
+        ulEbs = ulPbs
+        if ulMbr != 0 or ulGbr != 0:
+            ulCir = max(ulGbr * 1000 / 8, 1)
+            ulPir = max(ulMbr * 1000 / 8, ulCir)
+        else:
+            ulCir = 0
+            ulPir = 0
 
-    def addSessionQER(self, qer):
-        # gate, (cir, pir, cbs, pbs, ebs), srciface, fseID
-        return
+        # calculate downlink burst sizes
+        dlCbs = (float(dlGbr) * 1000 / 8) * (burstDuration / 1000)
+        dlPbs = (float(dlMbr) * 1000 / 8) * (burstDuration / 1000)
+        dlEbs = dlPbs
+        if dlMbr != 0 or dlGbr != 0:
+            dlCir = max(dlGbr * 1000 / 8, 1)
+            dlPir = max(dlMbr * 1000 / 8, dlCir)
+        else:
+            dlCir = 0
+            dlPir = 0
 
-    def delSessionQER(self, qer):
-        # gate, (cir, pir, cbs, pbs, ebs), srciface, fseID
-        return
+        fields = [
+            'ulCbs', 'ulPbs', 'ulEbs', 'ulCir', 'ulPir',
+            'dlCbs', 'dlPbs', 'dlEbs', 'dlCir', 'dlPir',
+        ]
+        defaults = [
+            ulCbs, ulPbs, ulEbs, ulCir, ulPir, dlCbs, dlPbs, dlEbs, dlCir, dlPir,
+        ]
+
+        rates = namedtuple('rates', fields, defaults=defaults)
+        return rates()
 
     def addApplicationQER(self, qer):
-        return
-        # ''' adds QER for uplink and downlink application traffic '''
-        # calculate burst sizes from ulGbr and ulMbr
-        # ulCbs = (float(qer["ulGbr"]) * 1000 / 8) * (qer["burstDurationMs"] / 1000)
-        # ulPbs = (float(qer["ulMbr"]) * 1000 / 8) * (qer["burstDurationMs"] / 1000)
-        # ulEbs = ulPbs
-        # ulCir = max(qer["ulGbr"] * 1000 / 8, 1)
-        # ulPir = max(qer["ulMbr"] * 1000 / 8, ulCir)
-        # calculate burst sizes from dlGbr and dlMbr
-        # dlCbs = (float(qer["dlGbr"]) * 1000 / 8) * (qer["burstDurationMs"] / 1000)
-        # dlPbs = (float(qer["dlMbr"]) * 1000 / 8) * (qer["burstDurationMs"] / 1000)
-        # dlEbs = dlPbs
-        # dlCir = max(qer["dlGbr"] * 1000 / 8, 1)
-        # dlPir = max(qer["dlMbr"] * 1000 / 8, dlCir)
-        # construct uplink QosCommandAddArg and send to BESS
-        # for srcIface in [self.access, self.core]:
-            # f = module_msg.QosCommandAddArg(
-                # gate = qer["gate"],
-                # cir = (int(ulCir) if srcIface == self.access else int(dlCir)),
-                # pir = (int(ulPir) if srcIface == self.access else int(dlPir)),
-                # cbs = (int(ulCbs) if srcIface == self.access else int(dlCbs)),
-                # pbs = (int(ulPbs) if srcIface == self.access else int(dlPbs)),
-                # ebs = (int(ulEbs) if srcIface == self.access else int(dlEbs)),
-                # fields = [
-                    # util_msg.FieldData(value_int = srcIface),
-                    # util_msg.FieldData(value_int = qer["qerID"]),
-                    # util_msg.FieldData(value_int = qer["fseID"])
-                # ],
-                # values = [
-                    # util_msg.FieldData(value_int = qer["qfi"])
-                # ],
-            # )
-            # any = Any()
-            # any.Pack(f)
-            # response = self.bess_client.ModuleCommand(
-                # bess_msg.CommandRequest(
-                    # name = "appQERLookup",
-                    # cmd = "add",
-                    # arg = any
-                # )
-            # )
-            # print(response)
+        ''' installs uplink and downlink applicaiton QER '''
+        rates = self._calcRates(
+            qer.ulGbr,
+            qer.ulMbr,
+            qer.dlGbr,
+            qer.dlMbr,
+            qer.burstDurationMs,
+        )
+
+        # construct UL/DL QosCommandAddArg's and send to BESS
+        for srcIface in [self.access, self.core]:
+            f = module_msg.QosCommandAddArg(
+                gate = qer.gate,
+                cir = int(rates.ulCir) if srcIface == self.access else int(rates.dlCir),
+                pir = int(rates.ulPir) if srcIface == self.access else int(rates.dlPir),
+                cbs = int(rates.ulCbs) if srcIface == self.access else int(rates.dlCbs),
+                pbs = int(rates.ulPbs) if srcIface == self.access else int(rates.dlPbs),
+                ebs = int(rates.ulEbs) if srcIface == self.access else int(rates.dlEbs),
+                fields = [
+                    util_msg.FieldData(value_int = srcIface),
+                    util_msg.FieldData(value_int = qer.qerID),
+                    util_msg.FieldData(value_int = qer.fseID)
+                ],
+                values = [
+                    util_msg.FieldData(value_int = qer.qfi)
+                ],
+            )
+
+            any = Any()
+            any.Pack(f)
+
+            response = self.bess_client.ModuleCommand(
+                bess_msg.CommandRequest(
+                    name = "appQERLookup",
+                    cmd = "add",
+                    arg = any
+                )
+            )
+            print(response)
 
     def delApplicationQER(self, qer):
-        return
-    #     ''' deletes QER for uplink and downlink application traffic '''
-    #     for srcIface in [self.access, self.core]:
-    #         f = module_msg.QosCommandDeleteArg(
-    #             fields =  [
-    #                 util_msg.FieldData(value_int = srcIface),
-    #                 util_msg.FieldData(value_int = qer["qerID"]),
-    #                 util_msg.FieldData(value_int = qer["fseID"]),
-    #             ]
-    #         )
-    #         any = Any()
-    #         any.Pack(f)
+        ''' deletes uplink and downlink application QER '''
+        for srcIface in [self.access, self.core]:
+            f = module_msg.QosCommandDeleteArg(
+                fields =  [
+                    util_msg.FieldData(value_int = srcIface),
+                    util_msg.FieldData(value_int = qer.qerID),
+                    util_msg.FieldData(value_int = qer.fseID),
+                ],
+            )
+            any = Any()
+            any.Pack(f)
 
-    #         response = self.bess_client.ModuleCommand(
-    #             bess_msg.CommandRequest(
-    #                 name = "appQERLookup",
-    #                 cmd = "add",
-    #                 arg = any
-    #             )
-    #         )
-    #         print(response)
+            response = self.bess_client.ModuleCommand(
+                bess_msg.CommandRequest(
+                    name = "appQERLookup",
+                    cmd = "delete",
+                    arg = any
+                )
+            )
+            print(response)
+
+    def addSessionQER(self, qer):
+        ''' installs uplink and downlink session QER '''
+        rates = self._calcRates(
+            qer.ulGbr,
+            qer.ulMbr,
+            qer.dlGbr,
+            qer.dlMbr,
+            qer.burstDurationMs,
+        )
+
+        # construct UL/DL QosCommandAddArg's and send to BESS
+        for srcIface in [self.access, self.core]:
+            f = module_msg.QosCommandAddArg(
+                gate = qer.gate,
+                cir = int(rates.ulCir) if srcIface == self.access else int(rates.dlCir),
+                pir = int(rates.ulPir) if srcIface == self.access else int(rates.dlPir),
+                cbs = int(rates.ulCbs) if srcIface == self.access else int(rates.dlCbs),
+                pbs = int(rates.ulPbs) if srcIface == self.access else int(rates.dlPbs),
+                ebs = int(rates.ulEbs) if srcIface == self.access else int(rates.dlEbs),
+                fields = [
+                    util_msg.FieldData(value_int = srcIface),
+                    util_msg.FieldData(value_int = qer.fseID)
+                ],
+            )
+
+            any = Any()
+            any.Pack(f)
+
+            response = self.bess_client.ModuleCommand(
+                bess_msg.CommandRequest(
+                    name = "sessionQERLookup",
+                    cmd = "add",
+                    arg = any
+                )
+            )
+            print(response)
+
+    def delSessionQER(self, qer):
+        ''' deletes uplink and downlink QER '''
+        for srcIface in [self.access, self.core]:
+            f = module_msg.QosCommandDeleteArg(
+                fields =  [
+                    util_msg.FieldData(value_int = srcIface),
+                    util_msg.FieldData(value_int = qer.fseID),
+                ],
+            )
+            any = Any()
+            any.Pack(f)
+
+            response = self.bess_client.ModuleCommand(
+                bess_msg.CommandRequest(
+                    name = "sessionQERLookup",
+                    cmd = "delete",
+                    arg = any
+                )
+            )
+            print(response)
 
     def tearDown(self):
+        print("Closing gRPC channel...")
         self.channel.close()

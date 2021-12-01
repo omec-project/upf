@@ -3,6 +3,7 @@
 
 import time
 from ipaddress import IPv4Address
+from pprint import pprint
 
 from trex_test import TrexTest
 from grpc_test import GrpcTest
@@ -15,7 +16,7 @@ from trex_stl_lib.api import (
 )
 import ptf.testutils as testutils
 
-RATE = 1_000_000_000  # 1 Gbps
+RATE = 1_000_000  # 1 Mbps
 UPF_DEST_MAC = "0c:c4:7a:19:6d:ca"
 
 # Port setup
@@ -50,7 +51,6 @@ class PdrTest(TrexTest, GrpcTest):
         print(self.delPDR(pdr))
         print()
 
-
 class FarTest(TrexTest, GrpcTest):
     def runTest(self):
         # create basic N6 uplink FAR
@@ -71,31 +71,55 @@ class FarTest(TrexTest, GrpcTest):
         print(self.delFAR(far))
         print()
     
-
-class QerTest(TrexTest, GrpcTest):
+class QerAppTest(TrexTest, GrpcTest):
     def runTest(self):
-        qer = self.createQER()
-
         # configure as basic N6 UL/DL QER
-        qer["gate"] = self.gateUnmeter
-        qer["qfi"] = 9
-        qer["qerID"] = self.n6
-        qer["fseID"] = 0x30000000
-
-        qer["ulGbr"] = 50_000
-        qer["ulMbr"] = 90_000
-        qer["dlGbr"] = 60_000
-        qer["dlMbr"] = 80_000
-        qer["burstDurationMs"] = 10
+        qer = self.createQER(
+            gate = self.gateUnmeter,
+            qfi = 9,
+            qerID = self.n6,
+            fseID = 0x30000000,
+            ulGbr = 0,
+            ulMbr = 0,
+            dlGbr = 0,
+            dlMbr = 0,
+            burstDurationMs = 100,
+        )
 
         print("add qer response:")
         self.addApplicationQER(qer)
         print()
 
         print("del qer response:")
+        # Testing purposes: verify bess fails to find QER when modified
+        # qer = qer._replace(qerID=self.n3)
         self.delApplicationQER(qer)
         print()
 
+class QerSessionTest(TrexTest, GrpcTest):
+    def runTest(self):
+        # configure as basic N6 UL/DL QER
+        qer = self.createQER(
+            gate = self.gateUnmeter,
+            qfi = 0,
+            qerID = 1,
+            fseID = 0x30000000,
+            ulGbr = 0,
+            ulMbr = 0,
+            dlGbr = 0,
+            dlMbr = 0,
+            burstDurationMs = 100,
+        )
+
+        print("add qer response:")
+        self.addSessionQER(qer)
+        print()
+
+        print("del qer response:")
+        # Testing purposes: verify bess fails to find QER when modified
+        qer = qer._replace(qerID=self.n9)
+        self.delSessionQER(qer)
+        print()
 
 class SimpleTest(TrexTest, GrpcTest):
     def runTest(self):
@@ -114,7 +138,7 @@ class SimpleTest(TrexTest, GrpcTest):
         # program UPF for downlink traffic by installing PDRs and FARs
         print("Installing PDRs and FARs...")
         for i in range(numSessions):
-            # create N6 UL and DL PDRs for UEIP
+            # install N6 DL PDR to match UE dst IP
             pdrDown = self.createPDR(
                 srcIface = self.core,
                 dstIP = int(startIP + i),
@@ -127,28 +151,9 @@ class SimpleTest(TrexTest, GrpcTest):
                 qerIDList = [self.n6, 1],
                 needDecap = 0,
             )
-
-            # pdrUp = self.createPDR(
-            #     srcIface = self.access,
-            #     tunnelIP4Dst = int(accessIP),
-            #     tunnelTEID = n3TEID + i,
-            #     srcIP = int(startIP + i),
-            #     srcIfaceMask = 0xFF,
-            #     tunnelIP4DstMask = 0xFFFFFFFF,
-            #     tunnelTEIDMask = 0xFFFFFFFF,
-            #     srcIPMask = 0xFFFFFFFF,
-            #     precedence = 255,
-            #     fseID = n3TEID + i,
-            #     ctrID = i,
-            #     farID = self.n6,
-            #     qerIDList = [self.n6, 1],
-            #     needDecap = 1,
-            # )
-
             self.addPDR(pdrDown)
-            # self.addPDR(pdrUp)
 
-            # create N6 UL and DL FARs for 
+            # install N6 DL FAR for encap
             farDown = self.createFAR(
                 farID = i,
                 fseID = n3TEID + i,
@@ -160,53 +165,54 @@ class SimpleTest(TrexTest, GrpcTest):
                 tunnelTEID = 0,
                 tunnelPort = tunnelGTPUPort,
             )
-
-            # farUp = self.createFAR(
-            #     farID = self.n9,
-            #     fseID = n3TEID + i,
-            #     applyAction = self.actionForward,
-            #     dstIntf = self.dstCore,
-            #     tunnelType = 0x1,
-            #     tunnelIP4Src = int(coreIP),
-            #     tunnelIP4Dst = int(AUPFIP), # uplink IP, upf to ?
-            #     tunnelTEID = n9TEID + i,
-            #     tunnelPort = tunnelGTPUPort,
-            # )
-
             self.addFAR(farDown)
-            # self.addFAR(farUp)
 
-        # TODO: set up trex to send traffic thru UPF
+            # install N6 DL/UL application QER
+            qer = self.createQER(
+                gate = self.gateUnmeter,
+                qerID = self.n6,
+                fseID = n3TEID + i,
+                qfi = 9,
+                ulGbr = 0,
+                ulMbr = 0,
+                dlGbr = 0,
+                dlMbr = 0,
+                burstDurationMs = 100,
+            )
+            self.addApplicationQER(qer)
+
+        # set up trex to send traffic thru UPF
         print("Setting up TRex client...")
-        # vm = STLVM()
-        # vm.var(
-        #     name="dst",
-        #     min_value=str(startIP),
-        #     max_value=str(endIP),
-        #     size=4,
-        #     op="random",
-        # )
-        # vm.write(fv_name="dst", pkt_offset="IP.dst")
-        # vm.fix_chksum()
+        vm = STLVM()
+        vm.var(
+            name="dst",
+            min_value=str(startIP),
+            max_value=str(endIP),
+            size=4,
+            op="random",
+        )
+        vm.write(fv_name="dst", pkt_offset="IP.dst")
+        vm.fix_chksum()
 
-        # pkt = testutils.simple_udp_packet(
-        #     pktlen=1400,
-        #     eth_dst=UPF_DEST_MAC,
-        #     with_udp_chksum=False,
-        # )
-        # stream = STLStream(
-        #     packet=STLPktBuilder(pkt=pkt, vm=vm),
-        #     mode=STLTXCont(bps_L1=RATE),
-        # )
-        # self.trex_client.add_streams(stream, ports=[TREX_SENDER_PORT])
+        pkt = testutils.simple_udp_packet(
+            pktlen=1400,
+            eth_dst=UPF_DEST_MAC,
+            with_udp_chksum=False,
+        )
+        stream = STLStream(
+            packet=STLPktBuilder(pkt=pkt, vm=vm),
+            mode=STLTXCont(bps_L1=RATE),
+        )
+        self.trex_client.add_streams(stream, ports=[BESS_SENDER_PORT])
 
-        # self.trex_client.start(
-        #     ports=[TREX_SENDER_PORT], mult="1", duration=15
-        # )
-        # s_time = time.time()
-        # print(f"End time was {time.time() - s_time()}")
+        print("Running traffic...")
+        s_time = time.time()
+        self.trex_client.start(
+            ports=[BESS_SENDER_PORT], mult="1", duration=15
+        )
+        self.trex_client.wait_on_traffic(ports=[BESS_SENDER_PORT])
+        print(f"Duration was {time.time() - s_time}")
 
-        # TODO: pull metrics from BESS and verify results
-        self.getPortStats(ifname="Access")
+        pprint(self.trex_client.get_stats())
 
         return
