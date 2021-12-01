@@ -232,7 +232,7 @@ func main() {
 	node.Done()
 
 	if err := httpSrv.Shutdown(context.Background()); err != nil {
-		log.Errorln("Failed to shutdown http: %v", err)
+		log.Errorf("Failed to shutdown http: %v", err)
 	}
 
 	upf.exit()
