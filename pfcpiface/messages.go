@@ -36,6 +36,17 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 	var reply message.Message
 	var err error
 
+	// Check that the PFCP message did not get truncated.
+	header, err := message.ParseHeader(buf)
+	if err != nil {
+		log.Errorln("could not parse PFCP message header: ", err)
+		return
+	}
+	if header.Length > uint16(len(buf)) {
+		log.Errorln("receive buffer too small for PFCP message")
+		return
+	}
+
 	msg, err := message.Parse(buf)
 	if err != nil {
 		log.Errorln("Ignoring undecodable message: ", buf, " error: ", err)

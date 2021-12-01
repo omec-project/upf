@@ -20,7 +20,7 @@ import (
 
 // PktBufSz : buffer size for incoming pkt.
 const (
-	PktBufSz    = 1500
+	PktBufSz    = 4096
 	PFCPPort    = "8805"
 	MaxItems    = 10
 	readTimeout = 25 * time.Second
@@ -138,8 +138,7 @@ func (pConn *PFCPConn) setLocalNodeID(id string) {
 func (pConn *PFCPConn) Serve() {
 	go func() {
 		for {
-			buf := make([]byte, 1024)
-
+			buf := make([]byte, PktBufSz)
 			n, err := pConn.Read(buf)
 			if err != nil {
 				if errors.Is(err, net.ErrClosed) {
@@ -148,8 +147,9 @@ func (pConn *PFCPConn) Serve() {
 
 				continue
 			}
+			buf = buf[:n]
 
-			pConn.HandlePFCPMsg(buf[:n])
+			pConn.HandlePFCPMsg(buf)
 		}
 	}()
 
