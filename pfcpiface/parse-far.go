@@ -46,7 +46,7 @@ type far struct {
 	tunnelPort    uint16
 }
 
-// Satisfies the fmt.Stringer interface.
+// FIXME: refactor it and use fmt.Sprintf()
 func (f far) String() string {
 	b := strings.Builder{}
 	fmt.Fprintf(&b, "\n")
@@ -63,6 +63,30 @@ func (f far) String() string {
 	fmt.Fprintf(&b, "sendEndMarker: %v\n", f.sendEndMarker)
 
 	return b.String()
+}
+
+func (f *far) Drops() bool {
+	if (f.applyAction & ActionDrop) != 0 {
+		return true
+	}
+
+	return false
+}
+
+func (f *far) Buffers() bool {
+	if (f.applyAction & ActionBuffer) != 0 {
+		return true
+	}
+
+	return false
+}
+
+func (f *far) Forwards() bool {
+	if (f.applyAction & ActionForward) != 0 {
+		return true
+	}
+
+	return false
 }
 
 func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error {
@@ -120,7 +144,7 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 
 			f.tunnelTEID = ohcFields.TEID
 			f.tunnelIP4Dst = ip2int(ohcFields.IPv4Address)
-			f.tunnelType = uint8(1)
+			f.tunnelType = uint8(1)  // FIXME: what does it mean?
 			f.tunnelPort = tunnelGTPUPort
 		case ie.DestinationInterface:
 			fields = Set(fields, FwdIEDestinationIntf)

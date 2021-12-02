@@ -28,7 +28,10 @@ type fastPath interface {
 	/* write endMarker to fastpath */
 	sendEndMarkers(endMarkerList *[][]byte) error
 	/* write pdr/far/qer to fastpath */
-	sendMsgToUPF(method upfMsgType, pdrs []pdr, fars []far, qers []qer) uint8
+	// "master" function to send create/update/delete messages to UPF.
+	// "new" PacketForwardingRules are only used for update messages to UPF.
+	// TODO: we should have better CRUD API, with a single function per message type.
+	sendMsgToUPF(method upfMsgType, all PacketForwardingRules, new PacketForwardingRules) uint8
 	/* check of communication channel to fastpath is setup */
 	isConnected(accessIP *net.IP) bool
 	summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric)

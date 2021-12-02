@@ -5,6 +5,8 @@ package main
 
 import (
 	"flag"
+	"fmt"
+
 	// #nosec G404 // Ignore G404. We don't need strong random number generator for allocating IDs for P4 objects.
 	"math/rand"
 	"net"
@@ -20,6 +22,7 @@ var (
 	p4RtcServerPort = flag.String("p4RtcServerPort", "", "P4 Server port")
 )
 
+// FIXME: it should not be here IMO
 // P4rtcInfo : P4 runtime interface settings.
 type P4rtcInfo struct {
 	AccessIP    string `json:"access_ip"`
@@ -41,6 +44,12 @@ type counter struct {
 	// free      map[uint64]uint64
 }
 
+type tunnelParams struct {
+	tunnelIP4Src  uint32
+	tunnelIP4Dst  uint32
+	tunnelPort    uint16
+}
+
 type UP4 struct {
 	host             string
 	deviceID         uint64
@@ -49,8 +58,13 @@ type UP4 struct {
 	accessIP         net.IP
 	p4rtcServer      string
 	p4rtcPort        string
+
 	p4client         *P4rtClient
+	p4RtTranslator   *P4rtTranslator
+
 	counters         []counter
+	tunnelPeerIDs    map[tunnelParams]uint8
+
 	reportNotifyChan chan<- uint64
 	endMarkerChan    chan []byte
 }
@@ -254,6 +268,7 @@ func (up4 *UP4) isConnected(accessIP *net.IP) bool {
 	return true
 }
 
+// TODO: rename it to initUPF()
 func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	log.Println("setUpfInfo UP4")
 
@@ -301,6 +316,8 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 		}
 	}
 
+	up4.p4RtTranslator = newP4RtTranslator(up4.p4client.P4Info)
+
 	errin = initCounter(up4)
 	if errin != nil {
 		log.Println("Counter Init failed. : ", errin)
@@ -331,9 +348,32 @@ func (up4 *UP4) endMarkerSendLoop(endMarkerChan chan []byte) {
 	}
 }
 
-func (up4 *UP4) sendMsgToUPF(
-	method upfMsgType, pdrs []pdr, fars []far, qers []qer) uint8 {
+func findRelatedFAR(pdr pdr, fars []far) (far, error) {
+	for _, far := range fars {
+		if pdr.farID == far.farID {
+			return far, nil
+		}
+	}
+
+	return far{}, fmt.Errorf("cannot find any related FAR for PDR")
+}
+
+// TODO: implement it
+// Returns error if we reach maximum supported GTP Tunnel Peers (254 base stations + 1 dbuf).
+func (up4 *UP4) allocateGTPTunnelPeerID(params tunnelParams) (uint8, error) {
+	return 1, nil
+}
+
+func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, updated PacketForwardingRules) uint8 {
 	log.Println("sendMsgToUPF p4")
+
+	pdrs := rules.pdrs
+	fars := rules.fars
+
+	if method == upfMsgTypeMod {
+		// no need to use updated PDRs as session's PDRs are already updated
+		fars = updated.fars
+	}
 
 	var (
 		funcType uint8
@@ -343,7 +383,7 @@ func (up4 *UP4) sendMsgToUPF(
 	)
 
 	if !up4.isConnected(nil) {
-		log.Println("UP4 server not connected")
+		log.Error("UP4 server not connected")
 		return cause
 	}
 
@@ -359,6 +399,8 @@ func (up4 *UP4) sendMsgToUPF(
 				}
 				pdrs[i].ctrID = uint32(val)
 			}
+
+			// TODO: allocate tunnel peer id based on FARs
 		}
 	case upfMsgTypeDel:
 		{
@@ -379,26 +421,66 @@ func (up4 *UP4) sendMsgToUPF(
 		}
 	}
 
-	for _, pdr := range pdrs {
-		log.Traceln(pdr)
-		log.Traceln("write pdr funcType : ", funcType)
+	for _, far := range fars {
+		// downlink FAR that does encapsulation
+		if far.Forwards() && far.dstIntf == ie.DstInterfaceAccess {
+			tunnelParams := tunnelParams{
+				tunnelIP4Src: far.tunnelIP4Src,
+				tunnelIP4Dst: far.tunnelIP4Dst,
+				tunnelPort:   far.tunnelPort,
+			}
+			if _, exists := up4.tunnelPeerIDs[tunnelParams]; !exists {
+				allocatedTunnelPeerID, err := up4.allocateGTPTunnelPeerID(tunnelParams)
+				if err != nil {
+					log.Error("failed to allocate GTP tunnel peer ID based on FAR: ", err)
+					return cause
+				}
 
-		errin := up4.p4client.WritePdrTable(pdr, funcType)
-		if errin != nil {
-			resetCounterVal(up4, preQosPdrCounter, uint64(pdr.ctrID))
-			log.Println("pdr entry function failed ", errin)
+				gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(allocatedTunnelPeerID, far)
+				if err != nil {
+					log.Error("failed to build GTP Tunnel Peers table entry from FAR")
+					return cause
+				}
 
-			return cause
+				if err := up4.p4client.WriteTableEntries(gtpTunnelPeerEntry); err != nil {
+					log.Error("failed to write GTP Tunnel Peers table entry to UP4")
+					return cause
+				}
+
+				up4.tunnelPeerIDs[tunnelParams] = allocatedTunnelPeerID
+			}
 		}
 	}
 
-	for _, far := range fars {
-		log.Traceln(far)
-		log.Traceln("write far funcType : ", funcType)
+	for _, pdr := range pdrs {
+		pdrLog := log.WithFields(log.Fields{
+			"pdr": pdr,
+		})
+		pdrLog.Traceln(pdr)
+		pdrLog.Traceln("write pdr funcType : ", funcType)
 
-		errin := up4.p4client.WriteFarTable(far, funcType)
-		if errin != nil {
-			log.Println("far entry function failed ", errin)
+		far, err := findRelatedFAR(pdr, fars)
+		if err != nil {
+			pdrLog.Warning("no related FAR for PDR found: ", err)
+			continue
+		}
+
+		sessionsEntry, err := up4.p4RtTranslator.BuildSessionsTableEntry(pdr, 0, far.Buffers())
+		if err != nil {
+			// log failed to build
+			continue
+		}
+
+		terminationsEntry, err := up4.p4RtTranslator.BuildTerminationsTableEntry(pdr, far)
+		if err != nil {
+			log.Error("failed to build P4rt table entry for Terminations table")
+			continue
+		}
+
+		err = up4.p4client.WriteTableEntries(sessionsEntry, terminationsEntry)
+		if err != nil {
+			// TODO: revert operations (e.g. reset counter)
+			log.Error("failed to write P4rt table entries: ", err)
 			return cause
 		}
 	}

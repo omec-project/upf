@@ -14,15 +14,19 @@ type notifyFlag struct {
 	mux  sync.Mutex
 }
 
+type PacketForwardingRules struct {
+	pdrs             []pdr
+	fars             []far
+	qers             []qer
+}
+
 // PFCPSession implements one PFCP session.
 type PFCPSession struct {
 	localSEID        uint64
 	remoteSEID       uint64
 	notificationFlag notifyFlag
-	pdrs             []pdr
-	fars             []far
-	qers             []qer
 	metrics          *metrics.Session
+	PacketForwardingRules
 }
 
 // NewPFCPSession allocates an session with ID.
@@ -37,9 +41,11 @@ func (pConn *PFCPConn) NewPFCPSession(rseid uint64) uint64 {
 		s := PFCPSession{
 			localSEID:  lseid,
 			remoteSEID: rseid,
-			pdrs:       make([]pdr, 0, MaxItems),
-			fars:       make([]far, 0, MaxItems),
-			qers:       make([]qer, 0, MaxItems),
+			PacketForwardingRules: PacketForwardingRules{
+				pdrs: make([]pdr, 0, MaxItems),
+				fars: make([]far, 0, MaxItems),
+				qers: make([]qer, 0, MaxItems),
+			},
 		}
 		pConn.sessions[lseid] = &s
 
