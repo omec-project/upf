@@ -136,17 +136,20 @@ func ParseStrIP(n3name string) (net.IP, net.IPMask) {
 func ParseIP(name string, iface string) net.IP {
 	byNameInterface, err := net.InterfaceByName(name)
 	if err != nil {
-		log.Fatalln("Unable to get info on interface name:", name, err)
+		log.Errorln("Unable to get info on interface name:", name, err)
+		return nil
 	}
 
 	addresses, err := byNameInterface.Addrs()
 	if err != nil {
-		log.Fatalln("Unable to retrieve addresses from interface name!", err)
+		log.Errorln("Unable to retrieve addresses from interface name!", err)
+		return nil
 	}
 
 	ip, _, err := net.ParseCIDR(addresses[0].String())
 	if err != nil {
-		log.Fatalln("Unable to parse", iface, " IP: ", err)
+		log.Errorln("Unable to parse", iface, " IP: ", err)
+		return nil
 	}
 
 	log.Println(iface, " IP: ", ip)
