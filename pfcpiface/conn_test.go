@@ -7,7 +7,7 @@ import (
 )
 
 func Test(t *testing.T) {
-	buf := []byte{0,0,0,16,0}
+	buf := []byte{0, 0, 0, 16, 0}
 
 	parsedIe, err := ie.Parse(buf)
 	if err != nil {
