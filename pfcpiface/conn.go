@@ -18,9 +18,7 @@ import (
 	"github.com/omec-project/upf-epc/pfcpiface/metrics"
 )
 
-// PktBufSz : buffer size for incoming pkt.
 const (
-	PktBufSz    = 4096
 	PFCPPort    = "8805"
 	MaxItems    = 10
 	readTimeout = 25 * time.Second
