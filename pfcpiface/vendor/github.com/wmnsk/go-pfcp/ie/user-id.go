@@ -221,7 +221,7 @@ func (f *UserIDFields) MarshalTo(b []byte) error {
 		offset += int(f.MSISDNLength)
 	}
 
-	if has1stBit(f.Flags) {
+	if has4thBit(f.Flags) {
 		b[offset] = f.NAILength
 		offset++
 
