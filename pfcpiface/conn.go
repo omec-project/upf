@@ -140,6 +140,7 @@ func (pConn *PFCPConn) Serve() {
 		for {
 			buf := make([]byte, PktBufSz)
 			n, err := pConn.Read(buf)
+			buf = buf[:n]
 			if err != nil {
 				if errors.Is(err, net.ErrClosed) {
 					return
@@ -147,7 +148,6 @@ func (pConn *PFCPConn) Serve() {
 
 				continue
 			}
-			buf = buf[:n]
 
 			pConn.HandlePFCPMsg(buf)
 		}
