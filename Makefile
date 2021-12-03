@@ -69,4 +69,9 @@ pb:
 		.;
 	cp -a output/bess_pb ${BESS_PB_DIR}
 
+test:
+	DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) \
+	--target pfcpiface-test \
+	.;
+
 .PHONY: docker-build docker-push output pb

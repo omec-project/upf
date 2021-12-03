@@ -10,7 +10,7 @@ RUN apt-get update && \
     apt-get -y install --no-install-recommends \
         ca-certificates \
         libelf-dev
-        
+
 ARG MAKEFLAGS
 
 ENV PKG_CONFIG_PATH=/usr/lib64/pkgconfig
@@ -107,6 +107,9 @@ FROM golang AS pfcpiface-build
 WORKDIR /pfcpiface
 COPY pfcpiface .
 RUN CGO_ENABLED=0 go build -mod=vendor -o /bin/pfcpiface
+
+FROM pfcpiface-build AS pfcpiface-test
+RUN CGO_ENABLED=0 go test -mod=vendor -v .
 
 # Stage pfcpiface: runtime image of pfcpiface toward SMF/SPGW-C
 FROM alpine AS pfcpiface
