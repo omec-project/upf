@@ -5,6 +5,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -46,12 +47,30 @@ func (ep *endpoint) parseNet(ipnet string) error {
 }
 
 func (ep *endpoint) parsePort(port string) error {
-	p, err := strconv.ParseUint(port, 10, 16)
+	ports := strings.Split(port, "-")
+	if len(ports) == 0 || len(ports) > 2 {
+		return fmt.Errorf("invalid port string \"%v\"", port)
+	}
+	// Pretend this is a port range with one element.
+	if len(ports) == 1 {
+		ports = append(ports, ports[0])
+	}
+
+	low, err := strconv.ParseUint(ports[0], 10, 16)
+	if err != nil {
+		return err
+	}
+	high, err := strconv.ParseUint(ports[1], 10, 16)
 	if err != nil {
 		return err
 	}
 
-	ep.Port = uint16(p)
+	// TODO: support port ranges
+	if low != high {
+		return fmt.Errorf("port ranges are not supported yet \"%v\"", port)
+	}
+
+	ep.Port = uint16(low)
 
 	return nil
 }
@@ -68,8 +87,10 @@ type ipFilterRule struct {
 // "permit out ip from any to 60.60.0.102"
 // "permit out ip from 60.60.0.1/26 to 60.60.0.102"
 // "permit out ip from 60.60.0.1 8888 to 60.60.0.102/26"
+// "permit out ip from 60.60.0.1 8888-8888 to 60.60.0.102/26"
 // "permit out ip from 60.60.0.1 to 60.60.0.102 9999"
 // "permit out ip from 60.60.0.1 8888 to 60.60.0.102 9999"
+// "permit out ip from 60.60.0.1 8888-8888 to 60.60.0.102 9999-9999"
 
 func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 	fields := strings.Fields(flowDesc)
@@ -116,6 +137,7 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 			err := ipf.src.parseNet(fields[i])
 			if err != nil {
 				log.Println(err)
+				return err
 			}
 
 			if fields[i+1] != "to" {
@@ -124,6 +146,7 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 				err = ipf.src.parsePort(fields[i])
 				if err != nil {
 					log.Println("src port parse failed ", err)
+					return err
 				}
 			}
 		case "to":
@@ -133,6 +156,7 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 			err := ipf.dst.parseNet(fields[i])
 			if err != nil {
 				log.Println(err)
+				return err
 			}
 
 			if i < len(fields)-1 {
@@ -141,6 +165,7 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 				err = ipf.dst.parsePort(fields[i])
 				if err != nil {
 					log.Println("dst port parse failed ", err)
+					return err
 				}
 			}
 		}
