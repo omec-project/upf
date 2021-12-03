@@ -364,6 +364,10 @@ func (i *IE) UnmarshalBinary(b []byte) error {
 		return nil
 	}
 
+	if l < offset+end {
+		return io.ErrUnexpectedEOF
+	}
+
 	i.Payload = b[offset : offset+end]
 
 	if i.IsGrouped() {
