@@ -230,6 +230,7 @@ func (b *bess) getPortStats(ifname string) *pb.GetPortStatsResponse {
 		log.Println("Error calling GetPortStats", ifname, err)
 		return nil
 	}
+
 	if res.GetError() != nil {
 		log.Println("Error calling GetPortStats", ifname, err, res.GetError().Errmsg)
 		return nil
@@ -338,11 +339,13 @@ func (b *bess) readFlowMeasurement(
 		LatencyPercentiles: q,
 		JitterPercentiles:  q,
 	}
+
 	any, err := anypb.New(req)
 	if err != nil {
 		log.Errorln("Error marshalling request", req, err)
 		return
 	}
+
 	resp, err := b.client.ModuleCommand(
 		ctx, &pb.CommandRequest{
 			Name: module,
@@ -350,14 +353,22 @@ func (b *bess) readFlowMeasurement(
 			Arg:  any,
 		},
 	)
+
 	if err != nil {
 		log.Errorln(module, "read failed!:", err)
 		return
 	}
+
+	if resp.GetError() != nil {
+		log.Errorln(module, "error reading flow stats:", resp.GetError().Errmsg)
+		return
+	}
+
 	if err = resp.Data.UnmarshalTo(&stats); err != nil {
 		log.Errorln(err)
 		return
 	}
+
 	return
 }
 
@@ -368,16 +379,19 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 	defer cancel()
 	// Read stats. This flips the buffer flag, reads from the now inactive side, and clear if needed.
 	q := []float64{50, 90, 99}
+
 	qosStatsInResp, err := b.readFlowMeasurement(ctx, PreQosFlowMeasure, true, q)
 	if err != nil {
 		log.Errorln(PreQosFlowMeasure, " read failed!:", err)
 		return
 	}
+
 	postDlQosStatsResp, err := b.readFlowMeasurement(ctx, PostDlQosFlowMeasure, true, q)
 	if err != nil {
 		log.Errorln(PostDlQosFlowMeasure, " read failed!:", err)
 		return
 	}
+
 	postUlQosStatsResp, err := b.readFlowMeasurement(ctx, PostUlQosFlowMeasure, true, q)
 	if err != nil {
 		log.Errorln(PostUlQosFlowMeasure, " read failed!:", err)

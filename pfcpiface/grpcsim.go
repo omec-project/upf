@@ -4,14 +4,72 @@
 package main
 
 import (
+	"fmt"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
-func (u *upf) sim(method string, s *SimModeInfo) {
-	log.Infoln(*simulate, "sessions:", s.MaxSessions)
+// simMode : Type indicating the desired simulation mode.
+type simMode int
+
+const (
+	simModeDisable simMode = iota
+	simModeCreate
+	simModeDelete
+	simModeCreateAndContinue
+)
+
+func (s *simMode) String() string {
+	switch *s {
+	case simModeDisable:
+		return "disable"
+	case simModeCreate:
+		return "create"
+	case simModeDelete:
+		return "delete"
+	case simModeCreateAndContinue:
+		return "create_continue"
+	default:
+		return "unknown sim mode"
+	}
+}
+
+func (s *simMode) Set(value string) error {
+	switch value {
+	case "disable":
+		*s = simModeDisable
+	case "create":
+		*s = simModeCreate
+	case "delete":
+		*s = simModeDelete
+	case "create_continue":
+		*s = simModeCreateAndContinue
+	default:
+		return fmt.Errorf("unknown sim mode %v", value)
+	}
+	return nil
+}
+
+func (s simMode) create() bool {
+	return s == simModeCreate || s == simModeCreateAndContinue
+}
+
+func (s simMode) delete() bool {
+	return s == simModeDelete
+}
+
+func (s simMode) keepGoing() bool {
+	return s == simModeCreateAndContinue
+}
+
+func (s simMode) enable() bool {
+	return s != simModeDisable
+}
+
+func (u *upf) sim(mode simMode, s *SimModeInfo) {
+	log.Infoln(simulate.String(), "sessions:", s.MaxSessions)
 
 	start := time.Now()
 	ueip := s.StartUEIP
@@ -189,15 +247,12 @@ func (u *upf) sim(method string, s *SimModeInfo) {
 
 		qers = append(qers, sessionQer)
 
-		switch method {
-		case "create":
+		if mode.create() {
 			u.sendMsgToUPF(upfMsgTypeAdd, pdrs, fars, qers)
-
-		case "delete":
+		} else if mode.delete() {
 			u.sendMsgToUPF(upfMsgTypeDel, pdrs, fars, qers)
-
-		default:
-			log.Fatalln("Unsupported method", method)
+		} else {
+			log.Fatalln("Unsupported method", mode)
 		}
 	}
 

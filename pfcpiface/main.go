@@ -20,7 +20,7 @@ import (
 var (
 	configPath = flag.String("config", "upf.json", "path to upf config")
 	httpAddr   = flag.String("http", "0.0.0.0:8080", "http IP/port combo")
-	simulate   = flag.String("simulate", "", "create|delete simulated sessions")
+	simulate   = simModeDisable
 	pfcpsim    = flag.Bool("pfcpsim", false, "simulate PFCP")
 )
 
@@ -151,6 +151,7 @@ func ParseIP(name string, iface string) net.IP {
 }
 
 func init() {
+	flag.Var(&simulate, "simulate", "create|delete|create_continue simulated sessions")
 	// Set up logger
 	log.SetReportCaller(true)
 	log.SetFormatter(&log.TextFormatter{
@@ -191,14 +192,11 @@ func main() {
 		return
 	}
 
-	if *simulate != "" {
-		if *simulate != "create" && *simulate != "delete" {
-			log.Fatalln("Invalid simulate method", simulate)
+	if simulate.enable() {
+		upf.sim(simulate, &conf.SimInfo)
+		if !simulate.keepGoing() {
+			return
 		}
-
-		upf.sim(*simulate, &conf.SimInfo)
-
-		return
 	}
 
 	setupConfigHandler(upf)
@@ -234,7 +232,7 @@ func main() {
 	node.Done()
 
 	if err := httpSrv.Shutdown(context.Background()); err != nil {
-		log.Errorln("Failed to shutdown http: %v", err)
+		log.Errorln("Failed to shutdown http:", err)
 	}
 
 	upf.exit()

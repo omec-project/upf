@@ -120,8 +120,10 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 		reportNotifyChan:  make(chan uint64, 1024),
 	}
 
-	u.accessIP = ParseIP(conf.AccessIface.IfName, "Access")
-	u.coreIP = ParseIP(conf.CoreIface.IfName, "Core")
+	if !conf.EnableP4rt {
+		u.accessIP = ParseIP(conf.AccessIface.IfName, "Access")
+		u.coreIP = ParseIP(conf.CoreIface.IfName, "Core")
+	}
 
 	if u.enableUeIPAlloc {
 		u.ippool, err = NewIPPool(u.ippoolCidr)

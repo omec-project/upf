@@ -187,6 +187,8 @@ CommandResponse FlowMeasure::CommandReadStats(
   rte_hash *current_hash = nullptr;
   std::vector<SessionStats> *current_data = nullptr;
   switch (cached_current_flag) {  // Pick the offline buffer set.
+    case Flag::FLAG_VALUE_INVALID:
+      return CommandSuccess(resp);  // return empty stats when no traffic
     case Flag::FLAG_VALUE_A:
       current_hash = table_b_;
       current_data = &table_data_b_;
