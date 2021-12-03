@@ -354,6 +354,10 @@ func (b *bess) readFlowMeasurement(
 		log.Errorln(module, "read failed!:", err)
 		return
 	}
+	if resp.GetError() != nil {
+		log.Errorln(module, "error reading flow stats:", resp.GetError().Errmsg)
+		return
+	}
 	if err = resp.Data.UnmarshalTo(&stats); err != nil {
 		log.Errorln(err)
 		return
