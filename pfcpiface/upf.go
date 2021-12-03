@@ -133,8 +133,10 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 		enableHBTimer:     conf.EnableHBTimer,
 	}
 
-	u.accessIP = ParseIP(conf.AccessIface.IfName, "Access")
-	u.coreIP = ParseIP(conf.CoreIface.IfName, "Core")
+	if !conf.EnableP4rt {
+		u.accessIP = ParseIP(conf.AccessIface.IfName, "Access")
+		u.coreIP = ParseIP(conf.CoreIface.IfName, "Core")
+	}
 
 	u.maxReqRetries = maxReqRetries
 	if conf.MaxReqRetries != 0 {

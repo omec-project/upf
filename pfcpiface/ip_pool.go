@@ -66,8 +66,10 @@ func NewIPPool(cidr string) (*IPPool, error) {
 	}
 
 	for ip := ip.Mask(ipnet.Mask); ipnet.Contains(ip); inc(ip) {
-		i.inventory[ip.String()] = false
-		i.freePool = append(i.freePool, ip)
+		ipVal := make(net.IP, len(ip))
+		copy(ipVal, ip)
+		i.inventory[ipVal.String()] = false
+		i.freePool = append(i.freePool, ipVal)
 	}
 
 	// remove network address and broadcast address

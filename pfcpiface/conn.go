@@ -20,9 +20,7 @@ import (
 	"github.com/omec-project/upf-epc/pfcpiface/metrics"
 )
 
-// PktBufSz : buffer size for incoming pkt.
 const (
-	PktBufSz    = 1500
 	PFCPPort    = "8805"
 	MaxItems    = 10
 	readTimeout = 25 * time.Second
@@ -214,10 +212,9 @@ func (pConn *PFCPConn) setLocalNodeID(id string) {
 // Serve serves forever a single PFCP peer.
 func (pConn *PFCPConn) Serve() {
 	go func() {
+		recvBuf := make([]byte, 65507) // Maximum UDP payload size
 		for {
-			buf := make([]byte, 1024)
-
-			n, err := pConn.Read(buf)
+			n, err := pConn.Read(recvBuf)
 			if err != nil {
 				if errors.Is(err, net.ErrClosed) {
 					return
@@ -225,8 +222,9 @@ func (pConn *PFCPConn) Serve() {
 
 				continue
 			}
+			buf := append([]byte{}, recvBuf[:n]...)
 
-			pConn.HandlePFCPMsg(buf[:n])
+			pConn.HandlePFCPMsg(buf)
 		}
 	}()
 

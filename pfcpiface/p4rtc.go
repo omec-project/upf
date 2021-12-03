@@ -397,7 +397,8 @@ func (c *P4rtClient) WritePdrTable(pdrEntry pdr, funcType uint8) error {
 		}()
 
 		return nil
-	} else if funcType == FunctionTypeInsert {
+	} else if (funcType == FunctionTypeInsert) ||
+		(funcType == FunctionTypeUpdate) {
 		te.ParamSize = 5
 		te.Params = make([]ActionParam, te.ParamSize)
 		te.Params[0].Name = "id"

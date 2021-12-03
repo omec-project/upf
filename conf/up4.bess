@@ -436,7 +436,7 @@ check_gtpu_port = " and udp dst port 2152"
 check_gtpu_msg_echo = " and udp[9] = 0x1"
 
 # Echo filter
-uplink_echo_filter = {"priority": -GTPUEchoGate, "filter": check_ip +
+uplink_echo_filter = {"priority": GTPUEchoGate, "filter": check_ip +
                       check_spgwu_ip + check_gtpu_port +
                       check_gtpu_msg_echo, "gate": GTPUEchoGate}
 accessFastBPF.add(filters=[uplink_echo_filter])
