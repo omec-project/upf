@@ -17,6 +17,11 @@ import (
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
+const (
+	p4InfoPath = "/bin/p4info.txt"
+	deviceConfigPath = "/bin/bmv2.json"
+)
+
 var (
 	p4RtcServerIP   = flag.String("p4RtcServerIP", "", "P4 Server ip")
 	p4RtcServerPort = flag.String("p4RtcServerPort", "", "P4 Server port")
@@ -54,14 +59,15 @@ type UP4 struct {
 	host             string
 	deviceID         uint64
 	timeout          uint32
-	accessIPMask     net.IPMask
-	accessIP         net.IP
+	accessIP         *net.IPNet
 	p4rtcServer      string
 	p4rtcPort        string
+	enableEndMarker  bool
 
 	p4client         *P4rtClient
 	p4RtTranslator   *P4rtTranslator
 
+	// TODO: create UP4Store object and move these fields there
 	counters         []counter
 	tunnelPeerIDs    map[tunnelParams]uint8
 
@@ -84,39 +90,22 @@ func (up4 *UP4) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) erro
 func (up4 *UP4) portStats(uc *upfCollector, ch chan<- prometheus.Metric) {
 }
 
-func setSwitchInfo(p4rtClient *P4rtClient) (net.IP, net.IPMask, error) {
-	log.Println("Set Switch Info")
-	log.Println("device id ", (*p4rtClient).DeviceID)
+func (up4 *UP4) getAccessIP() (*net.IPNet, error) {
+	log.Println("getAccessIP")
 
-	p4InfoPath := "/bin/p4info.txt"
-	deviceConfigPath := "/bin/bmv2.json"
-
-	errin := p4rtClient.GetForwardingPipelineConfig()
-	if errin != nil {
-		errin = p4rtClient.SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath)
-		if errin != nil {
-			log.Println("set forwarding pipeling config failed. ", errin)
-			return nil, nil, errin
-		}
+	interfaceTableEntry, err := up4.p4RtTranslator.BuildInterfaceTableEntry("ACCESS", "UPLINK")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Access IP from UP4: %v", err)
 	}
 
-	intfEntry := IntfTableEntry{
-		SrcIntf:   "ACCESS",
-		Direction: "UPLINK",
+	resp, err := up4.p4client.ReadTableEntry(interfaceTableEntry, 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Access IP from UP4: %v", err)
 	}
 
-	errin = p4rtClient.ReadInterfaceTable(&intfEntry)
-	if errin != nil {
-		log.Println("Read Interface table failed ", errin)
-		return nil, nil, errin
-	}
+	accessIP, err := up4.p4RtTranslator.ParseAccessIPFromReadInterfaceTableResponse(resp)
 
-	log.Println("accessip after read intf ", intfEntry.IP)
-	accessIP := net.IP(intfEntry.IP)
-	accessIPMask := net.CIDRMask(intfEntry.PrefixLen, 32)
-	log.Println("AccessIP: ", accessIP, ", AccessIPMask: ", accessIPMask)
-
-	return accessIP, accessIPMask, errin
+	return accessIP, nil
 }
 
 func (c *counter) init() {
@@ -179,90 +168,68 @@ func (up4 *UP4) exit() {
 	log.Println("Exit function P4rtc")
 }
 
-func (up4 *UP4) channelSetup() (*P4rtClient, error) {
+func (up4 *UP4) setupChannel() error {
 	log.Println("Channel Setup.")
 
-	localclient, errin := CreateChannel(up4.host, up4.deviceID, up4.reportNotifyChan)
-	if errin != nil {
-		log.Println("create channel failed : ", errin)
-		return nil, errin
+	client, err := CreateChannel(up4.host, up4.deviceID, up4.reportNotifyChan)
+	if err != nil {
+		log.Errorf("create channel failed: %v", err)
+		return err
 	}
+	up4.p4client = client
 
-	if localclient != nil {
-		log.Println("device id ", (*localclient).DeviceID)
-
-		up4.accessIP, up4.accessIPMask, errin = setSwitchInfo(localclient)
-		if errin != nil {
-			log.Println("Switch set info failed ", errin)
-			return nil, errin
+	err = up4.p4client.GetForwardingPipelineConfig()
+	if err != nil {
+		err = up4.p4client.SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath)
+		if err != nil {
+			log.Errorf("set forwarding pipeling config failed: %v", err)
+			return err
 		}
-
-		log.Println("accessIP, Mask ", up4.accessIP, up4.accessIPMask)
-	} else {
-		log.Println("p4runtime client is null.")
-		return nil, errin
-	}
-
-	return localclient, nil
-}
-
-func initCounter(p *UP4) error {
-	log.Println("Initialize counters for p4client.")
-
-	var errin error
-
-	if p.p4client == nil {
-		return ErrOperationFailedWithReason("init counter", "P4client null")
-	}
-
-	p.counters = make([]counter, 2)
-
-	errin = setCounterSize(p, preQosPdrCounter, "PreQosPipe.pre_qos_pdr_counter")
-	if errin != nil {
-		log.Println("preQosPdrCounter counter not found : ", errin)
-	}
-
-	errin = setCounterSize(p, postQosPdrCounter, "PostQosPipe.post_qos_pdr_counter")
-	if errin != nil {
-		log.Println("postQosPdrCounter counter not found : ", errin)
-	}
-
-	for i := range p.counters {
-		log.Println("init maps for counters.")
-		p.counters[i].init()
 	}
 
 	return nil
 }
 
-func (up4 *UP4) isConnected(accessIP *net.IP) bool {
-	var errin error
+func (up4 *UP4) initCounters() error {
+	log.Println("Initialize counters for p4client.")
+
 	if up4.p4client == nil {
-		up4.p4client, errin = up4.channelSetup()
-		if errin != nil {
-			log.Println("create channel failed : ", errin)
-			return false
-		}
+		return ErrOperationFailedWithReason("init counter", "P4client null")
+	}
 
-		if accessIP != nil {
-			*accessIP = up4.accessIP
-		}
+	up4.counters = make([]counter, 2)
 
-		errin = up4.p4client.ClearPdrTable()
-		if errin != nil {
-			log.Println("clear PDR table failed : ", errin)
-		}
+	err := setCounterSize(up4, preQosPdrCounter, "PreQosPipe.pre_qos_pdr_counter")
+	if err != nil {
+		log.Println("preQosPdrCounter counter not found : ", err)
+	}
 
-		errin = up4.p4client.ClearFarTable()
-		if errin != nil {
-			log.Println("clear FAR table failed : ", errin)
-		}
+	err = setCounterSize(up4, postQosPdrCounter, "PostQosPipe.post_qos_pdr_counter")
+	if err != nil {
+		log.Println("postQosPdrCounter counter not found : ", err)
+	}
 
-		errin = initCounter(up4)
-		if errin != nil {
-			log.Println("Counter Init failed. : ", errin)
-			return false
-		}
+	for i := range up4.counters {
+		log.Println("init maps for counters.")
+		up4.counters[i].init()
+	}
+
+	return nil
+}
+
+// This function ensures that PFCP Agent is connected to UP4.
+// Returns true if the connection is already established.
+// Otherwise, tries to connect to UP4. Returns false if fails.
+// FIXME: the argument should be removed from fastpath API
+func (up4 *UP4) isConnected(accessIP *net.IP) bool {
+	if up4.p4client != nil {
+		return true
+	}
+
+	err := up4.tryConnect()
+	if err != nil {
+		log.Errorf("failed to connect to UP4: %v", err)
+		return false
 	}
 
 	return true
@@ -272,10 +239,9 @@ func (up4 *UP4) isConnected(accessIP *net.IP) bool {
 func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	log.Println("setUpfInfo UP4")
 
-	var errin error
-
-	u.accessIP, up4.accessIPMask = ParseStrIP(conf.P4rtcIface.AccessIP)
-	log.Println("AccessIP: ", u.accessIP, ", AccessIPMask: ", up4.accessIPMask)
+	up4.accessIP = ParseStrIP(conf.P4rtcIface.AccessIP)
+	u.accessIP = up4.accessIP.IP
+	log.Println("AccessIP: ", up4.accessIP)
 
 	up4.p4rtcServer = conf.P4rtcIface.P4rtcServer
 	log.Println("UP4 server ip/name", up4.p4rtcServer)
@@ -299,36 +265,55 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	log.Println("server name: ", up4.host)
 	up4.deviceID = 1
 	up4.timeout = 30
-	up4.p4client, errin = up4.channelSetup()
-	u.accessIP = up4.accessIP
+	up4.enableEndMarker = conf.EnableEndMarker
 
-	if errin != nil {
-		log.Println("create channel failed : ", errin)
-	} else {
-		errin = up4.p4client.ClearPdrTable()
-		if errin != nil {
-			log.Println("clear PDR table failed : ", errin)
-		}
+	err := up4.tryConnect()
+	if err != nil {
+		log.Errorf("failed to connect to UP4: %v", err)
+		return
+	}
 
-		errin = up4.p4client.ClearFarTable()
-		if errin != nil {
-			log.Println("clear FAR table failed : ", errin)
-		}
+	up4.accessIP, err = up4.getAccessIP()
+	if err != nil {
+		log.Errorf("Failed to get Access IP from UP4: %v", err)
+		return
+	}
+	log.Infof("Retrieved Access IP from UP4: %v", up4.accessIP)
+	u.accessIP = up4.accessIP.IP
+}
+
+func (up4 *UP4) tryConnect() error {
+	err := up4.setupChannel()
+	if err != nil {
+		return err
 	}
 
 	up4.p4RtTranslator = newP4RtTranslator(up4.p4client.P4Info)
 
-	errin = initCounter(up4)
-	if errin != nil {
-		log.Println("Counter Init failed. : ", errin)
+	// TODO: clear tables at startup
+	//errin = up4.p4client.ClearPdrTable()
+	//if errin != nil {
+	//	log.Println("clear PDR table failed : ", errin)
+	//}
+	//
+	//errin = up4.p4client.ClearFarTable()
+	//if errin != nil {
+	//	log.Println("clear FAR table failed : ", errin)
+	//}
+
+	err = up4.initCounters()
+	if err != nil {
+		return fmt.Errorf("Counter Init failed. : %v", err)
 	}
 
-	if conf.EnableEndMarker {
+	if up4.enableEndMarker {
 		log.Println("Starting end marker loop")
 
 		up4.endMarkerChan = make(chan []byte, 1024)
 		go up4.endMarkerSendLoop(up4.endMarkerChan)
 	}
+
+	return nil
 }
 
 func (up4 *UP4) sendEndMarkers(endMarkerList *[][]byte) error {
@@ -348,6 +333,7 @@ func (up4 *UP4) endMarkerSendLoop(endMarkerChan chan []byte) {
 	}
 }
 
+// TODO: move to "helper" file
 func findRelatedFAR(pdr pdr, fars []far) (far, error) {
 	for _, far := range fars {
 		if pdr.farID == far.farID {
@@ -399,8 +385,6 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 				}
 				pdrs[i].ctrID = uint32(val)
 			}
-
-			// TODO: allocate tunnel peer id based on FARs
 		}
 	case upfMsgTypeDel:
 		{
@@ -433,18 +417,21 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 				allocatedTunnelPeerID, err := up4.allocateGTPTunnelPeerID(tunnelParams)
 				if err != nil {
 					log.Error("failed to allocate GTP tunnel peer ID based on FAR: ", err)
-					return cause
+					// TODO: not sure whether to continue of return PFCP error
+					continue
 				}
 
 				gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(allocatedTunnelPeerID, far)
 				if err != nil {
-					log.Error("failed to build GTP Tunnel Peers table entry from FAR")
-					return cause
+					log.Errorf("failed to build GTP Tunnel Peers table entry from FAR: %v", err)
+					// TODO: not sure whether to continue of return PFCP error
+					continue
 				}
 
 				if err := up4.p4client.WriteTableEntries(gtpTunnelPeerEntry); err != nil {
-					log.Error("failed to write GTP Tunnel Peers table entry to UP4")
-					return cause
+					log.Errorf("failed to write GTP Tunnel Peers table entry to UP4: %v", err)
+					// TODO: not sure whether to continue of return PFCP error
+					continue
 				}
 
 				up4.tunnelPeerIDs[tunnelParams] = allocatedTunnelPeerID
@@ -467,13 +454,13 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 
 		sessionsEntry, err := up4.p4RtTranslator.BuildSessionsTableEntry(pdr, 0, far.Buffers())
 		if err != nil {
-			// log failed to build
+			log.Error("failed to build P4rt table entry for Sessions table: ", err)
 			continue
 		}
 
 		terminationsEntry, err := up4.p4RtTranslator.BuildTerminationsTableEntry(pdr, far)
 		if err != nil {
-			log.Error("failed to build P4rt table entry for Terminations table")
+			log.Error("failed to build P4rt table entry for Terminations table: ", err)
 			continue
 		}
 

@@ -121,7 +121,7 @@ func ParseJSON(filepath *string, conf *Conf) {
 }
 
 // ParseStrIP : parse IP address from config.
-func ParseStrIP(n3name string) (net.IP, net.IPMask) {
+func ParseStrIP(n3name string) *net.IPNet {
 	ip, ipNet, err := net.ParseCIDR(n3name)
 	if err != nil {
 		log.Fatalln("Unable to parse IP: ", err)
@@ -129,7 +129,7 @@ func ParseStrIP(n3name string) (net.IP, net.IPMask) {
 
 	log.Println("IP: ", ip)
 
-	return ip, (ipNet).Mask
+	return ipNet
 }
 
 // ParseIP : parse IP address from the interface name.
