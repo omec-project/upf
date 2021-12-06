@@ -81,6 +81,11 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 		if reply != nil && err == nil && pConn.upf.enableHBTimer {
 			go pConn.startHeartBeatMonitor()
 		}
+		// TODO: Cleanup sessions
+	case message.MsgTypeAssociationSetupResponse:
+		reply, err = pConn.handleAssociationSetupResponse(msg)
+		// TODO: Cleanup sessions
+		// TODO: start heartbeats
 	case message.MsgTypeAssociationReleaseRequest:
 		reply, err = pConn.handleAssociationReleaseRequest(msg)
 		defer pConn.Shutdown()
@@ -92,9 +97,12 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 		reply, err = pConn.handleSessionModificationRequest(msg)
 	case message.MsgTypeSessionDeletionRequest:
 		reply, err = pConn.handleSessionDeletionRequest(msg)
+	case message.MsgTypeSessionReportResponse:
+		pConn.handleSessionReportResponse(msg)
 
-	// Incoming reponse messages
-	case message.MsgTypeAssociationSetupResponse, message.MsgTypeHeartbeatResponse, message.MsgTypeSessionReportResponse:
+	// Incoming response messages
+	// TODO: Association Setup Request, Session Report Request
+	case message.MsgTypeHeartbeatResponse:
 		err = pConn.handleIncomingResponse(msg)
 
 	default:
