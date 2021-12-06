@@ -33,7 +33,7 @@ func errProcess(err error) *HandlePFCPMsgError {
 }
 
 type Request struct {
-	msg message.Message // Request message
+	msg   message.Message      // Request message
 	reply chan message.Message // Response message
 }
 
@@ -101,7 +101,6 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 		log.Errorln("Message type: ", msgType, " is currently not supported")
 		return
 	}
-
 
 	nodeID := pConn.nodeID.remote
 	// Check for errors in handling the message

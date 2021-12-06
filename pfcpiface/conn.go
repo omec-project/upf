@@ -80,7 +80,7 @@ func (pConn *PFCPConn) startHeartBeatMonitor() {
 
 	for {
 		select {
-		case <- hbCtx.Done():
+		case <-hbCtx.Done():
 			log.Infoln("Cancel HeartBeat Timer", pConn.RemoteAddr().String())
 			return
 

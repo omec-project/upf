@@ -130,10 +130,10 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 		fastPath:          fp,
 		dnn:               conf.CPIface.Dnn,
 		reportNotifyChan:  make(chan uint64, 1024),
-		maxReqRetries: maxReqRetriesDefault,
-		respTimeout: respTimeoutDefault,
+		maxReqRetries:     maxReqRetriesDefault,
+		respTimeout:       respTimeoutDefault,
 		enableHBTimer:     conf.EnableHBTimer,
-		hbInterval: hbIntervalDefault,
+		hbInterval:        hbIntervalDefault,
 	}
 
 	if !conf.EnableP4rt {
