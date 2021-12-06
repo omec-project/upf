@@ -74,11 +74,11 @@ const (
 	n9 = 0x2
 
 	// Default values for outgoing requests
-	maxReqRetries = 5
-	respTimeout   = 2 // in seconds
+	maxReqRetriesDefault = 5
+	respTimeoutDefault   = 2 * time.Second
 
 	// Default value for Heart Beat Interval
-	hbInterval = 5 // in seconds
+	hbIntervalDefault = 5 * time.Second
 )
 
 func (u *upf) isConnected() bool {
@@ -130,7 +130,10 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 		fastPath:          fp,
 		dnn:               conf.CPIface.Dnn,
 		reportNotifyChan:  make(chan uint64, 1024),
+		maxReqRetries: maxReqRetriesDefault,
+		respTimeout: respTimeoutDefault,
 		enableHBTimer:     conf.EnableHBTimer,
+		hbInterval: hbIntervalDefault,
 	}
 
 	if !conf.EnableP4rt {
@@ -138,20 +141,23 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 		u.coreIP = ParseIP(conf.CoreIface.IfName, "Core")
 	}
 
-	u.maxReqRetries = maxReqRetries
 	if conf.MaxReqRetries != 0 {
 		u.maxReqRetries = conf.MaxReqRetries
 	}
 
-	u.respTimeout = time.Duration(respTimeout) * time.Second
-	if len(conf.RespTimeout) > 0 {
-		u.respTimeout, _ = time.ParseDuration(conf.RespTimeout)
+	if conf.RespTimeout != "" {
+		u.respTimeout, err = time.ParseDuration(conf.RespTimeout)
+		if err != nil {
+			log.Fatalln("Unable to parse resp_timeout")
+		}
 	}
 
 	if u.enableHBTimer {
-		u.hbInterval = time.Duration(hbInterval) * time.Second
-		if len(conf.HeartBeatInterval) > 0 {
-			u.hbInterval, _ = time.ParseDuration(conf.HeartBeatInterval)
+		if conf.HeartBeatInterval != "" {
+			u.hbInterval, err = time.ParseDuration(conf.HeartBeatInterval)
+			if err != nil {
+				log.Fatalln("Unable to parse heart_beat_interval")
+			}
 		}
 	}
 
