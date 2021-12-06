@@ -96,6 +96,12 @@ func (uc *upfCollector) Describe(ch chan<- *prometheus.Desc) {
 
 	ch <- uc.latency
 	ch <- uc.jitter
+
+	ch <- uc.sessionLatency
+	ch <- uc.sessionJitter
+	ch <- uc.sessionTxPackets
+	ch <- uc.sessionDroppedPackets
+	ch <- uc.sessionTxBytes
 }
 
 // Collect writes all metrics to prometheus metric channel.
