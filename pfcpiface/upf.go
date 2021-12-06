@@ -6,6 +6,7 @@ package main
 import (
 	"errors"
 	"net"
+	"time"
 
 	"github.com/Showmax/go-fqdn"
 	log "github.com/sirupsen/logrus"
@@ -50,6 +51,10 @@ type upf struct {
 	sliceInfo         *SliceInfo
 
 	fastPath
+	maxReqRetries uint8
+	respTimeout   time.Duration
+	enableHBTimer bool
+	hbInterval    time.Duration
 }
 
 // to be replaced with go-pfcp structs
@@ -67,6 +72,13 @@ const (
 	n3 = 0x0
 	n6 = 0x1
 	n9 = 0x2
+
+	// Default values for outgoing requests
+	maxReqRetriesDefault = 5
+	respTimeoutDefault   = 2 * time.Second
+
+	// Default value for Heart Beat Interval
+	hbIntervalDefault = 5 * time.Second
 )
 
 func (u *upf) isConnected() bool {
@@ -118,11 +130,35 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 		fastPath:          fp,
 		dnn:               conf.CPIface.Dnn,
 		reportNotifyChan:  make(chan uint64, 1024),
+		maxReqRetries:     maxReqRetriesDefault,
+		respTimeout:       respTimeoutDefault,
+		enableHBTimer:     conf.EnableHBTimer,
+		hbInterval:        hbIntervalDefault,
 	}
 
 	if !conf.EnableP4rt {
 		u.accessIP = ParseIP(conf.AccessIface.IfName, "Access")
 		u.coreIP = ParseIP(conf.CoreIface.IfName, "Core")
+	}
+
+	if conf.MaxReqRetries != 0 {
+		u.maxReqRetries = conf.MaxReqRetries
+	}
+
+	if conf.RespTimeout != "" {
+		u.respTimeout, err = time.ParseDuration(conf.RespTimeout)
+		if err != nil {
+			log.Fatalln("Unable to parse resp_timeout")
+		}
+	}
+
+	if u.enableHBTimer {
+		if conf.HeartBeatInterval != "" {
+			u.hbInterval, err = time.ParseDuration(conf.HeartBeatInterval)
+			if err != nil {
+				log.Fatalln("Unable to parse heart_beat_interval")
+			}
+		}
 	}
 
 	if u.enableUeIPAlloc {
