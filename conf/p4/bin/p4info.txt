@@ -128,9 +128,9 @@ tables {
 }
 tables {
   preamble {
-    id: 41020214
-    name: "PreQosPipe.source_iface_lookup"
-    alias: "source_iface_lookup"
+    id: 33923840
+    name: "PreQosPipe.interfaces"
+    alias: "interfaces"
   }
   match_fields {
     id: 1
@@ -146,9 +146,9 @@ tables {
 }
 tables {
   preamble {
-    id: 38006553
-    name: "PreQosPipe.pdrs"
-    alias: "pdrs"
+    id: 49584791
+    name: "PreQosPipe.sessions"
+    alias: "sessions"
   }
   match_fields {
     id: 1
@@ -158,9 +158,9 @@ tables {
   }
   match_fields {
     id: 2
-    name: "tunnel_ipv4_dst"
+    name: "ipv4_dst"
     bitwidth: 32
-    match_type: TERNARY
+    match_type: EXACT
   }
   match_fields {
     id: 3
@@ -168,41 +168,11 @@ tables {
     bitwidth: 32
     match_type: TERNARY
   }
-  match_fields {
-    id: 4
-    name: "ue_addr"
-    bitwidth: 32
-    match_type: TERNARY
-  }
-  match_fields {
-    id: 5
-    name: "inet_addr"
-    bitwidth: 32
-    match_type: TERNARY
-  }
-  match_fields {
-    id: 6
-    name: "ue_l4_port"
-    bitwidth: 16
-    match_type: RANGE
-  }
-  match_fields {
-    id: 7
-    name: "inet_l4_port"
-    bitwidth: 16
-    match_type: RANGE
-  }
-  match_fields {
-    id: 8
-    name: "ip_proto"
-    bitwidth: 8
-    match_type: TERNARY
+  action_refs {
+    id: 18820761
   }
   action_refs {
-    id: 31939583
-  }
-  action_refs {
-    id: 21822813
+    id: 20045386
   }
   action_refs {
     id: 21257015
@@ -213,27 +183,58 @@ tables {
 }
 tables {
   preamble {
-    id: 40930771
-    name: "PreQosPipe.load_far_attributes"
-    alias: "load_far_attributes"
+    id: 48872261
+    name: "PreQosPipe.terminations"
+    alias: "terminations"
   }
   match_fields {
     id: 1
-    name: "far_id"
-    bitwidth: 32
+    name: "slice_id"
+    bitwidth: 4
     match_type: EXACT
   }
   match_fields {
     id: 2
-    name: "session_id"
-    bitwidth: 96
+    name: "src_iface"
+    bitwidth: 8
+    match_type: EXACT
+  }
+  match_fields {
+    id: 3
+    name: "ue_address"
+    bitwidth: 32
     match_type: EXACT
   }
   action_refs {
-    id: 25716083
+    id: 33361772
   }
   action_refs {
-    id: 20110435
+    id: 31666072
+  }
+  action_refs {
+    id: 18415550
+  }
+  action_refs {
+    id: 21257015
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  size: 1024
+}
+tables {
+  preamble {
+    id: 49497304
+    name: "PreQosPipe.tunnel_peers"
+    alias: "tunnel_peers"
+  }
+  match_fields {
+    id: 1
+    name: "tunnel_peer_id"
+    bitwidth: 8
+    match_type: EXACT
+  }
+  action_refs {
+    id: 32742981
   }
   action_refs {
     id: 21257015
@@ -248,41 +249,6 @@ actions {
     name: "NoAction"
     alias: "NoAction"
     annotations: "@noWarn(\"unused\")"
-  }
-}
-actions {
-  preamble {
-    id: 23646333
-    name: "PreQosPipe.ExecuteFar.do_gtpu_tunnel"
-    alias: "do_gtpu_tunnel"
-  }
-}
-actions {
-  preamble {
-    id: 30425873
-    name: "PreQosPipe.ExecuteFar.do_forward"
-    alias: "do_forward"
-  }
-}
-actions {
-  preamble {
-    id: 28085271
-    name: "PreQosPipe.ExecuteFar.do_buffer"
-    alias: "do_buffer"
-  }
-}
-actions {
-  preamble {
-    id: 26909570
-    name: "PreQosPipe.ExecuteFar.do_drop"
-    alias: "do_drop"
-  }
-}
-actions {
-  preamble {
-    id: 21639584
-    name: "PreQosPipe.ExecuteFar.do_notify_cp"
-    alias: "do_notify_cp"
   }
 }
 actions {
@@ -363,138 +329,126 @@ actions {
     name: "direction"
     bitwidth: 8
   }
-}
-actions {
-  preamble {
-    id: 31939583
-    name: "PreQosPipe.set_pdr_attributes"
-    alias: "set_pdr_attributes"
-  }
-  params {
-    id: 1
-    name: "id"
-    bitwidth: 32
-  }
-  params {
-    id: 2
-    name: "fseid"
-    bitwidth: 96
-  }
   params {
     id: 3
-    name: "ctr_id"
-    bitwidth: 32
-  }
-  params {
-    id: 4
-    name: "far_id"
-    bitwidth: 32
-  }
-  params {
-    id: 5
-    name: "needs_gtpu_decap"
-    bitwidth: 1
+    name: "slice_id"
+    bitwidth: 4
   }
 }
 actions {
   preamble {
-    id: 21822813
-    name: "PreQosPipe.set_pdr_attributes_qos"
-    alias: "set_pdr_attributes_qos"
-  }
-  params {
-    id: 1
-    name: "id"
-    bitwidth: 32
-  }
-  params {
-    id: 2
-    name: "fseid"
-    bitwidth: 96
-  }
-  params {
-    id: 3
-    name: "ctr_id"
-    bitwidth: 32
-  }
-  params {
-    id: 4
-    name: "far_id"
-    bitwidth: 32
-  }
-  params {
-    id: 5
-    name: "scheduling_priority"
-    bitwidth: 32
-  }
-  params {
-    id: 6
-    name: "needs_gtpu_decap"
-    bitwidth: 1
+    id: 18820761
+    name: "PreQosPipe.set_params_uplink"
+    alias: "set_params_uplink"
   }
 }
 actions {
   preamble {
-    id: 25716083
-    name: "PreQosPipe.load_normal_far_attributes"
-    alias: "load_normal_far_attributes"
+    id: 20045386
+    name: "PreQosPipe.set_params_downlink"
+    alias: "set_params_downlink"
   }
   params {
     id: 1
-    name: "needs_dropping"
-    bitwidth: 1
-  }
-  params {
-    id: 2
-    name: "notify_cp"
-    bitwidth: 1
-  }
-}
-actions {
-  preamble {
-    id: 20110435
-    name: "PreQosPipe.load_tunnel_far_attributes"
-    alias: "load_tunnel_far_attributes"
-  }
-  params {
-    id: 1
-    name: "needs_dropping"
-    bitwidth: 1
-  }
-  params {
-    id: 2
-    name: "notify_cp"
-    bitwidth: 1
-  }
-  params {
-    id: 3
-    name: "needs_buffering"
-    bitwidth: 1
-  }
-  params {
-    id: 4
-    name: "tunnel_type"
+    name: "tunnel_peer_id"
     bitwidth: 8
   }
   params {
-    id: 5
-    name: "src_addr"
+    id: 2
+    name: "needs_buffering"
+    bitwidth: 1
+  }
+}
+actions {
+  preamble {
+    id: 33361772
+    name: "PreQosPipe.term_uplink"
+    alias: "term_uplink"
+  }
+  params {
+    id: 1
+    name: "ctr_idx"
     bitwidth: 32
   }
   params {
-    id: 6
-    name: "dst_addr"
-    bitwidth: 32
+    id: 2
+    name: "tc"
+    bitwidth: 2
+  }
+}
+actions {
+  preamble {
+    id: 31666072
+    name: "PreQosPipe.term_downlink"
+    alias: "term_downlink"
   }
   params {
-    id: 7
+    id: 1
     name: "teid"
     bitwidth: 32
   }
   params {
-    id: 8
+    id: 2
+    name: "ctr_idx"
+    bitwidth: 32
+  }
+  params {
+    id: 3
+    name: "qfi"
+    bitwidth: 6
+  }
+  params {
+    id: 4
+    name: "tc"
+    bitwidth: 2
+  }
+}
+actions {
+  preamble {
+    id: 18415550
+    name: "PreQosPipe.term_drop"
+    alias: "term_drop"
+  }
+  params {
+    id: 1
+    name: "ctr_idx"
+    bitwidth: 32
+  }
+}
+actions {
+  preamble {
+    id: 32742981
+    name: "PreQosPipe.load_tunnel_param"
+    alias: "load_tunnel_param"
+  }
+  params {
+    id: 1
+    name: "src_addr"
+    bitwidth: 32
+  }
+  params {
+    id: 2
+    name: "dst_addr"
+    bitwidth: 32
+  }
+  params {
+    id: 3
     name: "sport"
     bitwidth: 16
+  }
+}
+actions {
+  preamble {
+    id: 29247910
+    name: "PreQosPipe.do_gtpu_tunnel"
+    alias: "do_gtpu_tunnel"
+  }
+}
+actions {
+  preamble {
+    id: 31713420
+    name: "PreQosPipe.do_gtpu_tunnel_with_psc"
+    alias: "do_gtpu_tunnel_with_psc"
   }
 }
 action_profiles {
@@ -509,9 +463,9 @@ action_profiles {
 }
 counters {
   preamble {
-    id: 318101068
-    name: "PreQosPipe.pre_qos_pdr_counter"
-    alias: "pre_qos_pdr_counter"
+    id: 315693181
+    name: "PreQosPipe.pre_qos_counter"
+    alias: "pre_qos_counter"
   }
   spec {
     unit: BOTH
@@ -520,9 +474,9 @@ counters {
 }
 counters {
   preamble {
-    id: 311239454
-    name: "PostQosPipe.post_qos_pdr_counter"
-    alias: "post_qos_pdr_counter"
+    id: 302958180
+    name: "PostQosPipe.post_qos_counter"
+    alias: "post_qos_counter"
   }
   spec {
     unit: BOTH
@@ -588,11 +542,11 @@ type_info {
     key: "ddn_digest_t"
     value {
       members {
-        name: "fseid"
+        name: "ue_address"
         type_spec {
           bitstring {
             bit {
-              bitwidth: 96
+              bitwidth: 32
             }
           }
         }
@@ -624,22 +578,6 @@ type_info {
     }
   }
   serializable_enums {
-    key: "EtherType"
-    value {
-      underlying_type {
-        bitwidth: 16
-      }
-      members {
-        name: "IPV4"
-        value: "\010\000"
-      }
-      members {
-        name: "IPV6"
-        value: "\206\335"
-      }
-    }
-  }
-  serializable_enums {
     key: "InterfaceType"
     value {
       underlying_type {
@@ -656,86 +594,6 @@ type_info {
       members {
         name: "CORE"
         value: "\002"
-      }
-      members {
-        name: "N6_LAN"
-        value: "\003"
-      }
-      members {
-        name: "VN_INTERNAL"
-        value: "\004"
-      }
-      members {
-        name: "CONTROL_PLANE"
-        value: "\005"
-      }
-    }
-  }
-  serializable_enums {
-    key: "IpProtocol"
-    value {
-      underlying_type {
-        bitwidth: 8
-      }
-      members {
-        name: "ICMP"
-        value: "\001"
-      }
-      members {
-        name: "TCP"
-        value: "\006"
-      }
-      members {
-        name: "UDP"
-        value: "\021"
-      }
-    }
-  }
-  serializable_enums {
-    key: "L4Port"
-    value {
-      underlying_type {
-        bitwidth: 16
-      }
-      members {
-        name: "DHCP_SERV"
-        value: "\000C"
-      }
-      members {
-        name: "DHCP_CLIENT"
-        value: "\000D"
-      }
-      members {
-        name: "GTP_GPDU"
-        value: "\010h"
-      }
-      members {
-        name: "IPV4_IN_UDP"
-        value: "&\223"
-      }
-    }
-  }
-  serializable_enums {
-    key: "TunnelType"
-    value {
-      underlying_type {
-        bitwidth: 8
-      }
-      members {
-        name: "UNKNOWN"
-        value: "\000"
-      }
-      members {
-        name: "IP"
-        value: "\001"
-      }
-      members {
-        name: "UDP"
-        value: "\002"
-      }
-      members {
-        name: "GTPU"
-        value: "\003"
       }
     }
   }
