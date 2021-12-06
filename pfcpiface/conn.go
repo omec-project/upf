@@ -42,6 +42,10 @@ type nodeID struct {
 	local   string
 	remote  string
 }
+type hbMonitor struct {
+	hbCtx    context.Context //derived from pConn.ctx
+	hbCancel context.CancelFunc
+}
 
 // PFCPConn represents a PFCP connection with a unique PFCP peer.
 type PFCPConn struct {
@@ -61,6 +65,48 @@ type PFCPConn struct {
 	shutdown chan struct{}
 
 	metrics.InstrumentPFCP
+	hbMonitor   *hbMonitor
+	pendingReqs sync.Map
+}
+
+func (pConn *PFCPConn) startHeartBeatMonitor() {
+	// Stop HeartBeat routine if already running
+	if pConn.hbMonitor != nil {
+		pConn.hbMonitor.hbCancel()
+		pConn.hbMonitor = nil
+	}
+
+	if !pConn.upf.enableHBTimer {
+		return
+	}
+
+	hbctx, hbcancel := context.WithCancel(pConn.ctx)
+	pConn.hbMonitor = &hbMonitor{hbCtx: hbctx, hbCancel: hbcancel}
+
+	log.Infoln("Starting Heartbeat timer")
+	heartBeatTimer := time.NewTimer(pConn.upf.hbInterval)
+
+	for {
+		select {
+		case <-pConn.hbMonitor.hbCtx.Done():
+			log.Println("Cancel HeartBeat Timer")
+			return
+
+		case <-heartBeatTimer.C:
+			log.Println("HeartBeat Interval Timer Expired")
+
+			r := pConn.getHeartBeatRequest()
+
+			reply, timeout := pConn.sendPFCPRequestMessage(r)
+
+			if reply != nil {
+				heartBeatTimer = time.NewTimer(pConn.upf.hbInterval)
+			} else if timeout {
+				pConn.Shutdown()
+			}
+		}
+	}
+
 }
 
 // NewPFCPConn creates a connected UDP socket to the rAddr PFCP peer specified.
@@ -90,6 +136,7 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 		done:           node.pConnDone,
 		shutdown:       make(chan struct{}),
 		InstrumentPFCP: node.metrics,
+		hbMonitor:      nil,
 	}
 
 	p.setLocalNodeID(node.upf.nodeID)
@@ -158,6 +205,7 @@ func (pConn *PFCPConn) Serve() {
 		case <-pConn.ctx.Done():
 			pConn.Shutdown()
 			return
+
 		case <-pConn.shutdown:
 			return
 		}
@@ -167,6 +215,11 @@ func (pConn *PFCPConn) Serve() {
 // Shutdown stops connection backing PFCPConn.
 func (pConn *PFCPConn) Shutdown() error {
 	close(pConn.shutdown)
+
+	if pConn.hbMonitor != nil {
+		pConn.hbMonitor.hbCancel()
+		pConn.hbMonitor = nil
+	}
 
 	// Cleanup all sessions in this conn
 	for seid, sess := range pConn.sessions {

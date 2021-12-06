@@ -5,6 +5,7 @@ package main
 
 import (
 	"errors"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/message"
@@ -31,8 +32,35 @@ func errProcess(err error) *HandlePFCPMsgError {
 	return &HandlePFCPMsgError{Op: "Process", Err: err}
 }
 
+type RequestTimeoutAction func(msg message.Message) bool
+
+type Request struct {
+	msg message.Message // Request message
+
+	reply chan message.Message // Response message
+
+}
+
+func newRequest(msg message.Message) *Request {
+	return &Request{msg: msg, reply: make(chan message.Message)}
+}
+
+func (r *Request) GetResponse(done <-chan struct{}, respDuration time.Duration) (message.Message, bool) {
+	respTimer := time.NewTimer(respDuration)
+	select {
+	case <-done:
+		return nil, false
+	case c := <-r.reply:
+		respTimer.Stop()
+		return c, false
+	case <-respTimer.C:
+		return nil, true
+	}
+}
+
 // HandlePFCPMsg handles different types of PFCP messages.
 func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
+
 	var reply message.Message
 	var err error
 
@@ -48,16 +76,19 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 
 	switch msg.MessageType() {
 	// Connection related messages
+
 	case message.MsgTypeHeartbeatRequest:
 		reply, err = pConn.handleHeartbeatRequest(msg)
 	case message.MsgTypeHeartbeatResponse:
-		reply, err = pConn.handleHeartbeatResponse(msg)
+		err = pConn.handleIncomingResponse(msg)
 	case message.MsgTypePFDManagementRequest:
 		reply, err = pConn.handlePFDMgmtRequest(msg)
 	case message.MsgTypeAssociationSetupRequest:
 		reply, err = pConn.handleAssociationSetupRequest(msg)
-		// TODO: Cleanup sessions
-		// TODO: start heartbeats
+		if reply != nil && err == nil {
+			go pConn.startHeartBeatMonitor()
+
+		}
 	case message.MsgTypeAssociationSetupResponse:
 		reply, err = pConn.handleAssociationSetupResponse(msg)
 		// TODO: Cleanup sessions
@@ -121,4 +152,26 @@ func (pConn *PFCPConn) SendPFCPMsg(msg message.Message) {
 
 	m.Finish(nodeID, "Success")
 	log.Traceln("Sent", msgType, "to", addr)
+}
+
+func (pConn *PFCPConn) sendPFCPRequestMessage(r *Request) (message.Message, bool) {
+
+	pConn.pendingReqs.Store(r.msg.Sequence(), r)
+
+	pConn.SendPFCPMsg(r.msg)
+
+	retriesLeft := pConn.upf.maxReqRetries
+	for {
+		if reply, rc := r.GetResponse(pConn.shutdown, pConn.upf.respTimeout); rc {
+			log.Traceln("Request Timeout, retriesLeft:", retriesLeft)
+			if retriesLeft > 0 {
+				pConn.SendPFCPMsg(r.msg)
+				retriesLeft--
+			} else {
+				return nil, true
+			}
+		} else {
+			return reply, false
+		}
+	}
 }
