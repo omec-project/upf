@@ -32,13 +32,9 @@ func errProcess(err error) *HandlePFCPMsgError {
 	return &HandlePFCPMsgError{Op: "Process", Err: err}
 }
 
-type RequestTimeoutAction func(msg message.Message) bool
-
 type Request struct {
 	msg message.Message // Request message
-
 	reply chan message.Message // Response message
-
 }
 
 func newRequest(msg message.Message) *Request {
@@ -76,23 +72,15 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 
 	switch msg.MessageType() {
 	// Connection related messages
-
 	case message.MsgTypeHeartbeatRequest:
 		reply, err = pConn.handleHeartbeatRequest(msg)
-	case message.MsgTypeHeartbeatResponse:
-		err = pConn.handleIncomingResponse(msg)
 	case message.MsgTypePFDManagementRequest:
 		reply, err = pConn.handlePFDMgmtRequest(msg)
 	case message.MsgTypeAssociationSetupRequest:
 		reply, err = pConn.handleAssociationSetupRequest(msg)
-		if reply != nil && err == nil {
+		if reply != nil && err == nil && pConn.upf.enableHBTimer {
 			go pConn.startHeartBeatMonitor()
-
 		}
-	case message.MsgTypeAssociationSetupResponse:
-		reply, err = pConn.handleAssociationSetupResponse(msg)
-		// TODO: Cleanup sessions
-		// TODO: start heartbeats
 	case message.MsgTypeAssociationReleaseRequest:
 		reply, err = pConn.handleAssociationReleaseRequest(msg)
 		defer pConn.Shutdown()
@@ -104,12 +92,16 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 		reply, err = pConn.handleSessionModificationRequest(msg)
 	case message.MsgTypeSessionDeletionRequest:
 		reply, err = pConn.handleSessionDeletionRequest(msg)
-	case message.MsgTypeSessionReportResponse:
-		pConn.handleSessionReportResponse(msg)
+
+	// Incoming reponse messages
+	case message.MsgTypeAssociationSetupResponse, message.MsgTypeHeartbeatResponse, message.MsgTypeSessionReportResponse:
+		err = pConn.handleIncomingResponse(msg)
+
 	default:
 		log.Errorln("Message type: ", msgType, " is currently not supported")
 		return
 	}
+
 
 	nodeID := pConn.nodeID.remote
 	// Check for errors in handling the message

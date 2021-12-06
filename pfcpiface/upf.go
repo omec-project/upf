@@ -75,10 +75,10 @@ const (
 
 	// Default values for outgoing requests
 	maxReqRetries = 5
-	respTimeout   = 2000
+	respTimeout   = 2 // in seconds
 
 	// Default value for Heart Beat Interval
-	hbInterval = 5000
+	hbInterval = 5 // in seconds
 )
 
 func (u *upf) isConnected() bool {
@@ -143,13 +143,13 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 		u.maxReqRetries = conf.MaxReqRetries
 	}
 
-	u.respTimeout = time.Duration(respTimeout) * time.Millisecond
+	u.respTimeout = time.Duration(respTimeout) * time.Second
 	if len(conf.RespTimeout) > 0 {
 		u.respTimeout, _ = time.ParseDuration(conf.RespTimeout)
 	}
 
 	if u.enableHBTimer {
-		u.hbInterval = time.Duration(hbInterval) * time.Millisecond
+		u.hbInterval = time.Duration(hbInterval) * time.Second
 		if len(conf.HeartBeatInterval) > 0 {
 			u.hbInterval, _ = time.ParseDuration(conf.HeartBeatInterval)
 		}
