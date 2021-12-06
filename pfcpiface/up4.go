@@ -18,6 +18,7 @@ import (
 )
 
 const (
+	// FIXME: this is hardcoded currently, but should be passed as configuration/cmd line arg
 	p4InfoPath = "/bin/p4info.txt"
 	deviceConfigPath = "/bin/bmv2.json"
 )
@@ -36,10 +37,9 @@ type P4rtcInfo struct {
 	UEIP        string `json:"ue_ip_pool"`
 }
 
-// TODO: convert uint8 to enum.
 const (
-	preQosPdrCounter  uint8 = 0 // Pre qos pdr ctr
-	postQosPdrCounter uint8 = 1 // Post qos pdr ctr
+	preQosCounterID  = iota
+	postQosCounterID
 )
 
 type counter struct {
@@ -108,27 +108,23 @@ func (up4 *UP4) getAccessIP() (*net.IPNet, error) {
 	return accessIP, nil
 }
 
-func (c *counter) init() {
-	c.allocated = make(map[uint64]uint64)
-}
-
-func setCounterSize(p *UP4, counterID uint8, name string) error {
-	if p.p4client != nil {
-		for _, ctr := range p.p4client.P4Info.Counters {
-			if ctr.Preamble.Name == name {
-				log.Println("maxsize : ", ctr.Size)
-				log.Println("ctr ID : ", ctr.Preamble.Id)
-				p.counters[counterID].maxSize = uint64(ctr.Size)
-				p.counters[counterID].counterID = uint64(ctr.Preamble.Id)
-
-				return nil
-			}
-		}
+func (up4 *UP4) initCounter(counterID uint8, name string) error {
+	ctr, err := up4.p4RtTranslator.getCounterByName(name)
+	if err != nil {
+		return err
 	}
 
-	errin := ErrNotFoundWithParam("counter", "name", name)
+	up4.counters[counterID].maxSize = uint64(ctr.Size)
+	up4.counters[counterID].counterID = uint64(ctr.Preamble.Id)
 
-	return errin
+	log.WithFields(log.Fields{
+		"counterID": counterID,
+		"name": name,
+		"max-size": ctr.Size,
+		"UP4 counter ID": ctr.Preamble.Id,
+	}).Debug("Counter initialized successfully")
+
+	return nil
 }
 
 func resetCounterVal(p *UP4, counterID uint8, val uint64) {
@@ -190,28 +186,17 @@ func (up4 *UP4) setupChannel() error {
 	return nil
 }
 
-func (up4 *UP4) initCounters() error {
-	log.Println("Initialize counters for p4client.")
+func (up4 *UP4) initAllCounters() error {
+	log.Debug("Initializing counter for UP4")
 
-	if up4.p4client == nil {
-		return ErrOperationFailedWithReason("init counter", "P4client null")
-	}
-
-	up4.counters = make([]counter, 2)
-
-	err := setCounterSize(up4, preQosPdrCounter, "PreQosPipe.pre_qos_pdr_counter")
+	err := up4.initCounter(preQosCounterID, "PreQosPipe.pre_qos_counter")
 	if err != nil {
-		log.Println("preQosPdrCounter counter not found : ", err)
+		return fmt.Errorf("preQosCounterID counter init failed: %v", err)
 	}
 
-	err = setCounterSize(up4, postQosPdrCounter, "PostQosPipe.post_qos_pdr_counter")
+	err = up4.initCounter(postQosCounterID, "PostQosPipe.post_qos_counter")
 	if err != nil {
-		log.Println("postQosPdrCounter counter not found : ", err)
-	}
-
-	for i := range up4.counters {
-		log.Println("init maps for counters.")
-		up4.counters[i].init()
+		return fmt.Errorf("postQosCounterID counter init failed: %v", err)
 	}
 
 	return nil
@@ -266,6 +251,11 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	up4.deviceID = 1
 	up4.timeout = 30
 	up4.enableEndMarker = conf.EnableEndMarker
+	up4.counters = make([]counter, 2)
+	for i := range up4.counters {
+		// initialize allocated counters map
+		up4.counters[i].allocated = make(map[uint64]uint64)
+	}
 
 	err := up4.tryConnect()
 	if err != nil {
@@ -301,9 +291,9 @@ func (up4 *UP4) tryConnect() error {
 	//	log.Println("clear FAR table failed : ", errin)
 	//}
 
-	err = up4.initCounters()
+	err = up4.initAllCounters()
 	if err != nil {
-		return fmt.Errorf("Counter Init failed. : %v", err)
+		return fmt.Errorf("counters initialization failed. : %v", err)
 	}
 
 	if up4.enableEndMarker {
@@ -351,7 +341,12 @@ func (up4 *UP4) allocateGTPTunnelPeerID(params tunnelParams) (uint8, error) {
 }
 
 func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, updated PacketForwardingRules) uint8 {
-	log.Println("sendMsgToUPF p4")
+	up4Log := log.WithFields(log.Fields{
+		"method-type": method,
+		"old-rules": rules,
+		"updated-rules": updated,
+	})
+	up4Log.Debug("Sending PFCP message to UP4..")
 
 	pdrs := rules.pdrs
 	fars := rules.fars
@@ -378,7 +373,7 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 		{
 			funcType = FunctionTypeInsert
 			for i := range pdrs {
-				val, err = getCounterVal(up4, preQosPdrCounter)
+				val, err = getCounterVal(up4, preQosCounterID)
 				if err != nil {
 					log.Println("Counter id alloc failed ", err)
 					return cause
@@ -390,7 +385,7 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 		{
 			funcType = FunctionTypeDelete
 			for i := range pdrs {
-				resetCounterVal(up4, preQosPdrCounter,
+				resetCounterVal(up4, preQosCounterID,
 					uint64(pdrs[i].ctrID))
 			}
 		}
@@ -407,7 +402,7 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 
 	for _, far := range fars {
 		// downlink FAR that does encapsulation
-		if far.Forwards() && far.dstIntf == ie.DstInterfaceAccess {
+		if far.Forwards() && far.dstIntf == ie.DstInterfaceAccess && far.tunnelTEID != 0 {
 			tunnelParams := tunnelParams{
 				tunnelIP4Src: far.tunnelIP4Src,
 				tunnelIP4Dst: far.tunnelIP4Dst,
@@ -458,7 +453,8 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 			continue
 		}
 
-		terminationsEntry, err := up4.p4RtTranslator.BuildTerminationsTableEntry(pdr, far)
+		// FIXME: get TC from QFI->TC mapping
+		terminationsEntry, err := up4.p4RtTranslator.BuildTerminationsTableEntry(pdr, far, uint8(0))
 		if err != nil {
 			log.Error("failed to build P4rt table entry for Terminations table: ", err)
 			continue
@@ -467,7 +463,7 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 		err = up4.p4client.WriteTableEntries(sessionsEntry, terminationsEntry)
 		if err != nil {
 			// TODO: revert operations (e.g. reset counter)
-			log.Error("failed to write P4rt table entries: ", err)
+			log.Error("failed to write table entries to Sessions and Terminations tables: ", err)
 			return cause
 		}
 	}
