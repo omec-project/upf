@@ -72,6 +72,10 @@
     "": "Number of worker threads. Default: 1",
     "workers": 1,
 
+    "": "Parameters for handling outgoing requests",
+    "max_req_retries": 5,
+    "resp_timeout": "2s",
+
     "": "Whether to enable Network Token Functions",
     "enable_ntf": false,
 
@@ -87,6 +91,10 @@
     "" : "read_timeout: 25",
     "" : "notify_sockaddr: /tmp/notifycp",
     "" : "endmarker_sockaddr: /tmp/pfcpport",
+
+    "": "Whether to enable UPF HeartBeatTimer feature",
+    "enable_hbTimer": false,
+    "": "heart_beat_interval: 5s",
 
     "qci_qos_config": [
         {

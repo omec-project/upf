@@ -15,6 +15,17 @@ var errFlowDescAbsent = errors.New("flow description not present")
 var errFastpathDown = errors.New("fastpath down")
 var errReqRejected = errors.New("request rejected")
 
+func (pConn *PFCPConn) getHeartBeatRequest() *Request {
+	seq := pConn.getSeqNum()
+
+	hbreq := message.NewHeartbeatRequest(
+		seq,
+		ie.NewRecoveryTimeStamp(pConn.ts.local),
+		nil,
+	)
+	return newRequest(hbreq)
+}
+
 func (pConn *PFCPConn) handleHeartbeatRequest(msg message.Message) (message.Message, error) {
 	hbreq, ok := msg.(*message.HeartbeatRequest)
 	if !ok {
@@ -31,10 +42,14 @@ func (pConn *PFCPConn) handleHeartbeatRequest(msg message.Message) (message.Mess
 	return hbres, nil
 }
 
-func (pConn *PFCPConn) handleHeartbeatResponse(msg message.Message) (message.Message, error) {
-	// TODO: Handle timers
-	// TODO: Check and update remote recovery timestamp
-	return nil, nil
+func (pConn *PFCPConn) handleIncomingResponse(msg message.Message) error {
+	req, ok := pConn.pendingReqs.Load(msg.Sequence())
+
+	if ok {
+		req.(*Request).reply <- msg
+		pConn.pendingReqs.Delete(msg.Sequence())
+	}
+	return nil
 }
 
 func (pConn *PFCPConn) associationIEs() []*ie.IE {
