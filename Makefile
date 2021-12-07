@@ -74,4 +74,4 @@ test:
 	--target pfcpiface-test \
 	.;
 
-.PHONY: docker-build docker-push output pb
+.PHONY: docker-build docker-push output pb test
