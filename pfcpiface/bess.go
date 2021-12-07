@@ -9,6 +9,7 @@ import (
 	"flag"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc/credentials/insecure"
@@ -75,6 +76,8 @@ type bess struct {
 	notifyBessSocket net.Conn
 	endMarkerChan    chan []byte
 	qciQosMap        map[uint8]*QosConfigVal
+	fseidToIpMap     map[uint64]string
+	fseidMapMutex    sync.Mutex
 }
 
 func (b *bess) isConnected(accessIP *net.IP) bool {
@@ -399,7 +402,7 @@ func (b *bess) readFlowMeasurement(
 	}
 
 	if err = resp.Data.UnmarshalTo(&stats); err != nil {
-		log.Errorln(err)
+		log.Errorln(err, resp)
 		return
 	}
 
@@ -458,14 +461,24 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 				continue
 			}
 
+			// Find UE IP from FSEID.
+			b.fseidMapMutex.Lock()
+			ueIpString, found := b.fseidToIpMap[pre.Fseid]
+			b.fseidMapMutex.Unlock()
+			if !found {
+				log.Warnln("Could not find UE IP for FSEID", pre.Fseid)
+				continue
+			}
+
 			fseidString := strconv.FormatUint(post.Fseid, 10)
 			pdrString := strconv.FormatUint(post.Pdr, 10)
 			ch <- prometheus.MustNewConstMetric(
 				uc.sessionTxPackets,
 				prometheus.GaugeValue,
-				float64(post.TotalPackets),
+				float64(post.TotalPackets), // check if uint possible
 				fseidString,
 				pdrString,
+				ueIpString,
 			)
 			ch <- prometheus.MustNewConstMetric(
 				uc.sessionDroppedPackets,
@@ -473,6 +486,7 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 				float64(pre.TotalPackets-post.TotalPackets),
 				fseidString,
 				pdrString,
+				ueIpString,
 			)
 			ch <- prometheus.MustNewConstMetric(
 				uc.sessionTxBytes,
@@ -480,6 +494,7 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 				float64(post.TotalBytes),
 				fseidString,
 				pdrString,
+				ueIpString,
 			)
 			ch <- prometheus.MustNewConstSummary(
 				uc.sessionLatency,
@@ -492,6 +507,7 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 				},
 				fseidString,
 				pdrString,
+				ueIpString,
 			)
 			ch <- prometheus.MustNewConstSummary(
 				uc.sessionJitter,
@@ -504,6 +520,7 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 				},
 				fseidString,
 				pdrString,
+				ueIpString,
 			)
 		}
 	}
@@ -573,6 +590,10 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 	log.Println("bessIP ", *bessIP)
 
 	b.endMarkerChan = make(chan []byte, 1024)
+
+	b.fseidMapMutex.Lock()
+	b.fseidToIpMap = make(map[uint64]string)
+	b.fseidMapMutex.Unlock()
 
 	b.conn, err = grpc.Dial(*bessIP, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -664,6 +685,15 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 			break
 		}
 
+		// Only downlink PDRs contain the UE address.
+		if p.srcIP > 0 {
+			//log.Warnln(p.String())
+			b.fseidMapMutex.Lock()
+			b.fseidToIpMap[p.fseID] = int2ip(p.srcIP).String()
+			log.Warnln(p.fseID, " -> ", b.fseidToIpMap[p.fseID])
+			b.fseidMapMutex.Unlock()
+		}
+
 		f := &pb.WildcardMatchCommandAddArg{
 			Gate:     uint64(p.needDecap),
 			Priority: int64(p.precedence),
@@ -713,6 +743,13 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 			any *anypb.Any
 			err error
 		)
+
+		// Only downlink PDRs contain the UE address.
+		if p.srcIP > 0 {
+			b.fseidMapMutex.Lock()
+			delete(b.fseidToIpMap, p.fseID)
+			b.fseidMapMutex.Unlock()
+		}
 
 		f := &pb.WildcardMatchCommandDeleteArg{
 			Values: []*pb.FieldData{
