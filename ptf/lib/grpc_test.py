@@ -2,10 +2,13 @@
 # SPDX-License-Identifier: LicenseRef-ONF-Member-Only-1.0
 
 from collections import namedtuple
-import time
+from functools import wraps
+from pprint import pprint
+
 from ptf.base_tests import BaseTest
 import ptf.testutils as testutils
 from google.protobuf.any_pb2 import Any
+from google.protobuf.json_format import MessageToDict
 import grpc
 
 import service_pb2_grpc as pb
@@ -14,6 +17,7 @@ import module_msg_pb2 as module_msg
 import util_msg_pb2 as util_msg
 
 class GrpcTest(BaseTest):
+
     def setUp(self):
         # initialize useful variables (for readability)
         self.access = 0x1
@@ -34,6 +38,11 @@ class GrpcTest(BaseTest):
         self.gateDrop = 0x5
         self.gateUnmeter = 0x6
 
+        self.pdrs = []
+        self.fars = []
+        self.appQers = []
+        self.sessionQers = []
+
         # activate grpc connection to bess
         bess_server_addr = testutils.test_param_get("bess_upf_addr")
         self.channel = grpc.insecure_channel(target=bess_server_addr)
@@ -49,10 +58,10 @@ class GrpcTest(BaseTest):
             name = ifname + "Fast",
         )
 
-        print(self.bess_client.GetPortStats(req))
+        return self.bess_client.GetPortStats(req)
     
-    # TODO: WIP
-    def readFlowMeasurement(self, module, clear, quantiles):
+    def _readFlowMeasurement(self, module, clear, quantiles):
+        # pack request for flow measurements and send to bess
         request = module_msg.FlowMeasureCommandReadArg(
             clear=clear,
             latency_percentiles=quantiles,
@@ -66,34 +75,62 @@ class GrpcTest(BaseTest):
                 name = module,
                 cmd = "read",
                 arg = any,
-            )
+            ),
+            timeout=5,
         )
-        print(response)
 
-    # TODO: WIP
-    def sessionStats(self):
-        # XXX: something about large tables from bess.go
-        time.sleep(5)
+        # unpack response and return results
+        data = response.data
+        msg = module_msg.FlowMeasureReadResponse()
+        if data.Is(module_msg.FlowMeasureReadResponse.DESCRIPTOR):
+            data.Unpack(msg)
 
-        # Read stats
-        q = [50, 90, 99]
-        print("Pre-QoS measurement module")
-        qosStatsInResp = self.readFlowMeasurement(
+        msg = MessageToDict(msg)
+        if "statistics" in msg:
+            return msg["statistics"]
+        
+        return msg
+
+    def getSessionStats(self, q=[50, 90, 99], quiet=False):
+
+        # Pre-Qos Measurement Module
+        qosStatsInResp = self._readFlowMeasurement(
             module="preQosFlowMeasure",
             clear=True,
             quantiles=q,
         )
-        print(qosStatsInResp)
-        # postDlQosStatsResp = self.readFlowMeasurement(
-        #     module="postDLQosFlowMeasure",
-        #     clear=True,
-        #     quantiles=q,
-        # )
-        # postUlQosStatsResp = self.readFlowMeasurement(
-        #     module="postULQosFlowMeasure",
-        #     clear=True,
-        #     quantiles=q,
-        # )
+        if not quiet:
+            print("Pre-QoS measurement module:")
+            pprint(qosStatsInResp)
+            print()
+
+        # Post-Qos Downlink Measurement Module
+        postDlQosStatsResp = self._readFlowMeasurement(
+            module="postDLQosFlowMeasure",
+            clear=True,
+            quantiles=q,
+        )
+        if not quiet:
+            print("Post-QoS downlink measurement module:")
+            pprint(postDlQosStatsResp)
+            print()
+
+        # Post-Qos Uplink Measurement Module
+        postUlQosStatsResp = self._readFlowMeasurement(
+            module="postULQosFlowMeasure",
+            clear=True,
+            quantiles=q,
+        )
+        if not quiet:
+            print("Post-QoS uplink measurement module:")
+            pprint(postUlQosStatsResp)
+            print()
+
+        return {
+            "preQos":    qosStatsInResp,
+            "postDlQos": postDlQosStatsResp,
+            "postUlQos": postUlQosStatsResp,
+        }
 
     """ API for configuring BESS-UPF """
 
@@ -280,9 +317,9 @@ class GrpcTest(BaseTest):
         QER = namedtuple('QER', fields, defaults=defaults)
         return QER()
 
-    def addPDR(self, pdr):
-        for qer in pdr.qerIDList:
-            qerID = qer
+    def addPDR(self, pdr, debug=False):
+        for qerID in pdr.qerIDList:
+            qerID = qerID
             break
 
         # parse params of pdr into WildcardMatchCommandAddArg
@@ -323,15 +360,20 @@ class GrpcTest(BaseTest):
         any.Pack(f)
 
         # send client module command with method add and arg stored Any()
-        return self.bess_client.ModuleCommand(
+        response = self.bess_client.ModuleCommand(
             bess_msg.CommandRequest(
                 name = "pdrLookup",
                 cmd = "add",
                 arg = any
-            )
+            ),
+            timeout=5,
         )
+        if debug:
+            print(response)
 
-    def delPDR(self, pdr):
+        self.pdrs.append(pdr)
+
+    def delPDR(self, pdr, debug=False):
         # parse params of pdr into WildcardMatchCommandDeleteArg
         f = module_msg.WildcardMatchCommandDeleteArg(
             values = [
@@ -361,13 +403,16 @@ class GrpcTest(BaseTest):
         any.Pack(f)
 
         # send client module command with method delete and arg stored Any()
-        return self.bess_client.ModuleCommand(
+        response = self.bess_client.ModuleCommand(
             bess_msg.CommandRequest(
                 name = "pdrLookup",
                 cmd = "delete",
                 arg = any
-            )
+            ),
+            timeout=5,
         )
+        if debug:
+            print(response)
     
     def _setActionValue(self, far):
         farForwardD = 0x0
@@ -387,7 +432,7 @@ class GrpcTest(BaseTest):
         elif (far.applyAction & self.actionNotify) != 0: 
             return farNotify
 
-    def addFAR(self, far):
+    def addFAR(self, far, debug=False):
         # set action value for far action
         action = self._setActionValue(far)
 
@@ -413,15 +458,20 @@ class GrpcTest(BaseTest):
         any.Pack(f)
 
         # send client module command with method add and arg stored Any()
-        return self.bess_client.ModuleCommand(
+        response = self.bess_client.ModuleCommand(
             bess_msg.CommandRequest(
                 name = "farLookup",
                 cmd = "add",
                 arg = any
-            )
+            ),
+            timeout=5,
         )
+        if debug:
+            print(response)
 
-    def delFAR(self, far):
+        self.fars.append(far)
+
+    def delFAR(self, far, debug=False):
         # parse params of far into ExactMatchCommandDeleteArg
         f = module_msg.ExactMatchCommandDeleteArg(
             fields = [
@@ -435,13 +485,16 @@ class GrpcTest(BaseTest):
         any.Pack(f)
 
         # send client module command with method delete and arg stored Any()
-        return self.bess_client.ModuleCommand(
+        response = self.bess_client.ModuleCommand(
             bess_msg.CommandRequest(
                 name = "farLookup",
                 cmd = "delete",
                 arg = any
-            )
+            ),
+            timeout=5,
         )
+        if debug:
+            print(response)
 
     def _calcRates(self, ulGbr, ulMbr, dlGbr, dlMbr, burstDuration):
         # calculate uplink burst sizes
@@ -477,7 +530,7 @@ class GrpcTest(BaseTest):
         rates = namedtuple('rates', fields, defaults=defaults)
         return rates()
 
-    def addApplicationQER(self, qer):
+    def addApplicationQER(self, qer, debug=False):
         ''' installs uplink and downlink applicaiton QER '''
         rates = self._calcRates(
             qer.ulGbr,
@@ -514,11 +567,15 @@ class GrpcTest(BaseTest):
                     name = "appQERLookup",
                     cmd = "add",
                     arg = any
-                )
+                ),
+                timeout=5,
             )
-            print(response)
+            if debug:
+                print(response)
+        
+        self.appQers.append(qer)
 
-    def delApplicationQER(self, qer):
+    def delApplicationQER(self, qer, debug=False):
         ''' deletes uplink and downlink application QER '''
         for srcIface in [self.access, self.core]:
             f = module_msg.QosCommandDeleteArg(
@@ -536,11 +593,13 @@ class GrpcTest(BaseTest):
                     name = "appQERLookup",
                     cmd = "delete",
                     arg = any
-                )
+                ),
+                timeout=5,
             )
-            print(response)
+            if debug:
+                print(response)
 
-    def addSessionQER(self, qer):
+    def addSessionQER(self, qer, debug=False):
         ''' installs uplink and downlink session QER '''
         rates = self._calcRates(
             qer.ulGbr,
@@ -573,12 +632,16 @@ class GrpcTest(BaseTest):
                     name = "sessionQERLookup",
                     cmd = "add",
                     arg = any
-                )
+                ),
+                timeout=5,
             )
-            print(response)
+            if debug:
+                print(response)
+        
+        self.sessionQers.append(qer)
 
-    def delSessionQER(self, qer):
-        ''' deletes uplink and downlink QER '''
+    def delSessionQER(self, qer, debug=False):
+        ''' deletes uplink and downlink session QER '''
         for srcIface in [self.access, self.core]:
             f = module_msg.QosCommandDeleteArg(
                 fields =  [
@@ -594,10 +657,54 @@ class GrpcTest(BaseTest):
                     name = "sessionQERLookup",
                     cmd = "delete",
                     arg = any
-                )
+                ),
+                timeout=5,
             )
-            print(response)
+            if debug:
+                print(response)
 
     def tearDown(self):
         print("Closing gRPC channel...")
         self.channel.close()
+
+
+""" Functionality for flow cleanup after tests """
+
+def cleanupRules(test):
+    for pdr in test.pdrs:
+        test.delPDR(pdr)
+
+    for far in test.fars:
+        test.delFAR(far)
+
+    for aQer in test.appQers:
+        test.delApplicationQER(aQer)
+
+    for sQer in test.sessionQers:
+        test.delSessionQER(sQer)
+
+    return
+
+def autocleanup(f):
+    @wraps(f)
+    def handle(*args, **kwargs):
+        test = args[0]
+        assert isinstance(test, GrpcTest)
+
+        try:
+            # Clear QoS stats on BESS before test runs
+            test.getSessionStats(quiet=True)
+
+            return f(*args, **kwargs)
+
+        finally:
+            # cleanup rules for pdrs, fars, app qers and session qers
+            cleanupRules(test)
+
+            # clear lists
+            test.pdrs = []
+            test.fars = []
+            test.appQers = []
+            test.sessionQers = []
+
+    return handle

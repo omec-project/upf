@@ -6,7 +6,7 @@ from ipaddress import IPv4Address
 from pprint import pprint
 
 from trex_test import TrexTest
-from grpc_test import GrpcTest
+from grpc_test import GrpcTest, autocleanup
 
 from trex_stl_lib.api import (
     STLVM,
@@ -16,7 +16,6 @@ from trex_stl_lib.api import (
 )
 import ptf.testutils as testutils
 
-RATE = 1_000_000  # 1 Mbps
 UPF_DEST_MAC = "0c:c4:7a:19:6d:ca"
 
 # Port setup
@@ -25,104 +24,21 @@ TREX_RECEIVER_PORT = 1
 BESS_SENDER_PORT = 2
 BESS_RECEIVER_PORT = 3
 
-class PdrTest(TrexTest, GrpcTest):
+class DownlinkBaselineTest(TrexTest, GrpcTest):
+    """
+    Baseline linerate test generating downlink traffic at 1 Mpps with
+    10k UEs and asserting expected performance of BESS-UPF
+    """
+
+    @autocleanup
     def runTest(self):
-        # create basic N6 downlink pdr
-        pdr = self.createPDR(
-            srcIface = self.core,
-            dstIP = int(IPv4Address('16.0.0.1')),
-            srcIfaceMask = 0xFF,
-            dstIPMask = 0xFFFFFFFF,
-            precedence = 255,
-            fseID = 0x30000000,
-            ctrID = 0,
-            farID = self.n3,
-            qerIDList = [self.n6, 1],
-            needDecap = 0,
-        )
-
-        print("add pdr response:")
-        print(self.addPDR(pdr))
-        print()
-
-        # Testing purposes: verify bess fails to find PDR when modified
-        # pdr = pdr._replace(srcIfaceMask=0xAF)
-        print("del pdr response:")
-        print(self.delPDR(pdr))
-        print()
-
-class FarTest(TrexTest, GrpcTest):
-    def runTest(self):
-        # create basic N6 uplink FAR
-        far = self.createFAR(
-            farID = self.n6,
-            fseID = 0x30000000,
-            applyAction = self.actionForward,
-            dstIntf = self.dstCore,
-        )
-
-        print("add far response:")
-        print(self.addFAR(far))
-        print()
-
-        # Testing purposes: verify bess fails to find FAR when modified
-        # far = far._replace(fseID=0xA0000000)
-        print("del far response:")
-        print(self.delFAR(far))
-        print()
-    
-class QerAppTest(TrexTest, GrpcTest):
-    def runTest(self):
-        # configure as basic N6 UL/DL QER
-        qer = self.createQER(
-            gate = self.gateUnmeter,
-            qfi = 9,
-            qerID = self.n6,
-            fseID = 0x30000000,
-            ulGbr = 0,
-            ulMbr = 0,
-            dlGbr = 0,
-            dlMbr = 0,
-            burstDurationMs = 100,
-        )
-
-        print("add qer response:")
-        self.addApplicationQER(qer)
-        print()
-
-        print("del qer response:")
-        self.delApplicationQER(qer)
-        print()
-
-class QerSessionTest(TrexTest, GrpcTest):
-    def runTest(self):
-        # configure as basic N6 UL/DL QER
-        qer = self.createQER(
-            gate = self.gateUnmeter,
-            qfi = 0,
-            qerID = 1,
-            fseID = 0x30000000,
-            ulGbr = 0,
-            ulMbr = 0,
-            dlGbr = 0,
-            dlMbr = 0,
-            burstDurationMs = 100,
-        )
-
-        print("add qer response:")
-        self.addSessionQER(qer)
-        print()
-
-        print("del qer response:")
-        self.delSessionQER(qer)
-        print()
-
-class SimpleTest(TrexTest, GrpcTest):
-    def runTest(self):
-        # define num UE sessions, start UEIP
-        numSessions = 10
-        n3TEID = 0
+        # test specs
+        testDuration = 10
+        numSessions = 10_000 # 10k UEs
         tunnelGTPUPort = 2152
+        transmitRate = 1_000_000  # 1 Mpps
+
+        n3TEID = 0
 
         startIP = IPv4Address('16.0.0.1')
         endIP = startIP + numSessions - 1
@@ -140,7 +56,7 @@ class SimpleTest(TrexTest, GrpcTest):
                 srcIfaceMask = 0xFF,
                 dstIPMask = 0xFFFFFFFF,
                 precedence = 255,
-                fseID = n3TEID + i,
+                fseID = n3TEID + i + 1, # start from 1
                 ctrID = 0,
                 farID = i,
                 qerIDList = [self.n6, 1],
@@ -151,7 +67,7 @@ class SimpleTest(TrexTest, GrpcTest):
             # install N6 DL FAR for encap
             farDown = self.createFAR(
                 farID = i,
-                fseID = n3TEID + i,
+                fseID = n3TEID + i + 1, # start from 1
                 applyAction = self.actionForward,
                 dstIntf = self.dstAccess,
                 tunnelType = 0x1,
@@ -166,13 +82,13 @@ class SimpleTest(TrexTest, GrpcTest):
             qer = self.createQER(
                 gate = self.gateUnmeter,
                 qerID = self.n6,
-                fseID = n3TEID + i,
+                fseID = n3TEID + i + 1, # start from 1
                 qfi = 9,
                 ulGbr = 0,
                 ulMbr = 0,
                 dlGbr = 0,
                 dlMbr = 0,
-                burstDurationMs = 100,
+                burstDurationMs = 10,
             )
             self.addApplicationQER(qer)
 
@@ -190,24 +106,77 @@ class SimpleTest(TrexTest, GrpcTest):
         vm.fix_chksum()
 
         pkt = testutils.simple_udp_packet(
-            pktlen=1400,
+            pktlen=64,
             eth_dst=UPF_DEST_MAC,
             with_udp_chksum=False,
         )
         stream = STLStream(
             packet=STLPktBuilder(pkt=pkt, vm=vm),
-            mode=STLTXCont(bps_L1=RATE),
+            mode=STLTXCont(pps=transmitRate),
         )
         self.trex_client.add_streams(stream, ports=[BESS_SENDER_PORT])
 
         print("Running traffic...")
         s_time = time.time()
         self.trex_client.start(
-            ports=[BESS_SENDER_PORT], mult="1", duration=15
+            ports=[BESS_SENDER_PORT], mult="1", duration=testDuration
         )
+
+        # pull BESS stats once for per-flow latency stats
+        time.sleep(5)
+        if self.trex_client.is_traffic_active():
+            stats = self.getSessionStats(quiet=True)
+
+            preQos = stats["preQos"]
+            postDlQos = stats["postDlQos"]
+            postUlQos = stats["postUlQos"]
+
         self.trex_client.wait_on_traffic(ports=[BESS_SENDER_PORT])
         print(f"Duration was {time.time() - s_time}")
+        trex_stats = self.trex_client.get_stats()
+        pprint(trex_stats)
 
-        pprint(self.trex_client.get_stats())
+        # Verify
+        # - 99.9th %ile latency < 100 us
+        # - 99th %ile jitter < 20 us
+        # - 0% packet loss
+        sent_packets = trex_stats['total']['opackets']
+        recv_packets = trex_stats['total']['ipackets']
 
+        self.assertEqual(
+            sent_packets,
+            recv_packets,
+            f"Didn't receive all packets; sent {sent_packets}, received {recv_packets}",
+        ) 
+
+        # Assert latency on downlink fseid's
+        for fseid in postDlQos:
+            lat = fseid['latency']['percentileValuesNs']
+            jitter = fseid['jitter']['percentileValuesNs']
+
+            # assert 99.9th% latency < 100 us
+            self.assertLessEqual(
+                int(lat[2]) / 1000,
+                100,
+                f"99.9th %ile was not less than 100 us! Was {int(lat[2]) / 1000}"
+            )
+
+            # assert 99th% jitter < 20 us
+            self.assertLessEqual(
+                int(jitter[1]) / 1000,
+                20,
+                f"99th %ile jitter was not less than 20 us! Was {int(jitter[1]) / 1000}"  
+            )
+
+        return
+
+# TODO
+class UplinkBaselineTest(TrexTest, GrpcTest):
+    """
+    Baseline linerate test generating uplink traffic at 1 Mpps with
+    10k UEs and asserting expected performance of BESS-UPF
+    """
+
+    @autocleanup
+    def runTest(self):
         return
