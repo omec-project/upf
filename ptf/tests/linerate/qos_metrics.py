@@ -27,8 +27,7 @@ BESS_RECEIVER_PORT = 3
 # Test specs
 DURATION = 10
 RATE = 1_000_000  # 1 Mpps
-# UE_COUNT = 10_000 # 10k UEs
-UE_COUNT = 10
+UE_COUNT = 10_000 # 10k UEs
 GTPU_PORT = 2152
 PKT_SIZE = 64
 
@@ -46,7 +45,7 @@ class PerFlowQosMetricsTest(TrexTest, GrpcTest):
         endIP = startIP + UE_COUNT - 1
 
         accessIP = IPv4Address('10.128.13.29')
-        enbIP = IPv4Address('10.27.19.99') # arbitrary ip for nonexistent enodeB
+        enbIP = IPv4Address('10.27.19.99') # arbitrary ip for non-existent eNodeB for gtpu encap
 
         # program UPF for downlink traffic by installing PDRs and FARs
         print("Installing PDRs and FARs...")
@@ -147,7 +146,7 @@ class PerFlowQosMetricsTest(TrexTest, GrpcTest):
             f"Didn't receive all packets; sent {sent_packets}, received {recv_packets}",
         ) 
 
-        # Assert latency
+        # Assert stats per fseid in downlink QoS metrics
         for fseid in postDlQos:
             lat = fseid['latency']['percentileValuesNs']
             jitter = fseid['jitter']['percentileValuesNs']
