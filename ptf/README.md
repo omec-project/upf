@@ -14,7 +14,7 @@ speed tests, that assess UPF features at a component level. This
 "component-level" is achieved by bypassing calls to the pfcp agent, in
 favor of communicating with BESS directly via gRPC.
 
-![Routes](docs/upf-access.png)
+![Routes](docs/upf-access.svg)
 
 This figure illustrates the two options for implementing communication
 with the UPF. In this framework, we opt for **gRPC calls**, allowing
@@ -51,7 +51,7 @@ interacting with downlink traffic from 10,000 unique UEs.
 Tests require two separate machines to run, since both TRex and UPF-EPC
 use DPDK. Test workflow is as such:
 
-![Test](docs/test-run.png)
+![Test](docs/test-run.svg)
 
 In **step 1**, rules are installed onto UPF-EPC via BESS gRPC messages
 from the test framework.
