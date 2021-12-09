@@ -43,6 +43,10 @@ type Conf struct {
 	LogLevel          string           `json:"log_level"`
 	QciQosConfig      []QciQosConfig   `json:"qci_qos_config"`
 	SliceMeterConfig  SliceMeterConfig `json:"slice_rate_limit_config"`
+	MaxReqRetries     uint8            `json:"max_req_retries"`
+	RespTimeout       string           `json:"resp_timeout"`
+	EnableHBTimer     bool             `json:"enable_hbTimer"`
+	HeartBeatInterval string           `json:"heart_beat_interval"`
 }
 
 // QciQosConfig : Qos configured attributes.

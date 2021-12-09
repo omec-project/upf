@@ -61,6 +61,43 @@ type PFCPConn struct {
 	shutdown chan struct{}
 
 	metrics.InstrumentPFCP
+	hbCtxCancel context.CancelFunc
+	pendingReqs sync.Map
+}
+
+func (pConn *PFCPConn) startHeartBeatMonitor() {
+	// Stop HeartBeat routine if already running
+	if pConn.hbCtxCancel != nil {
+		pConn.hbCtxCancel()
+		pConn.hbCtxCancel = nil
+	}
+
+	hbCtx, hbCancel := context.WithCancel(pConn.ctx)
+	pConn.hbCtxCancel = hbCancel
+
+	log.Infoln("Starting Heartbeat timer")
+	heartBeatTimer := time.NewTimer(pConn.upf.hbInterval)
+
+	for {
+		select {
+		case <-hbCtx.Done():
+			log.Infoln("Cancel HeartBeat Timer", pConn.RemoteAddr().String())
+			return
+
+		case <-heartBeatTimer.C:
+			log.Traceln("HeartBeat Interval Timer Expired", pConn.RemoteAddr().String())
+
+			r := pConn.getHeartBeatRequest()
+
+			reply, timeout := pConn.sendPFCPRequestMessage(r)
+
+			if reply != nil {
+				heartBeatTimer = time.NewTimer(pConn.upf.hbInterval)
+			} else if timeout {
+				pConn.Shutdown()
+			}
+		}
+	}
 }
 
 // NewPFCPConn creates a connected UDP socket to the rAddr PFCP peer specified.
@@ -90,6 +127,7 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 		done:           node.pConnDone,
 		shutdown:       make(chan struct{}),
 		InstrumentPFCP: node.metrics,
+		hbCtxCancel:    nil,
 	}
 
 	p.setLocalNodeID(node.upf.nodeID)
@@ -158,6 +196,7 @@ func (pConn *PFCPConn) Serve() {
 		case <-pConn.ctx.Done():
 			pConn.Shutdown()
 			return
+
 		case <-pConn.shutdown:
 			return
 		}
@@ -167,6 +206,11 @@ func (pConn *PFCPConn) Serve() {
 // Shutdown stops connection backing PFCPConn.
 func (pConn *PFCPConn) Shutdown() error {
 	close(pConn.shutdown)
+
+	if pConn.hbCtxCancel != nil {
+		pConn.hbCtxCancel()
+		pConn.hbCtxCancel = nil
+	}
 
 	// Cleanup all sessions in this conn
 	for seid, sess := range pConn.sessions {
