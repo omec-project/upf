@@ -12,6 +12,7 @@ ARG UNITTEST_XML_REPORTING_VER=3.0.4
 ARG PROTOBUF_VER=3.12
 ARG GRPC_VER=1.26
 
+# Install dependencies for general PTF test definitions
 FROM ubuntu:20.04 as ptf-deps
 
 ARG SCAPY_VER
@@ -36,14 +37,14 @@ RUN apt update && \
     apt install -y $RUNTIME_DEPS
 RUN pip3 install --no-cache-dir --root /python_output $PIP_DEPS
 
-# Install TRex deps
+# Install TRex traffic gen and library for TRex API
 FROM alpine:3.12.1 as trex-builder
 ARG TREX_VER
 ARG TREX_EXT_LIBS
 ARG TREX_LIBS
-# Install Trex library
+
 ENV TREX_SCRIPT_DIR=/trex-core-${TREX_VER}/scripts
-# RUN apt update && apt install -y wget
+
 RUN wget https://github.com/stratum/trex-core/archive/${TREX_VER}.zip && \
     unzip -qq ${TREX_VER}.zip && \
     mkdir -p /output/${TREX_EXT_LIBS} && \
@@ -52,6 +53,7 @@ RUN wget https://github.com/stratum/trex-core/archive/${TREX_VER}.zip && \
     cp -r ${TREX_SCRIPT_DIR}/external_libs/* /output/${TREX_EXT_LIBS} && \
     cp -r ${TREX_SCRIPT_DIR}/automation/trex_control_plane/stf/trex_stf_lib /output/${TREX_LIBS}
 
+# Synthesize all dependencies for runtime
 FROM ubuntu:20.04
 
 ARG TREX_EXT_LIBS
@@ -79,9 +81,11 @@ RUN pip3 install --no-cache-dir scipy==1.5.4 numpy==1.19.4 matplotlib==3.3.3 pyy
 
 ENV TREX_EXT_LIBS=${TREX_EXT_LIBS}
 ENV PYTHONPATH=${TREX_EXT_LIBS}:${TREX_LIBS}
+
 COPY --from=trex-builder /output /
 COPY --from=ptf-deps /python_output /
-# Install custom scapy version from TRex
+
+# Install custom scapy version from TRex so PTF tests can access certain scapy features
 RUN cd ${TREX_EXT_LIBS}/scapy-${SCAPY_VER}/ && python3 setup.py install
 RUN ldconfig
 

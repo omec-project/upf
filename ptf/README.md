@@ -70,25 +70,19 @@ To install TRex onto your server, please refer to the [TRex installation
 guide](https://trex-tgn.cisco.com/trex/doc/trex_manual.html#_download_and_installation)
 
 ### Steps
-1. In `/upf-epc/`, generate proto files in Python for BESS gRPC
-communication
+1. Generate Python protobuf files and PTF test image build dependencies
 ```console
-make py-pb
-cd ptf
+$ make build
 ```
-2. Build dependencies for the PTF test image
+2. Run PTF tests using the `run_tests` script:
 ```console
-make build
-```
-3. Run PTF tests using the `run_tests` script:
-```console
-./run_tests -t [test-dir] [optional: filename/filename.test_case]
+$ ./run_tests -t [test-dir] [optional: filename/filename.test_case]
 ```
 To run all test cases in the `unary/` directory:
 ```console
-./run_tests -t tests/unary
+$ ./run_tests -t tests/unary
 ```
 To run a specific test case:
 ```console
-./run_tests -t tests/linerate/ baseline.DownlinkPerformanceBaselineTest
+$ ./run_tests -t tests/linerate/ baseline.DownlinkPerformanceBaselineTest
 ```
