@@ -414,7 +414,10 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 		return sendError(errors.New("write to FastPath failed"))
 	}
 
-	releaseAllocatedIPs(upf.ippool, session)
+	if err := upf.ippool.DeallocIP(session.localSEID); err != nil {
+		return sendError(errors.New("session IP dealloc failed"))
+	}
+
 	/* delete sessionRecord */
 	pConn.RemoveSession(localSEID)
 

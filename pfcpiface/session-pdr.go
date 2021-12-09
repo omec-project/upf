@@ -12,21 +12,6 @@ import (
 	"github.com/wmnsk/go-pfcp/message"
 )
 
-// Release allocated IPs.
-func releaseAllocatedIPs(ippool *IPPool, session *PFCPSession) {
-	log.Println("release allocated IPs")
-
-	for _, pdr := range session.pdrs {
-		if (pdr.allocIPFlag) && (pdr.srcIface == core) {
-			var ueIP net.IP = int2ip(pdr.dstIP)
-
-			log.Println("pdrID : ", pdr.pdrID, ", ueIP : ", ueIP.String())
-
-			ippool.DeallocIP(ueIP)
-		}
-	}
-}
-
 func addPdrInfo(msg *message.SessionEstablishmentResponse,
 	session *PFCPSession) {
 	log.Println("Add PDRs with UPF alloc IPs to Establishment response")
