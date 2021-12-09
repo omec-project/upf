@@ -1,5 +1,5 @@
-# Copyright 2021-present Open Networking Foundation
-# SPDX-License-Identifier: LicenseRef-ONF-Member-Only-1.0
+# SPDX-License-Identifier: Apache-2.0
+# Copyright(c) 2021 Open Networking Foundation
 
 import time
 from ipaddress import IPv4Address

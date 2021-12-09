@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
-# Copyright 2013-2018 Barefoot Networks, Inc.
-# Copyright 2018-present Open Networking Foundation
-# SPDX-License-Identifier: LicenseRef-ONF-Member-Only-1.0 AND Apache-2.0
+# SPDX-License-Identifier: Apache-2.0
+# Copyright(c) 2021 Open Networking Foundation
 
 import argparse
 import logging
