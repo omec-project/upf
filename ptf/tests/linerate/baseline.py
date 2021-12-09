@@ -7,12 +7,14 @@ from pprint import pprint
 
 from trex_test import TrexTest
 from grpc_test import GrpcTest, autocleanup
+from trex_utils import *
 
 from trex_stl_lib.api import (
     STLVM,
     STLPktBuilder,
     STLStream,
     STLTXCont,
+    STLFlowLatencyStats,
 )
 import ptf.testutils as testutils
 
@@ -24,31 +26,33 @@ TREX_RECEIVER_PORT = 1
 BESS_SENDER_PORT = 2
 BESS_RECEIVER_PORT = 3
 
-class DownlinkBaselineTest(TrexTest, GrpcTest):
+# test specs
+DURATION = 10
+RATE = 250_000  # 250 Kpps
+UE_COUNT = 10_000 # 10k UEs
+GTPU_PORT = 2152
+PKT_SIZE = 64
+
+class DownlinkPerformanceBaselineTest(TrexTest, GrpcTest):
     """
-    Baseline linerate test generating downlink traffic at 1 Mpps with
-    10k UEs and asserting expected performance of BESS-UPF
+    Performance baseline linerate test generating downlink traffic at 1 Mpps
+    with 10k UE IPs, asserting expected performance of BESS-UPF as reported by
+    TRex traffic generator.
     """
 
     @autocleanup
     def runTest(self):
-        # test specs
-        testDuration = 10
-        numSessions = 10_000 # 10k UEs
-        tunnelGTPUPort = 2152
-        transmitRate = 1_000_000  # 1 Mpps
-
         n3TEID = 0
 
         startIP = IPv4Address('16.0.0.1')
-        endIP = startIP + numSessions - 1
+        endIP = startIP + UE_COUNT - 1
 
         accessIP = IPv4Address('10.128.13.29')
         enbIP = IPv4Address('10.27.19.99') # arbitrary ip for nonexistent enodeB
 
         # program UPF for downlink traffic by installing PDRs and FARs
         print("Installing PDRs and FARs...")
-        for i in range(numSessions):
+        for i in range(UE_COUNT):
             # install N6 DL PDR to match UE dst IP
             pdrDown = self.createPDR(
                 srcIface = self.core,
@@ -74,7 +78,7 @@ class DownlinkBaselineTest(TrexTest, GrpcTest):
                 tunnelIP4Src = int(accessIP),
                 tunnelIP4Dst = int(enbIP), # only one eNB to send to downlink
                 tunnelTEID = 0,
-                tunnelPort = tunnelGTPUPort,
+                tunnelPort = GTPU_PORT,
             )
             self.addFAR(farDown)
 
@@ -106,72 +110,59 @@ class DownlinkBaselineTest(TrexTest, GrpcTest):
         vm.fix_chksum()
 
         pkt = testutils.simple_udp_packet(
-            pktlen=64,
+            pktlen=PKT_SIZE,
             eth_dst=UPF_DEST_MAC,
             with_udp_chksum=False,
         )
         stream = STLStream(
             packet=STLPktBuilder(pkt=pkt, vm=vm),
-            mode=STLTXCont(pps=transmitRate),
+            mode=STLTXCont(pps=RATE),
+            flow_stats=STLFlowLatencyStats(pg_id=0),
         )
         self.trex_client.add_streams(stream, ports=[BESS_SENDER_PORT])
 
         print("Running traffic...")
         s_time = time.time()
         self.trex_client.start(
-            ports=[BESS_SENDER_PORT], mult="1", duration=testDuration
+            ports=[BESS_SENDER_PORT],
+            mult="1",
+            duration=DURATION,
         )
-
-        # pull BESS stats once for per-flow latency stats
-        time.sleep(5)
-        if self.trex_client.is_traffic_active():
-            stats = self.getSessionStats(quiet=True)
-
-            preQos = stats["preQos"]
-            postDlQos = stats["postDlQos"]
-            postUlQos = stats["postUlQos"]
 
         self.trex_client.wait_on_traffic(ports=[BESS_SENDER_PORT])
         print(f"Duration was {time.time() - s_time}")
+
         trex_stats = self.trex_client.get_stats()
-        pprint(trex_stats)
+        lat_stats = get_latency_stats(0, trex_stats)
+        flow_stats = get_flow_stats(0, trex_stats)
 
-        # Verify
-        # - 99.9th %ile latency < 100 us
-        # - 99th %ile jitter < 20 us
-        # - 0% packet loss
-        sent_packets = trex_stats['total']['opackets']
-        recv_packets = trex_stats['total']['ipackets']
+        # Verify test results met baseline performance expectations
 
+        # 0% packet loss
         self.assertEqual(
-            sent_packets,
-            recv_packets,
-            f"Didn't receive all packets; sent {sent_packets}, received {recv_packets}",
+            flow_stats.tx_packets,
+            flow_stats.rx_packets,
+            f"Didn't receive all packets; sent {flow_stats.tx_packets}, received {flow_stats.rx_packets}",
         ) 
 
-        # Assert latency on downlink fseid's
-        for fseid in postDlQos:
-            lat = fseid['latency']['percentileValuesNs']
-            jitter = fseid['jitter']['percentileValuesNs']
+        # 99.9th %ile latency < 100 us
+        self.assertLessEqual(
+            lat_stats.percentile_99_9,
+            100,
+            f"99.9th %ile latency was higher than 100 us! Was {lat_stats.percentile_99_9}",
+        )
 
-            # assert 99.9th% latency < 100 us
-            self.assertLessEqual(
-                int(lat[2]) / 1000,
-                100,
-                f"99.9th %ile was not less than 100 us! Was {int(lat[2]) / 1000}"
-            )
-
-            # assert 99th% jitter < 20 us
-            self.assertLessEqual(
-                int(jitter[1]) / 1000,
-                20,
-                f"99th %ile jitter was not less than 20 us! Was {int(jitter[1]) / 1000}"  
-            )
+        # jitter < 20 us (trex doesn't give jitter histogram)
+        self.assertLessEqual(
+            lat_stats.jitter,
+            20,
+            f"Jitter was higher than 20 us! Was {lat_stats.jitter}",
+        )
 
         return
 
 # TODO
-class UplinkBaselineTest(TrexTest, GrpcTest):
+class UplinkPerformanceBaselineTest(TrexTest, GrpcTest):
     """
     Baseline linerate test generating uplink traffic at 1 Mpps with
     10k UEs and asserting expected performance of BESS-UPF

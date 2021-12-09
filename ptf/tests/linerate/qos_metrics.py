@@ -26,15 +26,15 @@ BESS_RECEIVER_PORT = 3
 
 # Test specs
 DURATION = 10
-RATE = 1_000_000  # 1 Mpps
+RATE = 250_000  # 250 Kpps
 UE_COUNT = 10_000 # 10k UEs
 GTPU_PORT = 2152
 PKT_SIZE = 64
 
 class PerFlowQosMetricsTest(TrexTest, GrpcTest):
     """
-    Generates 1 Mpps downlink traffic for 10k UEs (flows). Verifies
-    BESS-UPF reports baseline latency, jitter, packet loss and tput
+    Generates 1 Mpps downlink traffic for 10k dest UE IP addresses. Uses
+    BESS-UPF QoS metrics to verify baseline packet loss, latency, and jitter
     results.
     """
     @autocleanup
@@ -126,7 +126,7 @@ class PerFlowQosMetricsTest(TrexTest, GrpcTest):
         # pull session stats once sometime while traffic is running
         time.sleep(DURATION - 5)
         if self.trex_client.is_traffic_active():
-            stats = self.getSessionStats(q=[90, 99, 99.9], quiet=False)
+            stats = self.getSessionStats(q=[90, 99, 99.9], quiet=True)
 
             preQos = stats["preQos"]
             postDlQos = stats["postDlQos"]
