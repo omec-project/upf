@@ -175,10 +175,14 @@ tables {
     id: 20045386
   }
   action_refs {
-    id: 21257015
+    id: 18601841
+  }
+  action_refs {
+    id: 28401267
     annotations: "@defaultonly"
     scope: DEFAULT_ONLY
   }
+  const_default_action_id: 28401267
   size: 1024
 }
 tables {
@@ -337,6 +341,13 @@ actions {
 }
 actions {
   preamble {
+    id: 28401267
+    name: "PreQosPipe.do_drop"
+    alias: "do_drop"
+  }
+}
+actions {
+  preamble {
     id: 18820761
     name: "PreQosPipe.set_params_uplink"
     alias: "set_params_uplink"
@@ -353,10 +364,12 @@ actions {
     name: "tunnel_peer_id"
     bitwidth: 8
   }
-  params {
-    id: 2
-    name: "needs_buffering"
-    bitwidth: 1
+}
+actions {
+  preamble {
+    id: 18601841
+    name: "PreQosPipe.set_params_buffering"
+    alias: "set_params_buffering"
   }
 }
 actions {
