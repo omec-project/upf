@@ -186,19 +186,27 @@ void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 
     // meter if ogate is 0
     if (ogate == METER_GATE) {
-      uint64_t time = rte_rdtsc();
-      uint32_t pkt_len = pkt->total_len() - val[j]->deduct_len;
-      uint8_t color = rte_meter_trtcm_color_blind_check(&val[j]->m, val[j]->p,
-                                                        time, pkt_len);
-
-      DLOG(INFO) << "color : " << color << std::endl;
-      // update ogate to color specific gate
-      if (color == RTE_COLOR_GREEN) {
+      if (val[j]->p->cir_period == 0 || val[j]->p->pir_period == 0) {
+        // FIXME: https://github.com/omec-project/upf-epc/issues/376
+        DLOG(INFO) << "Detected pir/cir_period zero in rte_meter_trtcm_profile,"
+                   << " BUG? Setting METER_GREEN_GATE to prevent crash"
+                   << std::endl;
         ogate = METER_GREEN_GATE;
-      } else if (color == RTE_COLOR_YELLOW) {
-        ogate = METER_YELLOW_GATE;
-      } else if (color == RTE_COLOR_RED) {
-        ogate = METER_RED_GATE;
+      } else {
+        uint64_t time = rte_rdtsc();
+        uint32_t pkt_len = pkt->total_len() - val[j]->deduct_len;
+        uint8_t color = rte_meter_trtcm_color_blind_check(&val[j]->m, val[j]->p,
+                                                          time, pkt_len);
+
+        DLOG(INFO) << "color : " << color << std::endl;
+        // update ogate to color specific gate
+        if (color == RTE_COLOR_GREEN) {
+          ogate = METER_GREEN_GATE;
+        } else if (color == RTE_COLOR_YELLOW) {
+          ogate = METER_YELLOW_GATE;
+        } else if (color == RTE_COLOR_RED) {
+          ogate = METER_RED_GATE;
+        }
       }
     }
 
