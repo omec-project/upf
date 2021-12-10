@@ -74,6 +74,16 @@ func (t *P4rtTranslator) getTableByID(tableID uint32) (*p4ConfigV1.Table, error)
 	return nil, fmt.Errorf("table with ID %v not found", tableID)
 }
 
+func (t *P4rtTranslator) getTableIDByName(name string) (uint32, error) {
+	for _, table := range t.p4Info.Tables {
+		if table.Preamble.Name == name {
+			return table.Preamble.Id, nil
+		}
+	}
+
+	return 0, fmt.Errorf("table with name %v not found", name)
+}
+
 func (t *P4rtTranslator) getCounterByName(name string) (*p4ConfigV1.Counter, error) {
 	for _, ctr := range t.p4Info.Counters {
 		if ctr.Preamble.Name == name {
@@ -179,6 +189,7 @@ func (t *P4rtTranslator) withTernaryMatchField(entry *p4.TableEntry, name string
 		"entry": entry.String(),
 		"field name": name ,
 	})
+	ternaryFieldLog.Trace("Adding ternary match field to the entry")
 
 	if entry.TableId == 0 {
 		return fmt.Errorf("no table name for entry defined, set table name before adding match fields")
@@ -209,8 +220,18 @@ func (t *P4rtTranslator) withTernaryMatchField(entry *p4.TableEntry, name string
 		return fmt.Errorf("failed to find match field name: %s", name)
 	}
 
+	matchField := &p4.FieldMatch{
+		FieldId: p4MatchField.Id,
+	}
 
-	// FIXME: complete impl
+	ternaryMatch := &p4.FieldMatch_Ternary{
+		Value: byteVal,
+		Mask:  byteMask,
+	}
+
+	matchField.FieldMatchType = &p4.FieldMatch_Ternary_{Ternary: ternaryMatch}
+
+	entry.Match = append(entry.Match, matchField)
 	return nil
 }
 
@@ -308,6 +329,10 @@ func (t *P4rtTranslator) BuildSessionsTableEntry(pdr pdr, tunnelPeerID uint8, ne
 	})
 	builderLog.Trace("Building P4rt table entry for Sessions table")
 
+	if pdr.srcIface == 0 {
+		return nil, fmt.Errorf("invalid PDR received with source interface = %v", pdr.srcIface)
+	}
+
 	tableID := t.tableID("PreQosPipe.sessions")
 
 	entry := &p4.TableEntry{
@@ -316,15 +341,20 @@ func (t *P4rtTranslator) BuildSessionsTableEntry(pdr pdr, tunnelPeerID uint8, ne
 		Priority: DefaultPriority,
 	}
 
+	if err := t.withExactMatchField(entry, "src_iface", pdr.srcIface); err != nil {
+		return nil, err
+	}
+
 	var action *p4.Action
 	if pdr.srcIface == access {
 		if err := t.withExactMatchField(entry, "ipv4_dst", pdr.tunnelIP4Dst); err != nil {
 			return nil, err
 		}
 
-		if err := t.withTernaryMatchField(entry, "ipv4_dst", pdr.tunnelIP4Dst, pdr.tunnelIP4DstMask); err != nil {
+		if err := t.withTernaryMatchField(entry, "teid", pdr.tunnelTEID, pdr.tunnelTEIDMask); err != nil {
 			return nil, err
 		}
+
 		action = &p4.Action{
 			ActionId: t.actionID("PreQosPipe.set_params_uplink"),
 		}
@@ -333,14 +363,17 @@ func (t *P4rtTranslator) BuildSessionsTableEntry(pdr pdr, tunnelPeerID uint8, ne
 			return nil, err
 		}
 
-		action = &p4.Action{
-			ActionId: t.actionID("PreQosPipe.set_params_downlink"),
-		}
-		if err := t.withActionParam(action, "tunnel_peer_id", tunnelPeerID); err != nil {
-			return nil, err
-		}
-		if err := t.withActionParam(action, "needs_buffering", needsBuffering); err != nil {
-			return nil, err
+		if needsBuffering {
+			action = &p4.Action{
+				ActionId: t.actionID("PreQosPipe.set_params_buffering"),
+			}
+		} else {
+			action = &p4.Action{
+				ActionId: t.actionID("PreQosPipe.set_params_downlink"),
+			}
+			if err := t.withActionParam(action, "tunnel_peer_id", tunnelPeerID); err != nil {
+				return nil, err
+			}
 		}
 	} else {
 		return nil, fmt.Errorf("unknown source interface type of PDR: %v", pdr.srcIface)
@@ -360,6 +393,10 @@ func (t *P4rtTranslator) BuildTerminationsTableEntry(pdr pdr, relatedFAR far, tc
 		"far": relatedFAR,
 	})
 	builderLog.Debug("Building P4rt table entry for UP4 Terminations table")
+
+	if pdr.srcIface == 0 {
+		return nil, fmt.Errorf("invalid PDR received with source interface = %v", pdr.srcIface)
+	}
 
 	tableID := t.tableID("PreQosPipe.terminations")
 	entry := &p4.TableEntry{
@@ -424,6 +461,10 @@ func (t *P4rtTranslator) BuildTerminationsTableEntry(pdr pdr, relatedFAR far, tc
 
 	if err := t.withActionParam(action, "tc", tc); err != nil {
 		return nil, err
+	}
+
+	entry.Action = &p4.TableAction{
+		Type: &p4.TableAction_Action{Action: action},
 	}
 
 	builderLog.WithField("entry", entry).Debug("Built P4rt table entry for Terminations table")

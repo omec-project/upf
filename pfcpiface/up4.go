@@ -98,12 +98,15 @@ func (up4 *UP4) getAccessIP() (*net.IPNet, error) {
 		return nil, fmt.Errorf("failed to get Access IP from UP4: %v", err)
 	}
 
-	resp, err := up4.p4client.ReadTableEntry(interfaceTableEntry, 0)
+	resp, err := up4.p4client.ReadTableEntry(interfaceTableEntry)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Access IP from UP4: %v", err)
 	}
 
 	accessIP, err := up4.p4RtTranslator.ParseAccessIPFromReadInterfaceTableResponse(resp)
+	if err != nil {
+		return nil, err
+	}
 
 	return accessIP, nil
 }
@@ -251,6 +254,7 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	up4.deviceID = 1
 	up4.timeout = 30
 	up4.enableEndMarker = conf.EnableEndMarker
+	up4.tunnelPeerIDs = make(map[tunnelParams]uint8)
 	up4.counters = make([]counter, 2)
 	for i := range up4.counters {
 		// initialize allocated counters map
@@ -272,6 +276,40 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	u.accessIP = up4.accessIP.IP
 }
 
+func (up4 *UP4) clearAllTables() error {
+	sessionsTableID, err := up4.p4RtTranslator.getTableIDByName("PreQosPipe.sessions")
+	if err != nil {
+		return err
+	}
+
+	err = up4.p4client.ClearTable(sessionsTableID)
+	if err != nil {
+		return err
+	}
+
+	terminationsTableID, err := up4.p4RtTranslator.getTableIDByName("PreQosPipe.terminations")
+	if err != nil {
+		return err
+	}
+
+	err = up4.p4client.ClearTable(terminationsTableID)
+	if err != nil {
+		return err
+	}
+
+	gtpTunnelPeersTableID, err := up4.p4RtTranslator.getTableIDByName("PreQosPipe.tunnel_peers")
+	if err != nil {
+		return err
+	}
+
+	err = up4.p4client.ClearTable(gtpTunnelPeersTableID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (up4 *UP4) tryConnect() error {
 	err := up4.setupChannel()
 	if err != nil {
@@ -280,16 +318,10 @@ func (up4 *UP4) tryConnect() error {
 
 	up4.p4RtTranslator = newP4RtTranslator(up4.p4client.P4Info)
 
-	// TODO: clear tables at startup
-	//errin = up4.p4client.ClearPdrTable()
-	//if errin != nil {
-	//	log.Println("clear PDR table failed : ", errin)
-	//}
-	//
-	//errin = up4.p4client.ClearFarTable()
-	//if errin != nil {
-	//	log.Println("clear FAR table failed : ", errin)
-	//}
+	err = up4.clearAllTables()
+	if err != nil {
+		log.Warningf("failed to clear tables: %v", err)
+	}
 
 	err = up4.initAllCounters()
 	if err != nil {
@@ -337,7 +369,39 @@ func findRelatedFAR(pdr pdr, fars []far) (far, error) {
 // TODO: implement it
 // Returns error if we reach maximum supported GTP Tunnel Peers (254 base stations + 1 dbuf).
 func (up4 *UP4) allocateGTPTunnelPeerID(params tunnelParams) (uint8, error) {
-	return 1, nil
+	return 2, nil
+}
+
+// This method is used to "fix" uplink PDRs, for which the UE addresss is not provided by control plane.
+// We need UE address in the uplink PDRs because we use it as "session_id" in the P4 pipeline.
+// TODO: this is a temporary solution. Remove it once
+func getPDRsWithFixedUEAddressForUplinkPDRs(allPDRs []pdr) []pdr {
+	getDownlinkPDRByFSEID := func(pdrs []pdr, fseid uint64) (pdr, error) {
+		for _, p := range pdrs {
+			// downlink
+			if p.srcIface == core {
+				if p.fseID == fseid {
+					return p, nil
+				}
+			}
+		}
+		return pdr{}, fmt.Errorf("failed to find downlink PDR with FSEID %v", fseid)
+	}
+
+	newPDRs := make([]pdr, len(allPDRs))
+	for _, p := range allPDRs {
+		// uplink
+		if p.srcIface == access {
+			dlPDR, err := getDownlinkPDRByFSEID(allPDRs, p.fseID)
+			if err == nil {
+				p.srcIP = dlPDR.dstIP
+			}
+			log.Errorf("failed to find downlink PDR to get UE address: %v", err)
+		}
+		newPDRs = append(newPDRs, p)
+	}
+
+	return newPDRs
 }
 
 func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, updated PacketForwardingRules) uint8 {
@@ -412,20 +476,17 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 				allocatedTunnelPeerID, err := up4.allocateGTPTunnelPeerID(tunnelParams)
 				if err != nil {
 					log.Error("failed to allocate GTP tunnel peer ID based on FAR: ", err)
-					// TODO: not sure whether to continue of return PFCP error
 					continue
 				}
 
 				gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(allocatedTunnelPeerID, far)
 				if err != nil {
 					log.Errorf("failed to build GTP Tunnel Peers table entry from FAR: %v", err)
-					// TODO: not sure whether to continue of return PFCP error
 					continue
 				}
 
 				if err := up4.p4client.WriteTableEntries(gtpTunnelPeerEntry); err != nil {
 					log.Errorf("failed to write GTP Tunnel Peers table entry to UP4: %v", err)
-					// TODO: not sure whether to continue of return PFCP error
 					continue
 				}
 
@@ -434,6 +495,7 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 		}
 	}
 
+	pdrs = getPDRsWithFixedUEAddressForUplinkPDRs(pdrs)
 	for _, pdr := range pdrs {
 		pdrLog := log.WithFields(log.Fields{
 			"pdr": pdr,
@@ -446,8 +508,20 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 			pdrLog.Warning("no related FAR for PDR found: ", err)
 			continue
 		}
+		log.Println("Related FAR:")
+		log.Println(far)
 
-		sessionsEntry, err := up4.p4RtTranslator.BuildSessionsTableEntry(pdr, 0, far.Buffers())
+		tunnelParams := tunnelParams{
+			tunnelIP4Src: far.tunnelIP4Src,
+			tunnelIP4Dst: far.tunnelIP4Dst,
+			tunnelPort:   far.tunnelPort,
+		}
+		tunnelPeerID, exists := up4.tunnelPeerIDs[tunnelParams]
+		if !exists {
+			pdrLog.Warn("related FAR does not include tunnel params, failed to find allocated GTP tunnel peer ID")
+		}
+
+		sessionsEntry, err := up4.p4RtTranslator.BuildSessionsTableEntry(pdr, tunnelPeerID, far.Buffers())
 		if err != nil {
 			log.Error("failed to build P4rt table entry for Sessions table: ", err)
 			continue

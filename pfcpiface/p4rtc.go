@@ -30,13 +30,11 @@ type P4DeviceConfig []byte
 
 const invalidID = 0
 
-// TODO: use iota
 // Table Entry Function Type.
 const (
 	FunctionTypeInsert uint8  = 1               // Insert table Entry Function
 	FunctionTypeUpdate uint8  = 2               // Update table Entry Function
 	FunctionTypeDelete uint8  = 3               // Delete table Entry Function
-	InterfaceTypeStr   string = "InterfaceType" // Interface Type field name"
 )
 
 // P4rtClient ... P4 Runtime client object.
@@ -147,77 +145,21 @@ func (c *P4rtClient) Init(reportNotifyChan chan<- uint64) (err error) {
 	return
 }
 
-// FIXME: write functions to read counters
-//func (c *P4rtClient) getCounterValue(entity *p4.Entity, ce *IntfCounterEntry) error {
-//	entry := entity.GetCounterEntry()
-//	index := uint64(entry.GetIndex().Index)
-//	byteCount := uint64(entry.GetData().ByteCount)
-//	pktCount := uint64(entry.GetData().PacketCount)
-//	ce.ByteCount[index] = byteCount
-//	ce.PktCount[index] = pktCount
-//	log.Traceln("index , bytecount, pktcount ", index, byteCount, pktCount)
-//
-//	return nil
-//}
-//
-//// ReadCounter ... Read Counter entry.
-//func (c *P4rtClient) ReadCounter(ce *IntfCounterEntry) error {
-//	log.Println("ReadCounter ID : ", ce.CounterID)
-//
-//	readRes, err := c.ReadCounterEntry(ce)
-//	if err != nil {
-//		log.Println("Read Counters failed ", err)
-//		return err
-//	}
-//
-//	log.Traceln(proto.MarshalTextString(readRes))
-//
-//	for _, ent := range readRes.GetEntities() {
-//		err := c.getCounterValue(ent, ce)
-//		if err != nil {
-//			log.Println("getCounterValue failed ", err)
-//			continue
-//		}
-//	}
-//
-//	return nil
-//}
-//
-//// ReadCounterEntry .. Read counter Entry.
-//func (c *P4rtClient) ReadCounterEntry(ce *IntfCounterEntry) (*p4.ReadResponse, error) {
-//	log.Traceln("Read Counter Entry")
-//
-//	var (
-//		index    p4.Index
-//		entry    p4.CounterEntry
-//		entity   p4.Entity
-//		ctrEntry p4.Entity_CounterEntry
-//	)
-//
-//	index.Index = int64(ce.Index)
-//	entry.CounterId = uint32(ce.CounterID)
-//	// entry.Index = &index
-//	ctrEntry.CounterEntry = &entry
-//	entity.Entity = &ctrEntry
-//	/*
-//		index := &p4.Index{
-//			Index: int64(ce.Index),
-//		}
-//		entry := &p4.CounterEntry{
-//			CounterId: uint32(ce.CounterID),
-//			Index:     index,
-//		}
-//
-//		entity := &p4.Entity{
-//			Entity: &p4.Entity_CounterEntry{CounterEntry: entry},
-//		}*/
-//	log.Traceln(proto.MarshalTextString(&entity))
-//
-//	return c.ReadReq(&entity)
-//}
+// ReadCounterEntry .. Read counter Entry.
+func (c *P4rtClient) ReadCounterEntry(entry *p4.CounterEntry) (*p4.ReadResponse, error) {
+	log.Traceln("Read Counter Entry ", entry.CounterId)
+
+	entity := &p4.Entity{
+		Entity: &p4.Entity_CounterEntry{CounterEntry: entry},
+	}
+
+	log.Traceln(proto.MarshalTextString(entity))
+
+	return c.ReadReq(entity)
+}
 
 // ReadTableEntry ... Read table Entry.
-func (c *P4rtClient) ReadTableEntry(entry *p4.TableEntry, prio int32) (*p4.ReadResponse, error) {
+func (c *P4rtClient) ReadTableEntry(entry *p4.TableEntry) (*p4.ReadResponse, error) {
 	log.Println("Read Table Entry for Table ", entry.TableId)
 
 	entity := &p4.Entity{
@@ -270,6 +212,34 @@ func (c *P4rtClient) ReadReq(entity *p4.Entity) (*p4.ReadResponse, error) {
 	}
 
 	return nil, err
+}
+
+func (c *P4rtClient) ClearTable(tableID uint32) error {
+	log.Traceln("Clearing P4 table: ", tableID)
+
+	entry := &p4.TableEntry{
+		TableId:  tableID,
+		Priority: DefaultPriority,
+	}
+
+	readRes, err := c.ReadTableEntry(entry)
+	if err != nil {
+		return err
+	}
+
+	updates := make([]*p4.Update, len(readRes.GetEntities()))
+
+	for _, entity := range readRes.GetEntities() {
+		updateType := p4.Update_DELETE
+		update := &p4.Update{
+			Type:   updateType,
+			Entity: entity,
+		}
+
+		updates = append(updates, update)
+	}
+
+	return c.WriteBatchReq(updates)
 }
 
 // InsertTableEntry .. Insert table Entry.
