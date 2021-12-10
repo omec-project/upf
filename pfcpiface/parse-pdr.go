@@ -87,7 +87,7 @@ func (p pdr) String() string {
 	return b.String()
 }
 
-func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, ippool *IPPool) error {
+func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, ippool *IPPool) error {
 	var ueIP4 net.IP
 
 	for _, pdiIE := range pdiIEs {
@@ -95,21 +95,19 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, ippool *IPPoo
 		case ie.UEIPAddress:
 			ueIPaddr, err := pdiIE.UEIPAddress()
 			if err != nil {
-				log.Println("Failed to parse UE IP address")
+				log.Warnln("Failed to parse UE IP address")
 				continue
 			}
 
 			if needAllocIP(ueIPaddr) {
 				/* alloc IPV6 if CHV6 is enabled : TBD */
-				log.Println("UPF should alloc UE IP. CHV4 flag set")
-
-				ueIP4, err = ippool.AllocIP()
+				log.Printf("UPF should alloc UE IP for SEID %v. CHV4 flag set", seid)
+				ueIP4, err = ippool.LookupOrAllocIP(seid)
+				log.Traceln("Found or allocated new IP", ueIP4, "from pool", ippool)
 				if err != nil {
-					log.Println("failed to allocate UE IP")
+					log.Errorln("failed to allocate UE IP")
 					return err
 				}
-
-				log.Println("ueipv4 : ", ueIP4.String())
 
 				p.allocIPFlag = true
 			} else {
@@ -287,7 +285,7 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, ippoo
 		outerHeaderRemoval = 1
 	}
 
-	err = p.parsePDI(pdi, appPFDs, ippool)
+	err = p.parsePDI(seid, pdi, appPFDs, ippool)
 	if err != nil && !errors.Is(err, errBadFilterDesc) {
 		return err
 	}
