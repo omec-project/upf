@@ -12,6 +12,21 @@ import (
 	"github.com/wmnsk/go-pfcp/message"
 )
 
+// Release allocated IPs.
+func releaseAllocatedIPs(ippool *IPPool, session *PFCPSession) error {
+	log.Println("release allocated IP")
+
+	// Check if we allocated an UE IP for this session and delete it.
+	for _, pdr := range session.pdrs {
+		if (pdr.allocIPFlag) && (pdr.srcIface == core) {
+			var ueIP net.IP = int2ip(pdr.dstIP)
+			log.Traceln("Releasing IP", ueIP, " of session", session.localSEID)
+			return ippool.DeallocIP(session.localSEID)
+		}
+	}
+	return nil
+}
+
 func addPdrInfo(msg *message.SessionEstablishmentResponse,
 	session *PFCPSession) {
 	log.Println("Add PDRs with UPF alloc IPs to Establishment response")
