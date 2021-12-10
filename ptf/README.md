@@ -27,7 +27,8 @@ directly between the framework and BESS instance.
     * `linerate/`: high-speed tests via TRex
 * `lib/`: general purpose libraries and classes to be imported
 in PTF test definitions
-* `trex-config/`: contains YAML config file definition for TRex 
+* `config/`: contains YAML config file definition for TRex along with other
+specialized config files
 
 **Unary** tests are *single packet* tests that assess UPF
 performance in specific scenarios. Packets are crafted and sent to the
@@ -61,10 +62,9 @@ In **step 2**, TRex/Scapy generates traffic to the UPF across NICs.
 In **step 3**, traffic routes through the UPF and back to the machine hosting TRex, where results are asserted.
 
 ## Steps to run tests
-The run script assumes that the TRex DPDK daemon server and UPF-EPC are
-already running on their respective machines. It also assumes that the
-TRex config file in `trex-config/` has been configured correctly to
-route traffic to the UPF.
+The run script assumes that the TRex DPDK daemon server and UPF-EPC are already
+running on their respective machines. It also assumes that the TRex config file
+in `config/` has been configured correctly to route traffic to the UPF.
 
 To install TRex onto your server, please refer to the [TRex installation
 guide](https://trex-tgn.cisco.com/trex/doc/trex_manual.html#_download_and_installation)
