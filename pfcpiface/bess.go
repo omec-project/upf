@@ -760,7 +760,7 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 		ebs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 		pbs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 
-		if qer.dlStatus == ie.GateStatusClosed {
+		if qer.dlStatus != ie.GateStatusOpen {
 			gate = qerGateStatusDrop
 		} else if qer.dlMbr != 0 || qer.dlGbr != 0 {
 			/* MBR/GBR is received in Kilobits/sec.
