@@ -16,28 +16,33 @@ import bess_msg_pb2 as bess_msg
 import module_msg_pb2 as module_msg
 import util_msg_pb2 as util_msg
 
+# initialize useful variables
+ACCESS = 0x1
+CORE = 0x2
+DST_ACCESS = ACCESS - 1
+DST_CORE = CORE - 1
+
+N3 = 0x0
+N6 = 0x1
+N9 = 0x2
+
+ACTION_DROP = 0x1
+ACTION_FORWARD = 0x2
+ACTION_BUFFER = 0x4
+ACTION_NOTIFY = 0x8
+
+GATE_METER = 0x0
+GATE_DROP = 0x5
+GATE_UNMETER = 0x6
+
 class GrpcTest(BaseTest):
+    """Define a base test for communicating with BESS over gRPC
+
+    This base test contains setUp, tearDown and a library of functions for
+    configuring rules on BESS and reading metrics.
+    """
 
     def setUp(self):
-        # initialize useful variables (for readability)
-        self.access = 0x1
-        self.core = 0x2
-        self.dstAccess = self.access - 1
-        self.dstCore = self.core - 1
-
-        self.n3 = 0x0
-        self.n6 = 0x1
-        self.n9 = 0x2
-
-        self.actionDrop = 0x1
-        self.actionForward = 0x2
-        self.actionBuffer = 0x4
-        self.actionNotify = 0x8
-
-        self.gateMeter = 0x0
-        self.gateDrop = 0x5
-        self.gateUnmeter = 0x6
-
         self.pdrs = []
         self.fars = []
         self.appQers = []
@@ -420,16 +425,16 @@ class GrpcTest(BaseTest):
         farDrop = 0x2
         farNotify = 0x3
 
-        if (far.applyAction & self.actionForward) != 0:
-            if far.dstIntf == self.dstAccess:
+        if (far.applyAction & ACTION_FORWARD) != 0:
+            if far.dstIntf == DST_ACCESS:
                 return farForwardD
-            elif far.dstIntf == self.dstCore:
+            elif far.dstIntf == DST_CORE:
                 return farForwardU
-        elif (far.applyAction & self.actionDrop) != 0: 
+        elif (far.applyAction & ACTION_DROP) != 0: 
             return farDrop
-        elif (far.applyAction & self.actionBuffer) != 0 : 
+        elif (far.applyAction & ACTION_BUFFER) != 0 : 
             return farNotify
-        elif (far.applyAction & self.actionNotify) != 0: 
+        elif (far.applyAction & ACTION_NOTIFY) != 0: 
             return farNotify
 
     def addFAR(self, far, debug=False):
@@ -541,14 +546,14 @@ class GrpcTest(BaseTest):
         )
 
         # construct UL/DL QosCommandAddArg's and send to BESS
-        for srcIface in [self.access, self.core]:
+        for srcIface in [ACCESS, CORE]:
             f = module_msg.QosCommandAddArg(
                 gate = qer.gate,
-                cir = int(rates.ulCir) if srcIface == self.access else int(rates.dlCir),
-                pir = int(rates.ulPir) if srcIface == self.access else int(rates.dlPir),
-                cbs = int(rates.ulCbs) if srcIface == self.access else int(rates.dlCbs),
-                pbs = int(rates.ulPbs) if srcIface == self.access else int(rates.dlPbs),
-                ebs = int(rates.ulEbs) if srcIface == self.access else int(rates.dlEbs),
+                cir = int(rates.ulCir) if srcIface == ACCESS else int(rates.dlCir),
+                pir = int(rates.ulPir) if srcIface == ACCESS else int(rates.dlPir),
+                cbs = int(rates.ulCbs) if srcIface == ACCESS else int(rates.dlCbs),
+                pbs = int(rates.ulPbs) if srcIface == ACCESS else int(rates.dlPbs),
+                ebs = int(rates.ulEbs) if srcIface == ACCESS else int(rates.dlEbs),
                 fields = [
                     util_msg.FieldData(value_int = srcIface),
                     util_msg.FieldData(value_int = qer.qerID),
@@ -577,7 +582,7 @@ class GrpcTest(BaseTest):
 
     def delApplicationQER(self, qer, debug=False):
         ''' deletes uplink and downlink application QER '''
-        for srcIface in [self.access, self.core]:
+        for srcIface in [ACCESS, CORE]:
             f = module_msg.QosCommandDeleteArg(
                 fields =  [
                     util_msg.FieldData(value_int = srcIface),
@@ -610,14 +615,14 @@ class GrpcTest(BaseTest):
         )
 
         # construct UL/DL QosCommandAddArg's and send to BESS
-        for srcIface in [self.access, self.core]:
+        for srcIface in [ACCESS, CORE]:
             f = module_msg.QosCommandAddArg(
                 gate = qer.gate,
-                cir = int(rates.ulCir) if srcIface == self.access else int(rates.dlCir),
-                pir = int(rates.ulPir) if srcIface == self.access else int(rates.dlPir),
-                cbs = int(rates.ulCbs) if srcIface == self.access else int(rates.dlCbs),
-                pbs = int(rates.ulPbs) if srcIface == self.access else int(rates.dlPbs),
-                ebs = int(rates.ulEbs) if srcIface == self.access else int(rates.dlEbs),
+                cir = int(rates.ulCir) if srcIface == ACCESS else int(rates.dlCir),
+                pir = int(rates.ulPir) if srcIface == ACCESS else int(rates.dlPir),
+                cbs = int(rates.ulCbs) if srcIface == ACCESS else int(rates.dlCbs),
+                pbs = int(rates.ulPbs) if srcIface == ACCESS else int(rates.dlPbs),
+                ebs = int(rates.ulEbs) if srcIface == ACCESS else int(rates.dlEbs),
                 fields = [
                     util_msg.FieldData(value_int = srcIface),
                     util_msg.FieldData(value_int = qer.fseID)
@@ -642,7 +647,7 @@ class GrpcTest(BaseTest):
 
     def delSessionQER(self, qer, debug=False):
         ''' deletes uplink and downlink session QER '''
-        for srcIface in [self.access, self.core]:
+        for srcIface in [ACCESS, CORE]:
             f = module_msg.QosCommandDeleteArg(
                 fields =  [
                     util_msg.FieldData(value_int = srcIface),

@@ -1,20 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright(c) 2021 Open Networking Foundation
 
-import time
 from ipaddress import IPv4Address
-from pprint import pprint
-
 from trex_test import TrexTest
-from grpc_test import GrpcTest, autocleanup
-
-from trex_stl_lib.api import (
-    STLVM,
-    STLPktBuilder,
-    STLStream,
-    STLTXCont,
-)
-import ptf.testutils as testutils
+from grpc_test import *
 
 UPF_DEST_MAC = "0c:c4:7a:19:6d:ca"
 
@@ -28,15 +17,15 @@ class PdrTest(TrexTest, GrpcTest):
     def runTest(self):
         # create basic N6 downlink pdr
         pdr = self.createPDR(
-            srcIface = self.core,
+            srcIface = CORE,
             dstIP = int(IPv4Address('16.0.0.1')),
             srcIfaceMask = 0xFF,
             dstIPMask = 0xFFFFFFFF,
             precedence = 255,
             fseID = 0x30000000,
             ctrID = 0,
-            farID = self.n3,
-            qerIDList = [self.n6, 1],
+            farID = N3,
+            qerIDList = [N6, 1],
             needDecap = 0,
         )
 
@@ -54,10 +43,10 @@ class FarTest(TrexTest, GrpcTest):
     def runTest(self):
         # create basic N6 uplink FAR
         far = self.createFAR(
-            farID = self.n6,
+            farID = N6,
             fseID = 0x30000000,
-            applyAction = self.actionForward,
-            dstIntf = self.dstCore,
+            applyAction = ACTION_FORWARD,
+            dstIntf = DST_CORE,
         )
 
         print("add far response:")
@@ -74,9 +63,9 @@ class QerAppTest(TrexTest, GrpcTest):
     def runTest(self):
         # configure as basic N6 UL/DL QER
         qer = self.createQER(
-            gate = self.gateUnmeter,
+            gate = GATE_UNMETER,
             qfi = 9,
-            qerID = self.n6,
+            qerID = N6,
             fseID = 0x30000000,
             ulGbr = 0,
             ulMbr = 0,
@@ -97,7 +86,7 @@ class QerSessionTest(TrexTest, GrpcTest):
     def runTest(self):
         # configure as basic N6 UL/DL QER
         qer = self.createQER(
-            gate = self.gateUnmeter,
+            gate = GATE_UNMETER,
             qfi = 0,
             qerID = 1,
             fseID = 0x30000000,
@@ -120,4 +109,4 @@ class MetricsTest(GrpcTest):
     @autocleanup
     def runTest(self):
         print(self.getPortStats("core"))
-        self.printSessionStats()
+        self.getSessionStats()

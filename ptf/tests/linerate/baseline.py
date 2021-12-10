@@ -6,7 +6,7 @@ from ipaddress import IPv4Address
 from pprint import pprint
 
 from trex_test import TrexTest
-from grpc_test import GrpcTest, autocleanup
+from grpc_test import *
 from trex_utils import *
 
 from trex_stl_lib.api import (
@@ -55,7 +55,7 @@ class DownlinkPerformanceBaselineTest(TrexTest, GrpcTest):
         for i in range(UE_COUNT):
             # install N6 DL PDR to match UE dst IP
             pdrDown = self.createPDR(
-                srcIface = self.core,
+                srcIface = CORE,
                 dstIP = int(startIP + i),
                 srcIfaceMask = 0xFF,
                 dstIPMask = 0xFFFFFFFF,
@@ -63,7 +63,7 @@ class DownlinkPerformanceBaselineTest(TrexTest, GrpcTest):
                 fseID = n3TEID + i + 1, # start from 1
                 ctrID = 0,
                 farID = i,
-                qerIDList = [self.n6, 1],
+                qerIDList = [N6, 1],
                 needDecap = 0,
             )
             self.addPDR(pdrDown)
@@ -72,8 +72,8 @@ class DownlinkPerformanceBaselineTest(TrexTest, GrpcTest):
             farDown = self.createFAR(
                 farID = i,
                 fseID = n3TEID + i + 1, # start from 1
-                applyAction = self.actionForward,
-                dstIntf = self.dstAccess,
+                applyAction = ACTION_FORWARD,
+                dstIntf = DST_ACCESS,
                 tunnelType = 0x1,
                 tunnelIP4Src = int(accessIP),
                 tunnelIP4Dst = int(enbIP), # only one eNB to send to downlink
@@ -84,8 +84,8 @@ class DownlinkPerformanceBaselineTest(TrexTest, GrpcTest):
 
             # install N6 DL/UL application QER
             qer = self.createQER(
-                gate = self.gateUnmeter,
-                qerID = self.n6,
+                gate = GATE_UNMETER,
+                qerID = N6,
                 fseID = n3TEID + i + 1, # start from 1
                 qfi = 9,
                 ulGbr = 0,
