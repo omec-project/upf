@@ -40,6 +40,9 @@ type P4rtcInfo struct {
 const (
 	preQosCounterID  = iota
 	postQosCounterID
+
+	// 253 base stations + 1 dbuf (fixed in UP4) + 1 reserved (fixed in P4 pipeline)
+	maxGTPTunnelPeerIDs = 253
 )
 
 type counter struct {
@@ -70,6 +73,7 @@ type UP4 struct {
 	// TODO: create UP4Store object and move these fields there
 	counters         []counter
 	tunnelPeerIDs    map[tunnelParams]uint8
+	tunnelPeerIDsPool []uint8
 
 	reportNotifyChan chan<- uint64
 	endMarkerChan    chan []byte
@@ -205,6 +209,18 @@ func (up4 *UP4) initAllCounters() error {
 	return nil
 }
 
+func (up4 *UP4) initTunnelPeerIDs() {
+	up4.tunnelPeerIDs = make(map[tunnelParams]uint8)
+	// a simple queue storing available;
+	// 0 is reserved;
+	// 1 is reserved for dbuf
+	up4.tunnelPeerIDsPool = make([]uint8, 0, maxGTPTunnelPeerIDs)
+
+	for i := 2; i < maxGTPTunnelPeerIDs + 2; i++ {
+		up4.tunnelPeerIDsPool = append(up4.tunnelPeerIDsPool, uint8(i))
+	}
+}
+
 // This function ensures that PFCP Agent is connected to UP4.
 // Returns true if the connection is already established.
 // Otherwise, tries to connect to UP4. Returns false if fails.
@@ -254,7 +270,7 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	up4.deviceID = 1
 	up4.timeout = 30
 	up4.enableEndMarker = conf.EnableEndMarker
-	up4.tunnelPeerIDs = make(map[tunnelParams]uint8)
+	up4.initTunnelPeerIDs()
 	up4.counters = make([]counter, 2)
 	for i := range up4.counters {
 		// initialize allocated counters map
@@ -366,10 +382,21 @@ func findRelatedFAR(pdr pdr, fars []far) (far, error) {
 	return far{}, fmt.Errorf("cannot find any related FAR for PDR")
 }
 
-// TODO: implement it
-// Returns error if we reach maximum supported GTP Tunnel Peers (254 base stations + 1 dbuf).
-func (up4 *UP4) allocateGTPTunnelPeerID(params tunnelParams) (uint8, error) {
-	return 2, nil
+// Returns error if we reach maximum supported GTP Tunnel Peers.
+func (up4 *UP4) allocateGTPTunnelPeerID() (uint8, error) {
+	if len(up4.tunnelPeerIDsPool) == 0 {
+		return 0, fmt.Errorf("no free tunnel peer IDs available")
+	}
+
+	// pick top from queue
+	allocated := up4.tunnelPeerIDsPool[0]
+	up4.tunnelPeerIDsPool = up4.tunnelPeerIDsPool[1:]
+
+	return allocated, nil
+}
+
+func (up4 *UP4) releaseAllocatedGTPTunnelPeerID(allocated uint8) {
+	up4.tunnelPeerIDsPool = append(up4.tunnelPeerIDsPool, allocated)
 }
 
 // This method is used to "fix" uplink PDRs, for which the UE addresss is not provided by control plane.
@@ -473,7 +500,7 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 				tunnelPort:   far.tunnelPort,
 			}
 			if _, exists := up4.tunnelPeerIDs[tunnelParams]; !exists {
-				allocatedTunnelPeerID, err := up4.allocateGTPTunnelPeerID(tunnelParams)
+				allocatedTunnelPeerID, err := up4.allocateGTPTunnelPeerID()
 				if err != nil {
 					log.Error("failed to allocate GTP tunnel peer ID based on FAR: ", err)
 					continue
@@ -517,7 +544,7 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 			tunnelPort:   far.tunnelPort,
 		}
 		tunnelPeerID, exists := up4.tunnelPeerIDs[tunnelParams]
-		if !exists {
+		if !exists && far.Forwards() {
 			pdrLog.Warn("related FAR does not include tunnel params, failed to find allocated GTP tunnel peer ID")
 		}
 
