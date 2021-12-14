@@ -21,7 +21,6 @@ import (
 const (
 	PFCPPort    = "8805"
 	MaxItems    = 10
-	readTimeout = 25 * time.Second
 )
 
 // Timeout : connection timeout.

@@ -42,7 +42,6 @@ const (
 	farForwardD = 0x0
 	farForwardU = 0x1
 	farDrop     = 0x2
-	farBuffer   = 0x3
 	farNotify   = 0x4
 	// Bit Rates.
 	KB = 1000
@@ -52,16 +51,15 @@ const (
 
 const (
 	// Internal gates for QER.
-	qerGateMeter      uint64 = iota
-	qerGateStatusDrop        = iota + 4
-	qerGateUnmeter
+	qerGateMeter      uint64 = 0
+	qerGateStatusDrop uint64 = 5
+	qerGateUnmeter    uint64 = 6
 )
 
 const (
 	// Internal gates for Slice meter.
-	sliceMeterGateMeter      uint64 = iota
-	sliceMeterGateLookupFail        = iota + 4
-	sliceMeterGateUnmeter
+	sliceMeterGateMeter      uint64 = 0
+	sliceMeterGateUnmeter    uint64 = 6
 )
 
 var intEnc = func(u uint64) *pb.FieldData {

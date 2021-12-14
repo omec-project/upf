@@ -133,7 +133,7 @@ func resetCounterVal(p *p4rtc, counterID uint8, val uint64) {
 	delete(p.counters[counterID].allocated, val)
 }
 
-func getCounterVal(p *p4rtc, counterID uint8, pdrID uint32) (uint64, error) {
+func getCounterVal(p *p4rtc, counterID uint8) (uint64, error) {
 	/*
 	   loop :
 	      random counter generate
@@ -353,8 +353,7 @@ func (p *p4rtc) sendMsgToUPF(
 		{
 			funcType = FunctionTypeInsert
 			for i := range pdrs {
-				val, err = getCounterVal(p,
-					preQosPdrCounter, pdrs[i].pdrID)
+				val, err = getCounterVal(p, preQosPdrCounter)
 				if err != nil {
 					log.Println("Counter id alloc failed ", err)
 					return cause
