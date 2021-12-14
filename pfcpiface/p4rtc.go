@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -44,6 +43,7 @@ type P4rtClient struct {
 	stream     p4.P4Runtime_StreamChannelClient
 	electionID p4.Uint128
 	deviceID   uint64
+	digests    chan *p4.DigestList
 
 	// exported fields
 	P4Info   p4ConfigV1.P4Info
@@ -85,11 +85,12 @@ func (c *P4rtClient) SendPacketOut(packet []byte) (err error) {
 }
 
 // Init .. Initialize Client.
-func (c *P4rtClient) Init(reportNotifyChan chan<- uint64) (err error) {
+func (c *P4rtClient) Init() (err error) {
 	// Initialize stream for mastership and packet I/O
 	// ctx, cancel := context.WithTimeout(context.Background(),
 	//                                   time.Duration(timeout) * time.Second)
 	// defer cancel()
+	c.digests = make(chan *p4.DigestList, 1024)
 	c.stream, err = c.client.StreamChannel(
 		context.Background(),
 		grpcRetry.WithMax(3),
@@ -112,21 +113,7 @@ func (c *P4rtClient) Init(reportNotifyChan chan<- uint64) (err error) {
 					log.Println("client is not master")
 				}
 			} else if dig := res.GetDigest(); dig != nil {
-				log.Println("Received Digest")
-				for _, p4d := range dig.GetData() {
-					if fseidStr := p4d.GetBitstring(); fseidStr != nil {
-						log.Println("fseid data in digest")
-						fseid := binary.BigEndian.Uint64(fseidStr[4:])
-						reportNotifyChan <- fseid
-					}
-					/*if structVal := p4d.GetStruct(); structVal != nil {
-						log.Println("Struct data in digest")
-						for _, memberVal := range structVal.GetMembers() {
-							fseid := memberVal.GetBitstring()
-							c.reportDigest <- fseid
-						}
-					}*/
-				}
+				c.digests <- dig
 			} else {
 				log.Println("stream recv: ", res)
 			}
@@ -143,6 +130,19 @@ func (c *P4rtClient) Init(reportNotifyChan chan<- uint64) (err error) {
 	log.Println("exited from recv thread.")
 
 	return
+}
+
+func (c *P4rtClient) GetNextDigestData() []byte {
+	// blocking
+	nextDigest := <-c.digests
+	log.Println("Received Digest")
+	for _, p4d := range nextDigest.GetData() {
+		if bitstring := p4d.GetBitstring(); bitstring != nil {
+			return bitstring
+		}
+	}
+
+	return nil
 }
 
 // ReadCounterEntry .. Read counter Entry.
@@ -438,9 +438,7 @@ func LoadDeviceConfig(deviceConfigPath string) (P4DeviceConfig, error) {
 }
 
 // CreateChannel ... Create p4runtime client channel.
-func CreateChannel(host string,
-	deviceID uint64,
-	reportNotifyChan chan<- uint64) (*P4rtClient, error) {
+func CreateChannel(host string, deviceID uint64) (*P4rtClient, error) {
 	log.Println("create channel")
 	// Second, check to see if we can reuse the gRPC connection for a new P4RT client
 	conn, err := GetConnection(host)
@@ -455,7 +453,7 @@ func CreateChannel(host string,
 		deviceID: deviceID,
 	}
 
-	err = client.Init(reportNotifyChan)
+	err = client.Init()
 	if err != nil {
 		log.Println("client Init error: ", err)
 		return nil, err

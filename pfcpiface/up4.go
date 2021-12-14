@@ -4,6 +4,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"flag"
 	"fmt"
 	p4 "github.com/p4lang/p4runtime/go/p4/v1"
@@ -73,6 +74,10 @@ type UP4 struct {
 	counters         []counter
 	tunnelPeerIDs    map[tunnelParams]uint8
 	tunnelPeerIDsPool []uint8
+
+	// ueAddrToFSEID is used to store UE Address <-> F-SEID mapping,
+	// which is needed to efficiently find F-SEID when we receive a P4 Digest (DDN) for a UE address.
+	ueAddrToFSEID    map[uint32]uint64
 
 	reportNotifyChan chan<- uint64
 	endMarkerChan    chan []byte
@@ -173,7 +178,7 @@ func (up4 *UP4) exit() {
 func (up4 *UP4) setupChannel() error {
 	log.Println("Channel Setup.")
 
-	client, err := CreateChannel(up4.host, up4.deviceID, up4.reportNotifyChan)
+	client, err := CreateChannel(up4.host, up4.deviceID)
 	if err != nil {
 		log.Errorf("create channel failed: %v", err)
 		return err
@@ -270,6 +275,7 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	up4.timeout = 30
 	up4.enableEndMarker = conf.EnableEndMarker
 	up4.initTunnelPeerIDs()
+	up4.ueAddrToFSEID = make(map[uint32]uint64)
 	up4.counters = make([]counter, 2)
 	for i := range up4.counters {
 		// initialize allocated counters map
@@ -325,6 +331,17 @@ func (up4 *UP4) clearAllTables() error {
 	return nil
 }
 
+func (up4 *UP4) listenToDDNs() {
+	log.Info("Listening to Data Notifications from UP4..")
+	for {
+		digestData := up4.p4client.GetNextDigestData()
+		ueAddr := binary.BigEndian.Uint32(digestData)
+		if fseid, exists := up4.ueAddrToFSEID[ueAddr]; exists {
+			up4.reportNotifyChan <- fseid
+		}
+	}
+}
+
 func (up4 *UP4) tryConnect() error {
 	err := up4.setupChannel()
 	if err != nil {
@@ -343,6 +360,7 @@ func (up4 *UP4) tryConnect() error {
 		return fmt.Errorf("counters initialization failed. : %v", err)
 	}
 
+	go up4.listenToDDNs()
 	if up4.enableEndMarker {
 		log.Println("Starting end marker loop")
 
@@ -594,9 +612,27 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 			log.Error("failed to write table entries to Sessions and Terminations tables: ", err)
 			return cause
 		}
+
+		up4.saveUeAddrToFSEID(pdr)
 	}
 
 	cause = ie.CauseRequestAccepted
 
 	return cause
+}
+
+func (up4 *UP4) saveUeAddrToFSEID(pdr pdr) {
+	var ueAddr uint32
+	if pdr.srcIface == access {
+		ueAddr = pdr.srcIP
+	} else if pdr.srcIface == core {
+		ueAddr = pdr.dstIP
+	} else {
+		// unknown PDR direction
+		return
+	}
+
+	if _, exists := up4.ueAddrToFSEID[ueAddr]; !exists {
+		up4.ueAddrToFSEID[ueAddr] = pdr.fseID
+	}
 }
