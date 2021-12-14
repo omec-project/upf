@@ -97,12 +97,13 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 		reply, err = pConn.handleSessionModificationRequest(msg)
 	case message.MsgTypeSessionDeletionRequest:
 		reply, err = pConn.handleSessionDeletionRequest(msg)
-	case message.MsgTypeSessionReportResponse: {
-		_, err := pConn.handleSessionReportResponse(msg)
-		if err != nil {
-			log.WithField("error", err).Warn("Failed to handle PFCP session report response, ignoring..")
+	case message.MsgTypeSessionReportResponse:
+		{
+			_, err := pConn.handleSessionReportResponse(msg)
+			if err != nil {
+				log.WithField("error", err).Warn("Failed to handle PFCP session report response, ignoring..")
+			}
 		}
-	}
 
 	// Incoming response messages
 	// TODO: Association Setup Request, Session Report Request

@@ -3,6 +3,7 @@
 
 PROJECT_NAME             := upf-epc
 VERSION                  ?= $(shell cat ./VERSION)
+GO_FILES                 := $(shell find . -type d \( -path ./pfcpiface/vendor -o -path ./pfcpiface/bess_pb  \) -prune -o -name '*.go' -print)
 
 # Note that we set the target platform of Docker images to native
 # For a more portable image set CPU=haswell
@@ -69,4 +70,7 @@ pb:
 		.;
 	cp -a output/bess_pb ${BESS_PB_DIR}
 
-.PHONY: docker-build docker-push output pb
+fmt:
+	@gofmt -s -l -w $(GO_FILES)
+
+.PHONY: docker-build docker-push output pb fmt

@@ -22,7 +22,7 @@ const (
 // errors
 var (
 	writeToFastpathErr = errors.New("write to FastPath failed")
-	assocNotFoundErr = errors.New("no association found for NodeID")
+	assocNotFoundErr   = errors.New("no association found for NodeID")
 	allocateSessionErr = errors.New("unable to allocate new PFCP session")
 )
 

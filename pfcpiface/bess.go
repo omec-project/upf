@@ -58,8 +58,8 @@ const (
 
 const (
 	// Internal gates for Slice meter.
-	sliceMeterGateMeter      uint64 = 0
-	sliceMeterGateUnmeter    uint64 = 6
+	sliceMeterGateMeter   uint64 = 0
+	sliceMeterGateUnmeter uint64 = 6
 )
 
 var intEnc = func(u uint64) *pb.FieldData {
