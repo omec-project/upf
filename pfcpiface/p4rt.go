@@ -168,7 +168,7 @@ func (p *p4rtc) exit() {
 func (p *p4rtc) channelSetup() (*P4rtClient, error) {
 	log.Println("Channel Setup.")
 
-	localclient, errin := CreateChannel(p.host, p.deviceID, p.timeout, p.reportNotifyChan)
+	localclient, errin := CreateChannel(p.host, p.deviceID, p.reportNotifyChan)
 	if errin != nil {
 		log.Println("create channel failed : ", errin)
 		return nil, errin

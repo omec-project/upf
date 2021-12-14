@@ -123,5 +123,4 @@ func (node *PFCPNode) Serve() {
 func (node *PFCPNode) Done() {
 	<-node.done
 	log.Infoln("Shutdown complete")
-	return
 }

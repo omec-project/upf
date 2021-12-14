@@ -13,7 +13,7 @@ type QosLevel uint8
 
 const (
 	ApplicationQos QosLevel = 0
-	SessionQos              = 1
+	SessionQos     QosLevel = 1
 )
 
 // CreateQER appends qer to existing list of QERs in the session.

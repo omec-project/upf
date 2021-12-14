@@ -1026,12 +1026,12 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 
 		q := &pb.QosCommandAddArg{
 			Gate:              gate,
-			Cir:               cir,                               /* committed info rate */
-			Pir:               pir,                               /* peak info rate */
-			Cbs:               cbs,                               /* committed burst size */
-			Pbs:               pbs,                               /* Peak burst size */
-			Ebs:               ebs,                               /* Excess burst size */
-			OptionalDeductLen: &pb.QosCommandAddArg_DeductLen{0}, /* Include all headers */
+			Cir:               cir,                                          /* committed info rate */
+			Pir:               pir,                                          /* peak info rate */
+			Cbs:               cbs,                                          /* committed burst size */
+			Pbs:               pbs,                                          /* Peak burst size */
+			Ebs:               ebs,                                          /* Excess burst size */
+			OptionalDeductLen: &pb.QosCommandAddArg_DeductLen{DeductLen: 0}, /* Include all headers */
 			Fields: []*pb.FieldData{
 				intEnc(uint64(farForwardU)), /* Action */
 				intEnc(uint64(0)),           /* tunnel_out_type */
@@ -1070,12 +1070,12 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 		// TODO: packet deduction should take GTPU extension header into account
 		q = &pb.QosCommandAddArg{
 			Gate:              gate,
-			Cir:               cir,                                /* committed info rate */
-			Pir:               pir,                                /* peak info rate */
-			Cbs:               cbs,                                /* committed burst size */
-			Pbs:               pbs,                                /* Peak burst size */
-			Ebs:               ebs,                                /* Excess burst size */
-			OptionalDeductLen: &pb.QosCommandAddArg_DeductLen{50}, /* Exclude Ethernet,IP,UDP,GTP header */
+			Cir:               cir,                                           /* committed info rate */
+			Pir:               pir,                                           /* peak info rate */
+			Cbs:               cbs,                                           /* committed burst size */
+			Pbs:               pbs,                                           /* Peak burst size */
+			Ebs:               ebs,                                           /* Excess burst size */
+			OptionalDeductLen: &pb.QosCommandAddArg_DeductLen{DeductLen: 50}, /* Exclude Ethernet,IP,UDP,GTP header */
 			Fields: []*pb.FieldData{
 				intEnc(uint64(farForwardD)), /* Action */
 				intEnc(uint64(1)),           /* tunnel_out_type */
