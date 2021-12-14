@@ -13,12 +13,5 @@ jobs:
     steps:
       - uses: actions/checkout@v2.4.0
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v2.5.2
-        with:
-          version: latest
-          working-directory: pfcpiface
-          # the following are enabled by default:
-          #  deadcode, errcheck, gosimple, govet, ineffassign, staticcheck, structcheck, typecheck, unused, varcheck
-          args: |
-            -v --skip-files ".*\\.pb\\.go" --max-same-issues=0 --max-issues-per-linter=0 -E goconst -E goerr113 \
-            -E gofmt -E misspell -E gosec -E goimports -E unparam -E nilnil -E nilerr
+        run: |
+          make golint
