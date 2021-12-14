@@ -267,11 +267,11 @@ func (c *P4rtClient) InsertTableEntry(entry *p4.TableEntry, funcType uint8, prio
 	return c.WriteReq(update)
 }
 
-func (c *P4rtClient) WriteTableEntries(entries ...*p4.TableEntry) error {
+func (c *P4rtClient) ApplyTableEntries(methodType p4.Update_Type, entries ...*p4.TableEntry) error {
 	var updates []*p4.Update
 	for _, entry := range entries {
 		update := &p4.Update{
-			Type: p4.Update_INSERT,
+			Type: methodType,
 			Entity: &p4.Entity{
 				Entity: &p4.Entity_TableEntry{TableEntry: entry},
 			},

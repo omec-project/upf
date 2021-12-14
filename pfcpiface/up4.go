@@ -6,8 +6,7 @@ package main
 import (
 	"flag"
 	"fmt"
-
-	// #nosec G404 // Ignore G404. We don't need strong random number generator for allocating IDs for P4 objects.
+	p4 "github.com/p4lang/p4runtime/go/p4/v1"
 	"math/rand"
 	"net"
 	"time"
@@ -399,36 +398,72 @@ func (up4 *UP4) releaseAllocatedGTPTunnelPeerID(allocated uint8) {
 	up4.tunnelPeerIDsPool = append(up4.tunnelPeerIDsPool, allocated)
 }
 
-// This method is used to "fix" uplink PDRs, for which the UE addresss is not provided by control plane.
-// We need UE address in the uplink PDRs because we use it as "session_id" in the P4 pipeline.
-// TODO: this is a temporary solution. Remove it once
-func getPDRsWithFixedUEAddressForUplinkPDRs(allPDRs []pdr) []pdr {
-	getDownlinkPDRByFSEID := func(pdrs []pdr, fseid uint64) (pdr, error) {
-		for _, p := range pdrs {
-			// downlink
-			if p.srcIface == core {
-				if p.fseID == fseid {
-					return p, nil
-				}
-			}
-		}
-		return pdr{}, fmt.Errorf("failed to find downlink PDR with FSEID %v", fseid)
+func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
+	methodType := p4.Update_MODIFY
+	var tunnelPeerID uint8
+	tunnelParams := tunnelParams{
+		tunnelIP4Src: far.tunnelIP4Src,
+		tunnelIP4Dst: far.tunnelIP4Dst,
+		tunnelPort:   far.tunnelPort,
 	}
 
-	newPDRs := make([]pdr, len(allPDRs))
-	for _, p := range allPDRs {
-		// uplink
-		if p.srcIface == access {
-			dlPDR, err := getDownlinkPDRByFSEID(allPDRs, p.fseID)
-			if err == nil {
-				p.srcIP = dlPDR.dstIP
-			}
-			log.Errorf("failed to find downlink PDR to get UE address: %v", err)
+	tunnelPeerID, exists := up4.tunnelPeerIDs[tunnelParams]
+
+	if !exists {
+		var err error
+		tunnelPeerID, err = up4.allocateGTPTunnelPeerID()
+		if err != nil {
+			//log.Error("failed to allocate GTP tunnel peer ID based on FAR: ", err)
+			return err
 		}
-		newPDRs = append(newPDRs, p)
+		methodType = p4.Update_INSERT
 	}
 
-	return newPDRs
+
+	gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(tunnelPeerID, far)
+	if err != nil {
+		return err
+	}
+
+	if err := up4.p4client.ApplyTableEntries(methodType, gtpTunnelPeerEntry); err != nil {
+		return err
+	}
+
+	up4.tunnelPeerIDs[tunnelParams] = tunnelPeerID
+	return nil
+}
+
+func (up4 *UP4) removeGTPTunnelPeer(far far) {
+	removeLog := log.WithFields(log.Fields{
+		"far": far,
+	})
+	tunnelParams := tunnelParams{
+		tunnelIP4Src: far.tunnelIP4Src,
+		tunnelIP4Dst: far.tunnelIP4Dst,
+		tunnelPort:   far.tunnelPort,
+	}
+
+	tunnelPeerID, exists := up4.tunnelPeerIDs[tunnelParams]
+	if !exists {
+		removeLog.WithField("tunnel-params", tunnelParams)
+		removeLog.Error("GTP tunnel peer ID not found for tunnel params")
+		return
+	}
+
+	removeLog.WithField("tunnel-peer-id", tunnelPeerID)
+
+	gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(tunnelPeerID, far)
+	if err != nil {
+		removeLog.Error("failed to build GTP tunnel peer entry to remove")
+		return
+	}
+
+	removeLog.Debug("Removing GTP Tunnel Peer ID")
+	if err := up4.p4client.ApplyTableEntries(p4.Update_DELETE, gtpTunnelPeerEntry); err != nil {
+		removeLog.Error("failed to remove GTP tunnel peer")
+	}
+
+	up4.releaseAllocatedGTPTunnelPeerID(tunnelPeerID)
 }
 
 func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, updated PacketForwardingRules) uint8 {
@@ -448,7 +483,7 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 	}
 
 	var (
-		funcType uint8
+		methodType p4.Update_Type
 		err      error
 		val      uint64
 		cause    uint8 = ie.CauseRequestRejected
@@ -462,7 +497,7 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 	switch method {
 	case upfMsgTypeAdd:
 		{
-			funcType = FunctionTypeInsert
+			methodType = p4.Update_INSERT
 			for i := range pdrs {
 				val, err = getCounterVal(up4, preQosCounterID)
 				if err != nil {
@@ -474,7 +509,7 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 		}
 	case upfMsgTypeDel:
 		{
-			funcType = FunctionTypeDelete
+			methodType = p4.Update_DELETE
 			for i := range pdrs {
 				resetCounterVal(up4, preQosCounterID,
 					uint64(pdrs[i].ctrID))
@@ -482,7 +517,7 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 		}
 	case upfMsgTypeMod:
 		{
-			funcType = FunctionTypeUpdate
+			methodType = p4.Update_MODIFY
 		}
 	default:
 		{
@@ -493,42 +528,33 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 
 	for _, far := range fars {
 		// downlink FAR that does encapsulation
-		if far.Forwards() && far.dstIntf == ie.DstInterfaceAccess && far.tunnelTEID != 0 {
-			tunnelParams := tunnelParams{
-				tunnelIP4Src: far.tunnelIP4Src,
-				tunnelIP4Dst: far.tunnelIP4Dst,
-				tunnelPort:   far.tunnelPort,
+		if far.Forwards() && far.dstIntf == ie.DstInterfaceAccess {
+			switch method {
+			case upfMsgTypeAdd, upfMsgTypeMod: {
+				if far.tunnelTEID == 0 {
+					up4Log.Warn("Downlink FAR without tunnel params received, cannot install GTP Tunnel Peer")
+					continue
+				}
+				if err := up4.addOrUpdateGTPTunnelPeer(far); err != nil {
+					up4Log.WithFields(log.Fields{
+						"far": far,
+					}).Error("Failed to add or update GTP tunnel peer")
+				}
 			}
-			if _, exists := up4.tunnelPeerIDs[tunnelParams]; !exists {
-				allocatedTunnelPeerID, err := up4.allocateGTPTunnelPeerID()
-				if err != nil {
-					log.Error("failed to allocate GTP tunnel peer ID based on FAR: ", err)
-					continue
-				}
-
-				gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(allocatedTunnelPeerID, far)
-				if err != nil {
-					log.Errorf("failed to build GTP Tunnel Peers table entry from FAR: %v", err)
-					continue
-				}
-
-				if err := up4.p4client.WriteTableEntries(gtpTunnelPeerEntry); err != nil {
-					log.Errorf("failed to write GTP Tunnel Peers table entry to UP4: %v", err)
-					continue
-				}
-
-				up4.tunnelPeerIDs[tunnelParams] = allocatedTunnelPeerID
+			case upfMsgTypeDel: {
+				up4.removeGTPTunnelPeer(far)
+			}
+			default:
+				up4Log.Errorf("unsupported PFCP method: %v", method)
 			}
 		}
 	}
 
-	pdrs = getPDRsWithFixedUEAddressForUplinkPDRs(pdrs)
 	for _, pdr := range pdrs {
 		pdrLog := log.WithFields(log.Fields{
 			"pdr": pdr,
 		})
 		pdrLog.Traceln(pdr)
-		pdrLog.Traceln("write pdr funcType : ", funcType)
 
 		far, err := findRelatedFAR(pdr, fars)
 		if err != nil {
@@ -561,7 +587,8 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 			continue
 		}
 
-		err = up4.p4client.WriteTableEntries(sessionsEntry, terminationsEntry)
+		pdrLog.Traceln("Applying PDR: ", p4.Update_Type_name[int32(methodType)])
+		err = up4.p4client.ApplyTableEntries(methodType, sessionsEntry, terminationsEntry)
 		if err != nil {
 			// TODO: revert operations (e.g. reset counter)
 			log.Error("failed to write table entries to Sessions and Terminations tables: ", err)
