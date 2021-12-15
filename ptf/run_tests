@@ -25,6 +25,7 @@ it=$(test -t 0 && echo "-it" || echo "-t")
 docker run --name "${runName}" "${it}" \
 	--privileged \
 	-v "${TEST_DIR}":/upf-tests/ \
+	-v "${TEST_DIR}/log":/tmp \
 	"${TESTER_DOCKER_IMG}" \
 	python3 -u /upf-tests/lib/ptf_runner.py \
 	--ptf-dir /upf-tests/"${testdir}" \
@@ -32,4 +33,6 @@ docker run --name "${runName}" "${it}" \
 	--trex-address "${TREX_ADDR}" \
 	--bess-address "${UPF_ADDR}" \
 	--trex-config /upf-tests/config/4-ports-with-l2.yaml \
+	--xunit \
+	--xunit-dir /tmp/ptf-logs \
 	${testName}
