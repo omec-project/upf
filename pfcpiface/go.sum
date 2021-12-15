@@ -145,6 +145,8 @@ github.com/stretchr/testify v1.7.0 h1:nwc3DEeHmmLAfoZucVR881uASk0Mfjw8xYJ99tb5Cc
 github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/wmnsk/go-pfcp v0.0.12-0.20211202142119-0e03d83ad9c5 h1:jMY8r/0CmRJ7YEXu/eE1SpOjwfT6IPX3TL9wJ/4wllE=
 github.com/wmnsk/go-pfcp v0.0.12-0.20211202142119-0e03d83ad9c5/go.mod h1:QKYWo1Wac4hc1Ut1YeaPKxcYUf8oHBZyqODJC6VAPBI=
+github.com/wmnsk/go-pfcp v0.0.13 h1:mXLqgChfEw6OA40GfQP3eN4SQP45h9nUD6qneuy3hm8=
+github.com/wmnsk/go-pfcp v0.0.13/go.mod h1:QKYWo1Wac4hc1Ut1YeaPKxcYUf8oHBZyqODJC6VAPBI=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 go.opentelemetry.io/proto/otlp v0.7.0/go.mod h1:PqfVotwruBrMGOCsRd/89rSnXhoiJIqeYNgFYFoEGnI=
