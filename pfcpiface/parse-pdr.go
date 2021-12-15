@@ -71,6 +71,7 @@ func (p pdr) String() string {
 	fmt.Fprintf(&b, "srcPortMask: %x\n", p.srcPortMask)
 	fmt.Fprintf(&b, "dstPortMask: %x\n", p.dstPortMask)
 	fmt.Fprintf(&b, "protoMask: %x\n", p.protoMask)
+	fmt.Fprintf(&b, "precedence: %v\n", p.precedence)
 	fmt.Fprintf(&b, "pdrID: %v\n", p.pdrID)
 	fmt.Fprintf(&b, "fseID: %x\n", p.fseID)
 	fmt.Fprintf(&b, "fseidIP: %v\n", int2ip(p.fseidIP))
