@@ -19,8 +19,12 @@ const (
 	DefaultDDNTimeout = 20
 )
 
-var errAssocNotFound = errors.New("no association found for NodeID")
-var errAllocateSession = errors.New("unable to allocate new PFCP session")
+// errors
+var (
+	ErrWriteToFastpath = errors.New("write to FastPath failed")
+	ErrAssocNotFound   = errors.New("no association found for NodeID")
+	ErrAllocateSession = errors.New("unable to allocate new PFCP session")
+)
 
 func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (message.Message, error) {
 	upf := pConn.upf
@@ -76,13 +80,13 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 	if strings.Compare(nodeID, pConn.nodeID.remote) != 0 {
 		log.Warnln("Association not found for Establishment request",
 			"with nodeID: ", nodeID, ", Association NodeID: ", pConn.nodeID.remote)
-		return errProcessReply(errAssocNotFound, ie.CauseNoEstablishedPFCPAssociation)
+		return errProcessReply(ErrAssocNotFound, ie.CauseNoEstablishedPFCPAssociation)
 	}
 
 	/* Read CreatePDRs and CreateFARs from payload */
 	localSEID := pConn.NewPFCPSession(remoteSEID)
 	if localSEID == 0 {
-		return errProcessReply(errAllocateSession,
+		return errProcessReply(ErrAllocateSession,
 			ie.CauseNoResourcesAvailable)
 	}
 
@@ -110,7 +114,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 	for _, cQER := range sereq.CreateQER {
 		var q qer
-		if err := q.parseQER(cQER, session.localSEID, upf); err != nil {
+		if err := q.parseQER(cQER, session.localSEID); err != nil {
 			return errProcessReply(err, ie.CauseRequestRejected)
 		}
 
@@ -123,7 +127,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 	cause := upf.sendMsgToUPF(upfMsgTypeAdd, session.pdrs, session.fars, session.qers)
 	if cause == ie.CauseRequestRejected {
 		pConn.RemoveSession(session.localSEID)
-		return errProcessReply(errors.New("write to FastPath failed"),
+		return errProcessReply(ErrWriteToFastpath,
 			ie.CauseRequestRejected)
 	}
 
@@ -227,7 +231,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 
 	for _, cQER := range smreq.CreateQER {
 		var q qer
-		if err := q.parseQER(cQER, localSEID, upf); err != nil {
+		if err := q.parseQER(cQER, localSEID); err != nil {
 			return sendError(err)
 		}
 
@@ -285,7 +289,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 			err error
 		)
 
-		if err = q.parseQER(uQER, localSEID, upf); err != nil {
+		if err = q.parseQER(uQER, localSEID); err != nil {
 			return sendError(err)
 		}
 
@@ -304,7 +308,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 
 	cause := upf.sendMsgToUPF(upfMsgTypeMod, addPDRs, addFARs, addQERs)
 	if cause == ie.CauseRequestRejected {
-		return sendError(errors.New("write to FastPath failed"))
+		return sendError(ErrWriteToFastpath)
 	}
 
 	if session.getNotifyFlag() {
@@ -366,7 +370,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 
 	cause = upf.sendMsgToUPF(upfMsgTypeDel, delPDRs, delFARs, delQERs)
 	if cause == ie.CauseRequestRejected {
-		return sendError(errors.New("write to FastPath failed"))
+		return sendError(ErrWriteToFastpath)
 	}
 
 	// Build response message
@@ -411,7 +415,7 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 
 	cause := upf.sendMsgToUPF(upfMsgTypeDel, session.pdrs, session.fars, session.qers)
 	if cause == ie.CauseRequestRejected {
-		return sendError(errors.New("write to FastPath failed"))
+		return sendError(ErrWriteToFastpath)
 	}
 
 	if err := releaseAllocatedIPs(upf.ippool, session); err != nil {
@@ -472,7 +476,7 @@ func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
 	for _, far := range session.fars {
 		if far.farID == farID {
 			if far.applyAction&ActionNotify == 0 {
-				log.Errorln("packet recieved for forwarding far. discard")
+				log.Errorln("packet received for forwarding far. discard")
 				return
 			}
 		}

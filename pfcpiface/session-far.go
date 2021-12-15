@@ -104,15 +104,11 @@ func (s *PFCPSession) getNotifyFlag() bool {
 
 func (s *PFCPSession) runTimerForDDNNotify(timeout time.Duration) {
 	endTime := time.After(timeout)
+	for range endTime {
+		log.Println("DDN notify send timeout")
+		s.setNotifyFlag(false)
 
-	for {
-		select {
-		case <-endTime:
-			log.Println("DDN notify send timeout")
-			s.setNotifyFlag(false)
-
-			return
-		}
+		return
 	}
 }
 

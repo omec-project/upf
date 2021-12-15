@@ -17,4 +17,4 @@ jobs:
         with:
           version: latest
           working-directory: pfcpiface
-          args: -v --enable-all --disable=nlreturn --max-same-issues=0 --max-issues-per-linter=0
+          args: -v --config ../.golangci.yml

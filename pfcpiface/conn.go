@@ -19,9 +19,8 @@ import (
 )
 
 const (
-	PFCPPort    = "8805"
-	MaxItems    = 10
-	readTimeout = 25 * time.Second
+	PFCPPort = "8805"
+	MaxItems = 10
 )
 
 // Timeout : connection timeout.

@@ -171,7 +171,7 @@ func (c *P4rtClient) SendPacketOut(packet []byte) (err error) {
 }
 
 // Init .. Initialize Client.
-func (c *P4rtClient) Init(timeout uint32, reportNotifyChan chan<- uint64) (err error) {
+func (c *P4rtClient) Init(reportNotifyChan chan<- uint64) (err error) {
 	// Initialize stream for mastership and packet I/O
 	// ctx, cancel := context.WithTimeout(context.Background(),
 	//                                   time.Duration(timeout) * time.Second)
@@ -1161,7 +1161,6 @@ func LoadDeviceConfig(deviceConfigPath string) (P4DeviceConfig, error) {
 // CreateChannel ... Create p4runtime client channel.
 func CreateChannel(host string,
 	deviceID uint64,
-	timeout uint32,
 	reportNotifyChan chan<- uint64) (*P4rtClient, error) {
 	log.Println("create channel")
 	// Second, check to see if we can reuse the gRPC connection for a new P4RT client
@@ -1177,7 +1176,7 @@ func CreateChannel(host string,
 		DeviceID: deviceID,
 	}
 
-	err = client.Init(timeout, reportNotifyChan)
+	err = client.Init(reportNotifyChan)
 	if err != nil {
 		log.Println("Client Init error: ", err)
 		return nil, err

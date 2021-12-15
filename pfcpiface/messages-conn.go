@@ -42,14 +42,13 @@ func (pConn *PFCPConn) handleHeartbeatRequest(msg message.Message) (message.Mess
 	return hbres, nil
 }
 
-func (pConn *PFCPConn) handleIncomingResponse(msg message.Message) error {
+func (pConn *PFCPConn) handleIncomingResponse(msg message.Message) {
 	req, ok := pConn.pendingReqs.Load(msg.Sequence())
 
 	if ok {
 		req.(*Request).reply <- msg
 		pConn.pendingReqs.Delete(msg.Sequence())
 	}
-	return nil
 }
 
 func (pConn *PFCPConn) associationIEs() []*ie.IE {

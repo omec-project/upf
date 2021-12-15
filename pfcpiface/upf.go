@@ -62,7 +62,6 @@ type upf struct {
 // Don't change these values.
 const (
 	tunnelGTPUPort = 2152
-	invalidQerID   = 0xFFFFFFFF
 
 	// src-iface consts.
 	core   = 0x2
