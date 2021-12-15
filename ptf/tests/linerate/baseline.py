@@ -28,7 +28,7 @@ BESS_RECEIVER_PORT = 3
 
 # test specs
 DURATION = 10
-RATE = 250_000  # 250 Kpps
+RATE = 100_000  # 100 Kpps
 UE_COUNT = 10_000 # 10k UEs
 GTPU_PORT = 2152
 PKT_SIZE = 64
@@ -148,11 +148,11 @@ class DownlinkPerformanceBaselineTest(TrexTest, GrpcTest):
         # 99.9th %ile latency < 100 us
         self.assertLessEqual(
             lat_stats.percentile_99_9,
-            1000,
-            f"99.9th %ile latency was higher than 1000 us! Was {lat_stats.percentile_99_9} us",
+            100,
+            f"99.9th %ile latency was higher than 100 us! Was {lat_stats.percentile_99_9} us",
         )
 
-        # jitter < 20 us (trex doesn't give jitter histogram)
+        # jitter < 20 us
         self.assertLessEqual(
             lat_stats.jitter,
             20,

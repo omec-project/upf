@@ -136,40 +136,39 @@ class PerFlowQosMetricsTest(TrexTest, GrpcTest):
         print(f"Duration was {time.time() - s_time}")
         trex_stats = self.trex_client.get_stats()
 
-        # Assert 0% packet loss
         sent_packets = trex_stats['total']['opackets']
         recv_packets = trex_stats['total']['ipackets']
 
+        # 0% packet loss
         self.assertEqual(
             sent_packets,
             recv_packets,
             f"Didn't receive all packets; sent {sent_packets}, received {recv_packets}",
         ) 
 
-        # Assert stats per fseid in downlink QoS metrics
         for fseid in postDlQos:
             lat = fseid['latency']['percentileValuesNs']
             jitter = fseid['jitter']['percentileValuesNs']
 
-            # assert 99th% latency
+            # 99th %ile latency < 100 us
             self.assertLessEqual(
                 int(lat[1]) / 1000,
                 100,
-                f"99th %ile was not less than 100 us! Was {int(lat[1]) / 1000} us"
+                f"99th %ile latency was higher than 100 us! Was {int(lat[1]) / 1000} us"
             )
 
-            # assert 99.9th% latency
+            # 99.9th %ile latency < 200 us
             self.assertLessEqual(
                 int(lat[2]) / 1000,
                 200,
-                f"99.9th %ile was not less than 200 us! Was {int(lat[2]) / 1000}"
+                f"99.9th %ile latency was higher than 200 us! Was {int(lat[2]) / 1000} us"
             )
 
-            # assert 99th% jitter < 100 us
+            # 99th% jitter < 20 us
             self.assertLessEqual(
                 int(jitter[1]) / 1000,
-                100,
-                f"99th %ile jitter was not less than 100 us! Was {int(jitter[1]) / 1000}"  
+                20,
+                f"99th %ile jitter was higher than 20 us! Was {int(jitter[1]) / 1000} us"  
             )
 
         return
