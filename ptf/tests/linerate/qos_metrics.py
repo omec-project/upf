@@ -26,7 +26,7 @@ BESS_RECEIVER_PORT = 3
 
 # Test specs
 DURATION = 10
-RATE = 250_000  # 250 Kpps
+RATE = 100_000  # 100 Kpps
 UE_COUNT = 10_000 # 10k UEs
 GTPU_PORT = 2152
 PKT_SIZE = 64
@@ -151,18 +151,18 @@ class PerFlowQosMetricsTest(TrexTest, GrpcTest):
             lat = fseid['latency']['percentileValuesNs']
             jitter = fseid['jitter']['percentileValuesNs']
 
-            # assert 99th% latency < 50 us
+            # assert 99th% latency
             self.assertLessEqual(
                 int(lat[1]) / 1000,
-                50,
-                f"99th %ile was not less than 50 us! Was {int(lat[1]) / 1000} us"
+                100,
+                f"99th %ile was not less than 100 us! Was {int(lat[1]) / 1000} us"
             )
 
-            # assert 99.9th% latency < 100 us
+            # assert 99.9th% latency
             self.assertLessEqual(
                 int(lat[2]) / 1000,
-                100,
-                f"99.9th %ile was not less than 100 us! Was {int(lat[2]) / 1000}"
+                200,
+                f"99.9th %ile was not less than 200 us! Was {int(lat[2]) / 1000}"
             )
 
             # assert 99th% jitter < 100 us
