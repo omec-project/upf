@@ -19,7 +19,6 @@ import (
 
 var (
 	configPath = flag.String("config", "upf.json", "path to upf config")
-	httpAddr   = flag.String("http", "0.0.0.0:8080", "http IP/port combo")
 	simulate   = simModeDisable
 	pfcpsim    = flag.Bool("pfcpsim", false, "simulate PFCP")
 )

@@ -98,12 +98,12 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 	case message.MsgTypeSessionDeletionRequest:
 		reply, err = pConn.handleSessionDeletionRequest(msg)
 	case message.MsgTypeSessionReportResponse:
-		pConn.handleSessionReportResponse(msg)
+		_, err = pConn.handleSessionReportResponse(msg)
 
 	// Incoming response messages
 	// TODO: Association Setup Request, Session Report Request
 	case message.MsgTypeHeartbeatResponse:
-		err = pConn.handleIncomingResponse(msg)
+		pConn.handleIncomingResponse(msg)
 
 	default:
 		log.Errorln("Message type: ", msgType, " is currently not supported")

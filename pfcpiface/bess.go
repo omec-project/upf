@@ -41,7 +41,6 @@ const (
 	farForwardD = 0x0
 	farForwardU = 0x1
 	farDrop     = 0x2
-	farBuffer   = 0x3
 	farNotify   = 0x4
 	// Bit Rates.
 	KB = 1000
@@ -51,16 +50,15 @@ const (
 
 const (
 	// Internal gates for QER.
-	qerGateMeter      uint64 = iota
-	qerGateStatusDrop        = iota + 4
-	qerGateUnmeter
+	qerGateMeter      uint64 = 0
+	qerGateStatusDrop uint64 = 5
+	qerGateUnmeter    uint64 = 6
 )
 
 const (
 	// Internal gates for Slice meter.
-	sliceMeterGateMeter      uint64 = iota
-	sliceMeterGateLookupFail        = iota + 4
-	sliceMeterGateUnmeter
+	sliceMeterGateMeter   uint64 = 0
+	sliceMeterGateUnmeter uint64 = 6
 )
 
 var intEnc = func(u uint64) *pb.FieldData {
@@ -1027,12 +1025,12 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 
 		q := &pb.QosCommandAddArg{
 			Gate:              gate,
-			Cir:               cir,                               /* committed info rate */
-			Pir:               pir,                               /* peak info rate */
-			Cbs:               cbs,                               /* committed burst size */
-			Pbs:               pbs,                               /* Peak burst size */
-			Ebs:               ebs,                               /* Excess burst size */
-			OptionalDeductLen: &pb.QosCommandAddArg_DeductLen{0}, /* Include all headers */
+			Cir:               cir,                                          /* committed info rate */
+			Pir:               pir,                                          /* peak info rate */
+			Cbs:               cbs,                                          /* committed burst size */
+			Pbs:               pbs,                                          /* Peak burst size */
+			Ebs:               ebs,                                          /* Excess burst size */
+			OptionalDeductLen: &pb.QosCommandAddArg_DeductLen{DeductLen: 0}, /* Include all headers */
 			Fields: []*pb.FieldData{
 				intEnc(uint64(farForwardU)), /* Action */
 				intEnc(uint64(0)),           /* tunnel_out_type */
@@ -1071,12 +1069,12 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 		// TODO: packet deduction should take GTPU extension header into account
 		q = &pb.QosCommandAddArg{
 			Gate:              gate,
-			Cir:               cir,                                /* committed info rate */
-			Pir:               pir,                                /* peak info rate */
-			Cbs:               cbs,                                /* committed burst size */
-			Pbs:               pbs,                                /* Peak burst size */
-			Ebs:               ebs,                                /* Excess burst size */
-			OptionalDeductLen: &pb.QosCommandAddArg_DeductLen{50}, /* Exclude Ethernet,IP,UDP,GTP header */
+			Cir:               cir,                                           /* committed info rate */
+			Pir:               pir,                                           /* peak info rate */
+			Cbs:               cbs,                                           /* committed burst size */
+			Pbs:               pbs,                                           /* Peak burst size */
+			Ebs:               ebs,                                           /* Excess burst size */
+			OptionalDeductLen: &pb.QosCommandAddArg_DeductLen{DeductLen: 50}, /* Exclude Ethernet,IP,UDP,GTP header */
 			Fields: []*pb.FieldData{
 				intEnc(uint64(farForwardD)), /* Action */
 				intEnc(uint64(1)),           /* tunnel_out_type */
