@@ -146,36 +146,27 @@ tables {
 }
 tables {
   preamble {
-    id: 49584791
-    name: "PreQosPipe.sessions"
-    alias: "sessions"
+    id: 44976597
+    name: "PreQosPipe.sessions_uplink"
+    alias: "sessions_uplink"
   }
   match_fields {
     id: 1
-    name: "src_iface"
-    bitwidth: 8
+    name: "n3_address"
+    bitwidth: 32
     match_type: EXACT
   }
   match_fields {
     id: 2
-    name: "ipv4_dst"
+    name: "teid"
     bitwidth: 32
     match_type: EXACT
   }
-  match_fields {
-    id: 3
-    name: "teid"
-    bitwidth: 32
-    match_type: TERNARY
+  action_refs {
+    id: 19461580
   }
   action_refs {
-    id: 18820761
-  }
-  action_refs {
-    id: 20045386
-  }
-  action_refs {
-    id: 18601841
+    id: 22196934
   }
   action_refs {
     id: 28401267
@@ -187,42 +178,83 @@ tables {
 }
 tables {
   preamble {
-    id: 48872261
-    name: "PreQosPipe.terminations"
-    alias: "terminations"
+    id: 34742049
+    name: "PreQosPipe.sessions_downlink"
+    alias: "sessions_downlink"
   }
   match_fields {
     id: 1
-    name: "slice_id"
-    bitwidth: 4
-    match_type: EXACT
-  }
-  match_fields {
-    id: 2
-    name: "src_iface"
-    bitwidth: 8
-    match_type: EXACT
-  }
-  match_fields {
-    id: 3
     name: "ue_address"
     bitwidth: 32
     match_type: EXACT
   }
   action_refs {
-    id: 33361772
+    id: 21848329
   }
   action_refs {
-    id: 31666072
+    id: 20229579
   }
   action_refs {
-    id: 18415550
+    id: 20249483
   }
   action_refs {
-    id: 21257015
+    id: 28401267
     annotations: "@defaultonly"
     scope: DEFAULT_ONLY
   }
+  const_default_action_id: 28401267
+  size: 1024
+}
+tables {
+  preamble {
+    id: 37595532
+    name: "PreQosPipe.terminations_uplink"
+    alias: "terminations_uplink"
+  }
+  match_fields {
+    id: 1
+    name: "ue_address"
+    bitwidth: 32
+    match_type: EXACT
+  }
+  action_refs {
+    id: 28305359
+  }
+  action_refs {
+    id: 20977365
+  }
+  action_refs {
+    id: 28401267
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  const_default_action_id: 28401267
+  size: 1024
+}
+tables {
+  preamble {
+    id: 34778590
+    name: "PreQosPipe.terminations_downlink"
+    alias: "terminations_downlink"
+  }
+  match_fields {
+    id: 1
+    name: "ue_address"
+    bitwidth: 32
+    match_type: EXACT
+  }
+  action_refs {
+    id: 32699713
+  }
+  action_refs {
+    id: 31264233
+  }
+  action_refs {
+    id: 28401267
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  const_default_action_id: 28401267
   size: 1024
 }
 tables {
@@ -348,16 +380,23 @@ actions {
 }
 actions {
   preamble {
-    id: 18820761
-    name: "PreQosPipe.set_params_uplink"
-    alias: "set_params_uplink"
+    id: 19461580
+    name: "PreQosPipe.set_session_uplink"
+    alias: "set_session_uplink"
   }
 }
 actions {
   preamble {
-    id: 20045386
-    name: "PreQosPipe.set_params_downlink"
-    alias: "set_params_downlink"
+    id: 22196934
+    name: "PreQosPipe.set_session_uplink_drop"
+    alias: "set_session_uplink_drop"
+  }
+}
+actions {
+  preamble {
+    id: 21848329
+    name: "PreQosPipe.set_session_downlink"
+    alias: "set_session_downlink"
   }
   params {
     id: 1
@@ -367,16 +406,23 @@ actions {
 }
 actions {
   preamble {
-    id: 18601841
-    name: "PreQosPipe.set_params_buffering"
-    alias: "set_params_buffering"
+    id: 20229579
+    name: "PreQosPipe.set_session_downlink_drop"
+    alias: "set_session_downlink_drop"
   }
 }
 actions {
   preamble {
-    id: 33361772
-    name: "PreQosPipe.term_uplink"
-    alias: "term_uplink"
+    id: 20249483
+    name: "PreQosPipe.set_session_downlink_buff"
+    alias: "set_session_downlink_buff"
+  }
+}
+actions {
+  preamble {
+    id: 28305359
+    name: "PreQosPipe.uplink_term_fwd"
+    alias: "uplink_term_fwd"
   }
   params {
     id: 1
@@ -391,18 +437,30 @@ actions {
 }
 actions {
   preamble {
-    id: 31666072
-    name: "PreQosPipe.term_downlink"
-    alias: "term_downlink"
+    id: 20977365
+    name: "PreQosPipe.uplink_term_drop"
+    alias: "uplink_term_drop"
   }
   params {
     id: 1
-    name: "teid"
+    name: "ctr_idx"
+    bitwidth: 32
+  }
+}
+actions {
+  preamble {
+    id: 32699713
+    name: "PreQosPipe.downlink_term_fwd"
+    alias: "downlink_term_fwd"
+  }
+  params {
+    id: 1
+    name: "ctr_idx"
     bitwidth: 32
   }
   params {
     id: 2
-    name: "ctr_idx"
+    name: "teid"
     bitwidth: 32
   }
   params {
@@ -418,9 +476,9 @@ actions {
 }
 actions {
   preamble {
-    id: 18415550
-    name: "PreQosPipe.term_drop"
-    alias: "term_drop"
+    id: 31264233
+    name: "PreQosPipe.downlink_term_drop"
+    alias: "downlink_term_drop"
   }
   params {
     id: 1

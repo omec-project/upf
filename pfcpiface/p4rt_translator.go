@@ -11,7 +11,34 @@ import (
 	"net"
 )
 
+// P4 constants
 const (
+	FieldN3Address = "n3_address"
+	FieldUEAddress = "ue_address"
+	FieldTEID = "teid"
+	FieldQFI = "qfi"
+	FieldCounterIndex = "ctr_idx"
+	FieldTrafficClass = "tc"
+	FieldTunnelPeerID = "tunnel_peer_id"
+	FieldTunnelSrcAddress = "src_addr"
+	FieldTunnelDstAddress = "dst_addr"
+	FieldTunnelSrcPort = "sport"
+
+	TableTunnelPeers = "PreQosPipe.tunnel_peers"
+	TableDownlinkTerminations = "PreQosPipe.terminations_downlink"
+	TableUplinkTerminations = "PreQosPipe.terminations_uplink"
+	TableDownlinkSessions = "PreQosPipe.sessions_downlink"
+	TableUplinkSessions = "PreQosPipe.sessions_uplink"
+
+	ActSetUplinkSession = "PreQosPipe.set_session_uplink"
+	ActSetDownlinkSession = "PreQosPipe.set_session_downlink"
+	ActSetDownlinkSessionBuff = "PreQosPipe.set_session_downlink_buff"
+    ActUplinkTermDrop = "PreQosPipe.uplink_term_drop"
+    ActUplinkTermFwd = "PreQosPipe.uplink_term_fwd"
+	ActDownlinkTermDrop = "PreQosPipe.downlink_term_drop"
+	ActDownlinkTermFwd = "PreQosPipe.downlink_term_fwd"
+	ActLoadTunnelParams = "PreQosPipe.load_tunnel_param"
+
 	DefaultPriority = 0
 )
 
@@ -321,145 +348,177 @@ func (t *P4rtTranslator) ParseAccessIPFromReadInterfaceTableResponse(resp *p4.Re
 	return nil, fmt.Errorf("failed to parse Access IP from P4Runtime response")
 }
 
-func (t *P4rtTranslator) BuildSessionsTableEntry(pdr pdr, tunnelPeerID uint8, needsBuffering bool) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr) (*p4.TableEntry, error) {
+	uplinkBuilderLog := log.WithFields(log.Fields{
+		"pdr": pdr,
+	})
+	uplinkBuilderLog.Trace("Building P4rt table entry for sessions_uplink table")
+
+	tableID := t.tableID(TableUplinkSessions)
+
+	entry := &p4.TableEntry{
+		TableId:  tableID,
+		Priority: DefaultPriority,
+	}
+
+	if err := t.withExactMatchField(entry, FieldN3Address, pdr.tunnelIP4Dst); err != nil {
+		return nil, err
+	}
+
+	if err := t.withTernaryMatchField(entry, FieldTEID, pdr.tunnelTEID, pdr.tunnelTEIDMask); err != nil {
+		return nil, err
+	}
+
+	action := &p4.Action{
+		ActionId: t.actionID(ActSetUplinkSession),
+	}
+
+	entry.Action = &p4.TableAction{
+		Type: &p4.TableAction_Action{Action: action},
+	}
+
+	uplinkBuilderLog.WithField("entry", entry).Trace("Built P4rt table entry for sessions_uplink table")
+	return entry, nil
+}
+
+func (t *P4rtTranslator) buildDownlinkSessionsEntry(pdr pdr, tunnelPeerID uint8, needsBuffering bool) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
 		"pdr": pdr,
 		"tunnelPeerID": tunnelPeerID,
 		"needsBuffering": needsBuffering,
 	})
-	builderLog.Trace("Building P4rt table entry for Sessions table")
+	builderLog.Trace("Building P4rt table entry for sessions_downlink table")
 
-	if pdr.srcIface == 0 {
-		return nil, fmt.Errorf("invalid PDR received with source interface = %v", pdr.srcIface)
-	}
-
-	tableID := t.tableID("PreQosPipe.sessions")
-
+	tableID := t.tableID(TableDownlinkSessions)
 	entry := &p4.TableEntry{
 		TableId:  tableID,
-		// FIXME: we might want to configure priority
 		Priority: DefaultPriority,
 	}
 
-	if err := t.withExactMatchField(entry, "src_iface", pdr.srcIface); err != nil {
+	if err := t.withExactMatchField(entry, FieldUEAddress, pdr.dstIP); err != nil {
 		return nil, err
 	}
 
 	var action *p4.Action
-	if pdr.srcIface == access {
-		if err := t.withExactMatchField(entry, "ipv4_dst", pdr.tunnelIP4Dst); err != nil {
-			return nil, err
-		}
-
-		if err := t.withTernaryMatchField(entry, "teid", pdr.tunnelTEID, pdr.tunnelTEIDMask); err != nil {
-			return nil, err
-		}
-
+	if needsBuffering {
 		action = &p4.Action{
-			ActionId: t.actionID("PreQosPipe.set_params_uplink"),
-		}
-	} else if pdr.srcIface == core {
-		if err := t.withExactMatchField(entry, "ipv4_dst", pdr.dstIP); err != nil {
-			return nil, err
-		}
-
-		if needsBuffering {
-			action = &p4.Action{
-				ActionId: t.actionID("PreQosPipe.set_params_buffering"),
-			}
-		} else {
-			action = &p4.Action{
-				ActionId: t.actionID("PreQosPipe.set_params_downlink"),
-			}
-			if err := t.withActionParam(action, "tunnel_peer_id", tunnelPeerID); err != nil {
-				return nil, err
-			}
+			ActionId: t.actionID(ActSetDownlinkSessionBuff),
 		}
 	} else {
-		return nil, fmt.Errorf("unknown source interface type of PDR: %v", pdr.srcIface)
+		action = &p4.Action{
+			ActionId: t.actionID(ActSetDownlinkSession),
+		}
+		if err := t.withActionParam(action, FieldTunnelPeerID, tunnelPeerID); err != nil {
+			return nil, err
+		}
 	}
 
 	entry.Action = &p4.TableAction{
 		Type: &p4.TableAction_Action{Action: action},
 	}
 
-	builderLog.WithField("entry", entry).Trace("Built P4rt table entry for Sessions table")
+	builderLog.WithField("entry", entry).Trace("Built P4rt table entry for sessions_downlink table")
 	return entry, nil
 }
 
-func (t *P4rtTranslator) BuildTerminationsTableEntry(pdr pdr, relatedFAR far, tc uint8) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) BuildSessionsTableEntry(pdr pdr, tunnelPeerID uint8, needsBuffering bool) (*p4.TableEntry, error) {
+	switch pdr.srcIface {
+	case access:
+		return t.buildUplinkSessionsEntry(pdr)
+	case core:
+		return t.buildDownlinkSessionsEntry(pdr, tunnelPeerID, needsBuffering)
+	default:
+		return nil, fmt.Errorf("unknown source interface type of PDR: %v", pdr.srcIface)
+	}
+}
+
+func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, shouldDrop bool, tc uint8) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
 		"pdr": pdr,
-		"far": relatedFAR,
+		"tc": tc,
 	})
-	builderLog.Debug("Building P4rt table entry for UP4 Terminations table")
+	builderLog.Debug("Building P4rt table entry for UP4 terminations_uplink table")
 
-	if pdr.srcIface == 0 {
-		return nil, fmt.Errorf("invalid PDR received with source interface = %v", pdr.srcIface)
-	}
-
-	tableID := t.tableID("PreQosPipe.terminations")
+	tableID := t.tableID(TableUplinkTerminations)
 	entry := &p4.TableEntry{
 		TableId: tableID,
-		// FIXME: we might want to configure priority
 		Priority: DefaultPriority,
 	}
 
-	// FIXME: how to get slice ID?
-	if err := t.withExactMatchField(entry, "slice_id", uint8(0)); err != nil {
+	if err := t.withExactMatchField(entry, FieldUEAddress, pdr.srcIP); err != nil {
 		return nil, err
-	}
-
-	if err := t.withExactMatchField(entry, "src_iface", pdr.srcIface); err != nil {
-		return nil, err
-	}
-
-	if relatedFAR.Drops() {
-		entry.Action = &p4.TableAction{
-			Type: &p4.TableAction_Action{Action: &p4.Action{
-				ActionId: t.actionID("PreQosPipe.term_drop"),
-			}},
-		}
-		builderLog.WithField("entry", entry).Debug("Built P4rt table entry for Terminations table")
-		return entry, nil
 	}
 
 	var action *p4.Action
-	if pdr.srcIface == access {
-		// TODO: verify with SD-Core that we have srcIP set.
-		if err := t.withExactMatchField(entry, "ue_address", pdr.srcIP); err != nil {
-			return nil, err
+	if shouldDrop {
+		action = &p4.Action{
+			ActionId: t.actionID(ActUplinkTermDrop),
+		}
+	} else {
+		action = &p4.Action{
+			ActionId: t.actionID(ActUplinkTermFwd),
 		}
 
-		action = &p4.Action{
-			ActionId: t.actionID("PreQosPipe.term_uplink"),
-		}
-	} else if pdr.srcIface == core {
-		if err := t.withExactMatchField(entry, "ue_address", pdr.dstIP); err != nil {
+		if err := t.withActionParam(action, FieldTrafficClass, tc); err != nil {
 			return nil, err
 		}
+	}
+
+	if err := t.withActionParam(action, FieldCounterIndex, pdr.ctrID); err != nil {
+		return nil, err
+	}
+
+	entry.Action = &p4.TableAction{
+		Type: &p4.TableAction_Action{Action: action},
+	}
+
+	builderLog.WithField("entry", entry).Debug("Built P4rt table entry for terminations_uplink table")
+	return entry, nil
+}
+
+func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, relatedFAR far, tc uint8) (*p4.TableEntry, error) {
+	builderLog := log.WithFields(log.Fields{
+		"pdr": pdr,
+		"tc": tc,
+		"related-far": relatedFAR,
+	})
+	builderLog.Debug("Building P4rt table entry for UP4 terminations_downlink table")
+
+	tableID := t.tableID(TableDownlinkTerminations)
+	entry := &p4.TableEntry{
+		TableId: tableID,
+		Priority: DefaultPriority,
+	}
+
+	if err := t.withExactMatchField(entry, FieldUEAddress, pdr.dstIP); err != nil {
+		return nil, err
+	}
+
+	var action *p4.Action
+	if relatedFAR.Drops() {
 		action = &p4.Action{
-			ActionId: t.actionID("PreQosPipe.term_downlink"),
+			ActionId: t.actionID(ActDownlinkTermDrop),
+		}
+	} else {
+		action = &p4.Action{
+			ActionId: t.actionID(ActDownlinkTermFwd),
 		}
 
-		if err := t.withActionParam(action, "teid", pdr.tunnelTEID); err != nil {
+		if err := t.withActionParam(action, FieldTEID, pdr.tunnelTEID); err != nil {
 			return nil, err
 		}
 
 		// TODO: add support for QFI, which should be stored as the part of PDR
-		if err := t.withActionParam(action, "qfi", uint8(0)); err != nil {
+		if err := t.withActionParam(action, FieldQFI, uint8(0)); err != nil {
 			return nil, err
 		}
 
-	} else {
-		return nil, fmt.Errorf("unknown source interface type of PDR: %v", pdr.srcIface)
+		if err := t.withActionParam(action, FieldTrafficClass, tc); err != nil {
+			return nil, err
+		}
 	}
 
-	if err := t.withActionParam(action, "ctr_idx", pdr.ctrID); err != nil {
-		return nil, err
-	}
-
-	if err := t.withActionParam(action, "tc", tc); err != nil {
+	if err := t.withActionParam(action, FieldCounterIndex, pdr.ctrID); err != nil {
 		return nil, err
 	}
 
@@ -467,8 +526,19 @@ func (t *P4rtTranslator) BuildTerminationsTableEntry(pdr pdr, relatedFAR far, tc
 		Type: &p4.TableAction_Action{Action: action},
 	}
 
-	builderLog.WithField("entry", entry).Debug("Built P4rt table entry for Terminations table")
+	builderLog.WithField("entry", entry).Debug("Built P4rt table entry for terminations_downlink table")
 	return entry, nil
+}
+
+func (t *P4rtTranslator) BuildTerminationsTableEntry(pdr pdr, relatedFAR far, tc uint8) (*p4.TableEntry, error) {
+	switch pdr.srcIface {
+	case access:
+		return t.buildUplinkTerminationsEntry(pdr, relatedFAR.Drops(), tc)
+	case core:
+		return t.buildDownlinkTerminationsEntry(pdr, relatedFAR, tc)
+	default:
+		return nil, fmt.Errorf("unknown source interface type of PDR: %v", pdr.srcIface)
+	}
 }
 
 func (t *P4rtTranslator) BuildGTPTunnelPeerTableEntry(tunnelPeerID uint8, far far) (*p4.TableEntry, error) {
@@ -478,33 +548,32 @@ func (t *P4rtTranslator) BuildGTPTunnelPeerTableEntry(tunnelPeerID uint8, far fa
 	})
 	builderLog.Trace("Building P4rt table entry for GTP Tunnel Peers table")
 
-	tableID := t.tableID("PreQosPipe.tunnel_peers")
+	tableID := t.tableID(TableTunnelPeers)
 	entry := &p4.TableEntry{
 		TableId:  tableID,
-		// FIXME: we might want to configure priority
 		Priority: DefaultPriority,
 		Action: &p4.TableAction{
 			Type: &p4.TableAction_Action{
 				Action: &p4.Action{
-					ActionId: t.actionID("PreQosPipe.load_tunnel_param"),
+					ActionId: t.actionID(ActLoadTunnelParams),
 				},
 			},
 		},
 	}
 
-	if err := t.withExactMatchField(entry, "tunnel_peer_id", tunnelPeerID); err != nil {
+	if err := t.withExactMatchField(entry, FieldTunnelPeerID, tunnelPeerID); err != nil {
 		return nil, err
 	}
 
-	if err := t.withActionParam(entry.GetAction().GetAction(), "src_addr", far.tunnelIP4Src); err != nil {
+	if err := t.withActionParam(entry.GetAction().GetAction(), FieldTunnelSrcAddress, far.tunnelIP4Src); err != nil {
 		return nil, err
 	}
 
-	if err := t.withActionParam(entry.GetAction().GetAction(), "dst_addr", far.tunnelIP4Dst); err != nil {
+	if err := t.withActionParam(entry.GetAction().GetAction(), FieldTunnelDstAddress, far.tunnelIP4Dst); err != nil {
 		return nil, err
 	}
 
-	if err := t.withActionParam(entry.GetAction().GetAction(), "sport", far.tunnelPort); err != nil {
+	if err := t.withActionParam(entry.GetAction().GetAction(), FieldTunnelSrcPort, far.tunnelPort); err != nil {
 		return nil, err
 	}
 
