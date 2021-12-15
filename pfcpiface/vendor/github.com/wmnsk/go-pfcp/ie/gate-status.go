@@ -60,7 +60,7 @@ func (i *IE) GateStatusUL() (uint8, error) {
 		return 0, err
 	}
 
-	return (v >> 2) & 0xff, nil
+	return (v >> 2) & 0x01, nil
 }
 
 // GateStatusDL returns GateStatusDL in uint8 if the type of IE matches.
@@ -70,5 +70,5 @@ func (i *IE) GateStatusDL() (uint8, error) {
 		return 0, err
 	}
 
-	return v & 0xff, nil
+	return v & 0x01, nil
 }
