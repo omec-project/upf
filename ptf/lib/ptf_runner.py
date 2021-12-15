@@ -192,8 +192,8 @@ def main():
         required=False,
     )
     parser.add_argument(
-        "--trex-sw-mode",
-        help="Disables NIC HW acceleration, required to compute Trex per-flow stats",
+        "--trex-hw-mode",
+        help="Enables NIC HW acceleration and disables TRex software mode",
         action="store_true",
         required=False,
     )
@@ -205,10 +205,11 @@ def main():
 
     # if line rate test, set up and tear down TRex
     if args.trex_address is not None:
-        if args.trex_sw_mode:
-            trex_args = "--software --no-hw-flow-stat"
-        else:
+        if args.trex_hw_mode:
             trex_args = None
+        else:
+            trex_args = "--software --no-hw-flow-stat"
+        
         trex_daemon_client = CTRexClient(args.trex_address, trex_args=trex_args)
 
         info("Starting TRex daemon client...")
