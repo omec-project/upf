@@ -21,9 +21,9 @@ const (
 
 // errors
 var (
-	writeToFastpathErr = errors.New("write to FastPath failed")
-	assocNotFoundErr   = errors.New("no association found for NodeID")
-	allocateSessionErr = errors.New("unable to allocate new PFCP session")
+	ErrWriteToFastpath = errors.New("write to FastPath failed")
+	ErrAssocNotFound   = errors.New("no association found for NodeID")
+	ErrAllocateSession = errors.New("unable to allocate new PFCP session")
 )
 
 func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (message.Message, error) {
@@ -80,13 +80,13 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 	if strings.Compare(nodeID, pConn.nodeID.remote) != 0 {
 		log.Warnln("Association not found for Establishment request",
 			"with nodeID: ", nodeID, ", Association NodeID: ", pConn.nodeID.remote)
-		return errProcessReply(assocNotFoundErr, ie.CauseNoEstablishedPFCPAssociation)
+		return errProcessReply(ErrAssocNotFound, ie.CauseNoEstablishedPFCPAssociation)
 	}
 
 	/* Read CreatePDRs and CreateFARs from payload */
 	localSEID := pConn.NewPFCPSession(remoteSEID)
 	if localSEID == 0 {
-		return errProcessReply(allocateSessionErr,
+		return errProcessReply(ErrAllocateSession,
 			ie.CauseNoResourcesAvailable)
 	}
 
@@ -127,7 +127,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 	cause := upf.sendMsgToUPF(upfMsgTypeAdd, session.pdrs, session.fars, session.qers)
 	if cause == ie.CauseRequestRejected {
 		pConn.RemoveSession(session.localSEID)
-		return errProcessReply(writeToFastpathErr,
+		return errProcessReply(ErrWriteToFastpath,
 			ie.CauseRequestRejected)
 	}
 
@@ -308,7 +308,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 
 	cause := upf.sendMsgToUPF(upfMsgTypeMod, addPDRs, addFARs, addQERs)
 	if cause == ie.CauseRequestRejected {
-		return sendError(writeToFastpathErr)
+		return sendError(ErrWriteToFastpath)
 	}
 
 	if session.getNotifyFlag() {
@@ -370,7 +370,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 
 	cause = upf.sendMsgToUPF(upfMsgTypeDel, delPDRs, delFARs, delQERs)
 	if cause == ie.CauseRequestRejected {
-		return sendError(writeToFastpathErr)
+		return sendError(ErrWriteToFastpath)
 	}
 
 	// Build response message
@@ -415,7 +415,7 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 
 	cause := upf.sendMsgToUPF(upfMsgTypeDel, session.pdrs, session.fars, session.qers)
 	if cause == ie.CauseRequestRejected {
-		return sendError(writeToFastpathErr)
+		return sendError(ErrWriteToFastpath)
 	}
 
 	if err := releaseAllocatedIPs(upf.ippool, session); err != nil {
