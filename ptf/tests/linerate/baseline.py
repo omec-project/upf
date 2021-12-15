@@ -145,11 +145,11 @@ class DownlinkPerformanceBaselineTest(TrexTest, GrpcTest):
             f"Didn't receive all packets; sent {flow_stats.tx_packets}, received {flow_stats.rx_packets}",
         ) 
 
-        # 99.9th %ile latency < 100 us
+        # 99.9th %ile latency < 1000 us
         self.assertLessEqual(
             lat_stats.percentile_99_9,
-            100,
-            f"99.9th %ile latency was higher than 100 us! Was {lat_stats.percentile_99_9} us",
+            1000,
+            f"99.9th %ile latency was higher than 1000 us! Was {lat_stats.percentile_99_9} us",
         )
 
         # jitter < 20 us

@@ -164,11 +164,11 @@ class PerFlowQosMetricsTest(TrexTest, GrpcTest):
                 f"99.9th %ile latency was higher than 200 us! Was {int(lat[2]) / 1000} us"
             )
 
-            # 99th% jitter < 20 us
+            # 99th% jitter < 100 us
             self.assertLessEqual(
                 int(jitter[1]) / 1000,
-                20,
-                f"99th %ile jitter was higher than 20 us! Was {int(jitter[1]) / 1000} us"  
+                100,
+                f"99th %ile jitter was higher than 100 us! Was {int(jitter[1]) / 1000} us"  
             )
 
         return
