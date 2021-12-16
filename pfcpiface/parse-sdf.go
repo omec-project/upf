@@ -5,7 +5,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -33,14 +32,14 @@ func (ep *endpoint) parseNet(ipnet string) error {
 		ipnet = ipNetFields[0] + "/32"
 	case 2:
 	default:
-		return errors.New("incorrect network string")
+		return ErrInvalidArgument("network string", len(ipNetFields))
 	}
 
 	var err error
 
 	_, ep.IPNet, err = net.ParseCIDR(ipnet)
 	if err != nil {
-		return errors.New("unable to ParseCIDR")
+		return ErrOperationFailedWithReason("ParseCIDR", err.Error())
 	}
 
 	return nil
@@ -49,7 +48,7 @@ func (ep *endpoint) parseNet(ipnet string) error {
 func (ep *endpoint) parsePort(port string) error {
 	ports := strings.Split(port, "-")
 	if len(ports) == 0 || len(ports) > 2 {
-		return fmt.Errorf("invalid port string \"%v\"", port)
+		return ErrInvalidArgument("port string", port)
 	}
 	// Pretend this is a port range with one element.
 	if len(ports) == 1 {
@@ -67,7 +66,7 @@ func (ep *endpoint) parsePort(port string) error {
 
 	// TODO: support port ranges
 	if low != high {
-		return fmt.Errorf("port ranges are not supported yet \"%v\"", port)
+		return ErrInvalidArgumentWithReason("port", port, "port ranges are not supported yet")
 	}
 
 	ep.Port = uint16(low)

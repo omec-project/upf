@@ -203,7 +203,7 @@ func (pConn *PFCPConn) Serve() {
 }
 
 // Shutdown stops connection backing PFCPConn.
-func (pConn *PFCPConn) Shutdown() error {
+func (pConn *PFCPConn) Shutdown() {
 	close(pConn.shutdown)
 
 	if pConn.hbCtxCancel != nil {
@@ -222,12 +222,11 @@ func (pConn *PFCPConn) Shutdown() error {
 
 	err := pConn.Close()
 	if err != nil {
-		return err
+		log.Error("Failed to close PFCP connection..")
+		return
 	}
 
 	log.Infoln("Shutdown complete for", rAddr)
-
-	return nil
 }
 
 func (pConn *PFCPConn) getSeqNum() uint32 {

@@ -4,7 +4,6 @@
 package main
 
 import (
-	"fmt"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -47,7 +46,7 @@ func (s *simMode) Set(value string) error {
 	case "create_continue":
 		*s = simModeCreateAndContinue
 	default:
-		return fmt.Errorf("unknown sim mode %v", value)
+		return ErrInvalidArgument("sim mode", value)
 	}
 	return nil
 }

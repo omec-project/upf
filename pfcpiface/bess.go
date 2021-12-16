@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/binary"
 	"flag"
-	"fmt"
 	"net"
 	"strconv"
 	"time"
@@ -1094,7 +1093,7 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 
 func (b *bess) processQER(ctx context.Context, any *anypb.Any, method upfMsgType, qosTableName string) error {
 	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
-		return fmt.Errorf("invalid method name: %v", method)
+		return ErrInvalidArgument("method name", method)
 	}
 
 	methods := [...]string{"add", "add", "delete", "clear"}
