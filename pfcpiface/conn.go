@@ -75,6 +75,7 @@ func (pConn *PFCPConn) startHeartBeatMonitor() {
 	pConn.hbCtxCancel = hbCancel
 
 	log.Infoln("Starting Heartbeat timer")
+
 	heartBeatTimer := time.NewTimer(pConn.upf.hbInterval)
 
 	for {
@@ -151,6 +152,7 @@ func (pConn *PFCPConn) setLocalNodeID(id string) {
 	if id != "" && nodeIP == nil {
 		pConn.nodeID.localIE = ie.NewNodeID("", "", id)
 		pConn.nodeID.local = id
+
 		return
 	}
 
@@ -173,6 +175,7 @@ func (pConn *PFCPConn) setLocalNodeID(id string) {
 func (pConn *PFCPConn) Serve() {
 	go func() {
 		recvBuf := make([]byte, 65507) // Maximum UDP payload size
+
 		for {
 			n, err := pConn.Read(recvBuf)
 			if err != nil {
@@ -182,8 +185,8 @@ func (pConn *PFCPConn) Serve() {
 
 				continue
 			}
-			buf := append([]byte{}, recvBuf[:n]...)
 
+			buf := append([]byte{}, recvBuf[:n]...)
 			pConn.HandlePFCPMsg(buf)
 		}
 	}()

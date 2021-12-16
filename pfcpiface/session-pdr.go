@@ -19,10 +19,13 @@ func releaseAllocatedIPs(ippool *IPPool, session *PFCPSession) error {
 	for _, pdr := range session.pdrs {
 		if (pdr.allocIPFlag) && (pdr.srcIface == core) {
 			var ueIP net.IP = int2ip(pdr.dstIP)
+
 			log.Traceln("Releasing IP", ueIP, " of session", session.localSEID)
+
 			return ippool.DeallocIP(session.localSEID)
 		}
 	}
+
 	return nil
 }
 

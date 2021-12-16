@@ -59,6 +59,7 @@ func (ep *endpoint) parsePort(port string) error {
 	if err != nil {
 		return err
 	}
+
 	high, err := strconv.ParseUint(ports[1], 10, 16)
 	if err != nil {
 		return err
