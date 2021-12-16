@@ -198,6 +198,7 @@ func main() {
 
 	if simulate.enable() {
 		upf.sim(simulate, &conf.SimInfo)
+
 		if !simulate.keepGoing() {
 			return
 		}
@@ -222,6 +223,7 @@ func main() {
 	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
+
 	node := NewPFCPNode(ctx, upf)
 	go node.Serve()
 

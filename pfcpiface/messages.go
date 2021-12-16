@@ -56,9 +56,10 @@ func (r *Request) GetResponse(done <-chan struct{}, respDuration time.Duration) 
 
 // HandlePFCPMsg handles different types of PFCP messages.
 func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
-
-	var reply message.Message
-	var err error
+	var (
+		reply message.Message
+		err   error
+	)
 
 	msg, err := message.Parse(buf)
 	if err != nil {
@@ -140,12 +141,14 @@ func (pConn *PFCPConn) SendPFCPMsg(msg message.Message) {
 	if err := msg.MarshalTo(out); err != nil {
 		m.Finish(nodeID, "Failure")
 		log.Errorln("Failed to marshal", msgType, "for", addr, err)
+
 		return
 	}
 
 	if _, err := pConn.Write(out); err != nil {
 		m.Finish(nodeID, "Failure")
 		log.Errorln("Failed to transmit", msgType, "to", addr, err)
+
 		return
 	}
 
@@ -154,15 +157,15 @@ func (pConn *PFCPConn) SendPFCPMsg(msg message.Message) {
 }
 
 func (pConn *PFCPConn) sendPFCPRequestMessage(r *Request) (message.Message, bool) {
-
 	pConn.pendingReqs.Store(r.msg.Sequence(), r)
-
 	pConn.SendPFCPMsg(r.msg)
 
 	retriesLeft := pConn.upf.maxReqRetries
+
 	for {
 		if reply, rc := r.GetResponse(pConn.shutdown, pConn.upf.respTimeout); rc {
 			log.Traceln("Request Timeout, retriesLeft:", retriesLeft)
+
 			if retriesLeft > 0 {
 				pConn.SendPFCPMsg(r.msg)
 				retriesLeft--

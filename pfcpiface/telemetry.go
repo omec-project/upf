@@ -102,6 +102,7 @@ func (uc *upfCollector) Describe(ch chan<- *prometheus.Desc) {
 func (uc *upfCollector) Collect(ch chan<- prometheus.Metric) {
 	uc.summaryLatencyJitter(ch)
 	uc.portStats(ch)
+
 	if uc.upf.enableFlowMeasure {
 		if err := uc.sessionStats(ch); err != nil {
 			log.Error(err)

@@ -62,7 +62,6 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 	fseidIP := ip2int(fseid.IPv4Address)
 
 	errProcessReply := func(err error, cause uint8) (message.Message, error) {
-
 		// Build response message
 		seres := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
 			0,                    /* FO <-- what's this? */
@@ -131,6 +130,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 	}
 
 	var localFSEID *ie.IE
+
 	localIP := pConn.LocalAddr().(*net.UDPAddr).IP
 	if localIP.To4() != nil {
 		localFSEID = ie.NewFSEID(session.localSEID, localIP, nil)
@@ -533,5 +533,6 @@ func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) (message
 
 		return nil, nil
 	}
+
 	return nil, nil
 }

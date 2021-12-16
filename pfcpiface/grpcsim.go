@@ -48,6 +48,7 @@ func (s *simMode) Set(value string) error {
 	default:
 		return ErrInvalidArgument("sim mode", value)
 	}
+
 	return nil
 }
 
