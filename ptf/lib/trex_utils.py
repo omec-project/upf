@@ -13,6 +13,9 @@ K = 1000
 M = 1000 * K
 G = 1000 * M
 
+"""
+Library of useful functions for parsing and reading TRex statistics.
+"""
 
 def to_readable(src: int, unit: str = "bps") -> str:
     """

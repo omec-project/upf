@@ -7,6 +7,7 @@ set -eux -o pipefail
 
 TEST_DIR="$(pwd)"
 
+# Read in parameters following style: https://google.github.io/styleguide/shellguide.html#case-statement
 while getopts 't:' flag; do
 	case "${flag}" in
 	t) testdir="${OPTARG}" ;;
@@ -15,13 +16,16 @@ while getopts 't:' flag; do
 done
 
 testName="${3:-""}"
+# assign random number to each instance of ptf container
 runName=ptf-${RANDOM}
 
 source .env
 echo "*** Starting tests in container (${runName})..."
-# Do not attach stdin if running in an environment without it (e.g., Jenkins)
+
+# Do not attach stdin if running in an environment without it (e.g. Jenkins)
 it=$(test -t 0 && echo "-it" || echo "-t")
 
+# run PTF command from script in test container with all necessary dependencies
 docker run --name "${runName}" "${it}" \
 	--privileged \
 	-v "${TEST_DIR}":/upf-tests/ \

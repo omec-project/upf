@@ -36,10 +36,10 @@ GATE_DROP = 0x5
 GATE_UNMETER = 0x6
 
 class GrpcTest(BaseTest):
-    """Define a base test for communicating with BESS over gRPC
+    """Define a base test for communicating with BESS over gRPC messages
 
-    This base test contains setUp, tearDown and a library of functions for
-    configuring rules on BESS and reading metrics.
+    This base test contains setUp, tearDown and a library of functions
+    for installing rules on BESS and reading metrics from BESS.
     """
 
     def setUp(self):
@@ -53,10 +53,12 @@ class GrpcTest(BaseTest):
         self.channel = grpc.insecure_channel(target=bess_server_addr)
         self.bess_client = pb.BESSControlStub(self.channel)
     
-    """ API for getting metrics from BESS-UPF """
+    """
+    API for reading metrics from BESS-UPF modules
+    """
 
     def getPortStats(self, ifname):
-        # to get bess interface names:
+        # to reveal bess interface names:
         # `docker exec -it bess ./bessctl`
         # `$ show port`
         req = bess_msg.GetPortStatsRequest(
@@ -66,7 +68,7 @@ class GrpcTest(BaseTest):
         return self.bess_client.GetPortStats(req)
     
     def _readFlowMeasurement(self, module, clear, quantiles):
-        # pack request for flow measurements and send to bess
+        # create request for flow measurements and send to bess
         request = module_msg.FlowMeasureCommandReadArg(
             clear=clear,
             latency_percentiles=quantiles,
@@ -97,6 +99,10 @@ class GrpcTest(BaseTest):
         return msg
 
     def getSessionStats(self, q=[50, 90, 99], quiet=False):
+        """
+        Get QoS metrics from 3 different modules directly from BESS-UPF
+        and return back in Python dictionary format
+        """
 
         # Pre-Qos Measurement Module
         qosStatsInResp = self._readFlowMeasurement(
@@ -137,7 +143,7 @@ class GrpcTest(BaseTest):
             "postUlQos": postUlQosStatsResp,
         }
 
-    """ API for configuring BESS-UPF """
+    """ API for installing rules onto BESS-UPF over BESS gRPC calls """
 
     def createPDR(
         self,
@@ -327,7 +333,7 @@ class GrpcTest(BaseTest):
             qerID = qerID
             break
 
-        # parse params of pdr into WildcardMatchCommandAddArg
+        # parse params of PDR tuple into a wildcard match message to send to BESS
         f = module_msg.WildcardMatchCommandAddArg(
             gate = pdr.needDecap,
             priority = 4294967295 - pdr.precedence, # XXX: golang max 32 bit uint
@@ -364,7 +370,7 @@ class GrpcTest(BaseTest):
         any = Any()
         any.Pack(f)
 
-        # send client module command with method add and arg stored Any()
+        # send request to UPF to add rule
         response = self.bess_client.ModuleCommand(
             bess_msg.CommandRequest(
                 name = "pdrLookup",
@@ -407,7 +413,7 @@ class GrpcTest(BaseTest):
         any = Any()
         any.Pack(f)
 
-        # send client module command with method delete and arg stored Any()
+        # send request to UPF to delete rule
         response = self.bess_client.ModuleCommand(
             bess_msg.CommandRequest(
                 name = "pdrLookup",
@@ -462,7 +468,7 @@ class GrpcTest(BaseTest):
         any = Any()
         any.Pack(f)
 
-        # send client module command with method add and arg stored Any()
+        # send request to UPF to add rule
         response = self.bess_client.ModuleCommand(
             bess_msg.CommandRequest(
                 name = "farLookup",
@@ -489,7 +495,7 @@ class GrpcTest(BaseTest):
         any = Any()
         any.Pack(f)
 
-        # send client module command with method delete and arg stored Any()
+        # send request to UPF to delete rule
         response = self.bess_client.ModuleCommand(
             bess_msg.CommandRequest(
                 name = "farLookup",
@@ -675,7 +681,7 @@ class GrpcTest(BaseTest):
 
 """ Functionality for flow cleanup after tests """
 
-def cleanupRules(test):
+def _cleanupRules(test):
     for pdr in test.pdrs:
         test.delPDR(pdr)
 
@@ -691,6 +697,10 @@ def cleanupRules(test):
     return
 
 def autocleanup(f):
+    """
+    Decorator for cleaning up installed rules after a PTF test's
+    completion
+    """
     @wraps(f)
     def handle(*args, **kwargs):
         test = args[0]
@@ -704,7 +714,7 @@ def autocleanup(f):
 
         finally:
             # cleanup rules for pdrs, fars, app qers and session qers
-            cleanupRules(test)
+            _cleanupRules(test)
 
             # clear lists
             test.pdrs = []

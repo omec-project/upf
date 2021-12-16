@@ -7,6 +7,10 @@ from ptf.base_tests import BaseTest
 
 
 class TrexTest(BaseTest):
+    """
+    Base test for setting up and tearing down TRex client instance for
+    linerate tests.
+    """
     def setUp(self):
         super(TrexTest, self).setUp()
         trex_server_addr = testutils.test_param_get("trex_server_addr")

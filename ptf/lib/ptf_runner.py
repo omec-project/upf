@@ -91,6 +91,14 @@ def remove_dummy_interface():
 
 
 def set_up_trex_server(trex_daemon_client, trex_address, trex_config):
+    """Start the TRex daemon client to run while PTF tests are running
+
+    The TRex daemon client handles spawning TRex clients for each PTF
+    test case. A TRex client is a temporary client that generates
+    traffic. At the end of the PTF test, the TRex daemon client also
+    handles closing this client.
+    """
+
     try:
         info("Pushing TRex config %s to the server", trex_config)
         if not trex_daemon_client.push_files(trex_config):
@@ -124,11 +132,13 @@ def run_test(
     Runs PTF tests included in provided directory.
     """
 
+    # create a dummy interface for PTF
     if not create_dummy_interface() or not set_up_interfaces([DUMMY_IFACE_NAME]):
         return False
 
     pypath = "/upf-tests/lib"
 
+    # build the ptf command to be run
     cmd = ["ptf"]
     cmd.extend(["--test-dir", ptfdir])
     cmd.extend(["--pypath", pypath])
@@ -141,14 +151,14 @@ def run_test(
     info("Executing PTF command: {}".format(" ".join(cmd)))
 
     try:
-        # send ptf output to stdout.
+        # run ptf and send output to stdout
         p = subprocess.Popen(cmd)
         p.wait()
     except Exception:
         error("Error when running PTF tests")
         return False
     finally:
-        # always clean up the dummy interface.
+        # always clean up the dummy interface
         remove_dummy_interface()
 
     return p.returncode == 0
@@ -167,6 +177,11 @@ def check_ptf():
 
 # noinspection PyTypeChecker
 def main():
+
+    """
+    Read in all command line arguments.
+    """
+
     parser = argparse.ArgumentParser(
         description="Start TRex daemon client and run PTF command"
     )
@@ -199,11 +214,16 @@ def main():
     )
     args, unknown_args = parser.parse_known_args()
 
+    # ensure PTF command is available
     if not check_ptf():
         error("Cannot find PTF executable")
         sys.exit(1)
 
-    # if line rate test, set up and tear down TRex
+    """
+    Run either linerate or unary test case, depending on arguments.
+    """
+
+    # if line rate test, need to perform set up of TRex traffic generator
     if args.trex_address is not None:
         if args.trex_hw_mode:
             trex_args = None
@@ -234,6 +254,7 @@ def main():
 
         trex_daemon_client.stop_trex()
 
+    # if unary test, can skip TRex set up and just run PTF command
     else:
         info("Running unary test(s)...")
         success = run_test(
