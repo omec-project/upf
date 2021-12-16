@@ -3,7 +3,7 @@
 
 # generates python protobuf files and builds ptf docker image
 build: 
-	cd ..; make py-pb
+	cd .. && make py-pb
 	docker build -t bess-upf-ptf .
 
 # removes generated python protobuf files

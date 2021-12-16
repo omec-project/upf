@@ -110,7 +110,7 @@ docker rm -f pause bess bess-routectl bess-web bess-pfcpiface || true
 sudo rm -rf /var/run/netns/pause
 
 # Build
-make docker-build
+DOCKER_TARGETS=bess make docker-build
 
 if [ "$mode" == 'dpdk' ]; then
 	DEVICES=${DEVICES:-'--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio'}
@@ -183,6 +183,8 @@ docker run --name bess-web -d --restart unless-stopped \
 	upf-epc-bess:"$(<VERSION)" http 0.0.0.0 $gui_port
 
 # Run bess-pfcpiface depending on mode type
+# FIXME: remove dependency on pfcpiface when running ptf tests
+# modify ptf to do initial setup instead of pfcpiface
 docker run --name bess-pfcpiface -td --restart on-failure \
 	--net container:pause \
 	-v "$PWD/conf/upf.json":/conf/upf.json \
