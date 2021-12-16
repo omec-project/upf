@@ -4,7 +4,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -27,7 +26,7 @@ func (i *IPPool) DeallocIP(seid uint64) error {
 	ip, ok := i.inventory[seid]
 	if !ok {
 		log.Warnln("Attempt to dealloc non-existent session", seid)
-		return fmt.Errorf("can't dealloc non-existent session %v", seid)
+		return ErrInvalidArgumentWithReason("seid", seid, "can't dealloc non-existent session")
 	}
 
 	delete(i.inventory, seid)
@@ -41,8 +40,7 @@ func (i *IPPool) LookupOrAllocIP(seid uint64) (net.IP, error) {
 	defer i.mu.Unlock()
 
 	if len(i.freePool) == 0 {
-		err := errors.New("ip pool empty")
-		return nil, err
+		return nil, ErrOperationFailedWithReason("IP allocation", "ip pool empty")
 	}
 
 	// Try to find an exiting session and return the allocated IP.

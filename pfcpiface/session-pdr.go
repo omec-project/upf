@@ -4,7 +4,6 @@
 package main
 
 import (
-	"errors"
 	"net"
 
 	log "github.com/sirupsen/logrus"
@@ -64,7 +63,7 @@ func (s *PFCPSession) UpdatePDR(p pdr) error {
 		}
 	}
 
-	return errors.New("PDR not found")
+	return ErrNotFound("PDR")
 }
 
 // RemovePDR removes pdr from existing list of PDRs in the session.
@@ -76,5 +75,5 @@ func (s *PFCPSession) RemovePDR(id uint32) (*pdr, error) {
 		}
 	}
 
-	return nil, errors.New("PDR not found")
+	return nil, ErrNotFound("PDR")
 }

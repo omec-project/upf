@@ -47,7 +47,7 @@ func (q *qer) parseQER(ie1 *ie.IE, seid uint64) error {
 	qerID, err := ie1.QERID()
 	if err != nil {
 		log.Println("Could not read QER ID!")
-		return nil
+		return err
 	}
 
 	qfi, err := ie1.QFI()

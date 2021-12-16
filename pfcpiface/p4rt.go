@@ -5,7 +5,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"math/rand"
 	"net"
 	"time"
@@ -123,7 +122,7 @@ func setCounterSize(p *p4rtc, counterID uint8, name string) error {
 		}
 	}
 
-	errin := fmt.Errorf("countername not found %s", name)
+	errin := ErrNotFoundWithParam("counter", "name", name)
 
 	return errin
 }
@@ -158,7 +157,7 @@ func getCounterVal(p *p4rtc, counterID uint8) (uint64, error) {
 		}
 	}
 
-	return 0, fmt.Errorf("key alloc fail %v", val)
+	return 0, ErrOperationFailedWithParam("counter allocation", "final val", val)
 }
 
 func (p *p4rtc) exit() {
@@ -198,8 +197,7 @@ func initCounter(p *p4rtc) error {
 	var errin error
 
 	if p.p4client == nil {
-		errin = fmt.Errorf("can't initialize counter. P4client null")
-		return errin
+		return ErrOperationFailedWithReason("init counter", "P4client null")
 	}
 
 	p.counters = make([]counter, 2)
