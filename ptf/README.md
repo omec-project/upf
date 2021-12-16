@@ -1,5 +1,7 @@
 # PTF tests for BESS-UPF
 
+[![Build Status](https://jenkins.onosproject.org/buildStatus/icon?job=bess-upf-linerate-tests&subject=PTF+Linerate+Tests)](https://jenkins.onosproject.org/job/bess-upf-linerate-tests/)
+
 ## Tools
 * [PTF](https://github.com/p4lang/PTF): "Packet Testing Framework"; a
 data plane testing framework written in Python
