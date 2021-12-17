@@ -52,12 +52,6 @@ type counter struct {
 	// free      map[uint64]uint64
 }
 
-type tunnelParams struct {
-	tunnelIP4Src uint32
-	tunnelIP4Dst uint32
-	tunnelPort   uint16
-}
-
 type UP4 struct {
 	host            string
 	deviceID        uint64
@@ -446,7 +440,7 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
 
 	methodType := p4.Update_MODIFY
 	tunnelParams := tunnelParams{
-		tunnelIP4Src: ip2int(up4.accessIP.IP.To4()),
+		tunnelIP4Src: ip2int(up4.accessIP.IP),
 		tunnelIP4Dst: far.tunnelIP4Dst,
 		tunnelPort:   far.tunnelPort,
 	}
@@ -465,7 +459,7 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
 		methodType = p4.Update_INSERT
 	}
 
-	gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(tunnelPeerID, far)
+	gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(tunnelPeerID, tunnelParams)
 	if err != nil {
 		return err
 	}
@@ -484,7 +478,7 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 		"far": far,
 	})
 	tunnelParams := tunnelParams{
-		tunnelIP4Src: ip2int(up4.accessIP.IP.To4()),
+		tunnelIP4Src: ip2int(up4.accessIP.IP),
 		tunnelIP4Dst: far.tunnelIP4Dst,
 		tunnelPort:   far.tunnelPort,
 	}
@@ -498,7 +492,7 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 
 	removeLog.WithField("tunnel-peer-id", tunnelPeerID)
 
-	gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(tunnelPeerID, far)
+	gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(tunnelPeerID, tunnelParams)
 	if err != nil {
 		removeLog.Error("failed to build GTP tunnel peer entry to remove")
 		return
@@ -615,7 +609,7 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 		log.Println(far)
 
 		tunnelParams := tunnelParams{
-			tunnelIP4Src: ip2int(up4.accessIP.IP.To4()),
+			tunnelIP4Src: ip2int(up4.accessIP.IP),
 			tunnelIP4Dst: far.tunnelIP4Dst,
 			tunnelPort:   far.tunnelPort,
 		}

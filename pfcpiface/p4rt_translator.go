@@ -48,6 +48,12 @@ const (
 	DefaultPriority = 0
 )
 
+type tunnelParams struct {
+	tunnelIP4Src uint32
+	tunnelIP4Dst uint32
+	tunnelPort   uint16
+}
+
 type P4rtTranslator struct {
 	p4Info p4ConfigV1.P4Info
 }
@@ -335,12 +341,14 @@ func (t *P4rtTranslator) getLPMMatchFieldValue(tableEntry *p4.TableEntry, name s
 					"trying to get LPM value for non-LPM match field")
 			}
 
-			ipNet := &net.IPNet{}
-			ipNet.IP = make([]byte, 4)
-			copy(ipNet.IP, lpmField.Value)
-			ipNet.Mask = net.CIDRMask(int(lpmField.PrefixLen), 32-int(lpmField.PrefixLen))
+			ipNet := &net.IPNet{
+				IP: make(net.IP, net.IPv4len),
+				Mask: net.CIDRMask(int(lpmField.PrefixLen), 8*net.IPv4len),
+			}
+			copy(ipNet.IP, lpmField.Value[:])
 
 			return ipNet, nil
+
 		}
 	}
 
@@ -593,10 +601,10 @@ func (t *P4rtTranslator) BuildTerminationsTableEntry(pdr pdr, relatedFAR far, tc
 	}
 }
 
-func (t *P4rtTranslator) BuildGTPTunnelPeerTableEntry(tunnelPeerID uint8, far far) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) BuildGTPTunnelPeerTableEntry(tunnelPeerID uint8, tunnelParams tunnelParams) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
 		"tunnelPeerID": tunnelPeerID,
-		"far":          far,
+		"tunnel-params": tunnelParams,
 	})
 	builderLog.Trace("Building P4rt table entry for GTP Tunnel Peers table")
 
@@ -617,15 +625,15 @@ func (t *P4rtTranslator) BuildGTPTunnelPeerTableEntry(tunnelPeerID uint8, far fa
 		return nil, err
 	}
 
-	if err := t.withActionParam(entry.GetAction().GetAction(), FieldTunnelSrcAddress, far.tunnelIP4Src); err != nil {
+	if err := t.withActionParam(entry.GetAction().GetAction(), FieldTunnelSrcAddress, tunnelParams.tunnelIP4Src); err != nil {
 		return nil, err
 	}
 
-	if err := t.withActionParam(entry.GetAction().GetAction(), FieldTunnelDstAddress, far.tunnelIP4Dst); err != nil {
+	if err := t.withActionParam(entry.GetAction().GetAction(), FieldTunnelDstAddress, tunnelParams.tunnelIP4Dst); err != nil {
 		return nil, err
 	}
 
-	if err := t.withActionParam(entry.GetAction().GetAction(), FieldTunnelSrcPort, far.tunnelPort); err != nil {
+	if err := t.withActionParam(entry.GetAction().GetAction(), FieldTunnelSrcPort, tunnelParams.tunnelPort); err != nil {
 		return nil, err
 	}
 
