@@ -15,9 +15,9 @@ type notifyFlag struct {
 }
 
 type PacketForwardingRules struct {
-	pdrs             []pdr
-	fars             []far
-	qers             []qer
+	pdrs []pdr
+	fars []far
+	qers []qer
 }
 
 // PFCPSession implements one PFCP session.

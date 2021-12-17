@@ -31,9 +31,9 @@ const invalidID = 0
 
 // Table Entry Function Type.
 const (
-	FunctionTypeInsert uint8  = 1               // Insert table Entry Function
-	FunctionTypeUpdate uint8  = 2               // Update table Entry Function
-	FunctionTypeDelete uint8  = 3               // Delete table Entry Function
+	FunctionTypeInsert uint8 = 1 // Insert table Entry Function
+	FunctionTypeUpdate uint8 = 2 // Update table Entry Function
+	FunctionTypeDelete uint8 = 3 // Delete table Entry Function
 )
 
 // P4rtClient ... P4 Runtime client object.
@@ -46,7 +46,7 @@ type P4rtClient struct {
 	digests    chan *p4.DigestList
 
 	// exported fields
-	P4Info   p4ConfigV1.P4Info
+	P4Info p4ConfigV1.P4Info
 }
 
 // CheckStatus ... Check client connection status.
@@ -91,6 +91,7 @@ func (c *P4rtClient) Init() (err error) {
 	//                                   time.Duration(timeout) * time.Second)
 	// defer cancel()
 	c.digests = make(chan *p4.DigestList, 1024)
+
 	c.stream, err = c.client.StreamChannel(
 		context.Background(),
 		grpcRetry.WithMax(3),
@@ -135,7 +136,9 @@ func (c *P4rtClient) Init() (err error) {
 func (c *P4rtClient) GetNextDigestData() []byte {
 	// blocking
 	nextDigest := <-c.digests
-	log.Println("Received Digest")
+
+	log.Debug("Received Digest")
+
 	for _, p4d := range nextDigest.GetData() {
 		if bitstring := p4d.GetBitstring(); bitstring != nil {
 			return bitstring
@@ -243,7 +246,7 @@ func (c *P4rtClient) ClearTable(tableID uint32) error {
 }
 
 // InsertTableEntry .. Insert table Entry.
-func (c *P4rtClient) InsertTableEntry(entry *p4.TableEntry, funcType uint8, prio int32) error {
+func (c *P4rtClient) InsertTableEntry(entry *p4.TableEntry, funcType uint8) error {
 	log.Println("Insert Table Entry for Table ", entry.TableId)
 
 	var updateType p4.Update_Type
@@ -269,6 +272,7 @@ func (c *P4rtClient) InsertTableEntry(entry *p4.TableEntry, funcType uint8, prio
 
 func (c *P4rtClient) ApplyTableEntries(methodType p4.Update_Type, entries ...*p4.TableEntry) error {
 	var updates []*p4.Update
+
 	for _, entry := range entries {
 		update := &p4.Update{
 			Type: methodType,

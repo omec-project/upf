@@ -4,51 +4,94 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
+	"net"
+
 	p4ConfigV1 "github.com/p4lang/p4runtime/go/p4/config/v1"
 	p4 "github.com/p4lang/p4runtime/go/p4/v1"
 	log "github.com/sirupsen/logrus"
-	"net"
 )
 
 // P4 constants
 const (
-	FieldN3Address = "n3_address"
-	FieldUEAddress = "ue_address"
-	FieldTEID = "teid"
-	FieldQFI = "qfi"
-	FieldCounterIndex = "ctr_idx"
-	FieldTrafficClass = "tc"
-	FieldTunnelPeerID = "tunnel_peer_id"
+	FieldN3Address        = "n3_address"
+	FieldUEAddress        = "ue_address"
+	FieldTEID             = "teid"
+	FieldQFI              = "qfi"
+	FieldCounterIndex     = "ctr_idx"
+	FieldTrafficClass     = "tc"
+	FieldTunnelPeerID     = "tunnel_peer_id"
 	FieldTunnelSrcAddress = "src_addr"
 	FieldTunnelDstAddress = "dst_addr"
-	FieldTunnelSrcPort = "sport"
+	FieldTunnelSrcPort    = "sport"
 
-	TableTunnelPeers = "PreQosPipe.tunnel_peers"
+	TableTunnelPeers          = "PreQosPipe.tunnel_peers"
 	TableDownlinkTerminations = "PreQosPipe.terminations_downlink"
-	TableUplinkTerminations = "PreQosPipe.terminations_uplink"
-	TableDownlinkSessions = "PreQosPipe.sessions_downlink"
-	TableUplinkSessions = "PreQosPipe.sessions_uplink"
+	TableUplinkTerminations   = "PreQosPipe.terminations_uplink"
+	TableDownlinkSessions     = "PreQosPipe.sessions_downlink"
+	TableUplinkSessions       = "PreQosPipe.sessions_uplink"
 
-	ActSetUplinkSession = "PreQosPipe.set_session_uplink"
-	ActSetDownlinkSession = "PreQosPipe.set_session_downlink"
+	ActSetUplinkSession       = "PreQosPipe.set_session_uplink"
+	ActSetDownlinkSession     = "PreQosPipe.set_session_downlink"
 	ActSetDownlinkSessionBuff = "PreQosPipe.set_session_downlink_buff"
-    ActUplinkTermDrop = "PreQosPipe.uplink_term_drop"
-    ActUplinkTermFwd = "PreQosPipe.uplink_term_fwd"
-	ActDownlinkTermDrop = "PreQosPipe.downlink_term_drop"
-	ActDownlinkTermFwd = "PreQosPipe.downlink_term_fwd"
-	ActLoadTunnelParams = "PreQosPipe.load_tunnel_param"
+	ActUplinkTermDrop         = "PreQosPipe.uplink_term_drop"
+	ActUplinkTermFwd          = "PreQosPipe.uplink_term_fwd"
+	ActDownlinkTermDrop       = "PreQosPipe.downlink_term_drop"
+	ActDownlinkTermFwd        = "PreQosPipe.downlink_term_fwd"
+	ActLoadTunnelParams       = "PreQosPipe.load_tunnel_param"
 
 	DefaultPriority = 0
 )
 
 type P4rtTranslator struct {
-	p4Info     p4ConfigV1.P4Info
+	p4Info p4ConfigV1.P4Info
 }
 
 func newP4RtTranslator(p4info p4ConfigV1.P4Info) *P4rtTranslator {
 	return &P4rtTranslator{
 		p4Info: p4info,
+	}
+}
+
+func convertValueToBinary(value interface{}) ([]byte, error) {
+	switch t := value.(type) {
+	case []byte:
+		return value.([]byte), nil
+	case bool:
+		uintFlag := uint8(0)
+
+		flag := value.(bool)
+		if flag {
+			uintFlag = 1
+		}
+
+		b := make([]byte, 1)
+		b[0] = uintFlag
+
+		return b, nil
+	case uint8:
+		b := make([]byte, 1)
+		b[0] = value.(uint8)
+
+		return b, nil
+	case uint16:
+		b := make([]byte, 2)
+		binary.BigEndian.PutUint16(b, value.(uint16))
+
+		return b, nil
+	case uint32:
+		b := make([]byte, 4)
+		binary.BigEndian.PutUint32(b, value.(uint32))
+
+		return b, nil
+	case uint64:
+		b := make([]byte, 8)
+		binary.BigEndian.PutUint64(b, value.(uint64))
+
+		return b, nil
+	default:
+		return nil, ErrOperationFailedWithParam("convert type to byte array", "type", t)
 	}
 }
 
@@ -59,15 +102,6 @@ func (t *P4rtTranslator) tableID(name string) uint32 {
 		}
 	}
 
-	return invalidID
-}
-
-func (t *P4rtTranslator) counterID(name string) uint32 {
-	for _, counter := range t.p4Info.GetCounters() {
-		if counter.Preamble.Name == name {
-			return counter.Preamble.Id
-		}
-	}
 	return invalidID
 }
 
@@ -88,7 +122,7 @@ func (t *P4rtTranslator) getActionByID(actionID uint32) (*p4ConfigV1.Action, err
 		}
 	}
 
-	return nil, fmt.Errorf("action with given ID not found")
+	return nil, ErrNotFoundWithParam("action", "ID", actionID)
 }
 
 func (t *P4rtTranslator) getTableByID(tableID uint32) (*p4ConfigV1.Table, error) {
@@ -98,7 +132,7 @@ func (t *P4rtTranslator) getTableByID(tableID uint32) (*p4ConfigV1.Table, error)
 		}
 	}
 
-	return nil, fmt.Errorf("table with ID %v not found", tableID)
+	return nil, ErrNotFoundWithParam("table", "ID", tableID)
 }
 
 func (t *P4rtTranslator) getTableIDByName(name string) (uint32, error) {
@@ -108,7 +142,7 @@ func (t *P4rtTranslator) getTableIDByName(name string) (uint32, error) {
 		}
 	}
 
-	return 0, fmt.Errorf("table with name %v not found", name)
+	return 0, ErrNotFoundWithParam("table", "name", name)
 }
 
 func (t *P4rtTranslator) getCounterByName(name string) (*p4ConfigV1.Counter, error) {
@@ -118,7 +152,7 @@ func (t *P4rtTranslator) getCounterByName(name string) (*p4ConfigV1.Counter, err
 		}
 	}
 
-	return nil, fmt.Errorf("counter with name %v not found", name)
+	return nil, ErrNotFoundWithParam("counter", "name", name)
 }
 
 func (t *P4rtTranslator) getMatchFieldIDByName(table *p4ConfigV1.Table, fieldName string) uint32 {
@@ -141,16 +175,6 @@ func (t *P4rtTranslator) getMatchFieldByName(table *p4ConfigV1.Table, fieldName 
 	return nil
 }
 
-func (t *P4rtTranslator) getMatchFieldSizeByName(table *p4ConfigV1.Table, fieldName string) int32 {
-	for _, field := range table.MatchFields {
-		if field.Name == fieldName {
-			return field.Bitwidth / 8
-		}
-	}
-
-	return invalidID
-}
-
 func (t *P4rtTranslator) getActionParamByName(action *p4ConfigV1.Action, paramName string) *p4ConfigV1.Action_Param {
 	for _, param := range action.Params {
 		if param.Name == paramName {
@@ -161,26 +185,10 @@ func (t *P4rtTranslator) getActionParamByName(action *p4ConfigV1.Action, paramNa
 	return nil
 }
 
-func (t *P4rtTranslator) getEnumVal(enumName string, valName string) ([]byte, error) {
-	enumVal, ok := t.p4Info.TypeInfo.SerializableEnums[enumName]
-	if !ok {
-		err := fmt.Errorf("enum not found with name %s", enumName)
-		return nil, err
-	}
-
-	for _, enums := range enumVal.Members {
-		if enums.Name == valName {
-			return enums.Value, nil
-		}
-	}
-
-	return nil, fmt.Errorf("EnumVal not found")
-}
-
 // TODO: find a way to use *p4.TableEntry as receiver
 func (t *P4rtTranslator) withExactMatchField(entry *p4.TableEntry, name string, value interface{}) error {
 	if entry.TableId == 0 {
-		return fmt.Errorf("no table name for entry defined, set table name before adding match fields")
+		return ErrInvalidArgumentWithReason("entry.TableId", entry.TableId, "no table name for entry defined, set table name before adding match fields")
 	}
 
 	p4Table, err := t.getTableByID(entry.TableId)
@@ -190,14 +198,14 @@ func (t *P4rtTranslator) withExactMatchField(entry *p4.TableEntry, name string, 
 
 	p4MatchField := t.getMatchFieldByName(p4Table, name)
 	if p4MatchField == nil {
-		return fmt.Errorf("failed to find match field name: %s", name)
+		return ErrOperationFailedWithParam("find match field", "name", name)
 	}
 
 	matchField := &p4.FieldMatch{
 		FieldId: p4MatchField.Id,
 	}
 
-	byteVal, err := ConvertValueToBinary(value)
+	byteVal, err := convertValueToBinary(value)
 	if err != nil {
 		return err
 	}
@@ -208,33 +216,34 @@ func (t *P4rtTranslator) withExactMatchField(entry *p4.TableEntry, name string, 
 	matchField.FieldMatchType = &p4.FieldMatch_Exact_{Exact: exactMatch}
 
 	entry.Match = append(entry.Match, matchField)
+
 	return nil
 }
 
 func (t *P4rtTranslator) withTernaryMatchField(entry *p4.TableEntry, name string, value interface{}, mask interface{}) error {
 	ternaryFieldLog := log.WithFields(log.Fields{
-		"entry": entry.String(),
-		"field name": name ,
+		"entry":      entry.String(),
+		"field name": name,
 	})
 	ternaryFieldLog.Trace("Adding ternary match field to the entry")
 
 	if entry.TableId == 0 {
-		return fmt.Errorf("no table name for entry defined, set table name before adding match fields")
+		return ErrInvalidArgumentWithReason("entry.TableId", entry.TableId, "no table name for entry defined, set table name before adding match fields")
 	}
 
-	byteVal, err := ConvertValueToBinary(value)
+	byteVal, err := convertValueToBinary(value)
 	if err != nil {
 		return err
 	}
 
-	byteMask, err := ConvertValueToBinary(mask)
+	byteMask, err := convertValueToBinary(mask)
 	if err != nil {
 		return err
 	}
 
 	if len(byteVal) != len(byteMask) {
 		ternaryFieldLog.Trace("value and mask length mismatch")
-		return fmt.Errorf("value and mask length mismatch for ternary field: %s", name)
+		return ErrOperationFailedWithParam("value and mask length mismatch for ternary field", "field", name)
 	}
 
 	p4Table, err := t.getTableByID(entry.TableId)
@@ -244,7 +253,7 @@ func (t *P4rtTranslator) withTernaryMatchField(entry *p4.TableEntry, name string
 
 	p4MatchField := t.getMatchFieldByName(p4Table, name)
 	if p4MatchField == nil {
-		return fmt.Errorf("failed to find match field name: %s", name)
+		return ErrOperationFailedWithParam("find match field", "name", name)
 	}
 
 	matchField := &p4.FieldMatch{
@@ -259,15 +268,17 @@ func (t *P4rtTranslator) withTernaryMatchField(entry *p4.TableEntry, name string
 	matchField.FieldMatchType = &p4.FieldMatch_Ternary_{Ternary: ternaryMatch}
 
 	entry.Match = append(entry.Match, matchField)
+
 	return nil
 }
 
 func (t *P4rtTranslator) withActionParam(action *p4.Action, name string, value interface{}) error {
 	if action.ActionId == 0 {
-		return fmt.Errorf("no action ID defined, set action ID before adding action parameters")
+		return ErrInvalidArgumentWithReason("entry.ActionId", action.ActionId,
+			"invalid action ID defined, set action ID before adding action parameters")
 	}
 
-	byteVal, err := ConvertValueToBinary(value)
+	byteVal, err := convertValueToBinary(value)
 	if err != nil {
 		return err
 	}
@@ -279,12 +290,12 @@ func (t *P4rtTranslator) withActionParam(action *p4.Action, name string, value i
 
 	p4ActionParam := t.getActionParamByName(p4Action, name)
 	if p4ActionParam == nil {
-		return fmt.Errorf("failed to find action param name %s", name)
+		return ErrOperationFailedWithParam("find action param", "action param name", name)
 	}
 
 	param := &p4.Action_Param{
 		ParamId: p4ActionParam.Id,
-		Value: byteVal,
+		Value:   byteVal,
 	}
 
 	action.Params = append(action.Params, param)
@@ -306,18 +317,20 @@ func (t *P4rtTranslator) getLPMMatchFieldValue(tableEntry *p4.TableEntry, name s
 		if mf.FieldId == p4MatchFieldID {
 			lpmField := mf.GetLpm()
 			if lpmField == nil {
-				return nil, fmt.Errorf("trying to get LPM value for non-LPM match field")
+				return nil, ErrOperationFailedWithReason("getting LPM match field value",
+					"trying to get LPM value for non-LPM match field")
 			}
+
 			ipNet := &net.IPNet{}
 			ipNet.IP = make([]byte, 4)
 			copy(ipNet.IP, lpmField.Value)
-			ipNet.Mask = net.CIDRMask(int(lpmField.PrefixLen), 32 - int(lpmField.PrefixLen))
+			ipNet.Mask = net.CIDRMask(int(lpmField.PrefixLen), 32-int(lpmField.PrefixLen))
 
 			return ipNet, nil
 		}
 	}
 
-	return nil, fmt.Errorf("match field %s not found for table %s", name, p4Table.Preamble.Name)
+	return nil, ErrNotFoundWithParam(fmt.Sprintf("match field %s", name), "table", p4Table.Preamble.Name)
 }
 
 func (t *P4rtTranslator) BuildInterfaceTableEntry(srcIntf string, direction string) (*p4.TableEntry, error) {
@@ -325,7 +338,6 @@ func (t *P4rtTranslator) BuildInterfaceTableEntry(srcIntf string, direction stri
 
 	entry := &p4.TableEntry{
 		TableId:  tableID,
-		// FIXME: we might want to configure priority
 		Priority: DefaultPriority,
 	}
 
@@ -340,12 +352,12 @@ func (t *P4rtTranslator) ParseAccessIPFromReadInterfaceTableResponse(resp *p4.Re
 			log.WithFields(log.Fields{
 				"entity": entity,
 			}).Warn("failed to get LPM field from response entity")
+		} else {
+			return field, nil
 		}
-
-		return field, nil
 	}
 
-	return nil, fmt.Errorf("failed to parse Access IP from P4Runtime response")
+	return nil, ErrOperationFailed("parse Access IP from P4Runtime response")
 }
 
 func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr) (*p4.TableEntry, error) {
@@ -378,13 +390,14 @@ func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr) (*p4.TableEntry, erro
 	}
 
 	uplinkBuilderLog.WithField("entry", entry).Trace("Built P4rt table entry for sessions_uplink table")
+
 	return entry, nil
 }
 
 func (t *P4rtTranslator) buildDownlinkSessionsEntry(pdr pdr, tunnelPeerID uint8, needsBuffering bool) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
-		"pdr": pdr,
-		"tunnelPeerID": tunnelPeerID,
+		"pdr":            pdr,
+		"tunnelPeerID":   tunnelPeerID,
 		"needsBuffering": needsBuffering,
 	})
 	builderLog.Trace("Building P4rt table entry for sessions_downlink table")
@@ -418,6 +431,7 @@ func (t *P4rtTranslator) buildDownlinkSessionsEntry(pdr pdr, tunnelPeerID uint8,
 	}
 
 	builderLog.WithField("entry", entry).Trace("Built P4rt table entry for sessions_downlink table")
+
 	return entry, nil
 }
 
@@ -428,20 +442,20 @@ func (t *P4rtTranslator) BuildSessionsTableEntry(pdr pdr, tunnelPeerID uint8, ne
 	case core:
 		return t.buildDownlinkSessionsEntry(pdr, tunnelPeerID, needsBuffering)
 	default:
-		return nil, fmt.Errorf("unknown source interface type of PDR: %v", pdr.srcIface)
+		return nil, ErrUnsupported("source interface type of PDR", pdr.srcIface)
 	}
 }
 
 func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, shouldDrop bool, tc uint8) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
 		"pdr": pdr,
-		"tc": tc,
+		"tc":  tc,
 	})
 	builderLog.Debug("Building P4rt table entry for UP4 terminations_uplink table")
 
 	tableID := t.tableID(TableUplinkTerminations)
 	entry := &p4.TableEntry{
-		TableId: tableID,
+		TableId:  tableID,
 		Priority: DefaultPriority,
 	}
 
@@ -473,20 +487,21 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, shouldDrop bool, 
 	}
 
 	builderLog.WithField("entry", entry).Debug("Built P4rt table entry for terminations_uplink table")
+
 	return entry, nil
 }
 
 func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, relatedFAR far, tc uint8) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
-		"pdr": pdr,
-		"tc": tc,
+		"pdr":         pdr,
+		"tc":          tc,
 		"related-far": relatedFAR,
 	})
 	builderLog.Debug("Building P4rt table entry for UP4 terminations_downlink table")
 
 	tableID := t.tableID(TableDownlinkTerminations)
 	entry := &p4.TableEntry{
-		TableId: tableID,
+		TableId:  tableID,
 		Priority: DefaultPriority,
 	}
 
@@ -527,6 +542,7 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, relatedFAR far,
 	}
 
 	builderLog.WithField("entry", entry).Debug("Built P4rt table entry for terminations_downlink table")
+
 	return entry, nil
 }
 
@@ -537,14 +553,14 @@ func (t *P4rtTranslator) BuildTerminationsTableEntry(pdr pdr, relatedFAR far, tc
 	case core:
 		return t.buildDownlinkTerminationsEntry(pdr, relatedFAR, tc)
 	default:
-		return nil, fmt.Errorf("unknown source interface type of PDR: %v", pdr.srcIface)
+		return nil, ErrUnsupported("source interface type of PDR", pdr.srcIface)
 	}
 }
 
 func (t *P4rtTranslator) BuildGTPTunnelPeerTableEntry(tunnelPeerID uint8, far far) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
 		"tunnelPeerID": tunnelPeerID,
-		"far": far,
+		"far":          far,
 	})
 	builderLog.Trace("Building P4rt table entry for GTP Tunnel Peers table")
 
@@ -577,7 +593,7 @@ func (t *P4rtTranslator) BuildGTPTunnelPeerTableEntry(tunnelPeerID uint8, far fa
 		return nil, err
 	}
 
-
 	builderLog.WithField("entry", entry).Debug("Built P4rt table entry for GTP Tunnel Peers table")
+
 	return entry, nil
 }

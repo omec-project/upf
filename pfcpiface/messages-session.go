@@ -378,6 +378,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		fars: delFARs,
 		qers: delQERs,
 	}
+
 	cause = upf.sendMsgToUPF(upfMsgTypeDel, deleted, PacketForwardingRules{})
 	if cause == ie.CauseRequestRejected {
 		return sendError(ErrWriteToFastpath)
