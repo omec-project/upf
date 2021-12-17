@@ -113,14 +113,14 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 	}
 
 	// TODO: Get SEID range from PFCPNode for this PFCPConn
-
 	log.Infoln("Created PFCPConn from:", conn.LocalAddr(), "to:", conn.RemoteAddr())
 
+	rng := rand.New(rand.NewSource(time.Now().UnixNano())) // #nosec G404
 	p := &PFCPConn{
 		ctx:            node.ctx,
 		Conn:           conn,
 		ts:             ts,
-		rng:            rand.New(rand.NewSource(time.Now().UnixNano())),
+		rng:            rng,
 		maxRetries:     100,
 		sessions:       make(map[uint64]*PFCPSession),
 		upf:            node.upf,

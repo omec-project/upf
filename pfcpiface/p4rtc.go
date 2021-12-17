@@ -12,6 +12,11 @@ import (
 	"os"
 	"time"
 
+	"google.golang.org/grpc/credentials/insecure"
+
+	//nolint:staticcheck // Ignore SA1019.
+	// Upgrading to google.golang.org/protobuf/proto is not a drop-in replacement,
+	// as also P4Runtime stubs are based on the deprecated proto.
 	"github.com/golang/protobuf/proto"
 	grpcRetry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	p4ConfigV1 "github.com/p4lang/p4runtime/go/p4/config/v1"
@@ -1125,7 +1130,7 @@ func GetConnection(host string) (conn *grpc.ClientConn, err error) {
 	/* get connection */
 	log.Println("Get connection.")
 
-	conn, err = grpc.Dial(host, grpc.WithInsecure())
+	conn, err = grpc.Dial(host, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Println("grpc dial err: ", err)
 		return nil, err

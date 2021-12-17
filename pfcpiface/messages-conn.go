@@ -86,23 +86,6 @@ func (pConn *PFCPConn) associationIEs() []*ie.IE {
 	return ies
 }
 
-func (pConn *PFCPConn) sendAssociationRequest() error {
-	upf := pConn.upf
-
-	if !upf.isConnected() {
-		return errFastpathDown
-	}
-
-	// Build request message
-	asreq := message.NewAssociationSetupRequest(pConn.getSeqNum(),
-		pConn.associationIEs()...,
-	)
-
-	pConn.SendPFCPMsg(asreq)
-
-	return nil
-}
-
 func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (message.Message, error) {
 	addr := pConn.RemoteAddr().String()
 	upf := pConn.upf
@@ -151,33 +134,33 @@ func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (messa
 	return asres, nil
 }
 
-func (pConn *PFCPConn) handleAssociationSetupResponse(msg message.Message) (message.Message, error) {
+func (pConn *PFCPConn) handleAssociationSetupResponse(msg message.Message) error {
 	addr := pConn.RemoteAddr().String()
 
 	asres, ok := msg.(*message.AssociationSetupResponse)
 	if !ok {
-		return nil, errUnmarshal(errMsgUnexpectedType)
+		return errUnmarshal(errMsgUnexpectedType)
 	}
 
 	cause, err := asres.Cause.Cause()
 	if err != nil {
-		return nil, errUnmarshal(err)
+		return errUnmarshal(err)
 	}
 
 	if cause != ie.CauseRequestAccepted {
 		log.Errorln("Association Setup Response from", addr,
 			"with Cause:", cause)
-		return nil, errReqRejected
+		return errReqRejected
 	}
 
 	nodeID, err := asres.NodeID.NodeID()
 	if err != nil {
-		return nil, errUnmarshal(err)
+		return errUnmarshal(err)
 	}
 
 	ts, err := asres.RecoveryTimeStamp.RecoveryTimeStamp()
 	if err != nil {
-		return nil, errUnmarshal(err)
+		return errUnmarshal(err)
 	}
 
 	if pConn.ts.remote.IsZero() {
@@ -195,7 +178,7 @@ func (pConn *PFCPConn) handleAssociationSetupResponse(msg message.Message) (mess
 	log.Infoln("Association setup done between nodes",
 		"local:", pConn.nodeID.local, "remote:", pConn.nodeID.remote)
 
-	return nil, nil
+	return nil
 }
 
 func (pConn *PFCPConn) handleAssociationReleaseRequest(msg message.Message) (message.Message, error) {
