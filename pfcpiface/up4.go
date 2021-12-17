@@ -293,27 +293,47 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 }
 
 func (up4 *UP4) clearAllTables() error {
-	sessionsTableID, err := up4.p4RtTranslator.getTableIDByName("PreQosPipe.sessions")
+	sessionsUplinkTableID, err := up4.p4RtTranslator.getTableIDByName(TableUplinkSessions)
 	if err != nil {
 		return err
 	}
 
-	err = up4.p4client.ClearTable(sessionsTableID)
+	err = up4.p4client.ClearTable(sessionsUplinkTableID)
 	if err != nil {
 		return err
 	}
 
-	terminationsTableID, err := up4.p4RtTranslator.getTableIDByName("PreQosPipe.terminations")
+	sessionsDownlinkTableID, err := up4.p4RtTranslator.getTableIDByName(TableDownlinkSessions)
 	if err != nil {
 		return err
 	}
 
-	err = up4.p4client.ClearTable(terminationsTableID)
+	err = up4.p4client.ClearTable(sessionsDownlinkTableID)
 	if err != nil {
 		return err
 	}
 
-	gtpTunnelPeersTableID, err := up4.p4RtTranslator.getTableIDByName("PreQosPipe.tunnel_peers")
+	terminationsUplinkTableID, err := up4.p4RtTranslator.getTableIDByName(TableUplinkTerminations)
+	if err != nil {
+		return err
+	}
+
+	err = up4.p4client.ClearTable(terminationsUplinkTableID)
+	if err != nil {
+		return err
+	}
+
+	terminationsDownlinkTableID, err := up4.p4RtTranslator.getTableIDByName(TableDownlinkTerminations)
+	if err != nil {
+		return err
+	}
+
+	err = up4.p4client.ClearTable(terminationsDownlinkTableID)
+	if err != nil {
+		return err
+	}
+
+	gtpTunnelPeersTableID, err := up4.p4RtTranslator.getTableIDByName(TableTunnelPeers)
 	if err != nil {
 		return err
 	}
