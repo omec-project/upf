@@ -497,17 +497,17 @@ func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
 	pConn.SendPFCPMsg(srreq)
 }
 
-func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) (message.Message, error) {
+func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) error {
 	upf := pConn.upf
 
 	srres, ok := msg.(*message.SessionReportResponse)
 	if !ok {
-		return nil, errUnmarshal(errMsgUnexpectedType)
+		return errUnmarshal(errMsgUnexpectedType)
 	}
 
 	cause := srres.Cause.Payload[0]
 	if cause == ie.CauseRequestAccepted {
-		return nil, nil
+		return nil
 	}
 
 	log.Warnln("session req not accepted seq : ", srres.SequenceNumber)
@@ -517,7 +517,7 @@ func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) (message
 	if cause == ie.CauseSessionContextNotFound {
 		sessItem, ok := pConn.sessions[seid]
 		if !ok {
-			return nil, errProcess(ErrNotFoundWithParam("PFCP session context", "SEID", seid))
+			return errProcess(ErrNotFoundWithParam("PFCP session context", "SEID", seid))
 		}
 
 		log.Warnln("context not found, deleting session locally")
@@ -527,12 +527,12 @@ func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) (message
 		cause := upf.sendMsgToUPF(
 			upfMsgTypeDel, sessItem.pdrs, sessItem.fars, sessItem.qers)
 		if cause == ie.CauseRequestRejected {
-			return nil, errProcess(
+			return errProcess(
 				ErrOperationFailedWithParam("delete session from fastpath", "seid", seid))
 		}
 
-		return nil, nil
+		return nil
 	}
 
-	return nil, nil
+	return nil
 }

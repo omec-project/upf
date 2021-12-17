@@ -84,7 +84,7 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 		}
 		// TODO: Cleanup sessions
 	case message.MsgTypeAssociationSetupResponse:
-		reply, err = pConn.handleAssociationSetupResponse(msg)
+		err = pConn.handleAssociationSetupResponse(msg)
 		// TODO: Cleanup sessions
 		// TODO: start heartbeats
 	case message.MsgTypeAssociationReleaseRequest:
@@ -99,7 +99,7 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 	case message.MsgTypeSessionDeletionRequest:
 		reply, err = pConn.handleSessionDeletionRequest(msg)
 	case message.MsgTypeSessionReportResponse:
-		_, err = pConn.handleSessionReportResponse(msg)
+		err = pConn.handleSessionReportResponse(msg)
 
 	// Incoming response messages
 	// TODO: Association Setup Request, Session Report Request
