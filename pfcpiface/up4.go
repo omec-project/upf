@@ -40,7 +40,7 @@ type counter struct {
 	// free      map[uint64]uint64
 }
 
-type p4rtc struct {
+type UP4 struct {
 	host             string
 	deviceID         uint64
 	timeout          uint32
@@ -54,19 +54,19 @@ type p4rtc struct {
 	endMarkerChan    chan []byte
 }
 
-func (p *p4rtc) addSliceInfo(sliceInfo *SliceInfo) error {
+func (up4 *UP4) addSliceInfo(sliceInfo *SliceInfo) error {
 	log.Errorln("Slice Info not supported in P4")
 	return nil
 }
 
-func (p *p4rtc) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric) {
+func (up4 *UP4) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric) {
 }
 
-func (p *p4rtc) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) error {
+func (up4 *UP4) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) error {
 	return nil
 }
 
-func (p *p4rtc) portStats(uc *upfCollector, ch chan<- prometheus.Metric) {
+func (up4 *UP4) portStats(uc *upfCollector, ch chan<- prometheus.Metric) {
 }
 
 func setSwitchInfo(p4rtClient *P4rtClient) (net.IP, net.IPMask, error) {
@@ -108,7 +108,7 @@ func (c *counter) init() {
 	c.allocated = make(map[uint64]uint64)
 }
 
-func setCounterSize(p *p4rtc, counterID uint8, name string) error {
+func setCounterSize(p *UP4, counterID uint8, name string) error {
 	if p.p4client != nil {
 		for _, ctr := range p.p4client.P4Info.Counters {
 			if ctr.Preamble.Name == name {
@@ -127,12 +127,12 @@ func setCounterSize(p *p4rtc, counterID uint8, name string) error {
 	return errin
 }
 
-func resetCounterVal(p *p4rtc, counterID uint8, val uint64) {
+func resetCounterVal(p *UP4, counterID uint8, val uint64) {
 	log.Println("delete counter val ", val)
 	delete(p.counters[counterID].allocated, val)
 }
 
-func getCounterVal(p *p4rtc, counterID uint8) (uint64, error) {
+func getCounterVal(p *UP4, counterID uint8) (uint64, error) {
 	/*
 	   loop :
 	      random counter generate
@@ -160,14 +160,14 @@ func getCounterVal(p *p4rtc, counterID uint8) (uint64, error) {
 	return 0, ErrOperationFailedWithParam("counter allocation", "final val", val)
 }
 
-func (p *p4rtc) exit() {
+func (up4 *UP4) exit() {
 	log.Println("Exit function P4rtc")
 }
 
-func (p *p4rtc) channelSetup() (*P4rtClient, error) {
+func (up4 *UP4) channelSetup() (*P4rtClient, error) {
 	log.Println("Channel Setup.")
 
-	localclient, errin := CreateChannel(p.host, p.deviceID, p.reportNotifyChan)
+	localclient, errin := CreateChannel(up4.host, up4.deviceID, up4.reportNotifyChan)
 	if errin != nil {
 		log.Println("create channel failed : ", errin)
 		return nil, errin
@@ -176,13 +176,13 @@ func (p *p4rtc) channelSetup() (*P4rtClient, error) {
 	if localclient != nil {
 		log.Println("device id ", (*localclient).DeviceID)
 
-		p.accessIP, p.accessIPMask, errin = setSwitchInfo(localclient)
+		up4.accessIP, up4.accessIPMask, errin = setSwitchInfo(localclient)
 		if errin != nil {
 			log.Println("Switch set info failed ", errin)
 			return nil, errin
 		}
 
-		log.Println("accessIP, Mask ", p.accessIP, p.accessIPMask)
+		log.Println("accessIP, Mask ", up4.accessIP, up4.accessIPMask)
 	} else {
 		log.Println("p4runtime client is null.")
 		return nil, errin
@@ -191,7 +191,7 @@ func (p *p4rtc) channelSetup() (*P4rtClient, error) {
 	return localclient, nil
 }
 
-func initCounter(p *p4rtc) error {
+func initCounter(p *UP4) error {
 	log.Println("Initialize counters for p4client.")
 
 	var errin error
@@ -220,30 +220,30 @@ func initCounter(p *p4rtc) error {
 	return nil
 }
 
-func (p *p4rtc) isConnected(accessIP *net.IP) bool {
+func (up4 *UP4) isConnected(accessIP *net.IP) bool {
 	var errin error
-	if p.p4client == nil {
-		p.p4client, errin = p.channelSetup()
+	if up4.p4client == nil {
+		up4.p4client, errin = up4.channelSetup()
 		if errin != nil {
 			log.Println("create channel failed : ", errin)
 			return false
 		}
 
 		if accessIP != nil {
-			*accessIP = p.accessIP
+			*accessIP = up4.accessIP
 		}
 
-		errin = p.p4client.ClearPdrTable()
+		errin = up4.p4client.ClearPdrTable()
 		if errin != nil {
 			log.Println("clear PDR table failed : ", errin)
 		}
 
-		errin = p.p4client.ClearFarTable()
+		errin = up4.p4client.ClearFarTable()
 		if errin != nil {
 			log.Println("clear FAR table failed : ", errin)
 		}
 
-		errin = initCounter(p)
+		errin = initCounter(up4)
 		if errin != nil {
 			log.Println("Counter Init failed. : ", errin)
 			return false
@@ -253,54 +253,54 @@ func (p *p4rtc) isConnected(accessIP *net.IP) bool {
 	return true
 }
 
-func (p *p4rtc) setUpfInfo(u *upf, conf *Conf) {
-	log.Println("setUpfInfo p4rtc")
+func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
+	log.Println("setUpfInfo UP4")
 
 	var errin error
 
-	u.accessIP, p.accessIPMask = ParseStrIP(conf.P4rtcIface.AccessIP)
-	log.Println("AccessIP: ", u.accessIP, ", AccessIPMask: ", p.accessIPMask)
+	u.accessIP, up4.accessIPMask = ParseStrIP(conf.P4rtcIface.AccessIP)
+	log.Println("AccessIP: ", u.accessIP, ", AccessIPMask: ", up4.accessIPMask)
 
-	p.p4rtcServer = conf.P4rtcIface.P4rtcServer
-	log.Println("p4rtc server ip/name", p.p4rtcServer)
-	p.p4rtcPort = conf.P4rtcIface.P4rtcPort
-	p.reportNotifyChan = u.reportNotifyChan
+	up4.p4rtcServer = conf.P4rtcIface.P4rtcServer
+	log.Println("UP4 server ip/name", up4.p4rtcServer)
+	up4.p4rtcPort = conf.P4rtcIface.P4rtcPort
+	up4.reportNotifyChan = u.reportNotifyChan
 
 	if *p4RtcServerIP != "" {
-		p.p4rtcServer = *p4RtcServerIP
+		up4.p4rtcServer = *p4RtcServerIP
 	}
 
 	if *p4RtcServerPort != "" {
-		p.p4rtcPort = *p4RtcServerPort
+		up4.p4rtcPort = *p4RtcServerPort
 	}
 
 	u.coreIP = net.ParseIP(net.IPv4zero.String())
 
-	log.Println("onos server ip ", p.p4rtcServer)
-	log.Println("onos server port ", p.p4rtcPort)
+	log.Println("onos server ip ", up4.p4rtcServer)
+	log.Println("onos server port ", up4.p4rtcPort)
 
-	p.host = p.p4rtcServer + ":" + p.p4rtcPort
-	log.Println("server name: ", p.host)
-	p.deviceID = 1
-	p.timeout = 30
-	p.p4client, errin = p.channelSetup()
-	u.accessIP = p.accessIP
+	up4.host = up4.p4rtcServer + ":" + up4.p4rtcPort
+	log.Println("server name: ", up4.host)
+	up4.deviceID = 1
+	up4.timeout = 30
+	up4.p4client, errin = up4.channelSetup()
+	u.accessIP = up4.accessIP
 
 	if errin != nil {
 		log.Println("create channel failed : ", errin)
 	} else {
-		errin = p.p4client.ClearPdrTable()
+		errin = up4.p4client.ClearPdrTable()
 		if errin != nil {
 			log.Println("clear PDR table failed : ", errin)
 		}
 
-		errin = p.p4client.ClearFarTable()
+		errin = up4.p4client.ClearFarTable()
 		if errin != nil {
 			log.Println("clear FAR table failed : ", errin)
 		}
 	}
 
-	errin = initCounter(p)
+	errin = initCounter(up4)
 	if errin != nil {
 		log.Println("Counter Init failed. : ", errin)
 	}
@@ -308,29 +308,29 @@ func (p *p4rtc) setUpfInfo(u *upf, conf *Conf) {
 	if conf.EnableEndMarker {
 		log.Println("Starting end marker loop")
 
-		p.endMarkerChan = make(chan []byte, 1024)
-		go p.endMarkerSendLoop(p.endMarkerChan)
+		up4.endMarkerChan = make(chan []byte, 1024)
+		go up4.endMarkerSendLoop(up4.endMarkerChan)
 	}
 }
 
-func (p *p4rtc) sendEndMarkers(endMarkerList *[][]byte) error {
+func (up4 *UP4) sendEndMarkers(endMarkerList *[][]byte) error {
 	for _, eMarker := range *endMarkerList {
-		p.endMarkerChan <- eMarker
+		up4.endMarkerChan <- eMarker
 	}
 
 	return nil
 }
 
-func (p *p4rtc) endMarkerSendLoop(endMarkerChan chan []byte) {
+func (up4 *UP4) endMarkerSendLoop(endMarkerChan chan []byte) {
 	for outPacket := range endMarkerChan {
-		err := p.p4client.SendPacketOut(outPacket)
+		err := up4.p4client.SendPacketOut(outPacket)
 		if err != nil {
 			log.Println("end marker write failed")
 		}
 	}
 }
 
-func (p *p4rtc) sendMsgToUPF(
+func (up4 *UP4) sendMsgToUPF(
 	method upfMsgType, pdrs []pdr, fars []far, qers []qer) uint8 {
 	log.Println("sendMsgToUPF p4")
 
@@ -341,8 +341,8 @@ func (p *p4rtc) sendMsgToUPF(
 		cause    uint8 = ie.CauseRequestRejected
 	)
 
-	if !p.isConnected(nil) {
-		log.Println("p4rtc server not connected")
+	if !up4.isConnected(nil) {
+		log.Println("UP4 server not connected")
 		return cause
 	}
 
@@ -351,7 +351,7 @@ func (p *p4rtc) sendMsgToUPF(
 		{
 			funcType = FunctionTypeInsert
 			for i := range pdrs {
-				val, err = getCounterVal(p, preQosPdrCounter)
+				val, err = getCounterVal(up4, preQosPdrCounter)
 				if err != nil {
 					log.Println("Counter id alloc failed ", err)
 					return cause
@@ -363,7 +363,7 @@ func (p *p4rtc) sendMsgToUPF(
 		{
 			funcType = FunctionTypeDelete
 			for i := range pdrs {
-				resetCounterVal(p, preQosPdrCounter,
+				resetCounterVal(up4, preQosPdrCounter,
 					uint64(pdrs[i].ctrID))
 			}
 		}
@@ -382,9 +382,9 @@ func (p *p4rtc) sendMsgToUPF(
 		log.Traceln(pdr)
 		log.Traceln("write pdr funcType : ", funcType)
 
-		errin := p.p4client.WritePdrTable(pdr, funcType)
+		errin := up4.p4client.WritePdrTable(pdr, funcType)
 		if errin != nil {
-			resetCounterVal(p, preQosPdrCounter, uint64(pdr.ctrID))
+			resetCounterVal(up4, preQosPdrCounter, uint64(pdr.ctrID))
 			log.Println("pdr entry function failed ", errin)
 
 			return cause
@@ -395,7 +395,7 @@ func (p *p4rtc) sendMsgToUPF(
 		log.Traceln(far)
 		log.Traceln("write far funcType : ", funcType)
 
-		errin := p.p4client.WriteFarTable(far, funcType)
+		errin := up4.p4client.WriteFarTable(far, funcType)
 		if errin != nil {
 			log.Println("far entry function failed ", errin)
 			return cause
