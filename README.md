@@ -7,6 +7,8 @@ Copyright(c) 2019 Intel Corporation
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/omec-project/upf-epc)](https://goreportcard.com/report/github.com/omec-project/upf-epc)
 
+[![Build Status](https://jenkins.onosproject.org/buildStatus/icon?job=bess-upf-linerate-tests&subject=Linerate+Tests)](https://jenkins.onosproject.org/job/bess-upf-linerate-tests/)
+
 ## Overview
 
 UPF-EPC is a revised version of [ngic-rtc](https://github.com/omec-project/ngic-rtc/tree/central-cp-multi-upfs)'s [dp](https://github.com/omec-project/ngic-rtc/tree/central-cp-multi-upfs/dp).

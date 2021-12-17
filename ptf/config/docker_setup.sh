@@ -110,7 +110,7 @@ docker rm -f pause bess bess-routectl bess-web bess-pfcpiface || true
 sudo rm -rf /var/run/netns/pause
 
 # Build
-DOCKER_TARGETS=bess make docker-build
+make docker-build
 
 if [ "$mode" == 'dpdk' ]; then
 	DEVICES=${DEVICES:-'--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio'}
