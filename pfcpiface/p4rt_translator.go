@@ -342,13 +342,12 @@ func (t *P4rtTranslator) getLPMMatchFieldValue(tableEntry *p4.TableEntry, name s
 			}
 
 			ipNet := &net.IPNet{
-				IP: make(net.IP, net.IPv4len),
+				IP:   make(net.IP, net.IPv4len),
 				Mask: net.CIDRMask(int(lpmField.PrefixLen), 8*net.IPv4len),
 			}
 			copy(ipNet.IP, lpmField.Value[:])
 
 			return ipNet, nil
-
 		}
 	}
 
@@ -603,7 +602,7 @@ func (t *P4rtTranslator) BuildTerminationsTableEntry(pdr pdr, relatedFAR far, tc
 
 func (t *P4rtTranslator) BuildGTPTunnelPeerTableEntry(tunnelPeerID uint8, tunnelParams tunnelParams) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
-		"tunnelPeerID": tunnelPeerID,
+		"tunnelPeerID":  tunnelPeerID,
 		"tunnel-params": tunnelParams,
 	})
 	builderLog.Trace("Building P4rt table entry for GTP Tunnel Peers table")
