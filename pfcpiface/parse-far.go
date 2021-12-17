@@ -144,7 +144,7 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 
 			f.tunnelTEID = ohcFields.TEID
 			f.tunnelIP4Dst = ip2int(ohcFields.IPv4Address)
-			f.tunnelType = uint8(1)  // FIXME: what does it mean?
+			f.tunnelType = uint8(1) // FIXME: what does it mean?
 			f.tunnelPort = tunnelGTPUPort
 		case ie.DestinationInterface:
 			fields = Set(fields, FwdIEDestinationIntf)

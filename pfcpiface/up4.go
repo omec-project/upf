@@ -19,7 +19,7 @@ import (
 
 const (
 	// FIXME: this is hardcoded currently, but should be passed as configuration/cmd line arg
-	p4InfoPath = "/bin/p4info.txt"
+	p4InfoPath       = "/bin/p4info.txt"
 	deviceConfigPath = "/bin/bmv2.json"
 )
 
@@ -38,7 +38,7 @@ type P4rtcInfo struct {
 }
 
 const (
-	preQosCounterID  = iota
+	preQosCounterID = iota
 	postQosCounterID
 
 	// 253 base stations + 1 dbuf (fixed in UP4) + 1 reserved (fixed in P4 pipeline)
@@ -53,31 +53,31 @@ type counter struct {
 }
 
 type tunnelParams struct {
-	tunnelIP4Src  uint32
-	tunnelIP4Dst  uint32
-	tunnelPort    uint16
+	tunnelIP4Src uint32
+	tunnelIP4Dst uint32
+	tunnelPort   uint16
 }
 
 type UP4 struct {
-	host             string
-	deviceID         uint64
-	timeout          uint32
-	accessIP         *net.IPNet
-	p4rtcServer      string
-	p4rtcPort        string
-	enableEndMarker  bool
+	host            string
+	deviceID        uint64
+	timeout         uint32
+	accessIP        *net.IPNet
+	p4rtcServer     string
+	p4rtcPort       string
+	enableEndMarker bool
 
-	p4client         *P4rtClient
-	p4RtTranslator   *P4rtTranslator
+	p4client       *P4rtClient
+	p4RtTranslator *P4rtTranslator
 
 	// TODO: create UP4Store object and move these fields there
-	counters         []counter
-	tunnelPeerIDs    map[tunnelParams]uint8
+	counters          []counter
+	tunnelPeerIDs     map[tunnelParams]uint8
 	tunnelPeerIDsPool []uint8
 
 	// ueAddrToFSEID is used to store UE Address <-> F-SEID mapping,
 	// which is needed to efficiently find F-SEID when we receive a P4 Digest (DDN) for a UE address.
-	ueAddrToFSEID    map[uint32]uint64
+	ueAddrToFSEID map[uint32]uint64
 
 	reportNotifyChan chan<- uint64
 	endMarkerChan    chan []byte
@@ -129,9 +129,9 @@ func (up4 *UP4) initCounter(counterID uint8, name string) error {
 	up4.counters[counterID].counterID = uint64(ctr.Preamble.Id)
 
 	log.WithFields(log.Fields{
-		"counterID": counterID,
-		"name": name,
-		"max-size": ctr.Size,
+		"counterID":      counterID,
+		"name":           name,
+		"max-size":       ctr.Size,
 		"UP4 counter ID": ctr.Preamble.Id,
 	}).Debug("Counter initialized successfully")
 
@@ -220,7 +220,7 @@ func (up4 *UP4) initTunnelPeerIDs() {
 	// 1 is reserved for dbuf
 	up4.tunnelPeerIDsPool = make([]uint8, 0, maxGTPTunnelPeerIDs)
 
-	for i := 2; i < maxGTPTunnelPeerIDs + 2; i++ {
+	for i := 2; i < maxGTPTunnelPeerIDs+2; i++ {
 		up4.tunnelPeerIDsPool = append(up4.tunnelPeerIDsPool, uint8(i))
 	}
 }
@@ -437,7 +437,6 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
 		methodType = p4.Update_INSERT
 	}
 
-
 	gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(tunnelPeerID, far)
 	if err != nil {
 		return err
@@ -486,8 +485,8 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 
 func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, updated PacketForwardingRules) uint8 {
 	up4Log := log.WithFields(log.Fields{
-		"method-type": method,
-		"old-rules": rules,
+		"method-type":   method,
+		"old-rules":     rules,
 		"updated-rules": updated,
 	})
 	up4Log.Debug("Sending PFCP message to UP4..")
@@ -502,9 +501,9 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 
 	var (
 		methodType p4.Update_Type
-		err      error
-		val      uint64
-		cause    uint8 = ie.CauseRequestRejected
+		err        error
+		val        uint64
+		cause      uint8 = ie.CauseRequestRejected
 	)
 
 	if !up4.isConnected(nil) {
@@ -548,20 +547,22 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 		// downlink FAR that does encapsulation
 		if far.Forwards() && far.dstIntf == ie.DstInterfaceAccess {
 			switch method {
-			case upfMsgTypeAdd, upfMsgTypeMod: {
-				if far.tunnelTEID == 0 {
-					up4Log.Warn("Downlink FAR without tunnel params received, cannot install GTP Tunnel Peer")
-					continue
+			case upfMsgTypeAdd, upfMsgTypeMod:
+				{
+					if far.tunnelTEID == 0 {
+						up4Log.Warn("Downlink FAR without tunnel params received, cannot install GTP Tunnel Peer")
+						continue
+					}
+					if err := up4.addOrUpdateGTPTunnelPeer(far); err != nil {
+						up4Log.WithFields(log.Fields{
+							"far": far,
+						}).Error("Failed to add or update GTP tunnel peer")
+					}
 				}
-				if err := up4.addOrUpdateGTPTunnelPeer(far); err != nil {
-					up4Log.WithFields(log.Fields{
-						"far": far,
-					}).Error("Failed to add or update GTP tunnel peer")
+			case upfMsgTypeDel:
+				{
+					up4.removeGTPTunnelPeer(far)
 				}
-			}
-			case upfMsgTypeDel: {
-				up4.removeGTPTunnelPeer(far)
-			}
 			default:
 				up4Log.Errorf("unsupported PFCP method: %v", method)
 			}
