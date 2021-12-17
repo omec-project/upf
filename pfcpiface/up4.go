@@ -5,6 +5,7 @@ package main
 
 import (
 	"flag"
+	// #nosec G404 // Ignore G404. We don't need strong random number generator for allocating IDs for P4 objects.
 	"math/rand"
 	"net"
 	"time"
@@ -147,7 +148,7 @@ func getCounterVal(p *UP4, counterID uint8) (uint64, error) {
 	for i := 0; i < int(ctr.maxSize); i++ {
 		rand.Seed(time.Now().UnixNano())
 
-		val = uint64(rand.Intn(int(ctr.maxSize)-1) + 1)
+		val = uint64(rand.Intn(int(ctr.maxSize)-1) + 1) // #nosec G404
 		if _, ok := ctr.allocated[val]; !ok {
 			log.Println("key not in allocated map ", val)
 

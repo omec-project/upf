@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"time"
 
+	"google.golang.org/grpc/credentials/insecure"
+
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
@@ -529,7 +531,7 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 
 	b.endMarkerChan = make(chan []byte, 1024)
 
-	b.conn, err = grpc.Dial(*bessIP, grpc.WithInsecure())
+	b.conn, err = grpc.Dial(*bessIP, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalln("did not connect:", err)
 	}
