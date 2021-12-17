@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+# SPDX-License-Identifier: Apache-2.0
+# Copyright(c) 2021 Open Networking Foundation
+
+set -eux -o pipefail
+
+TEST_DIR="$(pwd)"
+
+# Read in parameters following style: https://google.github.io/styleguide/shellguide.html#case-statement
+while getopts 't:' flag; do
+	case "${flag}" in
+	t) testdir="${OPTARG}" ;;
+	*) error "Unexpected option ${flag}" ;;
+	esac
+done
+
+testName="${3:-""}"
+# assign random number to each instance of ptf container
+runName=ptf-${RANDOM}
+
+source .env
+echo "*** Starting tests in container (${runName})..."
+
+# Do not attach stdin if running in an environment without it (e.g. Jenkins)
+it=$(test -t 0 && echo "-it" || echo "-t")
+
+# run PTF command from script in test container with all necessary dependencies
+docker run --name "${runName}" "${it}" \
+	--privileged \
+	-v "${TEST_DIR}":/upf-tests/ \
+	-v "${TEST_DIR}/log":/tmp \
+	"${TESTER_DOCKER_IMG}" \
+	python3 -u /upf-tests/lib/ptf_runner.py \
+	--ptf-dir /upf-tests/"${testdir}" \
+	${TREX_PARAMS:-} \
+	--trex-address "${TREX_ADDR}" \
+	--bess-address "${UPF_ADDR}" \
+	--trex-config /upf-tests/config/4-ports-with-l2.yaml \
+	--xunit \
+	--xunit-dir /tmp/ptf-logs \
+	${testName}
