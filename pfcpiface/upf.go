@@ -4,7 +4,6 @@
 package main
 
 import (
-	"errors"
 	"net"
 	"time"
 
@@ -86,7 +85,7 @@ func (u *upf) isConnected() bool {
 
 func (u *upf) addSliceInfo(sliceInfo *SliceInfo) error {
 	if sliceInfo == nil {
-		return errors.New("invalid slice")
+		return ErrInvalidArgument("sliceInfo", sliceInfo)
 	}
 
 	u.sliceInfo = sliceInfo

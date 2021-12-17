@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/binary"
 	"flag"
-	"fmt"
 	"net"
 	"strconv"
 	"time"
@@ -398,8 +397,9 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 	// Prepare prometheus stats.
 	createStats := func(preResp, postResp *pb.FlowMeasureReadResponse, ch chan<- prometheus.Metric) {
 		for i := 0; i < len(postResp.Statistics); i++ {
-			post := postResp.Statistics[i]
 			var pre *pb.FlowMeasureReadResponse_Statistic
+
+			post := postResp.Statistics[i]
 			// Find preQos values.
 			for _, v := range preResp.Statistics {
 				if post.Pdr == v.Pdr && post.Fseid == v.Fseid {
@@ -407,6 +407,7 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 					break
 				}
 			}
+
 			if pre == nil {
 				log.Infof("Found no pre QoS statistics for PDR %v FSEID %v", post.Pdr, post.Fseid)
 				continue
@@ -1094,7 +1095,7 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 
 func (b *bess) processQER(ctx context.Context, any *anypb.Any, method upfMsgType, qosTableName string) error {
 	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
-		return fmt.Errorf("invalid method name: %v", method)
+		return ErrInvalidArgument("method name", method)
 	}
 
 	methods := [...]string{"add", "add", "delete", "clear"}

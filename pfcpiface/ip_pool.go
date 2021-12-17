@@ -4,7 +4,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -27,12 +26,13 @@ func (i *IPPool) DeallocIP(seid uint64) error {
 	ip, ok := i.inventory[seid]
 	if !ok {
 		log.Warnln("Attempt to dealloc non-existent session", seid)
-		return fmt.Errorf("can't dealloc non-existent session %v", seid)
+		return ErrInvalidArgumentWithReason("seid", seid, "can't dealloc non-existent session")
 	}
 
 	delete(i.inventory, seid)
 	i.freePool = append(i.freePool, ip) // Simply append to enqueue.
 	log.Traceln("Deallocated session ", seid, "IP", ip)
+
 	return nil
 }
 
@@ -41,8 +41,7 @@ func (i *IPPool) LookupOrAllocIP(seid uint64) (net.IP, error) {
 	defer i.mu.Unlock()
 
 	if len(i.freePool) == 0 {
-		err := errors.New("ip pool empty")
-		return nil, err
+		return nil, ErrOperationFailedWithReason("IP allocation", "ip pool empty")
 	}
 
 	// Try to find an exiting session and return the allocated IP.
@@ -66,13 +65,16 @@ func (i *IPPool) LookupOrAllocIP(seid uint64) (net.IP, error) {
 func (i *IPPool) String() string {
 	i.mu.Lock()
 	defer i.mu.Unlock()
+
 	sb := strings.Builder{}
 	sb.WriteString("Inventory:\n")
+
 	for s, e := range i.inventory {
 		sb.WriteString(fmt.Sprintf("\tSEID %v -> %+v\n", s, e))
 	}
 
 	sb.WriteString("Free Pool:\n")
+
 	for _, ip := range i.freePool {
 		sb.WriteString(fmt.Sprintf("\tIP %s\n", ip.String()))
 	}

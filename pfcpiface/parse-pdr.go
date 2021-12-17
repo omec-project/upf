@@ -103,12 +103,14 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 			if needAllocIP(ueIPaddr) {
 				/* alloc IPV6 if CHV6 is enabled : TBD */
 				log.Printf("UPF should alloc UE IP for SEID %v. CHV4 flag set", seid)
+
 				ueIP4, err = ippool.LookupOrAllocIP(seid)
-				log.Traceln("Found or allocated new IP", ueIP4, "from pool", ippool)
 				if err != nil {
 					log.Errorln("failed to allocate UE IP")
 					return err
 				}
+
+				log.Traceln("Found or allocated new IP", ueIP4, "from pool", ippool)
 
 				p.allocIPFlag = true
 			} else {

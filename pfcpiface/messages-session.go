@@ -5,7 +5,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"strings"
 
@@ -63,7 +62,6 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 	fseidIP := ip2int(fseid.IPv4Address)
 
 	errProcessReply := func(err error, cause uint8) (message.Message, error) {
-
 		// Build response message
 		seres := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
 			0,                    /* FO <-- what's this? */
@@ -132,6 +130,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 	}
 
 	var localFSEID *ie.IE
+
 	localIP := pConn.LocalAddr().(*net.UDPAddr).IP
 	if localIP.To4() != nil {
 		localFSEID = ie.NewFSEID(session.localSEID, localIP, nil)
@@ -183,7 +182,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 
 	session, ok := pConn.sessions[localSEID]
 	if !ok {
-		return sendError(fmt.Errorf("session not found: %v", localSEID))
+		return sendError(ErrNotFoundWithParam("PFCP session", "localSEID", localSEID))
 	}
 
 	var fseidIP uint32
@@ -410,7 +409,7 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 
 	session, ok := pConn.sessions[localSEID]
 	if !ok {
-		return sendError(fmt.Errorf("session not found: %v", localSEID))
+		return sendError(ErrNotFoundWithParam("PFCP session", "localSEID", localSEID))
 	}
 
 	cause := upf.sendMsgToUPF(upfMsgTypeDel, session.pdrs, session.fars, session.qers)
@@ -419,7 +418,7 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 	}
 
 	if err := releaseAllocatedIPs(upf.ippool, session); err != nil {
-		return sendError(errors.New("session IP dealloc failed"))
+		return sendError(ErrOperationFailedWithReason("session IP dealloc", err.Error()))
 	}
 
 	/* delete sessionRecord */
@@ -518,8 +517,7 @@ func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) (message
 	if cause == ie.CauseSessionContextNotFound {
 		sessItem, ok := pConn.sessions[seid]
 		if !ok {
-			return nil, errProcess(
-				fmt.Errorf("context not found locally or remote. SEID : %v", seid))
+			return nil, errProcess(ErrNotFoundWithParam("PFCP session context", "SEID", seid))
 		}
 
 		log.Warnln("context not found, deleting session locally")
@@ -530,10 +528,11 @@ func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) (message
 			upfMsgTypeDel, sessItem.pdrs, sessItem.fars, sessItem.qers)
 		if cause == ie.CauseRequestRejected {
 			return nil, errProcess(
-				fmt.Errorf("delete session from fastpath failed for: %v", seid))
+				ErrOperationFailedWithParam("delete session from fastpath", "seid", seid))
 		}
 
 		return nil, nil
 	}
+
 	return nil, nil
 }

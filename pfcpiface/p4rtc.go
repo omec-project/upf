@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -122,8 +121,7 @@ func (c *P4rtClient) getEnumVal(enumName string,
 	valName string) ([]byte, error) {
 	enumVal, ok := c.P4Info.TypeInfo.SerializableEnums[enumName]
 	if !ok {
-		err := fmt.Errorf("enum not found with name %s", enumName)
-		return nil, err
+		return nil, ErrNotFoundWithParam("P4 enum value", "name", enumName)
 	}
 
 	for _, enums := range enumVal.Members {
@@ -132,7 +130,7 @@ func (c *P4rtClient) getEnumVal(enumName string,
 		}
 	}
 
-	return nil, fmt.Errorf("EnumVal not found")
+	return nil, ErrNotFound("P4 enum value")
 }
 
 // CheckStatus ... Check client connection status.
@@ -471,9 +469,12 @@ func (c *P4rtClient) WriteInterfaceTable(intfEntry IntfTableEntry, funcType uint
 	return c.InsertTableEntry(te, funcType, prio)
 }
 
-func (c *P4rtClient) getCounterValue(entity *p4.Entity,
-	ce *IntfCounterEntry) error {
+func (c *P4rtClient) getCounterValue(entity *p4.Entity, ce *IntfCounterEntry) error {
 	entry := entity.GetCounterEntry()
+	if entry == nil {
+		return ErrOperationFailedWithReason("get counter value", "cannot get counter entry from P4 entity")
+	}
+
 	index := uint64(entry.GetIndex().Index)
 	byteCount := uint64(entry.GetData().ByteCount)
 	pktCount := uint64(entry.GetData().PacketCount)
@@ -493,10 +494,10 @@ func (c *P4rtClient) getFieldValue(entity *p4.Entity, te AppTableEntry) (*MatchF
 	inputField := te.Fields[0]
 	inputParam := te.Params[0]
 
-	if (entry.TableId != tableID) ||
-		(entry.Action.GetAction().ActionId != actionID) {
-		err := fmt.Errorf("invalid tableID / ActionID")
-		return nil, err
+	if entry.TableId != tableID {
+		return nil, ErrInvalidArgument("tableID", tableID)
+	} else if entry.Action.GetAction().ActionId != actionID {
+		return nil, ErrInvalidArgument("ActionID", actionID)
 	}
 
 	var (
@@ -585,7 +586,7 @@ func (c *P4rtClient) getFieldValue(entity *p4.Entity, te AppTableEntry) (*MatchF
 						}
 					default:
 						log.Println("Unknown MatchType.")
-						return nil, fmt.Errorf("unknown MatchType for FieldMatch")
+						return nil, ErrUnsupported("MatchType for FieldMatch", matchType)
 					}
 
 					log.Println("Field value found.")
@@ -596,7 +597,7 @@ func (c *P4rtClient) getFieldValue(entity *p4.Entity, te AppTableEntry) (*MatchF
 		}
 	}
 
-	return nil, fmt.Errorf("getField Value failed")
+	return nil, ErrOperationFailed("getField Value")
 }
 
 func (c *P4rtClient) addFieldValue(entry *p4.TableEntry, field MatchField, tableID uint32) error {
@@ -650,7 +651,7 @@ func (c *P4rtClient) addFieldValue(entry *p4.TableEntry, field MatchField, table
 						}
 					default:
 						log.Println("Unknown MatchType.")
-						return fmt.Errorf("unknown MatchType for FieldMatch")
+						return ErrUnsupported("MatchType for FieldMatch", fields.GetMatchType())
 					}
 
 					entry.Match = append(entry.Match, fieldVal)
@@ -661,7 +662,7 @@ func (c *P4rtClient) addFieldValue(entry *p4.TableEntry, field MatchField, table
 		}
 	}
 
-	return fmt.Errorf("addField Value failed")
+	return ErrOperationFailed("addField Value")
 }
 
 func (c *P4rtClient) addActionValue(action *p4.Action, param ActionParam,
@@ -684,7 +685,7 @@ func (c *P4rtClient) addActionValue(action *p4.Action, param ActionParam,
 		}
 	}
 
-	return fmt.Errorf("addAction Value failed")
+	return ErrOperationFailed("addAction Value")
 }
 
 // ReadCounter ... Read Counter entry.
@@ -878,7 +879,7 @@ func (c *P4rtClient) ReadInterfaceTable(intfEntry *IntfTableEntry) error {
 		return nil
 	}
 
-	return fmt.Errorf("ReadInterfaceTable failed")
+	return ErrOperationFailed("ReadInterfaceTable")
 }
 
 // ReadTableEntry ... Read table Entry.
@@ -1152,7 +1153,7 @@ func LoadDeviceConfig(deviceConfigPath string) (P4DeviceConfig, error) {
 	if b, err := deviceConfig.Read(bin); err != nil {
 		return nil, fmt.Errorf("read %s: %w", deviceConfigPath, err)
 	} else if b != int(bmv2Info.Size()) {
-		return nil, errors.New("bmv2 bin copy failed")
+		return nil, ErrOperationFailedWithReason("bmv2 bin copy", "invalid size of read config")
 	}
 
 	return bin, nil

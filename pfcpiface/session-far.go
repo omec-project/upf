@@ -4,7 +4,6 @@
 package main
 
 import (
-	"errors"
 	"net"
 	"time"
 
@@ -86,7 +85,7 @@ func (s *PFCPSession) UpdateFAR(f *far, endMarkerList *[][]byte) error {
 		}
 	}
 
-	return errors.New("FAR not found")
+	return ErrNotFound("FAR")
 }
 
 func (s *PFCPSession) setNotifyFlag(flag bool) {
@@ -136,5 +135,5 @@ func (s *PFCPSession) RemoveFAR(id uint32) (*far, error) {
 		}
 	}
 
-	return nil, errors.New("FAR not found")
+	return nil, ErrNotFound("FAR")
 }
