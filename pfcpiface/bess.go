@@ -7,8 +7,6 @@ import (
 	"context"
 	"encoding/binary"
 	"flag"
-	"fmt"
-	"math"
 	"net"
 	"strconv"
 	"time"
@@ -42,7 +40,6 @@ const (
 	farForwardD = 0x0
 	farForwardU = 0x1
 	farDrop     = 0x2
-	farBuffer   = 0x3
 	farNotify   = 0x4
 	// Bit Rates.
 	KB = 1000
@@ -52,16 +49,15 @@ const (
 
 const (
 	// Internal gates for QER.
-	qerGateMeter      uint64 = iota
-	qerGateStatusDrop        = iota + 4
-	qerGateUnmeter
+	qerGateMeter      uint64 = 0
+	qerGateStatusDrop uint64 = 5
+	qerGateUnmeter    uint64 = 6
 )
 
 const (
 	// Internal gates for Slice meter.
-	sliceMeterGateMeter      uint64 = iota
-	sliceMeterGateLookupFail        = iota + 4
-	sliceMeterGateUnmeter
+	sliceMeterGateMeter   uint64 = 0
+	sliceMeterGateUnmeter uint64 = 6
 )
 
 var intEnc = func(u uint64) *pb.FieldData {
@@ -401,8 +397,9 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 	// Prepare prometheus stats.
 	createStats := func(preResp, postResp *pb.FlowMeasureReadResponse, ch chan<- prometheus.Metric) {
 		for i := 0; i < len(postResp.Statistics); i++ {
-			post := postResp.Statistics[i]
 			var pre *pb.FlowMeasureReadResponse_Statistic
+
+			post := postResp.Statistics[i]
 			// Find preQos values.
 			for _, v := range preResp.Statistics {
 				if post.Pdr == v.Pdr && post.Fseid == v.Fseid {
@@ -410,6 +407,7 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 					break
 				}
 			}
+
 			if pre == nil {
 				log.Infof("Found no pre QoS statistics for PDR %v FSEID %v", post.Pdr, post.Fseid)
 				continue
@@ -623,7 +621,7 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 		f := &pb.WildcardMatchCommandAddArg{
 			Gate:     uint64(p.needDecap),
-			Priority: int64(math.MaxUint32 - p.precedence),
+			Priority: int64(p.precedence),
 			Values: []*pb.FieldData{
 				intEnc(uint64(p.srcIface)),     /* src_iface */
 				intEnc(uint64(p.tunnelIP4Dst)), /* tunnel_ipv4_dst */
@@ -727,7 +725,7 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 		ebs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 		pbs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 
-		if qer.ulStatus == ie.GateStatusClosed {
+		if qer.ulStatus != ie.GateStatusOpen {
 			gate = qerGateStatusDrop
 		} else if qer.ulMbr != 0 || qer.ulGbr != 0 {
 			/* MBR/GBR is received in Kilobits/sec.
@@ -760,7 +758,7 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 		ebs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 		pbs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 
-		if qer.dlStatus == ie.GateStatusClosed {
+		if qer.dlStatus != ie.GateStatusOpen {
 			gate = qerGateStatusDrop
 		} else if qer.dlMbr != 0 || qer.dlGbr != 0 {
 			/* MBR/GBR is received in Kilobits/sec.
@@ -1028,12 +1026,12 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 
 		q := &pb.QosCommandAddArg{
 			Gate:              gate,
-			Cir:               cir,                               /* committed info rate */
-			Pir:               pir,                               /* peak info rate */
-			Cbs:               cbs,                               /* committed burst size */
-			Pbs:               pbs,                               /* Peak burst size */
-			Ebs:               ebs,                               /* Excess burst size */
-			OptionalDeductLen: &pb.QosCommandAddArg_DeductLen{0}, /* Include all headers */
+			Cir:               cir,                                          /* committed info rate */
+			Pir:               pir,                                          /* peak info rate */
+			Cbs:               cbs,                                          /* committed burst size */
+			Pbs:               pbs,                                          /* Peak burst size */
+			Ebs:               ebs,                                          /* Excess burst size */
+			OptionalDeductLen: &pb.QosCommandAddArg_DeductLen{DeductLen: 0}, /* Include all headers */
 			Fields: []*pb.FieldData{
 				intEnc(uint64(farForwardU)), /* Action */
 				intEnc(uint64(0)),           /* tunnel_out_type */
@@ -1072,12 +1070,12 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 		// TODO: packet deduction should take GTPU extension header into account
 		q = &pb.QosCommandAddArg{
 			Gate:              gate,
-			Cir:               cir,                                /* committed info rate */
-			Pir:               pir,                                /* peak info rate */
-			Cbs:               cbs,                                /* committed burst size */
-			Pbs:               pbs,                                /* Peak burst size */
-			Ebs:               ebs,                                /* Excess burst size */
-			OptionalDeductLen: &pb.QosCommandAddArg_DeductLen{50}, /* Exclude Ethernet,IP,UDP,GTP header */
+			Cir:               cir,                                           /* committed info rate */
+			Pir:               pir,                                           /* peak info rate */
+			Cbs:               cbs,                                           /* committed burst size */
+			Pbs:               pbs,                                           /* Peak burst size */
+			Ebs:               ebs,                                           /* Excess burst size */
+			OptionalDeductLen: &pb.QosCommandAddArg_DeductLen{DeductLen: 50}, /* Exclude Ethernet,IP,UDP,GTP header */
 			Fields: []*pb.FieldData{
 				intEnc(uint64(farForwardD)), /* Action */
 				intEnc(uint64(1)),           /* tunnel_out_type */
@@ -1097,7 +1095,7 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 
 func (b *bess) processQER(ctx context.Context, any *anypb.Any, method upfMsgType, qosTableName string) error {
 	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
-		return fmt.Errorf("invalid method name: %v", method)
+		return ErrInvalidArgument("method name", method)
 	}
 
 	methods := [...]string{"add", "add", "delete", "clear"}

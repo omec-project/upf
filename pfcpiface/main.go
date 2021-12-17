@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"io/ioutil"
 	"net"
@@ -19,7 +20,6 @@ import (
 
 var (
 	configPath = flag.String("config", "upf.json", "path to upf config")
-	httpAddr   = flag.String("http", "0.0.0.0:8080", "http IP/port combo")
 	simulate   = simModeDisable
 	pfcpsim    = flag.Bool("pfcpsim", false, "simulate PFCP")
 )
@@ -198,6 +198,7 @@ func main() {
 
 	if simulate.enable() {
 		upf.sim(simulate, &conf.SimInfo)
+
 		if !simulate.keepGoing() {
 			return
 		}
@@ -214,7 +215,7 @@ func main() {
 	httpSrv := &http.Server{Addr: ":" + httpPort, Handler: nil}
 
 	go func() {
-		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := httpSrv.ListenAndServe(); err != nil && errors.Is(err, http.ErrServerClosed) {
 			log.Fatalln("http server failed", err)
 		}
 
@@ -222,6 +223,7 @@ func main() {
 	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
+
 	node := NewPFCPNode(ctx, upf)
 	go node.Serve()
 

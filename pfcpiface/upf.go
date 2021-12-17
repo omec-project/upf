@@ -4,7 +4,6 @@
 package main
 
 import (
-	"errors"
 	"net"
 	"time"
 
@@ -62,7 +61,6 @@ type upf struct {
 // Don't change these values.
 const (
 	tunnelGTPUPort = 2152
-	invalidQerID   = 0xFFFFFFFF
 
 	// src-iface consts.
 	core   = 0x2
@@ -87,7 +85,7 @@ func (u *upf) isConnected() bool {
 
 func (u *upf) addSliceInfo(sliceInfo *SliceInfo) error {
 	if sliceInfo == nil {
-		return errors.New("invalid slice")
+		return ErrInvalidArgument("sliceInfo", sliceInfo)
 	}
 
 	u.sliceInfo = sliceInfo

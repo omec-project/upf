@@ -63,6 +63,7 @@ func (node *PFCPNode) handleNewPeers() {
 			if errors.Is(err, net.ErrClosed) {
 				return
 			}
+
 			continue
 		}
 
@@ -97,6 +98,7 @@ func (node *PFCPNode) Serve() {
 			log.Infoln("Removed connection to", rAddr)
 		case <-node.ctx.Done():
 			shutdown = true
+
 			log.Infoln("Entering node shutdown")
 
 			err := node.Close()
@@ -123,5 +125,4 @@ func (node *PFCPNode) Serve() {
 func (node *PFCPNode) Done() {
 	<-node.done
 	log.Infoln("Shutdown complete")
-	return
 }

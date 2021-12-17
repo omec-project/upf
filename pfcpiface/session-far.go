@@ -4,7 +4,6 @@
 package main
 
 import (
-	"errors"
 	"net"
 	"time"
 
@@ -86,7 +85,7 @@ func (s *PFCPSession) UpdateFAR(f *far, endMarkerList *[][]byte) error {
 		}
 	}
 
-	return errors.New("FAR not found")
+	return ErrNotFound("FAR")
 }
 
 func (s *PFCPSession) setNotifyFlag(flag bool) {
@@ -104,15 +103,11 @@ func (s *PFCPSession) getNotifyFlag() bool {
 
 func (s *PFCPSession) runTimerForDDNNotify(timeout time.Duration) {
 	endTime := time.After(timeout)
+	for range endTime {
+		log.Println("DDN notify send timeout")
+		s.setNotifyFlag(false)
 
-	for {
-		select {
-		case <-endTime:
-			log.Println("DDN notify send timeout")
-			s.setNotifyFlag(false)
-
-			return
-		}
+		return
 	}
 }
 
@@ -140,5 +135,5 @@ func (s *PFCPSession) RemoveFAR(id uint32) (*far, error) {
 		}
 	}
 
-	return nil, errors.New("FAR not found")
+	return nil, ErrNotFound("FAR")
 }

@@ -23,6 +23,7 @@ func (pConn *PFCPConn) getHeartBeatRequest() *Request {
 		ie.NewRecoveryTimeStamp(pConn.ts.local),
 		nil,
 	)
+
 	return newRequest(hbreq)
 }
 
@@ -42,14 +43,13 @@ func (pConn *PFCPConn) handleHeartbeatRequest(msg message.Message) (message.Mess
 	return hbres, nil
 }
 
-func (pConn *PFCPConn) handleIncomingResponse(msg message.Message) error {
+func (pConn *PFCPConn) handleIncomingResponse(msg message.Message) {
 	req, ok := pConn.pendingReqs.Load(msg.Sequence())
 
 	if ok {
 		req.(*Request).reply <- msg
 		pConn.pendingReqs.Delete(msg.Sequence())
 	}
-	return nil
 }
 
 func (pConn *PFCPConn) associationIEs() []*ie.IE {
@@ -82,6 +82,7 @@ func (pConn *PFCPConn) associationIEs() []*ie.IE {
 		// ie.NewUserPlaneIPResourceInformation(0x41, 0, coreIP, "", "", ie.SrcInterfaceCore),
 		ie.NewUPFunctionFeatures(features...),
 	}
+
 	return ies
 }
 
@@ -98,6 +99,7 @@ func (pConn *PFCPConn) sendAssociationRequest() error {
 	)
 
 	pConn.SendPFCPMsg(asreq)
+
 	return nil
 }
 
@@ -142,6 +144,7 @@ func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (messa
 
 	pConn.nodeID.remote = nodeID
 	asres.Cause = ie.NewCause(ie.CauseRequestAccepted)
+
 	log.Infoln("Association setup done between nodes",
 		"local:", pConn.nodeID.local, "remote:", pConn.nodeID.remote)
 

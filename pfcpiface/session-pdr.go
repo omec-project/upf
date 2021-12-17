@@ -4,7 +4,6 @@
 package main
 
 import (
-	"errors"
 	"net"
 
 	log "github.com/sirupsen/logrus"
@@ -13,18 +12,21 @@ import (
 )
 
 // Release allocated IPs.
-func releaseAllocatedIPs(ippool *IPPool, session *PFCPSession) {
-	log.Println("release allocated IPs")
+func releaseAllocatedIPs(ippool *IPPool, session *PFCPSession) error {
+	log.Println("release allocated IP")
 
+	// Check if we allocated an UE IP for this session and delete it.
 	for _, pdr := range session.pdrs {
 		if (pdr.allocIPFlag) && (pdr.srcIface == core) {
 			var ueIP net.IP = int2ip(pdr.dstIP)
 
-			log.Println("pdrID : ", pdr.pdrID, ", ueIP : ", ueIP.String())
+			log.Traceln("Releasing IP", ueIP, " of session", session.localSEID)
 
-			ippool.DeallocIP(ueIP)
+			return ippool.DeallocIP(session.localSEID)
 		}
 	}
+
+	return nil
 }
 
 func addPdrInfo(msg *message.SessionEstablishmentResponse,
@@ -64,7 +66,7 @@ func (s *PFCPSession) UpdatePDR(p pdr) error {
 		}
 	}
 
-	return errors.New("PDR not found")
+	return ErrNotFound("PDR")
 }
 
 // RemovePDR removes pdr from existing list of PDRs in the session.
@@ -76,5 +78,5 @@ func (s *PFCPSession) RemovePDR(id uint32) (*pdr, error) {
 		}
 	}
 
-	return nil, errors.New("PDR not found")
+	return nil, ErrNotFound("PDR")
 }

@@ -4,7 +4,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -82,7 +81,7 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 	}
 
 	if action == 0 {
-		return errors.New("Invalid FAR Action")
+		return ErrInvalidArgument("FAR Action", action)
 	}
 
 	f.applyAction = action
@@ -97,7 +96,7 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 	case update:
 		fwdIEs, err = farIE.UpdateForwardingParameters()
 	default:
-		return errors.New("invalid op specified")
+		return ErrInvalidOperation(op)
 	}
 
 	if err != nil {

@@ -4,8 +4,9 @@
 package main
 
 import (
-	"errors"
+	"fmt"
 	"net"
+	"strings"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
@@ -14,45 +15,71 @@ import (
 type IPPool struct {
 	mu       sync.Mutex
 	freePool []net.IP
-	// inventory makes note if IP is allocated
-	inventory map[string]bool
+	// inventory keeps track of allocated sessions and their IPs
+	inventory map[uint64]net.IP
 }
 
-func (i *IPPool) DeallocIP(ip net.IP) {
+func (i *IPPool) DeallocIP(seid uint64) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
-	isAllocated, ok := i.inventory[ip.String()]
+	ip, ok := i.inventory[seid]
 	if !ok {
-		log.Warnln("Attempt to dealloc non-existent IP", ip)
-		return
+		log.Warnln("Attempt to dealloc non-existent session", seid)
+		return ErrInvalidArgumentWithReason("seid", seid, "can't dealloc non-existent session")
 	}
 
-	if !isAllocated {
-		log.Warnln("Attempt to dealloc a free IP", ip)
-		return
-	}
-
-	i.inventory[ip.String()] = false
+	delete(i.inventory, seid)
 	i.freePool = append(i.freePool, ip) // Simply append to enqueue.
-	log.Traceln("Deallocated IP:", ip)
+	log.Traceln("Deallocated session ", seid, "IP", ip)
+
+	return nil
 }
 
-func (i *IPPool) AllocIP() (net.IP, error) {
+func (i *IPPool) LookupOrAllocIP(seid uint64) (net.IP, error) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
 	if len(i.freePool) == 0 {
-		err := errors.New("ip pool empty")
-		return nil, err
+		return nil, ErrOperationFailedWithReason("IP allocation", "ip pool empty")
 	}
 
-	ip := i.freePool[0]
-	i.inventory[ip.String()] = true
-	i.freePool = i.freePool[1:] // Slice off the element once it is dequeued.
+	// Try to find an exiting session and return the allocated IP.
+	ip, found := i.inventory[seid]
+	if found {
+		log.Traceln("Found existing session", seid, "IP", ip)
+		return ip, nil
+	}
 
-	log.Traceln("Allocated IP:", ip)
-	return ip, nil
+	ip = i.freePool[0]
+	i.freePool = i.freePool[1:] // Slice off the element once it is dequeued.
+	i.inventory[seid] = ip
+	log.Traceln("Allocated new session", seid, "IP", ip)
+
+	ipVal := make(net.IP, len(ip))
+	copy(ipVal, ip)
+
+	return ipVal, nil
+}
+
+func (i *IPPool) String() string {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	sb := strings.Builder{}
+	sb.WriteString("Inventory:\n")
+
+	for s, e := range i.inventory {
+		sb.WriteString(fmt.Sprintf("\tSEID %v -> %+v\n", s, e))
+	}
+
+	sb.WriteString("Free Pool:\n")
+
+	for _, ip := range i.freePool {
+		sb.WriteString(fmt.Sprintf("\tIP %s\n", ip.String()))
+	}
+
+	return sb.String()
 }
 
 func NewIPPool(cidr string) (*IPPool, error) {
@@ -62,13 +89,12 @@ func NewIPPool(cidr string) (*IPPool, error) {
 	}
 
 	i := &IPPool{
-		inventory: make(map[string]bool),
+		inventory: make(map[uint64]net.IP),
 	}
 
 	for ip := ip.Mask(ipnet.Mask); ipnet.Contains(ip); inc(ip) {
 		ipVal := make(net.IP, len(ip))
 		copy(ipVal, ip)
-		i.inventory[ipVal.String()] = false
 		i.freePool = append(i.freePool, ipVal)
 	}
 

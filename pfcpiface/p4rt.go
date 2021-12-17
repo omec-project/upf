@@ -5,7 +5,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"math/rand"
 	"net"
 	"time"
@@ -123,7 +122,7 @@ func setCounterSize(p *p4rtc, counterID uint8, name string) error {
 		}
 	}
 
-	errin := fmt.Errorf("countername not found %s", name)
+	errin := ErrNotFoundWithParam("counter", "name", name)
 
 	return errin
 }
@@ -133,7 +132,7 @@ func resetCounterVal(p *p4rtc, counterID uint8, val uint64) {
 	delete(p.counters[counterID].allocated, val)
 }
 
-func getCounterVal(p *p4rtc, counterID uint8, pdrID uint32) (uint64, error) {
+func getCounterVal(p *p4rtc, counterID uint8) (uint64, error) {
 	/*
 	   loop :
 	      random counter generate
@@ -158,7 +157,7 @@ func getCounterVal(p *p4rtc, counterID uint8, pdrID uint32) (uint64, error) {
 		}
 	}
 
-	return 0, fmt.Errorf("key alloc fail %v", val)
+	return 0, ErrOperationFailedWithParam("counter allocation", "final val", val)
 }
 
 func (p *p4rtc) exit() {
@@ -168,7 +167,7 @@ func (p *p4rtc) exit() {
 func (p *p4rtc) channelSetup() (*P4rtClient, error) {
 	log.Println("Channel Setup.")
 
-	localclient, errin := CreateChannel(p.host, p.deviceID, p.timeout, p.reportNotifyChan)
+	localclient, errin := CreateChannel(p.host, p.deviceID, p.reportNotifyChan)
 	if errin != nil {
 		log.Println("create channel failed : ", errin)
 		return nil, errin
@@ -198,8 +197,7 @@ func initCounter(p *p4rtc) error {
 	var errin error
 
 	if p.p4client == nil {
-		errin = fmt.Errorf("can't initialize counter. P4client null")
-		return errin
+		return ErrOperationFailedWithReason("init counter", "P4client null")
 	}
 
 	p.counters = make([]counter, 2)
@@ -353,8 +351,7 @@ func (p *p4rtc) sendMsgToUPF(
 		{
 			funcType = FunctionTypeInsert
 			for i := range pdrs {
-				val, err = getCounterVal(p,
-					preQosPdrCounter, pdrs[i].pdrID)
+				val, err = getCounterVal(p, preQosPdrCounter)
 				if err != nil {
 					log.Println("Counter id alloc failed ", err)
 					return cause
