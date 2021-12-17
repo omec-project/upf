@@ -184,7 +184,7 @@ func main() {
 	log.Infoln(conf)
 
 	if conf.EnableP4rt {
-		fp = &p4rtc{}
+		fp = &UP4{}
 	} else {
 		fp = &bess{}
 	}
