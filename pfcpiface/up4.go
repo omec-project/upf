@@ -101,10 +101,7 @@ func (up4 *UP4) portStats(uc *upfCollector, ch chan<- prometheus.Metric) {
 func (up4 *UP4) getAccessIP() (*net.IPNet, error) {
 	log.Println("getAccessIP")
 
-	interfaceTableEntry, err := up4.p4RtTranslator.BuildInterfaceTableEntry("ACCESS", "UPLINK")
-	if err != nil {
-		return nil, ErrOperationFailedWithReason("get Access IP from UP4", err.Error())
-	}
+	interfaceTableEntry := up4.p4RtTranslator.BuildInterfaceTableEntryNoAction()
 
 	resp, err := up4.p4client.ReadTableEntry(interfaceTableEntry)
 	if err != nil {
@@ -290,14 +287,9 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 		return
 	}
 
-	up4.accessIP, err = up4.getAccessIP()
-	if err != nil {
-		log.Errorf("Failed to get Access IP from UP4: %v", err)
-		return
+	if up4.accessIP != nil {
+		u.accessIP = up4.accessIP.IP
 	}
-
-	log.Infof("Retrieved Access IP from UP4: %v", up4.accessIP)
-	u.accessIP = up4.accessIP.IP
 }
 
 func (up4 *UP4) clearAllTables() error {
@@ -374,6 +366,13 @@ func (up4 *UP4) tryConnect() error {
 		go up4.endMarkerSendLoop(up4.endMarkerChan)
 	}
 
+	up4.accessIP, err = up4.getAccessIP()
+	if err != nil {
+		log.Errorf("Failed to get Access IP from UP4: %v", err)
+	} else {
+		log.Infof("Retrieved Access IP from UP4: %v", up4.accessIP)
+	}
+
 	return nil
 }
 
@@ -427,7 +426,7 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
 
 	methodType := p4.Update_MODIFY
 	tunnelParams := tunnelParams{
-		tunnelIP4Src: far.tunnelIP4Src,
+		tunnelIP4Src: ip2int(up4.accessIP.IP.To4()),
 		tunnelIP4Dst: far.tunnelIP4Dst,
 		tunnelPort:   far.tunnelPort,
 	}
@@ -465,7 +464,7 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 		"far": far,
 	})
 	tunnelParams := tunnelParams{
-		tunnelIP4Src: far.tunnelIP4Src,
+		tunnelIP4Src: ip2int(up4.accessIP.IP.To4()),
 		tunnelIP4Dst: far.tunnelIP4Dst,
 		tunnelPort:   far.tunnelPort,
 	}
@@ -596,7 +595,7 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 		log.Println(far)
 
 		tunnelParams := tunnelParams{
-			tunnelIP4Src: far.tunnelIP4Src,
+			tunnelIP4Src: ip2int(up4.accessIP.IP.To4()),
 			tunnelIP4Dst: far.tunnelIP4Dst,
 			tunnelPort:   far.tunnelPort,
 		}

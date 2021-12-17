@@ -15,6 +15,9 @@ import (
 
 // P4 constants
 const (
+	DirectionUplink = 1
+
+	FieldIPv4DstPrefix    = "ipv4_dst_prefix"
 	FieldN3Address        = "n3_address"
 	FieldUEAddress        = "ue_address"
 	FieldTEID             = "teid"
@@ -26,6 +29,7 @@ const (
 	FieldTunnelDstAddress = "dst_addr"
 	FieldTunnelSrcPort    = "sport"
 
+	TableInterfaces           = "PreQosPipe.interfaces"
 	TableTunnelPeers          = "PreQosPipe.tunnel_peers"
 	TableDownlinkTerminations = "PreQosPipe.terminations_downlink"
 	TableUplinkTerminations   = "PreQosPipe.terminations_uplink"
@@ -303,6 +307,16 @@ func (t *P4rtTranslator) withActionParam(action *p4.Action, name string, value i
 	return nil
 }
 
+func (t *P4rtTranslator) getActionParamValue(tableEntry *p4.TableEntry, id uint32) ([]byte, error) {
+	for _, param := range tableEntry.Action.GetAction().Params {
+		if param.ParamId == id {
+			return param.Value, nil
+		}
+	}
+
+	return nil, ErrNotFoundWithParam("action param", "id", id)
+}
+
 func (t *P4rtTranslator) getLPMMatchFieldValue(tableEntry *p4.TableEntry, name string) (*net.IPNet, error) {
 	tableID := tableEntry.TableId
 
@@ -333,27 +347,49 @@ func (t *P4rtTranslator) getLPMMatchFieldValue(tableEntry *p4.TableEntry, name s
 	return nil, ErrNotFoundWithParam(fmt.Sprintf("match field %s", name), "table", p4Table.Preamble.Name)
 }
 
-func (t *P4rtTranslator) BuildInterfaceTableEntry(srcIntf string, direction string) (*p4.TableEntry, error) {
-	tableID := t.tableID("PreQosPipe.source_iface_lookup")
+func (t *P4rtTranslator) BuildInterfaceTableEntryNoAction() *p4.TableEntry {
+	tableID := t.tableID(TableInterfaces)
 
 	entry := &p4.TableEntry{
 		TableId:  tableID,
 		Priority: DefaultPriority,
 	}
 
-	// FIXME: complete
-	return entry, nil
+	return entry
 }
 
 func (t *P4rtTranslator) ParseAccessIPFromReadInterfaceTableResponse(resp *p4.ReadResponse) (*net.IPNet, error) {
+	var interfaceTypeParamID uint32 = 1
+
+	var directionParamID uint32 = 1
+
 	for _, entity := range resp.GetEntities() {
-		field, err := t.getLPMMatchFieldValue(entity.GetTableEntry(), "ipv4_dst_prefix")
+		accessIP, err := t.getLPMMatchFieldValue(entity.GetTableEntry(), FieldIPv4DstPrefix)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"entity": entity,
 			}).Warn("failed to get LPM field from response entity")
-		} else {
-			return field, nil
+
+			continue
+		}
+
+		interfaceType, err := t.getActionParamValue(entity.GetTableEntry(), interfaceTypeParamID)
+		if err != nil {
+			return nil, err
+		}
+
+		directionValue, err := t.getActionParamValue(entity.GetTableEntry(), directionParamID)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(interfaceType) != 1 && len(directionValue) != 1 {
+			return nil, ErrOperationFailedWithReason("parse Access IP from UP4",
+				"invalid length of action params")
+		}
+
+		if interfaceType[0] == access && directionValue[0] == DirectionUplink {
+			return accessIP, nil
 		}
 	}
 
