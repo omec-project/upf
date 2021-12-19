@@ -153,12 +153,12 @@ if [ "$mode" != 'sim' ]; then
 fi
 
 # Run bessd
-	# --cpuset-cpus=8-9 \
-	# -u 0 \
-	# --cap-add IPC_LOCK
-	# -m 2048
-	# --privileged \
-	# --cap-add=all \
+# --cpuset-cpus=8-9 \
+# -u 0 \
+# --cap-add IPC_LOCK
+# -m 2048
+# --privileged \
+# --cap-add=all \
 docker run --name bess -td --restart unless-stopped \
 	--cpuset-cpus=5-8 \
 	--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
