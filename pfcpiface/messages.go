@@ -83,10 +83,7 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 			go pConn.startHeartBeatMonitor()
 		}
 		// TODO: Cleanup sessions
-	case message.MsgTypeAssociationSetupResponse:
-		err = pConn.handleAssociationSetupResponse(msg)
-		// TODO: Cleanup sessions
-		// TODO: start heartbeats
+
 	case message.MsgTypeAssociationReleaseRequest:
 		reply, err = pConn.handleAssociationReleaseRequest(msg)
 		defer pConn.Shutdown()
@@ -102,8 +99,8 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 		err = pConn.handleSessionReportResponse(msg)
 
 	// Incoming response messages
-	// TODO: Association Setup Request, Session Report Request
-	case message.MsgTypeHeartbeatResponse:
+	// TODO: Session Report Request
+	case message.MsgTypeAssociationSetupResponse, message.MsgTypeHeartbeatResponse:
 		pConn.handleIncomingResponse(msg)
 
 	default:
@@ -157,15 +154,14 @@ func (pConn *PFCPConn) SendPFCPMsg(msg message.Message) {
 }
 
 func (pConn *PFCPConn) sendPFCPRequestMessage(r *Request) (message.Message, bool) {
+
 	pConn.pendingReqs.Store(r.msg.Sequence(), r)
+
 	pConn.SendPFCPMsg(r.msg)
-
 	retriesLeft := pConn.upf.maxReqRetries
-
 	for {
 		if reply, rc := r.GetResponse(pConn.shutdown, pConn.upf.respTimeout); rc {
 			log.Traceln("Request Timeout, retriesLeft:", retriesLeft)
-
 			if retriesLeft > 0 {
 				pConn.SendPFCPMsg(r.msg)
 				retriesLeft--

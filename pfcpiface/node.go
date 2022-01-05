@@ -55,6 +55,21 @@ func (node *PFCPNode) handleNewPeers() {
 	lAddrStr := node.LocalAddr().String()
 	log.Infoln("listening for new PFCP connections on", lAddrStr)
 
+	for _, peer := range node.upf.peers {
+		log.Println("SPGWC/SMF hostname ", peer)
+
+		n4DstIP := getRemoteIP(peer)
+		log.Println("Establishing PFCP Conn with CP node: ", n4DstIP.String())
+		if n4DstIP.String() != net.IPv4zero.String() {
+			pfcpConn := node.NewPFCPConn(lAddrStr, n4DstIP.String()+":"+"8806", nil)
+			if pfcpConn != nil {
+				go pfcpConn.sendAssociationRequest()
+			}
+		} else {
+			log.Println("Failed to establish PFCP Conn with control plane IP: ", n4DstIP.String())
+		}
+	}
+
 	for {
 		buf := make([]byte, 1024)
 

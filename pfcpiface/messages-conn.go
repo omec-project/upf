@@ -15,6 +15,29 @@ var errFlowDescAbsent = errors.New("flow description not present")
 var errFastpathDown = errors.New("fastpath down")
 var errReqRejected = errors.New("request rejected")
 
+func (pConn *PFCPConn) sendAssociationRequest() {
+	// Build request message
+	asreq := message.NewAssociationSetupRequest(pConn.getSeqNum(),
+		pConn.associationIEs()...,
+	)
+
+	r := newRequest(asreq)
+	reply, timeout := pConn.sendPFCPRequestMessage(r)
+	if reply != nil {
+		err := pConn.handleAssociationSetupResponse(reply)
+		if err != nil {
+			log.Errorln("Handling of Assoc Setup Reponse Failed ", pConn.RemoteAddr())
+			pConn.Shutdown()
+			return
+		}
+		if pConn.upf.enableHBTimer {
+			go pConn.startHeartBeatMonitor()
+		}
+	} else if timeout {
+		pConn.Shutdown()
+	}
+}
+
 func (pConn *PFCPConn) getHeartBeatRequest() *Request {
 	seq := pConn.getSeqNum()
 
