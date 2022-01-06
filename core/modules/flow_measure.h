@@ -35,6 +35,8 @@ class FlowMeasure final : public Module {
   std::string GetDesc() const override { return ""; };
   CommandResponse CommandReadStats(
       const bess::pb::FlowMeasureCommandReadArg &arg);
+  CommandResponse CommandFlipFlag(
+      const bess::pb::FlowMeasureCommandFlipArg &arg);
 
  private:
   // Flag represents a collection of possible values to select buffer sides.
@@ -48,7 +50,7 @@ class FlowMeasure final : public Module {
   template <typename T>
   static constexpr bool Flag_IsValid(T value) {
     Flag flag = static_cast<Flag>(value);
-    return flag >= Flag::FLAG_VALUE_INVALID && flag <= Flag::FLAG_VALUE_MAX;
+    return flag > Flag::FLAG_VALUE_INVALID && flag <= Flag::FLAG_VALUE_MAX;
   }
 
   static const std::string Flag_Name(const Flag &flag) {
