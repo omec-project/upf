@@ -23,13 +23,16 @@ func (pConn *PFCPConn) sendAssociationRequest() {
 
 	r := newRequest(asreq)
 	reply, timeout := pConn.sendPFCPRequestMessage(r)
+
 	if reply != nil {
 		err := pConn.handleAssociationSetupResponse(reply)
 		if err != nil {
-			log.Errorln("Handling of Assoc Setup Reponse Failed ", pConn.RemoteAddr())
+			log.Errorln("Handling of Assoc Setup Response Failed ", pConn.RemoteAddr())
 			pConn.Shutdown()
+
 			return
 		}
+
 		if pConn.upf.enableHBTimer {
 			go pConn.startHeartBeatMonitor()
 		}

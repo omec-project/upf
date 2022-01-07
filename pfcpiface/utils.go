@@ -100,14 +100,13 @@ func calcBurstSizeFromRate(kbps uint64, ms uint64) uint64 {
 	return uint64((float64(kbps) * 1000 / 8) * (float64(ms) / 1000))
 }
 
-func getRemoteIP(dstIP string) net.IP {
-	conn, err := net.Dial("udp", dstIP+":"+"8806")
+func getRemoteIP(dstIP string) (net.IP, error) {
+	conn, err := net.Dial("udp", dstIP+":"+PFCPPort)
 	if err != nil {
-		ip := net.IPv4zero.String()
-		return net.ParseIP(ip)
+		return nil, err
 	}
 	defer conn.Close()
 	remoteAddr := conn.RemoteAddr().(*net.UDPAddr)
 
-	return remoteAddr.IP
+	return remoteAddr.IP, nil
 }

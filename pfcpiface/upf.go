@@ -139,6 +139,7 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 	if len(conf.CPIface.Peers) > 0 {
 		u.peers = make([]string, len(conf.CPIface.Peers))
 		nc := copy(u.peers, conf.CPIface.Peers)
+
 		if nc == 0 {
 			log.Fatalln("Failed to parse cpiface peers")
 		}

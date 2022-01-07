@@ -386,5 +386,4 @@ func pfcpSim() {
 
 	time.Sleep(10 * time.Second)
 	deletePFCP(conn, raddr, seid)
-
 }

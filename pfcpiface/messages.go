@@ -154,14 +154,15 @@ func (pConn *PFCPConn) SendPFCPMsg(msg message.Message) {
 }
 
 func (pConn *PFCPConn) sendPFCPRequestMessage(r *Request) (message.Message, bool) {
-
 	pConn.pendingReqs.Store(r.msg.Sequence(), r)
 
 	pConn.SendPFCPMsg(r.msg)
 	retriesLeft := pConn.upf.maxReqRetries
+
 	for {
 		if reply, rc := r.GetResponse(pConn.shutdown, pConn.upf.respTimeout); rc {
 			log.Traceln("Request Timeout, retriesLeft:", retriesLeft)
+
 			if retriesLeft > 0 {
 				pConn.SendPFCPMsg(r.msg)
 				retriesLeft--
