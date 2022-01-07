@@ -46,19 +46,6 @@ metadata:
 data:
   upf.json: |
     {
-      "table_sizes": {
-        "": "Example sizes based on sim mode and 50K sessions. Customize as per your control plane",
-        "": "50K per unique tuple, we send 4 unique PDR patterns",
-        "pdrLookup": 50000,
-        "": "4 PDRs per session",
-        "flowMeasure": 200000,
-        "": "there are 2 QERs and 2 entries per QER",
-        "appQERLookup": 200000,
-        "": "there is 1 session QER and 2 entries per session QER",
-        "sessionQERLookup": 100000,
-        "": "there are 3 FARs",
-        "farLookup": 150000
-      },
       "access": {
         "ifname": "access"
       },
@@ -69,11 +56,6 @@ data:
       "workers": "1",
       "cpiface": {
         "dnn": "internet",
-        "http_port": "8080",
-        "enable_ue_ip_alloc": false,
-        "ue_ip_pool": "10.250.0.0/16",
-        "" : "use_fqdn: true",
-        "" : "hostname: upf-0"
       }
     }
 ---
