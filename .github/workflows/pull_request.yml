@@ -27,9 +27,13 @@ jobs:
           go mod tidy
           go mod vendor
 
-      - name: Build the Docker image
+      - name: Build the BESS-UPF Docker image
         run: |
-          make docker-build
+          DOCKER_TARGETS=bess make docker-build
+
+      - name: Build the PFCP Agent Docker image
+        run: |
+          DOCKER_TARGETS=pfcpiface make docker-build
 
       # Format the code
       - name: Clang Format
@@ -54,9 +58,14 @@ jobs:
           git --no-pager diff
 
       # Build again and commit
-      - name: Build the Docker image (after format)
+      - name: Build the BESS-UPF Docker image (after format)
         run: |
-          make docker-build
+          DOCKER_TARGETS=bess make docker-build
+
+      - name: Build the PFCP Agent Docker image (after format)
+        run: |
+          DOCKER_TARGETS=pfcpiface make docker-build
+
       - name: Update PR with changes
         uses: gr2m/create-or-update-pull-request-action@v1.x
         env:
