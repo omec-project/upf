@@ -33,6 +33,7 @@ DOCKER_TARGETS           ?= bess pfcpiface
 
 # https://docs.docker.com/engine/reference/commandline/build/#specifying-target-build-stage---target
 docker-build:
+	@cd pfcpiface && go mod tidy && go mod vendor && cd ..
 	for target in $(DOCKER_TARGETS); do \
 		DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) \
 			--target $$target \
@@ -46,6 +47,7 @@ docker-build:
 			. \
 			|| exit 1; \
 	done
+	@rm -r pfcpiface/vendor
 
 docker-push:
 	for target in $(DOCKER_TARGETS); do \
