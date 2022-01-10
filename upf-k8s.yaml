@@ -55,7 +55,7 @@ data:
       "measure_upf": true,
       "workers": "1",
       "cpiface": {
-        "dnn": "internet",
+        "dnn": "internet"
       }
     }
 ---
