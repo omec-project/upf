@@ -1,7 +1,7 @@
 # vim: syntax=py
 # -*- mode: python -*-
 # SPDX-License-Identifier: Apache-2.0
-# Copyright(c) 2019 Intel Corporation
+# Copyright (c) 2019 Intel Corporation
 #
 # Copyright (c) 2014-2016, The Regents of the University of California.
 # Copyright (c) 2016-2017, Nefeli Networks, Inc.
