@@ -562,11 +562,11 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, relatedFAR far,
 			ActionId: t.actionID(ActDownlinkTermFwd),
 		}
 
-		if err := t.withActionParam(action, FieldTEID, pdr.tunnelTEID); err != nil {
+		if err := t.withActionParam(action, FieldTEID, relatedFAR.tunnelTEID); err != nil {
 			return nil, err
 		}
 
-		// TODO: add support for QFI, which should be stored as the part of PDR
+		// TODO: add support for QFI, which should be provided as a part of related QER
 		if err := t.withActionParam(action, FieldQFI, uint8(0)); err != nil {
 			return nil, err
 		}
