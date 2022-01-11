@@ -2,7 +2,7 @@ diff --git a/protobuf/module_msg.proto b/protobuf/module_msg.proto
 index c435437a..a6e606f4 100644
 --- a/protobuf/module_msg.proto
 +++ b/protobuf/module_msg.proto
-@@ -1335,3 +1335,35 @@ message QosCommandClearArg {
+@@ -1335,3 +1335,40 @@ message QosCommandClearArg {
  message QosCommandSetDefaultGateArg {
    uint64 gate = 1;
  }
@@ -16,6 +16,7 @@ index c435437a..a6e606f4 100644
 +  bool clear = 1; // If true, the data will be all cleared after read
 +  repeated double latency_percentiles = 2; /// ascending list of real numbers in [0.0, 100.0]
 +  repeated double jitter_percentiles = 3; /// ascending list of real numbers in [0.0, 100.0]
++  uint64 flag_to_read = 4; /// Which buffer to read from
 +}
 +message FlowMeasureReadResponse {
 +  message Statistic {
@@ -37,4 +38,8 @@ index c435437a..a6e606f4 100644
 +    uint64 total_packets = 12;
 +  }
 +  repeated Statistic statistics = 1;
++}
++message FlowMeasureCommandFlipArg {}
++message FlowMeasureFlipResponse {
++  uint64 old_flag = 1;
 +}
