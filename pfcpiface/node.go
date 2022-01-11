@@ -51,26 +51,32 @@ func NewPFCPNode(ctx context.Context, upf *upf) *PFCPNode {
 	}
 }
 
+func (node *PFCPNode) tryConnectToN4Peer(lAddrStr string) {
+	for _, peer := range node.upf.peers {
+		conn, err := net.Dial("udp", peer+":"+PFCPPort)
+		if err != nil {
+			log.Warnln("Failed to establish PFCP connection to peer ", peer)
+			continue
+		}
+		remoteAddr := conn.RemoteAddr().(*net.UDPAddr)
+		n4DstIP := remoteAddr.IP
+		log.WithFields(log.Fields{
+			"SPGWC/SMF host": peer,
+			"CP node":        n4DstIP.String(),
+		}).Info("Establishing PFCP Conn with CP node")
+
+		pfcpConn := node.NewPFCPConn(lAddrStr, n4DstIP.String()+":"+PFCPPort, nil)
+		if pfcpConn != nil {
+			go pfcpConn.sendAssociationRequest()
+		}
+	}
+}
+
 func (node *PFCPNode) handleNewPeers() {
 	lAddrStr := node.LocalAddr().String()
 	log.Infoln("listening for new PFCP connections on", lAddrStr)
 
-	for _, peer := range node.upf.peers {
-		n4DstIP, err := getRemoteIP(peer)
-		if err != nil {
-			log.Infoln("Failed to establish PFCP connection to peer ", peer)
-		} else {
-			log.WithFields(log.Fields{
-				"SPGWC/SMF host": peer,
-				"CP node":        n4DstIP.String(),
-			}).Info("Establishing PFCP Conn with CP node")
-
-			pfcpConn := node.NewPFCPConn(lAddrStr, n4DstIP.String()+":"+PFCPPort, nil)
-			if pfcpConn != nil {
-				go pfcpConn.sendAssociationRequest()
-			}
-		}
-	}
+	node.tryConnectToN4Peer(lAddrStr)
 
 	for {
 		buf := make([]byte, 1024)
