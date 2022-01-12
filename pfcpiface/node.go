@@ -103,7 +103,7 @@ func (node *PFCPNode) Serve() {
 
 			err := node.Close()
 			if err != nil {
-				log.Errorln("Error closing PFCPNode Conn", err)
+				log.Errorln("Error closing PFCPNode conn", err)
 			}
 
 			// Clear out the remaining pconn completions
