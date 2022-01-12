@@ -117,9 +117,19 @@ func (b *bess) addSliceInfo(sliceInfo *SliceInfo) error {
 }
 
 func (b *bess) sendMsgToUPF(
-	method upfMsgType, pdrs []pdr, fars []far, qers []qer) uint8 {
+	method upfMsgType, rules PacketForwardingRules, updated PacketForwardingRules) uint8 {
 	// create context
 	var cause uint8 = ie.CauseRequestAccepted
+
+	pdrs := rules.pdrs
+	fars := rules.fars
+	qers := rules.qers
+
+	if method == upfMsgTypeMod {
+		pdrs = updated.pdrs
+		fars = updated.fars
+		qers = updated.qers
+	}
 
 	calls := len(pdrs) + len(fars) + len(qers)
 	if calls == 0 {
