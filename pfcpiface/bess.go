@@ -117,9 +117,19 @@ func (b *bess) addSliceInfo(sliceInfo *SliceInfo) error {
 }
 
 func (b *bess) sendMsgToUPF(
-	method upfMsgType, pdrs []pdr, fars []far, qers []qer) uint8 {
+	method upfMsgType, rules PacketForwardingRules, updated PacketForwardingRules) uint8 {
 	// create context
 	var cause uint8 = ie.CauseRequestAccepted
+
+	pdrs := rules.pdrs
+	fars := rules.fars
+	qers := rules.qers
+
+	if method == upfMsgTypeMod {
+		pdrs = updated.pdrs
+		fars = updated.fars
+		qers = updated.qers
+	}
 
 	calls := len(pdrs) + len(fars) + len(qers)
 	if calls == 0 {
@@ -329,13 +339,49 @@ func (b *bess) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metri
 	measureIface("Core", uc.upf.coreIface)
 }
 
+func (b *bess) flipFlowMeasurementBufferFlag(ctx context.Context, module string) (flip pb.FlowMeasureFlipResponse, err error) {
+	req := &pb.FlowMeasureCommandFlipArg{}
+
+	any, err := anypb.New(req)
+	if err != nil {
+		log.Errorln("Error marshalling request", req, err)
+		return
+	}
+
+	resp, err := b.client.ModuleCommand(
+		ctx, &pb.CommandRequest{
+			Name: module,
+			Cmd:  "flip",
+			Arg:  any,
+		},
+	)
+
+	if err != nil {
+		log.Errorln(module, "read failed!:", err)
+		return
+	}
+
+	if resp.GetError() != nil {
+		log.Errorln(module, "error reading flow stats:", resp.GetError().Errmsg)
+		return
+	}
+
+	if err = resp.Data.UnmarshalTo(&flip); err != nil {
+		log.Errorln(err)
+		return
+	}
+
+	return
+}
+
 func (b *bess) readFlowMeasurement(
-	ctx context.Context, module string, clear bool, q []float64,
+	ctx context.Context, module string, flagToRead uint64, clear bool, q []float64,
 ) (stats pb.FlowMeasureReadResponse, err error) {
 	req := &pb.FlowMeasureCommandReadArg{
 		Clear:              clear,
 		LatencyPercentiles: q,
 		JitterPercentiles:  q,
+		FlagToRead:         flagToRead,
 	}
 
 	any, err := anypb.New(req)
@@ -375,22 +421,29 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 	// non-blocking for the dataplane anyway.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	// Read stats. This flips the buffer flag, reads from the now inactive side, and clear if needed.
-	q := []float64{50, 90, 99}
-
-	qosStatsInResp, err := b.readFlowMeasurement(ctx, PreQosFlowMeasure, true, q)
+	// Flips the buffer flag, automatically waits for in-flight packets to drain.
+	flip, err := b.flipFlowMeasurementBufferFlag(ctx, PreQosFlowMeasure)
 	if err != nil {
 		log.Errorln(PreQosFlowMeasure, " read failed!:", err)
 		return
 	}
 
-	postDlQosStatsResp, err := b.readFlowMeasurement(ctx, PostDlQosFlowMeasure, true, q)
+	q := []float64{50, 90, 99}
+
+	// Read stats from the now inactive side, and clear if needed.
+	qosStatsInResp, err := b.readFlowMeasurement(ctx, PreQosFlowMeasure, flip.OldFlag, true, q)
+	if err != nil {
+		log.Errorln(PreQosFlowMeasure, " read failed!:", err)
+		return
+	}
+
+	postDlQosStatsResp, err := b.readFlowMeasurement(ctx, PostDlQosFlowMeasure, flip.OldFlag, true, q)
 	if err != nil {
 		log.Errorln(PostDlQosFlowMeasure, " read failed!:", err)
 		return
 	}
 
-	postUlQosStatsResp, err := b.readFlowMeasurement(ctx, PostUlQosFlowMeasure, true, q)
+	postUlQosStatsResp, err := b.readFlowMeasurement(ctx, PostUlQosFlowMeasure, flip.OldFlag, true, q)
 	if err != nil {
 		log.Errorln(PostUlQosFlowMeasure, " read failed!:", err)
 		return
