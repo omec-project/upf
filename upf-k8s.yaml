@@ -5,13 +5,14 @@
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
-  name: s1u-net
+  name: access-net
   annotations:
-    k8s.v1.cni.cncf.io/resourceName: intel.com/sriov_vfio_s1u_net
+    k8s.v1.cni.cncf.io/resourceName: intel.com/sriov_vfio_access_net
 spec:
   config: '{
+    "cniVersion": "0.3.1",
     "type": "vfioveth",
-    "name": "s1u-net",
+    "name": "access-net",
     "ipam": {
         "type": "host-local",
         "subnet": "198.18.0.0/24",
@@ -24,13 +25,14 @@ spec:
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
-  name: sgi-net
+  name: core-net
   annotations:
-    k8s.v1.cni.cncf.io/resourceName: intel.com/sriov_vfio_sgi_net
+    k8s.v1.cni.cncf.io/resourceName: intel.com/sriov_vfio_core_net
 spec:
   config: '{
+    "cniVersion": "0.3.1",
     "type": "vfioveth",
-    "name": "sgi-net",
+    "name": "core-net",
     "ipam": {
         "type": "host-local",
         "subnet": "198.19.0.0/24",
@@ -47,14 +49,17 @@ metadata:
 data:
   upf.json: |
     {
-      "s1u": {
-        "ifname": "s1u"
+      "access": {
+        "ifname": "access"
       },
-      "sgi": {
-        "ifname": "sgi"
+      "core": {
+        "ifname": "core"
       },
       "measure_upf": true,
       "workers": "1",
+      "cpiface": {
+        "dnn": "internet"
+      }
     }
 ---
 apiVersion: v1
@@ -67,8 +72,8 @@ metadata:
       prometheus.io/scrape: "true"
       prometheus.io/port: "8080"
       k8s.v1.cni.cncf.io/networks: '[
-            { "name": "s1u-net", "interface": "s1u" },
-            { "name": "sgi-net", "interface": "sgi" }
+            { "name": "access-net", "interface": "access" },
+            { "name": "core-net", "interface": "core" }
     ]'
 spec:
   shareProcessNamespace: true
@@ -108,8 +113,8 @@ spec:
     command: ["/opt/bess/bessctl/conf/route_control.py"]
     args:
     - -i
-    - s1u
-    - sgi
+    - access
+    - core
     env:
     - name: PYTHONUNBUFFERED
       value: "1"
@@ -144,8 +149,8 @@ spec:
         hugepages-1Gi: 2Gi
         cpu: 2
         memory: 256Mi
-        intel.com/sriov_vfio_s1u_net: '1'
-        intel.com/sriov_vfio_sgi_net: '1'
+        intel.com/sriov_vfio_access_net: '1'
+        intel.com/sriov_vfio_core_net: '1'
     volumeMounts:
     - name: upf-conf
       mountPath: /conf
