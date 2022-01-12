@@ -58,8 +58,10 @@ func (node *PFCPNode) tryConnectToN4Peer(lAddrStr string) {
 			log.Warnln("Failed to establish PFCP connection to peer ", peer)
 			continue
 		}
+
 		remoteAddr := conn.RemoteAddr().(*net.UDPAddr)
 		n4DstIP := remoteAddr.IP
+
 		log.WithFields(log.Fields{
 			"SPGWC/SMF host": peer,
 			"CP node":        n4DstIP.String(),
