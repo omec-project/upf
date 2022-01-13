@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2021 Open Networking Foundation
+# Copyright 2021 Intel Corporation
 
 docker rm -f prom grafana || true
 
