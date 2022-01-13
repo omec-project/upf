@@ -512,13 +512,6 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 }
 
 func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updated PacketForwardingRules) uint8 {
-	up4Log := log.WithFields(log.Fields{
-		"method-type":   method,
-		"old-rules":     all,
-		"updated-rules": updated,
-	})
-	up4Log.Debug("Sending PFCP message to UP4..")
-
 	var (
 		methodType p4.Update_Type
 		err        error
@@ -535,29 +528,25 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updat
 	case upfMsgTypeAdd:
 		{
 			methodType = p4.Update_INSERT
-			for i := range updated.pdrs {
+			for i := range all.pdrs {
 				val, err = getCounterVal(up4, preQosCounterID)
 				if err != nil {
 					log.Println("Counter id alloc failed ", err)
 					return cause
 				}
-				updated.pdrs[i].ctrID = uint32(val)
+				all.pdrs[i].ctrID = uint32(val)
 			}
 
-			for _, p := range updated.pdrs {
+			for _, p := range all.pdrs {
 				up4.insertUeAddrAndFSEIDMappings(p)
 			}
 		}
 	case upfMsgTypeDel:
 		{
 			methodType = p4.Update_DELETE
-			for i := range updated.pdrs {
+			for i := range all.pdrs {
 				resetCounterVal(up4, preQosCounterID,
-					uint64(updated.pdrs[i].ctrID))
-			}
-
-			for _, p := range all.pdrs {
-				up4.removeUeAddrAndFSEIDMappings(p)
+					uint64(all.pdrs[i].ctrID))
 			}
 		}
 	case upfMsgTypeMod:
@@ -575,6 +564,13 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updat
 			return cause
 		}
 	}
+
+	up4Log := log.WithFields(log.Fields{
+		"method-type":   p4.Update_Type_name[int32(methodType)],
+		"all":     all,
+		"updated-rules": updated,
+	})
+	up4Log.Debug("Sending PFCP message to UP4..")
 
 	for _, far := range updated.fars {
 		// downlink FAR that does encapsulation
@@ -603,11 +599,11 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updat
 		}
 	}
 
-	for _, pdr := range updated.pdrs {
+	for _, pdr := range all.pdrs {
 		pdrLog := log.WithFields(log.Fields{
 			"pdr": pdr,
 		})
-		pdrLog.Traceln(pdr)
+		pdrLog.Debug("Installing P4 table entries for PDR")
 
 		far, err := findRelatedFAR(pdr, all.fars)
 		if err != nil {
@@ -615,8 +611,7 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updat
 			continue
 		}
 
-		log.Println("Related FAR:")
-		log.Println(far)
+		pdrLog.WithField("related FAR", far).Debug("Found related FAR for PDR")
 
 		tunnelParams := tunnelParams{
 			tunnelIP4Src: ip2int(up4.accessIP.IP),
@@ -625,8 +620,8 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updat
 		}
 
 		tunnelPeerID, exists := up4.tunnelPeerIDs[tunnelParams]
-		if !exists && far.Forwards() {
-			pdrLog.Warn("related FAR does not include tunnel params, failed to find allocated GTP tunnel peer ID")
+		if !exists && far.tunnelTEID != 0 {
+			pdrLog.Warn("failed to find allocated GTP tunnel peer ID")
 		}
 
 		sessionsEntry, err := up4.p4RtTranslator.BuildSessionsTableEntry(pdr, tunnelPeerID, far.Buffers())
@@ -652,13 +647,20 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updat
 			continue
 		}
 
-		pdrLog.Traceln("Applying PDR: ", p4.Update_Type_name[int32(methodType)])
+		pdrLog.WithField("method type", p4.Update_Type_name[int32(methodType)])
+		pdrLog.Debug("Applying table entries")
 
 		err = up4.p4client.ApplyTableEntries(methodType, sessionsEntry, terminationsEntry)
 		if err != nil {
 			// TODO: revert operations (e.g. reset counter)
 			log.Error("failed to write table entries to Sessions and Terminations tables: ", err)
 			return cause
+		}
+	}
+
+	if method == upfMsgTypeDel {
+		for _, p := range all.pdrs {
+			up4.removeUeAddrAndFSEIDMappings(p)
 		}
 	}
 
