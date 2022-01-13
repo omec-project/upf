@@ -503,7 +503,7 @@ func (b *bess) sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 			ch <- prometheus.MustNewConstMetric(
 				pc.sessionTxPackets,
 				prometheus.GaugeValue,
-				float64(post.TotalPackets), // check if uint possible
+				float64(post.TotalPackets),
 				fseidString,
 				pdrString,
 				ueIpString,
