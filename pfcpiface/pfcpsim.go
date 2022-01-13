@@ -73,8 +73,8 @@ func createPFCP(conn *net.UDPConn, raddr *net.UDPAddr) uint64 {
 			ie.NewApplicationIDsPFDs(
 				ie.NewApplicationID("1001"),
 				ie.NewPFDContext(
-					ie.NewPFDContents("permit out 6 from 0.0.0.0 to 192.168.96.0/24 2000", "", "", "", "", nil, nil, nil),
-					ie.NewPFDContents("permit in 6 from 192.168.96.0/24 2000 to 0.0.0.0", "", "", "", "", nil, nil, nil),
+					ie.NewPFDContents("permit out 6 from 0.0.0.0 3000 to 192.168.96.0/24 2000", "", "", "", "", nil, nil, nil),
+					ie.NewPFDContents("permit in 6 from 192.168.96.0/24 2000 to 0.0.0.0 3000", "", "", "", "", nil, nil, nil),
 				),
 			),
 		).Marshal()
