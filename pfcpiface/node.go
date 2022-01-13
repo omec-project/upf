@@ -51,7 +51,7 @@ func NewPFCPNode(ctx context.Context, upf *upf) *PFCPNode {
 	}
 }
 
-func (node *PFCPNode) tryConnectToN4Peer(lAddrStr string) {
+func (node *PFCPNode) tryConnectToN4Peers(lAddrStr string) {
 	for _, peer := range node.upf.peers {
 		conn, err := net.Dial("udp", peer+":"+PFCPPort)
 		if err != nil {
@@ -78,7 +78,7 @@ func (node *PFCPNode) handleNewPeers() {
 	lAddrStr := node.LocalAddr().String()
 	log.Infoln("listening for new PFCP connections on", lAddrStr)
 
-	node.tryConnectToN4Peer(lAddrStr)
+	node.tryConnectToN4Peers(lAddrStr)
 
 	for {
 		buf := make([]byte, 1024)
