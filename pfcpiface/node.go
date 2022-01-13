@@ -5,7 +5,6 @@ import (
 	"errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"net"
-	"strconv"
 
 	reuse "github.com/libp2p/go-reuseport"
 	log "github.com/sirupsen/logrus"
@@ -28,7 +27,7 @@ type PFCPNode struct {
 	upf *upf
 	// metrics for PFCP messages and sessions
 	metrics metrics.InstrumentPFCP
-
+	// collector for UPF statistics
 	collector *PfcpNodeCollector
 }
 
@@ -185,85 +184,11 @@ func (col PfcpNodeCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (col PfcpNodeCollector) Collect(ch chan<- prometheus.Metric) {
-	stats, err := col.node.upf.sessionStats2()
-	if err != nil {
-		log.Errorln(err)
-		return
-	}
-	// TODO: pick first connection for now
-	var con *PFCPConn
-	for _, c := range col.node.pConns {
-		con = c
-		break
-	}
-
-	for _, s := range stats {
-		fseidString := strconv.FormatUint(s.Fseid, 10)
-		pdrString := strconv.FormatUint(s.Pdr, 10)
-		ueIpString := "unknown"
-
-		if con != nil {
-			session, ok := con.sessions[s.Fseid]
-			if !ok {
-				log.Errorln("Invalid or unknown FSEID in session info", s)
-				continue
-			}
-			for _, p := range session.pdrs {
-				if uint64(p.pdrID) != s.Pdr {
-					continue
-				}
-				// Only downlink PDRs contain the UE address.
-				if p.srcIP > 0 {
-					ueIpString = int2ip(p.srcIP).String()
-					log.Warnln(p.fseID, " -> ", ueIpString)
-					break
-				}
-			}
-		} else {
-			log.Warnln("No active PFCP connection, IP lookup disabled")
+	if col.node.upf.enableFlowMeasure {
+		err := col.node.upf.sessionStats(&col, ch)
+		if err != nil {
+			log.Errorln(err)
+			return
 		}
-
-		ch <- prometheus.MustNewConstMetric(
-			col.sessionTxPackets,
-			prometheus.GaugeValue,
-			float64(s.TxPackets), // check if uint possible
-			fseidString,
-			pdrString,
-			ueIpString,
-		)
-		ch <- prometheus.MustNewConstMetric(
-			col.sessionRxPackets,
-			prometheus.GaugeValue,
-			float64(s.RxPackets),
-			fseidString,
-			pdrString,
-			ueIpString,
-		)
-		ch <- prometheus.MustNewConstMetric(
-			col.sessionTxBytes,
-			prometheus.GaugeValue,
-			float64(s.TxBytes),
-			fseidString,
-			pdrString,
-			ueIpString,
-		)
-		ch <- prometheus.MustNewConstSummary(
-			col.sessionLatency,
-			s.TxPackets,
-			0,
-			s.Latency,
-			fseidString,
-			pdrString,
-			ueIpString,
-		)
-		ch <- prometheus.MustNewConstSummary(
-			col.sessionJitter,
-			s.TxPackets,
-			0,
-			s.Jitter,
-			fseidString,
-			pdrString,
-			ueIpString,
-		)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"flag"
 	"net"
+	"strconv"
 	"time"
 
 	"google.golang.org/grpc/credentials/insecure"
@@ -415,11 +416,7 @@ func (b *bess) readFlowMeasurement(
 	return
 }
 
-func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) error {
-	return nil
-}
-
-func (b *bess) sessionStats2() (s []sessionInfo, err error) {
+func (b *bess) sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) (err error) {
 	// Clearing table data with large tables is slow, let's wait for a little longer since this is
 	// non-blocking for the dataplane anyway.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
@@ -452,6 +449,13 @@ func (b *bess) sessionStats2() (s []sessionInfo, err error) {
 		return
 	}
 
+	// TODO: pick first connection for now
+	var con *PFCPConn
+	for _, c := range pc.node.pConns {
+		con = c
+		break
+	}
+
 	// Prepare session stats.
 	createStats := func(preResp, postResp *pb.FlowMeasureReadResponse) {
 		for i := 0; i < len(postResp.Statistics); i++ {
@@ -471,26 +475,81 @@ func (b *bess) sessionStats2() (s []sessionInfo, err error) {
 				continue
 			}
 
-			si := sessionInfo{
-				Fseid:     post.Fseid,
-				Pdr:       post.Pdr,
-				TxPackets: post.TotalPackets,
-				RxPackets: pre.TotalPackets,
-				TxBytes:   post.TotalBytes,
-				RxBytes:   pre.TotalBytes,
-				Latency: map[float64]float64{
+			fseidString := strconv.FormatUint(pre.Fseid, 10)
+			pdrString := strconv.FormatUint(pre.Pdr, 10)
+			ueIpString := "unknown"
+
+			if con != nil {
+				session, ok := con.sessions[pre.Fseid]
+				if !ok {
+					log.Errorln("Invalid or unknown FSEID", pre.Fseid)
+					continue
+				}
+				for _, p := range session.pdrs {
+					if uint64(p.pdrID) != pre.Pdr {
+						continue
+					}
+					// Only downlink PDRs contain the UE address.
+					if p.srcIP > 0 {
+						ueIpString = int2ip(p.srcIP).String()
+						log.Warnln(p.fseID, " -> ", ueIpString)
+						break
+					}
+				}
+			} else {
+				log.Warnln("No active PFCP connection, IP lookup disabled")
+			}
+
+			ch <- prometheus.MustNewConstMetric(
+				pc.sessionTxPackets,
+				prometheus.GaugeValue,
+				float64(post.TotalPackets), // check if uint possible
+				fseidString,
+				pdrString,
+				ueIpString,
+			)
+			ch <- prometheus.MustNewConstMetric(
+				pc.sessionRxPackets,
+				prometheus.GaugeValue,
+				float64(pre.TotalPackets),
+				fseidString,
+				pdrString,
+				ueIpString,
+			)
+			ch <- prometheus.MustNewConstMetric(
+				pc.sessionTxBytes,
+				prometheus.GaugeValue,
+				float64(post.TotalBytes),
+				fseidString,
+				pdrString,
+				ueIpString,
+			)
+			ch <- prometheus.MustNewConstSummary(
+				pc.sessionLatency,
+				post.TotalPackets,
+				0,
+				map[float64]float64{
 					q[0]: float64(post.Latency.PercentileValuesNs[0]),
 					q[1]: float64(post.Latency.PercentileValuesNs[1]),
 					q[2]: float64(post.Latency.PercentileValuesNs[2]),
 				},
-				Jitter: map[float64]float64{
+				fseidString,
+				pdrString,
+				ueIpString,
+			)
+			ch <- prometheus.MustNewConstSummary(
+				pc.sessionJitter,
+				post.TotalPackets,
+				0,
+				map[float64]float64{
 					q[0]: float64(post.Jitter.PercentileValuesNs[0]),
 					q[1]: float64(post.Jitter.PercentileValuesNs[1]),
 					q[2]: float64(post.Jitter.PercentileValuesNs[2]),
 				},
-			}
-
-			s = append(s, si)
+				fseidString,
+				pdrString,
+				ueIpString,
+			)
 		}
 	}
 

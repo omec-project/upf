@@ -8,7 +8,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	log "github.com/sirupsen/logrus"
 )
 
 func getPctiles() []float64 {
@@ -76,12 +75,6 @@ func (uc *upfCollector) Describe(ch chan<- *prometheus.Desc) {
 func (uc *upfCollector) Collect(ch chan<- prometheus.Metric) {
 	uc.summaryLatencyJitter(ch)
 	uc.portStats(ch)
-
-	if uc.upf.enableFlowMeasure {
-		if err := uc.sessionStats(ch); err != nil {
-			log.Error(err)
-		}
-	}
 }
 
 func (uc *upfCollector) portStats(ch chan<- prometheus.Metric) {
@@ -91,10 +84,6 @@ func (uc *upfCollector) portStats(ch chan<- prometheus.Metric) {
 
 func (uc *upfCollector) summaryLatencyJitter(ch chan<- prometheus.Metric) {
 	uc.upf.summaryLatencyJitter(uc, ch)
-}
-
-func (uc *upfCollector) sessionStats(ch chan<- prometheus.Metric) error {
-	return uc.upf.sessionStats(uc, ch)
 }
 
 func setupProm(upf *upf) {
