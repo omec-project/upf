@@ -528,16 +528,16 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updat
 	case upfMsgTypeAdd:
 		{
 			methodType = p4.Update_INSERT
-			for i := range all.pdrs {
+			for i := range updated.pdrs {
 				val, err = getCounterVal(up4, preQosCounterID)
 				if err != nil {
 					log.Println("Counter id alloc failed ", err)
 					return cause
 				}
-				all.pdrs[i].ctrID = uint32(val)
+				updated.pdrs[i].ctrID = uint32(val)
 			}
 
-			for _, p := range all.pdrs {
+			for _, p := range updated.pdrs {
 				up4.updateUEAddrAndFSEIDMappings(p)
 			}
 		}
