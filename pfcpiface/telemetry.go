@@ -33,12 +33,6 @@ type upfCollector struct {
 	latency *prometheus.Desc
 	jitter  *prometheus.Desc
 
-	sessionLatency        *prometheus.Desc
-	sessionJitter         *prometheus.Desc
-	sessionTxPackets      *prometheus.Desc
-	sessionDroppedPackets *prometheus.Desc
-	sessionTxBytes        *prometheus.Desc
-
 	upf *upf
 }
 
@@ -64,27 +58,6 @@ func newUpfCollector(upf *upf) *upfCollector {
 			"Shows the packet processing jitter percentiles in UPF",
 			[]string{"iface"}, nil,
 		),
-		// TODO: check if iface field for direction can be added, like port stats
-		sessionLatency: prometheus.NewDesc(prometheus.BuildFQName("upf2", "session", "latency_ns"),
-			"Shows the latency of a session in UPF",
-			[]string{"fseid", "pdr", "ue_ip"}, nil,
-		),
-		sessionJitter: prometheus.NewDesc(prometheus.BuildFQName("upf2", "session", "jitter_ns"),
-			"Shows the jitter of a session in UPF",
-			[]string{"fseid", "pdr", "ue_ip"}, nil,
-		),
-		sessionTxPackets: prometheus.NewDesc(prometheus.BuildFQName("upf2", "session", "tx_packets"),
-			"Shows the total number of packets for a given session in UPF",
-			[]string{"fseid", "pdr", "ue_ip"}, nil,
-		),
-		sessionDroppedPackets: prometheus.NewDesc(prometheus.BuildFQName("upf2", "session", "dropped_packets"),
-			"Shows the number of packets dropped for a given session in UPF",
-			[]string{"fseid", "pdr", "ue_ip"}, nil,
-		),
-		sessionTxBytes: prometheus.NewDesc(prometheus.BuildFQName("upf2", "session", "tx_bytes"),
-			"Shows the total number of bytes for a given session in UPF",
-			[]string{"fseid", "pdr", "ue_ip"}, nil,
-		),
 		upf: upf,
 	}
 }
@@ -97,12 +70,6 @@ func (uc *upfCollector) Describe(ch chan<- *prometheus.Desc) {
 
 	ch <- uc.latency
 	ch <- uc.jitter
-
-	ch <- uc.sessionLatency
-	ch <- uc.sessionJitter
-	ch <- uc.sessionTxPackets
-	ch <- uc.sessionDroppedPackets
-	ch <- uc.sessionTxBytes
 }
 
 // Collect writes all metrics to prometheus metric channel.

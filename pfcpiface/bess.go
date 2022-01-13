@@ -8,8 +8,6 @@ import (
 	"encoding/binary"
 	"flag"
 	"net"
-	"strconv"
-	"sync"
 	"time"
 
 	"google.golang.org/grpc/credentials/insecure"
@@ -76,8 +74,6 @@ type bess struct {
 	notifyBessSocket net.Conn
 	endMarkerChan    chan []byte
 	qciQosMap        map[uint8]*QosConfigVal
-	fseidToIpMap     map[uint64]string
-	fseidMapMutex    sync.Mutex
 }
 
 func (b *bess) isConnected(accessIP *net.IP) bool {
@@ -419,6 +415,10 @@ func (b *bess) readFlowMeasurement(
 	return
 }
 
+func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) error {
+	return nil
+}
+
 func (b *bess) sessionStats2() (s []sessionInfo, err error) {
 	// Clearing table data with large tables is slow, let's wait for a little longer since this is
 	// non-blocking for the dataplane anyway.
@@ -500,129 +500,6 @@ func (b *bess) sessionStats2() (s []sessionInfo, err error) {
 	return
 }
 
-func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err error) {
-	return nil
-	// Clearing table data with large tables is slow, let's wait for a little longer since this is
-	// non-blocking for the dataplane anyway.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	// Flips the buffer flag, automatically waits for in-flight packets to drain.
-	flip, err := b.flipFlowMeasurementBufferFlag(ctx, PreQosFlowMeasure)
-	if err != nil {
-		log.Errorln(PreQosFlowMeasure, " read failed!:", err)
-		return
-	}
-
-	q := []float64{50, 90, 99}
-
-	// Read stats from the now inactive side, and clear if needed.
-	qosStatsInResp, err := b.readFlowMeasurement(ctx, PreQosFlowMeasure, flip.OldFlag, true, q)
-	if err != nil {
-		log.Errorln(PreQosFlowMeasure, " read failed!:", err)
-		return
-	}
-
-	postDlQosStatsResp, err := b.readFlowMeasurement(ctx, PostDlQosFlowMeasure, flip.OldFlag, true, q)
-	if err != nil {
-		log.Errorln(PostDlQosFlowMeasure, " read failed!:", err)
-		return
-	}
-
-	postUlQosStatsResp, err := b.readFlowMeasurement(ctx, PostUlQosFlowMeasure, flip.OldFlag, true, q)
-	if err != nil {
-		log.Errorln(PostUlQosFlowMeasure, " read failed!:", err)
-		return
-	}
-
-	// Prepare prometheus stats.
-	createStats := func(preResp, postResp *pb.FlowMeasureReadResponse, ch chan<- prometheus.Metric) {
-		for i := 0; i < len(postResp.Statistics); i++ {
-			var pre *pb.FlowMeasureReadResponse_Statistic
-
-			post := postResp.Statistics[i]
-			// Find preQos values.
-			for _, v := range preResp.Statistics {
-				if post.Pdr == v.Pdr && post.Fseid == v.Fseid {
-					pre = v
-					break
-				}
-			}
-
-			if pre == nil {
-				log.Infof("Found no pre QoS statistics for PDR %v FSEID %v", post.Pdr, post.Fseid)
-				continue
-			}
-
-			// Find UE IP from FSEID.
-			b.fseidMapMutex.Lock()
-			ueIpString, found := b.fseidToIpMap[pre.Fseid]
-			b.fseidMapMutex.Unlock()
-			if !found {
-				log.Warnln("Could not find UE IP for FSEID", pre.Fseid)
-				continue
-			}
-
-			fseidString := strconv.FormatUint(post.Fseid, 10)
-			pdrString := strconv.FormatUint(post.Pdr, 10)
-			ch <- prometheus.MustNewConstMetric(
-				uc.sessionTxPackets,
-				prometheus.GaugeValue,
-				float64(post.TotalPackets), // check if uint possible
-				fseidString,
-				pdrString,
-				ueIpString,
-			)
-			ch <- prometheus.MustNewConstMetric(
-				uc.sessionDroppedPackets,
-				prometheus.GaugeValue,
-				float64(pre.TotalPackets-post.TotalPackets),
-				fseidString,
-				pdrString,
-				ueIpString,
-			)
-			ch <- prometheus.MustNewConstMetric(
-				uc.sessionTxBytes,
-				prometheus.GaugeValue,
-				float64(post.TotalBytes),
-				fseidString,
-				pdrString,
-				ueIpString,
-			)
-			ch <- prometheus.MustNewConstSummary(
-				uc.sessionLatency,
-				post.TotalPackets,
-				0,
-				map[float64]float64{
-					50.0: float64(post.Latency.PercentileValuesNs[0]),
-					99.0: float64(post.Latency.PercentileValuesNs[1]),
-					99.9: float64(post.Latency.PercentileValuesNs[2]),
-				},
-				fseidString,
-				pdrString,
-				ueIpString,
-			)
-			ch <- prometheus.MustNewConstSummary(
-				uc.sessionJitter,
-				post.TotalPackets,
-				0,
-				map[float64]float64{
-					50.0: float64(post.Jitter.PercentileValuesNs[0]),
-					99.0: float64(post.Jitter.PercentileValuesNs[1]),
-					99.9: float64(post.Jitter.PercentileValuesNs[2]),
-				},
-				fseidString,
-				pdrString,
-				ueIpString,
-			)
-		}
-	}
-
-	createStats(&qosStatsInResp, &postUlQosStatsResp, ch)
-	createStats(&qosStatsInResp, &postDlQosStatsResp, ch)
-
-	return
-}
-
 func (b *bess) endMarkerSendLoop(endMarkerChan chan []byte) {
 	for outPacket := range endMarkerChan {
 		_, err := b.endMarkerSocket.Write(outPacket)
@@ -682,10 +559,6 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 	log.Println("bessIP ", *bessIP)
 
 	b.endMarkerChan = make(chan []byte, 1024)
-
-	b.fseidMapMutex.Lock()
-	b.fseidToIpMap = make(map[uint64]string)
-	b.fseidMapMutex.Unlock()
 
 	b.conn, err = grpc.Dial(*bessIP, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -777,15 +650,6 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 			break
 		}
 
-		// Only downlink PDRs contain the UE address.
-		if p.srcIP > 0 {
-			//log.Warnln(p.String())
-			b.fseidMapMutex.Lock()
-			b.fseidToIpMap[p.fseID] = int2ip(p.srcIP).String()
-			log.Warnln(p.fseID, " -> ", b.fseidToIpMap[p.fseID])
-			b.fseidMapMutex.Unlock()
-		}
-
 		f := &pb.WildcardMatchCommandAddArg{
 			Gate:     uint64(p.needDecap),
 			Priority: int64(p.precedence),
@@ -835,13 +699,6 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 			any *anypb.Any
 			err error
 		)
-
-		// Only downlink PDRs contain the UE address.
-		if p.srcIP > 0 {
-			b.fseidMapMutex.Lock()
-			delete(b.fseidToIpMap, p.fseID)
-			b.fseidMapMutex.Unlock()
-		}
 
 		f := &pb.WildcardMatchCommandDeleteArg{
 			Values: []*pb.FieldData{
