@@ -18,6 +18,17 @@ const (
 	upfMsgTypeClear
 )
 
+type sessionInfo struct {
+	Fseid     uint64
+	Pdr       uint64
+	TxPackets uint64
+	RxPackets uint64
+	TxBytes   uint64
+	RxBytes   uint64
+	Latency   map[float64]float64
+	Jitter    map[float64]float64
+}
+
 type fastPath interface {
 	/* Close any pending sessions */
 	exit()
@@ -34,4 +45,5 @@ type fastPath interface {
 	summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric)
 	portStats(uc *upfCollector, ch chan<- prometheus.Metric)
 	sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) error
+	sessionStats2() ([]sessionInfo, error)
 }

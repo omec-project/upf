@@ -409,7 +409,89 @@ func (b *bess) readFlowMeasurement(
 	return
 }
 
+func (b *bess) sessionStats2() (s []sessionInfo, err error) {
+	// Clearing table data with large tables is slow, let's wait for a little longer since this is
+	// non-blocking for the dataplane anyway.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	// Flips the buffer flag, automatically waits for in-flight packets to drain.
+	flip, err := b.flipFlowMeasurementBufferFlag(ctx, PreQosFlowMeasure)
+	if err != nil {
+		log.Errorln(PreQosFlowMeasure, " read failed!:", err)
+		return
+	}
+
+	q := []float64{50, 90, 99}
+
+	// Read stats from the now inactive side, and clear if needed.
+	qosStatsInResp, err := b.readFlowMeasurement(ctx, PreQosFlowMeasure, flip.OldFlag, true, q)
+	if err != nil {
+		log.Errorln(PreQosFlowMeasure, " read failed!:", err)
+		return
+	}
+
+	postDlQosStatsResp, err := b.readFlowMeasurement(ctx, PostDlQosFlowMeasure, flip.OldFlag, true, q)
+	if err != nil {
+		log.Errorln(PostDlQosFlowMeasure, " read failed!:", err)
+		return
+	}
+
+	postUlQosStatsResp, err := b.readFlowMeasurement(ctx, PostUlQosFlowMeasure, flip.OldFlag, true, q)
+	if err != nil {
+		log.Errorln(PostUlQosFlowMeasure, " read failed!:", err)
+		return
+	}
+
+	// Prepare session stats.
+	createStats := func(preResp, postResp *pb.FlowMeasureReadResponse) {
+		for i := 0; i < len(postResp.Statistics); i++ {
+			var pre *pb.FlowMeasureReadResponse_Statistic
+
+			post := postResp.Statistics[i]
+			// Find preQos values.
+			for _, v := range preResp.Statistics {
+				if post.Pdr == v.Pdr && post.Fseid == v.Fseid {
+					pre = v
+					break
+				}
+			}
+
+			if pre == nil {
+				log.Infof("Found no pre QoS statistics for PDR %v FSEID %v", post.Pdr, post.Fseid)
+				continue
+			}
+
+			si := sessionInfo{
+				Fseid:     post.Fseid,
+				Pdr:       post.Pdr,
+				TxPackets: post.TotalPackets,
+				RxPackets: pre.TotalPackets,
+				TxBytes:   post.TotalBytes,
+				RxBytes:   pre.TotalBytes,
+				Latency: map[float64]float64{
+					q[0]: float64(post.Latency.PercentileValuesNs[0]),
+					q[1]: float64(post.Latency.PercentileValuesNs[1]),
+					q[2]: float64(post.Latency.PercentileValuesNs[2]),
+				},
+				Jitter: map[float64]float64{
+					q[0]: float64(post.Jitter.PercentileValuesNs[0]),
+					q[1]: float64(post.Jitter.PercentileValuesNs[1]),
+					q[2]: float64(post.Jitter.PercentileValuesNs[2]),
+				},
+			}
+
+			s = append(s, si)
+		}
+	}
+
+	createStats(&qosStatsInResp, &postUlQosStatsResp)
+	createStats(&qosStatsInResp, &postDlQosStatsResp)
+
+	return
+}
+
 func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err error) {
+	return nil
 	// Clearing table data with large tables is slow, let's wait for a little longer since this is
 	// non-blocking for the dataplane anyway.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)

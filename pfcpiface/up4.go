@@ -67,6 +67,10 @@ func (up4 *UP4) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) erro
 	return nil
 }
 
+func (up4 *UP4) sessionStats2() (s []sessionInfo, err error) {
+	return
+}
+
 func (up4 *UP4) portStats(uc *upfCollector, ch chan<- prometheus.Metric) {
 }
 
