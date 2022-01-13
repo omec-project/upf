@@ -6,9 +6,10 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
-	"net"
 )
 
 type pdr struct {
@@ -50,14 +51,22 @@ func needAllocIP(ueIPaddr *ie.UEIPAddressFields) bool {
 }
 
 func (p pdr) String() string {
-	return fmt.Sprintf("PDR(id=%v, F-SEID=%v, srcIface=%v, tunnelIPv4Dst=%v/%x, " +
-		"tunnelTEID=%v/%x, srcIP=%v/%x, dstIP=%v/%x," +
-		"srcPort=%v/%x, dstPort=%v/%x, protocol=%v/%x, precedence=%v, F-SEID IP=%v, " +
+	return fmt.Sprintf("PDR(id=%v, F-SEID=%v, srcIface=%v, tunnelIPv4Dst=%v/%x, "+
+		"tunnelTEID=%v/%x, srcIP=%v/%x, dstIP=%v/%x,"+
+		"srcPort=%v/%x, dstPort=%v/%x, protocol=%v/%x, precedence=%v, F-SEID IP=%v, "+
 		"counterID=%v, farID=%v, qerIDs=%v, needDecap=%v, allocIPFlag=%v)",
 		p.pdrID, p.fseID, p.srcIface, p.tunnelIP4Dst, p.tunnelIP4DstMask,
 		p.tunnelTEID, p.tunnelTEIDMask, p.srcIP, p.srcIPMask, p.dstIP, p.dstIPMask,
 		p.srcPort, p.srcPortMask, p.dstPort, p.dstPortMask, p.proto, p.protoMask, p.precedence,
 		p.fseidIP, p.ctrID, p.farID, p.qerIDList, p.needDecap, p.allocIPFlag)
+}
+
+func (p pdr) IsUplink() bool {
+	return p.srcIface == access
+}
+
+func (p pdr) IsDownlink() bool {
+	return p.srcIface == core
 }
 
 func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, ippool *IPPool) error {

@@ -538,7 +538,7 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updat
 			}
 
 			for _, p := range all.pdrs {
-				up4.insertUeAddrAndFSEIDMappings(p)
+				up4.updateUEAddrAndFSEIDMappings(p)
 			}
 		}
 	case upfMsgTypeDel:
@@ -555,7 +555,7 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updat
 
 			// Update PDR IE might modify UE IP <-> F-SEID mappings
 			for _, p := range updated.pdrs {
-				up4.insertUeAddrAndFSEIDMappings(p)
+				up4.updateUEAddrAndFSEIDMappings(p)
 			}
 		}
 	default:
@@ -567,7 +567,7 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updat
 
 	up4Log := log.WithFields(log.Fields{
 		"method-type":   p4.Update_Type_name[int32(methodType)],
-		"all":     all,
+		"all":           all,
 		"updated-rules": updated,
 	})
 	up4Log.Debug("Sending PFCP message to UP4..")
@@ -584,7 +584,7 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updat
 					}
 					if err := up4.addOrUpdateGTPTunnelPeer(far); err != nil {
 						up4Log.WithFields(log.Fields{
-							"far": far,
+							"far":   far,
 							"error": err.Error(),
 						}).Error("Failed to add or update GTP tunnel peer")
 					}
@@ -630,13 +630,14 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updat
 			continue
 		}
 
-		if pdr.srcIface == access {
+		if pdr.IsUplink() {
 			ueAddr, exists := up4.fseidToUEAddr[pdr.fseID]
 			if !exists {
-				// this is only possible if a linked DL PDR was not provided in the same PFCP message
+				// this is only possible if a linked DL PDR was not provided in the same PFCP Establishment message
 				log.Error("UE Address not found for uplink PDR, a linked DL PDR was not provided?")
 				return cause
 			}
+
 			pdr.srcIP = ueAddr
 		}
 
@@ -669,8 +670,8 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updat
 	return cause
 }
 
-func (up4 *UP4) insertUeAddrAndFSEIDMappings(pdr pdr) {
-	if pdr.srcIface != core {
+func (up4 *UP4) updateUEAddrAndFSEIDMappings(pdr pdr) {
+	if !pdr.IsDownlink() {
 		return
 	}
 
@@ -679,7 +680,7 @@ func (up4 *UP4) insertUeAddrAndFSEIDMappings(pdr pdr) {
 }
 
 func (up4 *UP4) removeUeAddrAndFSEIDMappings(pdr pdr) {
-	if pdr.srcIface != core {
+	if !pdr.IsDownlink() {
 		return
 	}
 

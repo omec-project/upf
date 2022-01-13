@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
 )
@@ -45,8 +46,8 @@ type far struct {
 }
 
 func (f far) String() string {
-	return fmt.Sprintf("FAR(id=%v, F-SEID=%v, F-SEID IPv4=%v, dstInterface=%v, tunnelType=%v, " +
-		"tunnelIPv4Src=%v, tunnelIPv4Dst=%v, tunnelTEID=%v, tunnelSrcPort=%v, " +
+	return fmt.Sprintf("FAR(id=%v, F-SEID=%v, F-SEID IPv4=%v, dstInterface=%v, tunnelType=%v, "+
+		"tunnelIPv4Src=%v, tunnelIPv4Dst=%v, tunnelTEID=%v, tunnelSrcPort=%v, "+
 		"sendEndMarker=%v, drops=%v, forwards=%v, buffers=%v)", f.farID, f.fseID, f.fseidIP, f.dstIntf,
 		f.tunnelType, f.tunnelIP4Src, f.tunnelIP4Dst, f.tunnelTEID, f.tunnelPort, f.sendEndMarker,
 		f.Drops(), f.Forwards(), f.Buffers())
