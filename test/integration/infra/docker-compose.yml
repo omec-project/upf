@@ -1,0 +1,30 @@
+version: "3"
+# SPDX-FileCopyrightText: 2022-present Open Networking Foundation
+# SPDX-License-Identifier: Apache-2.0
+
+services:
+  pfcp-agent:
+    build:
+      context: ../../../
+      dockerfile: Dockerfile
+      target: pfcpiface
+    hostname: pfcp-agent
+    container_name: pfcp-agent
+    tty: true
+    stdin_open: true
+    volumes:
+      - ./config/upf.json:/config.json
+    entrypoint: "/bin/pfcpiface"
+    command: [ "-config", "/config.json" ]
+    working_dir: /bin/
+    expose:
+      - 8805
+  tester:
+    build:
+      context: ""
+      dockerfile: Dockerfile.tester
+    hostname: tester
+    container_name: tester
+    tty: true
+    stdin_open: true
+    entrypoint: "/bin/bash"

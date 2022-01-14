@@ -114,8 +114,8 @@ RUN mkdir /bess_pb && \
 FROM golang AS pfcpiface-build
 WORKDIR /pfcpiface
 
-COPY pfcpiface/go.mod ./
-COPY pfcpiface/go.sum ./
+COPY go.mod ./
+COPY go.sum ./
 RUN go mod download
 
 COPY pfcpiface .
