@@ -3,13 +3,13 @@ package main
 import (
 	"context"
 	"errors"
-	"github.com/prometheus/client_golang/prometheus"
 	"net"
 
 	reuse "github.com/libp2p/go-reuseport"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/omec-project/upf-epc/pfcpiface/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // PFCPNode represents a PFCP endpoint of the UPF.

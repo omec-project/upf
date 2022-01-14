@@ -485,6 +485,7 @@ func (b *bess) sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 					log.Errorln("Invalid or unknown FSEID", pre.Fseid)
 					continue
 				}
+
 				for _, p := range session.pdrs {
 					if uint64(p.pdrID) != pre.Pdr {
 						continue
@@ -493,6 +494,7 @@ func (b *bess) sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 					if p.srcIP > 0 {
 						ueIpString = int2ip(p.srcIP).String()
 						log.Warnln(p.fseID, " -> ", ueIpString)
+
 						break
 					}
 				}
