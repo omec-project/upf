@@ -211,6 +211,16 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 					p.srcIP = ip2int(ipf.src.IPNet.IP)
 					p.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
 
+					if ipf.dst.Port > 0 {
+						p.dstPort = ipf.dst.Port
+						p.dstPortMask = 0xffff
+					}
+
+					if ipf.src.Port > 0 {
+						p.srcPort = ipf.src.Port
+						p.srcPortMask = 0xffff
+					}
+
 					break
 				}
 			}
@@ -253,6 +263,16 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 				p.srcIPMask = ipMask2int(ipf.dst.IPNet.Mask)
 				p.dstIP = ip2int(ipf.src.IPNet.IP)
 				p.dstIPMask = ipMask2int(ipf.src.IPNet.Mask)
+			}
+
+			if ipf.dst.Port > 0 {
+				p.dstPort = ipf.dst.Port
+				p.dstPortMask = 0xffff
+			}
+
+			if ipf.src.Port > 0 {
+				p.srcPort = ipf.src.Port
+				p.srcPortMask = 0xffff
 			}
 		}
 	}
