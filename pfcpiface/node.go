@@ -9,7 +9,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/omec-project/upf-epc/pfcpiface/metrics"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // PFCPNode represents a PFCP endpoint of the UPF.
@@ -27,8 +26,6 @@ type PFCPNode struct {
 	upf *upf
 	// metrics for PFCP messages and sessions
 	metrics metrics.InstrumentPFCP
-	// collector for UPF statistics
-	collector *PfcpNodeCollector
 }
 
 // NewPFCPNode create a new PFCPNode listening on local address.
@@ -43,7 +40,7 @@ func NewPFCPNode(ctx context.Context, upf *upf) *PFCPNode {
 		log.Fatalln("prom metrics service init failed", err)
 	}
 
-	node := &PFCPNode{
+	return &PFCPNode{
 		ctx:        ctx,
 		PacketConn: conn,
 		done:       make(chan struct{}),
@@ -52,10 +49,6 @@ func NewPFCPNode(ctx context.Context, upf *upf) *PFCPNode {
 		upf:        upf,
 		metrics:    metrics,
 	}
-
-	node.collector = NewPFCPNodeCollector(node)
-
-	return node
 }
 
 func (node *PFCPNode) handleNewPeers() {
@@ -132,63 +125,4 @@ func (node *PFCPNode) Serve() {
 func (node *PFCPNode) Done() {
 	<-node.done
 	log.Infoln("Shutdown complete")
-}
-
-// PfcpNodeCollector makes a PFCPNode Prometheus observable.
-type PfcpNodeCollector struct {
-	node                  *PFCPNode
-	sessionLatency        *prometheus.Desc
-	sessionJitter         *prometheus.Desc
-	sessionTxPackets      *prometheus.Desc
-	sessionRxPackets      *prometheus.Desc
-	sessionDroppedPackets *prometheus.Desc
-	sessionTxBytes        *prometheus.Desc
-}
-
-func NewPFCPNodeCollector(node *PFCPNode) *PfcpNodeCollector {
-	c := &PfcpNodeCollector{
-		node: node,
-		sessionLatency: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "latency_ns"),
-			"Shows the latency of a session in UPF",
-			[]string{"fseid", "pdr", "ue_ip"}, nil,
-		),
-		sessionJitter: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "jitter_ns"),
-			"Shows the jitter of a session in UPF",
-			[]string{"fseid", "pdr", "ue_ip"}, nil,
-		),
-		sessionTxPackets: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "tx_packets"),
-			"Shows the total number of packets sent for a given session in UPF",
-			[]string{"fseid", "pdr", "ue_ip"}, nil,
-		),
-		sessionRxPackets: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "rx_packets"),
-			"Shows the total number of packets received for a given session in UPF",
-			[]string{"fseid", "pdr", "ue_ip"}, nil,
-		),
-		sessionDroppedPackets: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "dropped_packets"),
-			"Shows the number of packets dropped for a given session in UPF",
-			[]string{"fseid", "pdr", "ue_ip"}, nil,
-		),
-		sessionTxBytes: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "tx_bytes"),
-			"Shows the total number of bytes for a given session in UPF",
-			[]string{"fseid", "pdr", "ue_ip"}, nil,
-		),
-	}
-
-	prometheus.MustRegister(c)
-
-	return c
-}
-
-func (col PfcpNodeCollector) Describe(ch chan<- *prometheus.Desc) {
-	prometheus.DescribeByCollect(col, ch)
-}
-
-func (col PfcpNodeCollector) Collect(ch chan<- prometheus.Metric) {
-	if col.node.upf.enableFlowMeasure {
-		err := col.node.upf.sessionStats(&col, ch)
-		if err != nil {
-			log.Errorln(err)
-			return
-		}
-	}
 }
