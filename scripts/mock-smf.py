@@ -523,7 +523,7 @@ def send_recv_pfcp(pkt: scapy.Packet, expected_response_type: int, session: Opti
     if verbosity_override > 1:
         pkt.show()
     capture(pkt)
-    response = scapy.sr1(pkt, verbose=verbosity_override)
+    response = scapy.sr1(pkt, verbose=verbosity_override, timeout=5)
     if response is None:
         return False
     capture(response)
@@ -707,21 +707,20 @@ def handle_user_input(input_file: Optional[IO] = None, output_file: Optional[IO]
         if not input_file:
             return input("Enter your selection : ")
         else:
-            # Poll the input file for an unread line
-            while True:
-                read_head = input_file.tell()
-                line = input_file.readline()
-                if line:
-                    return line
-                time.sleep(0.5)
-                input_file.seek(read_head)
+            read_head = input_file.tell()
+            line = input_file.readline()
+            if line:
+                print("returning %s" % line)
+                return line
+            time.sleep(0.5)
+            input_file.seek(read_head)
 
     while True:
         print("=" * 40)
         for choice, (action_desc, action) in user_choices.items():
             print("\"%s\" - %s" % (choice, action_desc))
         try:
-            args = parser.parse_args(input("Enter your selection : ").split())
+            args = parser.parse_args(get_user_input().split())
         except Exception as e:
             print(e)
             parser.print_help()
@@ -739,7 +738,7 @@ def handle_user_input(input_file: Optional[IO] = None, output_file: Optional[IO]
 def main():
     global our_addr, peer_addr, pcap_filename
 
-    our_addr = "127.0.0.1"
+    our_addr = ifcfg.interfaces()['eth0']['inet']
 
     parser = argparse.ArgumentParser()
     parser.add_argument("upfaddr", help="Address or hostname of the UPF")

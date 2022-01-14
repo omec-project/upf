@@ -3,28 +3,48 @@ version: "3"
 # SPDX-License-Identifier: Apache-2.0
 
 services:
-  pfcp-agent:
+  pfcpiface:
     build:
       context: ../../../
       dockerfile: Dockerfile
       target: pfcpiface
-    hostname: pfcp-agent
-    container_name: pfcp-agent
+    hostname: pfcpiface
+    container_name: pfcpiface
     tty: true
     stdin_open: true
     volumes:
-      - ./config/upf.json:/config.json
+      - ../config/upf.json:/config.json
     entrypoint: "/bin/pfcpiface"
     command: [ "-config", "/config.json" ]
     working_dir: /bin/
     expose:
       - 8805
-  tester:
+    depends_on:
+      - mock-up4
+  mock-smf:
     build:
       context: ""
-      dockerfile: Dockerfile.tester
-    hostname: tester
-    container_name: tester
+      dockerfile: Dockerfile.mocksmf
+    hostname: mock-smf
+    container_name: mock-smf
     tty: true
     stdin_open: true
-    entrypoint: "/bin/bash"
+    volumes:
+      - ./tmp:/tmp
+      - ../../../scripts/mock-smf.py:/mock-smf.py
+    entrypoint: "/mock-smf.py"
+    command: [ "pfcpiface", "--pcap-file", "/tmp/mock-smf.pcap" ]
+    depends_on:
+      - pfcpiface
+  mock-up4:
+    image: opennetworking/p4mn
+    hostname: mock-up4
+    container_name: mock-up4
+    privileged: true
+    tty: true
+    stdin_open: true
+    ports:
+      - "50001:50001" # P4Runtime server
+    command: [ "--topo", "single"]
+    expose:
+      - 50001

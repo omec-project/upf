@@ -65,8 +65,10 @@ output:
 	rm -rf output && mkdir output && tar -xf output.tar -C output && rm -f output.tar
 
 test-integration:
-	@docker-compose -f test/integration/infra/up4/docker-compose.yml up --build -d
+	@docker-compose -f test/integration/infra/docker-compose.yml rm -fsv
+	@docker-compose -f test/integration/infra/docker-compose.yml up --build -d
 	@go test ./test/integration/...
+	@docker-compose -f test/integration/infra/docker-compose.yml rm -fsv
 
 pb:
 	DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) \

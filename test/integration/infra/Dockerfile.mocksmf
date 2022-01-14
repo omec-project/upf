@@ -3,7 +3,5 @@
 
 FROM python:3.9.0-slim-buster
 RUN apt-get update && apt-get install -y git net-tools tcpdump vim iputils-ping screen
-RUN pip3 install ifcfg
-RUN pip3 install --no-cache-dir \
-    p4runtime-shell scapy==2.4.5
+RUN pip3 install ifcfg scapy
 
