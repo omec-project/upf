@@ -1,0 +1,19 @@
+name: Component-level integration tests
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2.4.0
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '1.13'
+      - name: Run integration tests for PFCP Agent & UP4
+        run: |
+            make test-integration
