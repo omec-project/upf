@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-present Open Networking Foundation
 name: Component-level integration tests
 
 on:
@@ -7,7 +9,7 @@ on:
   pull_request:
 
 jobs:
-  build:
+  test-integration-up4:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2.4.0
