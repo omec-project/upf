@@ -91,4 +91,4 @@ fmt:
 golint:
 	@docker run --rm -v $(CURDIR):/app -w /app/pfcpiface golangci/golangci-lint:latest golangci-lint run -v --config /app/.golangci.yml
 
-.PHONY: docker-build docker-push output pb fmt golint
+.PHONY: docker-build docker-push output pb fmt golint test-integration

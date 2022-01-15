@@ -16,7 +16,9 @@ func setup(t *testing.T) {
 }
 
 func teardown(t *testing.T) {
-	pfcpClient.DisconnectN4()
+	if pfcpClient != nil {
+		pfcpClient.DisconnectN4()
+	}
 }
 
 func TestBasicPFCPAssociation(t *testing.T) {
