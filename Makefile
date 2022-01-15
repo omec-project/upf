@@ -67,7 +67,7 @@ output:
 test-integration:
 	@docker-compose -f test/integration/infra/docker-compose.yml rm -fsv
 	@docker-compose -f test/integration/infra/docker-compose.yml up --build -d
-	@go test ./test/integration/...
+	@go test -count=1 ./test/integration/...
 	@docker-compose -f test/integration/infra/docker-compose.yml rm -fsv
 
 pb:

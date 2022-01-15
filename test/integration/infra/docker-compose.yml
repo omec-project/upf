@@ -17,25 +17,12 @@ services:
     entrypoint: "/bin/pfcpiface"
     command: [ "-config", "/config.json" ]
     working_dir: /bin/
+    ports:
+      - "8805:8805/udp"
     expose:
       - 8805
     depends_on:
       - mock-up4
-  mock-smf:
-    build:
-      context: ""
-      dockerfile: Dockerfile.mocksmf
-    hostname: mock-smf
-    container_name: mock-smf
-    tty: true
-    stdin_open: true
-    volumes:
-      - ./tmp:/tmp
-      - ../../../scripts/mock-smf.py:/mock-smf.py
-    entrypoint: "/mock-smf.py"
-    command: [ "pfcpiface", "--pcap-file", "/tmp/mock-smf.pcap" ]
-    depends_on:
-      - pfcpiface
   mock-up4:
     image: opennetworking/p4mn
     hostname: mock-up4
