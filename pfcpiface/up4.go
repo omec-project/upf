@@ -43,7 +43,7 @@ const (
 
 	// 253 base stations + 1 dbuf (fixed in UP4) + 1 reserved (fixed in P4 pipeline)
 	maxGTPTunnelPeerIDs = 253
-	maxApplicationIDs = 254
+	maxApplicationIDs   = 254
 )
 
 type counter struct {
@@ -66,10 +66,10 @@ type UP4 struct {
 	p4RtTranslator *P4rtTranslator
 
 	// TODO: create UP4Store object and move these fields there
-	counters          []counter
-	tunnelPeerIDs     map[tunnelParams]uint8
-	tunnelPeerIDsPool []uint8
-	applicationIDs    map[applicationFilter]uint8
+	counters           []counter
+	tunnelPeerIDs      map[tunnelParams]uint8
+	tunnelPeerIDsPool  []uint8
+	applicationIDs     map[applicationFilter]uint8
 	applicationIDsPool []uint8
 
 	// ueAddrToFSEID is used to store UE Address <-> F-SEID mapping,
@@ -226,7 +226,7 @@ func (up4 *UP4) initApplicationIDs() {
 	// 0 is reserved;
 	up4.applicationIDsPool = make([]uint8, 0, maxApplicationIDs)
 
-	for i := 1; i < maxApplicationIDs + 1; i++ {
+	for i := 1; i < maxApplicationIDs+1; i++ {
 		up4.applicationIDsPool = append(up4.applicationIDsPool, uint8(i))
 	}
 }

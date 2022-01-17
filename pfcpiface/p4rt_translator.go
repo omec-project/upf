@@ -268,8 +268,8 @@ func (t *P4rtTranslator) withLPMField(entry *p4.TableEntry, name string, value u
 	}
 
 	lpmMatch := &p4.FieldMatch_LPM{
-		Value:                byteVal,
-		PrefixLen:            int32(prefixLen),
+		Value:     byteVal,
+		PrefixLen: int32(prefixLen),
 	}
 
 	matchField.FieldMatchType = &p4.FieldMatch_Lpm{Lpm: lpmMatch}
@@ -315,8 +315,8 @@ func (t *P4rtTranslator) withRangeMatchField(entry *p4.TableEntry, name string, 
 	}
 
 	rangeMatch := &p4.FieldMatch_Range{
-		Low:                  lowByteVal,
-		High:                 highByteVal,
+		Low:  lowByteVal,
+		High: highByteVal,
 	}
 
 	matchField.FieldMatchType = &p4.FieldMatch_Range_{Range: rangeMatch}

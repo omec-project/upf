@@ -94,8 +94,8 @@ func (u *upf) sim(mode simMode, s *SimModeInfo) {
 		pdrN6Down := pdr{
 			srcIface: core,
 			appFilter: applicationFilter{
-				dstIP:    ip2int(ueip) + i,
-				dstIPMask:    0xFFFFFFFF,
+				dstIP:     ip2int(ueip) + i,
+				dstIPMask: 0xFFFFFFFF,
 			},
 
 			srcIfaceMask: 0xFF,
@@ -135,8 +135,8 @@ func (u *upf) sim(mode simMode, s *SimModeInfo) {
 			tunnelIP4Dst: ip2int(u.accessIP),
 			tunnelTEID:   n3TEID + i,
 			appFilter: applicationFilter{
-				srcIP:        ip2int(ueip) + i,
-				srcIPMask:        0xFFFFFFFF,
+				srcIP:     ip2int(ueip) + i,
+				srcIPMask: 0xFFFFFFFF,
 			},
 
 			srcIfaceMask:     0xFF,
@@ -158,8 +158,8 @@ func (u *upf) sim(mode simMode, s *SimModeInfo) {
 			tunnelIP4Dst: ip2int(u.accessIP),
 			tunnelTEID:   n3TEID + i,
 			appFilter: applicationFilter{
-				dstIP:        ip2int(n9appip),
-				dstIPMask:        0xFFFFFFFF,
+				dstIP:     ip2int(n9appip),
+				dstIPMask: 0xFFFFFFFF,
 			},
 
 			srcIfaceMask:     0xFF,
