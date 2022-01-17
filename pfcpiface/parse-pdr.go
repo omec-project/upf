@@ -13,24 +13,31 @@ import (
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
+type applicationFilter struct {
+	srcIP   uint32
+	dstIP   uint32
+	srcPort uint16
+	dstPort uint16
+	proto   uint8
+
+	srcIPMask   uint32
+	dstIPMask   uint32
+	srcPortMask uint16
+	dstPortMask uint16
+	protoMask   uint8
+}
+
 type pdr struct {
 	srcIface     uint8
 	tunnelIP4Dst uint32
 	tunnelTEID   uint32
-	srcIP        uint32
-	dstIP        uint32
-	srcPort      uint16
-	dstPort      uint16
-	proto        uint8
+	ueAddress    uint32
 
 	srcIfaceMask     uint8
 	tunnelIP4DstMask uint32
 	tunnelTEIDMask   uint32
-	srcIPMask        uint32
-	dstIPMask        uint32
-	srcPortMask      uint16
-	dstPortMask      uint16
-	protoMask        uint8
+
+	appFilter applicationFilter
 
 	precedence  uint32
 	pdrID       uint32
@@ -51,6 +58,16 @@ func needAllocIP(ueIPaddr *ie.UEIPAddressFields) bool {
 	return true
 }
 
+func (af applicationFilter) String() string {
+	return fmt.Sprintf("ApplicationFilter(srcIP=%v/%x, dstIP=%v/%x, proto=%v/%x, srcPort=%v/%x, dstPort=%v/%x)",
+		af.srcIP, af.srcIPMask, af.dstIP, af.dstIPMask, af.proto,
+		af.protoMask, af.srcPort, af.srcPortMask, af.dstPort, af.dstPortMask)
+}
+
+func (af applicationFilter) IsEmpty() bool {
+	return af.srcIP == 0 && af.dstIP == 0 && af.proto == 0 && af.srcPort == 0 && af.dstPort == 0
+}
+
 // Satisfies the fmt.Stringer interface.
 func (p pdr) String() string {
 	b := strings.Builder{}
@@ -58,19 +75,11 @@ func (p pdr) String() string {
 	fmt.Fprintf(&b, "srcIface: %v\n", p.srcIface)
 	fmt.Fprintf(&b, "tunnelIP4Dst: %v\n", int2ip(p.tunnelIP4Dst))
 	fmt.Fprintf(&b, "tunnelTEID: %x\n", p.tunnelTEID)
+	fmt.Fprintf(&b, "ueAddress: %x\n", p.ueAddress)
 	fmt.Fprintf(&b, "tunnelTEIDMask: %x\n", p.tunnelTEIDMask)
-	fmt.Fprintf(&b, "srcIP: %v\n", int2ip(p.srcIP))
-	fmt.Fprintf(&b, "dstIP: %v\n", int2ip(p.dstIP))
-	fmt.Fprintf(&b, "srcPort: %v\n", p.srcPort)
-	fmt.Fprintf(&b, "dstPort: %v\n", p.dstPort)
-	fmt.Fprintf(&b, "proto: %v\n", p.proto)
+	fmt.Fprintf(&b, "applicationFilter: %v\n", p.appFilter)
 	fmt.Fprintf(&b, "srcIfaceMask: %x\n", p.srcIfaceMask)
 	fmt.Fprintf(&b, "tunnelIP4DstMask: %v\n", int2ip(p.tunnelIP4DstMask))
-	fmt.Fprintf(&b, "srcIPMask: %v\n", int2ip(p.srcIPMask))
-	fmt.Fprintf(&b, "dstIPMask: %v\n", int2ip(p.dstIPMask))
-	fmt.Fprintf(&b, "srcPortMask: %x\n", p.srcPortMask)
-	fmt.Fprintf(&b, "dstPortMask: %x\n", p.dstPortMask)
-	fmt.Fprintf(&b, "protoMask: %x\n", p.protoMask)
 	fmt.Fprintf(&b, "precedence: %v\n", p.precedence)
 	fmt.Fprintf(&b, "pdrID: %v\n", p.pdrID)
 	fmt.Fprintf(&b, "fseID: %x\n", p.fseID)
@@ -158,13 +167,7 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 
 	// Needed if SDF filter is bad or absent
 	if len(ueIP4) == 4 {
-		if p.srcIface == core {
-			p.dstIP = ip2int(ueIP4)
-			p.dstIPMask = 0xffffffff // /32
-		} else if p.srcIface == access {
-			p.srcIP = ip2int(ueIP4)
-			p.srcIPMask = 0xffffffff // /32
-		}
+		p.ueAddress = ip2int(ueIP4)
 	}
 
 	for _, ie2 := range pdiIEs {
@@ -202,23 +205,23 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 					log.Println("Found a match", p.srcIface, flowDesc)
 
 					if ipf.proto != reservedProto {
-						p.proto = ipf.proto
-						p.protoMask = reservedProto
+						p.appFilter.proto = ipf.proto
+						p.appFilter.protoMask = reservedProto
 					}
 					// TODO: Verify assumption that flow description in case of PFD is to be taken as-is
-					p.dstIP = ip2int(ipf.dst.IPNet.IP)
-					p.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
-					p.srcIP = ip2int(ipf.src.IPNet.IP)
-					p.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
+					p.appFilter.dstIP = ip2int(ipf.dst.IPNet.IP)
+					p.appFilter.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
+					p.appFilter.srcIP = ip2int(ipf.src.IPNet.IP)
+					p.appFilter.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
 
 					if ipf.dst.Port > 0 {
-						p.dstPort = ipf.dst.Port
-						p.dstPortMask = 0xffff
+						p.appFilter.dstPort = ipf.dst.Port
+						p.appFilter.dstPortMask = 0xffff
 					}
 
 					if ipf.src.Port > 0 {
-						p.srcPort = ipf.src.Port
-						p.srcPortMask = 0xffff
+						p.appFilter.srcPort = ipf.src.Port
+						p.appFilter.srcPortMask = 0xffff
 					}
 
 					break
@@ -249,30 +252,30 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 			}
 
 			if ipf.proto != reservedProto {
-				p.proto = ipf.proto
-				p.protoMask = reservedProto
+				p.appFilter.proto = ipf.proto
+				p.appFilter.protoMask = reservedProto
 			}
 
 			if p.srcIface == core {
-				p.dstIP = ip2int(ipf.dst.IPNet.IP)
-				p.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
-				p.srcIP = ip2int(ipf.src.IPNet.IP)
-				p.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
+				p.appFilter.dstIP = ip2int(ipf.dst.IPNet.IP)
+				p.appFilter.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
+				p.appFilter.srcIP = ip2int(ipf.src.IPNet.IP)
+				p.appFilter.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
 			} else if p.srcIface == access {
-				p.srcIP = ip2int(ipf.dst.IPNet.IP)
-				p.srcIPMask = ipMask2int(ipf.dst.IPNet.Mask)
-				p.dstIP = ip2int(ipf.src.IPNet.IP)
-				p.dstIPMask = ipMask2int(ipf.src.IPNet.Mask)
+				p.appFilter.srcIP = ip2int(ipf.dst.IPNet.IP)
+				p.appFilter.srcIPMask = ipMask2int(ipf.dst.IPNet.Mask)
+				p.appFilter.dstIP = ip2int(ipf.src.IPNet.IP)
+				p.appFilter.dstIPMask = ipMask2int(ipf.src.IPNet.Mask)
 			}
 
 			if ipf.dst.Port > 0 {
-				p.dstPort = ipf.dst.Port
-				p.dstPortMask = 0xffff
+				p.appFilter.dstPort = ipf.dst.Port
+				p.appFilter.dstPortMask = 0xffff
 			}
 
 			if ipf.src.Port > 0 {
-				p.srcPort = ipf.src.Port
-				p.srcPortMask = 0xffff
+				p.appFilter.srcPort = ipf.src.Port
+				p.appFilter.srcPortMask = 0xffff
 			}
 		}
 	}

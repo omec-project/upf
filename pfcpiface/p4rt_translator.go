@@ -6,6 +6,7 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
+	"math/bits"
 	"net"
 
 	p4ConfigV1 "github.com/p4lang/p4runtime/go/p4/config/v1"
@@ -17,9 +18,13 @@ import (
 const (
 	DirectionUplink = 1
 
+	FieldAppIPProto       = "app_ip_proto"
+	FieldAppL4Port        = "app_l4_port"
+	FieldAppIPAddress     = "app_ip_addr"
 	FieldIPv4DstPrefix    = "ipv4_dst_prefix"
 	FieldN3Address        = "n3_address"
 	FieldUEAddress        = "ue_address"
+	FieldApplicationID    = "app_id"
 	FieldTEID             = "teid"
 	FieldQFI              = "qfi"
 	FieldCounterIndex     = "ctr_idx"
@@ -35,6 +40,7 @@ const (
 	TableUplinkTerminations   = "PreQosPipe.terminations_uplink"
 	TableDownlinkSessions     = "PreQosPipe.sessions_downlink"
 	TableUplinkSessions       = "PreQosPipe.sessions_uplink"
+	TableApplications         = "PreQosPipe.applications"
 
 	ActSetUplinkSession       = "PreQosPipe.set_session_uplink"
 	ActSetDownlinkSession     = "PreQosPipe.set_session_downlink"
@@ -44,6 +50,7 @@ const (
 	ActDownlinkTermDrop       = "PreQosPipe.downlink_term_drop"
 	ActDownlinkTermFwd        = "PreQosPipe.downlink_term_fwd"
 	ActLoadTunnelParams       = "PreQosPipe.load_tunnel_param"
+	ActSetAppID               = "PreQosPipe.set_app_id"
 
 	DefaultPriority = 0
 )
@@ -230,6 +237,95 @@ func (t *P4rtTranslator) withExactMatchField(entry *p4.TableEntry, name string, 
 	return nil
 }
 
+func (t *P4rtTranslator) withLPMField(entry *p4.TableEntry, name string, value uint32, prefixLen uint8) error {
+	lpmFieldLog := log.WithFields(log.Fields{
+		"entry":      entry.String(),
+		"field name": name,
+	})
+	lpmFieldLog.Trace("Adding LPM match field to the entry")
+
+	if entry.TableId == 0 {
+		return ErrInvalidArgumentWithReason("entry.TableId", entry.TableId, "no table name for entry defined, set table name before adding match fields")
+	}
+
+	p4Table, err := t.getTableByID(entry.TableId)
+	if err != nil {
+		return err
+	}
+
+	p4MatchField := t.getMatchFieldByName(p4Table, name)
+	if p4MatchField == nil {
+		return ErrOperationFailedWithParam("find match field", "name", name)
+	}
+
+	byteVal, err := convertValueToBinary(value)
+	if err != nil {
+		return err
+	}
+
+	matchField := &p4.FieldMatch{
+		FieldId: p4MatchField.Id,
+	}
+
+	lpmMatch := &p4.FieldMatch_LPM{
+		Value:                byteVal,
+		PrefixLen:            int32(prefixLen),
+	}
+
+	matchField.FieldMatchType = &p4.FieldMatch_Lpm{Lpm: lpmMatch}
+
+	entry.Match = append(entry.Match, matchField)
+
+	return nil
+}
+
+func (t *P4rtTranslator) withRangeMatchField(entry *p4.TableEntry, name string, low interface{}, high interface{}) error {
+	rangeFieldLog := log.WithFields(log.Fields{
+		"entry":      entry.String(),
+		"field name": name,
+	})
+	rangeFieldLog.Trace("Adding range match field to the entry")
+
+	if entry.TableId == 0 {
+		return ErrInvalidArgumentWithReason("entry.TableId", entry.TableId, "no table name for entry defined, set table name before adding match fields")
+	}
+
+	lowByteVal, err := convertValueToBinary(low)
+	if err != nil {
+		return err
+	}
+
+	highByteVal, err := convertValueToBinary(high)
+	if err != nil {
+		return err
+	}
+
+	p4Table, err := t.getTableByID(entry.TableId)
+	if err != nil {
+		return err
+	}
+
+	p4MatchField := t.getMatchFieldByName(p4Table, name)
+	if p4MatchField == nil {
+		return ErrOperationFailedWithParam("find match field", "name", name)
+	}
+
+	matchField := &p4.FieldMatch{
+		FieldId: p4MatchField.Id,
+	}
+
+	rangeMatch := &p4.FieldMatch_Range{
+		Low:                  lowByteVal,
+		High:                 highByteVal,
+	}
+
+	matchField.FieldMatchType = &p4.FieldMatch_Range_{Range: rangeMatch}
+
+	entry.Match = append(entry.Match, matchField)
+
+	return nil
+}
+
 func (t *P4rtTranslator) withTernaryMatchField(entry *p4.TableEntry, name string, value interface{}, mask interface{}) error {
 	ternaryFieldLog := log.WithFields(log.Fields{
 		"entry":      entry.String(),
@@ -403,6 +499,63 @@ func (t *P4rtTranslator) ParseAccessIPFromReadInterfaceTableResponse(resp *p4.Re
 	return nil, ErrOperationFailed("parse Access IP from P4Runtime response")
 }
 
+func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, internalAppID uint8) (*p4.TableEntry, error) {
+	applicationsBuilderLog := log.WithFields(log.Fields{
+		"pdr": pdr,
+	})
+	applicationsBuilderLog.Trace("Building P4rt table entry for applications table")
+
+	tableID := t.tableID(TableApplications)
+	entry := &p4.TableEntry{
+		TableId:  tableID,
+		Priority: DefaultPriority,
+	}
+
+	// the current assumption (and limitation):
+	//  applications are only filtered based on dst IP/port in the UP4 pipeline
+	appIP, appIPMask := pdr.appFilter.dstIP, pdr.appFilter.dstIPMask
+	appPort, appPortMask := pdr.appFilter.dstPort, pdr.appFilter.dstPortMask
+	appProto, appProtoMask := pdr.appFilter.proto, pdr.appFilter.protoMask
+
+	appIPPrefixLen := 32 - bits.TrailingZeros32(appIPMask)
+	if appIPPrefixLen != 0 {
+		// append IP only if prefix greater than 0, leads to smaller protobuf message
+		if err := t.withLPMField(entry, FieldAppIPAddress, appIP, uint8(appIPPrefixLen)); err != nil {
+			return nil, err
+		}
+	}
+
+	if appPort != 0 && appPortMask != 0 {
+		// append L4 port only if specified, leads to smaller protobuf message
+		if err := t.withRangeMatchField(entry, FieldAppL4Port, appPort, appPort); err != nil {
+			return nil, err
+		}
+	}
+
+	if appProto != 0 && appProtoMask != 0 {
+		// append proto only if specified, leads to smaller protobuf message
+		if err := t.withTernaryMatchField(entry, FieldAppIPProto, appProto, appProtoMask); err != nil {
+			return nil, err
+		}
+	}
+
+	action := &p4.Action{
+		ActionId: t.actionID(ActSetAppID),
+	}
+
+	if err := t.withActionParam(action, FieldApplicationID, internalAppID); err != nil {
+		return nil, err
+	}
+
+	entry.Action = &p4.TableAction{
+		Type: &p4.TableAction_Action{Action: action},
+	}
+
+	applicationsBuilderLog.WithField("entry", entry).Trace("Built P4rt table entry for applications table")
+
+	return entry, nil
+}
+
 func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr) (*p4.TableEntry, error) {
 	uplinkBuilderLog := log.WithFields(log.Fields{
 		"pdr": pdr,
@@ -451,7 +604,7 @@ func (t *P4rtTranslator) buildDownlinkSessionsEntry(pdr pdr, tunnelPeerID uint8,
 		Priority: DefaultPriority,
 	}
 
-	if err := t.withExactMatchField(entry, FieldUEAddress, pdr.dstIP); err != nil {
+	if err := t.withExactMatchField(entry, FieldUEAddress, pdr.ueAddress); err != nil {
 		return nil, err
 	}
 
@@ -489,7 +642,7 @@ func (t *P4rtTranslator) BuildSessionsTableEntry(pdr pdr, tunnelPeerID uint8, ne
 	}
 }
 
-func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, shouldDrop bool, tc uint8) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, shouldDrop bool, internalAppID uint8, tc uint8) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
 		"pdr": pdr,
 		"tc":  tc,
@@ -502,7 +655,11 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, shouldDrop bool, 
 		Priority: DefaultPriority,
 	}
 
-	if err := t.withExactMatchField(entry, FieldUEAddress, pdr.srcIP); err != nil {
+	if err := t.withExactMatchField(entry, FieldUEAddress, pdr.ueAddress); err != nil {
+		return nil, err
+	}
+
+	if err := t.withExactMatchField(entry, FieldApplicationID, internalAppID); err != nil {
 		return nil, err
 	}
 
@@ -534,7 +691,7 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, shouldDrop bool, 
 	return entry, nil
 }
 
-func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, relatedFAR far, tc uint8) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, relatedFAR far, internalAppID uint8, tc uint8) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
 		"pdr":         pdr,
 		"tc":          tc,
@@ -548,7 +705,11 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, relatedFAR far,
 		Priority: DefaultPriority,
 	}
 
-	if err := t.withExactMatchField(entry, FieldUEAddress, pdr.dstIP); err != nil {
+	if err := t.withExactMatchField(entry, FieldUEAddress, pdr.ueAddress); err != nil {
+		return nil, err
+	}
+
+	if err := t.withExactMatchField(entry, FieldApplicationID, internalAppID); err != nil {
 		return nil, err
 	}
 
@@ -589,12 +750,12 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, relatedFAR far,
 	return entry, nil
 }
 
-func (t *P4rtTranslator) BuildTerminationsTableEntry(pdr pdr, relatedFAR far, tc uint8) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) BuildTerminationsTableEntry(pdr pdr, relatedFAR far, internalAppID uint8, tc uint8) (*p4.TableEntry, error) {
 	switch pdr.srcIface {
 	case access:
-		return t.buildUplinkTerminationsEntry(pdr, relatedFAR.Drops(), tc)
+		return t.buildUplinkTerminationsEntry(pdr, relatedFAR.Drops(), internalAppID, tc)
 	case core:
-		return t.buildDownlinkTerminationsEntry(pdr, relatedFAR, tc)
+		return t.buildDownlinkTerminationsEntry(pdr, relatedFAR, internalAppID, tc)
 	default:
 		return nil, ErrUnsupported("source interface type of PDR", pdr.srcIface)
 	}

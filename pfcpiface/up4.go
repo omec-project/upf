@@ -43,6 +43,7 @@ const (
 
 	// 253 base stations + 1 dbuf (fixed in UP4) + 1 reserved (fixed in P4 pipeline)
 	maxGTPTunnelPeerIDs = 253
+	maxApplicationIDs = 254
 )
 
 type counter struct {
@@ -68,6 +69,8 @@ type UP4 struct {
 	counters          []counter
 	tunnelPeerIDs     map[tunnelParams]uint8
 	tunnelPeerIDsPool []uint8
+	applicationIDs    map[applicationFilter]uint8
+	applicationIDsPool []uint8
 
 	// ueAddrToFSEID is used to store UE Address <-> F-SEID mapping,
 	// which is needed to efficiently find F-SEID when we receive a P4 Digest (DDN) for a UE address.
@@ -207,13 +210,24 @@ func (up4 *UP4) initAllCounters() error {
 
 func (up4 *UP4) initTunnelPeerIDs() {
 	up4.tunnelPeerIDs = make(map[tunnelParams]uint8)
-	// a simple queue storing available;
+	// a simple queue storing available tunnel peer IDs
 	// 0 is reserved;
 	// 1 is reserved for dbuf
 	up4.tunnelPeerIDsPool = make([]uint8, 0, maxGTPTunnelPeerIDs)
 
 	for i := 2; i < maxGTPTunnelPeerIDs+2; i++ {
 		up4.tunnelPeerIDsPool = append(up4.tunnelPeerIDsPool, uint8(i))
+	}
+}
+
+func (up4 *UP4) initApplicationIDs() {
+	up4.applicationIDs = make(map[applicationFilter]uint8)
+	// a simple queue storing available application IDs
+	// 0 is reserved;
+	up4.applicationIDsPool = make([]uint8, 0, maxApplicationIDs)
+
+	for i := 1; i < maxApplicationIDs + 1; i++ {
+		up4.applicationIDsPool = append(up4.applicationIDsPool, uint8(i))
 	}
 }
 
@@ -267,6 +281,7 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	up4.timeout = 30
 	up4.enableEndMarker = conf.EnableEndMarker
 	up4.initTunnelPeerIDs()
+	up4.initApplicationIDs()
 	up4.ueAddrToFSEID = make(map[uint32]uint64)
 
 	up4.counters = make([]counter, 2)
@@ -507,6 +522,37 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 	up4.releaseAllocatedGTPTunnelPeerID(tunnelPeerID)
 }
 
+// Returns error if we reach maximum supported Application IDs.
+func (up4 *UP4) allocateInternalApplicationID() (uint8, error) {
+	if len(up4.applicationIDsPool) == 0 {
+		return 0, ErrOperationFailedWithReason("allocate Application ID",
+			"no free application IDs available")
+	}
+
+	// pick top from queue
+	allocated := up4.applicationIDsPool[0]
+	up4.applicationIDsPool = up4.applicationIDsPool[1:]
+
+	return allocated, nil
+}
+
+func (up4 *UP4) releaseInternalApplicationID(allocated uint8) {
+	up4.applicationIDsPool = append(up4.applicationIDsPool, allocated)
+}
+
+func (up4 *UP4) addOrUpdateApplicationsTableEntry(appFilter applicationFilter) (uint8, error) {
+	if allocated, exists := up4.applicationIDs[appFilter]; exists {
+		return allocated, nil
+	}
+
+	newAppID, err := up4.allocateInternalApplicationID()
+	if err != nil {
+		return 0, err
+	}
+
+	return newAppID, nil
+}
+
 func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, updated PacketForwardingRules) uint8 {
 	up4Log := log.WithFields(log.Fields{
 		"method-type":   method,
@@ -554,6 +600,10 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 			for i := range pdrs {
 				resetCounterVal(up4, preQosCounterID,
 					uint64(pdrs[i].ctrID))
+
+				if internalAppID, exists := up4.applicationIDs[pdrs[i].appFilter]; exists {
+					up4.releaseInternalApplicationID(internalAppID)
+				}
 			}
 		}
 	case upfMsgTypeMod:
@@ -625,8 +675,26 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 			continue
 		}
 
+		var applicationsEntry *p4.TableEntry
+
+		// applicationID = 0 is passed as a default value if no application filtering rule exists
+		var applicationID uint8 = 0
+		if !pdr.appFilter.IsEmpty() {
+			applicationID, err = up4.addOrUpdateApplicationsTableEntry(pdr.appFilter)
+			if err != nil {
+				pdrLog.Error("failed to add or update Application")
+				return cause
+			}
+
+			applicationsEntry, err = up4.p4RtTranslator.BuildApplicationsTableEntry(pdr, applicationID)
+			if err != nil {
+				log.Error("failed to build P4rt table entry for Applications table: ", err)
+				continue
+			}
+		}
+
 		// FIXME: get TC from QFI->TC mapping
-		terminationsEntry, err := up4.p4RtTranslator.BuildTerminationsTableEntry(pdr, far, uint8(0))
+		terminationsEntry, err := up4.p4RtTranslator.BuildTerminationsTableEntry(pdr, far, applicationID, uint8(0))
 		if err != nil {
 			log.Error("failed to build P4rt table entry for Terminations table: ", err)
 			continue
@@ -634,7 +702,7 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 
 		pdrLog.Traceln("Applying PDR: ", p4.Update_Type_name[int32(methodType)])
 
-		err = up4.p4client.ApplyTableEntries(methodType, sessionsEntry, terminationsEntry)
+		err = up4.p4client.ApplyTableEntries(methodType, applicationsEntry, sessionsEntry, terminationsEntry)
 		if err != nil {
 			// TODO: revert operations (e.g. reset counter)
 			log.Error("failed to write table entries to Sessions and Terminations tables: ", err)
@@ -650,16 +718,7 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 }
 
 func (up4 *UP4) saveUeAddrToFSEID(pdr pdr) {
-	var ueAddr uint32
-	if pdr.srcIface == access {
-		ueAddr = pdr.srcIP
-	} else if pdr.srcIface == core {
-		ueAddr = pdr.dstIP
-	} else {
-		// unknown PDR direction
-		return
-	}
-
+	ueAddr := pdr.ueAddress
 	if _, exists := up4.ueAddrToFSEID[ueAddr]; !exists {
 		up4.ueAddrToFSEID[ueAddr] = pdr.fseID
 	}
