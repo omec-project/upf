@@ -1,0 +1,37 @@
+version: "3.7"
+# SPDX-FileCopyrightText: 2022-present Open Networking Foundation
+# SPDX-License-Identifier: Apache-2.0
+
+services:
+  pfcpiface:
+    build:
+      context: ../../../
+      dockerfile: Dockerfile
+      target: pfcpiface
+    hostname: pfcpiface
+    container_name: pfcpiface
+    tty: true
+    stdin_open: true
+    volumes:
+      - ../config/upf.json:/config.json
+    entrypoint: "/bin/pfcpiface"
+    command: [ "-config", "/config.json" ]
+    working_dir: /bin/
+    ports:
+      - "8805:8805/udp"
+    expose:
+      - 8805
+    depends_on:
+      - mock-up4
+  mock-up4:
+    image: opennetworking/p4mn:stable
+    hostname: mock-up4
+    container_name: mock-up4
+    privileged: true
+    tty: true
+    stdin_open: true
+    ports:
+      - "50001:50001" # P4Runtime server
+    command: [ "--topo", "single"]
+    expose:
+      - 50001

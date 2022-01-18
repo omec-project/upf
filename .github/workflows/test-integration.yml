@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-present Open Networking Foundation
+name: E2E integration tests
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  test-integration-up4:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2.4.0
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '1.13'
+      - name: Run integration tests for PFCP Agent & UP4
+        run: |
+            make test-up4-integration
