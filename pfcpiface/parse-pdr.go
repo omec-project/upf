@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -51,41 +50,23 @@ func needAllocIP(ueIPaddr *ie.UEIPAddressFields) bool {
 	return true
 }
 
-// Satisfies the fmt.Stringer interface.
 func (p pdr) String() string {
-	b := strings.Builder{}
-	fmt.Fprintf(&b, "\n")
-	fmt.Fprintf(&b, "srcIface: %v\n", p.srcIface)
-	fmt.Fprintf(&b, "tunnelIP4Dst: %v\n", int2ip(p.tunnelIP4Dst))
-	fmt.Fprintf(&b, "tunnelTEID: %x\n", p.tunnelTEID)
-	fmt.Fprintf(&b, "tunnelTEIDMask: %x\n", p.tunnelTEIDMask)
-	fmt.Fprintf(&b, "srcIP: %v\n", int2ip(p.srcIP))
-	fmt.Fprintf(&b, "dstIP: %v\n", int2ip(p.dstIP))
-	fmt.Fprintf(&b, "srcPort: %v\n", p.srcPort)
-	fmt.Fprintf(&b, "dstPort: %v\n", p.dstPort)
-	fmt.Fprintf(&b, "proto: %v\n", p.proto)
-	fmt.Fprintf(&b, "srcIfaceMask: %x\n", p.srcIfaceMask)
-	fmt.Fprintf(&b, "tunnelIP4DstMask: %v\n", int2ip(p.tunnelIP4DstMask))
-	fmt.Fprintf(&b, "srcIPMask: %v\n", int2ip(p.srcIPMask))
-	fmt.Fprintf(&b, "dstIPMask: %v\n", int2ip(p.dstIPMask))
-	fmt.Fprintf(&b, "srcPortMask: %x\n", p.srcPortMask)
-	fmt.Fprintf(&b, "dstPortMask: %x\n", p.dstPortMask)
-	fmt.Fprintf(&b, "protoMask: %x\n", p.protoMask)
-	fmt.Fprintf(&b, "precedence: %v\n", p.precedence)
-	fmt.Fprintf(&b, "pdrID: %v\n", p.pdrID)
-	fmt.Fprintf(&b, "fseID: %x\n", p.fseID)
-	fmt.Fprintf(&b, "fseidIP: %v\n", int2ip(p.fseidIP))
-	fmt.Fprintf(&b, "ctrID: %v\n", p.ctrID)
-	fmt.Fprintf(&b, "farID: %v\n", p.farID)
+	return fmt.Sprintf("PDR(id=%v, F-SEID=%v, srcIface=%v, tunnelIPv4Dst=%v/%x, "+
+		"tunnelTEID=%v/%x, srcIP=%v/%x, dstIP=%v/%x,"+
+		"srcPort=%v/%x, dstPort=%v/%x, protocol=%v/%x, precedence=%v, F-SEID IP=%v, "+
+		"counterID=%v, farID=%v, qerIDs=%v, needDecap=%v, allocIPFlag=%v)",
+		p.pdrID, p.fseID, p.srcIface, p.tunnelIP4Dst, p.tunnelIP4DstMask,
+		p.tunnelTEID, p.tunnelTEIDMask, p.srcIP, p.srcIPMask, p.dstIP, p.dstIPMask,
+		p.srcPort, p.srcPortMask, p.dstPort, p.dstPortMask, p.proto, p.protoMask, p.precedence,
+		p.fseidIP, p.ctrID, p.farID, p.qerIDList, p.needDecap, p.allocIPFlag)
+}
 
-	for _, qer := range p.qerIDList {
-		fmt.Fprintf(&b, "qerID: %v\n", qer)
-	}
+func (p pdr) IsUplink() bool {
+	return p.srcIface == access
+}
 
-	fmt.Fprintf(&b, "needDecap: %v\n", p.needDecap)
-	fmt.Fprintf(&b, "allocIPFlag: %v\n", p.allocIPFlag)
-
-	return b.String()
+func (p pdr) IsDownlink() bool {
+	return p.srcIface == core
 }
 
 func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, ippool *IPPool) error {
