@@ -24,7 +24,7 @@ services:
     depends_on:
       - mock-up4
   mock-up4:
-    image: opennetworking/mn-stratum
+    image: opennetworking/p4mn:stable
     hostname: mock-up4
     container_name: mock-up4
     privileged: true
