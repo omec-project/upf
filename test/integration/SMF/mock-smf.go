@@ -26,6 +26,7 @@ var (
 	sequenceNumber         uint32
 	associationEstablished bool
 	UdpConnection          *net.UDPConn
+	inputFile              string
 )
 
 // End of global vars
@@ -50,6 +51,7 @@ func init() {
 	sequenceNumber = 0
 	associationEstablished = false
 	UdpConnection = nil
+	inputFile = ""
 }
 
 func getSequenceNumber(reset bool) uint32 {
@@ -118,7 +120,7 @@ func recvHandler(wg *sync.WaitGroup, msgType uint8) {
 			log.Infof("Received expected msg: %v", msg.MessageTypeName())
 		default:
 			done = true
-			log.Debugf("Received unexpected message: %v", msg.MessageTypeName())
+			log.Errorf("ERROR Received unexpected message: %v", msg.MessageTypeName())
 		}
 	}
 }
@@ -126,7 +128,7 @@ func recvHandler(wg *sync.WaitGroup, msgType uint8) {
 func sendData(data []byte) error {
 	_, err := UdpConnection.Write(data)
 	if err != nil {
-		log.Errorf("Error while sending data to socket")
+		log.Errorf("Error while sending data to socket: %v", err)
 		return err
 	}
 
@@ -144,6 +146,21 @@ func craftPfcpAssociationSetupRequest(address net.IP) *message.AssociationSetupR
 	return request
 }
 
+func setup_association() {
+	wg := new(sync.WaitGroup)
+	assoRequest, _ := craftPfcpAssociationSetupRequest(upfAddress).Marshal()
+	err := sendData(assoRequest)
+	if err != nil {
+		log.Errorf("Error while sending association request: %v", err)
+		return
+	}
+
+	wg.Add(1)
+	go recvHandler(wg, message.MsgTypeAssociationSetupResponse) // start response handler on new goroutine
+
+	wg.Wait()
+}
+
 func startPfcpHeartbeats(wg *sync.WaitGroup, quitCh chan struct{}) {
 	defer wg.Done()
 	period := 1 * time.Second
@@ -152,15 +169,7 @@ func startPfcpHeartbeats(wg *sync.WaitGroup, quitCh chan struct{}) {
 
 	seq := getSequenceNumber(false)
 
-	assRequest, _ := craftPfcpAssociationSetupRequest(upfAddress).Marshal()
-	err := sendData(assRequest)
-	wg.Add(1)
-	go recvHandler(wg, message.MsgTypeAssociationSetupResponse) // start response handler on new goroutine
-
-	if err != nil {
-		log.Fatalf("Error sending association request: %v", err)
-		return
-	}
+	go recvHandler(wg, message.MsgTypeHeartbeatResponse) // start receiving
 
 	for {
 		select {
@@ -218,7 +227,7 @@ func parseArgs() {
 
 }
 
-// Connects to PFCP peer provided address
+// Set global connection to PFCP peer provided address
 func connect(address net.IP) {
 	udpAddr := fmt.Sprintf("%s:%v", address.String(), PFCP_PROTOCOL_PORT)
 	log.Debugf("Start connection to %v", udpAddr)
@@ -240,17 +249,66 @@ func connect(address net.IP) {
 }
 
 func readInput(input chan<- int) {
+	if inputFile != "" {
+		// Set inputFile as stdIn
+
+		oldStdin := os.Stdin
+		defer func() {
+			os.Stdin = oldStdin
+		}() // restore old StdIN
+
+		f, err := os.Open(inputFile)
+		if err != nil {
+			log.Errorf("Error while reading inputFile: %v", err)
+		} else {
+			defer func(f *os.File) {
+				err := f.Close()
+				if err != nil {
+					log.Errorf("Error while closing file: %v", err)
+				}
+			}(f)
+
+			os.Stdin = f
+		}
+	}
+
 	for {
 		var u int
 		_, err := fmt.Scanf("%d\n", &u)
 		if err != nil {
-			panic(err)
+			if err == io.EOF {
+				return
+			} else {
+				panic(err)
+			}
 		}
 		input <- u
 	}
 }
 
-func server(wg *sync.WaitGroup) {
+func handleUserInput() {
+	userInput := make(chan int)
+	done := false
+	go readInput(userInput)
+
+	for !done {
+		fmt.Println("Enter answer ")
+
+		select {
+		case userAnswer := <-userInput:
+			if userAnswer == 1 {
+				fmt.Println("Correct answer:", userAnswer)
+			} else {
+				fmt.Println("Wrong answer")
+			}
+		case <-time.After(5 * time.Second):
+			done = true
+			fmt.Println("\n Time is over!")
+		}
+	}
+}
+
+func server(wg *sync.WaitGroup, quitCh chan struct{}) {
 	defer wg.Done()
 	laddr, err := net.ResolveUDPAddr("udp", "localhost:8805")
 	if err != nil {
@@ -266,64 +324,72 @@ func server(wg *sync.WaitGroup) {
 	var seq uint32 = 1
 
 	for {
-		log.Printf("Server: waiting for messages to come on: %s", laddr)
-		n, addr, err := conn.ReadFrom(buf)
-		if err != nil {
-			log.Fatal(err)
-		}
+		select {
+		case <-quitCh:
+			log.Debugf("Received quit signal")
+			return
+		default:
+			log.Printf("Server: waiting for messages to come on: %s", laddr)
+			n, addr, err := conn.ReadFrom(buf)
+			if err != nil {
+				log.Fatal(err)
+			}
 
-		msg, err := message.Parse(buf[:n])
-		if err != nil {
-			log.Printf("Server: ignored undecodable message: %x, error: %s", buf[:n], err)
-			continue
-		}
+			msg, err := message.Parse(buf[:n])
+			if err != nil {
+				log.Printf("Server: ignored undecodable message: %x, error: %s", buf[:n], err)
+				continue
+			}
 
-		hbreq, ok := msg.(*message.HeartbeatRequest)
-		if !ok {
-			log.Printf("Server: got unexpected message: %s, from: %s", msg.MessageTypeName(), addr)
-			continue
-		}
+			hbreq, ok := msg.(*message.HeartbeatRequest)
+			if !ok {
+				log.Printf("Server: got unexpected message: %s, from: %s", msg.MessageTypeName(), addr)
+				continue
+			}
 
-		ts, err := hbreq.RecoveryTimeStamp.RecoveryTimeStamp()
-		if err != nil {
-			log.Printf("Server: got Heartbeat Request with invalid TS: %s, from: %s", err, addr)
-			continue
-		} else {
-			log.Printf("Server: got Heartbeat Request with TS: %s, from: %s", ts, addr)
-		}
+			ts, err := hbreq.RecoveryTimeStamp.RecoveryTimeStamp()
+			if err != nil {
+				log.Printf("Server: got Heartbeat Request with invalid TS: %s, from: %s", err, addr)
+				continue
+			} else {
+				log.Printf("Server: got Heartbeat Request with TS: %s, from: %s", ts, addr)
+			}
 
-		// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
-		hbres, err := message.NewHeartbeatResponse(seq, ie.NewRecoveryTimeStamp(time.Now())).Marshal()
-		if err != nil {
-			log.Fatal(err)
-		}
-		seq++
+			// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
+			hbres, err := message.NewHeartbeatResponse(seq, ie.NewRecoveryTimeStamp(time.Now())).Marshal()
+			if err != nil {
+				log.Fatal(err)
+			}
+			seq++
 
-		if _, err := conn.WriteTo(hbres, addr); err != nil {
-			log.Fatal(err)
-		}
+			if _, err := conn.WriteTo(hbres, addr); err != nil {
+				log.Fatal(err)
+			}
 
-		log.Printf("Server: sent Heartbeat Response to: %s", addr)
+			log.Printf("Server: sent Heartbeat Response to: %s", addr)
+		}
 	}
 }
 
 func main() {
 	log.SetOutput(io.MultiWriter(os.Stdout)) // Debug. if you want to save the log output to file simply add it in here.
-	wg := new(sync.WaitGroup)
+	wg := new(sync.WaitGroup)                // main wait group
+	quitCh := make(chan struct{})
 
 	wg.Add(1)
-	go server(wg) // start emulating server for debug.
+	go server(wg, quitCh) // start emulating server for debug.
 
 	parseArgs()
 
 	connect(upfAddress) // set global connection
 
-	quitCh := make(chan struct{})
 	wg.Add(1)
 	go startPfcpHeartbeats(wg, quitCh)
 
 	time.Sleep(3 * time.Second)
-	quitCh <- struct{}{} // stops pfcpheartbeat goroutine
+	quitCh <- struct{}{} // stops pfcpheartbeat and server goroutine
+
+	handleUserInput()
 
 	wg.Wait() // wait for all go-routine before shutting down
 
