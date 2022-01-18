@@ -5,7 +5,7 @@ The tests defined in this directory implement the so-called "broad integration t
 
 The purpose of E2E integration tests is to verify the behavior of the PFCP Agent with different flavors of PFCP messages, 
 as well as to check PFCP Agent's integration with data plane components (UP4, BESS-UPF). In detail, these tests verify if 
-PFCP messages are handled as expected by the PFCP Agent, and if the PFCP Agent installs correct packet forwarding rules onto the target (UP4/BESS). 
+PFCP messages are handled as expected by the PFCP Agent, and if the PFCP Agent installs correct packet forwarding rules onto the fast-path target (UP4/BESS). 
 
 ## Structure 
 
@@ -17,7 +17,7 @@ PFCP messages are handled as expected by the PFCP Agent, and if the PFCP Agent i
 
 The E2E integration tests are integrated within the Go test framework and can be run by `go test`. 
 
-The tests use `docker-compose` to set up `pfcpiface` and `mock-up4` (the BMv2 container running UP4 pipeline) images.
+The tests use `docker-compose` to set up `pfcpiface` and `mock-up4` (the BMv2 container running the UP4 pipeline) images.
 Then, a given test case generates PFCP messages towards `pfcpiface` and fetches the runtime forwarding configuration from the
 data plane component (e.g., via P4Runtime for UP4) to verify forwarding state configuration. 
 
