@@ -90,6 +90,10 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 	session := pConn.sessions[localSEID]
 
+	addPDRs := make([]pdr, 0, MaxItems)
+	addFARs := make([]far, 0, MaxItems)
+	addQERs := make([]qer, 0, MaxItems)
+
 	for _, cPDR := range sereq.CreatePDR {
 		var p pdr
 		if err := p.parsePDR(cPDR, session.localSEID, pConn.appPFDs, upf.ippool); err != nil {
@@ -98,6 +102,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 		p.fseidIP = fseidIP
 		session.CreatePDR(p)
+		addPDRs = append(addPDRs, p)
 	}
 
 	for _, cFAR := range sereq.CreateFAR {
@@ -108,6 +113,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 		f.fseidIP = fseidIP
 		session.CreateFAR(f)
+		addFARs = append(addFARs, f)
 	}
 
 	for _, cQER := range sereq.CreateQER {
@@ -118,11 +124,20 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 		q.fseidIP = fseidIP
 		session.CreateQER(q)
+		addQERs = append(addQERs, q)
 	}
 
 	session.MarkSessionQer()
 
-	cause := upf.sendMsgToUPF(upfMsgTypeAdd, session.PacketForwardingRules, PacketForwardingRules{})
+	// session.PacketForwardingRules stores all PFCP rules that has been installed so far,
+	// while 'updated' stores only the PFCP rules that has been provided in this particular message.
+	updated := PacketForwardingRules{
+		pdrs: addPDRs,
+		fars: addFARs,
+		qers: addQERs,
+	}
+
+	cause := upf.sendMsgToUPF(upfMsgTypeAdd, session.PacketForwardingRules, updated)
 	if cause == ie.CauseRequestRejected {
 		pConn.RemoveSession(session.localSEID)
 		return errProcessReply(ErrWriteToFastpath,

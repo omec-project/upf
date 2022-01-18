@@ -184,7 +184,7 @@ func main() {
 		log.SetLevel(level)
 	}
 
-	log.Infoln(conf)
+	log.Infof("%+v", conf)
 
 	if conf.EnableP4rt {
 		fp = &UP4{}
