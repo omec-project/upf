@@ -5,7 +5,6 @@ package main
 
 import (
 	"fmt"
-	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -25,22 +24,10 @@ type qer struct {
 	fseidIP  uint32
 }
 
-// Satisfies the fmt.Stringer interface.
 func (q qer) String() string {
-	b := strings.Builder{}
-	fmt.Fprintf(&b, "\n")
-	fmt.Fprintf(&b, "qerID: %v\n", q.qerID)
-	fmt.Fprintf(&b, "fseID: %x\n", q.fseID)
-	fmt.Fprintf(&b, "qfi: %v\n", q.qfi)
-	fmt.Fprintf(&b, "fseIDIP: %v\n", int2ip(q.fseidIP))
-	fmt.Fprintf(&b, "uplinkStatus: %v\n", q.ulStatus)
-	fmt.Fprintf(&b, "downlinkStatus: %v\n", q.dlStatus)
-	fmt.Fprintf(&b, "uplinkMBR: %v\n", q.ulMbr)
-	fmt.Fprintf(&b, "downlinkMBR: %v\n", q.dlMbr)
-	fmt.Fprintf(&b, "uplinkGBR: %v\n", q.ulGbr)
-	fmt.Fprintf(&b, "downlinkGBR: %v\n", q.dlGbr)
-
-	return b.String()
+	return fmt.Sprintf("QER(id=%v, F-SEID=%v, F-SEID IP=%v, QFI=%v, "+
+		"uplinkMBR=%v, downlinkMBR=%v, uplinkGBR=%v, downlinkGBR=%v)",
+		q.qerID, q.fseID, q.fseidIP, q.qfi, q.ulMbr, q.dlMbr, q.ulGbr, q.dlGbr)
 }
 
 func (q *qer) parseQER(ie1 *ie.IE, seid uint64) error {
