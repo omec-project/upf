@@ -72,6 +72,10 @@ type UP4 struct {
 	// ueAddrToFSEID is used to store UE Address <-> F-SEID mapping,
 	// which is needed to efficiently find F-SEID when we receive a P4 Digest (DDN) for a UE address.
 	ueAddrToFSEID map[uint32]uint64
+	// fseidToUEAddr is used to store F-SEID <-> UE Address mapping,
+	// which is needed to efficiently find UE address for UL PDRs in the PFCP messages.
+	// We need both maps to make lookup efficient, but both maps should always be updated in atomic way.
+	fseidToUEAddr map[uint64]uint32
 
 	reportNotifyChan chan<- uint64
 	endMarkerChan    chan []byte
@@ -268,6 +272,7 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	up4.enableEndMarker = conf.EnableEndMarker
 	up4.initTunnelPeerIDs()
 	up4.ueAddrToFSEID = make(map[uint32]uint64)
+	up4.fseidToUEAddr = make(map[uint64]uint32)
 
 	up4.counters = make([]counter, 2)
 	for i := range up4.counters {
@@ -452,7 +457,6 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
 
 		tunnelPeerID, err = up4.allocateGTPTunnelPeerID()
 		if err != nil {
-			//log.Error("failed to allocate GTP tunnel peer ID based on FAR: ", err)
 			return err
 		}
 
@@ -507,22 +511,7 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 	up4.releaseAllocatedGTPTunnelPeerID(tunnelPeerID)
 }
 
-func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, updated PacketForwardingRules) uint8 {
-	up4Log := log.WithFields(log.Fields{
-		"method-type":   method,
-		"old-rules":     rules,
-		"updated-rules": updated,
-	})
-	up4Log.Debug("Sending PFCP message to UP4..")
-
-	pdrs := rules.pdrs
-	fars := rules.fars
-
-	if method == upfMsgTypeMod {
-		// no need to use updated PDRs as session's PDRs are already updated
-		fars = updated.fars
-	}
-
+func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updated PacketForwardingRules) uint8 {
 	var (
 		methodType p4.Update_Type
 		err        error
@@ -539,26 +528,35 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 	case upfMsgTypeAdd:
 		{
 			methodType = p4.Update_INSERT
-			for i := range pdrs {
+			for i := range updated.pdrs {
 				val, err = getCounterVal(up4, preQosCounterID)
 				if err != nil {
 					log.Println("Counter id alloc failed ", err)
 					return cause
 				}
-				pdrs[i].ctrID = uint32(val)
+				updated.pdrs[i].ctrID = uint32(val)
+			}
+
+			for _, p := range updated.pdrs {
+				up4.updateUEAddrAndFSEIDMappings(p)
 			}
 		}
 	case upfMsgTypeDel:
 		{
 			methodType = p4.Update_DELETE
-			for i := range pdrs {
+			for i := range all.pdrs {
 				resetCounterVal(up4, preQosCounterID,
-					uint64(pdrs[i].ctrID))
+					uint64(all.pdrs[i].ctrID))
 			}
 		}
 	case upfMsgTypeMod:
 		{
 			methodType = p4.Update_MODIFY
+
+			// Update PDR IE might modify UE IP <-> F-SEID mappings
+			for _, p := range updated.pdrs {
+				up4.updateUEAddrAndFSEIDMappings(p)
+			}
 		}
 	default:
 		{
@@ -567,7 +565,14 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 		}
 	}
 
-	for _, far := range fars {
+	up4Log := log.WithFields(log.Fields{
+		"method-type":   p4.Update_Type_name[int32(methodType)],
+		"all":           all,
+		"updated-rules": updated,
+	})
+	up4Log.Debug("Sending PFCP message to UP4..")
+
+	for _, far := range updated.fars {
 		// downlink FAR that does encapsulation
 		if far.Forwards() && far.dstIntf == ie.DstInterfaceAccess {
 			switch method {
@@ -579,7 +584,8 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 					}
 					if err := up4.addOrUpdateGTPTunnelPeer(far); err != nil {
 						up4Log.WithFields(log.Fields{
-							"far": far,
+							"far":   far,
+							"error": err.Error(),
 						}).Error("Failed to add or update GTP tunnel peer")
 					}
 				}
@@ -593,20 +599,19 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 		}
 	}
 
-	for _, pdr := range pdrs {
+	for _, pdr := range all.pdrs {
 		pdrLog := log.WithFields(log.Fields{
 			"pdr": pdr,
 		})
-		pdrLog.Traceln(pdr)
+		pdrLog.Debug("Installing P4 table entries for PDR")
 
-		far, err := findRelatedFAR(pdr, fars)
+		far, err := findRelatedFAR(pdr, all.fars)
 		if err != nil {
 			pdrLog.Warning("no related FAR for PDR found: ", err)
 			continue
 		}
 
-		log.Println("Related FAR:")
-		log.Println(far)
+		pdrLog.WithField("related FAR", far).Debug("Found related FAR for PDR")
 
 		tunnelParams := tunnelParams{
 			tunnelIP4Src: ip2int(up4.accessIP.IP),
@@ -615,14 +620,25 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 		}
 
 		tunnelPeerID, exists := up4.tunnelPeerIDs[tunnelParams]
-		if !exists && far.Forwards() {
-			pdrLog.Warn("related FAR does not include tunnel params, failed to find allocated GTP tunnel peer ID")
+		if !exists && far.tunnelTEID != 0 {
+			pdrLog.Warn("failed to find allocated GTP tunnel peer ID")
 		}
 
 		sessionsEntry, err := up4.p4RtTranslator.BuildSessionsTableEntry(pdr, tunnelPeerID, far.Buffers())
 		if err != nil {
 			log.Error("failed to build P4rt table entry for Sessions table: ", err)
 			continue
+		}
+
+		if pdr.IsUplink() {
+			ueAddr, exists := up4.fseidToUEAddr[pdr.fseID]
+			if !exists {
+				// this is only possible if a linked DL PDR was not provided in the same PFCP Establishment message
+				log.Error("UE Address not found for uplink PDR, a linked DL PDR was not provided?")
+				return cause
+			}
+
+			pdr.srcIP = ueAddr
 		}
 
 		// FIXME: get TC from QFI->TC mapping
@@ -632,7 +648,8 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 			continue
 		}
 
-		pdrLog.Traceln("Applying PDR: ", p4.Update_Type_name[int32(methodType)])
+		pdrLog.WithField("method type", p4.Update_Type_name[int32(methodType)])
+		pdrLog.Debug("Applying table entries")
 
 		err = up4.p4client.ApplyTableEntries(methodType, sessionsEntry, terminationsEntry)
 		if err != nil {
@@ -640,8 +657,12 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 			log.Error("failed to write table entries to Sessions and Terminations tables: ", err)
 			return cause
 		}
+	}
 
-		up4.saveUeAddrToFSEID(pdr)
+	if method == upfMsgTypeDel {
+		for _, p := range all.pdrs {
+			up4.removeUeAddrAndFSEIDMappings(p)
+		}
 	}
 
 	cause = ie.CauseRequestAccepted
@@ -649,18 +670,20 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, rules PacketForwardingRules, upd
 	return cause
 }
 
-func (up4 *UP4) saveUeAddrToFSEID(pdr pdr) {
-	var ueAddr uint32
-	if pdr.srcIface == access {
-		ueAddr = pdr.srcIP
-	} else if pdr.srcIface == core {
-		ueAddr = pdr.dstIP
-	} else {
-		// unknown PDR direction
+func (up4 *UP4) updateUEAddrAndFSEIDMappings(pdr pdr) {
+	if !pdr.IsDownlink() {
 		return
 	}
 
-	if _, exists := up4.ueAddrToFSEID[ueAddr]; !exists {
-		up4.ueAddrToFSEID[ueAddr] = pdr.fseID
+	// update both maps in one shot
+	up4.ueAddrToFSEID[pdr.dstIP], up4.fseidToUEAddr[pdr.fseID] = pdr.fseID, pdr.dstIP
+}
+
+func (up4 *UP4) removeUeAddrAndFSEIDMappings(pdr pdr) {
+	if !pdr.IsDownlink() {
+		return
 	}
+
+	delete(up4.ueAddrToFSEID, pdr.dstIP)
+	delete(up4.fseidToUEAddr, pdr.fseID)
 }

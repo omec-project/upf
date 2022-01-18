@@ -21,9 +21,13 @@ jobs:
         run: |
           make pb
 
-      - name: Build the Docker image
+      - name: Build the BESS-UPF Docker image
         run: |
-          make docker-build
+          DOCKER_TARGETS=bess make docker-build
+
+      - name: Build the PFCP Agent Docker image
+        run: |
+          DOCKER_TARGETS=pfcpiface make docker-build
 
       # Format the code
       - name: Clang Format
@@ -48,9 +52,14 @@ jobs:
           git --no-pager diff
 
       # Build again and commit
-      - name: Build the Docker image (after format)
+      - name: Build the BESS-UPF Docker image (after format)
         run: |
-          make docker-build
+          DOCKER_TARGETS=bess make docker-build
+
+      - name: Build the PFCP Agent Docker image (after format)
+        run: |
+          DOCKER_TARGETS=pfcpiface make docker-build
+
       - name: Update PR with changes
         uses: gr2m/create-or-update-pull-request-action@v1.x
         env:
@@ -61,11 +70,15 @@ jobs:
           branch: ${{ github.event.pull_request.head.ref }}
           author: "Github Actions <actions@github>"
           commit-message: "Actions: Updated with changes from CI"
-      - uses: docker/login-action@v1.12.0
+      - id: docker-login
+        # Secrets from the main repo are not used if PR comes from fork. We skip pushing Docker image then.
+        if: github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'
+        uses: docker/login-action@v1.12.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.CR_PAT }}
       - name: Push Docker image
+        if: steps.docker-login.conclusion == 'success'
         run: |
           make docker-push
