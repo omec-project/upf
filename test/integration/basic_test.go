@@ -3,7 +3,9 @@ package integration
 import (
 	"github.com/omec-project/upf-epc/pkg/pfcpsim"
 	"github.com/stretchr/testify/require"
+
 	"github.com/wmnsk/go-pfcp/ie"
+
 	"testing"
 	"time"
 )
