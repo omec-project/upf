@@ -26,5 +26,5 @@ data plane component (e.g., via P4Runtime for UP4) to verify forwarding state co
 To run all E2E integration tests invoke the command below from the root directory:
 
 ```bash
-make test-integration
+make test-up4-integration
 ```
