@@ -14,8 +14,7 @@ services:
     stdin_open: true
     volumes:
       - ../config/upf.json:/config.json
-    entrypoint: "/bin/pfcpiface"
-    command: [ "-config", "/config.json" ]
+    entrypoint: "/bin/sh"
     working_dir: /bin/
     ports:
       - "8805:8805/udp"
@@ -24,7 +23,9 @@ services:
     depends_on:
       - mock-up4
   mock-up4:
-    image: opennetworking/p4mn:stable
+    # NOTE: mn-stratum is easier to debug and more stable.
+    # but should be replaced with p4mn if integration tests will cover DDNs.
+    image: opennetworking/mn-stratum:21.12
     hostname: mock-up4
     container_name: mock-up4
     privileged: true
