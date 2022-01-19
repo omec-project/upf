@@ -26,7 +26,7 @@ func ConnectP4rt(addr string, electionID p4_v1.Uint128) (*client.Client, error) 
 
 	stopCh = make(chan struct{})
 
-	p4RtC := client.NewClient(c, 1, electionID)
+	p4RtC := client.NewClient(c, 1, electionID, client.DisableCanonicalBytestrings)
 	arbitrationCh := make(chan bool)
 	go p4RtC.Run(stopCh, arbitrationCh, nil)
 

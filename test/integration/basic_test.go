@@ -39,6 +39,7 @@ var (
 	slaveElectionID = p4_v1.Uint128{High: 0, Low: 1}
 
 	pfcpClient *pfcpsim.PFCPClient
+	p4rtClient *p4rtc.Client
 )
 
 func initMockUP4() error {
@@ -98,11 +99,17 @@ func setup(t *testing.T) {
 	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.1")
 	err = pfcpClient.ConnectN4("127.0.0.1")
 	require.NoErrorf(t, err, "failed to connect to UPF")
+
+	p4rtClient, err = providers.ConnectP4rt("127.0.0.1:50001", slaveElectionID)
+	require.NoErrorf(t, err, "failed to connect to P4Runtime server as slave")
 }
 
 func teardown(t *testing.T) {
 	if pfcpClient != nil {
 		pfcpClient.DisconnectN4()
+	}
+	if p4rtClient != nil {
+		providers.DisconnectP4rt()
 	}
 }
 
