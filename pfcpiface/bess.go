@@ -456,6 +456,10 @@ func (b *bess) sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 		break
 	}
 
+	if con == nil {
+		log.Warnln("No active PFCP connection, UE IP lookup disabled")
+	}
+
 	// Prepare session stats.
 	createStats := func(preResp, postResp *pb.FlowMeasureReadResponse) {
 		for i := 0; i < len(postResp.Statistics); i++ {
@@ -486,20 +490,15 @@ func (b *bess) sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 					continue
 				}
 
+				// Try to find the N6 uplink PDR with the UE IP.
 				for _, p := range session.pdrs {
-					if uint64(p.pdrID) != pre.Pdr {
-						continue
-					}
-					// Only downlink PDRs contain the UE address.
-					if p.srcIP > 0 {
+					if p.IsUplink() && p.srcIP > 0 {
 						ueIpString = int2ip(p.srcIP).String()
-						log.Warnln(p.fseID, " -> ", ueIpString)
+						log.Traceln(p.fseID, " -> ", ueIpString)
 
 						break
 					}
 				}
-			} else {
-				log.Warnln("No active PFCP connection, IP lookup disabled")
 			}
 
 			ch <- prometheus.MustNewConstMetric(
