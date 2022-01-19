@@ -230,6 +230,7 @@ func (t *P4rtTranslator) withExactMatchField(entry *p4.TableEntry, name string, 
 	return nil
 }
 
+//nolint:unused
 func (t *P4rtTranslator) withTernaryMatchField(entry *p4.TableEntry, name string, value interface{}, mask interface{}) error {
 	ternaryFieldLog := log.WithFields(log.Fields{
 		"entry":      entry.String(),
