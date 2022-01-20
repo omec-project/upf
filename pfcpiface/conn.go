@@ -74,7 +74,10 @@ func (pConn *PFCPConn) startHeartBeatMonitor() {
 	hbCtx, hbCancel := context.WithCancel(pConn.ctx)
 	pConn.hbCtxCancel = hbCancel
 
-	log.Infoln("Starting Heartbeat timer")
+	hbLog := log.WithFields(log.Fields{
+		"internal": pConn.upf.hbInterval,
+	})
+	hbLog.Infoln("Starting Heartbeat timer")
 
 	heartBeatTimer := time.NewTimer(pConn.upf.hbInterval)
 
