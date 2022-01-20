@@ -89,6 +89,7 @@ func (pConn *PFCPConn) startHeartBeatMonitor() {
 		case <-hbCtx.Done():
 			log.Infoln("Cancel HeartBeat Timer", pConn.RemoteAddr().String())
 			heartBeatExpiryTimer.Stop()
+
 			return
 		case <-pConn.hbReset:
 			heartBeatExpiryTimer.Reset(pConn.upf.hbInterval)
