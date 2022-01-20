@@ -567,7 +567,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, meth
 			if !exists {
 				// this is only possible if a linked DL PDR was not provided in the same PFCP Establishment message
 				log.Error("UE Address not found for uplink PDR, a linked DL PDR was not provided?")
-				return ErrOperationFailedWithReason("adding UP4 entries","UE Address not found for uplink PDR, a linked DL PDR was not provided?")
+				return ErrOperationFailedWithReason("adding UP4 entries", "UE Address not found for uplink PDR, a linked DL PDR was not provided?")
 			}
 
 			pdr.srcIP = ueAddr
@@ -580,9 +580,9 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, meth
 		}
 
 		pdrLog.WithFields(log.Fields{
-			"sessions entry": sessionsEntry,
+			"sessions entry":     sessionsEntry,
 			"terminations entry": terminationsEntry,
-			"method type": p4.Update_Type_name[int32(methodType)],
+			"method type":        p4.Update_Type_name[int32(methodType)],
 		})
 		pdrLog.Debug("Applying table entries")
 
@@ -602,6 +602,7 @@ func (up4 *UP4) sendCreate(all PacketForwardingRules, updated PacketForwardingRu
 			log.Println("Counter id alloc failed ", err)
 			return ErrOperationFailedWithReason("Counter ID allocation", err.Error())
 		}
+
 		updated.pdrs[i].ctrID = uint32(val)
 	}
 
@@ -674,16 +675,14 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updat
 	up4Log.Debug("Sending PFCP message to UP4..")
 
 	var err error
+
 	switch method {
 	case upfMsgTypeAdd:
 		err = up4.sendCreate(all, updated)
-		break
 	case upfMsgTypeMod:
 		err = up4.sendUpdate(all, updated)
-		break
 	case upfMsgTypeDel:
 		err = up4.sendDelete(all)
-		break
 	default:
 		// unknown upfMsgType
 		return ie.CauseRequestRejected
