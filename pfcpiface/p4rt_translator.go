@@ -230,6 +230,7 @@ func (t *P4rtTranslator) withExactMatchField(entry *p4.TableEntry, name string, 
 	return nil
 }
 
+//nolint:unused
 func (t *P4rtTranslator) withTernaryMatchField(entry *p4.TableEntry, name string, value interface{}, mask interface{}) error {
 	ternaryFieldLog := log.WithFields(log.Fields{
 		"entry":      entry.String(),
@@ -420,7 +421,7 @@ func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr) (*p4.TableEntry, erro
 		return nil, err
 	}
 
-	if err := t.withTernaryMatchField(entry, FieldTEID, pdr.tunnelTEID, pdr.tunnelTEIDMask); err != nil {
+	if err := t.withExactMatchField(entry, FieldTEID, pdr.tunnelTEID); err != nil {
 		return nil, err
 	}
 
