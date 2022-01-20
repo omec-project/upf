@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2019 Intel Corporation
+# Copyright 2022 Open Networking Foundation
 name: Pull Request
 
 on: [pull_request]

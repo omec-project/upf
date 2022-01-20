@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright(c) 2021 Intel Corporation
+// Copyright 2021 Intel Corporation
 
 package main
 
