@@ -1,7 +1,7 @@
 # vim: syntax=py
 # -*- mode: python -*-
 # SPDX-License-Identifier: Apache-2.0
-# Copyright(c) 2019 Intel Corporation
+# Copyright 2019 Intel Corporation
 
 p = PMDPort(name='ipv4frags', vdev='eth_pcap0,rx_pcap=ipv4frags.pcap,tx_pcap=reassembled.pcap')
 reassemb = IPDefrag(num_flows=10)

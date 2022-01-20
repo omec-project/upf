@@ -1,3 +1,7 @@
+<!--
+SPDX-License-Identifier: Apache-2.0
+Copyright 2019 Intel Corporation
+-->
 ---
 name: Feature request
 about: Suggest an idea for this project
