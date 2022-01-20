@@ -208,7 +208,6 @@ func main() {
 	}
 
 	setupConfigHandler(upf)
-	setupProm(upf)
 
 	httpPort := "8080"
 	if conf.CPIface.HTTPPort != "" {
@@ -229,6 +228,8 @@ func main() {
 
 	node := NewPFCPNode(ctx, upf)
 	go node.Serve()
+
+	setupProm(upf, node)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
