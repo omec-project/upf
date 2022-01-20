@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright(c) 2021 Open Networking Foundation
+# Copyright 2021 Open Networking Foundation
 
 # This file is executed by the Jenkins job defined at
 # https://gerrit.onosproject.org/plugins/gitiles/ci-management/+/refs/heads/master/jjb/pipeline/bess-upf-linerate.groovy

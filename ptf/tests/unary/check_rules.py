@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright(c) 2021 Open Networking Foundation
+# Copyright 2021 Open Networking Foundation
 
 from ipaddress import IPv4Address
 from trex_test import TrexTest
