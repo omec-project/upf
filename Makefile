@@ -94,4 +94,4 @@ golint:
 check-reuse:
 	@docker run --rm -v $(CURDIR):/upf-epc -w /upf-epc omecproject/reuse-verify:latest reuse lint
 
-.PHONY: docker-build docker-push output pb fmt golint check-reuse test-integration
+.PHONY: docker-build docker-push output pb fmt golint check-reuse test-up4-integration
