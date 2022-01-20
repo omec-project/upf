@@ -36,5 +36,5 @@ type fastPath interface {
 	isConnected(accessIP *net.IP) bool
 	summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric)
 	portStats(uc *upfCollector, ch chan<- prometheus.Metric)
-	sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) error
+	sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) error
 }
