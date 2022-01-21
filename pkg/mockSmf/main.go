@@ -3,7 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/omec-project/upf-epc/pkg/mockSmf/smf"
+	"github.com/omec-project/upf-epc/pkg/pfcpsim"
 	"github.com/pborman/getopt/v2"
 	"github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -25,7 +25,7 @@ var (
 	doOnce            sync.Once
 	sessionCount      int
 
-	globalMockSmf *smf.MockSMF
+	globalMockSmf *pfcpsim.PFCPClient
 )
 
 func GetLoggerInstance() *logrus.Logger {
@@ -85,7 +85,7 @@ func init() {
 	remotePeerAddress = nil
 	localAddress = nil
 	inputFile = ""
-	globalMockSmf = &smf.MockSMF{} // Empty struct
+	globalMockSmf = &pfcpsim.PFCPClient{} // Empty struct
 }
 
 // Retrieves the IP associated with interfaceName. returns error if something goes wrong.
@@ -222,13 +222,19 @@ func handleUserInput() {
 			switch userAnswer {
 			case 1:
 				log.Infof("Selected Teardown Association: %v", userAnswer)
-				globalMockSmf.TeardownPfcpAssociation()
+				err := globalMockSmf.TeardownAssociation()
+				if err != nil {
+					return
+				}
 			case 2:
 				log.Infoln("Selected Setup Association: %v", userAnswer)
-				globalMockSmf.SetupPfcpAssociation()
+				err := globalMockSmf.SetupAssociation()
+				if err != nil {
+					log.Errorf("Error while setup association: %v", err)
+				}
 			case 9:
 				log.Infoln("Shutting down")
-				globalMockSmf.Disconnect()
+				globalMockSmf.DisconnectN4()
 				os.Exit(0)
 
 			default:
@@ -357,12 +363,12 @@ func main() {
 
 	parseArgs()
 
-	globalMockSmf = smf.NewMockSMF(remotePeerAddress, localAddress, log)
-	globalMockSmf.Connect()
-	globalMockSmf.InitializeSessions(sessionCount)
+	globalMockSmf = pfcpsim.NewPFCPClient("127.0.0.1")
+	err := globalMockSmf.ConnectN4("127.0.0.1")
+	log.Errorf("failed to connect to UPF: %v", err)
 
 	handleUserInput()
 
-	globalMockSmf.Disconnect()
+	globalMockSmf.DisconnectN4()
 	wg.Wait() // wait for all go-routine before shutting down
 }

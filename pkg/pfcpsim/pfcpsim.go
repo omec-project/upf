@@ -13,6 +13,7 @@ import (
 
 const (
 	PFCPStandardPort = 8805
+	HEARTBEAT_PERIOD = 5 // in seconds
 )
 
 // PFCPClient enables to simulate a client sending PFCP messages towards the UPF.
@@ -21,7 +22,7 @@ const (
 // - 2nd mode gives a user more control over PFCP sequence flow
 //   and enables send and receive of individual messages (e.g., SendAssociationSetupRequest(), PeekNextResponse())
 type PFCPClient struct {
-	aliveLock sync.Mutex
+	aliveLock          sync.Mutex
 	isAssociationAlive bool
 
 	ctx              context.Context
@@ -34,18 +35,17 @@ type PFCPClient struct {
 	seqNumLock     sync.Mutex
 
 	localAddr string
-	conn *net.UDPConn
+	conn      *net.UDPConn
 }
 
 func NewPFCPClient(localAddr string) *PFCPClient {
-	client := &PFCPClient{
+	return &PFCPClient{
 		sequenceNumber: 0,
-		localAddr: localAddr,
+		localAddr:      localAddr,
+		ctx:            context.Background(),
+		heartbeatsChan: make(chan *message.HeartbeatResponse),
+		recvChan:       make(chan message.Message),
 	}
-	client.ctx = context.Background()
-	client.heartbeatsChan = make(chan *message.HeartbeatResponse)
-	client.recvChan = make(chan message.Message)
-	return client
 }
 
 func (c *PFCPClient) getNextSequenceNumber() uint32 {
@@ -124,7 +124,9 @@ func (c *PFCPClient) ConnectN4(remoteAddr string) error {
 }
 
 func (c *PFCPClient) DisconnectN4() {
-	c.cancelHeartbeats()
+	if c.cancelHeartbeats != nil {
+		c.cancelHeartbeats()
+	}
 	c.conn.Close()
 }
 
@@ -132,7 +134,7 @@ func (c *PFCPClient) PeekNextHeartbeatResponse(timeout time.Duration) (*message.
 	select {
 	case msg := <-c.heartbeatsChan:
 		return msg, nil
-	case <-time.After(timeout * time.Second):
+	case <-time.After(timeout):
 		return nil, errors.New("timeout waiting for response")
 	}
 }
@@ -141,13 +143,13 @@ func (c *PFCPClient) PeekNextResponse(timeout time.Duration) (message.Message, e
 	select {
 	case msg := <-c.recvChan:
 		return msg, nil
-	case <-time.After(timeout * time.Second):
+	case <-time.After(timeout):
 		return nil, errors.New("timeout waiting for response")
 	}
 }
 
-// TODO: enable passing custom IEs
-func (c *PFCPClient) SendAssociationSetupRequest() error {
+// SendAssociationSetupRequest sends an association setup request. It allows adding custom IEs.
+func (c *PFCPClient) SendAssociationSetupRequest(infoelement ...*ie.IE) error {
 	c.resetSequenceNumber()
 
 	assocReq := message.NewAssociationSetupRequest(
@@ -156,7 +158,24 @@ func (c *PFCPClient) SendAssociationSetupRequest() error {
 		ie.NewNodeID(c.localAddr, "", ""),
 	)
 
+	for _, ieValue := range infoelement {
+		assocReq.IEs = append(assocReq.IEs, ieValue)
+	}
+
 	return c.sendMsg(assocReq)
+}
+
+func (c *PFCPClient) craftPfcpAssociationReleaseRequest(infoElement ...*ie.IE) *message.AssociationReleaseRequest {
+	ie1 := ie.NewNodeID(c.conn.RemoteAddr().String(), "", "")
+
+	c.resetSequenceNumber()
+	msg := message.NewAssociationReleaseRequest(0, ie1)
+
+	for _, ieValue := range infoElement {
+		msg.IEs = append(msg.IEs, ieValue)
+	}
+
+	return msg
 }
 
 func (c *PFCPClient) SendHeartbeatRequest() error {
@@ -169,14 +188,17 @@ func (c *PFCPClient) SendHeartbeatRequest() error {
 	return c.sendMsg(hbReq)
 }
 
-func (c *PFCPClient) StartHeartbeats(stopCtx context.Context) {
-	ticker := time.NewTicker(5 * time.Second)
+func (c *PFCPClient) startHeartbeats(stopCtx context.Context) {
+	ticker := time.NewTicker(HEARTBEAT_PERIOD * time.Second)
 	for {
 		select {
 		case <-stopCtx.Done():
 			return
 		case <-ticker.C:
-			c.SendAndRecvHeartbeat()
+			err := c.SendAndRecvHeartbeat()
+			if err != nil {
+				return
+			}
 		}
 	}
 }
@@ -216,7 +238,32 @@ func (c *PFCPClient) SetupAssociation() error {
 	ctx, cancelFunc := context.WithCancel(c.ctx)
 	c.cancelHeartbeats = cancelFunc
 
-	go c.StartHeartbeats(ctx)
+	go c.startHeartbeats(ctx)
+
+	return nil
+}
+
+func (c *PFCPClient) TeardownAssociation() error {
+	msg := c.craftPfcpAssociationReleaseRequest()
+
+	err := c.sendMsg(msg)
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.PeekNextResponse(5)
+	if err != nil {
+		return err
+	}
+
+	if _, ok := resp.(*message.AssociationReleaseResponse); !ok {
+		return errors.New(fmt.Sprintf("received unexpected message: %v", resp.MessageTypeName()))
+	}
+
+	if c.cancelHeartbeats != nil {
+		c.cancelHeartbeats()
+	}
+	c.setAssociationAlive(false)
 
 	return nil
 }
