@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/pborman/getopt/v2"
@@ -16,57 +17,291 @@ import (
 )
 
 // Global vars
-// TODO refactor. Try to make global vars local vars.
 
 var (
-	log                    *logrus.Logger
-	upfAddress             net.IP
-	localAddress           net.IP
-	semaphore              chan struct{}
-	sequenceNumber         uint32
-	associationEstablished bool
-	UdpConnection          *net.UDPConn
-	inputFile              string
+	log               *logrus.Logger
+	remotePeerAddress net.IP
+	localAddress      net.IP
+	inputFile         string
+	once              sync.Once
+
+	globalMockSmf *MockSMF
 )
 
-// End of global vars
+func getLoggerInstance() *logrus.Logger {
+	// setting global logging instance
+	once.Do(func() {
+		log = logrus.New()
+	})
+	return log
+}
+
+func setLogLevel(level logrus.Level) {
+	log.SetLevel(level)
+}
 
 const (
 	HEARTBEAT_PERIOD   = 5 // in seconds
 	PFCP_PROTOCOL_PORT = 8805
 )
 
-// IFace contains the network interface card name and address
-type IFace struct {
-	Name string
-	IP   net.IP
+type MockSMF struct {
+	seqLock        *sync.Mutex
+	sequenceNumber uint32
+
+	associationEstablished bool
+
+	remotePeerAddress net.IP
+	localAddress      net.IP
+	UdpConnection     *net.UDPConn
+	recvChannel       chan message.Message
+	heartbeatChannel  chan message.HeartbeatResponse
+
+	log *logrus.Logger
+
+	ctx              context.Context
+	cancelHeartbeats context.CancelFunc
+	cancelRecv       context.CancelFunc
+}
+
+func NewMockSMF(rAddr net.IP, lAddr net.IP, logger *logrus.Logger) *MockSMF {
+	if logger == nil {
+		logger = new(logrus.Logger)
+	}
+
+	return &MockSMF{
+		remotePeerAddress:      rAddr,
+		localAddress:           lAddr,
+		seqLock:                new(sync.Mutex),
+		sequenceNumber:         0,
+		associationEstablished: false,
+		ctx:                    context.Background(),
+		log:                    getLoggerInstance(),
+		recvChannel:            make(chan message.Message),
+		heartbeatChannel:       make(chan message.HeartbeatResponse),
+	}
+}
+
+func (m *MockSMF) DisconnectAndClose() {
+	m.cancelHeartbeats()
+	m.cancelRecv()
+	err := m.UdpConnection.Close()
+	if err != nil {
+		log.Errorf("Error while closing connection to remote peer: %v", err)
+		return
+	}
+}
+
+func (m *MockSMF) Connect() {
+	udpAddr := fmt.Sprintf("%s:%v", m.remotePeerAddress.String(), PFCP_PROTOCOL_PORT)
+	m.log.Infof("Start connection to %v", udpAddr)
+
+	rAddr, err := net.ResolveUDPAddr("udp", udpAddr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	//lAddr := &net.UDPAddr{IP: m.localAddress}
+	lAddr := &net.UDPAddr{IP: net.ParseIP("127.0.0.1")} // FIXME DEBUG
+	m.UdpConnection, err = net.DialUDP("udp", lAddr, rAddr)
+	if err != nil {
+		m.log.Fatal(err)
+	}
+	m.log.Debugf("Connected to %v", m.UdpConnection.RemoteAddr())
+
+	ctx, cancelFunc := context.WithCancel(m.ctx)
+	m.cancelRecv = cancelFunc
+	go m.recv(ctx)
+}
+
+func (m *MockSMF) getSequenceNumber(reset bool) uint32 {
+	m.seqLock.Lock()
+
+	m.sequenceNumber++
+	if reset {
+		m.sequenceNumber = 0
+	}
+
+	m.seqLock.Unlock()
+
+	return m.sequenceNumber
+}
+
+func (m *MockSMF) sendData(data []byte) error {
+	_, err := m.UdpConnection.Write(data)
+	if err != nil {
+		m.log.Errorf("Error while sending data to socket: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func (m *MockSMF) recv(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			buffer := make([]byte, 1500)
+
+			n, _, err := m.UdpConnection.ReadFromUDP(buffer)
+			if err != nil {
+				m.log.Errorf("Error on read from connection: %v", err)
+				continue
+			}
+			msg, err := message.Parse(buffer[:n])
+			if err != nil {
+				m.log.Errorf("Error while parsing pfcp message: %v", err)
+				continue
+			}
+
+			if hbResponse, ok := msg.(*message.HeartbeatResponse); ok {
+				m.heartbeatChannel <- *hbResponse
+			} else {
+				m.recvChannel <- msg
+			}
+		}
+	}
+}
+
+func (m *MockSMF) SetupPfcpAssociation() {
+	assoRequest, _ := craftPfcpAssociationSetupRequest(m.remotePeerAddress, m.getSequenceNumber(true)).Marshal()
+
+	err := m.sendData(assoRequest)
+	if err != nil {
+		m.log.Errorf("Error while sending association request: %v", err)
+	}
+
+	response := m.recvWithTimeout(2)
+
+	if response.MessageType() != message.MsgTypeAssociationSetupResponse {
+		m.log.Errorf("Received unexpected type of message: %v", response.MessageTypeName())
+		return
+	}
+
+	log.Infof("Established PFCP association to %v", m.remotePeerAddress)
+	m.associationEstablished = true
+
+	ctx, cancelFunc := context.WithCancel(m.ctx)
+	m.cancelHeartbeats = cancelFunc
+	go m.startPfcpHeartbeats(ctx)
+}
+
+func (m *MockSMF) recvWithTimeout(timeout time.Duration) message.Message {
+	select {
+	case msg := <-m.recvChannel:
+		// TODO should I filter here? what if we intercept a message that is not the one we're interested in? e.g. heartbeat
+		return msg
+	case <-time.After(timeout * time.Second):
+		m.log.Errorf("Timeout reached while waiting for response")
+		return nil
+	}
+}
+
+func (m *MockSMF) recvHeartbeatWithTimeout(timeout time.Duration) *message.HeartbeatResponse {
+	select {
+	case msg := <-m.heartbeatChannel:
+		return &msg
+	case <-time.After(timeout * time.Second):
+		m.log.Errorf("Timeout reached while waiting for response")
+		return nil
+	}
+}
+
+func (m *MockSMF) TeardownPfcpAssociation() {
+	data, err := craftPfcpAssociationReleaseRequest(m.remotePeerAddress).Marshal()
+	if err != nil {
+		m.log.Errorf("Error marshalling association release request: %v", err)
+		return
+	}
+
+	err = m.sendData(data)
+	if err != nil {
+		m.log.Errorf("Error while sending data: %v", err)
+	}
+
+	response := m.recvWithTimeout(2)
+	if response == nil {
+		m.log.Errorf("Error while tearing down PFCP association: did not receive any message")
+		return
+	}
+	if response.MessageType() != message.MsgTypeAssociationReleaseResponse {
+		m.log.Errorf("Error while tearing down PFCP association. Received unexpected msg. Type: %v",
+			response.MessageTypeName())
+		return
+	}
+
+	m.cancelHeartbeats()
+
+	// TODO active_sessions.clear()
+	log.Infoln("Association removed.")
+	m.setAssociationEstablished(false)
+}
+
+func (m *MockSMF) setAssociationEstablished(value bool) {
+	m.associationEstablished = value
+}
+
+func (m *MockSMF) startPfcpHeartbeats(ctx context.Context) {
+
+	period := HEARTBEAT_PERIOD * time.Second
+	ticker := time.NewTicker(period)
+
+	ctx, cancelFunc := context.WithCancel(m.ctx)
+	m.cancelHeartbeats = cancelFunc
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			select {
+			case <-ticker.C:
+				var localAddress net.IP = nil // FIXME recover local address
+				seq := m.getSequenceNumber(false)
+
+				hbreq := message.NewHeartbeatRequest(
+					seq,
+					ie.NewRecoveryTimeStamp(time.Now()),
+					ie.NewSourceIPAddress(localAddress, nil, 0),
+				)
+
+				reqBytes, err := hbreq.Marshal()
+				if err != nil {
+					m.log.Fatalf("could not marshal heartbeat request: %v", err)
+				}
+
+				err = m.sendData(reqBytes)
+				if err != nil {
+					m.log.Fatalf("could not send data: %v", err)
+				}
+
+				response := m.recvHeartbeatWithTimeout(2 * HEARTBEAT_PERIOD) //FIXME
+				if response == nil {
+					m.log.Errorf("Did not receive any heartbeat response")
+					m.setAssociationEstablished(false)
+					m.cancelHeartbeats()
+				}
+
+				m.setAssociationEstablished(true)
+
+			}
+		}
+	}
 }
 
 func init() {
 	// Initializing global vars
-	log = logrus.New()
-	upfAddress = nil
+	log = getLoggerInstance()
+	remotePeerAddress = nil
 	localAddress = nil
-	semaphore = make(chan struct{}, 1) // binary semaphore guarding sequenceNumber
-	sequenceNumber = 0
-	associationEstablished = false
-	UdpConnection = nil
 	inputFile = ""
+	globalMockSmf = &MockSMF{} // Empty struct
 }
 
-func getSequenceNumber(reset bool) uint32 {
-	semaphore <- struct{}{} // Acquire lock
-	if reset {
-		sequenceNumber = 0
-	}
-	seq := sequenceNumber
-
-	<-semaphore // Release lock
-
-	return seq
-}
-
-func getIfaceAddress(interfaceName string) (*IFace, error) {
+// Retrieves the IP associated with interfaceName. returns error if something goes wrong.
+func getIfaceAddress(interfaceName string) (net.IP, error) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		log.Errorf("could not retrieve network interfaces: %v", err)
@@ -85,10 +320,7 @@ func getIfaceAddress(interfaceName string) (*IFace, error) {
 			case *net.IPNet:
 				log.Debugf("Ifaces: %v : %s (%s)\n", i.Name, iface, iface.IP.DefaultMask())
 				if strings.Contains(i.Name, interfaceName) {
-					return &IFace{
-						Name: i.Name,
-						IP:   iface.IP,
-					}, nil
+					return iface.IP, nil
 				}
 			}
 		}
@@ -97,115 +329,27 @@ func getIfaceAddress(interfaceName string) (*IFace, error) {
 	return nil, errors.New("could not find a correct interface")
 }
 
-// recvHandler method is responsible for receiving pfcp message responses. The
-// responses are sent through inbound channel.
-func recvHandler(wg *sync.WaitGroup, msgType uint8) {
-	defer wg.Done()
-	done := false
+func craftPfcpAssociationReleaseRequest(address net.IP) *message.AssociationReleaseRequest {
+	ie1 := ie.NewNodeID(address.String(), "", "")
 
-	for !done {
-		buffer := make([]byte, 1500)
-		n, _, err := UdpConnection.ReadFromUDP(buffer)
-		if err != nil {
-			log.Errorf("Error on read: %v", err)
-			continue
-		}
-		msg, err := message.Parse(buffer[:n])
-		if err != nil {
-			log.Errorf("Error while parsing pfcp message: %v", err)
-		}
-
-		switch msg.MessageType() {
-		case msgType:
-			log.Infof("Received expected msg: %v", msg.MessageTypeName())
-		default:
-			done = true
-			log.Errorf("ERROR Received unexpected message: %v", msg.MessageTypeName())
-		}
-	}
+	return message.NewAssociationReleaseRequest(0, ie1)
 }
 
-func sendData(data []byte) error {
-	_, err := UdpConnection.Write(data)
-	if err != nil {
-		log.Errorf("Error while sending data to socket: %v", err)
-		return err
-	}
-
-	return nil
-}
-
-func craftPfcpAssociationSetupRequest(address net.IP) *message.AssociationSetupRequest {
+func craftPfcpAssociationSetupRequest(address net.IP, seq uint32) *message.AssociationSetupRequest {
 	ie1 := ie.NewNodeID(address.String(), "", "")
 	ie2 := ie.NewRecoveryTimeStamp(time.Now())
-
-	var seq uint32 = 0 // Should be 0 when initializing new association. TODO reset global sequence_num
 
 	request := message.NewAssociationSetupRequest(seq, ie1, ie2)
 
 	return request
 }
 
-func setup_association() {
-	wg := new(sync.WaitGroup)
-	assoRequest, _ := craftPfcpAssociationSetupRequest(upfAddress).Marshal()
-	err := sendData(assoRequest)
-	if err != nil {
-		log.Errorf("Error while sending association request: %v", err)
-		return
-	}
-
-	wg.Add(1)
-	go recvHandler(wg, message.MsgTypeAssociationSetupResponse) // start response handler on new goroutine
-
-	wg.Wait()
-}
-
-func startPfcpHeartbeats(wg *sync.WaitGroup, quitCh chan struct{}) {
-	defer wg.Done()
-	period := 1 * time.Second
-	ticker := time.NewTicker(period)
-	log.Debugf("Started PFCP heartbeat goroutine. Sending msgs every: %s seconds", period)
-
-	seq := getSequenceNumber(false)
-
-	go recvHandler(wg, message.MsgTypeHeartbeatResponse) // start receiving
-
-	for {
-		select {
-		case <-ticker.C:
-			// TODO send heartbeat messages
-			hbreq := message.NewHeartbeatRequest(
-				seq,
-				ie.NewRecoveryTimeStamp(time.Now()),
-				ie.NewSourceIPAddress(upfAddress, nil, 0),
-			)
-
-			hbreq.Header.SequenceNumber = seq // FIXME check this
-
-			reqBytes, err := hbreq.Marshal()
-			if err != nil {
-				log.Fatalf("could not marshal heartbeat request: %v", err)
-			}
-
-			err = sendData(reqBytes)
-			if err != nil {
-				log.Fatalf("could not send data: %v", err)
-			}
-
-		case <-quitCh:
-			log.Debug("Stopping PFCP heartbeat goroutine")
-			ticker.Stop()
-			return
-		}
-	}
-}
-
 func parseArgs() {
 	//inputFile := getopt.StringLong("input-file", 'i', "", "File to poll for input commands. Default is stdin")
 	//outputFile := getopt.StringLong("output-file", 'o', "", "File in which to write output. Default is stdout")
-	upfAddr := getopt.StringLong("upfaddr", 'a', "", "Address of the UPF")
-	verbosity := getopt.BoolLong("verbose", 'v', "", "Set verbosity level")
+	upfAddr := getopt.StringLong("upfaddr", 'a', "", "Address of the remote peer (e.g. UPF)")
+	verbosity := getopt.BoolLong("verbose", 'v', "Set verbosity level")
+	interfaceName := getopt.StringLong("interface", 'i', "Set interface name to discover local address")
 	optHelp := getopt.BoolLong("help", 0, "Help")
 
 	getopt.Parse()
@@ -216,46 +360,34 @@ func parseArgs() {
 
 	// Flag checks
 	if *verbosity {
-		log.Level = logrus.DebugLevel
-		log.Debug("verbosity level set.")
+		setLogLevel(logrus.DebugLevel)
+		log.Info("verbosity level set.")
 	}
 
-	upfAddress = net.ParseIP(*upfAddr)
-	if upfAddress == nil {
+	remotePeerAddress = net.ParseIP(*upfAddr)
+	if remotePeerAddress == nil {
 		log.Fatalf("could not parse upf address")
 	}
 
-}
-
-// Set global connection to PFCP peer provided address
-func connect(address net.IP) {
-	udpAddr := fmt.Sprintf("%s:%v", address.String(), PFCP_PROTOCOL_PORT)
-	log.Debugf("Start connection to %v", udpAddr)
-
-	rAddr, err := net.ResolveUDPAddr("udp", udpAddr)
+	var err error = nil
+	localAddress, err = getIfaceAddress(*interfaceName)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error while retriving interface informations: %v", err)
 	}
-
-	var lAddr *net.UDPAddr = nil // FIXME debug purpose. set local address when using remote connections.
-	conn, err := net.DialUDP("udp", lAddr, rAddr)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Debugf("Connected to %v", conn.RemoteAddr())
-	associationEstablished = true
-	UdpConnection = conn
 
 }
 
 func readInput(input chan<- int) {
+	//inputFile = "commands.txt" //FIXME DEBUG
+
 	if inputFile != "" {
 		// Set inputFile as stdIn
 
 		oldStdin := os.Stdin
 		defer func() {
+			// restore StdIN
 			os.Stdin = oldStdin
-		}() // restore old StdIN
+		}()
 
 		f, err := os.Open(inputFile)
 		if err != nil {
@@ -277,9 +409,9 @@ func readInput(input chan<- int) {
 		_, err := fmt.Scanf("%d\n", &u)
 		if err != nil {
 			if err == io.EOF {
-				return
+				break
 			} else {
-				panic(err)
+				log.Debugf("Skipping bad entry: %v", err)
 			}
 		}
 		input <- u
@@ -292,23 +424,33 @@ func handleUserInput() {
 	go readInput(userInput)
 
 	for !done {
-		fmt.Println("Enter answer ")
+		fmt.Println("1. Teardown Association")
+		fmt.Println("2. Setup Association")
+		fmt.Print("Enter service: ")
 
 		select {
 		case userAnswer := <-userInput:
-			if userAnswer == 1 {
-				fmt.Println("Correct answer:", userAnswer)
-			} else {
-				fmt.Println("Wrong answer")
+			switch userAnswer {
+			case 1:
+				log.Infof("Selected Teardown Association: %v", userAnswer)
+				globalMockSmf.TeardownPfcpAssociation()
+			case 2:
+				log.Infoln("Selected Setup Association: %v", userAnswer)
+				globalMockSmf.SetupPfcpAssociation()
+
+			default:
+				fmt.Println("Not implemented or wrong answer")
 			}
-		case <-time.After(5 * time.Second):
-			done = true
-			fmt.Println("\n Time is over!")
+
+			//case <-time.After(10 * time.Second):
+			//	done = true
+			//	fmt.Println("\n DEBUG: Time is over!")
 		}
 	}
 }
 
 func server(wg *sync.WaitGroup, quitCh chan struct{}) {
+	// Emulates User-plane N4
 	defer wg.Done()
 	laddr, err := net.ResolveUDPAddr("udp", "localhost:8805")
 	if err != nil {
@@ -341,32 +483,72 @@ func server(wg *sync.WaitGroup, quitCh chan struct{}) {
 				continue
 			}
 
-			hbreq, ok := msg.(*message.HeartbeatRequest)
-			if !ok {
-				log.Printf("Server: got unexpected message: %s, from: %s", msg.MessageTypeName(), addr)
-				continue
-			}
+			switch msg.MessageType() {
+			case message.MsgTypeHeartbeatRequest:
+				hbreq, ok := msg.(*message.HeartbeatRequest)
+				if !ok {
+					log.Printf("Server: got unexpected message: %s, from: %s", msg.MessageTypeName(), addr)
+					continue
+				}
+				ts, err := hbreq.RecoveryTimeStamp.RecoveryTimeStamp()
+				if err != nil {
+					log.Printf("Server: got Heartbeat Request with invalid TS: %s, from: %s", err, addr)
+					continue
+				} else {
+					log.Printf("Server: got Heartbeat Request with TS: %s, from: %s", ts, addr)
+				}
+				// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
+				hbres, err := message.NewHeartbeatResponse(seq, ie.NewRecoveryTimeStamp(time.Now())).Marshal()
+				if err != nil {
+					log.Fatal(err)
+				}
+				seq++
 
-			ts, err := hbreq.RecoveryTimeStamp.RecoveryTimeStamp()
-			if err != nil {
-				log.Printf("Server: got Heartbeat Request with invalid TS: %s, from: %s", err, addr)
-				continue
-			} else {
-				log.Printf("Server: got Heartbeat Request with TS: %s, from: %s", ts, addr)
-			}
+				if _, err := conn.WriteTo(hbres, addr); err != nil {
+					log.Fatal(err)
+				}
+				log.Printf("Server: sent Heartbeat Response to: %s", addr)
 
-			// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
-			hbres, err := message.NewHeartbeatResponse(seq, ie.NewRecoveryTimeStamp(time.Now())).Marshal()
-			if err != nil {
-				log.Fatal(err)
-			}
-			seq++
+			case message.MsgTypeAssociationSetupRequest:
+				assoRequest, ok := msg.(*message.AssociationSetupRequest)
+				if !ok {
+					log.Printf("Server: got unexpected message: %s, from: %s", assoRequest.MessageTypeName(), addr)
+					continue
+				}
+				seq++
 
-			if _, err := conn.WriteTo(hbres, addr); err != nil {
-				log.Fatal(err)
-			}
+				assoResponse, err := message.NewAssociationSetupResponse(seq).Marshal() // FIXME add IEs
+				if err != nil {
+					log.Errorf("Error while marshaling association response: %v", err)
+				}
 
-			log.Printf("Server: sent Heartbeat Response to: %s", addr)
+				if _, err := conn.WriteTo(assoResponse, addr); err != nil {
+					log.Fatal(err)
+				}
+				log.Printf("Server: sent Association Response to: %s", addr)
+
+			case message.MsgTypeAssociationReleaseRequest:
+				assoReleaseRequest, ok := msg.(*message.AssociationReleaseRequest)
+				if !ok {
+					log.Infof("Server: got unexpected message: %s, from: %s", assoReleaseRequest.MessageTypeName(), addr)
+					continue
+				}
+				seq = 0
+
+				cause := ie.NewCause(ie.CauseRequestAccepted)
+				ts := ie.NewRecoveryTimeStamp(time.Now())
+				releaseResponse, err := message.NewAssociationReleaseResponse(seq, cause, ts).Marshal() // FIXME add IEs
+				if err != nil {
+					log.Errorf("Error while marshaling association response: %v", err)
+				}
+
+				if _, err := conn.WriteTo(releaseResponse, addr); err != nil {
+					log.Fatal(err)
+				}
+				log.Infof("Server: sent Association Release Response to: %s", addr)
+				log.Infof("Server: Association removed.")
+			} // end of switch
+
 		}
 	}
 }
@@ -378,19 +560,17 @@ func main() {
 
 	wg.Add(1)
 	go server(wg, quitCh) // start emulating server for debug.
+	time.Sleep(500 * time.Millisecond)
 
 	parseArgs()
 
-	connect(upfAddress) // set global connection
-
-	wg.Add(1)
-	go startPfcpHeartbeats(wg, quitCh)
-
-	time.Sleep(3 * time.Second)
-	quitCh <- struct{}{} // stops pfcpheartbeat and server goroutine
+	globalMockSmf = NewMockSMF(remotePeerAddress, localAddress, log)
+	globalMockSmf.Connect()
+	globalMockSmf.SetupPfcpAssociation()
 
 	handleUserInput()
 
+	globalMockSmf.DisconnectAndClose()
 	wg.Wait() // wait for all go-routine before shutting down
 
 	//// FIXME how to return default interface connected to internet without passing iface name?
