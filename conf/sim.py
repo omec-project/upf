@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # SPDX-License-Identifier: Apache-2.0
-# Copyright(c) 2019 Intel Corporation
+# Copyright 2019 Intel Corporation
 
 from scapy.contrib.gtp import *
 from scapy.all import *

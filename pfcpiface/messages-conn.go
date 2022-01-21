@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright(c) 2021 Intel Corporation
+// Copyright 2021 Intel Corporation
 
 package main
 
@@ -58,6 +58,9 @@ func (pConn *PFCPConn) handleHeartbeatRequest(msg message.Message) (message.Mess
 	if !ok {
 		return nil, errUnmarshal(errMsgUnexpectedType)
 	}
+
+	// reset heartbeat expiry timer
+	pConn.hbReset <- struct{}{}
 
 	// TODO: Check and update remote recovery timestamp
 
