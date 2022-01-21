@@ -17,26 +17,25 @@ import (
 )
 
 // Global vars
-
 var (
 	log               *logrus.Logger
 	remotePeerAddress net.IP
 	localAddress      net.IP
 	inputFile         string
-	once              sync.Once
+	doOnce            sync.Once
 
 	globalMockSmf *MockSMF
 )
 
-func getLoggerInstance() *logrus.Logger {
+func GetLoggerInstance() *logrus.Logger {
 	// setting global logging instance
-	once.Do(func() {
+	doOnce.Do(func() {
 		log = logrus.New()
 	})
 	return log
 }
 
-func setLogLevel(level logrus.Level) {
+func SetLogLevel(level logrus.Level) {
 	log.SetLevel(level)
 }
 
@@ -45,11 +44,23 @@ const (
 	PFCP_PROTOCOL_PORT = 8805
 )
 
+type Session struct {
+	ourSeid uint64
+
+	ueAddress net.IP
+	peerSeid  uint64
+	//sentPdrs  map[int]ie.IE
+	//sentFars  map[int]ie.IE
+	//sentQers map[int]ie.IE
+}
+
 type MockSMF struct {
 	seqLock        *sync.Mutex
 	sequenceNumber uint32
 
 	associationEstablished bool
+
+	activeSessions map[int]Session
 
 	remotePeerAddress net.IP
 	localAddress      net.IP
@@ -75,8 +86,9 @@ func NewMockSMF(rAddr net.IP, lAddr net.IP, logger *logrus.Logger) *MockSMF {
 		seqLock:                new(sync.Mutex),
 		sequenceNumber:         0,
 		associationEstablished: false,
+		activeSessions:         make(map[int]Session),
 		ctx:                    context.Background(),
-		log:                    getLoggerInstance(),
+		log:                    GetLoggerInstance(),
 		recvChannel:            make(chan message.Message),
 		heartbeatChannel:       make(chan message.HeartbeatResponse),
 	}
@@ -101,8 +113,8 @@ func (m *MockSMF) Connect() {
 		log.Fatal(err)
 	}
 
-	//lAddr := &net.UDPAddr{IP: m.localAddress}
-	lAddr := &net.UDPAddr{IP: net.ParseIP("127.0.0.1")} // FIXME DEBUG
+	lAddr := &net.UDPAddr{IP: m.localAddress}
+	//lAddr := &net.UDPAddr{IP: net.ParseIP("127.0.0.1")} // FIXME DEBUG
 	m.UdpConnection, err = net.DialUDP("udp", lAddr, rAddr)
 	if err != nil {
 		m.log.Fatal(err)
@@ -135,6 +147,20 @@ func (m *MockSMF) sendData(data []byte) error {
 	}
 
 	return nil
+}
+
+func (m *MockSMF) createSession() {
+	lastIndex := len(m.activeSessions) - 1
+	lastSeid := m.activeSessions[lastIndex].ourSeid // get last ourSeid to generate new one
+	newSeid := lastSeid + 1
+
+	sess := Session{
+		ourSeid:   newSeid,
+		ueAddress: nil, // TODO Where to get UE-Address?
+		peerSeid:  0,   // TODO Where to get peer SEID? Association Response?
+	}
+
+	m.activeSessions[lastIndex+1] = sess
 }
 
 func (m *MockSMF) recv(ctx context.Context) {
@@ -234,9 +260,11 @@ func (m *MockSMF) TeardownPfcpAssociation() {
 
 	m.cancelHeartbeats()
 
-	// TODO active_sessions.clear()
-	log.Infoln("Association removed.")
+	// clear sessions
+	m.activeSessions = make(map[int]Session)
 	m.setAssociationEstablished(false)
+	log.Infoln("Association removed.")
+
 }
 
 func (m *MockSMF) setAssociationEstablished(value bool) {
@@ -255,45 +283,41 @@ func (m *MockSMF) startPfcpHeartbeats(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		default:
-			select {
-			case <-ticker.C:
-				var localAddress net.IP = nil // FIXME recover local address
-				seq := m.getSequenceNumber(false)
+		case <-ticker.C:
+			var localAddress net.IP = nil // FIXME recover local address
+			seq := m.getSequenceNumber(false)
 
-				hbreq := message.NewHeartbeatRequest(
-					seq,
-					ie.NewRecoveryTimeStamp(time.Now()),
-					ie.NewSourceIPAddress(localAddress, nil, 0),
-				)
+			hbreq := message.NewHeartbeatRequest(
+				seq,
+				ie.NewRecoveryTimeStamp(time.Now()),
+				ie.NewSourceIPAddress(localAddress, nil, 0),
+			)
 
-				reqBytes, err := hbreq.Marshal()
-				if err != nil {
-					m.log.Fatalf("could not marshal heartbeat request: %v", err)
-				}
-
-				err = m.sendData(reqBytes)
-				if err != nil {
-					m.log.Fatalf("could not send data: %v", err)
-				}
-
-				response := m.recvHeartbeatWithTimeout(2 * HEARTBEAT_PERIOD) //FIXME
-				if response == nil {
-					m.log.Errorf("Did not receive any heartbeat response")
-					m.setAssociationEstablished(false)
-					m.cancelHeartbeats()
-				}
-
-				m.setAssociationEstablished(true)
-
+			reqBytes, err := hbreq.Marshal()
+			if err != nil {
+				m.log.Fatalf("could not marshal heartbeat request: %v", err)
 			}
+
+			err = m.sendData(reqBytes)
+			if err != nil {
+				m.log.Fatalf("could not send data: %v", err)
+			}
+
+			response := m.recvHeartbeatWithTimeout(2 * HEARTBEAT_PERIOD) //FIXME
+			if response == nil {
+				m.log.Errorf("Did not receive any heartbeat response")
+				m.setAssociationEstablished(false)
+				m.cancelHeartbeats()
+			}
+
+			m.setAssociationEstablished(true)
 		}
 	}
 }
 
 func init() {
 	// Initializing global vars
-	log = getLoggerInstance()
+	log = GetLoggerInstance()
 	remotePeerAddress = nil
 	localAddress = nil
 	inputFile = ""
@@ -344,6 +368,24 @@ func craftPfcpAssociationSetupRequest(address net.IP, seq uint32) *message.Assoc
 	return request
 }
 
+func craftPfcpSessionEstRequest(address net.IP, seq uint32, Seid uint64) *message.SessionEstablishmentRequest {
+	IEnodeID := ie.NewNodeID(address.String(), "", "")
+
+	fseidIE := craftFseid(address, Seid)
+	return message.NewSessionEstablishmentRequest(
+		0,
+		0,
+		0,
+		seq,
+		0,
+		fseidIE,
+		IEnodeID)
+}
+
+func craftFseid(address net.IP, seid uint64) *ie.IE {
+	return ie.NewFSEID(seid, address, nil)
+}
+
 func parseArgs() {
 	//inputFile := getopt.StringLong("input-file", 'i', "", "File to poll for input commands. Default is stdin")
 	//outputFile := getopt.StringLong("output-file", 'o', "", "File in which to write output. Default is stdout")
@@ -360,7 +402,7 @@ func parseArgs() {
 
 	// Flag checks
 	if *verbosity {
-		setLogLevel(logrus.DebugLevel)
+		SetLogLevel(logrus.DebugLevel)
 		log.Info("verbosity level set.")
 	}
 
@@ -426,6 +468,7 @@ func handleUserInput() {
 	for !done {
 		fmt.Println("1. Teardown Association")
 		fmt.Println("2. Setup Association")
+		fmt.Println("3. Create Session ")
 		fmt.Print("Enter service: ")
 
 		select {
@@ -566,7 +609,6 @@ func main() {
 
 	globalMockSmf = NewMockSMF(remotePeerAddress, localAddress, log)
 	globalMockSmf.Connect()
-	globalMockSmf.SetupPfcpAssociation()
 
 	handleUserInput()
 
