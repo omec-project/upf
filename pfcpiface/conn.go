@@ -173,12 +173,25 @@ func (pConn *PFCPConn) setLocalNodeID(id string) {
 
 // Serve serves forever a single PFCP peer.
 func (pConn *PFCPConn) Serve() {
-	go func() {
+	connClosed := make(chan struct{}, 1)
+	go func(connClosed chan struct{}) {
 		recvBuf := make([]byte, 65507) // Maximum UDP payload size
 
 		for {
+			err := pConn.SetReadDeadline(time.Now().Add(pConn.upf.readTimeout))
+			if err != nil {
+				log.Errorf("failed to set read timeout: %v", err)
+			}
+
 			n, err := pConn.Read(recvBuf)
 			if err != nil {
+				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+					log.Infof("Read timeout received for connection: %v<->%v",
+						pConn.LocalAddr(), pConn.RemoteAddr())
+					connClosed <- struct{}{}
+					return
+				}
+
 				if errors.Is(err, net.ErrClosed) {
 					return
 				}
@@ -189,12 +202,15 @@ func (pConn *PFCPConn) Serve() {
 			buf := append([]byte{}, recvBuf[:n]...)
 			pConn.HandlePFCPMsg(buf)
 		}
-	}()
+	}(connClosed)
 
 	// TODO: Sender goroutine
 
 	for {
 		select {
+		case <-connClosed:
+			pConn.Shutdown()
+			return
 		case <-pConn.ctx.Done():
 			pConn.Shutdown()
 			return
