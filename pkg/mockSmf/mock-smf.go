@@ -23,6 +23,7 @@ var (
 	localAddress      net.IP
 	inputFile         string
 	doOnce            sync.Once
+	sessionCount      int
 
 	globalMockSmf *MockSMF
 )
@@ -389,9 +390,10 @@ func craftFseid(address net.IP, seid uint64) *ie.IE {
 func parseArgs() {
 	//inputFile := getopt.StringLong("input-file", 'i', "", "File to poll for input commands. Default is stdin")
 	//outputFile := getopt.StringLong("output-file", 'o', "", "File in which to write output. Default is stdout")
-	upfAddr := getopt.StringLong("upfaddr", 'a', "", "Address of the remote peer (e.g. UPF)")
+	upfAddr := getopt.StringLong("remoteAddress", 'r', "", "Address of the remote peer (e.g. UPF)")
 	verbosity := getopt.BoolLong("verbose", 'v', "Set verbosity level")
 	interfaceName := getopt.StringLong("interface", 'i', "Set interface name to discover local address")
+	sessionCnt := getopt.IntLong("session-count", 's', 1, "Set the amount of sessions to create")
 	optHelp := getopt.BoolLong("help", 0, "Help")
 
 	getopt.Parse()
@@ -406,9 +408,14 @@ func parseArgs() {
 		log.Info("verbosity level set.")
 	}
 
+	if *sessionCnt < 0 {
+		log.Fatalf("session count cannot be a negative number.")
+	}
+	sessionCount = *sessionCnt
+
 	remotePeerAddress = net.ParseIP(*upfAddr)
 	if remotePeerAddress == nil {
-		log.Fatalf("could not parse upf address")
+		log.Fatalf("could not parse remote peer address")
 	}
 
 	var err error = nil
@@ -482,7 +489,7 @@ func handleUserInput() {
 				globalMockSmf.SetupPfcpAssociation()
 
 			default:
-				fmt.Println("Not implemented or wrong answer")
+				fmt.Println("Not implemented or bad entry")
 			}
 
 			//case <-time.After(10 * time.Second):
