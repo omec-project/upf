@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: Apache-2.0
- * Copyright(c) 2021 Open Networking Foundation
+ * Copyright 2021 Open Networking Foundation
  */
 
 #include "flow_measure.h"

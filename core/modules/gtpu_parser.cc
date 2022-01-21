@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: Apache-2.0
- * Copyright(c) 2019 Intel Corporation
+ * Copyright 2019 Intel Corporation
  */
 /* for GTP parser */
 #include "gtpu_parser.h"

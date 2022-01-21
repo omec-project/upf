@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright(c) 2020 Intel Corporation
+// Copyright 2020 Intel Corporation
 
 package main
 
@@ -60,7 +60,10 @@ type PFCPConn struct {
 	shutdown chan struct{}
 
 	metrics.InstrumentPFCP
+
+	hbReset     chan struct{}
 	hbCtxCancel context.CancelFunc
+
 	pendingReqs sync.Map
 }
 
@@ -74,26 +77,28 @@ func (pConn *PFCPConn) startHeartBeatMonitor() {
 	hbCtx, hbCancel := context.WithCancel(pConn.ctx)
 	pConn.hbCtxCancel = hbCancel
 
-	log.Infoln("Starting Heartbeat timer")
+	log.WithFields(log.Fields{
+		"interval": pConn.upf.hbInterval,
+	}).Infoln("Starting Heartbeat timer")
 
-	heartBeatTimer := time.NewTimer(pConn.upf.hbInterval)
+	heartBeatExpiryTimer := time.NewTicker(pConn.upf.hbInterval)
 
 	for {
 		select {
 		case <-hbCtx.Done():
 			log.Infoln("Cancel HeartBeat Timer", pConn.RemoteAddr().String())
-			return
+			heartBeatExpiryTimer.Stop()
 
-		case <-heartBeatTimer.C:
+			return
+		case <-pConn.hbReset:
+			heartBeatExpiryTimer.Reset(pConn.upf.hbInterval)
+		case <-heartBeatExpiryTimer.C:
 			log.Traceln("HeartBeat Interval Timer Expired", pConn.RemoteAddr().String())
 
 			r := pConn.getHeartBeatRequest()
 
-			reply, timeout := pConn.sendPFCPRequestMessage(r)
-
-			if reply != nil {
-				heartBeatTimer = time.NewTimer(pConn.upf.hbInterval)
-			} else if timeout {
+			if _, timeout := pConn.sendPFCPRequestMessage(r); timeout {
+				heartBeatExpiryTimer.Stop()
 				pConn.Shutdown()
 			}
 		}
@@ -127,6 +132,7 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 		done:           node.pConnDone,
 		shutdown:       make(chan struct{}),
 		InstrumentPFCP: node.metrics,
+		hbReset:        make(chan struct{}, 100),
 		hbCtxCancel:    nil,
 	}
 

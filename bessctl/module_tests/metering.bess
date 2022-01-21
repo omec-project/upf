@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright(c) 2021 Intel Corporation
+# Copyright 2021 Intel Corporation
 
 # Update assignments to hit different QoS entries
 iface, qer, fseid = 1, 2, 4
