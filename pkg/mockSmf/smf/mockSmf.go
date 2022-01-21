@@ -26,26 +26,50 @@ type MockSMF struct {
 	client *pfcpsim.PFCPClient
 }
 
-func NewMockSMF(lAddr net.IP, logger *logrus.Logger) *MockSMF {
+func NewMockSMF(lAddr string, logger *logrus.Logger) *MockSMF {
 	if logger == nil {
 		logger = new(logrus.Logger)
 	}
 
-	pfcpClient := pfcpsim.NewPFCPClient(lAddr.String())
-
 	return &MockSMF{
 		activeSessions: make(map[int]Session),
 		log:            logger,
-		client:         pfcpClient,
+		client:         pfcpsim.NewPFCPClient(lAddr),
 	}
 }
 
 func (m *MockSMF) Disconnect() {
 	m.client.DisconnectN4()
+	m.log.Infof("PFCP client Disconnected")
+
 }
 
-func (m *MockSMF) Connect(remoteAddress string) {
-	m.client.ConnectN4(remoteAddress)
+func (m *MockSMF) Connect(remoteAddress string) error {
+	err := m.client.ConnectN4(remoteAddress)
+	if err != nil {
+		return err
+	}
+	m.log.Infof("PFCP client is connected")
+	return nil
+}
+
+func (m *MockSMF) TeardownAssociation() {
+	err := m.client.TeardownAssociation()
+	if err != nil {
+		m.log.Errorf("error while tearing down association: %v", err)
+	}
+
+	m.log.Infoln("Teardown association finished")
+
+}
+
+func (m *MockSMF) SetupAssociation() {
+	err := m.client.SetupAssociation()
+	if err != nil {
+		m.log.Errorf("error while setting up association: %v", err)
+	}
+
+	m.log.Infof("setup association completed")
 }
 
 func (m *MockSMF) createSession() {

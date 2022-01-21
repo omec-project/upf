@@ -3,7 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/omec-project/upf-epc/pkg/pfcpsim"
+	"github.com/omec-project/upf-epc/pkg/mockSmf/smf"
 	"github.com/pborman/getopt/v2"
 	"github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -25,7 +25,7 @@ var (
 	doOnce            sync.Once
 	sessionCount      int
 
-	globalMockSmf *pfcpsim.PFCPClient
+	globalMockSmf *smf.MockSMF
 )
 
 func GetLoggerInstance() *logrus.Logger {
@@ -85,11 +85,12 @@ func init() {
 	remotePeerAddress = nil
 	localAddress = nil
 	inputFile = ""
-	globalMockSmf = &pfcpsim.PFCPClient{} // Empty struct
+	globalMockSmf = &smf.MockSMF{} // Empty struct
 }
 
 // Retrieves the IP associated with interfaceName. returns error if something goes wrong.
 func getIfaceAddress(interfaceName string) (net.IP, error) {
+	// TODO simply this. it retrieves all the interfaces.
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		log.Errorf("could not retrieve network interfaces: %v", err)
@@ -120,7 +121,7 @@ func getIfaceAddress(interfaceName string) (net.IP, error) {
 func parseArgs() {
 	//inputFile := getopt.StringLong("input-file", 'i', "", "File to poll for input commands. Default is stdin")
 	outputFile := getopt.StringLong("output-file", 'o', "", "File in which to write output. Default is stdout")
-	upfAddr := getopt.StringLong("remoteAddress", 'r', "", "Address of the remote peer (e.g. UPF)")
+	peerAddr := getopt.StringLong("remoteAddress", 'r', "", "Address of the remote peer (e.g. UPF)")
 	verbosity := getopt.BoolLong("verbose", 'v', "Set verbosity level")
 	interfaceName := getopt.StringLong("interface", 'i', "Set interface name to discover local address")
 	sessionCnt := getopt.IntLong("session-count", 's', 1, "Set the amount of sessions to create, starting from 1 (included)")
@@ -139,7 +140,8 @@ func parseArgs() {
 	}
 
 	if *outputFile != "" {
-		logOutput(*outputFile)
+		fn := logOutput(*outputFile)
+		defer fn()
 	}
 
 	if *sessionCnt < 0 {
@@ -147,11 +149,11 @@ func parseArgs() {
 	}
 	sessionCount = *sessionCnt
 
-	remotePeerAddress = net.ParseIP(*upfAddr)
+	remotePeerAddress = net.ParseIP(*peerAddr)
 	if remotePeerAddress == nil {
-		address, err := net.LookupHost(*upfAddr)
+		address, err := net.LookupHost(*peerAddr)
 		if err != nil {
-			log.Fatalf("couldn't retrieve hostname or address from parameters: %s", *upfAddr)
+			log.Fatalf("couldn't retrieve hostname or address from parameters: %s", *peerAddr)
 		}
 		remotePeerAddress = net.ParseIP(address[0])
 	}
@@ -222,19 +224,13 @@ func handleUserInput() {
 			switch userAnswer {
 			case 1:
 				log.Infof("Selected Teardown Association: %v", userAnswer)
-				err := globalMockSmf.TeardownAssociation()
-				if err != nil {
-					return
-				}
+				globalMockSmf.TeardownAssociation()
 			case 2:
 				log.Infoln("Selected Setup Association: %v", userAnswer)
-				err := globalMockSmf.SetupAssociation()
-				if err != nil {
-					log.Errorf("Error while setup association: %v", err)
-				}
+				globalMockSmf.SetupAssociation()
 			case 9:
 				log.Infoln("Shutting down")
-				globalMockSmf.DisconnectN4()
+				globalMockSmf.Disconnect()
 				os.Exit(0)
 
 			default:
@@ -363,12 +359,12 @@ func main() {
 
 	parseArgs()
 
-	globalMockSmf = pfcpsim.NewPFCPClient("127.0.0.1")
-	err := globalMockSmf.ConnectN4("127.0.0.1")
+	globalMockSmf = smf.NewMockSMF("127.0.0.1", GetLoggerInstance())
+	err := globalMockSmf.Connect(remotePeerAddress.String())
 	log.Errorf("failed to connect to UPF: %v", err)
 
 	handleUserInput()
 
-	globalMockSmf.DisconnectN4()
+	globalMockSmf.Disconnect()
 	wg.Wait() // wait for all go-routine before shutting down
 }
