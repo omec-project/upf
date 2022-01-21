@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2021 Intel Corporation
+// Copyright 2021 Open Networking Foundation
 package main
 
 import (
@@ -51,9 +54,34 @@ func NewPFCPNode(ctx context.Context, upf *upf) *PFCPNode {
 	}
 }
 
+func (node *PFCPNode) tryConnectToN4Peers(lAddrStr string) {
+	for _, peer := range node.upf.peers {
+		conn, err := net.Dial("udp", peer+":"+PFCPPort)
+		if err != nil {
+			log.Warnln("Failed to establish PFCP connection to peer ", peer)
+			continue
+		}
+
+		remoteAddr := conn.RemoteAddr().(*net.UDPAddr)
+		n4DstIP := remoteAddr.IP
+
+		log.WithFields(log.Fields{
+			"SPGWC/SMF host": peer,
+			"CP node":        n4DstIP.String(),
+		}).Info("Establishing PFCP Conn with CP node")
+
+		pfcpConn := node.NewPFCPConn(lAddrStr, n4DstIP.String()+":"+PFCPPort, nil)
+		if pfcpConn != nil {
+			go pfcpConn.sendAssociationRequest()
+		}
+	}
+}
+
 func (node *PFCPNode) handleNewPeers() {
 	lAddrStr := node.LocalAddr().String()
 	log.Infoln("listening for new PFCP connections on", lAddrStr)
+
+	node.tryConnectToN4Peers(lAddrStr)
 
 	for {
 		buf := make([]byte, 1024)
@@ -103,7 +131,7 @@ func (node *PFCPNode) Serve() {
 
 			err := node.Close()
 			if err != nil {
-				log.Errorln("Error closing PFCPNode Conn", err)
+				log.Errorln("Error closing PFCPNode conn", err)
 			}
 
 			// Clear out the remaining pconn completions

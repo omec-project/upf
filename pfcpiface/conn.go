@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright(c) 2020 Intel Corporation
+// Copyright 2020 Intel Corporation
 
 package main
 
@@ -216,7 +216,7 @@ func (pConn *PFCPConn) Shutdown() {
 
 	// Cleanup all sessions in this conn
 	for seid, sess := range pConn.sessions {
-		pConn.upf.sendMsgToUPF(upfMsgTypeDel, sess.pdrs, sess.fars, sess.qers)
+		pConn.upf.sendMsgToUPF(upfMsgTypeDel, sess.PacketForwardingRules, PacketForwardingRules{})
 		pConn.RemoveSession(seid)
 	}
 

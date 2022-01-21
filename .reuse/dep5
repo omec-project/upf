@@ -1,0 +1,24 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: upf-epc
+Upstream-Contact: OMEC Developers <omec-dev@opennetworking.org>
+Source: https://github.com/omec-project/upf-epc
+
+Files: pfcpiface/**/*.pb.go
+Copyright: 2016-2017, Nefeli Networks, Inc.
+Copyright: 2017, The Regents of the University of California.
+License: BSD-3-Clause
+
+Files: VERSION go.mod go.sum pfcpiface/metrics.txt docs/pipeline.txt ptf/docs/test-run.svg ptf/docs/upf-access.svg ptf/config/upf.json docs/images/bess-programming.svg docs/images/bess-upf-on-ec2.svg docs/images/pipeline.svg docs/images/ubench-pktgen.svg docs/images/ubench-sim.svg docs/images/upf.svg bessctl/module_tests/ipv4frags.pcap
+Copyright: 2019-present Intel Corporation
+Copyright: 2020-present Open Networking Foundation
+License: Apache-2.0
+
+Files: patches/**/*.patch
+Copyright: 2019-present Intel Corporation
+Copyright: 2021-present Open Networking Foundation
+License: Apache-2.0
+
+Files: conf/**/*.json conf/*.json test/integration/config/*.json conf/p4/bin/p4info.bin conf/p4/bin/p4info.txt conf/prometheus.yml
+Copyright: 2019-present Intel Corporation
+Copyright: 2020-present Open Networking Foundation
+License: Apache-2.0

@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: Apache-2.0
- * Copyright(c) 2021 Open Networking Foundation
+ * Copyright 2021 Open Networking Foundation
  */
 
 #include "flow_measure.h"
@@ -14,6 +14,8 @@
 const Commands FlowMeasure::cmds = {
     {"read", "FlowMeasureCommandReadArg",
      MODULE_CMD_FUNC(&FlowMeasure::CommandReadStats), Command::THREAD_SAFE},
+    {"flip", "FlowMeasureCommandFlipArg",
+     MODULE_CMD_FUNC(&FlowMeasure::CommandFlipFlag), Command::THREAD_SAFE},
 };
 /*----------------------------------------------------------------------------------*/
 CommandResponse FlowMeasure::Init(const bess::pb::FlowMeasureArg &arg) {
@@ -160,42 +162,38 @@ void FlowMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 /*----------------------------------------------------------------------------------*/
 CommandResponse FlowMeasure::CommandReadStats(
     const bess::pb::FlowMeasureCommandReadArg &arg) {
+  Flag flag_to_read = static_cast<Flag>(arg.flag_to_read());
+  if (!Flag_IsValid(flag_to_read)) {
+    return CommandFailure(EINVAL, "invalid flag value");
+  }
   // Cache current flag so we don't block the dataplane while reading the stats.
   Flag cached_current_flag;
-  // Flip the flag if leader module.
-  if (leader_) {
-    {
-      const std::lock_guard<std::mutex> lock(flag_mutex_);
-      current_flag_value_ = current_flag_value_ == Flag::FLAG_VALUE_A
-                                ? Flag::FLAG_VALUE_B
-                                : Flag::FLAG_VALUE_A;
-      cached_current_flag = current_flag_value_;
-    }
-    VLOG(1) << name() << ": leader flipped the buffer flag to "
-            << Flag_Name(cached_current_flag);
-    // Wait for pipeline to flush packets with old flag value.
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  } else {
+  {
     const std::lock_guard<std::mutex> lock(flag_mutex_);
     cached_current_flag = current_flag_value_;
-    VLOG(1) << name() << ": follower is seeing buffer flag "
-            << Flag_Name(cached_current_flag);
   }
+  VLOG(1) << name() << ": " << (leader_ ? "leader" : "follower")
+          << " last saw buffer flag " << Flag_Name(cached_current_flag)
+          << ", now reading from " << Flag_Name(flag_to_read);
+  VLOG_IF(1, cached_current_flag == flag_to_read)
+      << name()
+      << ": requested to read active buffer flag. Either there is no "
+         "traffic or the controller is performing invalid requests.";
 
   bess::pb::FlowMeasureReadResponse resp;
   auto t_start = std::chrono::high_resolution_clock::now();
   rte_hash *current_hash = nullptr;
   std::vector<SessionStats> *current_data = nullptr;
-  switch (cached_current_flag) {  // Pick the offline buffer set.
+  switch (flag_to_read) {
     case Flag::FLAG_VALUE_INVALID:
       return CommandSuccess(resp);  // return empty stats when no traffic
     case Flag::FLAG_VALUE_A:
-      current_hash = table_b_;
-      current_data = &table_data_b_;
-      break;
-    case Flag::FLAG_VALUE_B:
       current_hash = table_a_;
       current_data = &table_data_a_;
+      break;
+    case Flag::FLAG_VALUE_B:
+      current_hash = table_b_;
+      current_data = &table_data_b_;
       break;
     default:
       return CommandFailure(EINVAL, "invalid flag value");
@@ -247,6 +245,32 @@ CommandResponse FlowMeasure::CommandReadStats(
     std::chrono::duration<double> diff = t_done - t_start;
     VLOG(1) << name() << ": CommandReadStats took " << diff.count() << "s.";
   }
+
+  return CommandSuccess(resp);
+}
+
+CommandResponse FlowMeasure::CommandFlipFlag(
+    const bess::pb::FlowMeasureCommandFlipArg &) {
+  // Can only flip the flag if leader module.
+  if (!leader_) {
+    return CommandFailure(EINVAL, "only leaders can flip the flag");
+  }
+  // Cache flags so we block the dataplane as short as possible.
+  Flag cached_old_flag, cached_current_flag;
+  {
+    const std::lock_guard<std::mutex> lock(flag_mutex_);
+    cached_old_flag = current_flag_value_;
+    current_flag_value_ = current_flag_value_ == Flag::FLAG_VALUE_A
+                              ? Flag::FLAG_VALUE_B
+                              : Flag::FLAG_VALUE_A;
+    cached_current_flag = current_flag_value_;
+  }
+  VLOG(1) << name() << ": leader flipped the buffer flag to "
+          << Flag_Name(cached_current_flag);
+  bess::pb::FlowMeasureFlipResponse resp;
+  resp.set_old_flag(static_cast<uint64_t>(cached_old_flag));
+  // Wait for pipeline to flush packets with old flag value.
+  std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
   return CommandSuccess(resp);
 }

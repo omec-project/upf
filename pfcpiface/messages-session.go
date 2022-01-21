@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright(c) 2021 Intel Corporation
+// Copyright 2021 Intel Corporation
 
 package main
 
@@ -90,6 +90,10 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 	session := pConn.sessions[localSEID]
 
+	addPDRs := make([]pdr, 0, MaxItems)
+	addFARs := make([]far, 0, MaxItems)
+	addQERs := make([]qer, 0, MaxItems)
+
 	for _, cPDR := range sereq.CreatePDR {
 		var p pdr
 		if err := p.parsePDR(cPDR, session.localSEID, pConn.appPFDs, upf.ippool); err != nil {
@@ -98,6 +102,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 		p.fseidIP = fseidIP
 		session.CreatePDR(p)
+		addPDRs = append(addPDRs, p)
 	}
 
 	for _, cFAR := range sereq.CreateFAR {
@@ -108,6 +113,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 		f.fseidIP = fseidIP
 		session.CreateFAR(f)
+		addFARs = append(addFARs, f)
 	}
 
 	for _, cQER := range sereq.CreateQER {
@@ -118,11 +124,20 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 		q.fseidIP = fseidIP
 		session.CreateQER(q)
+		addQERs = append(addQERs, q)
 	}
 
 	session.MarkSessionQer()
 
-	cause := upf.sendMsgToUPF(upfMsgTypeAdd, session.pdrs, session.fars, session.qers)
+	// session.PacketForwardingRules stores all PFCP rules that has been installed so far,
+	// while 'updated' stores only the PFCP rules that has been provided in this particular message.
+	updated := PacketForwardingRules{
+		pdrs: addPDRs,
+		fars: addFARs,
+		qers: addQERs,
+	}
+
+	cause := upf.sendMsgToUPF(upfMsgTypeAdd, session.PacketForwardingRules, updated)
 	if cause == ie.CauseRequestRejected {
 		pConn.RemoveSession(session.localSEID)
 		return errProcessReply(ErrWriteToFastpath,
@@ -305,7 +320,13 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 
 	session.MarkSessionQer()
 
-	cause := upf.sendMsgToUPF(upfMsgTypeMod, addPDRs, addFARs, addQERs)
+	updated := PacketForwardingRules{
+		pdrs: addPDRs,
+		fars: addFARs,
+		qers: addQERs,
+	}
+
+	cause := upf.sendMsgToUPF(upfMsgTypeMod, session.PacketForwardingRules, updated)
 	if cause == ie.CauseRequestRejected {
 		return sendError(ErrWriteToFastpath)
 	}
@@ -367,7 +388,13 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		delQERs = append(delQERs, *q)
 	}
 
-	cause = upf.sendMsgToUPF(upfMsgTypeDel, delPDRs, delFARs, delQERs)
+	deleted := PacketForwardingRules{
+		pdrs: delPDRs,
+		fars: delFARs,
+		qers: delQERs,
+	}
+
+	cause = upf.sendMsgToUPF(upfMsgTypeDel, deleted, PacketForwardingRules{})
 	if cause == ie.CauseRequestRejected {
 		return sendError(ErrWriteToFastpath)
 	}
@@ -412,7 +439,7 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 		return sendError(ErrNotFoundWithParam("PFCP session", "localSEID", localSEID))
 	}
 
-	cause := upf.sendMsgToUPF(upfMsgTypeDel, session.pdrs, session.fars, session.qers)
+	cause := upf.sendMsgToUPF(upfMsgTypeDel, session.PacketForwardingRules, PacketForwardingRules{})
 	if cause == ie.CauseRequestRejected {
 		return sendError(ErrWriteToFastpath)
 	}
@@ -525,7 +552,7 @@ func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) error {
 		pConn.RemoveSession(seid)
 
 		cause := upf.sendMsgToUPF(
-			upfMsgTypeDel, sessItem.pdrs, sessItem.fars, sessItem.qers)
+			upfMsgTypeDel, sessItem.PacketForwardingRules, PacketForwardingRules{})
 		if cause == ie.CauseRequestRejected {
 			return errProcess(
 				ErrOperationFailedWithParam("delete session from fastpath", "seid", seid))

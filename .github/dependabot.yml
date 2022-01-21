@@ -1,5 +1,7 @@
-# https://help.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2020 Intel Corporation
 
+# https://help.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
 version: 2
 updates:
 

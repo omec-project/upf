@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright(c) 2020 Intel Corporation
+// Copyright 2020 Intel Corporation
 
 package main
 
@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/binary"
 	"flag"
+	"math"
 	"net"
 	"strconv"
 	"time"
@@ -117,9 +118,19 @@ func (b *bess) addSliceInfo(sliceInfo *SliceInfo) error {
 }
 
 func (b *bess) sendMsgToUPF(
-	method upfMsgType, pdrs []pdr, fars []far, qers []qer) uint8 {
+	method upfMsgType, rules PacketForwardingRules, updated PacketForwardingRules) uint8 {
 	// create context
 	var cause uint8 = ie.CauseRequestAccepted
+
+	pdrs := rules.pdrs
+	fars := rules.fars
+	qers := rules.qers
+
+	if method == upfMsgTypeMod {
+		pdrs = updated.pdrs
+		fars = updated.fars
+		qers = updated.qers
+	}
 
 	calls := len(pdrs) + len(fars) + len(qers)
 	if calls == 0 {
@@ -329,13 +340,49 @@ func (b *bess) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metri
 	measureIface("Core", uc.upf.coreIface)
 }
 
+func (b *bess) flipFlowMeasurementBufferFlag(ctx context.Context, module string) (flip pb.FlowMeasureFlipResponse, err error) {
+	req := &pb.FlowMeasureCommandFlipArg{}
+
+	any, err := anypb.New(req)
+	if err != nil {
+		log.Errorln("Error marshalling request", req, err)
+		return
+	}
+
+	resp, err := b.client.ModuleCommand(
+		ctx, &pb.CommandRequest{
+			Name: module,
+			Cmd:  "flip",
+			Arg:  any,
+		},
+	)
+
+	if err != nil {
+		log.Errorln(module, "read failed!:", err)
+		return
+	}
+
+	if resp.GetError() != nil {
+		log.Errorln(module, "error reading flow stats:", resp.GetError().Errmsg)
+		return
+	}
+
+	if err = resp.Data.UnmarshalTo(&flip); err != nil {
+		log.Errorln(err)
+		return
+	}
+
+	return
+}
+
 func (b *bess) readFlowMeasurement(
-	ctx context.Context, module string, clear bool, q []float64,
+	ctx context.Context, module string, flagToRead uint64, clear bool, q []float64,
 ) (stats pb.FlowMeasureReadResponse, err error) {
 	req := &pb.FlowMeasureCommandReadArg{
 		Clear:              clear,
 		LatencyPercentiles: q,
 		JitterPercentiles:  q,
+		FlagToRead:         flagToRead,
 	}
 
 	any, err := anypb.New(req)
@@ -363,41 +410,59 @@ func (b *bess) readFlowMeasurement(
 	}
 
 	if err = resp.Data.UnmarshalTo(&stats); err != nil {
-		log.Errorln(err)
+		log.Errorln(err, resp)
 		return
 	}
 
 	return
 }
 
-func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err error) {
+func (b *bess) sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) (err error) {
 	// Clearing table data with large tables is slow, let's wait for a little longer since this is
 	// non-blocking for the dataplane anyway.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	// Read stats. This flips the buffer flag, reads from the now inactive side, and clear if needed.
-	q := []float64{50, 90, 99}
-
-	qosStatsInResp, err := b.readFlowMeasurement(ctx, PreQosFlowMeasure, true, q)
+	// Flips the buffer flag, automatically waits for in-flight packets to drain.
+	flip, err := b.flipFlowMeasurementBufferFlag(ctx, PreQosFlowMeasure)
 	if err != nil {
 		log.Errorln(PreQosFlowMeasure, " read failed!:", err)
 		return
 	}
 
-	postDlQosStatsResp, err := b.readFlowMeasurement(ctx, PostDlQosFlowMeasure, true, q)
+	q := []float64{50, 90, 99}
+
+	// Read stats from the now inactive side, and clear if needed.
+	qosStatsInResp, err := b.readFlowMeasurement(ctx, PreQosFlowMeasure, flip.OldFlag, true, q)
+	if err != nil {
+		log.Errorln(PreQosFlowMeasure, " read failed!:", err)
+		return
+	}
+
+	postDlQosStatsResp, err := b.readFlowMeasurement(ctx, PostDlQosFlowMeasure, flip.OldFlag, true, q)
 	if err != nil {
 		log.Errorln(PostDlQosFlowMeasure, " read failed!:", err)
 		return
 	}
 
-	postUlQosStatsResp, err := b.readFlowMeasurement(ctx, PostUlQosFlowMeasure, true, q)
+	postUlQosStatsResp, err := b.readFlowMeasurement(ctx, PostUlQosFlowMeasure, flip.OldFlag, true, q)
 	if err != nil {
 		log.Errorln(PostUlQosFlowMeasure, " read failed!:", err)
 		return
 	}
 
-	// Prepare prometheus stats.
-	createStats := func(preResp, postResp *pb.FlowMeasureReadResponse, ch chan<- prometheus.Metric) {
+	// TODO: pick first connection for now
+	var con *PFCPConn
+	for _, c := range pc.node.pConns {
+		con = c
+		break
+	}
+
+	if con == nil {
+		log.Warnln("No active PFCP connection, UE IP lookup disabled")
+	}
+
+	// Prepare session stats.
+	createStats := func(preResp, postResp *pb.FlowMeasureReadResponse) {
 		for i := 0; i < len(postResp.Statistics); i++ {
 			var pre *pb.FlowMeasureReadResponse_Statistic
 
@@ -415,58 +480,83 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 				continue
 			}
 
-			fseidString := strconv.FormatUint(post.Fseid, 10)
-			pdrString := strconv.FormatUint(post.Pdr, 10)
+			fseidString := strconv.FormatUint(pre.Fseid, 10)
+			pdrString := strconv.FormatUint(pre.Pdr, 10)
+			ueIpString := "unknown"
+
+			if con != nil {
+				session, ok := con.sessions[pre.Fseid]
+				if !ok {
+					log.Errorln("Invalid or unknown FSEID", pre.Fseid)
+					continue
+				}
+
+				// Try to find the N6 uplink PDR with the UE IP.
+				for _, p := range session.pdrs {
+					if p.IsUplink() && p.srcIP > 0 {
+						ueIpString = int2ip(p.srcIP).String()
+						log.Traceln(p.fseID, " -> ", ueIpString)
+
+						break
+					}
+				}
+			}
+
 			ch <- prometheus.MustNewConstMetric(
-				uc.sessionTxPackets,
+				pc.sessionTxPackets,
 				prometheus.GaugeValue,
 				float64(post.TotalPackets),
 				fseidString,
 				pdrString,
+				ueIpString,
 			)
 			ch <- prometheus.MustNewConstMetric(
-				uc.sessionDroppedPackets,
+				pc.sessionRxPackets,
 				prometheus.GaugeValue,
-				float64(pre.TotalPackets-post.TotalPackets),
+				float64(pre.TotalPackets),
 				fseidString,
 				pdrString,
+				ueIpString,
 			)
 			ch <- prometheus.MustNewConstMetric(
-				uc.sessionTxBytes,
+				pc.sessionTxBytes,
 				prometheus.GaugeValue,
 				float64(post.TotalBytes),
 				fseidString,
 				pdrString,
+				ueIpString,
 			)
 			ch <- prometheus.MustNewConstSummary(
-				uc.sessionLatency,
+				pc.sessionLatency,
 				post.TotalPackets,
 				0,
 				map[float64]float64{
-					50.0: float64(post.Latency.PercentileValuesNs[0]),
-					99.0: float64(post.Latency.PercentileValuesNs[1]),
-					99.9: float64(post.Latency.PercentileValuesNs[2]),
+					q[0]: float64(post.Latency.PercentileValuesNs[0]),
+					q[1]: float64(post.Latency.PercentileValuesNs[1]),
+					q[2]: float64(post.Latency.PercentileValuesNs[2]),
 				},
 				fseidString,
 				pdrString,
+				ueIpString,
 			)
 			ch <- prometheus.MustNewConstSummary(
-				uc.sessionJitter,
+				pc.sessionJitter,
 				post.TotalPackets,
 				0,
 				map[float64]float64{
-					50.0: float64(post.Jitter.PercentileValuesNs[0]),
-					99.0: float64(post.Jitter.PercentileValuesNs[1]),
-					99.9: float64(post.Jitter.PercentileValuesNs[2]),
+					q[0]: float64(post.Jitter.PercentileValuesNs[0]),
+					q[1]: float64(post.Jitter.PercentileValuesNs[1]),
+					q[2]: float64(post.Jitter.PercentileValuesNs[2]),
 				},
 				fseidString,
 				pdrString,
+				ueIpString,
 			)
 		}
 	}
 
-	createStats(&qosStatsInResp, &postUlQosStatsResp, ch)
-	createStats(&qosStatsInResp, &postDlQosStatsResp, ch)
+	createStats(&qosStatsInResp, &postUlQosStatsResp)
+	createStats(&qosStatsInResp, &postDlQosStatsResp)
 
 	return
 }
@@ -623,7 +713,7 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 		f := &pb.WildcardMatchCommandAddArg{
 			Gate:     uint64(p.needDecap),
-			Priority: int64(p.precedence),
+			Priority: int64(math.MaxUint32 - p.precedence),
 			Values: []*pb.FieldData{
 				intEnc(uint64(p.srcIface)),     /* src_iface */
 				intEnc(uint64(p.tunnelIP4Dst)), /* tunnel_ipv4_dst */

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright(c) 2020 Intel Corporation
+// Copyright 2020 Intel Corporation
 
 package main
 
@@ -45,6 +45,7 @@ type upf struct {
 	coreIP            net.IP
 	nodeID            string
 	ippool            *IPPool
+	peers             []string
 	dnn               string
 	reportNotifyChan  chan uint64
 	sliceInfo         *SliceInfo
@@ -127,11 +128,21 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 		nodeID:            nodeID,
 		fastPath:          fp,
 		dnn:               conf.CPIface.Dnn,
+		peers:             conf.CPIface.Peers,
 		reportNotifyChan:  make(chan uint64, 1024),
 		maxReqRetries:     maxReqRetriesDefault,
 		respTimeout:       respTimeoutDefault,
 		enableHBTimer:     conf.EnableHBTimer,
 		hbInterval:        hbIntervalDefault,
+	}
+
+	if len(conf.CPIface.Peers) > 0 {
+		u.peers = make([]string, len(conf.CPIface.Peers))
+		nc := copy(u.peers, conf.CPIface.Peers)
+
+		if nc == 0 {
+			log.Warnln("Failed to parse cpiface peers, PFCP Agent will not initiate connection to N4 peers.")
+		}
 	}
 
 	if !conf.EnableP4rt {

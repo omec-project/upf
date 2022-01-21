@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright(c) 2020 Intel Corporation
+// Copyright 2020 Intel Corporation
 
 package main
 
 import (
 	"fmt"
-	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -46,23 +45,24 @@ type far struct {
 	tunnelPort    uint16
 }
 
-// Satisfies the fmt.Stringer interface.
 func (f far) String() string {
-	b := strings.Builder{}
-	fmt.Fprintf(&b, "\n")
-	fmt.Fprintf(&b, "farID: %v\n", f.farID)
-	fmt.Fprintf(&b, "fseID: %x\n", f.fseID)
-	fmt.Fprintf(&b, "fseIDIP: %v\n", int2ip(f.fseidIP))
-	fmt.Fprintf(&b, "dstIntf: %v\n", f.dstIntf)
-	fmt.Fprintf(&b, "applyAction: %v\n", f.applyAction)
-	fmt.Fprintf(&b, "tunnelType: %v\n", f.tunnelType)
-	fmt.Fprintf(&b, "tunnelIP4Src: %v\n", int2ip(f.tunnelIP4Src))
-	fmt.Fprintf(&b, "tunnelIP4Dst: %v\n", int2ip(f.tunnelIP4Dst))
-	fmt.Fprintf(&b, "tunnelTEID: %x\n", f.tunnelTEID)
-	fmt.Fprintf(&b, "tunnelPort: %v\n", f.tunnelPort)
-	fmt.Fprintf(&b, "sendEndMarker: %v\n", f.sendEndMarker)
+	return fmt.Sprintf("FAR(id=%v, F-SEID=%v, F-SEID IPv4=%v, dstInterface=%v, tunnelType=%v, "+
+		"tunnelIPv4Src=%v, tunnelIPv4Dst=%v, tunnelTEID=%v, tunnelSrcPort=%v, "+
+		"sendEndMarker=%v, drops=%v, forwards=%v, buffers=%v)", f.farID, f.fseID, f.fseidIP, f.dstIntf,
+		f.tunnelType, f.tunnelIP4Src, f.tunnelIP4Dst, f.tunnelTEID, f.tunnelPort, f.sendEndMarker,
+		f.Drops(), f.Forwards(), f.Buffers())
+}
 
-	return b.String()
+func (f *far) Drops() bool {
+	return f.applyAction&ActionDrop != 0
+}
+
+func (f *far) Buffers() bool {
+	return f.applyAction&ActionBuffer != 0
+}
+
+func (f *far) Forwards() bool {
+	return f.applyAction&ActionForward != 0
 }
 
 func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error {
@@ -120,7 +120,7 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 
 			f.tunnelTEID = ohcFields.TEID
 			f.tunnelIP4Dst = ip2int(ohcFields.IPv4Address)
-			f.tunnelType = uint8(1)
+			f.tunnelType = uint8(1) // FIXME: what does it mean?
 			f.tunnelPort = tunnelGTPUPort
 		case ie.DestinationInterface:
 			fields = Set(fields, FwdIEDestinationIntf)
