@@ -195,6 +195,7 @@ func (pConn *PFCPConn) Serve() {
 					log.Infof("Read timeout received for connection: %v<->%v",
 						pConn.LocalAddr(), pConn.RemoteAddr())
 					connClosed <- struct{}{}
+
 					return
 				}
 
