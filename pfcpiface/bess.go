@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright(c) 2020 Intel Corporation
+// Copyright 2020 Intel Corporation
 
 package main
 
@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/binary"
 	"flag"
+	"math"
 	"net"
 	"strconv"
 	"time"
@@ -409,14 +410,14 @@ func (b *bess) readFlowMeasurement(
 	}
 
 	if err = resp.Data.UnmarshalTo(&stats); err != nil {
-		log.Errorln(err)
+		log.Errorln(err, resp)
 		return
 	}
 
 	return
 }
 
-func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err error) {
+func (b *bess) sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) (err error) {
 	// Clearing table data with large tables is slow, let's wait for a little longer since this is
 	// non-blocking for the dataplane anyway.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
@@ -449,8 +450,19 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 		return
 	}
 
-	// Prepare prometheus stats.
-	createStats := func(preResp, postResp *pb.FlowMeasureReadResponse, ch chan<- prometheus.Metric) {
+	// TODO: pick first connection for now
+	var con *PFCPConn
+	for _, c := range pc.node.pConns {
+		con = c
+		break
+	}
+
+	if con == nil {
+		log.Warnln("No active PFCP connection, UE IP lookup disabled")
+	}
+
+	// Prepare session stats.
+	createStats := func(preResp, postResp *pb.FlowMeasureReadResponse) {
 		for i := 0; i < len(postResp.Statistics); i++ {
 			var pre *pb.FlowMeasureReadResponse_Statistic
 
@@ -468,58 +480,83 @@ func (b *bess) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) (err 
 				continue
 			}
 
-			fseidString := strconv.FormatUint(post.Fseid, 10)
-			pdrString := strconv.FormatUint(post.Pdr, 10)
+			fseidString := strconv.FormatUint(pre.Fseid, 10)
+			pdrString := strconv.FormatUint(pre.Pdr, 10)
+			ueIpString := "unknown"
+
+			if con != nil {
+				session, ok := con.sessions[pre.Fseid]
+				if !ok {
+					log.Errorln("Invalid or unknown FSEID", pre.Fseid)
+					continue
+				}
+
+				// Try to find the N6 uplink PDR with the UE IP.
+				for _, p := range session.pdrs {
+					if p.IsUplink() && p.srcIP > 0 {
+						ueIpString = int2ip(p.srcIP).String()
+						log.Traceln(p.fseID, " -> ", ueIpString)
+
+						break
+					}
+				}
+			}
+
 			ch <- prometheus.MustNewConstMetric(
-				uc.sessionTxPackets,
+				pc.sessionTxPackets,
 				prometheus.GaugeValue,
 				float64(post.TotalPackets),
 				fseidString,
 				pdrString,
+				ueIpString,
 			)
 			ch <- prometheus.MustNewConstMetric(
-				uc.sessionDroppedPackets,
+				pc.sessionRxPackets,
 				prometheus.GaugeValue,
-				float64(pre.TotalPackets-post.TotalPackets),
+				float64(pre.TotalPackets),
 				fseidString,
 				pdrString,
+				ueIpString,
 			)
 			ch <- prometheus.MustNewConstMetric(
-				uc.sessionTxBytes,
+				pc.sessionTxBytes,
 				prometheus.GaugeValue,
 				float64(post.TotalBytes),
 				fseidString,
 				pdrString,
+				ueIpString,
 			)
 			ch <- prometheus.MustNewConstSummary(
-				uc.sessionLatency,
+				pc.sessionLatency,
 				post.TotalPackets,
 				0,
 				map[float64]float64{
-					50.0: float64(post.Latency.PercentileValuesNs[0]),
-					99.0: float64(post.Latency.PercentileValuesNs[1]),
-					99.9: float64(post.Latency.PercentileValuesNs[2]),
+					q[0]: float64(post.Latency.PercentileValuesNs[0]),
+					q[1]: float64(post.Latency.PercentileValuesNs[1]),
+					q[2]: float64(post.Latency.PercentileValuesNs[2]),
 				},
 				fseidString,
 				pdrString,
+				ueIpString,
 			)
 			ch <- prometheus.MustNewConstSummary(
-				uc.sessionJitter,
+				pc.sessionJitter,
 				post.TotalPackets,
 				0,
 				map[float64]float64{
-					50.0: float64(post.Jitter.PercentileValuesNs[0]),
-					99.0: float64(post.Jitter.PercentileValuesNs[1]),
-					99.9: float64(post.Jitter.PercentileValuesNs[2]),
+					q[0]: float64(post.Jitter.PercentileValuesNs[0]),
+					q[1]: float64(post.Jitter.PercentileValuesNs[1]),
+					q[2]: float64(post.Jitter.PercentileValuesNs[2]),
 				},
 				fseidString,
 				pdrString,
+				ueIpString,
 			)
 		}
 	}
 
-	createStats(&qosStatsInResp, &postUlQosStatsResp, ch)
-	createStats(&qosStatsInResp, &postDlQosStatsResp, ch)
+	createStats(&qosStatsInResp, &postUlQosStatsResp)
+	createStats(&qosStatsInResp, &postDlQosStatsResp)
 
 	return
 }
@@ -676,7 +713,7 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 		f := &pb.WildcardMatchCommandAddArg{
 			Gate:     uint64(p.needDecap),
-			Priority: int64(p.precedence),
+			Priority: int64(math.MaxUint32 - p.precedence),
 			Values: []*pb.FieldData{
 				intEnc(uint64(p.srcIface)),     /* src_iface */
 				intEnc(uint64(p.tunnelIP4Dst)), /* tunnel_ipv4_dst */

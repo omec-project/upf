@@ -89,7 +89,7 @@ func (up4 *UP4) addSliceInfo(sliceInfo *SliceInfo) error {
 func (up4 *UP4) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric) {
 }
 
-func (up4 *UP4) sessionStats(uc *upfCollector, ch chan<- prometheus.Metric) error {
+func (up4 *UP4) sessionStats(*PfcpNodeCollector, chan<- prometheus.Metric) error {
 	return nil
 }
 

@@ -1,3 +1,7 @@
+<!--
+SPDX-License-Identifier: Apache-2.0
+Copyright 2022 Open Networking Foundation
+-->
 # E2E integration tests
 
 The tests defined in this directory implement the so-called "broad integration tests" 
