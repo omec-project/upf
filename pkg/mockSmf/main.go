@@ -24,6 +24,7 @@ var (
 	inputFile         string
 	doOnce            sync.Once
 	sessionCount      int
+	baseId            int
 
 	globalMockSmf *smf.MockSMF
 )
@@ -41,12 +42,10 @@ func SetLogLevel(level logrus.Level) {
 }
 
 func logOutput(logfile string) func() {
-	// open file read/write | create if not exist | clear file at open if exists
 	f, _ := os.OpenFile(logfile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 
-	// save existing stdout | MultiWriter writes to saved stdout and file
 	out := os.Stdout
-	mw := io.MultiWriter(out, f)
+	multiWriter := io.MultiWriter(out, f)
 
 	// get pipe reader and writer | writes to pipe writer come out pipe reader
 	r, w, _ := os.Pipe()
@@ -55,25 +54,25 @@ func logOutput(logfile string) func() {
 	os.Stdout = w
 	os.Stderr = w
 
-	// writes with log.Print should also write to mw
-	log.SetOutput(mw)
+	// writes with log.Print should also write to multiWriter
+	log.SetOutput(multiWriter)
 
 	//create channel to control exit | will block until all copies are finished
 	exit := make(chan bool)
 
 	go func() {
 		// copy all reads from pipe to multiwriter, which writes to stdout and file
-		_, _ = io.Copy(mw, r)
+		_, _ = io.Copy(multiWriter, r)
 		// when r or w is closed copy will finish and true will be sent to channel
 		exit <- true
 	}()
 
 	// function to be deferred in main until program exits
 	return func() {
-		// close writer then block on exit channel | this will let mw finish writing before the program exits
+		// close writer then block on exit channel | this will let multiWriter finish writing before the program exits
 		_ = w.Close()
 		<-exit
-		// close file after all writes have finished
+
 		_ = f.Close()
 	}
 
@@ -107,7 +106,6 @@ func getIfaceAddress(interfaceName string) (net.IP, error) {
 		for _, addr := range addrs {
 			switch iface := addr.(type) {
 			case *net.IPNet:
-				log.Debugf("Ifaces: %v : %s (%s)\n", i.Name, iface, iface.IP.DefaultMask())
 				if strings.Contains(i.Name, interfaceName) {
 					return iface.IP, nil
 				}
@@ -125,6 +123,7 @@ func parseArgs() {
 	verbosity := getopt.BoolLong("verbose", 'v', "Set verbosity level")
 	interfaceName := getopt.StringLong("interface", 'i', "Set interface name to discover local address")
 	sessionCnt := getopt.IntLong("session-count", 's', 1, "Set the amount of sessions to create, starting from 1 (included)")
+	base := getopt.IntLong("base", 'b', 1, "First ID used to generate all other ID fields.")
 	optHelp := getopt.BoolLong("help", 0, "Help")
 
 	getopt.Parse()
@@ -144,8 +143,13 @@ func parseArgs() {
 		defer fn()
 	}
 
+	if *base < 0 {
+		log.Fatalf("base id cannot be a negative number")
+	}
+	baseId = *base
+
 	if *sessionCnt < 0 {
-		log.Fatalf("session count cannot be a negative number.")
+		log.Fatalf("session count cannot be a negative number")
 	}
 	sessionCount = *sessionCnt
 
@@ -223,11 +227,14 @@ func handleUserInput() {
 		case userAnswer := <-userInput:
 			switch userAnswer {
 			case 1:
-				log.Infof("Selected Teardown Association: %v", userAnswer)
+				log.Infof("Selected Teardown Association")
 				globalMockSmf.TeardownAssociation()
 			case 2:
-				log.Infoln("Selected Setup Association: %v", userAnswer)
+				log.Infof("Selected Setup Association")
 				globalMockSmf.SetupAssociation()
+			case 3:
+				log.Infof("Selected Create Session")
+				globalMockSmf.InitializeSessions(baseId, sessionCount)
 			case 9:
 				log.Infoln("Shutting down")
 				globalMockSmf.Disconnect()
@@ -359,12 +366,13 @@ func main() {
 
 	parseArgs()
 
-	globalMockSmf = smf.NewMockSMF("127.0.0.1", GetLoggerInstance())
+	globalMockSmf = smf.NewMockSMF(localAddress.String(), GetLoggerInstance())
 	err := globalMockSmf.Connect(remotePeerAddress.String())
-	log.Errorf("failed to connect to UPF: %v", err)
+	if err != nil {
+		log.Fatalf("failed to connect to UPF: %v", err)
+	}
 
 	handleUserInput()
 
-	globalMockSmf.Disconnect()
 	wg.Wait() // wait for all go-routine before shutting down
 }

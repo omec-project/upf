@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
 	"net"
@@ -28,6 +29,8 @@ type PFCPClient struct {
 	aliveLock          sync.Mutex
 	isAssociationAlive bool
 
+	log *logrus.Logger
+
 	ctx              context.Context
 	cancelHeartbeats context.CancelFunc
 
@@ -41,11 +44,16 @@ type PFCPClient struct {
 	conn      *net.UDPConn
 }
 
-func NewPFCPClient(localAddr string) *PFCPClient {
+func NewPFCPClient(localAddr string, logger *logrus.Logger) *PFCPClient {
+	if logger == nil {
+		logger = logrus.New()
+	}
+
 	return &PFCPClient{
 		sequenceNumber: 0,
 		localAddr:      localAddr,
 		ctx:            context.Background(),
+		log:            logger,
 		heartbeatsChan: make(chan *message.HeartbeatResponse),
 		recvChan:       make(chan message.Message),
 	}
@@ -137,7 +145,7 @@ func (c *PFCPClient) PeekNextHeartbeatResponse(timeout time.Duration) (*message.
 	select {
 	case msg := <-c.heartbeatsChan:
 		return msg, nil
-	case <-time.After(timeout):
+	case <-time.After(timeout * time.Second):
 		return nil, errors.New("timeout waiting for response")
 	}
 }
@@ -146,7 +154,7 @@ func (c *PFCPClient) PeekNextResponse(timeout time.Duration) (message.Message, e
 	select {
 	case msg := <-c.recvChan:
 		return msg, nil
-	case <-time.After(timeout):
+	case <-time.After(timeout * time.Second):
 		return nil, errors.New("timeout waiting for response")
 	}
 }
@@ -217,6 +225,7 @@ func (c *PFCPClient) SendAndRecvHeartbeat() error {
 		c.setAssociationAlive(false)
 		return err
 	}
+	c.log.Infoln("Received heartbeat response")
 
 	c.setAssociationAlive(true)
 

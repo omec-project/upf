@@ -13,13 +13,33 @@ type Session struct {
 
 	ueAddress net.IP
 	peerSeid  uint64
+	uplink    UeFlow
+	downlink  UeFlow
 	//sentPdrs  map[int]ie.IE
 	//sentFars  map[int]ie.IE
 	//sentQers map[int]ie.IE
 }
 
+type UeFlow struct {
+	teid  uint16
+	pdrId uint16
+	farId uint16
+	qerId uint16
+	urrId uint16
+}
+
+func NewUeFlow(baseId int) *UeFlow {
+	return &UeFlow{
+		teid:  uint16(baseId + 1),
+		pdrId: uint16(baseId + 1),
+		farId: uint16(baseId + 1),
+		qerId: uint16(baseId + 1),
+		urrId: uint16(baseId + 1),
+	}
+}
+
 type MockSMF struct {
-	activeSessions map[int]Session
+	activeSessions map[uint64]Session
 
 	log *logrus.Logger
 
@@ -32,9 +52,9 @@ func NewMockSMF(lAddr string, logger *logrus.Logger) *MockSMF {
 	}
 
 	return &MockSMF{
-		activeSessions: make(map[int]Session),
+		activeSessions: make(map[uint64]Session),
 		log:            logger,
-		client:         pfcpsim.NewPFCPClient(lAddr),
+		client:         pfcpsim.NewPFCPClient(lAddr, logger),
 	}
 }
 
@@ -72,31 +92,64 @@ func (m *MockSMF) SetupAssociation() {
 	m.log.Infof("setup association completed")
 }
 
-func (m *MockSMF) createSession() {
-	lastIndex := len(m.activeSessions) - 1
-	lastSeid := m.activeSessions[lastIndex].ourSeid // get last ourSeid to generate new one
-	newSeid := lastSeid + 1
+func (m *MockSMF) CreateSession(baseId uint64) {
+	seid := baseId
 
-	sess := Session{
-		ourSeid:   newSeid,
-		ueAddress: nil, // TODO Where to get UE-Address?
-		peerSeid:  0,
+	if len(m.activeSessions) != 0 {
+		lastSeid := m.activeSessions[uint64(len(m.activeSessions)-1)].ourSeid // get last ourSeid to generate new one
+		baseId = lastSeid + 1
 	}
 
-	m.activeSessions[lastIndex+1] = sess
+	sess := &Session{
+		ourSeid:   seid,
+		ueAddress: nil,
+		peerSeid:  0,
+
+		uplink: UeFlow{
+			teid:  uint16(baseId),
+			pdrId: uint16(baseId),
+			farId: uint16(baseId),
+			qerId: uint16(baseId),
+			urrId: uint16(baseId),
+		},
+		downlink: UeFlow{
+			teid:  uint16(baseId),
+			pdrId: uint16(baseId),
+			farId: uint16(baseId),
+			qerId: uint16(baseId),
+			urrId: uint16(baseId),
+		},
+	}
+
+	m.activeSessions[seid] = *sess
 }
 
-func (m *MockSMF) InitializeSessions(count int) {
+func (m *MockSMF) InitializeSessions(baseId int, count int) {
 	for i := 1; i < (count + 1); i++ {
 		seid := uint64(i)
 
 		sess := Session{
 			ourSeid:   seid,
-			ueAddress: nil, // TODO Where to get UE-Address?
-			peerSeid:  0,   // TODO Where to get peer SEID? Association Response?
+			ueAddress: nil,
+			peerSeid:  0,
+
+			uplink: UeFlow{
+				teid:  uint16(baseId),
+				pdrId: uint16(baseId),
+				farId: uint16(baseId),
+				qerId: uint16(baseId),
+				urrId: uint16(baseId),
+			},
+			downlink: UeFlow{
+				teid:  uint16(baseId),
+				pdrId: uint16(baseId),
+				farId: uint16(baseId),
+				qerId: uint16(baseId),
+				urrId: uint16(baseId),
+			},
 		}
 
-		m.activeSessions[i] = sess
+		m.activeSessions[seid] = sess
 	}
 }
 
