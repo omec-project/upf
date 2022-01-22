@@ -192,7 +192,7 @@ func (pConn *PFCPConn) Serve() {
 			n, err := pConn.Read(recvBuf)
 			if err != nil {
 				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-					log.Infof("Read timeout received for connection: %v<->%v",
+					log.Infof("Read timeout for connection %v<->%v, is the SMF still alive?",
 						pConn.LocalAddr(), pConn.RemoteAddr())
 					connClosed <- struct{}{}
 
