@@ -63,11 +63,11 @@ func (m *MockSMF) Connect(remoteAddress string) error {
 func (m *MockSMF) TeardownAssociation() {
 	err := m.client.TeardownAssociation()
 	if err != nil {
-		m.log.Errorf("error while tearing down association: %v", err)
+		m.log.Errorf("Error while tearing down association: %v", err)
+		return
 	}
 
 	m.log.Infoln("Teardown association completed")
-
 }
 
 func (m *MockSMF) SetupAssociation() {
@@ -83,38 +83,39 @@ func (m *MockSMF) SetupAssociation() {
 func (m *MockSMF) RecvSessionEstResponse(session *Session) {
 	response, err := m.client.PeekNextResponse(5)
 	if err != nil {
-		m.log.Errorf("error while receiving message: %v", err)
+		m.log.Errorf("Error while receiving message: %v", err)
+		return
 	}
 
 	if response.MessageType() == message.MsgTypeSessionEstablishmentResponse {
 
-		for _, ie1 := range response.(*message.SessionEstablishmentResponse).IEs {
-			if ie1.Type == ie.Cause {
-				cause, err := ie1.Cause()
+		for _, infoElement := range response.(*message.SessionEstablishmentResponse).IEs {
+			if infoElement.Type == ie.Cause {
+				cause, err := infoElement.Cause()
 
 				if err != nil {
-					m.log.Errorf("error retrieving IE cause: %v", err)
+					m.log.Errorf("Error retrieving IE cause: %v", err)
 					return
 				}
 
-				if !(cause == ie.CauseRequestAccepted) { //FIXME should support also cause "reserved"?
-					m.log.Errorf("unexpected cause")
+				if cause != ie.CauseRequestAccepted { //FIXME should support also cause "reserved"?
+					m.log.Errorf("Unexpected cause")
 					return
 				}
 			}
 
-			if ie1.Type == ie.FSEID {
+			if infoElement.Type == ie.FSEID {
 				// set session peerSeid
-				fs, err := ie1.FSEID()
+				fs, err := infoElement.FSEID()
 				if err != nil {
-					m.log.Errorf("error retrieving FSEID from IE: %v", err)
+					m.log.Errorf("Error retrieving FSEID from IE: %v", err)
 					return
 				}
 				session.setPeerSeid(fs.SEID)
 			}
 		}
 	} else {
-		m.log.Errorf("received %v but was expecting %v", response.MessageType(), message.MsgTypeSessionEstablishmentResponse)
+		m.log.Errorf("Received %v but was expecting %v", response.MessageType(), message.MsgTypeSessionEstablishmentResponse)
 	}
 }
 
@@ -153,7 +154,7 @@ func (m *MockSMF) CreateSession(baseId uint64) {
 func (m *MockSMF) InitializeSessions(baseId int, count int) {
 	ip, _, err := net.ParseCIDR(m.ueAddressPool)
 	if err != nil {
-		m.log.Errorf("could not parse address pool: %v", err)
+		m.log.Errorf("Could not parse address pool: %v", err)
 	}
 
 	ip = iplib.NextIP(ip) // TODO handle case net address is full
@@ -185,15 +186,15 @@ func (m *MockSMF) InitializeSessions(baseId int, count int) {
 			},
 		}
 
-		m.log.Debugf("created session with SEID %v", sess.ourSeid)
+		m.log.Debugf("Created session with SEID %v", sess.ourSeid)
 		m.activeSessions[seid] = sess
 	}
 }
 
-func craftPfcpSessionEstRequest(address net.IP, seq uint32, Seid uint64) *message.SessionEstablishmentRequest {
+func craftPfcpSessionEstRequest(address net.IP, seq uint32, seid uint64) *message.SessionEstablishmentRequest {
 	IEnodeID := ie.NewNodeID(address.String(), "", "")
 
-	fseidIE := craftFseid(address, Seid)
+	fseidIE := ie.NewFSEID(seid, address, nil)
 	msg := message.NewSessionEstablishmentRequest(
 		0,
 		0,
@@ -207,8 +208,4 @@ func craftPfcpSessionEstRequest(address net.IP, seq uint32, Seid uint64) *messag
 	msg.PDNType.Type = ie.PDNType
 
 	return msg
-}
-
-func craftFseid(address net.IP, seid uint64) *ie.IE {
-	return ie.NewFSEID(seid, address, nil)
 }

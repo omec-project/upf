@@ -137,7 +137,7 @@ func parseArgs() {
 	// Flag checks and validations
 	if *verbosity {
 		SetLogLevel(logrus.DebugLevel)
-		log.Info("verbosity level set.")
+		log.Info("Verbosity level set.")
 	}
 
 	if *outputFile != "" {
@@ -146,12 +146,12 @@ func parseArgs() {
 	}
 
 	if *base < 0 {
-		log.Fatalf("base id cannot be a negative number")
+		log.Fatalf("Base id cannot be a negative number")
 	}
 	baseId = *base
 
 	if *sessionCnt < 0 {
-		log.Fatalf("session count cannot be a negative number")
+		log.Fatalf("Session count cannot be a negative number")
 	}
 	sessionCount = *sessionCnt
 
@@ -159,7 +159,7 @@ func parseArgs() {
 	if remotePeerAddress == nil {
 		address, err := net.LookupHost(*peerAddr)
 		if err != nil {
-			log.Fatalf("could not retrieve hostname or address from parameters: %s", *peerAddr)
+			log.Fatalf("Could not retrieve hostname or address from parameters: %s", *peerAddr)
 		}
 		remotePeerAddress = net.ParseIP(address[0])
 	}
@@ -168,7 +168,7 @@ func parseArgs() {
 
 	_, _, err = net.ParseCIDR(*ueAddrPool)
 	if err != nil {
-		log.Fatalf("could not parse ue address pool: %v", err)
+		log.Fatalf("Could not parse ue address pool: %v", err)
 	}
 	ueAddressPool = *ueAddrPool
 
@@ -242,7 +242,7 @@ func handleUserInput() {
 				globalMockSmf.SetupAssociation()
 			case 3:
 				log.Infof("Selected Create Session")
-				globalMockSmf.InitializeSessions(baseId, sessionCount, ueAddressPool)
+				globalMockSmf.InitializeSessions(baseId, sessionCount)
 			case 9:
 				log.Infoln("Shutting down")
 				globalMockSmf.Disconnect()
