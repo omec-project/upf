@@ -256,6 +256,10 @@ func (c *PFCPClient) SetupAssociation() error {
 }
 
 func (c *PFCPClient) TeardownAssociation() error {
+	if !c.isAssociationAlive {
+		return errors.New("association does not exist")
+	}
+
 	msg := c.craftPfcpAssociationReleaseRequest()
 
 	err := c.sendMsg(msg)

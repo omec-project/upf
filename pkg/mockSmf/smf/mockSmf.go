@@ -1,6 +1,7 @@
 package smf
 
 import (
+	"github.com/c-robinson/iplib"
 	"github.com/omec-project/upf-epc/pkg/pfcpsim"
 	"github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -8,17 +9,10 @@ import (
 	"net"
 )
 
-type Session struct {
-	ourSeid uint64
-
-	ueAddress net.IP
-	peerSeid  uint64
-	uplink    UeFlow
-	downlink  UeFlow
-	//sentPdrs  map[int]ie.IE
-	//sentFars  map[int]ie.IE
-	//sentQers map[int]ie.IE
-}
+const (
+	INTERFACE_ACCESS = 0
+	INTERFACE_CORE   = 1
+)
 
 type UeFlow struct {
 	teid  uint16
@@ -28,25 +22,17 @@ type UeFlow struct {
 	urrId uint16
 }
 
-func NewUeFlow(baseId int) *UeFlow {
-	return &UeFlow{
-		teid:  uint16(baseId + 1),
-		pdrId: uint16(baseId + 1),
-		farId: uint16(baseId + 1),
-		qerId: uint16(baseId + 1),
-		urrId: uint16(baseId + 1),
-	}
-}
-
 type MockSMF struct {
 	activeSessions map[uint64]Session
+
+	ueAddressPool string
 
 	log *logrus.Logger
 
 	client *pfcpsim.PFCPClient
 }
 
-func NewMockSMF(lAddr string, logger *logrus.Logger) *MockSMF {
+func NewMockSMF(lAddr string, ueAddressPool string, logger *logrus.Logger) *MockSMF {
 	if logger == nil {
 		logger = new(logrus.Logger)
 	}
@@ -54,6 +40,7 @@ func NewMockSMF(lAddr string, logger *logrus.Logger) *MockSMF {
 	return &MockSMF{
 		activeSessions: make(map[uint64]Session),
 		log:            logger,
+		ueAddressPool:  ueAddressPool,
 		client:         pfcpsim.NewPFCPClient(lAddr, logger),
 	}
 }
@@ -79,7 +66,7 @@ func (m *MockSMF) TeardownAssociation() {
 		m.log.Errorf("error while tearing down association: %v", err)
 	}
 
-	m.log.Infoln("Teardown association finished")
+	m.log.Infoln("Teardown association completed")
 
 }
 
@@ -90,6 +77,45 @@ func (m *MockSMF) SetupAssociation() {
 	}
 
 	m.log.Infof("setup association completed")
+}
+
+// RecvSessionEstResponse receives messages response.
+func (m *MockSMF) RecvSessionEstResponse(session *Session) {
+	response, err := m.client.PeekNextResponse(5)
+	if err != nil {
+		m.log.Errorf("error while receiving message: %v", err)
+	}
+
+	if response.MessageType() == message.MsgTypeSessionEstablishmentResponse {
+
+		for _, ie1 := range response.(*message.SessionEstablishmentResponse).IEs {
+			if ie1.Type == ie.Cause {
+				cause, err := ie1.Cause()
+
+				if err != nil {
+					m.log.Errorf("error retrieving IE cause: %v", err)
+					return
+				}
+
+				if !(cause == ie.CauseRequestAccepted) { //FIXME should support also cause "reserved"?
+					m.log.Errorf("unexpected cause")
+					return
+				}
+			}
+
+			if ie1.Type == ie.FSEID {
+				// set session peerSeid
+				fs, err := ie1.FSEID()
+				if err != nil {
+					m.log.Errorf("error retrieving FSEID from IE: %v", err)
+					return
+				}
+				session.setPeerSeid(fs.SEID)
+			}
+		}
+	} else {
+		m.log.Errorf("received %v but was expecting %v", response.MessageType(), message.MsgTypeSessionEstablishmentResponse)
+	}
 }
 
 func (m *MockSMF) CreateSession(baseId uint64) {
@@ -113,7 +139,7 @@ func (m *MockSMF) CreateSession(baseId uint64) {
 			urrId: uint16(baseId),
 		},
 		downlink: UeFlow{
-			teid:  uint16(baseId),
+			teid:  uint16(baseId) + 1,
 			pdrId: uint16(baseId),
 			farId: uint16(baseId),
 			qerId: uint16(baseId),
@@ -125,23 +151,33 @@ func (m *MockSMF) CreateSession(baseId uint64) {
 }
 
 func (m *MockSMF) InitializeSessions(baseId int, count int) {
+	ip, _, err := net.ParseCIDR(m.ueAddressPool)
+	if err != nil {
+		m.log.Errorf("could not parse address pool: %v", err)
+	}
+
+	ip = iplib.NextIP(ip) // TODO handle case net address is full
+
 	for i := 1; i < (count + 1); i++ {
 		seid := uint64(i)
+		teid := uint16(i)
+
+		ueIp := ip
 
 		sess := Session{
 			ourSeid:   seid,
-			ueAddress: nil,
+			ueAddress: ueIp,
 			peerSeid:  0,
 
 			uplink: UeFlow{
-				teid:  uint16(baseId),
+				teid:  teid,
 				pdrId: uint16(baseId),
 				farId: uint16(baseId),
 				qerId: uint16(baseId),
 				urrId: uint16(baseId),
 			},
 			downlink: UeFlow{
-				teid:  uint16(baseId),
+				teid:  teid + 1, //FIXME correct? uplink and downlink have different TEIDs?
 				pdrId: uint16(baseId),
 				farId: uint16(baseId),
 				qerId: uint16(baseId),
@@ -149,6 +185,7 @@ func (m *MockSMF) InitializeSessions(baseId int, count int) {
 			},
 		}
 
+		m.log.Debugf("created session with SEID %v", sess.ourSeid)
 		m.activeSessions[seid] = sess
 	}
 }

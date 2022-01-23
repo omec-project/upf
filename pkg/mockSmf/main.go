@@ -25,6 +25,7 @@ var (
 	doOnce            sync.Once
 	sessionCount      int
 	baseId            int
+	ueAddressPool     string
 
 	globalMockSmf *smf.MockSMF
 )
@@ -84,11 +85,11 @@ func init() {
 	remotePeerAddress = nil
 	localAddress = nil
 	inputFile = ""
-	globalMockSmf = &smf.MockSMF{} // Empty struct
+	globalMockSmf = &smf.MockSMF{}
 }
 
 // Retrieves the IP associated with interfaceName. returns error if something goes wrong.
-func getIfaceAddress(interfaceName string) (net.IP, error) {
+func getInterfaceAddress(interfaceName string) (net.IP, error) {
 	// TODO simply this. it retrieves all the interfaces.
 	ifaces, err := net.Interfaces()
 	if err != nil {
@@ -124,6 +125,7 @@ func parseArgs() {
 	interfaceName := getopt.StringLong("interface", 'i', "Set interface name to discover local address")
 	sessionCnt := getopt.IntLong("session-count", 's', 1, "Set the amount of sessions to create, starting from 1 (included)")
 	base := getopt.IntLong("base", 'b', 1, "First ID used to generate all other ID fields.")
+	ueAddrPool := getopt.StringLong("ue-address-pool", 'u', "17.0.0.0/24", "The IPv4 CIDR prefix from which UE addresses will be drawn, incrementally")
 	optHelp := getopt.BoolLong("help", 0, "Help")
 
 	getopt.Parse()
@@ -132,7 +134,7 @@ func parseArgs() {
 		os.Exit(0)
 	}
 
-	// Flag checks
+	// Flag checks and validations
 	if *verbosity {
 		SetLogLevel(logrus.DebugLevel)
 		log.Info("verbosity level set.")
@@ -157,15 +159,22 @@ func parseArgs() {
 	if remotePeerAddress == nil {
 		address, err := net.LookupHost(*peerAddr)
 		if err != nil {
-			log.Fatalf("couldn't retrieve hostname or address from parameters: %s", *peerAddr)
+			log.Fatalf("could not retrieve hostname or address from parameters: %s", *peerAddr)
 		}
 		remotePeerAddress = net.ParseIP(address[0])
 	}
 
 	var err error = nil
-	localAddress, err = getIfaceAddress(*interfaceName)
+
+	_, _, err = net.ParseCIDR(*ueAddrPool)
 	if err != nil {
-		log.Fatalf("Error while retriving interface informations: %v", err)
+		log.Fatalf("could not parse ue address pool: %v", err)
+	}
+	ueAddressPool = *ueAddrPool
+
+	localAddress, err = getInterfaceAddress(*interfaceName)
+	if err != nil {
+		log.Fatalf("Error while retriving interface information: %v", err)
 	}
 
 }
@@ -213,10 +222,9 @@ func readInput(input chan<- int) {
 
 func handleUserInput() {
 	userInput := make(chan int)
-	done := false
 	go readInput(userInput)
 
-	for !done {
+	for {
 		fmt.Println("1. Teardown Association")
 		fmt.Println("2. Setup Association")
 		fmt.Println("3. Create Session ")
@@ -234,7 +242,7 @@ func handleUserInput() {
 				globalMockSmf.SetupAssociation()
 			case 3:
 				log.Infof("Selected Create Session")
-				globalMockSmf.InitializeSessions(baseId, sessionCount)
+				globalMockSmf.InitializeSessions(baseId, sessionCount, ueAddressPool)
 			case 9:
 				log.Infoln("Shutting down")
 				globalMockSmf.Disconnect()
@@ -243,10 +251,6 @@ func handleUserInput() {
 			default:
 				fmt.Println("Not implemented or bad entry")
 			}
-
-			//case <-time.After(10 * time.Second):
-			//	done = true
-			//	fmt.Println("\n DEBUG: Time is over!")
 		}
 	}
 }
@@ -366,7 +370,7 @@ func main() {
 
 	parseArgs()
 
-	globalMockSmf = smf.NewMockSMF(localAddress.String(), GetLoggerInstance())
+	globalMockSmf = smf.NewMockSMF(localAddress.String(), ueAddressPool, GetLoggerInstance())
 	err := globalMockSmf.Connect(remotePeerAddress.String())
 	if err != nil {
 		log.Fatalf("failed to connect to UPF: %v", err)
