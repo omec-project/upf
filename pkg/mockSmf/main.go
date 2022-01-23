@@ -18,7 +18,8 @@ import (
 
 // Global vars
 var (
-	log               *logrus.Logger
+	log *logrus.Logger
+
 	remotePeerAddress net.IP
 	localAddress      net.IP
 	inputFile         string
@@ -42,7 +43,7 @@ func SetLogLevel(level logrus.Level) {
 	log.SetLevel(level)
 }
 
-func logOutput(logfile string) func() {
+func setStdout(logfile string) func() {
 	f, _ := os.OpenFile(logfile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 
 	out := os.Stdout
@@ -70,7 +71,7 @@ func logOutput(logfile string) func() {
 
 	// function to be deferred in main until program exits
 	return func() {
-		// close writer then block on exit channel | this will let multiWriter finish writing before the program exits
+		// close writer then block on exit channel. this will let multiWriter finish writing before the program exits
 		_ = w.Close()
 		<-exit
 
@@ -88,7 +89,7 @@ func init() {
 	globalMockSmf = &smf.MockSMF{}
 }
 
-// Retrieves the IP associated with interfaceName. returns error if something goes wrong.
+// getInterfaceAddress retrieves the IP of parameter interfaceName. returns error if something goes wrong.
 func getInterfaceAddress(interfaceName string) (net.IP, error) {
 	// TODO simply this. it retrieves all the interfaces.
 	ifaces, err := net.Interfaces()
@@ -141,7 +142,8 @@ func parseArgs() {
 	}
 
 	if *outputFile != "" {
-		fn := logOutput(*outputFile)
+		// TODO move this in main function
+		fn := setStdout(*outputFile)
 		defer fn()
 	}
 
@@ -225,24 +227,29 @@ func handleUserInput() {
 	go readInput(userInput)
 
 	for {
+		// TODO use literals, not int
 		fmt.Println("1. Teardown Association")
 		fmt.Println("2. Setup Association")
-		fmt.Println("3. Create Session ")
-		fmt.Println("9. Stop ")
+		fmt.Println("3. Create Sessions ")
+		fmt.Println("4. Delete Sessions ")
+		fmt.Println("9. Exit ")
 		fmt.Print("Enter service: ")
 
 		select {
 		case userAnswer := <-userInput:
 			switch userAnswer {
 			case 1:
-				log.Infof("Selected Teardown Association")
+				log.Infof("Selected teardown association")
 				globalMockSmf.TeardownAssociation()
 			case 2:
-				log.Infof("Selected Setup Association")
+				log.Infof("Selected setup association")
 				globalMockSmf.SetupAssociation()
 			case 3:
-				log.Infof("Selected Create Session")
+				log.Infof("Selected create sessions")
 				globalMockSmf.InitializeSessions(baseId, sessionCount)
+			case 4:
+				log.Infof("Selected delete sessions")
+				globalMockSmf.DeleteAllSessions()
 			case 9:
 				log.Infoln("Shutting down")
 				globalMockSmf.Disconnect()
@@ -258,7 +265,10 @@ func handleUserInput() {
 func server(wg *sync.WaitGroup, quitCh chan struct{}) {
 	// Emulates User-plane N4
 	defer wg.Done()
-	laddr, err := net.ResolveUDPAddr("udp", "localhost:8805")
+	seid := uint64(999) //Mock SEID
+	localAddress := net.ParseIP("127.0.0.1")
+
+	laddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%v:8805", localAddress.String()))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -353,6 +363,50 @@ func server(wg *sync.WaitGroup, quitCh chan struct{}) {
 				}
 				log.Infof("Server: sent Association Release Response to: %s", addr)
 				log.Infof("Server: Association removed.")
+
+			case message.MsgTypeSessionEstablishmentRequest:
+				log.Infof("received session establishment request")
+				cause := ie.NewCause(ie.CauseRequestAccepted)
+				fseid := ie.NewFSEID(seid, localAddress, nil)
+				seq++
+				sessDelResp, err := message.NewSessionEstablishmentResponse(
+					0,
+					0,
+					seid,
+					seq,
+					0,
+					cause,
+					fseid,
+				).Marshal()
+
+				if err != nil {
+					log.Errorf("Error while marshalling session establishment response")
+				}
+
+				if _, err := conn.WriteTo(sessDelResp, addr); err != nil {
+					log.Fatal(err)
+				}
+
+			case message.MsgTypeSessionDeletionRequest:
+				log.Infof("Received session deletion request")
+				cause := ie.NewCause(ie.CauseRequestAccepted)
+				seq++
+				sessDelResp, err := message.NewSessionDeletionResponse(
+					0,
+					0,
+					seid,
+					seq,
+					0,
+					cause,
+				).Marshal()
+				if err != nil {
+					log.Errorf("error while marshalling session delete response: %v", err)
+				}
+
+				if _, err := conn.WriteTo(sessDelResp, addr); err != nil {
+					log.Fatal(err)
+				}
+
 			} // end of switch
 
 		}
@@ -360,8 +414,7 @@ func server(wg *sync.WaitGroup, quitCh chan struct{}) {
 }
 
 func main() {
-	log.SetOutput(io.MultiWriter(os.Stdout)) // Debug. if you want to save the log output to file simply add it in here.
-	wg := new(sync.WaitGroup)                // main wait group
+	wg := new(sync.WaitGroup)
 	quitCh := make(chan struct{})
 
 	wg.Add(1)
@@ -373,10 +426,10 @@ func main() {
 	globalMockSmf = smf.NewMockSMF(localAddress.String(), ueAddressPool, GetLoggerInstance())
 	err := globalMockSmf.Connect(remotePeerAddress.String())
 	if err != nil {
-		log.Fatalf("failed to connect to UPF: %v", err)
+		log.Fatalf("Failed to connect to remote peer: %v", err)
 	}
 
 	handleUserInput()
 
-	wg.Wait() // wait for all go-routine before shutting down
+	wg.Wait() // wait for all go-routines before shutting down
 }

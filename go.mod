@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/Showmax/go-fqdn v1.0.0
+	github.com/c-robinson/iplib v1.0.3
 	github.com/golang/protobuf v1.5.2
 	github.com/google/gopacket v1.1.19
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
@@ -11,6 +12,7 @@ require (
 	github.com/libp2p/go-reuseport v0.1.0
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/p4lang/p4runtime v1.3.0
+	github.com/pborman/getopt/v2 v2.1.0
 	github.com/prometheus/client_golang v1.11.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0

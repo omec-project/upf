@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/sirupsen/logrus"
-	"github.com/wmnsk/go-pfcp/ie"
+	ielib "github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
 	"net"
 	"sync"
@@ -44,10 +44,8 @@ type PFCPClient struct {
 	conn      *net.UDPConn
 }
 
-func NewPFCPClient(localAddr string, logger *logrus.Logger) *PFCPClient {
-	if logger == nil {
-		logger = logrus.New()
-	}
+func NewPFCPClient(localAddr string) *PFCPClient {
+	logger := logrus.New()
 
 	return &PFCPClient{
 		sequenceNumber: 0,
@@ -160,30 +158,30 @@ func (c *PFCPClient) PeekNextResponse(timeout time.Duration) (message.Message, e
 }
 
 // SendAssociationSetupRequest sends an association setup request. It allows adding custom IEs.
-func (c *PFCPClient) SendAssociationSetupRequest(infoelement ...*ie.IE) error {
+func (c *PFCPClient) SendAssociationSetupRequest(ie ...*ielib.IE) error {
 	c.resetSequenceNumber()
 
 	assocReq := message.NewAssociationSetupRequest(
 		c.getNextSequenceNumber(),
-		ie.NewRecoveryTimeStamp(time.Now()),
-		ie.NewNodeID(c.localAddr, "", ""),
+		ielib.NewRecoveryTimeStamp(time.Now()),
+		ielib.NewNodeID(c.localAddr, "", ""),
 	)
 
-	for _, ieValue := range infoelement {
+	for _, ieValue := range ie {
 		assocReq.IEs = append(assocReq.IEs, ieValue)
 	}
 
 	return c.sendMsg(assocReq)
 }
 
-func (c *PFCPClient) craftPfcpAssociationReleaseRequest(infoElement ...*ie.IE) *message.AssociationReleaseRequest {
-	ie1 := ie.NewNodeID(c.conn.RemoteAddr().String(), "", "")
+func (c *PFCPClient) craftPfcpAssociationReleaseRequest(infoElement ...*ielib.IE) *message.AssociationReleaseRequest {
+	ie1 := ielib.NewNodeID(c.conn.RemoteAddr().String(), "", "")
 
 	c.resetSequenceNumber()
 	msg := message.NewAssociationReleaseRequest(0, ie1)
 
-	for _, ieValue := range infoElement {
-		msg.IEs = append(msg.IEs, ieValue)
+	for _, ie := range infoElement {
+		msg.IEs = append(msg.IEs, ie)
 	}
 
 	return msg
@@ -192,8 +190,8 @@ func (c *PFCPClient) craftPfcpAssociationReleaseRequest(infoElement ...*ie.IE) *
 func (c *PFCPClient) SendHeartbeatRequest() error {
 	hbReq := message.NewHeartbeatRequest(
 		c.getNextSequenceNumber(),
-		ie.NewRecoveryTimeStamp(time.Now()),
-		ie.NewSourceIPAddress(net.ParseIP(c.localAddr), nil, 0),
+		ielib.NewRecoveryTimeStamp(time.Now()),
+		ielib.NewSourceIPAddress(net.ParseIP(c.localAddr), nil, 0),
 	)
 
 	return c.sendMsg(hbReq)
@@ -232,6 +230,10 @@ func (c *PFCPClient) SendAndRecvHeartbeat() error {
 	return nil
 }
 
+func (c *PFCPClient) SetLogger(logger *logrus.Logger) {
+	c.log = logger
+}
+
 func (c *PFCPClient) SetupAssociation() error {
 	err := c.SendAssociationSetupRequest()
 	if err != nil {
@@ -251,6 +253,84 @@ func (c *PFCPClient) SetupAssociation() error {
 	c.cancelHeartbeats = cancelFunc
 
 	go c.startHeartbeats(ctx)
+
+	return nil
+}
+
+func (c *PFCPClient) CreateSession(session Session, ie ...*ielib.IE) error {
+	ie1 := ielib.NewNodeID(c.localAddr, "", "")
+	ie2 := ielib.NewFSEID(session.ourSeid, net.ParseIP(c.localAddr), nil)
+	ie3 := ielib.NewPDNType(ielib.PDNTypeIPv4)
+
+	sessionEstReq := message.NewSessionEstablishmentRequest(
+		0,
+		0,
+		session.ourSeid,
+		c.getNextSequenceNumber(),
+		0,
+		ie1,
+		ie2,
+		ie3,
+	)
+
+	err := c.sendMsg(sessionEstReq)
+	if err != nil {
+		return err
+	}
+
+	res, err := c.PeekNextResponse(5)
+	if err != nil {
+		return err
+	}
+
+	if res.MessageType() != message.MsgTypeSessionEstablishmentResponse {
+		errMsg := fmt.Sprintf("sent session establishment request but received: %v", res.MessageTypeName())
+		return errors.New(errMsg)
+	}
+
+	return nil
+}
+
+func (c *PFCPClient) DeleteSession(session Session, ie ...*ielib.IE) error {
+	if session.GetPeerSeid() == 0 {
+		// most probably did not get F-SEID from session establishment.
+		//return errors.New("session does not have peer F-SEID")
+		fmt.Println("DEBUG Skipping session peer seid check") //FIXME REMOVE
+	}
+
+	seid := session.GetOurSeid()
+	c.log.Debugf("Deleting session with SEID %v", seid)
+
+	ie1 := ielib.NewFSEID(seid, net.ParseIP(c.localAddr), nil)
+
+	sessionDeletionReq := message.NewSessionDeletionRequest(
+		0,
+		0,
+		seid,
+		c.getNextSequenceNumber(),
+		0,
+		ie1,
+	)
+
+	for _, ie := range ie {
+		// append optional IEs passed by caller
+		sessionDeletionReq.IEs = append(sessionDeletionReq.IEs, ie)
+	}
+
+	err := c.sendMsg(sessionDeletionReq)
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.PeekNextResponse(5)
+	if err != nil {
+		return err
+	}
+
+	if resp.MessageType() != message.MsgTypeSessionDeletionResponse {
+		errMsg := fmt.Sprintf("sent session delete request but received unexpected message: %v", resp.MessageTypeName())
+		return errors.New(errMsg)
+	}
 
 	return nil
 }
