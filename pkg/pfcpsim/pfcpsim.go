@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/sirupsen/logrus"
-	ielib "github.com/wmnsk/go-pfcp/ie"
+	ieLib "github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
 	"net"
 	"sync"
@@ -158,13 +158,13 @@ func (c *PFCPClient) PeekNextResponse(timeout time.Duration) (message.Message, e
 }
 
 // SendAssociationSetupRequest sends an association setup request. It allows adding custom IEs.
-func (c *PFCPClient) SendAssociationSetupRequest(ie ...*ielib.IE) error {
+func (c *PFCPClient) SendAssociationSetupRequest(ie ...*ieLib.IE) error {
 	c.resetSequenceNumber()
 
 	assocReq := message.NewAssociationSetupRequest(
 		c.getNextSequenceNumber(),
-		ielib.NewRecoveryTimeStamp(time.Now()),
-		ielib.NewNodeID(c.localAddr, "", ""),
+		ieLib.NewRecoveryTimeStamp(time.Now()),
+		ieLib.NewNodeID(c.localAddr, "", ""),
 	)
 
 	for _, ieValue := range ie {
@@ -174,8 +174,8 @@ func (c *PFCPClient) SendAssociationSetupRequest(ie ...*ielib.IE) error {
 	return c.sendMsg(assocReq)
 }
 
-func (c *PFCPClient) craftPfcpAssociationReleaseRequest(infoElement ...*ielib.IE) *message.AssociationReleaseRequest {
-	ie1 := ielib.NewNodeID(c.conn.RemoteAddr().String(), "", "")
+func (c *PFCPClient) craftPfcpAssociationReleaseRequest(infoElement ...*ieLib.IE) *message.AssociationReleaseRequest {
+	ie1 := ieLib.NewNodeID(c.conn.RemoteAddr().String(), "", "")
 
 	c.resetSequenceNumber()
 	msg := message.NewAssociationReleaseRequest(0, ie1)
@@ -190,8 +190,8 @@ func (c *PFCPClient) craftPfcpAssociationReleaseRequest(infoElement ...*ielib.IE
 func (c *PFCPClient) SendHeartbeatRequest() error {
 	hbReq := message.NewHeartbeatRequest(
 		c.getNextSequenceNumber(),
-		ielib.NewRecoveryTimeStamp(time.Now()),
-		ielib.NewSourceIPAddress(net.ParseIP(c.localAddr), nil, 0),
+		ieLib.NewRecoveryTimeStamp(time.Now()),
+		ieLib.NewSourceIPAddress(net.ParseIP(c.localAddr), nil, 0),
 	)
 
 	return c.sendMsg(hbReq)
@@ -257,10 +257,10 @@ func (c *PFCPClient) SetupAssociation() error {
 	return nil
 }
 
-func (c *PFCPClient) CreateSession(session Session, ie ...*ielib.IE) error {
-	ie1 := ielib.NewNodeID(c.localAddr, "", "")
-	ie2 := ielib.NewFSEID(session.ourSeid, net.ParseIP(c.localAddr), nil)
-	ie3 := ielib.NewPDNType(ielib.PDNTypeIPv4)
+func (c *PFCPClient) CreateSession(session Session, ie ...*ieLib.IE) error {
+	ie1 := ieLib.NewNodeID(c.localAddr, "", "")
+	ie2 := ieLib.NewFSEID(session.ourSeid, net.ParseIP(c.localAddr), nil)
+	ie3 := ieLib.NewPDNType(ieLib.PDNTypeIPv4)
 
 	sessionEstReq := message.NewSessionEstablishmentRequest(
 		0,
@@ -291,7 +291,7 @@ func (c *PFCPClient) CreateSession(session Session, ie ...*ielib.IE) error {
 	return nil
 }
 
-func (c *PFCPClient) DeleteSession(session Session, ie ...*ielib.IE) error {
+func (c *PFCPClient) DeleteSession(session Session, ie ...*ieLib.IE) error {
 	if session.GetPeerSeid() == 0 {
 		// most probably did not get F-SEID from session establishment.
 		//return errors.New("session does not have peer F-SEID")
@@ -301,7 +301,7 @@ func (c *PFCPClient) DeleteSession(session Session, ie ...*ielib.IE) error {
 	seid := session.GetOurSeid()
 	c.log.Debugf("Deleting session with SEID %v", seid)
 
-	ie1 := ielib.NewFSEID(seid, net.ParseIP(c.localAddr), nil)
+	ie1 := ieLib.NewFSEID(seid, net.ParseIP(c.localAddr), nil)
 
 	sessionDeletionReq := message.NewSessionDeletionRequest(
 		0,
