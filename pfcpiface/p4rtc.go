@@ -463,7 +463,7 @@ func CreateChannel(host string, deviceID uint64) (*P4rtClient, error) {
 		return nil, err
 	}
 
-	err = client.SetMastership(p4.Uint128{High: 0, Low: 1})
+	err = client.SetMastership(p4.Uint128{High: 1, Low: 1})
 	if err != nil {
 		log.Println("Set Mastership error: ", err)
 		return nil, err

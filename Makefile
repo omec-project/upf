@@ -67,7 +67,7 @@ output:
 test-up4-integration:
 	docker-compose -f test/integration/infra/docker-compose.yml rm -fsv
 	COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker-compose -f test/integration/infra/docker-compose.yml up --build -d
-	go test -count=1 ./test/integration/...
+	go test -v -count=1 -failfast ./test/integration/...
 	docker-compose -f test/integration/infra/docker-compose.yml rm -fsv
 
 pb:
