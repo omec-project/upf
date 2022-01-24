@@ -80,7 +80,7 @@ const (
 	// Default value for Heart Beat Interval
 	hbIntervalDefault = 5 * time.Second
 
-	readTimeoutDefault = 10 * time.Second
+	readTimeoutDefault = 15 * time.Second
 )
 
 func (u *upf) isConnected() bool {
