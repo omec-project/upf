@@ -16,7 +16,6 @@ import (
 	"time"
 )
 
-// Global vars
 var (
 	log *logrus.Logger
 
@@ -121,7 +120,7 @@ func getInterfaceAddress(interfaceName string) (net.IP, error) {
 func parseArgs() {
 	//inputFile := getopt.StringLong("input-file", 'i', "", "File to poll for input commands. Default is stdin")
 	outputFile := getopt.StringLong("output-file", 'o', "", "File in which to write output. Default is stdout")
-	peerAddr := getopt.StringLong("remoteAddress", 'r', "", "Address of the remote peer (e.g. UPF)")
+	peerAddr := getopt.StringLong("remoteAddress", 'r', "", "Address or hostname of the remote peer (e.g. UPF)")
 	verbosity := getopt.BoolLong("verbose", 'v', "Set verbosity level")
 	interfaceName := getopt.StringLong("interface", 'i', "Set interface name to discover local address")
 	sessionCnt := getopt.IntLong("session-count", 's', 1, "Set the amount of sessions to create, starting from 1 (included)")
@@ -262,11 +261,13 @@ func handleUserInput() {
 	}
 }
 
-func server(wg *sync.WaitGroup, quitCh chan struct{}) {
-	// Emulates User-plane N4
+func emulateRemotePeerServer(wg *sync.WaitGroup, quitCh chan struct{}) {
+	// Emulates User-plane N4. Used for local debugging
+
 	defer wg.Done()
 	seid := uint64(999) //Mock SEID
 	localAddress := net.ParseIP("127.0.0.1")
+	// TODO save sessions locally
 
 	laddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%v:8805", localAddress.String()))
 	if err != nil {
@@ -313,7 +314,7 @@ func server(wg *sync.WaitGroup, quitCh chan struct{}) {
 				} else {
 					log.Printf("Server: got Heartbeat Request with TS: %s, from: %s", ts, addr)
 				}
-				// Timestamp shouldn't be the time message is sent in the real deployment but anyway :D
+				// Timestamp shouldn't be the time message is sent in the real deployment
 				hbres, err := message.NewHeartbeatResponse(seq, ie.NewRecoveryTimeStamp(time.Now())).Marshal()
 				if err != nil {
 					log.Fatal(err)
@@ -418,7 +419,7 @@ func main() {
 	quitCh := make(chan struct{})
 
 	wg.Add(1)
-	go server(wg, quitCh) // start emulating server for debug.
+	go emulateRemotePeerServer(wg, quitCh) // start emulating remote UPF for debug.
 	time.Sleep(500 * time.Millisecond)
 
 	parseArgs()

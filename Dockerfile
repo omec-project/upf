@@ -150,7 +150,7 @@ COPY --from=bess /bin/bessd /
 COPY --from=pfcpiface /bin/pfcpiface /
 COPY --from=bess-build /bess /bess
 
-# Stage mockSMF-build: builds the mockSMF docker image
+# Stage mock-smf-build: builds the mockSMF docker image
 FROM golang AS mock-smf-build
 WORKDIR /mock-smf
 
@@ -162,7 +162,7 @@ RUN go mod download
 COPY . ./
 RUN CGO_ENABLED=0 go build -o /bin/mock-smf pkg/mockSmf/main.go
 
-# Stage mockSMF: runtime image of mockSMF
+# Stage mock-smf: runtime image of mockSMF
 FROM alpine AS mock-smf
 COPY --from=mock-smf-build /bin/mock-smf /bin
 ENTRYPOINT [ "/bin/mock-smf", "-r", "127.0.0.1", "-v", "-i",  "eth0" ]

@@ -74,8 +74,12 @@ func (m *MockSMF) SetupAssociation() {
 	m.log.Infof("setup association completed")
 }
 
-// RecvSessionEstResponse receives messages response.
-func (m *MockSMF) RecvSessionEstResponse(session *pfcpsim.Session) {
+func (m *MockSMF) CreateSession(session *pfcpsim.Session) {
+	err := m.client.SendSessionEstRequest(session)
+	if err != nil {
+		m.log.Errorf("Error while establishment of session: %v", err)
+	}
+
 	response, err := m.client.PeekNextResponse(5)
 	if err != nil {
 		m.log.Errorf("Error while receiving message: %v", err)
@@ -114,13 +118,13 @@ func (m *MockSMF) RecvSessionEstResponse(session *pfcpsim.Session) {
 	}
 }
 
-func (m *MockSMF) CreateSession(baseId uint64) {
+// craftSession creates a session and saves it in ActiveSessions map
+func (m *MockSMF) craftSession(baseId uint64) *pfcpsim.Session {
 	seid := baseId
 
-	if len(m.activeSessions) != 0 {
-		session := m.activeSessions[uint64(len(m.activeSessions)-1)]
-		lastSeid := session.GetOurSeid() // get last ourSeid to generate new one
-		baseId = lastSeid + 1
+	if session, ok := m.activeSessions[seid]; ok {
+		// Session already present. return it
+		return &session
 	}
 
 	uplink := pfcpsim.UeFlow{
@@ -139,14 +143,12 @@ func (m *MockSMF) CreateSession(baseId uint64) {
 		UrrId: uint16(baseId),
 	}
 
-	sess := *pfcpsim.NewSession(nil, seid, uplink, downlink)
+	session := pfcpsim.NewSession(nil, seid, uplink, downlink)
+	m.activeSessions[seid] = *session
 
-	m.activeSessions[seid] = sess
+	m.log.Debugf("Created session with SEID %v", session.GetOurSeid())
 
-	err := m.client.CreateSession(sess)
-	if err != nil {
-		m.log.Errorf("Error while establishment of session: %v", err)
-	}
+	return session
 }
 
 func (m *MockSMF) InitializeSessions(baseId int, count int) {
@@ -158,37 +160,28 @@ func (m *MockSMF) InitializeSessions(baseId int, count int) {
 	ip = iplib.NextIP(ip) // TODO handle case net address is full
 
 	for i := 1; i < (count + 1); i++ {
-		seid := uint64(i)
-		teid := uint16(i)
+		session := m.craftSession(uint64(i))
+		m.CreateSession(session)
 
-		uplink := pfcpsim.UeFlow{
-			Teid:  teid,
-			PdrId: uint16(baseId),
-			FarId: uint16(baseId),
-			QerId: uint16(baseId),
-			UrrId: uint16(baseId),
-		}
-
-		downlink := pfcpsim.UeFlow{
-			Teid:  teid + 1, //FIXME correct? uplink and downlink have different TEIDs?
-			PdrId: uint16(baseId),
-			FarId: uint16(baseId),
-			QerId: uint16(baseId),
-			UrrId: uint16(baseId),
-		}
-
-		session := *pfcpsim.NewSession(ip, seid, uplink, downlink)
-
-		m.log.Debugf("Created session with SEID %v", session.GetOurSeid())
-		m.activeSessions[seid] = session
 	}
 }
 
 func (m *MockSMF) DeleteAllSessions() {
 	for _, session := range m.activeSessions {
-		err := m.client.DeleteSession(session)
+		err := m.client.SendSessionDeletionRequest(session)
 		if err != nil {
-			m.log.Errorf("Error while deleting Session: %v", err)
+			m.log.Errorf("Error while sending session deletion request: %v", err)
 		}
+
+		resp, err := m.client.PeekNextResponse(5)
+		if err != nil {
+			m.log.Errorf("Error while sending session deletion request: %v", err)
+		}
+
+		if resp.MessageType() != message.MsgTypeSessionDeletionResponse {
+			m.log.Errorf("sent session delete request but received unexpected message: %v", resp.MessageTypeName())
+		}
+
+		m.log.Infof("Session with SEID %v was successfully deleted", session.GetOurSeid())
 	}
 }

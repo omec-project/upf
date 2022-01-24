@@ -171,17 +171,17 @@ func (c *PFCPClient) SendAssociationSetupRequest(ie ...*ieLib.IE) error {
 		assocReq.IEs = append(assocReq.IEs, ieValue)
 	}
 
-	return c.sendMsg(assocReq)
+	return c.sendMsg(assocReq) //
 }
 
-func (c *PFCPClient) craftPfcpAssociationReleaseRequest(infoElement ...*ieLib.IE) *message.AssociationReleaseRequest {
+func (c *PFCPClient) craftPfcpAssociationReleaseRequest(ie ...*ieLib.IE) *message.AssociationReleaseRequest {
 	ie1 := ieLib.NewNodeID(c.conn.RemoteAddr().String(), "", "")
 
 	c.resetSequenceNumber()
 	msg := message.NewAssociationReleaseRequest(0, ie1)
 
-	for _, ie := range infoElement {
-		msg.IEs = append(msg.IEs, ie)
+	for _, ieValue := range ie {
+		msg.IEs = append(msg.IEs, ieValue)
 	}
 
 	return msg
@@ -257,7 +257,7 @@ func (c *PFCPClient) SetupAssociation() error {
 	return nil
 }
 
-func (c *PFCPClient) CreateSession(session Session, ie ...*ieLib.IE) error {
+func (c *PFCPClient) SendSessionEstRequest(session *Session, ie ...*ieLib.IE) error {
 	ie1 := ieLib.NewNodeID(c.localAddr, "", "")
 	ie2 := ieLib.NewFSEID(session.ourSeid, net.ParseIP(c.localAddr), nil)
 	ie3 := ieLib.NewPDNType(ieLib.PDNTypeIPv4)
@@ -273,25 +273,10 @@ func (c *PFCPClient) CreateSession(session Session, ie ...*ieLib.IE) error {
 		ie3,
 	)
 
-	err := c.sendMsg(sessionEstReq)
-	if err != nil {
-		return err
-	}
-
-	res, err := c.PeekNextResponse(5)
-	if err != nil {
-		return err
-	}
-
-	if res.MessageType() != message.MsgTypeSessionEstablishmentResponse {
-		errMsg := fmt.Sprintf("sent session establishment request but received: %v", res.MessageTypeName())
-		return errors.New(errMsg)
-	}
-
-	return nil
+	return c.sendMsg(sessionEstReq)
 }
 
-func (c *PFCPClient) DeleteSession(session Session, ie ...*ieLib.IE) error {
+func (c *PFCPClient) SendSessionDeletionRequest(session Session, ie ...*ieLib.IE) error {
 	if session.GetPeerSeid() == 0 {
 		// most probably did not get F-SEID from session establishment.
 		//return errors.New("session does not have peer F-SEID")
@@ -317,22 +302,7 @@ func (c *PFCPClient) DeleteSession(session Session, ie ...*ieLib.IE) error {
 		sessionDeletionReq.IEs = append(sessionDeletionReq.IEs, ie)
 	}
 
-	err := c.sendMsg(sessionDeletionReq)
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.PeekNextResponse(5)
-	if err != nil {
-		return err
-	}
-
-	if resp.MessageType() != message.MsgTypeSessionDeletionResponse {
-		errMsg := fmt.Sprintf("sent session delete request but received unexpected message: %v", resp.MessageTypeName())
-		return errors.New(errMsg)
-	}
-
-	return nil
+	return c.sendMsg(sessionDeletionReq)
 }
 
 func (c *PFCPClient) TeardownAssociation() error {
