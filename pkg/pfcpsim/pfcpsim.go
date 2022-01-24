@@ -41,13 +41,13 @@ type PFCPClient struct {
 	seqNumLock     sync.Mutex
 
 	localAddr string
-	conn *net.UDPConn
+	conn      *net.UDPConn
 }
 
 func NewPFCPClient(localAddr string) *PFCPClient {
 	client := &PFCPClient{
 		sequenceNumber: 0,
-		localAddr: localAddr,
+		localAddr:      localAddr,
 	}
 	client.ctx = context.Background()
 	client.heartbeatsChan = make(chan *message.HeartbeatResponse)
