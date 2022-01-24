@@ -24,8 +24,12 @@ const (
 // - 2nd mode gives a user more control over PFCP sequence flow
 //   and enables send and receive of individual messages (e.g., SendAssociationSetupRequest(), PeekNextResponse())
 type PFCPClient struct {
-	aliveLock          sync.Mutex
-	isAssociationAlive bool
+	// keeps the current number of active PFCP sessions
+	// it is also used as F-SEID
+	numSessions uint64
+
+	aliveLock           sync.Mutex
+	isAssociationActive bool
 
 	ctx              context.Context
 	cancelHeartbeats context.CancelFunc
@@ -60,6 +64,11 @@ func (c *PFCPClient) getNextSequenceNumber() uint32 {
 	return c.sequenceNumber
 }
 
+func (c *PFCPClient) getNextFSEID() uint64 {
+	c.numSessions++
+	return c.numSessions
+}
+
 func (c *PFCPClient) resetSequenceNumber() {
 	c.seqNumLock.Lock()
 	defer c.seqNumLock.Unlock()
@@ -67,11 +76,11 @@ func (c *PFCPClient) resetSequenceNumber() {
 	c.sequenceNumber = 0
 }
 
-func (c *PFCPClient) setAssociationAlive(status bool) {
+func (c *PFCPClient) setAssociationStatus(status bool) {
 	c.aliveLock.Lock()
 	defer c.aliveLock.Unlock()
 
-	c.isAssociationAlive = status
+	c.isAssociationActive = status
 }
 
 func (c *PFCPClient) sendMsg(msg message.Message) error {
@@ -172,6 +181,24 @@ func (c *PFCPClient) SendHeartbeatRequest() error {
 	return c.sendMsg(hbReq)
 }
 
+func (c *PFCPClient) SendSessionEstablishmentRequest(pdrs []*ie.IE, fars []*ie.IE, qers []*ie.IE) error {
+	estReq := message.NewSessionEstablishmentRequest(
+		0,
+		0,
+		0,
+		c.getNextSequenceNumber(),
+		0,
+		ie.NewNodeID(c.localAddr, "", ""),
+		ie.NewFSEID(c.getNextFSEID(), net.ParseIP(c.localAddr), nil),
+		ie.NewPDNType(ie.PDNTypeIPv4),
+	)
+	estReq.CreatePDR = append(estReq.CreatePDR, pdrs...)
+	estReq.CreateFAR = append(estReq.CreateFAR, fars...)
+	estReq.CreateQER = append(estReq.CreateQER, qers...)
+
+	return c.sendMsg(estReq)
+}
+
 func (c *PFCPClient) StartHeartbeats(stopCtx context.Context) {
 	ticker := time.NewTicker(5 * time.Second)
 	for {
@@ -192,11 +219,11 @@ func (c *PFCPClient) SendAndRecvHeartbeat() error {
 
 	_, err = c.PeekNextHeartbeatResponse(5)
 	if err != nil {
-		c.setAssociationAlive(false)
+		c.setAssociationStatus(false)
 		return err
 	}
 
-	c.setAssociationAlive(true)
+	c.setAssociationStatus(true)
 
 	return nil
 }
@@ -219,6 +246,8 @@ func (c *PFCPClient) SetupAssociation() error {
 	ctx, cancelFunc := context.WithCancel(c.ctx)
 	c.cancelHeartbeats = cancelFunc
 
+	c.setAssociationStatus(true)
+
 	go c.StartHeartbeats(ctx)
 
 	return nil
@@ -228,5 +257,34 @@ func (c *PFCPClient) IsAssociationAlive() bool {
 	c.aliveLock.Lock()
 	defer c.aliveLock.Unlock()
 
-	return c.isAssociationAlive
+	return c.isAssociationActive
+}
+
+// EstablishSession sends PFCP Session Establishment Request and waits for PFCP Session Establishment Response.
+// Returns error if the process fails at any stage.
+func (c *PFCPClient) EstablishSession(pdrs []*ie.IE, fars []*ie.IE, qers []*ie.IE) error {
+	if !c.isAssociationActive {
+		return fmt.Errorf("PFCP association is not active")
+	}
+
+	err := c.SendSessionEstablishmentRequest(pdrs, fars, qers)
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.PeekNextResponse(5)
+	if err != nil {
+		return err
+	}
+
+	estResp, ok := resp.(*message.SessionEstablishmentResponse)
+	if !ok {
+		return fmt.Errorf("invalid message received, expected session establishment response")
+	}
+
+	if cause, err := estResp.Cause.Cause(); err != nil || cause != ie.CauseRequestAccepted {
+		return fmt.Errorf("session establishment response returns invalid cause: %v", cause)
+	}
+
+	return nil
 }
