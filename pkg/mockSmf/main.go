@@ -123,7 +123,7 @@ func parseArgs() {
 	peerAddr := getopt.StringLong("remoteAddress", 'r', "", "Address or hostname of the remote peer (e.g. UPF)")
 	verbosity := getopt.BoolLong("verbose", 'v', "Set verbosity level")
 	interfaceName := getopt.StringLong("interface", 'i', "Set interface name to discover local address")
-	sessionCnt := getopt.IntLong("session-count", 's', 1, "Set the amount of sessions to create, starting from 1 (included)")
+	sessionCnt := getopt.IntLong("session-count", 'c', 1, "Set the amount of sessions to create, starting from 1 (included)")
 	base := getopt.IntLong("base", 'b', 1, "First ID used to generate all other ID fields.")
 	ueAddrPool := getopt.StringLong("ue-address-pool", 'u', "17.0.0.0/24", "The IPv4 CIDR prefix from which UE addresses will be drawn, incrementally")
 	optHelp := getopt.BoolLong("help", 0, "Help")
