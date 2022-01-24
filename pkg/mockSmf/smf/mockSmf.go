@@ -9,11 +9,6 @@ import (
 	"net"
 )
 
-const (
-	INTERFACE_ACCESS = 0
-	INTERFACE_CORE   = 1
-)
-
 type MockSMF struct {
 	activeSessions map[uint64]pfcpsim.Session
 
