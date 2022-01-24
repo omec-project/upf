@@ -92,6 +92,7 @@ func (m *MockSMF) SetupAssociation() {
 }
 
 func (m *MockSMF) CreateSession(session *pfcpsim.Session) {
+	// TODO use EstablishSession instead.
 	err := m.client.SendSessionEstRequest(session)
 	if err != nil {
 		m.log.Errorf("Error while establishment of session: %v", err)

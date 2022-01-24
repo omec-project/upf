@@ -281,6 +281,36 @@ func (c *PFCPClient) craftPfcpAssociationReleaseRequest(ie ...*ieLib.IE) *messag
 	return msg
 }
 
+func (c *PFCPClient) SendSessionDeletionRequest(session Session, ie ...*ieLib.IE) error {
+	// TODO refactor this method to be similar to EstablishSession
+	if session.GetPeerSeid() == 0 {
+		// most probably did not get F-SEID from session establishment.
+		//return errors.New("session does not have peer F-SEID")
+		fmt.Println("DEBUG Skipping session peer seid check") //FIXME REMOVE
+	}
+
+	seid := session.GetOurSeid()
+	c.log.Debugf("Deleting session with SEID %v", seid)
+
+	ie1 := ieLib.NewFSEID(seid, net.ParseIP(c.localAddr), nil)
+
+	sessionDeletionReq := message.NewSessionDeletionRequest(
+		0,
+		0,
+		seid,
+		c.getNextSequenceNumber(),
+		0,
+		ie1,
+	)
+
+	for _, ie := range ie {
+		// append optional IEs passed by caller
+		sessionDeletionReq.IEs = append(sessionDeletionReq.IEs, ie)
+	}
+
+	return c.sendMsg(sessionDeletionReq)
+}
+
 func (c *PFCPClient) IsAssociationAlive() bool {
 	c.aliveLock.Lock()
 	defer c.aliveLock.Unlock()
@@ -315,6 +345,26 @@ func (c *PFCPClient) TeardownAssociation() error {
 	c.setAssociationStatus(false)
 
 	return nil
+}
+
+func (c *PFCPClient) SendSessionEstRequest(session *Session, ie ...*ieLib.IE) error {
+	// TODO remove this and use EstablishSession instead
+	ie1 := ieLib.NewNodeID(c.localAddr, "", "")
+	ie2 := ieLib.NewFSEID(session.ourSeid, net.ParseIP(c.localAddr), nil)
+	ie3 := ieLib.NewPDNType(ieLib.PDNTypeIPv4)
+
+	sessionEstReq := message.NewSessionEstablishmentRequest(
+		0,
+		0,
+		session.ourSeid,
+		c.getNextSequenceNumber(),
+		0,
+		ie1,
+		ie2,
+		ie3,
+	)
+
+	return c.sendMsg(sessionEstReq)
 }
 
 // EstablishSession sends PFCP Session Establishment Request and waits for PFCP Session Establishment Response.

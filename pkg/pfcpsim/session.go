@@ -22,9 +22,9 @@ type Session struct {
 	uplink   UeFlow
 	downlink UeFlow
 
-	sentPdrs map[int]ie.IE
-	sentFars map[int]ie.IE
-	sentQers map[int]ie.IE
+	sentPdrs []ie.IE
+	sentFars []ie.IE
+	sentQers []ie.IE
 }
 
 func NewSession(ueAddress net.IP, ourSeid uint64, uplink UeFlow, downlink UeFlow) *Session {
@@ -34,16 +34,34 @@ func NewSession(ueAddress net.IP, ourSeid uint64, uplink UeFlow, downlink UeFlow
 		peerSeid:  0, // Update later when received F-SEID IE from peer
 		uplink:    uplink,
 		downlink:  downlink,
-		sentPdrs:  make(map[int]ie.IE),
-		sentFars:  make(map[int]ie.IE),
-		sentQers:  make(map[int]ie.IE),
+		sentPdrs:  make([]ie.IE, 0),
+		sentFars:  make([]ie.IE, 0),
+		sentQers:  make([]ie.IE, 0),
+	}
+}
+
+func (s *Session) AddPdr(pdrs ...*ie.IE) {
+	for _, pdr := range pdrs {
+		s.sentPdrs = append(s.sentPdrs, *pdr)
+	}
+}
+
+func (s *Session) AddFar(fars ...*ie.IE) {
+	for _, far := range fars {
+		s.sentFars = append(s.sentFars, *far)
+	}
+}
+
+func (s *Session) AddQer(qers ...*ie.IE) {
+	for _, qer := range qers {
+		s.sentFars = append(s.sentFars, *qer)
 	}
 }
 
 func (s *Session) ClearSentRules() {
-	s.sentPdrs = make(map[int]ie.IE)
-	s.sentFars = make(map[int]ie.IE)
-	s.sentQers = make(map[int]ie.IE)
+	s.sentPdrs = make([]ie.IE, 0)
+	s.sentFars = make([]ie.IE, 0)
+	s.sentQers = make([]ie.IE, 0)
 }
 
 func (s *Session) IsCreated() bool {
