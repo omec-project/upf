@@ -48,7 +48,7 @@ def atoh(ip):
     return socket.inet_aton(ip)
 
 def mac2hex(mac):
-    return long(mac.replace(':', ''), 16)
+    return int(mac.replace(':', ''), 16)
 
 # Craft a packet with the specified IP address and port number
 def gen_packet(dst_ip, dst_port):
