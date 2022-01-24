@@ -80,12 +80,7 @@ func setStdout(logfile string) func() {
 }
 
 func init() {
-	// Initializing global vars
 	log = GetLoggerInstance()
-	remotePeerAddress = nil
-	localAddress = nil
-	inputFile = ""
-	globalMockSmf = &smf.MockSMF{}
 }
 
 // getInterfaceAddress retrieves the IP of parameter interfaceName. returns error if something goes wrong.
@@ -118,7 +113,7 @@ func getInterfaceAddress(interfaceName string) (net.IP, error) {
 }
 
 func parseArgs() {
-	//inputFile := getopt.StringLong("input-file", 'i', "", "File to poll for input commands. Default is stdin")
+	inputF := getopt.StringLong("input-file", 'i', "", "File to poll for input commands. Default is stdin")
 	outputFile := getopt.StringLong("output-file", 'o', "", "File in which to write output. Default is stdout")
 	peerAddr := getopt.StringLong("remoteAddress", 'r', "", "Address or hostname of the remote peer (e.g. UPF)")
 	verbosity := getopt.BoolLong("verbose", 'v', "Set verbosity level")
@@ -144,6 +139,10 @@ func parseArgs() {
 		// TODO move this in main function
 		fn := setStdout(*outputFile)
 		defer fn()
+	}
+
+	if *inputF != "" {
+		inputFile = *inputF
 	}
 
 	if *base < 0 {

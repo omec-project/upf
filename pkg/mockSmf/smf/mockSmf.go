@@ -41,6 +41,28 @@ func (m *MockSMF) Disconnect() {
 
 }
 
+/*
+func (m *MockSMF) SendSessionEstRequest(session *pfcpsim.Session, infoElement ...*ie.IE) error {
+	// TODO move this in pfcpsim.
+	ie1 := ie.NewNodeID(c.localAddr, "", "")
+	ie2 := ie.NewFSEID(session.GetOurSeid(), net.ParseIP(c.localAddr), nil)
+	ie3 := ie.NewPDNType(ie.PDNTypeIPv4)
+
+	sessionEstReq := message.NewSessionEstablishmentRequest(
+		0,
+		0,
+		session.GetOurSeid(),
+		m.client.getNextSequenceNumber(),
+		0,
+		ie1,
+		ie2,
+		ie3,
+	)
+
+	return m.client.sendMsg(sessionEstReq)
+}
+*/
+
 func (m *MockSMF) Connect(remoteAddress string) error {
 	err := m.client.ConnectN4(remoteAddress)
 	if err != nil {

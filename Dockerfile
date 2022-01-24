@@ -151,6 +151,7 @@ COPY --from=pfcpiface /bin/pfcpiface /
 COPY --from=bess-build /bess /bess
 
 # Stage mock-smf-build: builds the mockSMF docker image
+# TODO move mock-smf to new Dockerfile
 FROM golang AS mock-smf-build
 WORKDIR /mock-smf
 
@@ -160,7 +161,7 @@ COPY go.sum ./go.sum
 RUN go mod download
 
 COPY . ./
-RUN CGO_ENABLED=0 go build -o /bin/mock-smf pkg/mockSmf/main.go
+RUN CGO_ENABLED=0 go build -o /bin/mock-smf cmd/pfcpsim-client/main.go
 
 # Stage mock-smf: runtime image of mockSMF
 FROM alpine AS mock-smf
