@@ -123,7 +123,7 @@ func TestBasicPFCPAssociation(t *testing.T) {
 	err := pfcpClient.SetupAssociation()
 	require.NoErrorf(t, err, "failed to setup PFCP association")
 
-	time.Sleep(time.Second * 10)
+	time.Sleep(2 * pfcpsim.HeartbeatPeriod)
 
 	require.True(t, pfcpClient.IsAssociationAlive())
 }
@@ -139,6 +139,7 @@ func TestBasicSessionEstablishment(t *testing.T) {
 		NewUplinkPDR(Create, 1, 15, upfN3Address, 1, 4, 1),
 		NewDownlinkPDR(Create, 2, ueAddress, 2, 4, 2),
 	}
+
 	fars := []*ie.IE{
 		NewUplinkFAR(Create, 1, ActionForward),
 		NewDownlinkFAR(Create, 2, ActionDrop, 16, nodeBAddress),
