@@ -31,7 +31,6 @@ func NewMockSMF(lAddr string, ueAddressPool string, nodeBAddress string, logger 
 	}
 
 	pfcpClient := pfcpsim.NewPFCPClient(lAddr)
-	pfcpClient.SetLogger(logger)
 
 	return &MockSMF{
 		log:           logger,
@@ -93,7 +92,7 @@ func (m *MockSMF) InitializeSessions(baseId int, count int, remotePeerAddress st
 
 	ueIpFromPool = iplib.NextIP(ueIpFromPool) // TODO handle case net address is full
 
-	for i := baseId; i < (count + 1); i++ {
+	for i := baseId; i < (count + baseId); i++ {
 		// using variables to ease comprehension on how sessions rules are linked together
 
 		uplinkTeid := uint32(i)

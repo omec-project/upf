@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	ieLib "github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
 	"net"
@@ -44,8 +43,6 @@ type PFCPClient struct {
 
 	localAddr string
 	conn      *net.UDPConn
-
-	log *logrus.Logger
 }
 
 func NewPFCPClient(localAddr string) *PFCPClient {
@@ -188,10 +185,6 @@ func (c *PFCPClient) SendHeartbeatRequest() error {
 	)
 
 	return c.sendMsg(hbReq)
-}
-
-func (c *PFCPClient) SetLogger(logger *logrus.Logger) {
-	c.log = logger
 }
 
 func (c *PFCPClient) SendSessionEstablishmentRequest(pdrs []*ieLib.IE, fars []*ieLib.IE, qers []*ieLib.IE) error {
