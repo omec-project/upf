@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright(c) 2020 Intel Corporation
+// Copyright 2020 Intel Corporation
 
 package main
 
@@ -49,6 +49,7 @@ type upf struct {
 	dnn               string
 	reportNotifyChan  chan uint64
 	sliceInfo         *SliceInfo
+	readTimeout       time.Duration
 
 	fastPath
 	maxReqRetries uint8
@@ -78,6 +79,8 @@ const (
 
 	// Default value for Heart Beat Interval
 	hbIntervalDefault = 5 * time.Second
+
+	readTimeoutDefault = 15 * time.Second
 )
 
 func (u *upf) isConnected() bool {
@@ -159,6 +162,11 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 		if err != nil {
 			log.Fatalln("Unable to parse resp_timeout")
 		}
+	}
+
+	u.readTimeout = readTimeoutDefault
+	if conf.ReadTimeout != 0 {
+		u.readTimeout = time.Second * time.Duration(conf.ReadTimeout)
 	}
 
 	if u.enableHBTimer {

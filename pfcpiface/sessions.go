@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright(c) 2020 Intel Corporation
+// Copyright 2020 Intel Corporation
 
 package main
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/omec-project/upf-epc/pfcpiface/metrics"
@@ -27,6 +28,10 @@ type PFCPSession struct {
 	notificationFlag notifyFlag
 	metrics          *metrics.Session
 	PacketForwardingRules
+}
+
+func (p PacketForwardingRules) String() string {
+	return fmt.Sprintf("PDRs=%v, FARs=%v, QERs=%v", p.pdrs, p.fars, p.qers)
 }
 
 // NewPFCPSession allocates an session with ID.

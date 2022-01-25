@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright(c) 2020 Intel Corporation
+// Copyright 2020 Intel Corporation
 
 package main
 
@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -68,33 +67,21 @@ func (af applicationFilter) IsEmpty() bool {
 	return af.srcIP == 0 && af.dstIP == 0 && af.proto == 0 && af.srcPort == 0 && af.dstPort == 0
 }
 
-// Satisfies the fmt.Stringer interface.
 func (p pdr) String() string {
-	b := strings.Builder{}
-	fmt.Fprintf(&b, "\n")
-	fmt.Fprintf(&b, "srcIface: %v\n", p.srcIface)
-	fmt.Fprintf(&b, "tunnelIP4Dst: %v\n", int2ip(p.tunnelIP4Dst))
-	fmt.Fprintf(&b, "tunnelTEID: %x\n", p.tunnelTEID)
-	fmt.Fprintf(&b, "ueAddress: %x\n", p.ueAddress)
-	fmt.Fprintf(&b, "tunnelTEIDMask: %x\n", p.tunnelTEIDMask)
-	fmt.Fprintf(&b, "applicationFilter: %v\n", p.appFilter)
-	fmt.Fprintf(&b, "srcIfaceMask: %x\n", p.srcIfaceMask)
-	fmt.Fprintf(&b, "tunnelIP4DstMask: %v\n", int2ip(p.tunnelIP4DstMask))
-	fmt.Fprintf(&b, "precedence: %v\n", p.precedence)
-	fmt.Fprintf(&b, "pdrID: %v\n", p.pdrID)
-	fmt.Fprintf(&b, "fseID: %x\n", p.fseID)
-	fmt.Fprintf(&b, "fseidIP: %v\n", int2ip(p.fseidIP))
-	fmt.Fprintf(&b, "ctrID: %v\n", p.ctrID)
-	fmt.Fprintf(&b, "farID: %v\n", p.farID)
+	return fmt.Sprintf("PDR(id=%v, F-SEID=%v, srcIface=%v, tunnelIPv4Dst=%v/%x, "+
+		"tunnelTEID=%v/%x, ueAddress=%v, applicationFilter=%v, precedence=%v, F-SEID IP=%v, "+
+		"counterID=%v, farID=%v, qerIDs=%v, needDecap=%v, allocIPFlag=%v)",
+		p.pdrID, p.fseID, p.srcIface, p.tunnelIP4Dst, p.tunnelIP4DstMask,
+		p.tunnelTEID, p.tunnelTEIDMask, int2ip(p.ueAddress), p.appFilter, p.precedence,
+		p.fseidIP, p.ctrID, p.farID, p.qerIDList, p.needDecap, p.allocIPFlag)
+}
 
-	for _, qer := range p.qerIDList {
-		fmt.Fprintf(&b, "qerID: %v\n", qer)
-	}
+func (p pdr) IsUplink() bool {
+	return p.srcIface == access
+}
 
-	fmt.Fprintf(&b, "needDecap: %v\n", p.needDecap)
-	fmt.Fprintf(&b, "allocIPFlag: %v\n", p.allocIPFlag)
-
-	return b.String()
+func (p pdr) IsDownlink() bool {
+	return p.srcIface == core
 }
 
 func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, ippool *IPPool) error {

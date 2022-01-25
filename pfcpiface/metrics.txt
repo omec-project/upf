@@ -376,3 +376,26 @@ upf_packets_count{dir="rx",iface="Access"} 3.20726192e+08
 upf_packets_count{dir="rx",iface="Core"} 3.2073401e+08
 upf_packets_count{dir="tx",iface="Access"} 1.26494177e+08
 upf_packets_count{dir="tx",iface="Core"} 1.27662469e+08
+# HELP upf_session_jitter_ns Shows the jitter of a session in UPF
+# TYPE upf_session_jitter_ns summary
+upf_session_jitter_ns{fseid="805306368",pdr="1",ue_ip="10.0.0.1",quantile="50"} 0
+upf_session_jitter_ns{fseid="805306368",pdr="1",ue_ip="10.0.0.1",quantile="90"} 0
+upf_session_jitter_ns{fseid="805306368",pdr="1",ue_ip="10.0.0.1",quantile="99"} 0
+upf_session_jitter_ns_sum{fseid="805306368",pdr="1",ue_ip="10.0.0.1"} 0
+upf_session_jitter_ns_count{fseid="805306368",pdr="1",ue_ip="10.0.0.1"} 736733
+# HELP upf_session_latency_ns Shows the latency of a session in UPF
+# TYPE upf_session_latency_ns summary
+upf_session_latency_ns{fseid="805306368",pdr="1",ue_ip="10.0.0.1",quantile="50"} 16000
+upf_session_latency_ns{fseid="805306368",pdr="1",ue_ip="10.0.0.1",quantile="90"} 17000
+upf_session_latency_ns{fseid="805306368",pdr="1",ue_ip="10.0.0.1",quantile="99"} 18000
+upf_session_latency_ns_sum{fseid="805306368",pdr="1",ue_ip="10.0.0.1"} 0
+upf_session_latency_ns_count{fseid="805306368",pdr="1",ue_ip="10.0.0.1"} 736733
+# HELP upf_session_rx_packets Shows the total number of packets received for a given session in UPF
+# TYPE upf_session_rx_packets gauge
+upf_session_rx_packets{fseid="805306368",pdr="1",ue_ip="10.0.0.1"} 736733
+# HELP upf_session_tx_bytes Shows the total number of bytes for a given session in UPF
+# TYPE upf_session_tx_bytes gauge
+upf_session_tx_bytes{fseid="805306368",pdr="1",ue_ip="10.0.0.1"} 1.20824212e+08
+# HELP upf_session_tx_packets Shows the total number of packets sent for a given session in UPF
+# TYPE upf_session_tx_packets gauge
+upf_session_tx_packets{fseid="805306368",pdr="1",ue_ip="10.0.0.1"} 736733

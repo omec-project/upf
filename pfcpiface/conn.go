@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright(c) 2020 Intel Corporation
+// Copyright 2020 Intel Corporation
 
 package main
 
@@ -60,7 +60,10 @@ type PFCPConn struct {
 	shutdown chan struct{}
 
 	metrics.InstrumentPFCP
+
+	hbReset     chan struct{}
 	hbCtxCancel context.CancelFunc
+
 	pendingReqs sync.Map
 }
 
@@ -74,26 +77,28 @@ func (pConn *PFCPConn) startHeartBeatMonitor() {
 	hbCtx, hbCancel := context.WithCancel(pConn.ctx)
 	pConn.hbCtxCancel = hbCancel
 
-	log.Infoln("Starting Heartbeat timer")
+	log.WithFields(log.Fields{
+		"interval": pConn.upf.hbInterval,
+	}).Infoln("Starting Heartbeat timer")
 
-	heartBeatTimer := time.NewTimer(pConn.upf.hbInterval)
+	heartBeatExpiryTimer := time.NewTicker(pConn.upf.hbInterval)
 
 	for {
 		select {
 		case <-hbCtx.Done():
 			log.Infoln("Cancel HeartBeat Timer", pConn.RemoteAddr().String())
-			return
+			heartBeatExpiryTimer.Stop()
 
-		case <-heartBeatTimer.C:
+			return
+		case <-pConn.hbReset:
+			heartBeatExpiryTimer.Reset(pConn.upf.hbInterval)
+		case <-heartBeatExpiryTimer.C:
 			log.Traceln("HeartBeat Interval Timer Expired", pConn.RemoteAddr().String())
 
 			r := pConn.getHeartBeatRequest()
 
-			reply, timeout := pConn.sendPFCPRequestMessage(r)
-
-			if reply != nil {
-				heartBeatTimer = time.NewTimer(pConn.upf.hbInterval)
-			} else if timeout {
+			if _, timeout := pConn.sendPFCPRequestMessage(r); timeout {
+				heartBeatExpiryTimer.Stop()
 				pConn.Shutdown()
 			}
 		}
@@ -127,6 +132,7 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 		done:           node.pConnDone,
 		shutdown:       make(chan struct{}),
 		InstrumentPFCP: node.metrics,
+		hbReset:        make(chan struct{}, 100),
 		hbCtxCancel:    nil,
 	}
 
@@ -173,12 +179,26 @@ func (pConn *PFCPConn) setLocalNodeID(id string) {
 
 // Serve serves forever a single PFCP peer.
 func (pConn *PFCPConn) Serve() {
-	go func() {
+	connTimeout := make(chan struct{}, 1)
+	go func(connTimeout chan struct{}) {
 		recvBuf := make([]byte, 65507) // Maximum UDP payload size
 
 		for {
+			err := pConn.SetReadDeadline(time.Now().Add(pConn.upf.readTimeout))
+			if err != nil {
+				log.Errorf("failed to set read timeout: %v", err)
+			}
+
 			n, err := pConn.Read(recvBuf)
 			if err != nil {
+				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+					log.Infof("Read timeout for connection %v<->%v, is the SMF still alive?",
+						pConn.LocalAddr(), pConn.RemoteAddr())
+					connTimeout <- struct{}{}
+
+					return
+				}
+
 				if errors.Is(err, net.ErrClosed) {
 					return
 				}
@@ -189,12 +209,15 @@ func (pConn *PFCPConn) Serve() {
 			buf := append([]byte{}, recvBuf[:n]...)
 			pConn.HandlePFCPMsg(buf)
 		}
-	}()
+	}(connTimeout)
 
 	// TODO: Sender goroutine
 
 	for {
 		select {
+		case <-connTimeout:
+			pConn.Shutdown()
+			return
 		case <-pConn.ctx.Done():
 			pConn.Shutdown()
 			return

@@ -31,6 +31,10 @@ DOCKER_LABEL_BUILD_DATE  ?= $(shell date -u "+%Y-%m-%dT%H:%M:%SZ")
 
 DOCKER_TARGETS           ?= bess pfcpiface
 
+# Golang grpc/protobuf generation
+BESS_PB_DIR ?= pfcpiface
+PTF_PB_DIR ?= ptf/lib
+
 # https://docs.docker.com/engine/reference/commandline/build/#specifying-target-build-stage---target
 docker-build:
 	for target in $(DOCKER_TARGETS); do \
@@ -60,9 +64,11 @@ output:
 		.;
 	rm -rf output && mkdir output && tar -xf output.tar -C output && rm -f output.tar
 
-# Golang grpc/protobuf generation
-BESS_PB_DIR ?= pfcpiface
-PTF_PB_DIR ?= ptf/lib
+test-up4-integration:
+	docker-compose -f test/integration/infra/docker-compose.yml rm -fsv
+	COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker-compose -f test/integration/infra/docker-compose.yml up --build -d
+	go test -v -count=1 -failfast ./test/integration/...
+	docker-compose -f test/integration/infra/docker-compose.yml rm -fsv
 
 pb:
 	DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) \
@@ -85,4 +91,7 @@ fmt:
 golint:
 	@docker run --rm -v $(CURDIR):/app -w /app/pfcpiface golangci/golangci-lint:latest golangci-lint run -v --config /app/.golangci.yml
 
-.PHONY: docker-build docker-push output pb fmt golint
+check-reuse:
+	@docker run --rm -v $(CURDIR):/upf-epc -w /upf-epc omecproject/reuse-verify:latest reuse lint
+
+.PHONY: docker-build docker-push output pb fmt golint check-reuse test-up4-integration

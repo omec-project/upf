@@ -6,6 +6,7 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 	"math/bits"
 	"net"
 
@@ -508,7 +509,7 @@ func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, internalAppID uint
 	tableID := t.tableID(TableApplications)
 	entry := &p4.TableEntry{
 		TableId:  tableID,
-		Priority: DefaultPriority,
+		Priority: int32(math.MaxUint32 - pdr.precedence),
 	}
 
 	// the current assumption (and limitation):
@@ -573,7 +574,7 @@ func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr) (*p4.TableEntry, erro
 		return nil, err
 	}
 
-	if err := t.withTernaryMatchField(entry, FieldTEID, pdr.tunnelTEID, pdr.tunnelTEIDMask); err != nil {
+	if err := t.withExactMatchField(entry, FieldTEID, pdr.tunnelTEID); err != nil {
 		return nil, err
 	}
 
