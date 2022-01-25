@@ -268,19 +268,6 @@ func (c *PFCPClient) SetupAssociation() error {
 	return nil
 }
 
-func (c *PFCPClient) craftPfcpAssociationReleaseRequest(ie ...*ieLib.IE) *message.AssociationReleaseRequest {
-	ie1 := ieLib.NewNodeID(c.conn.RemoteAddr().String(), "", "")
-
-	c.resetSequenceNumber()
-	msg := message.NewAssociationReleaseRequest(0, ie1)
-
-	for _, ieValue := range ie {
-		msg.IEs = append(msg.IEs, ieValue)
-	}
-
-	return msg
-}
-
 func (c *PFCPClient) SendSessionDeletionRequest(session Session, ie ...*ieLib.IE) error {
 	// TODO refactor this method to be similar to EstablishSession
 	if session.GetPeerSeid() == 0 {
@@ -323,7 +310,10 @@ func (c *PFCPClient) TeardownAssociation() error {
 		return errors.New("association does not exist")
 	}
 
-	msg := c.craftPfcpAssociationReleaseRequest()
+	ie1 := ieLib.NewNodeID(c.conn.RemoteAddr().String(), "", "")
+
+	c.resetSequenceNumber()
+	msg := message.NewAssociationReleaseRequest(0, ie1)
 
 	err := c.sendMsg(msg)
 	if err != nil {

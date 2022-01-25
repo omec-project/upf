@@ -6,11 +6,10 @@ import (
 )
 
 type UeFlow struct {
-	Teid  uint16
+	Teid  uint32
 	PdrId uint16
-	FarId uint16
-	QerId uint16
-	UrrId uint16
+	FarId uint32
+	QerId uint32
 }
 
 type Session struct {
@@ -27,7 +26,7 @@ type Session struct {
 	sentQers []ie.IE
 }
 
-func NewSession(ueAddress net.IP, ourSeid uint64, uplink UeFlow, downlink UeFlow) *Session {
+func NewSession(ourSeid uint64, ueAddress net.IP, uplink UeFlow, downlink UeFlow) *Session {
 	return &Session{
 		ourSeid:   ourSeid,
 		ueAddress: ueAddress,
@@ -40,22 +39,16 @@ func NewSession(ueAddress net.IP, ourSeid uint64, uplink UeFlow, downlink UeFlow
 	}
 }
 
-func (s *Session) AddPdr(pdrs ...*ie.IE) {
-	for _, pdr := range pdrs {
-		s.sentPdrs = append(s.sentPdrs, *pdr)
-	}
+func (s *Session) AddPdr(pdr *ie.IE) {
+	s.sentPdrs = append(s.sentPdrs, *pdr)
 }
 
-func (s *Session) AddFar(fars ...*ie.IE) {
-	for _, far := range fars {
-		s.sentFars = append(s.sentFars, *far)
-	}
+func (s *Session) AddFar(far *ie.IE) {
+	s.sentFars = append(s.sentFars, *far)
 }
 
-func (s *Session) AddQer(qers ...*ie.IE) {
-	for _, qer := range qers {
-		s.sentFars = append(s.sentFars, *qer)
-	}
+func (s *Session) AddQer(qer *ie.IE) {
+	s.sentFars = append(s.sentFars, *qer)
 }
 
 func (s *Session) ClearSentRules() {

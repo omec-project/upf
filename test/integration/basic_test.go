@@ -136,19 +136,19 @@ func TestBasicSessionEstablishment(t *testing.T) {
 	require.NoErrorf(t, err, "failed to setup PFCP association")
 
 	pdrs := []*ie.IE{
-		NewUplinkPDR(create, 1, 15, upfN3Address, 1, 4, 1),
-		NewDownlinkPDR(create, 2, ueAddress, 2, 4, 2),
+		NewUplinkPDR(Create, 1, 15, upfN3Address, 1, 4, 1),
+		NewDownlinkPDR(Create, 2, ueAddress, 2, 4, 2),
 	}
 	fars := []*ie.IE{
-		NewUplinkFAR(create, 1, ActionForward),
-		NewDownlinkFAR(create, 2, ActionDrop, 16, nodeBAddress),
+		NewUplinkFAR(Create, 1, ActionForward),
+		NewDownlinkFAR(Create, 2, ActionDrop, 16, nodeBAddress),
 	}
 
 	qers := []*ie.IE{
 		// session QER
-		NewQER(create, 4, 0x09, 500000, 500000, 0, 0),
+		NewQER(Create, 4, 0x09, 500000, 500000, 0, 0),
 		// application QER
-		NewQER(create, 1, 0x08, 50000, 50000, 30000, 30000),
+		NewQER(Create, 1, 0x08, 50000, 50000, 30000, 30000),
 	}
 
 	err = pfcpClient.EstablishSession(pdrs, fars, qers)

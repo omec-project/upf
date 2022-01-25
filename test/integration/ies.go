@@ -11,14 +11,13 @@ import (
 type IEMethod uint8
 
 const (
-	create IEMethod = iota
-	update
-	delete
+	Create IEMethod = iota
+	Update
+	Delete
 )
 
 const (
 	dummyPrecedence = 100
-
 )
 
 var uplinkPDR = ie.NewCreatePDR(
@@ -36,12 +35,11 @@ var uplinkPDR = ie.NewCreatePDR(
 	ie.NewQERID(4),
 )
 
-
 // TODO: use builder pattern to create PDR IE
 func NewUplinkPDR(method IEMethod, id uint16, teid uint32, n3address string,
-				  farID uint32, sessQerID uint32, appQerID uint32) *ie.IE {
+	farID uint32, sessQerID uint32, appQerID uint32) *ie.IE {
 	createFunc := ie.NewCreatePDR
-	if method == update {
+	if method == Update {
 		createFunc = ie.NewUpdatePDR
 	}
 
@@ -61,9 +59,9 @@ func NewUplinkPDR(method IEMethod, id uint16, teid uint32, n3address string,
 }
 
 func NewDownlinkPDR(method IEMethod, id uint16, ueAddress string,
-					farID uint32, sessQerID uint32, appQerID uint32) *ie.IE {
+	farID uint32, sessQerID uint32, appQerID uint32) *ie.IE {
 	createFunc := ie.NewCreatePDR
-	if method == update {
+	if method == Update {
 		createFunc = ie.NewUpdatePDR
 	}
 
@@ -83,7 +81,7 @@ func NewDownlinkPDR(method IEMethod, id uint16, ueAddress string,
 
 func NewUplinkFAR(method IEMethod, id uint32, applyAction uint8) *ie.IE {
 	createFunc := ie.NewCreateFAR
-	if method == update {
+	if method == Update {
 		createFunc = ie.NewUpdateFAR
 	}
 
@@ -98,7 +96,7 @@ func NewUplinkFAR(method IEMethod, id uint32, applyAction uint8) *ie.IE {
 
 func NewDownlinkFAR(method IEMethod, id uint32, applyAction uint8, teid uint32, downlinkIP string) *ie.IE {
 	createFunc := ie.NewCreateFAR
-	if method == update {
+	if method == Update {
 		createFunc = ie.NewUpdateFAR
 	}
 
@@ -114,7 +112,7 @@ func NewDownlinkFAR(method IEMethod, id uint32, applyAction uint8, teid uint32, 
 
 func NewQER(method IEMethod, id uint32, qfi uint8, ulMbr uint64, dlMbr uint64, ulGbr uint64, dlGbr uint64) *ie.IE {
 	createFunc := ie.NewCreateQER
-	if method == update {
+	if method == Update {
 		createFunc = ie.NewUpdateQER
 	}
 
@@ -127,5 +125,3 @@ func NewQER(method IEMethod, id uint32, qfi uint8, ulMbr uint64, dlMbr uint64, u
 		ie.NewGBR(ulGbr, dlGbr),
 	)
 }
-
-

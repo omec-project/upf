@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"github.com/omec-project/upf-epc/pkg/mockSmf/smf"
 	"github.com/pborman/getopt/v2"
@@ -23,11 +22,21 @@ var (
 	localAddress      net.IP
 	inputFile         string
 	doOnce            sync.Once
+	gNodeBAddress     net.IP
 	sessionCount      int
 	baseId            int
 	ueAddressPool     string
 
 	globalMockSmf *smf.MockSMF
+)
+
+const (
+	// Values for mock-up4 environment
+
+	defaultGNodeBAddress = "198.18.0.10"
+	defaultUeAddressPool = "17.0.0.0/24"
+
+	defaultUpfN3Address = "198.18.0.1"
 )
 
 func GetLoggerInstance() *logrus.Logger {
@@ -109,18 +118,20 @@ func getInterfaceAddress(interfaceName string) (net.IP, error) {
 		}
 	}
 
-	return nil, errors.New("could not find a correct interface")
+	return nil, fmt.Errorf("could not find interface: %v", interfaceName)
 }
 
 func parseArgs() {
-	inputF := getopt.StringLong("input-file", 'i', "", "File to poll for input commands. Default is stdin")
+	inputF := getopt.StringLong("input-file", 'f', "", "File to poll for input commands. Default is stdin")
 	outputFile := getopt.StringLong("output-file", 'o', "", "File in which to write output. Default is stdout")
 	peerAddr := getopt.StringLong("remoteAddress", 'r', "", "Address or hostname of the remote peer (e.g. UPF)")
-	verbosity := getopt.BoolLong("verbose", 'v', "Set verbosity level")
-	interfaceName := getopt.StringLong("interface", 'i', "Set interface name to discover local address")
+	interfaceName := getopt.StringLong("interface", 'i', "", "Set interface name to discover local address")
 	sessionCnt := getopt.IntLong("session-count", 'c', 1, "Set the amount of sessions to create, starting from 1 (included)")
 	base := getopt.IntLong("base", 'b', 1, "First ID used to generate all other ID fields.")
-	ueAddrPool := getopt.StringLong("ue-address-pool", 'u', "17.0.0.0/24", "The IPv4 CIDR prefix from which UE addresses will be drawn, incrementally")
+	ueAddrPool := getopt.StringLong("ue-address-pool", 'u', defaultUeAddressPool, "The IPv4 CIDR prefix from which UE addresses will be drawn, incrementally")
+	gNodeBAddr := getopt.StringLong("gnodeb-address", 'g', defaultGNodeBAddress, "The IPv4 of (g/e)NodeBAddress for downlink PDRs")
+	verbosity := getopt.BoolLong("verbose", 'v', "Set verbosity level to debug")
+
 	optHelp := getopt.BoolLong("help", 0, "Help")
 
 	getopt.Parse()
@@ -131,8 +142,9 @@ func parseArgs() {
 
 	// Flag checks and validations
 	if *verbosity {
-		SetLogLevel(logrus.DebugLevel)
-		log.Info("Verbosity level set.")
+		level := logrus.DebugLevel
+		SetLogLevel(level)
+		log.Infof("Verbosity level set to: %v", level.String())
 	}
 
 	if *outputFile != "" {
@@ -154,6 +166,12 @@ func parseArgs() {
 		log.Fatalf("Session count cannot be a negative number")
 	}
 	sessionCount = *sessionCnt
+
+	// IPs checks
+	gNodeBAddress = net.ParseIP(*gNodeBAddr)
+	if gNodeBAddress == nil {
+		log.Fatalf("Could not retrieve IP address of (g/e)NodeB")
+	}
 
 	remotePeerAddress = net.ParseIP(*peerAddr)
 	if remotePeerAddress == nil {
@@ -244,7 +262,7 @@ func handleUserInput() {
 				globalMockSmf.SetupAssociation()
 			case 3:
 				log.Infof("Selected create sessions")
-				globalMockSmf.InitializeSessions(baseId, sessionCount)
+				globalMockSmf.InitializeSessions(baseId, sessionCount, remotePeerAddress.String())
 			case 4:
 				log.Infof("Selected delete sessions")
 				globalMockSmf.DeleteAllSessions()
@@ -423,7 +441,7 @@ func main() {
 
 	parseArgs()
 
-	globalMockSmf = smf.NewMockSMF(localAddress.String(), ueAddressPool, GetLoggerInstance())
+	globalMockSmf = smf.NewMockSMF(localAddress.String(), ueAddressPool, gNodeBAddress.String(), GetLoggerInstance())
 	err := globalMockSmf.Connect(remotePeerAddress.String())
 	if err != nil {
 		log.Fatalf("Failed to connect to remote peer: %v", err)

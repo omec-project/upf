@@ -3,23 +3,36 @@ package smf
 import (
 	"github.com/c-robinson/iplib"
 	"github.com/omec-project/upf-epc/pkg/pfcpsim"
+	"github.com/omec-project/upf-epc/test/integration"
 	"github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
 	"net"
 )
 
+const (
+	// Values for mock-up4 environment
+
+	defaultSliceID = 0
+
+	ActionForward uint8 = 0x2
+	ActionDrop    uint8 = 0x1
+	ActionBuffer  uint8 = 0x4
+	ActionNotify  uint8 = 0x8
+)
+
 type MockSMF struct {
 	activeSessions map[uint64]pfcpsim.Session
 
 	ueAddressPool string
+	nodeBAddress  string
 
 	log *logrus.Logger
 
 	client *pfcpsim.PFCPClient
 }
 
-func NewMockSMF(lAddr string, ueAddressPool string, logger *logrus.Logger) *MockSMF {
+func NewMockSMF(lAddr string, ueAddressPool string, nodeBAddress string, logger *logrus.Logger) *MockSMF {
 	if logger == nil {
 		logger = new(logrus.Logger)
 	}
@@ -31,6 +44,7 @@ func NewMockSMF(lAddr string, ueAddressPool string, logger *logrus.Logger) *Mock
 		activeSessions: make(map[uint64]pfcpsim.Session),
 		log:            logger,
 		ueAddressPool:  ueAddressPool,
+		nodeBAddress:   nodeBAddress,
 		client:         pfcpClient,
 	}
 }
@@ -40,28 +54,6 @@ func (m *MockSMF) Disconnect() {
 	m.log.Infof("PFCP client Disconnected")
 
 }
-
-/*
-func (m *MockSMF) SendSessionEstRequest(session *pfcpsim.Session, infoElement ...*ie.IE) error {
-	// TODO move this in pfcpsim.
-	ie1 := ie.NewNodeID(c.localAddr, "", "")
-	ie2 := ie.NewFSEID(session.GetOurSeid(), net.ParseIP(c.localAddr), nil)
-	ie3 := ie.NewPDNType(ie.PDNTypeIPv4)
-
-	sessionEstReq := message.NewSessionEstablishmentRequest(
-		0,
-		0,
-		session.GetOurSeid(),
-		m.client.getNextSequenceNumber(),
-		0,
-		ie1,
-		ie2,
-		ie3,
-	)
-
-	return m.client.sendMsg(sessionEstReq)
-}
-*/
 
 func (m *MockSMF) Connect(remoteAddress string) error {
 	err := m.client.ConnectN4(remoteAddress)
@@ -91,92 +83,112 @@ func (m *MockSMF) SetupAssociation() {
 	m.log.Infof("Setup association completed")
 }
 
-func (m *MockSMF) CreateSession(session *pfcpsim.Session) {
-	// TODO use EstablishSession instead.
-	err := m.client.SendSessionEstRequest(session)
+func craftUeFlow(teid uint32, pdr ie.IE, far ie.IE, qer ie.IE) (*pfcpsim.UeFlow, error) {
+	// TODO still unused
+	pdrId, err := pdr.PDRID()
 	if err != nil {
-		m.log.Errorf("Error while establishment of session: %v", err)
+		return nil, err
 	}
 
-	response, err := m.client.PeekNextResponse(5)
+	farId, err := far.FARID()
 	if err != nil {
-		m.log.Errorf("Error while receiving message: %v", err)
-		return
+		return nil, err
 	}
 
-	if response.MessageType() == message.MsgTypeSessionEstablishmentResponse {
-		for _, infoElement := range response.(*message.SessionEstablishmentResponse).IEs {
-
-			if infoElement.Type == ie.Cause {
-				cause, err := infoElement.Cause()
-				if err != nil {
-					m.log.Errorf("Error retrieving IE cause: %v", err)
-					return
-				}
-
-				if cause != ie.CauseRequestAccepted { //FIXME should support also cause "reserved"?
-					m.log.Errorf("Unexpected cause")
-					return
-				}
-			}
-
-			if infoElement.Type == ie.FSEID {
-				// set session peerSeid
-				fs, err := infoElement.FSEID()
-				if err != nil {
-					m.log.Errorf("Error retrieving FSEID from IE: %v", err)
-					return
-				}
-				session.SetPeerSeid(fs.SEID)
-			}
-		}
-	} else {
-		m.log.Errorf("Received %v but was expecting %v", response.MessageTypeName(), message.MsgTypeSessionEstablishmentResponse)
+	qerId, err := qer.QERID()
+	if err != nil {
+		return nil, err
 	}
+
+	ueFlow := &pfcpsim.UeFlow{
+		Teid:  teid,
+		PdrId: pdrId,
+		FarId: farId,
+		QerId: qerId,
+	}
+
+	return ueFlow, nil
 }
 
-// craftSession creates a session from ID and saves it in ActiveSessions map
-func (m *MockSMF) craftSession(ID uint64, ueAddress net.IP) *pfcpsim.Session {
-	if session, ok := m.activeSessions[ID]; ok {
-		// Session already present. return it
-		return &session
-	}
+// craftSession creates a session using fSeid as identifier.
+//If not found, a new session is created and saved in ActiveSessions map
+func craftSession(fSeid uint64, ueAddress net.IP, uplinkFlow pfcpsim.UeFlow, downlinkFlow pfcpsim.UeFlow) *pfcpsim.Session {
+	//if session, ok := m.activeSessions[fSeid]; ok {
+	// TODO job of the caller to do this.
+	//	// Session already present. return it
+	//	return &session
+	//}
 
-	uplink := pfcpsim.UeFlow{
-		Teid:  uint16(ID),
-		PdrId: uint16(ID),
-		FarId: uint16(ID),
-		QerId: uint16(ID),
-		UrrId: uint16(ID),
-	}
-
-	downlink := pfcpsim.UeFlow{
-		Teid:  uint16(ID) + 1,
-		PdrId: uint16(ID),
-		FarId: uint16(ID),
-		QerId: uint16(ID),
-		UrrId: uint16(ID),
-	}
-
-	session := pfcpsim.NewSession(ueAddress, ID, uplink, downlink)
-	m.activeSessions[ID] = *session
-
-	m.log.Debugf("Created session with SEID %v", session.GetOurSeid())
-
-	return session
+	return pfcpsim.NewSession(fSeid, ueAddress, uplinkFlow, downlinkFlow)
 }
 
-func (m *MockSMF) InitializeSessions(baseId int, count int) {
-	ip, _, err := net.ParseCIDR(m.ueAddressPool)
+func (m *MockSMF) InitializeSessions(baseId int, count int, remotePeerAddress string) {
+	ueIpFromPool, _, err := net.ParseCIDR(m.ueAddressPool)
 	if err != nil {
 		m.log.Errorf("Could not parse address pool: %v", err)
 	}
 
-	ip = iplib.NextIP(ip) // TODO handle case net address is full
+	ueIpFromPool = iplib.NextIP(ueIpFromPool) // TODO handle case net address is full
 
-	for i := baseId; i < count; i++ {
-		session := m.craftSession(uint64(i), ip)
-		m.CreateSession(session)
+	for i := baseId; i < (count + 1); i++ {
+		// using variables to ease comprehension on how sessions rules are linked together
+
+		uplinkTeid := uint32(i)
+		downlinkTeid := uint32(i + 1)
+
+		uplinkFarID := uint32(i)
+		downlinkFarID := uint32(i + 1)
+
+		sessQerID := uint32(i + 3)
+
+		uplinkPdrID := uint16(i)
+		dowlinkPdrID := uint16(i + 1)
+
+		uplinkAppQerID := uint32(i)
+		downlinkAppQerID := uint32(i + 1)
+
+		appQerID := uint32(i)
+
+		upfN3Address := remotePeerAddress //FIXME is it correct?
+
+		pdrs := []*ie.IE{
+			integration.NewUplinkPDR(integration.Create, uplinkPdrID, uplinkTeid, upfN3Address, uplinkFarID, sessQerID, uplinkAppQerID),
+			integration.NewDownlinkPDR(integration.Create, dowlinkPdrID, ueIpFromPool.String(), downlinkFarID, sessQerID, downlinkAppQerID),
+		}
+
+		fars := []*ie.IE{
+			integration.NewUplinkFAR(integration.Create, uplinkFarID, ActionForward),
+			integration.NewDownlinkFAR(integration.Create, downlinkFarID, ActionDrop, downlinkTeid, m.nodeBAddress),
+		}
+
+		qers := []*ie.IE{
+			// session QER
+			integration.NewQER(integration.Create, sessQerID, 0x09, 500000, 500000, 0, 0),
+			// application QER
+			integration.NewQER(integration.Create, appQerID, 0x08, 50000, 50000, 30000, 30000),
+		}
+
+		//m.CreateSession(session)
+		uplinkUeFlow, err := craftUeFlow(uplinkTeid, *pdrs[0], *fars[0], *qers[0])
+		if err != nil {
+			m.log.Errorf("Error while creating ue flow: %v", err)
+			return
+		}
+
+		// Interested only in session QERs // TODO handle also application QER
+		downlinkUeFlow, err := craftUeFlow(downlinkTeid, *pdrs[1], *fars[1], *qers[0])
+		if err != nil {
+			m.log.Errorf("Error while creating downlink ue flow: %v", err)
+			return
+		}
+		m.log.Debugf("Created uplink: %v; downlink: %v", uplinkUeFlow.Teid, downlinkUeFlow.Teid)
+
+		err = m.client.EstablishSession(pdrs, fars, qers)
+		if err != nil {
+			m.log.Errorf("Error while establishing sessions: %v", err)
+		}
+
+		m.log.Infof("Created sessions")
 	}
 }
 
