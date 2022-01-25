@@ -205,6 +205,20 @@ func (c *PFCPClient) SendSessionEstablishmentRequest(pdrs []*ieLib.IE, fars []*i
 	return c.sendMsg(estReq)
 }
 
+func (c *PFCPClient) SendSessionDeletionRequest(FSEID uint64) error {
+	delReq := message.NewSessionDeletionRequest(
+		0,
+		0,
+		0,
+		c.getNextSequenceNumber(),
+		0,
+		ieLib.NewNodeID(c.localAddr, "", ""),
+		ieLib.NewFSEID(FSEID, net.ParseIP(c.localAddr), nil),
+	)
+
+	return c.sendMsg(delReq)
+}
+
 func (c *PFCPClient) StartHeartbeats(stopCtx context.Context) {
 	ticker := time.NewTicker(HeartbeatPeriod * time.Second)
 	for {
@@ -325,6 +339,37 @@ func (c *PFCPClient) EstablishSession(pdrs []*ieLib.IE, fars []*ieLib.IE, qers [
 
 	if cause, err := estResp.Cause.Cause(); err != nil || cause != ieLib.CauseRequestAccepted {
 		return fmt.Errorf("session establishment response returns invalid cause: %v", cause)
+	}
+
+	return nil
+}
+
+// DeleteAllSessions sends Session Deletion Request and awaits for PFCP Session Deletion Response.
+// Returns error if the process fails at any stage.
+func (c *PFCPClient) DeleteAllSessions() error {
+	// TODO clear all PDRs, FARs etc. sent to pfcpiface
+	for FSEID := c.numSessions; FSEID <= 0; FSEID-- {
+		err := c.SendSessionDeletionRequest(FSEID)
+		if err != nil {
+			return err
+		}
+
+		resp, err := c.PeekNextResponse(5)
+		if err != nil {
+			return err
+		}
+
+		delResp, ok := resp.(*message.SessionDeletionResponse)
+		if !ok {
+			return fmt.Errorf("invalid message received, expected session deletion response")
+		}
+
+		if cause, err := delResp.Cause.Cause(); err != nil || cause != ieLib.CauseRequestAccepted {
+			return fmt.Errorf("session deletion response returns invalid cause: %v", cause)
+		}
+
+		// decrease number of active sessions (erase FSEID)
+		c.numSessions--
 	}
 
 	return nil

@@ -22,6 +22,8 @@ type MockSMF struct {
 	nodeBAddress  string
 	upfAddress    string
 
+	activeSessions int
+
 	lastUEAddress net.IP
 
 	log *logrus.Logger
@@ -147,35 +149,16 @@ func (m *MockSMF) InitializeSessions(count int) {
 		}
 
 		// TODO show session's F-SEID
+		m.activeSessions++
 		m.log.Infof("Created sessions")
 	}
-
-	//pdrs := []*ie.IE{
-	//	integration.NewUplinkPDR(integration.Create, 1, 15, m.upfAddress, 1, 4, 1),
-	//	integration.NewDownlinkPDR(integration.Create, 2, m.getNextUEAddress().String(), 2, 4, 2),
-	//}
-	//fars := []*ie.IE{
-	//	integration.NewUplinkFAR(integration.Create, 1, ActionForward),
-	//	integration.NewDownlinkFAR(integration.Create, 2, ActionDrop, 16, m.nodeBAddress),
-	//}
-	//
-	//qers := []*ie.IE{
-	//	// session QER
-	//	integration.NewQER(integration.Create, 4, 0x09, 500000, 500000, 0, 0),
-	//	// application QER
-	//	integration.NewQER(integration.Create, 1, 0x08, 50000, 50000, 30000, 30000),
-	//}
-
-	//err = m.client.EstablishSession(pdrs, fars, qers)
-	//if err != nil {
-	//	m.log.Errorf("Error while establishing sessions: %v", err)
-	//}
-	//
-	//m.log.Infof("Created sessions")
-
 }
 
 func (m *MockSMF) DeleteAllSessions() {
-	// TODO Refactor this to use new structure
-	m.log.Errorf("Not implemented")
+	err := m.client.DeleteAllSessions()
+	if err != nil {
+		m.log.Errorf("Error while deleting sessions: %v", err)
+	}
+
+	m.log.Infof("Deleted all sessions")
 }
