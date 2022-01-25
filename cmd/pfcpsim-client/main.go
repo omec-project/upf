@@ -52,6 +52,8 @@ const (
 	directionDownlink = 0x2
 )
 
+// GetLoggerInstance uses a singleton pattern to return a single logger instance
+// that can be used anywhere.
 func GetLoggerInstance() *logrus.Logger {
 	// setting global logging instance
 	doOnce.Do(func() {
@@ -64,7 +66,9 @@ func SetLogLevel(level logrus.Level) {
 	log.SetLevel(level)
 }
 
-func setStdout(logfile string) func() {
+// copyOutputToLogfile reads from Stdout and Stderr to save in a persistent file,
+// provided through logfile parameter.
+func copyOutputToLogfile(logfile string) func() {
 	f, _ := os.OpenFile(logfile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 
 	out := os.Stdout
@@ -230,7 +234,7 @@ func parseArgs() {
 
 	if *outputFile != "" {
 		// TODO move this in main function
-		fn := setStdout(*outputFile)
+		fn := copyOutputToLogfile(*outputFile)
 		defer fn()
 	}
 
