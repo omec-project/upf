@@ -6,6 +6,7 @@ package main
 import (
 	"encoding/binary"
 	"flag"
+	"google.golang.org/grpc/codes"
 	"math/rand"
 	"net"
 	"time"
@@ -46,6 +47,12 @@ const (
 	maxApplicationIDs   = 254
 )
 
+type application struct {
+	appIP uint32
+	appL4Port uint16
+	appProto uint8
+}
+
 type counter struct {
 	maxSize   uint64
 	counterID uint64
@@ -69,7 +76,7 @@ type UP4 struct {
 	counters           []counter
 	tunnelPeerIDs      map[tunnelParams]uint8
 	tunnelPeerIDsPool  []uint8
-	applicationIDs     map[applicationFilter]uint8
+	applicationIDs     map[application]uint8
 	applicationIDsPool []uint8
 
 	// ueAddrToFSEID is used to store UE Address <-> F-SEID mapping,
@@ -225,7 +232,7 @@ func (up4 *UP4) initTunnelPeerIDs() {
 }
 
 func (up4 *UP4) initApplicationIDs() {
-	up4.applicationIDs = make(map[applicationFilter]uint8)
+	up4.applicationIDs = make(map[application]uint8)
 	// a simple queue storing available application IDs
 	// 0 is reserved;
 	up4.applicationIDsPool = make([]uint8, 0, maxApplicationIDs)
@@ -451,8 +458,12 @@ func (up4 *UP4) allocateGTPTunnelPeerID() (uint8, error) {
 	return allocated, nil
 }
 
-func (up4 *UP4) releaseAllocatedGTPTunnelPeerID(allocated uint8) {
-	up4.tunnelPeerIDsPool = append(up4.tunnelPeerIDsPool, allocated)
+func (up4 *UP4) releaseAllocatedGTPTunnelPeerID(tunnelParams tunnelParams) {
+	allocated, exists := up4.tunnelPeerIDs[tunnelParams]
+	if exists {
+		delete(up4.tunnelPeerIDs, tunnelParams)
+		up4.tunnelPeerIDsPool = append(up4.tunnelPeerIDsPool, allocated)
+	}
 }
 
 func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
@@ -523,11 +534,11 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 		removeLog.Error("failed to remove GTP tunnel peer")
 	}
 
-	up4.releaseAllocatedGTPTunnelPeerID(tunnelPeerID)
+	up4.releaseAllocatedGTPTunnelPeerID(tunnelParams)
 }
 
 // Returns error if we reach maximum supported Application IDs.
-func (up4 *UP4) allocateInternalApplicationID() (uint8, error) {
+func (up4 *UP4) allocateInternalApplicationID(app application) (uint8, error) {
 	if len(up4.applicationIDsPool) == 0 {
 		return 0, ErrOperationFailedWithReason("allocate Application ID",
 			"no free application IDs available")
@@ -537,19 +548,35 @@ func (up4 *UP4) allocateInternalApplicationID() (uint8, error) {
 	allocated := up4.applicationIDsPool[0]
 	up4.applicationIDsPool = up4.applicationIDsPool[1:]
 
+	up4.applicationIDs[app] = allocated
+
 	return allocated, nil
 }
 
-func (up4 *UP4) releaseInternalApplicationID(allocated uint8) {
-	up4.applicationIDsPool = append(up4.applicationIDsPool, allocated)
+func (up4 *UP4) releaseInternalApplicationID(appFilter applicationFilter) {
+	app := application{
+		appIP:     appFilter.srcIP,
+		appL4Port: appFilter.srcPort,
+		appProto:  appFilter.proto,
+	}
+	allocated, exists := up4.applicationIDs[app]
+	if exists {
+		delete(up4.applicationIDs, app)
+		up4.applicationIDsPool = append(up4.applicationIDsPool, allocated)
+	}
 }
 
-func (up4 *UP4) addOrUpdateApplicationsTableEntry(appFilter applicationFilter) (uint8, error) {
-	if allocated, exists := up4.applicationIDs[appFilter]; exists {
+func (up4 *UP4) getOrAllocateInternalApplicationID(appFilter applicationFilter) (uint8, error) {
+	app := application{
+		appIP:     appFilter.srcIP,
+		appL4Port: appFilter.srcPort,
+		appProto:  appFilter.proto,
+	}
+	if allocated, exists := up4.applicationIDs[app]; exists {
 		return allocated, nil
 	}
 
-	newAppID, err := up4.allocateInternalApplicationID()
+	newAppID, err := up4.allocateInternalApplicationID(app)
 	if err != nil {
 		return 0, err
 	}
@@ -596,6 +623,8 @@ func (up4 *UP4) updateTunnelPeersBasedOnFARs(fars []far) error {
 // inserts/modifies/removes table entries from UP4 device, according to methodType.
 func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, methodType p4.Update_Type) error {
 	for _, pdr := range pdrs {
+		entriesToApply := make([]*p4.TableEntry, 0)
+
 		pdrLog := log.WithFields(log.Fields{
 			"pdr": pdr,
 		})
@@ -607,7 +636,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, meth
 			return err
 		}
 
-		pdrLog.WithField("related FAR", far)
+		pdrLog = pdrLog.WithField("related FAR", far)
 		pdrLog.Debug("Found related FAR for PDR")
 
 		tunnelParams := tunnelParams{
@@ -625,6 +654,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, meth
 		if err != nil {
 			return ErrOperationFailedWithReason("build P4rt table entry for Sessions table", err.Error())
 		}
+		entriesToApply = append(entriesToApply, sessionsEntry)
 
 		if pdr.IsUplink() {
 			ueAddr, exists := up4.fseidToUEAddr[pdr.fseID]
@@ -641,18 +671,19 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, meth
 
 		// applicationID = 0 is passed as a default value if no application filtering rule exists
 		var applicationID uint8 = 0
-		if !pdr.appFilter.IsEmpty() {
-			applicationID, err = up4.addOrUpdateApplicationsTableEntry(pdr.appFilter)
+		if pdr.appFilter.srcIP != 0 || pdr.appFilter.srcPort != 0 || pdr.appFilter.proto != 0 {
+			applicationID, err = up4.getOrAllocateInternalApplicationID(pdr.appFilter)
 			if err != nil {
-				pdrLog.Error("failed to add or update Application")
+				pdrLog.Error("failed to get or allocate internal application ID")
 				return err
 			}
 
 			applicationsEntry, err = up4.p4RtTranslator.BuildApplicationsTableEntry(pdr, applicationID)
 			if err != nil {
-				log.Error("failed to build P4rt table entry for Applications table: ", err)
-				continue
+				return ErrOperationFailedWithReason("build P4rt table entry for Applications table", err.Error())
 			}
+
+			entriesToApply = append(entriesToApply, applicationsEntry)
 		}
 
 		// FIXME: get TC from QFI->TC mapping
@@ -661,16 +692,30 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, meth
 			return ErrOperationFailedWithReason("build P4rt table entry for Terminations table", err.Error())
 		}
 
-		pdrLog.WithFields(log.Fields{
-			"sessions entry":     sessionsEntry,
-			"terminations entry": terminationsEntry,
+		entriesToApply = append(entriesToApply, terminationsEntry)
+
+		pdrLog = pdrLog.WithFields(log.Fields{
+			"entries":            entriesToApply,
 			"method type":        p4.Update_Type_name[int32(methodType)],
 		})
 		pdrLog.Debug("Applying table entries")
 
-		err = up4.p4client.ApplyTableEntries(methodType, applicationsEntry, sessionsEntry, terminationsEntry)
+		err = up4.p4client.ApplyTableEntries(methodType, entriesToApply...)
 		if err != nil {
-			return ErrOperationFailedWithReason("write table entries to Sessions and Terminations tables", err.Error())
+			p4Error, ok := err.(*P4RuntimeError)
+			if !ok {
+				// not a P4Runtime error, returning err
+				return ErrOperationFailedWithReason("applying table entries to UP4", err.Error())
+			}
+
+			for _, status := range p4Error.Get() {
+				// ignore ALREADY_EXISTS
+				if status.GetCanonicalCode() == int32(codes.AlreadyExists) {
+					continue
+				}
+
+				return ErrOperationFailedWithReason("applying table entries to UP4", p4Error.Error())
+			}
 		}
 	}
 
@@ -737,6 +782,7 @@ func (up4 *UP4) sendDelete(deleted PacketForwardingRules) error {
 	}
 
 	for _, p := range deleted.pdrs {
+		up4.releaseInternalApplicationID(p.appFilter)
 		up4.removeUeAddrAndFSEIDMappings(p)
 	}
 
