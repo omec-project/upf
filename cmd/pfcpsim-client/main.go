@@ -178,7 +178,6 @@ func init() {
 // getInterfaceAddress retrieves the IP of interfaceName.
 // Returns error if fail occurs at any stage.
 func getInterfaceAddress(interfaceName string) (net.IP, error) {
-	// TODO simply this. it retrieves all the interfaces.
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		log.Errorf("could not retrieve network interfaces: %v", err)
@@ -233,7 +232,6 @@ func parseArgs() {
 	}
 
 	if *outputFile != "" {
-		// TODO move this in main function
 		fn := copyOutputToLogfile(*outputFile)
 		defer fn()
 	}
