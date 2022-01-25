@@ -6,11 +6,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"io/ioutil"
 	"os"
 	"time"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -78,6 +79,7 @@ func convertError(err error) error {
 	p4RtError := &P4RuntimeError{
 		errors: make([]*p4.Error, 0),
 	}
+
 	for _, detailItem := range st.Details() {
 		p4Error, ok := detailItem.(*p4.Error)
 		if !ok {
@@ -358,10 +360,12 @@ func (c *P4rtClient) WriteBatchReq(updates []*p4.Update) error {
 	req.Updates = append(req.Updates, updates...)
 
 	log.Traceln(proto.MarshalTextString(req))
+
 	_, err := c.client.Write(context.Background(), req)
 	if err != nil {
 		return convertError(err)
 	}
+
 	return nil
 }
 

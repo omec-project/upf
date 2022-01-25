@@ -6,10 +6,11 @@ package main
 import (
 	"encoding/binary"
 	"flag"
-	"google.golang.org/grpc/codes"
 	"math/rand"
 	"net"
 	"time"
+
+	"google.golang.org/grpc/codes"
 
 	p4 "github.com/p4lang/p4runtime/go/p4/v1"
 
@@ -48,9 +49,9 @@ const (
 )
 
 type application struct {
-	appIP uint32
+	appIP     uint32
 	appL4Port uint16
-	appProto uint8
+	appProto  uint8
 }
 
 type counter struct {
@@ -559,6 +560,7 @@ func (up4 *UP4) releaseInternalApplicationID(appFilter applicationFilter) {
 		appL4Port: appFilter.srcPort,
 		appProto:  appFilter.proto,
 	}
+
 	allocated, exists := up4.applicationIDs[app]
 	if exists {
 		delete(up4.applicationIDs, app)
@@ -654,6 +656,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, meth
 		if err != nil {
 			return ErrOperationFailedWithReason("build P4rt table entry for Sessions table", err.Error())
 		}
+
 		entriesToApply = append(entriesToApply, sessionsEntry)
 
 		if pdr.IsUplink() {
@@ -695,8 +698,8 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, meth
 		entriesToApply = append(entriesToApply, terminationsEntry)
 
 		pdrLog = pdrLog.WithFields(log.Fields{
-			"entries":            entriesToApply,
-			"method type":        p4.Update_Type_name[int32(methodType)],
+			"entries":     entriesToApply,
+			"method type": p4.Update_Type_name[int32(methodType)],
 		})
 		pdrLog.Debug("Applying table entries")
 
