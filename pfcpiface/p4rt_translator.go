@@ -48,8 +48,10 @@ const (
 	ActSetDownlinkSessionBuff = "PreQosPipe.set_session_downlink_buff"
 	ActUplinkTermDrop         = "PreQosPipe.uplink_term_drop"
 	ActUplinkTermFwd          = "PreQosPipe.uplink_term_fwd"
+	ActUplinkTermFwdNoTC      = "PreQosPipe.uplink_term_fwd_no_tc"
 	ActDownlinkTermDrop       = "PreQosPipe.downlink_term_drop"
 	ActDownlinkTermFwd        = "PreQosPipe.downlink_term_fwd"
+	ActDownlinkTermFwdNoTC    = "PreQosPipe.downlink_term_fwd_no_tc"
 	ActLoadTunnelParams       = "PreQosPipe.load_tunnel_param"
 	ActSetAppID               = "PreQosPipe.set_app_id"
 
@@ -509,32 +511,28 @@ func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, internalAppID uint
 	tableID := t.tableID(TableApplications)
 	entry := &p4.TableEntry{
 		TableId:  tableID,
-		Priority: int32(math.MaxUint32 - pdr.precedence),
+		Priority: int32(math.MaxInt32 - pdr.precedence),
 	}
 
-	// the current assumption (and limitation):
-	//  applications are only filtered based on dst IP/port in the UP4 pipeline
-	appIP, appIPMask := pdr.appFilter.dstIP, pdr.appFilter.dstIPMask
-	appPort, appPortMask := pdr.appFilter.dstPort, pdr.appFilter.dstPortMask
+	// srcIP/srcPort is always set as an application endpoint
+	appIP, appIPMask := pdr.appFilter.srcIP, pdr.appFilter.srcIPMask
+	appPort := pdr.appFilter.srcPort
 	appProto, appProtoMask := pdr.appFilter.proto, pdr.appFilter.protoMask
 
 	appIPPrefixLen := 32 - bits.TrailingZeros32(appIPMask)
-	if appIPPrefixLen != 0 {
-		// append IP only if prefix greater than 0, leads to smaller protobuf message
+	if appIPPrefixLen > 0 {
 		if err := t.withLPMField(entry, FieldAppIPAddress, appIP, uint8(appIPPrefixLen)); err != nil {
 			return nil, err
 		}
 	}
 
-	if appPort != 0 && appPortMask != 0 {
-		// append L4 port only if specified, leads to smaller protobuf message
+	if appPort != 0 {
 		if err := t.withRangeMatchField(entry, FieldAppL4Port, appPort, appPort); err != nil {
 			return nil, err
 		}
 	}
 
 	if appProto != 0 && appProtoMask != 0 {
-		// append proto only if specified, leads to smaller protobuf message
 		if err := t.withTernaryMatchField(entry, FieldAppIPProto, appProto, appProtoMask); err != nil {
 			return nil, err
 		}
@@ -669,13 +667,17 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, shouldDrop bool, 
 		action = &p4.Action{
 			ActionId: t.actionID(ActUplinkTermDrop),
 		}
-	} else {
+	} else if !shouldDrop && tc != 0 {
 		action = &p4.Action{
 			ActionId: t.actionID(ActUplinkTermFwd),
 		}
 
 		if err := t.withActionParam(action, FieldTrafficClass, tc); err != nil {
 			return nil, err
+		}
+	} else {
+		action = &p4.Action{
+			ActionId: t.actionID(ActUplinkTermFwdNoTC),
 		}
 	}
 
@@ -719,7 +721,7 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, relatedFAR far,
 		action = &p4.Action{
 			ActionId: t.actionID(ActDownlinkTermDrop),
 		}
-	} else {
+	} else if !relatedFAR.Drops() && tc != 0 {
 		action = &p4.Action{
 			ActionId: t.actionID(ActDownlinkTermFwd),
 		}
@@ -734,6 +736,19 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, relatedFAR far,
 		}
 
 		if err := t.withActionParam(action, FieldTrafficClass, tc); err != nil {
+			return nil, err
+		}
+	} else {
+		action = &p4.Action{
+			ActionId: t.actionID(ActDownlinkTermFwdNoTC),
+		}
+
+		if err := t.withActionParam(action, FieldTEID, relatedFAR.tunnelTEID); err != nil {
+			return nil, err
+		}
+
+		// TODO: add support for QFI, which should be provided as a part of related QER
+		if err := t.withActionParam(action, FieldQFI, uint8(0)); err != nil {
 			return nil, err
 		}
 	}
