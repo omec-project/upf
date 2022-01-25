@@ -2,14 +2,18 @@ package main
 
 import (
 	"fmt"
+	p4rtc "github.com/antoninbas/p4runtime-go-client/pkg/client"
+	"github.com/antoninbas/p4runtime-go-client/pkg/util/conversion"
 	"github.com/omec-project/upf-epc/pkg/mockSmf/smf"
+	"github.com/omec-project/upf-epc/test/integration/providers"
+	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/pborman/getopt/v2"
 	"github.com/sirupsen/logrus"
-	"github.com/wmnsk/go-pfcp/ie"
-	"github.com/wmnsk/go-pfcp/message"
 	"io"
 	"net"
 	"os"
+	"path"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -20,23 +24,32 @@ var (
 
 	remotePeerAddress net.IP
 	localAddress      net.IP
-	inputFile         string
-	doOnce            sync.Once
-	gNodeBAddress     net.IP
-	sessionCount      int
-	baseId            int
+	upfAddress        net.IP
+	NodeBAddress      net.IP
 	ueAddressPool     string
+
+	inputFile string
+	doOnce    sync.Once
+
+	sessionCount int
 
 	globalMockSmf *smf.MockSMF
 )
 
 const (
 	// Values for mock-up4 environment
-
 	defaultGNodeBAddress = "198.18.0.10"
 	defaultUeAddressPool = "17.0.0.0/24"
 
 	defaultUpfN3Address = "198.18.0.1"
+
+	defaultSliceID = 0
+
+	srcIfaceAccess = 0x1
+	srcIfaceCore   = 0x2
+
+	directionUplink   = 0x1
+	directionDownlink = 0x2
 )
 
 func GetLoggerInstance() *logrus.Logger {
@@ -88,8 +101,74 @@ func setStdout(logfile string) func() {
 
 }
 
+func initMockUP4() error {
+	// used to initialize UP4 only
+	var masterElectionID = p4_v1.Uint128{High: 2, Low: 0}
+
+	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", masterElectionID)
+	if err != nil {
+		return err
+	}
+	defer providers.DisconnectP4rt()
+
+	_, currentFilePath, _, ok := runtime.Caller(0)
+	if !ok {
+		return fmt.Errorf("could not retrieve current file path")
+	}
+
+	bmv2Json := path.Join(currentFilePath, "../../../conf/p4/bin/bmv2.json")
+	p4Info := path.Join(currentFilePath, "../../../conf/p4/bin/p4info.txt")
+
+	_, err = p4rtClient.SetFwdPipe(bmv2Json, p4Info, 0)
+	if err != nil {
+		return err
+	}
+
+	ipAddr, err := conversion.IpToBinary(defaultUpfN3Address)
+	if err != nil {
+		return err
+	}
+
+	srcIface, err := conversion.UInt32ToBinary(srcIfaceAccess, 1)
+	if err != nil {
+		return err
+	}
+
+	direction, err := conversion.UInt32ToBinary(directionUplink, 1)
+	if err != nil {
+		return err
+	}
+
+	sliceID, err := conversion.UInt32ToBinary(defaultSliceID, 1)
+	if err != nil {
+		return err
+	}
+
+	te := p4rtClient.NewTableEntry("PreQosPipe.interfaces", []p4rtc.MatchInterface{&p4rtc.LpmMatch{
+		Value: ipAddr,
+		PLen:  32,
+	}}, p4rtClient.NewTableActionDirect("PreQosPipe.set_source_iface",
+		[][]byte{srcIface, direction, sliceID}), nil)
+
+	if err := p4rtClient.InsertTableEntry(te); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func init() {
 	log = GetLoggerInstance()
+
+	err := initMockUP4()
+	if err != nil {
+		log.Fatalf("Could not initialize mock UP4: %v", err)
+	}
+
+	providers.RunDockerCommand("pfcpiface", "/bin/pfcpiface -config /config.json")
+
+	// wait for PFCP Agent to initialize
+	time.Sleep(time.Second * 3)
 }
 
 // getInterfaceAddress retrieves the IP of parameter interfaceName. returns error if something goes wrong.
@@ -124,12 +203,12 @@ func getInterfaceAddress(interfaceName string) (net.IP, error) {
 func parseArgs() {
 	inputF := getopt.StringLong("input-file", 'f', "", "File to poll for input commands. Default is stdin")
 	outputFile := getopt.StringLong("output-file", 'o', "", "File in which to write output. Default is stdout")
-	peerAddr := getopt.StringLong("remoteAddress", 'r', "", "Address or hostname of the remote peer (e.g. UPF)")
+	remotePeer := getopt.StringLong("remote-peer-address", 'r', "127.0.0.1", "Address or hostname of the remote peer (PFCP Agent)")
+	upfAddr := getopt.StringLong("upf-address", 'u', defaultUpfN3Address, "Address of the UPF (UP4)")
 	interfaceName := getopt.StringLong("interface", 'i', "", "Set interface name to discover local address")
 	sessionCnt := getopt.IntLong("session-count", 'c', 1, "Set the amount of sessions to create, starting from 1 (included)")
-	base := getopt.IntLong("base", 'b', 1, "First ID used to generate all other ID fields.")
-	ueAddrPool := getopt.StringLong("ue-address-pool", 'u', defaultUeAddressPool, "The IPv4 CIDR prefix from which UE addresses will be drawn, incrementally")
-	gNodeBAddr := getopt.StringLong("gnodeb-address", 'g', defaultGNodeBAddress, "The IPv4 of (g/e)NodeBAddress for downlink PDRs")
+	ueAddrPool := getopt.StringLong("ue-address-pool", 'e', defaultUeAddressPool, "The IPv4 CIDR prefix from which UE addresses will be drawn, incrementally")
+	NodeBAddr := getopt.StringLong("nodeb-address", 'g', defaultGNodeBAddress, "The IPv4 of (g/e)NodeBAddress for downlink PDRs")
 	verbosity := getopt.BoolLong("verbose", 'v', "Set verbosity level to debug")
 
 	optHelp := getopt.BoolLong("help", 0, "Help")
@@ -157,29 +236,29 @@ func parseArgs() {
 		inputFile = *inputF
 	}
 
-	if *base < 0 {
-		log.Fatalf("Base id cannot be a negative number")
-	}
-	baseId = *base
-
 	if *sessionCnt <= 0 {
 		log.Fatalf("Session count cannot be 0 or a negative number")
 	}
 	sessionCount = *sessionCnt
 
 	// IPs checks
-	gNodeBAddress = net.ParseIP(*gNodeBAddr)
-	if gNodeBAddress == nil {
+	NodeBAddress = net.ParseIP(*NodeBAddr)
+	if NodeBAddress == nil {
 		log.Fatalf("Could not retrieve IP address of (g/e)NodeB")
 	}
 
-	remotePeerAddress = net.ParseIP(*peerAddr)
+	remotePeerAddress = net.ParseIP(*remotePeer)
 	if remotePeerAddress == nil {
-		address, err := net.LookupHost(*peerAddr)
+		address, err := net.LookupHost(*remotePeer)
 		if err != nil {
-			log.Fatalf("Could not retrieve hostname or address from parameters: %s", *peerAddr)
+			log.Fatalf("Could not retrieve hostname or address for remote peer: %s", *remotePeer)
 		}
 		remotePeerAddress = net.ParseIP(address[0])
+	}
+
+	upfAddress = net.ParseIP(*upfAddr)
+	if upfAddress == nil {
+		log.Fatalf("Error while parsing UPF address")
 	}
 
 	var err error = nil
@@ -197,9 +276,7 @@ func parseArgs() {
 
 }
 
-func readInput(input chan<- int) {
-	//inputFile = "commands.txt" //FIXME DEBUG
-
+func readInput(input chan<- string) {
 	if inputFile != "" {
 		// Set inputFile as stdIn
 
@@ -225,8 +302,8 @@ func readInput(input chan<- int) {
 	}
 
 	for {
-		var u int
-		_, err := fmt.Scanf("%d\n", &u)
+		var u string
+		_, err := fmt.Scanf("%s\n", &u)
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -239,35 +316,34 @@ func readInput(input chan<- int) {
 }
 
 func handleUserInput() {
-	userInput := make(chan int)
+	userInput := make(chan string)
 	go readInput(userInput)
 
 	for {
-		// TODO use literals, not int
-		fmt.Println("1. Teardown Association")
-		fmt.Println("2. Setup Association")
-		fmt.Println("3. Create Sessions ")
-		fmt.Println("4. Delete Sessions ")
-		fmt.Println("9. Exit ")
+		fmt.Println("'disassociate': Teardown Association")
+		fmt.Println("'associate': Setup Association")
+		fmt.Println("'create': Create Sessions ")
+		fmt.Println("'delete': Delete Sessions ")
+		fmt.Println("'exit': Exit ")
 		fmt.Print("Enter service: ")
 
 		select {
 		case userAnswer := <-userInput:
 			switch userAnswer {
-			case 1:
-				log.Infof("Selected teardown association")
+			case "disassociate":
+				log.Tracef("Selected teardown association")
 				globalMockSmf.TeardownAssociation()
-			case 2:
-				log.Infof("Selected setup association")
+			case "associate":
+				log.Tracef("Selected setup association")
 				globalMockSmf.SetupAssociation()
-			case 3:
-				log.Infof("Selected create sessions")
-				globalMockSmf.InitializeSessions(baseId, sessionCount, remotePeerAddress.String())
-			case 4:
-				log.Infof("Selected delete sessions")
+			case "create":
+				log.Tracef("Selected create sessions")
+				globalMockSmf.InitializeSessions(sessionCount)
+			case "delete":
+				log.Tracef("Selected delete sessions")
 				globalMockSmf.DeleteAllSessions()
-			case 9:
-				log.Infoln("Shutting down")
+			case "exit":
+				log.Tracef("Shutting down")
 				globalMockSmf.Disconnect()
 				os.Exit(0)
 
@@ -278,176 +354,20 @@ func handleUserInput() {
 	}
 }
 
-func emulateRemotePeerServer(wg *sync.WaitGroup, quitCh chan struct{}) {
-	// Emulates User-plane N4. Used for local debugging
-
-	defer wg.Done()
-	seid := uint64(999) //Mock SEID
-	localAddress := net.ParseIP("127.0.0.1")
-	// TODO save sessions locally
-
-	laddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%v:8805", localAddress.String()))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	conn, err := net.ListenUDP("udp", laddr)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	buf := make([]byte, 1500)
-	var seq uint32 = 1
-
-	for {
-		select {
-		case <-quitCh:
-			log.Debugf("Received quit signal")
-			return
-		default:
-			log.Printf("Server: waiting for messages to come on: %s", laddr)
-			n, addr, err := conn.ReadFrom(buf)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			msg, err := message.Parse(buf[:n])
-			if err != nil {
-				log.Printf("Server: ignored undecodable message: %x, error: %s", buf[:n], err)
-				continue
-			}
-
-			switch msg.MessageType() {
-			case message.MsgTypeHeartbeatRequest:
-				hbreq, ok := msg.(*message.HeartbeatRequest)
-				if !ok {
-					log.Printf("Server: got unexpected message: %s, from: %s", msg.MessageTypeName(), addr)
-					continue
-				}
-				ts, err := hbreq.RecoveryTimeStamp.RecoveryTimeStamp()
-				if err != nil {
-					log.Printf("Server: got Heartbeat Request with invalid TS: %s, from: %s", err, addr)
-					continue
-				} else {
-					log.Printf("Server: got Heartbeat Request with TS: %s, from: %s", ts, addr)
-				}
-				// Timestamp shouldn't be the time message is sent in the real deployment
-				hbres, err := message.NewHeartbeatResponse(seq, ie.NewRecoveryTimeStamp(time.Now())).Marshal()
-				if err != nil {
-					log.Fatal(err)
-				}
-				seq++
-
-				if _, err := conn.WriteTo(hbres, addr); err != nil {
-					log.Fatal(err)
-				}
-				log.Printf("Server: sent Heartbeat Response to: %s", addr)
-
-			case message.MsgTypeAssociationSetupRequest:
-				assoRequest, ok := msg.(*message.AssociationSetupRequest)
-				if !ok {
-					log.Printf("Server: got unexpected message: %s, from: %s", assoRequest.MessageTypeName(), addr)
-					continue
-				}
-				seq++
-
-				assoResponse, err := message.NewAssociationSetupResponse(seq).Marshal() // FIXME add IEs
-				if err != nil {
-					log.Errorf("Error while marshaling association response: %v", err)
-				}
-
-				if _, err := conn.WriteTo(assoResponse, addr); err != nil {
-					log.Fatal(err)
-				}
-				log.Printf("Server: sent Association Response to: %s", addr)
-
-			case message.MsgTypeAssociationReleaseRequest:
-				assoReleaseRequest, ok := msg.(*message.AssociationReleaseRequest)
-				if !ok {
-					log.Infof("Server: got unexpected message: %s, from: %s", assoReleaseRequest.MessageTypeName(), addr)
-					continue
-				}
-				seq = 0
-
-				cause := ie.NewCause(ie.CauseRequestAccepted)
-				ts := ie.NewRecoveryTimeStamp(time.Now())
-				releaseResponse, err := message.NewAssociationReleaseResponse(seq, cause, ts).Marshal() // FIXME add IEs
-				if err != nil {
-					log.Errorf("Error while marshaling association response: %v", err)
-				}
-
-				if _, err := conn.WriteTo(releaseResponse, addr); err != nil {
-					log.Fatal(err)
-				}
-				log.Infof("Server: sent Association Release Response to: %s", addr)
-				log.Infof("Server: Association removed.")
-
-			case message.MsgTypeSessionEstablishmentRequest:
-				log.Infof("received session establishment request")
-				cause := ie.NewCause(ie.CauseRequestAccepted)
-				fseid := ie.NewFSEID(seid, localAddress, nil)
-				seq++
-				sessDelResp, err := message.NewSessionEstablishmentResponse(
-					0,
-					0,
-					seid,
-					seq,
-					0,
-					cause,
-					fseid,
-				).Marshal()
-
-				if err != nil {
-					log.Errorf("Error while marshalling session establishment response")
-				}
-
-				if _, err := conn.WriteTo(sessDelResp, addr); err != nil {
-					log.Fatal(err)
-				}
-
-			case message.MsgTypeSessionDeletionRequest:
-				log.Infof("Received session deletion request")
-				cause := ie.NewCause(ie.CauseRequestAccepted)
-				seq++
-				sessDelResp, err := message.NewSessionDeletionResponse(
-					0,
-					0,
-					seid,
-					seq,
-					0,
-					cause,
-				).Marshal()
-				if err != nil {
-					log.Errorf("error while marshalling session delete response: %v", err)
-				}
-
-				if _, err := conn.WriteTo(sessDelResp, addr); err != nil {
-					log.Fatal(err)
-				}
-
-			} // end of switch
-
-		}
-	}
-}
-
 func main() {
-	//wg := new(sync.WaitGroup)
-	//quitCh := make(chan struct{})
-
-	//wg.Add(1)
-	//go emulateRemotePeerServer(wg, quitCh) // start emulating remote UPF for debug.
-	//time.Sleep(500 * time.Millisecond)
-
 	parseArgs()
 
-	globalMockSmf = smf.NewMockSMF(localAddress.String(), ueAddressPool, gNodeBAddress.String(), GetLoggerInstance())
+	globalMockSmf = smf.NewMockSMF(localAddress.String(),
+		ueAddressPool,
+		NodeBAddress.String(),
+		upfAddress.String(),
+		GetLoggerInstance(),
+	)
+
 	err := globalMockSmf.Connect(remotePeerAddress.String())
 	if err != nil {
 		log.Fatalf("Failed to connect to remote peer: %v", err)
 	}
 
 	handleUserInput()
-
-	//wg.Wait() // wait for all go-routines before shutting down
 }

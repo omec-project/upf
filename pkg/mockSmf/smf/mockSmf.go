@@ -7,6 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
 	"net"
+	"time"
 )
 
 const (
@@ -19,13 +20,16 @@ const (
 type MockSMF struct {
 	ueAddressPool string
 	nodeBAddress  string
+	upfAddress    string
+
+	lastUEAddress net.IP
 
 	log *logrus.Logger
 
 	client *pfcpsim.PFCPClient
 }
 
-func NewMockSMF(lAddr string, ueAddressPool string, nodeBAddress string, logger *logrus.Logger) *MockSMF {
+func NewMockSMF(lAddr string, ueAddressPool string, nodeBAddress string, upfAddress string, logger *logrus.Logger) *MockSMF {
 	if logger == nil {
 		logger = new(logrus.Logger)
 	}
@@ -36,6 +40,7 @@ func NewMockSMF(lAddr string, ueAddressPool string, nodeBAddress string, logger 
 		log:           logger,
 		ueAddressPool: ueAddressPool,
 		nodeBAddress:  nodeBAddress,
+		upfAddress:    upfAddress,
 		client:        pfcpClient,
 	}
 }
@@ -73,54 +78,60 @@ func (m *MockSMF) SetupAssociation() {
 		return
 	}
 
-	m.log.Infof("Setup association completed")
+	time.Sleep(pfcpsim.HeartbeatPeriod)
 
-	_, err = m.client.PeekNextHeartbeatResponse(pfcpsim.Heartbeat_Period)
-	if err != nil {
+	if !m.client.IsAssociationAlive() {
 		m.log.Errorf("Error while peeking heartbeat response: %v", err)
 		return
 	}
 
-	m.log.Infof("Received heartbeat response")
+	m.log.Infof("Setup association completed")
 }
 
-func (m *MockSMF) InitializeSessions(baseId int, count int, remotePeerAddress string) {
-	ueIpFromPool, _, err := net.ParseCIDR(m.ueAddressPool)
-	if err != nil {
-		m.log.Errorf("Could not parse address pool: %v", err)
+// getNextUEAddress retrieves the next available IP address from ueAddressPool
+func (m *MockSMF) getNextUEAddress() net.IP {
+	// TODO handle case net address is full
+	if m.lastUEAddress == nil {
+		// ueAddressPool is already validated
+		ueIpFromPool, _, _ := net.ParseCIDR(m.ueAddressPool)
+		m.lastUEAddress = iplib.NextIP(ueIpFromPool)
+
+		return m.lastUEAddress
+
+	} else {
+		m.lastUEAddress = iplib.NextIP(m.lastUEAddress)
+		return m.lastUEAddress
 	}
+}
 
-	ueIpFromPool = iplib.NextIP(ueIpFromPool) // TODO handle case net address is full
+// InitializeSessions create 'count' sessions, incrementally, using baseID as base to create session's rule IDs.
+func (m *MockSMF) InitializeSessions(count int) {
 
-	for i := baseId; i < (count + baseId); i++ {
-		// using variables to ease comprehension on how sessions rules are linked together
-
-		uplinkTeid := uint32(i)
-		downlinkTeid := uint32(i + 1)
+	for i := 1; i < (count + 1); i++ {
+		// using variables to ease comprehension on how rules are linked together
+		uplinkTEID := uint32(i + 10)
+		downlinkTEID := uint32(i + 11)
 
 		uplinkFarID := uint32(i)
 		downlinkFarID := uint32(i + 1)
 
-		sessQerID := uint32(i + 3)
-
 		uplinkPdrID := uint16(i)
 		dowlinkPdrID := uint16(i + 1)
+
+		sessQerID := uint32(i + 3)
+		appQerID := uint32(i)
 
 		uplinkAppQerID := uint32(i)
 		downlinkAppQerID := uint32(i + 1)
 
-		appQerID := uint32(i)
-
-		upfN3Address := remotePeerAddress //FIXME is it correct?
-
 		pdrs := []*ie.IE{
-			integration.NewUplinkPDR(integration.Create, uplinkPdrID, uplinkTeid, upfN3Address, uplinkFarID, sessQerID, uplinkAppQerID),
-			integration.NewDownlinkPDR(integration.Create, dowlinkPdrID, ueIpFromPool.String(), downlinkFarID, sessQerID, downlinkAppQerID),
+			integration.NewUplinkPDR(integration.Create, uplinkPdrID, uplinkTEID, m.upfAddress, uplinkFarID, sessQerID, uplinkAppQerID),
+			integration.NewDownlinkPDR(integration.Create, dowlinkPdrID, m.getNextUEAddress().String(), downlinkFarID, sessQerID, downlinkAppQerID),
 		}
 
 		fars := []*ie.IE{
 			integration.NewUplinkFAR(integration.Create, uplinkFarID, ActionForward),
-			integration.NewDownlinkFAR(integration.Create, downlinkFarID, ActionDrop, downlinkTeid, m.nodeBAddress),
+			integration.NewDownlinkFAR(integration.Create, downlinkFarID, ActionDrop, downlinkTEID, m.nodeBAddress),
 		}
 
 		qers := []*ie.IE{
@@ -130,16 +141,41 @@ func (m *MockSMF) InitializeSessions(baseId int, count int, remotePeerAddress st
 			integration.NewQER(integration.Create, appQerID, 0x08, 50000, 50000, 30000, 30000),
 		}
 
-		err = m.client.EstablishSession(pdrs, fars, qers)
+		err := m.client.EstablishSession(pdrs, fars, qers)
 		if err != nil {
 			m.log.Errorf("Error while establishing sessions: %v", err)
 		}
 
+		// TODO show session's F-SEID
 		m.log.Infof("Created sessions")
 	}
+
+	//pdrs := []*ie.IE{
+	//	integration.NewUplinkPDR(integration.Create, 1, 15, m.upfAddress, 1, 4, 1),
+	//	integration.NewDownlinkPDR(integration.Create, 2, m.getNextUEAddress().String(), 2, 4, 2),
+	//}
+	//fars := []*ie.IE{
+	//	integration.NewUplinkFAR(integration.Create, 1, ActionForward),
+	//	integration.NewDownlinkFAR(integration.Create, 2, ActionDrop, 16, m.nodeBAddress),
+	//}
+	//
+	//qers := []*ie.IE{
+	//	// session QER
+	//	integration.NewQER(integration.Create, 4, 0x09, 500000, 500000, 0, 0),
+	//	// application QER
+	//	integration.NewQER(integration.Create, 1, 0x08, 50000, 50000, 30000, 30000),
+	//}
+
+	//err = m.client.EstablishSession(pdrs, fars, qers)
+	//if err != nil {
+	//	m.log.Errorf("Error while establishing sessions: %v", err)
+	//}
+	//
+	//m.log.Infof("Created sessions")
+
 }
 
 func (m *MockSMF) DeleteAllSessions() {
 	// TODO Refactor this to use new structure
-
+	m.log.Errorf("Not implemented")
 }
