@@ -29,6 +29,9 @@ type PFCPClient struct {
 	// it is also used as F-SEID
 	numSessions uint64
 
+	// Save remoteSEID for session deletion
+	remoteSEIDS []uint64
+
 	aliveLock           sync.Mutex
 	isAssociationActive bool
 
@@ -205,15 +208,14 @@ func (c *PFCPClient) SendSessionEstablishmentRequest(pdrs []*ieLib.IE, fars []*i
 	return c.sendMsg(estReq)
 }
 
-func (c *PFCPClient) SendSessionDeletionRequest(FSEID uint64) error {
+func (c *PFCPClient) SendSessionDeletionRequest(localSEID uint64, remoteSEID uint64) error {
 	delReq := message.NewSessionDeletionRequest(
 		0,
 		0,
-		0,
+		remoteSEID,
 		c.getNextSequenceNumber(),
 		0,
-		ieLib.NewNodeID(c.localAddr, "", ""),
-		ieLib.NewFSEID(FSEID, net.ParseIP(c.localAddr), nil),
+		ieLib.NewFSEID(localSEID, net.ParseIP(c.localAddr), nil),
 	)
 
 	return c.sendMsg(delReq)
@@ -341,14 +343,23 @@ func (c *PFCPClient) EstablishSession(pdrs []*ieLib.IE, fars []*ieLib.IE, qers [
 		return fmt.Errorf("session establishment response returns invalid cause: %v", cause)
 	}
 
+	remoteUpfSEID, _ := estResp.UPFSEID.FSEID()
+	c.remoteSEIDS = append(c.remoteSEIDS, remoteUpfSEID.SEID)
+
 	return nil
 }
 
 // DeleteAllSessions sends Session Deletion Request and awaits for PFCP Session Deletion Response.
 // Returns error if the process fails at any stage.
 func (c *PFCPClient) DeleteAllSessions() error {
+	var remoteSEID uint64
+
 	for FSEID := c.numSessions; FSEID > 0; FSEID-- {
-		err := c.SendSessionDeletionRequest(FSEID)
+
+		// pop remoteSEID from slice
+		remoteSEID, c.remoteSEIDS = c.remoteSEIDS[len(c.remoteSEIDS)-1], c.remoteSEIDS[:len(c.remoteSEIDS)-1]
+
+		err := c.SendSessionDeletionRequest(FSEID, remoteSEID)
 		if err != nil {
 			return err
 		}
