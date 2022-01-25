@@ -201,6 +201,7 @@ func getInterfaceAddress(interfaceName string) (net.IP, error) {
 	return nil, fmt.Errorf("could not find interface: %v", interfaceName)
 }
 
+// parseArgs perform flag parsing and validation saving necessary data to global variables.
 func parseArgs() {
 	inputF := getopt.StringLong("input-file", 'f', "", "File to poll for input commands. Default is stdin")
 	outputFile := getopt.StringLong("output-file", 'o', "", "File in which to write output. Default is stdout")
@@ -277,6 +278,7 @@ func parseArgs() {
 
 }
 
+// readInput will cycle through user's input. if inputFile was provided as a flag, Stdin redirection is performed.
 func readInput(input chan<- string) {
 	if inputFile != "" {
 		// Set inputFile as stdIn
@@ -316,6 +318,7 @@ func readInput(input chan<- string) {
 	}
 }
 
+// handleUserInput spawn a goroutine cycling through user's input.
 func handleUserInput() {
 	userInput := make(chan string)
 	go readInput(userInput)
