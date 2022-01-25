@@ -208,13 +208,13 @@ func getInterfaceAddress(interfaceName string) (net.IP, error) {
 // parseArgs perform flag parsing and validation saving necessary data to global variables.
 func parseArgs() {
 	inputF := getopt.StringLong("input-file", 'f', "", "File to poll for input commands. Default is stdin")
-	outputFile := getopt.StringLong("output-file", 'o', "", "File in which to write output. Default is stdout")
+	outputFile := getopt.StringLong("output-file", 'o', "", "File in which copy from Stdout. Default uses only Stdout")
 	remotePeer := getopt.StringLong("remote-peer-address", 'r', "127.0.0.1", "Address or hostname of the remote peer (PFCP Agent)")
 	upfAddr := getopt.StringLong("upf-address", 'u', defaultUpfN3Address, "Address of the UPF (UP4)")
 	interfaceName := getopt.StringLong("interface", 'i', "", "Set interface name to discover local address")
 	sessionCnt := getopt.IntLong("session-count", 'c', 1, "Set the amount of sessions to create, starting from 1 (included)")
-	ueAddrPool := getopt.StringLong("ue-address-pool", 'e', defaultUeAddressPool, "The IPv4 CIDR prefix from which UE addresses will be drawn, incrementally")
-	NodeBAddr := getopt.StringLong("nodeb-address", 'g', defaultGNodeBAddress, "The IPv4 of (g/e)NodeBAddress for downlink PDRs")
+	ueAddrPool := getopt.StringLong("ue-address-pool", 'e', defaultUeAddressPool, "The IPv4 CIDR prefix from which UE addresses will be generated, incrementally")
+	NodeBAddr := getopt.StringLong("nodeb-address", 'g', defaultGNodeBAddress, "The IPv4 of (g/e)NodeBAddress")
 	verbosity := getopt.BoolLong("verbose", 'v', "Set verbosity level to debug")
 
 	optHelp := getopt.BoolLong("help", 0, "Help")
