@@ -171,7 +171,8 @@ func init() {
 	time.Sleep(time.Second * 3)
 }
 
-// getInterfaceAddress retrieves the IP of parameter interfaceName. returns error if something goes wrong.
+// getInterfaceAddress retrieves the IP of interfaceName.
+// Returns error if fail occurs at any stage.
 func getInterfaceAddress(interfaceName string) (net.IP, error) {
 	// TODO simply this. it retrieves all the interfaces.
 	ifaces, err := net.Interfaces()
