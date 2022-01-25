@@ -6,15 +6,10 @@ import (
 	"github.com/omec-project/upf-epc/test/integration"
 	"github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
-	"github.com/wmnsk/go-pfcp/message"
 	"net"
 )
 
 const (
-	// Values for mock-up4 environment
-
-	defaultSliceID = 0
-
 	ActionForward uint8 = 0x2
 	ActionDrop    uint8 = 0x1
 	ActionBuffer  uint8 = 0x4
@@ -22,8 +17,6 @@ const (
 )
 
 type MockSMF struct {
-	activeSessions map[uint64]pfcpsim.Session
-
 	ueAddressPool string
 	nodeBAddress  string
 
@@ -41,11 +34,10 @@ func NewMockSMF(lAddr string, ueAddressPool string, nodeBAddress string, logger 
 	pfcpClient.SetLogger(logger)
 
 	return &MockSMF{
-		activeSessions: make(map[uint64]pfcpsim.Session),
-		log:            logger,
-		ueAddressPool:  ueAddressPool,
-		nodeBAddress:   nodeBAddress,
-		client:         pfcpClient,
+		log:           logger,
+		ueAddressPool: ueAddressPool,
+		nodeBAddress:  nodeBAddress,
+		client:        pfcpClient,
 	}
 }
 
@@ -60,6 +52,7 @@ func (m *MockSMF) Connect(remoteAddress string) error {
 	if err != nil {
 		return err
 	}
+
 	m.log.Infof("PFCP client is connected")
 	return nil
 }
@@ -78,48 +71,18 @@ func (m *MockSMF) SetupAssociation() {
 	err := m.client.SetupAssociation()
 	if err != nil {
 		m.log.Errorf("Error while setting up association: %v", err)
+		return
 	}
 
 	m.log.Infof("Setup association completed")
-}
 
-func craftUeFlow(teid uint32, pdr ie.IE, far ie.IE, qer ie.IE) (*pfcpsim.UeFlow, error) {
-	// TODO still unused
-	pdrId, err := pdr.PDRID()
+	_, err = m.client.PeekNextHeartbeatResponse(pfcpsim.Heartbeat_Period)
 	if err != nil {
-		return nil, err
+		m.log.Errorf("Error while peeking heartbeat response: %v", err)
+		return
 	}
 
-	farId, err := far.FARID()
-	if err != nil {
-		return nil, err
-	}
-
-	qerId, err := qer.QERID()
-	if err != nil {
-		return nil, err
-	}
-
-	ueFlow := &pfcpsim.UeFlow{
-		Teid:  teid,
-		PdrId: pdrId,
-		FarId: farId,
-		QerId: qerId,
-	}
-
-	return ueFlow, nil
-}
-
-// craftSession creates a session using fSeid as identifier.
-//If not found, a new session is created and saved in ActiveSessions map
-func craftSession(fSeid uint64, ueAddress net.IP, uplinkFlow pfcpsim.UeFlow, downlinkFlow pfcpsim.UeFlow) *pfcpsim.Session {
-	//if session, ok := m.activeSessions[fSeid]; ok {
-	// TODO job of the caller to do this.
-	//	// Session already present. return it
-	//	return &session
-	//}
-
-	return pfcpsim.NewSession(fSeid, ueAddress, uplinkFlow, downlinkFlow)
+	m.log.Infof("Received heartbeat response")
 }
 
 func (m *MockSMF) InitializeSessions(baseId int, count int, remotePeerAddress string) {
@@ -168,21 +131,6 @@ func (m *MockSMF) InitializeSessions(baseId int, count int, remotePeerAddress st
 			integration.NewQER(integration.Create, appQerID, 0x08, 50000, 50000, 30000, 30000),
 		}
 
-		//m.CreateSession(session)
-		uplinkUeFlow, err := craftUeFlow(uplinkTeid, *pdrs[0], *fars[0], *qers[0])
-		if err != nil {
-			m.log.Errorf("Error while creating ue flow: %v", err)
-			return
-		}
-
-		// Interested only in session QERs // TODO handle also application QER
-		downlinkUeFlow, err := craftUeFlow(downlinkTeid, *pdrs[1], *fars[1], *qers[0])
-		if err != nil {
-			m.log.Errorf("Error while creating downlink ue flow: %v", err)
-			return
-		}
-		m.log.Debugf("Created uplink: %v; downlink: %v", uplinkUeFlow.Teid, downlinkUeFlow.Teid)
-
 		err = m.client.EstablishSession(pdrs, fars, qers)
 		if err != nil {
 			m.log.Errorf("Error while establishing sessions: %v", err)
@@ -193,21 +141,6 @@ func (m *MockSMF) InitializeSessions(baseId int, count int, remotePeerAddress st
 }
 
 func (m *MockSMF) DeleteAllSessions() {
-	for _, session := range m.activeSessions {
-		err := m.client.SendSessionDeletionRequest(session)
-		if err != nil {
-			m.log.Errorf("Error while sending session deletion request: %v", err)
-		}
+	// TODO Refactor this to use new structure
 
-		resp, err := m.client.PeekNextResponse(5)
-		if err != nil {
-			m.log.Errorf("Error while sending session deletion request: %v", err)
-		}
-
-		if resp.MessageType() != message.MsgTypeSessionDeletionResponse {
-			m.log.Errorf("Sent session delete request but received unexpected message: %v", resp.MessageTypeName())
-		}
-
-		m.log.Infof("Session with SEID %v was successfully deleted", session.GetOurSeid())
-	}
 }

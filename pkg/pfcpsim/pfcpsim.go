@@ -17,6 +17,7 @@ import (
 
 const (
 	PFCPStandardPort = 8805
+	Heartbeat_Period = 5
 )
 
 // PFCPClient enables to simulate a client sending PFCP messages towards the UPF.
@@ -212,7 +213,7 @@ func (c *PFCPClient) SendSessionEstablishmentRequest(pdrs []*ieLib.IE, fars []*i
 }
 
 func (c *PFCPClient) StartHeartbeats(stopCtx context.Context) {
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(Heartbeat_Period * time.Second)
 	for {
 		select {
 		case <-stopCtx.Done():
@@ -268,36 +269,6 @@ func (c *PFCPClient) SetupAssociation() error {
 	return nil
 }
 
-func (c *PFCPClient) SendSessionDeletionRequest(session Session, ie ...*ieLib.IE) error {
-	// TODO refactor this method to be similar to EstablishSession
-	if session.GetPeerSeid() == 0 {
-		// most probably did not get F-SEID from session establishment.
-		//return errors.New("session does not have peer F-SEID")
-		fmt.Println("DEBUG Skipping session peer seid check") //FIXME REMOVE
-	}
-
-	seid := session.GetOurSeid()
-	c.log.Debugf("Deleting session with SEID %v", seid)
-
-	ie1 := ieLib.NewFSEID(seid, net.ParseIP(c.localAddr), nil)
-
-	sessionDeletionReq := message.NewSessionDeletionRequest(
-		0,
-		0,
-		seid,
-		c.getNextSequenceNumber(),
-		0,
-		ie1,
-	)
-
-	for _, ie := range ie {
-		// append optional IEs passed by caller
-		sessionDeletionReq.IEs = append(sessionDeletionReq.IEs, ie)
-	}
-
-	return c.sendMsg(sessionDeletionReq)
-}
-
 func (c *PFCPClient) IsAssociationAlive() bool {
 	c.aliveLock.Lock()
 	defer c.aliveLock.Unlock()
@@ -335,26 +306,6 @@ func (c *PFCPClient) TeardownAssociation() error {
 	c.setAssociationStatus(false)
 
 	return nil
-}
-
-func (c *PFCPClient) SendSessionEstRequest(session *Session, ie ...*ieLib.IE) error {
-	// TODO remove this and use EstablishSession instead
-	ie1 := ieLib.NewNodeID(c.localAddr, "", "")
-	ie2 := ieLib.NewFSEID(session.ourSeid, net.ParseIP(c.localAddr), nil)
-	ie3 := ieLib.NewPDNType(ieLib.PDNTypeIPv4)
-
-	sessionEstReq := message.NewSessionEstablishmentRequest(
-		0,
-		0,
-		session.ourSeid,
-		c.getNextSequenceNumber(),
-		0,
-		ie1,
-		ie2,
-		ie3,
-	)
-
-	return c.sendMsg(sessionEstReq)
 }
 
 // EstablishSession sends PFCP Session Establishment Request and waits for PFCP Session Establishment Response.

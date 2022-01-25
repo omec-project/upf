@@ -162,8 +162,8 @@ func parseArgs() {
 	}
 	baseId = *base
 
-	if *sessionCnt < 0 {
-		log.Fatalf("Session count cannot be a negative number")
+	if *sessionCnt <= 0 {
+		log.Fatalf("Session count cannot be 0 or a negative number")
 	}
 	sessionCount = *sessionCnt
 
@@ -432,12 +432,12 @@ func emulateRemotePeerServer(wg *sync.WaitGroup, quitCh chan struct{}) {
 }
 
 func main() {
-	wg := new(sync.WaitGroup)
-	quitCh := make(chan struct{})
+	//wg := new(sync.WaitGroup)
+	//quitCh := make(chan struct{})
 
-	wg.Add(1)
-	go emulateRemotePeerServer(wg, quitCh) // start emulating remote UPF for debug.
-	time.Sleep(500 * time.Millisecond)
+	//wg.Add(1)
+	//go emulateRemotePeerServer(wg, quitCh) // start emulating remote UPF for debug.
+	//time.Sleep(500 * time.Millisecond)
 
 	parseArgs()
 
@@ -449,5 +449,5 @@ func main() {
 
 	handleUserInput()
 
-	wg.Wait() // wait for all go-routines before shutting down
+	//wg.Wait() // wait for all go-routines before shutting down
 }
