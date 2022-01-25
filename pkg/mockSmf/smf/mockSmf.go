@@ -109,75 +109,50 @@ func (m *MockSMF) getNextUEAddress() net.IP {
 // InitializeSessions create 'count' sessions, incrementally, using baseID as base to create session's rule IDs.
 func (m *MockSMF) InitializeSessions(count int) {
 
-	//for i := 1; i < (count + 1); i++ {
-	//	// using variables to ease comprehension on how rules are linked together
-	//	uplinkTEID := uint32(i + 10)
-	//	downlinkTEID := uint32(i + 11)
-	//
-	//	uplinkFarID := uint32(i)
-	//	downlinkFarID := uint32(i + 1)
-	//
-	//	uplinkPdrID := uint16(i)
-	//	dowlinkPdrID := uint16(i + 1)
-	//
-	//	sessQerID := uint32(i + 3)
-	//	appQerID := uint32(i)
-	//
-	//	uplinkAppQerID := uint32(i)
-	//	downlinkAppQerID := uint32(i + 1)
-	//
-	//	pdrs := []*ie.IE{
-	//		integration.NewUplinkPDR(integration.Create, uplinkPdrID, uplinkTEID, m.upfAddress, uplinkFarID, sessQerID, uplinkAppQerID),
-	//		integration.NewDownlinkPDR(integration.Create, dowlinkPdrID, m.getNextUEAddress().String(), downlinkFarID, sessQerID, downlinkAppQerID),
-	//	}
-	//
-	//	fars := []*ie.IE{
-	//		integration.NewUplinkFAR(integration.Create, uplinkFarID, ActionForward),
-	//		integration.NewDownlinkFAR(integration.Create, downlinkFarID, ActionDrop, downlinkTEID, m.nodeBAddress),
-	//	}
-	//
-	//	qers := []*ie.IE{
-	//		// session QER
-	//		integration.NewQER(integration.Create, sessQerID, 0x09, 500000, 500000, 0, 0),
-	//		// application QER
-	//		integration.NewQER(integration.Create, appQerID, 0x08, 50000, 50000, 30000, 30000),
-	//	}
-	//
-	//	err := m.client.EstablishSession(pdrs, fars, qers)
-	//	if err != nil {
-	//		m.log.Errorf("Error while establishing sessions: %v", err)
-	//	}
-	//
-	//	// TODO show session's F-SEID
-	//	m.activeSessions++
-	//	m.log.Infof("Created sessions")
-	//}
+	for i := 1; i < (count + 1); i++ {
+		// using variables to ease comprehension on how rules are linked together
+		uplinkTEID := uint32(i + 10)
+		downlinkTEID := uint32(i + 11)
 
-	pdrs := []*ie.IE{
-		integration.NewUplinkPDR(integration.Create, 1, 15, m.upfAddress, 1, 4, 1),
-		integration.NewDownlinkPDR(integration.Create, 2, m.getNextUEAddress().String(), 2, 4, 2),
+		uplinkFarID := uint32(i)
+		downlinkFarID := uint32(i + 1)
+
+		uplinkPdrID := uint16(i)
+		dowlinkPdrID := uint16(i + 1)
+
+		sessQerID := uint32(i + 3)
+		appQerID := uint32(i)
+
+		uplinkAppQerID := uint32(i)
+		downlinkAppQerID := uint32(i + 1)
+
+		pdrs := []*ie.IE{
+			integration.NewUplinkPDR(integration.Create, uplinkPdrID, uplinkTEID, m.upfAddress, uplinkFarID, sessQerID, uplinkAppQerID),
+			integration.NewDownlinkPDR(integration.Create, dowlinkPdrID, m.getNextUEAddress().String(), downlinkFarID, sessQerID, downlinkAppQerID),
+		}
+
+		fars := []*ie.IE{
+			integration.NewUplinkFAR(integration.Create, uplinkFarID, ActionForward),
+			integration.NewDownlinkFAR(integration.Create, downlinkFarID, ActionDrop, downlinkTEID, m.nodeBAddress),
+		}
+
+		qers := []*ie.IE{
+			// session QER
+			integration.NewQER(integration.Create, sessQerID, 0x09, 500000, 500000, 0, 0),
+			// application QER
+			integration.NewQER(integration.Create, appQerID, 0x08, 50000, 50000, 30000, 30000),
+		}
+
+		err := m.client.EstablishSession(pdrs, fars, qers)
+		if err != nil {
+			m.log.Errorf("Error while establishing sessions: %v", err)
+		}
+
+		// TODO show session's F-SEID
+		m.activeSessions++
+		m.log.Infof("Created sessions")
 	}
 
-	fars := []*ie.IE{
-		integration.NewUplinkFAR(integration.Create, 1, ActionForward),
-		integration.NewDownlinkFAR(integration.Create, 2, ActionDrop, 16, m.nodeBAddress),
-	}
-
-	qers := []*ie.IE{
-		// session QER
-		integration.NewQER(integration.Create, 4, 0x09, 500000, 500000, 0, 0),
-		// application QER
-		integration.NewQER(integration.Create, 1, 0x08, 50000, 50000, 30000, 30000),
-	}
-
-	err := m.client.EstablishSession(pdrs, fars, qers)
-	if err != nil {
-		m.log.Errorf("Error while establishing sessions: %v", err)
-	}
-
-	// TODO show session's F-SEID
-	m.activeSessions++
-	m.log.Infof("Created sessions")
 }
 
 func (m *MockSMF) DeleteAllSessions() {
