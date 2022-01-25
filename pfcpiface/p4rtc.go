@@ -6,6 +6,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"io/ioutil"
 	"os"
 	"time"
@@ -47,6 +49,49 @@ type P4rtClient struct {
 
 	// exported fields
 	P4Info p4ConfigV1.P4Info
+}
+
+type P4RuntimeError struct {
+	errors []*p4.Error
+}
+
+func (e *P4RuntimeError) Error() string {
+	return fmt.Sprintf("P4RuntimeError: %v", e.errors)
+}
+
+func (e *P4RuntimeError) Get() []*p4.Error {
+	return e.errors
+}
+
+// convertError parses nested P4Runtime errors.
+// See https://p4.org/p4-spec/p4runtime/main/P4Runtime-Spec.html#sec-error-reporting-messages.
+func convertError(err error) error {
+	st, ok := status.FromError(err)
+	if !ok {
+		return err
+	}
+
+	if st.Code() != codes.Unknown {
+		return err
+	}
+
+	p4RtError := &P4RuntimeError{
+		errors: make([]*p4.Error, 0),
+	}
+	for _, detailItem := range st.Details() {
+		p4Error, ok := detailItem.(*p4.Error)
+		if !ok {
+			continue
+		}
+
+		if p4Error.GetCanonicalCode() == int32(codes.OK) {
+			continue
+		}
+
+		p4RtError.errors = append(p4RtError.errors, p4Error)
+	}
+
+	return p4RtError
 }
 
 // CheckStatus ... Check client connection status.
@@ -294,9 +339,13 @@ func (c *P4rtClient) WriteReq(update *p4.Update) error {
 		ElectionId: &c.electionID,
 		Updates:    []*p4.Update{update},
 	}
-	_, err := c.client.Write(context.Background(), req)
 
-	return err
+	_, err := c.client.Write(context.Background(), req)
+	if err != nil {
+		return convertError(err)
+	}
+
+	return nil
 }
 
 // WriteBatchReq ... Write batch Request to up4.
@@ -310,8 +359,10 @@ func (c *P4rtClient) WriteBatchReq(updates []*p4.Update) error {
 
 	log.Traceln(proto.MarshalTextString(req))
 	_, err := c.client.Write(context.Background(), req)
-
-	return err
+	if err != nil {
+		return convertError(err)
+	}
+	return nil
 }
 
 // GetForwardingPipelineConfig ... Get Pipeline config from switch.
