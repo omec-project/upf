@@ -493,8 +493,8 @@ func (b *bess) sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 
 				// Try to find the N6 uplink PDR with the UE IP.
 				for _, p := range session.pdrs {
-					if p.IsUplink() && p.srcIP > 0 {
-						ueIpString = int2ip(p.srcIP).String()
+					if p.IsUplink() && p.ueAddress > 0 {
+						ueIpString = int2ip(p.ueAddress).String()
 						log.Traceln(p.fseID, " -> ", ueIpString)
 
 						break
