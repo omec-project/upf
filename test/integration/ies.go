@@ -19,23 +19,8 @@ const (
 const (
 	dummyPrecedence = 100
 
+	sdfFilter = "permit out ip from any 6181-6181 to assigned"
 )
-
-var uplinkPDR = ie.NewCreatePDR(
-	ie.NewPDRID(1),
-	ie.NewPrecedence(dummyPrecedence),
-	ie.NewPDI(
-		ie.NewSourceInterface(ie.SrcInterfaceAccess),
-		ie.NewFTEID(0x01, 0x30000000, net.ParseIP("198.18.0.1"), nil, 0),
-		ie.NewUEIPAddress(0x2, "16.0.0.1", "", 0, 0),
-		ie.NewSDFFilter("permit out ip from any to assigned", "", "", "", 1),
-	),
-	ie.NewOuterHeaderRemoval(0, 0),
-	ie.NewFARID(1),
-	ie.NewQERID(1),
-	ie.NewQERID(4),
-)
-
 
 // TODO: use builder pattern to create PDR IE
 func NewUplinkPDR(method IEMethod, id uint16, teid uint32, n3address string,
@@ -51,7 +36,7 @@ func NewUplinkPDR(method IEMethod, id uint16, teid uint32, n3address string,
 		ie.NewPDI(
 			ie.NewSourceInterface(ie.SrcInterfaceAccess),
 			ie.NewFTEID(0x01, teid, net.ParseIP(n3address), nil, 0),
-			ie.NewSDFFilter("permit out ip from any to assigned", "", "", "", 1),
+			ie.NewSDFFilter(sdfFilter, "", "", "", 1),
 		),
 		ie.NewOuterHeaderRemoval(0, 0),
 		ie.NewFARID(farID),
@@ -73,7 +58,7 @@ func NewDownlinkPDR(method IEMethod, id uint16, ueAddress string,
 		ie.NewPDI(
 			ie.NewSourceInterface(ie.SrcInterfaceCore),
 			ie.NewUEIPAddress(0x2, ueAddress, "", 0, 0),
-			ie.NewSDFFilter("permit out ip from any to assigned", "", "", "", 1),
+			ie.NewSDFFilter(sdfFilter, "", "", "", 1),
 		),
 		ie.NewFARID(farID),
 		ie.NewQERID(appQerID),
