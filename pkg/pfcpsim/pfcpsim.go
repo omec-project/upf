@@ -347,8 +347,7 @@ func (c *PFCPClient) EstablishSession(pdrs []*ieLib.IE, fars []*ieLib.IE, qers [
 // DeleteAllSessions sends Session Deletion Request and awaits for PFCP Session Deletion Response.
 // Returns error if the process fails at any stage.
 func (c *PFCPClient) DeleteAllSessions() error {
-	// TODO clear all PDRs, FARs etc. sent to pfcpiface
-	for FSEID := c.numSessions; FSEID <= 0; FSEID-- {
+	for FSEID := c.numSessions; FSEID > 0; FSEID-- {
 		err := c.SendSessionDeletionRequest(FSEID)
 		if err != nil {
 			return err

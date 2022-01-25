@@ -149,5 +149,3 @@ FROM scratch AS artifacts
 COPY --from=bess /bin/bessd /
 COPY --from=pfcpiface /bin/pfcpiface /
 COPY --from=bess-build /bess /bess
-
-

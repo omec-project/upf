@@ -158,6 +158,7 @@ func (m *MockSMF) DeleteAllSessions() {
 	err := m.client.DeleteAllSessions()
 	if err != nil {
 		m.log.Errorf("Error while deleting sessions: %v", err)
+		return
 	}
 
 	m.log.Infof("Deleted all sessions")
