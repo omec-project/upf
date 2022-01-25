@@ -70,6 +70,16 @@ test-up4-integration:
 	go test -v -count=1 -failfast ./test/integration/...
 	docker-compose -f test/integration/infra/docker-compose.yml rm -fsv
 
+test-mock-smf:
+	docker-compose -f test/integration/infra/docker-compose.yml rm -fsv
+	COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker-compose -f test/integration/infra/docker-compose.yml up --build -d
+	go run cmd/pfcpsim-client/main.go  -v -i en0 -c 2
+
+ build-mock-smf:
+	DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build -f cmd/pfcpsim-client/Dockerfile . \
+	--target mock-smf \
+	--tag ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}upf-epc-mock-smf:${DOCKER_TAG} \
+
 pb:
 	DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) \
 		--target pb \
