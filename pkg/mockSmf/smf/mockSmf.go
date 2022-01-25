@@ -63,6 +63,8 @@ func (m *MockSMF) Connect(remoteAddress string) error {
 	return nil
 }
 
+// TeardownAssociation uses the PFCP client to tearing down an already established association.
+// If called while no association is established by PFCP client, the latter will return an error
 func (m *MockSMF) TeardownAssociation() {
 	err := m.client.TeardownAssociation()
 	if err != nil {
@@ -73,6 +75,8 @@ func (m *MockSMF) TeardownAssociation() {
 	m.log.Infoln("Teardown association completed")
 }
 
+// SetupAssociation uses the PFCP client to establish an association,
+// logging its success by checking PFCPclient.IsAssociationAlive
 func (m *MockSMF) SetupAssociation() {
 	err := m.client.SetupAssociation()
 	if err != nil {
@@ -94,7 +98,6 @@ func (m *MockSMF) SetupAssociation() {
 func (m *MockSMF) getNextUEAddress() net.IP {
 	// TODO handle case net address is full
 	if m.lastUEAddress == nil {
-		// ueAddressPool is already validated
 		ueIpFromPool, _, _ := net.ParseCIDR(m.ueAddressPool)
 		m.lastUEAddress = iplib.NextIP(ueIpFromPool)
 
@@ -106,7 +109,8 @@ func (m *MockSMF) getNextUEAddress() net.IP {
 	}
 }
 
-// InitializeSessions create 'count' sessions, incrementally, using baseID as base to create session's rule IDs.
+// InitializeSessions create 'count' sessions incrementally.
+// Once created, the sessions are established through PFCP client.
 func (m *MockSMF) InitializeSessions(count int) {
 
 	for i := 1; i < (count + 1); i++ {
@@ -155,6 +159,8 @@ func (m *MockSMF) InitializeSessions(count int) {
 
 }
 
+// DeleteAllSessions uses the PFCP client DeleteAllSessions. If failure happens at any stage,
+// an error is logged through MockSMF logger.
 func (m *MockSMF) DeleteAllSessions() {
 	err := m.client.DeleteAllSessions()
 	if err != nil {
