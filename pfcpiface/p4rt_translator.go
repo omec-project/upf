@@ -550,7 +550,8 @@ func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, internalAppID uint
 		Type: &p4.TableAction_Action{Action: action},
 	}
 
-	applicationsBuilderLog.WithField("entry", entry).Trace("Built P4rt table entry for applications table")
+	applicationsBuilderLog = applicationsBuilderLog.WithField("entry", entry)
+	applicationsBuilderLog.Trace("Built P4rt table entry for applications table")
 
 	return entry, nil
 }
