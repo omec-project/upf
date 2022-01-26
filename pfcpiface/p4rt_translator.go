@@ -20,6 +20,7 @@ const (
 	FieldIPv4DstPrefix    = "ipv4_dst_prefix"
 	FieldN3Address        = "n3_address"
 	FieldUEAddress        = "ue_address"
+	FieldApplicationID    = "app_id"
 	FieldTEID             = "teid"
 	FieldQFI              = "qfi"
 	FieldCounterIndex     = "ctr_idx"
@@ -41,8 +42,10 @@ const (
 	ActSetDownlinkSessionBuff = "PreQosPipe.set_session_downlink_buff"
 	ActUplinkTermDrop         = "PreQosPipe.uplink_term_drop"
 	ActUplinkTermFwd          = "PreQosPipe.uplink_term_fwd"
+	ActUplinkTermFwdNoTC      = "PreQosPipe.uplink_term_fwd_no_tc"
 	ActDownlinkTermDrop       = "PreQosPipe.downlink_term_drop"
 	ActDownlinkTermFwd        = "PreQosPipe.downlink_term_fwd"
+	ActDownlinkTermFwdNoTC    = "PreQosPipe.downlink_term_fwd_no_tc"
 	ActLoadTunnelParams       = "PreQosPipe.load_tunnel_param"
 
 	DefaultPriority = 0
@@ -507,18 +510,27 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, shouldDrop bool, 
 		return nil, err
 	}
 
+	// FIXME: replace app_id with a meaningful value once we implement the full support for app filtering
+	if err := t.withExactMatchField(entry, FieldApplicationID, uint8(0)); err != nil {
+		return nil, err
+	}
+
 	var action *p4.Action
 	if shouldDrop {
 		action = &p4.Action{
 			ActionId: t.actionID(ActUplinkTermDrop),
 		}
-	} else {
+	} else if !shouldDrop && tc != 0 {
 		action = &p4.Action{
 			ActionId: t.actionID(ActUplinkTermFwd),
 		}
 
 		if err := t.withActionParam(action, FieldTrafficClass, tc); err != nil {
 			return nil, err
+		}
+	} else {
+		action = &p4.Action{
+			ActionId: t.actionID(ActUplinkTermFwdNoTC),
 		}
 	}
 
@@ -553,12 +565,17 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, relatedFAR far,
 		return nil, err
 	}
 
+	// FIXME: replace app_id with a meaningful value once we implement the full support for app filtering
+	if err := t.withExactMatchField(entry, FieldApplicationID, uint8(0)); err != nil {
+		return nil, err
+	}
+
 	var action *p4.Action
 	if relatedFAR.Drops() {
 		action = &p4.Action{
 			ActionId: t.actionID(ActDownlinkTermDrop),
 		}
-	} else {
+	} else if !relatedFAR.Drops() && tc != 0 {
 		action = &p4.Action{
 			ActionId: t.actionID(ActDownlinkTermFwd),
 		}
@@ -573,6 +590,19 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, relatedFAR far,
 		}
 
 		if err := t.withActionParam(action, FieldTrafficClass, tc); err != nil {
+			return nil, err
+		}
+	} else {
+		action = &p4.Action{
+			ActionId: t.actionID(ActDownlinkTermFwdNoTC),
+		}
+
+		if err := t.withActionParam(action, FieldTEID, relatedFAR.tunnelTEID); err != nil {
+			return nil, err
+		}
+
+		// TODO: add support for QFI, which should be provided as a part of related QER
+		if err := t.withActionParam(action, FieldQFI, uint8(0)); err != nil {
 			return nil, err
 		}
 	}
