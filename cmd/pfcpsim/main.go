@@ -2,20 +2,13 @@ package main
 
 import (
 	"fmt"
-	p4rtc "github.com/antoninbas/p4runtime-go-client/pkg/client"
-	"github.com/antoninbas/p4runtime-go-client/pkg/util/conversion"
 	"github.com/omec-project/upf-epc/pkg/mockSmf/smf"
-	"github.com/omec-project/upf-epc/test/integration/providers"
-	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/pborman/getopt/v2"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"net"
 	"os"
-	"path"
-	"runtime"
 	"strings"
-	"time"
 )
 
 var (
@@ -85,74 +78,6 @@ func copyOutputToLogfile(logfile string) func() {
 		_ = f.Close()
 	}
 
-}
-
-func initMockUP4() error {
-	// used to initialize UP4 only
-	var masterElectionID = p4_v1.Uint128{High: 2, Low: 0}
-
-	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", masterElectionID)
-	if err != nil {
-		return err
-	}
-	defer providers.DisconnectP4rt()
-
-	_, currentFilePath, _, ok := runtime.Caller(0)
-	if !ok {
-		return fmt.Errorf("could not retrieve current file path")
-	}
-
-	bmv2Json := path.Join(currentFilePath, "../../../conf/p4/bin/bmv2.json")
-	p4Info := path.Join(currentFilePath, "../../../conf/p4/bin/p4info.txt")
-
-	_, err = p4rtClient.SetFwdPipe(bmv2Json, p4Info, 0)
-	if err != nil {
-		return err
-	}
-
-	ipAddr, err := conversion.IpToBinary(defaultUpfN3Address)
-	if err != nil {
-		return err
-	}
-
-	srcIface, err := conversion.UInt32ToBinary(srcIfaceAccess, 1)
-	if err != nil {
-		return err
-	}
-
-	direction, err := conversion.UInt32ToBinary(directionUplink, 1)
-	if err != nil {
-		return err
-	}
-
-	sliceID, err := conversion.UInt32ToBinary(defaultSliceID, 1)
-	if err != nil {
-		return err
-	}
-
-	te := p4rtClient.NewTableEntry("PreQosPipe.interfaces", []p4rtc.MatchInterface{&p4rtc.LpmMatch{
-		Value: ipAddr,
-		PLen:  32,
-	}}, p4rtClient.NewTableActionDirect("PreQosPipe.set_source_iface",
-		[][]byte{srcIface, direction, sliceID}), nil)
-
-	if err := p4rtClient.InsertTableEntry(te); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func init() {
-	err := initMockUP4()
-	if err != nil {
-		log.Fatalf("Could not initialize mock UP4: %v", err)
-	}
-
-	providers.RunDockerCommand("pfcpiface", "/bin/pfcpiface -config /config.json")
-
-	// wait for PFCP Agent to initialize
-	time.Sleep(time.Second * 3)
 }
 
 // getInterfaceAddress retrieves the IP of interfaceName.

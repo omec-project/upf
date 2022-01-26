@@ -14,7 +14,7 @@ services:
     stdin_open: true
     volumes:
       - ../config/upf.json:/config.json
-    entrypoint: "/bin/sh"
+    entrypoint: "/bin/pfcpiface -config /config.json"
     working_dir: /bin/
     ports:
       - "8805:8805/udp"
