@@ -21,6 +21,8 @@
         ["userMetadata.inet_l4_port", 16, false],
         ["userMetadata.l4_sport", 16, false],
         ["userMetadata.l4_dport", 16, false],
+        ["userMetadata.ip_proto", 8, false],
+        ["userMetadata.application_id", 8, false],
         ["userMetadata.src_iface", 8, false],
         ["userMetadata.needs_gtpu_decap", 1, false],
         ["userMetadata.needs_tunneling", 1, false],
@@ -1495,7 +1497,7 @@
       "id" : 2,
       "source_info" : {
         "filename" : "p4src/main.p4",
-        "line" : 475,
+        "line" : 512,
         "column" : 49,
         "source_fragment" : "post_qos_counter"
       },
@@ -2761,8 +2763,68 @@
       ]
     },
     {
-      "name" : "PreQosPipe.uplink_term_drop",
+      "name" : "PreQosPipe.uplink_term_fwd_no_tc",
       "id" : 24,
+      "runtime_data" : [
+        {
+          "name" : "ctr_idx",
+          "bitwidth" : 32
+        }
+      ],
+      "primitives" : [
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["scalars", "userMetadata.ctr_idx"]
+            },
+            {
+              "type" : "runtime_data",
+              "value" : 0
+            }
+          ],
+          "source_info" : {
+            "filename" : "p4src/main.p4",
+            "line" : 233,
+            "column" : 8,
+            "source_fragment" : "local_meta.ctr_idx = ctr_idx; ..."
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["scalars", "userMetadata.terminations_hit"]
+            },
+            {
+              "type" : "expression",
+              "value" : {
+                "type" : "expression",
+                "value" : {
+                  "op" : "b2d",
+                  "left" : null,
+                  "right" : {
+                    "type" : "bool",
+                    "value" : true
+                  }
+                }
+              }
+            }
+          ],
+          "source_info" : {
+            "filename" : "p4src/main.p4",
+            "line" : 234,
+            "column" : 8,
+            "source_fragment" : "local_meta.terminations_hit = true"
+          }
+        }
+      ]
+    },
+    {
+      "name" : "PreQosPipe.uplink_term_drop",
+      "id" : 25,
       "runtime_data" : [
         {
           "name" : "ctr_idx",
@@ -2842,7 +2904,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 244,
+            "line" : 248,
             "column" : 8,
             "source_fragment" : "local_meta.needs_dropping = true"
           }
@@ -2851,7 +2913,7 @@
     },
     {
       "name" : "PreQosPipe.downlink_term_fwd",
-      "id" : 25,
+      "id" : 26,
       "runtime_data" : [
         {
           "name" : "ctr_idx",
@@ -2933,28 +2995,9 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 250,
+            "line" : 254,
             "column" : 8,
             "source_fragment" : "local_meta.tunnel_out_teid = teid"
-          }
-        },
-        {
-          "op" : "assign",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "userMetadata.tc"]
-            },
-            {
-              "type" : "runtime_data",
-              "value" : 3
-            }
-          ],
-          "source_info" : {
-            "filename" : "p4src/main.p4",
-            "line" : 251,
-            "column" : 8,
-            "source_fragment" : "local_meta.tc = tc"
           }
         },
         {
@@ -2971,7 +3014,132 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 252,
+            "line" : 255,
+            "column" : 8,
+            "source_fragment" : "local_meta.tunnel_out_qfi = qfi"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["scalars", "userMetadata.tc"]
+            },
+            {
+              "type" : "runtime_data",
+              "value" : 3
+            }
+          ],
+          "source_info" : {
+            "filename" : "p4src/main.p4",
+            "line" : 256,
+            "column" : 8,
+            "source_fragment" : "local_meta.tc = tc"
+          }
+        }
+      ]
+    },
+    {
+      "name" : "PreQosPipe.downlink_term_fwd_no_tc",
+      "id" : 27,
+      "runtime_data" : [
+        {
+          "name" : "ctr_idx",
+          "bitwidth" : 32
+        },
+        {
+          "name" : "teid",
+          "bitwidth" : 32
+        },
+        {
+          "name" : "qfi",
+          "bitwidth" : 6
+        }
+      ],
+      "primitives" : [
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["scalars", "userMetadata.ctr_idx"]
+            },
+            {
+              "type" : "runtime_data",
+              "value" : 0
+            }
+          ],
+          "source_info" : {
+            "filename" : "p4src/main.p4",
+            "line" : 233,
+            "column" : 8,
+            "source_fragment" : "local_meta.ctr_idx = ctr_idx; ..."
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["scalars", "userMetadata.terminations_hit"]
+            },
+            {
+              "type" : "expression",
+              "value" : {
+                "type" : "expression",
+                "value" : {
+                  "op" : "b2d",
+                  "left" : null,
+                  "right" : {
+                    "type" : "bool",
+                    "value" : true
+                  }
+                }
+              }
+            }
+          ],
+          "source_info" : {
+            "filename" : "p4src/main.p4",
+            "line" : 234,
+            "column" : 8,
+            "source_fragment" : "local_meta.terminations_hit = true"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["scalars", "userMetadata.tunnel_out_teid"]
+            },
+            {
+              "type" : "runtime_data",
+              "value" : 1
+            }
+          ],
+          "source_info" : {
+            "filename" : "p4src/main.p4",
+            "line" : 261,
+            "column" : 8,
+            "source_fragment" : "local_meta.tunnel_out_teid = teid"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["scalars", "userMetadata.tunnel_out_qfi"]
+            },
+            {
+              "type" : "runtime_data",
+              "value" : 2
+            }
+          ],
+          "source_info" : {
+            "filename" : "p4src/main.p4",
+            "line" : 262,
             "column" : 8,
             "source_fragment" : "local_meta.tunnel_out_qfi = qfi"
           }
@@ -2980,7 +3148,7 @@
     },
     {
       "name" : "PreQosPipe.downlink_term_drop",
-      "id" : 26,
+      "id" : 28,
       "runtime_data" : [
         {
           "name" : "ctr_idx",
@@ -3060,7 +3228,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 257,
+            "line" : 267,
             "column" : 8,
             "source_fragment" : "local_meta.needs_dropping = true"
           }
@@ -3068,8 +3236,39 @@
       ]
     },
     {
+      "name" : "PreQosPipe.set_app_id",
+      "id" : 29,
+      "runtime_data" : [
+        {
+          "name" : "app_id",
+          "bitwidth" : 8
+        }
+      ],
+      "primitives" : [
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["scalars", "userMetadata.application_id"]
+            },
+            {
+              "type" : "runtime_data",
+              "value" : 0
+            }
+          ],
+          "source_info" : {
+            "filename" : "p4src/main.p4",
+            "line" : 299,
+            "column" : 8,
+            "source_fragment" : "local_meta.application_id = app_id"
+          }
+        }
+      ]
+    },
+    {
       "name" : "PreQosPipe.load_tunnel_param",
-      "id" : 27,
+      "id" : 30,
       "runtime_data" : [
         {
           "name" : "src_addr",
@@ -3099,7 +3298,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 288,
+            "line" : 318,
             "column" : 8,
             "source_fragment" : "local_meta.tunnel_out_src_ipv4_addr = src_addr"
           }
@@ -3118,7 +3317,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 289,
+            "line" : 319,
             "column" : 8,
             "source_fragment" : "local_meta.tunnel_out_dst_ipv4_addr = dst_addr"
           }
@@ -3137,7 +3336,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 290,
+            "line" : 320,
             "column" : 8,
             "source_fragment" : "local_meta.tunnel_out_udp_sport = sport"
           }
@@ -3166,7 +3365,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 291,
+            "line" : 321,
             "column" : 8,
             "source_fragment" : "local_meta.needs_tunneling = true"
           }
@@ -3175,7 +3374,7 @@
     },
     {
       "name" : "PreQosPipe.do_gtpu_tunnel",
-      "id" : 28,
+      "id" : 31,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -3192,7 +3391,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 308,
+            "line" : 338,
             "column" : 8,
             "source_fragment" : "hdr.inner_udp = hdr.udp"
           }
@@ -3207,7 +3406,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 309,
+            "line" : 339,
             "column" : 8,
             "source_fragment" : "hdr.udp.setInvalid()"
           }
@@ -3226,7 +3425,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 310,
+            "line" : 340,
             "column" : 8,
             "source_fragment" : "hdr.inner_tcp = hdr.tcp"
           }
@@ -3241,7 +3440,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 311,
+            "line" : 341,
             "column" : 8,
             "source_fragment" : "hdr.tcp.setInvalid()"
           }
@@ -3260,7 +3459,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 312,
+            "line" : 342,
             "column" : 8,
             "source_fragment" : "hdr.inner_icmp = hdr.icmp"
           }
@@ -3275,7 +3474,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 313,
+            "line" : 343,
             "column" : 8,
             "source_fragment" : "hdr.icmp.setInvalid()"
           }
@@ -3290,7 +3489,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 314,
+            "line" : 344,
             "column" : 8,
             "source_fragment" : "hdr.udp.setValid()"
           }
@@ -3309,7 +3508,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 315,
+            "line" : 345,
             "column" : 8,
             "source_fragment" : "hdr.udp.sport = udp_sport; ..."
           }
@@ -3328,7 +3527,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/include/define.p4",
-            "line" : 87,
+            "line" : 90,
             "column" : 15,
             "source_fragment" : "2152, ..."
           }
@@ -3370,7 +3569,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 317,
+            "line" : 347,
             "column" : 8,
             "source_fragment" : "hdr.udp.len = udp_len; ..."
           }
@@ -3389,7 +3588,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 318,
+            "line" : 348,
             "column" : 8,
             "source_fragment" : "hdr.udp.checksum = 0"
           }
@@ -3408,7 +3607,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 320,
+            "line" : 350,
             "column" : 8,
             "source_fragment" : "hdr.inner_ipv4 = hdr.ipv4"
           }
@@ -3423,7 +3622,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 321,
+            "line" : 351,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.setValid()"
           }
@@ -3461,7 +3660,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 323,
+            "line" : 353,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.ihl = 5"
           }
@@ -3480,7 +3679,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 324,
+            "line" : 354,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.dscp = 0"
           }
@@ -3499,7 +3698,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 325,
+            "line" : 355,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.ecn = 0"
           }
@@ -3541,7 +3740,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 326,
+            "line" : 356,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.total_len = ipv4_total_len; ..."
           }
@@ -3560,7 +3759,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 327,
+            "line" : 357,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.identification = 0x1513"
           }
@@ -3579,7 +3778,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 328,
+            "line" : 358,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.flags = 0"
           }
@@ -3598,7 +3797,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 329,
+            "line" : 359,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.frag_offset = 0"
           }
@@ -3636,7 +3835,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/include/define.p4",
-            "line" : 81,
+            "line" : 84,
             "column" : 10,
             "source_fragment" : "17 ..."
           }
@@ -3655,7 +3854,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 332,
+            "line" : 362,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.src_addr = src_addr; ..."
           }
@@ -3674,7 +3873,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 333,
+            "line" : 363,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.dst_addr = dst_addr; ..."
           }
@@ -3693,7 +3892,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 334,
+            "line" : 364,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.checksum = 0"
           }
@@ -3708,7 +3907,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 341,
+            "line" : 371,
             "column" : 8,
             "source_fragment" : "hdr.gtpu.setValid()"
           }
@@ -3765,7 +3964,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 344,
+            "line" : 374,
             "column" : 8,
             "source_fragment" : "hdr.gtpu.spare = 0"
           }
@@ -3784,7 +3983,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 345,
+            "line" : 375,
             "column" : 8,
             "source_fragment" : "hdr.gtpu.ex_flag = 0"
           }
@@ -3803,7 +4002,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 346,
+            "line" : 376,
             "column" : 8,
             "source_fragment" : "hdr.gtpu.seq_flag = 0"
           }
@@ -3822,7 +4021,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 347,
+            "line" : 377,
             "column" : 8,
             "source_fragment" : "hdr.gtpu.npdu_flag = 0"
           }
@@ -3841,7 +4040,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/include/define.p4",
-            "line" : 70,
+            "line" : 73,
             "column" : 11,
             "source_fragment" : "255 ..."
           }
@@ -3860,7 +4059,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 349,
+            "line" : 379,
             "column" : 8,
             "source_fragment" : "hdr.gtpu.msglen = hdr.inner_ipv4.total_len"
           }
@@ -3879,7 +4078,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 350,
+            "line" : 380,
             "column" : 8,
             "source_fragment" : "hdr.gtpu.teid = teid; ..."
           }
@@ -3888,7 +4087,7 @@
     },
     {
       "name" : "PreQosPipe.do_gtpu_tunnel_with_psc",
-      "id" : 29,
+      "id" : 32,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -3905,7 +4104,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 308,
+            "line" : 338,
             "column" : 8,
             "source_fragment" : "hdr.inner_udp = hdr.udp"
           }
@@ -3920,7 +4119,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 309,
+            "line" : 339,
             "column" : 8,
             "source_fragment" : "hdr.udp.setInvalid()"
           }
@@ -3939,7 +4138,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 310,
+            "line" : 340,
             "column" : 8,
             "source_fragment" : "hdr.inner_tcp = hdr.tcp"
           }
@@ -3954,7 +4153,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 311,
+            "line" : 341,
             "column" : 8,
             "source_fragment" : "hdr.tcp.setInvalid()"
           }
@@ -3973,7 +4172,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 312,
+            "line" : 342,
             "column" : 8,
             "source_fragment" : "hdr.inner_icmp = hdr.icmp"
           }
@@ -3988,7 +4187,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 313,
+            "line" : 343,
             "column" : 8,
             "source_fragment" : "hdr.icmp.setInvalid()"
           }
@@ -4003,7 +4202,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 314,
+            "line" : 344,
             "column" : 8,
             "source_fragment" : "hdr.udp.setValid()"
           }
@@ -4022,7 +4221,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 315,
+            "line" : 345,
             "column" : 8,
             "source_fragment" : "hdr.udp.sport = udp_sport; ..."
           }
@@ -4041,7 +4240,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/include/define.p4",
-            "line" : 87,
+            "line" : 90,
             "column" : 15,
             "source_fragment" : "2152, ..."
           }
@@ -4083,7 +4282,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 317,
+            "line" : 347,
             "column" : 8,
             "source_fragment" : "hdr.udp.len = udp_len; ..."
           }
@@ -4102,7 +4301,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 318,
+            "line" : 348,
             "column" : 8,
             "source_fragment" : "hdr.udp.checksum = 0"
           }
@@ -4121,7 +4320,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 320,
+            "line" : 350,
             "column" : 8,
             "source_fragment" : "hdr.inner_ipv4 = hdr.ipv4"
           }
@@ -4136,7 +4335,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 321,
+            "line" : 351,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.setValid()"
           }
@@ -4174,7 +4373,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 323,
+            "line" : 353,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.ihl = 5"
           }
@@ -4193,7 +4392,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 324,
+            "line" : 354,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.dscp = 0"
           }
@@ -4212,7 +4411,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 325,
+            "line" : 355,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.ecn = 0"
           }
@@ -4254,7 +4453,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 326,
+            "line" : 356,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.total_len = ipv4_total_len; ..."
           }
@@ -4273,7 +4472,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 327,
+            "line" : 357,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.identification = 0x1513"
           }
@@ -4292,7 +4491,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 328,
+            "line" : 358,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.flags = 0"
           }
@@ -4311,7 +4510,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 329,
+            "line" : 359,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.frag_offset = 0"
           }
@@ -4349,7 +4548,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/include/define.p4",
-            "line" : 81,
+            "line" : 84,
             "column" : 10,
             "source_fragment" : "17 ..."
           }
@@ -4368,7 +4567,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 332,
+            "line" : 362,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.src_addr = src_addr; ..."
           }
@@ -4387,7 +4586,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 333,
+            "line" : 363,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.dst_addr = dst_addr; ..."
           }
@@ -4406,7 +4605,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 334,
+            "line" : 364,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.checksum = 0"
           }
@@ -4421,7 +4620,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 341,
+            "line" : 371,
             "column" : 8,
             "source_fragment" : "hdr.gtpu.setValid()"
           }
@@ -4478,7 +4677,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 344,
+            "line" : 374,
             "column" : 8,
             "source_fragment" : "hdr.gtpu.spare = 0"
           }
@@ -4497,7 +4696,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 345,
+            "line" : 375,
             "column" : 8,
             "source_fragment" : "hdr.gtpu.ex_flag = 0"
           }
@@ -4516,7 +4715,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 346,
+            "line" : 376,
             "column" : 8,
             "source_fragment" : "hdr.gtpu.seq_flag = 0"
           }
@@ -4535,7 +4734,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 347,
+            "line" : 377,
             "column" : 8,
             "source_fragment" : "hdr.gtpu.npdu_flag = 0"
           }
@@ -4554,7 +4753,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/include/define.p4",
-            "line" : 70,
+            "line" : 73,
             "column" : 11,
             "source_fragment" : "255 ..."
           }
@@ -4573,7 +4772,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 349,
+            "line" : 379,
             "column" : 8,
             "source_fragment" : "hdr.gtpu.msglen = hdr.inner_ipv4.total_len"
           }
@@ -4592,7 +4791,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 350,
+            "line" : 380,
             "column" : 8,
             "source_fragment" : "hdr.gtpu.teid = teid; ..."
           }
@@ -4634,7 +4833,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 374,
+            "line" : 404,
             "column" : 8,
             "source_fragment" : "hdr.gtpu.msglen = hdr.inner_ipv4.total_len + 4 ..."
           }
@@ -4653,7 +4852,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 376,
+            "line" : 406,
             "column" : 8,
             "source_fragment" : "hdr.gtpu.ex_flag = 1"
           }
@@ -4668,7 +4867,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 377,
+            "line" : 407,
             "column" : 8,
             "source_fragment" : "hdr.gtpu_options.setValid()"
           }
@@ -4687,7 +4886,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 378,
+            "line" : 408,
             "column" : 8,
             "source_fragment" : "hdr.gtpu_options.seq_num = 0"
           }
@@ -4706,7 +4905,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 379,
+            "line" : 409,
             "column" : 8,
             "source_fragment" : "hdr.gtpu_options.n_pdu_num = 0"
           }
@@ -4740,7 +4939,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 381,
+            "line" : 411,
             "column" : 8,
             "source_fragment" : "hdr.gtpu_ext_psc.setValid()"
           }
@@ -4797,7 +4996,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 384,
+            "line" : 414,
             "column" : 8,
             "source_fragment" : "hdr.gtpu_ext_psc.spare0 = 0"
           }
@@ -4816,7 +5015,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 385,
+            "line" : 415,
             "column" : 8,
             "source_fragment" : "hdr.gtpu_ext_psc.ppp = 0"
           }
@@ -4835,7 +5034,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 386,
+            "line" : 416,
             "column" : 8,
             "source_fragment" : "hdr.gtpu_ext_psc.rqi = 0"
           }
@@ -4854,7 +5053,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 387,
+            "line" : 417,
             "column" : 8,
             "source_fragment" : "hdr.gtpu_ext_psc.qfi = local_meta.tunnel_out_qfi"
           }
@@ -4881,8 +5080,8 @@
       ]
     },
     {
-      "name" : "main399",
-      "id" : 30,
+      "name" : "main429",
+      "id" : 33,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -4895,7 +5094,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 399,
+            "line" : 429,
             "column" : 12,
             "source_fragment" : "hdr.packet_out.setInvalid()"
           }
@@ -4903,8 +5102,8 @@
       ]
     },
     {
-      "name" : "main403",
-      "id" : 31,
+      "name" : "main433",
+      "id" : 34,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -4931,7 +5130,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 403,
+            "line" : 433,
             "column" : 16,
             "source_fragment" : "return"
           }
@@ -4939,8 +5138,8 @@
       ]
     },
     {
-      "name" : "main411",
-      "id" : 32,
+      "name" : "main441",
+      "id" : 35,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -4957,7 +5156,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 411,
+            "line" : 441,
             "column" : 20,
             "source_fragment" : "local_meta.ue_addr = hdr.inner_ipv4.src_addr"
           }
@@ -4976,7 +5175,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 412,
+            "line" : 442,
             "column" : 20,
             "source_fragment" : "local_meta.inet_addr = hdr.inner_ipv4.dst_addr"
           }
@@ -4995,7 +5194,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 413,
+            "line" : 443,
             "column" : 20,
             "source_fragment" : "local_meta.ue_l4_port = local_meta.l4_sport"
           }
@@ -5014,16 +5213,35 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 414,
+            "line" : 444,
             "column" : 20,
             "source_fragment" : "local_meta.inet_l4_port = local_meta.l4_dport"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["scalars", "userMetadata.ip_proto"]
+            },
+            {
+              "type" : "field",
+              "value" : ["inner_ipv4", "proto"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "p4src/main.p4",
+            "line" : 445,
+            "column" : 20,
+            "source_fragment" : "local_meta.ip_proto = hdr.inner_ipv4.proto"
           }
         }
       ]
     },
     {
-      "name" : "main420",
-      "id" : 33,
+      "name" : "main449",
+      "id" : 36,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -5040,7 +5258,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 420,
+            "line" : 449,
             "column" : 20,
             "source_fragment" : "local_meta.ue_addr = hdr.ipv4.dst_addr"
           }
@@ -5059,7 +5277,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 421,
+            "line" : 450,
             "column" : 20,
             "source_fragment" : "local_meta.inet_addr = hdr.ipv4.src_addr"
           }
@@ -5078,7 +5296,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 422,
+            "line" : 451,
             "column" : 20,
             "source_fragment" : "local_meta.ue_l4_port = local_meta.l4_dport"
           }
@@ -5097,16 +5315,35 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 423,
+            "line" : 452,
             "column" : 20,
             "source_fragment" : "local_meta.inet_l4_port = local_meta.l4_sport"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["scalars", "userMetadata.ip_proto"]
+            },
+            {
+              "type" : "field",
+              "value" : ["ipv4", "proto"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "p4src/main.p4",
+            "line" : 453,
+            "column" : 20,
+            "source_fragment" : "local_meta.ip_proto = hdr.ipv4.proto"
           }
         }
       ]
     },
     {
-      "name" : "main432",
-      "id" : 34,
+      "name" : "main469",
+      "id" : 37,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -5123,7 +5360,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 432,
+            "line" : 469,
             "column" : 20,
             "source_fragment" : "pre_qos_counter.count(local_meta.ctr_idx)"
           }
@@ -5132,7 +5369,7 @@
     },
     {
       "name" : "act",
-      "id" : 35,
+      "id" : 38,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -5162,7 +5399,7 @@
     },
     {
       "name" : "main109",
-      "id" : 36,
+      "id" : 39,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -5210,8 +5447,8 @@
       ]
     },
     {
-      "name" : "main487",
-      "id" : 37,
+      "name" : "main524",
+      "id" : 40,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -5224,7 +5461,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 487,
+            "line" : 524,
             "column" : 12,
             "source_fragment" : "hdr.packet_in.setValid()"
           }
@@ -5243,7 +5480,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 488,
+            "line" : 525,
             "column" : 12,
             "source_fragment" : "hdr.packet_in.ingress_port = std_meta.ingress_port"
           }
@@ -5253,7 +5490,7 @@
           "parameters" : [],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 490,
+            "line" : 527,
             "column" : 12,
             "source_fragment" : "exit"
           }
@@ -5261,8 +5498,8 @@
       ]
     },
     {
-      "name" : "main480",
-      "id" : 38,
+      "name" : "main517",
+      "id" : 41,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -5279,7 +5516,7 @@
           ],
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 480,
+            "line" : 517,
             "column" : 8,
             "source_fragment" : "post_qos_counter.count(local_meta.ctr_idx)"
           }
@@ -5309,25 +5546,25 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [35],
+          "action_ids" : [38],
           "actions" : ["act"],
           "base_default_next" : "node_3",
           "next_tables" : {
             "act" : "node_3"
           },
           "default_entry" : {
-            "action_id" : 35,
+            "action_id" : 38,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
           }
         },
         {
-          "name" : "tbl_main399",
+          "name" : "tbl_main429",
           "id" : 1,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 399,
+            "line" : 429,
             "column" : 12,
             "source_fragment" : "hdr.packet_out.setInvalid()"
           },
@@ -5338,14 +5575,14 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [30],
-          "actions" : ["main399"],
-          "base_default_next" : "node_30",
+          "action_ids" : [33],
+          "actions" : ["main429"],
+          "base_default_next" : "node_33",
           "next_tables" : {
-            "main399" : "node_30"
+            "main429" : "node_33"
           },
           "default_entry" : {
-            "action_id" : 30,
+            "action_id" : 33,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
@@ -5378,7 +5615,7 @@
           "actions" : ["NoAction"],
           "base_default_next" : null,
           "next_tables" : {
-            "__MISS__" : "tbl_main403",
+            "__MISS__" : "tbl_main433",
             "__HIT__" : "node_7"
           },
           "default_entry" : {
@@ -5389,11 +5626,11 @@
           }
         },
         {
-          "name" : "tbl_main403",
+          "name" : "tbl_main433",
           "id" : 3,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 403,
+            "line" : 433,
             "column" : 16,
             "source_fragment" : "return"
           },
@@ -5404,14 +5641,14 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [31],
-          "actions" : ["main403"],
+          "action_ids" : [34],
+          "actions" : ["main433"],
           "base_default_next" : "node_7",
           "next_tables" : {
-            "main403" : "node_7"
+            "main433" : "node_7"
           },
           "default_entry" : {
-            "action_id" : 31,
+            "action_id" : 34,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
@@ -5445,7 +5682,7 @@
           "base_default_next" : null,
           "next_tables" : {
             "__HIT__" : "node_9",
-            "__MISS__" : "node_30"
+            "__MISS__" : "node_33"
           },
           "default_entry" : {
             "action_id" : 10,
@@ -5455,11 +5692,11 @@
           }
         },
         {
-          "name" : "tbl_main411",
+          "name" : "tbl_main441",
           "id" : 5,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 411,
+            "line" : 441,
             "column" : 39,
             "source_fragment" : "= hdr.inner_ipv4.src_addr; ..."
           },
@@ -5470,14 +5707,14 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [32],
-          "actions" : ["main411"],
+          "action_ids" : [35],
+          "actions" : ["main441"],
           "base_default_next" : "PreQosPipe.sessions_uplink",
           "next_tables" : {
-            "main411" : "PreQosPipe.sessions_uplink"
+            "main441" : "PreQosPipe.sessions_uplink"
           },
           "default_entry" : {
-            "action_id" : 32,
+            "action_id" : 35,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
@@ -5514,11 +5751,11 @@
           "direct_meters" : null,
           "action_ids" : [18, 19, 13],
           "actions" : ["PreQosPipe.set_session_uplink", "PreQosPipe.set_session_uplink_drop", "PreQosPipe.do_drop"],
-          "base_default_next" : "PreQosPipe.terminations_uplink",
+          "base_default_next" : "PreQosPipe.applications",
           "next_tables" : {
-            "PreQosPipe.set_session_uplink" : "PreQosPipe.terminations_uplink",
-            "PreQosPipe.set_session_uplink_drop" : "PreQosPipe.terminations_uplink",
-            "PreQosPipe.do_drop" : "PreQosPipe.terminations_uplink"
+            "PreQosPipe.set_session_uplink" : "PreQosPipe.applications",
+            "PreQosPipe.set_session_uplink_drop" : "PreQosPipe.applications",
+            "PreQosPipe.do_drop" : "PreQosPipe.applications"
           },
           "default_entry" : {
             "action_id" : 13,
@@ -5528,49 +5765,11 @@
           }
         },
         {
-          "name" : "PreQosPipe.terminations_uplink",
+          "name" : "tbl_main449",
           "id" : 7,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 260,
-            "column" : 10,
-            "source_fragment" : "terminations_uplink"
-          },
-          "key" : [
-            {
-              "match_type" : "exact",
-              "name" : "ue_address",
-              "target" : ["inner_ipv4", "src_addr"],
-              "mask" : null
-            }
-          ],
-          "match_type" : "exact",
-          "type" : "simple",
-          "max_size" : 1024,
-          "with_counters" : false,
-          "support_timeout" : false,
-          "direct_meters" : null,
-          "action_ids" : [23, 24, 15],
-          "actions" : ["PreQosPipe.uplink_term_fwd", "PreQosPipe.uplink_term_drop", "PreQosPipe.do_drop"],
-          "base_default_next" : "node_18",
-          "next_tables" : {
-            "PreQosPipe.uplink_term_fwd" : "node_18",
-            "PreQosPipe.uplink_term_drop" : "node_18",
-            "PreQosPipe.do_drop" : "node_18"
-          },
-          "default_entry" : {
-            "action_id" : 15,
-            "action_const" : true,
-            "action_data" : [],
-            "action_entry_const" : true
-          }
-        },
-        {
-          "name" : "tbl_main420",
-          "id" : 8,
-          "source_info" : {
-            "filename" : "p4src/main.p4",
-            "line" : 420,
+            "line" : 449,
             "column" : 39,
             "source_fragment" : "= hdr.ipv4.dst_addr; ..."
           },
@@ -5581,14 +5780,14 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [33],
-          "actions" : ["main420"],
+          "action_ids" : [36],
+          "actions" : ["main449"],
           "base_default_next" : "PreQosPipe.sessions_downlink",
           "next_tables" : {
-            "main420" : "PreQosPipe.sessions_downlink"
+            "main449" : "PreQosPipe.sessions_downlink"
           },
           "default_entry" : {
-            "action_id" : 33,
+            "action_id" : 36,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
@@ -5596,7 +5795,7 @@
         },
         {
           "name" : "PreQosPipe.sessions_downlink",
-          "id" : 9,
+          "id" : 8,
           "source_info" : {
             "filename" : "p4src/main.p4",
             "line" : 218,
@@ -5635,10 +5834,10 @@
         },
         {
           "name" : "PreQosPipe.tunnel_peers",
-          "id" : 10,
+          "id" : 9,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 294,
+            "line" : 324,
             "column" : 10,
             "source_fragment" : "tunnel_peers"
           },
@@ -5656,12 +5855,12 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [27, 3],
+          "action_ids" : [30, 3],
           "actions" : ["PreQosPipe.load_tunnel_param", "NoAction"],
-          "base_default_next" : "PreQosPipe.terminations_downlink",
+          "base_default_next" : "PreQosPipe.applications",
           "next_tables" : {
-            "PreQosPipe.load_tunnel_param" : "PreQosPipe.terminations_downlink",
-            "NoAction" : "PreQosPipe.terminations_downlink"
+            "PreQosPipe.load_tunnel_param" : "PreQosPipe.applications",
+            "NoAction" : "PreQosPipe.applications"
           },
           "default_entry" : {
             "action_id" : 3,
@@ -5671,19 +5870,73 @@
           }
         },
         {
-          "name" : "PreQosPipe.terminations_downlink",
+          "name" : "PreQosPipe.applications",
+          "id" : 10,
+          "source_info" : {
+            "filename" : "p4src/main.p4",
+            "line" : 302,
+            "column" : 10,
+            "source_fragment" : "applications"
+          },
+          "key" : [
+            {
+              "match_type" : "lpm",
+              "name" : "app_ip_addr",
+              "target" : ["scalars", "userMetadata.inet_addr"],
+              "mask" : null
+            },
+            {
+              "match_type" : "range",
+              "name" : "app_l4_port",
+              "target" : ["scalars", "userMetadata.inet_l4_port"],
+              "mask" : null
+            },
+            {
+              "match_type" : "ternary",
+              "name" : "app_ip_proto",
+              "target" : ["scalars", "userMetadata.ip_proto"],
+              "mask" : null
+            }
+          ],
+          "match_type" : "range",
+          "type" : "simple",
+          "max_size" : 1024,
+          "with_counters" : false,
+          "support_timeout" : false,
+          "direct_meters" : null,
+          "action_ids" : [29],
+          "actions" : ["PreQosPipe.set_app_id"],
+          "base_default_next" : "node_17",
+          "next_tables" : {
+            "PreQosPipe.set_app_id" : "node_17"
+          },
+          "default_entry" : {
+            "action_id" : 29,
+            "action_const" : true,
+            "action_data" : ["0x0"],
+            "action_entry_const" : true
+          }
+        },
+        {
+          "name" : "PreQosPipe.terminations_uplink",
           "id" : 11,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 272,
+            "line" : 270,
             "column" : 10,
-            "source_fragment" : "terminations_downlink"
+            "source_fragment" : "terminations_uplink"
           },
           "key" : [
             {
               "match_type" : "exact",
               "name" : "ue_address",
-              "target" : ["ipv4", "dst_addr"],
+              "target" : ["scalars", "userMetadata.ue_addr"],
+              "mask" : null
+            },
+            {
+              "match_type" : "exact",
+              "name" : "app_id",
+              "target" : ["scalars", "userMetadata.application_id"],
               "mask" : null
             }
           ],
@@ -5693,13 +5946,59 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [25, 26, 16],
-          "actions" : ["PreQosPipe.downlink_term_fwd", "PreQosPipe.downlink_term_drop", "PreQosPipe.do_drop"],
-          "base_default_next" : "node_18",
+          "action_ids" : [23, 24, 25, 15],
+          "actions" : ["PreQosPipe.uplink_term_fwd", "PreQosPipe.uplink_term_fwd_no_tc", "PreQosPipe.uplink_term_drop", "PreQosPipe.do_drop"],
+          "base_default_next" : "node_21",
           "next_tables" : {
-            "PreQosPipe.downlink_term_fwd" : "node_18",
-            "PreQosPipe.downlink_term_drop" : "node_18",
-            "PreQosPipe.do_drop" : "node_18"
+            "PreQosPipe.uplink_term_fwd" : "node_21",
+            "PreQosPipe.uplink_term_fwd_no_tc" : "node_21",
+            "PreQosPipe.uplink_term_drop" : "node_21",
+            "PreQosPipe.do_drop" : "node_21"
+          },
+          "default_entry" : {
+            "action_id" : 15,
+            "action_const" : true,
+            "action_data" : [],
+            "action_entry_const" : true
+          }
+        },
+        {
+          "name" : "PreQosPipe.terminations_downlink",
+          "id" : 12,
+          "source_info" : {
+            "filename" : "p4src/main.p4",
+            "line" : 284,
+            "column" : 10,
+            "source_fragment" : "terminations_downlink"
+          },
+          "key" : [
+            {
+              "match_type" : "exact",
+              "name" : "ue_address",
+              "target" : ["scalars", "userMetadata.ue_addr"],
+              "mask" : null
+            },
+            {
+              "match_type" : "exact",
+              "name" : "app_id",
+              "target" : ["scalars", "userMetadata.application_id"],
+              "mask" : null
+            }
+          ],
+          "match_type" : "exact",
+          "type" : "simple",
+          "max_size" : 1024,
+          "with_counters" : false,
+          "support_timeout" : false,
+          "direct_meters" : null,
+          "action_ids" : [26, 28, 27, 16],
+          "actions" : ["PreQosPipe.downlink_term_fwd", "PreQosPipe.downlink_term_drop", "PreQosPipe.downlink_term_fwd_no_tc", "PreQosPipe.do_drop"],
+          "base_default_next" : "node_21",
+          "next_tables" : {
+            "PreQosPipe.downlink_term_fwd" : "node_21",
+            "PreQosPipe.downlink_term_drop" : "node_21",
+            "PreQosPipe.downlink_term_fwd_no_tc" : "node_21",
+            "PreQosPipe.do_drop" : "node_21"
           },
           "default_entry" : {
             "action_id" : 16,
@@ -5709,11 +6008,11 @@
           }
         },
         {
-          "name" : "tbl_main432",
-          "id" : 12,
+          "name" : "tbl_main469",
+          "id" : 13,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 432,
+            "line" : 469,
             "column" : 20,
             "source_fragment" : "pre_qos_counter.count(local_meta.ctr_idx)"
           },
@@ -5724,14 +6023,14 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [34],
-          "actions" : ["main432"],
-          "base_default_next" : "node_20",
+          "action_ids" : [37],
+          "actions" : ["main469"],
+          "base_default_next" : "node_23",
           "next_tables" : {
-            "main432" : "node_20"
+            "main469" : "node_23"
           },
           "default_entry" : {
-            "action_id" : 34,
+            "action_id" : 37,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
@@ -5739,10 +6038,10 @@
         },
         {
           "name" : "tbl_gtpu_decap",
-          "id" : 13,
+          "id" : 14,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 438,
+            "line" : 475,
             "column" : 20,
             "source_fragment" : "gtpu_decap()"
           },
@@ -5755,9 +6054,9 @@
           "direct_meters" : null,
           "action_ids" : [11],
           "actions" : ["PreQosPipe.gtpu_decap"],
-          "base_default_next" : "node_22",
+          "base_default_next" : "node_25",
           "next_tables" : {
-            "PreQosPipe.gtpu_decap" : "node_22"
+            "PreQosPipe.gtpu_decap" : "node_25"
           },
           "default_entry" : {
             "action_id" : 11,
@@ -5768,10 +6067,10 @@
         },
         {
           "name" : "tbl_do_buffer",
-          "id" : 14,
+          "id" : 15,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 441,
+            "line" : 478,
             "column" : 20,
             "source_fragment" : "do_buffer()"
           },
@@ -5784,9 +6083,9 @@
           "direct_meters" : null,
           "action_ids" : [12],
           "actions" : ["PreQosPipe.do_buffer"],
-          "base_default_next" : "node_24",
+          "base_default_next" : "node_27",
           "next_tables" : {
-            "PreQosPipe.do_buffer" : "node_24"
+            "PreQosPipe.do_buffer" : "node_27"
           },
           "default_entry" : {
             "action_id" : 12,
@@ -5797,10 +6096,10 @@
         },
         {
           "name" : "tbl_do_gtpu_tunnel",
-          "id" : 15,
+          "id" : 16,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 446,
+            "line" : 483,
             "column" : 24,
             "source_fragment" : "do_gtpu_tunnel()"
           },
@@ -5811,14 +6110,14 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [28],
+          "action_ids" : [31],
           "actions" : ["PreQosPipe.do_gtpu_tunnel"],
-          "base_default_next" : "node_28",
+          "base_default_next" : "node_31",
           "next_tables" : {
-            "PreQosPipe.do_gtpu_tunnel" : "node_28"
+            "PreQosPipe.do_gtpu_tunnel" : "node_31"
           },
           "default_entry" : {
-            "action_id" : 28,
+            "action_id" : 31,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
@@ -5826,10 +6125,10 @@
         },
         {
           "name" : "tbl_do_gtpu_tunnel_with_psc",
-          "id" : 16,
+          "id" : 17,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 449,
+            "line" : 486,
             "column" : 24,
             "source_fragment" : "do_gtpu_tunnel_with_psc()"
           },
@@ -5840,14 +6139,14 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [29],
+          "action_ids" : [32],
           "actions" : ["PreQosPipe.do_gtpu_tunnel_with_psc"],
-          "base_default_next" : "node_28",
+          "base_default_next" : "node_31",
           "next_tables" : {
-            "PreQosPipe.do_gtpu_tunnel_with_psc" : "node_28"
+            "PreQosPipe.do_gtpu_tunnel_with_psc" : "node_31"
           },
           "default_entry" : {
-            "action_id" : 29,
+            "action_id" : 32,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
@@ -5855,10 +6154,10 @@
         },
         {
           "name" : "tbl_do_drop",
-          "id" : 17,
+          "id" : 18,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 453,
+            "line" : 490,
             "column" : 20,
             "source_fragment" : "do_drop()"
           },
@@ -5871,9 +6170,9 @@
           "direct_meters" : null,
           "action_ids" : [17],
           "actions" : ["PreQosPipe.do_drop"],
-          "base_default_next" : "node_30",
+          "base_default_next" : "node_33",
           "next_tables" : {
-            "PreQosPipe.do_drop" : "node_30"
+            "PreQosPipe.do_drop" : "node_33"
           },
           "default_entry" : {
             "action_id" : 17,
@@ -5884,7 +6183,7 @@
         },
         {
           "name" : "tbl_main109",
-          "id" : 18,
+          "id" : 19,
           "source_info" : {
             "filename" : "p4src/main.p4",
             "line" : 109,
@@ -5898,14 +6197,14 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [36],
+          "action_ids" : [39],
           "actions" : ["main109"],
-          "base_default_next" : "node_32",
+          "base_default_next" : "node_35",
           "next_tables" : {
-            "main109" : "node_32"
+            "main109" : "node_35"
           },
           "default_entry" : {
-            "action_id" : 36,
+            "action_id" : 39,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
@@ -5913,7 +6212,7 @@
         },
         {
           "name" : "tbl_Routing_drop",
-          "id" : 19,
+          "id" : 20,
           "source_info" : {
             "filename" : "p4src/main.p4",
             "line" : 111,
@@ -5942,7 +6241,7 @@
         },
         {
           "name" : "PreQosPipe.Routing.routes_v4",
-          "id" : 20,
+          "id" : 21,
           "source_info" : {
             "filename" : "p4src/main.p4",
             "line" : 90,
@@ -5974,7 +6273,7 @@
         },
         {
           "name" : "PreQosPipe.Acl.acls",
-          "id" : 21,
+          "id" : 22,
           "source_info" : {
             "filename" : "p4src/main.p4",
             "line" : 42,
@@ -6107,7 +6406,7 @@
           "id" : 0,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 395,
+            "line" : 425,
             "column" : 12,
             "source_fragment" : "hdr.packet_out.isValid()"
           },
@@ -6122,7 +6421,7 @@
               }
             }
           },
-          "true_next" : "tbl_main399",
+          "true_next" : "tbl_main429",
           "false_next" : "PreQosPipe.my_station"
         },
         {
@@ -6147,14 +6446,14 @@
             }
           },
           "true_next" : "PreQosPipe.interfaces",
-          "false_next" : "node_30"
+          "false_next" : "node_33"
         },
         {
           "name" : "node_9",
           "id" : 2,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 410,
+            "line" : 440,
             "column" : 20,
             "source_fragment" : "local_meta.direction == Direction.UPLINK"
           },
@@ -6172,16 +6471,16 @@
               }
             }
           },
-          "true_next" : "tbl_main411",
-          "false_next" : "node_13"
+          "true_next" : "tbl_main441",
+          "false_next" : "node_12"
         },
         {
-          "name" : "node_13",
+          "name" : "node_12",
           "id" : 3,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 419,
-            "column" : 25,
+            "line" : 448,
+            "column" : 27,
             "source_fragment" : "local_meta.direction == Direction.DOWNLINK"
           },
           "expression" : {
@@ -6198,15 +6497,67 @@
               }
             }
           },
-          "true_next" : "tbl_main420",
-          "false_next" : "node_18"
+          "true_next" : "tbl_main449",
+          "false_next" : "PreQosPipe.applications"
         },
         {
-          "name" : "node_18",
+          "name" : "node_17",
           "id" : 4,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 430,
+            "line" : 461,
+            "column" : 20,
+            "source_fragment" : "local_meta.direction == Direction.UPLINK"
+          },
+          "expression" : {
+            "type" : "expression",
+            "value" : {
+              "op" : "==",
+              "left" : {
+                "type" : "field",
+                "value" : ["scalars", "userMetadata.direction"]
+              },
+              "right" : {
+                "type" : "hexstr",
+                "value" : "0x01"
+              }
+            }
+          },
+          "true_next" : "PreQosPipe.terminations_uplink",
+          "false_next" : "node_19"
+        },
+        {
+          "name" : "node_19",
+          "id" : 5,
+          "source_info" : {
+            "filename" : "p4src/main.p4",
+            "line" : 463,
+            "column" : 27,
+            "source_fragment" : "local_meta.direction == Direction.DOWNLINK"
+          },
+          "expression" : {
+            "type" : "expression",
+            "value" : {
+              "op" : "==",
+              "left" : {
+                "type" : "field",
+                "value" : ["scalars", "userMetadata.direction"]
+              },
+              "right" : {
+                "type" : "hexstr",
+                "value" : "0x02"
+              }
+            }
+          },
+          "true_next" : "PreQosPipe.terminations_downlink",
+          "false_next" : "node_21"
+        },
+        {
+          "name" : "node_21",
+          "id" : 6,
+          "source_info" : {
+            "filename" : "p4src/main.p4",
+            "line" : 467,
             "column" : 20,
             "source_fragment" : "local_meta.terminations_hit"
           },
@@ -6221,15 +6572,15 @@
               }
             }
           },
-          "true_next" : "tbl_main432",
-          "false_next" : "node_20"
+          "true_next" : "tbl_main469",
+          "false_next" : "node_23"
         },
         {
-          "name" : "node_20",
-          "id" : 5,
+          "name" : "node_23",
+          "id" : 7,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 437,
+            "line" : 474,
             "column" : 20,
             "source_fragment" : "local_meta.needs_gtpu_decap"
           },
@@ -6245,14 +6596,14 @@
             }
           },
           "true_next" : "tbl_gtpu_decap",
-          "false_next" : "node_22"
+          "false_next" : "node_25"
         },
         {
-          "name" : "node_22",
-          "id" : 6,
+          "name" : "node_25",
+          "id" : 8,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 440,
+            "line" : 477,
             "column" : 20,
             "source_fragment" : "local_meta.needs_buffering"
           },
@@ -6268,14 +6619,14 @@
             }
           },
           "true_next" : "tbl_do_buffer",
-          "false_next" : "node_24"
+          "false_next" : "node_27"
         },
         {
-          "name" : "node_24",
-          "id" : 7,
+          "name" : "node_27",
+          "id" : 9,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 443,
+            "line" : 480,
             "column" : 20,
             "source_fragment" : "local_meta.needs_tunneling"
           },
@@ -6290,15 +6641,15 @@
               }
             }
           },
-          "true_next" : "node_25",
-          "false_next" : "node_28"
+          "true_next" : "node_28",
+          "false_next" : "node_31"
         },
         {
-          "name" : "node_25",
-          "id" : 8,
+          "name" : "node_28",
+          "id" : 10,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 444,
+            "line" : 481,
             "column" : 24,
             "source_fragment" : "local_meta.tunnel_out_qfi == 0"
           },
@@ -6320,11 +6671,11 @@
           "false_next" : "tbl_do_gtpu_tunnel_with_psc"
         },
         {
-          "name" : "node_28",
-          "id" : 9,
+          "name" : "node_31",
+          "id" : 11,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 452,
+            "line" : 489,
             "column" : 20,
             "source_fragment" : "local_meta.needs_dropping"
           },
@@ -6340,11 +6691,11 @@
             }
           },
           "true_next" : "tbl_do_drop",
-          "false_next" : "node_30"
+          "false_next" : "node_33"
         },
         {
-          "name" : "node_30",
-          "id" : 10,
+          "name" : "node_33",
+          "id" : 12,
           "expression" : {
             "type" : "expression",
             "value" : {
@@ -6367,8 +6718,8 @@
           "true_next" : "tbl_main109"
         },
         {
-          "name" : "node_32",
-          "id" : 11,
+          "name" : "node_35",
+          "id" : 13,
           "source_info" : {
             "filename" : "p4src/main.p4",
             "line" : 110,
@@ -6399,18 +6750,18 @@
       "id" : 1,
       "source_info" : {
         "filename" : "p4src/main.p4",
-        "line" : 470,
+        "line" : 507,
         "column" : 8,
         "source_fragment" : "PostQosPipe"
       },
-      "init_table" : "tbl_main480",
+      "init_table" : "tbl_main517",
       "tables" : [
         {
-          "name" : "tbl_main480",
-          "id" : 22,
+          "name" : "tbl_main517",
+          "id" : 23,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 480,
+            "line" : 517,
             "column" : 8,
             "source_fragment" : "post_qos_counter.count(local_meta.ctr_idx)"
           },
@@ -6421,25 +6772,25 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [38],
-          "actions" : ["main480"],
-          "base_default_next" : "node_39",
+          "action_ids" : [41],
+          "actions" : ["main517"],
+          "base_default_next" : "node_42",
           "next_tables" : {
-            "main480" : "node_39"
+            "main517" : "node_42"
           },
           "default_entry" : {
-            "action_id" : 38,
+            "action_id" : 41,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
           }
         },
         {
-          "name" : "tbl_main487",
-          "id" : 23,
+          "name" : "tbl_main524",
+          "id" : 24,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 487,
+            "line" : 524,
             "column" : 12,
             "source_fragment" : "hdr.packet_in.setValid(); ..."
           },
@@ -6450,14 +6801,14 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [37],
-          "actions" : ["main487"],
+          "action_ids" : [40],
+          "actions" : ["main524"],
           "base_default_next" : null,
           "next_tables" : {
-            "main487" : null
+            "main524" : null
           },
           "default_entry" : {
-            "action_id" : 37,
+            "action_id" : 40,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
@@ -6467,11 +6818,11 @@
       "action_profiles" : [],
       "conditionals" : [
         {
-          "name" : "node_39",
-          "id" : 12,
+          "name" : "node_42",
+          "id" : 14,
           "source_info" : {
             "filename" : "p4src/main.p4",
-            "line" : 484,
+            "line" : 521,
             "column" : 12,
             "source_fragment" : "std_meta.egress_port == 255"
           },
@@ -6490,7 +6841,7 @@
             }
           },
           "false_next" : null,
-          "true_next" : "tbl_main487"
+          "true_next" : "tbl_main524"
         }
       ]
     }
