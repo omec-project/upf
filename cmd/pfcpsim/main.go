@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/omec-project/upf-epc/pkg/mockSmf/smf"
+	"github.com/omec-project/upf-epc/pkg/pfcpsim-client"
 	"github.com/pborman/getopt/v2"
 	log "github.com/sirupsen/logrus"
 	"io"
@@ -22,7 +22,7 @@ var (
 
 	sessionCount int
 
-	globalMockSmf *smf.MockSMF
+	globalMockSmf *pfcpsim_client.MockSMF
 )
 
 const (
@@ -268,7 +268,7 @@ func handleUserInput() {
 func main() {
 	parseArgs()
 
-	globalMockSmf = smf.NewMockSMF(localAddress.String(),
+	globalMockSmf = pfcpsim_client.NewMockSMF(localAddress.String(),
 		ueAddressPool,
 		NodeBAddress.String(),
 		upfAddress.String(),

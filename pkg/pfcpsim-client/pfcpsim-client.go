@@ -1,4 +1,4 @@
-package smf
+package pfcpsim_client
 
 import (
 	"github.com/c-robinson/iplib"
