@@ -4,7 +4,7 @@ import (
 	"github.com/c-robinson/iplib"
 	"github.com/omec-project/upf-epc/pkg/pfcpsim"
 	"github.com/omec-project/upf-epc/test/integration"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
 	"net"
 	"time"
@@ -26,17 +26,14 @@ type MockSMF struct {
 
 	lastUEAddress net.IP
 
-	log *logrus.Logger
-
 	client *pfcpsim.PFCPClient
 }
 
-func NewMockSMF(lAddr string, ueAddressPool string, nodeBAddress string, upfAddress string, logger *logrus.Logger) *MockSMF {
+func NewMockSMF(lAddr string, ueAddressPool string, nodeBAddress string, upfAddress string) *MockSMF {
 
 	pfcpClient := pfcpsim.NewPFCPClient(lAddr)
 
 	return &MockSMF{
-		log:           logger,
 		ueAddressPool: ueAddressPool,
 		nodeBAddress:  nodeBAddress,
 		upfAddress:    upfAddress,
@@ -46,7 +43,7 @@ func NewMockSMF(lAddr string, ueAddressPool string, nodeBAddress string, upfAddr
 
 func (m *MockSMF) Disconnect() {
 	m.client.DisconnectN4()
-	m.log.Infof("PFCP client Disconnected")
+	log.Infof("PFCP client Disconnected")
 
 }
 
@@ -56,7 +53,7 @@ func (m *MockSMF) Connect(remoteAddress string) error {
 		return err
 	}
 
-	m.log.Infof("PFCP client is connected")
+	log.Infof("PFCP client is connected")
 	return nil
 }
 
@@ -65,12 +62,11 @@ func (m *MockSMF) Connect(remoteAddress string) error {
 func (m *MockSMF) TeardownAssociation() {
 	err := m.client.TeardownAssociation()
 	if err != nil {
-		m.log.Errorf("Error while tearing down association: %v", err)
+		log.Errorf("Error while tearing down association: %v", err)
 		return
 	}
 
-	m.log.Infoln("Teardown association completed")
-	m.log.Debugf("Debug")
+	log.Infoln("Teardown association completed")
 }
 
 // SetupAssociation uses the PFCP client to establish an association,
@@ -78,18 +74,18 @@ func (m *MockSMF) TeardownAssociation() {
 func (m *MockSMF) SetupAssociation() {
 	err := m.client.SetupAssociation()
 	if err != nil {
-		m.log.Errorf("Error while setting up association: %v", err)
+		log.Errorf("Error while setting up association: %v", err)
 		return
 	}
 
-	time.Sleep(pfcpsim.HeartbeatPeriod)
+	time.Sleep(pfcpsim.DefaultHeartbeatPeriod)
 
 	if !m.client.IsAssociationAlive() {
-		m.log.Errorf("Error while peeking heartbeat response: %v", err)
+		log.Errorf("Error while peeking heartbeat response: %v", err)
 		return
 	}
 
-	m.log.Infof("Setup association completed")
+	log.Infof("Setup association completed")
 }
 
 // getNextUEAddress retrieves the next available IP address from ueAddressPool
@@ -147,12 +143,12 @@ func (m *MockSMF) InitializeSessions(count int) {
 
 		err := m.client.EstablishSession(pdrs, fars, qers)
 		if err != nil {
-			m.log.Errorf("Error while establishing sessions: %v", err)
+			log.Errorf("Error while establishing sessions: %v", err)
 		}
 
 		// TODO show session's F-SEID
 		m.activeSessions++
-		m.log.Infof("Created sessions")
+		log.Infof("Created sessions")
 	}
 
 }
@@ -162,9 +158,9 @@ func (m *MockSMF) InitializeSessions(count int) {
 func (m *MockSMF) DeleteAllSessions() {
 	err := m.client.DeleteAllSessions()
 	if err != nil {
-		m.log.Errorf("Error while deleting sessions: %v", err)
+		log.Errorf("Error while deleting sessions: %v", err)
 		return
 	}
 
-	m.log.Infof("Deleted all sessions")
+	log.Infof("Deleted all sessions")
 }

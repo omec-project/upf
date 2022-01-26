@@ -123,7 +123,7 @@ func TestBasicPFCPAssociation(t *testing.T) {
 	err := pfcpClient.SetupAssociation()
 	require.NoErrorf(t, err, "failed to setup PFCP association")
 
-	time.Sleep(2 * pfcpsim.HeartbeatPeriod)
+	time.Sleep(2 * pfcpsim.DefaultHeartbeatPeriod)
 
 	require.True(t, pfcpClient.IsAssociationAlive())
 }

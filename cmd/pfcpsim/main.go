@@ -272,7 +272,6 @@ func main() {
 		ueAddressPool,
 		NodeBAddress.String(),
 		upfAddress.String(),
-		log.StandardLogger(),
 	)
 
 	err := globalMockSmf.Connect(remotePeerAddress.String())

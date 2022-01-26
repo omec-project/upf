@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	PFCPStandardPort = 8805
-	HeartbeatPeriod  = 5
+	PFCPStandardPort       = 8805
+	DefaultHeartbeatPeriod = 5
 )
 
 // PFCPClient enables to simulate a client sending PFCP messages towards the UPF.
@@ -222,7 +222,7 @@ func (c *PFCPClient) SendSessionDeletionRequest(localSEID uint64, remoteSEID uin
 }
 
 func (c *PFCPClient) StartHeartbeats(stopCtx context.Context) {
-	ticker := time.NewTicker(HeartbeatPeriod * time.Second)
+	ticker := time.NewTicker(DefaultHeartbeatPeriod * time.Second)
 	for {
 		select {
 		case <-stopCtx.Done():
@@ -259,7 +259,7 @@ func (c *PFCPClient) SetupAssociation() error {
 		return err
 	}
 
-	resp, err := c.PeekNextResponse(HeartbeatPeriod)
+	resp, err := c.PeekNextResponse(DefaultHeartbeatPeriod)
 	if err != nil {
 		return err
 	}
