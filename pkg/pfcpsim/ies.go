@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2022 Open Networking Foundation
 
-package integration
+package pfcpsim
 
 import (
 	"github.com/wmnsk/go-pfcp/ie"

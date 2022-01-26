@@ -3,7 +3,6 @@ package pfcpsim_client
 import (
 	"github.com/c-robinson/iplib"
 	"github.com/omec-project/upf-epc/pkg/pfcpsim"
-	"github.com/omec-project/upf-epc/test/integration"
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
 	"net"
@@ -125,20 +124,20 @@ func (m *MockSMF) InitializeSessions(count int) {
 		downlinkAppQerID := uint32(i + 1)
 
 		pdrs := []*ie.IE{
-			integration.NewUplinkPDR(integration.Create, uplinkPdrID, uplinkTEID, m.upfAddress, uplinkFarID, sessQerID, uplinkAppQerID),
-			integration.NewDownlinkPDR(integration.Create, dowlinkPdrID, m.getNextUEAddress().String(), downlinkFarID, sessQerID, downlinkAppQerID),
+			pfcpsim.NewUplinkPDR(pfcpsim.Create, uplinkPdrID, uplinkTEID, m.upfAddress, uplinkFarID, sessQerID, uplinkAppQerID),
+			pfcpsim.NewDownlinkPDR(pfcpsim.Create, dowlinkPdrID, m.getNextUEAddress().String(), downlinkFarID, sessQerID, downlinkAppQerID),
 		}
 
 		fars := []*ie.IE{
-			integration.NewUplinkFAR(integration.Create, uplinkFarID, ActionForward),
-			integration.NewDownlinkFAR(integration.Create, downlinkFarID, ActionDrop, downlinkTEID, m.nodeBAddress),
+			pfcpsim.NewUplinkFAR(pfcpsim.Create, uplinkFarID, ActionForward),
+			pfcpsim.NewDownlinkFAR(pfcpsim.Create, downlinkFarID, ActionDrop, downlinkTEID, m.nodeBAddress),
 		}
 
 		qers := []*ie.IE{
 			// session QER
-			integration.NewQER(integration.Create, sessQerID, 0x09, 500000, 500000, 0, 0),
+			pfcpsim.NewQER(pfcpsim.Create, sessQerID, 0x09, 500000, 500000, 0, 0),
 			// application QER
-			integration.NewQER(integration.Create, appQerID, 0x08, 50000, 50000, 30000, 30000),
+			pfcpsim.NewQER(pfcpsim.Create, appQerID, 0x08, 50000, 50000, 30000, 30000),
 		}
 
 		err := m.client.EstablishSession(pdrs, fars, qers)
