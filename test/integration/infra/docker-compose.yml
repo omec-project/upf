@@ -4,10 +4,8 @@ version: "3.7"
 
 services:
   pfcpiface:
-    build:
-      context: ../../../
-      dockerfile: Dockerfile
-      target: pfcpiface
+    image: upf-epc-pfcpiface:${VERSION}
+    pull_policy: always
     hostname: pfcpiface
     container_name: pfcpiface
     tty: true

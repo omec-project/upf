@@ -30,5 +30,8 @@ data plane component (e.g., via P4Runtime for UP4) to verify forwarding state co
 To run all E2E integration tests invoke the command below from the root directory:
 
 ```bash
-make test-up4-integration
+DOCKER_TARGETS=pfcpiface make test-up4-integration
 ```
+
+> Note that `DOCKER_TARGETS=pfcpiface` is used to speed up the build process (avoids building BESS image). 
+> It must be removed once we add integration tests for BESS-UPF.
