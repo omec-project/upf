@@ -510,8 +510,9 @@ func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, internalAppID uint
 
 	tableID := t.tableID(TableApplications)
 	entry := &p4.TableEntry{
-		TableId:  tableID,
-		Priority: int32(math.MaxInt32 - pdr.precedence),
+		TableId: tableID,
+		// priority for UP4 cannot be greater than 65535
+		Priority: int32(math.MaxUint8 - pdr.precedence),
 	}
 
 	// srcIP/srcPort is always set as an application endpoint

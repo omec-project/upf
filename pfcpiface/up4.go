@@ -365,6 +365,16 @@ func (up4 *UP4) clearAllTables() error {
 		return err
 	}
 
+	applicationsTableID, err := up4.p4RtTranslator.getTableIDByName(TableApplications)
+	if err != nil {
+		return err
+	}
+
+	err = up4.p4client.ClearTable(applicationsTableID)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -459,6 +469,8 @@ func (up4 *UP4) allocateGTPTunnelPeerID() (uint8, error) {
 	return allocated, nil
 }
 
+// FIXME: SDFAB-960
+//nolint:unused
 func (up4 *UP4) releaseAllocatedGTPTunnelPeerID(tunnelParams tunnelParams) {
 	allocated, exists := up4.tunnelPeerIDs[tunnelParams]
 	if exists {
@@ -504,6 +516,8 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
 	return nil
 }
 
+// FIXME: SDFAB-960
+//nolint:unused
 func (up4 *UP4) removeGTPTunnelPeer(far far) {
 	removeLog := log.WithFields(log.Fields{
 		"far": far,
@@ -554,6 +568,8 @@ func (up4 *UP4) allocateInternalApplicationID(app application) (uint8, error) {
 	return allocated, nil
 }
 
+// FIXME: SDFAB-960
+//nolint:unused
 func (up4 *UP4) releaseInternalApplicationID(appFilter applicationFilter) {
 	app := application{
 		appIP:     appFilter.srcIP,
@@ -780,12 +796,7 @@ func (up4 *UP4) sendDelete(deleted PacketForwardingRules) error {
 		return err
 	}
 
-	for _, far := range deleted.fars {
-		up4.removeGTPTunnelPeer(far)
-	}
-
 	for _, p := range deleted.pdrs {
-		up4.releaseInternalApplicationID(p.appFilter)
 		up4.removeUeAddrAndFSEIDMappings(p)
 	}
 
@@ -820,7 +831,7 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updat
 	}
 
 	if err != nil {
-		log.Errorf("failed to apply forwarding configuration to UP4: %v", err)
+		up4Log.Errorf("failed to apply forwarding configuration to UP4: %v", err)
 		return ie.CauseRequestRejected
 	}
 
