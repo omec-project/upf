@@ -32,9 +32,6 @@ type MockSMF struct {
 }
 
 func NewMockSMF(lAddr string, ueAddressPool string, nodeBAddress string, upfAddress string, logger *logrus.Logger) *MockSMF {
-	if logger == nil {
-		logger = new(logrus.Logger)
-	}
 
 	pfcpClient := pfcpsim.NewPFCPClient(lAddr)
 
@@ -73,6 +70,7 @@ func (m *MockSMF) TeardownAssociation() {
 	}
 
 	m.log.Infoln("Teardown association completed")
+	m.log.Debugf("Debug")
 }
 
 // SetupAssociation uses the PFCP client to establish an association,

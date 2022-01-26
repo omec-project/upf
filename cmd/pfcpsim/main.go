@@ -8,20 +8,17 @@ import (
 	"github.com/omec-project/upf-epc/test/integration/providers"
 	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/pborman/getopt/v2"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"io"
 	"net"
 	"os"
 	"path"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
 )
 
 var (
-	log *logrus.Logger
-
 	remotePeerAddress net.IP
 	localAddress      net.IP
 	upfAddress        net.IP
@@ -29,7 +26,6 @@ var (
 	ueAddressPool     string
 
 	inputFile string
-	doOnce    sync.Once
 
 	sessionCount int
 
@@ -51,20 +47,6 @@ const (
 	directionUplink   = 0x1
 	directionDownlink = 0x2
 )
-
-// GetLoggerInstance uses a singleton pattern to return a single logger instance
-// that can be used anywhere.
-func GetLoggerInstance() *logrus.Logger {
-	// setting global logging instance
-	doOnce.Do(func() {
-		log = logrus.New()
-	})
-	return log
-}
-
-func SetLogLevel(level logrus.Level) {
-	log.SetLevel(level)
-}
 
 // copyOutputToLogfile reads from Stdout and Stderr to save in a persistent file,
 // provided through logfile parameter.
@@ -162,8 +144,6 @@ func initMockUP4() error {
 }
 
 func init() {
-	log = GetLoggerInstance()
-
 	err := initMockUP4()
 	if err != nil {
 		log.Fatalf("Could not initialize mock UP4: %v", err)
@@ -226,8 +206,8 @@ func parseArgs() {
 
 	// Flag checks and validations
 	if *verbosity {
-		level := logrus.DebugLevel
-		SetLogLevel(level)
+		level := log.DebugLevel
+		log.SetLevel(level)
 		log.Infof("Verbosity level set to: %v", level.String())
 	}
 
@@ -367,7 +347,7 @@ func main() {
 		ueAddressPool,
 		NodeBAddress.String(),
 		upfAddress.String(),
-		GetLoggerInstance(),
+		log.StandardLogger(),
 	)
 
 	err := globalMockSmf.Connect(remotePeerAddress.String())

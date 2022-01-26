@@ -8,7 +8,7 @@ COPY go.sum ./go.sum
 RUN go mod download
 
 COPY . ./
-RUN CGO_ENABLED=0 go build -o /bin/mock-smf cmd/pfcpsim-client/main.go
+RUN CGO_ENABLED=0 go build -o /bin/mock-smf cmd/pfcpsim/main.go
 
 # Stage mock-smf: runtime image of mockSMF
 FROM alpine AS mock-smf
