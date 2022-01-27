@@ -87,7 +87,10 @@ func convertError(err error) error {
 	for _, detailItem := range st.Details() {
 		p4Error, ok := detailItem.(*p4.Error)
 		if !ok {
-			continue
+			p4Error = &p4.Error{
+				CanonicalCode:        int32(codes.Unknown),
+				Message:              "failed to unpack P4 error",
+			}
 		}
 
 		p4RtError.errors = append(p4RtError.errors, p4Error)
