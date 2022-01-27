@@ -4,17 +4,19 @@
 package main
 
 import (
-	"github.com/omec-project/upf-epc/test/integration"
 	"net"
 	"testing"
+
+	"github.com/omec-project/upf-epc/test/integration"
 )
 
 func TestFARParsing(t *testing.T) {
-
 	f := far{}
 
 	op := create
+
 	var validFARID uint32 = 1
+
 	var validFARAction uint8 = ActionForward
 
 	validFAR := integration.NewUplinkFAR(integration.IEMethod(op), validFARID, validFARAction)
@@ -28,19 +30,19 @@ func TestFARParsing(t *testing.T) {
 
 	err := f.parseFAR(validFAR, 100, mockUpf, op)
 	if err != nil {
-		t.Errorf("Error parsing FAR: %v", err)
+		t.Errorf("Error while parsing FAR: %v", err)
 	}
 
 	if f.farID != validFARID {
-		t.Errorf("Error parsing FAR: FAR ID does not match")
+		t.Error("FAR ID does not match")
 	}
 
 	if f.applyAction != validFARAction {
-		t.Errorf("Error parsing FAR: FAR action does not match")
+		t.Error("FAR action does not match")
 	}
 
 	err = f.parseFAR(invalidFAR, 101, mockUpf, op)
 	if err == nil {
-		t.Errorf("Error parsing FAR: FAR is invalid but no error is returned")
+		t.Error("FAR is invalid but no error is returned")
 	}
 }
