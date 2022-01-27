@@ -88,8 +88,8 @@ func convertError(err error) error {
 		p4Error, ok := detailItem.(*p4.Error)
 		if !ok {
 			p4Error = &p4.Error{
-				CanonicalCode:        int32(codes.Unknown),
-				Message:              "failed to unpack P4 error",
+				CanonicalCode: int32(codes.Unknown),
+				Message:       "failed to unpack P4 error",
 			}
 		}
 
