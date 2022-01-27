@@ -67,6 +67,10 @@ func (e *P4RuntimeError) Get() []*p4.Error {
 // convertError parses nested P4Runtime errors.
 // See https://p4.org/p4-spec/p4runtime/main/P4Runtime-Spec.html#sec-error-reporting-messages.
 func convertError(err error) error {
+	if err == nil {
+		return err
+	}
+
 	st, ok := status.FromError(err)
 	if !ok {
 		return err
@@ -343,11 +347,8 @@ func (c *P4rtClient) WriteReq(update *p4.Update) error {
 	}
 
 	_, err := c.client.Write(context.Background(), req)
-	if err != nil {
-		return convertError(err)
-	}
 
-	return nil
+	return convertError(err)
 }
 
 // WriteBatchReq ... Write batch Request to up4.
@@ -362,11 +363,8 @@ func (c *P4rtClient) WriteBatchReq(updates []*p4.Update) error {
 	log.Traceln(proto.MarshalTextString(req))
 
 	_, err := c.client.Write(context.Background(), req)
-	if err != nil {
-		return convertError(err)
-	}
 
-	return nil
+	return convertError(err)
 }
 
 // GetForwardingPipelineConfig ... Get Pipeline config from switch.
