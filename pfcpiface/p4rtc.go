@@ -90,10 +90,6 @@ func convertError(err error) error {
 			continue
 		}
 
-		if p4Error.GetCanonicalCode() == int32(codes.OK) {
-			continue
-		}
-
 		p4RtError.errors = append(p4RtError.errors, p4Error)
 	}
 

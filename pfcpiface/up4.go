@@ -597,8 +597,9 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, meth
 			}
 
 			for _, status := range p4Error.Get() {
-				// ignore ALREADY_EXISTS
-				if status.GetCanonicalCode() == int32(codes.AlreadyExists) {
+				// ignore ALREADY_EXISTS or OK
+				if status.GetCanonicalCode() == int32(codes.AlreadyExists) ||
+					status.GetCanonicalCode() == int32(codes.OK) {
 					continue
 				}
 
