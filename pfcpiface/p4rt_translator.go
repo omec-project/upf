@@ -664,6 +664,11 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, shouldDrop bool, 
 		return nil, err
 	}
 
+	// FIXME: replace app_id with a meaningful value once we implement the full support for app filtering
+	if err := t.withExactMatchField(entry, FieldApplicationID, uint8(0)); err != nil {
+		return nil, err
+	}
+
 	var action *p4.Action
 	if shouldDrop {
 		action = &p4.Action{
@@ -715,6 +720,11 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, relatedFAR far,
 	}
 
 	if err := t.withExactMatchField(entry, FieldApplicationID, internalAppID); err != nil {
+		return nil, err
+	}
+
+	// FIXME: replace app_id with a meaningful value once we implement the full support for app filtering
+	if err := t.withExactMatchField(entry, FieldApplicationID, uint8(0)); err != nil {
 		return nil, err
 	}
 
