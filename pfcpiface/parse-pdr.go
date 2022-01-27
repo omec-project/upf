@@ -239,9 +239,11 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 				p.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
 				p.srcIP = ip2int(ipf.src.IPNet.IP)
 				p.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
+
 				if ipf.src.Port > 0 {
 					p.srcPort, p.srcPortMask = ipf.src.Port, 0xffff
 				}
+
 				if ipf.dst.Port > 0 {
 					p.dstPort, p.dstPortMask = ipf.dst.Port, 0xffff
 				}

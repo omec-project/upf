@@ -68,7 +68,7 @@ func (e *P4RuntimeError) Get() []*p4.Error {
 // See https://p4.org/p4-spec/p4runtime/main/P4Runtime-Spec.html#sec-error-reporting-messages.
 func convertError(err error) error {
 	if err == nil {
-		return err
+		return nil
 	}
 
 	st, ok := status.FromError(err)
