@@ -47,7 +47,7 @@ jobs:
           shfmt -l -w $(shfmt -f . | grep -v vendor/)
       - name: Go Format
         run: |
-          go fmt ./pfcpiface/... ./pkg/... ./test/...
+          make fmt
 
       - name: Show all CI changes
         run: |
