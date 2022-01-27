@@ -6,10 +6,11 @@ package main
 import (
 	"encoding/binary"
 	"flag"
-	"google.golang.org/grpc/codes"
 	"math/rand"
 	"net"
 	"time"
+
+	"google.golang.org/grpc/codes"
 
 	p4 "github.com/p4lang/p4runtime/go/p4/v1"
 
