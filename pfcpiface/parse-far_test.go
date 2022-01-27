@@ -5,5 +5,5 @@ import (
 )
 
 func Test(t *testing.T) {
-	t.SkipNow()
+	t.Fail()
 }
