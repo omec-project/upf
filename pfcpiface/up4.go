@@ -688,9 +688,9 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, meth
 
 		var applicationsEntry *p4.TableEntry
 
-		// applicationID = 0 is passed as a default value if no application filtering rule exists
-		var applicationID uint8 = 0
-		if pdr.appFilter.srcIP != 0 || pdr.appFilter.srcPort != 0 || pdr.appFilter.proto != 0 {
+		// as a default value is installed if no application filtering rule exists
+		var applicationID uint8 = DefaultApplicationID
+		if !pdr.appFilter.IsEmpty() {
 			applicationID, err = up4.getOrAllocateInternalApplicationID(pdr.appFilter)
 			if err != nil {
 				pdrLog.Error("failed to get or allocate internal application ID")

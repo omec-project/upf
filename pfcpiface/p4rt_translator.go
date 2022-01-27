@@ -56,6 +56,7 @@ const (
 	ActSetAppID               = "PreQosPipe.set_app_id"
 
 	DefaultPriority = 0
+	DefaultApplicationID = 0
 )
 
 type tunnelParams struct {
@@ -515,9 +516,17 @@ func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, internalAppID uint
 		Priority: int32(math.MaxUint8 - pdr.precedence),
 	}
 
-	// srcIP/srcPort is always set as an application endpoint
-	appIP, appIPMask := pdr.appFilter.srcIP, pdr.appFilter.srcIPMask
-	appPort := pdr.appFilter.srcPort
+	var appIP, appIPMask uint32 = 0, 0
+	var appPort uint16 = 0
+
+	if pdr.srcIface == access {
+		appIP, appIPMask = pdr.appFilter.dstIP, pdr.appFilter.dstIPMask
+		appPort = pdr.appFilter.dstPort
+	} else if pdr.srcIface == core {
+		appIP, appIPMask = pdr.appFilter.srcIP, pdr.appFilter.srcIPMask
+		appPort = pdr.appFilter.srcPort
+	}
+
 	appProto, appProtoMask := pdr.appFilter.proto, pdr.appFilter.protoMask
 
 	appIPPrefixLen := 32 - bits.TrailingZeros32(appIPMask)
@@ -664,11 +673,6 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, shouldDrop bool, 
 		return nil, err
 	}
 
-	// FIXME: replace app_id with a meaningful value once we implement the full support for app filtering
-	if err := t.withExactMatchField(entry, FieldApplicationID, uint8(0)); err != nil {
-		return nil, err
-	}
-
 	var action *p4.Action
 	if shouldDrop {
 		action = &p4.Action{
@@ -720,11 +724,6 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, relatedFAR far,
 	}
 
 	if err := t.withExactMatchField(entry, FieldApplicationID, internalAppID); err != nil {
-		return nil, err
-	}
-
-	// FIXME: replace app_id with a meaningful value once we implement the full support for app filtering
-	if err := t.withExactMatchField(entry, FieldApplicationID, uint8(0)); err != nil {
 		return nil, err
 	}
 
