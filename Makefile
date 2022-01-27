@@ -3,7 +3,7 @@
 
 PROJECT_NAME             := upf-epc
 VERSION                  ?= $(shell cat ./VERSION)
-GO                  	  ?= go
+GO                  	 ?= go
 GO_FILES                 := $(shell find . -type d \( -path ./pfcpiface/vendor -o -path ./pfcpiface/bess_pb  \) -prune -o -name '*.go' -print)
 
 # Note that we set the target platform of Docker images to native
