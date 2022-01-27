@@ -85,6 +85,12 @@ py-pb:
 		.;
 	cp -a output/bess_pb/. ${PTF_PB_DIR}
 
+test:
+	DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker run --rm --name pfpciface-test \
+ 		-v $(CURDIR):/app -w /app/pfcpiface \
+ 		golang:1.13 \
+ 		go test -v .
+
 fmt:
 	@gofmt -s -l -w $(GO_FILES)
 
@@ -94,4 +100,4 @@ golint:
 check-reuse:
 	@docker run --rm -v $(CURDIR):/upf-epc -w /upf-epc omecproject/reuse-verify:latest reuse lint
 
-.PHONY: docker-build docker-push output pb fmt golint check-reuse test-up4-integration
+.PHONY: docker-build docker-push output pb fmt golint check-reuse test-up4-integration test
