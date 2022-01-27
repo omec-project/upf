@@ -249,7 +249,7 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 				// FIXME: temporary workaround for SDF Filter,
 				//  remove once we meet spec compliance
 				p.srcPort = p.dstPort
-				p.dstPort, p.dstPortMask = 0, 0  // reset UE Port
+				p.dstPort, p.dstPortMask = 0, 0 // reset UE Port
 			} else if p.srcIface == access {
 				p.srcIP = ip2int(ipf.dst.IPNet.IP)
 				p.srcIPMask = ipMask2int(ipf.dst.IPNet.Mask)
@@ -265,7 +265,7 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 				// FIXME: temporary workaround for SDF Filter,
 				//  remove once we meet spec compliance
 				p.dstPort = p.srcPort
-				p.srcPort, p.srcPortMask = 0, 0  // reset UE Port
+				p.srcPort, p.srcPortMask = 0, 0 // reset UE Port
 			}
 		}
 	}
