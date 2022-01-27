@@ -36,21 +36,26 @@ const (
 )
 
 var (
-	// used to initialize UP4 only, then let PFCP Agent become master
-	masterElectionID = p4_v1.Uint128{High: 5, Low: 0}
-	// used to read table entries
-	slaveElectionID = p4_v1.Uint128{High: 0, Low: 1}
-
 	pfcpClient *pfcpsim.PFCPClient
 	p4rtClient *p4rtc.Client
 )
 
-func initMockUP4() error {
-	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", masterElectionID)
+func init() {
+	if err := initMockUP4(); err != nil {
+		panic("failed to initialize mock-up4")
+	}
+
+	providers.RunDockerCommand("pfcpiface", "/bin/pfcpiface -config /config.json")
+
+	// wait for PFCP Agent to initialize
+	time.Sleep(time.Second * 3)
+}
+
+func initMockUP4() (err error) {
+	p4rtClient, err = providers.ConnectP4rt("127.0.0.1:50001", p4_v1.Uint128{High: 0, Low: 1})
 	if err != nil {
 		return err
 	}
-	defer providers.DisconnectP4rt()
 
 	_, err = p4rtClient.SetFwdPipe("../../conf/p4/bin/bmv2.json", "../../conf/p4/bin/p4info.txt", 0)
 	if err != nil {
@@ -91,28 +96,14 @@ func initMockUP4() error {
 }
 
 func setup(t *testing.T) {
-	err := initMockUP4()
-	require.NoErrorf(t, err, "failed to initialize mock-up4")
-
-	providers.RunDockerCommand("pfcpiface", "/bin/pfcpiface -config /config.json")
-
-	// wait for PFCP Agent to initialize
-	time.Sleep(time.Second * 3)
-
 	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.1")
-	err = pfcpClient.ConnectN4("127.0.0.1")
+	err := pfcpClient.ConnectN4("127.0.0.1")
 	require.NoErrorf(t, err, "failed to connect to UPF")
-
-	p4rtClient, err = providers.ConnectP4rt("127.0.0.1:50001", slaveElectionID)
-	require.NoErrorf(t, err, "failed to connect to P4Runtime server as slave")
 }
 
 func teardown(t *testing.T) {
 	if pfcpClient != nil {
 		pfcpClient.DisconnectN4()
-	}
-	if p4rtClient != nil {
-		providers.DisconnectP4rt()
 	}
 }
 
@@ -154,5 +145,12 @@ func TestBasicSessionEstablishment(t *testing.T) {
 	err = pfcpClient.EstablishSession(pdrs, fars, qers)
 	require.NoErrorf(t, err, "failed to establish PFCP session")
 
-	// TODO: verify P4Runtime entries
+	entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.sessions_uplink")
+	require.Equal(t, 1, len(entries), "PreQosPipe.sessions_uplink should contain 1 entry")
+
+	entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.sessions_downlink")
+	require.Equal(t, 1, len(entries), "PreQosPipe.sessions_downlink should contain 1 entry")
+
+	entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.terminations_uplink")
+	require.Equal(t, 1, len(entries), "PreQosPipe.terminations_uplink should contain 1 entry")
 }
