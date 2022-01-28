@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2022 Open Networking Foundation
+
 package integration
 
 // this file should contain all the struct defs/constants used among different test cases.
