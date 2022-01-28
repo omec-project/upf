@@ -9,7 +9,7 @@ import (
 
 	p4rtc "github.com/antoninbas/p4runtime-go-client/pkg/client"
 	"github.com/antoninbas/p4runtime-go-client/pkg/util/conversion"
-	"github.com/omec-project/upf-epc/pkg/pfcpsim"
+	"github.com/omec-project/pfcpsim/pkg/pfcpsim"
 	"github.com/omec-project/upf-epc/test/integration/providers"
 	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/stretchr/testify/require"
