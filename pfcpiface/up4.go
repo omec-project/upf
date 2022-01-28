@@ -10,6 +10,8 @@ import (
 	"net"
 	"time"
 
+	"google.golang.org/grpc/codes"
+
 	p4 "github.com/p4lang/p4runtime/go/p4/v1"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -588,7 +590,21 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, meth
 
 		err = up4.p4client.ApplyTableEntries(methodType, sessionsEntry, terminationsEntry)
 		if err != nil {
-			return ErrOperationFailedWithReason("write table entries to Sessions and Terminations tables", err.Error())
+			p4Error, ok := err.(*P4RuntimeError)
+			if !ok {
+				// not a P4Runtime error, returning err
+				return ErrOperationFailedWithReason("applying table entries to UP4", err.Error())
+			}
+
+			for _, status := range p4Error.Get() {
+				// ignore ALREADY_EXISTS or OK
+				if status.GetCanonicalCode() == int32(codes.AlreadyExists) ||
+					status.GetCanonicalCode() == int32(codes.OK) {
+					continue
+				}
+
+				return ErrOperationFailedWithReason("applying table entries to UP4", p4Error.Error())
+			}
 		}
 	}
 
