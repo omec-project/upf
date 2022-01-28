@@ -16,6 +16,8 @@ import (
 	"syscall"
 
 	log "github.com/sirupsen/logrus"
+
+	_ "net/http/pprof"
 )
 
 var (
