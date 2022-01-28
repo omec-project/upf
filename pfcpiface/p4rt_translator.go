@@ -55,7 +55,7 @@ const (
 	ActLoadTunnelParams       = "PreQosPipe.load_tunnel_param"
 	ActSetAppID               = "PreQosPipe.set_app_id"
 
-	DefaultPriority = 0
+	DefaultPriority      = 0
 	DefaultApplicationID = 0
 )
 
@@ -516,8 +516,10 @@ func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, internalAppID uint
 		Priority: int32(math.MaxUint8 - pdr.precedence),
 	}
 
-	var appIP, appIPMask uint32 = 0, 0
-	var appPort uint16 = 0
+	var (
+		appIP, appIPMask uint32 = 0, 0
+		appPort          uint16 = 0
+	)
 
 	if pdr.srcIface == access {
 		appIP, appIPMask = pdr.appFilter.dstIP, pdr.appFilter.dstIPMask
