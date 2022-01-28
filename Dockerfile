@@ -67,7 +67,7 @@ RUN ./build_bess.sh && \
     cp -r core/pb /pb
 
 # Stage bess: creates the runtime image of BESS
-FROM python:3.9.9-slim AS bess
+FROM python:3.9.10-slim AS bess
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         gcc \
