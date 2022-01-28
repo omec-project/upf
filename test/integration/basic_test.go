@@ -37,7 +37,6 @@ const (
 
 var (
 	pfcpClient *pfcpsim.PFCPClient
-	p4rtClient *p4rtc.Client
 )
 
 func init() {
@@ -52,10 +51,11 @@ func init() {
 }
 
 func initMockUP4() (err error) {
-	p4rtClient, err = providers.ConnectP4rt("127.0.0.1:50001", p4_v1.Uint128{High: 0, Low: 1})
+	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", p4_v1.Uint128{High: 0, Low: 1})
 	if err != nil {
 		return err
 	}
+	defer providers.DisconnectP4rt()
 
 	_, err = p4rtClient.SetFwdPipe("../../conf/p4/bin/bmv2.json", "../../conf/p4/bin/p4info.txt", 0)
 	if err != nil {
@@ -119,38 +119,43 @@ func TestBasicPFCPAssociation(t *testing.T) {
 	require.True(t, pfcpClient.IsAssociationAlive())
 }
 
-func TestBasicSessionEstablishment(t *testing.T) {
+func TestSingleUEAttachAndDetach(t *testing.T) {
 	setup(t)
 	defer teardown(t)
+
+	testdata := &pfcpSessionData{
+		nbAddress: nodeBAddress,
+		ueAddress: ueAddress,
+		upfN3Address: upfN3Address,
+		ulTEID: 15,
+		dlTEID: 16,
+		sessQFI: 0x09,
+		appQFI: 0x08,
+	}
 
 	err := pfcpClient.SetupAssociation()
 	require.NoErrorf(t, err, "failed to setup PFCP association")
 
 	pdrs := []*ie.IE{
-		NewUplinkPDR(create, 1, 15, upfN3Address, 1, 4, 1),
-		NewDownlinkPDR(create, 2, ueAddress, 2, 4, 2),
+		NewUplinkPDR(create, 1, testdata.ulTEID, testdata.upfN3Address, 1, 4, 1),
+		NewDownlinkPDR(create, 2, testdata.ueAddress, 2, 4, 2),
 	}
 	fars := []*ie.IE{
 		NewUplinkFAR(create, 1, ActionForward),
-		NewDownlinkFAR(create, 2, ActionDrop, 16, nodeBAddress),
+		NewDownlinkFAR(create, 2, ActionDrop, testdata.dlTEID, testdata.nbAddress),
 	}
 
 	qers := []*ie.IE{
 		// session QER
-		NewQER(create, 4, 0x09, 500000, 500000, 0, 0),
+		NewQER(create, 4, testdata.sessQFI, 500000, 500000, 0, 0),
 		// application QER
-		NewQER(create, 1, 0x08, 50000, 50000, 30000, 30000),
+		NewQER(create, 1, testdata.appQFI, 50000, 50000, 30000, 30000),
 	}
 
 	err = pfcpClient.EstablishSession(pdrs, fars, qers)
 	require.NoErrorf(t, err, "failed to establish PFCP session")
 
-	entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.sessions_uplink")
-	require.Equal(t, 1, len(entries), "PreQosPipe.sessions_uplink should contain 1 entry")
+	verifyP4RuntimeEntries(t, testdata)
 
-	entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.sessions_downlink")
-	require.Equal(t, 1, len(entries), "PreQosPipe.sessions_downlink should contain 1 entry")
-
-	entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.terminations_uplink")
-	require.Equal(t, 1, len(entries), "PreQosPipe.terminations_uplink should contain 1 entry")
+	// TODO: release PFCP association
 }

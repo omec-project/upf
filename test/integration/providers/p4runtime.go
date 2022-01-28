@@ -42,6 +42,9 @@ func ConnectP4rt(addr string, electionID p4_v1.Uint128) (*client.Client, error) 
 	case <-arbitrationCh:
 	}
 
+	// used to retrieve P4Info if exists on device
+	p4RtC.GetFwdPipe(client.GetFwdPipeP4InfoAndCookie)
+
 	return p4RtC, nil
 }
 
