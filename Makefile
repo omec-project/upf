@@ -3,7 +3,6 @@
 
 PROJECT_NAME             := upf-epc
 VERSION                  ?= $(shell cat ./VERSION)
-GO                  	 ?= go
 GO_FILES                 := $(shell find . -type d \( -path ./pfcpiface/vendor -o -path ./pfcpiface/bess_pb  \) -prune -o -name '*.go' -print)
 
 # Note that we set the target platform of Docker images to native
@@ -93,7 +92,7 @@ py-pb:
 test: .coverage
 	@echo
 	@echo "==> Running unit tests with coverage <=="
-	$(GO) test -race -coverprofile=.coverage/coverage-unit.txt -covermode=atomic -v $(CURDIR)/pfcpiface
+	go test -race -coverprofile=.coverage/coverage-unit.txt -covermode=atomic -v $(CURDIR)/pfcpiface
 
 fmt:
 	@gofmt -s -l -w $(GO_FILES)
