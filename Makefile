@@ -37,7 +37,6 @@ PTF_PB_DIR ?= ptf/lib
 
 # https://docs.docker.com/engine/reference/commandline/build/#specifying-target-build-stage---target
 docker-build:
-	@go mod vendor
 	for target in $(DOCKER_TARGETS); do \
 		DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) \
 			--target $$target \
@@ -51,7 +50,6 @@ docker-build:
 			. \
 			|| exit 1; \
 	done
-	@rm -rf vendor/
 
 docker-push:
 	for target in $(DOCKER_TARGETS); do \
@@ -66,9 +64,10 @@ output:
 		.;
 	rm -rf output && mkdir output && tar -xf output.tar -C output && rm -f output.tar
 
-test-up4-integration: docker-build
+test-up4-integration:
 	docker-compose -f test/integration/infra/docker-compose.yml rm -fsv
-	VERSION=${VERSION} COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker-compose -f test/integration/infra/docker-compose.yml up --build -d
+	COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker-compose -f test/integration/infra/docker-compose.yml build $(DOCKER_BUILD_ARGS)
+	docker-compose -f test/integration/infra/docker-compose.yml up -d
 	go test -v -count=1 -failfast ./test/integration/...
 	docker-compose -f test/integration/infra/docker-compose.yml rm -fsv
 
