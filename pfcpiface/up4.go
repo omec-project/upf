@@ -584,12 +584,22 @@ func (up4 *UP4) releaseInternalApplicationID(appFilter applicationFilter) {
 	}
 }
 
-func (up4 *UP4) getOrAllocateInternalApplicationID(appFilter applicationFilter) (uint8, error) {
-	app := application{
-		appIP:     appFilter.srcIP,
-		appL4Port: appFilter.srcPort,
-		appProto:  appFilter.proto,
+func (up4 *UP4) getOrAllocateInternalApplicationID(pdr pdr) (uint8, error) {
+	var app application
+	if pdr.IsUplink() {
+		app = application{
+			appIP:     pdr.appFilter.dstIP,
+			appL4Port: pdr.appFilter.dstPort,
+		}
+	} else if pdr.IsDownlink() {
+		app = application{
+			appIP:     pdr.appFilter.srcIP,
+			appL4Port: pdr.appFilter.srcPort,
+		}
 	}
+
+	app.appProto = pdr.appFilter.proto
+
 	if allocated, exists := up4.applicationIDs[app]; exists {
 		return allocated, nil
 	}
@@ -691,7 +701,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, meth
 		// as a default value is installed if no application filtering rule exists
 		var applicationID uint8 = DefaultApplicationID
 		if !pdr.appFilter.IsEmpty() {
-			applicationID, err = up4.getOrAllocateInternalApplicationID(pdr.appFilter)
+			applicationID, err = up4.getOrAllocateInternalApplicationID(pdr)
 			if err != nil {
 				pdrLog.Error("failed to get or allocate internal application ID")
 				return err
