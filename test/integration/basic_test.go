@@ -157,5 +157,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 
 	verifyP4RuntimeEntries(t, testdata)
 
+	// TODO: modify PFCP association with Update FAR IEs
+
 	// TODO: release PFCP association
 }
