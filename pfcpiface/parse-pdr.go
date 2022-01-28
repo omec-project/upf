@@ -248,21 +248,35 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 				p.appFilter.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
 				p.appFilter.srcIP = ip2int(ipf.src.IPNet.IP)
 				p.appFilter.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
+
+				if ipf.src.Port > 0 {
+					p.appFilter.srcPort, p.appFilter.srcPortMask = ipf.src.Port, 0xffff
+				}
+
+				if ipf.dst.Port > 0 {
+					p.appFilter.dstPort, p.appFilter.dstPortMask = ipf.dst.Port, 0xffff
+				}
+
+				// FIXME: temporary workaround for SDF Filter,
+				//  remove once we meet spec compliance
+				p.appFilter.srcPort = p.appFilter.dstPort
+				p.appFilter.dstPort, p.appFilter.dstPortMask = 0, 0 // reset UE Port
 			} else if p.srcIface == access {
 				p.appFilter.srcIP = ip2int(ipf.dst.IPNet.IP)
 				p.appFilter.srcIPMask = ipMask2int(ipf.dst.IPNet.Mask)
 				p.appFilter.dstIP = ip2int(ipf.src.IPNet.IP)
 				p.appFilter.dstIPMask = ipMask2int(ipf.src.IPNet.Mask)
-			}
+				if ipf.dst.Port > 0 {
+					p.appFilter.srcPort, p.appFilter.srcPortMask = ipf.dst.Port, 0xffff
+				}
+				if ipf.src.Port > 0 {
+					p.appFilter.dstPort, p.appFilter.dstPortMask = ipf.src.Port, 0xffff
+				}
 
-			if ipf.dst.Port > 0 {
-				p.appFilter.dstPort = ipf.dst.Port
-				p.appFilter.dstPortMask = 0xffff
-			}
-
-			if ipf.src.Port > 0 {
-				p.appFilter.srcPort = ipf.src.Port
-				p.appFilter.srcPortMask = 0xffff
+				// FIXME: temporary workaround for SDF Filter,
+				//  remove once we meet spec compliance
+				p.appFilter.dstPort = p.appFilter.srcPort
+				p.appFilter.srcPort, p.appFilter.srcPortMask = 0, 0 // reset UE Port
 			}
 		}
 	}
