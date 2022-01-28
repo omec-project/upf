@@ -19,7 +19,7 @@ const (
 const (
 	dummyPrecedence = 100
 
-	sdfFilter = "permit out ip from any 6181-6181 to assigned"
+	sdfFilter = "permit out ip from any to assigned 6181-6181"
 )
 
 // TODO: use builder pattern to create PDR IE
