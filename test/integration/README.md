@@ -32,4 +32,3 @@ To run all E2E integration tests invoke the command below from the root director
 ```bash
 make test-up4-integration
 ```
-
