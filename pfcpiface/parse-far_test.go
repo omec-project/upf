@@ -8,23 +8,24 @@ import (
 	"testing"
 
 	"github.com/omec-project/upf-epc/test/integration"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
-func TestParseFAR(t *testing.T) {
-	type validTestCases struct {
-		input       *ie.IE
-		op          operation // saving op because far.parseFar() requires it as parameter
-		description string
-	}
+type testCase struct {
+	input       *ie.IE
+	op          operation
+	description string
+}
 
+func TestParseFAR(t *testing.T) {
 	createOp, updateOp := create, update
 
-	for _, scenario := range []validTestCases{
+	for _, scenario := range []testCase{
 		{
 			op:          createOp,
-			input:       integration.NewUplinkFAR(integration.IEMethod(createOp), 1, ActionDrop),
+			input:       integration.NewUplinkFAR(integration.IEMethod(createOp), 999, ActionDrop),
 			description: "Valid Uplink FAR input with create operation",
 		},
 		{
@@ -39,7 +40,6 @@ func TestParseFAR(t *testing.T) {
 		},
 	} {
 		t.Run(scenario.description, func(t *testing.T) {
-			t.Parallel()
 			mockFar := far{}
 			mockUpf := &upf{
 				accessIP: net.ParseIP("192.168.0.1"),
@@ -48,20 +48,18 @@ func TestParseFAR(t *testing.T) {
 
 			err := mockFar.parseFAR(scenario.input, 100, mockUpf, scenario.op)
 			require.NoError(t, err)
+
+			expectedID, err := scenario.input.FARID()
+			require.NoError(t, err)
+			assert.Equal(t, mockFar.farID, expectedID)
 		})
 	}
 }
 
 func TestParseFARShouldError(t *testing.T) {
-	type invalidTestCases struct {
-		input       *ie.IE
-		op          operation
-		description string
-	}
-
 	createOp, updateOp := create, update
 
-	for _, scenario := range []invalidTestCases{
+	for _, scenario := range []testCase{
 		{
 			op:          createOp,
 			input:       integration.NewUplinkFAR(integration.IEMethod(createOp), 1, 0),
@@ -90,7 +88,6 @@ func TestParseFARShouldError(t *testing.T) {
 		},
 	} {
 		t.Run(scenario.description, func(t *testing.T) {
-			t.Parallel()
 			mockFar := far{}
 			mockUpf := &upf{
 				accessIP: net.ParseIP("192.168.0.1"),
