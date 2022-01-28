@@ -10,6 +10,9 @@ import (
 	"os"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"google.golang.org/grpc/credentials/insecure"
 
 	//nolint:staticcheck // Ignore SA1019.
@@ -47,6 +50,53 @@ type P4rtClient struct {
 
 	// exported fields
 	P4Info p4ConfigV1.P4Info
+}
+
+type P4RuntimeError struct {
+	errors []*p4.Error
+}
+
+func (e *P4RuntimeError) Error() string {
+	return fmt.Sprintf("P4RuntimeError: %v", e.errors)
+}
+
+func (e *P4RuntimeError) Get() []*p4.Error {
+	return e.errors
+}
+
+// convertError parses nested P4Runtime errors.
+// See https://p4.org/p4-spec/p4runtime/main/P4Runtime-Spec.html#sec-error-reporting-messages.
+func convertError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	st, ok := status.FromError(err)
+	if !ok {
+		return err
+	}
+
+	if st.Code() != codes.Unknown {
+		return err
+	}
+
+	p4RtError := &P4RuntimeError{
+		errors: make([]*p4.Error, 0),
+	}
+
+	for _, detailItem := range st.Details() {
+		p4Error, ok := detailItem.(*p4.Error)
+		if !ok {
+			p4Error = &p4.Error{
+				CanonicalCode: int32(codes.Unknown),
+				Message:       "failed to unpack P4 error",
+			}
+		}
+
+		p4RtError.errors = append(p4RtError.errors, p4Error)
+	}
+
+	return p4RtError
 }
 
 // CheckStatus ... Check client connection status.
@@ -294,9 +344,10 @@ func (c *P4rtClient) WriteReq(update *p4.Update) error {
 		ElectionId: &c.electionID,
 		Updates:    []*p4.Update{update},
 	}
+
 	_, err := c.client.Write(context.Background(), req)
 
-	return err
+	return convertError(err)
 }
 
 // WriteBatchReq ... Write batch Request to up4.
@@ -309,9 +360,10 @@ func (c *P4rtClient) WriteBatchReq(updates []*p4.Update) error {
 	req.Updates = append(req.Updates, updates...)
 
 	log.Traceln(proto.MarshalTextString(req))
+
 	_, err := c.client.Write(context.Background(), req)
 
-	return err
+	return convertError(err)
 }
 
 // GetForwardingPipelineConfig ... Get Pipeline config from switch.
