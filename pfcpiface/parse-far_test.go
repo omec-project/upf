@@ -8,41 +8,95 @@ import (
 	"testing"
 
 	"github.com/omec-project/upf-epc/test/integration"
+	"github.com/stretchr/testify/require"
+	"github.com/wmnsk/go-pfcp/ie"
 )
 
-func TestFARParsing(t *testing.T) {
-	f := far{}
-
-	op := create
-
-	var validFARID uint32 = 1
-
-	var validFARAction uint8 = ActionForward
-
-	validFAR := integration.NewUplinkFAR(integration.IEMethod(op), validFARID, validFARAction)
-	// using invalid action (0)
-	invalidFAR := integration.NewDownlinkFAR(integration.IEMethod(op), 2, 0, 100, "10.0.10.1")
-
-	mockUpf := &upf{
-		accessIP: net.ParseIP("192.168.0.1"),
-		coreIP:   net.ParseIP("10.0.0.1"),
+func TestParseFAR(t *testing.T) {
+	type validTestCases struct {
+		input       *ie.IE
+		op          operation // saving op because far.parseFar() requires it as parameter
+		description string
 	}
 
-	err := f.parseFAR(validFAR, 100, mockUpf, op)
-	if err != nil {
-		t.Errorf("Error while parsing FAR: %v", err)
+	createOp, updateOp := create, update
+
+	for _, scenario := range []validTestCases{
+		{
+			op:          createOp,
+			input:       integration.NewUplinkFAR(integration.IEMethod(createOp), 1, ActionDrop),
+			description: "Valid Uplink FAR input with create operation",
+		},
+		{
+			op: updateOp,
+			input: integration.NewDownlinkFAR(integration.IEMethod(updateOp),
+				1,
+				ActionForward,
+				100,
+				"10.0.0.1",
+			),
+			description: "Valid Downlink FAR input with update operation",
+		},
+	} {
+		t.Run(scenario.description, func(t *testing.T) {
+			mockFar := far{}
+			mockUpf := &upf{
+				accessIP: net.ParseIP("192.168.0.1"),
+				coreIP:   net.ParseIP("10.0.0.1"),
+			}
+
+			err := mockFar.parseFAR(scenario.input, 100, mockUpf, scenario.op)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestParseFARShouldError(t *testing.T) {
+	type invalidTestCases struct {
+		input       *ie.IE
+		op          operation
+		description string
 	}
 
-	if f.farID != validFARID {
-		t.Error("FAR ID does not match")
-	}
+	createOp, updateOp := create, update
 
-	if f.applyAction != validFARAction {
-		t.Error("FAR action does not match")
-	}
+	for _, scenario := range []invalidTestCases{
+		{
+			op:          createOp,
+			input:       integration.NewUplinkFAR(integration.IEMethod(createOp), 1, 0),
+			description: "Uplink FAR with invalid action",
+		},
+		{
+			op: updateOp,
+			input: integration.NewDownlinkFAR(integration.IEMethod(updateOp),
+				1,
+				0,
+				100,
+				"10.0.0.1",
+			),
+			description: "Downlink FAR with invalid action",
+		},
+		{
+			op: createOp,
+			input: ie.NewCreateFAR(
+				ie.NewApplyAction(ActionDrop),
+				ie.NewUpdateForwardingParameters(
+					ie.NewDestinationInterface(ie.DstInterfaceAccess),
+					ie.NewOuterHeaderCreation(0x100, 100, "10.0.0.1", "", 0, 0, 0),
+				),
+			),
+			description: "Malformed Downlink FAR with missing FARID",
+		},
+	} {
+		t.Run(scenario.description, func(t *testing.T) {
+			mockFar := far{}
+			mockUpf := &upf{
+				accessIP: net.ParseIP("192.168.0.1"),
+				coreIP:   net.ParseIP("10.0.0.1"),
+			}
 
-	err = f.parseFAR(invalidFAR, 101, mockUpf, op)
-	if err == nil {
-		t.Error("FAR is invalid but no error is returned")
+			err := mockFar.parseFAR(scenario.input, 101, mockUpf, scenario.op)
+			require.Error(t, err)
+		})
 	}
 }
