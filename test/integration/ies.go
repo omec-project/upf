@@ -18,7 +18,6 @@ const (
 
 const (
 	dummyPrecedence = 100
-
 )
 
 var uplinkPDR = ie.NewCreatePDR(
@@ -36,10 +35,9 @@ var uplinkPDR = ie.NewCreatePDR(
 	ie.NewQERID(4),
 )
 
-
 // TODO: use builder pattern to create PDR IE
 func NewUplinkPDR(method IEMethod, id uint16, teid uint32, n3address string,
-				  farID uint32, sessQerID uint32, appQerID uint32) *ie.IE {
+	farID uint32, sessQerID uint32, appQerID uint32) *ie.IE {
 	createFunc := ie.NewCreatePDR
 	if method == update {
 		createFunc = ie.NewUpdatePDR
@@ -61,7 +59,7 @@ func NewUplinkPDR(method IEMethod, id uint16, teid uint32, n3address string,
 }
 
 func NewDownlinkPDR(method IEMethod, id uint16, ueAddress string,
-					farID uint32, sessQerID uint32, appQerID uint32) *ie.IE {
+	farID uint32, sessQerID uint32, appQerID uint32) *ie.IE {
 	createFunc := ie.NewCreatePDR
 	if method == update {
 		createFunc = ie.NewUpdatePDR
@@ -127,5 +125,3 @@ func NewQER(method IEMethod, id uint32, qfi uint8, ulMbr uint64, dlMbr uint64, u
 		ie.NewGBR(ulGbr, dlGbr),
 	)
 }
-
-
