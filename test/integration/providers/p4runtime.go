@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	stopCh chan struct{}
+	stopCh   chan struct{}
 	grpcConn *grpc.ClientConn
 )
 
