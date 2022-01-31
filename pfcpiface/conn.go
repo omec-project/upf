@@ -200,6 +200,7 @@ func (pConn *PFCPConn) Serve() {
 				}
 
 				if errors.Is(err, net.ErrClosed) {
+					log.Errorf("Connection error occured: %v", err)
 					return
 				}
 
@@ -230,6 +231,8 @@ func (pConn *PFCPConn) Serve() {
 
 // Shutdown stops connection backing PFCPConn.
 func (pConn *PFCPConn) Shutdown() {
+	log.Infof("Shutting down connection: %v", pConn.Conn)
+
 	close(pConn.shutdown)
 
 	if pConn.hbCtxCancel != nil {
