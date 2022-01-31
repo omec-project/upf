@@ -24,6 +24,10 @@ jobs:
         run: |
           make pb
 
+      - name: Run the Golang unit tests
+        run: |
+          make test
+
       - name: Build the BESS-UPF Docker image
         run: |
           DOCKER_TARGETS=bess make docker-build
