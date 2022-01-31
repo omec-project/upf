@@ -6,12 +6,12 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math/rand"
 	"net"
 	"sync"
 	"time"
 
+	reuse "github.com/libp2p/go-reuseport"
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
 
@@ -108,12 +108,7 @@ func (pConn *PFCPConn) startHeartBeatMonitor() {
 // NewPFCPConn creates a connected UDP socket to the rAddr PFCP peer specified.
 // buf is the first message received from the peer, nil if we are initiating.
 func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
-	remote, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", rAddr, 8805))
-	if err != nil {
-		log.Errorln("resolve udp addr failed", err)
-	}
-
-	conn, err := net.DialUDP("udp", nil, remote)
+	conn, err := reuse.Dial("udp", lAddr, rAddr)
 	if err != nil {
 		log.Errorln("dial socket failed", err)
 	}
