@@ -7,7 +7,6 @@ import (
 	"net"
 	"testing"
 
-	"github.com/omec-project/upf-epc/test/integration"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -19,22 +18,32 @@ type testCase struct {
 	description string
 }
 
+// TODO use pfcpsim library to create FARs
+
 func TestParseFAR(t *testing.T) {
 	createOp, updateOp := create, update
 
 	for _, scenario := range []testCase{
 		{
-			op:          createOp,
-			input:       integration.NewUplinkFAR(integration.IEMethod(createOp), 999, ActionDrop),
+			op: createOp,
+			input: ie.NewCreateFAR(
+				ie.NewFARID(999),
+				ie.NewApplyAction(ActionDrop),
+				ie.NewForwardingParameters(
+					ie.NewDestinationInterface(ie.DstInterfaceCore),
+				),
+			),
 			description: "Valid Uplink FAR input with create operation",
 		},
 		{
 			op: updateOp,
-			input: integration.NewDownlinkFAR(integration.IEMethod(updateOp),
-				1,
-				ActionForward,
-				100,
-				"10.0.0.1",
+			input: ie.NewUpdateFAR(
+				ie.NewFARID(1),
+				ie.NewApplyAction(ActionForward),
+				ie.NewUpdateForwardingParameters(
+					ie.NewDestinationInterface(ie.DstInterfaceAccess),
+					ie.NewOuterHeaderCreation(0x100, 100, "10.0.0.1", "", 0, 0, 0),
+				),
 			),
 			description: "Valid Downlink FAR input with update operation",
 		},
@@ -61,17 +70,25 @@ func TestParseFARShouldError(t *testing.T) {
 
 	for _, scenario := range []testCase{
 		{
-			op:          createOp,
-			input:       integration.NewUplinkFAR(integration.IEMethod(createOp), 1, 0),
+			op: createOp,
+			input: ie.NewCreateFAR(
+				ie.NewFARID(1),
+				ie.NewApplyAction(0),
+				ie.NewForwardingParameters(
+					ie.NewDestinationInterface(ie.DstInterfaceCore),
+				),
+			),
 			description: "Uplink FAR with invalid action",
 		},
 		{
 			op: updateOp,
-			input: integration.NewDownlinkFAR(integration.IEMethod(updateOp),
-				1,
-				0,
-				100,
-				"10.0.0.1",
+			input: ie.NewUpdateFAR(
+				ie.NewFARID(1),
+				ie.NewApplyAction(0),
+				ie.NewUpdateForwardingParameters(
+					ie.NewDestinationInterface(ie.DstInterfaceAccess),
+					ie.NewOuterHeaderCreation(0x100, 100, "10.0.0.1", "", 0, 0, 0),
+				),
 			),
 			description: "Downlink FAR with invalid action",
 		},
