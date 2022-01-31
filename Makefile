@@ -91,9 +91,7 @@ py-pb:
 test: .coverage
 	@echo
 	@echo "==> Running unit tests with coverage <=="
-	go test -race -coverprofile=.coverage/coverage-unit.txt -covermode=atomic -c $(CURDIR)/pfcpiface
-	./pfcpiface.test
-	#go test -race -coverprofile=.coverage/coverage-unit.txt -covermode=atomic $(CURDIR)/pfcpiface/
+	go test -race -coverprofile=.coverage/coverage-unit.txt -covermode=atomic $(CURDIR)/pfcpiface/*.go
 
 fmt:
 	@go fmt ./...
