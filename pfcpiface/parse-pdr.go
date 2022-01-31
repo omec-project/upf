@@ -172,9 +172,7 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 			for _, flowDesc := range apfd.flowDescs {
 				log.Println("flow desc", flowDesc)
 
-				var ipf ipFilterRule
-
-				err = ipf.parseFlowDesc(flowDesc, ueIP4.String())
+				ipf, err := parseFlowDesc(flowDesc, ueIP4.String())
 				if err != nil {
 					return errBadFilterDesc
 				}
@@ -222,9 +220,7 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 
 			log.Println("Flow Description is:", flowDesc)
 
-			var ipf ipFilterRule
-
-			err = ipf.parseFlowDesc(flowDesc, ueIP4.String())
+			ipf, err := parseFlowDesc(flowDesc, ueIP4.String())
 			if err != nil {
 				return errBadFilterDesc
 			}

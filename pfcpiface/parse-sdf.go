@@ -5,6 +5,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -81,6 +82,12 @@ type ipFilterRule struct {
 	src, dst          endpoint
 }
 
+func (ipf *ipFilterRule) String() string {
+	return fmt.Sprintf("FlowDescription{action=%v, direction=%v, proto=%v, "+
+		"srcIP=%v, srcPort=%v, dstIP=%v, dstPort=%v}",
+		ipf.action, ipf.direction, ipf.proto, ipf.src.IPNet, ipf.src.Port, ipf.dst.IPNet, ipf.dst.Port)
+}
+
 // "permit out ip from any to assigned"
 // "permit out ip from 60.60.0.102 to assigned"
 // "permit out ip from 60.60.0.102/32 to assigned"
@@ -92,17 +99,25 @@ type ipFilterRule struct {
 // "permit out ip from 60.60.0.1 8888 to 60.60.0.102 9999"
 // "permit out ip from 60.60.0.1 8888-8888 to 60.60.0.102 9999-9999"
 
-func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
+func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
+	parseLog := log.WithFields(log.Fields{
+		"flow-description": flowDesc,
+		"ue-address":       ueIP,
+	})
+	parseLog.Debug("Parsing flow description")
+
+	ipf := &ipFilterRule{}
+
 	fields := strings.Fields(flowDesc)
 
 	if err := parseAction(fields[0]); err != nil {
-		return err
+		return nil, err
 	}
 
 	ipf.action = fields[0]
 
 	if err := parseDirection(fields[1]); err != nil {
-		return err
+		return nil, err
 	}
 
 	ipf.direction = fields[1]
@@ -110,8 +125,6 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 
 	// bring to common intermediate representation
 	xform := func(i int) {
-		log.Println(fields)
-
 		switch fields[i] {
 		case "any":
 			fields[i] = "0.0.0.0/0"
@@ -122,13 +135,9 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 				fields[i] = "0.0.0.0/0"
 			}
 		}
-
-		log.Println(fields)
 	}
 
 	for i := 3; i < len(fields); i++ {
-		log.Println(fields[i])
-
 		switch fields[i] {
 		case "from":
 			i++
@@ -136,8 +145,8 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 
 			err := ipf.src.parseNet(fields[i])
 			if err != nil {
-				log.Println(err)
-				return err
+				parseLog.Error(err)
+				return nil, err
 			}
 
 			if fields[i+1] != "to" {
@@ -145,8 +154,8 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 
 				err = ipf.src.parsePort(fields[i])
 				if err != nil {
-					log.Println("src port parse failed ", err)
-					return err
+					parseLog.Error("src port parse failed ", err)
+					return nil, err
 				}
 			}
 		case "to":
@@ -155,8 +164,8 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 
 			err := ipf.dst.parseNet(fields[i])
 			if err != nil {
-				log.Println(err)
-				return err
+				parseLog.Error(err)
+				return nil, err
 			}
 
 			if i < len(fields)-1 {
@@ -164,16 +173,17 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 
 				err = ipf.dst.parsePort(fields[i])
 				if err != nil {
-					log.Println("dst port parse failed ", err)
-					return err
+					parseLog.Error("dst port parse failed ", err)
+					return nil, err
 				}
 			}
 		}
 	}
 
-	log.Println(ipf)
+	parseLog = parseLog.WithField("ip-filter", ipf)
+	parseLog.Debug("Flow description parsed successfully")
 
-	return nil
+	return ipf, nil
 }
 
 func parseAction(action string) error {
