@@ -29,6 +29,7 @@ func TestParseFAR(t *testing.T) {
 	createOp, updateOp := create, update
 
 	var FSEID uint64 = 100
+
 	coreIP := net.ParseIP("10.0.10.1")
 	UEAddressForDownlink := net.ParseIP("10.0.1.1")
 
@@ -46,7 +47,7 @@ func TestParseFAR(t *testing.T) {
 				farID:       999,
 				applyAction: ActionDrop,
 				fseID:       FSEID,
-				},
+			},
 			description: "Valid Uplink FAR input with create operation",
 		},
 		{
@@ -60,15 +61,15 @@ func TestParseFAR(t *testing.T) {
 				),
 			),
 			expected: &far{
-				farID: 1,
-				fseID: FSEID,
-				applyAction: ActionForward,
-				dstIntf: access,
-				tunnelTEID: 100,
-				tunnelType: access,
+				farID:        1,
+				fseID:        FSEID,
+				applyAction:  ActionForward,
+				dstIntf:      access,
+				tunnelTEID:   100,
+				tunnelType:   access,
 				tunnelIP4Src: ip2int(coreIP),
 				tunnelIP4Dst: ip2int(UEAddressForDownlink),
-				tunnelPort: uint16(defaultGTPProtocolPort),
+				tunnelPort:   uint16(defaultGTPProtocolPort),
 			},
 			description: "Valid Downlink FAR input with update operation",
 		},
