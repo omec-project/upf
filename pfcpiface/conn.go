@@ -189,6 +189,7 @@ func (pConn *PFCPConn) Serve() {
 				log.Errorf("failed to set read timeout: %v", err)
 			}
 
+			log.Infof("Waiting for UDP data")
 			n, err := pConn.Read(recvBuf)
 			if err != nil {
 				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
@@ -208,7 +209,9 @@ func (pConn *PFCPConn) Serve() {
 			}
 
 			buf := append([]byte{}, recvBuf[:n]...)
+			log.Infof("Handling new PFCP message: %v", buf)
 			pConn.HandlePFCPMsg(buf)
+			log.Infof("Recv buffer after handling message: %v, len=%d", recvBuf, len(recvBuf))
 		}
 	}(connTimeout)
 
