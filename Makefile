@@ -89,9 +89,13 @@ py-pb:
 	mkdir -p $(CURDIR)/.coverage
 
 test: .coverage
-	@echo
-	@echo "==> Running unit tests with coverage <=="
-	go test -race -coverprofile=.coverage/coverage-unit.txt -covermode=atomic -v $(CURDIR)/pfcpiface
+	docker run --rm -v $(CURDIR):/upf-epc -w /upf-epc golang:latest \
+		go test \
+			-race \
+			-coverprofile=.coverage/coverage-unit.txt \
+			-covermode=atomic \
+			-v \
+			./pfcpiface
 
 fmt:
 	@go fmt ./...
