@@ -46,9 +46,8 @@ jobs:
           # https://github.com/mvdan/sh/issues/288
           shfmt -l -w $(shfmt -f . | grep -v vendor/)
       - name: Go Format
-        working-directory: pfcpiface
         run: |
-          go fmt
+          make fmt
 
       - name: Show all CI changes
         run: |

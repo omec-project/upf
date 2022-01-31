@@ -20,10 +20,10 @@ func RunDockerCommand(container string, cmd string) {
 	defer cli.Close()
 
 	waiter, err := cli.ContainerAttach(ctx, container, types.ContainerAttachOptions{
-		Stderr:       true,
-		Stdout:       true,
-		Stdin:        true,
-		Stream:       true,
+		Stderr: true,
+		Stdout: true,
+		Stdin:  true,
+		Stream: true,
 	})
 
 	// Write to docker container

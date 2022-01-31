@@ -172,9 +172,7 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 			for _, flowDesc := range apfd.flowDescs {
 				log.Println("flow desc", flowDesc)
 
-				var ipf ipFilterRule
-
-				err = ipf.parseFlowDesc(flowDesc, ueIP4.String())
+				ipf, err := parseFlowDesc(flowDesc, ueIP4.String())
 				if err != nil {
 					return errBadFilterDesc
 				}
@@ -222,9 +220,7 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 
 			log.Println("Flow Description is:", flowDesc)
 
-			var ipf ipFilterRule
-
-			err = ipf.parseFlowDesc(flowDesc, ueIP4.String())
+			ipf, err := parseFlowDesc(flowDesc, ueIP4.String())
 			if err != nil {
 				return errBadFilterDesc
 			}
@@ -239,21 +235,35 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 				p.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
 				p.srcIP = ip2int(ipf.src.IPNet.IP)
 				p.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
+
+				if ipf.src.Port > 0 {
+					p.srcPort, p.srcPortMask = ipf.src.Port, 0xffff
+				}
+
+				if ipf.dst.Port > 0 {
+					p.dstPort, p.dstPortMask = ipf.dst.Port, 0xffff
+				}
+
+				// FIXME: temporary workaround for SDF Filter,
+				//  remove once we meet spec compliance
+				p.srcPort = p.dstPort
+				p.dstPort, p.dstPortMask = 0, 0 // reset UE Port
 			} else if p.srcIface == access {
 				p.srcIP = ip2int(ipf.dst.IPNet.IP)
 				p.srcIPMask = ipMask2int(ipf.dst.IPNet.Mask)
 				p.dstIP = ip2int(ipf.src.IPNet.IP)
 				p.dstIPMask = ipMask2int(ipf.src.IPNet.Mask)
-			}
+				if ipf.dst.Port > 0 {
+					p.srcPort, p.srcPortMask = ipf.dst.Port, 0xffff
+				}
+				if ipf.src.Port > 0 {
+					p.dstPort, p.dstPortMask = ipf.src.Port, 0xffff
+				}
 
-			if ipf.dst.Port > 0 {
-				p.dstPort = ipf.dst.Port
-				p.dstPortMask = 0xffff
-			}
-
-			if ipf.src.Port > 0 {
-				p.srcPort = ipf.src.Port
-				p.srcPortMask = 0xffff
+				// FIXME: temporary workaround for SDF Filter,
+				//  remove once we meet spec compliance
+				p.dstPort = p.srcPort
+				p.srcPort, p.srcPortMask = 0, 0 // reset UE Port
 			}
 		}
 	}
