@@ -59,8 +59,10 @@ func (pConn *PFCPConn) handleHeartbeatRequest(msg message.Message) (message.Mess
 		return nil, errUnmarshal(errMsgUnexpectedType)
 	}
 
-	// reset heartbeat expiry timer
-	pConn.hbReset <- struct{}{}
+	if pConn.upf.enableHBTimer {
+		// reset heartbeat expiry timer
+		pConn.hbReset <- struct{}{}
+	}
 
 	// TODO: Check and update remote recovery timestamp
 
