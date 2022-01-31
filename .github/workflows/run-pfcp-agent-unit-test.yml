@@ -14,8 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.4.0
       - uses: actions/setup-go@v2
-        with:
-          go-version: '1.13'
+
       - name: Run unit tests for PFCP Agent
         run: |
           make test
