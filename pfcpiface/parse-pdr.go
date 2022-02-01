@@ -46,7 +46,7 @@ func newRangeMatchPortFilter(low, high uint16) portFilter {
 }
 
 func (pr portFilter) String() string {
-	return fmt.Sprintf("{ %v - %v }", pr.portLow, pr.portHigh)
+	return fmt.Sprintf("{%v-%v}", pr.portLow, pr.portHigh)
 }
 
 func (pr portFilter) isWildcardMatch() bool {
