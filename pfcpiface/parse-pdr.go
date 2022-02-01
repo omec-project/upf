@@ -21,6 +21,8 @@ type portFilter struct {
 	portHigh uint16
 }
 
+// newWildcardPortFilter returns a portFilter that matches on every possible port, i.e., implements
+// no filtering.
 func newWildcardPortFilter() portFilter {
 	return portFilter{
 		portLow:  0,
@@ -28,6 +30,7 @@ func newWildcardPortFilter() portFilter {
 	}
 }
 
+// newExactMatchPortFilter returns a portFilter that matches on exactly the given port.
 func newExactMatchPortFilter(port uint16) portFilter {
 	return portFilter{
 		portLow:  port,
@@ -35,6 +38,9 @@ func newExactMatchPortFilter(port uint16) portFilter {
 	}
 }
 
+// newRangeMatchPortFilter returns a portFilter that matches on the given range [low, high].
+// low must be smaller than high. Creating exact and wildcard matches with this function is
+// possible, but use of the dedicated functions is encouraged.
 func newRangeMatchPortFilter(low, high uint16) portFilter {
 	if low > high {
 		return portFilter{}
@@ -42,6 +48,18 @@ func newRangeMatchPortFilter(low, high uint16) portFilter {
 	return portFilter{
 		portLow:  low,
 		portHigh: high,
+	}
+}
+
+// newTernaryMatchPortFilter returns a portFilter that matches on the given port and mask. Only
+// trivial mask are supported.
+func newTernaryMatchPortFilter(port, mask uint16) (portFilter, error) {
+	if mask == 0 {
+		return newWildcardPortFilter(), nil
+	} else if mask == math.MaxUint16 {
+		return newExactMatchPortFilter(port), nil
+	} else {
+		return portFilter{}, ErrInvalidArgument("newTernaryMatchPortFilter", mask)
 	}
 }
 
