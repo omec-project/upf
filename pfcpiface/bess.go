@@ -493,8 +493,8 @@ func (b *bess) sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 
 				// Try to find the N6 uplink PDR with the UE IP.
 				for _, p := range session.pdrs {
-					if p.IsUplink() && p.srcIP > 0 {
-						ueIpString = int2ip(p.srcIP).String()
+					if p.IsUplink() && p.ueAddress > 0 {
+						ueIpString = int2ip(p.ueAddress).String()
 						log.Traceln(p.fseID, " -> ", ueIpString)
 
 						break
@@ -715,24 +715,24 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 			Gate:     uint64(p.needDecap),
 			Priority: int64(math.MaxUint32 - p.precedence),
 			Values: []*pb.FieldData{
-				intEnc(uint64(p.srcIface)),     /* src_iface */
-				intEnc(uint64(p.tunnelIP4Dst)), /* tunnel_ipv4_dst */
-				intEnc(uint64(p.tunnelTEID)),   /* enb_teid */
-				intEnc(uint64(p.srcIP)),        /* ueaddr ip*/
-				intEnc(uint64(p.dstIP)),        /* inet ip */
-				intEnc(uint64(p.srcPort)),      /* ue port */
-				intEnc(uint64(p.dstPort)),      /* inet port */
-				intEnc(uint64(p.proto)),        /* proto id */
+				intEnc(uint64(p.srcIface)),          /* src_iface */
+				intEnc(uint64(p.tunnelIP4Dst)),      /* tunnel_ipv4_dst */
+				intEnc(uint64(p.tunnelTEID)),        /* enb_teid */
+				intEnc(uint64(p.appFilter.srcIP)),   /* ueaddr ip*/
+				intEnc(uint64(p.appFilter.dstIP)),   /* inet ip */
+				intEnc(uint64(p.appFilter.srcPort)), /* ue port */
+				intEnc(uint64(p.appFilter.dstPort)), /* inet port */
+				intEnc(uint64(p.appFilter.proto)),   /* proto id */
 			},
 			Masks: []*pb.FieldData{
-				intEnc(uint64(p.srcIfaceMask)),     /* src_iface-mask */
-				intEnc(uint64(p.tunnelIP4DstMask)), /* tunnel_ipv4_dst-mask */
-				intEnc(uint64(p.tunnelTEIDMask)),   /* enb_teid-mask */
-				intEnc(uint64(p.srcIPMask)),        /* ueaddr ip-mask */
-				intEnc(uint64(p.dstIPMask)),        /* inet ip-mask */
-				intEnc(uint64(p.srcPortMask)),      /* ue port-mask */
-				intEnc(uint64(p.dstPortMask)),      /* inet port-mask */
-				intEnc(uint64(p.protoMask)),        /* proto id-mask */
+				intEnc(uint64(p.srcIfaceMask)),          /* src_iface-mask */
+				intEnc(uint64(p.tunnelIP4DstMask)),      /* tunnel_ipv4_dst-mask */
+				intEnc(uint64(p.tunnelTEIDMask)),        /* enb_teid-mask */
+				intEnc(uint64(p.appFilter.srcIPMask)),   /* ueaddr ip-mask */
+				intEnc(uint64(p.appFilter.dstIPMask)),   /* inet ip-mask */
+				intEnc(uint64(p.appFilter.srcPortMask)), /* ue port-mask */
+				intEnc(uint64(p.appFilter.dstPortMask)), /* inet port-mask */
+				intEnc(uint64(p.appFilter.protoMask)),   /* proto id-mask */
 			},
 			Valuesv: []*pb.FieldData{
 				intEnc(uint64(p.pdrID)), /* pdr-id */
@@ -763,24 +763,24 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 		f := &pb.WildcardMatchCommandDeleteArg{
 			Values: []*pb.FieldData{
-				intEnc(uint64(p.srcIface)),     /* src_iface */
-				intEnc(uint64(p.tunnelIP4Dst)), /* tunnel_ipv4_dst */
-				intEnc(uint64(p.tunnelTEID)),   /* enb_teid */
-				intEnc(uint64(p.srcIP)),        /* ueaddr ip*/
-				intEnc(uint64(p.dstIP)),        /* inet ip */
-				intEnc(uint64(p.srcPort)),      /* ue port */
-				intEnc(uint64(p.dstPort)),      /* inet port */
-				intEnc(uint64(p.proto)),        /* proto id */
+				intEnc(uint64(p.srcIface)),          /* src_iface */
+				intEnc(uint64(p.tunnelIP4Dst)),      /* tunnel_ipv4_dst */
+				intEnc(uint64(p.tunnelTEID)),        /* enb_teid */
+				intEnc(uint64(p.appFilter.srcIP)),   /* ueaddr ip*/
+				intEnc(uint64(p.appFilter.dstIP)),   /* inet ip */
+				intEnc(uint64(p.appFilter.srcPort)), /* ue port */
+				intEnc(uint64(p.appFilter.dstPort)), /* inet port */
+				intEnc(uint64(p.appFilter.proto)),   /* proto id */
 			},
 			Masks: []*pb.FieldData{
-				intEnc(uint64(p.srcIfaceMask)),     /* src_iface-mask */
-				intEnc(uint64(p.tunnelIP4DstMask)), /* tunnel_ipv4_dst-mask */
-				intEnc(uint64(p.tunnelTEIDMask)),   /* enb_teid-mask */
-				intEnc(uint64(p.srcIPMask)),        /* ueaddr ip-mask */
-				intEnc(uint64(p.dstIPMask)),        /* inet ip-mask */
-				intEnc(uint64(p.srcPortMask)),      /* ue port-mask */
-				intEnc(uint64(p.dstPortMask)),      /* inet port-mask */
-				intEnc(uint64(p.protoMask)),        /* proto id-mask */
+				intEnc(uint64(p.srcIfaceMask)),          /* src_iface-mask */
+				intEnc(uint64(p.tunnelIP4DstMask)),      /* tunnel_ipv4_dst-mask */
+				intEnc(uint64(p.tunnelTEIDMask)),        /* enb_teid-mask */
+				intEnc(uint64(p.appFilter.srcIPMask)),   /* ueaddr ip-mask */
+				intEnc(uint64(p.appFilter.dstIPMask)),   /* inet ip-mask */
+				intEnc(uint64(p.appFilter.srcPortMask)), /* ue port-mask */
+				intEnc(uint64(p.appFilter.dstPortMask)), /* inet port-mask */
+				intEnc(uint64(p.appFilter.protoMask)),   /* proto id-mask */
 			},
 		}
 
