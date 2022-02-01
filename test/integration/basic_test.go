@@ -10,6 +10,7 @@ import (
 	p4rtc "github.com/antoninbas/p4runtime-go-client/pkg/client"
 	"github.com/antoninbas/p4runtime-go-client/pkg/util/conversion"
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim"
+	"github.com/omec-project/pfcpsim/pkg/pfcpsim/session"
 	"github.com/omec-project/upf-epc/test/integration/providers"
 	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/stretchr/testify/require"
@@ -18,6 +19,8 @@ import (
 
 const (
 	defaultSliceID = 0
+
+	defaultSDFFilter = "permit out ip from any to assigned"
 
 	ueAddress    = "17.0.0.1"
 	upfN3Address = "198.18.0.1"
@@ -137,19 +140,50 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 	require.NoErrorf(t, err, "failed to setup PFCP association")
 
 	pdrs := []*ie.IE{
-		NewUplinkPDR(create, 1, testdata.ulTEID, testdata.upfN3Address, 1, 4, 1),
-		NewDownlinkPDR(create, 2, testdata.ueAddress, 2, 4, 2),
+		session.NewPDRBuilder().MarkAsUplink().
+			WithMethod(session.Create).
+			WithID(1).
+			WithTEID(testdata.ulTEID).
+			WithN3Address(testdata.upfN3Address).
+			WithSDFFilter(defaultSDFFilter).
+			WithFARID(1).
+			AddQERID(4).
+			AddQERID(1).BuildPDR(),
+		session.NewPDRBuilder().MarkAsDownlink().
+			WithMethod(session.Create).
+			WithID(2).
+			WithUEAddress(testdata.ueAddress).
+			WithSDFFilter(defaultSDFFilter).
+			WithFARID(2).
+			AddQERID(4).
+			AddQERID(2).BuildPDR(),
 	}
+
 	fars := []*ie.IE{
-		NewUplinkFAR(create, 1, ActionForward),
-		NewDownlinkFAR(create, 2, ActionDrop, testdata.dlTEID, testdata.nbAddress),
+		session.NewFARBuilder().
+			// FIXME: we should set Desination Interface Type instead of direction
+			MarkAsUplink().
+			WithMethod(session.Create).WithID(1).WithAction(ActionForward).BuildFAR(),
+		session.NewFARBuilder().
+			// FIXME: we should set Desination Interface Type instead of direction
+			MarkAsDownlink().
+			WithMethod(session.Create).WithID(2).
+			WithAction(ActionDrop).WithTEID(testdata.dlTEID).WithDownlinkIP(testdata.nbAddress).BuildFAR(),
 	}
 
 	qers := []*ie.IE{
 		// session QER
-		NewQER(create, 4, testdata.sessQFI, 500000, 500000, 0, 0),
+		session.NewQERBuilder().WithMethod(session.Create).WithID(4).WithQFI(testdata.sessQFI).
+			WithUplinkMBR(500000).
+			WithDownlinkMBR(500000).
+			WithUplinkGBR(0).
+			WithDownlinkGBR(0).Build(),
 		// application QER
-		NewQER(create, 1, testdata.appQFI, 50000, 50000, 30000, 30000),
+		session.NewQERBuilder().WithMethod(session.Create).WithID(1).WithQFI(testdata.appQFI).
+			WithUplinkMBR(50000).
+			WithDownlinkMBR(50000).
+			WithUplinkGBR(30000).
+			WithDownlinkGBR(30000).Build(),
 	}
 
 	err = pfcpClient.EstablishSession(pdrs, fars, qers)
@@ -159,5 +193,8 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 
 	// TODO: modify PFCP association with Update FAR IEs
 
-	// TODO: release PFCP association
+	err = pfcpClient.TeardownAssociation()
+	require.NoErrorf(t, err, "failed to gracefully release PFCP association")
+
+	verifyNoP4RuntimeEntries(t)
 }

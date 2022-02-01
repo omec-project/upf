@@ -109,3 +109,13 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData) {
 	require.Equal(t, expected.Action.GetAction().ActionId, entries[0].Action.GetAction().ActionId, "PreQosPipe.terminations_downlink action does not equal expected")
 	require.Equal(t, expected.Match, entries[0].Match, "PreQosPipe.terminations_downlink match fields do not equal expected")
 }
+
+func verifyNoP4RuntimeEntries(t *testing.T) {
+	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", p4_v1.Uint128{High: 0, Low: 1})
+	require.NoErrorf(t, err, "failed to connect to P4Runtime server")
+	defer providers.DisconnectP4rt()
+
+	allInstalledEntries, _ := p4rtClient.ReadTableEntryWildcard("")
+	require.Equal(t, 1, len(allInstalledEntries), "UP4 should have only 1 entry installed")
+
+}
