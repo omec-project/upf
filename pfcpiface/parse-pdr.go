@@ -12,24 +12,31 @@ import (
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
+type applicationFilter struct {
+	srcIP   uint32
+	dstIP   uint32
+	srcPort uint16
+	dstPort uint16
+	proto   uint8
+
+	srcIPMask   uint32
+	dstIPMask   uint32
+	srcPortMask uint16
+	dstPortMask uint16
+	protoMask   uint8
+}
+
 type pdr struct {
 	srcIface     uint8
 	tunnelIP4Dst uint32
 	tunnelTEID   uint32
-	srcIP        uint32
-	dstIP        uint32
-	srcPort      uint16
-	dstPort      uint16
-	proto        uint8
+	ueAddress    uint32
 
 	srcIfaceMask     uint8
 	tunnelIP4DstMask uint32
 	tunnelTEIDMask   uint32
-	srcIPMask        uint32
-	dstIPMask        uint32
-	srcPortMask      uint16
-	dstPortMask      uint16
-	protoMask        uint8
+
+	appFilter applicationFilter
 
 	precedence  uint32
 	pdrID       uint32
@@ -50,14 +57,22 @@ func needAllocIP(ueIPaddr *ie.UEIPAddressFields) bool {
 	return true
 }
 
+func (af applicationFilter) String() string {
+	return fmt.Sprintf("ApplicationFilter(srcIP=%v/%x, dstIP=%v/%x, proto=%v/%x, srcPort=%v/%x, dstPort=%v/%x)",
+		af.srcIP, af.srcIPMask, af.dstIP, af.dstIPMask, af.proto,
+		af.protoMask, af.srcPort, af.srcPortMask, af.dstPort, af.dstPortMask)
+}
+
+func (af applicationFilter) IsEmpty() bool {
+	return af.srcIP == 0 && af.dstIP == 0 && af.proto == 0 && af.srcPort == 0 && af.dstPort == 0
+}
+
 func (p pdr) String() string {
 	return fmt.Sprintf("PDR(id=%v, F-SEID=%v, srcIface=%v, tunnelIPv4Dst=%v/%x, "+
-		"tunnelTEID=%v/%x, srcIP=%v/%x, dstIP=%v/%x,"+
-		"srcPort=%v/%x, dstPort=%v/%x, protocol=%v/%x, precedence=%v, F-SEID IP=%v, "+
+		"tunnelTEID=%v/%x, ueAddress=%v, applicationFilter=%v, precedence=%v, F-SEID IP=%v, "+
 		"counterID=%v, farID=%v, qerIDs=%v, needDecap=%v, allocIPFlag=%v)",
 		p.pdrID, p.fseID, p.srcIface, p.tunnelIP4Dst, p.tunnelIP4DstMask,
-		p.tunnelTEID, p.tunnelTEIDMask, p.srcIP, p.srcIPMask, p.dstIP, p.dstIPMask,
-		p.srcPort, p.srcPortMask, p.dstPort, p.dstPortMask, p.proto, p.protoMask, p.precedence,
+		p.tunnelTEID, p.tunnelTEIDMask, int2ip(p.ueAddress), p.appFilter, p.precedence,
 		p.fseidIP, p.ctrID, p.farID, p.qerIDList, p.needDecap, p.allocIPFlag)
 }
 
@@ -139,13 +154,7 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 
 	// Needed if SDF filter is bad or absent
 	if len(ueIP4) == 4 {
-		if p.srcIface == core {
-			p.dstIP = ip2int(ueIP4)
-			p.dstIPMask = 0xffffffff // /32
-		} else if p.srcIface == access {
-			p.srcIP = ip2int(ueIP4)
-			p.srcIPMask = 0xffffffff // /32
-		}
+		p.ueAddress = ip2int(ueIP4)
 	}
 
 	for _, ie2 := range pdiIEs {
@@ -181,23 +190,23 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 					log.Println("Found a match", p.srcIface, flowDesc)
 
 					if ipf.proto != reservedProto {
-						p.proto = ipf.proto
-						p.protoMask = reservedProto
+						p.appFilter.proto = ipf.proto
+						p.appFilter.protoMask = reservedProto
 					}
 					// TODO: Verify assumption that flow description in case of PFD is to be taken as-is
-					p.dstIP = ip2int(ipf.dst.IPNet.IP)
-					p.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
-					p.srcIP = ip2int(ipf.src.IPNet.IP)
-					p.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
+					p.appFilter.dstIP = ip2int(ipf.dst.IPNet.IP)
+					p.appFilter.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
+					p.appFilter.srcIP = ip2int(ipf.src.IPNet.IP)
+					p.appFilter.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
 
 					if ipf.dst.Port > 0 {
-						p.dstPort = ipf.dst.Port
-						p.dstPortMask = 0xffff
+						p.appFilter.dstPort = ipf.dst.Port
+						p.appFilter.dstPortMask = 0xffff
 					}
 
 					if ipf.src.Port > 0 {
-						p.srcPort = ipf.src.Port
-						p.srcPortMask = 0xffff
+						p.appFilter.srcPort = ipf.src.Port
+						p.appFilter.srcPortMask = 0xffff
 					}
 
 					break
@@ -226,44 +235,44 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 			}
 
 			if ipf.proto != reservedProto {
-				p.proto = ipf.proto
-				p.protoMask = reservedProto
+				p.appFilter.proto = ipf.proto
+				p.appFilter.protoMask = reservedProto
 			}
 
 			if p.srcIface == core {
-				p.dstIP = ip2int(ipf.dst.IPNet.IP)
-				p.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
-				p.srcIP = ip2int(ipf.src.IPNet.IP)
-				p.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
+				p.appFilter.dstIP = ip2int(ipf.dst.IPNet.IP)
+				p.appFilter.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
+				p.appFilter.srcIP = ip2int(ipf.src.IPNet.IP)
+				p.appFilter.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
 
 				if ipf.src.Port > 0 {
-					p.srcPort, p.srcPortMask = ipf.src.Port, 0xffff
+					p.appFilter.srcPort, p.appFilter.srcPortMask = ipf.src.Port, 0xffff
 				}
 
 				if ipf.dst.Port > 0 {
-					p.dstPort, p.dstPortMask = ipf.dst.Port, 0xffff
+					p.appFilter.dstPort, p.appFilter.dstPortMask = ipf.dst.Port, 0xffff
 				}
 
 				// FIXME: temporary workaround for SDF Filter,
 				//  remove once we meet spec compliance
-				p.srcPort = p.dstPort
-				p.dstPort, p.dstPortMask = 0, 0 // reset UE Port
+				p.appFilter.srcPort = p.appFilter.dstPort
+				p.appFilter.dstPort, p.appFilter.dstPortMask = 0, 0 // reset UE Port
 			} else if p.srcIface == access {
-				p.srcIP = ip2int(ipf.dst.IPNet.IP)
-				p.srcIPMask = ipMask2int(ipf.dst.IPNet.Mask)
-				p.dstIP = ip2int(ipf.src.IPNet.IP)
-				p.dstIPMask = ipMask2int(ipf.src.IPNet.Mask)
+				p.appFilter.srcIP = ip2int(ipf.dst.IPNet.IP)
+				p.appFilter.srcIPMask = ipMask2int(ipf.dst.IPNet.Mask)
+				p.appFilter.dstIP = ip2int(ipf.src.IPNet.IP)
+				p.appFilter.dstIPMask = ipMask2int(ipf.src.IPNet.Mask)
 				if ipf.dst.Port > 0 {
-					p.srcPort, p.srcPortMask = ipf.dst.Port, 0xffff
+					p.appFilter.srcPort, p.appFilter.srcPortMask = ipf.dst.Port, 0xffff
 				}
 				if ipf.src.Port > 0 {
-					p.dstPort, p.dstPortMask = ipf.src.Port, 0xffff
+					p.appFilter.dstPort, p.appFilter.dstPortMask = ipf.src.Port, 0xffff
 				}
 
 				// FIXME: temporary workaround for SDF Filter,
 				//  remove once we meet spec compliance
-				p.dstPort = p.srcPort
-				p.srcPort, p.srcPortMask = 0, 0 // reset UE Port
+				p.appFilter.dstPort = p.appFilter.srcPort
+				p.appFilter.srcPort, p.appFilter.srcPortMask = 0, 0 // reset UE Port
 			}
 		}
 	}
