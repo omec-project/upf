@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/stretchr/testify/assert"
 	"math"
 	"reflect"
 	"testing"
@@ -70,6 +71,12 @@ func Test_convertPortFiltersToTernary(t *testing.T) {
 			},
 		)
 	}
+}
+
+func Test_defaultPortFilter(t *testing.T) {
+	t.Run("default constructed is wildcard", func(t *testing.T) {
+		assert.True(t, portFilter{}.isWildcardMatch(), "default portFilter is wildcard")
+	})
 }
 
 func Test_newWildcardPortFilter(t *testing.T) {

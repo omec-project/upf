@@ -14,7 +14,8 @@ import (
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
-// portFilter encapsulates a L4 port range as seen in SDF.
+// portFilter encapsulates a L4 port range as seen in PDRs. A zero value portFilter represents
+// a wildcard match, but use of the dedicated new*PortFilter() functions is encouraged.
 type portFilter struct {
 	portLow  uint16
 	portHigh uint16
