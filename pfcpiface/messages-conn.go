@@ -59,8 +59,17 @@ func (pConn *PFCPConn) handleHeartbeatRequest(msg message.Message) (message.Mess
 		return nil, errUnmarshal(errMsgUnexpectedType)
 	}
 
-	// reset heartbeat expiry timer
-	pConn.hbReset <- struct{}{}
+	if pConn.upf.enableHBTimer {
+		// reset heartbeat expiry timer
+		// non-blocking write to channel
+		select {
+		case pConn.hbReset <- struct{}{}:
+			// timer reset
+		default:
+			// channel full, log warning and ignore
+			log.Warn("failed to reset heartbeat timer")
+		}
+	}
 
 	// TODO: Check and update remote recovery timestamp
 
