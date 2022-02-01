@@ -117,15 +117,16 @@ RUN mkdir /bess_pb && \
         --grpc_python_out=/bess_pb
 
 FROM golang AS pfcpiface-build
+ARG GOFLAGS
 WORKDIR /pfcpiface
 
 COPY go.mod /pfcpiface/go.mod
 COPY go.sum /pfcpiface/go.sum
 
-RUN go mod download
+RUN if [[ ! "$GOFLAGS" =~ "-mod=vendor" ]] ; then go mod download ; fi
 
 COPY . /pfcpiface
-RUN CGO_ENABLED=0 go build -o /bin/pfcpiface ./pfcpiface
+RUN CGO_ENABLED=0 go build $GOFLAGS -o /bin/pfcpiface ./pfcpiface
 
 # Stage pfcpiface: runtime image of pfcpiface toward SMF/SPGW-C
 FROM alpine AS pfcpiface

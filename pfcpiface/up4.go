@@ -45,7 +45,14 @@ const (
 
 	// 253 base stations + 1 dbuf (fixed in UP4) + 1 reserved (fixed in P4 pipeline)
 	maxGTPTunnelPeerIDs = 253
+	maxApplicationIDs   = 254
 )
+
+type application struct {
+	appIP     uint32
+	appL4Port uint16
+	appProto  uint8
+}
 
 type counter struct {
 	maxSize   uint64
@@ -67,9 +74,11 @@ type UP4 struct {
 	p4RtTranslator *P4rtTranslator
 
 	// TODO: create UP4Store object and move these fields there
-	counters          []counter
-	tunnelPeerIDs     map[tunnelParams]uint8
-	tunnelPeerIDsPool []uint8
+	counters           []counter
+	tunnelPeerIDs      map[tunnelParams]uint8
+	tunnelPeerIDsPool  []uint8
+	applicationIDs     map[application]uint8
+	applicationIDsPool []uint8
 
 	// ueAddrToFSEID is used to store UE Address <-> F-SEID mapping,
 	// which is needed to efficiently find F-SEID when we receive a P4 Digest (DDN) for a UE address.
@@ -213,13 +222,24 @@ func (up4 *UP4) initAllCounters() error {
 
 func (up4 *UP4) initTunnelPeerIDs() {
 	up4.tunnelPeerIDs = make(map[tunnelParams]uint8)
-	// a simple queue storing available;
+	// a simple queue storing available tunnel peer IDs
 	// 0 is reserved;
 	// 1 is reserved for dbuf
 	up4.tunnelPeerIDsPool = make([]uint8, 0, maxGTPTunnelPeerIDs)
 
 	for i := 2; i < maxGTPTunnelPeerIDs+2; i++ {
 		up4.tunnelPeerIDsPool = append(up4.tunnelPeerIDsPool, uint8(i))
+	}
+}
+
+func (up4 *UP4) initApplicationIDs() {
+	up4.applicationIDs = make(map[application]uint8)
+	// a simple queue storing available application IDs
+	// 0 is reserved;
+	up4.applicationIDsPool = make([]uint8, 0, maxApplicationIDs)
+
+	for i := 1; i < maxApplicationIDs+1; i++ {
+		up4.applicationIDsPool = append(up4.applicationIDsPool, uint8(i))
 	}
 }
 
@@ -273,6 +293,7 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	up4.timeout = 30
 	up4.enableEndMarker = conf.EnableEndMarker
 	up4.initTunnelPeerIDs()
+	up4.initApplicationIDs()
 	up4.ueAddrToFSEID = make(map[uint32]uint64)
 	up4.fseidToUEAddr = make(map[uint64]uint32)
 
@@ -340,6 +361,16 @@ func (up4 *UP4) clearAllTables() error {
 	}
 
 	err = up4.p4client.ClearTable(gtpTunnelPeersTableID)
+	if err != nil {
+		return err
+	}
+
+	applicationsTableID, err := up4.p4RtTranslator.getTableIDByName(TableApplications)
+	if err != nil {
+		return err
+	}
+
+	err = up4.p4client.ClearTable(applicationsTableID)
 	if err != nil {
 		return err
 	}
@@ -438,8 +469,14 @@ func (up4 *UP4) allocateGTPTunnelPeerID() (uint8, error) {
 	return allocated, nil
 }
 
-func (up4 *UP4) releaseAllocatedGTPTunnelPeerID(allocated uint8) {
-	up4.tunnelPeerIDsPool = append(up4.tunnelPeerIDsPool, allocated)
+// FIXME: SDFAB-960
+//nolint:unused
+func (up4 *UP4) releaseAllocatedGTPTunnelPeerID(tunnelParams tunnelParams) {
+	allocated, exists := up4.tunnelPeerIDs[tunnelParams]
+	if exists {
+		delete(up4.tunnelPeerIDs, tunnelParams)
+		up4.tunnelPeerIDsPool = append(up4.tunnelPeerIDsPool, allocated)
+	}
 }
 
 func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
@@ -479,6 +516,8 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
 	return nil
 }
 
+// FIXME: SDFAB-960
+//nolint:unused
 func (up4 *UP4) removeGTPTunnelPeer(far far) {
 	removeLog := log.WithFields(log.Fields{
 		"far": far,
@@ -510,7 +549,85 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 		removeLog.Error("failed to remove GTP tunnel peer")
 	}
 
-	up4.releaseAllocatedGTPTunnelPeerID(tunnelPeerID)
+	up4.releaseAllocatedGTPTunnelPeerID(tunnelParams)
+}
+
+// Returns error if we reach maximum supported Application IDs.
+func (up4 *UP4) allocateInternalApplicationID(app application) (uint8, error) {
+	if len(up4.applicationIDsPool) == 0 {
+		return 0, ErrOperationFailedWithReason("allocate Application ID",
+			"no free application IDs available")
+	}
+
+	// pick top from queue
+	allocated := up4.applicationIDsPool[0]
+	up4.applicationIDsPool = up4.applicationIDsPool[1:]
+
+	up4.applicationIDs[app] = allocated
+
+	return allocated, nil
+}
+
+// FIXME: SDFAB-960
+//nolint:unused
+func (up4 *UP4) releaseInternalApplicationID(appFilter applicationFilter) {
+	app := application{
+		appIP:     appFilter.srcIP,
+		appL4Port: appFilter.srcPort,
+		appProto:  appFilter.proto,
+	}
+
+	allocated, exists := up4.applicationIDs[app]
+	if exists {
+		delete(up4.applicationIDs, app)
+		up4.applicationIDsPool = append(up4.applicationIDsPool, allocated)
+	}
+}
+
+func (up4 *UP4) getOrAllocateInternalApplicationID(pdr pdr) (uint8, error) {
+	var app application
+	if pdr.IsUplink() {
+		app = application{
+			appIP:     pdr.appFilter.dstIP,
+			appL4Port: pdr.appFilter.dstPort,
+		}
+	} else if pdr.IsDownlink() {
+		app = application{
+			appIP:     pdr.appFilter.srcIP,
+			appL4Port: pdr.appFilter.srcPort,
+		}
+	}
+
+	app.appProto = pdr.appFilter.proto
+
+	if allocated, exists := up4.applicationIDs[app]; exists {
+		return allocated, nil
+	}
+
+	newAppID, err := up4.allocateInternalApplicationID(app)
+	if err != nil {
+		return 0, err
+	}
+
+	return newAppID, nil
+}
+
+func (up4 *UP4) updateUEAddrAndFSEIDMappings(pdr pdr) {
+	if !pdr.IsDownlink() {
+		return
+	}
+
+	// update both maps in one shot
+	up4.ueAddrToFSEID[pdr.ueAddress], up4.fseidToUEAddr[pdr.fseID] = pdr.fseID, pdr.ueAddress
+}
+
+func (up4 *UP4) removeUeAddrAndFSEIDMappings(pdr pdr) {
+	if !pdr.IsDownlink() {
+		return
+	}
+
+	delete(up4.ueAddrToFSEID, pdr.ueAddress)
+	delete(up4.fseidToUEAddr, pdr.fseID)
 }
 
 func (up4 *UP4) updateTunnelPeersBasedOnFARs(fars []far) error {
@@ -534,6 +651,8 @@ func (up4 *UP4) updateTunnelPeersBasedOnFARs(fars []far) error {
 // inserts/modifies/removes table entries from UP4 device, according to methodType.
 func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, methodType p4.Update_Type) error {
 	for _, pdr := range pdrs {
+		entriesToApply := make([]*p4.TableEntry, 0)
+
 		pdrLog := log.WithFields(log.Fields{
 			"pdr": pdr,
 		})
@@ -545,7 +664,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, meth
 			return err
 		}
 
-		pdrLog.WithField("related FAR", far)
+		pdrLog = pdrLog.WithField("related FAR", far)
 		pdrLog.Debug("Found related FAR for PDR")
 
 		tunnelParams := tunnelParams{
@@ -564,6 +683,8 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, meth
 			return ErrOperationFailedWithReason("build P4rt table entry for Sessions table", err.Error())
 		}
 
+		entriesToApply = append(entriesToApply, sessionsEntry)
+
 		if pdr.IsUplink() {
 			ueAddr, exists := up4.fseidToUEAddr[pdr.fseID]
 			if !exists {
@@ -572,23 +693,43 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, meth
 				return ErrOperationFailedWithReason("adding UP4 entries", "UE Address not found for uplink PDR, a linked DL PDR was not provided?")
 			}
 
-			pdr.srcIP = ueAddr
+			pdr.ueAddress = ueAddr
+		}
+
+		var applicationsEntry *p4.TableEntry
+
+		// as a default value is installed if no application filtering rule exists
+		var applicationID uint8 = DefaultApplicationID
+		if !pdr.appFilter.IsEmpty() {
+			applicationID, err = up4.getOrAllocateInternalApplicationID(pdr)
+			if err != nil {
+				pdrLog.Error("failed to get or allocate internal application ID")
+				return err
+			}
+
+			applicationsEntry, err = up4.p4RtTranslator.BuildApplicationsTableEntry(pdr, applicationID)
+			if err != nil {
+				return ErrOperationFailedWithReason("build P4rt table entry for Applications table", err.Error())
+			}
+
+			entriesToApply = append(entriesToApply, applicationsEntry)
 		}
 
 		// FIXME: get TC from QFI->TC mapping
-		terminationsEntry, err := up4.p4RtTranslator.BuildTerminationsTableEntry(pdr, far, uint8(0))
+		terminationsEntry, err := up4.p4RtTranslator.BuildTerminationsTableEntry(pdr, far, applicationID, uint8(0))
 		if err != nil {
 			return ErrOperationFailedWithReason("build P4rt table entry for Terminations table", err.Error())
 		}
 
-		pdrLog.WithFields(log.Fields{
-			"sessions entry":     sessionsEntry,
-			"terminations entry": terminationsEntry,
-			"method type":        p4.Update_Type_name[int32(methodType)],
+		entriesToApply = append(entriesToApply, terminationsEntry)
+
+		pdrLog = pdrLog.WithFields(log.Fields{
+			"entries":     entriesToApply,
+			"method type": p4.Update_Type_name[int32(methodType)],
 		})
 		pdrLog.Debug("Applying table entries")
 
-		err = up4.p4client.ApplyTableEntries(methodType, sessionsEntry, terminationsEntry)
+		err = up4.p4client.ApplyTableEntries(methodType, entriesToApply...)
 		if err != nil {
 			p4Error, ok := err.(*P4RuntimeError)
 			if !ok {
@@ -666,10 +807,6 @@ func (up4 *UP4) sendDelete(deleted PacketForwardingRules) error {
 		return err
 	}
 
-	for _, far := range deleted.fars {
-		up4.removeGTPTunnelPeer(far)
-	}
-
 	for _, p := range deleted.pdrs {
 		up4.removeUeAddrAndFSEIDMappings(p)
 	}
@@ -705,27 +842,9 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updat
 	}
 
 	if err != nil {
-		log.Errorf("failed to apply forwarding configuration to UP4: %v", err)
+		up4Log.Errorf("failed to apply forwarding configuration to UP4: %v", err)
 		return ie.CauseRequestRejected
 	}
 
 	return ie.CauseRequestAccepted
-}
-
-func (up4 *UP4) updateUEAddrAndFSEIDMappings(pdr pdr) {
-	if !pdr.IsDownlink() {
-		return
-	}
-
-	// update both maps in one shot
-	up4.ueAddrToFSEID[pdr.dstIP], up4.fseidToUEAddr[pdr.fseID] = pdr.fseID, pdr.dstIP
-}
-
-func (up4 *UP4) removeUeAddrAndFSEIDMappings(pdr pdr) {
-	if !pdr.IsDownlink() {
-		return
-	}
-
-	delete(up4.ueAddrToFSEID, pdr.dstIP)
-	delete(up4.fseidToUEAddr, pdr.fseID)
 }
