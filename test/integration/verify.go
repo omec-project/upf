@@ -15,7 +15,7 @@ import (
 const (
 	// TODO: auto-generate P4 constants from P4Info and share them with p4rt_translator
 	TableDownlinkSessions     = "PreQosPipe.sessions_downlink"
-	TableSessionsUplink = "PreQosPipe.sessions_uplink"
+	TableSessionsUplink       = "PreQosPipe.sessions_uplink"
 	TableUplinkTerminations   = "PreQosPipe.terminations_uplink"
 	TableDownlinkTerminations = "PreQosPipe.terminations_downlink"
 	ActSetUplinkSession       = "PreQosPipe.set_session_uplink"

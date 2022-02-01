@@ -127,13 +127,13 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 	defer teardown(t)
 
 	testdata := &pfcpSessionData{
-		nbAddress: nodeBAddress,
-		ueAddress: ueAddress,
+		nbAddress:    nodeBAddress,
+		ueAddress:    ueAddress,
 		upfN3Address: upfN3Address,
-		ulTEID: 15,
-		dlTEID: 16,
-		sessQFI: 0x09,
-		appQFI: 0x08,
+		ulTEID:       15,
+		dlTEID:       16,
+		sessQFI:      0x09,
+		appQFI:       0x08,
 	}
 
 	err := pfcpClient.SetupAssociation()
