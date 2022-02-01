@@ -271,7 +271,7 @@ func (t *P4rtTranslator) withLPMField(entry *p4.TableEntry, name string, value u
 	lpmFieldLog.Trace("Adding LPM match field to the entry")
 
 	if entry.TableId == 0 {
-		return ErrInvalidArgumentWithReason("entry.TableId", entry.TableId, "no table name for entry defined, set table name before adding match fields")
+		return ErrInvalidArgumentWithReason("entry.TableId", entry.TableId, "no table ID for entry defined, set table ID before adding match fields")
 	}
 
 	p4Table, err := t.getTableByID(entry.TableId)
@@ -313,7 +313,7 @@ func (t *P4rtTranslator) withRangeMatchField(entry *p4.TableEntry, name string, 
 	rangeFieldLog.Trace("Adding range match field to the entry")
 
 	if entry.TableId == 0 {
-		return ErrInvalidArgumentWithReason("entry.TableId", entry.TableId, "no table name for entry defined, set table name before adding match fields")
+		return ErrInvalidArgumentWithReason("entry.TableId", entry.TableId, "no table ID for entry defined, set table ID before adding match fields")
 	}
 
 	lowByteVal, err := convertValueToBinary(low)
