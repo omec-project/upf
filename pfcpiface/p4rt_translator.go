@@ -19,21 +19,23 @@ import (
 const (
 	DirectionUplink = 1
 
-	FieldAppIPProto       = "app_ip_proto"
-	FieldAppL4Port        = "app_l4_port"
-	FieldAppIPAddress     = "app_ip_addr"
-	FieldIPv4DstPrefix    = "ipv4_dst_prefix"
-	FieldN3Address        = "n3_address"
-	FieldUEAddress        = "ue_address"
-	FieldApplicationID    = "app_id"
-	FieldTEID             = "teid"
-	FieldQFI              = "qfi"
-	FieldCounterIndex     = "ctr_idx"
-	FieldTrafficClass     = "tc"
-	FieldTunnelPeerID     = "tunnel_peer_id"
-	FieldTunnelSrcAddress = "src_addr"
-	FieldTunnelDstAddress = "dst_addr"
-	FieldTunnelSrcPort    = "sport"
+	FieldAppIPProto        = "app_ip_proto"
+	FieldAppL4Port         = "app_l4_port"
+	FieldAppIPAddress      = "app_ip_addr"
+	FieldIPv4DstPrefix     = "ipv4_dst_prefix"
+	FieldN3Address         = "n3_address"
+	FieldUEAddress         = "ue_address"
+	FieldApplicationID     = "app_id"
+	FieldTEID              = "teid"
+	FieldQFI               = "qfi"
+	FieldCounterIndex      = "ctr_idx"
+	FieldTrafficClass      = "tc"
+	FieldTunnelPeerID      = "tunnel_peer_id"
+	FieldTunnelSrcAddress  = "src_addr"
+	FieldTunnelDstAddress  = "dst_addr"
+	FieldTunnelSrcPort     = "sport"
+	FieldSessionMeterIndex = "session_meter_id"
+	FieldAppMeterIndex     = "app_meter_id"
 
 	TableInterfaces           = "PreQosPipe.interfaces"
 	TableTunnelPeers          = "PreQosPipe.tunnel_peers"
@@ -588,9 +590,10 @@ func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, internalAppID uint
 	return entry, nil
 }
 
-func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr, sessMeterIdx uint16) (*p4.TableEntry, error) {
 	uplinkBuilderLog := log.WithFields(log.Fields{
 		"pdr": pdr,
+		"sessionMeterIndex": sessMeterIdx,
 	})
 	uplinkBuilderLog.Trace("Building P4rt table entry for sessions_uplink table")
 
@@ -613,6 +616,10 @@ func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr) (*p4.TableEntry, erro
 		ActionId: t.actionID(ActSetUplinkSession),
 	}
 
+	if err := t.withActionParam(action, FieldSessionMeterIndex, sessMeterIdx); err != nil {
+		return nil, err
+	}
+
 	entry.Action = &p4.TableAction{
 		Type: &p4.TableAction_Action{Action: action},
 	}
@@ -622,9 +629,10 @@ func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr) (*p4.TableEntry, erro
 	return entry, nil
 }
 
-func (t *P4rtTranslator) buildDownlinkSessionsEntry(pdr pdr, tunnelPeerID uint8, needsBuffering bool) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) buildDownlinkSessionsEntry(pdr pdr, sessMeterIdx uint16, tunnelPeerID uint8, needsBuffering bool) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
 		"pdr":            pdr,
+		"sessionMeterIndex": sessMeterIdx,
 		"tunnelPeerID":   tunnelPeerID,
 		"needsBuffering": needsBuffering,
 	})
@@ -654,6 +662,10 @@ func (t *P4rtTranslator) buildDownlinkSessionsEntry(pdr pdr, tunnelPeerID uint8,
 		}
 	}
 
+	if err := t.withActionParam(action, FieldSessionMeterIndex, sessMeterIdx); err != nil {
+		return nil, err
+	}
+
 	entry.Action = &p4.TableAction{
 		Type: &p4.TableAction_Action{Action: action},
 	}
@@ -663,20 +675,21 @@ func (t *P4rtTranslator) buildDownlinkSessionsEntry(pdr pdr, tunnelPeerID uint8,
 	return entry, nil
 }
 
-func (t *P4rtTranslator) BuildSessionsTableEntry(pdr pdr, tunnelPeerID uint8, needsBuffering bool) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) BuildSessionsTableEntry(pdr pdr, sessionMeter meter, tunnelPeerID uint8, needsBuffering bool) (*p4.TableEntry, error) {
 	switch pdr.srcIface {
 	case access:
-		return t.buildUplinkSessionsEntry(pdr)
+		return t.buildUplinkSessionsEntry(pdr, sessionMeter.uplinkCellID)
 	case core:
-		return t.buildDownlinkSessionsEntry(pdr, tunnelPeerID, needsBuffering)
+		return t.buildDownlinkSessionsEntry(pdr, sessionMeter.downlinkCellID, tunnelPeerID, needsBuffering)
 	default:
 		return nil, ErrUnsupported("source interface type of PDR", pdr.srcIface)
 	}
 }
 
-func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, shouldDrop bool, internalAppID uint8, tc uint8) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, appMeterIdx uint16, shouldDrop bool, internalAppID uint8, tc uint8) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
 		"pdr": pdr,
+		"appMeterIndex": appMeterIdx,
 		"tc":  tc,
 	})
 	builderLog.Debug("Building P4rt table entry for UP4 terminations_uplink table")
@@ -708,9 +721,15 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, shouldDrop bool, 
 		if err := t.withActionParam(action, FieldTrafficClass, tc); err != nil {
 			return nil, err
 		}
+		if err := t.withActionParam(action, FieldAppMeterIndex, appMeterIdx); err != nil {
+			return nil, err
+		}
 	} else {
 		action = &p4.Action{
 			ActionId: t.actionID(ActUplinkTermFwdNoTC),
+		}
+		if err := t.withActionParam(action, FieldAppMeterIndex, appMeterIdx); err != nil {
+			return nil, err
 		}
 	}
 
@@ -727,9 +746,10 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, shouldDrop bool, 
 	return entry, nil
 }
 
-func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, relatedFAR far, internalAppID uint8, tc uint8) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uint16, relatedFAR far, internalAppID uint8, tc uint8) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
 		"pdr":         pdr,
+		"appMeterIndex": appMeterIdx,
 		"tc":          tc,
 		"related-far": relatedFAR,
 	})
@@ -771,6 +791,10 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, relatedFAR far,
 		if err := t.withActionParam(action, FieldTrafficClass, tc); err != nil {
 			return nil, err
 		}
+
+		if err := t.withActionParam(action, FieldAppMeterIndex, appMeterIdx); err != nil {
+			return nil, err
+		}
 	} else {
 		action = &p4.Action{
 			ActionId: t.actionID(ActDownlinkTermFwdNoTC),
@@ -782,6 +806,10 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, relatedFAR far,
 
 		// TODO: add support for QFI, which should be provided as a part of related QER
 		if err := t.withActionParam(action, FieldQFI, uint8(0)); err != nil {
+			return nil, err
+		}
+
+		if err := t.withActionParam(action, FieldAppMeterIndex, appMeterIdx); err != nil {
 			return nil, err
 		}
 	}
@@ -799,12 +827,12 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, relatedFAR far,
 	return entry, nil
 }
 
-func (t *P4rtTranslator) BuildTerminationsTableEntry(pdr pdr, relatedFAR far, internalAppID uint8, tc uint8) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) BuildTerminationsTableEntry(pdr pdr, appMeter meter, relatedFAR far, internalAppID uint8, tc uint8) (*p4.TableEntry, error) {
 	switch pdr.srcIface {
 	case access:
-		return t.buildUplinkTerminationsEntry(pdr, relatedFAR.Drops(), internalAppID, tc)
+		return t.buildUplinkTerminationsEntry(pdr, appMeter.uplinkCellID, relatedFAR.Drops(), internalAppID, tc)
 	case core:
-		return t.buildDownlinkTerminationsEntry(pdr, relatedFAR, internalAppID, tc)
+		return t.buildDownlinkTerminationsEntry(pdr, appMeter.downlinkCellID, relatedFAR, internalAppID, tc)
 	default:
 		return nil, ErrUnsupported("source interface type of PDR", pdr.srcIface)
 	}
@@ -853,16 +881,16 @@ func (t *P4rtTranslator) BuildGTPTunnelPeerTableEntry(tunnelPeerID uint8, tunnel
 
 func (t *P4rtTranslator) BuildMeterEntry(meter string, cellID uint16, config *p4.MeterConfig) (*p4.MeterEntry, error) {
 	builderLog := log.WithFields(log.Fields{
-		"Meter": meter,
-		"Cell ID":  cellID,
+		"Meter":   meter,
+		"Cell ID": cellID,
 	})
 	builderLog.Trace("Building Meter entry")
 
 	meterID := t.meterID(meter)
 	entry := &p4.MeterEntry{
-		MeterId:              meterID,
-		Index:                &p4.Index{Index: int64(cellID)},
-		Config:               config,
+		MeterId: meterID,
+		Index:   &p4.Index{Index: int64(cellID)},
+		Config:  config,
 	}
 
 	builderLog = builderLog.WithField("meter-entry", entry)
@@ -870,4 +898,3 @@ func (t *P4rtTranslator) BuildMeterEntry(meter string, cellID uint16, config *p4
 
 	return entry, nil
 }
-

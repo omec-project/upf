@@ -876,7 +876,15 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, meth
 			return ErrNotFoundWithParam("allocated GTP tunnel peer ID", "tunnel params", tunnelParams)
 		}
 
-		sessionsEntry, err := up4.p4RtTranslator.BuildSessionsTableEntry(pdr, tunnelPeerID, far.Buffers())
+		var sessMeter = meter{0, 0}
+
+		// Session QER exists only if qerIDList has two elements
+		if len(pdr.qerIDList) == 2 {
+			// if 2 QERs are provided, the second one is Session QER
+			sessMeter = up4.meters[pdr.qerIDList[1]]
+		}
+
+		sessionsEntry, err := up4.p4RtTranslator.BuildSessionsTableEntry(pdr, sessMeter, tunnelPeerID, far.Buffers())
 		if err != nil {
 			return ErrOperationFailedWithReason("build P4rt table entry for Sessions table", err.Error())
 		}
@@ -913,8 +921,17 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, meth
 			entriesToApply = append(entriesToApply, applicationsEntry)
 		}
 
+		var appMeter = meter{0, 0}
+
+		if len(pdr.qerIDList) == 1 {
+			// if only one QER is provided, treat it as Application QER
+		} else if len(pdr.qerIDList) == 2 {
+			// if 2 QERs are provided, the first one is Application QER
+			appMeter = up4.meters[pdr.qerIDList[0]]
+		}
+
 		// FIXME: get TC from QFI->TC mapping
-		terminationsEntry, err := up4.p4RtTranslator.BuildTerminationsTableEntry(pdr, far, applicationID, uint8(0))
+		terminationsEntry, err := up4.p4RtTranslator.BuildTerminationsTableEntry(pdr, appMeter, far, applicationID, uint8(0))
 		if err != nil {
 			return ErrOperationFailedWithReason("build P4rt table entry for Terminations table", err.Error())
 		}
