@@ -592,7 +592,7 @@ func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, internalAppID uint
 
 func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr, sessMeterIdx uint16) (*p4.TableEntry, error) {
 	uplinkBuilderLog := log.WithFields(log.Fields{
-		"pdr": pdr,
+		"pdr":               pdr,
 		"sessionMeterIndex": sessMeterIdx,
 	})
 	uplinkBuilderLog.Trace("Building P4rt table entry for sessions_uplink table")
@@ -631,10 +631,10 @@ func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr, sessMeterIdx uint16) 
 
 func (t *P4rtTranslator) buildDownlinkSessionsEntry(pdr pdr, sessMeterIdx uint16, tunnelPeerID uint8, needsBuffering bool) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
-		"pdr":            pdr,
+		"pdr":               pdr,
 		"sessionMeterIndex": sessMeterIdx,
-		"tunnelPeerID":   tunnelPeerID,
-		"needsBuffering": needsBuffering,
+		"tunnelPeerID":      tunnelPeerID,
+		"needsBuffering":    needsBuffering,
 	})
 	builderLog.Trace("Building P4rt table entry for sessions_downlink table")
 
@@ -688,9 +688,9 @@ func (t *P4rtTranslator) BuildSessionsTableEntry(pdr pdr, sessionMeter meter, tu
 
 func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, appMeterIdx uint16, shouldDrop bool, internalAppID uint8, tc uint8) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
-		"pdr": pdr,
+		"pdr":           pdr,
 		"appMeterIndex": appMeterIdx,
-		"tc":  tc,
+		"tc":            tc,
 	})
 	builderLog.Debug("Building P4rt table entry for UP4 terminations_uplink table")
 
@@ -748,10 +748,10 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, appMeterIdx uint1
 
 func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uint16, relatedFAR far, internalAppID uint8, tc uint8) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
-		"pdr":         pdr,
+		"pdr":           pdr,
 		"appMeterIndex": appMeterIdx,
-		"tc":          tc,
-		"related-far": relatedFAR,
+		"tc":            tc,
+		"related-far":   relatedFAR,
 	})
 	builderLog.Debug("Building P4rt table entry for UP4 terminations_downlink table")
 

@@ -49,7 +49,7 @@ const (
 )
 
 const (
-	appMeter = "PreQosPipe.app_meter"
+	appMeter     = "PreQosPipe.app_meter"
 	sessionMeter = "PreQosPipe.session_meter"
 )
 
@@ -67,7 +67,7 @@ type counter struct {
 }
 
 type meter struct {
-	uplinkCellID uint16
+	uplinkCellID   uint16
 	downlinkCellID uint16
 }
 
@@ -261,7 +261,7 @@ func (up4 *UP4) initMetersPools() error {
 	}
 
 	log.WithFields(log.Fields{
-		"appMeter pool size": len(up4.appMeterCellIDsPool),
+		"appMeter pool size":  len(up4.appMeterCellIDsPool),
 		"sessMeter pool size": len(up4.sessMeterCellIDsPool),
 	}).Debug("P4 Meters pools initialized successfully")
 
@@ -738,8 +738,8 @@ func (up4 *UP4) updateTunnelPeersBasedOnFARs(fars []far) error {
 func getMeterConfigurationFromQER(mbr uint64, gbr uint64) *p4.MeterConfig {
 	defaultBurstDurationMs := 10
 	logger := log.WithFields(log.Fields{
-		"GBR (Kbps)": gbr,
-		"MBR (Kbps)": mbr,
+		"GBR (Kbps)":         gbr,
+		"MBR (Kbps)":         mbr,
 		"burstDuration (ms)": defaultBurstDurationMs,
 	})
 	logger.Debug("Converting GBR/MBR to P4 Meter configuration")
@@ -749,8 +749,8 @@ func getMeterConfigurationFromQER(mbr uint64, gbr uint64) *p4.MeterConfig {
 
 	/* MBR/GBR is received in Kilobits/sec.
 	   CIR/PIR is sent in bytes */
-	cir := maxUint64((gbr * 1000) / 8, 0)
-	pir := maxUint64((mbr * 1000) / 8, cir)
+	cir := maxUint64((gbr*1000)/8, 0)
+	pir := maxUint64((mbr*1000)/8, cir)
 
 	logger = logger.WithFields(log.Fields{
 		"CIR": cir,
@@ -761,10 +761,10 @@ func getMeterConfigurationFromQER(mbr uint64, gbr uint64) *p4.MeterConfig {
 	logger.Debug("GBR/MBR has been converted to P4 Meter configuration")
 
 	return &p4.MeterConfig{
-		Cir:                  int64(cir),
-		Cburst:               int64(cbs),
-		Pir:                  int64(pir),
-		Pburst:               int64(pbs),
+		Cir:    int64(cir),
+		Cburst: int64(cbs),
+		Pir:    int64(pir),
+		Pburst: int64(pbs),
 	}
 }
 
@@ -821,7 +821,7 @@ func (up4 *UP4) configureMetersBasedOnQERs(qers []qer) error {
 		//  (i.e., SessQerId will always be 0).
 
 		var (
-			err error
+			err   error
 			meter meter
 		)
 
