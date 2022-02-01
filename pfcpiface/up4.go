@@ -48,6 +48,11 @@ const (
 	maxApplicationIDs   = 254
 )
 
+const (
+	appMeter = "PreQosPipe.app_meter"
+	sessionMeter = "PreQosPipe.session_meter"
+)
+
 type application struct {
 	appIP     uint32
 	appL4Port uint16
@@ -59,6 +64,11 @@ type counter struct {
 	counterID uint64
 	allocated map[uint64]uint64
 	// free      map[uint64]uint64
+}
+
+type meter struct {
+	uplinkCellID uint16
+	downlinkCellID uint16
 }
 
 type UP4 struct {
@@ -79,6 +89,13 @@ type UP4 struct {
 	tunnelPeerIDsPool  []uint8
 	applicationIDs     map[application]uint8
 	applicationIDsPool []uint8
+
+	// meters stores the mapping from QER ID -> P4 Meter Cell ID.
+	// P4 Meter Cell ID is retrieved from appMeterCellIDsPool or sessMeterCellIDsPool,
+	// depending on QER type (application/session).
+	meters               map[uint32]meter
+	appMeterCellIDsPool  []uint16
+	sessMeterCellIDsPool []uint16
 
 	// ueAddrToFSEID is used to store UE Address <-> F-SEID mapping,
 	// which is needed to efficiently find F-SEID when we receive a P4 Digest (DDN) for a UE address.
@@ -220,6 +237,37 @@ func (up4 *UP4) initAllCounters() error {
 	return nil
 }
 
+func (up4 *UP4) initMetersPools() error {
+	log.Debug("Initializing P4 Meters pools for UP4")
+
+	appMeter, err := up4.p4RtTranslator.getMeterByName(appMeter)
+	if err != nil {
+		return err
+	}
+
+	up4.appMeterCellIDsPool = make([]uint16, int(appMeter.Size))
+	for i := 1; i < int(appMeter.Size); i++ {
+		up4.appMeterCellIDsPool = append(up4.appMeterCellIDsPool, uint16(i))
+	}
+
+	sessMeter, err := up4.p4RtTranslator.getMeterByName(sessionMeter)
+	if err != nil {
+		return err
+	}
+
+	up4.sessMeterCellIDsPool = make([]uint16, int(sessMeter.Size))
+	for i := 1; i < int(sessMeter.Size); i++ {
+		up4.sessMeterCellIDsPool = append(up4.sessMeterCellIDsPool, uint16(i))
+	}
+
+	log.WithFields(log.Fields{
+		"appMeter pool size": len(up4.appMeterCellIDsPool),
+		"sessMeter pool size": len(up4.sessMeterCellIDsPool),
+	}).Debug("P4 Meters pools initialized successfully")
+
+	return nil
+}
+
 func (up4 *UP4) initTunnelPeerIDs() {
 	up4.tunnelPeerIDs = make(map[tunnelParams]uint8)
 	// a simple queue storing available tunnel peer IDs
@@ -294,6 +342,7 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	up4.enableEndMarker = conf.EnableEndMarker
 	up4.initTunnelPeerIDs()
 	up4.initApplicationIDs()
+	up4.meters = make(map[uint32]meter)
 	up4.ueAddrToFSEID = make(map[uint32]uint64)
 	up4.fseidToUEAddr = make(map[uint64]uint32)
 
@@ -407,6 +456,11 @@ func (up4 *UP4) tryConnect() error {
 	err = up4.initAllCounters()
 	if err != nil {
 		return ErrOperationFailedWithReason("counters initialization", err.Error())
+	}
+
+	err = up4.initMetersPools()
+	if err != nil {
+		return ErrOperationFailedWithReason("meters pools initialization", err.Error())
 	}
 
 	go up4.listenToDDNs()
@@ -612,6 +666,40 @@ func (up4 *UP4) getOrAllocateInternalApplicationID(pdr pdr) (uint8, error) {
 	return newAppID, nil
 }
 
+func (up4 *UP4) allocateAppMeterCellID() (uint16, error) {
+	if len(up4.appMeterCellIDsPool) == 0 {
+		return 0, ErrOperationFailedWithReason("allocate Application Meter Cell ID",
+			"no free AppMeter Cell IDs available")
+	}
+
+	// pick top from queue
+	allocated := up4.appMeterCellIDsPool[0]
+	up4.appMeterCellIDsPool = up4.appMeterCellIDsPool[1:]
+
+	return allocated, nil
+}
+
+func (up4 *UP4) releaseAppMeterCellID(allocated uint16) {
+	up4.appMeterCellIDsPool = append(up4.appMeterCellIDsPool, allocated)
+}
+
+func (up4 *UP4) allocateSessionMeterCellID() (uint16, error) {
+	if len(up4.sessMeterCellIDsPool) == 0 {
+		return 0, ErrOperationFailedWithReason("allocate Session Meter Cell ID",
+			"no free SessionMeter Cell IDs available")
+	}
+
+	// pick top from queue
+	allocated := up4.sessMeterCellIDsPool[0]
+	up4.sessMeterCellIDsPool = up4.sessMeterCellIDsPool[1:]
+
+	return allocated, nil
+}
+
+func (up4 *UP4) releaseSessionMeterCellID(allocated uint16) {
+	up4.sessMeterCellIDsPool = append(up4.sessMeterCellIDsPool, allocated)
+}
+
 func (up4 *UP4) updateUEAddrAndFSEIDMappings(pdr pdr) {
 	if !pdr.IsDownlink() {
 		return
@@ -642,6 +730,116 @@ func (up4 *UP4) updateTunnelPeersBasedOnFARs(fars []far) error {
 				return err
 			}
 		}
+	}
+
+	return nil
+}
+
+func getMeterConfigurationFromQER(mbr uint64, gbr uint64) *p4.MeterConfig {
+	defaultBurstDurationMs := 10
+	logger := log.WithFields(log.Fields{
+		"GBR (Kbps)": gbr,
+		"MBR (Kbps)": mbr,
+		"burstDuration (ms)": defaultBurstDurationMs,
+	})
+	logger.Debug("Converting GBR/MBR to P4 Meter configuration")
+
+	cbs := calcBurstSizeFromRate(gbr, uint64(defaultBurstDurationMs))
+	pbs := calcBurstSizeFromRate(mbr, uint64(defaultBurstDurationMs))
+
+	/* MBR/GBR is received in Kilobits/sec.
+	   CIR/PIR is sent in bytes */
+	cir := maxUint64((gbr * 1000) / 8, 0)
+	pir := maxUint64((mbr * 1000) / 8, cir)
+
+	logger = logger.WithFields(log.Fields{
+		"CIR": cir,
+		"CBS": cbs,
+		"PIR": pir,
+		"PBS": pbs,
+	})
+	logger.Debug("GBR/MBR has been converted to P4 Meter configuration")
+
+	return &p4.MeterConfig{
+		Cir:                  int64(cir),
+		Cburst:               int64(cbs),
+		Pir:                  int64(pir),
+		Pburst:               int64(pbs),
+	}
+}
+
+func (up4 *UP4) configureMeterFromApplicationQER(q qer) (meter, error) {
+	uplinkCellID, err := up4.allocateAppMeterCellID()
+	if err != nil {
+		return meter{}, err
+	}
+
+	downlinkCellID, err := up4.allocateAppMeterCellID()
+	if err != nil {
+		up4.releaseAppMeterCellID(uplinkCellID)
+		return meter{}, err
+	}
+
+	ulMeterConfig := getMeterConfigurationFromQER(q.ulMbr, q.ulGbr)
+
+	uplinkMeterEntry, err := up4.p4RtTranslator.BuildMeterEntry(appMeter, uplinkCellID, ulMeterConfig)
+	if err != nil {
+		return meter{}, err
+	}
+
+	dlMeterConfig := getMeterConfigurationFromQER(q.dlMbr, q.dlGbr)
+
+	downlinkMeterEntry, err := up4.p4RtTranslator.BuildMeterEntry(appMeter, downlinkCellID, dlMeterConfig)
+	if err != nil {
+		return meter{}, err
+	}
+
+	err = up4.p4client.ApplyMeterEntries(p4.Update_INSERT, uplinkMeterEntry, downlinkMeterEntry)
+	if err != nil {
+		return meter{}, err
+	}
+
+	return meter{
+		uplinkCellID:   uplinkCellID,
+		downlinkCellID: downlinkCellID,
+	}, nil
+}
+
+func (up4 *UP4) configureMeterFromSessionQER(q qer) error {
+	return nil
+}
+
+// configureMetersBasedOnQERs
+func (up4 *UP4) configureMetersBasedOnQERs(qers []qer) error {
+	for _, qer := range qers {
+		logger := log.WithFields(log.Fields{
+			"qer": qer,
+		})
+		logger.Debug("Configuring P4 Meter based on QER")
+
+		// TODO: In case we have GBR QER, then we are going to program only app-level rate-limiting
+		//  (i.e., SessQerId will always be 0).
+
+		var (
+			err error
+			meter meter
+		)
+
+		switch qer.qosLevel {
+		case ApplicationQos:
+			meter, err = up4.configureMeterFromApplicationQER(qer)
+		case SessionQos:
+			err = up4.configureMeterFromSessionQER(qer)
+		default:
+			// unknown, type of QER
+			continue
+		}
+
+		if err != nil {
+			return ErrOperationFailedWithReason("configure P4 Meters from QERs", err.Error())
+		}
+
+		up4.meters[qer.qerID] = meter
 	}
 
 	return nil

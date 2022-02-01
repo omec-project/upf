@@ -126,6 +126,16 @@ func (t *P4rtTranslator) tableID(name string) uint32 {
 	return invalidID
 }
 
+func (t *P4rtTranslator) meterID(name string) uint32 {
+	for _, meter := range t.p4Info.Meters {
+		if meter.Preamble.Name == name {
+			return meter.Preamble.Id
+		}
+	}
+
+	return invalidID
+}
+
 func (t *P4rtTranslator) actionID(name string) uint32 {
 	for _, action := range t.p4Info.Actions {
 		if action.Preamble.Name == name {
@@ -174,6 +184,16 @@ func (t *P4rtTranslator) getCounterByName(name string) (*p4ConfigV1.Counter, err
 	}
 
 	return nil, ErrNotFoundWithParam("counter", "name", name)
+}
+
+func (t *P4rtTranslator) getMeterByName(name string) (*p4ConfigV1.Meter, error) {
+	for _, mtr := range t.p4Info.Meters {
+		if mtr.Preamble.Name == name {
+			return mtr, nil
+		}
+	}
+
+	return nil, ErrNotFoundWithParam("meter", "name", name)
 }
 
 func (t *P4rtTranslator) getMatchFieldIDByName(table *p4ConfigV1.Table, fieldName string) uint32 {
@@ -830,3 +850,24 @@ func (t *P4rtTranslator) BuildGTPTunnelPeerTableEntry(tunnelPeerID uint8, tunnel
 
 	return entry, nil
 }
+
+func (t *P4rtTranslator) BuildMeterEntry(meter string, cellID uint16, config *p4.MeterConfig) (*p4.MeterEntry, error) {
+	builderLog := log.WithFields(log.Fields{
+		"Meter": meter,
+		"Cell ID":  cellID,
+	})
+	builderLog.Trace("Building Meter entry")
+
+	meterID := t.meterID(meter)
+	entry := &p4.MeterEntry{
+		MeterId:              meterID,
+		Index:                &p4.Index{Index: int64(cellID)},
+		Config:               config,
+	}
+
+	builderLog = builderLog.WithField("meter-entry", entry)
+	builderLog.Debug("Meter entry built successfully")
+
+	return entry, nil
+}
+
