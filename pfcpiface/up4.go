@@ -245,7 +245,7 @@ func (up4 *UP4) initMetersPools() error {
 		return err
 	}
 
-	up4.appMeterCellIDsPool = make([]uint16, int(appMeter.Size))
+	up4.appMeterCellIDsPool = make([]uint16, 0, appMeter.Size)
 	for i := 1; i < int(appMeter.Size); i++ {
 		up4.appMeterCellIDsPool = append(up4.appMeterCellIDsPool, uint16(i))
 	}
@@ -255,7 +255,7 @@ func (up4 *UP4) initMetersPools() error {
 		return err
 	}
 
-	up4.sessMeterCellIDsPool = make([]uint16, int(sessMeter.Size))
+	up4.sessMeterCellIDsPool = make([]uint16, 0, sessMeter.Size)
 	for i := 1; i < int(sessMeter.Size); i++ {
 		up4.sessMeterCellIDsPool = append(up4.sessMeterCellIDsPool, uint16(i))
 	}
