@@ -168,7 +168,7 @@ type portFilterTernaryCrossProduct struct {
 // Converts two port ranges into a list of ternary rules covering the same range.
 func convertPortFiltersToTernary(src, dst portFilter) ([]portFilterTernaryCrossProduct, error) {
 	// A single range rule can result in multiple ternary ones. To cover the same range of packets,
-	// we need to create the cross product of src and dst rules. For now, we only allow one true
+	// we need to create the Cartesian product of src and dst rules. For now, we only allow one true
 	// range match to keep the complexity in check.
 	if src.isRangeMatch() && dst.isRangeMatch() {
 		return nil, ErrInvalidArgumentWithReason("convertPortFiltersToTernary",
