@@ -175,9 +175,9 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, afterModifi
 	defer providers.DisconnectP4rt()
 
 	var (
-		expectedAppID uint8 = 1
-		expectedTunnelPeerID uint8 = 0
-		expectedNumberOfAllEntries = 6
+		expectedAppID              uint8 = 1
+		expectedTunnelPeerID       uint8 = 0
+		expectedNumberOfAllEntries       = 6
 	)
 
 	if afterModification {
