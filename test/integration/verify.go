@@ -63,12 +63,12 @@ func buildExpectedApplicationsEntry(client *p4rtc.Client, testdata *pfcpSessionD
 
 	te := client.NewTableEntry(TableApplications, []p4rtc.MatchInterface{
 		&p4rtc.RangeMatch{
-			Low: conversion.ToCanonicalBytestring(lowVal),
+			Low:  conversion.ToCanonicalBytestring(lowVal),
 			High: conversion.ToCanonicalBytestring(highVal),
 		},
 		&p4rtc.TernaryMatch{
 			Value: protoVal,
-			Mask: []byte{0xff},
+			Mask:  []byte{0xff},
 		},
 	}, client.NewTableActionDirect(ActSetAppID, [][]byte{appID}), nil)
 	te.Priority = int32(math.MaxUint16 - testdata.precedence)

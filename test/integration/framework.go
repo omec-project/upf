@@ -10,7 +10,7 @@ type pfcpSessionData struct {
 	ueAddress    string
 	upfN3Address string
 
-	sdfFilter    string
+	sdfFilter string
 
 	precedence uint32
 
