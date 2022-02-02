@@ -67,6 +67,16 @@ func (pr portFilter) String() string {
 	return fmt.Sprintf("{%v-%v}", pr.portLow, pr.portHigh)
 }
 
+// Width returns the number of ports covered by this portFilter.
+func (pr portFilter) Width() uint16 {
+	// Need to handle the zero value.
+	if pr.isWildcardMatch() {
+		return math.MaxUint16
+	} else {
+		return pr.portHigh - pr.portLow + 1
+	}
+}
+
 func (pr portFilter) isWildcardMatch() bool {
 	return pr.portLow == 0 && pr.portHigh == math.MaxUint16 ||
 		pr.portLow == 0 && pr.portHigh == 0

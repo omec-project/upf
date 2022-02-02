@@ -288,13 +288,19 @@ func Test_portFilter_asComplexTernaryMatches(t *testing.T) {
 				portHigh: 0b11101, // 29
 			},
 			wantErr: false},
+		{name: "Worst case port range",
+			pr: portFilter{
+				portLow:  1,
+				portHigh: 65534,
+			},
+			wantErr: false},
 		{name: "low port filter",
 			pr: portFilter{
 				portLow:  0,
 				portHigh: 1023,
 			},
 			wantErr: false},
-		{name: "some app filter",
+		{name: "some small app filter",
 			pr: portFilter{
 				portLow:  8080,
 				portHigh: 8084,
@@ -368,6 +374,29 @@ func Test_portFilter_asTrivialTernaryMatch(t *testing.T) {
 				}
 				if got.mask != tt.wantMask {
 					t.Errorf("asTrivialTernaryMatch() got = %v, want %v", got.mask, tt.wantMask)
+				}
+			},
+		)
+	}
+}
+
+func Test_portFilter_Width(t *testing.T) {
+	tests := []struct {
+		name string
+		pr   portFilter
+		want uint16
+	}{
+		{name: "wildcard", pr: newWildcardPortFilter(), want: math.MaxUint16},
+		{name: "zero value", pr: portFilter{}, want: math.MaxUint16},
+		{name: "exact match", pr: newExactMatchPortFilter(100), want: 1},
+		{name: "range match", pr: newRangeMatchPortFilter(10, 12), want: 3},
+		{name: "range single match", pr: newRangeMatchPortFilter(1000, 1000), want: 1},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				if got := tt.pr.Width(); got != tt.want {
+					t.Errorf("Width() = %v, want %v", got, tt.want)
 				}
 			},
 		)
