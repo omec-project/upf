@@ -6,6 +6,7 @@ package main
 import (
 	"encoding/binary"
 	"flag"
+	"math"
 	"math/rand"
 	"net"
 	"time"
@@ -647,10 +648,22 @@ func (up4 *UP4) updateTunnelPeersBasedOnFARs(fars []far) error {
 	return nil
 }
 
+func verifyPDR(pdr pdr) error {
+	if pdr.precedence > math.MaxUint16 {
+		return ErrUnsupported("precedence greater than 65535", pdr.precedence)
+	}
+
+	return nil
+}
+
 // modifyUP4ForwardingConfiguration builds P4Runtime table entries and
 // inserts/modifies/removes table entries from UP4 device, according to methodType.
 func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, methodType p4.Update_Type) error {
 	for _, pdr := range pdrs {
+		if err := verifyPDR(pdr); err != nil {
+			return err
+		}
+
 		entriesToApply := make([]*p4.TableEntry, 0)
 
 		pdrLog := log.WithFields(log.Fields{
