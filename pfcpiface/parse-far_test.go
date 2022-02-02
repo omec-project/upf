@@ -7,12 +7,13 @@ import (
 	"net"
 	"testing"
 
+	pfcpsimLib "github.com/omec-project/pfcpsim/pkg/pfcpsim/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
-type testCase struct {
+type farTestCase struct {
 	input       *ie.IE
 	op          operation
 	expected    *far
@@ -23,8 +24,6 @@ const (
 	defaultGTPProtocolPort = 2152
 )
 
-// TODO use pfcpsim library to create FARs
-
 func TestParseFAR(t *testing.T) {
 	createOp, updateOp := create, update
 
@@ -33,16 +32,15 @@ func TestParseFAR(t *testing.T) {
 	coreIP := net.ParseIP("10.0.10.1")
 	UEAddressForDownlink := net.ParseIP("10.0.1.1")
 
-	for _, scenario := range []testCase{
+	for _, scenario := range []farTestCase{
 		{
 			op: createOp,
-			input: ie.NewCreateFAR(
-				ie.NewFARID(999),
-				ie.NewApplyAction(ActionDrop),
-				ie.NewForwardingParameters(
-					ie.NewDestinationInterface(core),
-				),
-			),
+			input: pfcpsimLib.NewFARBuilder().
+				WithID(999).
+				WithMethod(pfcpsimLib.IEMethod(createOp)).
+				WithAction(ActionDrop).
+				WithDstInterface(core).
+				BuildFAR(),
 			expected: &far{
 				farID:       999,
 				applyAction: ActionDrop,
@@ -52,14 +50,14 @@ func TestParseFAR(t *testing.T) {
 		},
 		{
 			op: updateOp,
-			input: ie.NewUpdateFAR(
-				ie.NewFARID(1),
-				ie.NewApplyAction(ActionForward),
-				ie.NewUpdateForwardingParameters(
-					ie.NewDestinationInterface(access),
-					ie.NewOuterHeaderCreation(0x100, 100, UEAddressForDownlink.String(), "", 0, 0, 0),
-				),
-			),
+			input: pfcpsimLib.NewFARBuilder().
+				WithID(1).
+				WithAction(ActionForward).
+				WithMethod(pfcpsimLib.IEMethod(updateOp)).
+				WithDstInterface(access).
+				WithDownlinkIP(UEAddressForDownlink.String()).
+				WithTEID(100).
+				BuildFAR(),
 			expected: &far{
 				farID:        1,
 				fseID:        FSEID,
@@ -84,7 +82,7 @@ func TestParseFAR(t *testing.T) {
 			err := mockFar.parseFAR(scenario.input, FSEID, mockUpf, scenario.op)
 			require.NoError(t, err)
 
-			assert.Equal(t, mockFar, scenario.expected)
+			assert.Equal(t, scenario.expected, mockFar)
 		})
 	}
 }
@@ -94,7 +92,7 @@ func TestParseFARShouldError(t *testing.T) {
 
 	var FSEID uint64 = 101
 
-	for _, scenario := range []testCase{
+	for _, scenario := range []farTestCase{
 		{
 			op: createOp,
 			input: ie.NewCreateFAR(
