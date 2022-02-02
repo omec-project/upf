@@ -163,9 +163,11 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 
 	fars := []*ie.IE{
 		session.NewFARBuilder().
-			WithMethod(session.Create).WithID(1).WithAction(ActionForward).BuildFAR(),
+			WithMethod(session.Create).WithID(1).WithDstInterface(ie.DstInterfaceCore).
+			WithAction(ActionForward).BuildFAR(),
 		session.NewFARBuilder().
 			WithMethod(session.Create).WithID(2).
+			WithDstInterface(ie.DstInterfaceAccess).
 			WithAction(ActionDrop).WithTEID(testdata.dlTEID).WithDownlinkIP(testdata.nbAddress).BuildFAR(),
 	}
 
@@ -190,12 +192,22 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 			WithDownlinkGBR(30000).Build(),
 	}
 
-	_, err = pfcpClient.EstablishSession(pdrs, fars, qers)
+	sess, err := pfcpClient.EstablishSession(pdrs, fars, qers)
 	require.NoErrorf(t, err, "failed to establish PFCP session")
 
 	verifyP4RuntimeEntries(t, testdata)
 
-	// TODO: modify PFCP association with Update FAR IEs
+	err = pfcpClient.ModifySession(sess, nil, []*ie.IE{
+		session.NewFARBuilder().
+			WithMethod(session.Update).WithID(2).
+			WithAction(ActionForward).WithDstInterface(ie.DstInterfaceAccess).
+			WithTEID(testdata.dlTEID).WithDownlinkIP(testdata.nbAddress).BuildFAR(),
+	}, nil)
+
+	// TODO: verify after modification
+
+	err = pfcpClient.DeleteSession(sess)
+	require.NoErrorf(t, err, "failed to delete PFCP session")
 
 	err = pfcpClient.TeardownAssociation()
 	require.NoErrorf(t, err, "failed to gracefully release PFCP association")
