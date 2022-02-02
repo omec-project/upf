@@ -679,6 +679,10 @@ func (up4 *UP4) allocateAppMeterCellID() (uint16, error) {
 }
 
 func (up4 *UP4) releaseAppMeterCellID(allocated uint16) {
+	if allocated == 0 {
+		// 0 is not a valid cell ID
+		return
+	}
 	up4.appMeterCellIDsPool.Add(allocated)
 }
 
@@ -694,6 +698,10 @@ func (up4 *UP4) allocateSessionMeterCellID() (uint16, error) {
 }
 
 func (up4 *UP4) releaseSessionMeterCellID(allocated uint16) {
+	if allocated == 0 {
+		// 0 is not a valid cell ID
+		return
+	}
 	up4.sessMeterCellIDsPool.Add(allocated)
 }
 
