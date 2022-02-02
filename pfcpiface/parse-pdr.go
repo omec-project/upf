@@ -112,8 +112,16 @@ func (pr portFilter) asTrivialTernaryMatch() (portFilterTernaryRule, error) {
 	return portFilterTernaryRule{}, ErrInvalidArgumentWithReason("asTrivialTernaryMatch", pr, "not trivially convertible")
 }
 
+type RangeConversionStrategy int
+
+const (
+	Exact RangeConversionStrategy = iota
+	Ternary
+	Hybrid
+)
+
 // Returns portFilter as a list of ternary matches that cover the same range.
-func (pr portFilter) asComplexTernaryMatches() ([]portFilterTernaryRule, error) {
+func (pr portFilter) asComplexTernaryMatches(strategy RangeConversionStrategy) ([]portFilterTernaryRule, error) {
 	rules := make([]portFilterTernaryRule, 0)
 
 	// Fast path for exact and wildcard matches which are trivial.
@@ -126,41 +134,49 @@ func (pr portFilter) asComplexTernaryMatches() ([]portFilterTernaryRule, error) 
 		return rules, nil
 	}
 
-	// Adapted from https://stackoverflow.com/a/66959276
-	const limit = math.MaxUint16
-	maxPort := func(port, mask uint16) uint16 {
-		xid := limit - mask
-		nid := port & mask
-		return nid + xid
-	}
-
-	portMask := func(port, end uint16) uint16 {
-		bit := uint16(1)
-		mask := uint16(limit)
-		testMask := uint16(limit)
-		netPort := port & limit
-		maximumPort := maxPort(netPort, limit)
-
-		for netPort > 0 && maximumPort < end {
-			netPort = port & testMask
-			if netPort < port {
-				break
-			}
-			maximumPort = maxPort(netPort, testMask)
-			if maximumPort <= end {
-				mask = testMask
-			}
-			testMask -= bit
-			bit <<= 1
+	if strategy == Ternary {
+		// Adapted from https://stackoverflow.com/a/66959276
+		const limit = math.MaxUint16
+		maxPort := func(port, mask uint16) uint16 {
+			xid := limit - mask
+			nid := port & mask
+			return nid + xid
 		}
-		return mask
-	}
 
-	port := uint32(pr.portLow) // Promote to higher bit width for greater-equals check.
-	for port <= uint32(pr.portHigh) {
-		mask := portMask(uint16(port), pr.portHigh)
-		rules = append(rules, portFilterTernaryRule{uint16(port), mask})
-		port = uint32(maxPort(uint16(port), mask)) + 1
+		portMask := func(port, end uint16) uint16 {
+			bit := uint16(1)
+			mask := uint16(limit)
+			testMask := uint16(limit)
+			netPort := port & limit
+			maximumPort := maxPort(netPort, limit)
+
+			for netPort > 0 && maximumPort < end {
+				netPort = port & testMask
+				if netPort < port {
+					break
+				}
+				maximumPort = maxPort(netPort, testMask)
+				if maximumPort <= end {
+					mask = testMask
+				}
+				testMask -= bit
+				bit <<= 1
+			}
+			return mask
+		}
+
+		port := uint32(pr.portLow) // Promote to higher bit width for greater-equals check.
+		for port <= uint32(pr.portHigh) {
+			mask := portMask(uint16(port), pr.portHigh)
+			rules = append(rules, portFilterTernaryRule{uint16(port), mask})
+			port = uint32(maxPort(uint16(port), mask)) + 1
+		}
+	} else if strategy == Exact {
+		for port := int(pr.portLow); port <= int(pr.portHigh); port++ {
+			rules = append(rules, portFilterTernaryRule{uint16(port), math.MaxUint16})
+		}
+	} else {
+		return nil, ErrInvalidArgument("asComplexTernaryMatches", strategy)
 	}
 
 	return rules, nil
@@ -192,7 +208,7 @@ func convertPortFiltersToTernary(src, dst portFilter) ([]portFilterTernaryCartes
 	rules := make([]portFilterTernaryCartesianProduct, 0)
 
 	if src.isRangeMatch() {
-		srcTernaryRules, err := src.asComplexTernaryMatches()
+		srcTernaryRules, err := src.asComplexTernaryMatches(Exact)
 		if err != nil {
 			return nil, err
 		}
@@ -208,7 +224,7 @@ func convertPortFiltersToTernary(src, dst portFilter) ([]portFilterTernaryCartes
 			rules = append(rules, p)
 		}
 	} else if dst.isRangeMatch() {
-		dstTernaryRules, err := dst.asComplexTernaryMatches()
+		dstTernaryRules, err := dst.asComplexTernaryMatches(Exact)
 		if err != nil {
 			return nil, err
 		}

@@ -47,7 +47,13 @@ func Test_convertPortFiltersToTernary(t *testing.T) {
 				},
 				{
 					srcPort: 0x2,
-					srcMask: 0xfffe,
+					srcMask: 0xffff,
+					dstPort: 80,
+					dstMask: math.MaxUint16,
+				},
+				{
+					srcPort: 0x3,
+					srcMask: 0xffff,
 					dstPort: 80,
 					dstMask: math.MaxUint16,
 				}},
@@ -314,7 +320,7 @@ func Test_portFilter_asComplexTernaryMatches(t *testing.T) {
 					portLow:  tt.pr.portLow,
 					portHigh: tt.pr.portHigh,
 				}
-				got, err := pr.asComplexTernaryMatches()
+				got, err := pr.asComplexTernaryMatches(Exact)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("asComplexTernaryMatches() error = %v, wantErr %v", err, tt.wantErr)
 					return
