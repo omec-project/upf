@@ -4,6 +4,7 @@
 package integration
 
 import (
+	"fmt"
 	p4rtc "github.com/antoninbas/p4runtime-go-client/pkg/client"
 	"github.com/antoninbas/p4runtime-go-client/pkg/util/conversion"
 	"github.com/omec-project/upf-epc/test/integration/providers"
@@ -22,11 +23,14 @@ const (
 	TableSessionsUplink       = "PreQosPipe.sessions_uplink"
 	TableUplinkTerminations   = "PreQosPipe.terminations_uplink"
 	TableDownlinkTerminations = "PreQosPipe.terminations_downlink"
+	TableTunnelPeers          = "PreQosPipe.tunnel_peers"
 	ActSetAppID               = "PreQosPipe.set_app_id"
 	ActSetUplinkSession       = "PreQosPipe.set_session_uplink"
 	ActSetDownlinkSession     = "PreQosPipe.set_session_downlink"
 	ActUplinkTermFwdNoTC      = "PreQosPipe.uplink_term_fwd_no_tc"
+	ActLoadTunnelParam        = "PreQosPipe.load_tunnel_param"
 	ActDownlinkTermDrop       = "PreQosPipe.downlink_term_drop"
+	ActDownlinkTermFwdNoTC    = "PreQosPipe.downlink_term_fwd_no_tc"
 )
 
 func buildExpectedApplicationsEntry(client *p4rtc.Client, testdata *pfcpSessionData, expectedAppID uint8) *p4_v1.TableEntry {
@@ -122,9 +126,24 @@ func buildExpectedTerminationsUplinkEntry(client *p4rtc.Client, testdata *pfcpSe
 	}, client.NewTableActionDirect(ActUplinkTermFwdNoTC, [][]byte{}), nil)
 }
 
-func buildExpectedTerminationsDownlinkEntry(client *p4rtc.Client, testdata *pfcpSessionData, expectedAppID uint8) *p4_v1.TableEntry {
+func buildExpectedTerminationsDownlinkEntry(client *p4rtc.Client, testdata *pfcpSessionData, expectedAppID uint8, afterModification bool) *p4_v1.TableEntry {
 	ueAddr, _ := conversion.IpToBinary(testdata.ueAddress)
 	appID, _ := conversion.UInt32ToBinary(uint32(expectedAppID), 3)
+
+	var actionParams [][]byte
+	action := ActDownlinkTermDrop
+
+	if afterModification {
+		action = ActDownlinkTermFwdNoTC
+		// dummy counter id, ignored later
+		actionParams = append(actionParams, []byte{0x00})
+
+		teid, _ := conversion.UInt32ToBinary(testdata.dlTEID, 0)
+		actionParams = append(actionParams, conversion.ToCanonicalBytestring(teid))
+
+		// FIXME: QFI is not currently set
+		actionParams = append(actionParams, []byte{0x00})
+	}
 
 	return client.NewTableEntry(TableDownlinkTerminations, []p4rtc.MatchInterface{
 		&p4rtc.ExactMatch{
@@ -133,21 +152,43 @@ func buildExpectedTerminationsDownlinkEntry(client *p4rtc.Client, testdata *pfcp
 		&p4rtc.ExactMatch{
 			Value: appID,
 		},
-	}, client.NewTableActionDirect(ActDownlinkTermDrop, [][]byte{}), nil)
+	}, client.NewTableActionDirect(action, actionParams), nil)
+}
+
+func buildExpectedTunnelPeersEntry(client *p4rtc.Client, testdata *pfcpSessionData, expectedTunnelPeerID uint8) *p4_v1.TableEntry {
+	srcAddr, _ := conversion.IpToBinary(testdata.upfN3Address)
+	dstAddr, _ := conversion.IpToBinary(testdata.nbAddress)
+	srcPort, _ := conversion.UInt32ToBinary(2152, 0)
+	srcPort = conversion.ToCanonicalBytestring(srcPort)
+
+	return client.NewTableEntry(TableTunnelPeers, []p4rtc.MatchInterface{
+		&p4rtc.ExactMatch{
+			Value: []byte{expectedTunnelPeerID},
+		},
+	}, client.NewTableActionDirect(ActLoadTunnelParam, [][]byte{srcAddr, dstAddr, srcPort}), nil)
 }
 
 // TODO: we should pass a list of pfcpSessionData if we will test multiple UEs
-func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData) {
+func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, afterModification bool) {
 	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", p4_v1.Uint128{High: 0, Low: 1})
 	require.NoErrorf(t, err, "failed to connect to P4Runtime server")
 	defer providers.DisconnectP4rt()
 
-	const (
-		expectedAppID = 1
+	var (
+		expectedAppID uint8 = 1
+		expectedTunnelPeerID uint8 = 0
+		expectedNumberOfAllEntries = 6
 	)
 
+	if afterModification {
+		// new tunnel peer
+		expectedNumberOfAllEntries++
+		expectedTunnelPeerID = 2
+	}
+
 	allInstalledEntries, _ := p4rtClient.ReadTableEntryWildcard("")
-	require.Equal(t, 6, len(allInstalledEntries), "UP4 should have exactly 6 entries installed")
+	require.Equal(t, expectedNumberOfAllEntries, len(allInstalledEntries),
+		fmt.Sprintf("UP4 should have exactly %v entries installed", expectedNumberOfAllEntries))
 
 	entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.applications")
 	require.Equal(t, 1, len(entries), "PreQosPipe.applications should contain 1 entry")
@@ -159,7 +200,7 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData) {
 
 	entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.sessions_downlink")
 	require.Equal(t, 1, len(entries), "PreQosPipe.sessions_downlink should contain 1 entry")
-	require.Equal(t, buildExpectedSessionsDownlinkEntry(p4rtClient, testdata, 0), entries[0], "PreQosPipe.sessions_downlink does not equal expected")
+	require.Equal(t, buildExpectedSessionsDownlinkEntry(p4rtClient, testdata, expectedTunnelPeerID), entries[0], "PreQosPipe.sessions_downlink does not equal expected")
 
 	entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.terminations_uplink")
 	require.Equal(t, 1, len(entries), "PreQosPipe.terminations_uplink should contain 1 entry")
@@ -170,10 +211,24 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData) {
 
 	entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.terminations_downlink")
 	require.Equal(t, 1, len(entries), "PreQosPipe.terminations_downlink should contain 1 entry")
-	expected = buildExpectedTerminationsDownlinkEntry(p4rtClient, testdata, expectedAppID)
+	expected = buildExpectedTerminationsDownlinkEntry(p4rtClient, testdata, expectedAppID, afterModification)
 	// we don't compare the entire object because counter ID is auto-generated by pfcpiface
 	require.Equal(t, expected.Action.GetAction().ActionId, entries[0].Action.GetAction().ActionId, "PreQosPipe.terminations_downlink action does not equal expected")
 	require.Equal(t, expected.Match, entries[0].Match, "PreQosPipe.terminations_downlink match fields do not equal expected")
+	if afterModification {
+		// ignore counter ID as it is random number generated by pfcpiface
+		require.Equal(t, expected.Action.GetAction().Params[1], entries[0].Action.GetAction().Params[1],
+			fmt.Sprintf("Action param (TEID) of action %v does not equal expected", ActDownlinkTermFwdNoTC))
+		require.Equal(t, expected.Action.GetAction().Params[2], entries[0].Action.GetAction().Params[2],
+			fmt.Sprintf("Action param (QFI) of action %v does not equal expected", ActDownlinkTermFwdNoTC))
+	}
+
+	if afterModification {
+		entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.tunnel_peers")
+		require.Equal(t, 1, len(entries), "PreQosPipe.tunnel_peers should contain 1 entry")
+		require.Equal(t, buildExpectedTunnelPeersEntry(p4rtClient, testdata, expectedTunnelPeerID), entries[0],
+			"PreQosPipe.tunnel_peers does not equal expected")
+	}
 }
 
 func verifyNoP4RuntimeEntries(t *testing.T) {

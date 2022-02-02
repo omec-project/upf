@@ -195,7 +195,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 	sess, err := pfcpClient.EstablishSession(pdrs, fars, qers)
 	require.NoErrorf(t, err, "failed to establish PFCP session")
 
-	verifyP4RuntimeEntries(t, testdata)
+	verifyP4RuntimeEntries(t, testdata, false)
 
 	err = pfcpClient.ModifySession(sess, nil, []*ie.IE{
 		session.NewFARBuilder().
@@ -204,7 +204,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 			WithTEID(testdata.dlTEID).WithDownlinkIP(testdata.nbAddress).BuildFAR(),
 	}, nil)
 
-	// TODO: verify after modification
+	verifyP4RuntimeEntries(t, testdata, true)
 
 	err = pfcpClient.DeleteSession(sess)
 	require.NoErrorf(t, err, "failed to delete PFCP session")
