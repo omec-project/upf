@@ -4,8 +4,9 @@
 package integration
 
 import (
-	"github.com/wmnsk/go-pfcp/ie"
 	"net"
+
+	"github.com/wmnsk/go-pfcp/ie"
 )
 
 type IEMethod uint8

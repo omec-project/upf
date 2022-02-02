@@ -151,7 +151,7 @@ func TestBasicSessionEstablishment(t *testing.T) {
 		NewQER(create, 1, 0x08, 50000, 50000, 30000, 30000),
 	}
 
-	err = pfcpClient.EstablishSession(pdrs, fars, qers)
+	_, err = pfcpClient.EstablishSession(pdrs, fars, qers)
 	require.NoErrorf(t, err, "failed to establish PFCP session")
 
 	// TODO: verify P4Runtime entries
