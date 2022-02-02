@@ -15,12 +15,12 @@ func Test_convertPortFiltersToTernary(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    []portFilterTernaryCrossProduct
+		want    []portFilterTernaryCartesianProduct
 		wantErr bool
 	}{
 		{name: "exact ranges",
 			args: args{src: newExactMatchPortFilter(5000), dst: newExactMatchPortFilter(80)},
-			want: []portFilterTernaryCrossProduct{{
+			want: []portFilterTernaryCartesianProduct{{
 				srcPort: 5000,
 				srcMask: math.MaxUint16,
 				dstPort: 80,
@@ -29,7 +29,7 @@ func Test_convertPortFiltersToTernary(t *testing.T) {
 			wantErr: false},
 		{name: "wildcard dst range",
 			args: args{src: newExactMatchPortFilter(10), dst: newWildcardPortFilter()},
-			want: []portFilterTernaryCrossProduct{{
+			want: []portFilterTernaryCartesianProduct{{
 				srcPort: 10,
 				srcMask: math.MaxUint16,
 				dstPort: 0,
@@ -38,7 +38,7 @@ func Test_convertPortFiltersToTernary(t *testing.T) {
 			wantErr: false},
 		{name: "true range src range",
 			args: args{src: newRangeMatchPortFilter(1, 3), dst: newExactMatchPortFilter(80)},
-			want: []portFilterTernaryCrossProduct{
+			want: []portFilterTernaryCartesianProduct{
 				{
 					srcPort: 0x1,
 					srcMask: 0xffff,
@@ -224,20 +224,24 @@ func Test_portFilter_asComplexTernaryMatches(t *testing.T) {
 		name    string
 		pr      portFilter
 		wantErr bool
+		want    []portFilterTernaryRule
 	}{
 		{name: "Exact match port range",
 			pr: portFilter{
 				portLow:  8888,
 				portHigh: 8888,
 			},
-			//want: []portFilterTernaryRule{
-			//	{port: 8888, mask: 0xffff},
-			//},
+			want: []portFilterTernaryRule{
+				{port: 8888, mask: 0xffff},
+			},
 			wantErr: false},
 		{name: "wildcard port range",
 			pr: portFilter{
 				portLow:  0,
 				portHigh: math.MaxUint16,
+			},
+			want: []portFilterTernaryRule{
+				{port: 0, mask: 0},
 			},
 			wantErr: false},
 		{name: "Simplest port range",
@@ -309,9 +313,9 @@ func Test_portFilter_asComplexTernaryMatches(t *testing.T) {
 					t.Errorf("asComplexTernaryMatches() error = %v, wantErr %v", err, tt.wantErr)
 					return
 				}
-				//if !reflect.DeepEqual(got, tt.want) {
-				//	t.Errorf("asComplexTernaryMatches() got = %v, want %v", got, tt.want)
-				//}
+				if tt.want != nil && !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("asComplexTernaryMatches() got = %v, want %v", got, tt.want)
+				}
 				// Do exhaustive test over entire value range.
 				for port := 0; port <= math.MaxUint16; port++ {
 					expectMatch := port >= int(tt.pr.portLow) && port <= int(tt.pr.portHigh)

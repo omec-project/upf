@@ -106,9 +106,13 @@ func (pr portFilter) asTrivialTernaryMatch() (portFilterTernaryRule, error) {
 func (pr portFilter) asComplexTernaryMatches() ([]portFilterTernaryRule, error) {
 	rules := make([]portFilterTernaryRule, 0)
 
-	// Fast path for exact matches which are trivial.
+	// Fast path for exact and wildcard matches which are trivial.
 	if pr.isExactMatch() {
 		rules = append(rules, pr.asExactMatchUnchecked())
+		return rules, nil
+	}
+	if pr.isWildcardMatch() {
+		rules = append(rules, portFilterTernaryRule{0, 0})
 		return rules, nil
 	}
 
@@ -160,13 +164,13 @@ func (pf portFilterTernaryRule) String() string {
 	return fmt.Sprintf("{0b%b & 0b%b}", pf.port, pf.mask)
 }
 
-type portFilterTernaryCrossProduct struct {
+type portFilterTernaryCartesianProduct struct {
 	srcPort, srcMask uint16
 	dstPort, dstMask uint16
 }
 
 // Converts two port ranges into a list of ternary rules covering the same range.
-func convertPortFiltersToTernary(src, dst portFilter) ([]portFilterTernaryCrossProduct, error) {
+func convertPortFiltersToTernary(src, dst portFilter) ([]portFilterTernaryCartesianProduct, error) {
 	// A single range rule can result in multiple ternary ones. To cover the same range of packets,
 	// we need to create the Cartesian product of src and dst rules. For now, we only allow one true
 	// range match to keep the complexity in check.
@@ -175,7 +179,7 @@ func convertPortFiltersToTernary(src, dst portFilter) ([]portFilterTernaryCrossP
 			src, "src and dst ports cannot both be a range match")
 	}
 
-	rules := make([]portFilterTernaryCrossProduct, 0)
+	rules := make([]portFilterTernaryCartesianProduct, 0)
 
 	if src.isRangeMatch() {
 		srcTernaryRules, err := src.asComplexTernaryMatches()
@@ -187,7 +191,7 @@ func convertPortFiltersToTernary(src, dst portFilter) ([]portFilterTernaryCrossP
 			return nil, err
 		}
 		for _, r := range srcTernaryRules {
-			p := portFilterTernaryCrossProduct{
+			p := portFilterTernaryCartesianProduct{
 				srcPort: r.port, srcMask: r.mask,
 				dstPort: dstTernary.port, dstMask: dstTernary.mask,
 			}
@@ -203,7 +207,7 @@ func convertPortFiltersToTernary(src, dst portFilter) ([]portFilterTernaryCrossP
 			return nil, err
 		}
 		for _, r := range dstTernaryRules {
-			p := portFilterTernaryCrossProduct{
+			p := portFilterTernaryCartesianProduct{
 				srcPort: srcTernary.port, srcMask: srcTernary.mask,
 				dstPort: r.port, dstMask: r.mask,
 			}
@@ -219,7 +223,7 @@ func convertPortFiltersToTernary(src, dst portFilter) ([]portFilterTernaryCrossP
 		if err != nil {
 			return nil, err
 		}
-		p := portFilterTernaryCrossProduct{
+		p := portFilterTernaryCartesianProduct{
 			dstPort: dstTernary.port, dstMask: dstTernary.mask,
 			srcPort: srcTernary.port, srcMask: srcTernary.mask,
 		}
