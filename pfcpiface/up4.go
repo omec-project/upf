@@ -14,6 +14,7 @@ import (
 
 	p4 "github.com/p4lang/p4runtime/go/p4/v1"
 
+	set "github.com/deckarep/golang-set"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -94,8 +95,8 @@ type UP4 struct {
 	// P4 Meter Cell ID is retrieved from appMeterCellIDsPool or sessMeterCellIDsPool,
 	// depending on QER type (application/session).
 	meters               map[uint32]meter
-	appMeterCellIDsPool  []uint16
-	sessMeterCellIDsPool []uint16
+	appMeterCellIDsPool  set.Set
+	sessMeterCellIDsPool set.Set
 
 	// ueAddrToFSEID is used to store UE Address <-> F-SEID mapping,
 	// which is needed to efficiently find F-SEID when we receive a P4 Digest (DDN) for a UE address.
@@ -245,9 +246,9 @@ func (up4 *UP4) initMetersPools() error {
 		return err
 	}
 
-	up4.appMeterCellIDsPool = make([]uint16, 0, appMeter.Size)
+	up4.appMeterCellIDsPool = set.NewSet()
 	for i := 1; i < int(appMeter.Size); i++ {
-		up4.appMeterCellIDsPool = append(up4.appMeterCellIDsPool, uint16(i))
+		up4.appMeterCellIDsPool.Add(uint16(i))
 	}
 
 	sessMeter, err := up4.p4RtTranslator.getMeterByName(sessionMeter)
@@ -255,14 +256,14 @@ func (up4 *UP4) initMetersPools() error {
 		return err
 	}
 
-	up4.sessMeterCellIDsPool = make([]uint16, 0, sessMeter.Size)
+	up4.sessMeterCellIDsPool = set.NewSet()
 	for i := 1; i < int(sessMeter.Size); i++ {
-		up4.sessMeterCellIDsPool = append(up4.sessMeterCellIDsPool, uint16(i))
+		up4.sessMeterCellIDsPool.Add(uint16(i))
 	}
 
 	log.WithFields(log.Fields{
-		"appMeter pool size": len(up4.appMeterCellIDsPool),
-		"sessMeter pool size": len(up4.sessMeterCellIDsPool),
+		"appMeter pool size": up4.appMeterCellIDsPool.Cardinality(),
+		"sessMeter pool size": up4.sessMeterCellIDsPool.Cardinality(),
 	}).Debug("P4 Meters pools initialized successfully")
 
 	return nil
@@ -667,37 +668,33 @@ func (up4 *UP4) getOrAllocateInternalApplicationID(pdr pdr) (uint8, error) {
 }
 
 func (up4 *UP4) allocateAppMeterCellID() (uint16, error) {
-	if len(up4.appMeterCellIDsPool) == 0 {
+	// pick from set
+	allocated := up4.appMeterCellIDsPool.Pop()
+	if allocated == nil {
 		return 0, ErrOperationFailedWithReason("allocate Application Meter Cell ID",
 			"no free AppMeter Cell IDs available")
 	}
 
-	// pick top from queue
-	allocated := up4.appMeterCellIDsPool[0]
-	up4.appMeterCellIDsPool = up4.appMeterCellIDsPool[1:]
-
-	return allocated, nil
+	return allocated.(uint16), nil
 }
 
 func (up4 *UP4) releaseAppMeterCellID(allocated uint16) {
-	up4.appMeterCellIDsPool = append(up4.appMeterCellIDsPool, allocated)
+	up4.appMeterCellIDsPool.Add(allocated)
 }
 
 func (up4 *UP4) allocateSessionMeterCellID() (uint16, error) {
-	if len(up4.sessMeterCellIDsPool) == 0 {
+	// pick from set
+	allocated := up4.sessMeterCellIDsPool.Pop()
+	if allocated == nil {
 		return 0, ErrOperationFailedWithReason("allocate Session Meter Cell ID",
 			"no free SessionMeter Cell IDs available")
 	}
 
-	// pick top from queue
-	allocated := up4.sessMeterCellIDsPool[0]
-	up4.sessMeterCellIDsPool = up4.sessMeterCellIDsPool[1:]
-
-	return allocated, nil
+	return allocated.(uint16), nil
 }
 
 func (up4 *UP4) releaseSessionMeterCellID(allocated uint16) {
-	up4.sessMeterCellIDsPool = append(up4.sessMeterCellIDsPool, allocated)
+	up4.sessMeterCellIDsPool.Add(allocated)
 }
 
 func (up4 *UP4) updateUEAddrAndFSEIDMappings(pdr pdr) {
@@ -747,10 +744,13 @@ func getMeterConfigurationFromQER(mbr uint64, gbr uint64) *p4.MeterConfig {
 	cbs := calcBurstSizeFromRate(gbr, uint64(defaultBurstDurationMs))
 	pbs := calcBurstSizeFromRate(mbr, uint64(defaultBurstDurationMs))
 
-	/* MBR/GBR is received in Kilobits/sec.
-	   CIR/PIR is sent in bytes */
-	cir := maxUint64((gbr * 1000) / 8, 0)
-	pir := maxUint64((mbr * 1000) / 8, cir)
+	var cir, pir uint64 = 0, 0
+	if mbr != 0 || gbr != 0 {
+		/* MBR/GBR is received in Kilobits/sec.
+		   CIR/PIR is sent in bytes */
+		cir = maxUint64((gbr * 1000) / 8, 0)
+		pir = maxUint64((mbr * 1000) / 8, cir)
+	}
 
 	logger = logger.WithFields(log.Fields{
 		"CIR": cir,
@@ -768,36 +768,130 @@ func getMeterConfigurationFromQER(mbr uint64, gbr uint64) *p4.MeterConfig {
 	}
 }
 
-func (up4 *UP4) configureMeterFromApplicationQER(q qer) (meter, error) {
+// configureApplicationMeter installs P4Runtime Meter Entries based on QoS configuration from QER.
+// If bidirectional, this function allocates two independent meter cell IDs, one per direction.
+func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, error) {
+	entries := make([]*p4.MeterEntry, 0)
+
+	applicationMeter := meter{
+		uplinkCellID:   0,
+		downlinkCellID: 0,
+	}
+
 	uplinkCellID, err := up4.allocateAppMeterCellID()
 	if err != nil {
 		return meter{}, err
 	}
+	applicationMeter.uplinkCellID = uplinkCellID
 
-	downlinkCellID, err := up4.allocateAppMeterCellID()
+	if bidirectional {
+		cellID, err := up4.allocateAppMeterCellID()
+		if err != nil {
+			up4.releaseAppMeterCellID(uplinkCellID)
+			return meter{}, err
+		}
+		applicationMeter.downlinkCellID = cellID
+	} else {
+		applicationMeter.downlinkCellID = uplinkCellID
+	}
+
+	releaseIDs := func() {
+		if applicationMeter.uplinkCellID != 0 {
+			up4.releaseSessionMeterCellID(applicationMeter.uplinkCellID)
+		}
+		if applicationMeter.downlinkCellID != 0 {
+			up4.releaseSessionMeterCellID(applicationMeter.downlinkCellID)
+		}
+	}
+
+	if applicationMeter.uplinkCellID != 0 {
+		// according to the SD-Core/SD-Fabric contract, UL and DL MBRs/GBRs are always equal for Application QERs.
+		meterConfig := getMeterConfigurationFromQER(q.ulMbr, q.ulGbr)
+
+		meterEntry, err := up4.p4RtTranslator.BuildMeterEntry(appMeter, applicationMeter.uplinkCellID, meterConfig)
+		if err != nil {
+			releaseIDs()
+			return meter{}, err
+		}
+		entries = append(entries, meterEntry)
+	}
+
+	if applicationMeter.downlinkCellID != 0 {
+		// according to the SD-Core/SD-Fabric contract, UL and DL MBRs/GBRs are always equal for Application QERs.
+		meterConfig := getMeterConfigurationFromQER(q.dlMbr, q.dlGbr)
+
+		meterEntry, err := up4.p4RtTranslator.BuildMeterEntry(appMeter, applicationMeter.downlinkCellID, meterConfig)
+		if err != nil {
+			releaseIDs()
+			return meter{}, err
+		}
+		entries = append(entries, meterEntry)
+	}
+
+	err = up4.p4client.ApplyMeterEntries(p4.Update_MODIFY, entries...)
 	if err != nil {
-		up4.releaseAppMeterCellID(uplinkCellID)
+		releaseIDs()
 		return meter{}, err
 	}
 
-	ulMeterConfig := getMeterConfigurationFromQER(q.ulMbr, q.ulGbr)
+	return applicationMeter, nil
+}
 
-	uplinkMeterEntry, err := up4.p4RtTranslator.BuildMeterEntry(appMeter, uplinkCellID, ulMeterConfig)
+// configureSessionMeter installs two P4Runtime Meter Entries.
+// Session QER is always bidirectional. Thus, this function always configures two independent cell IDs.
+func (up4 *UP4) configureSessionMeter(q qer) (meter, error) {
+	uplinkCellID, err := up4.allocateSessionMeterCellID()
 	if err != nil {
 		return meter{}, err
 	}
 
-	dlMeterConfig := getMeterConfigurationFromQER(q.dlMbr, q.dlGbr)
-
-	downlinkMeterEntry, err := up4.p4RtTranslator.BuildMeterEntry(appMeter, downlinkCellID, dlMeterConfig)
+	downlinkCellID, err := up4.allocateSessionMeterCellID()
 	if err != nil {
+		up4.releaseSessionMeterCellID(uplinkCellID)
 		return meter{}, err
 	}
 
-	err = up4.p4client.ApplyMeterEntries(p4.Update_INSERT, uplinkMeterEntry, downlinkMeterEntry)
+	releaseIDs := func() {
+		up4.releaseSessionMeterCellID(uplinkCellID)
+		up4.releaseSessionMeterCellID(downlinkCellID)
+	}
+
+	logger := log.WithFields(log.Fields{
+		"uplink cell ID": uplinkCellID,
+		"downlink cell ID": downlinkCellID,
+		"qer": q,
+	})
+	logger.Debug("Configuring Session Meter from QER")
+
+	uplinkMeterConfig := getMeterConfigurationFromQER(q.ulMbr, q.ulGbr)
+
+	uplinkMeterEntry, err := up4.p4RtTranslator.BuildMeterEntry(sessionMeter, uplinkCellID, uplinkMeterConfig)
 	if err != nil {
+		releaseIDs()
 		return meter{}, err
 	}
+
+	downlinkMeterConfig := getMeterConfigurationFromQER(q.dlMbr, q.dlGbr)
+
+	downlinkMeterEntry, err := up4.p4RtTranslator.BuildMeterEntry(sessionMeter, downlinkCellID, downlinkMeterConfig)
+	if err != nil {
+		releaseIDs()
+		return meter{}, err
+	}
+
+	logger = logger.WithFields(log.Fields{
+		"uplink meter entry": uplinkMeterEntry,
+		"downlink meter entry": downlinkMeterEntry,
+	})
+	logger.Debug("Installing P4 Meter entries")
+
+	err = up4.p4client.ApplyMeterEntries(p4.Update_MODIFY, uplinkMeterEntry, downlinkMeterEntry)
+	if err != nil {
+		releaseIDs()
+		return meter{}, err
+	}
+
+	logger.Debug("P4 Meter entries installed successfully")
 
 	return meter{
 		uplinkCellID:   uplinkCellID,
@@ -805,12 +899,12 @@ func (up4 *UP4) configureMeterFromApplicationQER(q qer) (meter, error) {
 	}, nil
 }
 
-func (up4 *UP4) configureMeterFromSessionQER(q qer) error {
-	return nil
-}
-
 // configureMetersBasedOnQERs
 func (up4 *UP4) configureMetersBasedOnQERs(qers []qer) error {
+	log.WithFields(log.Fields{
+		"qers": qers,
+	}).Debug("Configuring P4 Meters based on QERs")
+
 	for _, qer := range qers {
 		logger := log.WithFields(log.Fields{
 			"qer": qer,
@@ -827,16 +921,23 @@ func (up4 *UP4) configureMetersBasedOnQERs(qers []qer) error {
 
 		switch qer.qosLevel {
 		case ApplicationQos:
-			meter, err = up4.configureMeterFromApplicationQER(qer)
+			if len(qers) == 1 {
+				// if only a single QER is created, the QER is marked as Application QER,
+				// and all PDRs points to the same QER, which is not unique per direction.
+				// Therefore, we have to configure bidirectional meter (two independent cells, one per direction).
+				meter, err = up4.configureApplicationMeter(qer, true)
+			} else {
+				meter, err = up4.configureApplicationMeter(qer, false)
+			}
 		case SessionQos:
-			err = up4.configureMeterFromSessionQER(qer)
+			meter, err = up4.configureSessionMeter(qer)
 		default:
 			// unknown, type of QER
 			continue
 		}
 
 		if err != nil {
-			return ErrOperationFailedWithReason("configure P4 Meters from QERs", err.Error())
+			return ErrOperationFailedWithReason("configure P4 Meter from QER", err.Error())
 		}
 
 		up4.meters[qer.qerID] = meter
@@ -877,12 +978,10 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, meth
 		}
 
 		var sessMeter = meter{0, 0}
-
-		// Session QER exists only if qerIDList has two elements
 		if len(pdr.qerIDList) == 2 {
 			// if 2 QERs are provided, the second one is Session QER
 			sessMeter = up4.meters[pdr.qerIDList[1]]
-		}
+		} // else: if only 1 QER provided, set sessMeterIdx to 0, and use only per-app metering
 
 		sessionsEntry, err := up4.p4RtTranslator.BuildSessionsTableEntry(pdr, sessMeter, tunnelPeerID, far.Buffers())
 		if err != nil {
@@ -922,11 +1021,10 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, meth
 		}
 
 		var appMeter = meter{0, 0}
-
-		if len(pdr.qerIDList) == 1 {
-			// if only one QER is provided, treat it as Application QER
-		} else if len(pdr.qerIDList) == 2 {
-			// if 2 QERs are provided, the first one is Application QER
+		if len(pdr.qerIDList) != 0 {
+			// if only 1 QER provided, it's an application QER
+			// if 2 QERs provided, the first one is an application QER
+			// if more than 2 QERs provided, TODO: not supported
 			appMeter = up4.meters[pdr.qerIDList[0]]
 		}
 
@@ -980,6 +1078,10 @@ func (up4 *UP4) sendCreate(all PacketForwardingRules, updated PacketForwardingRu
 
 	for _, p := range updated.pdrs {
 		up4.updateUEAddrAndFSEIDMappings(p)
+	}
+
+	if err := up4.configureMetersBasedOnQERs(updated.qers); err != nil {
+		return err
 	}
 
 	if err := up4.updateTunnelPeersBasedOnFARs(updated.fars); err != nil {

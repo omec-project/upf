@@ -147,8 +147,10 @@ func TestBasicSessionEstablishment(t *testing.T) {
 	qers := []*ie.IE{
 		// session QER
 		NewQER(create, 4, 0x09, 500000, 500000, 0, 0),
-		// application QER
+		// uplink application QER
 		NewQER(create, 1, 0x08, 50000, 50000, 30000, 30000),
+		// downlink application QER
+		NewQER(create, 2, 0x08, 50000, 50000, 30000, 30000),
 	}
 
 	err = pfcpClient.EstablishSession(pdrs, fars, qers)

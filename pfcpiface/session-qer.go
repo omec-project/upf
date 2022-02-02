@@ -65,7 +65,7 @@ func findItemIndex(slice []uint32, val uint32) int {
 }
 
 // MarkSessionQer : identify and Mark session QER with flag.
-func (s *PFCPSession) MarkSessionQer() {
+func (s *PFCPSession) MarkSessionQer(qers []qer) {
 	sessQerIDList := make([]uint32, 0)
 	lastPdrIndex := len(s.pdrs) - 1
 	// create search list with first pdr's qerlist */
@@ -74,7 +74,7 @@ func (s *PFCPSession) MarkSessionQer() {
 	// If PDRs have no QERs, then no marking for session qers is needed.
 	// If PDRS have one QER and all PDRs point to same QER, then consider it as application qer.
 	// If number of QERS is 2 or more, then search for session QER
-	if (len(sessQerIDList) < 1) || (len(s.qers) < 2) {
+	if (len(sessQerIDList) < 1) || (len(qers) < 2) {
 		log.Infoln("need atleast 1 QER in PDR or 2 QERs in session to mark session QER.")
 		return
 	}
@@ -108,7 +108,7 @@ func (s *PFCPSession) MarkSessionQer() {
 		log.Warnln("Qer ID list size above 3. Not supported.")
 	}
 
-	for idx, qer := range s.qers {
+	for idx, qer := range qers {
 		if contains(sessQerIDList, qer.qerID) {
 			if qer.ulGbr > 0 || qer.dlGbr > 0 {
 				log.Infoln("Do not consider qer with non zero gbr value for session qer")
@@ -124,7 +124,7 @@ func (s *PFCPSession) MarkSessionQer() {
 
 	log.Infoln("session QER found. QER ID : ", sessQerID)
 
-	s.qers[sessionIdx].qosLevel = SessionQos
+	qers[sessionIdx].qosLevel = SessionQos
 
 	for i := range s.pdrs {
 		// remove common qerID from pdr's qer list
