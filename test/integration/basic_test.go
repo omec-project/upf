@@ -20,7 +20,7 @@ import (
 const (
 	defaultSliceID = 0
 
-	defaultSDFFilter = "permit out ip from any to assigned"
+	defaultSDFFilter = "permit out udp from any to assigned 80-80"
 
 	ueAddress    = "17.0.0.1"
 	upfN3Address = "198.18.0.1"
@@ -130,6 +130,8 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 		nbAddress:    nodeBAddress,
 		ueAddress:    ueAddress,
 		upfN3Address: upfN3Address,
+		sdfFilter:    defaultSDFFilter,
+
 		ulTEID:       15,
 		dlTEID:       16,
 		sessQFI:      0x09,
@@ -161,12 +163,8 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 
 	fars := []*ie.IE{
 		session.NewFARBuilder().
-			// FIXME: we should set Desination Interface Type instead of direction
-			MarkAsUplink().
 			WithMethod(session.Create).WithID(1).WithAction(ActionForward).BuildFAR(),
 		session.NewFARBuilder().
-			// FIXME: we should set Desination Interface Type instead of direction
-			MarkAsDownlink().
 			WithMethod(session.Create).WithID(2).
 			WithAction(ActionDrop).WithTEID(testdata.dlTEID).WithDownlinkIP(testdata.nbAddress).BuildFAR(),
 	}
@@ -178,15 +176,21 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 			WithDownlinkMBR(500000).
 			WithUplinkGBR(0).
 			WithDownlinkGBR(0).Build(),
-		// application QER
+		// uplink application QER
 		session.NewQERBuilder().WithMethod(session.Create).WithID(1).WithQFI(testdata.appQFI).
+			WithUplinkMBR(50000).
+			WithDownlinkMBR(50000).
+			WithUplinkGBR(30000).
+			WithDownlinkGBR(30000).Build(),
+		// downlink application QER
+		session.NewQERBuilder().WithMethod(session.Create).WithID(2).WithQFI(testdata.appQFI).
 			WithUplinkMBR(50000).
 			WithDownlinkMBR(50000).
 			WithUplinkGBR(30000).
 			WithDownlinkGBR(30000).Build(),
 	}
 
-	err = pfcpClient.EstablishSession(pdrs, fars, qers)
+	_, err = pfcpClient.EstablishSession(pdrs, fars, qers)
 	require.NoErrorf(t, err, "failed to establish PFCP session")
 
 	verifyP4RuntimeEntries(t, testdata)

@@ -9,20 +9,78 @@ import (
 	"github.com/omec-project/upf-epc/test/integration/providers"
 	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/stretchr/testify/require"
+	"math"
+	"strconv"
+	"strings"
 	"testing"
 )
 
 const (
 	// TODO: auto-generate P4 constants from P4Info and share them with p4rt_translator
+	TableApplications         = "PreQosPipe.applications"
 	TableDownlinkSessions     = "PreQosPipe.sessions_downlink"
 	TableSessionsUplink       = "PreQosPipe.sessions_uplink"
 	TableUplinkTerminations   = "PreQosPipe.terminations_uplink"
 	TableDownlinkTerminations = "PreQosPipe.terminations_downlink"
+	ActSetAppID               = "PreQosPipe.set_app_id"
 	ActSetUplinkSession       = "PreQosPipe.set_session_uplink"
 	ActSetDownlinkSession     = "PreQosPipe.set_session_downlink"
 	ActUplinkTermFwdNoTC      = "PreQosPipe.uplink_term_fwd_no_tc"
 	ActDownlinkTermDrop       = "PreQosPipe.downlink_term_drop"
 )
+
+func buildExpectedApplicationsEntry(client *p4rtc.Client, testdata *pfcpSessionData, expectedAppID uint8) *p4_v1.TableEntry {
+	fields := strings.Fields(testdata.sdfFilter)
+	var proto uint8
+	switch fields[2] {
+	case "udp":
+		proto = 0x11
+	case "tcp":
+		proto = 0x6
+	case "icmp":
+		proto = 0x1
+	default:
+		proto = 0
+	}
+
+	appPorts := strings.Split(fields[len(fields)-1], "-")
+	low, _ := strconv.ParseUint(appPorts[0], 10, 16)
+	var high uint64
+	if len(appPorts) > 1 {
+		high, _ = strconv.ParseUint(appPorts[1], 10, 16)
+	} else {
+		high = low
+	}
+
+	protoVal, _ := conversion.UInt32ToBinary(uint32(proto), 3)
+	// TODO: we assume default SDF filter: permit out udp from any to assigned
+	//  appIP, _ := conversion.IpToBinary("0.0.0.0")
+
+	lowVal, _ := conversion.UInt32ToBinary(uint32(low), 1)
+	highVal, _ := conversion.UInt32ToBinary(uint32(high), 1)
+
+	appID, _ := conversion.UInt32ToBinary(uint32(expectedAppID), 3)
+
+	te := client.NewTableEntry(TableApplications, []p4rtc.MatchInterface{
+		&p4rtc.RangeMatch{
+			Low: conversion.ToCanonicalBytestring(lowVal),
+			High: conversion.ToCanonicalBytestring(highVal),
+		},
+		&p4rtc.TernaryMatch{
+			Value: protoVal,
+			Mask: []byte{0xff},
+		},
+	}, client.NewTableActionDirect(ActSetAppID, [][]byte{appID}), nil)
+	te.Priority = int32(math.MaxUint16 - testdata.precedence)
+
+	// p4runtime-go-client doesn't properly enumerate match fields
+	// assuming "any" as application IP, we simply override FieldId
+	// TODO: fix enumeration in p4runtime-go-client
+	te.Match[0].FieldId = 2
+	te.Match[1].FieldId = 3
+
+	return te
+}
 
 func buildExpectedSessionsUplinkEntry(client *p4rtc.Client, testdata *pfcpSessionData) *p4_v1.TableEntry {
 	n3Addr, _ := conversion.IpToBinary(testdata.upfN3Address)
@@ -50,9 +108,9 @@ func buildExpectedSessionsDownlinkEntry(client *p4rtc.Client, testdata *pfcpSess
 	}, client.NewTableActionDirect(ActSetDownlinkSession, [][]byte{tunnelPeerID}), nil)
 }
 
-func buildExpectedTerminationsUplinkEntry(client *p4rtc.Client, testdata *pfcpSessionData) *p4_v1.TableEntry {
+func buildExpectedTerminationsUplinkEntry(client *p4rtc.Client, testdata *pfcpSessionData, expectedAppID uint8) *p4_v1.TableEntry {
 	ueAddr, _ := conversion.IpToBinary(testdata.ueAddress)
-	appID, _ := conversion.UInt32ToBinary(0, 3)
+	appID, _ := conversion.UInt32ToBinary(uint32(expectedAppID), 3)
 
 	return client.NewTableEntry(TableUplinkTerminations, []p4rtc.MatchInterface{
 		&p4rtc.ExactMatch{
@@ -64,9 +122,9 @@ func buildExpectedTerminationsUplinkEntry(client *p4rtc.Client, testdata *pfcpSe
 	}, client.NewTableActionDirect(ActUplinkTermFwdNoTC, [][]byte{}), nil)
 }
 
-func buildExpectedTerminationsDownlinkEntry(client *p4rtc.Client, testdata *pfcpSessionData) *p4_v1.TableEntry {
+func buildExpectedTerminationsDownlinkEntry(client *p4rtc.Client, testdata *pfcpSessionData, expectedAppID uint8) *p4_v1.TableEntry {
 	ueAddr, _ := conversion.IpToBinary(testdata.ueAddress)
-	appID, _ := conversion.UInt32ToBinary(0, 3)
+	appID, _ := conversion.UInt32ToBinary(uint32(expectedAppID), 3)
 
 	return client.NewTableEntry(TableDownlinkTerminations, []p4rtc.MatchInterface{
 		&p4rtc.ExactMatch{
@@ -84,10 +142,18 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData) {
 	require.NoErrorf(t, err, "failed to connect to P4Runtime server")
 	defer providers.DisconnectP4rt()
 
-	allInstalledEntries, _ := p4rtClient.ReadTableEntryWildcard("")
-	require.Equal(t, 5, len(allInstalledEntries), "UP4 should have exactly 5 entries installed")
+	const (
+		expectedAppID = 1
+	)
 
-	entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.sessions_uplink")
+	allInstalledEntries, _ := p4rtClient.ReadTableEntryWildcard("")
+	require.Equal(t, 6, len(allInstalledEntries), "UP4 should have exactly 6 entries installed")
+
+	entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.applications")
+	require.Equal(t, 1, len(entries), "PreQosPipe.applications should contain 1 entry")
+	require.Equal(t, buildExpectedApplicationsEntry(p4rtClient, testdata, expectedAppID), entries[0], "PreQosPipe.applications does not equal expected")
+
+	entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.sessions_uplink")
 	require.Equal(t, 1, len(entries), "PreQosPipe.sessions_uplink should contain 1 entry")
 	require.Equal(t, buildExpectedSessionsUplinkEntry(p4rtClient, testdata), entries[0], "PreQosPipe.sessions_uplink does not equal expected")
 
@@ -97,14 +163,14 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData) {
 
 	entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.terminations_uplink")
 	require.Equal(t, 1, len(entries), "PreQosPipe.terminations_uplink should contain 1 entry")
-	expected := buildExpectedTerminationsUplinkEntry(p4rtClient, testdata)
+	expected := buildExpectedTerminationsUplinkEntry(p4rtClient, testdata, expectedAppID)
 	// we don't compare the entire object because counter ID is auto-generated by pfcpiface
 	require.Equal(t, expected.Action.GetAction().ActionId, entries[0].Action.GetAction().ActionId, "PreQosPipe.terminations_uplink action does not equal expected")
 	require.Equal(t, expected.Match, entries[0].Match, "PreQosPipe.terminations_uplink match fields do not equal expected")
 
 	entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.terminations_downlink")
 	require.Equal(t, 1, len(entries), "PreQosPipe.terminations_downlink should contain 1 entry")
-	expected = buildExpectedTerminationsDownlinkEntry(p4rtClient, testdata)
+	expected = buildExpectedTerminationsDownlinkEntry(p4rtClient, testdata, expectedAppID)
 	// we don't compare the entire object because counter ID is auto-generated by pfcpiface
 	require.Equal(t, expected.Action.GetAction().ActionId, entries[0].Action.GetAction().ActionId, "PreQosPipe.terminations_downlink action does not equal expected")
 	require.Equal(t, expected.Match, entries[0].Match, "PreQosPipe.terminations_downlink match fields do not equal expected")
@@ -116,6 +182,6 @@ func verifyNoP4RuntimeEntries(t *testing.T) {
 	defer providers.DisconnectP4rt()
 
 	allInstalledEntries, _ := p4rtClient.ReadTableEntryWildcard("")
-	require.Equal(t, 1, len(allInstalledEntries), "UP4 should have only 1 entry installed")
-
+	// table entries for interfaces table are not removed by pfcpiface
+	require.Equal(t, 1, len(allInstalledEntries), "UP4 should have only 1 entry installed", allInstalledEntries)
 }

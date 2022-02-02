@@ -10,6 +10,10 @@ type pfcpSessionData struct {
 	ueAddress    string
 	upfN3Address string
 
+	sdfFilter    string
+
+	precedence uint32
+
 	ulTEID uint32
 	dlTEID uint32
 
