@@ -10,6 +10,7 @@ import (
 	p4rtc "github.com/antoninbas/p4runtime-go-client/pkg/client"
 	"github.com/antoninbas/p4runtime-go-client/pkg/util/conversion"
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim"
+	"github.com/omec-project/pfcpsim/pkg/pfcpsim/session"
 	"github.com/omec-project/upf-epc/test/integration/providers"
 	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/stretchr/testify/require"
@@ -18,6 +19,8 @@ import (
 
 const (
 	defaultSliceID = 0
+
+	defaultSDFFilter = "permit out udp from any to assigned 80-80"
 
 	ueAddress    = "17.0.0.1"
 	upfN3Address = "198.18.0.1"
@@ -36,17 +39,22 @@ const (
 )
 
 var (
-	// used to initialize UP4 only, then let PFCP Agent become master
-	masterElectionID = p4_v1.Uint128{High: 5, Low: 0}
-	// used to read table entries
-	slaveElectionID = p4_v1.Uint128{High: 0, Low: 1}
-
 	pfcpClient *pfcpsim.PFCPClient
-	p4rtClient *p4rtc.Client
 )
 
-func initMockUP4() error {
-	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", masterElectionID)
+func init() {
+	if err := initMockUP4(); err != nil {
+		panic("failed to initialize mock-up4")
+	}
+
+	providers.RunDockerCommand("pfcpiface", "/bin/pfcpiface -config /config.json")
+
+	// wait for PFCP Agent to initialize
+	time.Sleep(time.Second * 3)
+}
+
+func initMockUP4() (err error) {
+	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", p4_v1.Uint128{High: 0, Low: 1})
 	if err != nil {
 		return err
 	}
@@ -91,28 +99,14 @@ func initMockUP4() error {
 }
 
 func setup(t *testing.T) {
-	err := initMockUP4()
-	require.NoErrorf(t, err, "failed to initialize mock-up4")
-
-	providers.RunDockerCommand("pfcpiface", "/bin/pfcpiface -config /config.json")
-
-	// wait for PFCP Agent to initialize
-	time.Sleep(time.Second * 3)
-
 	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.1")
-	err = pfcpClient.ConnectN4("127.0.0.1")
+	err := pfcpClient.ConnectN4("127.0.0.1")
 	require.NoErrorf(t, err, "failed to connect to UPF")
-
-	p4rtClient, err = providers.ConnectP4rt("127.0.0.1:50001", slaveElectionID)
-	require.NoErrorf(t, err, "failed to connect to P4Runtime server as slave")
 }
 
 func teardown(t *testing.T) {
 	if pfcpClient != nil {
 		pfcpClient.DisconnectN4()
-	}
-	if p4rtClient != nil {
-		providers.DisconnectP4rt()
 	}
 }
 
@@ -128,31 +122,95 @@ func TestBasicPFCPAssociation(t *testing.T) {
 	require.True(t, pfcpClient.IsAssociationAlive())
 }
 
-func TestBasicSessionEstablishment(t *testing.T) {
+func TestSingleUEAttachAndDetach(t *testing.T) {
 	setup(t)
 	defer teardown(t)
+
+	testdata := &pfcpSessionData{
+		nbAddress:    nodeBAddress,
+		ueAddress:    ueAddress,
+		upfN3Address: upfN3Address,
+		sdfFilter:    defaultSDFFilter,
+
+		ulTEID:  15,
+		dlTEID:  16,
+		sessQFI: 0x09,
+		appQFI:  0x08,
+	}
 
 	err := pfcpClient.SetupAssociation()
 	require.NoErrorf(t, err, "failed to setup PFCP association")
 
 	pdrs := []*ie.IE{
-		NewUplinkPDR(create, 1, 15, upfN3Address, 1, 4, 1),
-		NewDownlinkPDR(create, 2, ueAddress, 2, 4, 2),
+		session.NewPDRBuilder().MarkAsUplink().
+			WithMethod(session.Create).
+			WithID(1).
+			WithTEID(testdata.ulTEID).
+			WithN3Address(testdata.upfN3Address).
+			WithSDFFilter(defaultSDFFilter).
+			WithFARID(1).
+			AddQERID(4).
+			AddQERID(1).BuildPDR(),
+		session.NewPDRBuilder().MarkAsDownlink().
+			WithMethod(session.Create).
+			WithID(2).
+			WithUEAddress(testdata.ueAddress).
+			WithSDFFilter(defaultSDFFilter).
+			WithFARID(2).
+			AddQERID(4).
+			AddQERID(2).BuildPDR(),
 	}
+
 	fars := []*ie.IE{
-		NewUplinkFAR(create, 1, ActionForward),
-		NewDownlinkFAR(create, 2, ActionDrop, 16, nodeBAddress),
+		session.NewFARBuilder().
+			WithMethod(session.Create).WithID(1).WithDstInterface(ie.DstInterfaceCore).
+			WithAction(ActionForward).BuildFAR(),
+		session.NewFARBuilder().
+			WithMethod(session.Create).WithID(2).
+			WithDstInterface(ie.DstInterfaceAccess).
+			WithAction(ActionDrop).WithTEID(testdata.dlTEID).WithDownlinkIP(testdata.nbAddress).BuildFAR(),
 	}
 
 	qers := []*ie.IE{
 		// session QER
-		NewQER(create, 4, 0x09, 500000, 500000, 0, 0),
-		// application QER
-		NewQER(create, 1, 0x08, 50000, 50000, 30000, 30000),
+		session.NewQERBuilder().WithMethod(session.Create).WithID(4).WithQFI(testdata.sessQFI).
+			WithUplinkMBR(500000).
+			WithDownlinkMBR(500000).
+			WithUplinkGBR(0).
+			WithDownlinkGBR(0).Build(),
+		// uplink application QER
+		session.NewQERBuilder().WithMethod(session.Create).WithID(1).WithQFI(testdata.appQFI).
+			WithUplinkMBR(50000).
+			WithDownlinkMBR(50000).
+			WithUplinkGBR(30000).
+			WithDownlinkGBR(30000).Build(),
+		// downlink application QER
+		session.NewQERBuilder().WithMethod(session.Create).WithID(2).WithQFI(testdata.appQFI).
+			WithUplinkMBR(50000).
+			WithDownlinkMBR(50000).
+			WithUplinkGBR(30000).
+			WithDownlinkGBR(30000).Build(),
 	}
 
-	err = pfcpClient.EstablishSession(pdrs, fars, qers)
+	sess, err := pfcpClient.EstablishSession(pdrs, fars, qers)
 	require.NoErrorf(t, err, "failed to establish PFCP session")
 
-	// TODO: verify P4Runtime entries
+	verifyP4RuntimeEntries(t, testdata, false)
+
+	err = pfcpClient.ModifySession(sess, nil, []*ie.IE{
+		session.NewFARBuilder().
+			WithMethod(session.Update).WithID(2).
+			WithAction(ActionForward).WithDstInterface(ie.DstInterfaceAccess).
+			WithTEID(testdata.dlTEID).WithDownlinkIP(testdata.nbAddress).BuildFAR(),
+	}, nil)
+
+	verifyP4RuntimeEntries(t, testdata, true)
+
+	err = pfcpClient.DeleteSession(sess)
+	require.NoErrorf(t, err, "failed to delete PFCP session")
+
+	err = pfcpClient.TeardownAssociation()
+	require.NoErrorf(t, err, "failed to gracefully release PFCP association")
+
+	verifyNoP4RuntimeEntries(t)
 }
