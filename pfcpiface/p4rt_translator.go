@@ -539,7 +539,7 @@ func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, internalAppID uint
 	}
 
 	if !appPort.isWildcardMatch() {
-		if err := t.withRangeMatchField(entry, FieldAppL4Port, appPort, appPort); err != nil {
+		if err := t.withRangeMatchField(entry, FieldAppL4Port, appPort.portLow, appPort.portHigh); err != nil {
 			return nil, err
 		}
 	}
