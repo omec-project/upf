@@ -712,12 +712,12 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 		}
 
 		// Translate port ranges into ternary rule(s) and insert them one-by-one.
-		portRules, err := convertPortFiltersToTernary(p.appFilter.srcPortFilter, p.appFilter.dstPortFilter)
+		portRules, err := CreatePortFilterCartesianProduct(p.appFilter.srcPortFilter, p.appFilter.dstPortFilter)
 		if err != nil {
 			log.Errorln(err)
 			return
 		}
-		log.Warnln("PDR rules", portRules)
+		log.Tracef("PDR rules %+v", portRules)
 
 		for _, r := range portRules {
 			f := &pb.WildcardMatchCommandAddArg{
@@ -772,7 +772,7 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 		)
 
 		// Translate port ranges into ternary rule(s) and insert them one-by-one.
-		portRules, err := convertPortFiltersToTernary(p.appFilter.srcPortFilter, p.appFilter.dstPortFilter)
+		portRules, err := CreatePortFilterCartesianProduct(p.appFilter.srcPortFilter, p.appFilter.dstPortFilter)
 		if err != nil {
 			log.Errorln(err)
 			return
