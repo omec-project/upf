@@ -56,6 +56,12 @@ func buildExpectedApplicationsEntry(client *p4rtc.Client, testdata *pfcpSessionD
 		high = low
 	}
 
+	if proto == 0 && len(appPorts) != 2 {
+		// ALLOW_ALL
+		return nil
+	}
+
+
 	protoVal, _ := conversion.UInt32ToBinary(uint32(proto), 3)
 	// TODO: we assume default SDF filter: permit out udp from any to assigned
 	//  appIP, _ := conversion.IpToBinary("0.0.0.0")
@@ -86,9 +92,9 @@ func buildExpectedApplicationsEntry(client *p4rtc.Client, testdata *pfcpSessionD
 	return te
 }
 
-func buildExpectedSessionsUplinkEntry(client *p4rtc.Client, testdata *pfcpSessionData) *p4_v1.TableEntry {
-	n3Addr, _ := conversion.IpToBinary(testdata.upfN3Address)
-	teid, _ := conversion.UInt32ToBinary(testdata.ulTEID, 3)
+func buildExpectedSessionsUplinkEntry(client *p4rtc.Client, upfN3Address string, ulTEID uint32) *p4_v1.TableEntry {
+	n3Addr, _ := conversion.IpToBinary(upfN3Address)
+	teid, _ := conversion.UInt32ToBinary(ulTEID, 3)
 
 	return client.NewTableEntry(TableSessionsUplink, []p4rtc.MatchInterface{
 		&p4rtc.ExactMatch{
@@ -100,8 +106,8 @@ func buildExpectedSessionsUplinkEntry(client *p4rtc.Client, testdata *pfcpSessio
 	}, client.NewTableActionDirect(ActSetUplinkSession, [][]byte{}), nil)
 }
 
-func buildExpectedSessionsDownlinkEntry(client *p4rtc.Client, testdata *pfcpSessionData, expectedTunnelPeerID uint8) *p4_v1.TableEntry {
-	ueAddr, _ := conversion.IpToBinary(testdata.ueAddress)
+func buildExpectedSessionsDownlinkEntry(client *p4rtc.Client, ueAddress string, expectedTunnelPeerID uint8) *p4_v1.TableEntry {
+	ueAddr, _ := conversion.IpToBinary(ueAddress)
 
 	tunnelPeerID, _ := conversion.UInt32ToBinary(uint32(expectedTunnelPeerID), 3)
 
@@ -155,9 +161,9 @@ func buildExpectedTerminationsDownlinkEntry(client *p4rtc.Client, testdata *pfcp
 	}, client.NewTableActionDirect(action, actionParams), nil)
 }
 
-func buildExpectedTunnelPeersEntry(client *p4rtc.Client, testdata *pfcpSessionData, expectedTunnelPeerID uint8) *p4_v1.TableEntry {
-	srcAddr, _ := conversion.IpToBinary(testdata.upfN3Address)
-	dstAddr, _ := conversion.IpToBinary(testdata.nbAddress)
+func buildExpectedTunnelPeersEntry(client *p4rtc.Client, upfN3Address string, nbAddress string, expectedTunnelPeerID uint8) *p4_v1.TableEntry {
+	srcAddr, _ := conversion.IpToBinary(upfN3Address)
+	dstAddr, _ := conversion.IpToBinary(nbAddress)
 	srcPort, _ := conversion.UInt32ToBinary(2152, 0)
 	srcPort = conversion.ToCanonicalBytestring(srcPort)
 
@@ -169,66 +175,72 @@ func buildExpectedTunnelPeersEntry(client *p4rtc.Client, testdata *pfcpSessionDa
 }
 
 // TODO: we should pass a list of pfcpSessionData if we will test multiple UEs
-func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, afterModification bool) {
+func verifyP4RuntimeEntries(t *testing.T, expected *p4RtEntries, afterModification bool) {
 	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", p4_v1.Uint128{High: 0, Low: 1})
 	require.NoErrorf(t, err, "failed to connect to P4Runtime server")
 	defer providers.DisconnectP4rt()
 
 	var (
-		expectedAppID              uint8 = 1
-		expectedTunnelPeerID       uint8 = 0
-		expectedNumberOfAllEntries       = 6
+		//expectedAppID              uint8 = 1
+		//expectedTunnelPeerID       uint8 = 0
+		expectedNumberOfAllEntries       = expected.Len() + 1 // interfaces table
 	)
 
 	if afterModification {
 		// new tunnel peer
 		expectedNumberOfAllEntries++
-		expectedTunnelPeerID = 2
+		//expectedTunnelPeerID = 2
 	}
 
 	allInstalledEntries, _ := p4rtClient.ReadTableEntryWildcard("")
 	require.Equal(t, expectedNumberOfAllEntries, len(allInstalledEntries),
-		fmt.Sprintf("UP4 should have exactly %v entries installed", expectedNumberOfAllEntries))
+		fmt.Sprintf("UP4 should have exactly %v p4RtEntries installed", expectedNumberOfAllEntries),
+		allInstalledEntries)
 
 	entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.applications")
-	require.Equal(t, 1, len(entries), "PreQosPipe.applications should contain 1 entry")
-	require.Equal(t, buildExpectedApplicationsEntry(p4rtClient, testdata, expectedAppID), entries[0], "PreQosPipe.applications does not equal expected")
+	require.Equal(t, len(expected.applications), len(entries),
+		fmt.Sprintf("PreQosPipe.applications should contain %v entry", len(expected.applications)))
+
+	if len(entries) > 0 {
+		require.Equal(t, expected.applications[0], entries[0], "PreQosPipe.applications does not equal expected")
+	}
 
 	entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.sessions_uplink")
-	require.Equal(t, 1, len(entries), "PreQosPipe.sessions_uplink should contain 1 entry")
-	require.Equal(t, buildExpectedSessionsUplinkEntry(p4rtClient, testdata), entries[0], "PreQosPipe.sessions_uplink does not equal expected")
+	require.Equal(t, len(expected.sessionsUplink), len(entries),
+		fmt.Sprintf("PreQosPipe.sessions_uplink should contain %v entries", len(expected.sessionsUplink)))
+	require.Equal(t, expected.sessionsUplink, entries, "PreQosPipe.sessions_uplink does not equal expected")
 
-	entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.sessions_downlink")
-	require.Equal(t, 1, len(entries), "PreQosPipe.sessions_downlink should contain 1 entry")
-	require.Equal(t, buildExpectedSessionsDownlinkEntry(p4rtClient, testdata, expectedTunnelPeerID), entries[0], "PreQosPipe.sessions_downlink does not equal expected")
-
-	entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.terminations_uplink")
-	require.Equal(t, 1, len(entries), "PreQosPipe.terminations_uplink should contain 1 entry")
-	expected := buildExpectedTerminationsUplinkEntry(p4rtClient, testdata, expectedAppID)
-	// we don't compare the entire object because counter ID is auto-generated by pfcpiface
-	require.Equal(t, expected.Action.GetAction().ActionId, entries[0].Action.GetAction().ActionId, "PreQosPipe.terminations_uplink action does not equal expected")
-	require.Equal(t, expected.Match, entries[0].Match, "PreQosPipe.terminations_uplink match fields do not equal expected")
-
-	entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.terminations_downlink")
-	require.Equal(t, 1, len(entries), "PreQosPipe.terminations_downlink should contain 1 entry")
-	expected = buildExpectedTerminationsDownlinkEntry(p4rtClient, testdata, expectedAppID, afterModification)
-	// we don't compare the entire object because counter ID is auto-generated by pfcpiface
-	require.Equal(t, expected.Action.GetAction().ActionId, entries[0].Action.GetAction().ActionId, "PreQosPipe.terminations_downlink action does not equal expected")
-	require.Equal(t, expected.Match, entries[0].Match, "PreQosPipe.terminations_downlink match fields do not equal expected")
-	if afterModification {
-		// ignore counter ID as it is random number generated by pfcpiface
-		require.Equal(t, expected.Action.GetAction().Params[1], entries[0].Action.GetAction().Params[1],
-			fmt.Sprintf("Action param (TEID) of action %v does not equal expected", ActDownlinkTermFwdNoTC))
-		require.Equal(t, expected.Action.GetAction().Params[2], entries[0].Action.GetAction().Params[2],
-			fmt.Sprintf("Action param (QFI) of action %v does not equal expected", ActDownlinkTermFwdNoTC))
-	}
-
-	if afterModification {
-		entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.tunnel_peers")
-		require.Equal(t, 1, len(entries), "PreQosPipe.tunnel_peers should contain 1 entry")
-		require.Equal(t, buildExpectedTunnelPeersEntry(p4rtClient, testdata, expectedTunnelPeerID), entries[0],
-			"PreQosPipe.tunnel_peers does not equal expected")
-	}
+	//entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.sessions_downlink")
+	//require.Equal(t, 1, len(entries), "PreQosPipe.sessions_downlink should contain 1 entry")
+	//require.Equal(t, buildExpectedSessionsDownlinkEntry(p4rtClient, testdata, expectedTunnelPeerID), entries[0], "PreQosPipe.sessions_downlink does not equal expected")
+	//
+	//entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.terminations_uplink")
+	//require.Equal(t, 1, len(entries), "PreQosPipe.terminations_uplink should contain 1 entry")
+	//expected := buildExpectedTerminationsUplinkEntry(p4rtClient, testdata, expectedAppID)
+	//// we don't compare the entire object because counter ID is auto-generated by pfcpiface
+	//require.Equal(t, expected.Action.GetAction().ActionId, entries[0].Action.GetAction().ActionId, "PreQosPipe.terminations_uplink action does not equal expected")
+	//require.Equal(t, expected.Match, entries[0].Match, "PreQosPipe.terminations_uplink match fields do not equal expected")
+	//
+	//entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.terminations_downlink")
+	//require.Equal(t, 1, len(entries), "PreQosPipe.terminations_downlink should contain 1 entry")
+	//expected = buildExpectedTerminationsDownlinkEntry(p4rtClient, testdata, expectedAppID, afterModification)
+	//// we don't compare the entire object because counter ID is auto-generated by pfcpiface
+	//require.Equal(t, expected.Action.GetAction().ActionId, entries[0].Action.GetAction().ActionId, "PreQosPipe.terminations_downlink action does not equal expected")
+	//require.Equal(t, expected.Match, entries[0].Match, "PreQosPipe.terminations_downlink match fields do not equal expected")
+	//if afterModification {
+	//	// ignore counter ID as it is random number generated by pfcpiface
+	//	require.Equal(t, expected.Action.GetAction().Params[1], entries[0].Action.GetAction().Params[1],
+	//		fmt.Sprintf("Action param (TEID) of action %v does not equal expected", ActDownlinkTermFwdNoTC))
+	//	require.Equal(t, expected.Action.GetAction().Params[2], entries[0].Action.GetAction().Params[2],
+	//		fmt.Sprintf("Action param (QFI) of action %v does not equal expected", ActDownlinkTermFwdNoTC))
+	//}
+	//
+	//if afterModification {
+	//	entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.tunnel_peers")
+	//	require.Equal(t, 1, len(entries), "PreQosPipe.tunnel_peers should contain 1 entry")
+	//	require.Equal(t, buildExpectedTunnelPeersEntry(p4rtClient, testdata, expectedTunnelPeerID), entries[0],
+	//		"PreQosPipe.tunnel_peers does not equal expected")
+	//}
 }
 
 func verifyNoP4RuntimeEntries(t *testing.T) {
@@ -237,7 +249,7 @@ func verifyNoP4RuntimeEntries(t *testing.T) {
 	defer providers.DisconnectP4rt()
 
 	allInstalledEntries, _ := p4rtClient.ReadTableEntryWildcard("")
-	// table entries for interfaces table are not removed by pfcpiface
+	// table p4RtEntries for interfaces table are not removed by pfcpiface
 	// FIXME: tunnel_peers and applications are not cleared on session deletion/association release
 	//  See SDFAB-960
 	require.Equal(t, 3, len(allInstalledEntries), "UP4 should have only 3 entry installed", allInstalledEntries)
