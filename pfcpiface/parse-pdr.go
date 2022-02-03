@@ -134,7 +134,15 @@ func (pr portFilter) asComplexTernaryMatches(strategy RangeConversionStrategy) (
 		return rules, nil
 	}
 
-	if strategy == Ternary {
+	if strategy == Exact {
+		if pr.Width() > 100 {
+			return nil, ErrInvalidArgumentWithReason("asComplexTernaryMatches", pr,
+				"port range too wide for exact match strategy")
+		}
+		for port := int(pr.portLow); port <= int(pr.portHigh); port++ {
+			rules = append(rules, portFilterTernaryRule{uint16(port), math.MaxUint16})
+		}
+	} else if strategy == Ternary {
 		// Adapted from https://stackoverflow.com/a/66959276
 		const limit = math.MaxUint16
 		maxPort := func(port, mask uint16) uint16 {
@@ -171,10 +179,6 @@ func (pr portFilter) asComplexTernaryMatches(strategy RangeConversionStrategy) (
 			rules = append(rules, portFilterTernaryRule{uint16(port), mask})
 			port = uint32(maxPort(uint16(port), mask)) + 1
 		}
-	} else if strategy == Exact {
-		for port := int(pr.portLow); port <= int(pr.portHigh); port++ {
-			rules = append(rules, portFilterTernaryRule{uint16(port), math.MaxUint16})
-		}
 	} else {
 		return nil, ErrInvalidArgument("asComplexTernaryMatches", strategy)
 	}
@@ -195,13 +199,14 @@ type portFilterTernaryCartesianProduct struct {
 	dstPort, dstMask uint16
 }
 
-// Converts two port ranges into a list of ternary rules covering the same range.
-func convertPortFiltersToTernary(src, dst portFilter) ([]portFilterTernaryCartesianProduct, error) {
+// CreatePortFilterCartesianProduct converts two port ranges into a list of ternary
+// rules covering the same range.
+func CreatePortFilterCartesianProduct(src, dst portFilter) ([]portFilterTernaryCartesianProduct, error) {
 	// A single range rule can result in multiple ternary ones. To cover the same range of packets,
 	// we need to create the Cartesian product of src and dst rules. For now, we only allow one true
 	// range match to keep the complexity in check.
 	if src.isRangeMatch() && dst.isRangeMatch() {
-		return nil, ErrInvalidArgumentWithReason("convertPortFiltersToTernary",
+		return nil, ErrInvalidArgumentWithReason("CreatePortFilterCartesianProduct",
 			src, "src and dst ports cannot both be a range match")
 	}
 

@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func Test_convertPortFiltersToTernary(t *testing.T) {
+func Test_CreatePortFilterCartesianProduct(t *testing.T) {
 	type args struct {
 		src portFilter
 		dst portFilter
@@ -66,13 +66,13 @@ func Test_convertPortFiltersToTernary(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				got, err := convertPortFiltersToTernary(tt.args.src, tt.args.dst)
+				got, err := CreatePortFilterCartesianProduct(tt.args.src, tt.args.dst)
 				if (err != nil) != tt.wantErr {
-					t.Errorf("convertPortFiltersToTernary() error = %v, wantErr %v", err, tt.wantErr)
+					t.Errorf("CreatePortFilterCartesianProduct() error = %v, wantErr %v", err, tt.wantErr)
 					return
 				}
 				if !reflect.DeepEqual(got, tt.want) {
-					t.Errorf("convertPortFiltersToTernary() got = %v, want %v", got, tt.want)
+					t.Errorf("CreatePortFilterCartesianProduct() got = %v, want %v", got, tt.want)
 				}
 			},
 		)
@@ -227,10 +227,11 @@ func matchesTernary(value uint16, rules []portFilterTernaryRule) bool {
 
 func Test_portFilter_asComplexTernaryMatches(t *testing.T) {
 	tests := []struct {
-		name    string
-		pr      portFilter
-		wantErr bool
-		want    []portFilterTernaryRule
+		name     string
+		pr       portFilter
+		strategy RangeConversionStrategy
+		wantErr  bool
+		want     []portFilterTernaryRule
 	}{
 		{name: "Exact match port range",
 			pr: portFilter{
@@ -274,6 +275,7 @@ func Test_portFilter_asComplexTernaryMatches(t *testing.T) {
 				portLow:  0x0100, // 256
 				portHigh: 0x01ff, // 511
 			},
+			strategy: Ternary,
 			//want: []portFilterTernaryRule{
 			//	{port: 0x0100, mask: 0xff00},
 			//},
@@ -299,13 +301,15 @@ func Test_portFilter_asComplexTernaryMatches(t *testing.T) {
 				portLow:  1,
 				portHigh: 65534,
 			},
-			wantErr: false},
+			strategy: Ternary,
+			wantErr:  false},
 		{name: "low port filter",
 			pr: portFilter{
 				portLow:  0,
 				portHigh: 1023,
 			},
-			wantErr: false},
+			strategy: Ternary,
+			wantErr:  false},
 		{name: "some small app filter",
 			pr: portFilter{
 				portLow:  8080,
@@ -320,7 +324,7 @@ func Test_portFilter_asComplexTernaryMatches(t *testing.T) {
 					portLow:  tt.pr.portLow,
 					portHigh: tt.pr.portHigh,
 				}
-				got, err := pr.asComplexTernaryMatches(Exact)
+				got, err := pr.asComplexTernaryMatches(tt.strategy)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("asComplexTernaryMatches() error = %v, wantErr %v", err, tt.wantErr)
 					return
