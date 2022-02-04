@@ -120,24 +120,24 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				ueAddress:    ueAddress,
 				upfN3Address: upfN3Address,
 				sdfFilter:    "permit out udp from any to assigned 80-80",
-				ulTEID:  15,
-				dlTEID:  16,
-				sessQFI: 0x09,
-				appQFI:  0x08,
+				ulTEID:       15,
+				dlTEID:       16,
+				sessQFI:      0x09,
+				appQFI:       0x08,
 			},
 			expected: p4RtValues{
 				appFilter: appFilter{
-					proto: 0x11,
-					appIP: net.ParseIP("0.0.0.0"),
+					proto:        0x11,
+					appIP:        net.ParseIP("0.0.0.0"),
 					appPrefixLen: 0,
 					appPort: portRange{
 						80, 80,
 					},
 				},
-				appID: 1,
+				appID:        1,
 				tunnelPeerID: 2,
 			},
-			desc:  "APPLICATION FILTERING permit out udp from any to assigned 80-80",
+			desc: "APPLICATION FILTERING permit out udp from any to assigned 80-80",
 		},
 		{
 			input: &pfcpSessionData{
@@ -145,16 +145,16 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				ueAddress:    ueAddress,
 				upfN3Address: upfN3Address,
 				// TODO: use wider port range once multi port ranges are supported
-				sdfFilter:    "permit out udp from 192.168.1.1/32 to assigned 80-80",
-				ulTEID:  15,
-				dlTEID:  16,
-				sessQFI: 0x09,
-				appQFI:  0x08,
+				sdfFilter: "permit out udp from 192.168.1.1/32 to assigned 80-80",
+				ulTEID:    15,
+				dlTEID:    16,
+				sessQFI:   0x09,
+				appQFI:    0x08,
 			},
 			expected: p4RtValues{
 				appFilter: appFilter{
-					proto: 0x11,
-					appIP: net.ParseIP("192.168.1.1"),
+					proto:        0x11,
+					appIP:        net.ParseIP("192.168.1.1"),
 					appPrefixLen: 32,
 					appPort: portRange{
 						80, 80,
@@ -162,10 +162,10 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				},
 				// FIXME: there is a dependency on previous test because pfcpiface doesn't clear application IDs properly
 				//  See SDFAB-960
-				appID: 2,
+				appID:        2,
 				tunnelPeerID: 2,
 			},
-			desc:  "APPLICATION FILTERING permit out udp from 192.168.1.1/32 to assigned 80-80",
+			desc: "APPLICATION FILTERING permit out udp from 192.168.1.1/32 to assigned 80-80",
 		},
 		{
 			input: &pfcpSessionData{
@@ -173,17 +173,17 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				ueAddress:    ueAddress,
 				upfN3Address: upfN3Address,
 				sdfFilter:    "permit out ip from any to assigned",
-				ulTEID:  15,
-				dlTEID:  16,
-				sessQFI: 0x09,
-				appQFI:  0x08,
+				ulTEID:       15,
+				dlTEID:       16,
+				sessQFI:      0x09,
+				appQFI:       0x08,
 			},
 			expected: p4RtValues{
 				// no application filtering rule expected
-				appID: 0,
+				appID:        0,
 				tunnelPeerID: 2,
 			},
-			desc:  "APPLICATION FILTERING ALLOW_ALL",
+			desc: "APPLICATION FILTERING ALLOW_ALL",
 		},
 	}
 

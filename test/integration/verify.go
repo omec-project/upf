@@ -43,7 +43,7 @@ func buildExpectedApplicationsEntry(client *p4rtc.Client, testdata *pfcpSessionD
 		appIPVal, _ := conversion.IpToBinary(expectedValues.appFilter.appIP.String())
 		mfs = append(mfs, &p4rtc.LpmMatch{
 			Value: appIPVal,
-			PLen: int32(expectedValues.appFilter.appPrefixLen),
+			PLen:  int32(expectedValues.appFilter.appPrefixLen),
 		})
 	}
 
@@ -51,7 +51,7 @@ func buildExpectedApplicationsEntry(client *p4rtc.Client, testdata *pfcpSessionD
 		lowVal, _ := conversion.UInt32ToBinary(uint32(expectedValues.appFilter.appPort.low), 2)
 		highVal, _ := conversion.UInt32ToBinary(uint32(expectedValues.appFilter.appPort.high), 2)
 		mfs = append(mfs, &p4rtc.RangeMatch{
-			Low: conversion.ToCanonicalBytestring(lowVal),
+			Low:  conversion.ToCanonicalBytestring(lowVal),
 			High: conversion.ToCanonicalBytestring(highVal),
 		})
 	}
@@ -60,7 +60,7 @@ func buildExpectedApplicationsEntry(client *p4rtc.Client, testdata *pfcpSessionD
 		protoVal, _ := conversion.UInt32ToBinary(uint32(expectedValues.appFilter.proto), 3)
 		mfs = append(mfs, &p4rtc.TernaryMatch{
 			Value: protoVal,
-			Mask: []byte{0xff},
+			Mask:  []byte{0xff},
 		})
 	}
 
@@ -176,8 +176,8 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, expectedVal
 	defer providers.DisconnectP4rt()
 
 	var (
-		expectedApplicationsEntries = 1
-		expectedTunnelPeerID       uint8 = 0
+		expectedApplicationsEntries       = 1
+		expectedTunnelPeerID        uint8 = 0
 	)
 
 	if afterModification {
