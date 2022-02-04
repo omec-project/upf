@@ -1013,13 +1013,17 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, meth
 
 		// as a default value is installed if no application filtering rule exists
 		var applicationID uint8 = DefaultApplicationID
-		if !pdr.appFilter.IsEmpty() {
+		if !pdr.IsAppFilterEmpty() {
 			applicationID, err = up4.getOrAllocateInternalApplicationID(pdr)
 			if err != nil {
 				pdrLog.Error("failed to get or allocate internal application ID")
 				return err
 			}
+		}
 
+		// TODO: the same app filter can be simultaneously used by another UE session. We cannot remove it.
+		//  We should come up with a way to check if an app filter is still in use.
+		if applicationID != 0 && methodType != p4.Update_DELETE {
 			applicationsEntry, err = up4.p4RtTranslator.BuildApplicationsTableEntry(pdr, applicationID)
 			if err != nil {
 				return ErrOperationFailedWithReason("build P4rt table entry for Applications table", err.Error())
