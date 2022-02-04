@@ -52,6 +52,9 @@ const (
 const (
 	appMeter     = "PreQosPipe.app_meter"
 	sessionMeter = "PreQosPipe.session_meter"
+
+	meterTypeApplication uint8 = 1
+	meterTypeSession     uint8 = 2
 )
 
 type application struct {
@@ -68,6 +71,7 @@ type counter struct {
 }
 
 type meter struct {
+	meterType      uint8
 	uplinkCellID   uint16
 	downlinkCellID uint16
 }
@@ -797,6 +801,7 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 	entries := make([]*p4.MeterEntry, 0)
 
 	applicationMeter := meter{
+		meterType: meterTypeApplication,
 		uplinkCellID:   0,
 		downlinkCellID: 0,
 	}
@@ -917,13 +922,13 @@ func (up4 *UP4) configureSessionMeter(q qer) (meter, error) {
 	logger.Debug("P4 Meter entries installed successfully")
 
 	return meter{
+		meterType: meterTypeSession,
 		uplinkCellID:   uplinkCellID,
 		downlinkCellID: downlinkCellID,
 	}, nil
 }
 
-// configureMetersBasedOnQERs
-func (up4 *UP4) configureMetersBasedOnQERs(qers []qer) error {
+func (up4 *UP4) configureMeters(qers []qer) error {
 	log.WithFields(log.Fields{
 		"qers": qers,
 	}).Debug("Configuring P4 Meters based on QERs")
@@ -969,6 +974,63 @@ func (up4 *UP4) configureMetersBasedOnQERs(qers []qer) error {
 	return nil
 }
 
+func (up4 *UP4) resetMeter(name string, meter meter) {
+	meterID := up4.p4RtTranslator.meterID(name)
+	entries := make([]*p4.MeterEntry, 0, 2)
+
+	entry := &p4.MeterEntry{
+		MeterId: meterID,
+		Index:   &p4.Index{Index: int64(meter.uplinkCellID)},
+	}
+
+	entries = append(entries, entry)
+
+	if meter.downlinkCellID != meter.uplinkCellID {
+		entry := &p4.MeterEntry{
+			MeterId: meterID,
+			Index:   &p4.Index{Index: int64(meter.downlinkCellID)},
+		}
+		entries = append(entries, entry)
+	}
+
+	err := up4.p4client.ApplyMeterEntries(p4.Update_MODIFY, entries...)
+	if err != nil {
+		log.Errorf("Failed to reset %v meter entries: %v", name, err)
+	}
+}
+
+func (up4 *UP4) resetMeters(qers []qer) {
+	log.WithFields(log.Fields{
+		"qers": qers,
+	}).Debug("Resetting P4 Meters")
+
+	for _, qer := range qers {
+		logger := log.WithFields(log.Fields{
+			"qer": qer,
+		})
+		logger.Debug("Resetting P4 Meter")
+
+		meter, exists := up4.meters[qer.qerID]
+		if !exists {
+			continue
+		}
+
+		if meter.meterType == meterTypeApplication {
+			up4.resetMeter(appMeter, meter)
+			up4.releaseAppMeterCellID(meter.uplinkCellID)
+			if meter.downlinkCellID != meter.uplinkCellID {
+				up4.releaseAppMeterCellID(meter.downlinkCellID)
+			}
+		} else if meter.meterType == meterTypeSession {
+			up4.resetMeter(sessionMeter, meter)
+			up4.releaseSessionMeterCellID(meter.uplinkCellID)
+			up4.releaseSessionMeterCellID(meter.downlinkCellID)
+		}
+
+		delete(up4.meters, qer.qerID)
+	}
+}
+
 // modifyUP4ForwardingConfiguration builds P4Runtime table entries and
 // inserts/modifies/removes table entries from UP4 device, according to methodType.
 func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers []qer, methodType p4.Update_Type) error {
@@ -1000,7 +1062,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 			return ErrNotFoundWithParam("allocated GTP tunnel peer ID", "tunnel params", tunnelParams)
 		}
 
-		var sessMeter = meter{0, 0}
+		var sessMeter = meter{meterTypeSession, 0, 0}
 		if len(pdr.qerIDList) == 2 {
 			// if 2 QERs are provided, the second one is Session QER
 			sessMeter = up4.meters[pdr.qerIDList[1]]
@@ -1047,7 +1109,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 			entriesToApply = append(entriesToApply, applicationsEntry)
 		}
 
-		var appMeter = meter{0, 0}
+		var appMeter = meter{meterTypeApplication, 0, 0}
 		if len(pdr.qerIDList) != 0 {
 			// if only 1 QER provided, it's an application QER
 			// if 2 QERs provided, the first one is an application QER
@@ -1113,7 +1175,7 @@ func (up4 *UP4) sendCreate(all PacketForwardingRules, updated PacketForwardingRu
 		up4.updateUEAddrAndFSEIDMappings(p)
 	}
 
-	if err := up4.configureMetersBasedOnQERs(updated.qers); err != nil {
+	if err := up4.configureMeters(updated.qers); err != nil {
 		return err
 	}
 
@@ -1156,6 +1218,8 @@ func (up4 *UP4) sendDelete(deleted PacketForwardingRules) error {
 	if err := up4.modifyUP4ForwardingConfiguration(deleted.pdrs, deleted.fars, deleted.qers, p4.Update_DELETE); err != nil {
 		return err
 	}
+
+	up4.resetMeters(deleted.qers)
 
 	for _, p := range deleted.pdrs {
 		up4.removeUeAddrAndFSEIDMappings(p)

@@ -134,8 +134,17 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 
 		ulTEID:  15,
 		dlTEID:  16,
+
 		sessQFI: 0x09,
 		appQFI:  0x08,
+
+		uplinkAppQerID: 1,
+		downlinkAppQerID: 2,
+		sessQerID: 4,
+		sessGBR: 0,
+		sessMBR: 500000,
+		appGBR: 30000,
+		appMBR: 50000,
 	}
 
 	err := pfcpClient.SetupAssociation()
@@ -173,19 +182,19 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 
 	qers := []*ie.IE{
 		// session QER
-		session.NewQERBuilder().WithMethod(session.Create).WithID(4).WithQFI(testdata.sessQFI).
+		session.NewQERBuilder().WithMethod(session.Create).WithID(testdata.sessQerID).WithQFI(testdata.sessQFI).
 			WithUplinkMBR(500000).
 			WithDownlinkMBR(500000).
 			WithUplinkGBR(0).
 			WithDownlinkGBR(0).Build(),
 		// uplink application QER
-		session.NewQERBuilder().WithMethod(session.Create).WithID(1).WithQFI(testdata.appQFI).
+		session.NewQERBuilder().WithMethod(session.Create).WithID(testdata.uplinkAppQerID).WithQFI(testdata.appQFI).
 			WithUplinkMBR(50000).
 			WithDownlinkMBR(50000).
 			WithUplinkGBR(30000).
 			WithDownlinkGBR(30000).Build(),
 		// downlink application QER
-		session.NewQERBuilder().WithMethod(session.Create).WithID(2).WithQFI(testdata.appQFI).
+		session.NewQERBuilder().WithMethod(session.Create).WithID(testdata.downlinkAppQerID).WithQFI(testdata.appQFI).
 			WithUplinkMBR(50000).
 			WithDownlinkMBR(50000).
 			WithUplinkGBR(30000).
