@@ -4,6 +4,7 @@
 package integration
 
 import (
+	log "github.com/sirupsen/logrus"
 	"testing"
 	"time"
 
@@ -44,7 +45,7 @@ var (
 
 func init() {
 	if err := initMockUP4(); err != nil {
-		panic("failed to initialize mock-up4")
+		panic("failed to initialize mock-up4: " + err.Error())
 	}
 
 	providers.RunDockerCommand("pfcpiface", "/bin/pfcpiface -config /config.json")
@@ -53,8 +54,16 @@ func init() {
 	time.Sleep(time.Second * 3)
 }
 
+func TimeBasedElectionId() p4_v1.Uint128 {
+	now := time.Now()
+	return p4_v1.Uint128{
+		High: uint64(now.Unix()),
+		Low: uint64(now.UnixMilli() % 1000),
+	}
+}
+
 func initMockUP4() (err error) {
-	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", p4_v1.Uint128{High: 0, Low: 1})
+	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", TimeBasedElectionId())
 	if err != nil {
 		return err
 	}
