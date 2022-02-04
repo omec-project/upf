@@ -52,6 +52,7 @@ func init() {
 	// wait for PFCP Agent to initialize
 	time.Sleep(time.Second * 3)
 }
+
 // Generates an election id that is monotonically increasing with time.
 // Specifically, the upper 64 bits are the unix timestamp in seconds, and the
 // lower 64 bits are the remaining nanoseconds. This is compatible with
