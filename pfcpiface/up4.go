@@ -262,7 +262,7 @@ func (up4 *UP4) initMetersPools() error {
 	}
 
 	log.WithFields(log.Fields{
-		"appMeter pool size": up4.appMeterCellIDsPool.Cardinality(),
+		"appMeter pool size":  up4.appMeterCellIDsPool.Cardinality(),
 		"sessMeter pool size": up4.sessMeterCellIDsPool.Cardinality(),
 	}).Debug("P4 Meters pools initialized successfully")
 
@@ -771,8 +771,8 @@ func getMeterConfigurationFromQER(mbr uint64, gbr uint64) *p4.MeterConfig {
 	if mbr != 0 || gbr != 0 {
 		/* MBR/GBR is received in Kilobits/sec.
 		   CIR/PIR is sent in bytes */
-		cir = maxUint64((gbr * 1000) / 8, 0)
-		pir = maxUint64((mbr * 1000) / 8, cir)
+		cir = maxUint64((gbr*1000)/8, 0)
+		pir = maxUint64((mbr*1000)/8, cir)
 	}
 
 	logger = logger.WithFields(log.Fields{
@@ -880,9 +880,9 @@ func (up4 *UP4) configureSessionMeter(q qer) (meter, error) {
 	}
 
 	logger := log.WithFields(log.Fields{
-		"uplink cell ID": uplinkCellID,
+		"uplink cell ID":   uplinkCellID,
 		"downlink cell ID": downlinkCellID,
-		"qer": q,
+		"qer":              q,
 	})
 	logger.Debug("Configuring Session Meter from QER")
 
@@ -903,7 +903,7 @@ func (up4 *UP4) configureSessionMeter(q qer) (meter, error) {
 	}
 
 	logger = logger.WithFields(log.Fields{
-		"uplink meter entry": uplinkMeterEntry,
+		"uplink meter entry":   uplinkMeterEntry,
 		"downlink meter entry": downlinkMeterEntry,
 	})
 	logger.Debug("Installing P4 Meter entries")
