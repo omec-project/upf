@@ -45,21 +45,10 @@ func newRangeMatchPortFilter(low, high uint16) portFilter {
 	if low > high {
 		return portFilter{}
 	}
+
 	return portFilter{
 		portLow:  low,
 		portHigh: high,
-	}
-}
-
-// newTernaryMatchPortFilter returns a portFilter that matches on the given port and mask. Only
-// trivial mask are supported.
-func newTernaryMatchPortFilter(port, mask uint16) (portFilter, error) {
-	if mask == 0 {
-		return newWildcardPortFilter(), nil
-	} else if mask == math.MaxUint16 {
-		return newExactMatchPortFilter(port), nil
-	} else {
-		return portFilter{}, ErrInvalidArgument("newTernaryMatchPortFilter", mask)
 	}
 }
 
@@ -96,10 +85,6 @@ func (pr portFilter) asExactMatchUnchecked() portFilterTernaryRule {
 	return portFilterTernaryRule{port: pr.portLow, mask: math.MaxUint16}
 }
 
-func (pr portFilter) asRangeMatchUnchecked() (uint16, uint16) {
-	return pr.portLow, pr.portHigh
-}
-
 // Return portFilter as a trivial, single value and mask, ternary match. Will fail if conversion is
 // not possible.
 func (pr portFilter) asTrivialTernaryMatch() (portFilterTernaryRule, error) {
@@ -117,7 +102,6 @@ type RangeConversionStrategy int
 const (
 	Exact RangeConversionStrategy = iota
 	Ternary
-	Hybrid
 )
 
 // Returns portFilter as a list of ternary matches that cover the same range.
@@ -129,6 +113,7 @@ func (pr portFilter) asComplexTernaryMatches(strategy RangeConversionStrategy) (
 		rules = append(rules, pr.asExactMatchUnchecked())
 		return rules, nil
 	}
+
 	if pr.isWildcardMatch() {
 		rules = append(rules, portFilterTernaryRule{0, 0})
 		return rules, nil
@@ -139,6 +124,7 @@ func (pr portFilter) asComplexTernaryMatches(strategy RangeConversionStrategy) (
 			return nil, ErrInvalidArgumentWithReason("asComplexTernaryMatches", pr,
 				"port range too wide for exact match strategy")
 		}
+
 		for port := int(pr.portLow); port <= int(pr.portHigh); port++ {
 			rules = append(rules, portFilterTernaryRule{uint16(port), math.MaxUint16})
 		}
@@ -217,10 +203,12 @@ func CreatePortFilterCartesianProduct(src, dst portFilter) ([]portFilterTernaryC
 		if err != nil {
 			return nil, err
 		}
+
 		dstTernary, err := dst.asTrivialTernaryMatch()
 		if err != nil {
 			return nil, err
 		}
+
 		for _, r := range srcTernaryRules {
 			p := portFilterTernaryCartesianProduct{
 				srcPort: r.port, srcMask: r.mask,
@@ -233,10 +221,12 @@ func CreatePortFilterCartesianProduct(src, dst portFilter) ([]portFilterTernaryC
 		if err != nil {
 			return nil, err
 		}
+
 		srcTernary, err := src.asTrivialTernaryMatch()
 		if err != nil {
 			return nil, err
 		}
+
 		for _, r := range dstTernaryRules {
 			p := portFilterTernaryCartesianProduct{
 				srcPort: srcTernary.port, srcMask: srcTernary.mask,
@@ -250,10 +240,12 @@ func CreatePortFilterCartesianProduct(src, dst portFilter) ([]portFilterTernaryC
 		if err != nil {
 			return nil, err
 		}
+
 		dstTernary, err := dst.asTrivialTernaryMatch()
 		if err != nil {
 			return nil, err
 		}
+
 		p := portFilterTernaryCartesianProduct{
 			dstPort: dstTernary.port, dstMask: dstTernary.mask,
 			srcPort: srcTernary.port, srcMask: srcTernary.mask,

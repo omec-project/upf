@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/stretchr/testify/assert"
 	"math"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_CreatePortFilterCartesianProduct(t *testing.T) {
@@ -12,6 +13,7 @@ func Test_CreatePortFilterCartesianProduct(t *testing.T) {
 		src portFilter
 		dst portFilter
 	}
+
 	tests := []struct {
 		name    string
 		args    args
@@ -63,6 +65,7 @@ func Test_CreatePortFilterCartesianProduct(t *testing.T) {
 			want:    nil,
 			wantErr: true},
 	}
+
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
@@ -104,23 +107,20 @@ func Test_newWildcardPortFilter(t *testing.T) {
 }
 
 func Test_portFilter_String(t *testing.T) {
-	type fields struct {
-		PortLow  uint16
-		PortHigh uint16
-	}
 	tests := []struct {
 		name   string
-		fields fields
+		fields portFilter
 		want   string
 	}{
 		// TODO: Add test cases.
 	}
+
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
 				pr := portFilter{
-					portLow:  tt.fields.PortLow,
-					portHigh: tt.fields.PortHigh,
+					portLow:  tt.fields.portLow,
+					portHigh: tt.fields.portHigh,
 				}
 				if got := pr.String(); got != tt.want {
 					t.Errorf("String() = %v, want %v", got, tt.want)
@@ -131,23 +131,20 @@ func Test_portFilter_String(t *testing.T) {
 }
 
 func Test_portFilter_isExactMatch(t *testing.T) {
-	type fields struct {
-		PortLow  uint16
-		PortHigh uint16
-	}
 	tests := []struct {
 		name   string
-		fields fields
+		fields portFilter
 		want   bool
 	}{
 		// TODO: Add test cases.
 	}
+
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
 				pr := portFilter{
-					portLow:  tt.fields.PortLow,
-					portHigh: tt.fields.PortHigh,
+					portLow:  tt.fields.portLow,
+					portHigh: tt.fields.portHigh,
 				}
 				if got := pr.isExactMatch(); got != tt.want {
 					t.Errorf("isExactMatch() = %v, want %v", got, tt.want)
@@ -158,23 +155,20 @@ func Test_portFilter_isExactMatch(t *testing.T) {
 }
 
 func Test_portFilter_isRangeMatch(t *testing.T) {
-	type fields struct {
-		PortLow  uint16
-		PortHigh uint16
-	}
 	tests := []struct {
 		name   string
-		fields fields
+		fields portFilter
 		want   bool
 	}{
 		// TODO: Add test cases.
 	}
+
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
 				pr := portFilter{
-					portLow:  tt.fields.PortLow,
-					portHigh: tt.fields.PortHigh,
+					portLow:  tt.fields.portLow,
+					portHigh: tt.fields.portHigh,
 				}
 				if got := pr.isRangeMatch(); got != tt.want {
 					t.Errorf("isRangeMatch() = %v, want %v", got, tt.want)
@@ -185,27 +179,24 @@ func Test_portFilter_isRangeMatch(t *testing.T) {
 }
 
 func Test_portFilter_isWildcardMatch(t *testing.T) {
-	type fields struct {
-		PortLow  uint16
-		PortHigh uint16
-	}
 	tests := []struct {
 		name   string
-		fields fields
+		fields portFilter
 		want   bool
 	}{
 		// TODO: Add test cases.
-		{name: "foo", fields: fields{
-			PortLow:  0,
-			PortHigh: 0,
+		{name: "foo", fields: portFilter{
+			portLow:  0,
+			portHigh: 0,
 		}, want: true},
 	}
+
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
 				pr := portFilter{
-					portLow:  tt.fields.PortLow,
-					portHigh: tt.fields.PortHigh,
+					portLow:  tt.fields.portLow,
+					portHigh: tt.fields.portHigh,
 				}
 				if got := pr.isWildcardMatch(); got != tt.want {
 					t.Errorf("isWildcardMatch() = %v, want %v", got, tt.want)
@@ -222,6 +213,7 @@ func matchesTernary(value uint16, rules []portFilterTernaryRule) bool {
 			return true
 		}
 	}
+
 	return false
 }
 

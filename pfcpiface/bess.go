@@ -717,6 +717,7 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 			log.Errorln(err)
 			return
 		}
+
 		log.Tracef("PDR rules %+v", portRules)
 
 		for _, r := range portRules {
@@ -807,6 +808,7 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 				log.Errorln("Error marshalling the rule", f, err)
 				return
 			}
+
 			b.processPDR(ctx, any, upfMsgTypeDel)
 		}
 		done <- true
