@@ -81,20 +81,20 @@ func (pr portRange) isRangeMatch() bool {
 
 // Returns portRange as an exact match, without checking if it is one. isExactMatch() must be true
 // before calling asExactMatchUnchecked.
-func (pr portRange) asExactMatchUnchecked() portFilterTernaryRule {
-	return portFilterTernaryRule{port: pr.low, mask: math.MaxUint16}
+func (pr portRange) asExactMatchUnchecked() portRangeTernaryRule {
+	return portRangeTernaryRule{port: pr.low, mask: math.MaxUint16}
 }
 
 // Return portRange as a trivial, single value and mask, ternary match. Will fail if conversion is
 // not possible.
-func (pr portRange) asTrivialTernaryMatch() (portFilterTernaryRule, error) {
+func (pr portRange) asTrivialTernaryMatch() (portRangeTernaryRule, error) {
 	if pr.isWildcardMatch() {
-		return portFilterTernaryRule{0, 0}, nil
+		return portRangeTernaryRule{0, 0}, nil
 	} else if pr.isExactMatch() {
 		return pr.asExactMatchUnchecked(), nil
 	}
 
-	return portFilterTernaryRule{}, ErrInvalidArgumentWithReason("asTrivialTernaryMatch", pr, "not trivially convertible")
+	return portRangeTernaryRule{}, ErrInvalidArgumentWithReason("asTrivialTernaryMatch", pr, "not trivially convertible")
 }
 
 type RangeConversionStrategy int
@@ -105,8 +105,8 @@ const (
 )
 
 // Returns portRange as a list of ternary matches that cover the same range.
-func (pr portRange) asComplexTernaryMatches(strategy RangeConversionStrategy) ([]portFilterTernaryRule, error) {
-	rules := make([]portFilterTernaryRule, 0)
+func (pr portRange) asComplexTernaryMatches(strategy RangeConversionStrategy) ([]portRangeTernaryRule, error) {
+	rules := make([]portRangeTernaryRule, 0)
 
 	// Fast path for exact and wildcard matches which are trivial.
 	if pr.isExactMatch() {
@@ -115,7 +115,7 @@ func (pr portRange) asComplexTernaryMatches(strategy RangeConversionStrategy) ([
 	}
 
 	if pr.isWildcardMatch() {
-		rules = append(rules, portFilterTernaryRule{0, 0})
+		rules = append(rules, portRangeTernaryRule{0, 0})
 		return rules, nil
 	}
 
@@ -126,7 +126,7 @@ func (pr portRange) asComplexTernaryMatches(strategy RangeConversionStrategy) ([
 		}
 
 		for port := int(pr.low); port <= int(pr.high); port++ {
-			rules = append(rules, portFilterTernaryRule{uint16(port), math.MaxUint16})
+			rules = append(rules, portRangeTernaryRule{uint16(port), math.MaxUint16})
 		}
 	} else if strategy == Ternary {
 		// Adapted from https://stackoverflow.com/a/66959276
@@ -162,7 +162,7 @@ func (pr portRange) asComplexTernaryMatches(strategy RangeConversionStrategy) ([
 		port := uint32(pr.low) // Promote to higher bit width for greater-equals check.
 		for port <= uint32(pr.high) {
 			mask := portMask(uint16(port), pr.high)
-			rules = append(rules, portFilterTernaryRule{uint16(port), mask})
+			rules = append(rules, portRangeTernaryRule{uint16(port), mask})
 			port = uint32(maxPort(uint16(port), mask)) + 1
 		}
 	} else {
@@ -172,22 +172,22 @@ func (pr portRange) asComplexTernaryMatches(strategy RangeConversionStrategy) ([
 	return rules, nil
 }
 
-type portFilterTernaryRule struct {
+type portRangeTernaryRule struct {
 	port, mask uint16
 }
 
-func (pf portFilterTernaryRule) String() string {
+func (pf portRangeTernaryRule) String() string {
 	return fmt.Sprintf("{0b%b & 0b%b}", pf.port, pf.mask)
 }
 
-type portFilterTernaryCartesianProduct struct {
+type portRangeTernaryCartesianProduct struct {
 	srcPort, srcMask uint16
 	dstPort, dstMask uint16
 }
 
 // CreatePortFilterCartesianProduct converts two port ranges into a list of ternary
 // rules covering the same range.
-func CreatePortFilterCartesianProduct(src, dst portRange) ([]portFilterTernaryCartesianProduct, error) {
+func CreatePortFilterCartesianProduct(src, dst portRange) ([]portRangeTernaryCartesianProduct, error) {
 	// A single range rule can result in multiple ternary ones. To cover the same range of packets,
 	// we need to create the Cartesian product of src and dst rules. For now, we only allow one true
 	// range match to keep the complexity in check.
@@ -196,7 +196,7 @@ func CreatePortFilterCartesianProduct(src, dst portRange) ([]portFilterTernaryCa
 			src, "src and dst ports cannot both be a range match")
 	}
 
-	rules := make([]portFilterTernaryCartesianProduct, 0)
+	rules := make([]portRangeTernaryCartesianProduct, 0)
 
 	if src.isRangeMatch() {
 		srcTernaryRules, err := src.asComplexTernaryMatches(Exact)
@@ -210,7 +210,7 @@ func CreatePortFilterCartesianProduct(src, dst portRange) ([]portFilterTernaryCa
 		}
 
 		for _, r := range srcTernaryRules {
-			p := portFilterTernaryCartesianProduct{
+			p := portRangeTernaryCartesianProduct{
 				srcPort: r.port, srcMask: r.mask,
 				dstPort: dstTernary.port, dstMask: dstTernary.mask,
 			}
@@ -228,7 +228,7 @@ func CreatePortFilterCartesianProduct(src, dst portRange) ([]portFilterTernaryCa
 		}
 
 		for _, r := range dstTernaryRules {
-			p := portFilterTernaryCartesianProduct{
+			p := portRangeTernaryCartesianProduct{
 				srcPort: srcTernary.port, srcMask: srcTernary.mask,
 				dstPort: r.port, dstMask: r.mask,
 			}
@@ -246,7 +246,7 @@ func CreatePortFilterCartesianProduct(src, dst portRange) ([]portFilterTernaryCa
 			return nil, err
 		}
 
-		p := portFilterTernaryCartesianProduct{
+		p := portRangeTernaryCartesianProduct{
 			dstPort: dstTernary.port, dstMask: dstTernary.mask,
 			srcPort: srcTernary.port, srcMask: srcTernary.mask,
 		}

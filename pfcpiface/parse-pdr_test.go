@@ -17,12 +17,12 @@ func Test_CreatePortFilterCartesianProduct(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    []portFilterTernaryCartesianProduct
+		want    []portRangeTernaryCartesianProduct
 		wantErr bool
 	}{
 		{name: "exact ranges",
 			args: args{src: newExactMatchPortFilter(5000), dst: newExactMatchPortFilter(80)},
-			want: []portFilterTernaryCartesianProduct{{
+			want: []portRangeTernaryCartesianProduct{{
 				srcPort: 5000,
 				srcMask: math.MaxUint16,
 				dstPort: 80,
@@ -31,7 +31,7 @@ func Test_CreatePortFilterCartesianProduct(t *testing.T) {
 			wantErr: false},
 		{name: "wildcard dst range",
 			args: args{src: newExactMatchPortFilter(10), dst: newWildcardPortFilter()},
-			want: []portFilterTernaryCartesianProduct{{
+			want: []portRangeTernaryCartesianProduct{{
 				srcPort: 10,
 				srcMask: math.MaxUint16,
 				dstPort: 0,
@@ -40,7 +40,7 @@ func Test_CreatePortFilterCartesianProduct(t *testing.T) {
 			wantErr: false},
 		{name: "true range src range",
 			args: args{src: newRangeMatchPortFilter(1, 3), dst: newExactMatchPortFilter(80)},
-			want: []portFilterTernaryCartesianProduct{
+			want: []portRangeTernaryCartesianProduct{
 				{
 					srcPort: 0x1,
 					srcMask: 0xffff,
@@ -106,7 +106,7 @@ func Test_newWildcardPortFilter(t *testing.T) {
 	}
 }
 
-func Test_portFilter_String(t *testing.T) {
+func Test_portRange_String(t *testing.T) {
 	tests := []struct {
 		name string
 		pr   portRange
@@ -126,7 +126,7 @@ func Test_portFilter_String(t *testing.T) {
 	}
 }
 
-func Test_portFilter_isExactMatch(t *testing.T) {
+func Test_portRange_isExactMatch(t *testing.T) {
 	tests := []struct {
 		name string
 		pr   portRange
@@ -146,7 +146,7 @@ func Test_portFilter_isExactMatch(t *testing.T) {
 	}
 }
 
-func Test_portFilter_isRangeMatch(t *testing.T) {
+func Test_portRange_isRangeMatch(t *testing.T) {
 	tests := []struct {
 		name string
 		pr   portRange
@@ -166,7 +166,7 @@ func Test_portFilter_isRangeMatch(t *testing.T) {
 	}
 }
 
-func Test_portFilter_isWildcardMatch(t *testing.T) {
+func Test_portRange_isWildcardMatch(t *testing.T) {
 	tests := []struct {
 		name string
 		pr   portRange
@@ -191,7 +191,7 @@ func Test_portFilter_isWildcardMatch(t *testing.T) {
 }
 
 // Perform a ternary match of value against rules.
-func matchesTernary(value uint16, rules []portFilterTernaryRule) bool {
+func matchesTernary(value uint16, rules []portRangeTernaryRule) bool {
 	for _, r := range rules {
 		if (value & r.mask) == r.port {
 			return true
@@ -201,20 +201,20 @@ func matchesTernary(value uint16, rules []portFilterTernaryRule) bool {
 	return false
 }
 
-func Test_portFilter_asComplexTernaryMatches(t *testing.T) {
+func Test_portRange_asComplexTernaryMatches(t *testing.T) {
 	tests := []struct {
 		name     string
 		pr       portRange
 		strategy RangeConversionStrategy
 		wantErr  bool
-		want     []portFilterTernaryRule
+		want     []portRangeTernaryRule
 	}{
 		{name: "Exact match port range",
 			pr: portRange{
 				low:  8888,
 				high: 8888,
 			},
-			want: []portFilterTernaryRule{
+			want: []portRangeTernaryRule{
 				{port: 8888, mask: 0xffff},
 			},
 			wantErr: false},
@@ -223,7 +223,7 @@ func Test_portFilter_asComplexTernaryMatches(t *testing.T) {
 				low:  0,
 				high: math.MaxUint16,
 			},
-			want: []portFilterTernaryRule{
+			want: []portRangeTernaryRule{
 				{port: 0, mask: 0},
 			},
 			wantErr: false},
@@ -232,7 +232,7 @@ func Test_portFilter_asComplexTernaryMatches(t *testing.T) {
 				low:  0b0, // 0
 				high: 0b1, // 1
 			},
-			//want: []portFilterTernaryRule{
+			//want: []portRangeTernaryRule{
 			//	{port: 0b0, mask: 0xfffe},
 			//},
 			wantErr: false},
@@ -241,7 +241,7 @@ func Test_portFilter_asComplexTernaryMatches(t *testing.T) {
 				low:  0b01, // 1
 				high: 0b10, // 2
 			},
-			//want: []portFilterTernaryRule{
+			//want: []portRangeTernaryRule{
 			//	{port: 0b01, mask: 0xffff},
 			//	{port: 0b10, mask: 0xffff},
 			//},
@@ -252,7 +252,7 @@ func Test_portFilter_asComplexTernaryMatches(t *testing.T) {
 				high: 0x01ff, // 511
 			},
 			strategy: Ternary,
-			//want: []portFilterTernaryRule{
+			//want: []portRangeTernaryRule{
 			//	{port: 0x0100, mask: 0xff00},
 			//},
 			wantErr: false},
@@ -261,7 +261,7 @@ func Test_portFilter_asComplexTernaryMatches(t *testing.T) {
 				low:  0b01, // 1
 				high: 0b11, // 3
 			},
-			//want: []portFilterTernaryRule{
+			//want: []portRangeTernaryRule{
 			//	{port: 0b01, mask: 0xffff},
 			//	{port: 0b10, mask: 0xfffe},
 			//},
@@ -320,7 +320,7 @@ func Test_portFilter_asComplexTernaryMatches(t *testing.T) {
 	}
 }
 
-func Test_portFilter_asTrivialTernaryMatch(t *testing.T) {
+func Test_portRange_asTrivialTernaryMatch(t *testing.T) {
 	tests := []struct {
 		name     string
 		pr       portRange
@@ -362,7 +362,7 @@ func Test_portFilter_asTrivialTernaryMatch(t *testing.T) {
 	}
 }
 
-func Test_portFilter_Width(t *testing.T) {
+func Test_portRange_Width(t *testing.T) {
 	tests := []struct {
 		name string
 		pr   portRange
