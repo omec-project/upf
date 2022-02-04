@@ -63,10 +63,6 @@ func (af applicationFilter) String() string {
 		af.protoMask, af.srcPort, af.srcPortMask, af.dstPort, af.dstPortMask)
 }
 
-func (af applicationFilter) IsEmpty() bool {
-	return af.srcIP == 0 && af.dstIP == 0 && af.proto == 0 && af.srcPort == 0 && af.dstPort == 0
-}
-
 func (p pdr) String() string {
 	return fmt.Sprintf("PDR(id=%v, F-SEID=%v, srcIface=%v, tunnelIPv4Dst=%v/%x, "+
 		"tunnelTEID=%v/%x, ueAddress=%v, applicationFilter=%v, precedence=%v, F-SEID IP=%v, "+
@@ -74,6 +70,12 @@ func (p pdr) String() string {
 		p.pdrID, p.fseID, p.srcIface, p.tunnelIP4Dst, p.tunnelIP4DstMask,
 		p.tunnelTEID, p.tunnelTEIDMask, int2ip(p.ueAddress), p.appFilter, p.precedence,
 		p.fseidIP, p.ctrID, p.farID, p.qerIDList, p.needDecap, p.allocIPFlag)
+}
+
+func (p pdr) IsAppFilterEmpty() bool {
+	return p.appFilter.proto == 0 &&
+		((p.IsUplink() && p.appFilter.dstIP == 0 && p.appFilter.dstPort == 0) ||
+			(p.IsDownlink() && p.appFilter.srcIP == 0 && p.appFilter.srcPort == 0))
 }
 
 func (p pdr) IsUplink() bool {
