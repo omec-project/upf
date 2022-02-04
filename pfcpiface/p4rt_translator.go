@@ -746,7 +746,8 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, appMeterIdx uint1
 	return entry, nil
 }
 
-func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uint16, relatedFAR far, internalAppID uint8, tc uint8) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uint16, relatedFAR far,
+	internalAppID uint8, qfi uint8, tc uint8) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
 		"pdr":           pdr,
 		"appMeterIndex": appMeterIdx,
@@ -783,8 +784,7 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uin
 			return nil, err
 		}
 
-		// TODO: add support for QFI, which should be provided as a part of related QER
-		if err := t.withActionParam(action, FieldQFI, uint8(0)); err != nil {
+		if err := t.withActionParam(action, FieldQFI, qfi); err != nil {
 			return nil, err
 		}
 
@@ -804,8 +804,7 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uin
 			return nil, err
 		}
 
-		// TODO: add support for QFI, which should be provided as a part of related QER
-		if err := t.withActionParam(action, FieldQFI, uint8(0)); err != nil {
+		if err := t.withActionParam(action, FieldQFI, qfi); err != nil {
 			return nil, err
 		}
 
@@ -827,12 +826,12 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uin
 	return entry, nil
 }
 
-func (t *P4rtTranslator) BuildTerminationsTableEntry(pdr pdr, appMeter meter, relatedFAR far, internalAppID uint8, tc uint8) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) BuildTerminationsTableEntry(pdr pdr, appMeter meter, relatedFAR far, internalAppID uint8, qfi uint8, tc uint8) (*p4.TableEntry, error) {
 	switch pdr.srcIface {
 	case access:
 		return t.buildUplinkTerminationsEntry(pdr, appMeter.uplinkCellID, relatedFAR.Drops(), internalAppID, tc)
 	case core:
-		return t.buildDownlinkTerminationsEntry(pdr, appMeter.downlinkCellID, relatedFAR, internalAppID, tc)
+		return t.buildDownlinkTerminationsEntry(pdr, appMeter.downlinkCellID, relatedFAR, internalAppID, qfi, tc)
 	default:
 		return nil, ErrUnsupported("source interface type of PDR", pdr.srcIface)
 	}

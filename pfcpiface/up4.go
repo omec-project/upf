@@ -510,6 +510,21 @@ func findRelatedFAR(pdr pdr, fars []far) (far, error) {
 	return far{}, ErrNotFoundWithParam("related FAR for PDR", "PDR", pdr)
 }
 
+func findRelatedApplicationQER(pdr pdr, qers []qer) (qer, error) {
+	for _, qer := range qers {
+		if len(pdr.qerIDList) != 0 {
+			// if only 1 QER provided, it's an application QER
+			// if 2 QERs provided, the first one is an application QER
+			// if more than 2 QERs provided, TODO: not supported
+			if pdr.qerIDList[0] == qer.qerID {
+				return qer, nil
+			}
+		}
+	}
+
+	return qer{}, ErrNotFoundWithParam("related application QER for PDR", "PDR", pdr)
+}
+
 // Returns error if we reach maximum supported GTP Tunnel Peers.
 func (up4 *UP4) allocateGTPTunnelPeerID() (uint8, error) {
 	if len(up4.tunnelPeerIDsPool) == 0 {
@@ -956,7 +971,7 @@ func (up4 *UP4) configureMetersBasedOnQERs(qers []qer) error {
 
 // modifyUP4ForwardingConfiguration builds P4Runtime table entries and
 // inserts/modifies/removes table entries from UP4 device, according to methodType.
-func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, methodType p4.Update_Type) error {
+func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers []qer, methodType p4.Update_Type) error {
 	for _, pdr := range pdrs {
 		entriesToApply := make([]*p4.TableEntry, 0)
 
@@ -1040,8 +1055,14 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, meth
 			appMeter = up4.meters[pdr.qerIDList[0]]
 		}
 
+		relatedQER, err := findRelatedApplicationQER(pdr, qers)
+		if err != nil {
+			return err
+		}
+
 		// FIXME: get TC from QFI->TC mapping
-		terminationsEntry, err := up4.p4RtTranslator.BuildTerminationsTableEntry(pdr, appMeter, far, applicationID, uint8(0))
+		terminationsEntry, err := up4.p4RtTranslator.BuildTerminationsTableEntry(pdr, appMeter, far,
+			applicationID, relatedQER.qfi, uint8(0))
 		if err != nil {
 			return ErrOperationFailedWithReason("build P4rt table entry for Terminations table", err.Error())
 		}
@@ -1101,7 +1122,7 @@ func (up4 *UP4) sendCreate(all PacketForwardingRules, updated PacketForwardingRu
 		return err
 	}
 
-	if err := up4.modifyUP4ForwardingConfiguration(all.pdrs, all.fars, p4.Update_INSERT); err != nil {
+	if err := up4.modifyUP4ForwardingConfiguration(all.pdrs, all.fars, all.qers, p4.Update_INSERT); err != nil {
 		// TODO: revert operations (e.g. reset counter)
 		return err
 	}
@@ -1119,7 +1140,7 @@ func (up4 *UP4) sendUpdate(all PacketForwardingRules, updated PacketForwardingRu
 		return err
 	}
 
-	if err := up4.modifyUP4ForwardingConfiguration(all.pdrs, all.fars, p4.Update_MODIFY); err != nil {
+	if err := up4.modifyUP4ForwardingConfiguration(all.pdrs, all.fars, all.qers, p4.Update_MODIFY); err != nil {
 		return err
 	}
 
@@ -1132,7 +1153,7 @@ func (up4 *UP4) sendDelete(deleted PacketForwardingRules) error {
 			uint64(deleted.pdrs[i].ctrID))
 	}
 
-	if err := up4.modifyUP4ForwardingConfiguration(deleted.pdrs, deleted.fars, p4.Update_DELETE); err != nil {
+	if err := up4.modifyUP4ForwardingConfiguration(deleted.pdrs, deleted.fars, deleted.qers, p4.Update_DELETE); err != nil {
 		return err
 	}
 
