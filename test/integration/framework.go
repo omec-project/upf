@@ -3,7 +3,7 @@
 
 package integration
 
-import p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
+import "net"
 
 // this file should contain all the struct defs/constants used among different test cases.
 
@@ -44,18 +44,19 @@ type pfcpSessionData struct {
 	appQFI  uint8
 }
 
-type p4RtEntries struct {
-	sessionsUplink []*p4_v1.TableEntry
-	sessionsDownlink []*p4_v1.TableEntry
-	terminationsUplink []*p4_v1.TableEntry
-	terminationsDownlink []*p4_v1.TableEntry
-
-	tunnelPeers []*p4_v1.TableEntry
-
-	applications []*p4_v1.TableEntry
+type portRange struct {
+	low uint16
+	high uint16
 }
 
-func (e p4RtEntries) Len() int {
-	return len(e.tunnelPeers) + len(e.applications) + len(e.sessionsUplink) +  len(e.sessionsDownlink) +
-		len(e.terminationsUplink) + len(e.terminationsDownlink)
+type appFilter struct {
+	proto uint8
+	appIP net.IP
+	appPrefixLen uint32
+	appPort portRange
+}
+
+type p4RtValues struct {
+	appID     uint8
+	appFilter appFilter
 }
