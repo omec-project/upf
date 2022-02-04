@@ -14,80 +14,80 @@ import (
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
-// portFilter encapsulates a L4 port range as seen in PDRs. A zero value portFilter represents
+// portRange encapsulates a L4 port range as seen in PDRs. A zero value portRange represents
 // a wildcard match, but use of the dedicated new*PortFilter() functions is encouraged.
-type portFilter struct {
-	portLow  uint16
-	portHigh uint16
+type portRange struct {
+	low  uint16
+	high uint16
 }
 
-// newWildcardPortFilter returns a portFilter that matches on every possible port, i.e., implements
+// newWildcardPortFilter returns a portRange that matches on every possible port, i.e., implements
 // no filtering.
-func newWildcardPortFilter() portFilter {
-	return portFilter{
-		portLow:  0,
-		portHigh: math.MaxUint16,
+func newWildcardPortFilter() portRange {
+	return portRange{
+		low:  0,
+		high: math.MaxUint16,
 	}
 }
 
-// newExactMatchPortFilter returns a portFilter that matches on exactly the given port.
-func newExactMatchPortFilter(port uint16) portFilter {
-	return portFilter{
-		portLow:  port,
-		portHigh: port,
+// newExactMatchPortFilter returns a portRange that matches on exactly the given port.
+func newExactMatchPortFilter(port uint16) portRange {
+	return portRange{
+		low:  port,
+		high: port,
 	}
 }
 
-// newRangeMatchPortFilter returns a portFilter that matches on the given range [low, high].
+// newRangeMatchPortFilter returns a portRange that matches on the given range [low, high].
 // low must be smaller than high. Creating exact and wildcard matches with this function is
 // possible, but use of the dedicated functions is encouraged.
-func newRangeMatchPortFilter(low, high uint16) portFilter {
+func newRangeMatchPortFilter(low, high uint16) portRange {
 	if low > high {
-		return portFilter{}
+		return portRange{}
 	}
 
-	return portFilter{
-		portLow:  low,
-		portHigh: high,
+	return portRange{
+		low:  low,
+		high: high,
 	}
 }
 
-func (pr portFilter) String() string {
-	return fmt.Sprintf("{%v-%v}", pr.portLow, pr.portHigh)
+func (pr portRange) String() string {
+	return fmt.Sprintf("{%v-%v}", pr.low, pr.high)
 }
 
-// Width returns the number of ports covered by this portFilter.
-func (pr portFilter) Width() uint16 {
+// Width returns the number of ports covered by this portRange.
+func (pr portRange) Width() uint16 {
 	// Need to handle the zero value.
 	if pr.isWildcardMatch() {
 		return math.MaxUint16
 	} else {
-		return pr.portHigh - pr.portLow + 1
+		return pr.high - pr.low + 1
 	}
 }
 
-func (pr portFilter) isWildcardMatch() bool {
-	return pr.portLow == 0 && pr.portHigh == math.MaxUint16 ||
-		pr.portLow == 0 && pr.portHigh == 0
+func (pr portRange) isWildcardMatch() bool {
+	return pr.low == 0 && pr.high == math.MaxUint16 ||
+		pr.low == 0 && pr.high == 0
 }
 
-func (pr portFilter) isExactMatch() bool {
-	return pr.portLow == pr.portHigh && pr.portHigh != 0
+func (pr portRange) isExactMatch() bool {
+	return pr.low == pr.high && pr.high != 0
 }
 
-func (pr portFilter) isRangeMatch() bool {
+func (pr portRange) isRangeMatch() bool {
 	return !pr.isExactMatch() && !pr.isWildcardMatch()
 }
 
-// Returns portFilter as an exact match, without checking if it is one. isExactMatch() must be true
+// Returns portRange as an exact match, without checking if it is one. isExactMatch() must be true
 // before calling asExactMatchUnchecked.
-func (pr portFilter) asExactMatchUnchecked() portFilterTernaryRule {
-	return portFilterTernaryRule{port: pr.portLow, mask: math.MaxUint16}
+func (pr portRange) asExactMatchUnchecked() portFilterTernaryRule {
+	return portFilterTernaryRule{port: pr.low, mask: math.MaxUint16}
 }
 
-// Return portFilter as a trivial, single value and mask, ternary match. Will fail if conversion is
+// Return portRange as a trivial, single value and mask, ternary match. Will fail if conversion is
 // not possible.
-func (pr portFilter) asTrivialTernaryMatch() (portFilterTernaryRule, error) {
+func (pr portRange) asTrivialTernaryMatch() (portFilterTernaryRule, error) {
 	if pr.isWildcardMatch() {
 		return portFilterTernaryRule{0, 0}, nil
 	} else if pr.isExactMatch() {
@@ -104,8 +104,8 @@ const (
 	Ternary
 )
 
-// Returns portFilter as a list of ternary matches that cover the same range.
-func (pr portFilter) asComplexTernaryMatches(strategy RangeConversionStrategy) ([]portFilterTernaryRule, error) {
+// Returns portRange as a list of ternary matches that cover the same range.
+func (pr portRange) asComplexTernaryMatches(strategy RangeConversionStrategy) ([]portFilterTernaryRule, error) {
 	rules := make([]portFilterTernaryRule, 0)
 
 	// Fast path for exact and wildcard matches which are trivial.
@@ -125,7 +125,7 @@ func (pr portFilter) asComplexTernaryMatches(strategy RangeConversionStrategy) (
 				"port range too wide for exact match strategy")
 		}
 
-		for port := int(pr.portLow); port <= int(pr.portHigh); port++ {
+		for port := int(pr.low); port <= int(pr.high); port++ {
 			rules = append(rules, portFilterTernaryRule{uint16(port), math.MaxUint16})
 		}
 	} else if strategy == Ternary {
@@ -159,9 +159,9 @@ func (pr portFilter) asComplexTernaryMatches(strategy RangeConversionStrategy) (
 			return mask
 		}
 
-		port := uint32(pr.portLow) // Promote to higher bit width for greater-equals check.
-		for port <= uint32(pr.portHigh) {
-			mask := portMask(uint16(port), pr.portHigh)
+		port := uint32(pr.low) // Promote to higher bit width for greater-equals check.
+		for port <= uint32(pr.high) {
+			mask := portMask(uint16(port), pr.high)
 			rules = append(rules, portFilterTernaryRule{uint16(port), mask})
 			port = uint32(maxPort(uint16(port), mask)) + 1
 		}
@@ -187,7 +187,7 @@ type portFilterTernaryCartesianProduct struct {
 
 // CreatePortFilterCartesianProduct converts two port ranges into a list of ternary
 // rules covering the same range.
-func CreatePortFilterCartesianProduct(src, dst portFilter) ([]portFilterTernaryCartesianProduct, error) {
+func CreatePortFilterCartesianProduct(src, dst portRange) ([]portFilterTernaryCartesianProduct, error) {
 	// A single range rule can result in multiple ternary ones. To cover the same range of packets,
 	// we need to create the Cartesian product of src and dst rules. For now, we only allow one true
 	// range match to keep the complexity in check.
@@ -259,8 +259,8 @@ func CreatePortFilterCartesianProduct(src, dst portFilter) ([]portFilterTernaryC
 type applicationFilter struct {
 	srcIP         uint32
 	dstIP         uint32
-	srcPortFilter portFilter
-	dstPortFilter portFilter
+	srcPortFilter portRange
+	dstPortFilter portRange
 	proto         uint8
 
 	srcIPMask uint32

@@ -50,7 +50,7 @@ const (
 
 type application struct {
 	appIP     uint32
-	appL4Port portFilter
+	appL4Port portRange
 	appProto  uint8
 }
 

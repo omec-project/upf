@@ -518,7 +518,7 @@ func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, internalAppID uint
 
 	var (
 		appIP, appIPMask uint32 = 0, 0
-		appPort          portFilter
+		appPort          portRange
 	)
 
 	if pdr.srcIface == access {
@@ -539,7 +539,7 @@ func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, internalAppID uint
 	}
 
 	if !appPort.isWildcardMatch() {
-		if err := t.withRangeMatchField(entry, FieldAppL4Port, appPort.portLow, appPort.portHigh); err != nil {
+		if err := t.withRangeMatchField(entry, FieldAppL4Port, appPort.low, appPort.high); err != nil {
 			return nil, err
 		}
 	}

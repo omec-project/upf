@@ -22,7 +22,7 @@ var errBadFilterDesc = errors.New("unsupported Filter Description format")
 
 type endpoint struct {
 	IPNet *net.IPNet
-	ports portFilter
+	ports portRange
 }
 
 func (ep *endpoint) parseNet(ipnet string) error {
