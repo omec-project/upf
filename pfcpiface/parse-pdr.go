@@ -498,8 +498,9 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 				p.appFilter.srcIPMask = ipMask2int(ipf.dst.IPNet.Mask)
 				p.appFilter.dstIP = ip2int(ipf.src.IPNet.IP)
 				p.appFilter.dstIPMask = ipMask2int(ipf.src.IPNet.Mask)
-				p.appFilter.dstPortFilter = ipf.dst.ports
-				p.appFilter.srcPortFilter = ipf.src.ports
+				// Ports are flipped for access PDRs
+				p.appFilter.dstPortFilter = ipf.src.ports
+				p.appFilter.srcPortFilter = ipf.dst.ports
 
 				// FIXME: temporary workaround for SDF Filter,
 				//  remove once we meet spec compliance
