@@ -32,7 +32,7 @@ const (
 )
 
 func buildExpectedApplicationsEntry(client *p4rtc.Client, testdata *pfcpSessionData, expectedValues p4RtValues) *p4_v1.TableEntry {
-	if expectedValues.appFilter.proto == 0 && expectedValues.appFilter.appIP.IsUnspecified() &&
+	if expectedValues.appFilter.proto == 0 && len(expectedValues.appFilter.appIP) == 0 &&
 		expectedValues.appFilter.appPort.low == 0 && expectedValues.appFilter.appPort.high == 0 {
 		return nil
 	}
@@ -40,7 +40,6 @@ func buildExpectedApplicationsEntry(client *p4rtc.Client, testdata *pfcpSessionD
 	mfs := make([]p4rtc.MatchInterface, 0)
 
 	if len(expectedValues.appFilter.appIP) > 0 && !expectedValues.appFilter.appIP.IsUnspecified() {
-		fmt.Println("building LPM")
 		appIPVal, _ := conversion.IpToBinary(expectedValues.appFilter.appIP.String())
 		mfs = append(mfs, &p4rtc.LpmMatch{
 			Value: appIPVal,
@@ -72,7 +71,6 @@ func buildExpectedApplicationsEntry(client *p4rtc.Client, testdata *pfcpSessionD
 	te.Priority = int32(math.MaxUint8 - testdata.precedence)
 
 	// p4runtime-go-client doesn't properly enumerate match fields
-	// assuming "any" as application IP, we simply override FieldId
 	// TODO: fix enumeration in p4runtime-go-client
 	for _, mf := range te.Match {
 		if mf.GetLpm() != nil {
@@ -184,7 +182,7 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, expectedVal
 
 	if afterModification {
 		// new tunnel peer
-		expectedTunnelPeerID = 2
+		expectedTunnelPeerID = expectedValues.tunnelPeerID
 	}
 
 	expectedApplicationsEntry := buildExpectedApplicationsEntry(p4rtClient, testdata, expectedValues)
@@ -252,9 +250,17 @@ func verifyNoP4RuntimeEntries(t *testing.T) {
 	require.NoErrorf(t, err, "failed to connect to P4Runtime server")
 	defer providers.DisconnectP4rt()
 
-	allInstalledEntries, _ := p4rtClient.ReadTableEntryWildcard("")
-	// table p4RtEntries for interfaces table are not removed by pfcpiface
-	// FIXME: tunnel_peers and applications are not cleared on session deletion/association release
-	//  See SDFAB-960
-	require.Equal(t, 3, len(allInstalledEntries), "UP4 should have only 3 entry installed", allInstalledEntries)
+	tables := []string{
+		// FIXME: tunnel_peers and applications are not cleared on session deletion/association release
+		//  See SDFAB-960
+		//  Add tunnel_peers and applications to the list, once fixed
+		"PreQosPipe.sessions_uplink", "PreQosPipe.sessions_downlink",
+		"PreQosPipe.terminations_uplink", "PreQosPipe.terminations_downlink",
+	}
+
+	for _, table := range tables {
+		entries, _ := p4rtClient.ReadTableEntryWildcard(table)
+		require.Equal(t, 0, len(entries),
+			fmt.Sprintf("%v should not contain any entries", table))
+	}
 }

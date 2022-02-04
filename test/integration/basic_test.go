@@ -112,6 +112,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 
+	// Application filtering test cases
 	testCases := []testCase{
 		{
 			input: &pfcpSessionData{
@@ -134,14 +135,16 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 					},
 				},
 				appID: 1,
+				tunnelPeerID: 2,
 			},
-			desc:  "Application filter including \"assigned\" UE address, IP proto, App L4 Port and \"any\" App IP",
+			desc:  "APPLICATION FILTERING permit out udp from any to assigned 80-80",
 		},
 		{
 			input: &pfcpSessionData{
 				nbAddress:    nodeBAddress,
 				ueAddress:    ueAddress,
 				upfN3Address: upfN3Address,
+				// TODO: use wider port range once multi port ranges are supported
 				sdfFilter:    "permit out udp from 192.168.1.1/32 to assigned 80-80",
 				ulTEID:  15,
 				dlTEID:  16,
@@ -157,9 +160,12 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 80,
 					},
 				},
+				// FIXME: there is a dependency on previous test because pfcpiface doesn't clear application IDs properly
+				//  See SDFAB-960
 				appID: 2,
+				tunnelPeerID: 2,
 			},
-			desc:  "Application filter including \"assigned\" UE address, IP proto, custom App L4 Port and custom App IP",
+			desc:  "APPLICATION FILTERING permit out udp from 192.168.1.1/32 to assigned 80-80",
 		},
 		{
 			input: &pfcpSessionData{
@@ -173,9 +179,11 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				appQFI:  0x08,
 			},
 			expected: p4RtValues{
+				// no application filtering rule expected
 				appID: 0,
+				tunnelPeerID: 2,
 			},
-			desc:  "Application filter ALLOW_ALL",
+			desc:  "APPLICATION FILTERING ALLOW_ALL",
 		},
 	}
 

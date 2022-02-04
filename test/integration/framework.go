@@ -45,18 +45,19 @@ type pfcpSessionData struct {
 }
 
 type portRange struct {
-	low uint16
+	low  uint16
 	high uint16
 }
 
 type appFilter struct {
-	proto uint8
-	appIP net.IP
+	proto        uint8
+	appIP        net.IP
 	appPrefixLen uint32
-	appPort portRange
+	appPort      portRange
 }
 
 type p4RtValues struct {
-	appID     uint8
-	appFilter appFilter
+	tunnelPeerID uint8
+	appID        uint8
+	appFilter    appFilter
 }
