@@ -712,7 +712,7 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 		}
 
 		// Translate port ranges into ternary rule(s) and insert them one-by-one.
-		portRules, err := CreatePortFilterCartesianProduct(p.appFilter.srcPortFilter, p.appFilter.dstPortFilter)
+		portRules, err := CreatePortRangeCartesianProduct(p.appFilter.srcPortRange, p.appFilter.dstPortRange)
 		if err != nil {
 			log.Errorln(err)
 			return
@@ -773,7 +773,7 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 		)
 
 		// Translate port ranges into ternary rule(s) and insert them one-by-one.
-		portRules, err := CreatePortFilterCartesianProduct(p.appFilter.srcPortFilter, p.appFilter.dstPortFilter)
+		portRules, err := CreatePortRangeCartesianProduct(p.appFilter.srcPortRange, p.appFilter.dstPortRange)
 		if err != nil {
 			log.Errorln(err)
 			return

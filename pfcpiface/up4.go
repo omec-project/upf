@@ -573,7 +573,7 @@ func (up4 *UP4) allocateInternalApplicationID(app application) (uint8, error) {
 func (up4 *UP4) releaseInternalApplicationID(appFilter applicationFilter) {
 	app := application{
 		appIP:     appFilter.srcIP,
-		appL4Port: appFilter.srcPortFilter,
+		appL4Port: appFilter.srcPortRange,
 		appProto:  appFilter.proto,
 	}
 
@@ -589,12 +589,12 @@ func (up4 *UP4) getOrAllocateInternalApplicationID(pdr pdr) (uint8, error) {
 	if pdr.IsUplink() {
 		app = application{
 			appIP:     pdr.appFilter.dstIP,
-			appL4Port: pdr.appFilter.dstPortFilter,
+			appL4Port: pdr.appFilter.dstPortRange,
 		}
 	} else if pdr.IsDownlink() {
 		app = application{
 			appIP:     pdr.appFilter.srcIP,
-			appL4Port: pdr.appFilter.srcPortFilter,
+			appL4Port: pdr.appFilter.srcPortRange,
 		}
 	}
 

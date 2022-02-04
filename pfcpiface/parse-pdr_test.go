@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_CreatePortFilterCartesianProduct(t *testing.T) {
+func Test_CreatePortRangeCartesianProduct(t *testing.T) {
 	type args struct {
 		src portRange
 		dst portRange
@@ -21,7 +21,7 @@ func Test_CreatePortFilterCartesianProduct(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "exact ranges",
-			args: args{src: newExactMatchPortFilter(5000), dst: newExactMatchPortFilter(80)},
+			args: args{src: newExactMatchPortRange(5000), dst: newExactMatchPortRange(80)},
 			want: []portRangeTernaryCartesianProduct{{
 				srcPort: 5000,
 				srcMask: math.MaxUint16,
@@ -30,7 +30,7 @@ func Test_CreatePortFilterCartesianProduct(t *testing.T) {
 			}},
 			wantErr: false},
 		{name: "wildcard dst range",
-			args: args{src: newExactMatchPortFilter(10), dst: newWildcardPortFilter()},
+			args: args{src: newExactMatchPortRange(10), dst: newWildcardPortRange()},
 			want: []portRangeTernaryCartesianProduct{{
 				srcPort: 10,
 				srcMask: math.MaxUint16,
@@ -39,7 +39,7 @@ func Test_CreatePortFilterCartesianProduct(t *testing.T) {
 			}},
 			wantErr: false},
 		{name: "true range src range",
-			args: args{src: newRangeMatchPortFilter(1, 3), dst: newExactMatchPortFilter(80)},
+			args: args{src: newRangeMatchPortRange(1, 3), dst: newExactMatchPortRange(80)},
 			want: []portRangeTernaryCartesianProduct{
 				{
 					srcPort: 0x1,
@@ -61,7 +61,7 @@ func Test_CreatePortFilterCartesianProduct(t *testing.T) {
 				}},
 			wantErr: false},
 		{name: "invalid double range",
-			args:    args{src: newRangeMatchPortFilter(10, 20), dst: newRangeMatchPortFilter(80, 85)},
+			args:    args{src: newRangeMatchPortRange(10, 20), dst: newRangeMatchPortRange(80, 85)},
 			want:    nil,
 			wantErr: true},
 	}
@@ -69,26 +69,26 @@ func Test_CreatePortFilterCartesianProduct(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				got, err := CreatePortFilterCartesianProduct(tt.args.src, tt.args.dst)
+				got, err := CreatePortRangeCartesianProduct(tt.args.src, tt.args.dst)
 				if (err != nil) != tt.wantErr {
-					t.Errorf("CreatePortFilterCartesianProduct() error = %v, wantErr %v", err, tt.wantErr)
+					t.Errorf("CreatePortRangeCartesianProduct() error = %v, wantErr %v", err, tt.wantErr)
 					return
 				}
 				if !reflect.DeepEqual(got, tt.want) {
-					t.Errorf("CreatePortFilterCartesianProduct() got = %v, want %v", got, tt.want)
+					t.Errorf("CreatePortRangeCartesianProduct() got = %v, want %v", got, tt.want)
 				}
 			},
 		)
 	}
 }
 
-func Test_defaultPortFilter(t *testing.T) {
+func Test_defaultPortRange(t *testing.T) {
 	t.Run("default constructed is wildcard", func(t *testing.T) {
 		assert.True(t, portRange{}.isWildcardMatch(), "default portRange is wildcard")
 	})
 }
 
-func Test_newWildcardPortFilter(t *testing.T) {
+func Test_newWildcardPortRange(t *testing.T) {
 	tests := []struct {
 		name string
 		want portRange
@@ -98,8 +98,8 @@ func Test_newWildcardPortFilter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				if got := newWildcardPortFilter(); !reflect.DeepEqual(got, tt.want) {
-					t.Errorf("newWildcardPortFilter() = %v, want %v", got, tt.want)
+				if got := newWildcardPortRange(); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("newWildcardPortRange() = %v, want %v", got, tt.want)
 				}
 			},
 		)
@@ -368,11 +368,11 @@ func Test_portRange_Width(t *testing.T) {
 		pr   portRange
 		want uint16
 	}{
-		{name: "wildcard", pr: newWildcardPortFilter(), want: math.MaxUint16},
+		{name: "wildcard", pr: newWildcardPortRange(), want: math.MaxUint16},
 		{name: "zero value", pr: portRange{}, want: math.MaxUint16},
-		{name: "exact match", pr: newExactMatchPortFilter(100), want: 1},
-		{name: "range match", pr: newRangeMatchPortFilter(10, 12), want: 3},
-		{name: "range single match", pr: newRangeMatchPortFilter(1000, 1000), want: 1},
+		{name: "exact match", pr: newExactMatchPortRange(100), want: 1},
+		{name: "range match", pr: newRangeMatchPortRange(10, 12), want: 3},
+		{name: "range single match", pr: newRangeMatchPortRange(1000, 1000), want: 1},
 	}
 	for _, tt := range tests {
 		t.Run(

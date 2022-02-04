@@ -71,7 +71,7 @@ func (ep *endpoint) parsePort(port string) error {
 		return ErrInvalidArgumentWithReason("port", port, "invalid port range")
 	}
 
-	ep.ports = newRangeMatchPortFilter(uint16(low), uint16(high))
+	ep.ports = newRangeMatchPortRange(uint16(low), uint16(high))
 
 	return nil
 }
@@ -84,8 +84,8 @@ type ipFilterRule struct {
 
 func newIpFilterRule() *ipFilterRule {
 	return &ipFilterRule{
-		src: endpoint{ports: newWildcardPortFilter()},
-		dst: endpoint{ports: newWildcardPortFilter()},
+		src: endpoint{ports: newWildcardPortRange()},
+		dst: endpoint{ports: newWildcardPortRange()},
 	}
 }
 

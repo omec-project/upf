@@ -523,10 +523,10 @@ func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, internalAppID uint
 
 	if pdr.srcIface == access {
 		appIP, appIPMask = pdr.appFilter.dstIP, pdr.appFilter.dstIPMask
-		appPort = pdr.appFilter.dstPortFilter
+		appPort = pdr.appFilter.dstPortRange
 	} else if pdr.srcIface == core {
 		appIP, appIPMask = pdr.appFilter.srcIP, pdr.appFilter.srcIPMask
-		appPort = pdr.appFilter.srcPortFilter
+		appPort = pdr.appFilter.srcPortRange
 	}
 
 	appProto, appProtoMask := pdr.appFilter.proto, pdr.appFilter.protoMask
