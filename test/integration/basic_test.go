@@ -132,19 +132,19 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 		upfN3Address: upfN3Address,
 		sdfFilter:    defaultSDFFilter,
 
-		ulTEID:  15,
-		dlTEID:  16,
+		ulTEID: 15,
+		dlTEID: 16,
 
 		sessQFI: 0x09,
 		appQFI:  0x08,
 
-		uplinkAppQerID: 1,
+		uplinkAppQerID:   1,
 		downlinkAppQerID: 2,
-		sessQerID: 4,
-		sessGBR: 0,
-		sessMBR: 500000,
-		appGBR: 30000,
-		appMBR: 50000,
+		sessQerID:        4,
+		sessGBR:          0,
+		sessMBR:          500000,
+		appGBR:           30000,
+		appMBR:           50000,
 	}
 
 	err := pfcpClient.SetupAssociation()

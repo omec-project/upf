@@ -18,16 +18,16 @@ type pfcpSessionData struct {
 	dlTEID uint32
 
 	// QER-related fields
-	sessQerID uint32
-	uplinkAppQerID uint32
+	sessQerID        uint32
+	uplinkAppQerID   uint32
 	downlinkAppQerID uint32
-	sessQFI uint8
-	appQFI  uint8
+	sessQFI          uint8
+	appQFI           uint8
 
 	sessMBR uint64
 	sessGBR uint64
 
 	// uplink/downlink GBR/MBR is always the same
-	appMBR  uint64
-	appGBR  uint64
+	appMBR uint64
+	appGBR uint64
 }
