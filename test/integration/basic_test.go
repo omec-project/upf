@@ -4,7 +4,6 @@
 package integration
 
 import (
-	log "github.com/sirupsen/logrus"
 	"testing"
 	"time"
 
@@ -58,7 +57,7 @@ func TimeBasedElectionId() p4_v1.Uint128 {
 	now := time.Now()
 	return p4_v1.Uint128{
 		High: uint64(now.Unix()),
-		Low:  uint64(now.UnixMilli() % 1000),
+		Low:  uint64(now.UnixNano() % 1e9),
 	}
 }
 
