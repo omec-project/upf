@@ -52,7 +52,13 @@ func init() {
 	// wait for PFCP Agent to initialize
 	time.Sleep(time.Second * 3)
 }
-
+// Generates an election id that is monotonically increasing with time.
+// Specifically, the upper 64 bits are the unix timestamp in seconds, and the
+// lower 64 bits are the remaining nanoseconds. This is compatible with
+// election-systems that use the same epoch-based election IDs, and in that
+// case, this election ID will be guaranteed to be higher than any previous
+// election ID. This is useful in tests where repeated connections need to
+// acquire mastership reliably.
 func TimeBasedElectionId() p4_v1.Uint128 {
 	now := time.Now()
 	return p4_v1.Uint128{
