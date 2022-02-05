@@ -132,6 +132,8 @@ func TestUPFBasedUeIPAllocation(t *testing.T) {
 			appQFI:       0x08,
 		},
 		expected: p4RtValues{
+			// first IP address from pool configured in ue_ip_alloc.json
+			ueAddress: "10.250.0.1",
 			// no application filtering rule expected
 			appID:        0,
 			tunnelPeerID: 2,
@@ -140,7 +142,7 @@ func TestUPFBasedUeIPAllocation(t *testing.T) {
 	}
 
 	t.Run(tc.desc, func(t *testing.T) {
-		testUEAttachDetach(t, &tc)
+		testUEAttachDetach(t, fillExpected(&tc))
 	})
 }
 
@@ -237,13 +239,17 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			testUEAttachDetach(t, &tc)
+			testUEAttachDetach(t, fillExpected(&tc))
 		})
 	}
 }
 
-func fillExpected(tc *testCase) {
-	if 
+func fillExpected(tc *testCase) *testCase {
+	if tc.expected.ueAddress == "" {
+		tc.expected.ueAddress = tc.input.ueAddress
+	}
+
+	return tc
 }
 
 func testUEAttachDetach(t *testing.T, testcase *testCase) {
