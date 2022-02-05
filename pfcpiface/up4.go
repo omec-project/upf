@@ -38,6 +38,7 @@ type P4rtcInfo struct {
 	P4rtcServer string `json:"p4rtc_server"`
 	P4rtcPort   string `json:"p4rtc_port"`
 	UEIP        string `json:"ue_ip_pool"`
+	QFIToTC     map[uint8]uint8 `json:"qfi_tc_mapping"`
 }
 
 const (
@@ -81,8 +82,9 @@ type UP4 struct {
 	deviceID        uint64
 	timeout         uint32
 	accessIP        *net.IPNet
-	p4rtcServer     string
-	p4rtcPort       string
+
+	p4rtcInfo		P4rtcInfo
+
 	enableEndMarker bool
 
 	p4client       *P4rtClient
@@ -322,25 +324,25 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	u.accessIP = up4.accessIP.IP
 	log.Println("AccessIP: ", up4.accessIP)
 
-	up4.p4rtcServer = conf.P4rtcIface.P4rtcServer
-	log.Println("UP4 server ip/name", up4.p4rtcServer)
-	up4.p4rtcPort = conf.P4rtcIface.P4rtcPort
+	up4.p4rtcInfo = conf.P4rtcIface
+
+	log.Println("UP4 server ip/name", up4.p4rtcInfo.P4rtcServer)
 	up4.reportNotifyChan = u.reportNotifyChan
 
 	if *p4RtcServerIP != "" {
-		up4.p4rtcServer = *p4RtcServerIP
+		up4.p4rtcInfo.P4rtcServer = *p4RtcServerIP
 	}
 
 	if *p4RtcServerPort != "" {
-		up4.p4rtcPort = *p4RtcServerPort
+		up4.p4rtcInfo.P4rtcPort = *p4RtcServerPort
 	}
 
 	u.coreIP = net.ParseIP(net.IPv4zero.String())
 
-	log.Println("onos server ip ", up4.p4rtcServer)
-	log.Println("onos server port ", up4.p4rtcPort)
+	log.Println("onos server ip ", up4.p4rtcInfo.P4rtcServer)
+	log.Println("onos server port ", up4.p4rtcInfo.P4rtcPort)
 
-	up4.host = up4.p4rtcServer + ":" + up4.p4rtcPort
+	up4.host = up4.p4rtcInfo.P4rtcServer + ":" + up4.p4rtcInfo.P4rtcPort
 	log.Println("server name: ", up4.host)
 	up4.deviceID = 1
 	up4.timeout = 30
@@ -1113,9 +1115,13 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 			// relatedQER.qfi = 0 in case of no app QER found, treat QFI=0 as default value
 		}
 
-		// FIXME: get TC from QFI->TC mapping
+		tc, exists := up4.p4rtcInfo.QFIToTC[relatedQER.qfi]
+		if !exists {
+			tc = NoTC
+		}
+
 		terminationsEntry, err := up4.p4RtTranslator.BuildTerminationsTableEntry(pdr, appMeter, far,
-			applicationID, relatedQER.qfi, uint8(0))
+			applicationID, relatedQER.qfi, tc)
 		if err != nil {
 			return ErrOperationFailedWithReason("build P4rt table entry for Terminations table", err.Error())
 		}
