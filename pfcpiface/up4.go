@@ -702,6 +702,7 @@ func (up4 *UP4) releaseAppMeterCellID(allocated uint16) {
 		// 0 is not a valid cell ID
 		return
 	}
+
 	up4.appMeterCellIDsPool.Add(allocated)
 }
 
@@ -721,6 +722,7 @@ func (up4 *UP4) releaseSessionMeterCellID(allocated uint16) {
 		// 0 is not a valid cell ID
 		return
 	}
+
 	up4.sessMeterCellIDsPool.Add(allocated)
 }
 
@@ -810,6 +812,7 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 	if err != nil {
 		return meter{}, err
 	}
+
 	applicationMeter.uplinkCellID = uplinkCellID
 
 	if bidirectional {
@@ -818,6 +821,7 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 			up4.releaseAppMeterCellID(uplinkCellID)
 			return meter{}, err
 		}
+
 		applicationMeter.downlinkCellID = cellID
 	} else {
 		applicationMeter.downlinkCellID = uplinkCellID
@@ -827,6 +831,7 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 		if applicationMeter.uplinkCellID != 0 {
 			up4.releaseSessionMeterCellID(applicationMeter.uplinkCellID)
 		}
+
 		if applicationMeter.downlinkCellID != 0 {
 			up4.releaseSessionMeterCellID(applicationMeter.downlinkCellID)
 		}
@@ -836,11 +841,8 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 		// according to the SD-Core/SD-Fabric contract, UL and DL MBRs/GBRs are always equal for Application QERs.
 		meterConfig := getMeterConfigurationFromQER(q.ulMbr, q.ulGbr)
 
-		meterEntry, err := up4.p4RtTranslator.BuildMeterEntry(appMeter, applicationMeter.uplinkCellID, meterConfig)
-		if err != nil {
-			releaseIDs()
-			return meter{}, err
-		}
+		meterEntry := up4.p4RtTranslator.BuildMeterEntry(appMeter, applicationMeter.uplinkCellID, meterConfig)
+
 		entries = append(entries, meterEntry)
 	}
 
@@ -848,11 +850,8 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 		// according to the SD-Core/SD-Fabric contract, UL and DL MBRs/GBRs are always equal for Application QERs.
 		meterConfig := getMeterConfigurationFromQER(q.dlMbr, q.dlGbr)
 
-		meterEntry, err := up4.p4RtTranslator.BuildMeterEntry(appMeter, applicationMeter.downlinkCellID, meterConfig)
-		if err != nil {
-			releaseIDs()
-			return meter{}, err
-		}
+		meterEntry := up4.p4RtTranslator.BuildMeterEntry(appMeter, applicationMeter.downlinkCellID, meterConfig)
+
 		entries = append(entries, meterEntry)
 	}
 
@@ -892,20 +891,10 @@ func (up4 *UP4) configureSessionMeter(q qer) (meter, error) {
 	logger.Debug("Configuring Session Meter from QER")
 
 	uplinkMeterConfig := getMeterConfigurationFromQER(q.ulMbr, q.ulGbr)
-
-	uplinkMeterEntry, err := up4.p4RtTranslator.BuildMeterEntry(sessionMeter, uplinkCellID, uplinkMeterConfig)
-	if err != nil {
-		releaseIDs()
-		return meter{}, err
-	}
+	uplinkMeterEntry := up4.p4RtTranslator.BuildMeterEntry(sessionMeter, uplinkCellID, uplinkMeterConfig)
 
 	downlinkMeterConfig := getMeterConfigurationFromQER(q.dlMbr, q.dlGbr)
-
-	downlinkMeterEntry, err := up4.p4RtTranslator.BuildMeterEntry(sessionMeter, downlinkCellID, downlinkMeterConfig)
-	if err != nil {
-		releaseIDs()
-		return meter{}, err
-	}
+	downlinkMeterEntry := up4.p4RtTranslator.BuildMeterEntry(sessionMeter, downlinkCellID, downlinkMeterConfig)
 
 	logger = logger.WithFields(log.Fields{
 		"uplink meter entry":   uplinkMeterEntry,
@@ -1018,6 +1007,7 @@ func (up4 *UP4) resetMeters(qers []qer) {
 		if meter.meterType == meterTypeApplication {
 			up4.resetMeter(appMeter, meter)
 			up4.releaseAppMeterCellID(meter.uplinkCellID)
+			
 			if meter.downlinkCellID != meter.uplinkCellID {
 				up4.releaseAppMeterCellID(meter.downlinkCellID)
 			}
@@ -1120,6 +1110,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 		relatedQER, err := findRelatedApplicationQER(pdr, qers)
 		if err != nil {
 			pdrLog.Warning(err)
+			// relatedQER.qfi = 0 in case of no app QER found, treat QFI=0 as default value
 		}
 
 		// FIXME: get TC from QFI->TC mapping

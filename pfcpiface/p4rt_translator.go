@@ -878,7 +878,7 @@ func (t *P4rtTranslator) BuildGTPTunnelPeerTableEntry(tunnelPeerID uint8, tunnel
 	return entry, nil
 }
 
-func (t *P4rtTranslator) BuildMeterEntry(meter string, cellID uint16, config *p4.MeterConfig) (*p4.MeterEntry, error) {
+func (t *P4rtTranslator) BuildMeterEntry(meter string, cellID uint16, config *p4.MeterConfig) *p4.MeterEntry {
 	builderLog := log.WithFields(log.Fields{
 		"Meter":   meter,
 		"Cell ID": cellID,
@@ -895,5 +895,5 @@ func (t *P4rtTranslator) BuildMeterEntry(meter string, cellID uint16, config *p4
 	builderLog = builderLog.WithField("meter-entry", entry)
 	builderLog.Debug("Meter entry built successfully")
 
-	return entry, nil
+	return entry
 }
