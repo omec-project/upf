@@ -801,7 +801,7 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 	entries := make([]*p4.MeterEntry, 0)
 
 	applicationMeter := meter{
-		meterType: meterTypeApplication,
+		meterType:      meterTypeApplication,
 		uplinkCellID:   0,
 		downlinkCellID: 0,
 	}
@@ -922,7 +922,7 @@ func (up4 *UP4) configureSessionMeter(q qer) (meter, error) {
 	logger.Debug("P4 Meter entries installed successfully")
 
 	return meter{
-		meterType: meterTypeSession,
+		meterType:      meterTypeSession,
 		uplinkCellID:   uplinkCellID,
 		downlinkCellID: downlinkCellID,
 	}, nil

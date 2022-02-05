@@ -41,8 +41,8 @@ type pfcpSessionData struct {
 	dlTEID uint32
 
 	// QER-related fields
-	sessQerID uint32
-	uplinkAppQerID uint32
+	sessQerID        uint32
+	uplinkAppQerID   uint32
 	downlinkAppQerID uint32
 
 	// only single QFI is fine, QFI is passed in session QER, but not considered.
@@ -52,8 +52,8 @@ type pfcpSessionData struct {
 	sessGBR uint64
 
 	// uplink/downlink GBR/MBR is always the same
-	appMBR  uint64
-	appGBR  uint64
+	appMBR uint64
+	appGBR uint64
 }
 
 type portRange struct {

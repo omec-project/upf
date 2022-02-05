@@ -188,14 +188,14 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				ulTEID:       15,
 				dlTEID:       16,
 
-				QFI:          0x09,
-				uplinkAppQerID: 1,
+				QFI:              0x09,
+				uplinkAppQerID:   1,
 				downlinkAppQerID: 2,
-				sessQerID: 4,
-				sessGBR: 0,
-				sessMBR: 500000,
-				appGBR: 30000,
-				appMBR: 50000,
+				sessQerID:        4,
+				sessGBR:          0,
+				sessMBR:          500000,
+				appGBR:           30000,
+				appMBR:           50000,
 			},
 			expected: p4RtValues{
 				appFilter: appFilter{
@@ -222,12 +222,12 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				QFI:          0x09,
 
 				// indicates 5G case (no application QERs, only session QER)
-				uplinkAppQerID: 0,
+				uplinkAppQerID:   0,
 				downlinkAppQerID: 0,
 
 				sessQerID: 4,
-				sessGBR: 300000,
-				sessMBR: 500000,
+				sessGBR:   300000,
+				sessMBR:   500000,
 			},
 			expected: p4RtValues{
 				appFilter: appFilter{
@@ -292,33 +292,33 @@ func testUEAttachDetach(t *testing.T, testcase *testCase) {
 		qers = append(qers,
 			// session QER
 			session.NewQERBuilder().WithMethod(session.Create).WithID(testcase.input.sessQerID).
-			WithQFI(testcase.input.QFI).
-			WithUplinkMBR(500000).
-			WithDownlinkMBR(500000).
-			WithUplinkGBR(0).
-			WithDownlinkGBR(0).Build())
+				WithQFI(testcase.input.QFI).
+				WithUplinkMBR(500000).
+				WithDownlinkMBR(500000).
+				WithUplinkGBR(0).
+				WithDownlinkGBR(0).Build())
 	}
 
 	if testcase.input.uplinkAppQerID != 0 {
 		qers = append(qers,
 			// uplink application QER
 			session.NewQERBuilder().WithMethod(session.Create).WithID(testcase.input.uplinkAppQerID).
-			WithQFI(testcase.input.QFI).
-			WithUplinkMBR(50000).
-			WithDownlinkMBR(50000).
-			WithUplinkGBR(30000).
-			WithDownlinkGBR(30000).Build())
+				WithQFI(testcase.input.QFI).
+				WithUplinkMBR(50000).
+				WithDownlinkMBR(50000).
+				WithUplinkGBR(30000).
+				WithDownlinkGBR(30000).Build())
 	}
 
 	if testcase.input.downlinkAppQerID != 0 {
 		qers = append(qers,
 			// downlink application QER
 			session.NewQERBuilder().WithMethod(session.Create).WithID(testcase.input.downlinkAppQerID).
-			WithQFI(testcase.input.QFI).
-			WithUplinkMBR(50000).
-			WithDownlinkMBR(50000).
-			WithUplinkGBR(30000).
-			WithDownlinkGBR(30000).Build())
+				WithQFI(testcase.input.QFI).
+				WithUplinkMBR(50000).
+				WithDownlinkMBR(50000).
+				WithUplinkGBR(30000).
+				WithDownlinkGBR(30000).Build())
 	}
 
 	sess, err := pfcpClient.EstablishSession(pdrs, fars, qers)
