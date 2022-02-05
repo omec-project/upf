@@ -7,7 +7,7 @@
     "": "FIXME: remove access_ip once it will not longer be mandatory",
     "access_ip": "192.168.1.1/24",
     "qfi_tc_mapping": {
-      "9": 3
+      "8": 3
     }
   }
 }

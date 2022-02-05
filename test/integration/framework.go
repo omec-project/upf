@@ -69,6 +69,7 @@ type appFilter struct {
 }
 
 type p4RtValues struct {
+	tc           uint8
 	tunnelPeerID uint8
 	appID        uint8
 	appFilter    appFilter
