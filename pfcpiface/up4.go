@@ -1119,7 +1119,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 
 		relatedQER, err := findRelatedApplicationQER(pdr, qers)
 		if err != nil {
-			return err
+			pdrLog.Warning(err)
 		}
 
 		// FIXME: get TC from QFI->TC mapping
