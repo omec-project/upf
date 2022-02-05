@@ -1007,7 +1007,7 @@ func (up4 *UP4) resetMeters(qers []qer) {
 		if meter.meterType == meterTypeApplication {
 			up4.resetMeter(appMeter, meter)
 			up4.releaseAppMeterCellID(meter.uplinkCellID)
-			
+
 			if meter.downlinkCellID != meter.uplinkCellID {
 				up4.releaseAppMeterCellID(meter.downlinkCellID)
 			}
