@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	configDefault = "default.json"
+	configDefault              = "default.json"
 	configUPFBasedIPAllocation = "ue_ip_alloc.json"
 )
 
@@ -37,7 +37,7 @@ type testCase struct {
 	input    *pfcpSessionData
 	expected p4RtValues
 
-	desc     string
+	desc string
 }
 
 func init() {
@@ -271,13 +271,13 @@ func testUEAttachDetach(t *testing.T, testcase *testCase) {
 	if !testcase.ctx.UPFBasedUeIPAllocation {
 		pdrs = append(pdrs,
 			session.NewPDRBuilder().MarkAsDownlink().
-			WithMethod(session.Create).
-			WithID(2).
-			WithUEAddress(testcase.input.ueAddress).
-			WithSDFFilter(testcase.input.sdfFilter).
-			WithFARID(2).
-			AddQERID(4).
-			AddQERID(2).BuildPDR())
+				WithMethod(session.Create).
+				WithID(2).
+				WithUEAddress(testcase.input.ueAddress).
+				WithSDFFilter(testcase.input.sdfFilter).
+				WithFARID(2).
+				AddQERID(4).
+				AddQERID(2).BuildPDR())
 	} else {
 		pdrs = append(pdrs,
 			// TODO: should be replaced by builder?
