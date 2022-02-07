@@ -33,7 +33,7 @@ func TestParseQER(t *testing.T) {
 				qfi:   0x09,
 				fseID: FSEID,
 			},
-			description: "Valid QER input with create operation",
+			description: "Valid Create QER input",
 		},
 		{
 			input: pfcpsimLib.NewQERBuilder().
@@ -45,7 +45,7 @@ func TestParseQER(t *testing.T) {
 				qfi:   0x09,
 				fseID: FSEID,
 			},
-			description: "Valid QER input with update operation",
+			description: "Valid Update QER input",
 		},
 	} {
 		t.Run(scenario.description, func(t *testing.T) {

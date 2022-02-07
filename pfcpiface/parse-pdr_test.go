@@ -52,7 +52,7 @@ func TestParsePDR(t *testing.T) {
 				qerIDList:        []uint32{qerID},
 				needDecap:        0x1, // OuterHeaderRemoval IE is present for uplink PDRs
 			},
-			description: "Valid Uplink PDR input with create operation",
+			description: "Valid Uplink Create PDR input",
 		},
 		{
 			input: pfcpsimLib.NewPDRBuilder().
@@ -72,7 +72,27 @@ func TestParsePDR(t *testing.T) {
 				ueAddress:    ip2int(UEAddress),
 				qerIDList:    []uint32{qerID},
 			},
-			description: "Valid downlink PDR input with update operation",
+			description: "Valid downlink Update PDR input",
+		},
+		{
+			input: pfcpsimLib.NewPDRBuilder().
+				WithID(pdrID).
+				WithMethod(pfcpsimLib.IEMethod(create)).
+				WithFARID(farID).
+				AddQERID(qerID).
+				WithUEAddress(UEAddress.String()).
+				MarkAsDownlink().
+				BuildPDR(),
+			expected: &pdr{
+				pdrID:        uint32(pdrID),
+				fseID:        FSEID,
+				farID:        farID,
+				srcIface:     core,
+				srcIfaceMask: 0xff,
+				ueAddress:    ip2int(UEAddress),
+				qerIDList:    []uint32{qerID},
+			},
+			description: "Valid downlink Create PDR input",
 		},
 	} {
 		t.Run(scenario.description, func(t *testing.T) {
