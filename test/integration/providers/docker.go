@@ -14,6 +14,9 @@ import (
 	"strings"
 )
 
+// RunDockerCommandAttach attaches to a running Docker container and executes a cmd.
+// It should be used to spawn a new pfcpiface process inside and redirect its stdout/stderr to `docker logs`.
+// This is equivalent to `docker attach` CLI command.
 func RunDockerCommandAttach(container string, cmd string) {
 	inout := make(chan []byte)
 	ctx := context.Background()
@@ -48,6 +51,9 @@ func RunDockerCommandAttach(container string, cmd string) {
 	waiter.Close()
 }
 
+// RunDockerExecCommand executes a cmd inside a running Docker container.
+// It should be used to invoke a "side" command inside a Docker container.
+// This is equivalent to `docker exec` CLI command.
 func RunDockerExecCommand(container string, cmd string) (
 	code int, stdout string, stderr string, err error,
 ) {

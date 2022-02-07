@@ -3,7 +3,11 @@
 
 package integration
 
-import "net"
+import (
+	"errors"
+	"net"
+	"time"
+)
 
 // this file should contain all the struct defs/constants used among different test cases.
 
@@ -61,4 +65,31 @@ type p4RtValues struct {
 	tunnelPeerID uint8
 	appID        uint8
 	appFilter    appFilter
+}
+
+func IsConnectionOpen(host string, port string) bool {
+	ln, err := net.Listen("udp", host + ":" + port)
+	if err != nil {
+		return true
+	}
+	ln.Close()
+	return false
+}
+
+func waitForPFCPAgentToStart() error {
+	timeout := time.After(5 * time.Second)
+	ticker := time.Tick(500 * time.Millisecond)
+
+	// Keep trying until we're timed out or get a result/error
+	for {
+		select {
+		case <-timeout:
+			return errors.New("timed out")
+		case <-ticker:
+			ok := IsConnectionOpen("127.0.0.1", "8805")
+			if ok {
+				return nil
+			}
+		}
+	}
 }

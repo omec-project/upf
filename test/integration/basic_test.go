@@ -95,11 +95,12 @@ func setup(t *testing.T, pfcpAgentConfig string) {
 	providers.RunDockerCommandAttach("pfcpiface",
 		fmt.Sprintf("/bin/pfcpiface -config /config/%s", pfcpAgentConfig))
 
-	// wait for PFCP Agent to initialize
-	time.Sleep(time.Second * 3)
+	// wait for PFCP Agent to initialize, blocking
+	err := waitForPFCPAgentToStart()
+	require.NoErrorf(t, err, "failed to start PFCP Agent: %v", err)
 
 	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.1")
-	err := pfcpClient.ConnectN4("127.0.0.1")
+	err = pfcpClient.ConnectN4("127.0.0.1")
 	require.NoErrorf(t, err, "failed to connect to UPF")
 }
 
