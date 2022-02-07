@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2020 Intel Corporation
+// Copyright 2022 Open Networking Foundation
 
 package main
 
@@ -21,7 +22,7 @@ var errBadFilterDesc = errors.New("unsupported Filter Description format")
 
 type endpoint struct {
 	IPNet *net.IPNet
-	Port  uint16
+	ports portRange
 }
 
 func (ep *endpoint) parseNet(ipnet string) error {
@@ -66,12 +67,11 @@ func (ep *endpoint) parsePort(port string) error {
 		return err
 	}
 
-	// TODO: support port ranges
-	if low != high {
-		return ErrInvalidArgumentWithReason("port", port, "port ranges are not supported yet")
+	if low > high {
+		return ErrInvalidArgumentWithReason("port", port, "invalid port range")
 	}
 
-	ep.Port = uint16(low)
+	ep.ports = newRangeMatchPortRange(uint16(low), uint16(high))
 
 	return nil
 }
@@ -82,10 +82,17 @@ type ipFilterRule struct {
 	src, dst          endpoint
 }
 
+func newIpFilterRule() *ipFilterRule {
+	return &ipFilterRule{
+		src: endpoint{ports: newWildcardPortRange()},
+		dst: endpoint{ports: newWildcardPortRange()},
+	}
+}
+
 func (ipf *ipFilterRule) String() string {
 	return fmt.Sprintf("FlowDescription{action=%v, direction=%v, proto=%v, "+
 		"srcIP=%v, srcPort=%v, dstIP=%v, dstPort=%v}",
-		ipf.action, ipf.direction, ipf.proto, ipf.src.IPNet, ipf.src.Port, ipf.dst.IPNet, ipf.dst.Port)
+		ipf.action, ipf.direction, ipf.proto, ipf.src.IPNet, ipf.src.ports, ipf.dst.IPNet, ipf.dst.ports)
 }
 
 // "permit out ip from any to assigned"
@@ -106,7 +113,7 @@ func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
 	})
 	parseLog.Debug("Parsing flow description")
 
-	ipf := &ipFilterRule{}
+	ipf := newIpFilterRule()
 
 	fields := strings.Fields(flowDesc)
 

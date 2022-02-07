@@ -92,4 +92,3 @@ func RunDockerExecCommand(container string, cmd string) (
 	// command is successful
 	return 0, string(stdoutBytes), string(stderrBytes), nil
 }
-
