@@ -1,29 +1,271 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2020 Intel Corporation
+// Copyright 2022 Open Networking Foundation
 
 package main
 
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
-type applicationFilter struct {
-	srcIP   uint32
-	dstIP   uint32
-	srcPort uint16
-	dstPort uint16
-	proto   uint8
+// portRange encapsulates a L4 port range as seen in PDRs. A zero value portRange represents
+// a wildcard match, but use of the dedicated new*PortRange() functions is encouraged.
+type portRange struct {
+	low  uint16
+	high uint16
+}
 
-	srcIPMask   uint32
-	dstIPMask   uint32
-	srcPortMask uint16
-	dstPortMask uint16
-	protoMask   uint8
+// newWildcardPortRange returns a portRange that matches on every possible port, i.e., implements
+// no filtering.
+func newWildcardPortRange() portRange {
+	return portRange{
+		low:  0,
+		high: math.MaxUint16,
+	}
+}
+
+// newExactMatchPortRange returns a portRange that matches on exactly the given port.
+func newExactMatchPortRange(port uint16) portRange {
+	return portRange{
+		low:  port,
+		high: port,
+	}
+}
+
+// newRangeMatchPortRange returns a portRange that matches on the given range [low, high].
+// low must be smaller than high. Creating exact and wildcard matches with this function is
+// possible, but use of the dedicated functions is encouraged.
+func newRangeMatchPortRange(low, high uint16) portRange {
+	if low > high {
+		return portRange{}
+	}
+
+	return portRange{
+		low:  low,
+		high: high,
+	}
+}
+
+func (pr portRange) String() string {
+	return fmt.Sprintf("{%v-%v}", pr.low, pr.high)
+}
+
+// Width returns the number of ports covered by this portRange.
+func (pr portRange) Width() uint16 {
+	// Need to handle the zero value.
+	if pr.isWildcardMatch() {
+		return math.MaxUint16
+	} else {
+		return pr.high - pr.low + 1
+	}
+}
+
+func (pr portRange) isWildcardMatch() bool {
+	return pr.low == 0 && pr.high == math.MaxUint16 ||
+		pr.low == 0 && pr.high == 0
+}
+
+func (pr portRange) isExactMatch() bool {
+	return pr.low == pr.high && pr.high != 0
+}
+
+func (pr portRange) isRangeMatch() bool {
+	return !pr.isExactMatch() && !pr.isWildcardMatch()
+}
+
+// Returns portRange as an exact match, without checking if it is one. isExactMatch() must be true
+// before calling asExactMatchUnchecked.
+func (pr portRange) asExactMatchUnchecked() portRangeTernaryRule {
+	return portRangeTernaryRule{port: pr.low, mask: math.MaxUint16}
+}
+
+// Return portRange as a trivial, single value and mask, ternary match. Will fail if conversion is
+// not possible.
+func (pr portRange) asTrivialTernaryMatch() (portRangeTernaryRule, error) {
+	if pr.isWildcardMatch() {
+		return portRangeTernaryRule{0, 0}, nil
+	} else if pr.isExactMatch() {
+		return pr.asExactMatchUnchecked(), nil
+	}
+
+	return portRangeTernaryRule{}, ErrInvalidArgumentWithReason("asTrivialTernaryMatch", pr, "not trivially convertible")
+}
+
+type RangeConversionStrategy int
+
+const (
+	Exact RangeConversionStrategy = iota
+	Ternary
+)
+
+// Returns portRange as a list of ternary matches that cover the same range.
+func (pr portRange) asComplexTernaryMatches(strategy RangeConversionStrategy) ([]portRangeTernaryRule, error) {
+	rules := make([]portRangeTernaryRule, 0)
+
+	// Fast path for exact and wildcard matches which are trivial.
+	if pr.isExactMatch() {
+		rules = append(rules, pr.asExactMatchUnchecked())
+		return rules, nil
+	}
+
+	if pr.isWildcardMatch() {
+		rules = append(rules, portRangeTernaryRule{0, 0})
+		return rules, nil
+	}
+
+	if strategy == Exact {
+		if pr.Width() > 100 {
+			return nil, ErrInvalidArgumentWithReason("asComplexTernaryMatches", pr,
+				"port range too wide for exact match strategy")
+		}
+
+		for port := int(pr.low); port <= int(pr.high); port++ {
+			rules = append(rules, portRangeTernaryRule{uint16(port), math.MaxUint16})
+		}
+	} else if strategy == Ternary {
+		// Adapted from https://stackoverflow.com/a/66959276
+		const limit = math.MaxUint16
+		maxPort := func(port, mask uint16) uint16 {
+			xid := limit - mask
+			nid := port & mask
+			return nid + xid
+		}
+
+		portMask := func(port, end uint16) uint16 {
+			bit := uint16(1)
+			mask := uint16(limit)
+			testMask := uint16(limit)
+			netPort := port & limit
+			maximumPort := maxPort(netPort, limit)
+
+			for netPort > 0 && maximumPort < end {
+				netPort = port & testMask
+				if netPort < port {
+					break
+				}
+				maximumPort = maxPort(netPort, testMask)
+				if maximumPort <= end {
+					mask = testMask
+				}
+				testMask -= bit
+				bit <<= 1
+			}
+			return mask
+		}
+
+		port := uint32(pr.low) // Promote to higher bit width for greater-equals check.
+		for port <= uint32(pr.high) {
+			mask := portMask(uint16(port), pr.high)
+			rules = append(rules, portRangeTernaryRule{uint16(port), mask})
+			port = uint32(maxPort(uint16(port), mask)) + 1
+		}
+	} else {
+		return nil, ErrInvalidArgument("asComplexTernaryMatches", strategy)
+	}
+
+	return rules, nil
+}
+
+type portRangeTernaryRule struct {
+	port, mask uint16
+}
+
+func (pf portRangeTernaryRule) String() string {
+	return fmt.Sprintf("{0b%b & 0b%b}", pf.port, pf.mask)
+}
+
+type portRangeTernaryCartesianProduct struct {
+	srcPort, srcMask uint16
+	dstPort, dstMask uint16
+}
+
+// CreatePortRangeCartesianProduct converts two port ranges into a list of ternary
+// rules covering the same range.
+func CreatePortRangeCartesianProduct(src, dst portRange) ([]portRangeTernaryCartesianProduct, error) {
+	// A single range rule can result in multiple ternary ones. To cover the same range of packets,
+	// we need to create the Cartesian product of src and dst rules. For now, we only allow one true
+	// range match to keep the complexity in check.
+	if src.isRangeMatch() && dst.isRangeMatch() {
+		return nil, ErrInvalidArgumentWithReason("CreatePortRangeCartesianProduct",
+			src, "src and dst ports cannot both be a range match")
+	}
+
+	rules := make([]portRangeTernaryCartesianProduct, 0)
+
+	if src.isRangeMatch() {
+		srcTernaryRules, err := src.asComplexTernaryMatches(Exact)
+		if err != nil {
+			return nil, err
+		}
+
+		dstTernary, err := dst.asTrivialTernaryMatch()
+		if err != nil {
+			return nil, err
+		}
+
+		for _, r := range srcTernaryRules {
+			p := portRangeTernaryCartesianProduct{
+				srcPort: r.port, srcMask: r.mask,
+				dstPort: dstTernary.port, dstMask: dstTernary.mask,
+			}
+			rules = append(rules, p)
+		}
+	} else if dst.isRangeMatch() {
+		dstTernaryRules, err := dst.asComplexTernaryMatches(Exact)
+		if err != nil {
+			return nil, err
+		}
+
+		srcTernary, err := src.asTrivialTernaryMatch()
+		if err != nil {
+			return nil, err
+		}
+
+		for _, r := range dstTernaryRules {
+			p := portRangeTernaryCartesianProduct{
+				srcPort: srcTernary.port, srcMask: srcTernary.mask,
+				dstPort: r.port, dstMask: r.mask,
+			}
+			rules = append(rules, p)
+		}
+	} else {
+		// Neither is range. Only one rule needed.
+		srcTernary, err := src.asTrivialTernaryMatch()
+		if err != nil {
+			return nil, err
+		}
+
+		dstTernary, err := dst.asTrivialTernaryMatch()
+		if err != nil {
+			return nil, err
+		}
+
+		p := portRangeTernaryCartesianProduct{
+			dstPort: dstTernary.port, dstMask: dstTernary.mask,
+			srcPort: srcTernary.port, srcMask: srcTernary.mask,
+		}
+		rules = append(rules, p)
+	}
+
+	return rules, nil
+}
+
+type applicationFilter struct {
+	srcIP        uint32
+	dstIP        uint32
+	srcPortRange portRange
+	dstPortRange portRange
+	proto        uint8
+
+	srcIPMask uint32
+	dstIPMask uint32
+	protoMask uint8
 }
 
 type pdr struct {
@@ -58,9 +300,9 @@ func needAllocIP(ueIPaddr *ie.UEIPAddressFields) bool {
 }
 
 func (af applicationFilter) String() string {
-	return fmt.Sprintf("ApplicationFilter(srcIP=%v/%x, dstIP=%v/%x, proto=%v/%x, srcPort=%v/%x, dstPort=%v/%x)",
+	return fmt.Sprintf("ApplicationFilter(srcIP=%v/%x, dstIP=%v/%x, proto=%v/%x, srcPort=%v, dstPort=%v)",
 		af.srcIP, af.srcIPMask, af.dstIP, af.dstIPMask, af.proto,
-		af.protoMask, af.srcPort, af.srcPortMask, af.dstPort, af.dstPortMask)
+		af.protoMask, af.srcPortRange, af.dstPortRange)
 }
 
 func (p pdr) String() string {
@@ -74,8 +316,8 @@ func (p pdr) String() string {
 
 func (p pdr) IsAppFilterEmpty() bool {
 	return p.appFilter.proto == 0 &&
-		((p.IsUplink() && p.appFilter.dstIP == 0 && p.appFilter.dstPort == 0) ||
-			(p.IsDownlink() && p.appFilter.srcIP == 0 && p.appFilter.srcPort == 0))
+		((p.IsUplink() && p.appFilter.dstIP == 0 && p.appFilter.dstPortRange.isWildcardMatch()) ||
+			(p.IsDownlink() && p.appFilter.srcIP == 0 && p.appFilter.srcPortRange.isWildcardMatch()))
 }
 
 func (p pdr) IsUplink() bool {
@@ -200,16 +442,8 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 					p.appFilter.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
 					p.appFilter.srcIP = ip2int(ipf.src.IPNet.IP)
 					p.appFilter.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
-
-					if ipf.dst.Port > 0 {
-						p.appFilter.dstPort = ipf.dst.Port
-						p.appFilter.dstPortMask = 0xffff
-					}
-
-					if ipf.src.Port > 0 {
-						p.appFilter.srcPort = ipf.src.Port
-						p.appFilter.srcPortMask = 0xffff
-					}
+					p.appFilter.dstPortRange = ipf.dst.ports
+					p.appFilter.srcPortRange = ipf.src.ports
 
 					break
 				}
@@ -246,35 +480,26 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 				p.appFilter.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
 				p.appFilter.srcIP = ip2int(ipf.src.IPNet.IP)
 				p.appFilter.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
-
-				if ipf.src.Port > 0 {
-					p.appFilter.srcPort, p.appFilter.srcPortMask = ipf.src.Port, 0xffff
-				}
-
-				if ipf.dst.Port > 0 {
-					p.appFilter.dstPort, p.appFilter.dstPortMask = ipf.dst.Port, 0xffff
-				}
+				p.appFilter.dstPortRange = ipf.dst.ports
+				p.appFilter.srcPortRange = ipf.src.ports
 
 				// FIXME: temporary workaround for SDF Filter,
 				//  remove once we meet spec compliance
-				p.appFilter.srcPort = p.appFilter.dstPort
-				p.appFilter.dstPort, p.appFilter.dstPortMask = 0, 0 // reset UE Port
+				p.appFilter.srcPortRange = p.appFilter.dstPortRange
+				p.appFilter.dstPortRange = newWildcardPortRange()
 			} else if p.srcIface == access {
 				p.appFilter.srcIP = ip2int(ipf.dst.IPNet.IP)
 				p.appFilter.srcIPMask = ipMask2int(ipf.dst.IPNet.Mask)
 				p.appFilter.dstIP = ip2int(ipf.src.IPNet.IP)
 				p.appFilter.dstIPMask = ipMask2int(ipf.src.IPNet.Mask)
-				if ipf.dst.Port > 0 {
-					p.appFilter.srcPort, p.appFilter.srcPortMask = ipf.dst.Port, 0xffff
-				}
-				if ipf.src.Port > 0 {
-					p.appFilter.dstPort, p.appFilter.dstPortMask = ipf.src.Port, 0xffff
-				}
+				// Ports are flipped for access PDRs
+				p.appFilter.dstPortRange = ipf.src.ports
+				p.appFilter.srcPortRange = ipf.dst.ports
 
 				// FIXME: temporary workaround for SDF Filter,
 				//  remove once we meet spec compliance
-				p.appFilter.dstPort = p.appFilter.srcPort
-				p.appFilter.srcPort, p.appFilter.srcPortMask = 0, 0 // reset UE Port
+				p.appFilter.dstPortRange = p.appFilter.srcPortRange
+				p.appFilter.srcPortRange = newWildcardPortRange()
 			}
 		}
 	}
