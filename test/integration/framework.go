@@ -33,6 +33,11 @@ const (
 	directionDownlink = 0x2
 )
 
+var (
+	// ReaderElectionID use reader election ID so that pfcpiface doesn't loose mastership.
+	ReaderElectionID = p4_v1.Uint128{High: 0, Low: 1}
+)
+
 type pfcpSessionData struct {
 	nbAddress    string
 	ueAddress    string
@@ -69,7 +74,7 @@ type p4RtValues struct {
 }
 
 func IsConnectionOpen(host string, port string) bool {
-	ln, err := net.Listen("udp", host + ":" + port)
+	ln, err := net.Listen("udp", host+":"+port)
 	if err != nil {
 		return true
 	}
