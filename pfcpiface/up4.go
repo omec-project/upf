@@ -1109,8 +1109,8 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 
 		relatedQER, err := findRelatedApplicationQER(pdr, qers)
 		if err != nil {
-			pdrLog.Warning(err)
 			// relatedQER.qfi = 0 in case of no app QER found, treat QFI=0 as default value
+			pdrLog.Warning(err)
 		}
 
 		// FIXME: get TC from QFI->TC mapping
