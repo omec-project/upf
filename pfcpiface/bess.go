@@ -711,45 +711,56 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 			break
 		}
 
-		f := &pb.WildcardMatchCommandAddArg{
-			Gate:     uint64(p.needDecap),
-			Priority: int64(math.MaxUint32 - p.precedence),
-			Values: []*pb.FieldData{
-				intEnc(uint64(p.srcIface)),          /* src_iface */
-				intEnc(uint64(p.tunnelIP4Dst)),      /* tunnel_ipv4_dst */
-				intEnc(uint64(p.tunnelTEID)),        /* enb_teid */
-				intEnc(uint64(p.appFilter.srcIP)),   /* ueaddr ip*/
-				intEnc(uint64(p.appFilter.dstIP)),   /* inet ip */
-				intEnc(uint64(p.appFilter.srcPort)), /* ue port */
-				intEnc(uint64(p.appFilter.dstPort)), /* inet port */
-				intEnc(uint64(p.appFilter.proto)),   /* proto id */
-			},
-			Masks: []*pb.FieldData{
-				intEnc(uint64(p.srcIfaceMask)),          /* src_iface-mask */
-				intEnc(uint64(p.tunnelIP4DstMask)),      /* tunnel_ipv4_dst-mask */
-				intEnc(uint64(p.tunnelTEIDMask)),        /* enb_teid-mask */
-				intEnc(uint64(p.appFilter.srcIPMask)),   /* ueaddr ip-mask */
-				intEnc(uint64(p.appFilter.dstIPMask)),   /* inet ip-mask */
-				intEnc(uint64(p.appFilter.srcPortMask)), /* ue port-mask */
-				intEnc(uint64(p.appFilter.dstPortMask)), /* inet port-mask */
-				intEnc(uint64(p.appFilter.protoMask)),   /* proto id-mask */
-			},
-			Valuesv: []*pb.FieldData{
-				intEnc(uint64(p.pdrID)), /* pdr-id */
-				intEnc(p.fseID),         /* fseid */
-				intEnc(uint64(p.ctrID)), /* ctr_id */
-				intEnc(uint64(qerID)),   /* qer_id */
-				intEnc(uint64(p.farID)), /* far_id */
-			},
-		}
-
-		any, err = anypb.New(f)
+		// Translate port ranges into ternary rule(s) and insert them one-by-one.
+		portRules, err := CreatePortRangeCartesianProduct(p.appFilter.srcPortRange, p.appFilter.dstPortRange)
 		if err != nil {
-			log.Println("Error marshalling the rule", f, err)
+			log.Errorln(err)
 			return
 		}
 
-		b.processPDR(ctx, any, upfMsgTypeAdd)
+		log.Tracef("PDR rules %+v", portRules)
+
+		for _, r := range portRules {
+			f := &pb.WildcardMatchCommandAddArg{
+				Gate:     uint64(p.needDecap),
+				Priority: int64(math.MaxUint32 - p.precedence),
+				Values: []*pb.FieldData{
+					intEnc(uint64(p.srcIface)),        /* src_iface */
+					intEnc(uint64(p.tunnelIP4Dst)),    /* tunnel_ipv4_dst */
+					intEnc(uint64(p.tunnelTEID)),      /* enb_teid */
+					intEnc(uint64(p.appFilter.srcIP)), /* ueaddr ip*/
+					intEnc(uint64(p.appFilter.dstIP)), /* inet ip */
+					intEnc(uint64(r.srcPort)),         /* ue port */
+					intEnc(uint64(r.dstPort)),         /* inet port */
+					intEnc(uint64(p.appFilter.proto)), /* proto id */
+				},
+				Masks: []*pb.FieldData{
+					intEnc(uint64(p.srcIfaceMask)),        /* src_iface-mask */
+					intEnc(uint64(p.tunnelIP4DstMask)),    /* tunnel_ipv4_dst-mask */
+					intEnc(uint64(p.tunnelTEIDMask)),      /* enb_teid-mask */
+					intEnc(uint64(p.appFilter.srcIPMask)), /* ueaddr ip-mask */
+					intEnc(uint64(p.appFilter.dstIPMask)), /* inet ip-mask */
+					intEnc(uint64(r.srcMask)),             /* ue port-mask */
+					intEnc(uint64(r.dstMask)),             /* inet port-mask */
+					intEnc(uint64(p.appFilter.protoMask)), /* proto id-mask */
+				},
+				Valuesv: []*pb.FieldData{
+					intEnc(uint64(p.pdrID)), /* pdr-id */
+					intEnc(p.fseID),         /* fseid */
+					intEnc(uint64(p.ctrID)), /* ctr_id */
+					intEnc(uint64(qerID)),   /* qer_id */
+					intEnc(uint64(p.farID)), /* far_id */
+				},
+			}
+
+			any, err = anypb.New(f)
+			if err != nil {
+				log.Println("Error marshalling the rule", f, err)
+				return
+			}
+
+			b.processPDR(ctx, any, upfMsgTypeAdd)
+		}
 		done <- true
 	}()
 }
@@ -761,36 +772,45 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 			err error
 		)
 
-		f := &pb.WildcardMatchCommandDeleteArg{
-			Values: []*pb.FieldData{
-				intEnc(uint64(p.srcIface)),          /* src_iface */
-				intEnc(uint64(p.tunnelIP4Dst)),      /* tunnel_ipv4_dst */
-				intEnc(uint64(p.tunnelTEID)),        /* enb_teid */
-				intEnc(uint64(p.appFilter.srcIP)),   /* ueaddr ip*/
-				intEnc(uint64(p.appFilter.dstIP)),   /* inet ip */
-				intEnc(uint64(p.appFilter.srcPort)), /* ue port */
-				intEnc(uint64(p.appFilter.dstPort)), /* inet port */
-				intEnc(uint64(p.appFilter.proto)),   /* proto id */
-			},
-			Masks: []*pb.FieldData{
-				intEnc(uint64(p.srcIfaceMask)),          /* src_iface-mask */
-				intEnc(uint64(p.tunnelIP4DstMask)),      /* tunnel_ipv4_dst-mask */
-				intEnc(uint64(p.tunnelTEIDMask)),        /* enb_teid-mask */
-				intEnc(uint64(p.appFilter.srcIPMask)),   /* ueaddr ip-mask */
-				intEnc(uint64(p.appFilter.dstIPMask)),   /* inet ip-mask */
-				intEnc(uint64(p.appFilter.srcPortMask)), /* ue port-mask */
-				intEnc(uint64(p.appFilter.dstPortMask)), /* inet port-mask */
-				intEnc(uint64(p.appFilter.protoMask)),   /* proto id-mask */
-			},
-		}
-
-		any, err = anypb.New(f)
+		// Translate port ranges into ternary rule(s) and insert them one-by-one.
+		portRules, err := CreatePortRangeCartesianProduct(p.appFilter.srcPortRange, p.appFilter.dstPortRange)
 		if err != nil {
-			log.Errorln("Error marshalling the rule", f, err)
+			log.Errorln(err)
 			return
 		}
 
-		b.processPDR(ctx, any, upfMsgTypeDel)
+		for _, r := range portRules {
+			f := &pb.WildcardMatchCommandDeleteArg{
+				Values: []*pb.FieldData{
+					intEnc(uint64(p.srcIface)),        /* src_iface */
+					intEnc(uint64(p.tunnelIP4Dst)),    /* tunnel_ipv4_dst */
+					intEnc(uint64(p.tunnelTEID)),      /* enb_teid */
+					intEnc(uint64(p.appFilter.srcIP)), /* ueaddr ip*/
+					intEnc(uint64(p.appFilter.dstIP)), /* inet ip */
+					intEnc(uint64(r.srcPort)),         /* ue port */
+					intEnc(uint64(r.dstPort)),         /* inet port */
+					intEnc(uint64(p.appFilter.proto)), /* proto id */
+				},
+				Masks: []*pb.FieldData{
+					intEnc(uint64(p.srcIfaceMask)),        /* src_iface-mask */
+					intEnc(uint64(p.tunnelIP4DstMask)),    /* tunnel_ipv4_dst-mask */
+					intEnc(uint64(p.tunnelTEIDMask)),      /* enb_teid-mask */
+					intEnc(uint64(p.appFilter.srcIPMask)), /* ueaddr ip-mask */
+					intEnc(uint64(p.appFilter.dstIPMask)), /* inet ip-mask */
+					intEnc(uint64(r.srcMask)),             /* ue port-mask */
+					intEnc(uint64(r.dstMask)),             /* inet port-mask */
+					intEnc(uint64(p.appFilter.protoMask)), /* proto id-mask */
+				},
+			}
+
+			any, err = anypb.New(f)
+			if err != nil {
+				log.Errorln("Error marshalling the rule", f, err)
+				return
+			}
+
+			b.processPDR(ctx, any, upfMsgTypeDel)
+		}
 		done <- true
 	}()
 }
