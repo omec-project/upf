@@ -30,7 +30,7 @@ type testCase struct {
 
 func init() {
 	if err := initMockUP4(); err != nil {
-		panic("failed to initialize mock-up4: " + err.Error())
+		panic("failed to initialize mock-up4")
 	}
 
 	providers.RunDockerCommand("pfcpiface", "/bin/pfcpiface -config /config.json")
@@ -39,23 +39,8 @@ func init() {
 	time.Sleep(time.Second * 3)
 }
 
-// Generates an election id that is monotonically increasing with time.
-// Specifically, the upper 64 bits are the unix timestamp in seconds, and the
-// lower 64 bits are the remaining nanoseconds. This is compatible with
-// election-systems that use the same epoch-based election IDs, and in that
-// case, this election ID will be guaranteed to be higher than any previous
-// election ID. This is useful in tests where repeated connections need to
-// acquire mastership reliably.
-func TimeBasedElectionId() p4_v1.Uint128 {
-	now := time.Now()
-	return p4_v1.Uint128{
-		High: uint64(now.Unix()),
-		Low:  uint64(now.UnixNano() % 1e9),
-	}
-}
-
 func initMockUP4() (err error) {
-	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", TimeBasedElectionId())
+	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", p4_v1.Uint128{High: 0, Low: 1})
 	if err != nil {
 		return err
 	}
