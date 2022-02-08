@@ -149,8 +149,17 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 	}
 
 	if !conf.EnableP4rt {
-		u.accessIP = ParseIP(conf.AccessIface.IfName, "Access")
-		u.coreIP = ParseIP(conf.CoreIface.IfName, "Core")
+		u.accessIP, err = GetUnicastAddressFromInterface(conf.AccessIface.IfName)
+		if err != nil {
+			log.Errorln(err)
+			return nil
+		}
+
+		u.coreIP, err = GetUnicastAddressFromInterface(conf.CoreIface.IfName)
+		if err != nil {
+			log.Errorln(err)
+			return nil
+		}
 	}
 
 	if conf.MaxReqRetries != 0 {

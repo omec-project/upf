@@ -253,7 +253,7 @@ func modifyPFCP(conn *net.UDPConn, raddr *net.UDPAddr, seid uint64) {
 			seid,
 			seq,
 			0,
-			//ie.NewFSEID(0x0000000000000001, net.ParseIP("127.0.0.1"), nil),
+			//ie.NewFSEID(0x0000000000000001, net.GetUnicastAddressFromInterface("127.0.0.1"), nil),
 			ie.NewPDNType(ie.PDNTypeIPv4),
 			// Downlink N9
 			ie.NewUpdatePDR(

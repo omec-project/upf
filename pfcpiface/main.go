@@ -132,31 +132,6 @@ func ParseStrIP(n3name string) *net.IPNet {
 	return ipNet
 }
 
-// ParseIP : parse IP address from the interface name.
-func ParseIP(name string, iface string) net.IP {
-	byNameInterface, err := net.InterfaceByName(name)
-	if err != nil {
-		log.Errorln("Unable to get info on interface name:", name, err)
-		return nil
-	}
-
-	addresses, err := byNameInterface.Addrs()
-	if err != nil {
-		log.Errorln("Unable to retrieve addresses from interface name!", err)
-		return nil
-	}
-
-	ip, _, err := net.ParseCIDR(addresses[0].String())
-	if err != nil {
-		log.Errorln("Unable to parse", iface, " IP: ", err)
-		return nil
-	}
-
-	log.Println(iface, " IP: ", ip)
-
-	return ip
-}
-
 func init() {
 	flag.Var(&simulate, "simulate", "create|delete|create_continue simulated sessions")
 	// Set up logger
