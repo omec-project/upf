@@ -159,11 +159,11 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				nbAddress:    nodeBAddress,
 				ueAddress:    ueAddress,
 				upfN3Address: upfN3Address,
-				sdfFilter: "permit out udp from 192.168.1.1/32 to assigned 80-400",
-				ulTEID:    15,
-				dlTEID:    16,
-				sessQFI:   0x09,
-				appQFI:    0x08,
+				sdfFilter:    "permit out udp from 192.168.1.1/32 to assigned 80-400",
+				ulTEID:       15,
+				dlTEID:       16,
+				sessQFI:      0x09,
+				appQFI:       0x08,
 			},
 			expected: p4RtValues{
 				appFilter: appFilter{
