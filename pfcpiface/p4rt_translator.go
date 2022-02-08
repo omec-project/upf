@@ -513,7 +513,7 @@ func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, internalAppID uint
 	entry := &p4.TableEntry{
 		TableId: tableID,
 		// priority for UP4 cannot be greater than 65535
-		Priority: int32(math.MaxUint8 - pdr.precedence),
+		Priority: int32(math.MaxUint16 - pdr.precedence),
 	}
 
 	var (
