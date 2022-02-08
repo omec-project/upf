@@ -442,7 +442,7 @@ actions {
   params {
     id: 1
     name: "session_meter_id"
-    bitwidth: 16
+    bitwidth: 32
   }
 }
 actions {
@@ -466,7 +466,7 @@ actions {
   params {
     id: 2
     name: "session_meter_id"
-    bitwidth: 16
+    bitwidth: 32
   }
 }
 actions {
@@ -485,7 +485,7 @@ actions {
   params {
     id: 1
     name: "session_meter_id"
-    bitwidth: 16
+    bitwidth: 32
   }
 }
 actions {
@@ -502,7 +502,7 @@ actions {
   params {
     id: 2
     name: "app_meter_id"
-    bitwidth: 16
+    bitwidth: 32
   }
 }
 actions {
@@ -524,7 +524,7 @@ actions {
   params {
     id: 3
     name: "app_meter_id"
-    bitwidth: 16
+    bitwidth: 32
   }
 }
 actions {
@@ -563,7 +563,7 @@ actions {
   params {
     id: 4
     name: "app_meter_id"
-    bitwidth: 16
+    bitwidth: 32
   }
 }
 actions {
@@ -595,7 +595,7 @@ actions {
   params {
     id: 5
     name: "app_meter_id"
-    bitwidth: 16
+    bitwidth: 32
   }
 }
 actions {
