@@ -3,7 +3,12 @@
 
 package integration
 
-import "net"
+import (
+	"errors"
+	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
+	"net"
+	"time"
+)
 
 // this file should contain all the struct defs/constants used among different test cases.
 
@@ -26,6 +31,11 @@ const (
 
 	directionUplink   = 0x1
 	directionDownlink = 0x2
+)
+
+var (
+	// ReaderElectionID use reader election ID so that pfcpiface doesn't loose mastership.
+	ReaderElectionID = p4_v1.Uint128{High: 0, Low: 1}
 )
 
 type pfcpSessionData struct {
@@ -57,7 +67,34 @@ type appFilter struct {
 }
 
 type p4RtValues struct {
+	ueAddress    string
 	tunnelPeerID uint8
 	appID        uint8
 	appFilter    appFilter
+}
+
+func IsConnectionOpen(host string, port string) bool {
+	ln, err := net.Listen("udp", host+":"+port)
+	if err != nil {
+		return true
+	}
+	ln.Close()
+	return false
+}
+
+func waitForPFCPAgentToStart() error {
+	timeout := time.After(5 * time.Second)
+	ticker := time.Tick(500 * time.Millisecond)
+
+	// Keep trying until we're timed out or get a result/error
+	for {
+		select {
+		case <-timeout:
+			return errors.New("timed out")
+		case <-ticker:
+			if IsConnectionOpen("127.0.0.1", "8805") {
+				return nil
+			}
+		}
+	}
 }
