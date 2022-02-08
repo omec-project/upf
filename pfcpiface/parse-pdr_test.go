@@ -132,9 +132,7 @@ func TestParsePDRShouldError(t *testing.T) {
 				ie.NewOuterHeaderRemoval(0, 0),
 				ie.NewFARID(2),
 			),
-			expected: &pdr{
-				qerIDList: []uint32{},
-			},
+			expected: &pdr{},
 			description: "Malformed Uplink PDR input without PDR ID",
 		},
 	} {
@@ -542,7 +540,8 @@ func Test_pdr_parsePDR_success(t *testing.T) {
 		fseid      = 300
 	)
 
-	var N3Address = net.ParseIP("192.168.0.1")
+	UEAddress := net.ParseIP("10.0.1.1")
+	N3Address := net.ParseIP("192.168.0.1")
 
 	type args struct {
 		ie1     *ie.IE
@@ -577,7 +576,6 @@ func Test_pdr_parsePDR_success(t *testing.T) {
 			srcIfaceMask:     math.MaxUint8,
 			tunnelIP4DstMask: math.MaxUint32,
 			tunnelTEIDMask:   math.MaxUint32,
-			appFilter:        applicationFilter{},
 			precedence:       precedence,
 			pdrID:            pdrID,
 			fseID:            fseid,
@@ -585,6 +583,32 @@ func Test_pdr_parsePDR_success(t *testing.T) {
 			qerIDList:        []uint32{qerID},
 			needDecap:        1,     // MarkAsUplink
 			allocIPFlag:      false, // nil ippool
+		}},
+		{name: "downlink PDR without IP alloc", args: args{
+			ie1: pfcpsimLib.NewPDRBuilder().
+				WithID(pdrID).
+				WithMethod(pfcpsimLib.IEMethod(create)).
+				WithPrecedence(precedence).
+				WithFARID(farID).
+				AddQERID(qerID).
+				WithUEAddress(UEAddress.String()).
+				WithTEID(teid).
+				MarkAsDownlink().
+				BuildPDR(),
+			seid:    fseid,
+			appPFDs: nil,
+			ippool:  nil,
+		}, want: pdr{
+			srcIface:     core, // MarkAsDownlink
+			ueAddress:    ip2int(UEAddress),
+			srcIfaceMask: math.MaxUint8,
+			precedence:   precedence,
+			pdrID:        pdrID,
+			fseID:        fseid,
+			farID:        farID,
+			qerIDList:    []uint32{qerID},
+			needDecap:    0,     // MarkAsDownlink
+			allocIPFlag:  false, // nil ippool
 		}},
 		// TODO: Add test cases.
 	}
@@ -596,6 +620,76 @@ func Test_pdr_parsePDR_success(t *testing.T) {
 				err := got.parsePDR(tt.args.ie1, tt.args.seid, tt.args.appPFDs, tt.args.ippool)
 				require.NoError(t, err)
 				require.Equal(t, got, tt.want)
+			},
+		)
+	}
+}
+
+func Test_pdr_parsePDR_failure(t *testing.T) {
+	const (
+		pdrID      = 1
+		precedence = 100
+		farID      = 5
+		qerID      = 10
+		teid       = 30
+		fseid      = 300
+	)
+
+	//UEAddress := net.ParseIP("10.0.1.1")
+	//N3Address := net.ParseIP("192.168.0.1")
+
+	type args struct {
+		ie1     *ie.IE
+		seid    uint64
+		appPFDs map[string]appPFD
+		ippool  *IPPool
+	}
+
+	tests := []struct {
+		name string
+		args args
+	}{
+		{name: "malformed uplink PDR with missing PDR ID", args: args{
+			ie1: ie.NewCreatePDR(
+				ie.NewPrecedence(precedence),
+				ie.NewPDI(
+					ie.NewSourceInterface(ie.SrcInterfaceAccess),
+					ie.NewFTEID(0x00, teid, net.ParseIP(""), nil, 0),
+					ie.NewSDFFilter("", "", "", "", 1),
+				),
+				ie.NewOuterHeaderRemoval(0, 0),
+				ie.NewFARID(farID),
+			),
+			seid:    fseid,
+			appPFDs: nil,
+			ippool:  nil,
+		}},
+		{name: "malformed uplink PDR with missing source interface", args: args{
+			ie1: ie.NewCreatePDR(
+				ie.NewPrecedence(precedence),
+				ie.NewPDI(
+					//ie.NewSourceInterface(ie.SrcInterfaceAccess),
+					ie.NewFTEID(0x00, teid, net.ParseIP(""), nil, 0),
+					ie.NewSDFFilter("", "", "", "", 1),
+				),
+				ie.NewOuterHeaderRemoval(0, 0),
+				ie.NewFARID(farID),
+				ie.NewPDRID(pdrID),
+			),
+			seid:    fseid,
+			appPFDs: nil,
+			ippool:  nil,
+		}},
+		// TODO: Add test cases.
+	}
+
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				var got pdr
+				err := got.parsePDR(tt.args.ie1, tt.args.seid, tt.args.appPFDs, tt.args.ippool)
+				require.Error(t, err)
+				require.Equal(t, got, pdr{})
 			},
 		)
 	}

@@ -510,7 +510,6 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, ippool *IPPool) error {
 	/* reset outerHeaderRemoval to begin with */
 	outerHeaderRemoval := uint8(0)
-	p.qerIDList = make([]uint32, 0)
 
 	pdrID, err := ie1.PDRID()
 	if err != nil {
@@ -565,6 +564,8 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, ippoo
 			return errin
 		}
 	}
+
+	p.qerIDList = make([]uint32, 0)
 
 	for _, x := range ies {
 		if x.Type == ie.QERID {
