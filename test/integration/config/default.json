@@ -1,7 +1,6 @@
 {
   "enable_p4rt": true,
   "log_level": "trace",
-  "": "Control plane controller settings",
   "cpiface": {
     "ue_ip_pool": "10.250.0.0/16"
   },
