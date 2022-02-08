@@ -4,12 +4,13 @@
 package integration
 
 import (
-	p4rtc "github.com/antoninbas/p4runtime-go-client/pkg/client"
-	"github.com/antoninbas/p4runtime-go-client/pkg/util/conversion"
-	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"net"
 	"testing"
 	"time"
+
+	p4rtc "github.com/antoninbas/p4runtime-go-client/pkg/client"
+	"github.com/antoninbas/p4runtime-go-client/pkg/util/conversion"
+	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim"
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim/session"
@@ -144,12 +145,11 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				nbAddress:    nodeBAddress,
 				ueAddress:    ueAddress,
 				upfN3Address: upfN3Address,
-				// TODO: use wider port range once multi port ranges are supported
-				sdfFilter: "permit out udp from 192.168.1.1/32 to assigned 80-80",
-				ulTEID:    15,
-				dlTEID:    16,
-				sessQFI:   0x09,
-				appQFI:    0x08,
+				sdfFilter:    "permit out udp from 192.168.1.1/32 to assigned 80-400",
+				ulTEID:       15,
+				dlTEID:       16,
+				sessQFI:      0x09,
+				appQFI:       0x08,
 			},
 			expected: p4RtValues{
 				appFilter: appFilter{
@@ -157,7 +157,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 					appIP:        net.ParseIP("192.168.1.1"),
 					appPrefixLen: 32,
 					appPort: portRange{
-						80, 80,
+						80, 400,
 					},
 				},
 				// FIXME: there is a dependency on previous test because pfcpiface doesn't clear application IDs properly

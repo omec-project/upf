@@ -15,7 +15,7 @@ require (
 	github.com/libp2p/go-reuseport v0.1.0
 	github.com/moby/term v0.0.0-20210619224110-3f7ff695adc6 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
-	github.com/omec-project/pfcpsim v0.0.0-20220202145615-1a19f047037d
+	github.com/omec-project/pfcpsim v0.0.0-20220202164427-6284bedae567
 	github.com/p4lang/p4runtime v1.3.0
 	github.com/prometheus/client_golang v1.11.0
 	github.com/sirupsen/logrus v1.8.1
