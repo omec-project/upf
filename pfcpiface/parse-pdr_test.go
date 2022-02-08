@@ -132,7 +132,7 @@ func TestParsePDRShouldError(t *testing.T) {
 				ie.NewOuterHeaderRemoval(0, 0),
 				ie.NewFARID(2),
 			),
-			expected: &pdr{},
+			expected:    &pdr{},
 			description: "Malformed Uplink PDR input without PDR ID",
 		},
 	} {
