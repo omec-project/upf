@@ -590,7 +590,7 @@ func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, internalAppID uint
 	return entry, nil
 }
 
-func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr, sessMeterIdx uint16) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr, sessMeterIdx uint32) (*p4.TableEntry, error) {
 	uplinkBuilderLog := log.WithFields(log.Fields{
 		"pdr":               pdr,
 		"sessionMeterIndex": sessMeterIdx,
@@ -629,7 +629,7 @@ func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr, sessMeterIdx uint16) 
 	return entry, nil
 }
 
-func (t *P4rtTranslator) buildDownlinkSessionsEntry(pdr pdr, sessMeterIdx uint16, tunnelPeerID uint8, needsBuffering bool) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) buildDownlinkSessionsEntry(pdr pdr, sessMeterIdx uint32, tunnelPeerID uint8, needsBuffering bool) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
 		"pdr":               pdr,
 		"sessionMeterIndex": sessMeterIdx,
@@ -686,7 +686,7 @@ func (t *P4rtTranslator) BuildSessionsTableEntry(pdr pdr, sessionMeter meter, tu
 	}
 }
 
-func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, appMeterIdx uint16, shouldDrop bool, internalAppID uint8, tc uint8) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, appMeterIdx uint32, shouldDrop bool, internalAppID uint8, tc uint8) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
 		"pdr":           pdr,
 		"appMeterIndex": appMeterIdx,
@@ -746,7 +746,7 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, appMeterIdx uint1
 	return entry, nil
 }
 
-func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uint16, relatedFAR far,
+func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uint32, relatedFAR far,
 	internalAppID uint8, qfi uint8, tc uint8) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
 		"pdr":           pdr,
@@ -878,7 +878,7 @@ func (t *P4rtTranslator) BuildGTPTunnelPeerTableEntry(tunnelPeerID uint8, tunnel
 	return entry, nil
 }
 
-func (t *P4rtTranslator) BuildMeterEntry(meter string, cellID uint16, config *p4.MeterConfig) *p4.MeterEntry {
+func (t *P4rtTranslator) BuildMeterEntry(meter string, cellID uint32, config *p4.MeterConfig) *p4.MeterEntry {
 	builderLog := log.WithFields(log.Fields{
 		"Meter":   meter,
 		"Cell ID": cellID,

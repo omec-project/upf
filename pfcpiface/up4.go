@@ -77,8 +77,8 @@ type counter struct {
 
 type meter struct {
 	meterType      uint8
-	uplinkCellID   uint16
-	downlinkCellID uint16
+	uplinkCellID   uint32
+	downlinkCellID uint32
 }
 
 type UP4 struct {
@@ -257,7 +257,7 @@ func (up4 *UP4) initMetersPools() error {
 
 	up4.appMeterCellIDsPool = set.NewSet()
 	for i := 1; i < int(appMeter.Size); i++ {
-		up4.appMeterCellIDsPool.Add(uint16(i))
+		up4.appMeterCellIDsPool.Add(uint32(i))
 	}
 
 	sessMeter, err := up4.p4RtTranslator.getMeterByName(sessionMeter)
@@ -267,7 +267,7 @@ func (up4 *UP4) initMetersPools() error {
 
 	up4.sessMeterCellIDsPool = set.NewSet()
 	for i := 1; i < int(sessMeter.Size); i++ {
-		up4.sessMeterCellIDsPool.Add(uint16(i))
+		up4.sessMeterCellIDsPool.Add(uint32(i))
 	}
 
 	log.WithFields(log.Fields{
@@ -691,7 +691,7 @@ func (up4 *UP4) getOrAllocateInternalApplicationID(pdr pdr) (uint8, error) {
 	return newAppID, nil
 }
 
-func (up4 *UP4) allocateAppMeterCellID() (uint16, error) {
+func (up4 *UP4) allocateAppMeterCellID() (uint32, error) {
 	// pick from set
 	allocated := up4.appMeterCellIDsPool.Pop()
 	if allocated == nil {
@@ -699,10 +699,10 @@ func (up4 *UP4) allocateAppMeterCellID() (uint16, error) {
 			"no free AppMeter Cell IDs available")
 	}
 
-	return allocated.(uint16), nil
+	return allocated.(uint32), nil
 }
 
-func (up4 *UP4) releaseAppMeterCellID(allocated uint16) {
+func (up4 *UP4) releaseAppMeterCellID(allocated uint32) {
 	if allocated == 0 {
 		// 0 is not a valid cell ID
 		return
@@ -711,7 +711,7 @@ func (up4 *UP4) releaseAppMeterCellID(allocated uint16) {
 	up4.appMeterCellIDsPool.Add(allocated)
 }
 
-func (up4 *UP4) allocateSessionMeterCellID() (uint16, error) {
+func (up4 *UP4) allocateSessionMeterCellID() (uint32, error) {
 	// pick from set
 	allocated := up4.sessMeterCellIDsPool.Pop()
 	if allocated == nil {
@@ -719,10 +719,10 @@ func (up4 *UP4) allocateSessionMeterCellID() (uint16, error) {
 			"no free SessionMeter Cell IDs available")
 	}
 
-	return allocated.(uint16), nil
+	return allocated.(uint32), nil
 }
 
-func (up4 *UP4) releaseSessionMeterCellID(allocated uint16) {
+func (up4 *UP4) releaseSessionMeterCellID(allocated uint32) {
 	if allocated == 0 {
 		// 0 is not a valid cell ID
 		return
