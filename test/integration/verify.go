@@ -68,7 +68,7 @@ func buildExpectedApplicationsEntry(client *p4rtc.Client, testdata *pfcpSessionD
 
 	te := client.NewTableEntry(TableApplications, mfs,
 		client.NewTableActionDirect(ActSetAppID, [][]byte{appID}), nil)
-	te.Priority = int32(math.MaxUint8 - testdata.precedence)
+	te.Priority = int32(math.MaxUint16 - testdata.precedence)
 
 	// p4runtime-go-client doesn't properly enumerate match fields
 	// TODO: fix enumeration in p4runtime-go-client
