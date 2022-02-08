@@ -5,12 +5,14 @@ package integration
 
 import (
 	"fmt"
-	p4rtc "github.com/antoninbas/p4runtime-go-client/pkg/client"
-	"github.com/antoninbas/p4runtime-go-client/pkg/util/conversion"
-	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
+
 	"net"
 	"testing"
 	"time"
+
+	p4rtc "github.com/antoninbas/p4runtime-go-client/pkg/client"
+	"github.com/antoninbas/p4runtime-go-client/pkg/util/conversion"
+	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim"
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim/session"
