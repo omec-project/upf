@@ -270,14 +270,17 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	if err != nil {
 		log.Fatalf("failed to parse Access IP from config: %v", err)
 	}
+
 	up4.accessIP = accessIP
 	u.accessIP = accessIP.IP
+
 	log.Println("AccessIP: ", up4.accessIP)
 
 	uePool, err := ParseStrIP(conf.CPIface.UEIPPool)
 	if err != nil {
 		log.Fatalf("failed to parse UE pool from config: %v", err)
 	}
+
 	up4.ueIPPool = uePool
 	log.Infof("UE IP pool: %v", up4.ueIPPool)
 
