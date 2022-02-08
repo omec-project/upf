@@ -42,12 +42,12 @@ type testCase struct {
 
 func init() {
 	if err := initMockUP4(); err != nil {
-		panic("failed to initialize mock-up4: " + err.Error())
+		panic("failed to initialize mock-up4")
 	}
 }
 
 func initMockUP4() (err error) {
-	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", TimeBasedElectionId())
+	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", p4_v1.Uint128{High: 0, Low: 1})
 	if err != nil {
 		return err
 	}
