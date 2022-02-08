@@ -12,7 +12,7 @@ import (
 
 var qosLevelName = map[QosLevel]string{
 	ApplicationQos: "application",
-	SessionQos: "session",
+	SessionQos:     "session",
 }
 
 type qer struct {
