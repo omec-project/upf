@@ -121,15 +121,15 @@ func ParseJSON(filepath *string, conf *Conf) {
 }
 
 // ParseStrIP : parse IP address from config.
-func ParseStrIP(n3name string) *net.IPNet {
-	ip, ipNet, err := net.ParseCIDR(n3name)
+func ParseStrIP(address string) (*net.IPNet, error) {
+	ip, ipNet, err := net.ParseCIDR(address)
 	if err != nil {
-		log.Fatalln("Unable to parse IP: ", err)
+		return nil, ErrOperationFailedWithReason("parse IP subnet", err.Error())
 	}
 
-	log.Println("IP: ", ip)
+	log.Info("Parsed IP: ", ip)
 
-	return ipNet
+	return ipNet, nil
 }
 
 // ParseIP : parse IP address from the interface name.
