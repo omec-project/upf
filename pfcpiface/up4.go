@@ -24,6 +24,11 @@ const (
 	// FIXME: this is hardcoded currently, but should be passed as configuration/cmd line arg
 	p4InfoPath       = "/bin/p4info.txt"
 	deviceConfigPath = "/bin/bmv2.json"
+
+	// DefaultQFI is set if no QER is sent by a control plane in PFCP messages.
+	// QFI=9 is used as a default value, because many Aether configurations uses it as default.
+	// TODO: we might want to make it configurable in future.
+	DefaultQFI = 9
 )
 
 var (
@@ -1107,15 +1112,17 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 			appMeter = up4.meters[pdr.qerIDList[0]]
 		}
 
+		var qfi uint8 = DefaultQFI
 		relatedQER, err := findRelatedApplicationQER(pdr, qers)
 		if err != nil {
-			// relatedQER.qfi = 0 in case of no app QER found, treat QFI=0 as default value
 			pdrLog.Warning(err)
+		} else {
+			qfi = relatedQER.qfi
 		}
 
 		// FIXME: get TC from QFI->TC mapping
 		terminationsEntry, err := up4.p4RtTranslator.BuildTerminationsTableEntry(pdr, appMeter, far,
-			applicationID, relatedQER.qfi, uint8(0))
+			applicationID, qfi, uint8(0))
 		if err != nil {
 			return ErrOperationFailedWithReason("build P4rt table entry for Terminations table", err.Error())
 		}
