@@ -172,7 +172,8 @@ void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
         uint32_t pkt_len = pkt->total_len() - val[j]->deduct_len;
         uint8_t color = rte_meter_trtcm_color_blind_check(&val[j]->m, val[j]->p,
                                                           time, pkt_len);
-
+        struct rte_mbuf *m = reinterpret_cast<struct rte_mbuf *>(pkt);
+        rte_mbuf_sched_color_set(m, color);
         DLOG(INFO) << "color : " << color << std::endl;
         // update ogate to color specific gate
         if (color == RTE_COLOR_GREEN) {
