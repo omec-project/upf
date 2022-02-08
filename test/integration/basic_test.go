@@ -5,6 +5,7 @@ package integration
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/suite"
 
 	"net"
 	"testing"
@@ -29,6 +30,10 @@ const (
 var (
 	pfcpClient *pfcpsim.PFCPClient
 )
+
+type TestRunner struct {
+	suite.Suite
+}
 
 type testContext struct {
 	UPFBasedUeIPAllocation bool
@@ -93,33 +98,46 @@ func initMockUP4() (err error) {
 	return nil
 }
 
-func setup(t *testing.T, pfcpAgentConfig string) {
+func TestRun(t *testing.T) {
+	suite.Run(t, new(TestRunner))
+}
+
+func (runner *TestRunner) BeforeTest(_, testName string) {
+	configPath := configDefault
+
+	if testName == "TestUPFBasedUeIPAllocation" {
+		configPath = configUPFBasedIPAllocation
+	}
+
 	providers.RunDockerCommandAttach("pfcpiface",
-		fmt.Sprintf("/bin/pfcpiface -config /config/%s", pfcpAgentConfig))
+		fmt.Sprintf("/bin/pfcpiface -config /config/%s", configPath))
 
 	// wait for PFCP Agent to initialize, blocking
 	err := waitForPFCPAgentToStart()
-	require.NoErrorf(t, err, "failed to start PFCP Agent: %v", err)
+	if err != nil {
+		panic("failed to start PFCP Agent: " + err.Error())
+	}
 
 	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.1")
 	err = pfcpClient.ConnectN4("127.0.0.1")
-	require.NoErrorf(t, err, "failed to connect to UPF")
+	if err != nil {
+		panic("failed to connect to UPF: " + err.Error())
+	}
 }
 
-func teardown(t *testing.T) {
+func (runner *TestRunner) AfterTest(_, _ string) {
 	if pfcpClient != nil {
 		pfcpClient.DisconnectN4()
 	}
 
 	// kill pfcpiface process inside container
 	_, _, _, err := providers.RunDockerExecCommand("pfcpiface", "killall -9 pfcpiface")
-	require.NoError(t, err, "failed to kill pfcpiface process")
+	if err != nil {
+		panic("failed to kill pfcpiface process: " + err.Error())
+	}
 }
 
-func TestUPFBasedUeIPAllocation(t *testing.T) {
-	setup(t, configUPFBasedIPAllocation)
-	defer teardown(t)
-
+func (runner *TestRunner) TestUPFBasedUeIPAllocation() {
 	tc := testCase{
 		ctx: testContext{
 			UPFBasedUeIPAllocation: true,
@@ -144,27 +162,21 @@ func TestUPFBasedUeIPAllocation(t *testing.T) {
 		desc: "UPF-based UE IP allocation",
 	}
 
-	t.Run(tc.desc, func(t *testing.T) {
+	runner.T().Run(tc.desc, func(t *testing.T) {
 		testUEAttachDetach(t, fillExpected(&tc))
 	})
 }
 
-func TestBasicPFCPAssociation(t *testing.T) {
-	setup(t, configDefault)
-	defer teardown(t)
-
+func (runner *TestRunner) TestBasicPFCPAssociation() {
 	err := pfcpClient.SetupAssociation()
-	require.NoErrorf(t, err, "failed to setup PFCP association")
+	require.NoErrorf(runner.T(), err, "failed to setup PFCP association")
 
 	time.Sleep(time.Second * 10)
 
-	require.True(t, pfcpClient.IsAssociationAlive())
+	require.True(runner.T(), pfcpClient.IsAssociationAlive())
 }
 
-func TestSingleUEAttachAndDetach(t *testing.T) {
-	setup(t, configDefault)
-	defer teardown(t)
-
+func (runner *TestRunner) TestSingleUEAttachAndDetach() {
 	// Application filtering test cases
 	testCases := []testCase{
 		{
@@ -240,7 +252,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.desc, func(t *testing.T) {
+		runner.T().Run(tc.desc, func(t *testing.T) {
 			testUEAttachDetach(t, fillExpected(&tc))
 		})
 	}
