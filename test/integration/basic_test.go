@@ -224,7 +224,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				appID:        1,
 				tunnelPeerID: 2,
 			},
-			desc: "QER_METERING 4G case - session QER, 2 app QERs",
+			desc: "QER_METERING - 1 session QER, 2 app QERs",
 		},
 		{
 			input: &pfcpSessionData{
@@ -256,7 +256,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				appID:        1,
 				tunnelPeerID: 2,
 			},
-			desc: "QER_METERING 5G case - session QER only",
+			desc: "QER_METERING - session QER only",
 		},
 	}
 
