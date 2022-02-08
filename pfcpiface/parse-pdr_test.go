@@ -531,3 +531,72 @@ func Test_portRange_Width(t *testing.T) {
 		)
 	}
 }
+
+func Test_pdr_parsePDR_success(t *testing.T) {
+	const (
+		pdrID      = 1
+		precedence = 100
+		farID      = 5
+		qerID      = 10
+		teid       = 30
+		fseid      = 300
+	)
+
+	var N3Address = net.ParseIP("192.168.0.1")
+
+	type args struct {
+		ie1     *ie.IE
+		seid    uint64
+		appPFDs map[string]appPFD
+		ippool  *IPPool
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want pdr
+	}{
+		{name: "uplink PDR without IP alloc", args: args{
+			ie1: pfcpsimLib.NewPDRBuilder().
+				WithID(pdrID).
+				WithMethod(pfcpsimLib.IEMethod(create)).
+				WithPrecedence(precedence).
+				WithFARID(farID).
+				AddQERID(qerID).
+				WithN3Address(N3Address.String()).
+				WithTEID(teid).
+				MarkAsUplink().
+				BuildPDR(),
+			seid:    fseid,
+			appPFDs: nil,
+			ippool:  nil,
+		}, want: pdr{
+			srcIface:         access, // MarkAsUplink
+			tunnelIP4Dst:     ip2int(N3Address),
+			tunnelTEID:       teid,
+			srcIfaceMask:     math.MaxUint8,
+			tunnelIP4DstMask: math.MaxUint32,
+			tunnelTEIDMask:   math.MaxUint32,
+			appFilter:        applicationFilter{},
+			precedence:       precedence,
+			pdrID:            pdrID,
+			fseID:            fseid,
+			farID:            farID,
+			qerIDList:        []uint32{qerID},
+			needDecap:        1,     // MarkAsUplink
+			allocIPFlag:      false, // nil ippool
+		}},
+		// TODO: Add test cases.
+	}
+
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				var got pdr
+				err := got.parsePDR(tt.args.ie1, tt.args.seid, tt.args.appPFDs, tt.args.ippool)
+				require.NoError(t, err)
+				require.Equal(t, got, tt.want)
+			},
+		)
+	}
+}
