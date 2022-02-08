@@ -34,6 +34,7 @@ func (q qer) String() string {
 	if !ok {
 		qosLevel = "invalid"
 	}
+
 	return fmt.Sprintf("QER(id=%v, F-SEID=%v, F-SEID IP=%v, QFI=%v, "+
 		"uplinkMBR=%v, downlinkMBR=%v, uplinkGBR=%v, downlinkGBR=%v, type=%s)",
 		q.qerID, q.fseID, q.fseidIP, q.qfi, q.ulMbr, q.dlMbr, q.ulGbr, q.dlGbr,

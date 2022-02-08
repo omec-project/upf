@@ -1113,6 +1113,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 		}
 
 		var qfi uint8 = DefaultQFI
+
 		relatedQER, err := findRelatedApplicationQER(pdr, qers)
 		if err != nil {
 			pdrLog.Warning(err)
