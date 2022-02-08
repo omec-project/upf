@@ -13,7 +13,7 @@ services:
     tty: true
     stdin_open: true
     volumes:
-      - ../config/upf.json:/config.json
+      - ../config/:/config/
     entrypoint: "/bin/sh"
     working_dir: /bin/
     ports:

@@ -1,0 +1,18 @@
+{
+  "enable_p4rt": true,
+  "log_level": "trace",
+
+  "": "Control plane controller settings",
+  "cpiface": {
+    "dnn": "internet",
+    "enable_ue_ip_alloc": true,
+    "ue_ip_pool": "10.250.0.0/16"
+  },
+
+  "p4rtciface": {
+    "p4rtc_server": "mock-up4",
+    "p4rtc_port": "50001",
+    "": "FIXME: remove access_ip once it will not longer be mandatory",
+    "access_ip": "192.168.1.1/24"
+  }
+}
