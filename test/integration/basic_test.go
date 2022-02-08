@@ -137,6 +137,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				sdfFilter:    "permit out udp from any to assigned 80-80",
 				ulTEID:       15,
 				dlTEID:       16,
+				QFI:          0x9,
 			},
 			expected: p4RtValues{
 				appFilter: appFilter{
@@ -161,6 +162,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				sdfFilter: "permit out udp from 192.168.1.1/32 to assigned 80-80",
 				ulTEID:    15,
 				dlTEID:    16,
+				QFI:       0x9,
 			},
 			expected: p4RtValues{
 				appFilter: appFilter{
@@ -186,6 +188,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				sdfFilter:    "permit out ip from any to assigned",
 				ulTEID:       15,
 				dlTEID:       16,
+				QFI:          0x9,
 			},
 			expected: p4RtValues{
 				// no application filtering rule expected
@@ -203,7 +206,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				ulTEID:       15,
 				dlTEID:       16,
 
-				QFI:              0x09,
+				QFI:              0x11,
 				uplinkAppQerID:   1,
 				downlinkAppQerID: 2,
 				sessQerID:        4,
@@ -234,7 +237,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				sdfFilter:    defaultSDFFilter,
 				ulTEID:       15,
 				dlTEID:       16,
-				QFI:          0x09,
+				QFI:          0x11,
 
 				// indicates 5G case (no application QERs, only session QER)
 				uplinkAppQerID:   0,
