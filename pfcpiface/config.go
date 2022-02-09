@@ -84,6 +84,14 @@ type IfaceType struct {
 	IfName string `json:"ifname"`
 }
 
+// P4rtcInfo : P4 runtime interface settings.
+type P4rtcInfo struct {
+	AccessIP    string `json:"access_ip"`
+	P4rtcServer string `json:"p4rtc_server"`
+	P4rtcPort   string `json:"p4rtc_port"`
+	UEIPPool    string `json:"ue_ip_pool"`
+}
+
 // validateConf checks that the given config reaches a baseline of correctness.
 func validateConf(conf Conf) error {
 	validModes := map[string]struct{}{
@@ -102,7 +110,7 @@ func validateConf(conf Conf) error {
 			return err
 		}
 
-		_, _, err = net.ParseCIDR(conf.P4rtcIface.UEIP)
+		_, _, err = net.ParseCIDR(conf.P4rtcIface.UEIPPool)
 		if err != nil {
 			return err
 		}
