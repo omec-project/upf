@@ -209,7 +209,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 					appIP:        net.ParseIP("192.168.1.1"),
 					appPrefixLen: 32,
 					appPort: portRange{
-						80, 400,
+						80, 399,
 					},
 				},
 				// FIXME: there is a dependency on previous test because pfcpiface doesn't clear application IDs properly
