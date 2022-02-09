@@ -5,6 +5,7 @@ package main
 
 import (
 	"encoding/binary"
+	log "github.com/sirupsen/logrus"
 	"net"
 	"strconv"
 	"strings"
@@ -98,4 +99,16 @@ func maxUint64(x, y uint64) uint64 {
 // Returns the bandwidth delay product for a given rate in kbps and duration in ms.
 func calcBurstSizeFromRate(kbps uint64, ms uint64) uint64 {
 	return uint64((float64(kbps) * 1000 / 8) * (float64(ms) / 1000))
+}
+
+// MustParseStrIP : parse IP address from config and fail on error.
+func MustParseStrIP(address string) *net.IPNet {
+	ip, ipNet, err := net.ParseCIDR(address)
+	if err != nil {
+		log.Fatal("unable to parse IP that we should parse")
+	}
+
+	log.Info("Parsed IP: ", ip)
+
+	return ipNet
 }

@@ -267,22 +267,13 @@ func (up4 *UP4) isConnected(accessIP *net.IP) bool {
 func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	log.Println("setUpfInfo UP4")
 
-	accessIP, err := ParseStrIP(conf.P4rtcIface.AccessIP)
-	if err != nil {
-		log.Fatalf("failed to parse Access IP from config: %v", err)
-	}
-
-	up4.accessIP = accessIP
-	u.accessIP = accessIP.IP
+	up4.accessIP = MustParseStrIP(conf.P4rtcIface.AccessIP)
+	u.accessIP = up4.accessIP.IP
 
 	log.Println("AccessIP: ", up4.accessIP)
 
-	uePool, err := ParseStrIP(conf.CPIface.UEIPPool)
-	if err != nil {
-		log.Fatalf("failed to parse UE pool from config: %v", err)
-	}
+	up4.ueIPPool = MustParseStrIP(conf.CPIface.UEIPPool)
 
-	up4.ueIPPool = uePool
 	log.Infof("UE IP pool: %v", up4.ueIPPool)
 
 	up4.p4rtcServer = conf.P4rtcIface.P4rtcServer
@@ -319,7 +310,7 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 		up4.counters[i].allocated = make(map[uint64]uint64)
 	}
 
-	err = up4.tryConnect()
+	err := up4.tryConnect()
 	if err != nil {
 		log.Errorf("failed to connect to UP4: %v", err)
 		return
@@ -437,11 +428,6 @@ func (up4 *UP4) tryConnect() error {
 		log.Warningf("failed to clear tables: %v", err)
 	}
 
-	err = up4.initUEPool()
-	if err != nil {
-		return ErrOperationFailedWithReason("UE pool initialization", err.Error())
-	}
-
 	err = up4.initAllCounters()
 	if err != nil {
 		return ErrOperationFailedWithReason("counters initialization", err.Error())
@@ -461,6 +447,11 @@ func (up4 *UP4) tryConnect() error {
 		log.Errorf("Failed to get Access IP from UP4: %v", err)
 	} else {
 		log.Infof("Retrieved Access IP from UP4: %v", up4.accessIP)
+	}
+
+	err = up4.initUEPool()
+	if err != nil {
+		return ErrOperationFailedWithReason("UE pool initialization", err.Error())
 	}
 
 	return nil
