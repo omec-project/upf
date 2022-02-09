@@ -107,6 +107,15 @@ func setup(t *testing.T, pfcpAgentConfig string) {
 }
 
 func teardown(t *testing.T) {
+	// clear Tunnel Peers table
+	// FIXME: Temporary solution. They should be cleared by pfcpiface, see SDFAB-960
+	p4rtClient, _ := providers.ConnectP4rt("127.0.0.1:50001", p4_v1.Uint128{High: 2, Low: 1})
+	defer providers.DisconnectP4rt()
+	entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.tunnel_peers")
+	for _, entry := range entries {
+		p4rtClient.DeleteTableEntry(entry)
+	}
+
 	if pfcpClient != nil {
 		pfcpClient.DisconnectN4()
 	}
@@ -352,7 +361,7 @@ func testUEAttachDetach(t *testing.T, testcase *testCase) {
 
 	verifyNoP4RuntimeEntries(t)
 
-	// clear Tunnel Peers and Applications tables
+	// clear Applications table
 	// FIXME: Temporary solution. They should be cleared by pfcpiface, see SDFAB-960
 	p4rtClient, _ := providers.ConnectP4rt("127.0.0.1:50001", p4_v1.Uint128{High: 2, Low: 1})
 	defer providers.DisconnectP4rt()
@@ -360,4 +369,6 @@ func testUEAttachDetach(t *testing.T, testcase *testCase) {
 	for _, entry := range entries {
 		p4rtClient.DeleteTableEntry(entry)
 	}
+	// give pfcpiface time to become master controller again
+	time.Sleep(1 * time.Second)
 }
