@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2020 Intel Corporation
+// Copyright 2022 Open Networking Foundation
 
 package main
 
@@ -111,4 +112,24 @@ func MustParseStrIP(address string) *net.IPNet {
 	log.Info("Parsed IP: ", ip)
 
 	return ipNet
+}
+
+// GetUnicastAddressFromInterface returns a unicast IP address configured on the interface.
+func GetUnicastAddressFromInterface(interfaceName string) (net.IP, error) {
+	iface, err := net.InterfaceByName(interfaceName)
+	if err != nil {
+		return nil, err
+	}
+
+	addresses, err := iface.Addrs()
+	if err != nil {
+		return nil, err
+	}
+
+	ip, _, err := net.ParseCIDR(addresses[0].String())
+	if err != nil {
+		return nil, err
+	}
+
+	return ip, nil
 }

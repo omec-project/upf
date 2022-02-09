@@ -435,7 +435,7 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 
 					if ipf.proto != reservedProto {
 						p.appFilter.proto = ipf.proto
-						p.appFilter.protoMask = reservedProto
+						p.appFilter.protoMask = math.MaxUint8
 					}
 					// TODO: Verify assumption that flow description in case of PFD is to be taken as-is
 					p.appFilter.dstIP = ip2int(ipf.dst.IPNet.IP)
@@ -472,7 +472,7 @@ func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, 
 
 			if ipf.proto != reservedProto {
 				p.appFilter.proto = ipf.proto
-				p.appFilter.protoMask = reservedProto
+				p.appFilter.protoMask = math.MaxUint8
 			}
 
 			if p.srcIface == core {
