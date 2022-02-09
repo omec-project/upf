@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2020 Intel Corporation
+// Copyright 2022 Open Networking Foundation
 
 package main
 
@@ -98,4 +99,24 @@ func maxUint64(x, y uint64) uint64 {
 // Returns the bandwidth delay product for a given rate in kbps and duration in ms.
 func calcBurstSizeFromRate(kbps uint64, ms uint64) uint64 {
 	return uint64((float64(kbps) * 1000 / 8) * (float64(ms) / 1000))
+}
+
+// GetUnicastAddressFromInterface returns a unicast IP address configured on the interface.
+func GetUnicastAddressFromInterface(interfaceName string) (net.IP, error) {
+	iface, err := net.InterfaceByName(interfaceName)
+	if err != nil {
+		return nil, err
+	}
+
+	addresses, err := iface.Addrs()
+	if err != nil {
+		return nil, err
+	}
+
+	ip, _, err := net.ParseCIDR(addresses[0].String())
+	if err != nil {
+		return nil, err
+	}
+
+	return ip, nil
 }
