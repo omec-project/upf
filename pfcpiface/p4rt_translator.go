@@ -187,6 +187,7 @@ func (t *P4rtTranslator) getCounterByName(name string) (*p4ConfigV1.Counter, err
 	return nil, ErrNotFoundWithParam("counter", "name", name)
 }
 
+//nolint:unused
 func (t *P4rtTranslator) getMatchFieldIDByName(table *p4ConfigV1.Table, fieldName string) uint32 {
 	for _, field := range table.MatchFields {
 		if field.Name == fieldName {
@@ -424,6 +425,7 @@ func (t *P4rtTranslator) withActionParam(action *p4.Action, name string, value i
 	return nil
 }
 
+//nolint:unused
 func (t *P4rtTranslator) getActionParamValue(tableEntry *p4.TableEntry, id uint32) ([]byte, error) {
 	for _, param := range tableEntry.Action.GetAction().Params {
 		if param.ParamId == id {
@@ -434,6 +436,7 @@ func (t *P4rtTranslator) getActionParamValue(tableEntry *p4.TableEntry, id uint3
 	return nil, ErrNotFoundWithParam("action param", "id", id)
 }
 
+//nolint:unused
 func (t *P4rtTranslator) getLPMMatchFieldValue(tableEntry *p4.TableEntry, name string) (*net.IPNet, error) {
 	tableID := tableEntry.TableId
 
