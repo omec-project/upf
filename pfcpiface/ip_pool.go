@@ -15,7 +15,7 @@ import (
 type IPPool struct {
 	mu       sync.Mutex
 	freePool []net.IP
-	// inventory keeps track of allocated sessions and their IPs
+	// inventory keeps track of allocated sessions and their IPs.
 	inventory map[uint64]net.IP
 }
 
@@ -41,7 +41,7 @@ func NewIPPool(poolSubnet string) (*IPPool, error) {
 		return nil, ErrInvalidArgumentWithReason("NewIPPool", poolSubnet, "pool subnet is too small to use as a pool")
 	}
 
-	// remove network address and broadcast address
+	// Remove network address and broadcast address.
 	i.freePool = i.freePool[1 : len(i.freePool)-1]
 
 	return i, nil
