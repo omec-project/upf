@@ -5,6 +5,7 @@ package main
 
 import (
 	log "github.com/sirupsen/logrus"
+
 	"net"
 	"time"
 
@@ -100,6 +101,7 @@ func validateConf(conf Conf) error {
 		if err != nil {
 			return err
 		}
+
 		_, _, err = net.ParseCIDR(conf.P4rtcIface.UEIP)
 		if err != nil {
 			return err
@@ -112,6 +114,7 @@ func validateConf(conf Conf) error {
 			return err
 		}
 	}
+
 	for _, peer := range conf.CPIface.Peers {
 		ip := net.ParseIP(peer)
 		if ip != nil {
@@ -160,6 +163,7 @@ func ParseJSON(filepath string) (Conf, error) {
 	}
 
 	var conf Conf
+
 	err = json.Unmarshal(byteValue, &conf)
 	if err != nil {
 		return Conf{}, err
@@ -169,12 +173,15 @@ func ParseJSON(filepath string) (Conf, error) {
 	if conf.LogLevel == "" {
 		conf.LogLevel = "info"
 	}
+
 	if conf.RespTimeout == "" {
 		conf.RespTimeout = respTimeoutDefault.String()
 	}
+
 	if conf.ReadTimeout == 0 {
 		conf.ReadTimeout = uint32(readTimeoutDefault.Seconds())
 	}
+
 	if conf.MaxReqRetries == 0 {
 		conf.MaxReqRetries = maxReqRetriesDefault
 	}
