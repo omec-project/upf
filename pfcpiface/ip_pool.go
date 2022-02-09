@@ -67,17 +67,13 @@ func (i *IPPool) String() string {
 	defer i.mu.Unlock()
 
 	sb := strings.Builder{}
-	sb.WriteString("Inventory:\n")
+	sb.WriteString("inventory: ")
 
 	for s, e := range i.inventory {
-		sb.WriteString(fmt.Sprintf("\tSEID %v -> %+v\n", s, e))
+		sb.WriteString(fmt.Sprintf("{F-SEID %v -> %+v} ", s, e))
 	}
 
-	sb.WriteString("Free Pool:\n")
-
-	for _, ip := range i.freePool {
-		sb.WriteString(fmt.Sprintf("\tIP %s\n", ip.String()))
-	}
+	sb.WriteString(fmt.Sprintf("Number of free IP addresses left: %d", len(i.freePool)))
 
 	return sb.String()
 }

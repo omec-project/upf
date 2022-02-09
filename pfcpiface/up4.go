@@ -67,6 +67,7 @@ type UP4 struct {
 	deviceID        uint64
 	timeout         uint32
 	accessIP        *net.IPNet
+	ueIPPool        *net.IPNet
 	p4rtcServer     string
 	p4rtcPort       string
 	enableEndMarker bool
@@ -266,9 +267,14 @@ func (up4 *UP4) isConnected(accessIP *net.IP) bool {
 func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	log.Println("setUpfInfo UP4")
 
-	up4.accessIP = ParseStrIP(conf.P4rtcIface.AccessIP)
+	up4.accessIP = MustParseStrIP(conf.P4rtcIface.AccessIP)
 	u.accessIP = up4.accessIP.IP
+
 	log.Println("AccessIP: ", up4.accessIP)
+
+	up4.ueIPPool = MustParseStrIP(conf.CPIface.UEIPPool)
+
+	log.Infof("UE IP pool: %v", up4.ueIPPool)
 
 	up4.p4rtcServer = conf.P4rtcIface.P4rtcServer
 	log.Println("UP4 server ip/name", up4.p4rtcServer)
@@ -379,6 +385,23 @@ func (up4 *UP4) clearAllTables() error {
 	return nil
 }
 
+func (up4 *UP4) initUEPool() error {
+	entry, err := up4.p4RtTranslator.BuildInterfaceTableEntry(up4.ueIPPool, true)
+	if err != nil {
+		return err
+	}
+
+	if err := up4.p4client.ApplyTableEntries(p4.Update_INSERT, entry); err != nil {
+		return err
+	}
+
+	log.WithFields(log.Fields{
+		"ue pool": up4.ueIPPool,
+	}).Debug("UE pool successfully initialized in the UP4 pipeline")
+
+	return nil
+}
+
 func (up4 *UP4) listenToDDNs() {
 	log.Info("Listening to Data Notifications from UP4..")
 
@@ -424,6 +447,11 @@ func (up4 *UP4) tryConnect() error {
 		log.Errorf("Failed to get Access IP from UP4: %v", err)
 	} else {
 		log.Infof("Retrieved Access IP from UP4: %v", up4.accessIP)
+	}
+
+	err = up4.initUEPool()
+	if err != nil {
+		return ErrOperationFailedWithReason("UE pool initialization", err.Error())
 	}
 
 	return nil
