@@ -36,8 +36,8 @@
         ["userMetadata.tunnel_out_udp_sport", 16, false],
         ["userMetadata.tunnel_out_teid", 32, false],
         ["userMetadata.tunnel_out_qfi", 6, false],
-        ["userMetadata.session_meter_id_internal", 32, false],
-        ["userMetadata.app_meter_id_internal", 32, false],
+        ["userMetadata.session_meter_idx_internal", 32, false],
+        ["userMetadata.app_meter_idx_internal", 32, false],
         ["userMetadata.session_color", 2, false],
         ["userMetadata.app_color", 2, false],
         ["userMetadata.preserved_ingress_port", 9, false],
@@ -1472,7 +1472,7 @@
       "source_info" : {
         "filename" : "p4src/main.p4",
         "line" : 131,
-        "column" : 49,
+        "column" : 50,
         "source_fragment" : "app_meter"
       },
       "is_direct" : false,
@@ -1486,7 +1486,7 @@
       "source_info" : {
         "filename" : "p4src/main.p4",
         "line" : 132,
-        "column" : 53,
+        "column" : 54,
         "source_fragment" : "session_meter"
       },
       "is_direct" : false,
@@ -2041,7 +2041,7 @@
           "parameters" : [
             {
               "type" : "field",
-              "value" : ["scalars", "userMetadata.session_meter_id_internal"]
+              "value" : ["scalars", "userMetadata.session_meter_idx_internal"]
             },
             {
               "type" : "hexstr",
@@ -2051,7 +2051,7 @@
           "source_info" : {
             "filename" : "p4src/include/define.p4",
             "line" : 70,
-            "column" : 52,
+            "column" : 54,
             "source_fragment" : "0; ..."
           }
         },
@@ -2060,7 +2060,7 @@
           "parameters" : [
             {
               "type" : "field",
-              "value" : ["scalars", "userMetadata.app_meter_id_internal"]
+              "value" : ["scalars", "userMetadata.app_meter_idx_internal"]
             },
             {
               "type" : "hexstr",
@@ -2070,7 +2070,7 @@
           "source_info" : {
             "filename" : "p4src/include/define.p4",
             "line" : 71,
-            "column" : 44,
+            "column" : 46,
             "source_fragment" : "0; ..."
           }
         },
@@ -2614,7 +2614,7 @@
       "id" : 19,
       "runtime_data" : [
         {
-          "name" : "session_meter_id",
+          "name" : "session_meter_idx",
           "bitwidth" : 32
         }
       ],
@@ -2653,7 +2653,7 @@
           "parameters" : [
             {
               "type" : "field",
-              "value" : ["scalars", "userMetadata.session_meter_id_internal"]
+              "value" : ["scalars", "userMetadata.session_meter_idx_internal"]
             },
             {
               "type" : "runtime_data",
@@ -2664,7 +2664,7 @@
             "filename" : "p4src/main.p4",
             "line" : 200,
             "column" : 8,
-            "source_fragment" : "local_meta.session_meter_id_internal = session_meter_id"
+            "source_fragment" : "local_meta.session_meter_idx_internal = session_meter_idx"
           }
         }
       ]
@@ -2714,7 +2714,7 @@
           "bitwidth" : 8
         },
         {
-          "name" : "session_meter_id",
+          "name" : "session_meter_idx",
           "bitwidth" : 32
         }
       ],
@@ -2743,7 +2743,7 @@
           "parameters" : [
             {
               "type" : "field",
-              "value" : ["scalars", "userMetadata.session_meter_id_internal"]
+              "value" : ["scalars", "userMetadata.session_meter_idx_internal"]
             },
             {
               "type" : "runtime_data",
@@ -2754,7 +2754,7 @@
             "filename" : "p4src/main.p4",
             "line" : 209,
             "column" : 8,
-            "source_fragment" : "local_meta.session_meter_id_internal = session_meter_id"
+            "source_fragment" : "local_meta.session_meter_idx_internal = session_meter_idx"
           }
         }
       ]
@@ -2800,7 +2800,7 @@
       "id" : 23,
       "runtime_data" : [
         {
-          "name" : "session_meter_id",
+          "name" : "session_meter_idx",
           "bitwidth" : 32
         }
       ],
@@ -2839,7 +2839,7 @@
           "parameters" : [
             {
               "type" : "field",
-              "value" : ["scalars", "userMetadata.session_meter_id_internal"]
+              "value" : ["scalars", "userMetadata.session_meter_idx_internal"]
             },
             {
               "type" : "runtime_data",
@@ -2850,7 +2850,7 @@
             "filename" : "p4src/main.p4",
             "line" : 217,
             "column" : 8,
-            "source_fragment" : "local_meta.session_meter_id_internal = session_meter_id"
+            "source_fragment" : "local_meta.session_meter_idx_internal = session_meter_idx"
           }
         }
       ]
@@ -2864,7 +2864,7 @@
           "bitwidth" : 32
         },
         {
-          "name" : "app_meter_id",
+          "name" : "app_meter_idx",
           "bitwidth" : 32
         }
       ],
@@ -2922,7 +2922,7 @@
           "parameters" : [
             {
               "type" : "field",
-              "value" : ["scalars", "userMetadata.app_meter_id_internal"]
+              "value" : ["scalars", "userMetadata.app_meter_idx_internal"]
             },
             {
               "type" : "runtime_data",
@@ -2933,7 +2933,7 @@
             "filename" : "p4src/main.p4",
             "line" : 254,
             "column" : 8,
-            "source_fragment" : "local_meta.app_meter_id_internal = app_meter_id"
+            "source_fragment" : "local_meta.app_meter_idx_internal = app_meter_idx"
           }
         }
       ]
@@ -2951,7 +2951,7 @@
           "bitwidth" : 2
         },
         {
-          "name" : "app_meter_id",
+          "name" : "app_meter_idx",
           "bitwidth" : 32
         }
       ],
@@ -3009,7 +3009,7 @@
           "parameters" : [
             {
               "type" : "field",
-              "value" : ["scalars", "userMetadata.app_meter_id_internal"]
+              "value" : ["scalars", "userMetadata.app_meter_idx_internal"]
             },
             {
               "type" : "runtime_data",
@@ -3020,7 +3020,7 @@
             "filename" : "p4src/main.p4",
             "line" : 254,
             "column" : 8,
-            "source_fragment" : "local_meta.app_meter_id_internal = app_meter_id; ..."
+            "source_fragment" : "local_meta.app_meter_idx_internal = app_meter_idx; ..."
           }
         },
         {
@@ -3150,7 +3150,7 @@
           "bitwidth" : 6
         },
         {
-          "name" : "app_meter_id",
+          "name" : "app_meter_idx",
           "bitwidth" : 32
         }
       ],
@@ -3246,7 +3246,7 @@
           "parameters" : [
             {
               "type" : "field",
-              "value" : ["scalars", "userMetadata.app_meter_id_internal"]
+              "value" : ["scalars", "userMetadata.app_meter_idx_internal"]
             },
             {
               "type" : "runtime_data",
@@ -3257,7 +3257,7 @@
             "filename" : "p4src/main.p4",
             "line" : 271,
             "column" : 8,
-            "source_fragment" : "local_meta.app_meter_id_internal = app_meter_id"
+            "source_fragment" : "local_meta.app_meter_idx_internal = app_meter_idx"
           }
         }
       ]
@@ -3283,7 +3283,7 @@
           "bitwidth" : 2
         },
         {
-          "name" : "app_meter_id",
+          "name" : "app_meter_idx",
           "bitwidth" : 32
         }
       ],
@@ -3379,7 +3379,7 @@
           "parameters" : [
             {
               "type" : "field",
-              "value" : ["scalars", "userMetadata.app_meter_id_internal"]
+              "value" : ["scalars", "userMetadata.app_meter_idx_internal"]
             },
             {
               "type" : "runtime_data",
@@ -3390,7 +3390,7 @@
             "filename" : "p4src/main.p4",
             "line" : 271,
             "column" : 8,
-            "source_fragment" : "local_meta.app_meter_id_internal = app_meter_id; ..."
+            "source_fragment" : "local_meta.app_meter_idx_internal = app_meter_idx; ..."
           }
         },
         {
@@ -5751,7 +5751,7 @@
             },
             {
               "type" : "field",
-              "value" : ["scalars", "userMetadata.session_meter_id_internal"]
+              "value" : ["scalars", "userMetadata.session_meter_idx_internal"]
             },
             {
               "type" : "field",
@@ -5762,7 +5762,7 @@
             "filename" : "p4src/main.p4",
             "line" : 492,
             "column" : 20,
-            "source_fragment" : "session_meter.execute_meter<MeterColor>(local_meta.session_meter_id_internal, local_meta.session_color)"
+            "source_fragment" : "session_meter.execute_meter<MeterColor>(local_meta.session_meter_idx_internal, local_meta.session_color)"
           }
         }
       ]
@@ -5781,7 +5781,7 @@
             },
             {
               "type" : "field",
-              "value" : ["scalars", "userMetadata.app_meter_id_internal"]
+              "value" : ["scalars", "userMetadata.app_meter_idx_internal"]
             },
             {
               "type" : "field",
@@ -5792,7 +5792,7 @@
             "filename" : "p4src/main.p4",
             "line" : 488,
             "column" : 16,
-            "source_fragment" : "app_meter.execute_meter<MeterColor>(local_meta.app_meter_id_internal, local_meta.app_color)"
+            "source_fragment" : "app_meter.execute_meter<MeterColor>(local_meta.app_meter_idx_internal, local_meta.app_color)"
           }
         }
       ]
@@ -6472,7 +6472,7 @@
             "filename" : "p4src/main.p4",
             "line" : 488,
             "column" : 16,
-            "source_fragment" : "app_meter.execute_meter<MeterColor>(local_meta.app_meter_id_internal, local_meta.app_color)"
+            "source_fragment" : "app_meter.execute_meter<MeterColor>(local_meta.app_meter_idx_internal, local_meta.app_color)"
           },
           "key" : [],
           "match_type" : "exact",
@@ -6530,7 +6530,7 @@
             "filename" : "p4src/main.p4",
             "line" : 492,
             "column" : 20,
-            "source_fragment" : "session_meter.execute_meter<MeterColor>(local_meta.session_meter_id_internal, local_meta.session_color)"
+            "source_fragment" : "session_meter.execute_meter<MeterColor>(local_meta.session_meter_idx_internal, local_meta.session_color)"
           },
           "key" : [],
           "match_type" : "exact",
