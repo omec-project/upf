@@ -23,7 +23,9 @@ services:
     depends_on:
       - mock-up4
   mock-up4:
-    image: opennetworking/p4mn:latest@sha256:cfcaca89d1a33371a6c2c4ee285e58d884ef01ea05072b6425eb03a3c94c4d7c
+    # NOTE: mn-stratum is easier to debug and more stable.
+    # but should be replaced with p4mn if integration tests will cover DDNs.
+    image: opennetworking/mn-stratum:21.12
     hostname: mock-up4
     container_name: mock-up4
     privileged: true

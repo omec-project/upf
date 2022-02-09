@@ -283,9 +283,6 @@ func (c *P4rtClient) ClearTable(tableID uint32) error {
 	updates := make([]*p4.Update, len(readRes.GetEntities()))
 
 	for _, entity := range readRes.GetEntities() {
-		log.Debug("entity: ", entity)
-		log.Debug("type table: ", entity.GetTableEntry() != nil)
-
 		update := &p4.Update{
 			Type:   p4.Update_DELETE,
 			Entity: entity,

@@ -11,6 +11,6 @@
   "p4rtciface": {
     "p4rtc_server": "mock-up4",
     "p4rtc_port": "50001",
-    "access_ip": "192.168.1.1/32"
+    "access_ip": "198.18.0.1/32"
   }
 }
