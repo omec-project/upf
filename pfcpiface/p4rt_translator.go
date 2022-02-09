@@ -34,8 +34,8 @@ const (
 	FieldTunnelSrcAddress  = "src_addr"
 	FieldTunnelDstAddress  = "dst_addr"
 	FieldTunnelSrcPort     = "sport"
-	FieldSessionMeterIndex = "session_meter_id"
-	FieldAppMeterIndex     = "app_meter_id"
+	FieldSessionMeterIndex = "session_meter_idx"
+	FieldAppMeterIndex     = "app_meter_idx"
 
 	TableInterfaces           = "PreQosPipe.interfaces"
 	TableTunnelPeers          = "PreQosPipe.tunnel_peers"
