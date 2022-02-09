@@ -5,9 +5,9 @@ package main
 
 import (
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 
 	"net"
-	"reflect"
 	"testing"
 )
 
@@ -63,9 +63,7 @@ func Test_endpoint_parseNet(t *testing.T) {
 				if err := got.parseNet(tt.args); (err != nil) != tt.wantErr {
 					t.Errorf("parseNet() error = %v, wantErr %v", err, tt.wantErr)
 				}
-				if !reflect.DeepEqual(got, tt.want) {
-					t.Errorf("parseNet() = %v, want %v", got, tt.want)
-				}
+				require.Equal(t, got, tt.want)
 			},
 		)
 	}
@@ -119,9 +117,7 @@ func Test_endpoint_parsePort(t *testing.T) {
 				if err := got.parsePort(tt.args); (err != nil) != tt.wantErr {
 					t.Errorf("parsePort() error = %v, wantErr %v", err, tt.wantErr)
 				}
-				if !reflect.DeepEqual(got, tt.want) {
-					t.Errorf("parsePort() = %v, want %v", got, tt.want)
-				}
+				require.Equal(t, got, tt.want)
 			},
 		)
 	}
@@ -154,9 +150,7 @@ func Test_ipFilterRule_String(t *testing.T) {
 					src:       tt.fields.src,
 					dst:       tt.fields.dst,
 				}
-				if got := ipf.String(); got != tt.want {
-					t.Errorf("String() = %v, want %v", got, tt.want)
-				}
+				require.Equal(t, ipf.String(), tt.want)
 			},
 		)
 	}
@@ -273,9 +267,7 @@ func Test_parseFlowDesc(t *testing.T) {
 					return
 				}
 				// TODO: add wants and enable equal check
-				//if !reflect.DeepEqual(got, tt.want) {
-				//	t.Errorf("parseFlowDesc() got = %v, want %v", got, tt.want)
-				//}
+				// require.Equal(t, got, tt.want)
 			},
 		)
 	}
@@ -302,9 +294,7 @@ func Test_parseL4Proto(t *testing.T) {
 					t.Errorf("parseL4Proto() error = %v, wantErr %v", err, tt.wantErr)
 					return
 				}
-				if got != tt.want {
-					t.Errorf("parseL4Proto() = %v, want %v", got, tt.want)
-				}
+				require.Equal(t, got, tt.want)
 			},
 		)
 	}
