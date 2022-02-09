@@ -317,15 +317,17 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 
 func (up4 *UP4) clearAllTables() error {
 	tables := []string {TableUplinkSessions, TableDownlinkSessions,TableUplinkTerminations, TableDownlinkTerminations, TableTunnelPeers, TableApplications}
+	tableIDs := make([]uint32, len(tables))
 	for _, table := range tables {
 		tableID, err := up4.p4RtTranslator.getTableIDByName(table)
 		if err != nil {
 			return err
 		}
-		err = up4.p4client.ClearTable(tableID)
-		if err != nil {
-			return err
-		}
+		tableIDs = append(tableIDs, tableID)
+	}
+	err := up4.p4client.ClearTables(tableIDs)
+	if err != nil {
+		return err
 	}
 	return nil
 }
