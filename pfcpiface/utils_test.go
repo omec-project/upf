@@ -21,7 +21,8 @@ func GetLoopbackInterface() (net.Interface, error) {
 	return net.Interface{}, ErrNotFound("No loopback interface found")
 }
 
-// This tests inherently depends on the host setup to a degree. We skip it if it's not feasible to run.
+// This tests inherently depends on the host setup to a degree.
+// If it's not feasible to run, we will skip it.
 func TestGetUnicastAddressFromInterface(t *testing.T) {
 	lb, err := GetLoopbackInterface()
 	if err != nil {

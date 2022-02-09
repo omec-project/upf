@@ -5,7 +5,6 @@ package main
 
 import (
 	"encoding/binary"
-
 	"net"
 	"strconv"
 	"strings"
