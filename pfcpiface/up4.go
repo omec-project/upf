@@ -6,6 +6,7 @@ package main
 import (
 	"encoding/binary"
 	"flag"
+	"math"
 	"math/rand"
 	"net"
 	"time"
@@ -782,7 +783,7 @@ func getMeterConfigurationFromQER(mbr uint64, gbr uint64) *p4.MeterConfig {
 	if mbr != 0 || gbr != 0 {
 		/* MBR/GBR is received in Kilobits/sec.
 		   CIR/PIR is sent in bytes */
-		cir = maxUint64((gbr*1000)/8, 0)
+		cir = maxUint64((gbr*1000)/8, 1)
 		pir = maxUint64((mbr*1000)/8, cir)
 	}
 
@@ -968,6 +969,14 @@ func (up4 *UP4) configureMeters(qers []qer) error {
 	return nil
 }
 
+func verifyPDR(pdr pdr) error {
+	if pdr.precedence > math.MaxUint16 {
+		return ErrUnsupported("precedence greater than 65535", pdr.precedence)
+	}
+
+	return nil
+}
+
 func (up4 *UP4) resetMeter(name string, meter meter) {
 	meterID := up4.p4RtTranslator.meterID(name)
 	entries := make([]*p4.MeterEntry, 0, 2)
@@ -1030,6 +1039,10 @@ func (up4 *UP4) resetMeters(qers []qer) {
 // inserts/modifies/removes table entries from UP4 device, according to methodType.
 func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers []qer, methodType p4.Update_Type) error {
 	for _, pdr := range pdrs {
+		if err := verifyPDR(pdr); err != nil {
+			return err
+		}
+
 		entriesToApply := make([]*p4.TableEntry, 0)
 
 		pdrLog := log.WithFields(log.Fields{
