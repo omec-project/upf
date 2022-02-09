@@ -95,17 +95,6 @@ func (ipf *ipFilterRule) String() string {
 		ipf.action, ipf.direction, ipf.proto, ipf.src.IPNet, ipf.src.ports, ipf.dst.IPNet, ipf.dst.ports)
 }
 
-// "permit out ip from any to assigned"
-// "permit out ip from 60.60.0.102 to assigned"
-// "permit out ip from 60.60.0.102/32 to assigned"
-// "permit out ip from any to 60.60.0.102"
-// "permit out ip from 60.60.0.1/26 to 60.60.0.102"
-// "permit out ip from 60.60.0.1 8888 to 60.60.0.102/26"
-// "permit out ip from 60.60.0.1 8888-8888 to 60.60.0.102/26"
-// "permit out ip from 60.60.0.1 to 60.60.0.102 9999"
-// "permit out ip from 60.60.0.1 8888 to 60.60.0.102 9999"
-// "permit out ip from 60.60.0.1 8888-8888 to 60.60.0.102 9999-9999"
-
 func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
 	parseLog := log.WithFields(log.Fields{
 		"flow-description": flowDesc,
@@ -116,6 +105,9 @@ func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
 	ipf := newIpFilterRule()
 
 	fields := strings.Fields(flowDesc)
+	if len(fields) < 3 {
+		return nil, errBadFilterDesc
+	}
 
 	if err := parseAction(fields[0]); err != nil {
 		return nil, err
@@ -128,7 +120,7 @@ func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
 	}
 
 	ipf.direction = fields[1]
-	ipf.proto = parseProto(fields[2])
+	ipf.proto, _ = parseL4Proto(fields[2])
 
 	// bring to common intermediate representation
 	xform := func(i int) {
@@ -215,18 +207,18 @@ func parseDirection(dir string) error {
 	return nil
 }
 
-func parseProto(proto string) uint8 {
+func parseL4Proto(proto string) (uint8, error) {
 	p, err := strconv.ParseUint(proto, 10, 8)
 	if err == nil {
-		return uint8(p)
+		return uint8(p), nil
 	}
 
 	switch proto {
 	case "udp":
-		return 17
+		return 17, nil
 	case "tcp":
-		return 6
+		return 6, nil
 	default:
-		return reservedProto // IANA reserved
+		return reservedProto, errBadFilterDesc
 	}
 }
