@@ -19,6 +19,61 @@ type IPPool struct {
 	inventory map[uint64]net.IP
 }
 
+// NewIPPool creates a new pool of IP addresses with the given subnet.
+// The smallest supported size is a /30.
+func NewIPPool(poolSubnet string) (*IPPool, error) {
+	ip, ipnet, err := net.ParseCIDR(poolSubnet)
+	if err != nil {
+		return nil, err
+	}
+
+	i := &IPPool{
+		inventory: make(map[uint64]net.IP),
+	}
+
+	for ip := ip.Mask(ipnet.Mask); ipnet.Contains(ip); inc(ip) {
+		ipVal := make(net.IP, len(ip))
+		copy(ipVal, ip)
+		i.freePool = append(i.freePool, ipVal)
+	}
+
+	if len(i.freePool) < 2 {
+		return nil, ErrInvalidArgumentWithReason("NewIPPool", poolSubnet, "pool subnet is too small to use as a pool")
+	}
+
+	// remove network address and broadcast address
+	i.freePool = i.freePool[1 : len(i.freePool)-1]
+
+	return i, nil
+}
+
+func (i *IPPool) LookupOrAllocIP(seid uint64) (net.IP, error) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	// Try to find an exiting session and return the allocated IP.
+	ip, found := i.inventory[seid]
+	if found {
+		log.Traceln("Found existing session", seid, "IP", ip)
+		return ip, nil
+	}
+
+	// Check capacity before new allocations.
+	if len(i.freePool) == 0 {
+		return nil, ErrOperationFailedWithReason("IP allocation", "ip pool empty")
+	}
+
+	ip = i.freePool[0]
+	i.freePool = i.freePool[1:] // Slice off the element once it is dequeued.
+	i.inventory[seid] = ip
+	log.Traceln("Allocated new session", seid, "IP", ip)
+
+	ipVal := make(net.IP, len(ip))
+	copy(ipVal, ip)
+
+	return ipVal, nil
+}
+
 func (i *IPPool) DeallocIP(seid uint64) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
@@ -34,32 +89,6 @@ func (i *IPPool) DeallocIP(seid uint64) error {
 	log.Traceln("Deallocated session ", seid, "IP", ip)
 
 	return nil
-}
-
-func (i *IPPool) LookupOrAllocIP(seid uint64) (net.IP, error) {
-	i.mu.Lock()
-	defer i.mu.Unlock()
-
-	if len(i.freePool) == 0 {
-		return nil, ErrOperationFailedWithReason("IP allocation", "ip pool empty")
-	}
-
-	// Try to find an exiting session and return the allocated IP.
-	ip, found := i.inventory[seid]
-	if found {
-		log.Traceln("Found existing session", seid, "IP", ip)
-		return ip, nil
-	}
-
-	ip = i.freePool[0]
-	i.freePool = i.freePool[1:] // Slice off the element once it is dequeued.
-	i.inventory[seid] = ip
-	log.Traceln("Allocated new session", seid, "IP", ip)
-
-	ipVal := make(net.IP, len(ip))
-	copy(ipVal, ip)
-
-	return ipVal, nil
 }
 
 func (i *IPPool) String() string {
@@ -80,26 +109,4 @@ func (i *IPPool) String() string {
 	}
 
 	return sb.String()
-}
-
-func NewIPPool(cidr string) (*IPPool, error) {
-	ip, ipnet, err := net.ParseCIDR(cidr)
-	if err != nil {
-		return nil, err
-	}
-
-	i := &IPPool{
-		inventory: make(map[uint64]net.IP),
-	}
-
-	for ip := ip.Mask(ipnet.Mask); ipnet.Contains(ip); inc(ip) {
-		ipVal := make(net.IP, len(ip))
-		copy(ipVal, ip)
-		i.freePool = append(i.freePool, ipVal)
-	}
-
-	// remove network address and broadcast address
-	i.freePool = i.freePool[1 : len(i.freePool)-1]
-
-	return i, nil
 }
