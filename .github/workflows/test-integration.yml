@@ -18,4 +18,4 @@ jobs:
           go-version: '1.13'
       - name: Run integration tests for PFCP Agent & UP4
         run: |
-            make test-up4-integration || docker-compose -f test/integration/infra/docker-compose.yml logs
+            make test-up4-integration || (docker-compose -f test/integration/infra/docker-compose.yml logs; exit 1)
