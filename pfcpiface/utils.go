@@ -6,10 +6,11 @@ package main
 
 import (
 	"encoding/binary"
-	log "github.com/sirupsen/logrus"
 	"net"
 	"strconv"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // grpc channel state.
