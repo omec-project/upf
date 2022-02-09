@@ -109,24 +109,6 @@ func (up4 *UP4) sessionStats(*PfcpNodeCollector, chan<- prometheus.Metric) error
 func (up4 *UP4) portStats(uc *upfCollector, ch chan<- prometheus.Metric) {
 }
 
-func (up4 *UP4) getAccessIP() (*net.IPNet, error) {
-	log.Println("getAccessIP")
-
-	interfaceTableEntry := up4.p4RtTranslator.BuildInterfaceTableEntryNoAction()
-
-	resp, err := up4.p4client.ReadTableEntry(interfaceTableEntry)
-	if err != nil {
-		return nil, ErrOperationFailedWithReason("get Access IP from UP4", err.Error())
-	}
-
-	accessIP, err := up4.p4RtTranslator.ParseAccessIPFromReadInterfaceTableResponse(resp)
-	if err != nil {
-		return nil, err
-	}
-
-	return accessIP, nil
-}
-
 func (up4 *UP4) initCounter(counterID uint8, name string) error {
 	ctr, err := up4.p4RtTranslator.getCounterByName(name)
 	if err != nil {
@@ -324,10 +306,6 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 		log.Errorf("failed to connect to UP4: %v", err)
 		return
 	}
-
-	if up4.accessIP != nil {
-		u.accessIP = up4.accessIP.IP
-	}
 }
 
 func (up4 *UP4) clearAllTables() error {
@@ -391,6 +369,16 @@ func (up4 *UP4) clearAllTables() error {
 		return err
 	}
 
+	interfacesTableID, err := up4.p4RtTranslator.getTableIDByName(TableInterfaces)
+	if err != nil {
+		return err
+	}
+
+	err = up4.p4client.ClearTable(interfacesTableID)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -407,6 +395,23 @@ func (up4 *UP4) initUEPool() error {
 	log.WithFields(log.Fields{
 		"ue pool": up4.ueIPPool,
 	}).Debug("UE pool successfully initialized in the UP4 pipeline")
+
+	return nil
+}
+
+func (up4 *UP4) initN3Address() error {
+	entry, err := up4.p4RtTranslator.BuildInterfaceTableEntry(up4.accessIP, false)
+	if err != nil {
+		return err
+	}
+
+	if err := up4.p4client.ApplyTableEntries(p4.Update_INSERT, entry); err != nil {
+		return err
+	}
+
+	log.WithFields(log.Fields{
+		"N3 address": up4.accessIP,
+	}).Debug("N3 address successfully initialized in the UP4 pipeline")
 
 	return nil
 }
@@ -442,6 +447,11 @@ func (up4 *UP4) tryConnect() error {
 		return ErrOperationFailedWithReason("UE pool initialization", err.Error())
 	}
 
+	err = up4.initN3Address()
+	if err != nil {
+		return ErrOperationFailedWithReason("N3 address initialization", err.Error())
+	}
+
 	err = up4.initAllCounters()
 	if err != nil {
 		return ErrOperationFailedWithReason("counters initialization", err.Error())
@@ -454,13 +464,6 @@ func (up4 *UP4) tryConnect() error {
 
 		up4.endMarkerChan = make(chan []byte, 1024)
 		go up4.endMarkerSendLoop(up4.endMarkerChan)
-	}
-
-	up4.accessIP, err = up4.getAccessIP()
-	if err != nil {
-		log.Errorf("Failed to get Access IP from UP4: %v", err)
-	} else {
-		log.Infof("Retrieved Access IP from UP4: %v", up4.accessIP)
 	}
 
 	return nil
