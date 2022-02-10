@@ -313,7 +313,8 @@ func verifyNoP4RuntimeEntries(t *testing.T, expectedValues p4RtValues) {
 	}
 	require.Equal(t, 0, nrOfConfiguredMeters, "application meter should not have any cells configured")
 
-	expectedAllEntries := 3
+	// 2 interfaces entries + 1 applications + 1 tunnel_peers
+	expectedAllEntries := 4
 	if expectedValues.appFilter.isEmpty() {
 		expectedAllEntries--
 	}
@@ -323,7 +324,7 @@ func verifyNoP4RuntimeEntries(t *testing.T, expectedValues p4RtValues) {
 	// FIXME: tunnel_peers and applications are not cleared on session deletion/association release
 	//  See SDFAB-960
 	require.Equal(t, expectedAllEntries, len(allInstalledEntries),
-		fmt.Sprintf("UP4 should have only %d entry installed", expectedAllEntries))
+		fmt.Sprintf("UP4 should have only %d entry installed", expectedAllEntries), allInstalledEntries)
 
 	tables := []string{
 		// FIXME: tunnel_peers and applications are not cleared on session deletion/association release
