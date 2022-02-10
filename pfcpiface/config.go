@@ -37,6 +37,8 @@ type Conf struct {
 	RespTimeout       string           `json:"resp_timeout"`
 	EnableHBTimer     bool             `json:"enable_hbTimer"`
 	HeartBeatInterval string           `json:"heart_beat_interval"`
+	EnableUeIPAlloc   bool             `json:"enable_ue_ip_alloc"`
+	UEIPPool          string           `json:"ue_ip_pool"`
 }
 
 // QciQosConfig : Qos configured attributes.
@@ -70,13 +72,11 @@ type SimModeInfo struct {
 
 // CPIfaceInfo : CPIface interface settings.
 type CPIfaceInfo struct {
-	Peers           []string `json:"peers"`
-	UseFQDN         bool     `json:"use_fqdn"`
-	NodeID          string   `json:"hostname"`
-	EnableUeIPAlloc bool     `json:"enable_ue_ip_alloc"`
-	UEIPPool        string   `json:"ue_ip_pool"`
-	HTTPPort        string   `json:"http_port"`
-	Dnn             string   `json:"dnn"`
+	Peers    []string `json:"peers"`
+	UseFQDN  bool     `json:"use_fqdn"`
+	NodeID   string   `json:"hostname"`
+	HTTPPort string   `json:"http_port"`
+	Dnn      string   `json:"dnn"`
 }
 
 // IfaceType : Gateway interface struct.
@@ -89,7 +89,6 @@ type P4rtcInfo struct {
 	AccessIP    string `json:"access_ip"`
 	P4rtcServer string `json:"p4rtc_server"`
 	P4rtcPort   string `json:"p4rtc_port"`
-	UEIPPool    string `json:"ue_ip_pool"`
 }
 
 // validateConf checks that the given config reaches a baseline of correctness.
@@ -98,11 +97,6 @@ func validateConf(conf Conf) error {
 		_, _, err := net.ParseCIDR(conf.P4rtcIface.AccessIP)
 		if err != nil {
 			return ErrInvalidArgumentWithReason("conf.P4rtcIface.AccessIP", conf.P4rtcIface.AccessIP, err.Error())
-		}
-
-		_, _, err = net.ParseCIDR(conf.P4rtcIface.UEIPPool)
-		if err != nil {
-			return ErrInvalidArgumentWithReason("conf.P4rtcIface.UEIPPool", conf.P4rtcIface.UEIPPool, err.Error())
 		}
 
 		if conf.Mode != "" {
@@ -121,16 +115,16 @@ func validateConf(conf Conf) error {
 		}
 	}
 
-	if conf.CPIface.EnableUeIPAlloc {
-		_, _, err := net.ParseCIDR(conf.CPIface.UEIPPool)
+	if conf.EnableUeIPAlloc {
+		_, _, err := net.ParseCIDR(conf.UEIPPool)
 		if err != nil {
-			return ErrInvalidArgumentWithReason("conf.CPIface.UEIPPool", conf.CPIface.UEIPPool, err.Error())
+			return ErrInvalidArgumentWithReason("conf.UEIPPool", conf.UEIPPool, err.Error())
 		}
 	}
 
 	for _, peer := range conf.CPIface.Peers {
 		ip := net.ParseIP(peer)
-		if ip != nil {
+		if ip == nil {
 			return ErrInvalidArgumentWithReason("conf.CPIface.Peers", peer, "invalid IP")
 		}
 	}

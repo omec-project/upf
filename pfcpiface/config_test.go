@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -64,5 +65,19 @@ func TestLoadConfigFile(t *testing.T) {
 
 		_, err := LoadConfigFile(confPath)
 		require.NoError(t, err)
+	})
+
+	t.Run("all sample configs must be valid", func(t *testing.T) {
+		paths := []string{
+			"../conf/upf.json",
+			"../ptf/config/upf.json",
+			"../test/integration/config/default.json",
+			"../test/integration/config/ue_ip_alloc.json",
+		}
+
+		for _, path := range paths {
+			_, err := LoadConfigFile(path)
+			assert.NoError(t, err, "config %v is not valid", path)
+		}
 	})
 }

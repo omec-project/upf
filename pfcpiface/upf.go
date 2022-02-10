@@ -122,12 +122,12 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 	}
 
 	u := &upf{
-		enableUeIPAlloc:   conf.CPIface.EnableUeIPAlloc,
+		enableUeIPAlloc:   conf.EnableUeIPAlloc,
 		enableEndMarker:   conf.EnableEndMarker,
 		enableFlowMeasure: conf.EnableFlowMeasure,
 		accessIface:       conf.AccessIface.IfName,
 		coreIface:         conf.CoreIface.IfName,
-		ippoolCidr:        conf.CPIface.UEIPPool,
+		ippoolCidr:        conf.UEIPPool,
 		nodeID:            nodeID,
 		fastPath:          fp,
 		dnn:               conf.CPIface.Dnn,
