@@ -314,7 +314,7 @@ func testUEAttachDetach(t *testing.T, testcase *testCase) {
 	defer func() {
 		providers.DisconnectP4rt()
 		// give pfcpiface time to become master controller again
-		time.Sleep(1 * time.Second)
+		time.Sleep(3 * time.Second)
 	}()
 	entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.applications")
 	for _, entry := range entries {
