@@ -39,10 +39,6 @@ func ErrInvalidArgumentWithReason(name string, value interface{}, reason string)
 	return fmt.Errorf("%w '%s'=%v (%s)", errInvalidArgument, name, value, reason)
 }
 
-func ErrOperationFailed(operation interface{}) error {
-	return fmt.Errorf("%v %w", operation, errFailed)
-}
-
 func ErrOperationFailedWithReason(operation interface{}, reason string) error {
 	return fmt.Errorf("%v %w due to: : %s", operation, errFailed, reason)
 }
