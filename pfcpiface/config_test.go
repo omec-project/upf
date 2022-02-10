@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,8 +18,8 @@ func mustWriteStringToDisk(s string, path string) {
 	}
 }
 
-func TestParseJSON(t *testing.T) {
-	t.Run("config is preserved", func(t *testing.T) {
+func TestLoadConfigFile(t *testing.T) {
+	t.Run("sample config is valid", func(t *testing.T) {
 		s := `{
 			"mode": "dpdk",
 			"log_level": "info",
@@ -63,8 +62,7 @@ func TestParseJSON(t *testing.T) {
 		confPath := t.TempDir() + "/conf.json"
 		mustWriteStringToDisk(s, confPath)
 
-		got, err := ParseJSON(confPath)
+		_, err := LoadConfigFile(confPath)
 		require.NoError(t, err)
-		assert.Equal(t, "info", got.LogLevel)
 	})
 }

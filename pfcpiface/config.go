@@ -160,8 +160,8 @@ func validateConf(conf Conf) error {
 	return nil
 }
 
-// ParseJSON : parse json file and populate corresponding struct.
-func ParseJSON(filepath string) (Conf, error) {
+// LoadConfigFile : parse json file and populate corresponding struct.
+func LoadConfigFile(filepath string) (Conf, error) {
 	// Open up file.
 	jsonFile, err := os.Open(filepath)
 	if err != nil {

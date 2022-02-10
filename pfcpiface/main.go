@@ -36,7 +36,7 @@ func main() {
 	flag.Parse()
 
 	// Read and parse json startup file.
-	conf, err := ParseJSON(*configPath)
+	conf, err := LoadConfigFile(*configPath)
 	if err != nil {
 		log.Fatalln("Error reading conf file:", err)
 	}
