@@ -41,11 +41,7 @@ func main() {
 		log.Fatalln("Error reading conf file:", err)
 	}
 
-	if level, err := log.ParseLevel(conf.LogLevel); err != nil {
-		log.Fatalln(err)
-	} else {
-		log.SetLevel(level)
-	}
+	log.SetLevel(conf.LogLevel)
 
 	log.Infof("%+v", conf)
 

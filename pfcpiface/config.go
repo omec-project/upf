@@ -30,7 +30,7 @@ type Conf struct {
 	EnableEndMarker   bool             `json:"enable_end_marker"`
 	NotifySockAddr    string           `json:"notify_sockaddr"`
 	EndMarkerSockAddr string           `json:"endmarker_sockaddr"`
-	LogLevel          string           `json:"log_level"`
+	LogLevel          log.Level        `json:"log_level"`
 	QciQosConfig      []QciQosConfig   `json:"qci_qos_config"`
 	SliceMeterConfig  SliceMeterConfig `json:"slice_rate_limit_config"`
 	MaxReqRetries     uint8            `json:"max_req_retries"`
@@ -135,10 +135,6 @@ func validateConf(conf Conf) error {
 		}
 	}
 
-	if _, err := log.ParseLevel(conf.LogLevel); err != nil {
-		return err
-	}
-
 	if _, err := time.ParseDuration(conf.RespTimeout); err != nil {
 		return ErrInvalidArgumentWithReason("conf.RespTimeout", conf.RespTimeout, "invalid duration")
 	}
@@ -183,10 +179,6 @@ func LoadConfigFile(filepath string) (Conf, error) {
 	}
 
 	// Set defaults, when missing.
-	if conf.LogLevel == "" {
-		conf.LogLevel = "info"
-	}
-
 	if conf.RespTimeout == "" {
 		conf.RespTimeout = respTimeoutDefault.String()
 	}
