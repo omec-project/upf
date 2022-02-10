@@ -97,12 +97,12 @@ func validateConf(conf Conf) error {
 	if conf.EnableP4rt {
 		_, _, err := net.ParseCIDR(conf.P4rtcIface.AccessIP)
 		if err != nil {
-			return err
+			return ErrInvalidArgumentWithReason("conf.P4rtcIface.AccessIP", conf.P4rtcIface.AccessIP, err.Error())
 		}
 
 		_, _, err = net.ParseCIDR(conf.P4rtcIface.UEIPPool)
 		if err != nil {
-			return err
+			return ErrInvalidArgumentWithReason("conf.P4rtcIface.UEIPPool", conf.P4rtcIface.UEIPPool, err.Error())
 		}
 
 		if conf.Mode != "" {
