@@ -1,5 +1,5 @@
 {
-    "": "Vdev or sim support. Enable `\"mode\": \"af_xdp\"` to enable AF_XDP mode, or `\"mode\": \"af_packet\"` to enable AF_PACKET mode, or `\"mode\": \"sim\"` to generate synthetic traffic from BESS's Source module",
+    "": "Vdev or sim support. Enable `\"mode\": \"af_xdp\"` to enable AF_XDP mode, or `\"mode\": \"af_packet\"` to enable AF_PACKET mode, `\"mode\": \"sim\"` to generate synthetic traffic from BESS's Source module or \"mode\": \"\" when running with UP4",
     "": "mode: af_xdp",
     "": "mode: af_packet",
     "": "mode: sim",
