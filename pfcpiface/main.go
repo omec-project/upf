@@ -120,18 +120,6 @@ func ParseJSON(filepath *string, conf *Conf) {
 	}
 }
 
-// ParseStrIP : parse IP address from config.
-func ParseStrIP(n3name string) *net.IPNet {
-	ip, ipNet, err := net.ParseCIDR(n3name)
-	if err != nil {
-		log.Fatalln("Unable to parse IP: ", err)
-	}
-
-	log.Println("IP: ", ip)
-
-	return ipNet
-}
-
 func init() {
 	flag.Var(&simulate, "simulate", "create|delete|create_continue simulated sessions")
 	// Set up logger
