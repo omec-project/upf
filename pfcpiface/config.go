@@ -124,7 +124,7 @@ func validateConf(conf Conf) error {
 	if conf.CPIface.EnableUeIPAlloc {
 		_, _, err := net.ParseCIDR(conf.CPIface.UEIPPool)
 		if err != nil {
-			return err
+			return ErrInvalidArgumentWithReason("conf.CPIface.UEIPPool", conf.CPIface.UEIPPool, err.Error())
 		}
 	}
 
