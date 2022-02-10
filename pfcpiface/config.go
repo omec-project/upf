@@ -94,16 +94,6 @@ type P4rtcInfo struct {
 
 // validateConf checks that the given config reaches a baseline of correctness.
 func validateConf(conf Conf) error {
-	validModes := map[string]struct{}{
-		"af_xdp":    {},
-		"af_packet": {},
-		"dpdk":      {},
-		"sim":       {},
-	}
-	if _, ok := validModes[conf.Mode]; !ok {
-		return ErrInvalidArgumentWithReason("conf.Mode", conf.Mode, "invalid mode")
-	}
-
 	if conf.EnableP4rt {
 		_, _, err := net.ParseCIDR(conf.P4rtcIface.AccessIP)
 		if err != nil {
@@ -113,6 +103,21 @@ func validateConf(conf Conf) error {
 		_, _, err = net.ParseCIDR(conf.P4rtcIface.UEIPPool)
 		if err != nil {
 			return err
+		}
+
+		if conf.Mode != "" {
+			return ErrInvalidArgumentWithReason("conf.Mode", conf.Mode, "mode must not be set for UP4")
+		}
+	} else {
+		// Mode is only relevant in a BESS deployment.
+		validModes := map[string]struct{}{
+			"af_xdp":    {},
+			"af_packet": {},
+			"dpdk":      {},
+			"sim":       {},
+		}
+		if _, ok := validModes[conf.Mode]; !ok {
+			return ErrInvalidArgumentWithReason("conf.Mode", conf.Mode, "invalid mode")
 		}
 	}
 
