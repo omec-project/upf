@@ -133,10 +133,11 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 		dnn:               conf.CPIface.Dnn,
 		peers:             conf.CPIface.Peers,
 		reportNotifyChan:  make(chan uint64, 1024),
-		maxReqRetries:     maxReqRetriesDefault,
+		maxReqRetries:     conf.MaxReqRetries,
 		respTimeout:       respTimeoutDefault,
 		enableHBTimer:     conf.EnableHBTimer,
 		hbInterval:        hbIntervalDefault,
+		readTimeout:       time.Second * time.Duration(conf.ReadTimeout),
 	}
 
 	if len(conf.CPIface.Peers) > 0 {
@@ -162,20 +163,9 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 		}
 	}
 
-	if conf.MaxReqRetries != 0 {
-		u.maxReqRetries = conf.MaxReqRetries
-	}
-
-	if conf.RespTimeout != "" {
-		u.respTimeout, err = time.ParseDuration(conf.RespTimeout)
-		if err != nil {
-			log.Fatalln("Unable to parse resp_timeout")
-		}
-	}
-
-	u.readTimeout = readTimeoutDefault
-	if conf.ReadTimeout != 0 {
-		u.readTimeout = time.Second * time.Duration(conf.ReadTimeout)
+	u.respTimeout, err = time.ParseDuration(conf.RespTimeout)
+	if err != nil {
+		log.Fatalln("Unable to parse resp_timeout")
 	}
 
 	if u.enableHBTimer {

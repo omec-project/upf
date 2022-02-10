@@ -31,15 +31,6 @@ var (
 	p4RtcServerPort = flag.String("p4RtcServerPort", "", "P4 Server port")
 )
 
-// FIXME: it should not be here IMO
-// P4rtcInfo : P4 runtime interface settings.
-type P4rtcInfo struct {
-	AccessIP    string `json:"access_ip"`
-	P4rtcServer string `json:"p4rtc_server"`
-	P4rtcPort   string `json:"p4rtc_port"`
-	UEIP        string `json:"ue_ip_pool"`
-}
-
 const (
 	preQosCounterID = iota
 	postQosCounterID
