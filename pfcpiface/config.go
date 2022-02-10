@@ -99,6 +99,11 @@ func validateConf(conf Conf) error {
 			return ErrInvalidArgumentWithReason("conf.P4rtcIface.AccessIP", conf.P4rtcIface.AccessIP, err.Error())
 		}
 
+		if !conf.EnableUeIPAlloc {
+			return ErrInvalidArgumentWithReason("conf.EnableUeIPAlloc",
+				conf.EnableUeIPAlloc, "UE IP pool allocation must be enabled in P4RT mode")
+		}
+
 		if conf.Mode != "" {
 			return ErrInvalidArgumentWithReason("conf.Mode", conf.Mode, "mode must not be set for UP4")
 		}
