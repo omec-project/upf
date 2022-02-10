@@ -1,8 +1,10 @@
 {
   "enable_p4rt": true,
   "log_level": "trace",
-  "enable_ue_ip_alloc": true,
-  "ue_ip_pool": "10.250.0.0/16",
+  "cpiface": {
+    "enable_ue_ip_alloc": true,
+    "ue_ip_pool": "10.250.0.0/16"
+  },
   "p4rtciface": {
     "p4rtc_server": "mock-up4",
     "p4rtc_port": "50001",

@@ -37,8 +37,6 @@ type Conf struct {
 	RespTimeout       string           `json:"resp_timeout"`
 	EnableHBTimer     bool             `json:"enable_hbTimer"`
 	HeartBeatInterval string           `json:"heart_beat_interval"`
-	EnableUeIPAlloc   bool             `json:"enable_ue_ip_alloc"`
-	UEIPPool          string           `json:"ue_ip_pool"`
 }
 
 // QciQosConfig : Qos configured attributes.
@@ -72,11 +70,13 @@ type SimModeInfo struct {
 
 // CPIfaceInfo : CPIface interface settings.
 type CPIfaceInfo struct {
-	Peers    []string `json:"peers"`
-	UseFQDN  bool     `json:"use_fqdn"`
-	NodeID   string   `json:"hostname"`
-	HTTPPort string   `json:"http_port"`
-	Dnn      string   `json:"dnn"`
+	Peers           []string `json:"peers"`
+	UseFQDN         bool     `json:"use_fqdn"`
+	NodeID          string   `json:"hostname"`
+	HTTPPort        string   `json:"http_port"`
+	Dnn             string   `json:"dnn"`
+	EnableUeIPAlloc bool     `json:"enable_ue_ip_alloc"`
+	UEIPPool        string   `json:"ue_ip_pool"`
 }
 
 // IfaceType : Gateway interface struct.
@@ -99,9 +99,9 @@ func validateConf(conf Conf) error {
 			return ErrInvalidArgumentWithReason("conf.P4rtcIface.AccessIP", conf.P4rtcIface.AccessIP, err.Error())
 		}
 
-		if !conf.EnableUeIPAlloc {
+		if !conf.CPIface.EnableUeIPAlloc {
 			return ErrInvalidArgumentWithReason("conf.EnableUeIPAlloc",
-				conf.EnableUeIPAlloc, "UE IP pool allocation must be enabled in P4RT mode")
+				conf.CPIface.EnableUeIPAlloc, "UE IP pool allocation must be enabled in P4RT mode")
 		}
 
 		if conf.Mode != "" {
@@ -120,10 +120,10 @@ func validateConf(conf Conf) error {
 		}
 	}
 
-	if conf.EnableUeIPAlloc {
-		_, _, err := net.ParseCIDR(conf.UEIPPool)
+	if conf.CPIface.EnableUeIPAlloc {
+		_, _, err := net.ParseCIDR(conf.CPIface.UEIPPool)
 		if err != nil {
-			return ErrInvalidArgumentWithReason("conf.UEIPPool", conf.UEIPPool, err.Error())
+			return ErrInvalidArgumentWithReason("conf.UEIPPool", conf.CPIface.UEIPPool, err.Error())
 		}
 	}
 

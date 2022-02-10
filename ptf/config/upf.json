@@ -91,9 +91,6 @@
     "" : "notify_sockaddr: /tmp/notifycp",
     "" : "endmarker_sockaddr: /tmp/pfcpport",
 
-    "enable_ue_ip_alloc": false,
-    "ue_ip_pool": "10.250.0.0/16",
-
     "qci_qos_config": [
         {
             "": "Default values for QERs with QCI/QFI not listed below",
@@ -120,6 +117,8 @@
     "cpiface": {
         "dnn": "internet",
         "http_port": "8080",
+        "enable_ue_ip_alloc": false,
+        "ue_ip_pool": "10.250.0.0/16",
         "" : "use_fqdn: true",
         "" : "hostname: upf-0"
     },

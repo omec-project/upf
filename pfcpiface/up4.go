@@ -245,7 +245,7 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 
 	log.Println("AccessIP: ", up4.accessIP)
 
-	up4.ueIPPool = MustParseStrIP(conf.UEIPPool)
+	up4.ueIPPool = MustParseStrIP(conf.CPIface.UEIPPool)
 
 	log.Infof("UE IP pool: %v", up4.ueIPPool)
 
