@@ -187,6 +187,7 @@ func (t *P4rtTranslator) getCounterByName(name string) (*p4ConfigV1.Counter, err
 	return nil, ErrNotFoundWithParam("counter", "name", name)
 }
 
+//nolint:unused
 func (t *P4rtTranslator) getMatchFieldIDByName(table *p4ConfigV1.Table, fieldName string) uint32 {
 	for _, field := range table.MatchFields {
 		if field.Name == fieldName {
@@ -424,6 +425,7 @@ func (t *P4rtTranslator) withActionParam(action *p4.Action, name string, value i
 	return nil
 }
 
+//nolint:unused
 func (t *P4rtTranslator) getActionParamValue(tableEntry *p4.TableEntry, id uint32) ([]byte, error) {
 	for _, param := range tableEntry.Action.GetAction().Params {
 		if param.ParamId == id {
@@ -434,6 +436,7 @@ func (t *P4rtTranslator) getActionParamValue(tableEntry *p4.TableEntry, id uint3
 	return nil, ErrNotFoundWithParam("action param", "id", id)
 }
 
+//nolint:unused
 func (t *P4rtTranslator) getLPMMatchFieldValue(tableEntry *p4.TableEntry, name string) (*net.IPNet, error) {
 	tableID := tableEntry.TableId
 
@@ -519,44 +522,6 @@ func (t *P4rtTranslator) BuildInterfaceTableEntry(ipNet *net.IPNet, isCore bool)
 	}
 
 	return entry, nil
-}
-
-func (t *P4rtTranslator) ParseAccessIPFromReadInterfaceTableResponse(resp *p4.ReadResponse) (*net.IPNet, error) {
-	var interfaceTypeParamID uint32 = 1
-
-	var directionParamID uint32 = 1
-
-	for _, entity := range resp.GetEntities() {
-		accessIP, err := t.getLPMMatchFieldValue(entity.GetTableEntry(), FieldIPv4DstPrefix)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"entity": entity,
-			}).Warn("failed to get LPM field from response entity")
-
-			continue
-		}
-
-		interfaceType, err := t.getActionParamValue(entity.GetTableEntry(), interfaceTypeParamID)
-		if err != nil {
-			return nil, err
-		}
-
-		directionValue, err := t.getActionParamValue(entity.GetTableEntry(), directionParamID)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(interfaceType) != 1 && len(directionValue) != 1 {
-			return nil, ErrOperationFailedWithReason("parse Access IP from UP4",
-				"invalid length of action params")
-		}
-
-		if interfaceType[0] == access && directionValue[0] == DirectionUplink {
-			return accessIP, nil
-		}
-	}
-
-	return nil, ErrOperationFailed("parse Access IP from P4Runtime response")
 }
 
 func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, internalAppID uint8) (*p4.TableEntry, error) {
