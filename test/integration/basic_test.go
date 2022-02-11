@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	p4rtc "github.com/antoninbas/p4runtime-go-client/pkg/client"
-	"github.com/antoninbas/p4runtime-go-client/pkg/util/conversion"
 	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim"
@@ -40,57 +38,6 @@ type testCase struct {
 	expected p4RtValues
 
 	desc string
-}
-
-func init() {
-	if err := initMockUP4(); err != nil {
-		panic("failed to initialize mock-up4")
-	}
-}
-
-func initMockUP4() (err error) {
-	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", p4_v1.Uint128{High: 0, Low: 2})
-	if err != nil {
-		return err
-	}
-	defer providers.DisconnectP4rt()
-
-	_, err = p4rtClient.SetFwdPipe("../../conf/p4/bin/bmv2.json", "../../conf/p4/bin/p4info.txt", 0)
-	if err != nil {
-		return err
-	}
-
-	ipAddr, err := conversion.IpToBinary(upfN3Address)
-	if err != nil {
-		return err
-	}
-
-	srcIface, err := conversion.UInt32ToBinary(srcIfaceAccess, 1)
-	if err != nil {
-		return err
-	}
-
-	direction, err := conversion.UInt32ToBinary(directionUplink, 1)
-	if err != nil {
-		return err
-	}
-
-	sliceID, err := conversion.UInt32ToBinary(defaultSliceID, 1)
-	if err != nil {
-		return err
-	}
-
-	te := p4rtClient.NewTableEntry("PreQosPipe.interfaces", []p4rtc.MatchInterface{&p4rtc.LpmMatch{
-		Value: ipAddr,
-		PLen:  32,
-	}}, p4rtClient.NewTableActionDirect("PreQosPipe.set_source_iface",
-		[][]byte{srcIface, direction, sliceID}), nil)
-
-	if err := p4rtClient.InsertTableEntry(te); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func setup(t *testing.T, pfcpAgentConfig string) {
@@ -364,11 +311,13 @@ func testUEAttachDetach(t *testing.T, testcase *testCase) {
 	// clear Applications table
 	// FIXME: Temporary solution. They should be cleared by pfcpiface, see SDFAB-960
 	p4rtClient, _ := providers.ConnectP4rt("127.0.0.1:50001", p4_v1.Uint128{High: 2, Low: 1})
-	defer providers.DisconnectP4rt()
+	defer func() {
+		providers.DisconnectP4rt()
+		// give pfcpiface time to become master controller again
+		time.Sleep(3 * time.Second)
+	}()
 	entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.applications")
 	for _, entry := range entries {
 		p4rtClient.DeleteTableEntry(entry)
 	}
-	// give pfcpiface time to become master controller again
-	time.Sleep(1 * time.Second)
 }
