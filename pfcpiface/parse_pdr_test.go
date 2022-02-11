@@ -20,7 +20,7 @@ type pdrTestCase struct {
 	description string
 }
 
-func TestParsePDR(t *testing.T) {
+func Test_parsePDR(t *testing.T) {
 	UEAddress := net.ParseIP("10.0.1.1")
 	N3Address := net.ParseIP("192.168.0.1")
 	FSEID := uint64(100)
@@ -160,7 +160,7 @@ func TestParsePDRShouldError(t *testing.T) {
 	}
 }
 
-func Test_CreatePortRangeCartesianProduct(t *testing.T) {
+func TestCreatePortRangeCartesianProduct(t *testing.T) {
 	type args struct {
 		src portRange
 		dst portRange
