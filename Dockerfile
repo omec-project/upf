@@ -52,12 +52,12 @@ RUN mv sample_plugin plugins
 ## Network Token
 ARG ENABLE_NTF
 ARG NTF_COMMIT=master
-COPY install_ntf.sh .
+COPY scripts/install_ntf.sh .
 RUN ./install_ntf.sh
 
 # Build and copy artifacts
 COPY core/ core/
-COPY build_bess.sh .
+COPY scripts/build_bess.sh .
 RUN ./build_bess.sh && \
     cp bin/bessd /bin && \
     mkdir -p /bin/modules && \
