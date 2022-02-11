@@ -128,7 +128,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				nbAddress:    nodeBAddress,
 				ueAddress:    ueAddress,
 				upfN3Address: upfN3Address,
-				sdfFilter:    "permit out udp from any to assigned 80-80",
+				sdfFilter:    "permit out udp from any 80-80 to assigned",
 				ulTEID:       15,
 				dlTEID:       16,
 				sessQFI:      0x09,
@@ -146,7 +146,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				appID:        1,
 				tunnelPeerID: 2,
 			},
-			desc: "APPLICATION FILTERING permit out udp from any to assigned 80-80",
+			desc: "APPLICATION FILTERING permit out udp from any 80-80 to assigned",
 		},
 		{
 			input: &pfcpSessionData{

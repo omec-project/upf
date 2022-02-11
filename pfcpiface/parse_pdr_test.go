@@ -552,7 +552,7 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 		wantErr       bool
 	}{
 		{
-			name:      "downlink SDF filter",
+			name:      "downlink SDF filter - app L4 port not spec-compliant",
 			sdfIE:     newFilter("permit out udp from 192.168.1.1/32 to assigned 80-400"),
 			direction: core,
 			wantAppFilter: applicationFilter{
@@ -568,8 +568,40 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:      "uplink SDF filter",
+			name:      "uplink SDF filter - app L4 port not spec-compliant",
 			sdfIE:     newFilter("permit out udp from 192.168.1.1/32 to assigned 80-400"),
+			direction: access,
+			wantAppFilter: applicationFilter{
+				srcIP:        ip2int(net.ParseIP(ueAddress)),
+				dstIP:        ip2int(net.ParseIP("192.168.1.1")),
+				srcPortRange: newWildcardPortRange(),
+				dstPortRange: newRangeMatchPortRange(80, 400),
+				proto:        17,
+				srcIPMask:    0xffffffff,
+				dstIPMask:    0xffffffff,
+				protoMask:    0xff,
+			},
+			wantErr: false,
+		},
+		{
+			name:      "downlink SDF filter - app L4 port spec-compliant",
+			sdfIE:     newFilter("permit out udp from 192.168.1.1/32 80-400 to assigned"),
+			direction: core,
+			wantAppFilter: applicationFilter{
+				srcIP:        ip2int(net.ParseIP("192.168.1.1")),
+				dstIP:        ip2int(net.ParseIP(ueAddress)),
+				srcPortRange: newRangeMatchPortRange(80, 400),
+				dstPortRange: newWildcardPortRange(),
+				proto:        17,
+				srcIPMask:    0xffffffff,
+				dstIPMask:    0xffffffff,
+				protoMask:    0xff,
+			},
+			wantErr: false,
+		},
+		{
+			name:      "uplink SDF filter - app L4 port spec-compliant",
+			sdfIE:     newFilter("permit out udp from 192.168.1.1/32 80-400 to assigned"),
 			direction: access,
 			wantAppFilter: applicationFilter{
 				srcIP:        ip2int(net.ParseIP(ueAddress)),

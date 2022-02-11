@@ -487,8 +487,10 @@ func (p *pdr) parseSDFFilter(ie *ie.IE) error {
 
 		// FIXME: temporary workaround for SDF Filter,
 		//  remove once we meet spec compliance
-		p.appFilter.srcPortRange = p.appFilter.dstPortRange
-		p.appFilter.dstPortRange = newWildcardPortRange()
+		if !p.appFilter.dstPortRange.isWildcardMatch() {
+			p.appFilter.srcPortRange = p.appFilter.dstPortRange
+			p.appFilter.dstPortRange = newWildcardPortRange()
+		}
 	} else if p.srcIface == access {
 		p.appFilter.srcIP = ip2int(ipf.dst.IPNet.IP)
 		p.appFilter.srcIPMask = ipMask2int(ipf.dst.IPNet.Mask)
@@ -500,8 +502,10 @@ func (p *pdr) parseSDFFilter(ie *ie.IE) error {
 
 		// FIXME: temporary workaround for SDF Filter,
 		//  remove once we meet spec compliance
-		p.appFilter.dstPortRange = p.appFilter.srcPortRange
-		p.appFilter.srcPortRange = newWildcardPortRange()
+		if !p.appFilter.srcPortRange.isWildcardMatch() {
+			p.appFilter.dstPortRange = p.appFilter.srcPortRange
+			p.appFilter.srcPortRange = newWildcardPortRange()
+		}
 	}
 
 	return nil
