@@ -95,12 +95,9 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 		reply, err = pConn.handleSessionModificationRequest(msg)
 	case message.MsgTypeSessionDeletionRequest:
 		reply, err = pConn.handleSessionDeletionRequest(msg)
-	case message.MsgTypeSessionReportResponse:
-		err = pConn.handleSessionReportResponse(msg)
 
 	// Incoming response messages
-	// TODO: Session Report Request
-	case message.MsgTypeAssociationSetupResponse, message.MsgTypeHeartbeatResponse:
+	case message.MsgTypeAssociationSetupResponse, message.MsgTypeHeartbeatResponse, message.MsgTypeSessionReportResponse:
 		pConn.handleIncomingResponse(msg)
 
 	default:

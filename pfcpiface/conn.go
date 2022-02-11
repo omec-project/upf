@@ -65,6 +65,24 @@ type PFCPConn struct {
 	hbCtxCancel context.CancelFunc
 
 	pendingReqs sync.Map
+	pConnID     uint32
+}
+
+func (pConn *PFCPConn) GenerateSessionID() uint64 {
+	var lseid uint64
+	//Make three attempts to derive a unique Id
+	for i := 0; i < 3; i++ {
+		rand := pConn.rng.Uint32()
+		lseid = (uint64(pConn.pConnID) << 32) | uint64(rand)
+		// Check if it already exists
+		if _, ok := pConn.sessions[lseid]; ok {
+			lseid = 0
+			continue
+		}
+		break
+	}
+	
+	return lseid
 }
 
 func (pConn *PFCPConn) startHeartBeatMonitor() {
@@ -134,6 +152,7 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 		InstrumentPFCP: node.metrics,
 		hbReset:        make(chan struct{}, 100),
 		hbCtxCancel:    nil,
+		pConnID:        node.getConnId(),
 	}
 
 	p.setLocalNodeID(node.upf.nodeID)

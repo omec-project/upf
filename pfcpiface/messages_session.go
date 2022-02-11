@@ -521,7 +521,18 @@ func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
 	srreq.DownlinkDataReport = ie.NewDownlinkDataReport(
 		ie.NewPDRID(uint16(pdrID)))
 
-	pConn.SendPFCPMsg(srreq)
+	r := newRequest(srreq)
+	reply, timeout := pConn.sendPFCPRequestMessage(r)
+
+	if reply != nil {
+		err := pConn.handleSessionReportResponse(reply)
+		if err != nil {
+			log.Errorln("Handling of Session Report Response Failed : ", err, pConn.RemoteAddr())
+			return
+		}
+	} else if timeout {
+		log.Errorln("Timeout for Session Report Response")
+	}
 }
 
 func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) error {

@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/omec-project/upf-epc/pfcpiface/metrics"
+	log "github.com/sirupsen/logrus"
 )
 
 type notifyFlag struct {
@@ -36,23 +37,21 @@ func (p PacketForwardingRules) String() string {
 
 // NewPFCPSession allocates an session with ID.
 func (pConn *PFCPConn) NewPFCPSession(rseid uint64) uint64 {
-	for i := 0; i < pConn.maxRetries; i++ {
-		lseid := pConn.rng.Uint64()
-		// Check if it already exists
-		if _, ok := pConn.sessions[lseid]; ok {
-			continue
-		}
-
-		s := PFCPSession{
-			localSEID:  lseid,
-			remoteSEID: rseid,
-			PacketForwardingRules: PacketForwardingRules{
-				pdrs: make([]pdr, 0, MaxItems),
-				fars: make([]far, 0, MaxItems),
-				qers: make([]qer, 0, MaxItems),
-			},
-		}
-		pConn.sessions[lseid] = &s
+	lseid := pConn.GenerateSessionID()
+	if lseid == 0 {
+		log.Errorln("Failed to generate session Id")
+		return 0
+	}
+	s := PFCPSession{
+		localSEID:  lseid,
+		remoteSEID: rseid,
+		PacketForwardingRules: PacketForwardingRules{
+			pdrs: make([]pdr, 0, MaxItems),
+			fars: make([]far, 0, MaxItems),
+			qers: make([]qer, 0, MaxItems),
+		},
+	}
+	pConn.sessions[lseid] = &s
 
 		// Metrics update
 		s.metrics = metrics.NewSession(pConn.nodeID.remote)
@@ -60,9 +59,6 @@ func (pConn *PFCPConn) NewPFCPSession(rseid uint64) uint64 {
 
 		return lseid
 	}
-
-	return 0
-}
 
 // RemoveSession removes session using lseid.
 func (pConn *PFCPConn) RemoveSession(lseid uint64) {

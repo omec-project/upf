@@ -29,6 +29,8 @@ type PFCPNode struct {
 	upf *upf
 	// metrics for PFCP messages and sessions
 	metrics metrics.InstrumentPFCP
+	// PFCP Connection Id
+	connId uint32
 }
 
 // NewPFCPNode create a new PFCPNode listening on local address.
@@ -51,6 +53,7 @@ func NewPFCPNode(ctx context.Context, upf *upf) *PFCPNode {
 		pConns:     make(map[string]*PFCPConn),
 		upf:        upf,
 		metrics:    metrics,
+		connId:     0,
 	}
 }
 
@@ -116,10 +119,9 @@ func (node *PFCPNode) Serve() {
 	for !shutdown {
 		select {
 		case fseid := <-node.upf.reportNotifyChan:
-			// TODO: Logic to distinguish PFCPConn based on SEID
-			for _, pConn := range node.pConns {
-				pConn.handleDigestReport(fseid)
-				break
+			pConn := node.findPFCPConnById(fseid)
+			if pConn != nil {
+				go pConn.handleDigestReport(fseid)
 			}
 		case rAddr := <-node.pConnDone:
 			delete(node.pConns, rAddr)
@@ -153,4 +155,21 @@ func (node *PFCPNode) Serve() {
 func (node *PFCPNode) Done() {
 	<-node.done
 	log.Infoln("Shutdown complete")
+}
+
+func (node *PFCPNode) findPFCPConnById(fseid uint64) *PFCPConn {
+	connID := uint32(fseid >> 32)
+
+	for _, pConn := range node.pConns {
+		if pConn.pConnID == connID {
+			return pConn
+		}
+		continue
+	}
+	return nil
+}
+
+func (node *PFCPNode) getConnId() uint32 {
+	node.connId++
+	return node.connId
 }
