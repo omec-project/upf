@@ -138,7 +138,7 @@ func TestParsePDRShouldError(t *testing.T) {
 			),
 			expected: &pdr{
 				qerIDList: []uint32{},
-				fseID: FSEID,
+				fseID:     FSEID,
 			},
 			description: "Malformed Uplink PDR input without PDR ID",
 		},
@@ -545,15 +545,15 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		direction uint8
-		sdfIE   *ie.IE
+		name          string
+		direction     uint8
+		sdfIE         *ie.IE
 		wantAppFilter applicationFilter
-		wantErr bool
+		wantErr       bool
 	}{
 		{
-			name: "downlink SDF filter",
-			sdfIE: newFilter("permit out udp from 192.168.1.1/32 to assigned 80-400"),
+			name:      "downlink SDF filter",
+			sdfIE:     newFilter("permit out udp from 192.168.1.1/32 to assigned 80-400"),
 			direction: core,
 			wantAppFilter: applicationFilter{
 				srcIP:        ip2int(net.ParseIP("192.168.1.1")),
@@ -568,8 +568,8 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "uplink SDF filter",
-			sdfIE: newFilter("permit out udp from 192.168.1.1/32 to assigned 80-400"),
+			name:      "uplink SDF filter",
+			sdfIE:     newFilter("permit out udp from 192.168.1.1/32 to assigned 80-400"),
 			direction: access,
 			wantAppFilter: applicationFilter{
 				srcIP:        ip2int(net.ParseIP(ueAddress)),
@@ -584,13 +584,13 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "wrong IE type passed",
-			sdfIE: ie.NewQERID(0),
+			name:    "wrong IE type passed",
+			sdfIE:   ie.NewQERID(0),
 			wantErr: true,
 		},
 		{
-			name: "empty flow description",
-			sdfIE: newFilter(""),
+			name:    "empty flow description",
+			sdfIE:   newFilter(""),
 			wantErr: true,
 		},
 	}
@@ -598,7 +598,7 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := &pdr{
 				ueAddress: ip2int(net.ParseIP("17.0.0.1")),
-				srcIface: tt.direction,
+				srcIface:  tt.direction,
 			}
 			if err := p.parseSDFFilter(tt.sdfIE); (err != nil) != tt.wantErr {
 				t.Errorf("parseSDFFilter() error = %v, wantErr %v", err, tt.wantErr)

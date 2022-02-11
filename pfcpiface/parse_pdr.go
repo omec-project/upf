@@ -419,7 +419,7 @@ func (p *pdr) parseApplicationID(ie *ie.IE, appPFDs map[string]appPFD) error {
 
 	for _, flowDesc := range apfd.flowDescs {
 		logger := log.WithFields(log.Fields{
-			"Application ID": apfd.appID,
+			"Application ID":   apfd.appID,
 			"Flow Description": flowDesc,
 		})
 		logger.Debug("Parsing flow description of Application ID IE")
@@ -528,7 +528,7 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, ippool *IPPoo
 		}
 	}
 
-	// make another iteration becuase Application ID and SDF Filter depend on UE IP Address IE
+	// make another iteration because Application ID and SDF Filter depend on UE IP Address IE
 	for _, ie2 := range pdiIEs {
 		switch ie2.Type {
 		case ie.ApplicationID:
@@ -625,7 +625,7 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, ippoo
 
 	p.precedence = precedence
 	p.pdrID = uint32(pdrID)
-	p.farID = farID  // farID currently not being set <--- FIXIT/TODO/XXX
+	p.farID = farID // farID currently not being set <--- FIXIT/TODO/XXX
 	/*p.qerID = qerID*/
 	p.needDecap = outerHeaderRemoval
 
