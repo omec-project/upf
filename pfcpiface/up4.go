@@ -15,6 +15,8 @@ import (
 
 	p4 "github.com/p4lang/p4runtime/go/p4/v1"
 
+	set "github.com/deckarep/golang-set"
+	
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -77,9 +79,9 @@ type UP4 struct {
 	// TODO: create UP4Store object and move these fields there
 	counters           []counter
 	tunnelPeerIDs      map[tunnelParams]uint8
-	tunnelPeerIDsPool  []uint8
+	tunnelPeerIDsPool  set.Set
 	applicationIDs     map[application]uint8
-	applicationIDsPool []uint8
+	applicationIDsPool set.Set
 
 	// ueAddrToFSEID is used to store UE Address <-> F-SEID mapping,
 	// which is needed to efficiently find F-SEID when we receive a P4 Digest (DDN) for a UE address.
@@ -226,10 +228,10 @@ func (up4 *UP4) initTunnelPeerIDs() {
 	// a simple queue storing available tunnel peer IDs
 	// 0 is reserved;
 	// 1 is reserved for dbuf
-	up4.tunnelPeerIDsPool = make([]uint8, 0, maxGTPTunnelPeerIDs)
+	up4.tunnelPeerIDsPool = set.NewSet()
 
 	for i := 2; i < maxGTPTunnelPeerIDs+2; i++ {
-		up4.tunnelPeerIDsPool = append(up4.tunnelPeerIDsPool, uint8(i))
+		up4.tunnelPeerIDsPool.Add(uint8(i))
 	}
 }
 
@@ -237,10 +239,10 @@ func (up4 *UP4) initApplicationIDs() {
 	up4.applicationIDs = make(map[application]uint8)
 	// a simple queue storing available application IDs
 	// 0 is reserved;
-	up4.applicationIDsPool = make([]uint8, 0, maxApplicationIDs)
+	up4.applicationIDsPool = set.NewSet()
 
 	for i := 1; i < maxApplicationIDs+1; i++ {
-		up4.applicationIDsPool = append(up4.applicationIDsPool, uint8(i))
+		up4.applicationIDsPool.Add(uint8(i))
 	}
 }
 
@@ -458,16 +460,20 @@ func findRelatedFAR(pdr pdr, fars []far) (far, error) {
 
 // Returns error if we reach maximum supported GTP Tunnel Peers.
 func (up4 *UP4) allocateGTPTunnelPeerID() (uint8, error) {
-	if len(up4.tunnelPeerIDsPool) == 0 {
+	if up4.tunnelPeerIDsPool.Cardinality() == 0 {
 		return 0, ErrOperationFailedWithReason("allocate GTP Tunnel Peer ID",
 			"no free tunnel peer IDs available")
 	}
 
-	// pick top from queue
-	allocated := up4.tunnelPeerIDsPool[0]
-	up4.tunnelPeerIDsPool = up4.tunnelPeerIDsPool[1:]
+	// pick from Set
+	allocated := up4.tunnelPeerIDsPool.Pop()
 
-	return allocated, nil
+	if allocated == nil {
+		return 0, ErrOperationFailedWithReason("allocate GTP Tunnel Peer ID",
+		"no free tunnel peer IDs available")
+	}
+
+	return allocated.(uint8), nil
 }
 
 // FIXME: SDFAB-960
@@ -476,7 +482,7 @@ func (up4 *UP4) releaseAllocatedGTPTunnelPeerID(tunnelParams tunnelParams) {
 	allocated, exists := up4.tunnelPeerIDs[tunnelParams]
 	if exists {
 		delete(up4.tunnelPeerIDs, tunnelParams)
-		up4.tunnelPeerIDsPool = append(up4.tunnelPeerIDsPool, allocated)
+		up4.tunnelPeerIDsPool.Add(allocated)
 	}
 }
 
@@ -555,18 +561,22 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 
 // Returns error if we reach maximum supported Application IDs.
 func (up4 *UP4) allocateInternalApplicationID(app application) (uint8, error) {
-	if len(up4.applicationIDsPool) == 0 {
+	if up4.applicationIDsPool.Cardinality() == 0 {
 		return 0, ErrOperationFailedWithReason("allocate Application ID",
 			"no free application IDs available")
 	}
 
 	// pick top from queue
-	allocated := up4.applicationIDsPool[0]
-	up4.applicationIDsPool = up4.applicationIDsPool[1:]
+	allocated := up4.applicationIDsPool.Pop()
 
-	up4.applicationIDs[app] = allocated
+	if allocated == nil {
+		return 0, ErrOperationFailedWithReason("allocate Application ID",
+		"no free application IDs available")
+	}
 
-	return allocated, nil
+	up4.applicationIDs[app] = allocated.(uint8)
+
+	return allocated.(uint8), nil
 }
 
 // FIXME: SDFAB-960
@@ -581,7 +591,7 @@ func (up4 *UP4) releaseInternalApplicationID(appFilter applicationFilter) {
 	allocated, exists := up4.applicationIDs[app]
 	if exists {
 		delete(up4.applicationIDs, app)
-		up4.applicationIDsPool = append(up4.applicationIDsPool, allocated)
+		up4.applicationIDsPool.Add(allocated)
 	}
 }
 
