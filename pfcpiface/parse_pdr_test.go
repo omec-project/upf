@@ -78,6 +78,10 @@ func Test_parsePDR(t *testing.T) {
 				srcIfaceMask: 0xff,
 				ueAddress:    ip2int(UEAddress),
 				qerIDList:    []uint32{qerID},
+				appFilter: applicationFilter{
+					dstIPMask: 0xffffffff,
+					dstIP: ip2int(UEAddress),
+				},
 			},
 			description: "Valid downlink Update PDR input",
 		},
@@ -100,6 +104,10 @@ func Test_parsePDR(t *testing.T) {
 				srcIfaceMask: 0xff,
 				ueAddress:    ip2int(UEAddress),
 				qerIDList:    []uint32{qerID},
+				appFilter: applicationFilter{
+					dstIPMask: 0xffffffff,
+					dstIP: ip2int(UEAddress),
+				},
 			},
 			description: "Valid downlink Create PDR input",
 		},
@@ -638,6 +646,74 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 
 			if !tt.wantErr {
 				require.Equal(t, tt.wantAppFilter, p.appFilter)
+			}
+		})
+	}
+}
+
+func Test_pdr_parsePDI(t *testing.T) {
+	ueAddress := "17.0.0.1"
+
+	type args struct {
+		pdiIEs  []*ie.IE
+		appPFDs map[string]appPFD
+		ippool  *IPPool
+	}
+	tests := []struct {
+		name     string
+		inputPDR pdr
+		args     args
+		wantPDR  pdr
+		wantErr  bool
+	}{
+		{
+			name:   "uplink PDR - no SDF Filter IE",
+			args:   args{
+				pdiIEs:  []*ie.IE{
+					ie.NewUEIPAddress(0x2, ueAddress, "", 0, 0),
+					ie.NewSourceInterface(ie.SrcInterfaceAccess),
+				},
+			},
+			wantPDR: pdr{
+				srcIface: access,
+				srcIfaceMask: 0xff,
+				ueAddress: ip2int(net.ParseIP(ueAddress)),
+				appFilter: applicationFilter{
+					srcIP:        ip2int(net.ParseIP(ueAddress)),
+					srcIPMask:    0xffffffff,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:   "downlink PDR - no SDF Filter IE",
+			args:   args{
+				pdiIEs:  []*ie.IE{
+					ie.NewUEIPAddress(0x2, ueAddress, "", 0, 0),
+					ie.NewSourceInterface(ie.SrcInterfaceCore),
+				},
+			},
+			wantPDR: pdr{
+				srcIface: core,
+				srcIfaceMask: 0xff,
+				ueAddress: ip2int(net.ParseIP(ueAddress)),
+				appFilter: applicationFilter{
+					dstIP:        ip2int(net.ParseIP(ueAddress)),
+					dstIPMask:    0xffffffff,
+				},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := pdr{}
+			if err := p.parsePDI(tt.args.pdiIEs, tt.args.appPFDs, tt.args.ippool); (err != nil) != tt.wantErr {
+				t.Errorf("parsePDI() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if !tt.wantErr {
+				require.Equal(t, tt.wantPDR, p)
 			}
 		})
 	}
