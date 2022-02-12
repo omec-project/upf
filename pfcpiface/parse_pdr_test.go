@@ -80,7 +80,7 @@ func Test_parsePDR(t *testing.T) {
 				qerIDList:    []uint32{qerID},
 				appFilter: applicationFilter{
 					dstIPMask: 0xffffffff,
-					dstIP: ip2int(UEAddress),
+					dstIP:     ip2int(UEAddress),
 				},
 			},
 			description: "Valid downlink Update PDR input",
@@ -106,7 +106,7 @@ func Test_parsePDR(t *testing.T) {
 				qerIDList:    []uint32{qerID},
 				appFilter: applicationFilter{
 					dstIPMask: 0xffffffff,
-					dstIP: ip2int(UEAddress),
+					dstIP:     ip2int(UEAddress),
 				},
 			},
 			description: "Valid downlink Create PDR input",
@@ -667,39 +667,39 @@ func Test_pdr_parsePDI(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name:   "uplink PDR - no SDF Filter IE",
-			args:   args{
-				pdiIEs:  []*ie.IE{
+			name: "uplink PDR - no SDF Filter IE",
+			args: args{
+				pdiIEs: []*ie.IE{
 					ie.NewUEIPAddress(0x2, ueAddress, "", 0, 0),
 					ie.NewSourceInterface(ie.SrcInterfaceAccess),
 				},
 			},
 			wantPDR: pdr{
-				srcIface: access,
+				srcIface:     access,
 				srcIfaceMask: 0xff,
-				ueAddress: ip2int(net.ParseIP(ueAddress)),
+				ueAddress:    ip2int(net.ParseIP(ueAddress)),
 				appFilter: applicationFilter{
-					srcIP:        ip2int(net.ParseIP(ueAddress)),
-					srcIPMask:    0xffffffff,
+					srcIP:     ip2int(net.ParseIP(ueAddress)),
+					srcIPMask: 0xffffffff,
 				},
 			},
 			wantErr: false,
 		},
 		{
-			name:   "downlink PDR - no SDF Filter IE",
-			args:   args{
-				pdiIEs:  []*ie.IE{
+			name: "downlink PDR - no SDF Filter IE",
+			args: args{
+				pdiIEs: []*ie.IE{
 					ie.NewUEIPAddress(0x2, ueAddress, "", 0, 0),
 					ie.NewSourceInterface(ie.SrcInterfaceCore),
 				},
 			},
 			wantPDR: pdr{
-				srcIface: core,
+				srcIface:     core,
 				srcIfaceMask: 0xff,
-				ueAddress: ip2int(net.ParseIP(ueAddress)),
+				ueAddress:    ip2int(net.ParseIP(ueAddress)),
 				appFilter: applicationFilter{
-					dstIP:        ip2int(net.ParseIP(ueAddress)),
-					dstIPMask:    0xffffffff,
+					dstIP:     ip2int(net.ParseIP(ueAddress)),
+					dstIPMask: 0xffffffff,
 				},
 			},
 			wantErr: false,
