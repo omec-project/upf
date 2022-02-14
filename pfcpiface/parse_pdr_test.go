@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"testing"
 
-	pfcpsimLib "github.com/omec-project/pfcpsim/pkg/pfcpsim/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -33,16 +32,17 @@ func Test_parsePDR(t *testing.T) {
 
 	for _, scenario := range []pdrTestCase{
 		{
-			input: pfcpsimLib.NewPDRBuilder().
-				WithID(pdrID).
-				WithMethod(pfcpsimLib.IEMethod(create)).
-				WithPrecedence(precedence).
-				WithFARID(farID).
-				AddQERID(qerID).
-				WithN3Address(N3Address.String()).
-				WithTEID(teid).
-				MarkAsUplink().
-				BuildPDR(),
+			input: ie.NewCreatePDR(
+				ie.NewPDRID(pdrID),
+				ie.NewPrecedence(precedence),
+				ie.NewPDI(
+					ie.NewSourceInterface(ie.SrcInterfaceAccess),
+					ie.NewFTEID(0x01, teid, N3Address, nil, 0),
+				),
+				ie.NewOuterHeaderRemoval(0, 0),
+				ie.NewFARID(farID),
+				ie.NewQERID(qerID),
+			),
 			expected: &pdr{
 				pdrID:            uint32(pdrID), // go-pfcp uses uint16 to create PDRIDs, while in pfcpiface we use uint32
 				precedence:       precedence,
@@ -60,14 +60,16 @@ func Test_parsePDR(t *testing.T) {
 			description: "Valid Uplink Create PDR input",
 		},
 		{
-			input: pfcpsimLib.NewPDRBuilder().
-				WithID(pdrID).
-				WithMethod(pfcpsimLib.IEMethod(update)).
-				WithFARID(farID).
-				AddQERID(qerID).
-				WithUEAddress(UEAddress.String()).
-				MarkAsDownlink().
-				BuildPDR(),
+			input: ie.NewUpdatePDR(
+				ie.NewPDRID(pdrID),
+				ie.NewPrecedence(0),
+				ie.NewPDI(
+					ie.NewSourceInterface(ie.SrcInterfaceCore),
+					ie.NewUEIPAddress(0x2, UEAddress.String(), "", 0, 0),
+				),
+				ie.NewFARID(farID),
+				ie.NewQERID(qerID),
+			),
 			expected: &pdr{
 				pdrID:        uint32(pdrID),
 				fseID:        FSEID,
@@ -80,14 +82,16 @@ func Test_parsePDR(t *testing.T) {
 			description: "Valid downlink Update PDR input",
 		},
 		{
-			input: pfcpsimLib.NewPDRBuilder().
-				WithID(pdrID).
-				WithMethod(pfcpsimLib.IEMethod(create)).
-				WithFARID(farID).
-				AddQERID(qerID).
-				WithUEAddress(UEAddress.String()).
-				MarkAsDownlink().
-				BuildPDR(),
+			input: ie.NewCreatePDR(
+				ie.NewPDRID(pdrID),
+				ie.NewPrecedence(0),
+				ie.NewPDI(
+					ie.NewSourceInterface(ie.SrcInterfaceCore),
+					ie.NewUEIPAddress(0x2, UEAddress.String(), "", 0, 0),
+				),
+				ie.NewFARID(farID),
+				ie.NewQERID(qerID),
+			),
 			expected: &pdr{
 				pdrID:        uint32(pdrID),
 				fseID:        FSEID,
@@ -134,6 +138,7 @@ func TestParsePDRShouldError(t *testing.T) {
 			),
 			expected: &pdr{
 				qerIDList: []uint32{},
+				fseID:     FSEID,
 			},
 			description: "Malformed Uplink PDR input without PDR ID",
 		},
@@ -529,5 +534,111 @@ func Test_portRange_Width(t *testing.T) {
 				}
 			},
 		)
+	}
+}
+
+func Test_pdr_parseSDFFilter(t *testing.T) {
+	ueAddress := "17.0.0.1"
+
+	newFilter := func(flowDesc string) *ie.IE {
+		return ie.NewSDFFilter(flowDesc, "", "", "", 1)
+	}
+
+	tests := []struct {
+		name          string
+		direction     uint8
+		sdfIE         *ie.IE
+		wantAppFilter applicationFilter
+		wantErr       bool
+	}{
+		{
+			name:      "downlink SDF filter - app L4 port not spec-compliant",
+			sdfIE:     newFilter("permit out udp from 192.168.1.1/32 to assigned 80-400"),
+			direction: core,
+			wantAppFilter: applicationFilter{
+				srcIP:        ip2int(net.ParseIP("192.168.1.1")),
+				dstIP:        ip2int(net.ParseIP(ueAddress)),
+				srcPortRange: newRangeMatchPortRange(80, 400),
+				dstPortRange: newWildcardPortRange(),
+				proto:        17,
+				srcIPMask:    0xffffffff,
+				dstIPMask:    0xffffffff,
+				protoMask:    0xff,
+			},
+			wantErr: false,
+		},
+		{
+			name:      "uplink SDF filter - app L4 port not spec-compliant",
+			sdfIE:     newFilter("permit out udp from 192.168.1.1/32 to assigned 80-400"),
+			direction: access,
+			wantAppFilter: applicationFilter{
+				srcIP:        ip2int(net.ParseIP(ueAddress)),
+				dstIP:        ip2int(net.ParseIP("192.168.1.1")),
+				srcPortRange: newWildcardPortRange(),
+				dstPortRange: newRangeMatchPortRange(80, 400),
+				proto:        17,
+				srcIPMask:    0xffffffff,
+				dstIPMask:    0xffffffff,
+				protoMask:    0xff,
+			},
+			wantErr: false,
+		},
+		{
+			name:      "downlink SDF filter - app L4 port spec-compliant",
+			sdfIE:     newFilter("permit out udp from 192.168.1.1/32 80-400 to assigned"),
+			direction: core,
+			wantAppFilter: applicationFilter{
+				srcIP:        ip2int(net.ParseIP("192.168.1.1")),
+				dstIP:        ip2int(net.ParseIP(ueAddress)),
+				srcPortRange: newRangeMatchPortRange(80, 400),
+				dstPortRange: newWildcardPortRange(),
+				proto:        17,
+				srcIPMask:    0xffffffff,
+				dstIPMask:    0xffffffff,
+				protoMask:    0xff,
+			},
+			wantErr: false,
+		},
+		{
+			name:      "uplink SDF filter - app L4 port spec-compliant",
+			sdfIE:     newFilter("permit out udp from 192.168.1.1/32 80-400 to assigned"),
+			direction: access,
+			wantAppFilter: applicationFilter{
+				srcIP:        ip2int(net.ParseIP(ueAddress)),
+				dstIP:        ip2int(net.ParseIP("192.168.1.1")),
+				srcPortRange: newWildcardPortRange(),
+				dstPortRange: newRangeMatchPortRange(80, 400),
+				proto:        17,
+				srcIPMask:    0xffffffff,
+				dstIPMask:    0xffffffff,
+				protoMask:    0xff,
+			},
+			wantErr: false,
+		},
+		{
+			name:    "wrong IE type passed",
+			sdfIE:   ie.NewQERID(0),
+			wantErr: true,
+		},
+		{
+			name:    "empty flow description",
+			sdfIE:   newFilter(""),
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &pdr{
+				ueAddress: ip2int(net.ParseIP("17.0.0.1")),
+				srcIface:  tt.direction,
+			}
+			if err := p.parseSDFFilter(tt.sdfIE); (err != nil) != tt.wantErr {
+				t.Errorf("parseSDFFilter() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if !tt.wantErr {
+				require.Equal(t, tt.wantAppFilter, p.appFilter)
+			}
+		})
 	}
 }
