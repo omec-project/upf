@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2022 Open Networking Foundation
 
-package main
+package pfcpiface
 
 import (
 	log "github.com/sirupsen/logrus"
