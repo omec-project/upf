@@ -126,7 +126,7 @@ func resetCounterVal(p *UP4, counterID uint8, val uint64) {
 	delete(p.counters[counterID].allocated, val)
 }
 
-func getCounterVal(p *UP4, counterID uint8) (uint64, error) {
+func (up4 *UP4) getCounterVal(counterID uint8) (uint64, error) {
 	/*
 	   loop :
 	      random counter generate
@@ -137,13 +137,13 @@ func getCounterVal(p *UP4, counterID uint8) (uint64, error) {
 	*/
 	var val uint64
 
-	ctr := &p.counters[counterID]
+	ctr := &up4.counters[counterID]
 	for i := 0; i < int(ctr.maxSize); i++ {
 		rand.Seed(time.Now().UnixNano())
 
 		val = uint64(rand.Intn(int(ctr.maxSize)-1) + 1) // #nosec G404
 		if _, ok := ctr.allocated[val]; !ok {
-			log.Println("key not in allocated map ", val)
+			log.Debug("Counter index is not in allocated map, assigning: ", val)
 
 			ctr.allocated[val] = 1
 
@@ -803,13 +803,12 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, meth
 
 func (up4 *UP4) sendCreate(all PacketForwardingRules, updated PacketForwardingRules) error {
 	for i := range updated.pdrs {
-		val, err := getCounterVal(up4, preQosCounterID)
+		val, err := up4.getCounterVal(preQosCounterID)
 		if err != nil {
-			log.Println("Counter id alloc failed ", err)
 			return ErrOperationFailedWithReason("Counter ID allocation", err.Error())
 		}
 
-		updated.pdrs[i].ctrID = uint32(val)
+		all.pdrs[i].ctrID = uint32(val)
 	}
 
 	for _, p := range updated.pdrs {
