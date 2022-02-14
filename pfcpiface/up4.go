@@ -33,15 +33,6 @@ var (
 	p4RtcServerPort = flag.String("p4RtcServerPort", "", "P4 Server port")
 )
 
-// FIXME: it should not be here IMO
-// P4rtcInfo : P4 runtime interface settings.
-type P4rtcInfo struct {
-	AccessIP    string `json:"access_ip"`
-	P4rtcServer string `json:"p4rtc_server"`
-	P4rtcPort   string `json:"p4rtc_port"`
-	UEIP        string `json:"ue_ip_pool"`
-}
-
 const (
 	preQosCounterID = iota
 	postQosCounterID
@@ -69,6 +60,7 @@ type UP4 struct {
 	deviceID        uint64
 	timeout         uint32
 	accessIP        *net.IPNet
+	ueIPPool        *net.IPNet
 	p4rtcServer     string
 	p4rtcPort       string
 	enableEndMarker bool
@@ -110,24 +102,6 @@ func (up4 *UP4) sessionStats(*PfcpNodeCollector, chan<- prometheus.Metric) error
 func (up4 *UP4) portStats(uc *upfCollector, ch chan<- prometheus.Metric) {
 }
 
-func (up4 *UP4) getAccessIP() (*net.IPNet, error) {
-	log.Println("getAccessIP")
-
-	interfaceTableEntry := up4.p4RtTranslator.BuildInterfaceTableEntryNoAction()
-
-	resp, err := up4.p4client.ReadTableEntry(interfaceTableEntry)
-	if err != nil {
-		return nil, ErrOperationFailedWithReason("get Access IP from UP4", err.Error())
-	}
-
-	accessIP, err := up4.p4RtTranslator.ParseAccessIPFromReadInterfaceTableResponse(resp)
-	if err != nil {
-		return nil, err
-	}
-
-	return accessIP, nil
-}
-
 func (up4 *UP4) initCounter(counterID uint8, name string) error {
 	ctr, err := up4.p4RtTranslator.getCounterByName(name)
 	if err != nil {
@@ -152,7 +126,7 @@ func resetCounterVal(p *UP4, counterID uint8, val uint64) {
 	delete(p.counters[counterID].allocated, val)
 }
 
-func getCounterVal(p *UP4, counterID uint8) (uint64, error) {
+func (up4 *UP4) getCounterVal(counterID uint8) (uint64, error) {
 	/*
 	   loop :
 	      random counter generate
@@ -163,13 +137,13 @@ func getCounterVal(p *UP4, counterID uint8) (uint64, error) {
 	*/
 	var val uint64
 
-	ctr := &p.counters[counterID]
+	ctr := &up4.counters[counterID]
 	for i := 0; i < int(ctr.maxSize); i++ {
 		rand.Seed(time.Now().UnixNano())
 
 		val = uint64(rand.Intn(int(ctr.maxSize)-1) + 1) // #nosec G404
 		if _, ok := ctr.allocated[val]; !ok {
-			log.Println("key not in allocated map ", val)
+			log.Debug("Counter index is not in allocated map, assigning: ", val)
 
 			ctr.allocated[val] = 1
 
@@ -268,9 +242,14 @@ func (up4 *UP4) isConnected(accessIP *net.IP) bool {
 func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	log.Println("setUpfInfo UP4")
 
-	up4.accessIP = ParseStrIP(conf.P4rtcIface.AccessIP)
+	up4.accessIP = MustParseStrIP(conf.P4rtcIface.AccessIP)
 	u.accessIP = up4.accessIP.IP
+
 	log.Println("AccessIP: ", up4.accessIP)
+
+	up4.ueIPPool = MustParseStrIP(conf.CPIface.UEIPPool)
+
+	log.Infof("UE IP pool: %v", up4.ueIPPool)
 
 	up4.p4rtcServer = conf.P4rtcIface.P4rtcServer
 	log.Println("UP4 server ip/name", up4.p4rtcServer)
@@ -310,10 +289,6 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	if err != nil {
 		log.Errorf("failed to connect to UP4: %v", err)
 		return
-	}
-
-	if up4.accessIP != nil {
-		u.accessIP = up4.accessIP.IP
 	}
 }
 
@@ -378,6 +353,50 @@ func (up4 *UP4) clearAllTables() error {
 		return err
 	}
 
+	interfacesTableID, err := up4.p4RtTranslator.getTableIDByName(TableInterfaces)
+	if err != nil {
+		return err
+	}
+
+	err = up4.p4client.ClearTable(interfacesTableID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (up4 *UP4) initUEPool() error {
+	entry, err := up4.p4RtTranslator.BuildInterfaceTableEntry(up4.ueIPPool, true)
+	if err != nil {
+		return err
+	}
+
+	if err := up4.p4client.ApplyTableEntries(p4.Update_INSERT, entry); err != nil {
+		return err
+	}
+
+	log.WithFields(log.Fields{
+		"ue pool": up4.ueIPPool,
+	}).Debug("UE pool successfully initialized in the UP4 pipeline")
+
+	return nil
+}
+
+func (up4 *UP4) initN3Address() error {
+	entry, err := up4.p4RtTranslator.BuildInterfaceTableEntry(up4.accessIP, false)
+	if err != nil {
+		return err
+	}
+
+	if err := up4.p4client.ApplyTableEntries(p4.Update_INSERT, entry); err != nil {
+		return err
+	}
+
+	log.WithFields(log.Fields{
+		"N3 address": up4.accessIP,
+	}).Debug("N3 address successfully initialized in the UP4 pipeline")
+
 	return nil
 }
 
@@ -421,11 +440,14 @@ func (up4 *UP4) tryConnect() error {
 		go up4.endMarkerSendLoop(up4.endMarkerChan)
 	}
 
-	up4.accessIP, err = up4.getAccessIP()
+	err = up4.initUEPool()
 	if err != nil {
-		log.Errorf("Failed to get Access IP from UP4: %v", err)
-	} else {
-		log.Infof("Retrieved Access IP from UP4: %v", up4.accessIP)
+		return ErrOperationFailedWithReason("UE pool initialization", err.Error())
+	}
+
+	err = up4.initN3Address()
+	if err != nil {
+		return ErrOperationFailedWithReason("N3 address initialization", err.Error())
 	}
 
 	return nil
@@ -781,13 +803,12 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, meth
 
 func (up4 *UP4) sendCreate(all PacketForwardingRules, updated PacketForwardingRules) error {
 	for i := range updated.pdrs {
-		val, err := getCounterVal(up4, preQosCounterID)
+		val, err := up4.getCounterVal(preQosCounterID)
 		if err != nil {
-			log.Println("Counter id alloc failed ", err)
 			return ErrOperationFailedWithReason("Counter ID allocation", err.Error())
 		}
 
-		updated.pdrs[i].ctrID = uint32(val)
+		all.pdrs[i].ctrID = uint32(val)
 	}
 
 	for _, p := range updated.pdrs {

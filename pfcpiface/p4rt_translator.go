@@ -17,7 +17,8 @@ import (
 
 // P4 constants
 const (
-	DirectionUplink = 1
+	DirectionUplink   = 1
+	DirectionDownlink = 2
 
 	FieldAppIPProto       = "app_ip_proto"
 	FieldAppL4Port        = "app_l4_port"
@@ -34,6 +35,9 @@ const (
 	FieldTunnelSrcAddress = "src_addr"
 	FieldTunnelDstAddress = "dst_addr"
 	FieldTunnelSrcPort    = "sport"
+	FieldSrcIface         = "src_iface"
+	FieldDirection        = "direction"
+	FieldSliceID          = "slice_id"
 
 	TableInterfaces           = "PreQosPipe.interfaces"
 	TableTunnelPeers          = "PreQosPipe.tunnel_peers"
@@ -43,6 +47,7 @@ const (
 	TableUplinkSessions       = "PreQosPipe.sessions_uplink"
 	TableApplications         = "PreQosPipe.applications"
 
+	ActSetSourceIface         = "PreQosPipe.set_source_iface"
 	ActSetUplinkSession       = "PreQosPipe.set_session_uplink"
 	ActSetDownlinkSession     = "PreQosPipe.set_session_downlink"
 	ActSetDownlinkSessionBuff = "PreQosPipe.set_session_downlink_buff"
@@ -111,7 +116,13 @@ func convertValueToBinary(value interface{}) ([]byte, error) {
 		binary.BigEndian.PutUint64(b, value.(uint64))
 
 		return b, nil
+	case int:
+		b := make([]byte, 4)
+		binary.BigEndian.PutUint32(b, uint32(value.(int)))
+
+		return b, nil
 	default:
+		log.Debugf("Type %T", t)
 		return nil, ErrOperationFailedWithParam("convert type to byte array", "type", t)
 	}
 }
@@ -176,6 +187,7 @@ func (t *P4rtTranslator) getCounterByName(name string) (*p4ConfigV1.Counter, err
 	return nil, ErrNotFoundWithParam("counter", "name", name)
 }
 
+//nolint:unused
 func (t *P4rtTranslator) getMatchFieldIDByName(table *p4ConfigV1.Table, fieldName string) uint32 {
 	for _, field := range table.MatchFields {
 		if field.Name == fieldName {
@@ -413,6 +425,7 @@ func (t *P4rtTranslator) withActionParam(action *p4.Action, name string, value i
 	return nil
 }
 
+//nolint:unused
 func (t *P4rtTranslator) getActionParamValue(tableEntry *p4.TableEntry, id uint32) ([]byte, error) {
 	for _, param := range tableEntry.Action.GetAction().Params {
 		if param.ParamId == id {
@@ -423,6 +436,7 @@ func (t *P4rtTranslator) getActionParamValue(tableEntry *p4.TableEntry, id uint3
 	return nil, ErrNotFoundWithParam("action param", "id", id)
 }
 
+//nolint:unused
 func (t *P4rtTranslator) getLPMMatchFieldValue(tableEntry *p4.TableEntry, name string) (*net.IPNet, error) {
 	tableID := tableEntry.TableId
 
@@ -465,42 +479,49 @@ func (t *P4rtTranslator) BuildInterfaceTableEntryNoAction() *p4.TableEntry {
 	return entry
 }
 
-func (t *P4rtTranslator) ParseAccessIPFromReadInterfaceTableResponse(resp *p4.ReadResponse) (*net.IPNet, error) {
-	var interfaceTypeParamID uint32 = 1
+func (t *P4rtTranslator) BuildInterfaceTableEntry(ipNet *net.IPNet, isCore bool) (*p4.TableEntry, error) {
+	tableID := t.tableID(TableInterfaces)
 
-	var directionParamID uint32 = 1
+	srcIface := access
+	direction := DirectionUplink
 
-	for _, entity := range resp.GetEntities() {
-		accessIP, err := t.getLPMMatchFieldValue(entity.GetTableEntry(), FieldIPv4DstPrefix)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"entity": entity,
-			}).Warn("failed to get LPM field from response entity")
-
-			continue
-		}
-
-		interfaceType, err := t.getActionParamValue(entity.GetTableEntry(), interfaceTypeParamID)
-		if err != nil {
-			return nil, err
-		}
-
-		directionValue, err := t.getActionParamValue(entity.GetTableEntry(), directionParamID)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(interfaceType) != 1 && len(directionValue) != 1 {
-			return nil, ErrOperationFailedWithReason("parse Access IP from UP4",
-				"invalid length of action params")
-		}
-
-		if interfaceType[0] == access && directionValue[0] == DirectionUplink {
-			return accessIP, nil
-		}
+	if isCore {
+		srcIface = core
+		direction = DirectionDownlink
 	}
 
-	return nil, ErrOperationFailed("parse Access IP from P4Runtime response")
+	entry := &p4.TableEntry{
+		TableId:  tableID,
+		Priority: DefaultPriority,
+	}
+
+	maskLength, _ := ipNet.Mask.Size()
+	if err := t.withLPMField(entry, FieldIPv4DstPrefix, ip2int(ipNet.IP.To4()), uint8(maskLength)); err != nil {
+		return nil, err
+	}
+
+	action := &p4.Action{
+		ActionId: t.actionID(ActSetSourceIface),
+	}
+
+	if err := t.withActionParam(action, FieldSrcIface, srcIface); err != nil {
+		return nil, err
+	}
+
+	if err := t.withActionParam(action, FieldDirection, direction); err != nil {
+		return nil, err
+	}
+
+	// slice ID is overwritten by UP4, so it's safe to set 0
+	if err := t.withActionParam(action, FieldSliceID, uint8(0)); err != nil {
+		return nil, err
+	}
+
+	entry.Action = &p4.TableAction{
+		Type: &p4.TableAction_Action{Action: action},
+	}
+
+	return entry, nil
 }
 
 func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, internalAppID uint8) (*p4.TableEntry, error) {

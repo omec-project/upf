@@ -328,178 +328,222 @@ func (p pdr) IsDownlink() bool {
 	return p.srcIface == core
 }
 
-func (p *pdr) parsePDI(seid uint64, pdiIEs []*ie.IE, appPFDs map[string]appPFD, ippool *IPPool) error {
+func (p *pdr) parseUEAddressIE(ueAddrIE *ie.IE, ippool *IPPool) error {
 	var ueIP4 net.IP
 
-	for _, pdiIE := range pdiIEs {
-		switch pdiIE.Type {
-		case ie.UEIPAddress:
-			ueIPaddr, err := pdiIE.UEIPAddress()
-			if err != nil {
-				log.Warnln("Failed to parse UE IP address")
-				continue
-			}
+	ueIPaddr, err := ueAddrIE.UEIPAddress()
+	if err != nil {
+		return err
+	}
 
-			if needAllocIP(ueIPaddr) {
-				/* alloc IPV6 if CHV6 is enabled : TBD */
-				log.Printf("UPF should alloc UE IP for SEID %v. CHV4 flag set", seid)
+	if needAllocIP(ueIPaddr) {
+		/* alloc IPV6 if CHV6 is enabled : TBD */
+		log.Infof("UPF should alloc UE IP for SEID %v. CHV4 flag set", p.fseID)
 
-				ueIP4, err = ippool.LookupOrAllocIP(seid)
-				if err != nil {
-					log.Errorln("failed to allocate UE IP")
-					return err
-				}
-
-				log.Traceln("Found or allocated new IP", ueIP4, "from pool", ippool)
-
-				p.allocIPFlag = true
-			} else {
-				ueIP4 = ueIPaddr.IPv4Address
-			}
-		case ie.SourceInterface:
-			srcIface, err := pdiIE.SourceInterface()
-			if err != nil {
-				log.Println("Failed to parse Source Interface IE!")
-				continue
-			}
-
-			if srcIface == ie.SrcInterfaceCPFunction {
-				log.Println("Source Interface CP Function not supported yet")
-			} else if srcIface == ie.SrcInterfaceAccess {
-				p.srcIface = access
-				p.srcIfaceMask = 0xFF
-			} else if srcIface == ie.SrcInterfaceCore {
-				p.srcIface = core
-				p.srcIfaceMask = 0xFF
-			}
-		case ie.FTEID:
-			fteid, err := pdiIE.FTEID()
-			if err != nil {
-				log.Println("Failed to parse FTEID IE")
-				continue
-			}
-
-			teid := fteid.TEID
-			tunnelIPv4Address := fteid.IPv4Address
-
-			if teid != 0 {
-				p.tunnelTEID = teid
-				p.tunnelTEIDMask = 0xFFFFFFFF
-				p.tunnelIP4Dst = ip2int(tunnelIPv4Address)
-				p.tunnelIP4DstMask = 0xFFFFFFFF
-
-				log.Println("TunnelIPv4Address:", tunnelIPv4Address)
-			}
-		case ie.QFI:
-			// Do nothing for the time being
-			continue
+		ueIP4, err = ippool.LookupOrAllocIP(p.fseID)
+		if err != nil {
+			log.Errorln("failed to allocate UE IP")
+			return err
 		}
+
+		log.Traceln("Found or allocated new IP", ueIP4, "from pool", ippool)
+
+		p.allocIPFlag = true
+	} else {
+		ueIP4 = ueIPaddr.IPv4Address
 	}
 
 	// Needed if SDF filter is bad or absent
-	if len(ueIP4) == 4 {
-		p.ueAddress = ip2int(ueIP4)
+	if len(ueIP4) != 4 {
+		return ErrOperationFailedWithParam("parse UE Address IE",
+			"IP address length", len(ueIP4))
 	}
 
-	for _, ie2 := range pdiIEs {
-		switch ie2.Type {
-		case ie.ApplicationID:
-			appID, err := ie2.ApplicationID()
-			if err != nil {
-				log.Println("Unable to parse Application ID", err)
-				continue
-			}
+	p.ueAddress = ip2int(ueIP4)
 
-			apfd, ok := appPFDs[appID]
-			if !ok {
-				log.Println("Unable to find Application ID", err)
-				continue
-			}
+	return nil
+}
 
-			if appID != apfd.appID {
-				log.Fatalln("Mismatch in App ID", appID, apfd.appID)
-			}
+func (p *pdr) parseSourceInterfaceIE(srcIfaceIE *ie.IE) error {
+	srcIface, err := srcIfaceIE.SourceInterface()
+	if err != nil {
+		return err
+	}
 
-			log.Println("inside application id", apfd.appID, apfd.flowDescs)
+	if srcIface == ie.SrcInterfaceCPFunction {
+		return ErrUnsupported("Source Interface CP Function", srcIface)
+	} else if srcIface == ie.SrcInterfaceAccess {
+		p.srcIface = access
+		p.srcIfaceMask = 0xFF
+	} else if srcIface == ie.SrcInterfaceCore {
+		p.srcIface = core
+		p.srcIfaceMask = 0xFF
+	}
 
-			for _, flowDesc := range apfd.flowDescs {
-				log.Println("flow desc", flowDesc)
+	return nil
+}
 
-				ipf, err := parseFlowDesc(flowDesc, ueIP4.String())
-				if err != nil {
-					return errBadFilterDesc
-				}
+func (p *pdr) parseFTEID(teidIE *ie.IE) error {
+	fteid, err := teidIE.FTEID()
+	if err != nil {
+		return err
+	}
 
-				if (p.srcIface == access && ipf.direction == "out") || (p.srcIface == core && ipf.direction == "in") {
-					log.Println("Found a match", p.srcIface, flowDesc)
+	teid := fteid.TEID
+	tunnelIPv4Address := fteid.IPv4Address
 
-					if ipf.proto != reservedProto {
-						p.appFilter.proto = ipf.proto
-						p.appFilter.protoMask = math.MaxUint8
-					}
-					// TODO: Verify assumption that flow description in case of PFD is to be taken as-is
-					p.appFilter.dstIP = ip2int(ipf.dst.IPNet.IP)
-					p.appFilter.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
-					p.appFilter.srcIP = ip2int(ipf.src.IPNet.IP)
-					p.appFilter.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
-					p.appFilter.dstPortRange = ipf.dst.ports
-					p.appFilter.srcPortRange = ipf.src.ports
+	if teid != 0 {
+		p.tunnelTEID = teid
+		p.tunnelTEIDMask = 0xFFFFFFFF
+		p.tunnelIP4Dst = ip2int(tunnelIPv4Address)
+		p.tunnelIP4DstMask = 0xFFFFFFFF
+	}
 
-					break
-				}
-			}
-		case ie.SDFFilter:
-			// Do nothing for the time being
-			sdfFields, err := ie2.SDFFilter()
-			if err != nil {
-				log.Println("Unable to parse SDF filter!")
-				continue
-			}
+	return nil
+}
 
-			flowDesc := sdfFields.FlowDescription
-			if flowDesc == "" {
-				log.Println("Empty SDF filter description!")
-				// TODO: Implement referencing SDF ID
-				continue
-			}
+func (p *pdr) parseApplicationID(ie *ie.IE, appPFDs map[string]appPFD) error {
+	appID, err := ie.ApplicationID()
+	if err != nil {
+		return err
+	}
 
-			log.Println("Flow Description is:", flowDesc)
+	apfd, ok := appPFDs[appID]
+	if !ok {
+		return ErrNotFoundWithParam("Application PFD for ApplicationID", "application ID", appID)
+	}
 
-			ipf, err := parseFlowDesc(flowDesc, ueIP4.String())
-			if err != nil {
-				return errBadFilterDesc
-			}
+	if appID != apfd.appID {
+		log.Fatalln("Mismatch in App ID", appID, apfd.appID)
+	}
+
+	for _, flowDesc := range apfd.flowDescs {
+		logger := log.WithFields(log.Fields{
+			"Application ID":   apfd.appID,
+			"Flow Description": flowDesc,
+		})
+		logger.Debug("Parsing flow description of Application ID IE")
+
+		ipf, err := parseFlowDesc(flowDesc, int2ip(p.ueAddress).String())
+		if err != nil {
+			return errBadFilterDesc
+		}
+
+		if (p.srcIface == access && ipf.direction == "out") ||
+			(p.srcIface == core && ipf.direction == "in") {
+			logger.Debug("Found a matching flow description")
 
 			if ipf.proto != reservedProto {
 				p.appFilter.proto = ipf.proto
 				p.appFilter.protoMask = math.MaxUint8
 			}
+			// TODO: Verify assumption that flow description in case of PFD is to be taken as-is
+			p.appFilter.dstIP = ip2int(ipf.dst.IPNet.IP)
+			p.appFilter.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
+			p.appFilter.srcIP = ip2int(ipf.src.IPNet.IP)
+			p.appFilter.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
+			p.appFilter.dstPortRange = ipf.dst.ports
+			p.appFilter.srcPortRange = ipf.src.ports
 
-			if p.srcIface == core {
-				p.appFilter.dstIP = ip2int(ipf.dst.IPNet.IP)
-				p.appFilter.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
-				p.appFilter.srcIP = ip2int(ipf.src.IPNet.IP)
-				p.appFilter.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
-				p.appFilter.dstPortRange = ipf.dst.ports
-				p.appFilter.srcPortRange = ipf.src.ports
+			return nil
+		}
+	}
 
-				// FIXME: temporary workaround for SDF Filter,
-				//  remove once we meet spec compliance
-				p.appFilter.srcPortRange = p.appFilter.dstPortRange
-				p.appFilter.dstPortRange = newWildcardPortRange()
-			} else if p.srcIface == access {
-				p.appFilter.srcIP = ip2int(ipf.dst.IPNet.IP)
-				p.appFilter.srcIPMask = ipMask2int(ipf.dst.IPNet.Mask)
-				p.appFilter.dstIP = ip2int(ipf.src.IPNet.IP)
-				p.appFilter.dstIPMask = ipMask2int(ipf.src.IPNet.Mask)
-				// Ports are flipped for access PDRs
-				p.appFilter.dstPortRange = ipf.src.ports
-				p.appFilter.srcPortRange = ipf.dst.ports
+	return nil
+}
 
-				// FIXME: temporary workaround for SDF Filter,
-				//  remove once we meet spec compliance
-				p.appFilter.dstPortRange = p.appFilter.srcPortRange
-				p.appFilter.srcPortRange = newWildcardPortRange()
+func (p *pdr) parseSDFFilter(ie *ie.IE) error {
+	sdfFields, err := ie.SDFFilter()
+	if err != nil {
+		return err
+	}
+
+	flowDesc := sdfFields.FlowDescription
+	if flowDesc == "" {
+		return ErrOperationFailedWithReason("parse SDF Filter", "empty filter description")
+	}
+
+	log.WithFields(log.Fields{
+		"Flow Description": flowDesc,
+	}).Debug("Parsing Flow Description from SDF Filter")
+
+	ipf, err := parseFlowDesc(flowDesc, int2ip(p.ueAddress).String())
+	if err != nil {
+		return errBadFilterDesc
+	}
+
+	if ipf.proto != reservedProto {
+		p.appFilter.proto = ipf.proto
+		p.appFilter.protoMask = math.MaxUint8
+	}
+
+	if p.srcIface == core {
+		p.appFilter.dstIP = ip2int(ipf.dst.IPNet.IP)
+		p.appFilter.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
+		p.appFilter.srcIP = ip2int(ipf.src.IPNet.IP)
+		p.appFilter.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
+		p.appFilter.dstPortRange = ipf.dst.ports
+		p.appFilter.srcPortRange = ipf.src.ports
+
+		// FIXME: temporary workaround for SDF Filter,
+		//  remove once we meet spec compliance
+		if !p.appFilter.dstPortRange.isWildcardMatch() {
+			p.appFilter.srcPortRange = p.appFilter.dstPortRange
+			p.appFilter.dstPortRange = newWildcardPortRange()
+		}
+	} else if p.srcIface == access {
+		p.appFilter.srcIP = ip2int(ipf.dst.IPNet.IP)
+		p.appFilter.srcIPMask = ipMask2int(ipf.dst.IPNet.Mask)
+		p.appFilter.dstIP = ip2int(ipf.src.IPNet.IP)
+		p.appFilter.dstIPMask = ipMask2int(ipf.src.IPNet.Mask)
+		// Ports are flipped for access PDRs
+		p.appFilter.dstPortRange = ipf.src.ports
+		p.appFilter.srcPortRange = ipf.dst.ports
+
+		// FIXME: temporary workaround for SDF Filter,
+		//  remove once we meet spec compliance
+		if !p.appFilter.srcPortRange.isWildcardMatch() {
+			p.appFilter.dstPortRange = p.appFilter.srcPortRange
+			p.appFilter.srcPortRange = newWildcardPortRange()
+		}
+	}
+
+	return nil
+}
+
+func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, ippool *IPPool) error {
+	for _, pdiIE := range pdiIEs {
+		switch pdiIE.Type {
+		case ie.UEIPAddress:
+			if err := p.parseUEAddressIE(pdiIE, ippool); err != nil {
+				log.Errorf("Failed to parse UE Address IE: %v", err)
+				return err
+			}
+		case ie.SourceInterface:
+			if err := p.parseSourceInterfaceIE(pdiIE); err != nil {
+				log.Errorf("Failed to parse Source Interface IE: %v", err)
+				return err
+			}
+		case ie.FTEID:
+			if err := p.parseFTEID(pdiIE); err != nil {
+				log.Errorf("Failed to parse F-TEID IE: %v", err)
+				return err
+			}
+		}
+	}
+
+	// make another iteration because Application ID and SDF Filter depend on UE IP Address IE
+	for _, ie2 := range pdiIEs {
+		switch ie2.Type {
+		case ie.ApplicationID:
+			if err := p.parseApplicationID(ie2, appPFDs); err != nil {
+				log.Errorf("Failed to parse Application ID IE: %v", err)
+				return err
+			}
+		case ie.SDFFilter:
+			if err := p.parseSDFFilter(ie2); err != nil {
+				log.Errorf("Failed to parse SDF Filter IE: %v", err)
+				return err
 			}
 		}
 	}
@@ -511,6 +555,7 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, ippoo
 	/* reset outerHeaderRemoval to begin with */
 	outerHeaderRemoval := uint8(0)
 	p.qerIDList = make([]uint32, 0)
+	p.fseID = seid
 
 	pdrID, err := ie1.PDRID()
 	if err != nil {
@@ -535,7 +580,7 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, ippoo
 		outerHeaderRemoval = 1
 	}
 
-	err = p.parsePDI(seid, pdi, appPFDs, ippool)
+	err = p.parsePDI(pdi, appPFDs, ippool)
 	if err != nil && !errors.Is(err, errBadFilterDesc) {
 		return err
 	}
@@ -584,9 +629,7 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, ippoo
 
 	p.precedence = precedence
 	p.pdrID = uint32(pdrID)
-	p.fseID = (seid) // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
-	p.ctrID = 0      // ctrID currently not being set <--- FIXIT/TODO/XXX
-	p.farID = farID  // farID currently not being set <--- FIXIT/TODO/XXX
+	p.farID = farID // farID currently not being set <--- FIXIT/TODO/XXX
 	/*p.qerID = qerID*/
 	p.needDecap = outerHeaderRemoval
 
