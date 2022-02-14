@@ -79,7 +79,7 @@ func Test_parsePDR(t *testing.T) {
 				ueAddress:    ip2int(UEAddress),
 				qerIDList:    []uint32{qerID},
 				appFilter: applicationFilter{
-					dstIPMask: 0xffffffff,
+					dstIPMask: math.MaxUint32,
 					dstIP:     ip2int(UEAddress),
 				},
 			},
@@ -105,7 +105,7 @@ func Test_parsePDR(t *testing.T) {
 				ueAddress:    ip2int(UEAddress),
 				qerIDList:    []uint32{qerID},
 				appFilter: applicationFilter{
-					dstIPMask: 0xffffffff,
+					dstIPMask: math.MaxUint32,
 					dstIP:     ip2int(UEAddress),
 				},
 			},
