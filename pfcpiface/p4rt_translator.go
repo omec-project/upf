@@ -671,7 +671,7 @@ func (t *P4rtTranslator) BuildSessionsTableEntry(pdr pdr, tunnelPeerID uint8, ne
 	case core:
 		return t.buildDownlinkSessionsEntry(pdr, tunnelPeerID, needsBuffering)
 	default:
-		return nil, ErrUnsupported("source interface type of PDR", pdr.srcIface)
+		return nil, NewUnsupportedSourceIFaceError(pdr.srcIface)
 	}
 }
 
@@ -807,7 +807,7 @@ func (t *P4rtTranslator) BuildTerminationsTableEntry(pdr pdr, relatedFAR far, in
 	case core:
 		return t.buildDownlinkTerminationsEntry(pdr, relatedFAR, internalAppID, tc)
 	default:
-		return nil, ErrUnsupported("source interface type of PDR", pdr.srcIface)
+		return nil, NewUnsupportedSourceIFaceError(pdr.srcIface)
 	}
 }
 

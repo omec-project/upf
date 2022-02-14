@@ -5,6 +5,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 var (
@@ -12,15 +13,77 @@ var (
 	errInvalidArgument  = errors.New("invalid argument")
 	errInvalidOperation = errors.New("invalid operation")
 	errFailed           = errors.New("failed")
-	errUnsupported      = errors.New("unsupported")
 )
 
-func ErrUnsupported(what string, value interface{}) error {
-	return fmt.Errorf("%s=%v %w", what, value, errUnsupported)
+type pfcpifaceError struct {
+	message string
+	error   []error
 }
 
-func ErrNotFound(what string) error {
-	return fmt.Errorf("%s %w", what, errNotFound)
+func (e *pfcpifaceError) unwrap() string {
+	errMsg := strings.Builder{}
+	errMsg.WriteString("")
+
+	for i, e := range e.error {
+		errMsg.WriteString(fmt.Sprintf("\n- Error %v: %v", i, e))
+	}
+
+	return errMsg.String()
+}
+
+func (e *pfcpifaceError) Error() string {
+	return fmt.Sprintf("Message: %v. %v", e.message, e.unwrap())
+}
+
+func NewUnsupportedSourceIFaceError(iFaceType uint8, err ...error) *pfcpifaceError {
+	msg := fmt.Sprintf("Unsupported source interface type. Provided: %v", iFaceType)
+	return &pfcpifaceError{
+		message: msg,
+		error:   err,
+	}
+}
+
+func NewUnsupportedPrecedenceValue(value uint32, err ...error) *pfcpifaceError {
+	msg := fmt.Sprintf("Unsupported precedence greater than 65535. Provided: %v", value)
+	return &pfcpifaceError{
+		message: msg,
+		error:   err,
+	}
+}
+
+func NewNotFoundError(what string, err ...error) *pfcpifaceError {
+	return &pfcpifaceError{
+		message: fmt.Sprintf("%v not found", what),
+		error:   err,
+	}
+}
+
+func NewPDRNotFoundError(err ...error) *pfcpifaceError {
+	return &pfcpifaceError{
+		message: "PDR not found",
+		error:   err,
+	}
+}
+
+func NewQERNotFoundError(err ...error) *pfcpifaceError {
+	return &pfcpifaceError{
+		message: "QER not found",
+		error:   err,
+	}
+}
+
+func NewFARNotFoundError(err ...error) *pfcpifaceError {
+	return &pfcpifaceError{
+		message: "FAR not found",
+		error:   err,
+	}
+}
+
+func NewLoopbackInterfaceNotFoundError(err ...error) *pfcpifaceError {
+	return &pfcpifaceError{
+		message: "No loopback interface found",
+		error:   err,
+	}
 }
 
 func ErrNotFoundWithParam(what string, paramName string, paramValue interface{}) error {

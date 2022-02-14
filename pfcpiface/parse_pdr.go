@@ -371,7 +371,7 @@ func (p *pdr) parseSourceInterfaceIE(srcIfaceIE *ie.IE) error {
 	}
 
 	if srcIface == ie.SrcInterfaceCPFunction {
-		return ErrUnsupported("Source Interface CP Function", srcIface)
+		return NewUnsupportedSourceIFaceError(srcIface)
 	} else if srcIface == ie.SrcInterfaceAccess {
 		p.srcIface = access
 		p.srcIfaceMask = 0xFF

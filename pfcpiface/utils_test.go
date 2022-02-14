@@ -21,7 +21,7 @@ func GetLoopbackInterface() (net.Interface, error) {
 		}
 	}
 
-	return net.Interface{}, ErrNotFound("No loopback interface found")
+	return net.Interface{}, NewLoopbackInterfaceNotFoundError()
 }
 
 // This tests inherently depends on the host setup to a degree.

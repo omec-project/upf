@@ -28,7 +28,7 @@ func (s *PFCPSession) UpdateQER(q qer) error {
 		}
 	}
 
-	return ErrNotFound("QER")
+	return NewQERNotFoundError()
 }
 
 // Int version of code present at https://github.com/juliangruber/go-intersect
@@ -145,5 +145,5 @@ func (s *PFCPSession) RemoveQER(id uint32) (*qer, error) {
 		}
 	}
 
-	return nil, ErrNotFound("QER")
+	return nil, NewQERNotFoundError()
 }

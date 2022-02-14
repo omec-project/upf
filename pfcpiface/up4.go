@@ -672,7 +672,7 @@ func (up4 *UP4) updateTunnelPeersBasedOnFARs(fars []far) error {
 
 func verifyPDR(pdr pdr) error {
 	if pdr.precedence > math.MaxUint16 {
-		return ErrUnsupported("precedence greater than 65535", pdr.precedence)
+		return NewUnsupportedPrecedenceValue(pdr.precedence)
 	}
 
 	return nil

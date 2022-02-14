@@ -85,7 +85,7 @@ func (s *PFCPSession) UpdateFAR(f *far, endMarkerList *[][]byte) error {
 		}
 	}
 
-	return ErrNotFound("FAR")
+	return NewFARNotFoundError()
 }
 
 func (s *PFCPSession) setNotifyFlag(flag bool) {
@@ -135,5 +135,5 @@ func (s *PFCPSession) RemoveFAR(id uint32) (*far, error) {
 		}
 	}
 
-	return nil, ErrNotFound("FAR")
+	return nil, NewFARNotFoundError()
 }
