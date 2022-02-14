@@ -532,6 +532,16 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, ippool *IPPoo
 		}
 	}
 
+	// initialize application filter with UE address;
+	// it can be overwritten by parseSDFFilter() later.
+	if p.IsDownlink() && p.ueAddress != 0 {
+		p.appFilter.dstIP = p.ueAddress
+		p.appFilter.dstIPMask = math.MaxUint32 // /32
+	} else if p.IsUplink() && p.ueAddress != 0 {
+		p.appFilter.srcIP = p.ueAddress
+		p.appFilter.srcIPMask = math.MaxUint32 // /32
+	}
+
 	// make another iteration because Application ID and SDF Filter depend on UE IP Address IE
 	for _, ie2 := range pdiIEs {
 		switch ie2.Type {
