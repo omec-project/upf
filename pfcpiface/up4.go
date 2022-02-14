@@ -6,6 +6,7 @@ package main
 import (
 	"encoding/binary"
 	"flag"
+	"fmt"
 	"math"
 	"math/rand"
 	"net"
@@ -47,8 +48,8 @@ const (
 )
 
 const (
-	appMeter     = "PreQosPipe.app_meter"
-	sessionMeter = "PreQosPipe.session_meter"
+	applicationMeter = "PreQosPipe.app_meter"
+	sessionMeter     = "PreQosPipe.session_meter"
 
 	meterTypeApplication uint8 = 1
 	meterTypeSession     uint8 = 2
@@ -65,6 +66,13 @@ type counter struct {
 	counterID uint64
 	allocated map[uint64]uint64
 	// free      map[uint64]uint64
+}
+
+// meterID is a tuple of F-SEID and QER ID.
+// This structure guarantees that QER ID is unique per PFCP session.
+type meterID struct {
+	qerID uint32
+	fseid uint64
 }
 
 type meter struct {
@@ -93,10 +101,10 @@ type UP4 struct {
 	applicationIDs     map[application]uint8
 	applicationIDsPool []uint8
 
-	// meters stores the mapping from QER ID -> P4 Meter Cell ID.
+	// meters stores the mapping from <F-SEID; QER ID> -> P4 Meter Cell ID.
 	// P4 Meter Cell ID is retrieved from appMeterCellIDsPool or sessMeterCellIDsPool,
 	// depending on QER type (application/session).
-	meters               map[uint32]meter
+	meters               map[meterID]meter
 	appMeterCellIDsPool  set.Set
 	sessMeterCellIDsPool set.Set
 
@@ -110,6 +118,11 @@ type UP4 struct {
 
 	reportNotifyChan chan<- uint64
 	endMarkerChan    chan []byte
+}
+
+func (m meter) String() string {
+	return fmt.Sprintf("Meter(type=%d, uplinkCellID=%d, downlinkCellID=%d)",
+		m.meterType, m.uplinkCellID, m.downlinkCellID)
 }
 
 func (up4 *UP4) addSliceInfo(sliceInfo *SliceInfo) error {
@@ -225,29 +238,43 @@ func (up4 *UP4) initAllCounters() error {
 func (up4 *UP4) initMetersPools() error {
 	log.Debug("Initializing P4 Meters pools for UP4")
 
-	appMeter, err := up4.p4RtTranslator.getMeterByName(appMeter)
+	appMeter, err := up4.p4RtTranslator.getMeterByName(applicationMeter)
 	if err != nil {
 		return err
 	}
+
+	log.WithFields(log.Fields{
+		"name":  applicationMeter,
+		"meter": appMeter,
+	}).Trace("Found P4 meter by name")
 
 	up4.appMeterCellIDsPool = set.NewSet()
 	for i := 1; i < int(appMeter.Size); i++ {
 		up4.appMeterCellIDsPool.Add(uint32(i))
 	}
 
+	log.Trace("Application meter IDs pool initialized: ", up4.appMeterCellIDsPool.String())
+
 	sessMeter, err := up4.p4RtTranslator.getMeterByName(sessionMeter)
 	if err != nil {
 		return err
 	}
+
+	log.WithFields(log.Fields{
+		"name":  sessionMeter,
+		"meter": sessMeter,
+	}).Trace("Found P4 meter by name")
 
 	up4.sessMeterCellIDsPool = set.NewSet()
 	for i := 1; i < int(sessMeter.Size); i++ {
 		up4.sessMeterCellIDsPool.Add(uint32(i))
 	}
 
+	log.Trace("Session meter IDs pool initialized: ", up4.sessMeterCellIDsPool.String())
+
 	log.WithFields(log.Fields{
-		"appMeter pool size":  up4.appMeterCellIDsPool.Cardinality(),
-		"sessMeter pool size": up4.sessMeterCellIDsPool.Cardinality(),
+		"applicationMeter pool size": up4.appMeterCellIDsPool.Cardinality(),
+		"sessMeter pool size":        up4.sessMeterCellIDsPool.Cardinality(),
 	}).Debug("P4 Meters pools initialized successfully")
 
 	return nil
@@ -332,7 +359,7 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	up4.enableEndMarker = conf.EnableEndMarker
 	up4.initTunnelPeerIDs()
 	up4.initApplicationIDs()
-	up4.meters = make(map[uint32]meter)
+	up4.meters = make(map[meterID]meter)
 	up4.ueAddrToFSEID = make(map[uint32]uint64)
 	up4.fseidToUEAddr = make(map[uint64]uint32)
 
@@ -722,6 +749,11 @@ func (up4 *UP4) allocateAppMeterCellID() (uint32, error) {
 			"no free AppMeter Cell IDs available")
 	}
 
+	log.WithFields(log.Fields{
+		"allocated ID":       allocated,
+		"number of free IDs": up4.appMeterCellIDsPool.Cardinality(),
+	}).Debug("Application meter cell ID allocated")
+
 	return allocated.(uint32), nil
 }
 
@@ -732,6 +764,11 @@ func (up4 *UP4) releaseAppMeterCellID(allocated uint32) {
 	}
 
 	up4.appMeterCellIDsPool.Add(allocated)
+
+	log.WithFields(log.Fields{
+		"released ID":        allocated,
+		"number of free IDs": up4.appMeterCellIDsPool.Cardinality(),
+	}).Debug("Application meter cell ID released")
 }
 
 func (up4 *UP4) allocateSessionMeterCellID() (uint32, error) {
@@ -741,6 +778,11 @@ func (up4 *UP4) allocateSessionMeterCellID() (uint32, error) {
 		return 0, ErrOperationFailedWithReason("allocate Session Meter Cell ID",
 			"no free SessionMeter Cell IDs available")
 	}
+
+	log.WithFields(log.Fields{
+		"allocated ID":       allocated,
+		"number of free IDs": up4.sessMeterCellIDsPool.Cardinality(),
+	}).Debug("Session meter cell ID allocated")
 
 	return allocated.(uint32), nil
 }
@@ -752,6 +794,11 @@ func (up4 *UP4) releaseSessionMeterCellID(allocated uint32) {
 	}
 
 	up4.sessMeterCellIDsPool.Add(allocated)
+
+	log.WithFields(log.Fields{
+		"released ID":        allocated,
+		"number of free IDs": up4.sessMeterCellIDsPool.Cardinality(),
+	}).Debug("Session meter cell ID released")
 }
 
 func (up4 *UP4) updateUEAddrAndFSEIDMappings(pdr pdr) {
@@ -830,7 +877,7 @@ func getMeterConfigurationFromQER(mbr uint64, gbr uint64) *p4.MeterConfig {
 func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, error) {
 	entries := make([]*p4.MeterEntry, 0)
 
-	applicationMeter := meter{
+	appMeter := meter{
 		meterType:      meterTypeApplication,
 		uplinkCellID:   0,
 		downlinkCellID: 0,
@@ -841,7 +888,7 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 		return meter{}, err
 	}
 
-	applicationMeter.uplinkCellID = uplinkCellID
+	appMeter.uplinkCellID = uplinkCellID
 
 	if bidirectional {
 		cellID, err := up4.allocateAppMeterCellID()
@@ -850,35 +897,35 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 			return meter{}, err
 		}
 
-		applicationMeter.downlinkCellID = cellID
+		appMeter.downlinkCellID = cellID
 	} else {
-		applicationMeter.downlinkCellID = uplinkCellID
+		appMeter.downlinkCellID = uplinkCellID
 	}
 
 	releaseIDs := func() {
-		if applicationMeter.uplinkCellID != 0 {
-			up4.releaseSessionMeterCellID(applicationMeter.uplinkCellID)
+		if appMeter.uplinkCellID != 0 {
+			up4.releaseSessionMeterCellID(appMeter.uplinkCellID)
 		}
 
-		if applicationMeter.downlinkCellID != 0 {
-			up4.releaseSessionMeterCellID(applicationMeter.downlinkCellID)
+		if appMeter.downlinkCellID != 0 {
+			up4.releaseSessionMeterCellID(appMeter.downlinkCellID)
 		}
 	}
 
-	if applicationMeter.uplinkCellID != 0 {
+	if appMeter.uplinkCellID != 0 {
 		// according to the SD-Core/SD-Fabric contract, UL and DL MBRs/GBRs are always equal for Application QERs.
 		meterConfig := getMeterConfigurationFromQER(q.ulMbr, q.ulGbr)
 
-		meterEntry := up4.p4RtTranslator.BuildMeterEntry(appMeter, applicationMeter.uplinkCellID, meterConfig)
+		meterEntry := up4.p4RtTranslator.BuildMeterEntry(applicationMeter, appMeter.uplinkCellID, meterConfig)
 
 		entries = append(entries, meterEntry)
 	}
 
-	if applicationMeter.downlinkCellID != 0 {
+	if appMeter.downlinkCellID != 0 {
 		// according to the SD-Core/SD-Fabric contract, UL and DL MBRs/GBRs are always equal for Application QERs.
 		meterConfig := getMeterConfigurationFromQER(q.dlMbr, q.dlGbr)
 
-		meterEntry := up4.p4RtTranslator.BuildMeterEntry(appMeter, applicationMeter.downlinkCellID, meterConfig)
+		meterEntry := up4.p4RtTranslator.BuildMeterEntry(applicationMeter, appMeter.downlinkCellID, meterConfig)
 
 		entries = append(entries, meterEntry)
 	}
@@ -889,7 +936,7 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 		return meter{}, err
 	}
 
-	return applicationMeter, nil
+	return appMeter, nil
 }
 
 // configureSessionMeter installs two P4Runtime Meter Entries.
@@ -985,7 +1032,13 @@ func (up4 *UP4) configureMeters(qers []qer) error {
 			return ErrOperationFailedWithReason("configure P4 Meter from QER", err.Error())
 		}
 
-		up4.meters[qer.qerID] = meter
+		logger = logger.WithField("P4 meter", meter)
+		logger.Debug("P4 meter successfully configured!")
+
+		up4.meters[meterID{
+			qerID: qer.qerID,
+			fseid: qer.fseID,
+		}] = meter
 	}
 
 	return nil
@@ -1035,13 +1088,17 @@ func (up4 *UP4) resetMeters(qers []qer) {
 		})
 		logger.Debug("Resetting P4 Meter")
 
-		meter, exists := up4.meters[qer.qerID]
+		meter, exists := up4.meters[meterID{
+			qerID: qer.qerID,
+			fseid: qer.fseID,
+		}]
 		if !exists {
+			logger.Error("P4 meter for QER ID not found, cannot reset!")
 			continue
 		}
 
 		if meter.meterType == meterTypeApplication {
-			up4.resetMeter(appMeter, meter)
+			up4.resetMeter(applicationMeter, meter)
 			up4.releaseAppMeterCellID(meter.uplinkCellID)
 
 			if meter.downlinkCellID != meter.uplinkCellID {
@@ -1053,7 +1110,13 @@ func (up4 *UP4) resetMeters(qers []qer) {
 			up4.releaseSessionMeterCellID(meter.downlinkCellID)
 		}
 
-		delete(up4.meters, qer.qerID)
+		logger = logger.WithField("P4 meter", meter)
+		logger.Debug("Removing P4 meter from allocated meters pool")
+
+		delete(up4.meters, meterID{
+			qerID: qer.qerID,
+			fseid: qer.fseID,
+		})
 	}
 }
 
@@ -1095,7 +1158,11 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 		var sessMeter = meter{meterTypeSession, 0, 0}
 		if len(pdr.qerIDList) == 2 {
 			// if 2 QERs are provided, the second one is Session QER
-			sessMeter = up4.meters[pdr.qerIDList[1]]
+			sessMeter = up4.meters[meterID{
+				qerID: pdr.qerIDList[1],
+				fseid: pdr.fseID,
+			}]
+			pdrLog.Debug("Application meter found for PDR: ", sessMeter)
 		} // else: if only 1 QER provided, set sessMeterIdx to 0, and use only per-app metering
 
 		sessionsEntry, err := up4.p4RtTranslator.BuildSessionsTableEntry(pdr, sessMeter, tunnelPeerID, far.Buffers())
@@ -1144,7 +1211,11 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 			// if only 1 QER provided, it's an application QER
 			// if 2 QERs provided, the first one is an application QER
 			// if more than 2 QERs provided, TODO: not supported
-			appMeter = up4.meters[pdr.qerIDList[0]]
+			appMeter = up4.meters[meterID{
+				qerID: pdr.qerIDList[0],
+				fseid: pdr.fseID,
+			}]
+			pdrLog.Debug("Application meter found for PDR: ", appMeter)
 		}
 
 		var qfi uint8 = DefaultQFI
@@ -1153,6 +1224,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 		if err != nil {
 			pdrLog.Warning(err)
 		} else {
+			pdrLog.Debug("Related QER found for PDR: ", relatedQER)
 			qfi = relatedQER.qfi
 		}
 
