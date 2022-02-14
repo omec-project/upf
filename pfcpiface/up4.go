@@ -16,7 +16,7 @@ import (
 	p4 "github.com/p4lang/p4runtime/go/p4/v1"
 
 	set "github.com/deckarep/golang-set"
-	
+
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -470,7 +470,7 @@ func (up4 *UP4) allocateGTPTunnelPeerID() (uint8, error) {
 
 	if allocated == nil {
 		return 0, ErrOperationFailedWithReason("allocate GTP Tunnel Peer ID",
-		"no free tunnel peer IDs available")
+			"no free tunnel peer IDs available")
 	}
 
 	return allocated.(uint8), nil
@@ -571,7 +571,7 @@ func (up4 *UP4) allocateInternalApplicationID(app application) (uint8, error) {
 
 	if allocated == nil {
 		return 0, ErrOperationFailedWithReason("allocate Application ID",
-		"no free application IDs available")
+			"no free application IDs available")
 	}
 
 	up4.applicationIDs[app] = allocated.(uint8)
