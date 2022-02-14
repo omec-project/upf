@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2020 Intel Corporation
 
-package main
+package pfcpiface
 
 import (
 	"fmt"

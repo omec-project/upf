@@ -2,7 +2,7 @@
 // Copyright 2020 Intel Corporation
 // Copyright 2022 Open Networking Foundation
 
-package main
+package pfcpiface
 
 import (
 	"encoding/binary"
