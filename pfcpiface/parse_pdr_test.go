@@ -677,7 +677,7 @@ func Test_pdr_parsePDI(t *testing.T) {
 			},
 			wantPDR: pdr{
 				srcIface:     access,
-				srcIfaceMask: 0xff,
+				srcIfaceMask: math.MaxUint8,
 				ueAddress:    ip2int(net.ParseIP(ueAddress)),
 				appFilter: applicationFilter{
 					srcIP:     ip2int(net.ParseIP(ueAddress)),
@@ -696,7 +696,7 @@ func Test_pdr_parsePDI(t *testing.T) {
 			},
 			wantPDR: pdr{
 				srcIface:     core,
-				srcIfaceMask: 0xff,
+				srcIfaceMask: math.MaxUint8,
 				ueAddress:    ip2int(net.ParseIP(ueAddress)),
 				appFilter: applicationFilter{
 					dstIP:     ip2int(net.ParseIP(ueAddress)),
