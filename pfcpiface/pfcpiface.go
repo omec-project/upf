@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2020 Intel Corporation
 // Copyright 2022-present Open Networking Foundation
 
-package main
+package pfcpiface
 
 import (
 	"context"
@@ -17,61 +16,56 @@ import (
 )
 
 var (
-	configPath = flag.String("config", "upf.json", "path to upf config")
-	simulate   = simModeDisable
-	pfcpsim    = flag.Bool("pfcpsim", false, "simulate PFCP")
+	simulate = simModeDisable
+	pfcpsim  = flag.Bool("pfcpsim", false, "simulate PFCP")
 )
 
 func init() {
 	flag.Var(&simulate, "simulate", "create|delete|create_continue simulated sessions")
-	// Set up logger
-	log.SetReportCaller(true)
-	log.SetFormatter(&log.TextFormatter{
-		FullTimestamp: true,
-	})
 }
 
-func main() {
-	// cmdline args
-	flag.Parse()
+type PFCPIface struct {
+	conf Conf
 
-	// Read and parse json startup file.
-	conf, err := LoadConfigFile(*configPath)
-	if err != nil {
-		log.Fatalln("Error reading conf file:", err)
+	fp  fastPath
+	upf *upf
+}
+
+func NewPFCPIface(conf Conf) *PFCPIface {
+	pfcpIface := &PFCPIface{
+		conf: conf,
 	}
 
-	log.SetLevel(conf.LogLevel)
-
-	log.Infof("%+v", conf)
-
-	var fp fastPath
 	if conf.EnableP4rt {
-		fp = &UP4{}
+		pfcpIface.fp = &UP4{}
 	} else {
-		fp = &bess{}
+		pfcpIface.fp = &bess{}
 	}
 
-	upf := NewUPF(&conf, fp)
+	pfcpIface.upf = NewUPF(&conf, pfcpIface.fp)
 
+	return pfcpIface
+}
+
+func (p *PFCPIface) Run() {
 	if *pfcpsim {
 		pfcpSim()
 		return
 	}
 
 	if simulate.enable() {
-		upf.sim(simulate, &conf.SimInfo)
+		p.upf.sim(simulate, &p.conf.SimInfo)
 
 		if !simulate.keepGoing() {
 			return
 		}
 	}
 
-	setupConfigHandler(upf)
+	setupConfigHandler(p.upf)
 
 	httpPort := "8080"
-	if conf.CPIface.HTTPPort != "" {
-		httpPort = conf.CPIface.HTTPPort
+	if p.conf.CPIface.HTTPPort != "" {
+		httpPort = p.conf.CPIface.HTTPPort
 	}
 
 	httpSrv := &http.Server{Addr: ":" + httpPort, Handler: nil}
@@ -86,10 +80,10 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	node := NewPFCPNode(ctx, upf)
+	node := NewPFCPNode(ctx, p.upf)
 	go node.Serve()
 
-	setupProm(upf, node)
+	setupProm(p.upf, node)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
@@ -105,5 +99,5 @@ func main() {
 		log.Errorln("Failed to shutdown http:", err)
 	}
 
-	upf.exit()
+	p.upf.exit()
 }
