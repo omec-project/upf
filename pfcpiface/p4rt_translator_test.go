@@ -16,11 +16,10 @@ var mockP4INFO = "pkg_info {\n  arch: \"v1model\"\n}\ntables {\n  preamble {\n  
 // secondMockP4INFO Took from https://github.com/p4lang/PI/blob/main/proto/demo_grpc/simple_router.p4info.txt
 var secondMockP4INFO = "tables {\n  preamble {\n    id: 33586128\n    name: \"decap_cpu_header\"\n    alias: \"decap_cpu_header\"\n  }\n  action_refs {\n    id: 16788917\n  }\n  size: 1024\n}\ntables {\n  preamble {\n    id: 33589124\n    name: \"forward\"\n    alias: \"forward\"\n  }\n  match_fields {\n    id: 1\n    name: \"routing_metadata.nhop_ipv4\"\n    bitwidth: 32\n    match_type: EXACT\n  }\n  action_refs {\n    id: 16780303\n  }\n  action_refs {\n    id: 16840314\n  }\n  action_refs {\n    id: 16784184\n  }\n  size: 512\n}\ntables {\n  preamble {\n    id: 33581985\n    name: \"ipv4_lpm\"\n    alias: \"ipv4_lpm\"\n  }\n  match_fields {\n    id: 1\n    name: \"ipv4.dstAddr\"\n    bitwidth: 32\n    match_type: LPM\n  }\n  action_refs {\n    id: 16812204\n  }\n  action_refs {\n    id: 16784184\n  }\n  size: 1024\n}\ntables {\n  preamble {\n    id: 33555613\n    name: \"send_arp_to_cpu\"\n    alias: \"send_arp_to_cpu\"\n  }\n  action_refs {\n    id: 16840314\n  }\n  size: 1024\n}\ntables {\n  preamble {\n    id: 33562826\n    name: \"send_frame\"\n    alias: \"send_frame\"\n  }\n  match_fields {\n    id: 1\n    name: \"standard_metadata.egress_port\"\n    bitwidth: 9\n    match_type: EXACT\n  }\n  action_refs {\n    id: 16813016\n  }\n  action_refs {\n    id: 16784184\n  }\n  size: 256\n}\nactions {\n  preamble {\n    id: 16788917\n    name: \"do_decap_cpu_header\"\n    alias: \"do_decap_cpu_header\"\n  }\n}\nactions {\n  preamble {\n    id: 16780303\n    name: \"set_dmac\"\n    alias: \"set_dmac\"\n  }\n  params {\n    id: 1\n    name: \"dmac\"\n    bitwidth: 48\n  }\n}\nactions {\n  preamble {\n    id: 16840314\n    name: \"do_send_to_cpu\"\n    alias: \"do_send_to_cpu\"\n  }\n  params {\n    id: 1\n    name: \"reason\"\n    bitwidth: 16\n  }\n  params {\n    id: 2\n    name: \"cpu_port\"\n    bitwidth: 9\n  }\n}\nactions {\n  preamble {\n    id: 16784184\n    name: \"_drop\"\n    alias: \"_drop\"\n  }\n}\nactions {\n  preamble {\n    id: 16812204\n    name: \"set_nhop\"\n    alias: \"set_nhop\"\n  }\n  params {\n    id: 1\n    name: \"nhop_ipv4\"\n    bitwidth: 32\n  }\n  params {\n    id: 2\n    name: \"port\"\n    bitwidth: 9\n  }\n}\nactions {\n  preamble {\n    id: 16813016\n    name: \"rewrite_mac\"\n    alias: \"rewrite_mac\"\n  }\n  params {\n    id: 1\n    name: \"smac\"\n    bitwidth: 48\n  }\n}"
 
-func setupNewTranslator(t *testing.T, p4info string) *P4rtTranslator {
+func setupNewTranslator(p4info string) *P4rtTranslator {
 	var p4Config p4ConfigV1.P4Info
 
-	err := proto.UnmarshalText(p4info, &p4Config)
-	require.NoError(t, err)
+	_ = proto.UnmarshalText(p4info, &p4Config)
 
 	return newP4RtTranslator(p4Config)
 }
@@ -34,17 +33,17 @@ func Test_actionID(t *testing.T) {
 	}{
 		{name: "get NoAction",
 			args:       "NoAction",
-			translator: setupNewTranslator(t, mockP4INFO),
+			translator: setupNewTranslator(mockP4INFO),
 			want:       uint32(21257015),
 		},
 		{name: "get rewrite_mac action",
 			args:       "rewrite_mac",
-			translator: setupNewTranslator(t, secondMockP4INFO),
+			translator: setupNewTranslator(secondMockP4INFO),
 			want:       uint32(16813016),
 		},
 		{name: "non existing action",
 			args:       "qwerty",
-			translator: setupNewTranslator(t, mockP4INFO),
+			translator: setupNewTranslator(mockP4INFO),
 			want:       uint32(0),
 		},
 	}
@@ -67,17 +66,17 @@ func Test_tableID(t *testing.T) {
 	}{
 		{name: "Existing table",
 			args:       "PreQosPipe.Routing.routes_v4",
-			translator: setupNewTranslator(t, mockP4INFO),
+			translator: setupNewTranslator(mockP4INFO),
 			want:       uint32(39015874),
 		},
 		{name: "Existing table in second mock P4 Info",
 			args:       "forward",
-			translator: setupNewTranslator(t, secondMockP4INFO),
+			translator: setupNewTranslator(secondMockP4INFO),
 			want:       uint32(33589124),
 		},
 		{name: "Non existing table",
 			args:       "testtttt",
-			translator: setupNewTranslator(t, secondMockP4INFO),
+			translator: setupNewTranslator(secondMockP4INFO),
 			want:       uint32(0),
 		},
 	}
@@ -92,33 +91,153 @@ func Test_tableID(t *testing.T) {
 }
 
 func Test_getCounterByName(t *testing.T) {
-	translator := setupNewTranslator(t, mockP4INFO)
+	type args struct {
+		counterName string
+		counterID   uint32
+	}
 
 	tests := []struct {
-		name    string
-		args    string
-		want    uint32
-		wantErr bool
+		name       string
+		translator *P4rtTranslator
+		want       args
+		wantErr    bool
 	}{
 		{name: "Existing counter",
-			args:    "PreQosPipe.pre_qos_counter",
-			want:    uint32(315693181),
+			translator: setupNewTranslator(mockP4INFO),
+			want: args{
+				counterName: "PreQosPipe.pre_qos_counter",
+				counterID:   uint32(315693181),
+			},
+			wantErr: false,
+		},
+		{name: "Existing counter",
+			translator: setupNewTranslator(mockP4INFO),
+			want: args{
+				counterName: "PostQosPipe.post_qos_counter",
+				counterID:   uint32(302958180),
+			},
 			wantErr: false,
 		},
 		{name: "Non existing counter",
-			args:    "testtttt",
-			wantErr: true,
+			want: args{
+				counterName: "testttt",
+				counterID:   0,
+			},
+			translator: setupNewTranslator(mockP4INFO),
+			wantErr:    true,
+		},
+		{name: "Non existing counter",
+			want: args{
+				counterName: "testtt",
+				counterID:   0,
+			},
+			translator: setupNewTranslator(secondMockP4INFO),
+			wantErr:    true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				got, err := translator.getCounterByName(tt.args)
+				got, err := tt.translator.getCounterByName(tt.want.counterName)
 				if tt.wantErr {
 					require.Error(t, err)
 				} else {
-					require.Equal(t, tt.want, got.Preamble.Id)
+					require.Equal(t, tt.want.counterID, got.Preamble.Id)
+					require.Equal(t, tt.want.counterName, got.Preamble.Name)
 				}
+			},
+		)
+	}
+}
+
+func Test_getTableByID(t *testing.T) {
+	type args struct {
+		tableID   uint32
+		tableName string
+	}
+
+	tests := []struct {
+		name       string
+		translator *P4rtTranslator
+		want       *args
+		wantErr    bool
+	}{
+		{name: "Existing table",
+			translator: setupNewTranslator(mockP4INFO),
+			want: &args{
+				tableID:   39015874,
+				tableName: "PreQosPipe.Routing.routes_v4",
+			},
+			wantErr: false,
+		},
+		{name: "Existing table",
+			translator: setupNewTranslator(secondMockP4INFO),
+			want: &args{
+				tableID:   33589124,
+				tableName: "forward",
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				got, err := tt.translator.getTableByID(tt.want.tableID)
+				if tt.wantErr {
+					require.Error(t, err)
+				} else {
+					require.Equal(t, tt.want.tableID, got.Preamble.Id)
+					require.Equal(t, tt.want.tableName, got.Preamble.Name)
+				}
+			},
+		)
+	}
+}
+
+func Test_getMatchFieldByName(t *testing.T) {
+	ts := setupNewTranslator(mockP4INFO)
+
+	mockTableID, _ := ts.getTableIDByName("PreQosPipe.Acl.acls")
+	mockTable, err := ts.getTableByID(mockTableID)
+	require.NoError(t, err)
+
+	type args struct {
+		table          *p4ConfigV1.Table
+		matchFieldName string
+	}
+
+	type want struct {
+		// TODO instead of this struct, create a p4ConfigV1.MatchField object
+		name  string
+		id    uint32
+		match p4ConfigV1.MatchField_MatchType
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{name: "Existing match Field",
+			args: args{
+				table:          mockTable,
+				matchFieldName: "inport",
+			},
+			want: want{
+				name:  "inport",
+				id:    1,
+				match: p4ConfigV1.MatchField_TERNARY,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				got := ts.getMatchFieldByName(tt.args.table, tt.args.matchFieldName)
+				require.Equal(t, tt.want.name, got.Name)
+				require.Equal(t, tt.want.id, got.Id)
+				require.Equal(t, tt.want.match, got.GetMatchType())
+
 			},
 		)
 	}
