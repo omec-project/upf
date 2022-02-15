@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	log "github.com/sirupsen/logrus"
@@ -27,13 +28,19 @@ func init() {
 type PFCPIface struct {
 	conf Conf
 
-	fp  fastPath
-	upf *upf
+	node    *PFCPNode
+	fp      fastPath
+	upf     *upf
+	httpSrv *http.Server
+
+	stop    context.CancelFunc
+	wg      *sync.WaitGroup
 }
 
 func NewPFCPIface(conf Conf) *PFCPIface {
 	pfcpIface := &PFCPIface{
 		conf: conf,
+		wg:   &sync.WaitGroup{},
 	}
 
 	if conf.EnableP4rt {
@@ -68,10 +75,10 @@ func (p *PFCPIface) Run() {
 		httpPort = p.conf.CPIface.HTTPPort
 	}
 
-	httpSrv := &http.Server{Addr: ":" + httpPort, Handler: nil}
+	p.httpSrv = &http.Server{Addr: ":" + httpPort, Handler: nil}
 
 	go func() {
-		if err := httpSrv.ListenAndServe(); err != nil && errors.Is(err, http.ErrServerClosed) {
+		if err := p.httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalln("http server failed", err)
 		}
 
@@ -79,25 +86,48 @@ func (p *PFCPIface) Run() {
 	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
+	p.stop = cancel
 
-	node := NewPFCPNode(ctx, p.upf)
-	go node.Serve()
+	p.node = NewPFCPNode(ctx, p.upf)
+	go p.node.Serve()
 
-	setupProm(p.upf, node)
+	setupProm(p.upf, p.node)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
 	signal.Notify(sig, syscall.SIGTERM)
-	<-sig
 
-	cancel()
+	go func() {
+		oscall := <-sig
+		log.Infof("System call received: %+v", oscall)
+		p.Stop()
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			p.shutdown()
+			return
+		}
+	}
+}
+
+func (p *PFCPIface) shutdown() {
+	defer p.wg.Done()
 
 	// Wait for node shutdown before http shutdown
-	node.Done()
+	p.node.Done()
 
-	if err := httpSrv.Shutdown(context.Background()); err != nil {
-		log.Errorln("Failed to shutdown http:", err)
+	if err := p.httpSrv.Shutdown(context.Background()); err != nil {
+		log.Errorln("Failed to shutdown http: ", err)
 	}
 
 	p.upf.exit()
+}
+
+// Stop sends cancellation signal to main Go routine and waits for shutdown to complete.
+func (p *PFCPIface) Stop() {
+	p.wg.Add(1)
+	p.stop()
+	p.wg.Wait()
 }

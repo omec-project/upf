@@ -5,7 +5,6 @@ package integration
 
 import (
 	"github.com/omec-project/upf-epc/pfcpiface"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -16,16 +15,19 @@ const (
 
 func ConfUP4Default() pfcpiface.Conf {
 	return pfcpiface.Conf{
+		RespTimeout: "2s",
+		ReadTimeout: 15,
 		CPIface: pfcpiface.CPIfaceInfo{
 			UEIPPool: defaultUEPool,
 		},
 		P4rtcIface: pfcpiface.P4rtcInfo{
 			AccessIP:    defaultAccessIP,
-			P4rtcServer: "mock-up4",
+			P4rtcServer: "127.0.0.1",
 			P4rtcPort:   defaultP4RuntimeServerPort,
+			P4Info: "../../conf/p4/bin/p4info.txt",
+			DeviceConfig: "../../conf/p4/bin/bmv2.json",
 		},
 		EnableP4rt: true,
-		LogLevel:   logrus.TraceLevel,
 	}
 }
 

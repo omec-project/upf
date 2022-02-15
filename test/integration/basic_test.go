@@ -4,8 +4,8 @@
 package integration
 
 import (
-	"encoding/json"
 	"github.com/omec-project/upf-epc/pfcpiface"
+	"github.com/sirupsen/logrus"
 	"os"
 
 	"net"
@@ -27,6 +27,7 @@ const (
 
 var (
 	pfcpClient *pfcpsim.PFCPClient
+	pfcpAgent  *pfcpiface.PFCPIface
 )
 
 type testContext struct {
@@ -41,6 +42,10 @@ type testCase struct {
 	desc string
 }
 
+func init() {
+	logrus.SetLevel(logrus.TraceLevel)
+}
+
 func setupBESS(t *testing.T, conf pfcpiface.Conf) {
 	// TODO: set up BESS mock
 }
@@ -50,12 +55,8 @@ func teardownBESS(t *testing.T) {
 }
 
 func setupUP4(t *testing.T, conf pfcpiface.Conf) {
-	cfgJson, _ := json.Marshal(conf)
-	err := os.WriteFile("./config/upf.json", cfgJson, 0644)
-	require.NoError(t, err)
-
-	providers.RunDockerCommandAttach("pfcpiface",
-		"/bin/pfcpiface -config /config/upf.json")
+	pfcpAgent = pfcpiface.NewPFCPIface(conf)
+	go pfcpAgent.Run()
 }
 
 func teardownUP4(t *testing.T) {
@@ -72,9 +73,8 @@ func teardownUP4(t *testing.T) {
 		pfcpClient.DisconnectN4()
 	}
 
-	// kill pfcpiface process inside container
-	_, _, _, err := providers.RunDockerExecCommand("pfcpiface", "killall -9 pfcpiface")
-	require.NoError(t, err, "failed to kill pfcpiface process")
+	pfcpAgent.Stop()
+	time.Sleep(3*time.Second)
 }
 
 func setup(t *testing.T, conf pfcpiface.Conf) {

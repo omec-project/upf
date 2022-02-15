@@ -3,25 +3,6 @@ version: "3.7"
 # SPDX-License-Identifier: Apache-2.0
 
 services:
-  pfcpiface:
-    build:
-      context: ../../../
-      dockerfile: Dockerfile
-      target: pfcpiface
-    hostname: pfcpiface
-    container_name: pfcpiface
-    tty: true
-    stdin_open: true
-    volumes:
-      - ../config/:/config/
-    entrypoint: "/bin/sh"
-    working_dir: /bin/
-    ports:
-      - "8805:8805/udp"
-    expose:
-      - 8805
-    depends_on:
-      - mock-up4
   mock-up4:
     # NOTE: mn-stratum is easier to debug and more stable.
     # but should be replaced with p4mn if integration tests will cover DDNs.
