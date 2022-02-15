@@ -20,12 +20,6 @@ import (
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
-const (
-	// FIXME: this is hardcoded currently, but should be passed as configuration/cmd line arg
-	p4InfoPath       = "/bin/p4info.txt"
-	deviceConfigPath = "/bin/bmv2.json"
-)
-
 var (
 	p4RtcServerIP   = flag.String("p4RtcServerIP", "", "P4 Server ip")
 	p4RtcServerPort = flag.String("p4RtcServerPort", "", "P4 Server port")
@@ -54,13 +48,13 @@ type counter struct {
 }
 
 type UP4 struct {
+	conf            P4rtcInfo
+
 	host            string
 	deviceID        uint64
 	timeout         uint32
 	accessIP        *net.IPNet
 	ueIPPool        *net.IPNet
-	p4rtcServer     string
-	p4rtcPort       string
 	enableEndMarker bool
 
 	p4client       *P4rtClient
@@ -169,7 +163,7 @@ func (up4 *UP4) setupChannel() error {
 
 	err = up4.p4client.GetForwardingPipelineConfig()
 	if err != nil {
-		err = up4.p4client.SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath)
+		err = up4.p4client.SetForwardingPipelineConfig(up4.conf.P4Info, up4.conf.DeviceConfig)
 		if err != nil {
 			log.Errorf("set forwarding pipeling config failed: %v", err)
 			return err
@@ -240,35 +234,38 @@ func (up4 *UP4) isConnected(accessIP *net.IP) bool {
 func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	log.Println("setUpfInfo UP4")
 
+	up4.conf = conf.P4rtcIface
+
 	up4.accessIP = MustParseStrIP(conf.P4rtcIface.AccessIP)
 	u.accessIP = up4.accessIP.IP
 
-	log.Println("AccessIP: ", up4.accessIP)
+	log.Infof("AccessIP: %v", up4.accessIP)
 
 	up4.ueIPPool = MustParseStrIP(conf.CPIface.UEIPPool)
 
 	log.Infof("UE IP pool: %v", up4.ueIPPool)
 
-	up4.p4rtcServer = conf.P4rtcIface.P4rtcServer
-	log.Println("UP4 server ip/name", up4.p4rtcServer)
-	up4.p4rtcPort = conf.P4rtcIface.P4rtcPort
+	p4rtcServer := conf.P4rtcIface.P4rtcServer
+
+	p4rtcPort := conf.P4rtcIface.P4rtcPort
 	up4.reportNotifyChan = u.reportNotifyChan
 
 	if *p4RtcServerIP != "" {
-		up4.p4rtcServer = *p4RtcServerIP
+		p4rtcServer = *p4RtcServerIP
 	}
 
 	if *p4RtcServerPort != "" {
-		up4.p4rtcPort = *p4RtcServerPort
+		p4rtcPort = *p4RtcServerPort
 	}
 
 	u.coreIP = net.ParseIP(net.IPv4zero.String())
 
-	log.Println("onos server ip ", up4.p4rtcServer)
-	log.Println("onos server port ", up4.p4rtcPort)
+	up4.host = p4rtcServer + ":" + p4rtcPort
 
-	up4.host = up4.p4rtcServer + ":" + up4.p4rtcPort
-	log.Println("server name: ", up4.host)
+	log.WithFields(log.Fields{
+		"UP4 endpoint": up4.host,
+	}).Info("UP4 endpoint configured")
+
 	up4.deviceID = 1
 	up4.timeout = 30
 	up4.enableEndMarker = conf.EnableEndMarker
