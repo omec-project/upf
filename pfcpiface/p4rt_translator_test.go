@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
 	//nolint:staticcheck // Ignore SA1019.
 	// Upgrading to google.golang.org/protobuf/proto is not a drop-in replacement,
 	// as also P4Runtime stubs are based on the deprecated proto.
