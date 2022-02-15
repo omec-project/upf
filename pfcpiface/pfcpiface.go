@@ -18,7 +18,6 @@ import (
 
 var (
 	simulate = simModeDisable
-	pfcpsim  = flag.Bool("pfcpsim", false, "simulate PFCP")
 )
 
 func init() {
@@ -57,11 +56,6 @@ func NewPFCPIface(conf Conf) *PFCPIface {
 }
 
 func (p *PFCPIface) Run() {
-	if *pfcpsim {
-		pfcpSim()
-		return
-	}
-
 	if simulate.enable() {
 		p.upf.sim(simulate, &p.conf.SimInfo)
 
