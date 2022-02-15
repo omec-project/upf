@@ -74,7 +74,6 @@ func teardownUP4(t *testing.T) {
 	}
 
 	pfcpAgent.Stop()
-	time.Sleep(3*time.Second)
 }
 
 func setup(t *testing.T, conf pfcpiface.Conf) {

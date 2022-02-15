@@ -40,7 +40,7 @@ type ConfigHandler struct {
 
 func setupConfigHandler(upf *upf) {
 	cfgHandler := ConfigHandler{upf: upf}
-	http.Handle("/v1/config/network-slices", &cfgHandler)
+	http.NewServeMux().Handle("/v1/config/network-slices", &cfgHandler)
 }
 
 func (c *ConfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

@@ -4,13 +4,16 @@
 package pfcpiface
 
 import (
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
+	"sync"
 
 	log "github.com/sirupsen/logrus"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
+
+var once sync.Once
 
 func getPctiles() []float64 {
 	return []float64{50, 75, 90, 95, 99, 99.9, 99.99, 99.999, 99.9999, 100}
@@ -150,5 +153,13 @@ func setupProm(upf *upf, node *PFCPNode) {
 	nc := NewPFCPNodeCollector(node)
 	prometheus.MustRegister(nc)
 
-	http.Handle("/metrics", promhttp.Handler())
+	http.NewServeMux().Handle("/metrics", promhttp.Handler())
+}
+
+func clearProm(upf *upf, node *PFCPNode) {
+	uc := newUpfCollector(upf)
+	prometheus.Unregister(uc)
+
+	nc := NewPFCPNodeCollector(node)
+	prometheus.Unregister(nc)
 }
