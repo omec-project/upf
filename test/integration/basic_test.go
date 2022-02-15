@@ -4,7 +4,9 @@
 package integration
 
 import (
-	"fmt"
+	"encoding/json"
+	"github.com/omec-project/upf-epc/pfcpiface"
+	"os"
 
 	"net"
 	"testing"
@@ -20,8 +22,7 @@ import (
 )
 
 const (
-	configDefault              = "default.json"
-	configUPFBasedIPAllocation = "ue_ip_alloc.json"
+	envFastpath = "FASTPATH"
 )
 
 var (
@@ -40,20 +41,24 @@ type testCase struct {
 	desc string
 }
 
-func setup(t *testing.T, pfcpAgentConfig string) {
-	providers.RunDockerCommandAttach("pfcpiface",
-		fmt.Sprintf("/bin/pfcpiface -config /config/%s", pfcpAgentConfig))
-
-	// wait for PFCP Agent to initialize, blocking
-	err := waitForPFCPAgentToStart()
-	require.NoErrorf(t, err, "failed to start PFCP Agent: %v", err)
-
-	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.1")
-	err = pfcpClient.ConnectN4("127.0.0.1")
-	require.NoErrorf(t, err, "failed to connect to UPF")
+func setupBESS(t *testing.T, conf pfcpiface.Conf) {
+	// TODO: set up BESS mock
 }
 
-func teardown(t *testing.T) {
+func teardownBESS(t *testing.T) {
+	// TODO: tear down BESS mock
+}
+
+func setupUP4(t *testing.T, conf pfcpiface.Conf) {
+	cfgJson, _ := json.Marshal(conf)
+	err := os.WriteFile("./config/upf.json", cfgJson, 0644)
+	require.NoError(t, err)
+
+	providers.RunDockerCommandAttach("pfcpiface",
+		"/bin/pfcpiface -config /config/upf.json")
+}
+
+func teardownUP4(t *testing.T) {
 	// clear Tunnel Peers table
 	// FIXME: Temporary solution. They should be cleared by pfcpiface, see SDFAB-960
 	p4rtClient, _ := providers.ConnectP4rt("127.0.0.1:50001", p4_v1.Uint128{High: 2, Low: 1})
@@ -72,8 +77,40 @@ func teardown(t *testing.T) {
 	require.NoError(t, err, "failed to kill pfcpiface process")
 }
 
+func setup(t *testing.T, conf pfcpiface.Conf) {
+	fastpath := os.Getenv(envFastpath)
+	switch fastpath {
+	case "bess":
+		setupBESS(t, conf)
+	case "up4":
+		setupUP4(t, conf)
+	default:
+		t.Fatalf("Wrong or missing fastpath implementation to test: %v!", fastpath)
+	}
+
+	// wait for PFCP Agent to initialize, blocking
+	err := waitForPFCPAgentToStart()
+	require.NoErrorf(t, err, "failed to start PFCP Agent: %v", err)
+
+	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.1")
+	err = pfcpClient.ConnectN4("127.0.0.1")
+	require.NoErrorf(t, err, "failed to connect to UPF")
+}
+
+func teardown(t *testing.T) {
+	fastpath := os.Getenv(envFastpath)
+	switch fastpath {
+	case "bess":
+		teardownBESS(t)
+	case "up4":
+		teardownUP4(t)
+	default:
+		t.Fatalf("Wrong or missing fastpath implementation to test: %v!", fastpath)
+	}
+}
+
 func TestUPFBasedUeIPAllocation(t *testing.T) {
-	setup(t, configUPFBasedIPAllocation)
+	setup(t, ConfUP4UeIpAlloc())
 	defer teardown(t)
 
 	tc := testCase{
@@ -106,7 +143,7 @@ func TestUPFBasedUeIPAllocation(t *testing.T) {
 }
 
 func TestBasicPFCPAssociation(t *testing.T) {
-	setup(t, configDefault)
+	setup(t, ConfUP4Default())
 	defer teardown(t)
 
 	err := pfcpClient.SetupAssociation()
@@ -118,7 +155,7 @@ func TestBasicPFCPAssociation(t *testing.T) {
 }
 
 func TestSingleUEAttachAndDetach(t *testing.T) {
-	setup(t, configDefault)
+	setup(t, ConfUP4Default())
 	defer teardown(t)
 
 	// Application filtering test cases
