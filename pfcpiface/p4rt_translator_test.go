@@ -4,15 +4,18 @@
 package pfcpiface
 
 import (
+	"bytes"
+	"encoding/binary"
+	"net"
+	"strconv"
+	"strings"
 	"testing"
-
 	//nolint:staticcheck // Ignore SA1019.
 	// Upgrading to google.golang.org/protobuf/proto is not a drop-in replacement,
 	// as also P4Runtime stubs are based on the deprecated proto.
 	"github.com/golang/protobuf/proto"
-	p4 "github.com/p4lang/p4runtime/go/p4/v1"
-
 	p4ConfigV1 "github.com/p4lang/p4runtime/go/p4/config/v1"
+	p4 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/stretchr/testify/require"
 )
 
@@ -377,45 +380,90 @@ func Test_getActionParamByName(t *testing.T) {
 }
 
 func Test_withLPMField(t *testing.T) {
+	ipString := "172.16.0.1"
 
-	entry := &p4.TableEntry{
-		TableId:  39015874,
-		Priority: DefaultPriority,
+	octets := strings.Split(ipString, ".")
+	octet0, _ := strconv.Atoi(octets[0])
+	octet1, _ := strconv.Atoi(octets[1])
+	octet2, _ := strconv.Atoi(octets[2])
+	octet3, _ := strconv.Atoi(octets[3])
+
+	ipBytes := []byte{byte(octet0), byte(octet1), byte(octet2), byte(octet3)}
+
+	ipToUint32 := func(ip string) uint32 {
+		var long uint32
+		binary.Read(bytes.NewBuffer(net.ParseIP(ip).To4()), binary.BigEndian, &long)
+
+		return long
+	}
+
+	type args struct {
+		tableEntry   *p4.TableEntry
+		lpmName      string
+		value        uint32
+		prefixLength uint8
 	}
 
 	type want struct {
-		actionId   uint32
-		actionName string
+		match      *p4.FieldMatch_LPM
+		numMatches int
 	}
 
 	tests := []struct {
 		name       string
-		args       uint32
+		args       *args
 		translator *P4rtTranslator
 		want       *want
 		wantErr    bool
 	}{
 		{name: "Add LPMMatch",
-			args:       32742981,
-			translator: setupNewTranslator(mockP4INFO),
-			want: &want{actionName: "PreQosPipe.load_tunnel_param",
-				actionId: 32742981,
+			args: &args{
+				tableEntry: &p4.TableEntry{
+					TableId:  39015874,
+					Priority: DefaultPriority,
+				},
+				lpmName:      "dst_prefix",
+				value:        ipToUint32(ipString),
+				prefixLength: uint8(16),
 			},
+			translator: setupNewTranslator(mockP4INFO),
+			want: &want{
+				match: &p4.FieldMatch_LPM{
+					Value:                ipBytes,
+					PrefixLen:            16,
+					XXX_NoUnkeyedLiteral: struct{}{},
+					XXX_unrecognized:     []uint8(nil),
+					XXX_sizecache:        0,
+				},
+				numMatches: 1,
+			},
+		},
+		{name: "non existent parameter name",
+			args: &args{
+				tableEntry: &p4.TableEntry{
+					TableId:  39015874,
+					Priority: DefaultPriority,
+				},
+				lpmName:      "test",
+				value:        ipToUint32(ipString),
+				prefixLength: uint8(16),
+			},
+			translator: setupNewTranslator(mockP4INFO),
+			want:       &want{},
+			wantErr:    true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				got, err := tt.translator.getActionByID(tt.args)
+				err := tt.translator.withLPMField(tt.args.tableEntry, tt.args.lpmName, tt.args.value, tt.args.prefixLength)
 				if tt.wantErr {
 					require.Error(t, err)
 					return
 				}
-
-				require.Equal(t, tt.want.actionName, got.GetPreamble().GetName())
-				require.Equal(t, tt.want.actionId, got.GetPreamble().GetId())
+				require.Equal(t, tt.want.numMatches, len(tt.args.tableEntry.GetMatch()))
+				require.Equal(t, tt.want.match, tt.args.tableEntry.GetMatch()[0].GetLpm())
 			},
 		)
 	}
-
 }
