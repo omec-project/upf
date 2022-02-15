@@ -48,7 +48,7 @@ type counter struct {
 }
 
 type UP4 struct {
-	conf            P4rtcInfo
+	conf P4rtcInfo
 
 	host            string
 	deviceID        uint64
