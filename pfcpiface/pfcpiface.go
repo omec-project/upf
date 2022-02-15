@@ -7,12 +7,13 @@ import (
 	"context"
 	"errors"
 	"flag"
-	log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 var (
