@@ -4,6 +4,7 @@
 package metrics
 
 import (
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -18,35 +19,25 @@ type Service struct {
 }
 
 func NewPrometheusService() (*Service, error) {
-	msgCount := prometheus.NewCounterVec(prometheus.CounterOpts{
+	reg := prometheus.NewRegistry()
+
+	msgCount := promauto.With(reg).NewCounterVec(prometheus.CounterOpts{
 		Name: "pfcp_messages_total",
 		Help: "Counter for incoming and outgoing PFCP messages",
 	}, []string{"node_id", "message_type", "direction", "result"})
 
-	if err := prometheus.Register(msgCount); err != nil {
-		return nil, err
-	}
-
-	msgDuration := prometheus.NewHistogramVec(prometheus.HistogramOpts{
+	msgDuration := promauto.With(reg).NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "pfcp_messages_duration_seconds",
 		Help:    "The latency of the PFCP request",
 		Buckets: []float64{1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 1e1},
 	}, []string{"node_id", "message_type", "direction"})
 
-	if err := prometheus.Register(msgDuration); err != nil {
-		return nil, err
-	}
-
-	sessions := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	sessions := promauto.With(reg).NewGaugeVec(prometheus.GaugeOpts{
 		Name: "pfcp_sessions",
 		Help: "Number of PFCP sessions currently in the UPF",
 	}, []string{"node_id"})
 
-	if err := prometheus.Register(sessions); err != nil {
-		return nil, err
-	}
-
-	sessionDuration := prometheus.NewHistogramVec(prometheus.HistogramOpts{
+	sessionDuration := promauto.With(reg).NewHistogramVec(prometheus.HistogramOpts{
 		Name: "pfcp_session_duration_seconds",
 		Help: "The lifetime of PFCP session",
 		Buckets: []float64{
@@ -63,10 +54,6 @@ func NewPrometheusService() (*Service, error) {
 			4 * 7 * 24 * time.Hour.Seconds(),
 		},
 	}, []string{"node_id"})
-
-	if err := prometheus.Register(sessionDuration); err != nil {
-		return nil, err
-	}
 
 	s := &Service{
 		msgCount:    msgCount,

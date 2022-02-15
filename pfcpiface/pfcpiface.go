@@ -99,6 +99,8 @@ func (p *PFCPIface) Run() {
 
 // Stop sends cancellation signal to main Go routine and waits for shutdown to complete.
 func (p *PFCPIface) Stop() {
+	clearProm(p.upf, p.node)
+
 	ctxHttpShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer func() {
 		cancel()
