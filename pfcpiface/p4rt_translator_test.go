@@ -14,6 +14,7 @@ import (
 	p4ConfigV1 "github.com/p4lang/p4runtime/go/p4/config/v1"
 )
 
+//nolint:unused
 func setupNewTranslator() *P4rtTranslator {
 	p4infoBytes, _ := ioutil.ReadFile(p4InfoPath)
 
@@ -31,7 +32,11 @@ func Test_actionID(t *testing.T) {
 		translator *P4rtTranslator
 		want       uint32
 	}{
-		{},
+		{name: "get NoAction",
+			args:       "NoAction",
+			translator: setupNewTranslator(),
+			want:       uint32(21257015),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(
@@ -49,7 +54,11 @@ func Test_tableID(t *testing.T) {
 		translator *P4rtTranslator
 		want       uint32
 	}{
-		{},
+		{name: "Existing table",
+			args:       "PreQosPipe.Routing.routes_v4",
+			translator: setupNewTranslator(),
+			want:       uint32(39015874),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(
@@ -78,7 +87,18 @@ func Test_getCounterByName(t *testing.T) {
 		want    *want
 		wantErr bool
 	}{
-		{},
+		{name: "Existing counter",
+			args: &args{
+				counterName: "PreQosPipe.pre_qos_counter",
+				counterID:   uint32(315693181),
+				translator:  setupNewTranslator(),
+			},
+			want: &want{
+				counterName: "PreQosPipe.pre_qos_counter",
+				counterID:   uint32(315693181),
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(
@@ -107,7 +127,18 @@ func Test_getTableByID(t *testing.T) {
 		want    *want
 		wantErr bool
 	}{
-		{},
+		{name: "Existing table",
+			args: &args{
+				tableID:    39015874,
+				tableName:  "PreQosPipe.Routing.routes_v4",
+				translator: setupNewTranslator(),
+			},
+			want: &want{
+				tableID:   39015874,
+				tableName: "PreQosPipe.Routing.routes_v4",
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(
