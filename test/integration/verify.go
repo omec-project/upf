@@ -267,6 +267,8 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, expectedVal
 	require.Equal(t, len(expected.Action.GetAction().Params), len(entries[0].Action.GetAction().Params),
 		"Number of action params for terminations_uplink does not equal expected")
 	require.Equal(t, expected.Match, entries[0].Match, "PreQosPipe.terminations_uplink match fields do not equal expected")
+	// check if counter index doesn't equal 0
+	require.NotEqual(t, []byte{0}, entries[0].Action.GetAction().Params[0].Value)
 	if expectedValues.tc != 0 {
 		require.Equal(t, expected.Action.GetAction().Params[1], entries[0].Action.GetAction().Params[1], "PreQosPipe.terminations_uplink action params do not equal expected")
 	}
@@ -278,6 +280,8 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, expectedVal
 	require.Equal(t, expected.Action.GetAction().ActionId, entries[0].Action.GetAction().ActionId, "PreQosPipe.terminations_downlink action does not equal expected")
 	require.Equal(t, len(expected.Action.GetAction().Params), len(entries[0].Action.GetAction().Params),
 		"Number of action params for terminations_downlink does not equal expected")
+	// check if counter index doesn't equal 0
+	require.NotEqual(t, []byte{0}, entries[0].Action.GetAction().Params[0].Value)
 
 	require.Equal(t, expected.Match, entries[0].Match, "PreQosPipe.terminations_downlink match fields do not equal expected")
 	if afterModification {
