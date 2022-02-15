@@ -109,6 +109,32 @@ func teardown(t *testing.T) {
 	}
 }
 
+func verifyEntries(t *testing.T, testcase *testCase, afterModification bool) {
+	fastpath := os.Getenv(envFastpath)
+	switch fastpath {
+	// TODO: add verify() for BESS
+	//  case "bess":
+	//	  teardownBESS(t)
+	case "up4":
+		verifyP4RuntimeEntries(t, testcase.input, testcase.expected, afterModification)
+	default:
+		t.Fatalf("Wrong or missing fastpath implementation to test: %v!", fastpath)
+	}
+}
+
+func verifyNoEntries(t *testing.T) {
+	fastpath := os.Getenv(envFastpath)
+	switch fastpath {
+	// TODO: add verify() for BESS
+	//  case "bess":
+	//	  teardownBESS(t)
+	case "up4":
+		verifyNoP4RuntimeEntries(t)
+	default:
+		t.Fatalf("Wrong or missing fastpath implementation to test: %v!", fastpath)
+	}
+}
+
 func TestUPFBasedUeIPAllocation(t *testing.T) {
 	setup(t, ConfUP4UeIpAlloc())
 	defer teardown(t)
@@ -326,7 +352,7 @@ func testUEAttachDetach(t *testing.T, testcase *testCase) {
 	sess, err := pfcpClient.EstablishSession(pdrs, fars, qers)
 	require.NoErrorf(t, err, "failed to establish PFCP session")
 
-	verifyP4RuntimeEntries(t, testcase.input, testcase.expected, false)
+	verifyEntries(t, testcase, false)
 
 	err = pfcpClient.ModifySession(sess, nil, []*ie.IE{
 		session.NewFARBuilder().
@@ -335,7 +361,7 @@ func testUEAttachDetach(t *testing.T, testcase *testCase) {
 			WithTEID(testcase.input.dlTEID).WithDownlinkIP(testcase.input.nbAddress).BuildFAR(),
 	}, nil)
 
-	verifyP4RuntimeEntries(t, testcase.input, testcase.expected, true)
+	verifyEntries(t, testcase, true)
 
 	err = pfcpClient.DeleteSession(sess)
 	require.NoErrorf(t, err, "failed to delete PFCP session")
@@ -343,7 +369,7 @@ func testUEAttachDetach(t *testing.T, testcase *testCase) {
 	err = pfcpClient.TeardownAssociation()
 	require.NoErrorf(t, err, "failed to gracefully release PFCP association")
 
-	verifyNoP4RuntimeEntries(t)
+	verifyNoEntries(t)
 
 	// clear Applications table
 	// FIXME: Temporary solution. They should be cleared by pfcpiface, see SDFAB-960
