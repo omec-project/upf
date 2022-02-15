@@ -31,15 +31,11 @@ type PFCPIface struct {
 	fp      fastPath
 	upf     *upf
 	httpSrv *http.Server
-
-	cancel context.CancelFunc
-	done   chan struct{}
 }
 
 func NewPFCPIface(conf Conf) *PFCPIface {
 	pfcpIface := &PFCPIface{
 		conf: conf,
-		done: make(chan struct{}),
 	}
 
 	if conf.EnableP4rt {
@@ -48,6 +44,12 @@ func NewPFCPIface(conf Conf) *PFCPIface {
 		pfcpIface.fp = &bess{}
 	}
 
+	httpPort := "8080"
+	if conf.CPIface.HTTPPort != "" {
+		httpPort = conf.CPIface.HTTPPort
+	}
+
+	pfcpIface.httpSrv = &http.Server{Addr: ":" + httpPort, Handler: nil}
 	pfcpIface.upf = NewUPF(&conf, pfcpIface.fp)
 
 	return pfcpIface
@@ -67,14 +69,10 @@ func (p *PFCPIface) Run() {
 		}
 	}
 
+	p.node = NewPFCPNode(p.upf)
+
 	setupConfigHandler(p.upf)
-
-	httpPort := "8080"
-	if p.conf.CPIface.HTTPPort != "" {
-		httpPort = p.conf.CPIface.HTTPPort
-	}
-
-	p.httpSrv = &http.Server{Addr: ":" + httpPort, Handler: nil}
+	setupProm(p.upf, p.node)
 
 	go func() {
 		if err := p.httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -83,14 +81,6 @@ func (p *PFCPIface) Run() {
 
 		log.Infoln("http server closed")
 	}()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	p.cancel = cancel
-
-	p.node = NewPFCPNode(ctx, p.upf)
-	go p.node.Serve()
-
-	setupProm(p.upf, p.node)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
@@ -103,16 +93,11 @@ func (p *PFCPIface) Run() {
 	}()
 
 	// blocking
-	<-p.done
+	p.node.Serve()
 }
 
 // Stop sends cancellation signal to main Go routine and waits for shutdown to complete.
 func (p *PFCPIface) Stop() {
-	p.cancel()
-
-	// Wait for node shutdown before http shutdown
-	p.node.Done()
-
 	ctxHttpShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer func() {
 		cancel()
@@ -122,8 +107,8 @@ func (p *PFCPIface) Stop() {
 		log.Errorln("Failed to shutdown http: ", err)
 	}
 
-	p.upf.exit()
+	p.node.Stop()
 
-	// unblock main Goroutine
-	close(p.done)
+	// Wait for PFCP node shutdown
+	p.node.Done()
 }
