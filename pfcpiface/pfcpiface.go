@@ -7,12 +7,12 @@ import (
 	"context"
 	"errors"
 	"flag"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-
-	log "github.com/sirupsen/logrus"
+	"time"
 )
 
 var (
@@ -27,13 +27,19 @@ func init() {
 type PFCPIface struct {
 	conf Conf
 
-	fp  fastPath
-	upf *upf
+	node    *PFCPNode
+	fp      fastPath
+	upf     *upf
+	httpSrv *http.Server
+
+	cancel context.CancelFunc
+	done   chan struct{}
 }
 
 func NewPFCPIface(conf Conf) *PFCPIface {
 	pfcpIface := &PFCPIface{
 		conf: conf,
+		done: make(chan struct{}),
 	}
 
 	if conf.EnableP4rt {
@@ -68,10 +74,10 @@ func (p *PFCPIface) Run() {
 		httpPort = p.conf.CPIface.HTTPPort
 	}
 
-	httpSrv := &http.Server{Addr: ":" + httpPort, Handler: nil}
+	p.httpSrv = &http.Server{Addr: ":" + httpPort, Handler: nil}
 
 	go func() {
-		if err := httpSrv.ListenAndServe(); err != nil && errors.Is(err, http.ErrServerClosed) {
+		if err := p.httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalln("http server failed", err)
 		}
 
@@ -79,25 +85,45 @@ func (p *PFCPIface) Run() {
 	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
+	p.cancel = cancel
 
-	node := NewPFCPNode(ctx, p.upf)
-	go node.Serve()
+	p.node = NewPFCPNode(ctx, p.upf)
+	go p.node.Serve()
 
-	setupProm(p.upf, node)
+	setupProm(p.upf, p.node)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
 	signal.Notify(sig, syscall.SIGTERM)
-	<-sig
 
-	cancel()
+	go func() {
+		oscall := <-sig
+		log.Infof("System call received: %+v", oscall)
+		p.Stop()
+	}()
+
+	// blocking
+	<-p.done
+}
+
+// Stop sends cancellation signal to main Go routine and waits for shutdown to complete.
+func (p *PFCPIface) Stop() {
+	p.cancel()
 
 	// Wait for node shutdown before http shutdown
-	node.Done()
+	p.node.Done()
 
-	if err := httpSrv.Shutdown(context.Background()); err != nil {
-		log.Errorln("Failed to shutdown http:", err)
+	ctxHttpShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer func() {
+		cancel()
+	}()
+
+	if err := p.httpSrv.Shutdown(ctxHttpShutdown); err != nil {
+		log.Errorln("Failed to shutdown http: ", err)
 	}
 
 	p.upf.exit()
+
+	// unblock main Goroutine
+	close(p.done)
 }
