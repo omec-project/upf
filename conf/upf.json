@@ -1,8 +1,9 @@
 {
-    "": "Vdev or sim support. Enable `\"mode\": \"af_xdp\"` to enable AF_XDP mode, or `\"mode\": \"af_packet\"` to enable AF_PACKET mode, or `\"mode\": \"sim\"` to generate synthetic traffic from BESS's Source module",
+    "": "Vdev or sim support. Enable `\"mode\": \"af_xdp\"` to enable AF_XDP mode, or `\"mode\": \"af_packet\"` to enable AF_PACKET mode, `\"mode\": \"sim\"` to generate synthetic traffic from BESS's Source module or \"mode\": \"\" when running with UP4",
     "": "mode: af_xdp",
     "": "mode: af_packet",
     "": "mode: sim",
+    "mode": "dpdk",
 
     "table_sizes": {
         "": "Example sizes based on sim mode and 50K sessions. Customize as per your control plane",
@@ -145,9 +146,8 @@
 
     "": "p4rtc interface settings",
     "p4rtciface": {
-    "access_ip": "172.17.0.1/32",
-    "p4rtc_server": "onos",
-    "p4rtc_port": "51001",
-    "ue_ip_pool": "10.250.0.0/24"
+        "access_ip": "172.17.0.1/32",
+        "p4rtc_server": "onos",
+        "p4rtc_port": "51001"
     }
 }

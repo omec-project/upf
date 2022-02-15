@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2020 Intel Corporation
 
-package main
+package pfcpiface
 
 import (
 	"fmt"
@@ -9,6 +9,11 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
 )
+
+var qosLevelName = map[QosLevel]string{
+	ApplicationQos: "application",
+	SessionQos:     "session",
+}
 
 type qer struct {
 	qerID    uint32
@@ -25,10 +30,15 @@ type qer struct {
 }
 
 func (q qer) String() string {
+	qosLevel, ok := qosLevelName[q.qosLevel]
+	if !ok {
+		qosLevel = "invalid"
+	}
+
 	return fmt.Sprintf("QER(id=%v, F-SEID=%v, F-SEID IP=%v, QFI=%v, "+
-		"uplinkMBR=%v, downlinkMBR=%v, uplinkGBR=%v, downlinkGBR=%v, applicationQER=%v, sessionQER=%v)",
+		"uplinkMBR=%v, downlinkMBR=%v, uplinkGBR=%v, downlinkGBR=%v, type=%s)",
 		q.qerID, q.fseID, q.fseidIP, q.qfi, q.ulMbr, q.dlMbr, q.ulGbr, q.dlGbr,
-		q.qosLevel == ApplicationQos, q.qosLevel == SessionQos)
+		qosLevel)
 }
 
 func (q *qer) parseQER(ie1 *ie.IE, seid uint64) error {

@@ -4,12 +4,13 @@
 package integration
 
 import (
-	p4rtc "github.com/antoninbas/p4runtime-go-client/pkg/client"
-	"github.com/antoninbas/p4runtime-go-client/pkg/util/conversion"
-	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
+	"fmt"
+
 	"net"
 	"testing"
 	"time"
+
+	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim"
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim/session"
@@ -18,86 +19,93 @@ import (
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
+const (
+	configDefault              = "default.json"
+	configUPFBasedIPAllocation = "ue_ip_alloc.json"
+)
+
 var (
 	pfcpClient *pfcpsim.PFCPClient
 )
 
+type testContext struct {
+	UPFBasedUeIPAllocation bool
+}
+
 type testCase struct {
+	ctx      testContext
 	input    *pfcpSessionData
 	expected p4RtValues
-	desc     string
+
+	desc string
 }
 
-func init() {
-	if err := initMockUP4(); err != nil {
-		panic("failed to initialize mock-up4")
-	}
+func setup(t *testing.T, pfcpAgentConfig string) {
+	providers.RunDockerCommandAttach("pfcpiface",
+		fmt.Sprintf("/bin/pfcpiface -config /config/%s", pfcpAgentConfig))
 
-	providers.RunDockerCommand("pfcpiface", "/bin/pfcpiface -config /config.json")
+	// wait for PFCP Agent to initialize, blocking
+	err := waitForPFCPAgentToStart()
+	require.NoErrorf(t, err, "failed to start PFCP Agent: %v", err)
 
-	// wait for PFCP Agent to initialize
-	time.Sleep(time.Second * 3)
-}
-
-func initMockUP4() (err error) {
-	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", p4_v1.Uint128{High: 0, Low: 1})
-	if err != nil {
-		return err
-	}
-	defer providers.DisconnectP4rt()
-
-	_, err = p4rtClient.SetFwdPipe("../../conf/p4/bin/bmv2.json", "../../conf/p4/bin/p4info.txt", 0)
-	if err != nil {
-		return err
-	}
-
-	ipAddr, err := conversion.IpToBinary(upfN3Address)
-	if err != nil {
-		return err
-	}
-
-	srcIface, err := conversion.UInt32ToBinary(srcIfaceAccess, 1)
-	if err != nil {
-		return err
-	}
-
-	direction, err := conversion.UInt32ToBinary(directionUplink, 1)
-	if err != nil {
-		return err
-	}
-
-	sliceID, err := conversion.UInt32ToBinary(defaultSliceID, 1)
-	if err != nil {
-		return err
-	}
-
-	te := p4rtClient.NewTableEntry("PreQosPipe.interfaces", []p4rtc.MatchInterface{&p4rtc.LpmMatch{
-		Value: ipAddr,
-		PLen:  32,
-	}}, p4rtClient.NewTableActionDirect("PreQosPipe.set_source_iface",
-		[][]byte{srcIface, direction, sliceID}), nil)
-
-	if err := p4rtClient.InsertTableEntry(te); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func setup(t *testing.T) {
 	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.1")
-	err := pfcpClient.ConnectN4("127.0.0.1")
+	err = pfcpClient.ConnectN4("127.0.0.1")
 	require.NoErrorf(t, err, "failed to connect to UPF")
 }
 
 func teardown(t *testing.T) {
+	// clear Tunnel Peers table
+	// FIXME: Temporary solution. They should be cleared by pfcpiface, see SDFAB-960
+	p4rtClient, _ := providers.ConnectP4rt("127.0.0.1:50001", p4_v1.Uint128{High: 2, Low: 1})
+	defer providers.DisconnectP4rt()
+	entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.tunnel_peers")
+	for _, entry := range entries {
+		p4rtClient.DeleteTableEntry(entry)
+	}
+
 	if pfcpClient != nil {
 		pfcpClient.DisconnectN4()
 	}
+
+	// kill pfcpiface process inside container
+	_, _, _, err := providers.RunDockerExecCommand("pfcpiface", "killall -9 pfcpiface")
+	require.NoError(t, err, "failed to kill pfcpiface process")
+}
+
+func TestUPFBasedUeIPAllocation(t *testing.T) {
+	setup(t, configUPFBasedIPAllocation)
+	defer teardown(t)
+
+	tc := testCase{
+		ctx: testContext{
+			UPFBasedUeIPAllocation: true,
+		},
+		input: &pfcpSessionData{
+			nbAddress:    nodeBAddress,
+			ueAddress:    ueAddress,
+			upfN3Address: upfN3Address,
+			sdfFilter:    "permit out ip from any to assigned",
+			ulTEID:       15,
+			dlTEID:       16,
+			QFI:          0x09,
+		},
+		expected: p4RtValues{
+			// first IP address from pool configured in ue_ip_alloc.json
+			ueAddress: "10.250.0.1",
+			// no application filtering rule expected
+			appID:        0,
+			tunnelPeerID: 2,
+		},
+		desc: "UPF-based UE IP allocation",
+	}
+
+	t.Run(tc.desc, func(t *testing.T) {
+		testUEAttachDetach(t, fillExpected(&tc))
+	})
 }
 
 func TestBasicPFCPAssociation(t *testing.T) {
-	setup(t)
+	setup(t, configDefault)
 	defer teardown(t)
 
 	err := pfcpClient.SetupAssociation()
@@ -109,7 +117,7 @@ func TestBasicPFCPAssociation(t *testing.T) {
 }
 
 func TestSingleUEAttachAndDetach(t *testing.T) {
-	setup(t)
+	setup(t, configDefault)
 	defer teardown(t)
 
 	// Application filtering test cases
@@ -119,9 +127,10 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				nbAddress:    nodeBAddress,
 				ueAddress:    ueAddress,
 				upfN3Address: upfN3Address,
-				sdfFilter:    "permit out udp from any to assigned 80-80",
+				sdfFilter:    "permit out udp from any 80-80 to assigned",
 				ulTEID:       15,
 				dlTEID:       16,
+				QFI:          0x9,
 			},
 			expected: p4RtValues{
 				appFilter: appFilter{
@@ -135,17 +144,17 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				appID:        1,
 				tunnelPeerID: 2,
 			},
-			desc: "APPLICATION FILTERING permit out udp from any to assigned 80-80",
+			desc: "APPLICATION FILTERING permit out udp from any 80-80 to assigned",
 		},
 		{
 			input: &pfcpSessionData{
 				nbAddress:    nodeBAddress,
 				ueAddress:    ueAddress,
 				upfN3Address: upfN3Address,
-				// TODO: use wider port range once multi port ranges are supported
-				sdfFilter: "permit out udp from 192.168.1.1/32 to assigned 80-80",
-				ulTEID:    15,
-				dlTEID:    16,
+				sdfFilter:    "permit out udp from 192.168.1.1/32 to assigned 80-400",
+				ulTEID:       15,
+				dlTEID:       16,
+				QFI:          0x9,
 			},
 			expected: p4RtValues{
 				appFilter: appFilter{
@@ -153,7 +162,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 					appIP:        net.ParseIP("192.168.1.1"),
 					appPrefixLen: 32,
 					appPort: portRange{
-						80, 80,
+						80, 400,
 					},
 				},
 				// FIXME: there is a dependency on previous test because pfcpiface doesn't clear application IDs properly
@@ -171,6 +180,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				sdfFilter:    "permit out ip from any to assigned",
 				ulTEID:       15,
 				dlTEID:       16,
+				QFI:          0x9,
 			},
 			expected: p4RtValues{
 				// no application filtering rule expected
@@ -188,7 +198,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				ulTEID:       15,
 				dlTEID:       16,
 
-				QFI:              0x09,
+				QFI:              0x11,
 				uplinkAppQerID:   1,
 				downlinkAppQerID: 2,
 				sessQerID:        4,
@@ -209,7 +219,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				appID:        1,
 				tunnelPeerID: 2,
 			},
-			desc: "QER_METERING 4G case - session QER, 2 app QERs",
+			desc: "QER_METERING - 1 session QER, 2 app QERs",
 		},
 		{
 			input: &pfcpSessionData{
@@ -219,7 +229,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				sdfFilter:    defaultSDFFilter,
 				ulTEID:       15,
 				dlTEID:       16,
-				QFI:          0x09,
+				QFI:          0x11,
 
 				// indicates 5G case (no application QERs, only session QER)
 				uplinkAppQerID:   0,
@@ -241,7 +251,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				appID:        1,
 				tunnelPeerID: 2,
 			},
-			desc: "QER_METERING 5G case - session QER only",
+			desc: "QER_METERING - session QER only",
 		},
 		{
 			input: &pfcpSessionData{
@@ -280,9 +290,17 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			testUEAttachDetach(t, &tc)
+			testUEAttachDetach(t, fillExpected(&tc))
 		})
 	}
+}
+
+func fillExpected(tc *testCase) *testCase {
+	if tc.expected.ueAddress == "" {
+		tc.expected.ueAddress = tc.input.ueAddress
+	}
+
+	return tc
 }
 
 func testUEAttachDetach(t *testing.T, testcase *testCase) {
@@ -299,14 +317,35 @@ func testUEAttachDetach(t *testing.T, testcase *testCase) {
 			WithFARID(1).
 			AddQERID(4).
 			AddQERID(1).BuildPDR(),
-		session.NewPDRBuilder().MarkAsDownlink().
-			WithMethod(session.Create).
-			WithID(2).
-			WithUEAddress(testcase.input.ueAddress).
-			WithSDFFilter(testcase.input.sdfFilter).
-			WithFARID(2).
-			AddQERID(4).
-			AddQERID(2).BuildPDR(),
+	}
+
+	if !testcase.ctx.UPFBasedUeIPAllocation {
+		pdrs = append(pdrs,
+			session.NewPDRBuilder().MarkAsDownlink().
+				WithMethod(session.Create).
+				WithID(2).
+				WithUEAddress(testcase.input.ueAddress).
+				WithSDFFilter(testcase.input.sdfFilter).
+				WithFARID(2).
+				AddQERID(4).
+				AddQERID(2).BuildPDR())
+	} else {
+		pdrs = append(pdrs,
+			// TODO: should be replaced by builder?
+			ie.NewCreatePDR(
+				ie.NewPDRID(2),
+				ie.NewPrecedence(testcase.input.precedence),
+				ie.NewPDI(
+					ie.NewSourceInterface(ie.SrcInterfaceCore),
+					// indicate UP to allocate UE IP Address
+					ie.NewUEIPAddress(0x10, "", "", 0, 0),
+					ie.NewSDFFilter(testcase.input.sdfFilter, "", "", "", 1),
+				),
+				ie.NewFARID(2),
+				ie.NewQERID(2),
+				ie.NewQERID(4),
+			),
+		)
 	}
 
 	fars := []*ie.IE{
@@ -376,10 +415,14 @@ func testUEAttachDetach(t *testing.T, testcase *testCase) {
 
 	verifyNoP4RuntimeEntries(t, testcase.expected)
 
-	// clear Tunnel Peers and Applications tables
+	// clear Applications table
 	// FIXME: Temporary solution. They should be cleared by pfcpiface, see SDFAB-960
 	p4rtClient, _ := providers.ConnectP4rt("127.0.0.1:50001", p4_v1.Uint128{High: 2, Low: 1})
-	defer providers.DisconnectP4rt()
+	defer func() {
+		providers.DisconnectP4rt()
+		// give pfcpiface time to become master controller again
+		time.Sleep(3 * time.Second)
+	}()
 	entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.applications")
 	for _, entry := range entries {
 		p4rtClient.DeleteTableEntry(entry)

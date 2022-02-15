@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2021 Open Networking Foundation
-package main
+package pfcpiface
 
 import (
 	"errors"
@@ -37,10 +37,6 @@ func ErrInvalidArgument(name string, value interface{}) error {
 
 func ErrInvalidArgumentWithReason(name string, value interface{}, reason string) error {
 	return fmt.Errorf("%w '%s'=%v (%s)", errInvalidArgument, name, value, reason)
-}
-
-func ErrOperationFailed(operation interface{}) error {
-	return fmt.Errorf("%v %w", operation, errFailed)
 }
 
 func ErrOperationFailedWithReason(operation interface{}, reason string) error {
