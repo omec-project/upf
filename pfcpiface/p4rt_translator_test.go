@@ -104,51 +104,67 @@ func Test_getCounterByName(t *testing.T) {
 	type args struct {
 		counterName string
 		counterID   uint32
+		translator  *P4rtTranslator
+	}
+
+	type want struct {
+		counterName string
+		counterID   uint32
 	}
 
 	tests := []struct {
-		name       string
-		translator *P4rtTranslator
-		want       *args
-		wantErr    bool
+		name    string
+		args    *args
+		want    *want
+		wantErr bool
 	}{
 		{name: "Existing counter",
-			translator: setupNewTranslator(mockP4INFO),
-			want: &args{
+			args: &args{
+				counterName: "PreQosPipe.pre_qos_counter",
+				counterID:   uint32(315693181),
+				translator:  setupNewTranslator(mockP4INFO),
+			},
+			want: &want{
 				counterName: "PreQosPipe.pre_qos_counter",
 				counterID:   uint32(315693181),
 			},
 			wantErr: false,
 		},
 		{name: "Existing counter",
-			translator: setupNewTranslator(mockP4INFO),
-			want: &args{
+			args: &args{
+				counterName: "PostQosPipe.post_qos_counter",
+				counterID:   uint32(302958180),
+				translator:  setupNewTranslator(mockP4INFO),
+			},
+			want: &want{
 				counterName: "PostQosPipe.post_qos_counter",
 				counterID:   uint32(302958180),
 			},
 			wantErr: false,
 		},
 		{name: "Non existing counter",
-			want: &args{
+			args: &args{
 				counterName: "testttt",
-				counterID:   0,
+				counterID:   uint32(0),
+				translator:  setupNewTranslator(mockP4INFO),
 			},
-			translator: setupNewTranslator(mockP4INFO),
-			wantErr:    true,
+			want:    &want{},
+			wantErr: true,
 		},
 		{name: "Non existing counter",
-			want: &args{
-				counterName: "testtt",
-				counterID:   0,
+			args: &args{
+				counterName: "testttt",
+				counterID:   uint32(0),
+				translator:  setupNewTranslator(secondMockP4INFO),
 			},
-			translator: setupNewTranslator(secondMockP4INFO),
-			wantErr:    true,
+			want:    &want{},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				got, err := tt.translator.getCounterByName(tt.want.counterName)
+				got, err := tt.args.translator.getCounterByName(tt.want.counterName)
 				if tt.wantErr {
 					require.Error(t, err)
 				} else {
@@ -162,44 +178,59 @@ func Test_getCounterByName(t *testing.T) {
 
 func Test_getTableByID(t *testing.T) {
 	type args struct {
+		tableID    uint32
+		tableName  string
+		translator *P4rtTranslator
+	}
+
+	type want struct {
 		tableID   uint32
 		tableName string
 	}
 
 	tests := []struct {
-		name       string
-		translator *P4rtTranslator
-		want       *args
-		wantErr    bool
+		name    string
+		args    *args
+		want    *want
+		wantErr bool
 	}{
 		{name: "Existing table",
-			translator: setupNewTranslator(mockP4INFO),
-			want: &args{
+			args: &args{
+				tableID:    39015874,
+				tableName:  "PreQosPipe.Routing.routes_v4",
+				translator: setupNewTranslator(mockP4INFO),
+			},
+			want: &want{
 				tableID:   39015874,
 				tableName: "PreQosPipe.Routing.routes_v4",
 			},
 			wantErr: false,
 		},
 		{name: "Existing table",
-			translator: setupNewTranslator(secondMockP4INFO),
-			want: &args{
+			args: &args{
+				tableID:    33589124,
+				tableName:  "forward",
+				translator: setupNewTranslator(secondMockP4INFO),
+			},
+			want: &want{
 				tableID:   33589124,
 				tableName: "forward",
 			},
 			wantErr: false,
 		},
 		{name: "non existing table",
-			translator: setupNewTranslator(mockP4INFO),
-			want: &args{
-				tableID: 999999,
+			args: &args{
+				tableID:    999999,
+				translator: setupNewTranslator(mockP4INFO),
 			},
+			want:    &want{},
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				got, err := tt.translator.getTableByID(tt.want.tableID)
+				got, err := tt.args.translator.getTableByID(tt.want.tableID)
 				if tt.wantErr {
 					require.Error(t, err)
 				} else {
@@ -281,36 +312,43 @@ func Test_getMatchFieldByName(t *testing.T) {
 }
 
 func Test_getActionbyID(t *testing.T) {
+	type args struct {
+		actionID   uint32
+		translator *P4rtTranslator
+	}
 	type want struct {
 		actionId   uint32
 		actionName string
 	}
 
 	tests := []struct {
-		name       string
-		args       uint32
-		translator *P4rtTranslator
-		want       *want
-		wantErr    bool
+		name    string
+		args    *args
+		want    *want
+		wantErr bool
 	}{
 		{name: "get existing action",
-			args:       32742981,
-			translator: setupNewTranslator(mockP4INFO),
+			args: &args{
+				actionID:   32742981,
+				translator: setupNewTranslator(mockP4INFO),
+			},
 			want: &want{actionName: "PreQosPipe.load_tunnel_param",
 				actionId: 32742981,
 			},
 		},
 		{name: "non existing action",
-			args:       999999,
-			translator: setupNewTranslator(mockP4INFO),
-			want:       nil,
-			wantErr:    true,
+			args: &args{
+				actionID:   9999999,
+				translator: setupNewTranslator(mockP4INFO),
+			},
+			want:    nil,
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				got, err := tt.translator.getActionByID(tt.args)
+				got, err := tt.args.translator.getActionByID(tt.args.actionID)
 				if tt.wantErr {
 					require.Error(t, err)
 					return
@@ -393,7 +431,8 @@ func Test_withLPMField(t *testing.T) {
 
 	ipToUint32 := func(ip string) uint32 {
 		var long uint32
-		binary.Read(bytes.NewBuffer(net.ParseIP(ip).To4()), binary.BigEndian, &long)
+		err := binary.Read(bytes.NewBuffer(net.ParseIP(ip).To4()), binary.BigEndian, &long)
+		require.NoError(t, err)
 
 		return long
 	}
