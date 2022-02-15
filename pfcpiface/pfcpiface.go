@@ -33,8 +33,8 @@ type PFCPIface struct {
 	upf     *upf
 	httpSrv *http.Server
 
-	stop    context.CancelFunc
-	wg      *sync.WaitGroup
+	stop context.CancelFunc
+	wg   *sync.WaitGroup
 }
 
 func NewPFCPIface(conf Conf) *PFCPIface {
