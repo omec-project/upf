@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2022 Open Networking Foundation
+
 package pfcpiface
 
 import (
@@ -7,6 +10,7 @@ import (
 	// Upgrading to google.golang.org/protobuf/proto is not a drop-in replacement,
 	// as also P4Runtime stubs are based on the deprecated proto.
 	"github.com/golang/protobuf/proto"
+	p4 "github.com/p4lang/p4runtime/go/p4/v1"
 
 	p4ConfigV1 "github.com/p4lang/p4runtime/go/p4/config/v1"
 	"github.com/stretchr/testify/require"
@@ -372,6 +376,46 @@ func Test_getActionParamByName(t *testing.T) {
 	}
 }
 
-func Test_(t *testing.T) {
+func Test_withLPMField(t *testing.T) {
+
+	entry := &p4.TableEntry{
+		TableId:  39015874,
+		Priority: DefaultPriority,
+	}
+
+	type want struct {
+		actionId   uint32
+		actionName string
+	}
+
+	tests := []struct {
+		name       string
+		args       uint32
+		translator *P4rtTranslator
+		want       *want
+		wantErr    bool
+	}{
+		{name: "Add LPMMatch",
+			args:       32742981,
+			translator: setupNewTranslator(mockP4INFO),
+			want: &want{actionName: "PreQosPipe.load_tunnel_param",
+				actionId: 32742981,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				got, err := tt.translator.getActionByID(tt.args)
+				if tt.wantErr {
+					require.Error(t, err)
+					return
+				}
+
+				require.Equal(t, tt.want.actionName, got.GetPreamble().GetName())
+				require.Equal(t, tt.want.actionId, got.GetPreamble().GetId())
+			},
+		)
+	}
 
 }
