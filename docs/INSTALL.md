@@ -129,7 +129,7 @@ To start UPF-EPC in simulation mode:
 
 3. Insert rules into relevant PDR and FAR tables
 
-    gRPC sim mode
+    Use gRPC sim mode to directly install PFCP forwarding rules via gRPC API (works only for BESS)
 
     ```bash
     docker exec -ti bess-pfcpiface pfcpiface -config /conf/upf.json -simulate create
@@ -137,11 +137,8 @@ To start UPF-EPC in simulation mode:
 
     OR
 
-    PFCP sim mode
+    Use the [pfcpsim](https://github.com/omec-project/pfcpsim) tool to generate PFCP messages towards the PFCP Agent.
 
-    ```bash
-    docker exec -ti bess-pfcpiface pfcpiface -config /conf/upf.json -pfcpsim
-    ```
 
 4. (optional) Observe the pipeline in GUI
 
