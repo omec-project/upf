@@ -1182,9 +1182,13 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 			qfi = relatedQER.qfi
 		}
 
-		// FIXME: get TC from QFI->TC mapping
+		tc, exists := up4.conf.QFIToTC[relatedQER.qfi]
+		if !exists {
+			tc = NoTC
+		}
+
 		terminationsEntry, err := up4.p4RtTranslator.BuildTerminationsTableEntry(pdr, appMeter, far,
-			applicationID, qfi, uint8(0))
+			applicationID, qfi, tc)
 		if err != nil {
 			return ErrOperationFailedWithReason("build P4rt table entry for Terminations table", err.Error())
 		}
