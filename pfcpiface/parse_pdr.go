@@ -301,7 +301,7 @@ func needAllocIP(ueIPaddr *ie.UEIPAddressFields) bool {
 
 func (af applicationFilter) String() string {
 	return fmt.Sprintf("ApplicationFilter(srcIP=%v/%x, dstIP=%v/%x, proto=%v/%x, srcPort=%v, dstPort=%v)",
-		af.srcIP, af.srcIPMask, af.dstIP, af.dstIPMask, af.proto,
+		int2ip(af.srcIP), af.srcIPMask, int2ip(af.dstIP), af.dstIPMask, af.proto,
 		af.protoMask, af.srcPortRange, af.dstPortRange)
 }
 
@@ -309,7 +309,7 @@ func (p pdr) String() string {
 	return fmt.Sprintf("PDR(id=%v, F-SEID=%v, srcIface=%v, tunnelIPv4Dst=%v/%x, "+
 		"tunnelTEID=%v/%x, ueAddress=%v, applicationFilter=%v, precedence=%v, F-SEID IP=%v, "+
 		"counterID=%v, farID=%v, qerIDs=%v, needDecap=%v, allocIPFlag=%v)",
-		p.pdrID, p.fseID, p.srcIface, p.tunnelIP4Dst, p.tunnelIP4DstMask,
+		p.pdrID, p.fseID, p.srcIface, int2ip(p.tunnelIP4Dst), p.tunnelIP4DstMask,
 		p.tunnelTEID, p.tunnelTEIDMask, int2ip(p.ueAddress), p.appFilter, p.precedence,
 		p.fseidIP, p.ctrID, p.farID, p.qerIDList, p.needDecap, p.allocIPFlag)
 }
