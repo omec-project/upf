@@ -27,9 +27,9 @@ func init() {
 type PFCPIface struct {
 	conf Conf
 
-	node    *PFCPNode
-	fp      fastPath
-	upf     *upf
+	node *PFCPNode
+	fp   fastPath
+	upf  *upf
 
 	httpSrv      *http.Server
 	httpEndpoint string
