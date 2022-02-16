@@ -34,7 +34,6 @@ func getP4InfoFile(t *testing.T) *p4ConfigV1.P4Info {
 }
 
 func Test_actionID(t *testing.T) {
-
 	var p4Config p4ConfigV1.P4Info
 	_ = proto.UnmarshalText(mockImmutableP4Info, &p4Config)
 
