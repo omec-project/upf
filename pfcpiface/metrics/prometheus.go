@@ -94,7 +94,7 @@ func (s *Service) SaveSessions(sess *Session) {
 	s.sessionDuration.WithLabelValues(sess.NodeID).Observe(sess.Duration)
 }
 
-func (s* Service) Stop() error {
+func (s *Service) Stop() error {
 	prometheus.Unregister(s.msgCount)
 	prometheus.Unregister(s.msgDuration)
 	prometheus.Unregister(s.sessions)

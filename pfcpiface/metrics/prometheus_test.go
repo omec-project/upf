@@ -1,8 +1,12 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2022-present Open Networking Foundation
+
 package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+
 	"testing"
 )
 
@@ -15,8 +19,8 @@ func TestNewPrometheusService(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	// TODO: we currently need to reset the DefaultRegisterer between tests.
-	// Use custom registries to avoid global state.
+	// TODO: we currently need to reset the DefaultRegisterer between tests, as some leave the
+	// 		 the registry in a bad state. Use custom registries to avoid global state.
 	prometheus.DefaultRegisterer = prometheus.NewRegistry()
 
 	t.Run("can register multiple times with stop", func(t *testing.T) {
@@ -27,7 +31,7 @@ func TestNewPrometheusService(t *testing.T) {
 		err = s.Stop()
 		require.NoError(t, err)
 
-		s, err = NewPrometheusService()
+		_, err = NewPrometheusService()
 		require.NoError(t, err)
 	})
 }
