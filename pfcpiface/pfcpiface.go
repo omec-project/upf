@@ -50,6 +50,7 @@ func NewPFCPIface(conf Conf) *PFCPIface {
 	if conf.CPIface.HTTPPort != "" {
 		httpPort = conf.CPIface.HTTPPort
 	}
+
 	pfcpIface.httpEndpoint = ":" + httpPort
 
 	pfcpIface.upf = NewUPF(&conf, pfcpIface.fp)
