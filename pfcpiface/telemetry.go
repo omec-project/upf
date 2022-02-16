@@ -12,6 +12,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+var (
+	uc *upfCollector
+	nc *PfcpNodeCollector
+)
+
 func getPctiles() []float64 {
 	return []float64{50, 75, 90, 95, 99, 99.9, 99.99, 99.999, 99.9999, 100}
 }
@@ -144,19 +149,23 @@ func (col PfcpNodeCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func setupProm(upf *upf, node *PFCPNode) {
-	uc := newUpfCollector(upf)
+	uc = newUpfCollector(upf)
 	prometheus.MustRegister(uc)
 
-	nc := NewPFCPNodeCollector(node)
+	nc = NewPFCPNodeCollector(node)
 	prometheus.MustRegister(nc)
 
 	http.NewServeMux().Handle("/metrics", promhttp.Handler())
 }
 
-func clearProm(upf *upf, node *PFCPNode) {
-	uc := newUpfCollector(upf)
-	prometheus.Unregister(uc)
+func clearProm() {
+	if uc != nil {
+		prometheus.Unregister(uc)
+	}
 
-	nc := NewPFCPNodeCollector(node)
-	prometheus.Unregister(nc)
+	if nc != nil {
+		prometheus.Unregister(nc)
+	}
+
+	log.Info("Prometheus collectors unregistered")
 }
