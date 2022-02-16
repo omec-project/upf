@@ -4,16 +4,13 @@
 package pfcpiface
 
 import (
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
-	"sync"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
-
-var once sync.Once
 
 func getPctiles() []float64 {
 	return []float64{50, 75, 90, 95, 99, 99.9, 99.99, 99.999, 99.9999, 100}
