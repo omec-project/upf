@@ -9,7 +9,6 @@ import (
 )
 
 type bessService struct {
-
 }
 
 func NewBESSService() *bessService {
@@ -25,4 +24,3 @@ func (b bessService) ModuleCommand(ctx context.Context, request *bess_pb.Command
 	// TODO: implement it
 	panic("implement me")
 }
-

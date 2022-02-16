@@ -20,9 +20,9 @@ type BESSMock struct {
 
 func NewBESSMock(lAddr string, rAddr string) *BESSMock {
 	return &BESSMock{
-		localEndpoint: lAddr,
+		localEndpoint:  lAddr,
 		remoteEndpoint: rAddr,
-		service: NewBESSService(),
+		service:        NewBESSService(),
 	}
 }
 
