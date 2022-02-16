@@ -65,9 +65,9 @@ func Test_UP4_allocateGTPTunnelPeerID(t *testing.T) {
 			},
 			want: &want{
 				remainingInPool: maxGTPTunnelPeerIDs - 2,
-				startID:         2,
+				startID:         2, // 0 reserved, 1 used for dbuf -> first useful ID is 2
 			},
-		}, //TODO add drain test (allocate all tunnel peer IDs and expect error
+		}, //TODO add drain test (allocate all tunnel peer IDs and expect error)
 	}
 	for _, tt := range tests {
 		t.Run(
@@ -76,15 +76,15 @@ func Test_UP4_allocateGTPTunnelPeerID(t *testing.T) {
 
 				for i := 0; i < tt.args.numAllocate; i++ {
 					got, err := tt.args.mockUP4.allocateGTPTunnelPeerID()
-					if (err != nil) != tt.wantErr {
-						t.Errorf("allocateGTPTunnelPeerID() error = %v, wantErr %v", err, tt.wantErr)
+					if tt.wantErr {
+						require.Error(t, err)
+						return
 					}
 
 					require.Equal(t, tt.want.startID+uint8(i), got)
 				}
 
 				require.Equal(t, tt.want.remainingInPool, len(tt.args.mockUP4.tunnelPeerIDsPool))
-
 			},
 		)
 	}
