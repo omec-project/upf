@@ -45,6 +45,7 @@ class Parser:
         self.workers = 1
         self.access_ifname = None
         self.core_ifname = None
+        self.dataplane_interface = None
         self.interfaces = dict()
         self.enable_ntf = False
         self.notify_sockaddr = "/tmp/notifycp"
@@ -150,6 +151,13 @@ class Parser:
             self.core_ifname = "core"
             print('Can\'t parse interface name(s)! Setting it to default values ({}, {})'.format(
                 "access", "core"))
+        try:
+            self.dataplane_interface = self.conf["dataplane_interface"]
+        except KeyError:
+            self.dataplane_interface = "dataplane"
+            print('Can\'t parse dataplane interface name! Setting it to default value ({})'.format(self.dataplane_interface))
+            print(self.conf)
+            os.exit(1)
 
         # Slice rate limits
         try:

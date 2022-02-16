@@ -84,6 +84,7 @@ func TestLoadConfigFile(t *testing.T) {
 	t.Run("all sample configs must be valid", func(t *testing.T) {
 		paths := []string{
 			"../conf/upf.json",
+			"../conf/aether.json",
 			"../ptf/config/upf.json",
 		}
 

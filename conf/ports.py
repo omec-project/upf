@@ -309,5 +309,7 @@ class Port:
         # Attach it to merge
         merge.connect(update)
 
+        self.rtr = merge
+
         if self.mode == 'sim':
             self.rtr = merge

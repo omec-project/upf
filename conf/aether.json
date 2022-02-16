@@ -1,0 +1,122 @@
+{
+    "": "Vdev or sim support. Enable `\"mode\": \"af_xdp\"` to enable AF_XDP mode, or `\"mode\": \"af_packet\"` to enable AF_PACKET mode, `\"mode\": \"sim\"` to generate synthetic traffic from BESS's Source module or \"mode\": \"\" when running with UP4",
+    "": "mode: af_xdp",
+    "": "mode: af_packet",
+    "": "mode\": \"sim",
+    "mode": "dpdk",
+
+    "table_sizes": {
+        "": "Example sizes based on sim mode and 50K sessions. Customize as per your control plane",
+        "": "50K per unique tuple, we send 4 unique PDR patterns",
+        "pdrLookup": 200000,
+        "": "4 PDRs per session",
+        "flowMeasure": 50000,
+        "": "there are 2 QERs and 2 entries per QER",
+        "appQERLookup": 200000,
+        "": "there is 1 session QER and 2 entries per session QER",
+        "sessionQERLookup": 100000,
+        "": "there are 3 FARs",
+        "farLookup": 150000
+    },
+
+    "": "Set the log level to one of \"panic\", \"fatal\", \"error\", \"warning\", \"info\", \"debug\", \"trace\"",
+    "log_level": "trace",
+
+    "": "Use the sim block to enable simulation using either Source module or via il_trafficgen",
+    "sim": {
+        "": "At this point we can simulate either N3/N6 or N3/N9 traffic, so choose n6 or n9 below",
+        "core": "n6",
+        "max_sessions": 10,
+        "start_ue_ip": "16.0.0.1",
+        "start_enb_ip": "11.1.1.129",
+        "start_aupf_ip": "13.1.1.199",
+        "n6_app_ip": "6.6.6.6",
+        "n9_app_ip": "9.9.9.9",
+        "start_n3_teid": "0x30000000",
+        "start_n9_teid": "0x90000000",
+        "pkt_size": 128,
+        "total_flows": 10
+    },
+
+    "": "max IP frag table entries (for IPv4 reassembly). Update the line below to `\"max_ip_defrag_flows\": 1000` to enable",
+    "": "max_ip_defrag_flows: 1000",
+
+    "": "Update the line below to `\"ip_frag_with_eth_mtu\": 1518` to enable",
+    "": "ip_frag_with_eth_mtu: 1518",
+
+    "": "Enable hardware offload of checksum. Might disable vector PMD",
+    "hwcksum": false,
+
+    "": "Enable PDU Session Container extension",
+    "gtppsc": true,
+
+    "": "Enable Intel Dynamic Device Personalization (DDP)",
+    "ddp": false,
+
+    "": "Telemetrics-See this link for details: https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py",
+    "measure_upf": true,
+
+    "": "Whether to enable flow measurement feature",
+    "measure_flow": true,
+
+    "dataplane_interface": "dataplane",
+
+    "": "Number of worker threads. Default: 1",
+    "workers": 1,
+
+    "": "Parameters for handling outgoing requests",
+    "max_req_retries": 5,
+    "resp_timeout": "60s",
+
+    "": "Whether to enable P4Runtime feature",
+    "enable_p4rt": false,
+    "enable_aether": true,
+    "" : "conn_timeout: 1000",
+    "" : "read_timeout: 25",
+    "" : "notify_sockaddr: /tmp/notifycp",
+    "" : "endmarker_sockaddr: /tmp/pfcpport",
+
+    "": "Whether to enable UPF HeartBeatTimer feature",
+    "enable_hbTimer": false,
+    "": "heart_beat_interval: 5s",
+
+    "qci_qos_config": [
+        {
+            "": "Default values for QERs with QCI/QFI not listed below",
+            "qci": 0,
+            "cbs": 50000,
+            "ebs": 50000,
+            "pbs": 50000,
+            "burst_duration_ms": 10,
+            "priority": 7
+        }
+    ],
+
+    "": "Optional slice-wide meter rate limits",
+    "slice_rate_limit_config": {
+        "": "uplink policer",
+        "n6_bps": 50000000000,
+        "n6_burst_bytes": 625000,
+        "": "downlink policer",
+        "n3_bps": 50000000000,
+        "n3_burst_bytes": 625000
+    },
+
+    "": "Control plane controller settings",
+    "cpiface": {
+        "peers": ["148.162.12.214"],
+        "dnn": "internet",
+        "http_port": "8080",
+        "enable_ue_ip_alloc": true,
+        "ue_ip_pool": "10.250.0.0/29",
+        "" : "use_fqdn: true",
+        "" : "hostname: upf-0"
+    },
+
+    "": "p4rtc interface settings",
+    "p4rtciface": {
+        "access_ip": "172.17.0.1/32",
+        "p4rtc_server": "onos",
+        "p4rtc_port": "51001"
+    }
+}

@@ -138,7 +138,7 @@ func NewUPF(conf *Conf, fp datapath) *upf {
 		}
 	}
 
-	if !conf.EnableP4rt {
+	if !conf.EnableP4rt && !conf.EnableAether {
 		u.accessIP, err = GetUnicastAddressFromInterface(conf.AccessIface.IfName)
 		if err != nil {
 			log.Errorln(err)
