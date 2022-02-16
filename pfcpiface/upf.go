@@ -72,15 +72,6 @@ const (
 	n3 = 0x0
 	n6 = 0x1
 	n9 = 0x2
-
-	// Default values for outgoing requests
-	maxReqRetriesDefault = 5
-	respTimeoutDefault   = 2 * time.Second
-
-	// Default value for Heart Beat Interval
-	hbIntervalDefault = 5 * time.Second
-
-	readTimeoutDefault = 15 * time.Second
 )
 
 func (u *upf) isConnected() bool {
@@ -134,9 +125,7 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 		peers:             conf.CPIface.Peers,
 		reportNotifyChan:  make(chan uint64, 1024),
 		maxReqRetries:     conf.MaxReqRetries,
-		respTimeout:       respTimeoutDefault,
 		enableHBTimer:     conf.EnableHBTimer,
-		hbInterval:        hbIntervalDefault,
 		readTimeout:       time.Second * time.Duration(conf.ReadTimeout),
 	}
 
