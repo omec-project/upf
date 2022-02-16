@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2021-present Open Networking Foundation
 
-package main
+package pfcpiface
 
 import (
 	"encoding/binary"
@@ -20,24 +20,26 @@ const (
 	DirectionUplink   = 1
 	DirectionDownlink = 2
 
-	FieldAppIPProto       = "app_ip_proto"
-	FieldAppL4Port        = "app_l4_port"
-	FieldAppIPAddress     = "app_ip_addr"
-	FieldIPv4DstPrefix    = "ipv4_dst_prefix"
-	FieldN3Address        = "n3_address"
-	FieldUEAddress        = "ue_address"
-	FieldApplicationID    = "app_id"
-	FieldTEID             = "teid"
-	FieldQFI              = "qfi"
-	FieldCounterIndex     = "ctr_idx"
-	FieldTrafficClass     = "tc"
-	FieldTunnelPeerID     = "tunnel_peer_id"
-	FieldTunnelSrcAddress = "src_addr"
-	FieldTunnelDstAddress = "dst_addr"
-	FieldTunnelSrcPort    = "sport"
-	FieldSrcIface         = "src_iface"
-	FieldDirection        = "direction"
-	FieldSliceID          = "slice_id"
+	FieldAppIPProto        = "app_ip_proto"
+	FieldAppL4Port         = "app_l4_port"
+	FieldAppIPAddress      = "app_ip_addr"
+	FieldIPv4DstPrefix     = "ipv4_dst_prefix"
+	FieldN3Address         = "n3_address"
+	FieldUEAddress         = "ue_address"
+	FieldApplicationID     = "app_id"
+	FieldTEID              = "teid"
+	FieldQFI               = "qfi"
+	FieldCounterIndex      = "ctr_idx"
+	FieldTrafficClass      = "tc"
+	FieldTunnelPeerID      = "tunnel_peer_id"
+	FieldTunnelSrcAddress  = "src_addr"
+	FieldTunnelDstAddress  = "dst_addr"
+	FieldTunnelSrcPort     = "sport"
+	FieldSrcIface          = "src_iface"
+	FieldDirection         = "direction"
+	FieldSliceID           = "slice_id"
+	FieldSessionMeterIndex = "session_meter_idx"
+	FieldAppMeterIndex     = "app_meter_idx"
 
 	TableInterfaces           = "PreQosPipe.interfaces"
 	TableTunnelPeers          = "PreQosPipe.tunnel_peers"
@@ -137,6 +139,16 @@ func (t *P4rtTranslator) tableID(name string) uint32 {
 	return invalidID
 }
 
+func (t *P4rtTranslator) meterID(name string) uint32 {
+	for _, meter := range t.p4Info.Meters {
+		if meter.Preamble.Name == name {
+			return meter.Preamble.Id
+		}
+	}
+
+	return invalidID
+}
+
 func (t *P4rtTranslator) actionID(name string) uint32 {
 	for _, action := range t.p4Info.Actions {
 		if action.Preamble.Name == name {
@@ -187,6 +199,17 @@ func (t *P4rtTranslator) getCounterByName(name string) (*p4ConfigV1.Counter, err
 	return nil, ErrNotFoundWithParam("counter", "name", name)
 }
 
+func (t *P4rtTranslator) getMeterByName(name string) (*p4ConfigV1.Meter, error) {
+	for _, mtr := range t.p4Info.Meters {
+		if mtr.Preamble.Name == name {
+			return mtr, nil
+		}
+	}
+
+	return nil, ErrNotFoundWithParam("meter", "name", name)
+}
+
+//nolint:unused
 func (t *P4rtTranslator) getMatchFieldIDByName(table *p4ConfigV1.Table, fieldName string) uint32 {
 	for _, field := range table.MatchFields {
 		if field.Name == fieldName {
@@ -424,6 +447,7 @@ func (t *P4rtTranslator) withActionParam(action *p4.Action, name string, value i
 	return nil
 }
 
+//nolint:unused
 func (t *P4rtTranslator) getActionParamValue(tableEntry *p4.TableEntry, id uint32) ([]byte, error) {
 	for _, param := range tableEntry.Action.GetAction().Params {
 		if param.ParamId == id {
@@ -434,6 +458,7 @@ func (t *P4rtTranslator) getActionParamValue(tableEntry *p4.TableEntry, id uint3
 	return nil, ErrNotFoundWithParam("action param", "id", id)
 }
 
+//nolint:unused
 func (t *P4rtTranslator) getLPMMatchFieldValue(tableEntry *p4.TableEntry, name string) (*net.IPNet, error) {
 	tableID := tableEntry.TableId
 
@@ -521,44 +546,6 @@ func (t *P4rtTranslator) BuildInterfaceTableEntry(ipNet *net.IPNet, isCore bool)
 	return entry, nil
 }
 
-func (t *P4rtTranslator) ParseAccessIPFromReadInterfaceTableResponse(resp *p4.ReadResponse) (*net.IPNet, error) {
-	var interfaceTypeParamID uint32 = 1
-
-	var directionParamID uint32 = 1
-
-	for _, entity := range resp.GetEntities() {
-		accessIP, err := t.getLPMMatchFieldValue(entity.GetTableEntry(), FieldIPv4DstPrefix)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"entity": entity,
-			}).Warn("failed to get LPM field from response entity")
-
-			continue
-		}
-
-		interfaceType, err := t.getActionParamValue(entity.GetTableEntry(), interfaceTypeParamID)
-		if err != nil {
-			return nil, err
-		}
-
-		directionValue, err := t.getActionParamValue(entity.GetTableEntry(), directionParamID)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(interfaceType) != 1 && len(directionValue) != 1 {
-			return nil, ErrOperationFailedWithReason("parse Access IP from UP4",
-				"invalid length of action params")
-		}
-
-		if interfaceType[0] == access && directionValue[0] == DirectionUplink {
-			return accessIP, nil
-		}
-	}
-
-	return nil, ErrOperationFailed("parse Access IP from P4Runtime response")
-}
-
 func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, internalAppID uint8) (*p4.TableEntry, error) {
 	applicationsBuilderLog := log.WithFields(log.Fields{
 		"pdr": pdr,
@@ -624,9 +611,10 @@ func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, internalAppID uint
 	return entry, nil
 }
 
-func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr, sessMeterIdx uint32) (*p4.TableEntry, error) {
 	uplinkBuilderLog := log.WithFields(log.Fields{
-		"pdr": pdr,
+		"pdr":               pdr,
+		"sessionMeterIndex": sessMeterIdx,
 	})
 	uplinkBuilderLog.Trace("Building P4rt table entry for sessions_uplink table")
 
@@ -649,6 +637,10 @@ func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr) (*p4.TableEntry, erro
 		ActionId: t.actionID(ActSetUplinkSession),
 	}
 
+	if err := t.withActionParam(action, FieldSessionMeterIndex, sessMeterIdx); err != nil {
+		return nil, err
+	}
+
 	entry.Action = &p4.TableAction{
 		Type: &p4.TableAction_Action{Action: action},
 	}
@@ -658,11 +650,12 @@ func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr) (*p4.TableEntry, erro
 	return entry, nil
 }
 
-func (t *P4rtTranslator) buildDownlinkSessionsEntry(pdr pdr, tunnelPeerID uint8, needsBuffering bool) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) buildDownlinkSessionsEntry(pdr pdr, sessMeterIdx uint32, tunnelPeerID uint8, needsBuffering bool) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
-		"pdr":            pdr,
-		"tunnelPeerID":   tunnelPeerID,
-		"needsBuffering": needsBuffering,
+		"pdr":               pdr,
+		"sessionMeterIndex": sessMeterIdx,
+		"tunnelPeerID":      tunnelPeerID,
+		"needsBuffering":    needsBuffering,
 	})
 	builderLog.Trace("Building P4rt table entry for sessions_downlink table")
 
@@ -690,6 +683,10 @@ func (t *P4rtTranslator) buildDownlinkSessionsEntry(pdr pdr, tunnelPeerID uint8,
 		}
 	}
 
+	if err := t.withActionParam(action, FieldSessionMeterIndex, sessMeterIdx); err != nil {
+		return nil, err
+	}
+
 	entry.Action = &p4.TableAction{
 		Type: &p4.TableAction_Action{Action: action},
 	}
@@ -699,21 +696,22 @@ func (t *P4rtTranslator) buildDownlinkSessionsEntry(pdr pdr, tunnelPeerID uint8,
 	return entry, nil
 }
 
-func (t *P4rtTranslator) BuildSessionsTableEntry(pdr pdr, tunnelPeerID uint8, needsBuffering bool) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) BuildSessionsTableEntry(pdr pdr, sessionMeter meter, tunnelPeerID uint8, needsBuffering bool) (*p4.TableEntry, error) {
 	switch pdr.srcIface {
 	case access:
-		return t.buildUplinkSessionsEntry(pdr)
+		return t.buildUplinkSessionsEntry(pdr, sessionMeter.uplinkCellID)
 	case core:
-		return t.buildDownlinkSessionsEntry(pdr, tunnelPeerID, needsBuffering)
+		return t.buildDownlinkSessionsEntry(pdr, sessionMeter.downlinkCellID, tunnelPeerID, needsBuffering)
 	default:
 		return nil, ErrUnsupported("source interface type of PDR", pdr.srcIface)
 	}
 }
 
-func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, shouldDrop bool, internalAppID uint8, tc uint8) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, appMeterIdx uint32, shouldDrop bool, internalAppID uint8, tc uint8) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
-		"pdr": pdr,
-		"tc":  tc,
+		"pdr":           pdr,
+		"appMeterIndex": appMeterIdx,
+		"tc":            tc,
 	})
 	builderLog.Debug("Building P4rt table entry for UP4 terminations_uplink table")
 
@@ -744,9 +742,15 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, shouldDrop bool, 
 		if err := t.withActionParam(action, FieldTrafficClass, tc); err != nil {
 			return nil, err
 		}
+		if err := t.withActionParam(action, FieldAppMeterIndex, appMeterIdx); err != nil {
+			return nil, err
+		}
 	} else {
 		action = &p4.Action{
 			ActionId: t.actionID(ActUplinkTermFwdNoTC),
+		}
+		if err := t.withActionParam(action, FieldAppMeterIndex, appMeterIdx); err != nil {
+			return nil, err
 		}
 	}
 
@@ -763,11 +767,13 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, shouldDrop bool, 
 	return entry, nil
 }
 
-func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, relatedFAR far, internalAppID uint8, tc uint8) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uint32, relatedFAR far,
+	internalAppID uint8, qfi uint8, tc uint8) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
-		"pdr":         pdr,
-		"tc":          tc,
-		"related-far": relatedFAR,
+		"pdr":           pdr,
+		"appMeterIndex": appMeterIdx,
+		"tc":            tc,
+		"related-far":   relatedFAR,
 	})
 	builderLog.Debug("Building P4rt table entry for UP4 terminations_downlink table")
 
@@ -799,12 +805,15 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, relatedFAR far,
 			return nil, err
 		}
 
-		// TODO: add support for QFI, which should be provided as a part of related QER
-		if err := t.withActionParam(action, FieldQFI, uint8(0)); err != nil {
+		if err := t.withActionParam(action, FieldQFI, qfi); err != nil {
 			return nil, err
 		}
 
 		if err := t.withActionParam(action, FieldTrafficClass, tc); err != nil {
+			return nil, err
+		}
+
+		if err := t.withActionParam(action, FieldAppMeterIndex, appMeterIdx); err != nil {
 			return nil, err
 		}
 	} else {
@@ -816,8 +825,11 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, relatedFAR far,
 			return nil, err
 		}
 
-		// TODO: add support for QFI, which should be provided as a part of related QER
-		if err := t.withActionParam(action, FieldQFI, uint8(0)); err != nil {
+		if err := t.withActionParam(action, FieldQFI, qfi); err != nil {
+			return nil, err
+		}
+
+		if err := t.withActionParam(action, FieldAppMeterIndex, appMeterIdx); err != nil {
 			return nil, err
 		}
 	}
@@ -835,12 +847,12 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, relatedFAR far,
 	return entry, nil
 }
 
-func (t *P4rtTranslator) BuildTerminationsTableEntry(pdr pdr, relatedFAR far, internalAppID uint8, tc uint8) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) BuildTerminationsTableEntry(pdr pdr, appMeter meter, relatedFAR far, internalAppID uint8, qfi uint8, tc uint8) (*p4.TableEntry, error) {
 	switch pdr.srcIface {
 	case access:
-		return t.buildUplinkTerminationsEntry(pdr, relatedFAR.Drops(), internalAppID, tc)
+		return t.buildUplinkTerminationsEntry(pdr, appMeter.uplinkCellID, relatedFAR.Drops(), internalAppID, tc)
 	case core:
-		return t.buildDownlinkTerminationsEntry(pdr, relatedFAR, internalAppID, tc)
+		return t.buildDownlinkTerminationsEntry(pdr, appMeter.downlinkCellID, relatedFAR, internalAppID, qfi, tc)
 	default:
 		return nil, ErrUnsupported("source interface type of PDR", pdr.srcIface)
 	}
@@ -885,4 +897,24 @@ func (t *P4rtTranslator) BuildGTPTunnelPeerTableEntry(tunnelPeerID uint8, tunnel
 	builderLog.WithField("entry", entry).Debug("Built P4rt table entry for GTP Tunnel Peers table")
 
 	return entry, nil
+}
+
+func (t *P4rtTranslator) BuildMeterEntry(meter string, cellID uint32, config *p4.MeterConfig) *p4.MeterEntry {
+	builderLog := log.WithFields(log.Fields{
+		"Meter":   meter,
+		"Cell ID": cellID,
+	})
+	builderLog.Trace("Building Meter entry")
+
+	meterID := t.meterID(meter)
+	entry := &p4.MeterEntry{
+		MeterId: meterID,
+		Index:   &p4.Index{Index: int64(cellID)},
+		Config:  config,
+	}
+
+	builderLog = builderLog.WithField("meter-entry", entry)
+	builderLog.Debug("Meter entry built successfully")
+
+	return entry
 }

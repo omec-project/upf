@@ -2,7 +2,7 @@
 // Copyright 2020 Intel Corporation
 // Copyright 2022 Open Networking Foundation
 
-package main
+package pfcpiface
 
 import (
 	"encoding/binary"
@@ -107,7 +107,7 @@ func calcBurstSizeFromRate(kbps uint64, ms uint64) uint64 {
 func MustParseStrIP(address string) *net.IPNet {
 	ip, ipNet, err := net.ParseCIDR(address)
 	if err != nil {
-		log.Fatal("unable to parse IP that we should parse")
+		log.Fatalf("unable to parse IP %v that we should parse", address)
 	}
 
 	log.Info("Parsed IP: ", ip)

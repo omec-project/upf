@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2021-present Open Networking Foundation
 
-package main
+package pfcpiface
 
 import (
 	"context"
@@ -283,9 +283,8 @@ func (c *P4rtClient) ClearTable(tableID uint32) error {
 	updates := make([]*p4.Update, len(readRes.GetEntities()))
 
 	for _, entity := range readRes.GetEntities() {
-		updateType := p4.Update_DELETE
 		update := &p4.Update{
-			Type:   updateType,
+			Type:   p4.Update_DELETE,
 			Entity: entity,
 		}
 
@@ -362,6 +361,23 @@ func (c *P4rtClient) ApplyTableEntries(methodType p4.Update_Type, entries ...*p4
 		}
 		log.Traceln("Writing table entry: ", proto.MarshalTextString(update))
 
+		updates = append(updates, update)
+	}
+
+	return c.WriteBatchReq(updates)
+}
+
+func (c *P4rtClient) ApplyMeterEntries(methodType p4.Update_Type, entries ...*p4.MeterEntry) error {
+	var updates []*p4.Update
+
+	for _, entry := range entries {
+		update := &p4.Update{
+			Type: methodType,
+			Entity: &p4.Entity{
+				Entity: &p4.Entity_MeterEntry{MeterEntry: entry},
+			},
+		}
+		log.Traceln("Writing table entry: ", proto.MarshalTextString(update))
 		updates = append(updates, update)
 	}
 

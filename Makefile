@@ -93,6 +93,7 @@ test: .coverage
 	docker run --rm -v $(CURDIR):/upf-epc -w /upf-epc golang:latest \
 		go test \
 			-race \
+			-failfast \
 			-coverprofile=.coverage/coverage-unit.txt \
 			-covermode=atomic \
 			-v \

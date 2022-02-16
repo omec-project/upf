@@ -125,9 +125,8 @@
 
     "": "p4rtc interface settings",
     "p4rtciface": {
-    "access_ip": "172.17.0.1/32",
-    "p4rtc_server": "onos",
-    "p4rtc_port": "51001",
-    "ue_ip_pool": "10.250.0.0/24"
+        "access_ip": "172.17.0.1/32",
+        "p4rtc_server": "onos",
+        "p4rtc_port": "51001"
     }
 }
