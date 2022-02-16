@@ -11,13 +11,13 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
 
 var (
 	simulate = simModeDisable
-	pfcpsim  = flag.Bool("pfcpsim", false, "simulate PFCP")
 )
 
 func init() {
@@ -27,8 +27,10 @@ func init() {
 type PFCPIface struct {
 	conf Conf
 
-	fp  fastPath
-	upf *upf
+	node    *PFCPNode
+	fp      fastPath
+	upf     *upf
+	httpSrv *http.Server
 }
 
 func NewPFCPIface(conf Conf) *PFCPIface {
@@ -42,17 +44,18 @@ func NewPFCPIface(conf Conf) *PFCPIface {
 		pfcpIface.fp = &bess{}
 	}
 
+	httpPort := "8080"
+	if conf.CPIface.HTTPPort != "" {
+		httpPort = conf.CPIface.HTTPPort
+	}
+
+	pfcpIface.httpSrv = &http.Server{Addr: ":" + httpPort, Handler: nil}
 	pfcpIface.upf = NewUPF(&conf, pfcpIface.fp)
 
 	return pfcpIface
 }
 
 func (p *PFCPIface) Run() {
-	if *pfcpsim {
-		pfcpSim()
-		return
-	}
-
 	if simulate.enable() {
 		p.upf.sim(simulate, &p.conf.SimInfo)
 
@@ -61,43 +64,46 @@ func (p *PFCPIface) Run() {
 		}
 	}
 
+	p.node = NewPFCPNode(p.upf)
+
 	setupConfigHandler(p.upf)
-
-	httpPort := "8080"
-	if p.conf.CPIface.HTTPPort != "" {
-		httpPort = p.conf.CPIface.HTTPPort
-	}
-
-	httpSrv := &http.Server{Addr: ":" + httpPort, Handler: nil}
+	setupProm(p.upf, p.node)
 
 	go func() {
-		if err := httpSrv.ListenAndServe(); err != nil && errors.Is(err, http.ErrServerClosed) {
+		if err := p.httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalln("http server failed", err)
 		}
 
 		log.Infoln("http server closed")
 	}()
 
-	ctx, cancel := context.WithCancel(context.Background())
-
-	node := NewPFCPNode(ctx, p.upf)
-	go node.Serve()
-
-	setupProm(p.upf, node)
-
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
 	signal.Notify(sig, syscall.SIGTERM)
-	<-sig
 
-	cancel()
+	go func() {
+		oscall := <-sig
+		log.Infof("System call received: %+v", oscall)
+		p.Stop()
+	}()
 
-	// Wait for node shutdown before http shutdown
-	node.Done()
+	// blocking
+	p.node.Serve()
+}
 
-	if err := httpSrv.Shutdown(context.Background()); err != nil {
-		log.Errorln("Failed to shutdown http:", err)
+// Stop sends cancellation signal to main Go routine and waits for shutdown to complete.
+func (p *PFCPIface) Stop() {
+	ctxHttpShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer func() {
+		cancel()
+	}()
+
+	if err := p.httpSrv.Shutdown(ctxHttpShutdown); err != nil {
+		log.Errorln("Failed to shutdown http: ", err)
 	}
 
-	p.upf.exit()
+	p.node.Stop()
+
+	// Wait for PFCP node shutdown
+	p.node.Done()
 }
