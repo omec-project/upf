@@ -99,6 +99,18 @@ test: .coverage
 			-v \
 			./pfcpiface
 
+internal/p4constants/p4info.go: conf/p4/bin/p4info.txt
+
+P4INFO_GO := internal/p4constants/p4info.go
+p4info-go: $(P4INFO_GO)
+$(P4INFO_GO):
+	$(info *** Generating go constants: $< -> $@)
+	@docker run --rm -v $(CURDIR):/tassen -w /tassen \
+		--entrypoint ./util/go-gen-p4-const.py $(PTF_IMG) \
+		--output $@ --p4info $<
+	@docker run --rm -v $(CURDIR):/tassen -w /tassen \
+		${GOLANG_IMG} gofmt -w $@
+
 fmt:
 	@go fmt ./...
 
