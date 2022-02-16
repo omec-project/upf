@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2021 Intel Corporation
 // Copyright 2021 Open Networking Foundation
-package main
+package pfcpiface
 
 import (
 	"context"
@@ -16,7 +16,8 @@ import (
 
 // PFCPNode represents a PFCP endpoint of the UPF.
 type PFCPNode struct {
-	ctx context.Context
+	ctx    context.Context
+	cancel context.CancelFunc
 	// listening socket for new "PFCP connections"
 	net.PacketConn
 	// done is closed to signal shutdown complete
@@ -34,7 +35,7 @@ type PFCPNode struct {
 }
 
 // NewPFCPNode create a new PFCPNode listening on local address.
-func NewPFCPNode(ctx context.Context, upf *upf) *PFCPNode {
+func NewPFCPNode(upf *upf) *PFCPNode {
 	conn, err := reuse.ListenPacket("udp", ":"+PFCPPort)
 	if err != nil {
 		log.Fatalln("ListenUDP failed", err)
@@ -45,8 +46,11 @@ func NewPFCPNode(ctx context.Context, upf *upf) *PFCPNode {
 		log.Fatalln("prom metrics service init failed", err)
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	return &PFCPNode{
 		ctx:        ctx,
+		cancel:     cancel,
 		PacketConn: conn,
 		done:       make(chan struct{}),
 		pConnDone:  make(chan string, 100),
@@ -129,7 +133,7 @@ func (node *PFCPNode) Serve() {
 		case <-node.ctx.Done():
 			shutdown = true
 
-			log.Infoln("Entering node shutdown")
+			log.Infoln("Shutting down PFCP node")
 
 			err := node.Close()
 			if err != nil {
@@ -145,10 +149,16 @@ func (node *PFCPNode) Serve() {
 
 			close(node.pConnDone)
 			log.Infoln("Done waiting for PFCPConn completions")
+
+			node.upf.exit()
 		}
 	}
 
 	close(node.done)
+}
+
+func (node *PFCPNode) Stop() {
+	node.cancel()
 }
 
 // Done waits for Shutdown() to complete

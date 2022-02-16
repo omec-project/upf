@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2022-present Open Networking Foundation
 
-package main
+package pfcpiface
 
 import (
 	log "github.com/sirupsen/logrus"
@@ -12,6 +12,16 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
+)
+
+const (
+	// Default values
+	maxReqRetriesDefault    = 5
+	respTimeoutDefault      = 2 * time.Second
+	hbIntervalDefault       = 5 * time.Second
+	readTimeoutDefault      = 15 * time.Second
+	p4InfoPathDefault       = "/bin/p4info.txt"
+	deviceConfigPathDefault = "/bin/bmv2.json"
 )
 
 // Conf : Json conf struct.
@@ -86,9 +96,11 @@ type IfaceType struct {
 
 // P4rtcInfo : P4 runtime interface settings.
 type P4rtcInfo struct {
-	AccessIP    string `json:"access_ip"`
-	P4rtcServer string `json:"p4rtc_server"`
-	P4rtcPort   string `json:"p4rtc_port"`
+	P4Info       string `json:"p4info"`
+	DeviceConfig string `json:"device_config"`
+	AccessIP     string `json:"access_ip"`
+	P4rtcServer  string `json:"p4rtc_server"`
+	P4rtcPort    string `json:"p4rtc_port"`
 }
 
 // validateConf checks that the given config reaches a baseline of correctness.
@@ -188,6 +200,20 @@ func LoadConfigFile(filepath string) (Conf, error) {
 
 	if conf.MaxReqRetries == 0 {
 		conf.MaxReqRetries = maxReqRetriesDefault
+	}
+
+	if conf.EnableHBTimer {
+		if conf.HeartBeatInterval == "" {
+			conf.HeartBeatInterval = hbIntervalDefault.String()
+		}
+	}
+
+	if conf.P4rtcIface.P4Info == "" {
+		conf.P4rtcIface.P4Info = p4InfoPathDefault
+	}
+
+	if conf.P4rtcIface.DeviceConfig == "" {
+		conf.P4rtcIface.DeviceConfig = deviceConfigPathDefault
 	}
 
 	// Perform basic validation.
