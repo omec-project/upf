@@ -96,11 +96,12 @@ type IfaceType struct {
 
 // P4rtcInfo : P4 runtime interface settings.
 type P4rtcInfo struct {
-	P4Info       string `json:"p4info"`
-	DeviceConfig string `json:"device_config"`
-	AccessIP     string `json:"access_ip"`
-	P4rtcServer  string `json:"p4rtc_server"`
-	P4rtcPort    string `json:"p4rtc_port"`
+	P4Info       string          `json:"p4info"`
+	DeviceConfig string          `json:"device_config"`
+	AccessIP     string          `json:"access_ip"`
+	P4rtcServer  string          `json:"p4rtc_server"`
+	P4rtcPort    string          `json:"p4rtc_port"`
+	QFIToTC      map[uint8]uint8 `json:"qfi_tc_mapping"`
 }
 
 // validateConf checks that the given config reaches a baseline of correctness.

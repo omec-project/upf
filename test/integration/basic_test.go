@@ -253,6 +253,39 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 			},
 			desc: "QER_METERING - session QER only",
 		},
+		{
+			input: &pfcpSessionData{
+				nbAddress:    nodeBAddress,
+				ueAddress:    ueAddress,
+				upfN3Address: upfN3Address,
+				sdfFilter:    defaultSDFFilter,
+				ulTEID:       15,
+				dlTEID:       16,
+
+				QFI:              0x08,
+				uplinkAppQerID:   1,
+				downlinkAppQerID: 2,
+				sessQerID:        4,
+				sessGBR:          0,
+				sessMBR:          500000,
+				appGBR:           30000,
+				appMBR:           50000,
+			},
+			expected: p4RtValues{
+				appFilter: appFilter{
+					proto:        0x11,
+					appIP:        net.ParseIP("0.0.0.0"),
+					appPrefixLen: 0,
+					appPort: portRange{
+						80, 80,
+					},
+				},
+				appID:        1,
+				tunnelPeerID: 2,
+				tc:           3,
+			},
+			desc: "QER_METERING - TC for QFI",
+		},
 	}
 
 	for _, tc := range testCases {
