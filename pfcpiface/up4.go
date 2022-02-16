@@ -23,9 +23,18 @@ import (
 )
 
 const (
-	// FIXME: this is hardcoded currently, but should be passed as configuration/cmd line arg
-	p4InfoPath       = "/bin/p4info.txt"
-	deviceConfigPath = "/bin/bmv2.json"
+	preQosCounterID = iota
+	postQosCounterID
+
+	// 253 base stations + 1 dbuf (fixed in UP4) + 1 reserved (fixed in P4 pipeline)
+	maxGTPTunnelPeerIDs = 253
+	maxApplicationIDs   = 254
+
+	applicationMeter = "PreQosPipe.app_meter"
+	sessionMeter     = "PreQosPipe.session_meter"
+
+	meterTypeApplication uint8 = 1
+	meterTypeSession     uint8 = 2
 
 	// DefaultQFI is set if no QER is sent by a control plane in PFCP messages.
 	// QFI=9 is used as a default value, because many Aether configurations uses it as default.
@@ -36,23 +45,6 @@ const (
 var (
 	p4RtcServerIP   = flag.String("p4RtcServerIP", "", "P4 Server ip")
 	p4RtcServerPort = flag.String("p4RtcServerPort", "", "P4 Server port")
-)
-
-const (
-	preQosCounterID = iota
-	postQosCounterID
-
-	// 253 base stations + 1 dbuf (fixed in UP4) + 1 reserved (fixed in P4 pipeline)
-	maxGTPTunnelPeerIDs = 253
-	maxApplicationIDs   = 254
-)
-
-const (
-	applicationMeter = "PreQosPipe.app_meter"
-	sessionMeter     = "PreQosPipe.session_meter"
-
-	meterTypeApplication uint8 = 1
-	meterTypeSession     uint8 = 2
 )
 
 type application struct {
@@ -82,15 +74,13 @@ type meter struct {
 }
 
 type UP4 struct {
-	p4rtcInfo P4rtcInfo
+	conf P4rtcInfo
 
 	host            string
 	deviceID        uint64
 	timeout         uint32
 	accessIP        *net.IPNet
 	ueIPPool        *net.IPNet
-	p4rtcServer     string
-	p4rtcPort       string
 	enableEndMarker bool
 
 	p4client       *P4rtClient
@@ -211,7 +201,7 @@ func (up4 *UP4) setupChannel() error {
 
 	err = up4.p4client.GetForwardingPipelineConfig()
 	if err != nil {
-		err = up4.p4client.SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath)
+		err = up4.p4client.SetForwardingPipelineConfig(up4.conf.P4Info, up4.conf.DeviceConfig)
 		if err != nil {
 			log.Errorf("set forwarding pipeling config failed: %v", err)
 			return err
@@ -327,37 +317,38 @@ func (up4 *UP4) isConnected(accessIP *net.IP) bool {
 func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	log.Println("setUpfInfo UP4")
 
-	up4.p4rtcInfo = conf.P4rtcIface
+	up4.conf = conf.P4rtcIface
 
 	up4.accessIP = MustParseStrIP(conf.P4rtcIface.AccessIP)
 	u.accessIP = up4.accessIP.IP
 
-	log.Println("AccessIP: ", up4.accessIP)
+	log.Infof("AccessIP: %v", up4.accessIP)
 
 	up4.ueIPPool = MustParseStrIP(conf.CPIface.UEIPPool)
 
 	log.Infof("UE IP pool: %v", up4.ueIPPool)
 
-	up4.p4rtcServer = conf.P4rtcIface.P4rtcServer
-	log.Println("UP4 server ip/name", up4.p4rtcServer)
-	up4.p4rtcPort = conf.P4rtcIface.P4rtcPort
+	p4rtcServer := conf.P4rtcIface.P4rtcServer
+
+	p4rtcPort := conf.P4rtcIface.P4rtcPort
 	up4.reportNotifyChan = u.reportNotifyChan
 
 	if *p4RtcServerIP != "" {
-		up4.p4rtcServer = *p4RtcServerIP
+		p4rtcServer = *p4RtcServerIP
 	}
 
 	if *p4RtcServerPort != "" {
-		up4.p4rtcPort = *p4RtcServerPort
+		p4rtcPort = *p4RtcServerPort
 	}
 
 	u.coreIP = net.ParseIP(net.IPv4zero.String())
 
-	log.Println("onos server ip ", up4.p4rtcServer)
-	log.Println("onos server port ", up4.p4rtcPort)
+	up4.host = p4rtcServer + ":" + p4rtcPort
 
-	up4.host = up4.p4rtcServer + ":" + up4.p4rtcPort
-	log.Println("server name: ", up4.host)
+	log.WithFields(log.Fields{
+		"UP4 endpoint": up4.host,
+	}).Info("UP4 endpoint configured")
+
 	up4.deviceID = 1
 	up4.timeout = 30
 	up4.enableEndMarker = conf.EnableEndMarker
@@ -1234,7 +1225,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 			qfi = relatedQER.qfi
 		}
 
-		tc, exists := up4.p4rtcInfo.QFIToTC[relatedQER.qfi]
+		tc, exists := up4.conf.QFIToTC[relatedQER.qfi]
 		if !exists {
 			tc = NoTC
 		}
