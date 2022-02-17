@@ -64,6 +64,9 @@ const (
 
 	DefaultPriority      = 0
 	DefaultApplicationID = 0
+	// NoTC assuming bit<2> type of TC in UP4,
+	// it's safe to use 255 as "unspecified TC" value
+	NoTC = 255
 )
 
 type tunnelParams struct {
@@ -734,7 +737,7 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, appMeterIdx uint3
 		action = &p4.Action{
 			ActionId: t.actionID(ActUplinkTermDrop),
 		}
-	} else if !shouldDrop && tc != 0 {
+	} else if !shouldDrop && tc != NoTC {
 		action = &p4.Action{
 			ActionId: t.actionID(ActUplinkTermFwd),
 		}
@@ -796,7 +799,7 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uin
 		action = &p4.Action{
 			ActionId: t.actionID(ActDownlinkTermDrop),
 		}
-	} else if !relatedFAR.Drops() && tc != 0 {
+	} else if !relatedFAR.Drops() && tc != NoTC {
 		action = &p4.Action{
 			ActionId: t.actionID(ActDownlinkTermFwd),
 		}
