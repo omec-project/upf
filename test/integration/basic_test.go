@@ -5,6 +5,7 @@ package integration
 
 import (
 	"github.com/omec-project/upf-epc/pfcpiface"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"os"
 
@@ -77,6 +78,10 @@ func teardownUP4(t *testing.T) {
 }
 
 func setup(t *testing.T, conf pfcpiface.Conf) {
+	// TODO: we currently need to reset the DefaultRegisterer between tests, as some leave the
+	// 		 the registry in a bad state. Use custom registries to avoid global state.
+	prometheus.DefaultRegisterer = prometheus.NewRegistry()
+
 	fastpath := os.Getenv(envFastpath)
 	switch fastpath {
 	case "bess":

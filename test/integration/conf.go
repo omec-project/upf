@@ -26,6 +26,9 @@ func ConfUP4Default() pfcpiface.Conf {
 			P4rtcPort:    defaultP4RuntimeServerPort,
 			P4Info:       "../../conf/p4/bin/p4info.txt",
 			DeviceConfig: "../../conf/p4/bin/bmv2.json",
+			QFIToTC: map[uint8]uint8{
+				8: 3,
+			},
 		},
 		EnableP4rt: true,
 	}
