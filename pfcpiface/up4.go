@@ -134,7 +134,7 @@ func (up4 *UP4) portStats(uc *upfCollector, ch chan<- prometheus.Metric) {
 }
 
 func (up4 *UP4) initCounter(counterID uint8, name string) error {
-	ctr, err := up4.p4RtTranslator.getCounterByName(name)
+	ctr, err := up4.p4RtTranslator.getCounterByID(uint32(counterID))
 	if err != nil {
 		return err
 	}
@@ -231,7 +231,7 @@ func (up4 *UP4) initAllCounters() error {
 func (up4 *UP4) initMetersPools() error {
 	log.Debug("Initializing P4 Meters pools for UP4")
 
-	appMeter, err := up4.p4RtTranslator.getMeterByName(applicationMeter)
+	appMeter, err := up4.p4RtTranslator.getMeterByID(p4constants.Meter_PreQosPipeAppMeter)
 	if err != nil {
 		return err
 	}
@@ -248,7 +248,7 @@ func (up4 *UP4) initMetersPools() error {
 
 	log.Trace("Application meter IDs pool initialized: ", up4.appMeterCellIDsPool.String())
 
-	sessMeter, err := up4.p4RtTranslator.getMeterByName(sessionMeter)
+	sessMeter, err := up4.p4RtTranslator.getMeterByID(p4constants.Meter_PreQosPipeSessionMeter)
 	if err != nil {
 		return err
 	}
@@ -857,7 +857,7 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 		// according to the SD-Core/SD-Fabric contract, UL and DL MBRs/GBRs are always equal for Application QERs.
 		meterConfig := getMeterConfigurationFromQER(q.ulMbr, q.ulGbr)
 
-		meterEntry := up4.p4RtTranslator.BuildMeterEntry(applicationMeter, appMeter.uplinkCellID, meterConfig)
+		meterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.Meter_PreQosPipeAppMeter, appMeter.uplinkCellID, meterConfig)
 
 		entries = append(entries, meterEntry)
 	}
@@ -866,7 +866,7 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 		// according to the SD-Core/SD-Fabric contract, UL and DL MBRs/GBRs are always equal for Application QERs.
 		meterConfig := getMeterConfigurationFromQER(q.dlMbr, q.dlGbr)
 
-		meterEntry := up4.p4RtTranslator.BuildMeterEntry(applicationMeter, appMeter.downlinkCellID, meterConfig)
+		meterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.Meter_PreQosPipeAppMeter, appMeter.downlinkCellID, meterConfig)
 
 		entries = append(entries, meterEntry)
 	}
@@ -907,10 +907,10 @@ func (up4 *UP4) configureSessionMeter(q qer) (meter, error) {
 	logger.Debug("Configuring Session Meter from QER")
 
 	uplinkMeterConfig := getMeterConfigurationFromQER(q.ulMbr, q.ulGbr)
-	uplinkMeterEntry := up4.p4RtTranslator.BuildMeterEntry(sessionMeter, uplinkCellID, uplinkMeterConfig)
+	uplinkMeterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.Meter_PreQosPipeSessionMeter, uplinkCellID, uplinkMeterConfig)
 
 	downlinkMeterConfig := getMeterConfigurationFromQER(q.dlMbr, q.dlGbr)
-	downlinkMeterEntry := up4.p4RtTranslator.BuildMeterEntry(sessionMeter, downlinkCellID, downlinkMeterConfig)
+	downlinkMeterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.Meter_PreQosPipeSessionMeter, downlinkCellID, downlinkMeterConfig)
 
 	logger = logger.WithFields(log.Fields{
 		"uplink meter entry":   uplinkMeterEntry,
@@ -993,8 +993,7 @@ func verifyPDR(pdr pdr) error {
 	return nil
 }
 
-func (up4 *UP4) resetMeter(name string, meter meter) {
-	meterID := up4.p4RtTranslator.meterID(name)
+func (up4 *UP4) resetMeter(meterID uint32, meter meter) {
 	entries := make([]*p4.MeterEntry, 0, 2)
 
 	entry := &p4.MeterEntry{
@@ -1014,7 +1013,7 @@ func (up4 *UP4) resetMeter(name string, meter meter) {
 
 	err := up4.p4client.ApplyMeterEntries(p4.Update_MODIFY, entries...)
 	if err != nil {
-		log.Errorf("Failed to reset %v meter entries: %v", name, err)
+		log.Errorf("Failed to reset %v meter entries: %v", meterID, err)
 	}
 }
 
@@ -1039,14 +1038,14 @@ func (up4 *UP4) resetMeters(qers []qer) {
 		}
 
 		if meter.meterType == meterTypeApplication {
-			up4.resetMeter(applicationMeter, meter)
+			up4.resetMeter(p4constants.Meter_PreQosPipeAppMeter, meter)
 			up4.releaseAppMeterCellID(meter.uplinkCellID)
 
 			if meter.downlinkCellID != meter.uplinkCellID {
 				up4.releaseAppMeterCellID(meter.downlinkCellID)
 			}
 		} else if meter.meterType == meterTypeSession {
-			up4.resetMeter(sessionMeter, meter)
+			up4.resetMeter(p4constants.Meter_PreQosPipeSessionMeter, meter)
 			up4.releaseSessionMeterCellID(meter.uplinkCellID)
 			up4.releaseSessionMeterCellID(meter.downlinkCellID)
 		}

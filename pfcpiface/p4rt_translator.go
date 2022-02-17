@@ -112,16 +112,6 @@ func convertValueToBinary(value interface{}) ([]byte, error) {
 	}
 }
 
-func (t *P4rtTranslator) meterID(name string) uint32 {
-	for _, meter := range t.p4Info.Meters {
-		if meter.Preamble.Name == name {
-			return meter.Preamble.Id
-		}
-	}
-
-	return invalidID
-}
-
 func (t *P4rtTranslator) getActionByID(actionID uint32) (*p4ConfigV1.Action, error) {
 	for _, action := range t.p4Info.Actions {
 		if action.Preamble.Id == actionID {
@@ -142,34 +132,24 @@ func (t *P4rtTranslator) getTableByID(tableID uint32) (*p4ConfigV1.Table, error)
 	return nil, ErrNotFoundWithParam("table", "ID", tableID)
 }
 
-func (t *P4rtTranslator) getTableIDByName(name string) (uint32, error) {
-	for _, table := range t.p4Info.Tables {
-		if table.Preamble.Name == name {
-			return table.Preamble.Id, nil
-		}
-	}
-
-	return 0, ErrNotFoundWithParam("table", "name", name)
-}
-
-func (t *P4rtTranslator) getCounterByName(name string) (*p4ConfigV1.Counter, error) {
+func (t *P4rtTranslator) getCounterByID(ID uint32) (*p4ConfigV1.Counter, error) {
 	for _, ctr := range t.p4Info.Counters {
-		if ctr.Preamble.Name == name {
+		if ctr.Preamble.Id == ID {
 			return ctr, nil
 		}
 	}
 
-	return nil, ErrNotFoundWithParam("counter", "name", name)
+	return nil, ErrNotFoundWithParam("counter", "ID", ID)
 }
 
-func (t *P4rtTranslator) getMeterByName(name string) (*p4ConfigV1.Meter, error) {
+func (t *P4rtTranslator) getMeterByID(ID uint32) (*p4ConfigV1.Meter, error) {
 	for _, mtr := range t.p4Info.Meters {
-		if mtr.Preamble.Name == name {
+		if mtr.Preamble.Id == ID {
 			return mtr, nil
 		}
 	}
 
-	return nil, ErrNotFoundWithParam("meter", "name", name)
+	return nil, ErrNotFoundWithParam("meter", "ID", ID)
 }
 
 //nolint:unused
@@ -851,14 +831,23 @@ func (t *P4rtTranslator) BuildGTPTunnelPeerTableEntry(tunnelPeerID uint8, tunnel
 	return entry, nil
 }
 
-func (t *P4rtTranslator) BuildMeterEntry(meter string, cellID uint32, config *p4.MeterConfig) *p4.MeterEntry {
+func (t *P4rtTranslator) BuildMeterEntry(meterID uint32, cellID uint32, config *p4.MeterConfig) *p4.MeterEntry {
+	meterName := ""
+
+	switch meterID {
+	case p4constants.Meter_PreQosPipeAppMeter:
+		meterName = applicationMeter
+		break
+	case p4constants.Meter_PreQosPipeSessionMeter:
+		meterName = sessionMeter
+	}
+
 	builderLog := log.WithFields(log.Fields{
-		"Meter":   meter,
+		"Meter":   meterName,
 		"Cell ID": cellID,
 	})
 	builderLog.Trace("Building Meter entry")
 
-	meterID := t.meterID(meter)
 	entry := &p4.MeterEntry{
 		MeterId: meterID,
 		Index:   &p4.Index{Index: int64(cellID)},
