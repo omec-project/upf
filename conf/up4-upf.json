@@ -71,6 +71,12 @@
     "": "A local path to the P4Info file",
     "" : "p4info: /bin/p4info.txt",
     "": "A local path to the device config (BMv2 json)",
-    "" : "device_config: /bin/bmv2.json"
+    "" : "device_config: /bin/bmv2.json",
+
+    "": "Mapping between QFI values and Traffic Classes (TC) in UP4 pipeline",
+    "qfi_tc_mapping": {
+      "8": 3,
+      "9": 3
+    }
   }
 }

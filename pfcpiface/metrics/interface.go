@@ -51,4 +51,5 @@ func (s *Session) Delete() {
 type InstrumentPFCP interface {
 	SaveMessages(m *Message)
 	SaveSessions(s *Session)
+	Stop() error
 }
