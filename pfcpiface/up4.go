@@ -12,6 +12,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/omec-project/upf-epc/internal/p4constants"
 	"google.golang.org/grpc/codes"
 
 	p4 "github.com/p4lang/p4runtime/go/p4/v1"
@@ -372,30 +373,16 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 }
 
 func (up4 *UP4) clearAllTables() error {
-	tables := []string{TableUplinkSessions, TableDownlinkSessions, TableUplinkTerminations, TableDownlinkTerminations, TableTunnelPeers, TableApplications}
-	tableIDs := make([]uint32, len(tables))
-
-	for _, table := range tables {
-		tableID, err := up4.p4RtTranslator.getTableIDByName(table)
-		if err != nil {
-			return err
-		}
-
-		tableIDs = append(tableIDs, tableID)
+	tableIDs := []uint32{
+		p4constants.Table_PreQosPipeSessionsUplink,
+		p4constants.Table_PreQosPipeSessionsDownlink,
+		p4constants.Table_PreQosPipeTerminationsUplink,
+		p4constants.Table_PreQosPipeTerminationsDownlink,
+		p4constants.Table_PreQosPipeTunnelPeers,
+		p4constants.Table_PreQosPipeInterfaces,
 	}
 
-	err := up4.p4client.ClearTables(tableIDs)
-	if err != nil {
-		return err
-	}
-
-	interfacesTableID, err := up4.p4RtTranslator.getTableIDByName(TableInterfaces)
-	if err != nil {
-		return err
-	}
-
-	err = up4.p4client.ClearTable(interfacesTableID)
-	if err != nil {
+	if err := up4.p4client.ClearTables(tableIDs); err != nil {
 		return err
 	}
 
