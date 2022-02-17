@@ -5,6 +5,7 @@ package pfcpiface
 
 import (
 	log "github.com/sirupsen/logrus"
+	"reflect"
 
 	"net"
 	"time"
@@ -22,36 +23,39 @@ const (
 	readTimeoutDefault      = 15 * time.Second
 	p4InfoPathDefault       = "/bin/p4info.txt"
 	deviceConfigPathDefault = "/bin/bmv2.json"
+
+	// NotifySockAddr : Unix Socket path to read bess notification from.
+	NotifySockAddr = "/tmp/notifycp"
+
+	// EndMarkerSockAddr : Unix Socket path to send end marker packet.
+	EndMarkerSockAddr = "/tmp/pfcpport"
+
+	// possible fastpaths
+	FastpathBESS = "bess"
+	FastpathUP4  = "up4"
 )
 
 // Conf : Json conf struct.
 type Conf struct {
-	Mode              string           `json:"mode"`
-	AccessIface       IfaceType        `json:"access"`
-	CoreIface         IfaceType        `json:"core"`
-	CPIface           CPIfaceInfo      `json:"cpiface"`
-	P4rtcIface        P4rtcInfo        `json:"p4rtciface"`
-	EnableP4rt        bool             `json:"enable_p4rt"`
-	EnableFlowMeasure bool             `json:"measure_flow"`
-	SimInfo           SimModeInfo      `json:"sim"`
-	ConnTimeout       uint32           `json:"conn_timeout"` // TODO(max): unused, remove
-	ReadTimeout       uint32           `json:"read_timeout"` // TODO(max): convert to duration string
-	EnableNotifyBess  bool             `json:"enable_notify_bess"`
-	EnableEndMarker   bool             `json:"enable_end_marker"`
-	NotifySockAddr    string           `json:"notify_sockaddr"`
-	EndMarkerSockAddr string           `json:"endmarker_sockaddr"`
 	LogLevel          log.Level        `json:"log_level"`
-	QciQosConfig      []QciQosConfig   `json:"qci_qos_config"`
+
+	// global settings for PFCP Agent
+	EnableUeIPAlloc   bool     `json:"enable_ue_ip_alloc"`
+	UEIPPool          string   `json:"ue_ip_pool"`
+	EnableFlowMeasure bool             `json:"measure_flow"`
+	EnableEndMarker   bool             `json:"enable_end_marker"`
 	SliceMeterConfig  SliceMeterConfig `json:"slice_rate_limit_config"`
-	MaxReqRetries     uint8            `json:"max_req_retries"`
-	RespTimeout       string           `json:"resp_timeout"`
-	EnableHBTimer     bool             `json:"enable_hbTimer"`
-	HeartBeatInterval string           `json:"heart_beat_interval"`
+	CPIface           CPIfaceInfo      `json:"cpiface"`
+
+	Fastpath        string             `json:"fastpath"`
+
+	BESSInfo          BESSInfo         `json:"bess"`
+	P4rtcIface        P4rtcInfo        `json:"up4"`
 }
 
-// QciQosConfig : Qos configured attributes.
-type QciQosConfig struct {
-	QCI                uint8  `json:"qci"`
+// QfiQosConfig : Qos configured attributes.
+type QfiQosConfig struct {
+	QFI                uint8  `json:"qfi"`
 	CBS                uint32 `json:"cbs"`
 	PBS                uint32 `json:"pbs"`
 	EBS                uint32 `json:"ebs"`
@@ -78,15 +82,19 @@ type SimModeInfo struct {
 	StartN9TEID string `json:"start_n9_teid"`
 }
 
-// CPIfaceInfo : CPIface interface settings.
+// CPIfaceInfo : CPIface (northbound) interface settings.
 type CPIfaceInfo struct {
+	HTTPPort        string   `json:"http_port"`
 	Peers           []string `json:"peers"`
 	UseFQDN         bool     `json:"use_fqdn"`
-	NodeID          string   `json:"hostname"`
-	HTTPPort        string   `json:"http_port"`
+	NodeID          string   `json:"node_id"`
 	Dnn             string   `json:"dnn"`
-	EnableUeIPAlloc bool     `json:"enable_ue_ip_alloc"`
-	UEIPPool        string   `json:"ue_ip_pool"`
+	EnableHBTimer     bool             `json:"enable_hbTimer"`
+	HeartBeatInterval string           `json:"heart_beat_interval"`
+
+	ReadTimeout       uint32           `json:"read_timeout"` // TODO(max): convert to duration string
+	MaxReqRetries     uint8            `json:"max_req_retries"`
+	RespTimeout       string           `json:"resp_timeout"`
 }
 
 // IfaceType : Gateway interface struct.
@@ -94,7 +102,19 @@ type IfaceType struct {
 	IfName string `json:"ifname"`
 }
 
-// P4rtcInfo : P4 runtime interface settings.
+// BESSInfo : BESS pipeline settings.
+type BESSInfo struct {
+	Mode              string           `json:"mode"`
+	AccessIface       IfaceType        `json:"access"`
+	CoreIface         IfaceType        `json:"core"`
+	EnableNotifyBess  bool             `json:"enable_notify_bess"`
+	NotifySockAddr    string           `json:"notify_sockaddr"`
+	EndMarkerSockAddr string           `json:"endmarker_sockaddr"`
+	QfiQosConfig      []QfiQosConfig   `json:"qfi_qos_config"`
+	SimInfo           SimModeInfo      `json:"sim"`
+}
+
+// P4rtcInfo : UP4 interface settings.
 type P4rtcInfo struct {
 	P4Info       string `json:"p4info"`
 	DeviceConfig string `json:"device_config"`
@@ -105,21 +125,25 @@ type P4rtcInfo struct {
 
 // validateConf checks that the given config reaches a baseline of correctness.
 func validateConf(conf Conf) error {
-	if conf.EnableP4rt {
+	if conf.Fastpath == FastpathUP4 {
 		_, _, err := net.ParseCIDR(conf.P4rtcIface.AccessIP)
 		if err != nil {
 			return ErrInvalidArgumentWithReason("conf.P4rtcIface.AccessIP", conf.P4rtcIface.AccessIP, err.Error())
 		}
 
-		_, _, err = net.ParseCIDR(conf.CPIface.UEIPPool)
+		_, _, err = net.ParseCIDR(conf.UEIPPool)
 		if err != nil {
-			return ErrInvalidArgumentWithReason("conf.UEIPPool", conf.CPIface.UEIPPool, err.Error())
+			return ErrInvalidArgumentWithReason("conf.UEIPPool", conf.UEIPPool, err.Error())
 		}
 
-		if conf.Mode != "" {
-			return ErrInvalidArgumentWithReason("conf.Mode", conf.Mode, "mode must not be set for UP4")
+		if !reflect.DeepEqual(BESSInfo{}, conf.BESSInfo) {
+			return ErrInvalidArgumentWithReason("conf.BESSInfo", conf.BESSInfo, "BESS settings must not be set for UP4")
 		}
-	} else {
+	} else if conf.Fastpath == FastpathBESS {
+		if !reflect.DeepEqual(P4rtcInfo{}, conf.P4rtcIface) {
+			return ErrInvalidArgumentWithReason("conf.P4rtcInfo", conf.P4rtcIface, "UP4 settings must not be set for BESS")
+		}
+
 		// Mode is only relevant in a BESS deployment.
 		validModes := map[string]struct{}{
 			"af_xdp":    {},
@@ -127,15 +151,29 @@ func validateConf(conf Conf) error {
 			"dpdk":      {},
 			"sim":       {},
 		}
-		if _, ok := validModes[conf.Mode]; !ok {
-			return ErrInvalidArgumentWithReason("conf.Mode", conf.Mode, "invalid mode")
+		if _, ok := validModes[conf.BESSInfo.Mode]; !ok {
+			return ErrInvalidArgumentWithReason("conf.Mode", conf.BESSInfo.Mode, "invalid mode")
 		}
+
+		if conf.BESSInfo.EnableNotifyBess {
+			if conf.BESSInfo.NotifySockAddr == "" {
+				conf.BESSInfo.NotifySockAddr = NotifySockAddr
+			}
+		}
+
+		if conf.EnableEndMarker {
+			if conf.BESSInfo.EndMarkerSockAddr == "" {
+				conf.BESSInfo.EndMarkerSockAddr = EndMarkerSockAddr
+			}
+		}
+	} else {
+		return ErrInvalidArgumentWithReason("conf.fastpath", conf.Fastpath, "invalid fastpath type")
 	}
 
-	if conf.CPIface.EnableUeIPAlloc {
-		_, _, err := net.ParseCIDR(conf.CPIface.UEIPPool)
+	if conf.EnableUeIPAlloc {
+		_, _, err := net.ParseCIDR(conf.UEIPPool)
 		if err != nil {
-			return ErrInvalidArgumentWithReason("conf.UEIPPool", conf.CPIface.UEIPPool, err.Error())
+			return ErrInvalidArgumentWithReason("conf.UEIPPool", conf.UEIPPool, err.Error())
 		}
 	}
 
@@ -146,20 +184,20 @@ func validateConf(conf Conf) error {
 		}
 	}
 
-	if _, err := time.ParseDuration(conf.RespTimeout); err != nil {
-		return ErrInvalidArgumentWithReason("conf.RespTimeout", conf.RespTimeout, "invalid duration")
+	if _, err := time.ParseDuration(conf.CPIface.RespTimeout); err != nil {
+		return ErrInvalidArgumentWithReason("conf.RespTimeout", conf.CPIface.RespTimeout, "invalid duration")
 	}
 
-	if conf.ReadTimeout == 0 {
-		return ErrInvalidArgumentWithReason("conf.ReadTimeout", conf.ReadTimeout, "invalid duration")
+	if conf.CPIface.ReadTimeout == 0 {
+		return ErrInvalidArgumentWithReason("conf.ReadTimeout", conf.CPIface.ReadTimeout, "invalid duration")
 	}
 
-	if conf.MaxReqRetries == 0 {
-		return ErrInvalidArgumentWithReason("conf.MaxReqRetries", conf.MaxReqRetries, "invalid number of retries")
+	if conf.CPIface.MaxReqRetries == 0 {
+		return ErrInvalidArgumentWithReason("conf.MaxReqRetries", conf.CPIface.MaxReqRetries, "invalid number of retries")
 	}
 
-	if conf.EnableHBTimer {
-		if _, err := time.ParseDuration(conf.HeartBeatInterval); err != nil {
+	if conf.CPIface.EnableHBTimer {
+		if _, err := time.ParseDuration(conf.CPIface.HeartBeatInterval); err != nil {
 			return err
 		}
 	}
@@ -190,21 +228,21 @@ func LoadConfigFile(filepath string) (Conf, error) {
 	}
 
 	// Set defaults, when missing.
-	if conf.RespTimeout == "" {
-		conf.RespTimeout = respTimeoutDefault.String()
+	if conf.CPIface.RespTimeout == "" {
+		conf.CPIface.RespTimeout = respTimeoutDefault.String()
 	}
 
-	if conf.ReadTimeout == 0 {
-		conf.ReadTimeout = uint32(readTimeoutDefault.Seconds())
+	if conf.CPIface.ReadTimeout == 0 {
+		conf.CPIface.ReadTimeout = uint32(readTimeoutDefault.Seconds())
 	}
 
-	if conf.MaxReqRetries == 0 {
-		conf.MaxReqRetries = maxReqRetriesDefault
+	if conf.CPIface.MaxReqRetries == 0 {
+		conf.CPIface.MaxReqRetries = maxReqRetriesDefault
 	}
 
-	if conf.EnableHBTimer {
-		if conf.HeartBeatInterval == "" {
-			conf.HeartBeatInterval = hbIntervalDefault.String()
+	if conf.CPIface.EnableHBTimer {
+		if conf.CPIface.HeartBeatInterval == "" {
+			conf.CPIface.HeartBeatInterval = hbIntervalDefault.String()
 		}
 	}
 

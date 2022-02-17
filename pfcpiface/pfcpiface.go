@@ -38,10 +38,12 @@ func NewPFCPIface(conf Conf) *PFCPIface {
 		conf: conf,
 	}
 
-	if conf.EnableP4rt {
+	if conf.Fastpath == FastpathUP4 {
 		pfcpIface.fp = &UP4{}
-	} else {
+	} else if conf.Fastpath == FastpathBESS {
 		pfcpIface.fp = &bess{}
+	} else {
+		log.Fatalln("Unsupported fastpath provided!")
 	}
 
 	httpPort := "8080"
@@ -57,7 +59,7 @@ func NewPFCPIface(conf Conf) *PFCPIface {
 
 func (p *PFCPIface) Run() {
 	if simulate.enable() {
-		p.upf.sim(simulate, &p.conf.SimInfo)
+		p.upf.sim(simulate, &p.conf.BESSInfo.SimInfo)
 
 		if !simulate.keepGoing() {
 			return

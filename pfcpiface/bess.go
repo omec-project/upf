@@ -25,10 +25,7 @@ import (
 const (
 	// DefaultBurstSize for cbs, pbs required for dpdk metering. 32 MTUs.
 	DefaultBurstSize = 32 * 1514
-	// SockAddr : Unix Socket path to read bess notification from.
-	SockAddr = "/tmp/notifycp"
-	// PfcpAddr : Unix Socket path to send end marker packet.
-	PfcpAddr = "/tmp/pfcpport"
+
 	// AppQerLookup: Application Qos table Name.
 	AppQerLookup = "appQERLookup"
 	// SessQerLookup: Session Qos table Name.
@@ -588,7 +585,7 @@ func (b *bess) notifyListen(reportNotifyChan chan<- uint64) {
 func (b *bess) readQciQosMap(conf *Conf) {
 	b.qciQosMap = make(map[uint8]*QosConfigVal)
 
-	for _, qosVal := range conf.QciQosConfig {
+	for _, qosVal := range conf.BESSInfo.QfiQosConfig {
 		qosConfigVal := &QosConfigVal{
 			cbs:              qosVal.CBS,
 			ebs:              qosVal.EBS,
@@ -596,7 +593,7 @@ func (b *bess) readQciQosMap(conf *Conf) {
 			burstDurationMs:  qosVal.BurstDurationMs,
 			schedulePriority: qosVal.SchedulingPriority,
 		}
-		b.qciQosMap[qosVal.QCI] = qosConfigVal
+		b.qciQosMap[qosVal.QFI] = qosConfigVal
 	}
 
 	if _, ok := b.qciQosMap[0]; !ok {
@@ -628,13 +625,8 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 
 	b.client = pb.NewBESSControlClient(b.conn)
 
-	if conf.EnableNotifyBess {
-		notifySockAddr := conf.NotifySockAddr
-		if notifySockAddr == "" {
-			notifySockAddr = SockAddr
-		}
-
-		b.notifyBessSocket, err = net.Dial("unixpacket", notifySockAddr)
+	if conf.BESSInfo.EnableNotifyBess {
+		b.notifyBessSocket, err = net.Dial("unixpacket", conf.BESSInfo.NotifySockAddr)
 		if err != nil {
 			log.Println("dial error:", err)
 			return
@@ -644,12 +636,7 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 	}
 
 	if conf.EnableEndMarker {
-		pfcpCommAddr := conf.EndMarkerSockAddr
-		if pfcpCommAddr == "" {
-			pfcpCommAddr = PfcpAddr
-		}
-
-		b.endMarkerSocket, err = net.Dial("unixpacket", pfcpCommAddr)
+		b.endMarkerSocket, err = net.Dial("unixpacket", conf.BESSInfo.EndMarkerSockAddr)
 		if err != nil {
 			log.Println("dial error:", err)
 			return
@@ -825,7 +812,7 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 		// Uplink QER
 		srcIface = access
 
-		// Lookup QCI from QFI, else try default QCI.
+		// Lookup QFI from QFI, else try default QFI.
 		qosVal, ok := b.qciQosMap[qer.qfi]
 		if !ok {
 			log.Debug("No config for qfi/qci : ", qer.qfi, ". Using default burst size.")
@@ -858,7 +845,7 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 		// Downlink QER
 		srcIface = core
 
-		// Lookup QCI from QFI, else try default QCI.
+		// Lookup QFI from QFI, else try default QFI.
 		qosVal, ok = b.qciQosMap[qer.qfi]
 		if !ok {
 			log.Debug("No config for qfi/qci : ", qer.qfi, ". Using default burst size.")

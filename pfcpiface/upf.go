@@ -113,20 +113,20 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 	}
 
 	u := &upf{
-		enableUeIPAlloc:   conf.CPIface.EnableUeIPAlloc,
+		enableUeIPAlloc:   conf.EnableUeIPAlloc,
 		enableEndMarker:   conf.EnableEndMarker,
 		enableFlowMeasure: conf.EnableFlowMeasure,
-		accessIface:       conf.AccessIface.IfName,
-		coreIface:         conf.CoreIface.IfName,
-		ippoolCidr:        conf.CPIface.UEIPPool,
+		accessIface:       conf.BESSInfo.AccessIface.IfName,
+		coreIface:         conf.BESSInfo.CoreIface.IfName,
+		ippoolCidr:        conf.UEIPPool,
 		nodeID:            nodeID,
 		fastPath:          fp,
 		dnn:               conf.CPIface.Dnn,
 		peers:             conf.CPIface.Peers,
 		reportNotifyChan:  make(chan uint64, 1024),
-		maxReqRetries:     conf.MaxReqRetries,
-		enableHBTimer:     conf.EnableHBTimer,
-		readTimeout:       time.Second * time.Duration(conf.ReadTimeout),
+		maxReqRetries:     conf.CPIface.MaxReqRetries,
+		enableHBTimer:     conf.CPIface.EnableHBTimer,
+		readTimeout:       time.Second * time.Duration(conf.CPIface.ReadTimeout),
 	}
 
 	if len(conf.CPIface.Peers) > 0 {
@@ -138,28 +138,28 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 		}
 	}
 
-	if !conf.EnableP4rt {
-		u.accessIP, err = GetUnicastAddressFromInterface(conf.AccessIface.IfName)
+	if conf.Fastpath == FastpathBESS {
+		u.accessIP, err = GetUnicastAddressFromInterface(conf.BESSInfo.AccessIface.IfName)
 		if err != nil {
 			log.Errorln(err)
 			return nil
 		}
 
-		u.coreIP, err = GetUnicastAddressFromInterface(conf.CoreIface.IfName)
+		u.coreIP, err = GetUnicastAddressFromInterface(conf.BESSInfo.CoreIface.IfName)
 		if err != nil {
 			log.Errorln(err)
 			return nil
 		}
 	}
 
-	u.respTimeout, err = time.ParseDuration(conf.RespTimeout)
+	u.respTimeout, err = time.ParseDuration(conf.CPIface.RespTimeout)
 	if err != nil {
 		log.Fatalln("Unable to parse resp_timeout")
 	}
 
 	if u.enableHBTimer {
-		if conf.HeartBeatInterval != "" {
-			u.hbInterval, err = time.ParseDuration(conf.HeartBeatInterval)
+		if conf.CPIface.HeartBeatInterval != "" {
+			u.hbInterval, err = time.ParseDuration(conf.CPIface.HeartBeatInterval)
 			if err != nil {
 				log.Fatalln("Unable to parse heart_beat_interval")
 			}
