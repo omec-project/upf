@@ -372,62 +372,19 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 }
 
 func (up4 *UP4) clearAllTables() error {
-	sessionsUplinkTableID, err := up4.p4RtTranslator.getTableIDByName(TableUplinkSessions)
-	if err != nil {
-		return err
+	tables := []string{TableUplinkSessions, TableDownlinkSessions, TableUplinkTerminations, TableDownlinkTerminations, TableTunnelPeers, TableApplications}
+	tableIDs := make([]uint32, len(tables))
+
+	for _, table := range tables {
+		tableID, err := up4.p4RtTranslator.getTableIDByName(table)
+		if err != nil {
+			return err
+		}
+
+		tableIDs = append(tableIDs, tableID)
 	}
 
-	err = up4.p4client.ClearTable(sessionsUplinkTableID)
-	if err != nil {
-		return err
-	}
-
-	sessionsDownlinkTableID, err := up4.p4RtTranslator.getTableIDByName(TableDownlinkSessions)
-	if err != nil {
-		return err
-	}
-
-	err = up4.p4client.ClearTable(sessionsDownlinkTableID)
-	if err != nil {
-		return err
-	}
-
-	terminationsUplinkTableID, err := up4.p4RtTranslator.getTableIDByName(TableUplinkTerminations)
-	if err != nil {
-		return err
-	}
-
-	err = up4.p4client.ClearTable(terminationsUplinkTableID)
-	if err != nil {
-		return err
-	}
-
-	terminationsDownlinkTableID, err := up4.p4RtTranslator.getTableIDByName(TableDownlinkTerminations)
-	if err != nil {
-		return err
-	}
-
-	err = up4.p4client.ClearTable(terminationsDownlinkTableID)
-	if err != nil {
-		return err
-	}
-
-	gtpTunnelPeersTableID, err := up4.p4RtTranslator.getTableIDByName(TableTunnelPeers)
-	if err != nil {
-		return err
-	}
-
-	err = up4.p4client.ClearTable(gtpTunnelPeersTableID)
-	if err != nil {
-		return err
-	}
-
-	applicationsTableID, err := up4.p4RtTranslator.getTableIDByName(TableApplications)
-	if err != nil {
-		return err
-	}
-
-	err = up4.p4client.ClearTable(applicationsTableID)
+	err := up4.p4client.ClearTables(tableIDs)
 	if err != nil {
 		return err
 	}
@@ -1225,9 +1182,13 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 			qfi = relatedQER.qfi
 		}
 
-		// FIXME: get TC from QFI->TC mapping
+		tc, exists := up4.conf.QFIToTC[relatedQER.qfi]
+		if !exists {
+			tc = NoTC
+		}
+
 		terminationsEntry, err := up4.p4RtTranslator.BuildTerminationsTableEntry(pdr, appMeter, far,
-			applicationID, qfi, uint8(0))
+			applicationID, qfi, tc)
 		if err != nil {
 			return ErrOperationFailedWithReason("build P4rt table entry for Terminations table", err.Error())
 		}
