@@ -163,20 +163,5 @@
                 "priority": 5
             }
         ]
-    },
-
-    "": "UP4 interface settings (if fastpath == up4)",
-    "up4": {
-        "": "Access IP (N3 address) of UPF (mandatory). It should use /32 prefix length.",
-        "access_ip": "172.17.0.1/32",
-        "": "IP address/hostname of the P4Runtime server (mandatory).",
-        "p4rtc_server": "onos",
-        "": "TCP port that the P4Runtime server is listening on (mandatory).",
-        "p4rtc_port": "51001",
-
-        "": "A local path to the P4Info file",
-        "" : "p4info: /bin/p4info.txt",
-        "": "A local path to the device config (BMv2 json)",
-        "" : "device_config: /bin/bmv2.json"
     }
 }

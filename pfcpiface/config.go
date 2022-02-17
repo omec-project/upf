@@ -246,12 +246,14 @@ func LoadConfigFile(filepath string) (Conf, error) {
 		}
 	}
 
-	if conf.P4rtcIface.P4Info == "" {
-		conf.P4rtcIface.P4Info = p4InfoPathDefault
-	}
+	if conf.Fastpath == FastpathUP4 {
+		if conf.P4rtcIface.P4Info == "" {
+			conf.P4rtcIface.P4Info = p4InfoPathDefault
+		}
 
-	if conf.P4rtcIface.DeviceConfig == "" {
-		conf.P4rtcIface.DeviceConfig = deviceConfigPathDefault
+		if conf.P4rtcIface.DeviceConfig == "" {
+			conf.P4rtcIface.DeviceConfig = deviceConfigPathDefault
+		}
 	}
 
 	// Perform basic validation.

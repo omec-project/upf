@@ -1,0 +1,76 @@
+{
+  "": "Set the log level to one of \"panic\", \"fatal\", \"error\", \"warning\", \"info\", \"debug\", \"trace\"",
+  "log_level": "info",
+
+  "": "Whether to enable flow measurement feature",
+  "measure_flow": false,
+
+  "": "Whether to enable End Marker Support",
+  "enable_end_marker": false,
+
+  "": "Whether to enable UPF-based UE IP allocation (default: false)",
+  "enable_ue_ip_alloc": false,
+  "": "IP pool to allocate UE address from (default: \"\"). Mandatory for UP4 fastpath.",
+  "ue_ip_pool": "10.250.0.0/16",
+
+  "": "Optional slice-wide meter rate limits",
+  "slice_rate_limit_config": {
+    "": "uplink policer",
+    "n6_bps": 500000000,
+    "n6_burst_bytes": 625000,
+    "": "downlink policer",
+    "n3_bps": 500000000,
+    "n3_burst_bytes": 625000
+  },
+
+  "": "UPF fastpath to use (up4, bess, aether-bess)",
+  "fastpath": "up4",
+
+  "": "Enable PDU Session Container extension.",
+  "": "TODO: not supported by UP4 fastpath plugin yet",
+  "gtppsc": false,
+
+  "": "Control (northbound) interface settings",
+  "cpiface": {
+    "": "Max retries for sending a PFCP message from UPF",
+    "max_req_retries": 5,
+    "": "Timeout to wait for response from PFCP peer",
+    "resp_timeout": "2s",
+
+    "": "Period (in seconds) to wait until an inactive PFCP connection is closed",
+    "" : "read_timeout: 25",
+
+    "": "Whether to enable UPF HeartBeatTimer feature",
+    "enable_hbTimer": false,
+    "": "heart_beat_interval: 5s",
+
+    "": "Initiate PFCP connection to peers from UPF",
+    "peers": ["148.162.12.214"],
+
+    "": "DNN/APN name (default: \"\")",
+    "dnn": "internet",
+
+    "": "HTTP port for metrics, slice config, etc.",
+    "http_port": "8080",
+
+    "": "PFCP NodeID - FQDN or IP to override (default: source IP address of UDPConn)",
+    "" : "node_id: upf-0",
+    "": "Whether to use FQDN to retrieve PFCP Node ID (default: false)",
+    "use_fqdn": false
+  },
+
+  "": "UP4 interface settings (if fastpath == up4)",
+  "up4": {
+    "": "Access IP (N3 address) of UPF (mandatory). It should use /32 prefix length.",
+    "access_ip": "172.17.0.1/32",
+    "": "IP address/hostname of the P4Runtime server (mandatory).",
+    "p4rtc_server": "onos",
+    "": "TCP port that the P4Runtime server is listening on (mandatory).",
+    "p4rtc_port": "51001",
+
+    "": "A local path to the P4Info file",
+    "" : "p4info: /bin/p4info.txt",
+    "": "A local path to the device config (BMv2 json)",
+    "" : "device_config: /bin/bmv2.json"
+  }
+}

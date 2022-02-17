@@ -187,7 +187,7 @@ docker run --name bess-web -d --restart unless-stopped \
 # modify ptf to do initial setup instead of pfcpiface
 docker run --name bess-pfcpiface -td --restart on-failure \
 	--net container:pause \
-	-v "$PWD/conf/upf.json":/conf/upf.json \
+	-v "$PWD/conf/bess-upf.json":/conf/upf.json \
 	upf-epc-pfcpiface:"$(<VERSION)" \
 	-config /conf/upf.json
 
