@@ -3,7 +3,6 @@
 
 PROJECT_NAME             := upf-epc
 VERSION                  ?= $(shell cat ./VERSION)
-GO_FILES                 := $(shell find . -type d \( -path ./pfcpiface/vendor -o -path ./pfcpiface/bess_pb  \) -prune -o -name '*.go' -print)
 
 # Note that we set the target platform of Docker images to native
 # For a more portable image set CPU=haswell
@@ -66,7 +65,8 @@ output:
 
 test-up4-integration:
 	docker-compose -f test/integration/infra/docker-compose.yml rm -fsv
-	COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker-compose -f test/integration/infra/docker-compose.yml up --build -d
+	COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker-compose -f test/integration/infra/docker-compose.yml build $(DOCKER_BUILD_ARGS)
+	docker-compose -f test/integration/infra/docker-compose.yml up -d
 	go test -v -count=1 -failfast ./test/integration/...
 	docker-compose -f test/integration/infra/docker-compose.yml rm -fsv
 
@@ -85,8 +85,22 @@ py-pb:
 		.;
 	cp -a output/bess_pb/. ${PTF_PB_DIR}
 
+.coverage:
+	rm -rf $(CURDIR)/.coverage
+	mkdir -p $(CURDIR)/.coverage
+
+test: .coverage
+	docker run --rm -v $(CURDIR):/upf-epc -w /upf-epc golang:latest \
+		go test \
+			-race \
+			-failfast \
+			-coverprofile=.coverage/coverage-unit.txt \
+			-covermode=atomic \
+			-v \
+			./pfcpiface
+
 fmt:
-	@gofmt -s -l -w $(GO_FILES)
+	@go fmt ./...
 
 golint:
 	@docker run --rm -v $(CURDIR):/app -w /app/pfcpiface golangci/golangci-lint:latest golangci-lint run -v --config /app/.golangci.yml
@@ -94,4 +108,4 @@ golint:
 check-reuse:
 	@docker run --rm -v $(CURDIR):/upf-epc -w /upf-epc omecproject/reuse-verify:latest reuse lint
 
-.PHONY: docker-build docker-push output pb fmt golint check-reuse test-up4-integration
+.PHONY: docker-build docker-push output pb fmt golint check-reuse test-up4-integration .coverage test

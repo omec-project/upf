@@ -90,4 +90,4 @@ https://user-images.githubusercontent.com/6157640/133918985-c36d4668-4e98-4866-8
 
 ## Installation
 
-Please see [INSTALL.md](INSTALL.md) for details on how to set up CP and UPF-EPC.
+Please see [INSTALL.md](docs/INSTALL.md) for details on how to set up CP and UPF-EPC.

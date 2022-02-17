@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2021 Intel Corporation
 
-package main
+package pfcpiface
 
 // PFD holds the switch level application IDs.
 type appPFD struct {

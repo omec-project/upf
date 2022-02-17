@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2020 Intel Corporation
+// Copyright 2022 Open Networking Foundation
 
-package main
+package pfcpiface
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -20,7 +22,7 @@ var errBadFilterDesc = errors.New("unsupported Filter Description format")
 
 type endpoint struct {
 	IPNet *net.IPNet
-	Port  uint16
+	ports portRange
 }
 
 func (ep *endpoint) parseNet(ipnet string) error {
@@ -65,12 +67,11 @@ func (ep *endpoint) parsePort(port string) error {
 		return err
 	}
 
-	// TODO: support port ranges
-	if low != high {
-		return ErrInvalidArgumentWithReason("port", port, "port ranges are not supported yet")
+	if low > high {
+		return ErrInvalidArgumentWithReason("port", port, "invalid port range")
 	}
 
-	ep.Port = uint16(low)
+	ep.ports = newRangeMatchPortRange(uint16(low), uint16(high))
 
 	return nil
 }
@@ -81,37 +82,48 @@ type ipFilterRule struct {
 	src, dst          endpoint
 }
 
-// "permit out ip from any to assigned"
-// "permit out ip from 60.60.0.102 to assigned"
-// "permit out ip from 60.60.0.102/32 to assigned"
-// "permit out ip from any to 60.60.0.102"
-// "permit out ip from 60.60.0.1/26 to 60.60.0.102"
-// "permit out ip from 60.60.0.1 8888 to 60.60.0.102/26"
-// "permit out ip from 60.60.0.1 8888-8888 to 60.60.0.102/26"
-// "permit out ip from 60.60.0.1 to 60.60.0.102 9999"
-// "permit out ip from 60.60.0.1 8888 to 60.60.0.102 9999"
-// "permit out ip from 60.60.0.1 8888-8888 to 60.60.0.102 9999-9999"
+func newIpFilterRule() *ipFilterRule {
+	return &ipFilterRule{
+		src: endpoint{ports: newWildcardPortRange()},
+		dst: endpoint{ports: newWildcardPortRange()},
+	}
+}
 
-func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
+func (ipf *ipFilterRule) String() string {
+	return fmt.Sprintf("FlowDescription{action=%v, direction=%v, proto=%v, "+
+		"srcIP=%v, srcPort=%v, dstIP=%v, dstPort=%v}",
+		ipf.action, ipf.direction, ipf.proto, ipf.src.IPNet, ipf.src.ports, ipf.dst.IPNet, ipf.dst.ports)
+}
+
+func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
+	parseLog := log.WithFields(log.Fields{
+		"flow-description": flowDesc,
+		"ue-address":       ueIP,
+	})
+	parseLog.Debug("Parsing flow description")
+
+	ipf := newIpFilterRule()
+
 	fields := strings.Fields(flowDesc)
+	if len(fields) < 3 {
+		return nil, errBadFilterDesc
+	}
 
 	if err := parseAction(fields[0]); err != nil {
-		return err
+		return nil, err
 	}
 
 	ipf.action = fields[0]
 
 	if err := parseDirection(fields[1]); err != nil {
-		return err
+		return nil, err
 	}
 
 	ipf.direction = fields[1]
-	ipf.proto = parseProto(fields[2])
+	ipf.proto, _ = parseL4Proto(fields[2])
 
 	// bring to common intermediate representation
 	xform := func(i int) {
-		log.Println(fields)
-
 		switch fields[i] {
 		case "any":
 			fields[i] = "0.0.0.0/0"
@@ -122,13 +134,9 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 				fields[i] = "0.0.0.0/0"
 			}
 		}
-
-		log.Println(fields)
 	}
 
 	for i := 3; i < len(fields); i++ {
-		log.Println(fields[i])
-
 		switch fields[i] {
 		case "from":
 			i++
@@ -136,8 +144,8 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 
 			err := ipf.src.parseNet(fields[i])
 			if err != nil {
-				log.Println(err)
-				return err
+				parseLog.Error(err)
+				return nil, err
 			}
 
 			if fields[i+1] != "to" {
@@ -145,8 +153,8 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 
 				err = ipf.src.parsePort(fields[i])
 				if err != nil {
-					log.Println("src port parse failed ", err)
-					return err
+					parseLog.Error("src port parse failed ", err)
+					return nil, err
 				}
 			}
 		case "to":
@@ -155,8 +163,8 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 
 			err := ipf.dst.parseNet(fields[i])
 			if err != nil {
-				log.Println(err)
-				return err
+				parseLog.Error(err)
+				return nil, err
 			}
 
 			if i < len(fields)-1 {
@@ -164,16 +172,17 @@ func (ipf *ipFilterRule) parseFlowDesc(flowDesc, ueIP string) error {
 
 				err = ipf.dst.parsePort(fields[i])
 				if err != nil {
-					log.Println("dst port parse failed ", err)
-					return err
+					parseLog.Error("dst port parse failed ", err)
+					return nil, err
 				}
 			}
 		}
 	}
 
-	log.Println(ipf)
+	parseLog = parseLog.WithField("ip-filter", ipf)
+	parseLog.Debug("Flow description parsed successfully")
 
-	return nil
+	return ipf, nil
 }
 
 func parseAction(action string) error {
@@ -198,18 +207,18 @@ func parseDirection(dir string) error {
 	return nil
 }
 
-func parseProto(proto string) uint8 {
+func parseL4Proto(proto string) (uint8, error) {
 	p, err := strconv.ParseUint(proto, 10, 8)
 	if err == nil {
-		return uint8(p)
+		return uint8(p), nil
 	}
 
 	switch proto {
 	case "udp":
-		return 17
+		return 17, nil
 	case "tcp":
-		return 6
+		return 6, nil
 	default:
-		return reservedProto // IANA reserved
+		return reservedProto, errBadFilterDesc
 	}
 }

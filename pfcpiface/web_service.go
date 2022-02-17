@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2020 Intel Corporation
 
-package main
+package pfcpiface
 
 import (
 	"encoding/json"
@@ -38,9 +38,9 @@ type ConfigHandler struct {
 	upf *upf
 }
 
-func setupConfigHandler(upf *upf) {
+func setupConfigHandler(mux *http.ServeMux, upf *upf) {
 	cfgHandler := ConfigHandler{upf: upf}
-	http.Handle("/v1/config/network-slices", &cfgHandler)
+	mux.Handle("/v1/config/network-slices", &cfgHandler)
 }
 
 func (c *ConfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

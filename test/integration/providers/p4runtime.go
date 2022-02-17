@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	stopCh chan struct{}
+	stopCh   chan struct{}
 	grpcConn *grpc.ClientConn
 )
 
@@ -41,6 +41,9 @@ func ConnectP4rt(addr string, electionID p4_v1.Uint128) (*client.Client, error) 
 		return nil, fmt.Errorf("failed to connect to P4Runtime server")
 	case <-arbitrationCh:
 	}
+
+	// used to retrieve P4Info if exists on device
+	p4RtC.GetFwdPipe(client.GetFwdPipeP4InfoAndCookie)
 
 	return p4RtC, nil
 }
