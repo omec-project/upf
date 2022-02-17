@@ -143,12 +143,12 @@ func (col PfcpNodeCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func setupProm(upf *upf, node *PFCPNode) {
+func setupProm(mux *http.ServeMux, upf *upf, node *PFCPNode) {
 	uc := newUpfCollector(upf)
 	prometheus.MustRegister(uc)
 
 	nc := NewPFCPNodeCollector(node)
 	prometheus.MustRegister(nc)
 
-	http.Handle("/metrics", promhttp.Handler())
+	mux.Handle("/metrics", promhttp.Handler())
 }
