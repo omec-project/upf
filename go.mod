@@ -1,6 +1,6 @@
 module github.com/omec-project/upf-epc
 
-go 1.16
+go 1.13
 
 require (
 	github.com/Showmax/go-fqdn v1.0.0
