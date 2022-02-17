@@ -99,7 +99,7 @@ test: .coverage
 			-v \
 			./pfcpiface
 
-p4info-go:
+p4-constants:
 	$(info *** Generating go constants...)
 	@docker run --rm -v $(CURDIR):/app -w /app \
 		opennetworking/up4-ptf:latest python ./utils/go_gen_p4_const.py \
