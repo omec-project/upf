@@ -294,6 +294,36 @@ func (c *P4rtClient) ClearTable(tableID uint32) error {
 	return c.WriteBatchReq(updates)
 }
 
+func (c *P4rtClient) ClearTables(tableIDs []uint32) error {
+	log.Traceln("Clearing P4 tables")
+
+	updates := []*p4.Update{}
+
+	for _, tableID := range tableIDs {
+		entry := &p4.TableEntry{
+			TableId:  tableID,
+			Priority: DefaultPriority,
+		}
+
+		readRes, err := c.ReadTableEntry(entry)
+		if err != nil {
+			return err
+		}
+
+		for _, entity := range readRes.GetEntities() {
+			updateType := p4.Update_DELETE
+			update := &p4.Update{
+				Type:   updateType,
+				Entity: entity,
+			}
+
+			updates = append(updates, update)
+		}
+	}
+
+	return c.WriteBatchReq(updates)
+}
+
 // InsertTableEntry .. Insert table Entry.
 func (c *P4rtClient) InsertTableEntry(entry *p4.TableEntry, funcType uint8) error {
 	log.Println("Insert Table Entry for Table ", entry.TableId)
@@ -330,6 +360,7 @@ func (c *P4rtClient) ApplyTableEntries(methodType p4.Update_Type, entries ...*p4
 			},
 		}
 		log.Traceln("Writing table entry: ", proto.MarshalTextString(update))
+
 		updates = append(updates, update)
 	}
 

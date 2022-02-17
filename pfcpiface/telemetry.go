@@ -4,16 +4,13 @@
 package pfcpiface
 
 import (
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
-	"sync"
 
 	log "github.com/sirupsen/logrus"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
-
-var once sync.Once
 
 func getPctiles() []float64 {
 	return []float64{50, 75, 90, 95, 99, 99.9, 99.99, 99.999, 99.9999, 100}
@@ -146,20 +143,28 @@ func (col PfcpNodeCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func setupProm(upf *upf, node *PFCPNode) {
+func setupProm(mux *http.ServeMux, upf *upf, node *PFCPNode) (*upfCollector, *PfcpNodeCollector, error) {
 	uc := newUpfCollector(upf)
-	prometheus.MustRegister(uc)
+	if err := prometheus.Register(uc); err != nil {
+		return nil, nil, err
+	}
 
 	nc := NewPFCPNodeCollector(node)
-	prometheus.MustRegister(nc)
+	if err := prometheus.Register(nc); err != nil {
+		return nil, nil, err
+	}
 
-	http.NewServeMux().Handle("/metrics", promhttp.Handler())
+	mux.Handle("/metrics", promhttp.Handler())
+
+	return uc, nc, nil
 }
 
-func clearProm(upf *upf, node *PFCPNode) {
-	uc := newUpfCollector(upf)
-	prometheus.Unregister(uc)
+func clearProm(uc *upfCollector, nc *PfcpNodeCollector) {
+	if ok := prometheus.Unregister(uc); !ok {
+		log.Warnln("Failed to unregister upfCollector")
+	}
 
-	nc := NewPFCPNodeCollector(node)
-	prometheus.Unregister(nc)
+	if ok := prometheus.Unregister(nc); !ok {
+		log.Warnln("Failed to unregister PfcpNodeCollector")
+	}
 }
