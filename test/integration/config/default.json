@@ -1,10 +1,10 @@
 {
-  "enable_p4rt": true,
+  "fastpath": "up4",
   "log_level": "trace",
-  "cpiface": {
-    "ue_ip_pool": "10.250.0.0/16"
-  },
-  "p4rtciface": {
+
+  "ue_ip_pool": "10.250.0.0/16",
+
+  "up4": {
     "p4rtc_server": "mock-up4",
     "p4rtc_port": "50001",
     "access_ip": "198.18.0.1/32"
