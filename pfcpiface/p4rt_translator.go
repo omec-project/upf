@@ -837,7 +837,6 @@ func (t *P4rtTranslator) BuildMeterEntry(meterID uint32, cellID uint32, config *
 	switch meterID {
 	case p4constants.Meter_PreQosPipeAppMeter:
 		meterName = applicationMeter
-		break
 	case p4constants.Meter_PreQosPipeSessionMeter:
 		meterName = sessionMeter
 	}
