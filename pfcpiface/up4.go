@@ -74,7 +74,7 @@ type meter struct {
 }
 
 type UP4 struct {
-	conf P4rtcInfo
+	conf UP4Info
 
 	host            string
 	deviceID        uint64
@@ -317,9 +317,9 @@ func (up4 *UP4) isConnected(accessIP *net.IP) bool {
 func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	log.Println("setUpfInfo UP4")
 
-	up4.conf = conf.P4rtcIface
+	up4.conf = conf.UP4Info
 
-	up4.accessIP = MustParseStrIP(conf.P4rtcIface.AccessIP)
+	up4.accessIP = MustParseStrIP(conf.UP4Info.AccessIP)
 	u.accessIP = up4.accessIP.IP
 
 	log.Infof("AccessIP: %v", up4.accessIP)
@@ -328,9 +328,9 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 
 	log.Infof("UE IP pool: %v", up4.ueIPPool)
 
-	p4rtcServer := conf.P4rtcIface.P4rtcServer
+	p4rtcServer := conf.UP4Info.P4rtcServer
 
-	p4rtcPort := conf.P4rtcIface.P4rtcPort
+	p4rtcPort := conf.UP4Info.P4rtcPort
 	up4.reportNotifyChan = u.reportNotifyChan
 
 	if *p4RtcServerIP != "" {

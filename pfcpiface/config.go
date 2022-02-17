@@ -49,8 +49,8 @@ type Conf struct {
 
 	Fastpath        string             `json:"fastpath"`
 
-	BESSInfo          BESSInfo         `json:"bess"`
-	P4rtcIface        P4rtcInfo        `json:"up4"`
+	BESSInfo BESSInfo `json:"bess"`
+	UP4Info  UP4Info  `json:"up4"`
 }
 
 // QfiQosConfig : Qos configured attributes.
@@ -114,8 +114,8 @@ type BESSInfo struct {
 	SimInfo           SimModeInfo      `json:"sim"`
 }
 
-// P4rtcInfo : UP4 interface settings.
-type P4rtcInfo struct {
+// UP4Info : UP4 interface settings.
+type UP4Info struct {
 	P4Info       string `json:"p4info"`
 	DeviceConfig string `json:"device_config"`
 	AccessIP     string `json:"access_ip"`
@@ -126,9 +126,9 @@ type P4rtcInfo struct {
 // validateConf checks that the given config reaches a baseline of correctness.
 func validateConf(conf Conf) error {
 	if conf.Fastpath == FastpathUP4 {
-		_, _, err := net.ParseCIDR(conf.P4rtcIface.AccessIP)
+		_, _, err := net.ParseCIDR(conf.UP4Info.AccessIP)
 		if err != nil {
-			return ErrInvalidArgumentWithReason("conf.P4rtcIface.AccessIP", conf.P4rtcIface.AccessIP, err.Error())
+			return ErrInvalidArgumentWithReason("conf.UP4Info.AccessIP", conf.UP4Info.AccessIP, err.Error())
 		}
 
 		_, _, err = net.ParseCIDR(conf.UEIPPool)
@@ -140,8 +140,8 @@ func validateConf(conf Conf) error {
 			return ErrInvalidArgumentWithReason("conf.BESSInfo", conf.BESSInfo, "BESS settings must not be set for UP4")
 		}
 	} else if conf.Fastpath == FastpathBESS {
-		if !reflect.DeepEqual(P4rtcInfo{}, conf.P4rtcIface) {
-			return ErrInvalidArgumentWithReason("conf.P4rtcInfo", conf.P4rtcIface, "UP4 settings must not be set for BESS")
+		if !reflect.DeepEqual(UP4Info{}, conf.UP4Info) {
+			return ErrInvalidArgumentWithReason("conf.UP4Info", conf.UP4Info, "UP4 settings must not be set for BESS")
 		}
 
 		// Mode is only relevant in a BESS deployment.
@@ -247,12 +247,12 @@ func LoadConfigFile(filepath string) (Conf, error) {
 	}
 
 	if conf.Fastpath == FastpathUP4 {
-		if conf.P4rtcIface.P4Info == "" {
-			conf.P4rtcIface.P4Info = p4InfoPathDefault
+		if conf.UP4Info.P4Info == "" {
+			conf.UP4Info.P4Info = p4InfoPathDefault
 		}
 
-		if conf.P4rtcIface.DeviceConfig == "" {
-			conf.P4rtcIface.DeviceConfig = deviceConfigPathDefault
+		if conf.UP4Info.DeviceConfig == "" {
+			conf.UP4Info.DeviceConfig = deviceConfigPathDefault
 		}
 	}
 
