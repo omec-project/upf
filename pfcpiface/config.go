@@ -37,17 +37,17 @@ const (
 
 // Conf : Json conf struct.
 type Conf struct {
-	LogLevel          log.Level        `json:"log_level"`
+	LogLevel log.Level `json:"log_level"`
 
 	// global settings for PFCP Agent
-	EnableUeIPAlloc   bool     `json:"enable_ue_ip_alloc"`
-	UEIPPool          string   `json:"ue_ip_pool"`
+	EnableUeIPAlloc   bool             `json:"enable_ue_ip_alloc"`
+	UEIPPool          string           `json:"ue_ip_pool"`
 	EnableFlowMeasure bool             `json:"measure_flow"`
 	EnableEndMarker   bool             `json:"enable_end_marker"`
 	SliceMeterConfig  SliceMeterConfig `json:"slice_rate_limit_config"`
 	CPIface           CPIfaceInfo      `json:"cpiface"`
 
-	Fastpath        string             `json:"fastpath"`
+	Fastpath string `json:"fastpath"`
 
 	BESSInfo BESSInfo `json:"bess"`
 	UP4Info  UP4Info  `json:"up4"`
@@ -84,17 +84,17 @@ type SimModeInfo struct {
 
 // CPIfaceInfo : CPIface (northbound) interface settings.
 type CPIfaceInfo struct {
-	HTTPPort        string   `json:"http_port"`
-	Peers           []string `json:"peers"`
-	UseFQDN         bool     `json:"use_fqdn"`
-	NodeID          string   `json:"node_id"`
-	Dnn             string   `json:"dnn"`
-	EnableHBTimer     bool             `json:"enable_hbTimer"`
-	HeartBeatInterval string           `json:"heart_beat_interval"`
+	HTTPPort          string   `json:"http_port"`
+	Peers             []string `json:"peers"`
+	UseFQDN           bool     `json:"use_fqdn"`
+	NodeID            string   `json:"node_id"`
+	Dnn               string   `json:"dnn"`
+	EnableHBTimer     bool     `json:"enable_hbTimer"`
+	HeartBeatInterval string   `json:"heart_beat_interval"`
 
-	ReadTimeout       uint32           `json:"read_timeout"` // TODO(max): convert to duration string
-	MaxReqRetries     uint8            `json:"max_req_retries"`
-	RespTimeout       string           `json:"resp_timeout"`
+	ReadTimeout   uint32 `json:"read_timeout"` // TODO(max): convert to duration string
+	MaxReqRetries uint8  `json:"max_req_retries"`
+	RespTimeout   string `json:"resp_timeout"`
 }
 
 // IfaceType : Gateway interface struct.
@@ -104,23 +104,23 @@ type IfaceType struct {
 
 // BESSInfo : BESS pipeline settings.
 type BESSInfo struct {
-	Mode              string           `json:"mode"`
-	AccessIface       IfaceType        `json:"access"`
-	CoreIface         IfaceType        `json:"core"`
-	EnableNotifyBess  bool             `json:"enable_notify_bess"`
-	NotifySockAddr    string           `json:"notify_sockaddr"`
-	EndMarkerSockAddr string           `json:"endmarker_sockaddr"`
-	QfiQosConfig      []QfiQosConfig   `json:"qfi_qos_config"`
-	SimInfo           SimModeInfo      `json:"sim"`
+	Mode              string         `json:"mode"`
+	AccessIface       IfaceType      `json:"access"`
+	CoreIface         IfaceType      `json:"core"`
+	EnableNotifyBess  bool           `json:"enable_notify_bess"`
+	NotifySockAddr    string         `json:"notify_sockaddr"`
+	EndMarkerSockAddr string         `json:"endmarker_sockaddr"`
+	QfiQosConfig      []QfiQosConfig `json:"qfi_qos_config"`
+	SimInfo           SimModeInfo    `json:"sim"`
 }
 
 // UP4Info : UP4 interface settings.
 type UP4Info struct {
-	P4Info       string `json:"p4info"`
-	DeviceConfig string `json:"device_config"`
-	AccessIP     string `json:"access_ip"`
-	P4rtcServer  string `json:"p4rtc_server"`
-	P4rtcPort    string `json:"p4rtc_port"`
+	P4Info       string          `json:"p4info"`
+	DeviceConfig string          `json:"device_config"`
+	AccessIP     string          `json:"access_ip"`
+	P4rtcServer  string          `json:"p4rtc_server"`
+	P4rtcPort    string          `json:"p4rtc_port"`
 	QFIToTC      map[uint8]uint8 `json:"qfi_tc_mapping"`
 }
 
