@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2022-present Open Networking Foundation
+
 package main
 
 import (
@@ -5,7 +8,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/ettle/strcase"
@@ -18,13 +20,14 @@ const (
 
 	DefaultPackageName = "p4constants"
 	// CopyrightHeader uses raw strings to avoid issues with reuse
-	CopyrightHeader = `// SPDX-License-Identifier: Apache-2.0 
-// Copyright 2022-present Open Networking Foundation`
+	CopyrightHeader = `// SPDX-License-Identifier: Apache-2.0
+// Copyright 2022-present Open Networking Foundation
+`
 
 	ConstOpen  = "//noinspection GoSnakeCaseUsage\nconst (\n"
 	ConstClose = ")"
 
-	Uint32String = "uint32 = "
+	IdTypeString = "uint32"
 
 	HfVarPrefix         = "Hdr_"
 	TblVarPrefix        = "Table_"
@@ -37,8 +40,19 @@ const (
 	MtrVarPrefix        = "Meter_"
 )
 
-func generate(p4info *p4ConfigV1.P4Info) string {
-	builder := new(strings.Builder)
+func emitEntityConstant(p4EntityName string, id uint32) string {
+	// see: https://go.dev/ref/spec#Identifiers
+	p4EntityName = strings.Replace(p4EntityName, ".", "_", -1)
+	p4EntityName = strcase.ToPascal(p4EntityName)
+	return fmt.Sprintf("%s \t %s = %v\n", p4EntityName, IdTypeString, id)
+}
+
+func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
+	builder := strings.Builder{}
+
+	builder.WriteString(CopyrightHeader + "\n")
+
+	builder.WriteString(fmt.Sprintf("package %s\n", packageName))
 	builder.WriteString(ConstOpen + "\n")
 
 	//HeaderField IDs
@@ -46,83 +60,65 @@ func generate(p4info *p4ConfigV1.P4Info) string {
 	for _, element := range p4info.GetTables() {
 		for _, matchField := range element.MatchFields {
 			tableName := element.GetPreamble().GetName()
-			name, ID := matchField.GetName(), strconv.FormatUint(uint64(matchField.GetId()), 10)
-			name = strcase.ToPascal(name)
-
-			builder.WriteString(HfVarPrefix + tableName + name + "\t" + Uint32String + ID + "\n")
+			name := matchField.GetName()
+			builder.WriteString(emitEntityConstant(HfVarPrefix+tableName+name, matchField.GetId()))
 		}
 	}
 	// Tables
 	builder.WriteString("// Tables\n")
 	for _, element := range p4info.GetTables() {
-		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
-		name = strcase.ToPascal(name)
-
-		builder.WriteString(TblVarPrefix + name + "\t" + Uint32String + ID + "\n")
+		name := element.GetPreamble().GetName()
+		builder.WriteString(emitEntityConstant(TblVarPrefix+name, element.GetPreamble().GetId()))
 	}
 	// Actions
 	builder.WriteString("// Actions\n")
 	for _, element := range p4info.GetActions() {
-		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
-		name = strcase.ToPascal(name)
-
-		builder.WriteString(ActVarPrefix + name + "\t" + Uint32String + ID + "\n")
-	}
-	// Indirect Counters
-	builder.WriteString("// IndirectCounters\n")
-	for _, element := range p4info.GetCounters() {
-		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
-		name = strcase.ToPascal(name)
-
-		builder.WriteString(CtrVarPrefix + name + "\t" + Uint32String + ID + "\n")
-	}
-	// Direct Counters
-	builder.WriteString("// DirectCounters\n")
-	for _, element := range p4info.GetDirectCounters() {
-		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
-		name = strcase.ToPascal(name)
-
-		builder.WriteString(DirctrVarPrefix + name + "\t" + Uint32String + ID + "\n")
+		name := element.GetPreamble().GetName()
+		builder.WriteString(emitEntityConstant(ActVarPrefix+name, element.GetPreamble().GetId()))
 	}
 	// Action Param IDs
 	builder.WriteString("// ActionParams\n")
 	for _, element := range p4info.GetActions() {
 		for _, actionParam := range element.GetParams() {
 			actionName := element.GetPreamble().GetName()
-			name, ID := actionParam.GetName(), strconv.FormatUint(uint64(actionParam.GetId()), 10)
-			name = strcase.ToPascal(name)
-
-			builder.WriteString(ActparamVarPrefix + actionName + name + "\t" + Uint32String + ID + "\n")
+			name := actionParam.GetName()
+			builder.WriteString(emitEntityConstant(ActparamVarPrefix+actionName+name, actionParam.GetId()))
 		}
+	}
+	// Indirect Counters
+	builder.WriteString("// IndirectCounters\n")
+	for _, element := range p4info.GetCounters() {
+		name := element.GetPreamble().GetName()
+		builder.WriteString(emitEntityConstant(CtrVarPrefix+name, element.GetPreamble().GetId()))
+	}
+	// Direct Counters
+	builder.WriteString("// DirectCounters\n")
+	for _, element := range p4info.GetDirectCounters() {
+		name := element.GetPreamble().GetName()
+		builder.WriteString(emitEntityConstant(DirctrVarPrefix+name, element.GetPreamble().GetId()))
 	}
 	// Action profiles
 	builder.WriteString("// ActionProfiles\n")
 	for _, element := range p4info.GetActionProfiles() {
-		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
-
-		builder.WriteString(ActprofVarPrefix + name + "\t" + Uint32String + ID + "\n")
+		name := element.GetPreamble().GetName()
+		builder.WriteString(emitEntityConstant(ActprofVarPrefix+name, element.GetPreamble().GetId()))
 	}
 	// Packet metadata
 	builder.WriteString("// PacketMetadata\n")
 	for _, element := range p4info.GetControllerPacketMetadata() {
-		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
-		name = strcase.ToPascal(name)
-
-		builder.WriteString(PacketmetaVarPrefix + name + "\t" + Uint32String + ID + "\n")
+		name := element.GetPreamble().GetName()
+		builder.WriteString(emitEntityConstant(PacketmetaVarPrefix+name, element.GetPreamble().GetId()))
 	}
 	// Meters
 	builder.WriteString("// Meters\n")
 	for _, element := range p4info.GetMeters() {
-		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
-		name = strcase.ToPascal(name)
-
-		builder.WriteString(MtrVarPrefix + name + "\t" + Uint32String + ID + "\n")
+		name := element.GetPreamble().GetName()
+		builder.WriteString(emitEntityConstant(MtrVarPrefix+name, element.GetPreamble().GetId()))
 	}
 
 	builder.WriteString(ConstClose + "\n")
 
-	return strings.Replace(builder.String(), ".", "_", -1)
-
+	return builder.String()
 }
 
 func getP4Config(p4infopath string) *p4ConfigV1.P4Info {
@@ -149,21 +145,14 @@ func main() {
 	flag.Parse()
 
 	p4config := getP4Config(*p4infoPath)
-	builder := new(strings.Builder)
 
-	builder.WriteString(CopyrightHeader) // not being included in generate() to avoid effects of strings.replace()
-	builder.WriteString(fmt.Sprintf("\n\npackage %s\n", *packageName))
-
-	builder.WriteString(generate(p4config))
-
-	result := builder.String()
+	result := generateP4Constants(p4config, *packageName)
 
 	if *outputPath == "-" {
 		fmt.Println(result)
-		os.Exit(0)
-	}
-
-	if err := os.WriteFile(*outputPath, []byte(result), 0644); err != nil {
-		panic(fmt.Sprintf("Error while creating File: %v", err))
+	} else {
+		if err := os.WriteFile(*outputPath, []byte(result), 0644); err != nil {
+			panic(fmt.Sprintf("Error while creating File: %v", err))
+		}
 	}
 }
