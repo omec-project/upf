@@ -399,6 +399,13 @@ actions {
 }
 actions {
   preamble {
+    id: 23766285
+    name: "PreQosPipe._initialize_metadata"
+    alias: "_initialize_metadata"
+  }
+}
+actions {
+  preamble {
     id: 26090030
     name: "PreQosPipe.set_source_iface"
     alias: "set_source_iface"
@@ -432,6 +439,11 @@ actions {
     name: "PreQosPipe.set_session_uplink"
     alias: "set_session_uplink"
   }
+  params {
+    id: 1
+    name: "session_meter_idx"
+    bitwidth: 32
+  }
 }
 actions {
   preamble {
@@ -451,6 +463,11 @@ actions {
     name: "tunnel_peer_id"
     bitwidth: 8
   }
+  params {
+    id: 2
+    name: "session_meter_idx"
+    bitwidth: 32
+  }
 }
 actions {
   preamble {
@@ -464,6 +481,28 @@ actions {
     id: 20249483
     name: "PreQosPipe.set_session_downlink_buff"
     alias: "set_session_downlink_buff"
+  }
+  params {
+    id: 1
+    name: "session_meter_idx"
+    bitwidth: 32
+  }
+}
+actions {
+  preamble {
+    id: 21760615
+    name: "PreQosPipe.uplink_term_fwd_no_tc"
+    alias: "uplink_term_fwd_no_tc"
+  }
+  params {
+    id: 1
+    name: "ctr_idx"
+    bitwidth: 32
+  }
+  params {
+    id: 2
+    name: "app_meter_idx"
+    bitwidth: 32
   }
 }
 actions {
@@ -482,16 +521,9 @@ actions {
     name: "tc"
     bitwidth: 2
   }
-}
-actions {
-  preamble {
-    id: 21760615
-    name: "PreQosPipe.uplink_term_fwd_no_tc"
-    alias: "uplink_term_fwd_no_tc"
-  }
   params {
-    id: 1
-    name: "ctr_idx"
+    id: 3
+    name: "app_meter_idx"
     bitwidth: 32
   }
 }
@@ -504,6 +536,33 @@ actions {
   params {
     id: 1
     name: "ctr_idx"
+    bitwidth: 32
+  }
+}
+actions {
+  preamble {
+    id: 26185804
+    name: "PreQosPipe.downlink_term_fwd_no_tc"
+    alias: "downlink_term_fwd_no_tc"
+  }
+  params {
+    id: 1
+    name: "ctr_idx"
+    bitwidth: 32
+  }
+  params {
+    id: 2
+    name: "teid"
+    bitwidth: 32
+  }
+  params {
+    id: 3
+    name: "qfi"
+    bitwidth: 6
+  }
+  params {
+    id: 4
+    name: "app_meter_idx"
     bitwidth: 32
   }
 }
@@ -533,27 +592,10 @@ actions {
     name: "tc"
     bitwidth: 2
   }
-}
-actions {
-  preamble {
-    id: 26185804
-    name: "PreQosPipe.downlink_term_fwd_no_tc"
-    alias: "downlink_term_fwd_no_tc"
-  }
   params {
-    id: 1
-    name: "ctr_idx"
+    id: 5
+    name: "app_meter_idx"
     bitwidth: 32
-  }
-  params {
-    id: 2
-    name: "teid"
-    bitwidth: 32
-  }
-  params {
-    id: 3
-    name: "qfi"
-    bitwidth: 6
   }
 }
 actions {
@@ -658,6 +700,28 @@ direct_counters {
     unit: BOTH
   }
   direct_table_id: 47204971
+}
+meters {
+  preamble {
+    id: 338231090
+    name: "PreQosPipe.app_meter"
+    alias: "app_meter"
+  }
+  spec {
+    unit: BYTES
+  }
+  size: 1024
+}
+meters {
+  preamble {
+    id: 347593234
+    name: "PreQosPipe.session_meter"
+    alias: "session_meter"
+  }
+  spec {
+    unit: BYTES
+  }
+  size: 1024
 }
 controller_packet_metadata {
   preamble {

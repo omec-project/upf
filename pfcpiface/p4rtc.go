@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2021-present Open Networking Foundation
 
-package main
+package pfcpiface
 
 import (
 	"context"
@@ -283,13 +283,42 @@ func (c *P4rtClient) ClearTable(tableID uint32) error {
 	updates := make([]*p4.Update, len(readRes.GetEntities()))
 
 	for _, entity := range readRes.GetEntities() {
-		updateType := p4.Update_DELETE
 		update := &p4.Update{
-			Type:   updateType,
+			Type:   p4.Update_DELETE,
 			Entity: entity,
 		}
 
 		updates = append(updates, update)
+	}
+
+	return c.WriteBatchReq(updates)
+}
+
+func (c *P4rtClient) ClearTables(tableIDs []uint32) error {
+	log.Traceln("Clearing P4 tables")
+
+	updates := []*p4.Update{}
+
+	for _, tableID := range tableIDs {
+		entry := &p4.TableEntry{
+			TableId:  tableID,
+			Priority: DefaultPriority,
+		}
+
+		readRes, err := c.ReadTableEntry(entry)
+		if err != nil {
+			return err
+		}
+
+		for _, entity := range readRes.GetEntities() {
+			updateType := p4.Update_DELETE
+			update := &p4.Update{
+				Type:   updateType,
+				Entity: entity,
+			}
+
+			updates = append(updates, update)
+		}
 	}
 
 	return c.WriteBatchReq(updates)
@@ -328,6 +357,24 @@ func (c *P4rtClient) ApplyTableEntries(methodType p4.Update_Type, entries ...*p4
 			Type: methodType,
 			Entity: &p4.Entity{
 				Entity: &p4.Entity_TableEntry{TableEntry: entry},
+			},
+		}
+		log.Traceln("Writing table entry: ", proto.MarshalTextString(update))
+
+		updates = append(updates, update)
+	}
+
+	return c.WriteBatchReq(updates)
+}
+
+func (c *P4rtClient) ApplyMeterEntries(methodType p4.Update_Type, entries ...*p4.MeterEntry) error {
+	var updates []*p4.Update
+
+	for _, entry := range entries {
+		update := &p4.Update{
+			Type: methodType,
+			Entity: &p4.Entity{
+				Entity: &p4.Entity_MeterEntry{MeterEntry: entry},
 			},
 		}
 		log.Traceln("Writing table entry: ", proto.MarshalTextString(update))

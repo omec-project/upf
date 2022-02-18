@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2020 Intel Corporation
 
-package main
+package pfcpiface
 
 import (
 	"fmt"
@@ -48,8 +48,8 @@ type far struct {
 func (f far) String() string {
 	return fmt.Sprintf("FAR(id=%v, F-SEID=%v, F-SEID IPv4=%v, dstInterface=%v, tunnelType=%v, "+
 		"tunnelIPv4Src=%v, tunnelIPv4Dst=%v, tunnelTEID=%v, tunnelSrcPort=%v, "+
-		"sendEndMarker=%v, drops=%v, forwards=%v, buffers=%v)", f.farID, f.fseID, f.fseidIP, f.dstIntf,
-		f.tunnelType, f.tunnelIP4Src, f.tunnelIP4Dst, f.tunnelTEID, f.tunnelPort, f.sendEndMarker,
+		"sendEndMarker=%v, drops=%v, forwards=%v, buffers=%v)", f.farID, f.fseID, int2ip(f.fseidIP), f.dstIntf,
+		f.tunnelType, int2ip(f.tunnelIP4Src), int2ip(f.tunnelIP4Dst), f.tunnelTEID, f.tunnelPort, f.sendEndMarker,
 		f.Drops(), f.Forwards(), f.Buffers())
 }
 

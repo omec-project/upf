@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2020 Intel Corporation
 
-package main
+package pfcpiface
 
 import (
 	"net"
@@ -72,15 +72,6 @@ const (
 	n3 = 0x0
 	n6 = 0x1
 	n9 = 0x2
-
-	// Default values for outgoing requests
-	maxReqRetriesDefault = 5
-	respTimeoutDefault   = 2 * time.Second
-
-	// Default value for Heart Beat Interval
-	hbIntervalDefault = 5 * time.Second
-
-	readTimeoutDefault = 15 * time.Second
 )
 
 func (u *upf) isConnected() bool {
@@ -133,10 +124,9 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 		dnn:               conf.CPIface.Dnn,
 		peers:             conf.CPIface.Peers,
 		reportNotifyChan:  make(chan uint64, 1024),
-		maxReqRetries:     maxReqRetriesDefault,
-		respTimeout:       respTimeoutDefault,
+		maxReqRetries:     conf.MaxReqRetries,
 		enableHBTimer:     conf.EnableHBTimer,
-		hbInterval:        hbIntervalDefault,
+		readTimeout:       time.Second * time.Duration(conf.ReadTimeout),
 	}
 
 	if len(conf.CPIface.Peers) > 0 {
@@ -149,24 +139,22 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 	}
 
 	if !conf.EnableP4rt {
-		u.accessIP = ParseIP(conf.AccessIface.IfName, "Access")
-		u.coreIP = ParseIP(conf.CoreIface.IfName, "Core")
-	}
-
-	if conf.MaxReqRetries != 0 {
-		u.maxReqRetries = conf.MaxReqRetries
-	}
-
-	if conf.RespTimeout != "" {
-		u.respTimeout, err = time.ParseDuration(conf.RespTimeout)
+		u.accessIP, err = GetUnicastAddressFromInterface(conf.AccessIface.IfName)
 		if err != nil {
-			log.Fatalln("Unable to parse resp_timeout")
+			log.Errorln(err)
+			return nil
+		}
+
+		u.coreIP, err = GetUnicastAddressFromInterface(conf.CoreIface.IfName)
+		if err != nil {
+			log.Errorln(err)
+			return nil
 		}
 	}
 
-	u.readTimeout = readTimeoutDefault
-	if conf.ReadTimeout != 0 {
-		u.readTimeout = time.Second * time.Duration(conf.ReadTimeout)
+	u.respTimeout, err = time.ParseDuration(conf.RespTimeout)
+	if err != nil {
+		log.Fatalln("Unable to parse resp_timeout")
 	}
 
 	if u.enableHBTimer {

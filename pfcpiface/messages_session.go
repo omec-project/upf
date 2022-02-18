@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2021 Intel Corporation
 
-package main
+package pfcpiface
 
 import (
 	"errors"
@@ -127,10 +127,14 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 		addQERs = append(addQERs, q)
 	}
 
-	session.MarkSessionQer()
+	session.MarkSessionQer(session.qers)
+	// FIXME: since PacketForwardingRules doesn't store pointers,
+	//  we must also mark session QERs in addQERs.
+	//  We need a kind of refactoring to clean it up.
+	session.MarkSessionQer(addQERs)
 
 	// session.PacketForwardingRules stores all PFCP rules that has been installed so far,
-	// while 'updated' stores only the PFCP rules that has been provided in this particular message.
+	// while 'updated' stores only the PFCP rules that have been provided in this particular message.
 	updated := PacketForwardingRules{
 		pdrs: addPDRs,
 		fars: addFARs,
@@ -318,7 +322,11 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		addQERs = append(addQERs, q)
 	}
 
-	session.MarkSessionQer()
+	session.MarkSessionQer(session.qers)
+	// FIXME: since PacketForwardingRules doesn't store pointers,
+	//  we must also mark session QERs in addQERs.
+	//  We need a kind of refactoring to clean it up.
+	session.MarkSessionQer(addQERs)
 
 	updated := PacketForwardingRules{
 		pdrs: addPDRs,
