@@ -6,11 +6,9 @@ package pfcpiface
 
 import (
 	"encoding/binary"
-	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"net"
 	"strconv"
 	"strings"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -135,19 +133,4 @@ func GetUnicastAddressFromInterface(interfaceName string) (net.IP, error) {
 	}
 
 	return ip, nil
-}
-
-// TimeBasedElectionId Generates an election id that is monotonically increasing with time.
-// Specifically, the upper 64 bits are the unix timestamp in seconds, and the
-// lower 64 bits are the remaining nanoseconds. This is compatible with
-// election-systems that use the same epoch-based election IDs, and in that
-// case, this election ID will be guaranteed to be higher than any previous
-// election ID. This is useful in tests where repeated connections need to
-// acquire mastership reliably.
-func TimeBasedElectionId() p4_v1.Uint128 {
-	now := time.Now()
-	return p4_v1.Uint128{
-		High: uint64(now.Unix()),
-		Low:  uint64(now.UnixNano() % 1e9),
-	}
 }

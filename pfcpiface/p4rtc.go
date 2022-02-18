@@ -99,6 +99,21 @@ func convertError(err error) error {
 	return p4RtError
 }
 
+// TimeBasedElectionId Generates an election id that is monotonically increasing with time.
+// Specifically, the upper 64 bits are the unix timestamp in seconds, and the
+// lower 64 bits are the remaining nanoseconds. This is compatible with
+// election-systems that use the same epoch-based election IDs, and in that
+// case, this election ID will be guaranteed to be higher than any previous
+// election ID. This is useful in tests where repeated connections need to
+// acquire mastership reliably.
+func TimeBasedElectionId() p4.Uint128 {
+	now := time.Now()
+	return p4.Uint128{
+		High: uint64(now.Unix()),
+		Low:  uint64(now.UnixNano() % 1e9),
+	}
+}
+
 // CheckStatus ... Check client connection status.
 func (c *P4rtClient) CheckStatus() (state int) {
 	return int(c.conn.GetState())
