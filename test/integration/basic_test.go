@@ -4,6 +4,7 @@
 package integration
 
 import (
+	"github.com/docker/docker/api/types/strslice"
 	"github.com/omec-project/upf-epc/pfcpiface"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -56,8 +57,12 @@ func teardownBESS(t *testing.T) {
 }
 
 func setupUP4(t *testing.T, conf pfcpiface.Conf) {
-	pfcpAgent = pfcpiface.NewPFCPIface(conf)
-	go pfcpAgent.Run()
+	err := providers.RunDockerContainer("pfcp-agent", "upf-epc-pfcpiface:0.3.0-dev",
+		strslice.StrSlice{"-config", "../../conf/upf.json"})
+	require.NoError(t, err)
+
+	//pfcpAgent = pfcpiface.NewPFCPIface(conf)
+	//go pfcpAgent.Run()
 }
 
 func teardownUP4(t *testing.T) {
@@ -74,7 +79,7 @@ func teardownUP4(t *testing.T) {
 		pfcpClient.DisconnectN4()
 	}
 
-	pfcpAgent.Stop()
+	//pfcpAgent.Stop()
 }
 
 func setup(t *testing.T, conf pfcpiface.Conf) {

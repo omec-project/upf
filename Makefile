@@ -69,13 +69,11 @@ test-up4-integration:
 	docker-compose -f test/integration/infra/docker-compose.yml up -d
 	# TODO: add -race flag to go test.
     #  We currently face race condiitions in our code.
-	docker run --network host --rm -e FASTPATH=up4 \
- 			-v $(CURDIR):/upf-epc -w /upf-epc golang:latest \
-    		go test \
-    			-failfast \
-    			-count=1 \
-    			-v \
-    			./test/integration/...
+	FASTPATH=up4 go test \
+			-failfast \
+			-count=1 \
+			-v \
+			./test/integration/...
 	docker-compose -f test/integration/infra/docker-compose.yml rm -fsv
 
 test-bess-integration:

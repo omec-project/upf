@@ -7,7 +7,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/strslice"
 	"github.com/docker/docker/client"
+	"github.com/docker/go-connections/nat"
 	"io"
 	"io/ioutil"
 	"os/exec"
@@ -91,4 +94,34 @@ func RunDockerExecCommand(container string, cmd string) (
 
 	// command is successful
 	return 0, string(stdoutBytes), string(stderrBytes), nil
+}
+
+func RunDockerContainer(name, image string, cmd strslice.StrSlice) error {
+	ctx := context.Background()
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		panic(err)
+	}
+	defer cli.Close()
+
+	resp, err := cli.ContainerCreate(ctx, &container.Config{
+		ExposedPorts:    nat.PortSet{"8805": struct{}{}},
+		Tty:             true,
+		Cmd:             cmd,
+		Image:           image,
+	}, &container.HostConfig{
+		NetworkMode:     "host",
+		PortBindings:    map[nat.Port][]nat.PortBinding{nat.Port("8805"): {{HostIP: "127.0.0.1", HostPort: "8805"}}},
+		RestartPolicy:   container.RestartPolicy{},
+		//AutoRemove:      true,
+	}, nil, nil, name)
+	if err != nil {
+		return err
+	}
+
+	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+		return err
+	}
+
+	return nil
 }
