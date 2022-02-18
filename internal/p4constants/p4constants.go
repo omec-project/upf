@@ -112,6 +112,7 @@ const (
 	//PacketMetadata
 	PacketMeta_PacketOut uint32 = 75327753
 	PacketMeta_PacketIn  uint32 = 80671331
-	//MetersMeter_PreQosPipeAppMeter	uint32 = 338231090
+	//Meters
+	Meter_PreQosPipeAppMeter     uint32 = 338231090
 	Meter_PreQosPipeSessionMeter uint32 = 347593234
 )

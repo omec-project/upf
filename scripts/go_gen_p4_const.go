@@ -105,7 +105,7 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 		builder.WriteString(PACKETMETA_VAR_PREFIX + name + "\t" + UINT32_STRING + ID + "\n")
 	}
 	// Meters
-	builder.WriteString("//Meters")
+	builder.WriteString("//Meters\n")
 	for _, element := range p4info.GetMeters() {
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
