@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2_0
 // Copyright 2022-present Open Networking Foundation
+
 package p4constants
 
 //noinspection GoSnakeCaseUsage
