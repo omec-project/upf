@@ -128,7 +128,7 @@ func getP4Config(p4infopath string) *p4ConfigV1.P4Info {
 
 	err = proto.UnmarshalText(string(p4infoBytes), &p4info)
 	if err != nil {
-		panic("Could not retrive P4Info file")
+		panic("Could not parse P4Info file")
 	}
 
 	return &p4info
