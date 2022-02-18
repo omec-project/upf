@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -10,13 +11,14 @@ import (
 	"github.com/ettle/strcase"
 	"github.com/golang/protobuf/proto"
 	p4ConfigV1 "github.com/p4lang/p4runtime/go/p4/config/v1"
-	"github.com/pborman/getopt/v2"
 )
 
 const (
 	P4INFO_PATH = "conf/p4/bin/p4info.txt"
 
-	COPYRIGHT_HEADER = "/*\n* Copyright 2022-present Open Networking Foundation\n*\n* SPDX-License-Identifier: Apache-2.0\n*/\n"
+	DEFAULT_PACKAGE_NAME = "p4constants"
+
+	COPYRIGHT_HEADER = "// SPDX-License-Identifier: Apache-2.0\n// Copyright 2022-present Open Networking Foundation\n"
 
 	CONST_OPEN  = "//noinspection GoSnakeCaseUsage\nconst (\n"
 	CONST_CLOSE = `)`
@@ -36,7 +38,7 @@ const (
 
 func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Builder {
 	//HeaderField IDs
-	builder.WriteString("//HeaderFields\n")
+	builder.WriteString("// HeaderFields\n")
 	for _, element := range p4info.GetTables() {
 		for _, matchField := range element.MatchFields {
 			tableName := element.GetPreamble().GetName()
@@ -47,7 +49,7 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 		}
 	}
 	// Tables
-	builder.WriteString("//Tables\n")
+	builder.WriteString("// Tables\n")
 	for _, element := range p4info.GetTables() {
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
@@ -55,7 +57,7 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 		builder.WriteString(TBL_VAR_PREFIX + name + "\t" + UINT32_STRING + ID + "\n")
 	}
 	// Actions
-	builder.WriteString("//Actions\n")
+	builder.WriteString("// Actions\n")
 	for _, element := range p4info.GetActions() {
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
@@ -63,7 +65,7 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 		builder.WriteString(ACT_VAR_PREFIX + name + "\t" + UINT32_STRING + ID + "\n")
 	}
 	// Indirect Counters
-	builder.WriteString("//IndirectCounters\n")
+	builder.WriteString("// IndirectCounters\n")
 	for _, element := range p4info.GetCounters() {
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
@@ -71,7 +73,7 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 		builder.WriteString(CTR_VAR_PREFIX + name + "\t" + UINT32_STRING + ID + "\n")
 	}
 	// Direct Counters
-	builder.WriteString("\t//DirectCounters\n")
+	builder.WriteString("// DirectCounters\n")
 	for _, element := range p4info.GetDirectCounters() {
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
@@ -79,7 +81,7 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 		builder.WriteString(DIRCTR_VAR_PREFIX + name + "\t" + UINT32_STRING + ID + "\n")
 	}
 	// Action Param IDs
-	builder.WriteString("\t//ActionParams\n")
+	builder.WriteString("// ActionParams\n")
 	for _, element := range p4info.GetActions() {
 		for _, actionParam := range element.GetParams() {
 			actionName := element.GetPreamble().GetName()
@@ -90,14 +92,14 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 		}
 	}
 	// Action profiles
-	builder.WriteString("//ActionProfiles\n")
+	builder.WriteString("// ActionProfiles\n")
 	for _, element := range p4info.GetActionProfiles() {
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 
 		builder.WriteString(ACTPROF_VAR_PREFIX + name + "\t" + UINT32_STRING + ID + "\n")
 	}
 	// Packet metadata
-	builder.WriteString("//PacketMetadata\n")
+	builder.WriteString("// PacketMetadata\n")
 	for _, element := range p4info.GetControllerPacketMetadata() {
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
@@ -105,7 +107,7 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 		builder.WriteString(PACKETMETA_VAR_PREFIX + name + "\t" + UINT32_STRING + ID + "\n")
 	}
 	// Meters
-	builder.WriteString("//Meters\n")
+	builder.WriteString("// Meters\n")
 	for _, element := range p4info.GetMeters() {
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
@@ -135,10 +137,11 @@ func getP4Config(p4infopath string) *p4ConfigV1.P4Info {
 }
 
 func main() {
-	p4infoPath := getopt.StringLong("p4info", 'p', P4INFO_PATH, "Path of the p4info file")
-	outputPath := getopt.StringLong("output", 'o', "-", "Default will print to Stdout")
+	p4infoPath := flag.String("p4info", P4INFO_PATH, "Path of the p4info file")
+	outputPath := flag.String("output", "-", "Default will print to Stdout")
+	packageName := flag.String("package", DEFAULT_PACKAGE_NAME, "Set the package name")
 
-	getopt.ParseV2()
+	flag.Parse()
 
 	p4config := getP4Config(*p4infoPath)
 
@@ -146,15 +149,7 @@ func main() {
 
 	stringBuilder.WriteString(COPYRIGHT_HEADER)
 
-	packageName := ""
-
-	if path := strings.Split(*outputPath, "/"); len(path) <= 1 {
-		packageName = "undefined"
-	} else {
-		packageName = path[len(path)-2]
-	}
-
-	stringBuilder.WriteString(fmt.Sprintf("package %s\n", packageName))
+	stringBuilder.WriteString(fmt.Sprintf("package %s\n", *packageName))
 	stringBuilder.WriteString(CONST_OPEN + "\n")
 
 	result := generate(p4config, stringBuilder).String()

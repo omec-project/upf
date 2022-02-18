@@ -1,14 +1,11 @@
-/*
-* Copyright 2022-present Open Networking Foundation
-*
-* SPDX-License-Identifier: Apache-2_0
- */
+// SPDX-License-Identifier: Apache-2_0
+// Copyright 2022-present Open Networking Foundation
 package p4constants
 
 //noinspection GoSnakeCaseUsage
 const (
 
-	//HeaderFields
+	// HeaderFields
 	Hdr_PreQosPipe_Routing_routes_v4DstPrefix     uint32 = 1
 	Hdr_PreQosPipe_Acl_aclsInport                 uint32 = 1
 	Hdr_PreQosPipe_Acl_aclsSrcIface               uint32 = 2
@@ -33,7 +30,7 @@ const (
 	Hdr_PreQosPipe_applicationsAppL4Port          uint32 = 2
 	Hdr_PreQosPipe_applicationsAppIpProto         uint32 = 3
 	Hdr_PreQosPipe_tunnel_peersTunnelPeerId       uint32 = 1
-	//Tables
+	// Tables
 	Table_PreQosPipeRoutingRoutesV4      uint32 = 39015874
 	Table_PreQosPipeAclAcls              uint32 = 47204971
 	Table_PreQosPipeMyStation            uint32 = 40931612
@@ -44,7 +41,7 @@ const (
 	Table_PreQosPipeTerminationsDownlink uint32 = 34778590
 	Table_PreQosPipeApplications         uint32 = 46868458
 	Table_PreQosPipeTunnelPeers          uint32 = 49497304
-	//Actions
+	// Actions
 	Action_NoAction                         uint32 = 21257015
 	Action_PreQosPipeRoutingDrop            uint32 = 31448256
 	Action_PreQosPipeRoutingRoute           uint32 = 23965128
@@ -70,12 +67,12 @@ const (
 	Action_PreQosPipeLoadTunnelParam        uint32 = 32742981
 	Action_PreQosPipeDoGtpuTunnel           uint32 = 29247910
 	Action_PreQosPipeDoGtpuTunnelWithPsc    uint32 = 31713420
-	//IndirectCounters
+	// IndirectCounters
 	Counter_PreQosPipePreQosCounter   uint32 = 315693181
 	Counter_PostQosPipePostQosCounter uint32 = 302958180
-	//DirectCounters
+	// DirectCounters
 	DirectCounter_Acls uint32 = 325583051
-	//ActionParams
+	// ActionParams
 	ActionParam_PreQosPipe_Routing_routeSrcMac                      uint32 = 1
 	ActionParam_PreQosPipe_Routing_routeDstMac                      uint32 = 2
 	ActionParam_PreQosPipe_Routing_routeEgressPort                  uint32 = 3
@@ -107,12 +104,12 @@ const (
 	ActionParam_PreQosPipe_load_tunnel_paramSrcAddr                 uint32 = 1
 	ActionParam_PreQosPipe_load_tunnel_paramDstAddr                 uint32 = 2
 	ActionParam_PreQosPipe_load_tunnel_paramSport                   uint32 = 3
-	//ActionProfiles
+	// ActionProfiles
 	ActionProfile_hashed_selector uint32 = 297808402
-	//PacketMetadata
+	// PacketMetadata
 	PacketMeta_PacketOut uint32 = 75327753
 	PacketMeta_PacketIn  uint32 = 80671331
-	//Meters
+	// Meters
 	Meter_PreQosPipeAppMeter     uint32 = 338231090
 	Meter_PreQosPipeSessionMeter uint32 = 347593234
 )
