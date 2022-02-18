@@ -108,6 +108,7 @@ func convertError(err error) error {
 // acquire mastership reliably.
 func TimeBasedElectionId() p4.Uint128 {
 	now := time.Now()
+
 	return p4.Uint128{
 		High: uint64(now.Unix()),
 		Low:  uint64(now.UnixNano() % 1e9),
