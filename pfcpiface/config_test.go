@@ -71,6 +71,8 @@ func TestLoadConfigFile(t *testing.T) {
 		paths := []string{
 			"../conf/upf.json",
 			"../ptf/config/upf.json",
+			"../test/integration/config/default.json",
+			"../test/integration/config/ue_ip_alloc.json",
 		}
 
 		for _, path := range paths {
