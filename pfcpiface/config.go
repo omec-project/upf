@@ -21,8 +21,6 @@ const (
 	respTimeoutDefault      = 2 * time.Second
 	hbIntervalDefault       = 5 * time.Second
 	readTimeoutDefault      = 15 * time.Second
-	p4InfoPathDefault       = "/bin/p4info.txt"
-	deviceConfigPathDefault = "/bin/bmv2.json"
 
 	// NotifySockAddr : Unix Socket path to read bess notification from.
 	NotifySockAddr = "/tmp/notifycp"
@@ -116,8 +114,6 @@ type BESSInfo struct {
 
 // UP4Info : UP4 interface settings.
 type UP4Info struct {
-	P4Info       string          `json:"p4info"`
-	DeviceConfig string          `json:"device_config"`
 	AccessIP     string          `json:"access_ip"`
 	P4rtcServer  string          `json:"p4rtc_server"`
 	P4rtcPort    string          `json:"p4rtc_port"`
@@ -244,16 +240,6 @@ func LoadConfigFile(filepath string) (Conf, error) {
 	if conf.CPIface.EnableHBTimer {
 		if conf.CPIface.HeartBeatInterval == "" {
 			conf.CPIface.HeartBeatInterval = hbIntervalDefault.String()
-		}
-	}
-
-	if conf.Fastpath == FastpathUP4 {
-		if conf.UP4Info.P4Info == "" {
-			conf.UP4Info.P4Info = p4InfoPathDefault
-		}
-
-		if conf.UP4Info.DeviceConfig == "" {
-			conf.UP4Info.DeviceConfig = deviceConfigPathDefault
 		}
 	}
 
