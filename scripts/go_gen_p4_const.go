@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: Apache-2.0
-// Copyright 2022 Open Networking Foundation
-
 package main
 
 import (
@@ -20,8 +17,9 @@ const (
 	P4infoPath = "conf/p4/bin/p4info.txt"
 
 	DefaultPackageName = "p4constants"
-
-	CopyrightHeader = "// SPDX-License-Identifier: Apache-2.0\n// Copyright 2022-present Open Networking Foundation\n\n"
+	// CopyrightHeader uses raw strings to avoid issues with reuse
+	CopyrightHeader = `// SPDX-License-Identifier: Apache-2.0 
+// Copyright 2022-present Open Networking Foundation`
 
 	ConstOpen  = "//noinspection GoSnakeCaseUsage\nconst (\n"
 	ConstClose = ")"
@@ -39,12 +37,8 @@ const (
 	MtrVarPrefix        = "Meter_"
 )
 
-func generate(p4info *p4ConfigV1.P4Info, packageName string) string {
+func generate(p4info *p4ConfigV1.P4Info) string {
 	builder := new(strings.Builder)
-
-	builder.WriteString(CopyrightHeader)
-
-	builder.WriteString(fmt.Sprintf("package %s\n", packageName))
 	builder.WriteString(ConstOpen + "\n")
 
 	//HeaderField IDs
@@ -128,6 +122,7 @@ func generate(p4info *p4ConfigV1.P4Info, packageName string) string {
 	builder.WriteString(ConstClose + "\n")
 
 	return strings.Replace(builder.String(), ".", "_", -1)
+
 }
 
 func getP4Config(p4infopath string) *p4ConfigV1.P4Info {
@@ -154,8 +149,14 @@ func main() {
 	flag.Parse()
 
 	p4config := getP4Config(*p4infoPath)
+	builder := new(strings.Builder)
 
-	result := generate(p4config, *packageName)
+	builder.WriteString(CopyrightHeader) // not being included in generate() to avoid effects of strings.replace()
+	builder.WriteString(fmt.Sprintf("\n\npackage %s\n", *packageName))
+
+	builder.WriteString(generate(p4config))
+
+	result := builder.String()
 
 	if *outputPath == "-" {
 		fmt.Println(result)
