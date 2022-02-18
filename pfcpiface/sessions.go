@@ -39,7 +39,7 @@ func (pConn *PFCPConn) NewPFCPSession(rseid uint64) uint64 {
 	for i := 0; i < pConn.maxRetries; i++ {
 		lseid := pConn.rng.Uint64()
 		// Check if it already exists
-		if _, ok := pConn.sessions[lseid]; ok {
+		if _, ok := pConn.store.GetSession(lseid); ok {
 			continue
 		}
 
@@ -52,10 +52,11 @@ func (pConn *PFCPConn) NewPFCPSession(rseid uint64) uint64 {
 				qers: make([]qer, 0, MaxItems),
 			},
 		}
-		pConn.sessions[lseid] = &s
+		s.metrics = metrics.NewSession(pConn.nodeID.remote)
+
+		pConn.store.UpdateSession(s)
 
 		// Metrics update
-		s.metrics = metrics.NewSession(pConn.nodeID.remote)
 		pConn.SaveSessions(s.metrics)
 
 		return lseid
@@ -66,7 +67,7 @@ func (pConn *PFCPConn) NewPFCPSession(rseid uint64) uint64 {
 
 // RemoveSession removes session using lseid.
 func (pConn *PFCPConn) RemoveSession(lseid uint64) {
-	s, ok := pConn.sessions[lseid]
+	s, ok := pConn.store.GetSession(lseid)
 	if !ok {
 		return
 	}
@@ -75,5 +76,5 @@ func (pConn *PFCPConn) RemoveSession(lseid uint64) {
 	s.metrics.Delete()
 	pConn.SaveSessions(s.metrics)
 
-	delete(pConn.sessions, lseid)
+	pConn.store.RemoveSession(lseid)
 }

@@ -88,7 +88,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 			ie.CauseNoResourcesAvailable)
 	}
 
-	session := pConn.sessions[localSEID]
+	session, _ := pConn.store.GetSession(localSEID)
 
 	addPDRs := make([]pdr, 0, MaxItems)
 	addFARs := make([]far, 0, MaxItems)
@@ -157,6 +157,8 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 		localFSEID = ie.NewFSEID(session.localSEID, nil, localIP)
 	}
 
+	pConn.store.UpdateSession(session)
+
 	// Build response message
 	seres := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
 		0,                                    /* FO <-- what's this? */
@@ -168,7 +170,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 		localFSEID,
 	)
 
-	addPdrInfo(seres, session)
+	addPdrInfo(seres, &session)
 
 	return seres, nil
 }
@@ -199,7 +201,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 
 	localSEID := smreq.SEID()
 
-	session, ok := pConn.sessions[localSEID]
+	session, ok := pConn.store.GetSession(localSEID)
 	if !ok {
 		return sendError(ErrNotFoundWithParam("PFCP session", "localSEID", localSEID))
 	}
@@ -407,6 +409,8 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		return sendError(ErrWriteToFastpath)
 	}
 
+	pConn.store.UpdateSession(session)
+
 	// Build response message
 	smres := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */
 		0,                                    /* FO <-- what's this? */
@@ -442,7 +446,7 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 	/* retrieve sessionRecord */
 	localSEID := sdreq.SEID()
 
-	session, ok := pConn.sessions[localSEID]
+	session, ok := pConn.store.GetSession(localSEID)
 	if !ok {
 		return sendError(ErrNotFoundWithParam("PFCP session", "localSEID", localSEID))
 	}
@@ -452,7 +456,7 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 		return sendError(ErrWriteToFastpath)
 	}
 
-	if err := releaseAllocatedIPs(upf.ippool, session); err != nil {
+	if err := releaseAllocatedIPs(upf.ippool, &session); err != nil {
 		return sendError(ErrOperationFailedWithReason("session IP dealloc", err.Error()))
 	}
 
@@ -472,7 +476,7 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 }
 
 func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
-	session, ok := pConn.sessions[fseid]
+	session, ok := pConn.store.GetSession(fseid)
 	if !ok {
 		log.Warnln("No session found for fseid : ", fseid)
 		return
@@ -526,6 +530,8 @@ func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
 
 	session.setNotifyFlag(true)
 
+	pConn.store.UpdateSession(session)
+
 	srreq.DownlinkDataReport = ie.NewDownlinkDataReport(
 		ie.NewPDRID(uint16(pdrID)))
 
@@ -550,7 +556,7 @@ func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) error {
 	seid := srres.SEID()
 
 	if cause == ie.CauseSessionContextNotFound {
-		sessItem, ok := pConn.sessions[seid]
+		sessItem, ok := pConn.store.GetSession(seid)
 		if !ok {
 			return errProcess(ErrNotFoundWithParam("PFCP session context", "SEID", seid))
 		}
