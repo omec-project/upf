@@ -136,10 +136,10 @@ func main() {
 	stringBuilder := new(strings.Builder)
 
 	stringBuilder.WriteString(COPYRIGHT_HEADER)
-	stringBuilder.WriteString("package scripts\n") //TODO read it from path
+	stringBuilder.WriteString("package p4constants\n") //TODO read it from path
 	stringBuilder.WriteString(CONST_OPEN + "\n")
 
-	result := generate(p4config, stringBuilder).String()
+	result := generate(p4config, stringBuilder).String() // TODO fix format : equal line spacing
 	result = strings.Replace(result, ".", "_", -1)
 
 	if *outputPath == "-" {
