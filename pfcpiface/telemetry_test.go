@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2022-present Open Networking Foundation
 
-package metrics
+package pfcpiface
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
+	"net/http"
 	"testing"
 )
 
@@ -23,30 +24,36 @@ func restoreReg() {
 	prometheus.DefaultRegisterer = backupGlobalRegistry
 }
 
-func TestNewPrometheusService(t *testing.T) {
-	t.Run("cannot register multiple times without stop", func(t *testing.T) {
+func Test_setupProm(t *testing.T) {
+	t.Run("can setup prom multiple times with clearProm", func(t *testing.T) {
 		saveReg()
 		defer restoreReg()
 
-		_, err := NewPrometheusService()
+		// TODO: use actual mocks
+		upf := &upf{}
+		node := NewPFCPNode(upf)
+
+		uc, nc, err := setupProm(http.NewServeMux(), upf, node)
 		require.NoError(t, err)
 
-		_, err = NewPrometheusService()
-		require.Error(t, err)
+		clearProm(uc, nc)
+
+		_, _, err = setupProm(http.NewServeMux(), upf, node)
+		require.NoError(t, err)
 	})
 
-	t.Run("can register multiple times with stop", func(t *testing.T) {
+	t.Run("cannot setup prom multiple times without clearProm", func(t *testing.T) {
 		saveReg()
 		defer restoreReg()
 
-		var s *Service
-		s, err := NewPrometheusService()
+		// TODO: use actual mocks
+		upf := &upf{}
+		node := NewPFCPNode(upf)
+
+		_, _, err := setupProm(http.NewServeMux(), upf, node)
 		require.NoError(t, err)
 
-		err = s.Stop()
-		require.NoError(t, err)
-
-		_, err = NewPrometheusService()
-		require.NoError(t, err)
+		_, _, err = setupProm(http.NewServeMux(), upf, node)
+		require.Error(t, err)
 	})
 }
