@@ -24,7 +24,7 @@ const (
 	CopyrightHeader = "// SPDX-License-Identifier: Apache-2.0\n// Copyright 2022-present Open Networking Foundation\n\n"
 
 	ConstOpen  = "//noinspection GoSnakeCaseUsage\nconst (\n"
-	ConstClose = `)`
+	ConstClose = ")"
 
 	Uint32String = "uint32 = "
 
