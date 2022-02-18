@@ -27,10 +27,15 @@ func init() {
 type PFCPIface struct {
 	conf Conf
 
-	node    *PFCPNode
-	fp      fastPath
-	upf     *upf
-	httpSrv *http.Server
+	node *PFCPNode
+	fp   fastPath
+	upf  *upf
+
+	httpSrv      *http.Server
+	httpEndpoint string
+
+	uc *upfCollector
+	nc *PfcpNodeCollector
 }
 
 func NewPFCPIface(conf Conf) *PFCPIface {
@@ -49,7 +54,8 @@ func NewPFCPIface(conf Conf) *PFCPIface {
 		httpPort = conf.CPIface.HTTPPort
 	}
 
-	pfcpIface.httpSrv = &http.Server{Addr: ":" + httpPort, Handler: nil}
+	pfcpIface.httpEndpoint = ":" + httpPort
+
 	pfcpIface.upf = NewUPF(&conf, pfcpIface.fp)
 
 	return pfcpIface
@@ -66,8 +72,19 @@ func (p *PFCPIface) Run() {
 
 	p.node = NewPFCPNode(p.upf)
 
-	setupConfigHandler(p.upf)
-	setupProm(p.upf, p.node)
+	httpMux := http.NewServeMux()
+
+	setupConfigHandler(httpMux, p.upf)
+
+	var err error
+
+	p.uc, p.nc, err = setupProm(httpMux, p.upf, p.node)
+
+	if err != nil {
+		log.Fatalln("setupProm failed", err)
+	}
+
+	p.httpSrv = &http.Server{Addr: p.httpEndpoint, Handler: httpMux}
 
 	go func() {
 		if err := p.httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
