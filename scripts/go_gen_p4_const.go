@@ -43,7 +43,7 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 			name, ID := matchField.GetName(), strconv.FormatUint(uint64(matchField.GetId()), 10)
 			name = strcase.ToPascal(name)
 
-			builder.WriteString(HF_VAR_PREFIX + tableName + name + UINT32_STRING + ID + "\n")
+			builder.WriteString(HF_VAR_PREFIX + tableName + name + "\t" + UINT32_STRING + ID + "\n")
 		}
 	}
 	// Tables
@@ -52,7 +52,7 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
 
-		builder.WriteString(TBL_VAR_PREFIX + name + UINT32_STRING + ID + "\n")
+		builder.WriteString(TBL_VAR_PREFIX + name + "\t" + UINT32_STRING + ID + "\n")
 	}
 	// Actions
 	builder.WriteString("//Actions\n")
@@ -60,7 +60,7 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
 
-		builder.WriteString(ACT_VAR_PREFIX + name + UINT32_STRING + ID + "\n")
+		builder.WriteString(ACT_VAR_PREFIX + name + "\t" + UINT32_STRING + ID + "\n")
 	}
 	// Indirect Counters
 	builder.WriteString("//IndirectCounters\n")
@@ -68,7 +68,7 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
 
-		builder.WriteString(CTR_VAR_PREFIX + name + UINT32_STRING + ID + "\n")
+		builder.WriteString(CTR_VAR_PREFIX + name + "\t" + UINT32_STRING + ID + "\n")
 	}
 	// Direct Counters
 	builder.WriteString("\t//DirectCounters\n")
@@ -76,7 +76,7 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
 
-		builder.WriteString(DIRCTR_VAR_PREFIX + name + UINT32_STRING + ID + "\n")
+		builder.WriteString(DIRCTR_VAR_PREFIX + name + "\t" + UINT32_STRING + ID + "\n")
 	}
 	// Action Param IDs
 	builder.WriteString("\t//ActionParams\n")
@@ -86,7 +86,7 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 			name, ID := actionParam.GetName(), strconv.FormatUint(uint64(actionParam.GetId()), 10)
 			name = strcase.ToPascal(name)
 
-			builder.WriteString(ACTPARAM_VAR_PREFIX + actionName + name + UINT32_STRING + ID + "\n")
+			builder.WriteString(ACTPARAM_VAR_PREFIX + actionName + name + "\t" + UINT32_STRING + ID + "\n")
 		}
 	}
 	// Action profiles
@@ -94,7 +94,7 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 	for _, element := range p4info.GetActionProfiles() {
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 
-		builder.WriteString(ACTPROF_VAR_PREFIX + name + UINT32_STRING + ID + "\n")
+		builder.WriteString(ACTPROF_VAR_PREFIX + name + "\t" + UINT32_STRING + ID + "\n")
 	}
 	// Packet metadata
 	builder.WriteString("//PacketMetadata\n")
@@ -102,7 +102,7 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
 
-		builder.WriteString(PACKETMETA_VAR_PREFIX + name + UINT32_STRING + ID + "\n")
+		builder.WriteString(PACKETMETA_VAR_PREFIX + name + "\t" + UINT32_STRING + ID + "\n")
 	}
 	// Meters
 	builder.WriteString("//Meters")
@@ -110,7 +110,7 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
 
-		builder.WriteString(MTR_VAR_PREFIX + name + UINT32_STRING + ID + "\n")
+		builder.WriteString(MTR_VAR_PREFIX + name + "\t" + UINT32_STRING + ID + "\n")
 	}
 
 	builder.WriteString(CONST_CLOSE + "\n")
