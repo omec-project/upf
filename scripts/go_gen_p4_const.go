@@ -36,26 +36,26 @@ const (
 
 func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Builder {
 	//HeaderField IDs
-	builder.WriteString("\t//HeaderFields\n")
+	builder.WriteString("//HeaderFields\n")
 	for _, element := range p4info.GetTables() {
 		for _, matchField := range element.MatchFields {
 			tableName := element.GetPreamble().GetName()
 			name, ID := matchField.GetName(), strconv.FormatUint(uint64(matchField.GetId()), 10)
 			name = strcase.ToPascal(name)
 
-			builder.WriteString("\t" + HF_VAR_PREFIX + tableName + name + "\t\t" + UINT32_STRING + ID + "\n")
+			builder.WriteString(HF_VAR_PREFIX + tableName + name + UINT32_STRING + ID + "\n")
 		}
 	}
 	// Tables
-	builder.WriteString("\t//Tables\n")
+	builder.WriteString("//Tables\n")
 	for _, element := range p4info.GetTables() {
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
 
-		builder.WriteString("\t" + TBL_VAR_PREFIX + name + "\t\t" + UINT32_STRING + ID + "\n")
+		builder.WriteString(TBL_VAR_PREFIX + name + UINT32_STRING + ID + "\n")
 	}
 	// Actions
-	builder.WriteString("\t//Actions\n")
+	builder.WriteString("//Actions\n")
 	for _, element := range p4info.GetActions() {
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
@@ -63,12 +63,12 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 		builder.WriteString("\t" + ACT_VAR_PREFIX + name + "\t\t" + UINT32_STRING + ID + "\n")
 	}
 	// Indirect Counters
-	builder.WriteString("\t//IndirectCounters\n")
+	builder.WriteString("//IndirectCounters\n")
 	for _, element := range p4info.GetCounters() {
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
 
-		builder.WriteString("\t" + CTR_VAR_PREFIX + name + "\t\t" + UINT32_STRING + ID + "\n")
+		builder.WriteString(CTR_VAR_PREFIX + name + UINT32_STRING + ID + "\n")
 	}
 	// Direct Counters
 	builder.WriteString("\t//DirectCounters\n")
@@ -76,7 +76,7 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
 
-		builder.WriteString("\t" + DIRCTR_VAR_PREFIX + name + "\t\t" + UINT32_STRING + ID + "\n")
+		builder.WriteString(DIRCTR_VAR_PREFIX + name + UINT32_STRING + ID + "\n")
 	}
 	// Action Param IDs
 	builder.WriteString("\t//ActionParams\n")
@@ -86,31 +86,31 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 			name, ID := actionParam.GetName(), strconv.FormatUint(uint64(actionParam.GetId()), 10)
 			name = strcase.ToPascal(name)
 
-			builder.WriteString("\t" + ACTPARAM_VAR_PREFIX + actionName + name + "\t\t" + UINT32_STRING + ID + "\n")
+			builder.WriteString(ACTPARAM_VAR_PREFIX + actionName + name + UINT32_STRING + ID + "\n")
 		}
 	}
 	// Action profiles
-	builder.WriteString("\t//ActionProfiles\n")
+	builder.WriteString("//ActionProfiles\n")
 	for _, element := range p4info.GetActionProfiles() {
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 
-		builder.WriteString("\t" + ACTPROF_VAR_PREFIX + name + "\t\t" + UINT32_STRING + ID + "\n")
+		builder.WriteString(ACTPROF_VAR_PREFIX + name + UINT32_STRING + ID + "\n")
 	}
 	// Packet metadata
-	builder.WriteString("\t//PacketMetadata\n")
+	builder.WriteString("//PacketMetadata\n")
 	for _, element := range p4info.GetControllerPacketMetadata() {
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
 
-		builder.WriteString("\t" + PACKETMETA_VAR_PREFIX + name + "\t\t" + UINT32_STRING + ID + "\n")
+		builder.WriteString(PACKETMETA_VAR_PREFIX + name + UINT32_STRING + ID + "\n")
 	}
 	// Meters
-	builder.WriteString("\t//Meters")
+	builder.WriteString("//Meters")
 	for _, element := range p4info.GetMeters() {
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
 
-		builder.WriteString("\t" + MTR_VAR_PREFIX + name + "\t\t" + UINT32_STRING + ID + "\n")
+		builder.WriteString(MTR_VAR_PREFIX + name + UINT32_STRING + ID + "\n")
 	}
 
 	builder.WriteString(CONST_CLOSE + "\n")
@@ -145,10 +145,19 @@ func main() {
 	stringBuilder := new(strings.Builder)
 
 	stringBuilder.WriteString(COPYRIGHT_HEADER)
-	stringBuilder.WriteString("package p4constants\n") //TODO read it from path
+
+	packageName := ""
+
+	if path := strings.Split(*outputPath, "/"); len(path) <= 1 {
+		packageName = "undefined"
+	} else {
+		packageName = path[len(path)-2]
+	}
+
+	stringBuilder.WriteString(fmt.Sprintf("package %s\n", packageName))
 	stringBuilder.WriteString(CONST_OPEN + "\n")
 
-	result := generate(p4config, stringBuilder).String() // TODO fix format : equal line spacing
+	result := generate(p4config, stringBuilder).String()
 	result = strings.Replace(result, ".", "_", -1)
 
 	if *outputPath == "-" {
