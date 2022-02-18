@@ -36,16 +36,18 @@ const (
 
 func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Builder {
 	//HeaderField IDs
+	builder.WriteString("\t//HeaderFields\n")
 	for _, element := range p4info.GetTables() {
 		for _, matchField := range element.MatchFields {
 			tableName := element.GetPreamble().GetName()
-			name, ID := matchField.GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
+			name, ID := matchField.GetName(), strconv.FormatUint(uint64(matchField.GetId()), 10)
 			name = strcase.ToPascal(name)
 
 			builder.WriteString("\t" + HF_VAR_PREFIX + tableName + name + "\t\t" + UINT32_STRING + ID + "\n")
 		}
 	}
 	// Tables
+	builder.WriteString("\t//Tables\n")
 	for _, element := range p4info.GetTables() {
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
@@ -53,6 +55,7 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 		builder.WriteString("\t" + TBL_VAR_PREFIX + name + "\t\t" + UINT32_STRING + ID + "\n")
 	}
 	// Actions
+	builder.WriteString("\t//Actions\n")
 	for _, element := range p4info.GetActions() {
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
@@ -60,6 +63,7 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 		builder.WriteString("\t" + ACT_VAR_PREFIX + name + "\t\t" + UINT32_STRING + ID + "\n")
 	}
 	// Indirect Counters
+	builder.WriteString("\t//IndirectCounters\n")
 	for _, element := range p4info.GetCounters() {
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
@@ -67,6 +71,7 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 		builder.WriteString("\t" + CTR_VAR_PREFIX + name + "\t\t" + UINT32_STRING + ID + "\n")
 	}
 	// Direct Counters
+	builder.WriteString("\t//DirectCounters\n")
 	for _, element := range p4info.GetDirectCounters() {
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
@@ -74,22 +79,25 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 		builder.WriteString("\t" + DIRCTR_VAR_PREFIX + name + "\t\t" + UINT32_STRING + ID + "\n")
 	}
 	// Action Param IDs
+	builder.WriteString("\t//ActionParams\n")
 	for _, element := range p4info.GetActions() {
 		for _, actionParam := range element.GetParams() {
 			actionName := element.GetPreamble().GetName()
-			name, ID := actionParam.GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
+			name, ID := actionParam.GetName(), strconv.FormatUint(uint64(actionParam.GetId()), 10)
 			name = strcase.ToPascal(name)
 
 			builder.WriteString("\t" + ACTPARAM_VAR_PREFIX + actionName + name + "\t\t" + UINT32_STRING + ID + "\n")
 		}
 	}
 	// Action profiles
+	builder.WriteString("\t//ActionProfiles\n")
 	for _, element := range p4info.GetActionProfiles() {
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 
 		builder.WriteString("\t" + ACTPROF_VAR_PREFIX + name + "\t\t" + UINT32_STRING + ID + "\n")
 	}
 	// Packet metadata
+	builder.WriteString("\t//PacketMetadata\n")
 	for _, element := range p4info.GetControllerPacketMetadata() {
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
@@ -97,6 +105,7 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 		builder.WriteString("\t" + PACKETMETA_VAR_PREFIX + name + "\t\t" + UINT32_STRING + ID + "\n")
 	}
 	// Meters
+	builder.WriteString("\t//Meters")
 	for _, element := range p4info.GetMeters() {
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
