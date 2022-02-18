@@ -9,6 +9,7 @@ require (
 	github.com/deckarep/golang-set v1.8.0
 	github.com/docker/docker v20.10.12+incompatible
 	github.com/docker/go-connections v0.4.0 // indirect
+	github.com/ettle/strcase v0.1.1
 	github.com/golang/protobuf v1.5.2
 	github.com/google/gopacket v1.1.19
 	github.com/gorilla/mux v1.8.0 // indirect

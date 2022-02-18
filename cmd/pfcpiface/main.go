@@ -36,8 +36,8 @@ func main() {
 
 	log.Infof("%+v", conf)
 
-	pfcpiface := pfcpiface.NewPFCPIface(conf)
+	pfcpi := pfcpiface.NewPFCPIface(conf)
 
 	// blocking
-	pfcpiface.Run()
+	pfcpi.Run()
 }
