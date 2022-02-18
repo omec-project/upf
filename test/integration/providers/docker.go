@@ -105,14 +105,14 @@ func RunDockerContainer(name, image string, cmd strslice.StrSlice) error {
 	defer cli.Close()
 
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
-		ExposedPorts:    nat.PortSet{"8805": struct{}{}},
-		Tty:             true,
-		Cmd:             cmd,
-		Image:           image,
+		ExposedPorts: nat.PortSet{"8805": struct{}{}},
+		Tty:          true,
+		Cmd:          cmd,
+		Image:        image,
 	}, &container.HostConfig{
-		NetworkMode:     "host",
-		PortBindings:    map[nat.Port][]nat.PortBinding{nat.Port("8805"): {{HostIP: "127.0.0.1", HostPort: "8805"}}},
-		RestartPolicy:   container.RestartPolicy{},
+		NetworkMode:   "host",
+		PortBindings:  map[nat.Port][]nat.PortBinding{nat.Port("8805"): {{HostIP: "127.0.0.1", HostPort: "8805"}}},
+		RestartPolicy: container.RestartPolicy{},
 		//AutoRemove:      true,
 	}, nil, nil, name)
 	if err != nil {
