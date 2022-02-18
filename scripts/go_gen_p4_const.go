@@ -18,7 +18,7 @@ const (
 
 	DEFAULT_PACKAGE_NAME = "p4constants"
 
-	COPYRIGHT_HEADER = "// SPDX-License-Identifier: Apache-2.0\n// Copyright 2022-present Open Networking Foundation\n"
+	COPYRIGHT_HEADER = "// SPDX-License-Identifier: Apache-2.0\n// Copyright 2022-present Open Networking Foundation\n\n"
 
 	CONST_OPEN  = "//noinspection GoSnakeCaseUsage\nconst (\n"
 	CONST_CLOSE = `)`
