@@ -33,6 +33,9 @@ type PFCPIface struct {
 
 	httpSrv      *http.Server
 	httpEndpoint string
+
+	uc *upfCollector
+	nc *PfcpNodeCollector
 }
 
 func NewPFCPIface(conf Conf) *PFCPIface {
@@ -72,7 +75,14 @@ func (p *PFCPIface) Run() {
 	httpMux := http.NewServeMux()
 
 	setupConfigHandler(httpMux, p.upf)
-	setupProm(httpMux, p.upf, p.node)
+
+	var err error
+
+	p.uc, p.nc, err = setupProm(httpMux, p.upf, p.node)
+
+	if err != nil {
+		log.Fatalln("setupProm failed", err)
+	}
 
 	p.httpSrv = &http.Server{Addr: p.httpEndpoint, Handler: httpMux}
 
