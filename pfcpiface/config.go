@@ -96,8 +96,6 @@ type IfaceType struct {
 
 // P4rtcInfo : P4 runtime interface settings.
 type P4rtcInfo struct {
-	P4Info       string          `json:"p4info"`
-	DeviceConfig string          `json:"device_config"`
 	AccessIP     string          `json:"access_ip"`
 	P4rtcServer  string          `json:"p4rtc_server"`
 	P4rtcPort    string          `json:"p4rtc_port"`
@@ -207,14 +205,6 @@ func LoadConfigFile(filepath string) (Conf, error) {
 		if conf.HeartBeatInterval == "" {
 			conf.HeartBeatInterval = hbIntervalDefault.String()
 		}
-	}
-
-	if conf.P4rtcIface.P4Info == "" {
-		conf.P4rtcIface.P4Info = p4InfoPathDefault
-	}
-
-	if conf.P4rtcIface.DeviceConfig == "" {
-		conf.P4rtcIface.DeviceConfig = deviceConfigPathDefault
 	}
 
 	// Perform basic validation.
