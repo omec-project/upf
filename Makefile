@@ -102,10 +102,10 @@ test: .coverage
 p4-constants:
 	$(info *** Generating go constants...)
 	@docker run --rm -v $(CURDIR):/app -w /app \
-		opennetworking/up4-ptf:latest python ./scripts/go_gen_p4_const.py \
-		--output internal/p4constants/p4constants.go --p4info conf/p4/bin/p4info.txt
+		golang:latest go run ./scripts/go_gen_p4_const.go \
+		-output internal/p4constants/p4constants.go -p4info conf/p4/bin/p4info.txt
 	@docker run --rm -v $(CURDIR):/app -w /app \
-		golang:1.16-alpine gofmt -w internal/p4constants/p4constants.go
+		golang:latest gofmt -w internal/p4constants/p4constants.go
 
 fmt:
 	@go fmt ./...

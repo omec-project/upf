@@ -36,9 +36,10 @@ func (q qer) String() string {
 	}
 
 	return fmt.Sprintf("QER(id=%v, F-SEID=%v, F-SEID IP=%v, QFI=%v, "+
-		"uplinkMBR=%v, downlinkMBR=%v, uplinkGBR=%v, downlinkGBR=%v, type=%s)",
+		"uplinkMBR=%v, downlinkMBR=%v, uplinkGBR=%v, downlinkGBR=%v, type=%s, "+
+		"uplinkStatus=%v, downlinkStatus=%v)",
 		q.qerID, q.fseID, q.fseidIP, q.qfi, q.ulMbr, q.dlMbr, q.ulGbr, q.dlGbr,
-		qosLevel)
+		qosLevel, q.ulStatus, q.dlStatus)
 }
 
 func (q *qer) parseQER(ie1 *ie.IE, seid uint64) error {
