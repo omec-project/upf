@@ -39,12 +39,12 @@ const (
 	MtrVarPrefix        = "Meter_"
 )
 
-func generate(p4info *p4ConfigV1.P4Info, packageName *string) string {
+func generate(p4info *p4ConfigV1.P4Info, packageName string) string {
 	builder := new(strings.Builder)
 
 	builder.WriteString(CopyrightHeader)
 
-	builder.WriteString(fmt.Sprintf("package %s\n", *packageName))
+	builder.WriteString(fmt.Sprintf("package %s\n", packageName))
 	builder.WriteString(ConstOpen + "\n")
 
 	//HeaderField IDs
@@ -155,7 +155,7 @@ func main() {
 
 	p4config := getP4Config(*p4infoPath)
 
-	result := generate(p4config, packageName)
+	result := generate(p4config, *packageName)
 
 	if *outputPath == "-" {
 		fmt.Println(result)
