@@ -60,7 +60,7 @@ func generate(p4info *p4ConfigV1.P4Info, builder *strings.Builder) *strings.Buil
 		name, ID := element.GetPreamble().GetName(), strconv.FormatUint(uint64(element.GetPreamble().GetId()), 10)
 		name = strcase.ToPascal(name)
 
-		builder.WriteString("\t" + ACT_VAR_PREFIX + name + "\t\t" + UINT32_STRING + ID + "\n")
+		builder.WriteString(ACT_VAR_PREFIX + name + UINT32_STRING + ID + "\n")
 	}
 	// Indirect Counters
 	builder.WriteString("//IndirectCounters\n")
