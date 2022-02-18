@@ -4,8 +4,9 @@
 package pfcpiface
 
 import (
-	log "github.com/sirupsen/logrus"
 	"reflect"
+
+	log "github.com/sirupsen/logrus"
 
 	"net"
 	"time"
@@ -17,10 +18,10 @@ import (
 
 const (
 	// Default values
-	maxReqRetriesDefault    = 5
-	respTimeoutDefault      = 2 * time.Second
-	hbIntervalDefault       = 5 * time.Second
-	readTimeoutDefault      = 15 * time.Second
+	maxReqRetriesDefault = 5
+	respTimeoutDefault   = 2 * time.Second
+	hbIntervalDefault    = 5 * time.Second
+	readTimeoutDefault   = 15 * time.Second
 
 	// NotifySockAddr : Unix Socket path to read bess notification from.
 	NotifySockAddr = "/tmp/notifycp"
@@ -114,10 +115,10 @@ type BESSInfo struct {
 
 // UP4Info : UP4 interface settings.
 type UP4Info struct {
-	AccessIP     string          `json:"access_ip"`
-	P4rtcServer  string          `json:"p4rtc_server"`
-	P4rtcPort    string          `json:"p4rtc_port"`
-	QFIToTC      map[uint8]uint8 `json:"qfi_tc_mapping"`
+	AccessIP    string          `json:"access_ip"`
+	P4rtcServer string          `json:"p4rtc_server"`
+	P4rtcPort   string          `json:"p4rtc_port"`
+	QFIToTC     map[uint8]uint8 `json:"qfi_tc_mapping"`
 }
 
 // validateConf checks that the given config reaches a baseline of correctness.
