@@ -88,8 +88,8 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 	constBuilder.WriteString("// HeaderFields\n")
 	for _, element := range p4info.GetTables() {
 		for _, matchField := range element.MatchFields {
-			tableName := element.GetPreamble().GetName()
-			name := matchField.GetName()
+			tableName, name := element.GetPreamble().GetName(), matchField.GetName()
+
 			constBuilder.WriteString(emitEntityConstant(hfVarPrefix+tableName+name, matchField.GetId()))
 		}
 	}
@@ -125,8 +125,8 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 	constBuilder.WriteString("// ActionParams\n")
 	for _, element := range p4info.GetActions() {
 		for _, actionParam := range element.GetParams() {
-			actionName := element.GetPreamble().GetName()
-			name := actionParam.GetName()
+			actionName, name := element.GetPreamble().GetName(), actionParam.GetName()
+
 			constBuilder.WriteString(emitEntityConstant(actparamVarPrefix+actionName+name, actionParam.GetId()))
 		}
 	}
