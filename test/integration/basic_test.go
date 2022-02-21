@@ -40,6 +40,14 @@ type testCase struct {
 	desc string
 }
 
+func TimeBasedElectionId() p4_v1.Uint128 {
+	now := time.Now()
+	return p4_v1.Uint128{
+		High: uint64(now.Unix()),
+		Low:  uint64(now.UnixNano() % 1e9),
+	}
+}
+
 func setup(t *testing.T, pfcpAgentConfig string) {
 	providers.RunDockerCommandAttach("pfcpiface",
 		fmt.Sprintf("/bin/pfcpiface -config /config/%s", pfcpAgentConfig))
@@ -56,7 +64,7 @@ func setup(t *testing.T, pfcpAgentConfig string) {
 func teardown(t *testing.T) {
 	// clear Tunnel Peers table
 	// FIXME: Temporary solution. They should be cleared by pfcpiface, see SDFAB-960
-	p4rtClient, _ := providers.ConnectP4rt("127.0.0.1:50001", p4_v1.Uint128{High: 2, Low: 1})
+	p4rtClient, _ := providers.ConnectP4rt("127.0.0.1:50001", TimeBasedElectionId())
 	defer providers.DisconnectP4rt()
 	entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.tunnel_peers")
 	for _, entry := range entries {
@@ -253,6 +261,39 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 			},
 			desc: "QER_METERING - session QER only",
 		},
+		{
+			input: &pfcpSessionData{
+				nbAddress:    nodeBAddress,
+				ueAddress:    ueAddress,
+				upfN3Address: upfN3Address,
+				sdfFilter:    defaultSDFFilter,
+				ulTEID:       15,
+				dlTEID:       16,
+
+				QFI:              0x08,
+				uplinkAppQerID:   1,
+				downlinkAppQerID: 2,
+				sessQerID:        4,
+				sessGBR:          0,
+				sessMBR:          500000,
+				appGBR:           30000,
+				appMBR:           50000,
+			},
+			expected: p4RtValues{
+				appFilter: appFilter{
+					proto:        0x11,
+					appIP:        net.ParseIP("0.0.0.0"),
+					appPrefixLen: 0,
+					appPort: portRange{
+						80, 80,
+					},
+				},
+				appID:        1,
+				tunnelPeerID: 2,
+				tc:           3,
+			},
+			desc: "QER_METERING - TC for QFI",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -384,7 +425,7 @@ func testUEAttachDetach(t *testing.T, testcase *testCase) {
 
 	// clear Applications table
 	// FIXME: Temporary solution. They should be cleared by pfcpiface, see SDFAB-960
-	p4rtClient, _ := providers.ConnectP4rt("127.0.0.1:50001", p4_v1.Uint128{High: 2, Low: 1})
+	p4rtClient, _ := providers.ConnectP4rt("127.0.0.1:50001", TimeBasedElectionId())
 	defer func() {
 		providers.DisconnectP4rt()
 		// give pfcpiface time to become master controller again

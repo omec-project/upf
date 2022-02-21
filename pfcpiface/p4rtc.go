@@ -99,6 +99,22 @@ func convertError(err error) error {
 	return p4RtError
 }
 
+// TimeBasedElectionId Generates an election id that is monotonically increasing with time.
+// Specifically, the upper 64 bits are the unix timestamp in seconds, and the
+// lower 64 bits are the remaining nanoseconds. This is compatible with
+// election-systems that use the same epoch-based election IDs, and in that
+// case, this election ID will be guaranteed to be higher than any previous
+// election ID. This is useful in tests where repeated connections need to
+// acquire mastership reliably.
+func TimeBasedElectionId() p4.Uint128 {
+	now := time.Now()
+
+	return p4.Uint128{
+		High: uint64(now.Unix()),
+		Low:  uint64(now.UnixNano() % 1e9),
+	}
+}
+
 // CheckStatus ... Check client connection status.
 func (c *P4rtClient) CheckStatus() (state int) {
 	return int(c.conn.GetState())
@@ -294,6 +310,36 @@ func (c *P4rtClient) ClearTable(tableID uint32) error {
 	return c.WriteBatchReq(updates)
 }
 
+func (c *P4rtClient) ClearTables(tableIDs []uint32) error {
+	log.Traceln("Clearing P4 tables")
+
+	updates := []*p4.Update{}
+
+	for _, tableID := range tableIDs {
+		entry := &p4.TableEntry{
+			TableId:  tableID,
+			Priority: DefaultPriority,
+		}
+
+		readRes, err := c.ReadTableEntry(entry)
+		if err != nil {
+			return err
+		}
+
+		for _, entity := range readRes.GetEntities() {
+			updateType := p4.Update_DELETE
+			update := &p4.Update{
+				Type:   updateType,
+				Entity: entity,
+			}
+
+			updates = append(updates, update)
+		}
+	}
+
+	return c.WriteBatchReq(updates)
+}
+
 // InsertTableEntry .. Insert table Entry.
 func (c *P4rtClient) InsertTableEntry(entry *p4.TableEntry, funcType uint8) error {
 	log.Println("Insert Table Entry for Table ", entry.TableId)
@@ -330,6 +376,7 @@ func (c *P4rtClient) ApplyTableEntries(methodType p4.Update_Type, entries ...*p4
 			},
 		}
 		log.Traceln("Writing table entry: ", proto.MarshalTextString(update))
+
 		updates = append(updates, update)
 	}
 
@@ -531,7 +578,7 @@ func CreateChannel(host string, deviceID uint64) (*P4rtClient, error) {
 		return nil, err
 	}
 
-	err = client.SetMastership(p4.Uint128{High: 1, Low: 1})
+	err = client.SetMastership(TimeBasedElectionId())
 	if err != nil {
 		log.Println("Set Mastership error: ", err)
 		return nil, err

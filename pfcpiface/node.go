@@ -157,6 +157,11 @@ func (node *PFCPNode) Serve() {
 
 func (node *PFCPNode) Stop() {
 	node.cancel()
+
+	if err := node.metrics.Stop(); err != nil {
+		// TODO: propagate error upwards
+		log.Errorln(err)
+	}
 }
 
 // Done waits for Shutdown() to complete
