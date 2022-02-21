@@ -3,7 +3,6 @@
 
 package p4constants
 
-//noinspection GoSnakeCaseUsage
 const (
 
 	// HeaderFields
@@ -166,6 +165,9 @@ var (
 	DirectCounterIDToNameMap = map[uint32]string{
 		325583051: "acls",
 	}
+	ActionProfileIDToNameMap = map[uint32]string{
+		297808402: "hashed_selector",
+	}
 	PktMetadataIDToNameMap = map[uint32]string{
 		75327753: "packet_out",
 		80671331: "packet_in",
@@ -219,6 +221,9 @@ var (
 	}
 	DirectCounterIDList = []uint32{
 		325583051,
+	}
+	ActionProfileIDList = []uint32{
+		297808402,
 	}
 	PktMetadataIDList = []uint32{
 		75327753,

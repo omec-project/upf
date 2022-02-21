@@ -24,7 +24,7 @@ const (
 // Copyright 2022-present Open Networking Foundation
 `
 
-	constOpen        = "//noinspection GoSnakeCaseUsage\nconst (\n"
+	constOpen        = "const (\n"
 	varOpen          = "var (\n"
 	mapFormatString  = "%v:\"%v\",\n"
 	listFormatString = "%v,\n"
@@ -49,6 +49,8 @@ const (
 	tableListDeclaration          = "TableIDList = []uint32 {\n"
 	actionMapDeclaration          = "ActionIDToNameMap = map[uint32]string {\n"
 	actionListDeclaration         = "ActionIDList = []uint32 {\n"
+	actionProfileMapDeclaration   = "ActionProfileIDToNameMap = map[uint32]string {\n"
+	actionProfileListDeclaration  = "ActionProfileIDList = []uint32 {\n"
 	counterMapDeclaration         = "CounterIDToNameMap = map[uint32]string {\n"
 	counterListDeclaration        = "CounterIDList = []uint32 {\n"
 	directCounterMapDeclaration   = "DirectCounterIDToNameMap = map[uint32]string {\n"
@@ -161,10 +163,18 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 
 	// Action profiles
 	constBuilder.WriteString("// ActionProfiles\n")
+	mapBuilder.WriteString(actionProfileMapDeclaration)
+	listBuilder.WriteString(actionProfileListDeclaration)
 	for _, element := range p4info.GetActionProfiles() {
-		name := element.GetPreamble().GetName()
-		constBuilder.WriteString(emitEntityConstant(actprofVarPrefix+name, element.GetPreamble().GetId()))
+		name, ID := element.GetPreamble().GetName(), element.GetPreamble().GetId()
+
+		constBuilder.WriteString(emitEntityConstant(actprofVarPrefix+name, ID))
+		mapBuilder.WriteString(fmt.Sprintf(mapFormatString, ID, name))
+		listBuilder.WriteString(fmt.Sprintf(listFormatString, ID))
 	}
+	mapBuilder.WriteString("}\n")
+	listBuilder.WriteString("}\n") //Close declarations
+
 	// Packet metadata
 	constBuilder.WriteString("// PacketMetadata\n")
 	mapBuilder.WriteString(packetMetadataMapDeclaration)
