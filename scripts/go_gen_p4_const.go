@@ -76,9 +76,7 @@ func emitEntitySizeConstant(p4EntityName string, id int64) string {
 }
 
 func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
-	constBuilder := strings.Builder{} // constBuilder used to create consts
-	mapBuilder := strings.Builder{}
-	listBuilder := strings.Builder{}
+	constBuilder, mapBuilder, listBuilder := strings.Builder{}, strings.Builder{}, strings.Builder{}
 
 	constBuilder.WriteString(copyrightHeader + "\n")
 
