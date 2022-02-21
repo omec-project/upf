@@ -61,8 +61,6 @@ const (
 	packetMetadataListDeclaration = "PktMetadataIDList = []uint32 {\n"
 )
 
-var ()
-
 func emitEntityConstant(p4EntityName string, id uint32) string {
 	// see: https://go.dev/ref/spec#Identifiers
 	p4EntityName = strings.Replace(p4EntityName, ".", "_", -1)
@@ -83,7 +81,7 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 	constBuilder.WriteString(copyrightHeader + "\n")
 
 	constBuilder.WriteString(fmt.Sprintf("package %s\n", packageName))
-	constBuilder.WriteString(constOpen + "\n")
+	constBuilder.WriteString(constOpen)
 	mapBuilder.WriteString(varOpen)
 
 	//HeaderField IDs
@@ -106,8 +104,8 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 		mapBuilder.WriteString(fmt.Sprintf(mapFormatString, ID, name))
 		listBuilder.WriteString(fmt.Sprintf(listFormatString, ID))
 	}
-	mapBuilder.WriteString("}\n") //Close declaration
-	listBuilder.WriteString("}\n")
+	mapBuilder.WriteString("}\n")
+	listBuilder.WriteString("}\n") //Close declaration
 
 	// Actions
 	constBuilder.WriteString("// Actions\n")
@@ -132,6 +130,7 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 			constBuilder.WriteString(emitEntityConstant(actparamVarPrefix+actionName+name, actionParam.GetId()))
 		}
 	}
+
 	// Indirect Counters
 	constBuilder.WriteString("// IndirectCounters\n")
 	mapBuilder.WriteString(counterMapDeclaration)
@@ -205,7 +204,7 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 	listBuilder.WriteString("}\n") //Close declarations
 
 	constBuilder.WriteString(constOrVarClose + "\n")
-	listBuilder.WriteString(constOrVarClose)
+	listBuilder.WriteString(constOrVarClose) // last builder closes 'var' declaration
 
 	return constBuilder.String() + mapBuilder.String() + listBuilder.String()
 }

@@ -4,7 +4,6 @@
 package p4constants
 
 const (
-
 	// HeaderFields
 	HdrPreQosPipeRoutingRoutesV4dstPrefix      uint32 = 1
 	HdrPreQosPipeAclAclsinport                 uint32 = 1
