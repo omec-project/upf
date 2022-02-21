@@ -53,6 +53,19 @@ jobs:
         run: |
           git --no-pager diff
 
+      - name: Build P4 constants
+        id: check
+        run: |
+          make p4-constants
+          echo "::set-output name=PORCELAIN::`git status --porcelain`"
+      # Verify P4 constants
+      - name: Check P4 constants are updated
+        if: ${{ steps.check.outputs.PORCELAIN != '' }}
+        uses: actions/github-script@v3
+        with:
+          script: |
+            core.setFailed('Please run make p4-constants and commit changes')
+
       # Build again and commit
       - name: Build the BESS-UPF Docker image (after format)
         run: |
