@@ -175,6 +175,9 @@ var (
 		338231090: "PreQosPipe.app_meter",
 		347593234: "PreQosPipe.session_meter",
 	}
+)
+
+var (
 	TableIDList = []uint32{
 		39015874,
 		47204971,

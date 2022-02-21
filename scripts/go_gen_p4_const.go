@@ -83,6 +83,7 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 	constBuilder.WriteString(fmt.Sprintf("package %s\n", packageName))
 	constBuilder.WriteString(constOpen)
 	mapBuilder.WriteString(varOpen)
+	listBuilder.WriteString(varOpen)
 
 	//HeaderField IDs
 	constBuilder.WriteString("// HeaderFields\n")
@@ -204,7 +205,8 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 	listBuilder.WriteString("}\n") //Close declarations
 
 	constBuilder.WriteString(constOrVarClose + "\n")
-	listBuilder.WriteString(constOrVarClose) // last builder closes 'var' declaration
+	mapBuilder.WriteString(constOrVarClose + "\n")
+	listBuilder.WriteString(constOrVarClose)
 
 	return constBuilder.String() + mapBuilder.String() + listBuilder.String()
 }
