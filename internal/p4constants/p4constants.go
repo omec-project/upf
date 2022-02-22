@@ -3,9 +3,7 @@
 
 package p4constants
 
-//noinspection GoSnakeCaseUsage
 const (
-
 	// HeaderFields
 	HdrPreQosPipeRoutingRoutesV4dstPrefix      uint32 = 1
 	HdrPreQosPipeAclAclsinport                 uint32 = 1
@@ -101,8 +99,10 @@ const (
 	ActionParamPreQosPipeLoadTunnelParamdstAddr                uint32 = 2
 	ActionParamPreQosPipeLoadTunnelParamsport                  uint32 = 3
 	// IndirectCounters
-	CounterPreQosPipePreQosCounter   uint32 = 315693181
-	CounterPostQosPipePostQosCounter uint32 = 302958180
+	CounterPreQosPipePreQosCounter       uint32 = 315693181
+	CounterSizePreQosPipePreQosCounter   uint64 = 1024
+	CounterPostQosPipePostQosCounter     uint32 = 302958180
+	CounterSizePostQosPipePostQosCounter uint64 = 1024
 	// DirectCounters
 	DirectCounterAcls uint32 = 325583051
 	// ActionProfiles
@@ -111,6 +111,164 @@ const (
 	PacketMetaPacketOut uint32 = 75327753
 	PacketMetaPacketIn  uint32 = 80671331
 	// Meters
-	MeterPreQosPipeAppMeter     uint32 = 338231090
-	MeterPreQosPipeSessionMeter uint32 = 347593234
+	MeterPreQosPipeAppMeter         uint32 = 338231090
+	MeterSizePreQosPipeAppMeter     uint64 = 1024
+	MeterPreQosPipeSessionMeter     uint32 = 347593234
+	MeterSizePreQosPipeSessionMeter uint64 = 1024
 )
+
+func GetTableIDToNameMap() map[uint32]string {
+	return map[uint32]string{
+		39015874: "PreQosPipe.Routing.routes_v4",
+		47204971: "PreQosPipe.Acl.acls",
+		40931612: "PreQosPipe.my_station",
+		33923840: "PreQosPipe.interfaces",
+		44976597: "PreQosPipe.sessions_uplink",
+		34742049: "PreQosPipe.sessions_downlink",
+		37595532: "PreQosPipe.terminations_uplink",
+		34778590: "PreQosPipe.terminations_downlink",
+		46868458: "PreQosPipe.applications",
+		49497304: "PreQosPipe.tunnel_peers",
+	}
+}
+
+func GetActionIDToNameMap() map[uint32]string {
+	return map[uint32]string{
+		21257015: "NoAction",
+		31448256: "PreQosPipe.Routing.drop",
+		23965128: "PreQosPipe.Routing.route",
+		30494847: "PreQosPipe.Acl.set_port",
+		26495283: "PreQosPipe.Acl.punt",
+		21596798: "PreQosPipe.Acl.clone_to_cpu",
+		18812293: "PreQosPipe.Acl.drop",
+		23766285: "PreQosPipe._initialize_metadata",
+		26090030: "PreQosPipe.set_source_iface",
+		28401267: "PreQosPipe.do_drop",
+		19461580: "PreQosPipe.set_session_uplink",
+		22196934: "PreQosPipe.set_session_uplink_drop",
+		21848329: "PreQosPipe.set_session_downlink",
+		20229579: "PreQosPipe.set_session_downlink_drop",
+		20249483: "PreQosPipe.set_session_downlink_buff",
+		21760615: "PreQosPipe.uplink_term_fwd_no_tc",
+		28305359: "PreQosPipe.uplink_term_fwd",
+		20977365: "PreQosPipe.uplink_term_drop",
+		26185804: "PreQosPipe.downlink_term_fwd_no_tc",
+		32699713: "PreQosPipe.downlink_term_fwd",
+		31264233: "PreQosPipe.downlink_term_drop",
+		23010411: "PreQosPipe.set_app_id",
+		32742981: "PreQosPipe.load_tunnel_param",
+		29247910: "PreQosPipe.do_gtpu_tunnel",
+		31713420: "PreQosPipe.do_gtpu_tunnel_with_psc",
+	}
+}
+
+func GetCounterIDToNameMap() map[uint32]string {
+	return map[uint32]string{
+		315693181: "PreQosPipe.pre_qos_counter",
+		302958180: "PostQosPipe.post_qos_counter",
+	}
+}
+
+func GetDirectCounterIDToNameMap() map[uint32]string {
+	return map[uint32]string{
+		325583051: "acls",
+	}
+}
+
+func GetActionProfileIDToNameMap() map[uint32]string {
+	return map[uint32]string{
+		297808402: "hashed_selector",
+	}
+}
+
+func GetPacketMetadataIDToNameMap() map[uint32]string {
+	return map[uint32]string{
+		75327753: "packet_out",
+		80671331: "packet_in",
+	}
+}
+
+func GetMeterIDToNameMap() map[uint32]string {
+	return map[uint32]string{
+		338231090: "PreQosPipe.app_meter",
+		347593234: "PreQosPipe.session_meter",
+	}
+}
+
+func GetTableIDList() []uint32 {
+	return []uint32{
+		39015874,
+		47204971,
+		40931612,
+		33923840,
+		44976597,
+		34742049,
+		37595532,
+		34778590,
+		46868458,
+		49497304,
+	}
+}
+
+func GetActionIDList() []uint32 {
+	return []uint32{
+		21257015,
+		31448256,
+		23965128,
+		30494847,
+		26495283,
+		21596798,
+		18812293,
+		23766285,
+		26090030,
+		28401267,
+		19461580,
+		22196934,
+		21848329,
+		20229579,
+		20249483,
+		21760615,
+		28305359,
+		20977365,
+		26185804,
+		32699713,
+		31264233,
+		23010411,
+		32742981,
+		29247910,
+		31713420,
+	}
+}
+
+func GetCounterIDList() []uint32 {
+	return []uint32{
+		315693181,
+		302958180,
+	}
+}
+
+func GetDirectCounterIDList() []uint32 {
+	return []uint32{
+		325583051,
+	}
+}
+
+func GetActionProfileIDList() []uint32 {
+	return []uint32{
+		297808402,
+	}
+}
+
+func GetPacketMetadataIDList() []uint32 {
+	return []uint32{
+		75327753,
+		80671331,
+	}
+}
+
+func GetMeterIDList() []uint32 {
+	return []uint32{
+		338231090,
+		347593234,
+	}
+}

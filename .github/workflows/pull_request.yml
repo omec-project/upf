@@ -52,6 +52,12 @@ jobs:
       - name: Show all CI changes
         run: |
           git --no-pager diff
+      # Verify P4 constants
+      - name: Build P4 constants
+        id: check
+        run: |
+          make p4-constants
+          git update-index --refresh
 
       # Build again and commit
       - name: Build the BESS-UPF Docker image (after format)
