@@ -58,9 +58,6 @@ jobs:
         run: |
           make p4-constants
           git update-index --refresh
-      - name: Log on step failure
-        if: steps.check.outcome == 'failure'
-        run: echo 'Please run make p4-constants and commit changes'
 
       # Build again and commit
       - name: Build the BESS-UPF Docker image (after format)
