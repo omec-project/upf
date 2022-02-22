@@ -211,18 +211,19 @@ func (up4 *UP4) setupChannel() error {
 
 func (up4 *UP4) initAllCounters() error {
 	log.Debug("Initializing counter for UP4")
-	preQosCounterIdentifier, preQoSCounterSize := p4constants.CounterPreQosPipePreQosCounter, p4constants.CounterSizePreQosPipePreQosCounter
-	preQosCounterName := p4constants.GetCounterIDToNameMap()[preQosCounterIdentifier]
 
-	err := up4.initCounter(preQosCounterID, preQosCounterName, preQoSCounterSize)
+	counterID, counterSize := p4constants.CounterPreQosPipePreQosCounter, p4constants.CounterSizePreQosPipePreQosCounter
+	counterName := p4constants.GetCounterIDToNameMap()[counterID]
+
+	err := up4.initCounter(preQosCounterID, counterName, counterSize)
 	if err != nil {
 		return ErrOperationFailedWithReason("init preQosCounterID counter", err.Error())
 	}
 
-	postQosCounterIdentifier, postQoSCounterSize := p4constants.CounterPreQosPipePreQosCounter, p4constants.CounterSizePreQosPipePreQosCounter
-	postQosCounterName := p4constants.GetCounterIDToNameMap()[postQosCounterIdentifier]
+	counterID, counterSize = p4constants.CounterPostQosPipePostQosCounter, p4constants.CounterSizePostQosPipePostQosCounter
+	counterName = p4constants.GetCounterIDToNameMap()[counterID]
 
-	err = up4.initCounter(postQosCounterID, postQosCounterName, postQoSCounterSize)
+	err = up4.initCounter(postQosCounterID, counterName, counterSize)
 	if err != nil {
 		return ErrOperationFailedWithReason("init postQosCounterID counter", err.Error())
 	}
