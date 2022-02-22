@@ -816,9 +816,9 @@ func (t *P4rtTranslator) BuildMeterEntry(meterID uint32, cellID uint32, config *
 
 	switch meterID {
 	case p4constants.MeterPreQosPipeAppMeter:
-		meterName = applicationMeter
+		meterName = p4constants.GetMeterIDToNameMap()[p4constants.MeterPreQosPipeAppMeter]
 	case p4constants.MeterPreQosPipeSessionMeter:
-		meterName = sessionMeter
+		meterName = p4constants.GetMeterIDToNameMap()[p4constants.MeterPreQosPipeSessionMeter]
 	}
 
 	builderLog := log.WithFields(log.Fields{

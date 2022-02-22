@@ -36,9 +36,6 @@ const (
 	maxGTPTunnelPeerIDs = 253
 	maxApplicationIDs   = 254
 
-	applicationMeter = "PreQosPipe.app_meter"
-	sessionMeter     = "PreQosPipe.session_meter"
-
 	meterTypeApplication uint8 = 1
 	meterTypeSession     uint8 = 2
 
@@ -240,8 +237,7 @@ func (up4 *UP4) initMetersPools() error {
 	appMeterName := p4constants.GetMeterIDToNameMap()[appMeterID]
 
 	log.WithFields(log.Fields{
-		"name":  applicationMeter,
-		"meter": appMeterName,
+		"name": appMeterName,
 	}).Trace("Found P4 meter by name")
 
 	up4.appMeterCellIDsPool = set.NewSet()
@@ -255,8 +251,7 @@ func (up4 *UP4) initMetersPools() error {
 	sessMeterName := p4constants.GetMeterIDToNameMap()[sessMeterID]
 
 	log.WithFields(log.Fields{
-		"name":  sessionMeter,
-		"meter": sessMeterName,
+		"name": sessMeterName,
 	}).Trace("Found P4 meter by name")
 
 	up4.sessMeterCellIDsPool = set.NewSet()
