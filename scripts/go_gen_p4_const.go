@@ -25,7 +25,6 @@ const (
 `
 
 	constOpen        = "const (\n"
-	varOpen          = "var (\n"
 	mapFormatString  = "%v:\"%v\",\n"
 	listFormatString = "%v,\n"
 	constOrVarClose  = ")\n"
@@ -45,20 +44,20 @@ const (
 	mtrVarPrefix        = "Meter_"
 	mtrSizeVarPrefix    = "MeterSize_"
 
-	tableMapDeclaration           = "TableIDToNameMap = map[uint32]string {\n"
-	tableListDeclaration          = "TableIDList = []uint32 {\n"
-	actionMapDeclaration          = "ActionIDToNameMap = map[uint32]string {\n"
-	actionListDeclaration         = "ActionIDList = []uint32 {\n"
-	actionProfileMapDeclaration   = "ActionProfileIDToNameMap = map[uint32]string {\n"
-	actionProfileListDeclaration  = "ActionProfileIDList = []uint32 {\n"
-	counterMapDeclaration         = "CounterIDToNameMap = map[uint32]string {\n"
-	counterListDeclaration        = "CounterIDList = []uint32 {\n"
-	directCounterMapDeclaration   = "DirectCounterIDToNameMap = map[uint32]string {\n"
-	directCounterListDeclaration  = "DirectCounterIDList = []uint32 {\n"
-	meterMapDeclaration           = "MeterIDToNameMap = map[uint32]string {\n"
-	meterListDeclaration          = "MeterIDList = []uint32 {\n"
-	packetMetadataMapDeclaration  = "PktMetadataIDToNameMap = map[uint32]string {\n"
-	packetMetadataListDeclaration = "PktMetadataIDList = []uint32 {\n"
+	tableMapFunc          = "func GetTableIDToNameMap() map[uint32]string {\n return map[uint32]string {\n"
+	tableListFunc         = "func GetTableIDList() []uint32 {\n return []uint32 {\n"
+	actionMapFunc         = "func GetActionIDToNameMap() map[uint32]string {\n return map[uint32]string {\n"
+	actionListFunc        = "func GetActionIDList() []uint32 {\n return []uint32 {\n"
+	counterMapFunc        = "func GetCounterIDToNameMap() map[uint32]string {\n return map[uint32]string {\n"
+	counterListFunc       = "func GetCounterIDList() []uint32 {\n return []uint32 {\n"
+	directCounterMapFunc  = "func GetDirectCounterIDToNameMap() map[uint32]string {\n return map[uint32]string {\n"
+	directCounterListFunc = "func GetDirectCounterIDList() []uint32 {\n return []uint32 {\n"
+	actionProfileMapFunc  = "func GetActionProfileIDToNameMap() map[uint32]string {\n return map[uint32]string {\n"
+	actionProfileListFunc = "func GetActionProfileIDList() []uint32 {\n return []uint32 {\n"
+	pktMetadataMapFunc    = "func GetPacketMetadataIDToNameMap() map[uint32]string {\n return map[uint32]string {\n"
+	pktMetadataListFunc   = "func GetPacketMetadataIDList() []uint32 {\n return []uint32 {\n"
+	metersMapFunc         = "func GetMeterIDToNameMap() map[uint32]string {\n return map[uint32]string {\n"
+	metersListFunc        = "func GetMeterIDList() []uint32 {\n return []uint32 {\n"
 )
 
 func emitEntityConstant(p4EntityName string, id uint32) string {
@@ -82,8 +81,6 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 
 	constBuilder.WriteString(fmt.Sprintf("package %s\n", packageName))
 	constBuilder.WriteString(constOpen)
-	mapBuilder.WriteString(varOpen)
-	listBuilder.WriteString(varOpen)
 
 	//HeaderField IDs
 	constBuilder.WriteString("// HeaderFields\n")
@@ -96,8 +93,8 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 	}
 	// Tables
 	constBuilder.WriteString("// Tables\n")
-	mapBuilder.WriteString(tableMapDeclaration)
-	listBuilder.WriteString(tableListDeclaration)
+	mapBuilder.WriteString(tableMapFunc)
+	listBuilder.WriteString(tableListFunc)
 	for _, element := range p4info.GetTables() {
 		name, ID := element.GetPreamble().GetName(), element.GetPreamble().GetId()
 
@@ -105,13 +102,13 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 		mapBuilder.WriteString(fmt.Sprintf(mapFormatString, ID, name))
 		listBuilder.WriteString(fmt.Sprintf(listFormatString, ID))
 	}
-	mapBuilder.WriteString("}\n")
-	listBuilder.WriteString("}\n") //Close declaration
+	mapBuilder.WriteString("}\n}\n\n")
+	listBuilder.WriteString("}\n}\n\n") //Close func declaration
 
 	// Actions
 	constBuilder.WriteString("// Actions\n")
-	mapBuilder.WriteString(actionMapDeclaration)
-	listBuilder.WriteString(actionListDeclaration)
+	mapBuilder.WriteString(actionMapFunc)
+	listBuilder.WriteString(actionListFunc)
 	for _, element := range p4info.GetActions() {
 		name, ID := element.GetPreamble().GetName(), element.GetPreamble().GetId()
 
@@ -119,8 +116,8 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 		mapBuilder.WriteString(fmt.Sprintf(mapFormatString, ID, name))
 		listBuilder.WriteString(fmt.Sprintf(listFormatString, ID))
 	}
-	mapBuilder.WriteString("}\n")
-	listBuilder.WriteString("}\n") //Close declarations
+	mapBuilder.WriteString("}\n}\n\n")
+	listBuilder.WriteString("}\n}\n\n") //Close func declarations
 
 	// Action Param IDs
 	constBuilder.WriteString("// ActionParams\n")
@@ -134,8 +131,8 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 
 	// Indirect Counters
 	constBuilder.WriteString("// IndirectCounters\n")
-	mapBuilder.WriteString(counterMapDeclaration)
-	listBuilder.WriteString(counterListDeclaration)
+	mapBuilder.WriteString(counterMapFunc)
+	listBuilder.WriteString(counterListFunc)
 	for _, element := range p4info.GetCounters() {
 		name, ID := element.GetPreamble().GetName(), element.GetPreamble().GetId()
 
@@ -144,13 +141,13 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 		mapBuilder.WriteString(fmt.Sprintf(mapFormatString, ID, name))
 		listBuilder.WriteString(fmt.Sprintf(listFormatString, ID))
 	}
-	mapBuilder.WriteString("}\n")
-	listBuilder.WriteString("}\n") //Close declarations
+	mapBuilder.WriteString("}\n}\n\n")
+	listBuilder.WriteString("}\n}\n\n") //Close func declarations
 
 	// Direct Counters
 	constBuilder.WriteString("// DirectCounters\n")
-	mapBuilder.WriteString(directCounterMapDeclaration)
-	listBuilder.WriteString(directCounterListDeclaration)
+	mapBuilder.WriteString(directCounterMapFunc)
+	listBuilder.WriteString(directCounterListFunc)
 	for _, element := range p4info.GetDirectCounters() {
 		name, ID := element.GetPreamble().GetName(), element.GetPreamble().GetId()
 
@@ -158,13 +155,13 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 		mapBuilder.WriteString(fmt.Sprintf(mapFormatString, ID, name))
 		listBuilder.WriteString(fmt.Sprintf(listFormatString, ID))
 	}
-	mapBuilder.WriteString("}\n")
-	listBuilder.WriteString("}\n") //Close declarations
+	mapBuilder.WriteString("}\n}\n\n")
+	listBuilder.WriteString("}\n}\n\n") //Close declarations
 
 	// Action profiles
 	constBuilder.WriteString("// ActionProfiles\n")
-	mapBuilder.WriteString(actionProfileMapDeclaration)
-	listBuilder.WriteString(actionProfileListDeclaration)
+	mapBuilder.WriteString(actionProfileMapFunc)
+	listBuilder.WriteString(actionProfileListFunc)
 	for _, element := range p4info.GetActionProfiles() {
 		name, ID := element.GetPreamble().GetName(), element.GetPreamble().GetId()
 
@@ -172,13 +169,13 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 		mapBuilder.WriteString(fmt.Sprintf(mapFormatString, ID, name))
 		listBuilder.WriteString(fmt.Sprintf(listFormatString, ID))
 	}
-	mapBuilder.WriteString("}\n")
-	listBuilder.WriteString("}\n") //Close declarations
+	mapBuilder.WriteString("}\n}\n\n")
+	listBuilder.WriteString("}\n}\n\n") //Close declarations
 
 	// Packet metadata
 	constBuilder.WriteString("// PacketMetadata\n")
-	mapBuilder.WriteString(packetMetadataMapDeclaration)
-	listBuilder.WriteString(packetMetadataListDeclaration)
+	mapBuilder.WriteString(pktMetadataMapFunc)
+	listBuilder.WriteString(pktMetadataListFunc)
 	for _, element := range p4info.GetControllerPacketMetadata() {
 		name, ID := element.GetPreamble().GetName(), element.GetPreamble().GetId()
 
@@ -186,13 +183,13 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 		mapBuilder.WriteString(fmt.Sprintf(mapFormatString, ID, name))
 		listBuilder.WriteString(fmt.Sprintf(listFormatString, ID))
 	}
-	mapBuilder.WriteString("}\n")
-	listBuilder.WriteString("}\n") //Close declarations
+	mapBuilder.WriteString("}\n}\n\n")
+	listBuilder.WriteString("}\n}\n\n") //Close declarations
 
 	// Meters
 	constBuilder.WriteString("// Meters\n")
-	mapBuilder.WriteString(meterMapDeclaration)
-	listBuilder.WriteString(meterListDeclaration)
+	mapBuilder.WriteString(metersMapFunc)
+	listBuilder.WriteString(metersListFunc)
 	for _, element := range p4info.GetMeters() {
 		name, ID := element.GetPreamble().GetName(), element.GetPreamble().GetId()
 
@@ -201,12 +198,10 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 		mapBuilder.WriteString(fmt.Sprintf(mapFormatString, ID, name))
 		listBuilder.WriteString(fmt.Sprintf(listFormatString, ID))
 	}
-	mapBuilder.WriteString("}\n")
-	listBuilder.WriteString("}\n") //Close declarations
+	mapBuilder.WriteString("}\n}\n\n")
+	listBuilder.WriteString("}\n}\n\n") //Close declarations
 
 	constBuilder.WriteString(constOrVarClose + "\n")
-	mapBuilder.WriteString(constOrVarClose + "\n")
-	listBuilder.WriteString(constOrVarClose)
 
 	return constBuilder.String() + mapBuilder.String() + listBuilder.String()
 }

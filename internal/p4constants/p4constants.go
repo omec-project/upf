@@ -117,8 +117,8 @@ const (
 	MeterSizePreQosPipeSessionMeter uint64 = 1024
 )
 
-var (
-	TableIDToNameMap = map[uint32]string{
+func GetTableIDToNameMap() map[uint32]string {
+	return map[uint32]string{
 		39015874: "PreQosPipe.Routing.routes_v4",
 		47204971: "PreQosPipe.Acl.acls",
 		40931612: "PreQosPipe.my_station",
@@ -130,7 +130,10 @@ var (
 		46868458: "PreQosPipe.applications",
 		49497304: "PreQosPipe.tunnel_peers",
 	}
-	ActionIDToNameMap = map[uint32]string{
+}
+
+func GetActionIDToNameMap() map[uint32]string {
+	return map[uint32]string{
 		21257015: "NoAction",
 		31448256: "PreQosPipe.Routing.drop",
 		23965128: "PreQosPipe.Routing.route",
@@ -157,28 +160,43 @@ var (
 		29247910: "PreQosPipe.do_gtpu_tunnel",
 		31713420: "PreQosPipe.do_gtpu_tunnel_with_psc",
 	}
-	CounterIDToNameMap = map[uint32]string{
+}
+
+func GetCounterIDToNameMap() map[uint32]string {
+	return map[uint32]string{
 		315693181: "PreQosPipe.pre_qos_counter",
 		302958180: "PostQosPipe.post_qos_counter",
 	}
-	DirectCounterIDToNameMap = map[uint32]string{
+}
+
+func GetDirectCounterIDToNameMap() map[uint32]string {
+	return map[uint32]string{
 		325583051: "acls",
 	}
-	ActionProfileIDToNameMap = map[uint32]string{
+}
+
+func GetActionProfileIDToNameMap() map[uint32]string {
+	return map[uint32]string{
 		297808402: "hashed_selector",
 	}
-	PktMetadataIDToNameMap = map[uint32]string{
+}
+
+func GetPacketMetadataIDToNameMap() map[uint32]string {
+	return map[uint32]string{
 		75327753: "packet_out",
 		80671331: "packet_in",
 	}
-	MeterIDToNameMap = map[uint32]string{
+}
+
+func GetMeterIDToNameMap() map[uint32]string {
+	return map[uint32]string{
 		338231090: "PreQosPipe.app_meter",
 		347593234: "PreQosPipe.session_meter",
 	}
-)
+}
 
-var (
-	TableIDList = []uint32{
+func GetTableIDList() []uint32 {
+	return []uint32{
 		39015874,
 		47204971,
 		40931612,
@@ -190,7 +208,10 @@ var (
 		46868458,
 		49497304,
 	}
-	ActionIDList = []uint32{
+}
+
+func GetActionIDList() []uint32 {
+	return []uint32{
 		21257015,
 		31448256,
 		23965128,
@@ -217,22 +238,37 @@ var (
 		29247910,
 		31713420,
 	}
-	CounterIDList = []uint32{
+}
+
+func GetCounterIDList() []uint32 {
+	return []uint32{
 		315693181,
 		302958180,
 	}
-	DirectCounterIDList = []uint32{
+}
+
+func GetDirectCounterIDList() []uint32 {
+	return []uint32{
 		325583051,
 	}
-	ActionProfileIDList = []uint32{
+}
+
+func GetActionProfileIDList() []uint32 {
+	return []uint32{
 		297808402,
 	}
-	PktMetadataIDList = []uint32{
+}
+
+func GetPacketMetadataIDList() []uint32 {
+	return []uint32{
 		75327753,
 		80671331,
 	}
-	MeterIDList = []uint32{
+}
+
+func GetMeterIDList() []uint32 {
+	return []uint32{
 		338231090,
 		347593234,
 	}
-)
+}
