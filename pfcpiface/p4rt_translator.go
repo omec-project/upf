@@ -812,14 +812,7 @@ func (t *P4rtTranslator) BuildGTPTunnelPeerTableEntry(tunnelPeerID uint8, tunnel
 }
 
 func (t *P4rtTranslator) BuildMeterEntry(meterID uint32, cellID uint32, config *p4.MeterConfig) *p4.MeterEntry {
-	meterName := ""
-
-	switch meterID {
-	case p4constants.MeterPreQosPipeAppMeter:
-		meterName = p4constants.GetMeterIDToNameMap()[p4constants.MeterPreQosPipeAppMeter]
-	case p4constants.MeterPreQosPipeSessionMeter:
-		meterName = p4constants.GetMeterIDToNameMap()[p4constants.MeterPreQosPipeSessionMeter]
-	}
+	meterName := p4constants.GetMeterIDToNameMap()[meterID]
 
 	builderLog := log.WithFields(log.Fields{
 		"Meter":   meterName,
