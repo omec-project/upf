@@ -138,20 +138,15 @@ func (up4 *UP4) sessionStats(*PfcpNodeCollector, chan<- prometheus.Metric) error
 func (up4 *UP4) portStats(uc *upfCollector, ch chan<- prometheus.Metric) {
 }
 
-func (up4 *UP4) initCounter(counterID uint8, name string) error {
-	ctr, err := up4.p4RtTranslator.getCounterByID(uint32(counterID))
-	if err != nil {
-		return err
-	}
-
-	up4.counters[counterID].maxSize = uint64(ctr.Size)
-	up4.counters[counterID].counterID = uint64(ctr.Preamble.Id)
+func (up4 *UP4) initCounter(counterID uint8, name string, counterSize uint64) error {
+	up4.counters[counterID].maxSize = counterSize
+	up4.counters[counterID].counterID = uint64(counterID)
 
 	log.WithFields(log.Fields{
 		"counterID":      counterID,
 		"name":           name,
-		"max-size":       ctr.Size,
-		"UP4 counter ID": ctr.Preamble.Id,
+		"max-size":       counterSize,
+		"UP4 counter ID": counterID,
 	}).Debug("Counter initialized successfully")
 
 	return nil
@@ -219,13 +214,18 @@ func (up4 *UP4) setupChannel() error {
 
 func (up4 *UP4) initAllCounters() error {
 	log.Debug("Initializing counter for UP4")
+	preQosCounterIdentifier, preQoSCounterSize := p4constants.CounterPreQosPipePreQosCounter, p4constants.CounterSizePreQosPipePreQosCounter
+	preQosCounterName := p4constants.GetCounterIDToNameMap()[preQosCounterIdentifier]
 
-	err := up4.initCounter(preQosCounterID, "PreQosPipe.pre_qos_counter")
+	err := up4.initCounter(preQosCounterID, preQosCounterName, preQoSCounterSize)
 	if err != nil {
 		return ErrOperationFailedWithReason("init preQosCounterID counter", err.Error())
 	}
 
-	err = up4.initCounter(postQosCounterID, "PostQosPipe.post_qos_counter")
+	postQosCounterIdentifier, postQoSCounterSize := p4constants.CounterPreQosPipePreQosCounter, p4constants.CounterSizePreQosPipePreQosCounter
+	postQosCounterName := p4constants.GetCounterIDToNameMap()[postQosCounterIdentifier]
+
+	err = up4.initCounter(postQosCounterID, postQosCounterName, postQoSCounterSize)
 	if err != nil {
 		return ErrOperationFailedWithReason("init postQosCounterID counter", err.Error())
 	}
@@ -236,35 +236,31 @@ func (up4 *UP4) initAllCounters() error {
 func (up4 *UP4) initMetersPools() error {
 	log.Debug("Initializing P4 Meters pools for UP4")
 
-	appMeter, err := up4.p4RtTranslator.getMeterByID(p4constants.MeterPreQosPipeAppMeter)
-	if err != nil {
-		return err
-	}
+	appMeterID, appMeterSize := p4constants.MeterPreQosPipeAppMeter, p4constants.MeterSizePreQosPipeAppMeter
+	appMeterName := p4constants.GetMeterIDToNameMap()[appMeterID]
 
 	log.WithFields(log.Fields{
 		"name":  applicationMeter,
-		"meter": appMeter,
+		"meter": appMeterName,
 	}).Trace("Found P4 meter by name")
 
 	up4.appMeterCellIDsPool = set.NewSet()
-	for i := 1; i < int(appMeter.Size); i++ {
+	for i := 1; i < int(appMeterSize); i++ {
 		up4.appMeterCellIDsPool.Add(uint32(i))
 	}
 
 	log.Trace("Application meter IDs pool initialized: ", up4.appMeterCellIDsPool.String())
 
-	sessMeter, err := up4.p4RtTranslator.getMeterByID(p4constants.MeterPreQosPipeSessionMeter)
-	if err != nil {
-		return err
-	}
+	sessMeterID, sessMeterSize := p4constants.MeterPreQosPipeSessionMeter, p4constants.MeterSizePreQosPipeSessionMeter
+	sessMeterName := p4constants.GetMeterIDToNameMap()[sessMeterID]
 
 	log.WithFields(log.Fields{
 		"name":  sessionMeter,
-		"meter": sessMeter,
+		"meter": sessMeterName,
 	}).Trace("Found P4 meter by name")
 
 	up4.sessMeterCellIDsPool = set.NewSet()
-	for i := 1; i < int(sessMeter.Size); i++ {
+	for i := 1; i < int(sessMeterSize); i++ {
 		up4.sessMeterCellIDsPool.Add(uint32(i))
 	}
 
@@ -378,16 +374,7 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 }
 
 func (up4 *UP4) clearAllTables() error {
-	tableIDs := []uint32{
-		p4constants.TablePreQosPipeSessionsUplink,
-		p4constants.TablePreQosPipeSessionsDownlink,
-		p4constants.TablePreQosPipeTerminationsUplink,
-		p4constants.TablePreQosPipeTerminationsDownlink,
-		p4constants.TablePreQosPipeTunnelPeers,
-		p4constants.TablePreQosPipeInterfaces,
-	}
-
-	if err := up4.p4client.ClearTables(tableIDs); err != nil {
+	if err := up4.p4client.ClearTables(p4constants.GetTableIDList()); err != nil {
 		return err
 	}
 

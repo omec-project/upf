@@ -132,26 +132,6 @@ func (t *P4rtTranslator) getTableByID(tableID uint32) (*p4ConfigV1.Table, error)
 	return nil, ErrNotFoundWithParam("table", "ID", tableID)
 }
 
-func (t *P4rtTranslator) getCounterByID(ID uint32) (*p4ConfigV1.Counter, error) {
-	for _, ctr := range t.p4Info.Counters {
-		if ctr.Preamble.Id == ID {
-			return ctr, nil
-		}
-	}
-
-	return nil, ErrNotFoundWithParam("counter", "ID", ID)
-}
-
-func (t *P4rtTranslator) getMeterByID(ID uint32) (*p4ConfigV1.Meter, error) {
-	for _, mtr := range t.p4Info.Meters {
-		if mtr.Preamble.Id == ID {
-			return mtr, nil
-		}
-	}
-
-	return nil, ErrNotFoundWithParam("meter", "ID", ID)
-}
-
 //nolint:unused
 func (t *P4rtTranslator) getMatchFieldIDByName(table *p4ConfigV1.Table, fieldName string) uint32 {
 	for _, field := range table.MatchFields {
