@@ -71,7 +71,6 @@ func Test_UP4_allocateAndReleaseGTPTunnelPeerID(t *testing.T) {
 				require.NoError(t, err)
 
 				for i := 0; i < tt.args.numAllocate; i++ {
-					_, err = tt.args.up4.allocateGTPTunnelPeerID()
 					err = tt.args.up4.releaseAllocatedGTPTunnelPeerID(*tt.args.tunnelParams[i])
 					require.NoError(t, err)
 				}
