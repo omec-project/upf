@@ -60,7 +60,6 @@ type counter struct {
 	maxSize        uint64
 	counterID      uint64
 	counterIDsPool set.Set
-	allocated      map[uint64]uint64
 	// free      map[uint64]uint64
 }
 
@@ -162,16 +161,16 @@ func (up4 *UP4) initCounter(counterID uint8, name string) error {
 
 func resetCounterVal(p *UP4, counterID uint8, val uint64) {
 	log.Println("delete counter val ", val)
-	delete(p.counters[counterID].allocated, val)
+	p.counters[counterID].counterIDsPool.Add(val)
 }
 
-func (up4 *UP4) getCounterVal(counterID uint8) (uint64, error) {
-	if up4.counters[counterID].counterIDsPool.Cardinality() == 0 {
+func (up4 *UP4) allocateCounterID(p4counterID uint8) (uint64, error) {
+	if up4.counters[p4counterID].counterIDsPool.Cardinality() == 0 {
 		return 0, ErrOperationFailedWithReason("allocate Counter ID",
 			"no free Counter IDs available")
 	}
 
-	allocated := up4.counters[counterID].counterIDsPool.Pop()
+	allocated := up4.counters[p4counterID].counterIDsPool.Pop()
 
 	if allocated == nil {
 		return 0, ErrOperationFailedWithReason("allocate Counter ID",
@@ -356,10 +355,6 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	up4.fseidToUEAddr = make(map[uint64]uint32)
 
 	up4.counters = make([]counter, 2)
-	for i := range up4.counters {
-		// initialize allocated counters map
-		up4.counters[i].allocated = make(map[uint64]uint64)
-	}
 
 	err := up4.tryConnect()
 	if err != nil {
@@ -1223,7 +1218,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 
 func (up4 *UP4) sendCreate(all PacketForwardingRules, updated PacketForwardingRules) error {
 	for i := range updated.pdrs {
-		val, err := up4.getCounterVal(preQosCounterID)
+		val, err := up4.allocateCounterID(preQosCounterID)
 		if err != nil {
 			return ErrOperationFailedWithReason("Counter ID allocation", err.Error())
 		}
