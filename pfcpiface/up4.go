@@ -556,13 +556,15 @@ func (up4 *UP4) allocateGTPTunnelPeerID() (uint8, error) {
 }
 
 // FIXME: SDFAB-960
-//nolint:unused
-func (up4 *UP4) releaseAllocatedGTPTunnelPeerID(tunnelParams tunnelParams) {
+func (up4 *UP4) releaseAllocatedGTPTunnelPeerID(tunnelParams tunnelParams) error {
 	allocated, exists := up4.tunnelPeerIDs[tunnelParams]
 	if exists {
 		delete(up4.tunnelPeerIDs, tunnelParams)
 		up4.tunnelPeerIDsPool = append(up4.tunnelPeerIDsPool, allocated)
+		return nil
 	}
+
+	return ErrNotFound(fmt.Sprintf("allocated GTP tunnel Peer ID does not exist"))
 }
 
 func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
@@ -635,7 +637,9 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 		removeLog.Error("failed to remove GTP tunnel peer")
 	}
 
-	up4.releaseAllocatedGTPTunnelPeerID(tunnelParams)
+	if err = up4.releaseAllocatedGTPTunnelPeerID(tunnelParams); err != nil {
+		removeLog.Error(fmt.Sprintf("failed to remove GTP tunnel peer: %v", err))
+	}
 }
 
 // Returns error if we reach maximum supported Application IDs.
