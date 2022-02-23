@@ -39,6 +39,8 @@ var (
 )
 
 type pfcpSessionData struct {
+	sliceID uint8
+
 	nbAddress    string
 	ueAddress    string
 	upfN3Address string
