@@ -55,6 +55,9 @@ func (a *aether) setUpfInfo(u *upf, conf *Conf) {
 	}
 
 	u.coreIP = net.ParseIP(net.IPv4zero.String())
+	u.accessIP = a.accessIP
+
+	u.enableFlowMeasure = true
 
 	if err = a.setupInterfaceClassification(); err != nil {
 		log.Fatalln(err)
