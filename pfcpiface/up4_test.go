@@ -12,9 +12,10 @@ import (
 
 func Test_UP4_allocateAndReleaseGTPTunnelPeerID(t *testing.T) {
 	type args struct {
-		numAllocate  int
-		up4          *UP4
-		tunnelParams []*tunnelParams
+		numAllocate        int
+		up4                *UP4
+		tunnelParams       []*tunnelParams
+		releaseTunnelPeers bool
 	}
 
 	tests := []struct {
@@ -32,10 +33,11 @@ func Test_UP4_allocateAndReleaseGTPTunnelPeerID(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "test allocateGTPTunnelPeerIDs",
+			name: "test allocate/release GTPTunnelPeerIDs",
 			args: &args{
-				up4:         &UP4{},
-				numAllocate: maxGTPTunnelPeerIDs,
+				up4:                &UP4{},
+				numAllocate:        maxGTPTunnelPeerIDs,
+				releaseTunnelPeers: true,
 			},
 			wantErr: false,
 		},
@@ -44,7 +46,6 @@ func Test_UP4_allocateAndReleaseGTPTunnelPeerID(t *testing.T) {
 		t.Run(
 			tt.name, func(t *testing.T) {
 				tt.args.up4.initTunnelPeerIDs()
-				var err error
 
 				for i := 0; i < tt.args.numAllocate; i++ {
 					got, err := tt.args.up4.allocateGTPTunnelPeerID()
@@ -57,22 +58,18 @@ func Test_UP4_allocateAndReleaseGTPTunnelPeerID(t *testing.T) {
 
 					require.NoError(t, err)
 
-					tunnelParam := &tunnelParams{
-						tunnelIP4Src: ip2int(net.ParseIP("10.0.0.0")),
-						tunnelIP4Dst: 0,
-						tunnelPort:   uint16(i),
+					if tt.args.releaseTunnelPeers {
+						tunnelParam := tunnelParams{
+							tunnelIP4Src: ip2int(net.ParseIP("10.0.0.0")),
+							tunnelIP4Dst: 0,
+							tunnelPort:   uint16(i),
+						}
+						// FIXME releaseAllocatedGTPTunnelPeerID requires a tunnelParams object that is built in addOrUpdateGTPTunnelPeer.
+						tt.args.up4.tunnelPeerIDs[tunnelParam] = got
+
+						err = tt.args.up4.releaseAllocatedGTPTunnelPeerID(tunnelParam)
+						require.NoError(t, err)
 					}
-
-					tt.args.tunnelParams = append(tt.args.tunnelParams, tunnelParam)
-					// FIXME releaseAllocatedGTPTunnelPeerID requires a tunnelParams object that is built in addOrUpdateGTPTunnelPeer.
-					tt.args.up4.tunnelPeerIDs[*tunnelParam] = got
-				}
-				// test releaseAllocatedGTPTunnelPeerID
-				require.NoError(t, err)
-
-				for i := 0; i < tt.args.numAllocate; i++ {
-					err = tt.args.up4.releaseAllocatedGTPTunnelPeerID(*tt.args.tunnelParams[i])
-					require.NoError(t, err)
 				}
 			},
 		)
