@@ -561,10 +561,11 @@ func (up4 *UP4) releaseAllocatedGTPTunnelPeerID(tunnelParams tunnelParams) error
 	if exists {
 		delete(up4.tunnelPeerIDs, tunnelParams)
 		up4.tunnelPeerIDsPool = append(up4.tunnelPeerIDsPool, allocated)
+
 		return nil
 	}
 
-	return ErrNotFound(fmt.Sprintf("allocated GTP tunnel Peer ID does not exist"))
+	return ErrNotFound("allocated GTP tunnel Peer ID does not exist")
 }
 
 func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
