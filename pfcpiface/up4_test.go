@@ -9,57 +9,49 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_UP4_initTunnelPeerIDs(t *testing.T) {
-	up4 := &UP4{}
-	up4.initTunnelPeerIDs()
-	require.Equal(t, maxGTPTunnelPeerIDs, len(up4.tunnelPeerIDsPool))
-}
-
 func Test_UP4_allocateGTPTunnelPeerID(t *testing.T) {
 	type args struct {
 		numAllocate int
 		up4         *UP4
 	}
 
-	type want struct {
-		remainingInPool int
-		startID         uint8
-	}
-
 	tests := []struct {
 		name    string
 		args    *args
-		want    *want
 		wantErr bool
 	}{
 		{
-			name: "allocate GTPTunnelPeerIDs",
+			name: "drain test allocateGTPTunnelPeerIDs",
 			args: &args{
 				up4:         &UP4{},
-				numAllocate: 2,
+				numAllocate: maxGTPTunnelPeerIDs + 1,
 			},
-			want: &want{
-				remainingInPool: maxGTPTunnelPeerIDs - 2,
-				startID:         2, // 0 reserved, 1 used for dbuf -> first useful ID is 2
+			wantErr: true,
+		},
+		{
+			name: "test allocateGTPTunnelPeerIDs",
+			args: &args{
+				up4:         &UP4{},
+				numAllocate: maxGTPTunnelPeerIDs,
 			},
-		}, //TODO add drain test (allocate all tunnel peer IDs and expect error)
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
 				tt.args.up4.initTunnelPeerIDs()
+				var err error
 
 				for i := 0; i < tt.args.numAllocate; i++ {
-					got, err := tt.args.up4.allocateGTPTunnelPeerID()
-					if tt.wantErr {
-						require.Error(t, err)
-						return
-					}
-
-					require.Equal(t, tt.want.startID+uint8(i), got)
+					_, err = tt.args.up4.allocateGTPTunnelPeerID()
 				}
 
-				require.Equal(t, tt.want.remainingInPool, len(tt.args.up4.tunnelPeerIDsPool))
+				if tt.wantErr {
+					require.Error(t, err)
+					return
+				}
+				require.NoError(t, err)
 			},
 		)
 	}
