@@ -8,9 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"math"
-	"math/rand"
 	"net"
-	"time"
 
 	"google.golang.org/grpc/codes"
 
@@ -59,9 +57,10 @@ type application struct {
 }
 
 type counter struct {
-	maxSize   uint64
-	counterID uint64
-	allocated map[uint64]uint64
+	maxSize        uint64
+	counterID      uint64
+	counterIDsPool set.Set
+	allocated      map[uint64]uint64
 	// free      map[uint64]uint64
 }
 
@@ -145,6 +144,11 @@ func (up4 *UP4) initCounter(counterID uint8, name string) error {
 
 	up4.counters[counterID].maxSize = uint64(ctr.Size)
 	up4.counters[counterID].counterID = uint64(ctr.Preamble.Id)
+	up4.counters[counterID].counterIDsPool = set.NewSet()
+
+	for i := uint64(0); i < up4.counters[counterID].maxSize+1; i++ {
+		up4.counters[counterID].counterIDsPool.Add(uint64(i))
+	}
 
 	log.WithFields(log.Fields{
 		"counterID":      counterID,
@@ -162,31 +166,19 @@ func resetCounterVal(p *UP4, counterID uint8, val uint64) {
 }
 
 func (up4 *UP4) getCounterVal(counterID uint8) (uint64, error) {
-	/*
-	   loop :
-	      random counter generate
-	      check allocated map
-	      if not in map then return counter val.
-	      if present continue
-	      if loop reaches max break and fail.
-	*/
-	var val uint64
-
-	ctr := &up4.counters[counterID]
-	for i := 0; i < int(ctr.maxSize); i++ {
-		rand.Seed(time.Now().UnixNano())
-
-		val = uint64(rand.Intn(int(ctr.maxSize)-1) + 1) // #nosec G404
-		if _, ok := ctr.allocated[val]; !ok {
-			log.Debug("Counter index is not in allocated map, assigning: ", val)
-
-			ctr.allocated[val] = 1
-
-			return val, nil
-		}
+	if up4.counters[counterID].counterIDsPool.Cardinality() == 0 {
+		return 0, ErrOperationFailedWithReason("allocate Counter ID",
+			"no free Counter IDs available")
 	}
 
-	return 0, ErrOperationFailedWithParam("counter allocation", "final val", val)
+	allocated := up4.counters[counterID].counterIDsPool.Pop()
+
+	if allocated == nil {
+		return 0, ErrOperationFailedWithReason("allocate Counter ID",
+			"no free Counter IDs available")
+	}
+
+	return allocated.(uint64), nil
 }
 
 func (up4 *UP4) exit() {
