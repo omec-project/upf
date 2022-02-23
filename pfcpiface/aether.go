@@ -5,6 +5,7 @@ package pfcpiface
 
 import (
 	"context"
+	"github.com/prometheus/client_golang/prometheus"
 
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
 	log "github.com/sirupsen/logrus"
@@ -58,6 +59,12 @@ func (a *aether) setUpfInfo(u *upf, conf *Conf) {
 	if err = a.setupInterfaceClassification(); err != nil {
 		log.Fatalln(err)
 	}
+}
+
+func (a *aether) sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) (err error) {
+	// TODO: implement
+	log.Traceln("sessionStats are not implemented in aether pipeline")
+	return
 }
 
 // setupInterfaceClassification inserts the necessary interface classification rules.
