@@ -60,15 +60,17 @@ const (
 	metersListFunc        = "func GetMeterIDList() []uint32 {\n return []uint32 {\n"
 )
 
-func emitEntityConstant(p4EntityName string, id uint32) string {
+func emitEntityConstant(prefix string, p4EntityName string, id uint32) string {
 	// see: https://go.dev/ref/spec#Identifiers
+	p4EntityName = prefix + "_" + p4EntityName
 	p4EntityName = strings.Replace(p4EntityName, ".", "_", -1)
 	p4EntityName = strcase.ToPascal(p4EntityName)
 	return fmt.Sprintf("%s \t %s = %v\n", p4EntityName, idTypeString, id)
 }
 
-func emitEntitySizeConstant(p4EntityName string, id int64) string {
+func emitEntitySizeConstant(prefix string, p4EntityName string, id int64) string {
 	// see: https://go.dev/ref/spec#Identifiers
+	p4EntityName = prefix + "_" + p4EntityName
 	p4EntityName = strings.Replace(p4EntityName, ".", "_", -1)
 	p4EntityName = strcase.ToPascal(p4EntityName)
 	return fmt.Sprintf("%s \t %s = %v\n", p4EntityName, sizeTypeString, id)
@@ -88,7 +90,7 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 		for _, matchField := range element.MatchFields {
 			tableName, name := element.GetPreamble().GetName(), matchField.GetName()
 
-			constBuilder.WriteString(emitEntityConstant(hfVarPrefix+tableName+name, matchField.GetId()))
+			constBuilder.WriteString(emitEntityConstant(hfVarPrefix+tableName, name, matchField.GetId()))
 		}
 	}
 	// Tables
@@ -98,7 +100,7 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 	for _, element := range p4info.GetTables() {
 		name, ID := element.GetPreamble().GetName(), element.GetPreamble().GetId()
 
-		constBuilder.WriteString(emitEntityConstant(tblVarPrefix+name, ID))
+		constBuilder.WriteString(emitEntityConstant(tblVarPrefix, name, ID))
 		mapBuilder.WriteString(fmt.Sprintf(mapFormatString, ID, name))
 		listBuilder.WriteString(fmt.Sprintf(listFormatString, ID))
 	}
@@ -112,7 +114,7 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 	for _, element := range p4info.GetActions() {
 		name, ID := element.GetPreamble().GetName(), element.GetPreamble().GetId()
 
-		constBuilder.WriteString(emitEntityConstant(actVarPrefix+name, ID))
+		constBuilder.WriteString(emitEntityConstant(actVarPrefix, name, ID))
 		mapBuilder.WriteString(fmt.Sprintf(mapFormatString, ID, name))
 		listBuilder.WriteString(fmt.Sprintf(listFormatString, ID))
 	}
@@ -125,7 +127,7 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 		for _, actionParam := range element.GetParams() {
 			actionName, name := element.GetPreamble().GetName(), actionParam.GetName()
 
-			constBuilder.WriteString(emitEntityConstant(actparamVarPrefix+actionName+name, actionParam.GetId()))
+			constBuilder.WriteString(emitEntityConstant(actparamVarPrefix+actionName, name, actionParam.GetId()))
 		}
 	}
 
@@ -136,8 +138,8 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 	for _, element := range p4info.GetCounters() {
 		name, ID := element.GetPreamble().GetName(), element.GetPreamble().GetId()
 
-		constBuilder.WriteString(emitEntityConstant(ctrVarPrefix+name, ID))
-		constBuilder.WriteString(emitEntitySizeConstant(ctrSizeVarPrefix+name, element.GetSize()))
+		constBuilder.WriteString(emitEntityConstant(ctrVarPrefix, name, ID))
+		constBuilder.WriteString(emitEntitySizeConstant(ctrSizeVarPrefix, name, element.GetSize()))
 		mapBuilder.WriteString(fmt.Sprintf(mapFormatString, ID, name))
 		listBuilder.WriteString(fmt.Sprintf(listFormatString, ID))
 	}
@@ -151,7 +153,7 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 	for _, element := range p4info.GetDirectCounters() {
 		name, ID := element.GetPreamble().GetName(), element.GetPreamble().GetId()
 
-		constBuilder.WriteString(emitEntityConstant(dirCtrVarPrefix+name, element.GetPreamble().GetId()))
+		constBuilder.WriteString(emitEntityConstant(dirCtrVarPrefix, name, element.GetPreamble().GetId()))
 		mapBuilder.WriteString(fmt.Sprintf(mapFormatString, ID, name))
 		listBuilder.WriteString(fmt.Sprintf(listFormatString, ID))
 	}
@@ -165,7 +167,7 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 	for _, element := range p4info.GetActionProfiles() {
 		name, ID := element.GetPreamble().GetName(), element.GetPreamble().GetId()
 
-		constBuilder.WriteString(emitEntityConstant(actprofVarPrefix+name, ID))
+		constBuilder.WriteString(emitEntityConstant(actprofVarPrefix, name, ID))
 		mapBuilder.WriteString(fmt.Sprintf(mapFormatString, ID, name))
 		listBuilder.WriteString(fmt.Sprintf(listFormatString, ID))
 	}
@@ -179,7 +181,7 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 	for _, element := range p4info.GetControllerPacketMetadata() {
 		name, ID := element.GetPreamble().GetName(), element.GetPreamble().GetId()
 
-		constBuilder.WriteString(emitEntityConstant(packetmetaVarPrefix+name, ID))
+		constBuilder.WriteString(emitEntityConstant(packetmetaVarPrefix, name, ID))
 		mapBuilder.WriteString(fmt.Sprintf(mapFormatString, ID, name))
 		listBuilder.WriteString(fmt.Sprintf(listFormatString, ID))
 	}
@@ -193,8 +195,8 @@ func generateP4Constants(p4info *p4ConfigV1.P4Info, packageName string) string {
 	for _, element := range p4info.GetMeters() {
 		name, ID := element.GetPreamble().GetName(), element.GetPreamble().GetId()
 
-		constBuilder.WriteString(emitEntityConstant(mtrVarPrefix+name, ID))
-		constBuilder.WriteString(emitEntitySizeConstant(mtrSizeVarPrefix+name, element.GetSize()))
+		constBuilder.WriteString(emitEntityConstant(mtrVarPrefix, name, ID))
+		constBuilder.WriteString(emitEntitySizeConstant(mtrSizeVarPrefix, name, element.GetSize()))
 		mapBuilder.WriteString(fmt.Sprintf(mapFormatString, ID, name))
 		listBuilder.WriteString(fmt.Sprintf(listFormatString, ID))
 	}
