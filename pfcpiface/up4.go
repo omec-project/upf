@@ -425,7 +425,7 @@ func (up4 *UP4) initUEPool() error {
 }
 
 func (up4 *UP4) initN3Address() error {
-	entry, err := up4.p4RtTranslator.BuildInterfaceTableEntry(up4.accessIP, up4.conf.SliceID,false)
+	entry, err := up4.p4RtTranslator.BuildInterfaceTableEntry(up4.accessIP, up4.conf.SliceID, false)
 	if err != nil {
 		return err
 	}
