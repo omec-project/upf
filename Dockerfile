@@ -22,7 +22,7 @@ RUN apt-get update && \
     apt-get -y install --no-install-recommends \
         ca-certificates \
         libelf-dev
-        
+
 ARG MAKEFLAGS
 
 ENV PKG_CONFIG_PATH=/usr/lib64/pkgconfig

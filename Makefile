@@ -99,6 +99,14 @@ test: .coverage
 			-v \
 			./pfcpiface
 
+p4-constants:
+	$(info *** Generating go constants...)
+	@docker run --rm -v $(CURDIR):/app -w /app \
+		golang:latest go run ./scripts/go_gen_p4_const.go \
+		-output internal/p4constants/p4constants.go -p4info conf/p4/bin/p4info.txt
+	@docker run --rm -v $(CURDIR):/app -w /app \
+		golang:latest gofmt -w internal/p4constants/p4constants.go
+
 fmt:
 	@go fmt ./...
 
