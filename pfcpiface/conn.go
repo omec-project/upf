@@ -53,7 +53,7 @@ type PFCPConn struct {
 	maxRetries int
 	appPFDs    map[string]appPFD
 
-	store      SessionStore
+	store SessionsStore
 
 	nodeID     nodeID
 	upf        *upf

@@ -7,7 +7,13 @@ type InMemoryStore struct {
 	sessions   map[uint64]PFCPSession
 }
 
-func (i InMemoryStore) GetAllSessions() []PFCPSession {
+func NewInMemoryStore() *InMemoryStore {
+	return &InMemoryStore{
+		sessions: make(map[uint64]PFCPSession),
+	}
+}
+
+func (i *InMemoryStore) GetAllSessions() []PFCPSession {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
@@ -19,13 +25,7 @@ func (i InMemoryStore) GetAllSessions() []PFCPSession {
 	return sessions
 }
 
-func NewInMemoryStore() *InMemoryStore {
-	return &InMemoryStore{
-		sessions: make(map[uint64]PFCPSession),
-	}
-}
-
-func (i InMemoryStore) UpdateSession(session PFCPSession) error {
+func (i *InMemoryStore) UpdateSession(session PFCPSession) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
@@ -38,7 +38,7 @@ func (i InMemoryStore) UpdateSession(session PFCPSession) error {
 	return nil
 }
 
-func (i InMemoryStore) RemoveSession(fseid uint64) error {
+func (i *InMemoryStore) RemoveSession(fseid uint64) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
@@ -47,7 +47,7 @@ func (i InMemoryStore) RemoveSession(fseid uint64) error {
 	return nil
 }
 
-func (i InMemoryStore) GetSession(fseid uint64) (PFCPSession, bool) {
+func (i *InMemoryStore) GetSession(fseid uint64) (PFCPSession, bool) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
