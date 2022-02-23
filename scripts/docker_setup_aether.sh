@@ -19,12 +19,8 @@ mode="dpdk"
 #mode="af_packet"
 # mode="sim"
 
-# Gateway interface(s)
-#
-# In the order of ("s1u" "sgi")
-# ifaces=("access" "core")
+# Gateway interface
 ifaces=("dataplane")
-# ifaces=("enp3s0f0" "enp3s0f1")
 
 # Static IP addresses of gateway interface(s) in cidr format
 #
@@ -154,12 +150,6 @@ if [ "$mode" != 'sim' ]; then
 fi
 
 # Run bessd
-	# --cpuset-cpus=8-9 \
-	# -u 0 \
-	# --cap-add IPC_LOCK
-	# -m 2048
-	# --privileged \
-	# --cap-add=all \
 docker run --name bess -td --restart unless-stopped \
 	--cpuset-cpus=5-8 \
 	--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
@@ -181,13 +171,7 @@ docker run --name bess-web -d --restart unless-stopped \
 # Sleep for a couple of secs before setting up the pipeline
 sleep 8
 docker exec bess ./bessctl run aether
-# docker exec bess ./bessctl run wildcardmatch-val
 sleep 5
-
-# Don't run any other container if mode is "sim"
-# if [ "$mode" == 'sim' ]; then
-# 	exit
-# fi
 
 # Run bess-pfcpiface depending on mode type
 docker run --name bess-pfcpiface -td --restart on-failure \

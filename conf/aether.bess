@@ -219,7 +219,7 @@ appQERLookup.set_default_gate(gate=qerFailGate)
 
 
 # ====================================================
-#       Downlink Pipeline
+#       BPF Setup
 # ====================================================
 bpfUeGatePass = 0
 bpfGTPUEchoGate = dataplane_port.bpf_gate()
