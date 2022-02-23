@@ -67,27 +67,8 @@ func (a *aether) setupInterfaceClassification() (err error) {
 	done := make(chan bool)
 	calls := 0
 
-	// GTP echo packets directly to UPF generate a reply.
-	ifc := interfaceClassification{
-		priority:    50,
-		dstIp:       ip2int(a.accessIP),
-		dstIpMask:   math.MaxUint32,
-		ipProto:     UdpProto,
-		ipProtoMask: math.MaxUint8,
-		dstPort:     tunnelGTPUPort,
-		dstPortMask: math.MaxUint16,
-
-		gate:     0,
-		srcIface: access,
-	}
-	if err = a.addInterfaceClassification(ctx, done, ifc); err != nil {
-		log.Errorln(err)
-		return
-	}
-	calls++
-
 	// Other GTP packets directly to UPF are uplink, from access.
-	ifc = interfaceClassification{
+	ifc := interfaceClassification{
 		priority:    40,
 		dstIp:       ip2int(a.accessIP),
 		dstIpMask:   math.MaxUint32,
