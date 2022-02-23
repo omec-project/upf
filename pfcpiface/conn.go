@@ -55,8 +55,8 @@ type PFCPConn struct {
 
 	store SessionsStore
 
-	nodeID     nodeID
-	upf        *upf
+	nodeID nodeID
+	upf    *upf
 	// channel to signal PFCPNode on exit
 	done     chan<- string
 	shutdown chan struct{}

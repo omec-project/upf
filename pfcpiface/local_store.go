@@ -3,8 +3,8 @@ package pfcpiface
 import "sync"
 
 type InMemoryStore struct {
-	mu sync.Mutex
-	sessions   map[uint64]PFCPSession
+	mu       sync.Mutex
+	sessions map[uint64]PFCPSession
 }
 
 func NewInMemoryStore() *InMemoryStore {
@@ -51,7 +51,7 @@ func (i *InMemoryStore) GetSession(fseid uint64) (PFCPSession, bool) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
-	sess, ok :=  i.sessions[fseid]
+	sess, ok := i.sessions[fseid]
 
 	return sess, ok
 }
