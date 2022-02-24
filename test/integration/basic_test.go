@@ -4,15 +4,10 @@
 package integration
 
 import (
-	"fmt"
-
 	"net"
 	"testing"
 	"time"
 
-	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
-
-	"github.com/omec-project/pfcpsim/pkg/pfcpsim"
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim/session"
 	"github.com/omec-project/upf-epc/test/integration/providers"
 	"github.com/stretchr/testify/require"
@@ -24,64 +19,8 @@ const (
 	configUPFBasedIPAllocation = "ue_ip_alloc.json"
 )
 
-var (
-	pfcpClient *pfcpsim.PFCPClient
-)
-
-type testContext struct {
-	UPFBasedUeIPAllocation bool
-}
-
-type testCase struct {
-	ctx      testContext
-	input    *pfcpSessionData
-	expected p4RtValues
-
-	desc string
-}
-
-func TimeBasedElectionId() p4_v1.Uint128 {
-	now := time.Now()
-	return p4_v1.Uint128{
-		High: uint64(now.Unix()),
-		Low:  uint64(now.UnixNano() % 1e9),
-	}
-}
-
-func setup(t *testing.T, pfcpAgentConfig string) {
-	providers.RunDockerCommandAttach("pfcpiface",
-		fmt.Sprintf("/bin/pfcpiface -config /config/%s", pfcpAgentConfig))
-
-	// wait for PFCP Agent to initialize, blocking
-	err := waitForPFCPAgentToStart()
-	require.NoErrorf(t, err, "failed to start PFCP Agent: %v", err)
-
-	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.1")
-	err = pfcpClient.ConnectN4("127.0.0.1")
-	require.NoErrorf(t, err, "failed to connect to UPF")
-}
-
-func teardown(t *testing.T) {
-	// clear Tunnel Peers table
-	// FIXME: Temporary solution. They should be cleared by pfcpiface, see SDFAB-960
-	p4rtClient, _ := providers.ConnectP4rt("127.0.0.1:50001", TimeBasedElectionId())
-	defer providers.DisconnectP4rt()
-	entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.tunnel_peers")
-	for _, entry := range entries {
-		p4rtClient.DeleteTableEntry(entry)
-	}
-
-	if pfcpClient != nil {
-		pfcpClient.DisconnectN4()
-	}
-
-	// kill pfcpiface process inside container
-	_, _, _, err := providers.RunDockerExecCommand("pfcpiface", "killall -9 pfcpiface")
-	require.NoError(t, err, "failed to kill pfcpiface process")
-}
-
 func TestUPFBasedUeIPAllocation(t *testing.T) {
-	setup(t, configUPFBasedIPAllocation)
+	setup(t, ConfigUPFBasedIPAllocation)
 	defer teardown(t)
 
 	tc := testCase{
@@ -113,7 +52,7 @@ func TestUPFBasedUeIPAllocation(t *testing.T) {
 }
 
 func TestBasicPFCPAssociation(t *testing.T) {
-	setup(t, configDefault)
+	setup(t, ConfigDefault)
 	defer teardown(t)
 
 	err := pfcpClient.SetupAssociation()
@@ -125,7 +64,7 @@ func TestBasicPFCPAssociation(t *testing.T) {
 }
 
 func TestSingleUEAttachAndDetach(t *testing.T) {
-	setup(t, configDefault)
+	setup(t, ConfigDefault)
 	defer teardown(t)
 
 	// Application filtering test cases
@@ -404,7 +343,7 @@ func testUEAttachDetach(t *testing.T, testcase *testCase) {
 	sess, err := pfcpClient.EstablishSession(pdrs, fars, qers)
 	require.NoErrorf(t, err, "failed to establish PFCP session")
 
-	verifyP4RuntimeEntries(t, testcase.input, testcase.expected, false)
+	verifyEntries(t, testcase.input, testcase.expected, false)
 
 	err = pfcpClient.ModifySession(sess, nil, []*ie.IE{
 		session.NewFARBuilder().
@@ -413,7 +352,7 @@ func testUEAttachDetach(t *testing.T, testcase *testCase) {
 			WithTEID(testcase.input.dlTEID).WithDownlinkIP(testcase.input.nbAddress).BuildFAR(),
 	}, nil)
 
-	verifyP4RuntimeEntries(t, testcase.input, testcase.expected, true)
+	verifyEntries(t, testcase.input, testcase.expected, true)
 
 	err = pfcpClient.DeleteSession(sess)
 	require.NoErrorf(t, err, "failed to delete PFCP session")
@@ -421,18 +360,20 @@ func testUEAttachDetach(t *testing.T, testcase *testCase) {
 	err = pfcpClient.TeardownAssociation()
 	require.NoErrorf(t, err, "failed to gracefully release PFCP association")
 
-	verifyNoP4RuntimeEntries(t, testcase.expected)
+	verifyNoEntries(t, testcase.expected)
 
-	// clear Applications table
-	// FIXME: Temporary solution. They should be cleared by pfcpiface, see SDFAB-960
-	p4rtClient, _ := providers.ConnectP4rt("127.0.0.1:50001", TimeBasedElectionId())
-	defer func() {
-		providers.DisconnectP4rt()
-		// give pfcpiface time to become master controller again
-		time.Sleep(3 * time.Second)
-	}()
-	entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.applications")
-	for _, entry := range entries {
-		p4rtClient.DeleteTableEntry(entry)
+	if isFastpathUP4() {
+		// clear Applications table
+		// FIXME: Temporary solution. They should be cleared by pfcpiface, see SDFAB-960
+		p4rtClient, _ := providers.ConnectP4rt("127.0.0.1:50001", TimeBasedElectionId())
+		defer func() {
+			providers.DisconnectP4rt()
+			// give pfcpiface time to become master controller again
+			time.Sleep(3 * time.Second)
+		}()
+		entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.applications")
+		for _, entry := range entries {
+			p4rtClient.DeleteTableEntry(entry)
+		}
 	}
 }
