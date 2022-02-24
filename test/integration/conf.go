@@ -72,7 +72,7 @@ func UP4ConfigDefault() pfcpiface.Conf {
 	}
 
 	config.CPIface = pfcpiface.CPIfaceInfo{
-		UEIPPool:        "10.250.0.0/16",
+		UEIPPool: "10.250.0.0/16",
 	}
 
 	return config
@@ -110,5 +110,3 @@ func GetConfig(fastpath string, configType uint32) pfcpiface.Conf {
 
 	return pfcpiface.Conf{}
 }
-
-

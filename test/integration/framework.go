@@ -24,10 +24,10 @@ import (
 // this file should contain all the struct defs/constants used among different test cases.
 
 const (
-	EnvMode = "MODE"
+	EnvMode     = "MODE"
 	EnvFastpath = "FASTPATH"
 
-	FastpathUP4 = "up4"
+	FastpathUP4  = "up4"
 	FastpathBESS = "bess"
 
 	ModeDocker = "docker"
@@ -209,7 +209,7 @@ func setup(t *testing.T, configType uint32) {
 			}
 		}()
 	}
-
+	
 	// wait for BESS mock to start, blocking
 	err := waitForBESSMockToStart()
 	require.NoErrorf(t, err, "failed to start BESS mock: %v", err)
