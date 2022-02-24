@@ -258,6 +258,9 @@ func teardown(t *testing.T) {
 		// kill pfcpiface process inside container
 		_, _, _, err := providers.RunDockerExecCommand("pfcpiface", "killall -9 pfcpiface")
 		require.NoError(t, err, "failed to kill pfcpiface process")
+
+		err = os.Remove("./config/upf.json")
+		require.NoError(t, err)
 	case ModeNative:
 		pfcpAgent.Stop()
 	default:
