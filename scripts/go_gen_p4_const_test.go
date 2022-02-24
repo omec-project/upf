@@ -20,7 +20,7 @@ const (
 	meter
 )
 
-func Test_generateConstants(t *testing.T) {
+func Test_generator(t *testing.T) {
 	type args struct {
 		p4config *p4ConfigV1.P4Info
 		genType  generatorType
