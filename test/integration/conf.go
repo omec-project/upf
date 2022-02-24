@@ -5,6 +5,7 @@ package integration
 
 import (
 	"github.com/omec-project/upf-epc/pfcpiface"
+	"runtime"
 )
 
 const (
@@ -18,12 +19,21 @@ var baseConfig = pfcpiface.Conf{
 }
 
 func BESSConfigDefault() pfcpiface.Conf {
+	var intf string
+
+	switch runtime.GOOS {
+	case "darwin":
+		intf = "lo0"
+	case "linux":
+		intf = "lo"
+	}
+
 	config := baseConfig
 	config.AccessIface = pfcpiface.IfaceType{
-		IfName: "lo0",
+		IfName: intf,
 	}
 	config.CoreIface = pfcpiface.IfaceType{
-		IfName: "lo0",
+		IfName: intf,
 	}
 	return config
 }
