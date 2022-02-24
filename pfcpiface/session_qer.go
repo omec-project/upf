@@ -118,6 +118,7 @@ func (s *PFCPSession) MarkSessionQer(qers []qer) {
 			if qer.ulMbr >= sessionMbr {
 				sessionIdx = idx
 				sessQerID = qer.qerID
+				sessionMbr = qer.ulMbr
 			}
 		}
 	}
