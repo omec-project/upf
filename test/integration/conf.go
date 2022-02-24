@@ -16,9 +16,9 @@ const (
 )
 
 var baseConfig = pfcpiface.Conf{
-	ReadTimeout:       15,
-	RespTimeout:       "2s",
-	LogLevel:          logrus.TraceLevel,
+	ReadTimeout: 15,
+	RespTimeout: "2s",
+	LogLevel:    logrus.TraceLevel,
 }
 
 func BESSConfigDefault() pfcpiface.Conf {

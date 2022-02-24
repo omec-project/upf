@@ -209,7 +209,7 @@ func setup(t *testing.T, configType uint32) {
 			}
 		}()
 	}
-	
+
 	// wait for BESS mock to start, blocking
 	err := waitForBESSMockToStart()
 	require.NoErrorf(t, err, "failed to start BESS mock: %v", err)
