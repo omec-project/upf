@@ -69,6 +69,17 @@ func Test_generateConstants(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "verify dummy action",
+			args: &args{
+				p4config: getP4Config(dummyP4info),
+			},
+			want: &want{
+				ID:   76544321,
+				name: "MyDummyAction",
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {

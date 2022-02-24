@@ -344,6 +344,13 @@ actions {
 }
 actions {
   preamble {
+    id: 76544321
+    name: "my.dummy.action"
+    alias: "dummy.action"
+  }
+}
+actions {
+  preamble {
     id: 23965128
     name: "PreQosPipe.Routing.route"
     alias: "route"
