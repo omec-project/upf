@@ -37,11 +37,12 @@ func (p PacketForwardingRules) String() string {
 
 // NewPFCPSession allocates an session with ID.
 func (pConn *PFCPConn) NewPFCPSession(rseid uint64) uint64 {
-	lseid := pConn.GenerateSessionID()
+	lseid := pConn.GenerateFseid()
 	if lseid == 0 {
 		log.Errorln("Failed to generate session Id")
 		return 0
 	}
+
 	s := PFCPSession{
 		localSEID:  lseid,
 		remoteSEID: rseid,
@@ -53,12 +54,12 @@ func (pConn *PFCPConn) NewPFCPSession(rseid uint64) uint64 {
 	}
 	pConn.sessions[lseid] = &s
 
-		// Metrics update
-		s.metrics = metrics.NewSession(pConn.nodeID.remote)
-		pConn.SaveSessions(s.metrics)
+	// Metrics update
+	s.metrics = metrics.NewSession(pConn.nodeID.remote)
+	pConn.SaveSessions(s.metrics)
 
-		return lseid
-	}
+	return lseid
+}
 
 // RemoveSession removes session using lseid.
 func (pConn *PFCPConn) RemoveSession(lseid uint64) {

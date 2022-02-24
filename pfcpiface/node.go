@@ -14,6 +14,10 @@ import (
 	"github.com/omec-project/upf-epc/pfcpiface/metrics"
 )
 
+const (
+	maxPFCPConns = 100
+)
+
 // PFCPNode represents a PFCP endpoint of the UPF.
 type PFCPNode struct {
 	ctx    context.Context
@@ -30,8 +34,34 @@ type PFCPNode struct {
 	upf *upf
 	// metrics for PFCP messages and sessions
 	metrics metrics.InstrumentPFCP
-	// PFCP Connection Id
-	connId uint32
+	// PFCP Connection Ids Pool
+	pfcpConnIdPool []uint32
+}
+
+func (node *PFCPNode) initPFCPConnIdPool() {
+	for i := 1; i < maxPFCPConns+1; i++ {
+		node.pfcpConnIdPool = append(node.pfcpConnIdPool, uint32(i))
+	}
+}
+
+func (node *PFCPNode) allocatePFCPConnId() uint32 {
+	if len(node.pfcpConnIdPool) == 0 {
+		log.Errorln("Failed to allocate PFCP Conn Ids, no free ids available")
+		return 0
+	}
+
+	allocatedId := node.pfcpConnIdPool[0]
+	node.pfcpConnIdPool = node.pfcpConnIdPool[1:]
+
+	return allocatedId
+}
+
+func (node *PFCPNode) cleanUpPFCPConn(rAddr string) {
+	pConn := node.pConns[rAddr]
+	if pConn != nil {
+		node.pfcpConnIdPool = append(node.pfcpConnIdPool, pConn.pConnId)
+		delete(node.pConns, rAddr)
+	}
 }
 
 // NewPFCPNode create a new PFCPNode listening on local address.
@@ -48,17 +78,21 @@ func NewPFCPNode(upf *upf) *PFCPNode {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	return &PFCPNode{
-		ctx:        ctx,
-		cancel:     cancel,
-		PacketConn: conn,
-		done:       make(chan struct{}),
-		pConnDone:  make(chan string, 100),
-		pConns:     make(map[string]*PFCPConn),
-		upf:        upf,
-		metrics:    metrics,
-		connId:     0,
+	node := &PFCPNode{
+		ctx:            ctx,
+		cancel:         cancel,
+		PacketConn:     conn,
+		done:           make(chan struct{}),
+		pConnDone:      make(chan string, 100),
+		pConns:         make(map[string]*PFCPConn),
+		upf:            upf,
+		metrics:        metrics,
+		pfcpConnIdPool: make([]uint32, 0, maxPFCPConns),
 	}
+
+	node.initPFCPConnIdPool()
+
+	return node
 }
 
 func (node *PFCPNode) tryConnectToN4Peers(lAddrStr string) {
@@ -123,12 +157,12 @@ func (node *PFCPNode) Serve() {
 	for !shutdown {
 		select {
 		case fseid := <-node.upf.reportNotifyChan:
-			pConn := node.findPFCPConnById(fseid)
+			pConn := node.findPFCPConnByFseid(fseid)
 			if pConn != nil {
 				go pConn.handleDigestReport(fseid)
 			}
 		case rAddr := <-node.pConnDone:
-			delete(node.pConns, rAddr)
+			node.cleanUpPFCPConn(rAddr)
 			log.Infoln("Removed connection to", rAddr)
 		case <-node.ctx.Done():
 			shutdown = true
@@ -172,19 +206,16 @@ func (node *PFCPNode) Done() {
 	log.Infoln("Shutdown complete")
 }
 
-func (node *PFCPNode) findPFCPConnById(fseid uint64) *PFCPConn {
+func (node *PFCPNode) findPFCPConnByFseid(fseid uint64) *PFCPConn {
 	connID := uint32(fseid >> 32)
 
 	for _, pConn := range node.pConns {
-		if pConn.pConnID == connID {
+		if pConn.pConnId == connID {
 			return pConn
 		}
+
 		continue
 	}
-	return nil
-}
 
-func (node *PFCPNode) getConnId() uint32 {
-	node.connId++
-	return node.connId
+	return nil
 }

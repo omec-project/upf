@@ -65,20 +65,21 @@ type PFCPConn struct {
 	hbCtxCancel context.CancelFunc
 
 	pendingReqs sync.Map
-	pConnID     uint32
+	pConnId     uint32
 }
 
-func (pConn *PFCPConn) GenerateSessionID() uint64 {
+func (pConn *PFCPConn) GenerateFseid() uint64 {
 	var lseid uint64
 	//Make three attempts to derive a unique Id
 	for i := 0; i < 3; i++ {
 		rand := pConn.rng.Uint32()
-		lseid = (uint64(pConn.pConnID) << 32) | uint64(rand)
+		lseid = (uint64(pConn.pConnId) << 32) | uint64(rand)
 		// Check if it already exists
 		if _, ok := pConn.sessions[lseid]; ok {
 			lseid = 0
 			continue
 		}
+
 		break
 	}
 	
@@ -139,6 +140,13 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 	log.Infoln("Created PFCPConn from:", conn.LocalAddr(), "to:", conn.RemoteAddr())
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano())) // #nosec G404
+
+	pConnId := node.allocatePFCPConnId()
+	if pConnId == 0 {
+		log.Errorln("Connection Id should not be zero")
+		return nil
+	}
+
 	p := &PFCPConn{
 		ctx:            node.ctx,
 		Conn:           conn,
@@ -152,7 +160,7 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 		InstrumentPFCP: node.metrics,
 		hbReset:        make(chan struct{}, 100),
 		hbCtxCancel:    nil,
-		pConnID:        node.getConnId(),
+		pConnId:        pConnId,
 	}
 
 	p.setLocalNodeID(node.upf.nodeID)
