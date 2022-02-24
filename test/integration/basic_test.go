@@ -28,6 +28,7 @@ func TestUPFBasedUeIPAllocation(t *testing.T) {
 			UPFBasedUeIPAllocation: true,
 		},
 		input: &pfcpSessionData{
+			sliceID:      1,
 			nbAddress:    nodeBAddress,
 			ueAddress:    ueAddress,
 			upfN3Address: upfN3Address,
@@ -71,6 +72,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 	testCases := []testCase{
 		{
 			input: &pfcpSessionData{
+				sliceID:      1,
 				nbAddress:    nodeBAddress,
 				ueAddress:    ueAddress,
 				upfN3Address: upfN3Address,
@@ -95,6 +97,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 		},
 		{
 			input: &pfcpSessionData{
+				sliceID:      1,
 				nbAddress:    nodeBAddress,
 				ueAddress:    ueAddress,
 				upfN3Address: upfN3Address,
@@ -121,6 +124,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 		},
 		{
 			input: &pfcpSessionData{
+				sliceID:      1,
 				nbAddress:    nodeBAddress,
 				ueAddress:    ueAddress,
 				upfN3Address: upfN3Address,
@@ -138,6 +142,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 		},
 		{
 			input: &pfcpSessionData{
+				sliceID:      1,
 				nbAddress:    nodeBAddress,
 				ueAddress:    ueAddress,
 				upfN3Address: upfN3Address,
@@ -170,6 +175,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 		},
 		{
 			input: &pfcpSessionData{
+				sliceID:      1,
 				nbAddress:    nodeBAddress,
 				ueAddress:    ueAddress,
 				upfN3Address: upfN3Address,
@@ -202,6 +208,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 		},
 		{
 			input: &pfcpSessionData{
+				sliceID:      1,
 				nbAddress:    nodeBAddress,
 				ueAddress:    ueAddress,
 				upfN3Address: upfN3Address,
