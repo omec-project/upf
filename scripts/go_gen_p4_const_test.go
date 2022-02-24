@@ -33,7 +33,7 @@ func Test_generateConstants(t *testing.T) {
 				p4config: getP4Config(dummyP4info),
 			},
 			want: &want{
-				ID:   40931612,
+				ID:   12345678,
 				name: "TablePreQosPipeMyStation",
 			},
 		},
