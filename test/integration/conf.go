@@ -14,8 +14,8 @@ const (
 )
 
 var baseConfig = pfcpiface.Conf{
-	ReadTimeout:       15,
-	RespTimeout:       "2s",
+	ReadTimeout: 15,
+	RespTimeout: "2s",
 }
 
 func BESSConfigDefault() pfcpiface.Conf {
@@ -61,7 +61,7 @@ func UP4ConfigDefault() pfcpiface.Conf {
 	}
 
 	config.CPIface = pfcpiface.CPIfaceInfo{
-		UEIPPool:        "10.250.0.0/16",
+		UEIPPool: "10.250.0.0/16",
 	}
 
 	return config
@@ -99,5 +99,3 @@ func GetConfig(fastpath string, configType uint32) pfcpiface.Conf {
 
 	return pfcpiface.Conf{}
 }
-
-

@@ -22,10 +22,10 @@ import (
 // this file should contain all the struct defs/constants used among different test cases.
 
 const (
-	EnvMode = "MODE"
+	EnvMode     = "MODE"
 	EnvFastpath = "FASTPATH"
 
-	FastpathUP4 = "up4"
+	FastpathUP4  = "up4"
 	FastpathBESS = "bess"
 
 	ModeDocker = "docker"
@@ -200,7 +200,7 @@ func setup(t *testing.T, configType uint32) {
 		}()
 	}
 
-	time.Sleep(3*time.Second)
+	time.Sleep(3 * time.Second)
 
 	switch os.Getenv(EnvMode) {
 	case ModeDocker:
