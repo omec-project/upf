@@ -5,6 +5,7 @@
     "ue_ip_pool": "10.250.0.0/16"
   },
   "p4rtciface": {
+    "slice_id": 1,
     "p4rtc_server": "mock-up4",
     "p4rtc_port": "50001",
     "qfi_tc_mapping": {

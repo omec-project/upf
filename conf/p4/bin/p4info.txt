@@ -283,18 +283,24 @@ tables {
   }
   match_fields {
     id: 1
+    name: "slice_id"
+    bitwidth: 4
+    match_type: EXACT
+  }
+  match_fields {
+    id: 2
     name: "app_ip_addr"
     bitwidth: 32
     match_type: LPM
   }
   match_fields {
-    id: 2
+    id: 3
     name: "app_l4_port"
     bitwidth: 16
     match_type: RANGE
   }
   match_fields {
-    id: 3
+    id: 4
     name: "app_ip_proto"
     bitwidth: 8
     match_type: TERNARY
