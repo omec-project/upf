@@ -4,6 +4,7 @@
 package integration
 
 import (
+	"encoding/json"
 	"errors"
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim"
 	"github.com/omec-project/upf-epc/pfcpiface"
@@ -13,6 +14,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"io/ioutil"
 	"net"
 	"os"
 	"testing"
@@ -143,8 +145,8 @@ func (af appFilter) isEmpty() bool {
 		af.appPort.low == 0 && af.appPort.high == 0
 }
 
-func IsConnectionOpen(host string, port string) bool {
-	ln, err := net.Listen("udp", host+":"+port)
+func IsConnectionOpen(network string, host string, port string) bool {
+	ln, err := net.Listen(network, host+":"+port)
 	if err != nil {
 		return true
 	}
@@ -152,7 +154,7 @@ func IsConnectionOpen(host string, port string) bool {
 	return false
 }
 
-func waitForPFCPAgentToStart() error {
+func waitForPortOpen(net string, host string, port string) error {
 	timeout := time.After(5 * time.Second)
 	ticker := time.Tick(500 * time.Millisecond)
 
@@ -162,11 +164,19 @@ func waitForPFCPAgentToStart() error {
 		case <-timeout:
 			return errors.New("timed out")
 		case <-ticker:
-			if IsConnectionOpen("127.0.0.1", "8805") {
+			if IsConnectionOpen("udp", "127.0.0.1", "8805") {
 				return nil
 			}
 		}
 	}
+}
+
+func waitForPFCPAgentToStart() error {
+	return waitForPortOpen("udp", "127.0.0.1", "8805")
+}
+
+func waitForBESSMockToStart() error {
+	return waitForPortOpen("tcp", "127.0.0.1", "10514")
 }
 
 func isModeNative() bool {
@@ -200,12 +210,17 @@ func setup(t *testing.T, configType uint32) {
 		}()
 	}
 
-	time.Sleep(3*time.Second)
+	// wait for BESS mock to start, blocking
+	err := waitForBESSMockToStart()
+	require.NoErrorf(t, err, "failed to start BESS mock: %v", err)
 
 	switch os.Getenv(EnvMode) {
 	case ModeDocker:
-		//providers.RunDockerCommandAttach("pfcpiface",
-		//	fmt.Sprintf("/bin/pfcpiface -config /config/%s", pfcpAgentConfig))
+		jsonConf, _ := json.Marshal(GetConfig(os.Getenv(EnvFastpath), configType))
+		err := ioutil.WriteFile("./config/upf.json", jsonConf, os.ModePerm)
+		require.NoError(t, err)
+		providers.RunDockerCommandAttach("pfcpiface",
+			"/bin/pfcpiface -config /config/upf.json")
 	case ModeNative:
 		pfcpAgent = pfcpiface.NewPFCPIface(GetConfig(os.Getenv(EnvFastpath), configType))
 		go pfcpAgent.Run()
@@ -214,7 +229,7 @@ func setup(t *testing.T, configType uint32) {
 	}
 
 	// wait for PFCP Agent to initialize, blocking
-	err := waitForPFCPAgentToStart()
+	err = waitForPFCPAgentToStart()
 	require.NoErrorf(t, err, "failed to start PFCP Agent: %v", err)
 
 	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.1")
@@ -260,7 +275,7 @@ func teardown(t *testing.T) {
 func verifyEntries(t *testing.T, testdata *pfcpSessionData, expectedValues p4RtValues, afterModification bool) {
 	switch os.Getenv(EnvFastpath) {
 	case FastpathUP4:
-		verifyEntries(t, testdata, expectedValues, afterModification)
+		verifyP4RuntimeEntries(t, testdata, expectedValues, afterModification)
 	case FastpathBESS:
 		// TODO: implement it
 	}

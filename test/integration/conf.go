@@ -5,6 +5,8 @@ package integration
 
 import (
 	"github.com/omec-project/upf-epc/pfcpiface"
+	"github.com/sirupsen/logrus"
+	"os"
 	"runtime"
 )
 
@@ -16,6 +18,7 @@ const (
 var baseConfig = pfcpiface.Conf{
 	ReadTimeout:       15,
 	RespTimeout:       "2s",
+	LogLevel:          logrus.TraceLevel,
 }
 
 func BESSConfigDefault() pfcpiface.Conf {
@@ -49,11 +52,19 @@ func BESSConfigUPFBasedIPAllocation() pfcpiface.Conf {
 }
 
 func UP4ConfigDefault() pfcpiface.Conf {
+	var up4Server string
+	switch os.Getenv(EnvMode) {
+	case ModeDocker:
+		up4Server = "mock-up4"
+	case ModeNative:
+		up4Server = "127.0.0.1"
+	}
+
 	config := baseConfig
 	config.EnableP4rt = true
 	config.P4rtcIface = pfcpiface.P4rtcInfo{
 		AccessIP:    upfN3Address + "/32",
-		P4rtcServer: "127.0.0.1",
+		P4rtcServer: up4Server,
 		P4rtcPort:   "50001",
 		QFIToTC: map[uint8]uint8{
 			8: 3,

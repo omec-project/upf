@@ -14,11 +14,6 @@ import (
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
-const (
-	configDefault              = "default.json"
-	configUPFBasedIPAllocation = "ue_ip_alloc.json"
-)
-
 func TestUPFBasedUeIPAllocation(t *testing.T) {
 	setup(t, ConfigUPFBasedIPAllocation)
 	defer teardown(t)
