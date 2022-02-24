@@ -11,7 +11,7 @@ import (
 
 const dummyP4info = "dummy_p4info.txt"
 
-func Test_generate(t *testing.T) {
+func Test_generateConstants(t *testing.T) {
 	type args struct {
 		p4config *p4ConfigV1.P4Info
 	}
@@ -58,6 +58,17 @@ func Test_generate(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "verify meter size",
+			args: &args{
+				p4config: getP4Config(dummyP4info),
+			},
+			want: &want{
+				ID:   1024,
+				name: "MeterSizePreQosPipeAppMeter",
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -69,12 +80,70 @@ func Test_generate(t *testing.T) {
 				return
 			}
 
+			if idx != -1 && tt.wantErr {
+				t.Fail()
+			}
+
+			line := strings.SplitN(result[idx:], "\n", 1)
+			require.True(t, strings.Contains(strings.Join(line, " "), strconv.Itoa(tt.want.ID)))
+		})
+	}
+}
+
+func Test_generateTables(t *testing.T) {
+	type args struct {
+		p4config *p4ConfigV1.P4Info
+	}
+
+	type want struct {
+		ID   int
+		name string
+	}
+
+	tests := []struct {
+		name    string
+		args    *args
+		want    *want
+		wantErr bool
+	}{
+		{
+			name: "verify table map",
+			args: &args{
+				p4config: getP4Config(dummyP4info),
+			},
+			want: &want{
+				ID:   44976597,
+				name: "PreQosPipe.sessions_uplink",
+			},
+		},
+		{
+			name: "non existing element",
+			args: &args{
+				p4config: getP4Config(dummyP4info),
+			},
+			want: &want{
+				ID:   1111,
+				name: "test",
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := generateTables(tt.args.p4config)
+
+			idx := strings.Index(result, tt.want.name)
+			if idx == -1 && tt.wantErr {
+				return
+			}
+
 			if idx == -1 && !tt.wantErr {
 				// Avoid panics
 				t.Fail()
 			}
 
-			line := strings.SplitN(result[idx:], "\n", 1)
+			line := strings.SplitN(result[idx:], ",", 1)
 			require.True(t, strings.Contains(strings.Join(line, " "), strconv.Itoa(tt.want.ID)))
 		})
 	}
