@@ -59,6 +59,7 @@ func Test_generate(t *testing.T) {
 			wantErr: true,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := generateConstants(tt.args.p4config)
@@ -66,6 +67,11 @@ func Test_generate(t *testing.T) {
 			idx := strings.Index(result, tt.want.name)
 			if idx == -1 && tt.wantErr {
 				return
+			}
+
+			if idx == -1 && !tt.wantErr {
+				// Avoid panics
+				t.Fail()
 			}
 
 			line := strings.SplitN(result[idx:], "\n", 1)
