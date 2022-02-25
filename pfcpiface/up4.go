@@ -370,7 +370,16 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 }
 
 func (up4 *UP4) clearAllTables() error {
-	if err := up4.p4client.ClearTables(p4constants.GetTableIDList()); err != nil {
+	tableIDs := []uint32{
+		p4constants.TablePreQosPipeSessionsUplink,
+		p4constants.TablePreQosPipeSessionsDownlink,
+		p4constants.TablePreQosPipeTerminationsUplink,
+		p4constants.TablePreQosPipeTerminationsDownlink,
+		p4constants.TablePreQosPipeTunnelPeers,
+		p4constants.TablePreQosPipeInterfaces,
+	}
+
+	if err := up4.p4client.ClearTables(tableIDs); err != nil {
 		return err
 	}
 
