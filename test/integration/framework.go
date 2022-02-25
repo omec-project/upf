@@ -224,11 +224,11 @@ func setup(t *testing.T, configType uint32) {
 				panic(err)
 			}
 		}()
-	}
 
-	// wait for BESS mock to start, blocking
-	err := waitForBESSMockToStart()
-	require.NoErrorf(t, err, "failed to start BESS mock: %v", err)
+		// wait for BESS mock to start, blocking
+		err := waitForBESSMockToStart()
+		require.NoErrorf(t, err, "failed to start BESS mock: %v", err)
+	}
 
 	switch os.Getenv(EnvMode) {
 	case ModeDocker:
@@ -245,7 +245,7 @@ func setup(t *testing.T, configType uint32) {
 	}
 
 	// wait for PFCP Agent to initialize, blocking
-	err = waitForPFCPAgentToStart()
+	err := waitForPFCPAgentToStart()
 	require.NoErrorf(t, err, "failed to start PFCP Agent: %v", err)
 
 	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.1")
