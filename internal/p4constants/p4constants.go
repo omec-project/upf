@@ -132,6 +132,21 @@ func GetTableIDToNameMap() map[uint32]string {
 	}
 }
 
+func GetTableIDList() []uint32 {
+	return []uint32{
+		39015874,
+		47204971,
+		40931612,
+		33923840,
+		44976597,
+		34742049,
+		37595532,
+		34778590,
+		46868458,
+		49497304,
+	}
+}
+
 func GetActionIDToNameMap() map[uint32]string {
 	return map[uint32]string{
 		21257015: "NoAction",
@@ -159,54 +174,6 @@ func GetActionIDToNameMap() map[uint32]string {
 		32742981: "PreQosPipe.load_tunnel_param",
 		29247910: "PreQosPipe.do_gtpu_tunnel",
 		31713420: "PreQosPipe.do_gtpu_tunnel_with_psc",
-	}
-}
-
-func GetCounterIDToNameMap() map[uint32]string {
-	return map[uint32]string{
-		315693181: "PreQosPipe.pre_qos_counter",
-		302958180: "PostQosPipe.post_qos_counter",
-	}
-}
-
-func GetDirectCounterIDToNameMap() map[uint32]string {
-	return map[uint32]string{
-		325583051: "acls",
-	}
-}
-
-func GetActionProfileIDToNameMap() map[uint32]string {
-	return map[uint32]string{
-		297808402: "hashed_selector",
-	}
-}
-
-func GetPacketMetadataIDToNameMap() map[uint32]string {
-	return map[uint32]string{
-		75327753: "packet_out",
-		80671331: "packet_in",
-	}
-}
-
-func GetMeterIDToNameMap() map[uint32]string {
-	return map[uint32]string{
-		338231090: "PreQosPipe.app_meter",
-		347593234: "PreQosPipe.session_meter",
-	}
-}
-
-func GetTableIDList() []uint32 {
-	return []uint32{
-		39015874,
-		47204971,
-		40931612,
-		33923840,
-		44976597,
-		34742049,
-		37595532,
-		34778590,
-		46868458,
-		49497304,
 	}
 }
 
@@ -240,10 +207,9 @@ func GetActionIDList() []uint32 {
 	}
 }
 
-func GetCounterIDList() []uint32 {
-	return []uint32{
-		315693181,
-		302958180,
+func GetDirectCounterIDToNameMap() map[uint32]string {
+	return map[uint32]string{
+		325583051: "acls",
 	}
 }
 
@@ -253,9 +219,36 @@ func GetDirectCounterIDList() []uint32 {
 	}
 }
 
+func GetCounterIDToNameMap() map[uint32]string {
+	return map[uint32]string{
+		315693181: "PreQosPipe.pre_qos_counter",
+		302958180: "PostQosPipe.post_qos_counter",
+	}
+}
+
+func GetCounterIDList() []uint32 {
+	return []uint32{
+		315693181,
+		302958180,
+	}
+}
+
+func GetActionProfileIDToNameMap() map[uint32]string {
+	return map[uint32]string{
+		297808402: "hashed_selector",
+	}
+}
+
 func GetActionProfileIDList() []uint32 {
 	return []uint32{
 		297808402,
+	}
+}
+
+func GetPacketMetadataIDToNameMap() map[uint32]string {
+	return map[uint32]string{
+		75327753: "packet_out",
+		80671331: "packet_in",
 	}
 }
 
@@ -263,6 +256,13 @@ func GetPacketMetadataIDList() []uint32 {
 	return []uint32{
 		75327753,
 		80671331,
+	}
+}
+
+func GetMeterIDToNameMap() map[uint32]string {
+	return map[uint32]string{
+		338231090: "PreQosPipe.app_meter",
+		347593234: "PreQosPipe.session_meter",
 	}
 }
 
