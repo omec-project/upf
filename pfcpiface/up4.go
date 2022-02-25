@@ -369,7 +369,7 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	}
 }
 
-func (up4 *UP4) clearAllTables() error {
+func (up4 *UP4) clearTables() error {
 	tableIDs := []uint32{
 		p4constants.TablePreQosPipeSessionsUplink,
 		p4constants.TablePreQosPipeSessionsDownlink,
@@ -441,7 +441,7 @@ func (up4 *UP4) tryConnect() error {
 
 	up4.p4RtTranslator = newP4RtTranslator(up4.p4client.P4Info)
 
-	err = up4.clearAllTables()
+	err = up4.clearTables()
 	if err != nil {
 		log.Warningf("failed to clear tables: %v", err)
 	}
