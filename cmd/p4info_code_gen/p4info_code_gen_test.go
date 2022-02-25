@@ -1,6 +1,8 @@
 package main
 
 import (
+	"io/fs"
+	"io/ioutil"
 	"strconv"
 	"strings"
 	"testing"
@@ -8,8 +10,6 @@ import (
 	p4ConfigV1 "github.com/p4lang/p4runtime/go/p4/config/v1"
 	"github.com/stretchr/testify/require"
 )
-
-const dummyP4info = "dummy_p4info.txt"
 
 type generatorType int
 
@@ -22,7 +22,84 @@ const (
 	meter
 )
 
+const testP4InfoString = `
+pkg_info {
+  arch: "v1model"
+}
+tables {
+  preamble {
+    id: 12345678
+    name: "PreQosPipe.my_station"
+    alias: "my_station"
+  }
+  match_fields {
+    id: 1
+    name: "dst_mac"
+    bitwidth: 48
+    match_type: EXACT
+  }
+  action_refs {
+    id: 21257015
+  }
+  size: 1024
+}
+actions {
+  preamble {
+    id: 26090030
+    name: "PreQosPipe.set_source_iface"
+    alias: "set_source_iface"
+  }
+  params {
+    id: 1
+    name: "src_iface"
+    bitwidth: 8
+  }
+  params {
+    id: 2
+    name: "direction"
+    bitwidth: 8
+  }
+  params {
+    id: 3
+    name: "slice_id"
+    bitwidth: 4
+  }
+}
+meters {
+  preamble {
+    id: 338231090
+    name: "PreQosPipe.app_meter"
+    alias: "app_meter"
+  }
+  spec {
+    unit: BYTES
+  }
+  size: 1024
+}
+counters {
+  preamble {
+    id: 315693181
+    name: "PreQosPipe.pre_qos_counter"
+    alias: "pre_qos_counter"
+  }
+  spec {
+    unit: BOTH
+  }
+  size: 1024
+}
+`
+
+func mustWriteStringToDisk(s string, path string) {
+	err := ioutil.WriteFile(path, []byte(s), fs.ModePerm)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func Test_generator(t *testing.T) {
+	p4infoPath := t.TempDir() + "/dummy_p4info.pb.txt"
+	mustWriteStringToDisk(testP4InfoString, p4infoPath)
+
 	type args struct {
 		p4config *p4ConfigV1.P4Info
 		genType  generatorType
@@ -42,7 +119,7 @@ func Test_generator(t *testing.T) {
 		{
 			name: "verify table const",
 			args: &args{
-				p4config: getP4Config(dummyP4info),
+				p4config: mustGetP4Config(p4infoPath),
 				genType:  constant,
 			},
 			want: &want{
@@ -53,18 +130,18 @@ func Test_generator(t *testing.T) {
 		{
 			name: "verify action const",
 			args: &args{
-				p4config: getP4Config(dummyP4info),
+				p4config: mustGetP4Config(p4infoPath),
 				genType:  constant,
 			},
 			want: &want{
-				ID:   23766285,
-				name: "ActionPreQosPipeInitializeMetadata",
+				ID:   26090030,
+				name: "ActionPreQosPipeSetSourceIface",
 			},
 		},
 		{
 			name: "non existing const",
 			args: &args{
-				p4config: getP4Config(dummyP4info),
+				p4config: mustGetP4Config(p4infoPath),
 				genType:  constant,
 			},
 			want: &want{
@@ -76,7 +153,7 @@ func Test_generator(t *testing.T) {
 		{
 			name: "verify meter size",
 			args: &args{
-				p4config: getP4Config(dummyP4info),
+				p4config: mustGetP4Config(p4infoPath),
 				genType:  constant,
 			},
 			want: &want{
@@ -85,31 +162,20 @@ func Test_generator(t *testing.T) {
 			},
 		},
 		{
-			name: "verify dummy action",
-			args: &args{
-				p4config: getP4Config(dummyP4info),
-				genType:  constant,
-			},
-			want: &want{
-				ID:   76544321,
-				name: "MyDummyAction",
-			},
-		},
-		{
 			name: "verify table map",
 			args: &args{
-				p4config: getP4Config(dummyP4info),
+				p4config: mustGetP4Config(p4infoPath),
 				genType:  table,
 			},
 			want: &want{
-				ID:   44976597,
-				name: "PreQosPipe.sessions_uplink",
+				ID:   12345678,
+				name: "PreQosPipe.my_station",
 			},
 		},
 		{
 			name: "non existing element",
 			args: &args{
-				p4config: getP4Config(dummyP4info),
+				p4config: mustGetP4Config(p4infoPath),
 				genType:  table,
 			},
 			want: &want{
@@ -121,7 +187,7 @@ func Test_generator(t *testing.T) {
 		{
 			name: "verify meter map",
 			args: &args{
-				p4config: getP4Config(dummyP4info),
+				p4config: mustGetP4Config(p4infoPath),
 				genType:  meter,
 			},
 			want: &want{
@@ -132,18 +198,18 @@ func Test_generator(t *testing.T) {
 		{
 			name: "verify action map",
 			args: &args{
-				p4config: getP4Config(dummyP4info),
+				p4config: mustGetP4Config(p4infoPath),
 				genType:  action,
 			},
 			want: &want{
-				ID:   30494847,
-				name: "PreQosPipe.Acl.set_port",
+				ID:   26090030,
+				name: "PreQosPipe.set_source_iface",
 			},
 		},
 		{
 			name: "non existing action",
 			args: &args{
-				p4config: getP4Config(dummyP4info),
+				p4config: mustGetP4Config(p4infoPath),
 				genType:  action,
 			},
 			want: &want{
@@ -155,7 +221,7 @@ func Test_generator(t *testing.T) {
 		{
 			name: "verify indirect counter map",
 			args: &args{
-				p4config: getP4Config(dummyP4info),
+				p4config: mustGetP4Config(p4infoPath),
 				genType:  indirectCounter,
 			},
 			want: &want{
@@ -166,7 +232,7 @@ func Test_generator(t *testing.T) {
 		{
 			name: "non existing indirect counter",
 			args: &args{
-				p4config: getP4Config(dummyP4info),
+				p4config: mustGetP4Config(p4infoPath),
 				genType:  indirectCounter,
 			},
 			want: &want{
@@ -174,17 +240,6 @@ func Test_generator(t *testing.T) {
 				name: "test",
 			},
 			wantErr: true,
-		},
-		{
-			name: "verify dummy direct counter",
-			args: &args{
-				p4config: getP4Config(dummyP4info),
-				genType:  directCounter,
-			},
-			want: &want{
-				ID:   12345,
-				name: "MyDummyCounter",
-			},
 		},
 	}
 
@@ -196,15 +251,15 @@ func Test_generator(t *testing.T) {
 			case constant:
 				result = generateConstants(tt.args.p4config)
 			case table:
-				result = generateTables(tt.args.p4config)
+				result = generateP4DataFunctions(tt.args.p4config, "Table")
 			case action:
-				result = generateActions(tt.args.p4config)
+				result = generateP4DataFunctions(tt.args.p4config, "Action")
 			case meter:
-				result = generateMeters(tt.args.p4config)
+				result = generateP4DataFunctions(tt.args.p4config, "Meter")
 			case indirectCounter:
-				result = generateIndirectCounters(tt.args.p4config)
+				result = generateP4DataFunctions(tt.args.p4config, "Counter")
 			case directCounter:
-				result = generateDirectCounters(tt.args.p4config)
+				result = generateP4DataFunctions(tt.args.p4config, "DirectCounter")
 			}
 
 			idx := strings.Index(result, tt.want.name)
@@ -213,11 +268,15 @@ func Test_generator(t *testing.T) {
 			}
 
 			if idx != -1 && tt.wantErr {
-				t.Fail()
+				t.Fatalf("Found unexpected entity name %s in generated code %s", tt.want.name, result)
 			}
 
-			line := strings.SplitN(result[idx:], "\n", 1)
-			require.True(t, strings.Contains(strings.Join(line, " "), strconv.Itoa(tt.want.ID)))
+			if idx == -1 {
+				t.Fatalf("Did not find expected entity name '%s' in generated code: %s", tt.want.name, result)
+			}
+
+			line := strings.Join(strings.SplitN(result[idx:], "\n", 1), " ")
+			require.Contains(t, line, strconv.Itoa(tt.want.ID), "ID not found")
 		})
 	}
 }

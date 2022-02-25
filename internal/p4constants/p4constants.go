@@ -208,15 +208,15 @@ func GetActionIDList() []uint32 {
 	}
 }
 
-func GetDirectCounterIDToNameMap() map[uint32]string {
+func GetActionProfileIDToNameMap() map[uint32]string {
 	return map[uint32]string{
-		325583051: "acls",
+		297808402: "hashed_selector",
 	}
 }
 
-func GetDirectCounterIDList() []uint32 {
+func GetActionProfileIDList() []uint32 {
 	return []uint32{
-		325583051,
+		297808402,
 	}
 }
 
@@ -234,29 +234,15 @@ func GetCounterIDList() []uint32 {
 	}
 }
 
-func GetActionProfileIDToNameMap() map[uint32]string {
+func GetDirectCounterIDToNameMap() map[uint32]string {
 	return map[uint32]string{
-		297808402: "hashed_selector",
+		325583051: "acls",
 	}
 }
 
-func GetActionProfileIDList() []uint32 {
+func GetDirectCounterIDList() []uint32 {
 	return []uint32{
-		297808402,
-	}
-}
-
-func GetPacketMetadataIDToNameMap() map[uint32]string {
-	return map[uint32]string{
-		75327753: "packet_out",
-		80671331: "packet_in",
-	}
-}
-
-func GetPacketMetadataIDList() []uint32 {
-	return []uint32{
-		75327753,
-		80671331,
+		325583051,
 	}
 }
 
@@ -272,4 +258,34 @@ func GetMeterIDList() []uint32 {
 		338231090,
 		347593234,
 	}
+}
+
+func GetDirectMeterIDToNameMap() map[uint32]string {
+	return map[uint32]string{}
+}
+
+func GetDirectMeterIDList() []uint32 {
+	return []uint32{}
+}
+
+func GetControllerPacketMetadataIDToNameMap() map[uint32]string {
+	return map[uint32]string{
+		75327753: "packet_out",
+		80671331: "packet_in",
+	}
+}
+
+func GetControllerPacketMetadataIDList() []uint32 {
+	return []uint32{
+		75327753,
+		80671331,
+	}
+}
+
+func GetRegisterIDToNameMap() map[uint32]string {
+	return map[uint32]string{}
+}
+
+func GetRegisterIDList() []uint32 {
+	return []uint32{}
 }
