@@ -106,19 +106,19 @@ jobs:
 
       - name: Pull old images for caching
         run: |
-          docker pull $DOCKER_REPOSITORY/upf-epc-bess:master-latest
-          docker pull $DOCKER_REPOSITORY/upf-epc-pfcpiface:master-latest
+          docker pull ${DOCKER_REPOSITORY}upf-epc-bess:master-latest
+          docker pull ${DOCKER_REPOSITORY}upf-epc-pfcpiface:master-latest
 
       - name: Build the BESS-UPF Docker image for Haswell
         run: |
           DOCKER_TARGETS=bess CPU=ivybridge make docker-build
-          docker tag $DOCKER_REPOSITORY/upf-epc-bess:$DOCKER_TAG $DOCKER_REPOSITORY/upf-epc-bess:$DOCKER_TAG-ivybridge
+          docker tag ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG-ivybridge
           DOCKER_TARGETS=bess CPU=haswell make docker-build
 
       - name: Build the PFCP Agent Docker image
         run: |
           DOCKER_TARGETS=pfcpiface CPU=ivybridge make docker-build
-          docker tag $DOCKER_REPOSITORY/upf-epc-pfcpiface:$DOCKER_TAG $DOCKER_REPOSITORY/upf-epc-pfcpiface:$DOCKER_TAG-ivybridge
+          docker tag ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG-ivybridge
           DOCKER_TARGETS=pfcpiface CPU=haswell make docker-build
 
       - id: docker-login
