@@ -78,6 +78,7 @@ jobs:
           branch: ${{ github.event.pull_request.head.ref }}
           author: "Github Actions <actions@github>"
           commit-message: "Actions: Updated with changes from CI"
+
       - id: docker-login
         # Secrets from the main repo are not used if PR comes from fork. We skip pushing Docker image then.
         if: github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'
@@ -86,7 +87,53 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.CR_PAT }}
+
       - name: Push Docker image
         if: steps.docker-login.conclusion == 'success'
         run: |
           make docker-push
+
+  # TODO: move to docker.yml after testing
+  build-dockerhub:
+    env:
+      DOCKER_REGISTRY: "docker.io"
+      DOCKER_REPOSITORY: "omecproject"
+      DOCKER_TAG: "master-${{ github.GITHUB_SHA }}"
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout and build
+      - uses: actions/checkout@v2.4.0
+
+      - name: Pull old images for caching
+        run: |
+          docker pull $DOCKER_REPOSITORY/upf-epc-bess:master-latest
+          docker pull $DOCKER_REPOSITORY/upf-epc-pfcpiface:master-latest
+
+      - name: Build the BESS-UPF Docker image for Haswell
+        run: |
+          DOCKER_TARGETS=bess CPU=ivybridge make docker-build
+          docker tag $DOCKER_REPOSITORY/upf-epc-bess:$DOCKER_TAG $DOCKER_REPOSITORY/upf-epc-bess:$DOCKER_TAG-ivybridge
+          DOCKER_TARGETS=bess CPU=haswell make docker-build
+
+      - name: Build the PFCP Agent Docker image
+        run: |
+          DOCKER_TARGETS=pfcpiface CPU=ivybridge make docker-build
+          docker tag $DOCKER_REPOSITORY/upf-epc-pfcpiface:$DOCKER_TAG $DOCKER_REPOSITORY/upf-epc-pfcpiface:$DOCKER_TAG-ivybridge
+          DOCKER_TARGETS=pfcpiface CPU=haswell make docker-build
+
+      - id: docker-login
+        # Secrets from the main repo are not used if PR comes from fork. We skip pushing Docker image then.
+        if: github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'
+        uses: docker/login-action@v1.13.0
+        with:
+          registry: docker.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.CR_PAT }}
+
+      - name: Push Docker image
+        if: steps.docker-login.conclusion == 'success'
+        run: |
+          DOCKER_TAG=master-latest make docker-push
+          DOCKER_TAG=master-latest-ivybridge make docker-push
+          DOCKER_TAG=$DOCKER_TAG make docker-push
+          DOCKER_TAG=$DOCKER_TAG-ivybridge make docker-push
