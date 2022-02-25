@@ -803,8 +803,8 @@ func getMeterConfigurationFromQER(mbr uint64, gbr uint64) *p4.MeterConfig {
 	logger.Debug("Converting GBR/MBR to P4 Meter configuration")
 
 	// FIXME: calculate from rate once P4-UPF supports GBRs
-	cbs := 1
-	cir := 1
+	cbs := 0
+	cir := 0
 
 	pbs := calcBurstSizeFromRate(mbr, uint64(defaultBurstDurationMs))
 
