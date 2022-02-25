@@ -82,7 +82,7 @@ func (pConn *PFCPConn) GenerateFseid() uint64 {
 
 		break
 	}
-	
+
 	return lseid
 }
 
