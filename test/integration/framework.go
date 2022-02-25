@@ -146,11 +146,27 @@ func (af appFilter) isEmpty() bool {
 }
 
 func IsConnectionOpen(network string, host string, port string) bool {
-	ln, err := net.Listen(network, host+":"+port)
-	if err != nil {
-		return true
+	target := net.JoinHostPort(host, port)
+
+	switch network {
+	case "udp":
+		ln, err := net.Listen(network, target)
+		if err != nil {
+			return true
+		}
+		ln.Close()
+	case "tcp":
+		conn, err := net.DialTimeout(network, target, time.Second*3)
+		if err != nil {
+			return false
+		}
+
+		if conn != nil {
+			conn.Close()
+			return true
+		}
 	}
-	ln.Close()
+
 	return false
 }
 
@@ -164,7 +180,7 @@ func waitForPortOpen(net string, host string, port string) error {
 		case <-timeout:
 			return errors.New("timed out")
 		case <-ticker:
-			if IsConnectionOpen("udp", "127.0.0.1", "8805") {
+			if IsConnectionOpen(net, host, port) {
 				return nil
 			}
 		}
