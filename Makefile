@@ -97,7 +97,7 @@ test: .coverage
 			-coverprofile=.coverage/coverage-unit.txt \
 			-covermode=atomic \
 			-v \
-			./pfcpiface
+			./pfcpiface ./scripts
 
 p4-constants:
 	$(info *** Generating go constants...)
