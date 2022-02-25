@@ -233,7 +233,7 @@ func setup(t *testing.T, configType uint32) {
 	switch os.Getenv(EnvMode) {
 	case ModeDocker:
 		jsonConf, _ := json.Marshal(GetConfig(os.Getenv(EnvFastpath), configType))
-		err := ioutil.WriteFile("./config/upf.json", jsonConf, os.ModePerm)
+		err := ioutil.WriteFile("./infra/upf.json", jsonConf, os.ModePerm)
 		require.NoError(t, err)
 		providers.RunDockerCommandAttach("pfcpiface",
 			"/bin/pfcpiface -config /config/upf.json")
@@ -275,7 +275,7 @@ func teardown(t *testing.T) {
 		_, _, _, err := providers.RunDockerExecCommand("pfcpiface", "killall -9 pfcpiface")
 		require.NoError(t, err, "failed to kill pfcpiface process")
 
-		err = os.Remove("./config/upf.json")
+		err = os.Remove("./infra/upf.json")
 		require.NoError(t, err)
 	case ModeNative:
 		pfcpAgent.Stop()
