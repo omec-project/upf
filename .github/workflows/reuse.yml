@@ -6,9 +6,9 @@ name: REUSE
 
 on:
   push:
-    branches: [master, main]
+    branches:
+      - master
   pull_request:
-    branches: [master, main]
 
 jobs:
   license-check:
@@ -16,4 +16,4 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: reuse lint
-        uses: fsfe/reuse-action@v1
+        run: make check-reuse
