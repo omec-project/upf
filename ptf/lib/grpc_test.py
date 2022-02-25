@@ -5,15 +5,16 @@ from collections import namedtuple
 from functools import wraps
 from pprint import pprint
 
-from ptf.base_tests import BaseTest
+import grpc
 import ptf.testutils as testutils
+from google.protobuf import text_format
 from google.protobuf.any_pb2 import Any
 from google.protobuf.json_format import MessageToDict
-import grpc
+from ptf.base_tests import BaseTest
 
-import service_pb2_grpc as pb
 import bess_msg_pb2 as bess_msg
 import module_msg_pb2 as module_msg
+import service_pb2_grpc as pb
 import util_msg_pb2 as util_msg
 
 # initialize useful variables
@@ -35,6 +36,8 @@ GATE_METER = 0x0
 GATE_DROP = 0x5
 GATE_UNMETER = 0x6
 
+QFI_DEFAULT = 9
+
 class GrpcTest(BaseTest):
     """Define a base test for communicating with BESS over gRPC messages
 
@@ -52,10 +55,21 @@ class GrpcTest(BaseTest):
         bess_server_addr = testutils.test_param_get("bess_upf_addr")
         self.channel = grpc.insecure_channel(target=bess_server_addr)
         self.bess_client = pb.BESSControlStub(self.channel)
-    
+
     """
     API for reading metrics from BESS-UPF modules
     """
+
+    def sendModuleCommand(self, request, timeout=5, raise_error=True):
+        # TODO: print to write log file for easier debugging
+        # print(text_format.MessageToString(request, as_one_line=True))
+        response = self.bess_client.ModuleCommand(
+            request,
+            timeout=timeout,
+        )
+        if raise_error and response.error.code != 0:
+            raise Exception(f"{request.name} {request.cmd}: {response.error.errmsg} (code {response.error.code})")
+        return response
 
     def getPortStats(self, ifname):
         # to reveal bess interface names:
@@ -66,7 +80,7 @@ class GrpcTest(BaseTest):
         )
 
         return self.bess_client.GetPortStats(req)
-    
+
     def _readFlowMeasurement(self, module, clear, quantiles):
         # create request for flow measurements and send to bess
         request = module_msg.FlowMeasureCommandReadArg(
@@ -77,13 +91,12 @@ class GrpcTest(BaseTest):
         any = Any()
         any.Pack(request)
 
-        response = self.bess_client.ModuleCommand(
+        response = self.sendModuleCommand(
             bess_msg.CommandRequest(
                 name = module,
                 cmd = "read",
                 arg = any,
-            ),
-            timeout=5,
+            )
         )
 
         # unpack response and return results
@@ -95,7 +108,7 @@ class GrpcTest(BaseTest):
         msg = MessageToDict(msg)
         if "statistics" in msg:
             return msg["statistics"]
-        
+
         return msg
 
     def getSessionStats(self, q=[50, 90, 99], quiet=False):
@@ -286,7 +299,7 @@ class GrpcTest(BaseTest):
         self,
         gate=0,
         qerID=0,
-        qfi=0,
+        qfi=QFI_DEFAULT,
         ulStatus=0,
         dlStatus=0,
         ulMbr=0,
@@ -371,13 +384,12 @@ class GrpcTest(BaseTest):
         any.Pack(f)
 
         # send request to UPF to add rule
-        response = self.bess_client.ModuleCommand(
+        response = self.sendModuleCommand(
             bess_msg.CommandRequest(
                 name = "pdrLookup",
                 cmd = "add",
                 arg = any
-            ),
-            timeout=5,
+            )
         )
         if debug:
             print(response)
@@ -414,17 +426,16 @@ class GrpcTest(BaseTest):
         any.Pack(f)
 
         # send request to UPF to delete rule
-        response = self.bess_client.ModuleCommand(
+        response = self.sendModuleCommand(
             bess_msg.CommandRequest(
                 name = "pdrLookup",
                 cmd = "delete",
                 arg = any
-            ),
-            timeout=5,
+            )
         )
         if debug:
             print(response)
-    
+
     def _setActionValue(self, far):
         farForwardD = 0x0
         farForwardU = 0x1
@@ -436,11 +447,11 @@ class GrpcTest(BaseTest):
                 return farForwardD
             elif far.dstIntf == DST_CORE:
                 return farForwardU
-        elif (far.applyAction & ACTION_DROP) != 0: 
+        elif (far.applyAction & ACTION_DROP) != 0:
             return farDrop
-        elif (far.applyAction & ACTION_BUFFER) != 0 : 
+        elif (far.applyAction & ACTION_BUFFER) != 0 :
             return farNotify
-        elif (far.applyAction & ACTION_NOTIFY) != 0: 
+        elif (far.applyAction & ACTION_NOTIFY) != 0:
             return farNotify
 
     def addFAR(self, far, debug=False):
@@ -469,13 +480,12 @@ class GrpcTest(BaseTest):
         any.Pack(f)
 
         # send request to UPF to add rule
-        response = self.bess_client.ModuleCommand(
+        response = self.sendModuleCommand(
             bess_msg.CommandRequest(
                 name = "farLookup",
                 cmd = "add",
                 arg = any
-            ),
-            timeout=5,
+            )
         )
         if debug:
             print(response)
@@ -496,39 +506,43 @@ class GrpcTest(BaseTest):
         any.Pack(f)
 
         # send request to UPF to delete rule
-        response = self.bess_client.ModuleCommand(
+        response = self.sendModuleCommand(
             bess_msg.CommandRequest(
                 name = "farLookup",
                 cmd = "delete",
                 arg = any
-            ),
-            timeout=5,
+            )
         )
         if debug:
             print(response)
 
-    def _calcRates(self, ulGbr, ulMbr, dlGbr, dlMbr, burstDuration):
+    def _calcRates(self, ulGbr, ulMbr, dlGbr, dlMbr, burstDuration, minBurstSize=1):
+        # 0 is not a valid rate or burst size, the minimum is 1
         # calculate uplink burst sizes
         ulCbs = (float(ulGbr) * 1000 / 8) * (burstDuration / 1000)
         ulPbs = (float(ulMbr) * 1000 / 8) * (burstDuration / 1000)
+        ulCbs = max(ulCbs, minBurstSize)
+        ulPbs = max(ulPbs, minBurstSize)
         ulEbs = ulPbs
         if ulMbr != 0 or ulGbr != 0:
             ulCir = max(ulGbr * 1000 / 8, 1)
             ulPir = max(ulMbr * 1000 / 8, ulCir)
         else:
-            ulCir = 0
-            ulPir = 0
+            ulCir = 1
+            ulPir = 1
 
         # calculate downlink burst sizes
         dlCbs = (float(dlGbr) * 1000 / 8) * (burstDuration / 1000)
         dlPbs = (float(dlMbr) * 1000 / 8) * (burstDuration / 1000)
+        dlCbs = max(dlCbs, minBurstSize)
+        dlPbs = max(dlPbs, minBurstSize)
         dlEbs = dlPbs
         if dlMbr != 0 or dlGbr != 0:
             dlCir = max(dlGbr * 1000 / 8, 1)
             dlPir = max(dlMbr * 1000 / 8, dlCir)
         else:
-            dlCir = 0
-            dlPir = 0
+            dlCir = 1
+            dlPir = 1
 
         fields = [
             'ulCbs', 'ulPbs', 'ulEbs', 'ulCir', 'ulPir',
@@ -550,6 +564,9 @@ class GrpcTest(BaseTest):
             qer.dlMbr,
             qer.burstDurationMs,
         )
+
+        if debug:
+            print(rates)
 
         # construct UL/DL QosCommandAddArg's and send to BESS
         for srcIface in [ACCESS, CORE]:
@@ -573,17 +590,16 @@ class GrpcTest(BaseTest):
             any = Any()
             any.Pack(f)
 
-            response = self.bess_client.ModuleCommand(
+            response = self.sendModuleCommand(
                 bess_msg.CommandRequest(
                     name = "appQERLookup",
                     cmd = "add",
                     arg = any
-                ),
-                timeout=5,
+                )
             )
             if debug:
                 print(response)
-        
+
         self.appQers.append(qer)
 
     def delApplicationQER(self, qer, debug=False):
@@ -599,13 +615,12 @@ class GrpcTest(BaseTest):
             any = Any()
             any.Pack(f)
 
-            response = self.bess_client.ModuleCommand(
+            response = self.sendModuleCommand(
                 bess_msg.CommandRequest(
                     name = "appQERLookup",
                     cmd = "delete",
                     arg = any
-                ),
-                timeout=5,
+                )
             )
             if debug:
                 print(response)
@@ -638,17 +653,16 @@ class GrpcTest(BaseTest):
             any = Any()
             any.Pack(f)
 
-            response = self.bess_client.ModuleCommand(
+            response = self.sendModuleCommand(
                 bess_msg.CommandRequest(
                     name = "sessionQERLookup",
                     cmd = "add",
                     arg = any
-                ),
-                timeout=5,
+                )
             )
             if debug:
                 print(response)
-        
+
         self.sessionQers.append(qer)
 
     def delSessionQER(self, qer, debug=False):
@@ -663,13 +677,12 @@ class GrpcTest(BaseTest):
             any = Any()
             any.Pack(f)
 
-            response = self.bess_client.ModuleCommand(
+            response = self.sendModuleCommand(
                 bess_msg.CommandRequest(
                     name = "sessionQERLookup",
                     cmd = "delete",
                     arg = any
-                ),
-                timeout=5,
+                )
             )
             if debug:
                 print(response)
@@ -677,7 +690,6 @@ class GrpcTest(BaseTest):
     def tearDown(self):
         print("Closing gRPC channel...")
         self.channel.close()
-
 
 """ Functionality for flow cleanup after tests """
 
