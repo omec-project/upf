@@ -25,9 +25,10 @@ const (
 	HdrPreQosPipeTerminationsUplinkAppId       uint32 = 2
 	HdrPreQosPipeTerminationsDownlinkUeAddress uint32 = 1
 	HdrPreQosPipeTerminationsDownlinkAppId     uint32 = 2
-	HdrPreQosPipeApplicationsAppIpAddr         uint32 = 1
-	HdrPreQosPipeApplicationsAppL4Port         uint32 = 2
-	HdrPreQosPipeApplicationsAppIpProto        uint32 = 3
+	HdrPreQosPipeApplicationsSliceId           uint32 = 1
+	HdrPreQosPipeApplicationsAppIpAddr         uint32 = 2
+	HdrPreQosPipeApplicationsAppL4Port         uint32 = 3
+	HdrPreQosPipeApplicationsAppIpProto        uint32 = 4
 	HdrPreQosPipeTunnelPeersTunnelPeerId       uint32 = 1
 	// Tables
 	TablePreQosPipeRoutingRoutesV4      uint32 = 39015874
