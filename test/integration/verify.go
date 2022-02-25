@@ -43,6 +43,10 @@ func buildExpectedApplicationsEntry(client *p4rtc.Client, testdata *pfcpSessionD
 
 	mfs := make([]p4rtc.MatchInterface, 0)
 
+	mfs = append(mfs, &p4rtc.ExactMatch{
+		Value: []byte{testdata.sliceID},
+	})
+
 	if len(expectedValues.appFilter.appIP) > 0 && !expectedValues.appFilter.appIP.IsUnspecified() {
 		appIPVal, _ := conversion.IpToBinary(expectedValues.appFilter.appIP.String())
 		mfs = append(mfs, &p4rtc.LpmMatch{
@@ -78,13 +82,13 @@ func buildExpectedApplicationsEntry(client *p4rtc.Client, testdata *pfcpSessionD
 	// TODO: fix enumeration in p4runtime-go-client
 	for _, mf := range te.Match {
 		if mf.GetLpm() != nil {
-			mf.FieldId = 1
-		}
-		if mf.GetRange() != nil {
 			mf.FieldId = 2
 		}
-		if mf.GetTernary() != nil {
+		if mf.GetRange() != nil {
 			mf.FieldId = 3
+		}
+		if mf.GetTernary() != nil {
+			mf.FieldId = 4
 		}
 	}
 
