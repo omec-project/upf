@@ -94,10 +94,10 @@ jobs:
           make docker-push
 
   # TODO: move to docker.yml after testing
-  build-dockerhub:
+  push-dockerhub:
     env:
-      DOCKER_REGISTRY: "docker.io"
-      DOCKER_REPOSITORY: "omecproject"
+      DOCKER_REGISTRY: "docker.io/"
+      DOCKER_REPOSITORY: "omecproject/"
       DOCKER_TAG: "master-${{ github.GITHUB_SHA }}"
     runs-on: ubuntu-latest
     steps:
@@ -127,8 +127,8 @@ jobs:
         uses: docker/login-action@v1.13.0
         with:
           registry: docker.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.CR_PAT }}
+          username: ${{ secrets.DOCKERHUB_LOGIN }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Push Docker image
         if: steps.docker-login.conclusion == 'success'
