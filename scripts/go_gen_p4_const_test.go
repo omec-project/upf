@@ -17,6 +17,8 @@ const (
 	constant generatorType = iota
 	table
 	action
+	indirectCounter
+	directCounter
 	meter
 )
 
@@ -150,6 +152,40 @@ func Test_generator(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "verify indirect counter map",
+			args: &args{
+				p4config: getP4Config(dummyP4info),
+				genType:  indirectCounter,
+			},
+			want: &want{
+				ID:   315693181,
+				name: "PreQosPipe.pre_qos_counter",
+			},
+		},
+		{
+			name: "non existing indirect counter",
+			args: &args{
+				p4config: getP4Config(dummyP4info),
+				genType:  indirectCounter,
+			},
+			want: &want{
+				ID:   111,
+				name: "test",
+			},
+			wantErr: true,
+		},
+		{
+			name: "verify dummy direct counter",
+			args: &args{
+				p4config: getP4Config(dummyP4info),
+				genType:  directCounter,
+			},
+			want: &want{
+				ID:   12345,
+				name: "MyDummyCounter",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -165,6 +201,10 @@ func Test_generator(t *testing.T) {
 				result = generateActions(tt.args.p4config)
 			case meter:
 				result = generateMeters(tt.args.p4config)
+			case indirectCounter:
+				result = generateIndirectCounters(tt.args.p4config)
+			case directCounter:
+				result = generateDirectCounters(tt.args.p4config)
 			}
 
 			idx := strings.Index(result, tt.want.name)

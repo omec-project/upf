@@ -708,6 +708,17 @@ direct_counters {
   }
   direct_table_id: 47204971
 }
+direct_counters {
+  preamble {
+    id: 12345
+    name: "MyDummyCounter"
+    alias: "mydummycounter"
+  }
+  spec {
+    unit: BOTH
+  }
+  direct_table_id: 1234
+}
 meters {
   preamble {
     id: 338231090
