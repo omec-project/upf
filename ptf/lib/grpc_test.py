@@ -18,6 +18,8 @@ import service_pb2_grpc as pb
 import util_msg_pb2 as util_msg
 
 # initialize useful variables
+from trex_test import TrexTest
+
 ACCESS = 0x1
 CORE = 0x2
 DST_ACCESS = ACCESS - 1
@@ -725,6 +727,10 @@ def autocleanup(f):
             return f(*args, **kwargs)
 
         finally:
+            # Reset Trex streams, stats, etc.
+            if isinstance(test, TrexTest):
+                test.reset()
+
             # cleanup rules for pdrs, fars, app qers and session qers
             _cleanupRules(test)
 

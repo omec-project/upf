@@ -25,34 +25,27 @@ BESS_SENDER_PORT = 2
 BESS_RECEIVER_PORT = 3
 
 # test specs
-DURATION = 5
+DURATION = 3
 GTPU_PORT = 2152
 PKT_SIZE = 1400
 
 
-class DlAppMbrConformingTest(TrexTest, GrpcTest):
-    """
-    Verifies that traffic conforming to the app MBR is not dropped.
-    """
+class DlAppMbrTest(TrexTest, GrpcTest):
+    """Base class for dowlink MBR testing"""
 
     @autocleanup
-    def runTest(self):
-
-        mbr_bps = 100 * M
+    def run_dl_traffic(self, mbr_bps, stream_bps, duration) -> FlowStats:
         mbr_kbps = mbr_bps / K
         burst_ms = 10
-        stream_bps = mbr_bps * 0.99
-
         teid = 1
-
-        ueIP = IPv4Address('16.0.0.1')
+        ue_ip = IPv4Address('16.0.0.1')
         # TODO: move to global constant file (or env)
-        accessIP = IPv4Address('10.128.13.29')
-        enbIP = IPv4Address('10.27.19.99')
+        access_ip = IPv4Address('10.128.13.29')
+        enb_ip = IPv4Address('10.27.19.99')
 
         pdrDown = self.createPDR(
             srcIface=CORE,
-            dstIP=int(ueIP),
+            dstIP=int(ue_ip),
             srcIfaceMask=0xFF,
             dstIPMask=0xFFFFFFFF,
             precedence=255,
@@ -62,20 +55,20 @@ class DlAppMbrConformingTest(TrexTest, GrpcTest):
             qerIDList=[1],
             needDecap=0,
         )
-        self.addPDR(pdrDown, True)
+        self.addPDR(pdrDown)
 
         farDown = self.createFAR(
             farID=1,
             fseID=1,
             applyAction=ACTION_FORWARD,
             dstIntf=DST_ACCESS,
-            tunnelType=0x1, # Replace with constant
-            tunnelIP4Src=int(accessIP),
-            tunnelIP4Dst=int(enbIP),
+            tunnelType=0x1,  # Replace with constant
+            tunnelIP4Src=int(access_ip),
+            tunnelIP4Dst=int(enb_ip),
             tunnelTEID=teid,
             tunnelPort=GTPU_PORT,
         )
-        self.addFAR(farDown, True)
+        self.addFAR(farDown)
 
         qer = self.createQER(
             gate=GATE_METER,
@@ -85,13 +78,12 @@ class DlAppMbrConformingTest(TrexTest, GrpcTest):
             dlMbr=mbr_kbps,
             burstDurationMs=burst_ms,
         )
-        self.addApplicationQER(qer, True)
+        self.addApplicationQER(qer)
 
-        print("Setting up TRex client...")
         pkt = testutils.simple_udp_packet(
             pktlen=PKT_SIZE,
             eth_dst=UPF_DEST_MAC,
-            ip_dst=str(ueIP),
+            ip_dst=str(ue_ip),
             with_udp_chksum=False
         )
         stream = STLStream(
@@ -101,29 +93,35 @@ class DlAppMbrConformingTest(TrexTest, GrpcTest):
         )
         self.trex_client.add_streams(stream, ports=[BESS_SENDER_PORT])
 
-        print("Running traffic...")
-        s_time = time.time()
-        self.trex_client.start(
-            ports=[BESS_SENDER_PORT],
-            mult="1",
-            duration=DURATION,
-        )
-
-        monitor_port_stats(self.trex_client)
-
-        self.trex_client.wait_on_traffic(ports=[BESS_SENDER_PORT])
-        print(f"Duration was {time.time() - s_time}")
+        start_and_monitor_port_stats(
+            client=self.trex_client,
+            duration=duration,
+            tx_port=BESS_SENDER_PORT,
+            rx_port=BESS_RECEIVER_PORT,
+            min_tx_bps=stream_bps * 0.95)
 
         trex_stats = self.trex_client.get_stats()
-        flow_stats = get_flow_stats(0, trex_stats)
+        return get_flow_stats(0, trex_stats)
 
-        # TODO: sanity check Trex TX rate
-        #  Did we generate enough traffic? should be close to stream_bps
 
-        # 0% packet loss
-        self.assertEqual(
-            flow_stats.tx_packets,
-            flow_stats.rx_packets,
-            f"Conforming app streams should not experience drops "
-            f"(sent {flow_stats.tx_packets} pkts, received {flow_stats.rx_packets})",
-        )
+class DlAppMbrConformingTest(DlAppMbrTest):
+    """
+    Verifies that traffic conforming to the app MBR is not dropped.
+    """
+
+    def runTest(self):
+        rates = [10 * M, 50 * M, 100 * M, 200 * M]
+
+        print()
+        for mbr_bps in rates:
+            print(f"Testing app MBR {to_readable(mbr_bps)}...")
+            flow_stats = self.run_dl_traffic(
+                mbr_bps=mbr_bps, stream_bps=mbr_bps*0.98, duration=2)
+
+            # 0% packet loss
+            self.assertEqual(
+                flow_stats.tx_packets,
+                flow_stats.rx_packets,
+                f"Conforming app streams should not experience drops "
+                f"(sent {flow_stats.tx_packets} pkts, received {flow_stats.rx_packets})",
+            )
