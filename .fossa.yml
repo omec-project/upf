@@ -16,4 +16,4 @@ analyze:
   - name: upf
     type: raw
     target: ../upf
-    path: ../upf
+    path: ./upf
