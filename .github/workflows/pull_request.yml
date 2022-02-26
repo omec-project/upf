@@ -109,17 +109,21 @@ jobs:
           docker pull ${DOCKER_REPOSITORY}upf-epc-bess:master-latest
           docker pull ${DOCKER_REPOSITORY}upf-epc-pfcpiface:master-latest
 
-      - name: Build the BESS-UPF Docker image for Haswell
+      - name: Build the BESS-UPF Docker images
         run: |
           DOCKER_TARGETS=bess CPU=ivybridge make docker-build
           docker tag ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG-ivybridge
+          docker tag ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG ${DOCKER_REPOSITORY}upf-epc-bess:master-latest-ivybridge
           DOCKER_TARGETS=bess CPU=haswell make docker-build
+          docker tag ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG ${DOCKER_REPOSITORY}upf-epc-bess:master-latest
 
-      - name: Build the PFCP Agent Docker image
+      - name: Build the PFCP Agent Docker images
         run: |
           DOCKER_TARGETS=pfcpiface CPU=ivybridge make docker-build
           docker tag ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG-ivybridge
+          docker tag ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG ${DOCKER_REPOSITORY}upf-epc-pfcpiface:master-latest-ivybridge
           DOCKER_TARGETS=pfcpiface CPU=haswell make docker-build
+          docker tag ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG ${DOCKER_REPOSITORY}upf-epc-pfcpiface:master-latest
 
       - id: docker-login
         # Secrets from the main repo are not used if PR comes from fork. We skip pushing Docker image then.
