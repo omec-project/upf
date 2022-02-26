@@ -408,7 +408,7 @@ func (up4 *UP4) clearAllTables() error {
 }
 
 func (up4 *UP4) initUEPool() error {
-	entry, err := up4.p4RtTranslator.BuildInterfaceTableEntry(up4.ueIPPool, true)
+	entry, err := up4.p4RtTranslator.BuildInterfaceTableEntry(up4.ueIPPool, up4.conf.SliceID, true)
 	if err != nil {
 		return err
 	}
@@ -425,7 +425,7 @@ func (up4 *UP4) initUEPool() error {
 }
 
 func (up4 *UP4) initN3Address() error {
-	entry, err := up4.p4RtTranslator.BuildInterfaceTableEntry(up4.accessIP, false)
+	entry, err := up4.p4RtTranslator.BuildInterfaceTableEntry(up4.accessIP, up4.conf.SliceID, false)
 	if err != nil {
 		return err
 	}
@@ -810,8 +810,8 @@ func getMeterConfigurationFromQER(mbr uint64, gbr uint64) *p4.MeterConfig {
 	logger.Debug("Converting GBR/MBR to P4 Meter configuration")
 
 	// FIXME: calculate from rate once P4-UPF supports GBRs
-	cbs := 1
-	cir := 1
+	cbs := 0
+	cir := 0
 
 	pbs := calcBurstSizeFromRate(mbr, uint64(defaultBurstDurationMs))
 
@@ -1164,7 +1164,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 		// TODO: the same app filter can be simultaneously used by another UE session. We cannot remove it.
 		//  We should come up with a way to check if an app filter is still in use.
 		if applicationID != 0 && methodType != p4.Update_DELETE {
-			applicationsEntry, err = up4.p4RtTranslator.BuildApplicationsTableEntry(pdr, applicationID)
+			applicationsEntry, err = up4.p4RtTranslator.BuildApplicationsTableEntry(pdr, up4.conf.SliceID, applicationID)
 			if err != nil {
 				return ErrOperationFailedWithReason("build P4rt table entry for Applications table", err.Error())
 			}
