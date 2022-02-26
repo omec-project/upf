@@ -110,18 +110,39 @@ class DlAppMbrConformingTest(DlAppMbrTest):
     """
 
     def runTest(self):
-        rates = [10 * M, 50 * M, 100 * M, 200 * M]
-
+        # Send slightly below the MBR, expect no packet loss.
+        mbrs_bps = [10 * M, 50 * M, 100 * M, 200 * M]
         print()
-        for mbr_bps in rates:
+        for mbr_bps in mbrs_bps:
             print(f"Testing app MBR {to_readable(mbr_bps)}...")
             flow_stats = self.run_dl_traffic(
                 mbr_bps=mbr_bps, stream_bps=mbr_bps*0.98, duration=2)
-
-            # 0% packet loss
             self.assertEqual(
                 flow_stats.tx_packets,
                 flow_stats.rx_packets,
                 f"Conforming app streams should not experience drops "
+                f"(sent {flow_stats.tx_packets} pkts, received {flow_stats.rx_packets})",
+            )
+
+
+class DlAppMbrNonConformingTest(DlAppMbrTest):
+    """
+    Verifies that traffic non-conforming to the app MBR is policed.
+    """
+
+    def runTest(self):
+        # Send twice the MBR, expect 50% packet loss.
+        mbrs_bps = [10 * M, 50 * M, 100 * M, 200 * M]
+        print()
+        for mbr_bps in mbrs_bps:
+            print(f"Testing app MBR {to_readable(mbr_bps)}...")
+            flow_stats = self.run_dl_traffic(
+                mbr_bps=mbr_bps, stream_bps=mbr_bps*2, duration=2)
+            loss = (flow_stats.tx_packets - flow_stats.rx_packets) / flow_stats.tx_packets
+            self.assertAlmostEqual(
+                loss,
+                0.5,
+                delta=0.01,
+                msg=f"Non-conforming app streams should experience around 50% pkt loss "
                 f"(sent {flow_stats.tx_packets} pkts, received {flow_stats.rx_packets})",
             )
