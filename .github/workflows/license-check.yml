@@ -20,7 +20,7 @@ jobs:
 
   fossa:
     runs-on: ubuntu-latest
-    container: fossa/fossa-cli
+    container: fossa/fossa-cli:base
     steps:
         - uses: actions/checkout@v2
         - name: FOSSA verification
