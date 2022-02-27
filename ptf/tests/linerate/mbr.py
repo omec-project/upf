@@ -40,7 +40,7 @@ class AppMbrTest(TrexTest, GrpcTest):
     """Base class for dowlink MBR testing"""
 
     @autocleanup
-    def run_dl_traffic(self, mbr_bps, stream_bps, duration) -> FlowStats:
+    def run_dl_traffic(self, mbr_bps, stream_bps, num_samples) -> FlowStats:
         mbr_kbps = mbr_bps / K
         burst_ms = 10
         teid = 1
@@ -102,7 +102,7 @@ class AppMbrTest(TrexTest, GrpcTest):
 
         start_and_monitor_port_stats(
             client=self.trex_client,
-            duration=duration,
+            num_samples=num_samples,
             tx_port=BESS_CORE_PORT,
             rx_port=BESS_ACCESS_PORT,
             min_tx_bps=stream_bps * 0.95)
@@ -111,7 +111,7 @@ class AppMbrTest(TrexTest, GrpcTest):
         return get_flow_stats(0, trex_stats)
 
     @autocleanup
-    def run_ul_traffic(self, mbr_bps, stream_bps, duration) -> FlowStats:
+    def run_ul_traffic(self, mbr_bps, stream_bps, num_samples) -> FlowStats:
         mbr_kbps = mbr_bps / K
         burst_ms = 10
         teid = 1
@@ -177,7 +177,7 @@ class AppMbrTest(TrexTest, GrpcTest):
 
         start_and_monitor_port_stats(
             client=self.trex_client,
-            duration=duration,
+            num_samples=num_samples,
             tx_port=BESS_ACCESS_PORT,
             rx_port=BESS_CORE_PORT,
             min_tx_bps=stream_bps * 0.95)
@@ -198,7 +198,7 @@ class DlAppMbrConformingTest(AppMbrTest):
         for mbr_bps in mbrs_bps:
             print(f"Testing app MBR {to_readable(mbr_bps)}...")
             flow_stats = self.run_dl_traffic(
-                mbr_bps=mbr_bps, stream_bps=mbr_bps*0.99, duration=2)
+                mbr_bps=mbr_bps, stream_bps=mbr_bps*0.99, num_samples=2)
             self.assertEqual(
                 flow_stats.tx_packets,
                 flow_stats.rx_packets,
@@ -219,7 +219,7 @@ class DlAppMbrNonConformingTest(AppMbrTest):
         for mbr_bps in mbrs_bps:
             print(f"Testing app MBR {to_readable(mbr_bps)}...")
             flow_stats = self.run_dl_traffic(
-                mbr_bps=mbr_bps, stream_bps=mbr_bps*2, duration=2)
+                mbr_bps=mbr_bps, stream_bps=mbr_bps*2, num_samples=2)
             loss = (flow_stats.tx_packets - flow_stats.rx_packets) / flow_stats.tx_packets
             self.assertAlmostEqual(
                 loss,
@@ -242,7 +242,7 @@ class UlAppMbrConformingTest(AppMbrTest):
         for mbr_bps in mbrs_bps:
             print(f"Testing app MBR {to_readable(mbr_bps)}...")
             flow_stats = self.run_ul_traffic(
-                mbr_bps=mbr_bps, stream_bps=mbr_bps*0.99, duration=2)
+                mbr_bps=mbr_bps, stream_bps=mbr_bps*0.99, num_samples=2)
             self.assertEqual(
                 flow_stats.tx_packets,
                 flow_stats.rx_packets,
@@ -263,7 +263,7 @@ class UlAppMbrNonConformingTest(AppMbrTest):
         for mbr_bps in mbrs_bps:
             print(f"Testing app MBR {to_readable(mbr_bps)}...")
             flow_stats = self.run_ul_traffic(
-                mbr_bps=mbr_bps, stream_bps=mbr_bps*2, duration=2)
+                mbr_bps=mbr_bps, stream_bps=mbr_bps*2, num_samples=2)
             loss = (flow_stats.tx_packets - flow_stats.rx_packets) / flow_stats.tx_packets
             self.assertAlmostEqual(
                 loss,

@@ -175,7 +175,7 @@ RateSamples = collections.namedtuple(
 
 
 def start_and_monitor_port_stats(
-        client: STLClient, duration: int, tx_port: int,
+        client: STLClient, num_samples: int, tx_port: int,
         rx_port: int, min_tx_bps: int = 0,
         ramp_up_timeout: int = 3, interval: int = 1) -> RateSamples:
     """
@@ -184,7 +184,7 @@ def start_and_monitor_port_stats(
     rate.
 
     :param client: TRex client
-    :param duration: for how many seconds minimum to collect samples
+    :param num_samples: number of rate samples to collect before stopping traffic
     :param tx_port: sending port
     :param rx_port: receiving port
     :param min_tx_bps: minimum sending rate to deem the collected samples valid
@@ -195,8 +195,7 @@ def start_and_monitor_port_stats(
 
     samples = RateSamples(tx_bps=[], tx_pps=[], rx_bps=[], rx_pps=[])
     ports = [tx_port, rx_port]
-    max_duration = (duration + ramp_up_timeout) * 2
-    ramp_up_elapsed = 0
+    duration = (num_samples * interval + ramp_up_timeout) * 2
     start_time = time.time()
 
     prev = {
@@ -210,7 +209,7 @@ def start_and_monitor_port_stats(
         for p in ports
     }
 
-    client.start(ports=[tx_port], duration=max_duration)
+    client.start(ports=[tx_port], duration=duration)
 
     time.sleep(interval)
     while client.is_traffic_active():
@@ -261,14 +260,13 @@ def start_and_monitor_port_stats(
                     f"TX port ({tx_port}) did not reach or sustain "
                     f"min sending rate ({to_readable(min_tx_bps)})")
             else:
-                ramp_up_elapsed = elapsed
                 # Discard last sample
                 samples.tx_bps.pop()
                 samples.tx_pps.pop()
                 samples.rx_bps.pop()
                 samples.rx_pps.pop()
 
-        if elapsed - ramp_up_elapsed > duration:
+        if len(samples.tx_bps) == num_samples:
             # We have enough samples.
             client.stop(ports=[tx_port])
             client.wait_on_traffic(ports=[tx_port], timeout=2)
