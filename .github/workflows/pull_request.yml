@@ -119,7 +119,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_LOGIN }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - name: Build for Haswell
+      - name: Build for Haswell latest
         env:
           DOCKER_TAG: master-latest
           CPU: haswell
@@ -129,9 +129,29 @@ jobs:
           CPU=$CPU make docker-build
           make docker-push
 
-      - name: Build for Ivybridge
+      - name: Build for Haswell SHA
+        env:
+          DOCKER_TAG: master-latest-${{ env.GIT_SHA_SHORT }}
+          CPU: haswell
+        run: |
+          docker pull ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG
+          docker pull ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG
+          CPU=$CPU make docker-build
+          make docker-push
+
+      - name: Build for Ivybridge latest
         env:
           DOCKER_TAG: master-latest-ivybridge
+          CPU: ivybridge
+        run: |
+          docker pull ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG
+          docker pull ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG
+          CPU=$CPU make docker-build
+          make docker-push
+
+      - name: Build for Ivybridge SHA
+        env:
+          DOCKER_TAG: master-latest-ivybridge-${{ env.GIT_SHA_SHORT }}
           CPU: ivybridge
         run: |
           docker pull ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG
