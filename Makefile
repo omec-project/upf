@@ -100,12 +100,12 @@ test: .coverage
 			-coverprofile=.coverage/coverage-unit.txt \
 			-covermode=atomic \
 			-v \
-			./pfcpiface
+			./pfcpiface ./cmd/...
 
 p4-constants:
 	$(info *** Generating go constants...)
 	@docker run --rm -v $(CURDIR):/app -w /app \
-		golang:latest go run ./scripts/go_gen_p4_const.go \
+		golang:latest go run ./cmd/p4info_code_gen/p4info_code_gen.go \
 		-output internal/p4constants/p4constants.go -p4info conf/p4/bin/p4info.txt
 	@docker run --rm -v $(CURDIR):/app -w /app \
 		golang:latest gofmt -w internal/p4constants/p4constants.go
