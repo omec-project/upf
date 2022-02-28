@@ -37,7 +37,7 @@ PDN_IP = IPv4Address("11.1.1.129")
 
 
 class AppMbrTest(TrexTest, GrpcTest):
-    """Base class for dowlink MBR testing"""
+    """Base class for app MBR testing"""
 
     @autocleanup
     def run_dl_traffic(self, mbr_bps, stream_bps, num_samples) -> FlowStats:
