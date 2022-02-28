@@ -179,12 +179,12 @@ def start_and_monitor_port_stats(
         rx_port: int, min_tx_bps: int = 0,
         ramp_up_timeout: int = 3, interval: int = 1) -> RateSamples:
     """
-    Starts traffic generation, collects port TX/RX rate samples,
+    Starts traffic generation and collects port TX/RX rate samples,
     while verifying that TRex is able to reach the given minimum sending
     rate.
 
     :param client: TRex client
-    :param num_samples: number of rate samples to collect before stopping traffic
+    :param num_samples: number of samples to collect before stopping traffic
     :param tx_port: sending port
     :param rx_port: receiving port
     :param min_tx_bps: minimum sending rate to deem the collected samples valid
