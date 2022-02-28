@@ -135,7 +135,7 @@ func (up4 *UP4) sessionStats(*PfcpNodeCollector, chan<- prometheus.Metric) error
 func (up4 *UP4) portStats(uc *upfCollector, ch chan<- prometheus.Metric) {
 }
 
-func (up4 *UP4) initCounter(counterID uint8, name string, counterSize uint64) error {
+func (up4 *UP4) initCounter(counterID uint8, name string, counterSize uint64) {
 	up4.counters[counterID].maxSize = counterSize
 	up4.counters[counterID].counterID = uint64(counterID)
 
@@ -145,8 +145,6 @@ func (up4 *UP4) initCounter(counterID uint8, name string, counterSize uint64) er
 		"max-size":       counterSize,
 		"UP4 counter ID": counterID,
 	}).Debug("Counter initialized successfully")
-
-	return nil
 }
 
 func resetCounterVal(p *UP4, counterID uint8, val uint64) {
@@ -209,29 +207,21 @@ func (up4 *UP4) setupChannel() error {
 	return nil
 }
 
-func (up4 *UP4) initAllCounters() error {
+func (up4 *UP4) initAllCounters() {
 	log.Debug("Initializing counter for UP4")
 
 	counterID, counterSize := p4constants.CounterPreQosPipePreQosCounter, p4constants.CounterSizePreQosPipePreQosCounter
 	counterName := p4constants.GetCounterIDToNameMap()[counterID]
 
-	err := up4.initCounter(preQosCounterID, counterName, counterSize)
-	if err != nil {
-		return ErrOperationFailedWithReason("init preQosCounterID counter", err.Error())
-	}
+	up4.initCounter(preQosCounterID, counterName, counterSize)
 
 	counterID, counterSize = p4constants.CounterPostQosPipePostQosCounter, p4constants.CounterSizePostQosPipePostQosCounter
 	counterName = p4constants.GetCounterIDToNameMap()[counterID]
 
-	err = up4.initCounter(postQosCounterID, counterName, counterSize)
-	if err != nil {
-		return ErrOperationFailedWithReason("init postQosCounterID counter", err.Error())
-	}
-
-	return nil
+	up4.initCounter(postQosCounterID, counterName, counterSize)
 }
 
-func (up4 *UP4) initMetersPools() error {
+func (up4 *UP4) initMetersPools() {
 	log.Debug("Initializing P4 Meters pools for UP4")
 
 	appMeterID, appMeterSize := p4constants.MeterPreQosPipeAppMeter, p4constants.MeterSizePreQosPipeAppMeter
@@ -266,8 +256,6 @@ func (up4 *UP4) initMetersPools() error {
 		"applicationMeter pool size": up4.appMeterCellIDsPool.Cardinality(),
 		"sessMeter pool size":        up4.sessMeterCellIDsPool.Cardinality(),
 	}).Debug("P4 Meters pools initialized successfully")
-
-	return nil
 }
 
 func (up4 *UP4) initTunnelPeerIDs() {
@@ -446,15 +434,8 @@ func (up4 *UP4) tryConnect() error {
 		log.Warningf("failed to clear tables: %v", err)
 	}
 
-	err = up4.initAllCounters()
-	if err != nil {
-		return ErrOperationFailedWithReason("counters initialization", err.Error())
-	}
-
-	err = up4.initMetersPools()
-	if err != nil {
-		return ErrOperationFailedWithReason("meters pools initialization", err.Error())
-	}
+	up4.initAllCounters()
+	up4.initMetersPools()
 
 	go up4.listenToDDNs()
 

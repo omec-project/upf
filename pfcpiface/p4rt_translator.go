@@ -423,7 +423,6 @@ func (t *P4rtTranslator) BuildInterfaceTableEntryNoAction() *p4.TableEntry {
 }
 
 func (t *P4rtTranslator) BuildInterfaceTableEntry(ipNet *net.IPNet, sliceID uint8, isCore bool) (*p4.TableEntry, error) {
-
 	srcIface := access
 	direction := DirectionUplink
 
