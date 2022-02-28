@@ -252,10 +252,7 @@ func fillExpected(tc *testCase) *testCase {
 	return tc
 }
 
-func testUEAttachDetach(t *testing.T, testcase *testCase) {
-	err := pfcpClient.SetupAssociation()
-	require.NoErrorf(t, err, "failed to setup PFCP association")
-
+func testUEAttach(t *testing.T, testcase *testCase) {
 	pdrs := []*ie.IE{
 		session.NewPDRBuilder().MarkAsUplink().
 			WithMethod(session.Create).
@@ -344,6 +341,7 @@ func testUEAttachDetach(t *testing.T, testcase *testCase) {
 
 	sess, err := pfcpClient.EstablishSession(pdrs, fars, qers)
 	require.NoErrorf(t, err, "failed to establish PFCP session")
+	testcase.session = sess
 
 	verifyEntries(t, testcase.input, testcase.expected, false)
 
@@ -355,14 +353,39 @@ func testUEAttachDetach(t *testing.T, testcase *testCase) {
 	}, nil)
 
 	verifyEntries(t, testcase.input, testcase.expected, true)
+}
 
-	err = pfcpClient.DeleteSession(sess)
+func testUEBuffering(t *testing.T, testcase *testCase) {
+	fars := []*ie.IE{
+		session.NewFARBuilder().
+			WithMethod(session.Create).WithID(2).
+			WithDstInterface(ie.DstInterfaceAccess).
+			WithAction(ActionDrop).WithTEID(testcase.input.dlTEID).
+			WithDownlinkIP(testcase.input.nbAddress).BuildFAR(),
+	}
+
+	err := pfcpClient.ModifySession(testcase.session, nil, fars, nil)
+	require.NoError(t, err)
+
+	verifyEntries(t, testcase.input, testcase.expected, UEStateBuffering)
+}
+
+func testUEDetach(t *testing.T, testcase *testCase) {
+	err := pfcpClient.DeleteSession(testcase.session)
 	require.NoErrorf(t, err, "failed to delete PFCP session")
+
+	verifyNoEntries(t, testcase.expected)
+}
+
+func testUEAttachDetach(t *testing.T, testcase *testCase) {
+	err := pfcpClient.SetupAssociation()
+	require.NoErrorf(t, err, "failed to setup PFCP association")
+
+	testUEAttach(t, testcase)
+	testUEDetach(t, testcase)
 
 	err = pfcpClient.TeardownAssociation()
 	require.NoErrorf(t, err, "failed to gracefully release PFCP association")
-
-	verifyNoEntries(t, testcase.expected)
 
 	if isFastpathUP4() {
 		// clear Applications table

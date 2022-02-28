@@ -53,6 +53,17 @@ const (
 	directionDownlink = 0x2
 )
 
+type UEState uint8
+
+const (
+	// UEStateAttaching after PFCP Session Establishment is done, but before PFCP Session Modification.
+	UEStateAttaching UEState = iota
+	// UEStateAttached state after PFCP Session Modification is done.
+	UEStateAttached
+	// UEStateBuffering state after PFCP Session Modification with buffering flags is done.
+	UEStateBuffering
+)
+
 var (
 	// ReaderElectionID use reader election ID so that pfcpiface doesn't loose mastership.
 	ReaderElectionID = p4_v1.Uint128{High: 0, Low: 1}
@@ -126,6 +137,9 @@ type testCase struct {
 	expected p4RtValues
 
 	desc string
+
+	// modified by test cases only
+	session *pfcpsim.PFCPSession
 }
 
 func init() {
@@ -291,10 +305,10 @@ func teardown(t *testing.T) {
 	}
 }
 
-func verifyEntries(t *testing.T, testdata *pfcpSessionData, expectedValues p4RtValues, afterModification bool) {
+func verifyEntries(t *testing.T, testdata *pfcpSessionData, expectedValues p4RtValues, ueState UEState) {
 	switch os.Getenv(EnvFastpath) {
 	case FastpathUP4:
-		verifyP4RuntimeEntries(t, testdata, expectedValues, afterModification)
+		verifyP4RuntimeEntries(t, testdata, expectedValues, ueState)
 	case FastpathBESS:
 		// TODO: implement it
 	}
