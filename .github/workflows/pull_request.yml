@@ -126,7 +126,16 @@ jobs:
           docker pull ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG
           docker pull ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG
           CPU=$CPU make docker-build
-          docker image ls
+          make docker-push
+
+      - name: Build for Ivybridge
+        env:
+          DOCKER_TAG: master-latest-ivybridge
+          CPU: ivybridge
+        run: |
+          docker pull ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG
+          docker pull ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG
+          CPU=$CPU make docker-build
           make docker-push
 
       # docker tag ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG      ${DOCKER_REPOSITORY}upf-epc-bess:master-latest
