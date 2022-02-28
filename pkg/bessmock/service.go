@@ -17,10 +17,10 @@ func NewBESSService() *bessService {
 
 func (b bessService) GetPortStats(ctx context.Context, request *bess_pb.GetPortStatsRequest) (*bess_pb.GetPortStatsResponse, error) {
 	// TODO: implement it
-	panic("implement me")
+	return &bess_pb.GetPortStatsResponse{}, nil
 }
 
 func (b bessService) ModuleCommand(ctx context.Context, request *bess_pb.CommandRequest) (*bess_pb.CommandResponse, error) {
 	// TODO: implement it
-	panic("implement me")
+	return &bess_pb.CommandResponse{}, nil
 }
