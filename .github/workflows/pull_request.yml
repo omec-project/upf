@@ -101,29 +101,49 @@ jobs:
       DOCKER_TAG: "master-${{ github.GITHUB_SHA }}"
     runs-on: ubuntu-latest
     steps:
-      # Checkout and build
+      # tags:
+      # master-latest
+      # master-latest-ivybridge
+      # master-$GIT_SHA_SHORT
+      # master-$GIT_SHA_SHORT-ivybridge
+
       - uses: actions/checkout@v2.4.0
 
-      - name: Pull old images for caching
+      - name: ivybridge-jobs
+        env:
+          DOCKER_TAG: master-latest
+          CPU: haswell
         run: |
-          docker pull ${DOCKER_REPOSITORY}upf-epc-bess:master-latest
-          docker pull ${DOCKER_REPOSITORY}upf-epc-pfcpiface:master-latest
+          docker pull ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG
+          docker pull ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG
+          DOCKER_TARGETS=bess      CPU=$CPU make docker-build
+          DOCKER_TARGETS=pfcpiface CPU=$CPU make docker-build
+          docker image ls
 
-      - name: Build the BESS-UPF Docker images
-        run: |
-          DOCKER_TARGETS=bess CPU=ivybridge make docker-build
-          docker tag ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG-ivybridge
-          docker tag ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG ${DOCKER_REPOSITORY}upf-epc-bess:master-latest-ivybridge
-          DOCKER_TARGETS=bess CPU=haswell make docker-build
-          docker tag ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG ${DOCKER_REPOSITORY}upf-epc-bess:master-latest
+      # docker tag ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG      ${DOCKER_REPOSITORY}upf-epc-bess:master-latest
+      # docker tag ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG ${DOCKER_REPOSITORY}upf-epc-pfcpiface:master-latest
 
-      - name: Build the PFCP Agent Docker images
-        run: |
-          DOCKER_TARGETS=pfcpiface CPU=ivybridge make docker-build
-          docker tag ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG-ivybridge
-          docker tag ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG ${DOCKER_REPOSITORY}upf-epc-pfcpiface:master-latest-ivybridge
-          DOCKER_TARGETS=pfcpiface CPU=haswell make docker-build
-          docker tag ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG ${DOCKER_REPOSITORY}upf-epc-pfcpiface:master-latest
+
+      # - name: Pull old images for caching
+      #   run: |
+      #     docker pull ${DOCKER_REPOSITORY}upf-epc-bess:master-latest
+      #     docker pull ${DOCKER_REPOSITORY}upf-epc-pfcpiface:master-latest
+
+      # - name: Build the BESS-UPF Docker images
+      #   run: |
+      #     DOCKER_TARGETS=bess CPU=ivybridge make docker-build
+      #     docker tag ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG-ivybridge
+      #     docker tag ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG ${DOCKER_REPOSITORY}upf-epc-bess:master-latest-ivybridge
+      #     DOCKER_TARGETS=bess CPU=haswell make docker-build
+      #     docker tag ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG ${DOCKER_REPOSITORY}upf-epc-bess:master-latest
+
+      # - name: Build the PFCP Agent Docker images
+      #   run: |
+      #     DOCKER_TARGETS=pfcpiface CPU=ivybridge make docker-build
+      #     docker tag ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG-ivybridge
+      #     docker tag ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG ${DOCKER_REPOSITORY}upf-epc-pfcpiface:master-latest-ivybridge
+      #     DOCKER_TARGETS=pfcpiface CPU=haswell make docker-build
+      #     docker tag ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG ${DOCKER_REPOSITORY}upf-epc-pfcpiface:master-latest
 
       - id: docker-login
         # Secrets from the main repo are not used if PR comes from fork. We skip pushing Docker image then.
