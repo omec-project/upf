@@ -4,7 +4,7 @@
 # Update assignments to hit different QoS entries
 iface, qer, fseid = 1, 2, 4
 ip_pkt_size = 46
-sleep_seconds_before_delete = 30
+sleep_seconds_before_delete = 20
 
 import struct
 def convert(format, val, bigendian=True):
@@ -68,32 +68,262 @@ Metering.add(fields=[{'value_int': 1},
              values=[{'value_int': 1}], # S:1
              gate=m_meter, cir=1 * MPPS , pir=1 * MPPS, cbs=2048, pbs=2048)
 
+import time
+time.sleep(sleep_seconds_before_delete)
+
 Metering.add(fields=[{'value_int': 1},
                      {'value_bin': convert('L', 3)},
                      {'value_bin': convert('Q', 6)}],
              values=[{'value_int': 2}], # S:2
-             gate=m_meter, cir=5 * MPPS, pir=5 * MPPS, cbs=2048, pbs=2048)
-
+            gate=m_meter, cir=5 * MPPS, pir=5 * MPPS, cbs=20481, pbs=20481)
 # GBR/MBR
 Metering.add(fields=[{'value_int': 1},
                      {'value_bin': convert('L', 4)},
                      {'value_bin': convert('Q', 8)}],
              values=[{'value_int': 3}], # S:3
-             gate=m_meter, cir=3 * MPPS, pir=6 * MPPS, cbs=2048, pbs=2048)
-
+          gate=m_meter, cir=3 * MPPS, pir=6 * MPPS, cbs=20482, pbs=20482)#
 # MBR only
 Metering.add(fields=[{'value_int': 1},
                      {'value_bin': convert('L', 5)},
                      {'value_bin': convert('Q', 10)}],
              values=[{'value_int': 4}], # S:4
-             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2048, pbs=2048)
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=20483, pbs=20483)
 
 # Unmeter
 Metering.add(fields=[{'value_int': 1},
                      {'value_bin': convert('L', 6)},
                      {'value_bin': convert('Q', 12)}],
              values=[{'value_int': 5}], # S:5
-             gate=m_unmeter)
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=20484, pbs=20484)
+
+Metering.add(fields=[{'value_int': 11},
+                     {'value_bin': convert('L', 16)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=20485, pbs=20485)
+
+Metering.add(fields=[{'value_int': 12},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=20486, pbs=20486)
+
+Metering.add(fields=[{'value_int': 13},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=20487, pbs=20487)
+
+Metering.add(fields=[{'value_int': 14},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=20488, pbs=20488)
+
+Metering.add(fields=[{'value_int': 15},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=20489, pbs=20489)
+
+Metering.add(fields=[{'value_int': 16},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2090, pbs=2090)
+
+Metering.add(fields=[{'value_int': 17},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2091, pbs=2091)
+
+Metering.add(fields=[{'value_int': 18},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2092, pbs=2092)
+
+Metering.add(fields=[{'value_int': 19},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2093, pbs=2093)
+
+
+Metering.add(fields=[{'value_int': 20},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2094, pbs=2094)
+
+Metering.add(fields=[{'value_int': 21},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2095, pbs=2095)
+
+Metering.add(fields=[{'value_int': 22},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2096, pbs=2096)
+
+Metering.add(fields=[{'value_int': 23},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2097, pbs=2097)
+
+Metering.add(fields=[{'value_int': 24},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2098, pbs=2098)
+
+Metering.add(fields=[{'value_int': 25},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2099, pbs=2099)
+        
+Metering.add(fields=[{'value_int': 26},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2100, pbs=2100)
+     
+Metering.add(fields=[{'value_int': 27},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2101, pbs=2101)
+         
+Metering.add(fields=[{'value_int': 28},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2102, pbs=2102)
+        
+Metering.add(fields=[{'value_int': 29},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2103, pbs=2103)
+         
+Metering.add(fields=[{'value_int': 30},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2104, pbs=2104)
+                                      
+Metering.add(fields=[{'value_int': 31},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2105, pbs=2105)
+
+Metering.add(fields=[{'value_int': 32},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2106, pbs=2106)
+
+Metering.add(fields=[{'value_int': 33},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2107, pbs=2107)
+
+Metering.add(fields=[{'value_int': 34},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2108, pbs=2108)
+
+Metering.add(fields=[{'value_int': 35},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2109, pbs=2109)
+
+Metering.add(fields=[{'value_int': 36},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2110, pbs=2110)
+
+Metering.add(fields=[{'value_int': 37},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2111, pbs=2111)
+
+Metering.add(fields=[{'value_int': 38},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2112, pbs=2112)
+
+Metering.add(fields=[{'value_int': 39},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2113, pbs=2113)
+
+Metering.add(fields=[{'value_int': 50},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2114, pbs=2114)
+
+Metering.add(fields=[{'value_int': 51},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2115, pbs=2115)
+
+Metering.add(fields=[{'value_int': 52},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2116, pbs=2116)
+
+Metering.add(fields=[{'value_int': 53},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2117, pbs=2117)
+
+Metering.add(fields=[{'value_int': 55},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2118, pbs=2118)
+
+Metering.add(fields=[{'value_int': 56},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2119, pbs=2119)
+
+Metering.add(fields=[{'value_int': 57},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2120, pbs=2120)
+
+Metering.add(fields=[{'value_int': 58},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2121, pbs=2121)
+
+Metering.add(fields=[{'value_int': 59},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2122, pbs=2122)
 
 # Gate closed
 Metering.add(fields=[{'value_int': 1},
@@ -102,35 +332,14 @@ Metering.add(fields=[{'value_int': 1},
              values=[{'value_int': 5}],
              gate=m_drop)
 
-# Delete QoS entries after sleep
-import time
-time.sleep(sleep_seconds_before_delete)
-
-# GBR only
-Metering.delete(fields=[{'value_int': 1},
-                     {'value_bin': convert('L', 2)},
-                     {'value_bin': convert('Q', 4)}])
-
-Metering.delete(fields=[{'value_int': 1},
-                     {'value_bin': convert('L', 3)},
-                     {'value_bin': convert('Q', 6)}])
-
-# GBR/MBR
-Metering.delete(fields=[{'value_int': 1},
-                     {'value_bin': convert('L', 4)},
-                     {'value_bin': convert('Q', 8)}])
-
-# MBR only
-Metering.delete(fields=[{'value_int': 1},
-                     {'value_bin': convert('L', 5)},
-                     {'value_bin': convert('Q', 10)}])
-
-# Unmeter
-Metering.delete(fields=[{'value_int': 1},
+n = 1
+while n <= 500:
+    print(n, end=' ')
+    Metering.add(fields=[{'value_int': 59},
                      {'value_bin': convert('L', 6)},
-                     {'value_bin': convert('Q', 12)}])
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2122+n, pbs=2122+n)
+    n = n+1             
+# Delete QoS entries after sleep
 
-# Gate closed
-Metering.delete(fields=[{'value_int': 1},
-                     {'value_bin': convert('L', 2)},
-                     {'value_bin': convert('Q', 3)}])
