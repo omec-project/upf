@@ -100,12 +100,6 @@ jobs:
       DOCKER_REPOSITORY: "omecproject/"
     runs-on: ubuntu-latest
     steps:
-      # tags:
-      # master-latest
-      # master-latest-ivybridge
-      # master-$GIT_SHA_SHORT
-      # master-$GIT_SHA_SHORT-ivybridge
-
       - uses: actions/checkout@v2.4.0
 
       - run: echo GIT_SHA_SHORT=$(git rev-parse --short HEAD) >> $GITHUB_ENV
@@ -119,7 +113,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_LOGIN }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - name: Build for Haswell latest
+      - name: Build and push "master-latest" Docker images for Haswell CPU
         env:
           DOCKER_TAG: master-latest
           CPU: haswell
@@ -129,7 +123,7 @@ jobs:
           CPU=$CPU make docker-build
           make docker-push
 
-      - name: Build for Haswell SHA
+      - name: Build and push "master-GIT_SHA" Docker images for Haswell CPU
         env:
           DOCKER_TAG: master-latest-${{ env.GIT_SHA_SHORT }}
           CPU: haswell
@@ -137,7 +131,7 @@ jobs:
           CPU=$CPU make docker-build
           make docker-push
 
-      - name: Build for Ivybridge latest
+      - name: Build and push "master-latest-ivybridge" Docker images for Ivybridge CPU
         env:
           DOCKER_TAG: master-latest-ivybridge
           CPU: ivybridge
@@ -147,7 +141,7 @@ jobs:
           CPU=$CPU make docker-build
           make docker-push
 
-      - name: Build for Ivybridge SHA
+      - name:Build and push "master-GIT_SHA-ivybridge" Docker images for Ivybridge CPU
         env:
           DOCKER_TAG: master-latest-ivybridge-${{ env.GIT_SHA_SHORT }}
           CPU: ivybridge
