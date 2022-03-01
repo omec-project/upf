@@ -94,9 +94,9 @@ type UP4 struct {
 	// TODO: create UP4Store object and move these fields there
 	counters           []counter
 	tunnelPeerIDs      map[tunnelParams]uint8
-	tunnelPeerIDsPool  set.Set
+	tunnelPeerIDsPool  []uint8
 	applicationIDs     map[application]uint8
-	applicationIDsPool set.Set
+	applicationIDsPool []uint8
 
 	// meters stores the mapping from <F-SEID; QER ID> -> P4 Meter Cell ID.
 	// P4 Meter Cell ID is retrieved from appMeterCellIDsPool or sessMeterCellIDsPool,
@@ -282,10 +282,10 @@ func (up4 *UP4) initTunnelPeerIDs() {
 	// a simple queue storing available tunnel peer IDs
 	// 0 is reserved;
 	// 1 is reserved for dbuf
-	up4.tunnelPeerIDsPool = set.NewSet()
+	up4.tunnelPeerIDsPool = make([]uint8, 0, maxGTPTunnelPeerIDs)
 
 	for i := 2; i < maxGTPTunnelPeerIDs+2; i++ {
-		up4.tunnelPeerIDsPool.Add(uint8(i))
+		up4.tunnelPeerIDsPool = append(up4.tunnelPeerIDsPool, uint8(i))
 	}
 }
 
@@ -293,10 +293,10 @@ func (up4 *UP4) initApplicationIDs() {
 	up4.applicationIDs = make(map[application]uint8)
 	// a simple queue storing available application IDs
 	// 0 is reserved;
-	up4.applicationIDsPool = set.NewSet()
+	up4.applicationIDsPool = make([]uint8, 0, maxApplicationIDs)
 
 	for i := 1; i < maxApplicationIDs+1; i++ {
-		up4.applicationIDsPool.Add(uint8(i))
+		up4.applicationIDsPool = append(up4.applicationIDsPool, uint8(i))
 	}
 }
 
@@ -543,20 +543,16 @@ func findRelatedApplicationQER(pdr pdr, qers []qer) (qer, error) {
 
 // Returns error if we reach maximum supported GTP Tunnel Peers.
 func (up4 *UP4) allocateGTPTunnelPeerID() (uint8, error) {
-	if up4.tunnelPeerIDsPool.Cardinality() == 0 {
+	if len(up4.tunnelPeerIDsPool) == 0 {
 		return 0, ErrOperationFailedWithReason("allocate GTP Tunnel Peer ID",
 			"no free tunnel peer IDs available")
 	}
 
-	// pick from set
-	allocated := up4.tunnelPeerIDsPool.Pop()
+	// pick top from queue
+	allocated := up4.tunnelPeerIDsPool[0]
+	up4.tunnelPeerIDsPool = up4.tunnelPeerIDsPool[1:]
 
-	if allocated == nil {
-		return 0, ErrOperationFailedWithReason("allocate GTP Tunnel Peer ID",
-			"no free tunnel peer IDs available")
-	}
-
-	return allocated.(uint8), nil
+	return allocated, nil
 }
 
 // FIXME: SDFAB-960
@@ -565,7 +561,7 @@ func (up4 *UP4) releaseAllocatedGTPTunnelPeerID(tunnelParams tunnelParams) {
 	allocated, exists := up4.tunnelPeerIDs[tunnelParams]
 	if exists {
 		delete(up4.tunnelPeerIDs, tunnelParams)
-		up4.tunnelPeerIDsPool.Add(allocated)
+		up4.tunnelPeerIDsPool = append(up4.tunnelPeerIDsPool, allocated)
 	}
 }
 
@@ -644,21 +640,18 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 
 // Returns error if we reach maximum supported Application IDs.
 func (up4 *UP4) allocateInternalApplicationID(app application) (uint8, error) {
-	if up4.applicationIDsPool.Cardinality() == 0 {
+	if len(up4.applicationIDsPool) == 0 {
 		return 0, ErrOperationFailedWithReason("allocate Application ID",
 			"no free application IDs available")
 	}
 
-	// pick from set
-	allocated := up4.applicationIDsPool.Pop()
-	if allocated == nil {
-		return 0, ErrOperationFailedWithReason("allocate Application ID",
-			"no free application IDs available")
-	}
+	// pick top from queue
+	allocated := up4.applicationIDsPool[0]
+	up4.applicationIDsPool = up4.applicationIDsPool[1:]
 
-	up4.applicationIDs[app] = allocated.(uint8)
+	up4.applicationIDs[app] = allocated
 
-	return allocated.(uint8), nil
+	return allocated, nil
 }
 
 // FIXME: SDFAB-960
@@ -673,7 +666,7 @@ func (up4 *UP4) releaseInternalApplicationID(appFilter applicationFilter) {
 	allocated, exists := up4.applicationIDs[app]
 	if exists {
 		delete(up4.applicationIDs, app)
-		up4.applicationIDsPool.Add(allocated)
+		up4.applicationIDsPool = append(up4.applicationIDsPool, allocated)
 	}
 }
 

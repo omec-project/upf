@@ -35,6 +35,9 @@ func TestUPFBasedUeIPAllocation(t *testing.T) {
 		expected: p4RtValues{
 			// first IP address from pool configured in ue_ip_alloc.json
 			ueAddress: "10.250.0.1",
+			// no application filtering rule expected
+			appID:        0,
+			tunnelPeerID: 2,
 		},
 		desc: "UPF-based UE IP allocation",
 	}
