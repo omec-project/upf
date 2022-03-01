@@ -73,7 +73,7 @@ jobs:
           CPU=$CPU make docker-build
           make docker-push
 
-      - name:Build and push "master-GIT_SHA-ivybridge" Docker images for Ivybridge CPU
+      - name: Build and push "master-GIT_SHA-ivybridge" Docker images for Ivybridge CPU
         env:
           DOCKER_TAG: master-latest-ivybridge-${{ env.GIT_SHA_SHORT }}
           CPU: ivybridge

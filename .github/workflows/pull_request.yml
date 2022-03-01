@@ -78,7 +78,6 @@ jobs:
           branch: ${{ github.event.pull_request.head.ref }}
           author: "Github Actions <actions@github>"
           commit-message: "Actions: Updated with changes from CI"
-
       - id: docker-login
         # Secrets from the main repo are not used if PR comes from fork. We skip pushing Docker image then.
         if: github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'
@@ -87,7 +86,6 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.CR_PAT }}
-
       - name: Push Docker image
         if: steps.docker-login.conclusion == 'success'
         run: |
