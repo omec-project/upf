@@ -653,7 +653,7 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, appMeterIdx uint3
 		}
 	} else if !shouldDrop && tc != NoTC {
 		action = &p4.Action{
-			ActionId: p4constants.ActionPreQosPipeUplinkTermDrop,
+			ActionId: p4constants.ActionPreQosPipeUplinkTermFwd,
 		}
 
 		if err := t.withActionParam(action, FieldTrafficClass, tc); err != nil {
@@ -664,7 +664,7 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, appMeterIdx uint3
 		}
 	} else {
 		action = &p4.Action{
-			ActionId: p4constants.ActionPreQosPipeDownlinkTermFwdNoTc,
+			ActionId: p4constants.ActionPreQosPipeUplinkTermFwdNoTc,
 		}
 		if err := t.withActionParam(action, FieldAppMeterIndex, appMeterIdx); err != nil {
 			return nil, err
