@@ -5,7 +5,7 @@ package bessmock
 
 import (
 	"fmt"
-	"github.com/omec-project/upf-epc/pfcpiface/bess_pb"
+	"github.com/omec-project/upf/pfcpiface/bess_pb"
 	"google.golang.org/grpc"
 	"net"
 )

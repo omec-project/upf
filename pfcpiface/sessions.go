@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/omec-project/upf-epc/pfcpiface/metrics"
+	"github.com/omec-project/upf/pfcpiface/metrics"
 )
 
 type notifyFlag struct {

@@ -1,4 +1,4 @@
-module github.com/omec-project/upf-epc
+module github.com/omec-project/upf
 
 go 1.13
 

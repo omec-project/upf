@@ -5,7 +5,7 @@
 # Multi-stage Dockerfile
 
 # Stage bess-deps: fetch BESS dependencies
-FROM ghcr.io/omec-project/upf-epc/bess_build AS bess-deps
+FROM ghcr.io/omec-project/upf/bess_build AS bess-deps
 # BESS pre-reqs
 WORKDIR /bess
 ARG BESS_COMMIT=dpdk-2011-focal

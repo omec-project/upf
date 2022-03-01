@@ -40,7 +40,7 @@ docker-build:
 		DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) \
 			--target $$target \
 			--tag ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}upf-epc-$$target:${DOCKER_TAG} \
-			--label org.opencontainers.image.source="https://github.com/omec-project/upf-epc" \
+			--label org.opencontainers.image.source="https://github.com/omec-project/upf" \
 			--label org.label.schema.version="${VERSION}" \
 			--label org.label.schema.vcs.url="${DOCKER_LABEL_VCS_URL}" \
 			--label org.label.schema.vcs.ref="${DOCKER_LABEL_VCS_REF}" \

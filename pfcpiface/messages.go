@@ -10,7 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/message"
 
-	"github.com/omec-project/upf-epc/pfcpiface/metrics"
+	"github.com/omec-project/upf/pfcpiface/metrics"
 )
 
 var errMsgUnexpectedType = errors.New("unable to parse message as type specified")

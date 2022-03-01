@@ -4,7 +4,7 @@
 package integration
 
 import (
-	"github.com/omec-project/upf-epc/pfcpiface"
+	"github.com/omec-project/upf/pfcpiface"
 	"github.com/sirupsen/logrus"
 	"os"
 	"runtime"

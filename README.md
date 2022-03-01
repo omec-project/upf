@@ -3,15 +3,15 @@ SPDX-License-Identifier: Apache-2.0
 Copyright 2019 Intel Corporation
 -->
 
-# upf-epc
+# upf
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/omec-project/upf-epc)](https://goreportcard.com/report/github.com/omec-project/upf-epc)
+[![Go Report Card](https://goreportcard.com/badge/github.com/omec-project/upf)](https://goreportcard.com/report/github.com/omec-project/upf)
 
 [![Build Status](https://jenkins.onosproject.org/buildStatus/icon?job=bess-upf-linerate-tests&subject=Linerate+Tests)](https://jenkins.onosproject.org/job/bess-upf-linerate-tests/)
 
 ## Overview
 
-UPF-EPC is a revised version of [ngic-rtc](https://github.com/omec-project/ngic-rtc/tree/central-cp-multi-upfs)'s [dp](https://github.com/omec-project/ngic-rtc/tree/central-cp-multi-upfs/dp).
+UPF is a revised version of [ngic-rtc](https://github.com/omec-project/ngic-rtc/tree/central-cp-multi-upfs)'s [dp](https://github.com/omec-project/ngic-rtc/tree/central-cp-multi-upfs/dp).
 It works seamlessly with all NFs available in the omec-project's EPC. Like ngic-rtc's dp, it communicates with [cp](https://github.com/omec-project/ngic-rtc/tree/central-cp-multi-upfs/cp) and
 conforms to Control User Plane Separated (CUPS) architecture. The prototype is based on the 3GPP TS23501 specifications of EPC and functions as a co-located Service
 and Packet Gateway (SPGW-U). This branch is compatible with Aether's control plane.
@@ -90,4 +90,4 @@ https://user-images.githubusercontent.com/6157640/133918985-c36d4668-4e98-4866-8
 
 ## Installation
 
-Please see [INSTALL.md](docs/INSTALL.md) for details on how to set up CP and UPF-EPC.
+Please see [INSTALL.md](docs/INSTALL.md) for details on how to set up CP and UPF.

@@ -162,7 +162,7 @@ void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     // meter if ogate is 0
     if (ogate == METER_GATE) {
       if (val[j]->p->cir_period == 0 || val[j]->p->pir_period == 0) {
-        // FIXME: https://github.com/omec-project/upf-epc/issues/376
+        // FIXME: https://github.com/omec-project/upf/issues/376
         DLOG(INFO) << "Detected pir/cir_period zero in rte_meter_trtcm_profile,"
                    << " BUG? Setting METER_GREEN_GATE to prevent crash"
                    << std::endl;
