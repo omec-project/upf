@@ -873,13 +873,12 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 			up4.releaseSessionMeterCellID(appMeter.uplinkCellID)
 		}
 
-		if appMeter.downlinkCellID != 0 {
+		if appMeter.downlinkCellID != appMeter.uplinkCellID {
 			up4.releaseSessionMeterCellID(appMeter.downlinkCellID)
 		}
 	}
 
 	if appMeter.uplinkCellID != 0 {
-		// according to the SD-Core/SD-Fabric contract, UL and DL MBRs/GBRs are always equal for Application QERs.
 		meterConfig := getMeterConfigurationFromQER(q.ulMbr, q.ulGbr)
 
 		meterEntry := up4.p4RtTranslator.BuildMeterEntry(applicationMeter, appMeter.uplinkCellID, meterConfig)
@@ -887,8 +886,7 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 		entries = append(entries, meterEntry)
 	}
 
-	if appMeter.downlinkCellID != 0 {
-		// according to the SD-Core/SD-Fabric contract, UL and DL MBRs/GBRs are always equal for Application QERs.
+	if appMeter.downlinkCellID != appMeter.uplinkCellID {
 		meterConfig := getMeterConfigurationFromQER(q.dlMbr, q.dlGbr)
 
 		meterEntry := up4.p4RtTranslator.BuildMeterEntry(applicationMeter, appMeter.downlinkCellID, meterConfig)
