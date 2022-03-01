@@ -120,10 +120,10 @@ type appFilter struct {
 }
 
 type p4RtValues struct {
-	tc           uint8
-	ueAddress    string
-	appID        uint8
-	appFilter    appFilter
+	tc        uint8
+	ueAddress string
+	appID     uint8
+	appFilter appFilter
 }
 
 type testContext struct {
