@@ -83,7 +83,6 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 					},
 				},
 				appID:        1,
-				tunnelPeerID: 2,
 			},
 			desc: "APPLICATION FILTERING permit out udp from any 80-80 to assigned",
 		},
@@ -110,7 +109,6 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				// FIXME: there is a dependency on previous test because pfcpiface doesn't clear application IDs properly
 				//  See SDFAB-960
 				appID:        2,
-				tunnelPeerID: 2,
 			},
 			desc: "APPLICATION FILTERING permit out udp from 192.168.1.1/32 to assigned 80-80",
 		},
@@ -128,7 +126,6 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 			expected: p4RtValues{
 				// no application filtering rule expected
 				appID:        0,
-				tunnelPeerID: 2,
 			},
 			desc: "APPLICATION FILTERING ALLOW_ALL",
 		},
@@ -161,7 +158,6 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 					},
 				},
 				appID:        1,
-				tunnelPeerID: 2,
 			},
 			desc: "QER_METERING - 1 session QER, 2 app QERs",
 		},
@@ -194,7 +190,6 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 					},
 				},
 				appID:        1,
-				tunnelPeerID: 2,
 			},
 			desc: "QER_METERING - session QER only",
 		},
@@ -227,7 +222,6 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 					},
 				},
 				appID:        1,
-				tunnelPeerID: 2,
 				tc:           3,
 			},
 			desc: "QER_METERING - TC for QFI",
@@ -239,6 +233,45 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 			testUEAttachDetach(t, fillExpected(&tc))
 		})
 	}
+}
+
+func TestUEBuffering(t *testing.T) {
+	setup(t, ConfigDefault)
+	defer teardown(t)
+
+	tc := testCase{
+		input: &pfcpSessionData{
+			sliceID:      1,
+			nbAddress:    nodeBAddress,
+			ueAddress:    ueAddress,
+			upfN3Address: upfN3Address,
+			sdfFilter:    "permit out udp from any 80-80 to assigned",
+			ulTEID:       15,
+			dlTEID:       16,
+			QFI:          0x9,
+		},
+		expected: p4RtValues{
+			appFilter: appFilter{
+				proto:        0x11,
+				appIP:        net.ParseIP("0.0.0.0"),
+				appPrefixLen: 0,
+				appPort: portRange{
+					80, 80,
+				},
+			},
+			appID:        1,
+		},
+	}
+
+	err := pfcpClient.SetupAssociation()
+	require.NoErrorf(t, err, "failed to setup PFCP association")
+
+	testUEAttach(t, fillExpected(&tc))
+	testUEBuffer(t, fillExpected(&tc))
+	testUEDetach(t, fillExpected(&tc))
+
+	err = pfcpClient.TeardownAssociation()
+	require.NoErrorf(t, err, "failed to gracefully release PFCP association")
 }
 
 func fillExpected(tc *testCase) *testCase {
@@ -340,7 +373,7 @@ func testUEAttach(t *testing.T, testcase *testCase) {
 	require.NoErrorf(t, err, "failed to establish PFCP session")
 	testcase.session = sess
 
-	verifyEntries(t, testcase.input, testcase.expected, false)
+	verifyEntries(t, testcase.input, testcase.expected, UEStateAttaching)
 
 	err = pfcpClient.ModifySession(sess, nil, []*ie.IE{
 		session.NewFARBuilder().
@@ -349,15 +382,16 @@ func testUEAttach(t *testing.T, testcase *testCase) {
 			WithTEID(testcase.input.dlTEID).WithDownlinkIP(testcase.input.nbAddress).BuildFAR(),
 	}, nil)
 
-	verifyEntries(t, testcase.input, testcase.expected, true)
+	verifyEntries(t, testcase.input, testcase.expected, UEStateAttached)
 }
 
-func testUEBuffering(t *testing.T, testcase *testCase) {
+func testUEBuffer(t *testing.T, testcase *testCase) {
+	// start buffering
 	fars := []*ie.IE{
 		session.NewFARBuilder().
-			WithMethod(session.Create).WithID(2).
+			WithMethod(session.Update).WithID(2).
 			WithDstInterface(ie.DstInterfaceAccess).
-			WithAction(ActionDrop).WithTEID(testcase.input.dlTEID).
+			WithAction(ActionBuffer|ActionNotify).WithTEID(0).
 			WithDownlinkIP(testcase.input.nbAddress).BuildFAR(),
 	}
 
@@ -365,6 +399,20 @@ func testUEBuffering(t *testing.T, testcase *testCase) {
 	require.NoError(t, err)
 
 	verifyEntries(t, testcase.input, testcase.expected, UEStateBuffering)
+
+	// stop buffering
+	fars = []*ie.IE{
+		session.NewFARBuilder().
+			WithMethod(session.Update).WithID(2).
+			WithDstInterface(ie.DstInterfaceAccess).
+			WithAction(ActionForward).WithTEID(testcase.input.dlTEID).
+			WithDownlinkIP(testcase.input.nbAddress).BuildFAR(),
+	}
+
+	err = pfcpClient.ModifySession(testcase.session, nil, fars, nil)
+	require.NoError(t, err)
+
+	verifyEntries(t, testcase.input, testcase.expected, UEStateAttached)
 }
 
 func testUEDetach(t *testing.T, testcase *testCase) {
