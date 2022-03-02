@@ -12,7 +12,7 @@ jobs:
   test-integration-up4-docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2.4.0
+      - uses: actions/checkout@v3
       - uses: actions/setup-go@v2
         with:
           go-version: '1.16'
@@ -22,7 +22,7 @@ jobs:
   test-integration-bess-native:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2.4.0
+      - uses: actions/checkout@v3
       - uses: actions/setup-go@v2
         with:
           go-version: '1.16'
