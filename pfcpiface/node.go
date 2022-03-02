@@ -44,16 +44,15 @@ func (node *PFCPNode) initPFCPConnIdPool() {
 	}
 }
 
-func (node *PFCPNode) allocatePFCPConnId() uint32 {
+func (node *PFCPNode) allocatePFCPConnId() (uint32, error) {
 	if len(node.pfcpConnIdPool) == 0 {
-		log.Errorln("Failed to allocate PFCP Conn Ids, no free ids available")
-		return 0
+		return 0, ErrOperationFailedWithReason("Allocation of PFCPConn Ids", "no free pfcpconn ids available")
 	}
 
 	allocatedId := node.pfcpConnIdPool[0]
 	node.pfcpConnIdPool = node.pfcpConnIdPool[1:]
 
-	return allocatedId
+	return allocatedId, nil
 }
 
 func (node *PFCPNode) cleanUpPFCPConn(rAddr string) {

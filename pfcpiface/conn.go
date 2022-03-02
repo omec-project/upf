@@ -68,7 +68,13 @@ type PFCPConn struct {
 	pConnId     uint32
 }
 
-func (pConn *PFCPConn) GenerateFseid() uint64 {
+/*        FSEID(64 bits)
+-------------------------------------
+   PFCPConn Id   |      SEID
+-----32 bits-----|-----32 bits-------
+-----(1-100)-----|--(random number)--*/
+
+func (pConn *PFCPConn) GenerateFseid() (uint64, error) {
 	var lseid uint64
 	//Make three attempts to derive a unique Id
 	for i := 0; i < 3; i++ {
@@ -76,14 +82,13 @@ func (pConn *PFCPConn) GenerateFseid() uint64 {
 		lseid = (uint64(pConn.pConnId) << 32) | uint64(rand)
 		// Check if it already exists
 		if _, ok := pConn.sessions[lseid]; ok {
-			lseid = 0
 			continue
 		}
 
-		break
+		return lseid, nil
 	}
 
-	return lseid
+	return 0, ErrOperationFailedWithReason("Generation of Fseid failed", "max retries reached for generating lseid")
 }
 
 func (pConn *PFCPConn) startHeartBeatMonitor() {
@@ -141,9 +146,9 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano())) // #nosec G404
 
-	pConnId := node.allocatePFCPConnId()
-	if pConnId == 0 {
-		log.Errorln("Connection Id should not be zero")
+	pConnId, err := node.allocatePFCPConnId()
+	if err != nil {
+		log.Errorln("Failed to allocate PFCPConn Id", err)
 		return nil
 	}
 

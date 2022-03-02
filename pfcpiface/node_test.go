@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type TestCasesAllocatePFCPConnId struct {
@@ -69,18 +70,26 @@ func TestAllocatePFCPConnId(t *testing.T) {
 		},
 	} {
 		t.Run(scenario.description, func(t *testing.T) {
-			allocatedId := scenario.input.allocatePFCPConnId()
-			assert.Equal(t, scenario.expectedOutput, allocatedId)
+			allocatedId, err := scenario.input.allocatePFCPConnId()
+			if err == nil {
+				assert.Equal(t, scenario.expectedOutput, allocatedId)
+			} else {
+				assert.Equal(t, scenario.expectedOutput, allocatedId)
+				require.Error(t, err)
+			}
 		})
 	}
 
 	secNode.initPFCPConnIdPool()
 
 	var allocateAllId uint32
+
+	var err error
 	for j := 0; j < maxPFCPConns+1; j++ {
-		allocateAllId = secNode.allocatePFCPConnId()
+		allocateAllId, err = secNode.allocatePFCPConnId()
 	}
 	assert.Equal(t, uint32(0), allocateAllId)
+	require.Error(t, err)
 }
 
 func TestCleanUpPFCPConn(t *testing.T) {

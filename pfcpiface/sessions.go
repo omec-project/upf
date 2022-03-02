@@ -37,9 +37,9 @@ func (p PacketForwardingRules) String() string {
 
 // NewPFCPSession allocates an session with ID.
 func (pConn *PFCPConn) NewPFCPSession(rseid uint64) uint64 {
-	lseid := pConn.GenerateFseid()
-	if lseid == 0 {
-		log.Errorln("Failed to generate session Id")
+	lseid, err := pConn.GenerateFseid()
+	if err != nil {
+		log.Errorln("Failed to generate session Id", err)
 		return 0
 	}
 

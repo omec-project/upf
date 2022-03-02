@@ -6,12 +6,13 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type TestCaseGenerateFseid struct {
-	input          *PFCPConn
-	expectedOutput uint64
-	description    string
+	input       *PFCPConn
+	notZero     uint64
+	description string
 }
 
 func TestGenerateFseid(t *testing.T) {
@@ -24,14 +25,15 @@ func TestGenerateFseid(t *testing.T) {
 
 	for _, scenario := range []TestCaseGenerateFseid{
 		{
-			input:          pConn,
-			expectedOutput: 0,
-			description:    "Checking if a random number is not zero",
+			input:       pConn,
+			notZero:     0,
+			description: "Checking if a random number is not zero",
 		},
 	} {
 		t.Run(scenario.description, func(t *testing.T) {
-			generatedId := scenario.input.GenerateFseid()
-			assert.NotEqual(t, scenario.expectedOutput, generatedId)
+			generatedId, err := scenario.input.GenerateFseid()
+			assert.NotEqual(t, scenario.notZero, generatedId)
+			require.NoError(t, err)
 		})
 	}
 }
