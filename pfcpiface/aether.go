@@ -5,7 +5,13 @@ package pfcpiface
 
 import (
 	"context"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/mdlayher/packet"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sys/unix"
+
+	_ "github.com/google/gopacket/layers"
 
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
 	log "github.com/sirupsen/logrus"
@@ -17,8 +23,10 @@ import (
 
 type aether struct {
 	bess
-	accessIP net.IP
-	ueSubnet *net.IPNet
+	accessIP    net.IP
+	ueSubnet    *net.IPNet
+	pktioSock   *packet.Conn
+	datapathMAC []byte
 }
 
 const (
@@ -47,11 +55,23 @@ func (a *aether) setUpfInfo(u *upf, conf *Conf) {
 	if err != nil {
 		log.Fatalf("unable to parse IP %v that we should parse", conf.P4rtcIface.AccessIP)
 	}
+	// Truncate slice to 4 bytes for later use.
+	a.accessIP = a.accessIP.To4()
+	if a.accessIP == nil {
+		log.Fatalln("access IP is not a IPv4 address")
+	}
 
 	// IP packets to UE subnet are downlink, from core.
 	_, a.ueSubnet, err = net.ParseCIDR(u.ippoolCidr)
 	if err != nil {
 		log.Fatalln(err)
+	}
+
+	// TODO: read from DPDK somehow
+	a.datapathMAC = []byte{0x00, 0x00, 0x00, 0xaa, 0xaa, 0xaa}
+	//a.datapathMAC = []byte{0x0c, 0xc4, 0x7a, 0x19, 0x6d, 0xca}
+	if len(a.datapathMAC) != 6 {
+		log.Fatalln("invalid mac address", a.datapathMAC)
 	}
 
 	u.coreIP = net.ParseIP(net.IPv4zero.String())
@@ -62,6 +82,251 @@ func (a *aether) setUpfInfo(u *upf, conf *Conf) {
 	if err = a.setupInterfaceClassification(); err != nil {
 		log.Fatalln(err)
 	}
+
+	if err = a.setupPktioSocket(conf); err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func (a *aether) setupPktioSocket(conf *Conf) error {
+	inf, err := net.InterfaceByName(conf.DataplaneInterface)
+	if err != nil {
+		return err
+	}
+
+	a.pktioSock, err = packet.Listen(inf, packet.Raw, unix.ETH_P_ALL, nil)
+	if err != nil {
+		return err
+	}
+
+	err = a.pktioSock.SetPromiscuous(true)
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		err := a.pktioRecvLoop()
+		if err != nil {
+			log.Errorln("pktioRecvLoop:", err)
+		}
+	}()
+
+	return nil
+}
+
+type pds struct {
+	conn *packet.Conn
+}
+
+func (p *pds) ReadPacketData() (data []byte, ci gopacket.CaptureInfo, err error) {
+	buf := make([]byte, 2000)
+	n, raddr, err := p.conn.ReadFrom(buf)
+	if err != nil {
+		return
+	}
+
+	ci.CaptureLength = n
+	ci.Length = n
+	ci.AncillaryData = append(ci.AncillaryData, raddr)
+
+	data = append(data, buf[:n]...)
+
+	return
+}
+
+func (a *aether) pktioRecvLoop() error {
+	defer a.pktioSock.Close()
+
+	s := pds{
+		conn: a.pktioSock,
+	}
+
+	// Start decoding from Ethernet later.
+	src := gopacket.NewPacketSource(&s, layers.LayerTypeEthernet)
+
+	for pkt := range src.Packets() {
+		log.Warnln(pkt)
+		ethLayer := pkt.Layer(layers.LayerTypeEthernet)
+		if ethLayer == nil {
+			log.Warnln("Unknown packet", pkt)
+			continue
+		}
+		eth, ok := ethLayer.(*layers.Ethernet)
+		if !ok {
+			log.Warnln("failed to parse Ethernet layer", ethLayer)
+			continue
+		}
+		// TODO: check dst mac for us or broadcast
+
+		if arpLayer := pkt.Layer(layers.LayerTypeARP); arpLayer != nil {
+			if err := a.handleARP(pkt, arpLayer); err != nil {
+				log.Errorln(err)
+			}
+			continue
+		}
+		if icmpLayer := pkt.Layer(layers.LayerTypeICMPv4); icmpLayer != nil {
+			if err := a.handleICMP(pkt, eth, icmpLayer); err != nil {
+				log.Errorln(err)
+			}
+			continue
+		}
+	}
+
+	return nil
+}
+
+func (a *aether) handleARP(pkt gopacket.Packet, arpLayer gopacket.Layer) error {
+	arp, ok := arpLayer.(*layers.ARP)
+	if !ok {
+		return ErrInvalidArgument("handleARP", arpLayer)
+	}
+
+	if arp.ProtAddressSize != net.IPv4len {
+		log.Warnln("Unexpected ARP proto addr size", arp.ProtAddressSize)
+		return nil
+	}
+	if int(arp.HwAddressSize) != len(layers.EthernetBroadcast) {
+		log.Warnln("Unexpected ARP hw addr size", arp.HwAddressSize)
+		return nil
+	}
+
+	if arp.Operation == layers.ARPRequest {
+		// Not for us.
+		if !a.accessIP.Equal(arp.DstProtAddress) {
+			log.Warnln("Unexpected ARP proto dst address", arp.DstProtAddress)
+			return nil
+		}
+
+		raddr, ok := pkt.Metadata().CaptureInfo.AncillaryData[0].(net.Addr)
+		if !ok {
+			return nil
+		}
+
+		ethResp := &layers.Ethernet{
+			BaseLayer:    layers.BaseLayer{},
+			SrcMAC:       a.datapathMAC,
+			DstMAC:       arp.SourceHwAddress,
+			EthernetType: layers.EthernetTypeARP,
+		}
+		arpResp := &layers.ARP{
+			AddrType:          layers.LinkTypeEthernet,
+			Protocol:          layers.EthernetTypeIPv4,
+			HwAddressSize:     arp.HwAddressSize,
+			ProtAddressSize:   arp.ProtAddressSize,
+			Operation:         layers.ARPReply,
+			SourceHwAddress:   a.datapathMAC,
+			SourceProtAddress: a.accessIP,
+			DstHwAddress:      arp.SourceHwAddress,
+			DstProtAddress:    arp.SourceProtAddress,
+		}
+
+		buf := gopacket.NewSerializeBuffer()
+		err := gopacket.SerializeLayers(buf, gopacket.SerializeOptions{
+			FixLengths:       true,
+			ComputeChecksums: true,
+		}, ethResp, arpResp)
+		if err != nil {
+			log.Error(err)
+			log.Errorln(gopacket.LayerDump(ethResp))
+			log.Errorln(gopacket.LayerDump(arpResp))
+			return err
+		}
+
+		_, err = a.pktioSock.WriteTo(buf.Bytes(), raddr)
+		if err != nil {
+			return err
+		}
+		txPkt := gopacket.NewPacket(buf.Bytes(), layers.LayerTypeEthernet, gopacket.Default)
+		log.Tracef("Sent ARP reply: %v", txPkt)
+	} else if arp.Operation == layers.ARPReply {
+
+	} else {
+		log.Warnln("Unknown ARP operation", arp.Operation)
+		return nil
+	}
+
+	return nil
+}
+
+func (a *aether) handleICMP(pkt gopacket.Packet, eth *layers.Ethernet, icmpLayer gopacket.Layer) error {
+	ipv4Layer := pkt.Layer(layers.LayerTypeIPv4)
+	if ipv4Layer == nil {
+		return ErrInvalidArgument("handleICMP", pkt)
+	}
+	ipv4, ok := ipv4Layer.(*layers.IPv4)
+	if !ok {
+		return ErrInvalidArgument("handleICMP", ipv4Layer)
+	}
+	icmp, ok := icmpLayer.(*layers.ICMPv4)
+	if !ok {
+		return ErrInvalidArgument("handleICMP", icmpLayer)
+	}
+	payloadLayer := pkt.Layer(gopacket.LayerTypePayload)
+	if payloadLayer == nil {
+		return ErrInvalidArgument("handleICMP", pkt)
+	}
+	payload, ok := payloadLayer.(*gopacket.Payload)
+	if !ok {
+		return ErrInvalidArgument("handleICMP", payloadLayer)
+	}
+
+	if icmp.TypeCode.Type() != layers.ICMPv4TypeEchoRequest {
+		log.Infoln("unsupported ICMP type:", icmp.TypeCode)
+		return nil
+	}
+
+	raddr, ok := pkt.Metadata().CaptureInfo.AncillaryData[0].(net.Addr)
+	if !ok {
+		return nil
+	}
+
+	ethResp := &layers.Ethernet{
+		SrcMAC:       a.datapathMAC,
+		DstMAC:       eth.SrcMAC,
+		EthernetType: eth.EthernetType,
+	}
+	ipv4Resp := &layers.IPv4{
+		Version:    ipv4.Version,
+		//IHL:        0,
+		//Length:     0,
+		Id:         0, // No ID on purpose
+		Flags:      layers.IPv4DontFragment,
+		TTL:        64,
+		Protocol:   ipv4.Protocol,
+		SrcIP:      a.accessIP,
+		DstIP:      ipv4.SrcIP,
+		//Options:    nil,
+		//Padding:    nil,
+	}
+	icmpResp := &layers.ICMPv4{
+		TypeCode:  layers.ICMPv4TypeEchoReply,
+		Checksum:  0,
+		Id:        icmp.Id,
+		Seq:       icmp.Seq,
+	}
+
+	buf := gopacket.NewSerializeBuffer()
+	err := gopacket.SerializeLayers(buf, gopacket.SerializeOptions{
+		FixLengths:       true,
+		ComputeChecksums: true,
+	}, ethResp, ipv4Resp, icmpResp, payload)
+	if err != nil {
+		log.Error(err)
+		log.Errorln(gopacket.LayerDump(ethResp))
+		log.Errorln(gopacket.LayerDump(ipv4Resp))
+		log.Errorln(gopacket.LayerDump(icmpResp))
+		log.Errorln(gopacket.LayerDump(payload))
+		return err
+	}
+
+	_, err = a.pktioSock.WriteTo(buf.Bytes(), raddr)
+	if err != nil {
+		return err
+	}
+	txPkt := gopacket.NewPacket(buf.Bytes(), layers.LayerTypeEthernet, gopacket.Default)
+	log.Tracef("Sent ICMP reply: %v", txPkt)
+
+	return nil
 }
 
 func (a *aether) sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) (err error) {

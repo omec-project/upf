@@ -46,6 +46,7 @@ class Parser:
         self.access_ifname = None
         self.core_ifname = None
         self.dataplane_interface = None
+        self.dataplane_interface_mac = None
         self.interfaces = dict()
         self.enable_ntf = False
         self.notify_sockaddr = "/tmp/notifycp"
@@ -153,11 +154,11 @@ class Parser:
                 "access", "core"))
         try:
             self.dataplane_interface = self.conf["dataplane_interface"]
+            self.dataplane_interface_mac = self.conf["dataplane_interface_mac"]
         except KeyError:
-            self.dataplane_interface = "dataplane"
-            print('Can\'t parse dataplane interface name! Setting it to default value ({})'.format(self.dataplane_interface))
+            print('Can\'t parse dataplane interface name!')
             print(self.conf)
-            os.exit(1)
+            sys.exit(1)
 
         # Slice rate limits
         try:

@@ -35,7 +35,7 @@ qerFailGate = 4
 qerStatusDropGate = 5
 qerUnmeteredGate = 6
 parser = Parser('conf/aether.json')
-interface_name = "dataplane"
+interface_name = "pktio"
 parser.parse([interface_name])
 
 if parser.mode == 'sim':
@@ -45,8 +45,9 @@ if parser.mode == 'sim':
 # Look up interface addresses
 # TODO(max): remove and do in agent
 dataplane_ip = ips_by_interface(parser.dataplane_interface)
-dataplane_mac = mac_by_interface(parser.dataplane_interface)
-
+dataplane_mac = parser.dataplane_interface_mac
+# TODO(max): lookup from config or similar
+dataplane_dpdk_interface_index = 0
 
 # ====================================================
 #       Core Setup
@@ -73,7 +74,7 @@ for wid in range(parser.workers):
 dataplane_port = port.Port(parser.interfaces[parser.dataplane_interface]["ifname"], parser.hwcksum, None)
 # initialize port with the configured driver
 dataplane_port.workers = [i for i in range(len(workers))]
-dataplane_port.init_port(0, parser.mode)
+dataplane_port.init_port(dataplane_dpdk_interface_index, parser.mode)
 # setup port module with auxiliary modules
 if parser.mode == 'sim':
     dataplane_port.setup_port(parser.ip_frag_with_eth_mtu, parser.max_ip_defrag_flows, parser.measure_upf, packet_generator[iface], **seq_kwargs[iface])
@@ -222,14 +223,15 @@ appQERLookup.set_default_gate(gate=qerFailGate)
 #       BPF Setup
 # ====================================================
 bpfUeGatePass = 0
-bpfGTPUEchoGate = dataplane_port.bpf_gate()
+bpfPacketOutGatePass = MAX_GATES - 1
+# bpfPacketOutGatePass = dataplane_port.bpf_gate()
 dataplaneBPF = dataplane_port.bpf
 dataplaneBPF:bpfUeGatePass \
     -> dataplaneRxIPCksum::IPChecksum(verify=True, hw=parser.hwcksum) \
     -> dataplaneRxUDPCksum::L4Checksum(verify=True, hw=parser.hwcksum) \
     -> pktParse
 
-# Add Core filter rules, i.e.:
+# Add UE traffic filter rules, i.e.:
 # setting filter to detect gtpu traffic
 # and dst host x.x.x.x                         # check S/PGWU IP
 # and udp dst port 2152                         # check GTPU port
@@ -237,35 +239,14 @@ check_ip = "ip"
 check_spgwu_ip = " and dst host " + \
     " or ".join(str(x) for x in dataplane_ip)
 check_gtpu_port = " and udp dst port 2152"
-GTPUGate = 0 #ports[parser.core_ifname].bpf_gate()
-downlink_filter = {"priority": -GTPUGate, "filter": check_ip +
-               check_spgwu_ip + check_gtpu_port, "gate": GTPUGate}
-dataplaneBPF.add(filters=[downlink_filter])
+downlink_bpf_rule = {"priority": -bpfUeGatePass, "filter": check_ip +
+                     check_spgwu_ip + check_gtpu_port, "gate": bpfUeGatePass}
 
-# Add Access filter rules, i.e.:
-# setting filter to detect gtpu traffic
-# and dst host 11.1.1.1                         # check S/PGWU IP
-# and udp dst port 2152                         # check GTPU port
-check_ip = "ip"
-check_spgwu_ip = " and dst host " + \
-    " or ".join(str(x) for x in dataplane_ip)
-check_gtpu_port = " and udp dst port 2152"
-check_gtpu_msg_echo = " and udp[9] = 0x1"
+# ARP and ICMP filter to veth interface.
+pktout_filter = "arp or icmp"
+pktout_bpf_rule = {"priority": -bpfPacketOutGatePass, "filter": pktout_filter, "gate": bpfPacketOutGatePass}
 
-# Echo filter
-# uplink_echo_filter = {"priority": bpfGTPUEchoGate, "filter": check_ip +
-#                       check_spgwu_ip + check_gtpu_port +
-#                       check_gtpu_msg_echo, "gate": bpfGTPUEchoGate}
-# dataplaneBPF.add(filters=[uplink_echo_filter])
-
-
-# 4. GTP Echo response pipeline
-# dataplaneBPF:bpfGTPUEchoGate \
-#     -> gtpuEcho::GtpuEcho(s1u_sgw_ip=ip2long(dataplane_ip[0])):1 \
-#     -> ethSwap::MACSwap() \
-#     -> echoOuterUDPCsum::L4Checksum() \
-#     -> echoOuterIPCsum::IPChecksum() \
-#     -> dataplane_port.rtr
+dataplaneBPF.add(filters=[downlink_bpf_rule, pktout_bpf_rule])
 
 # Drop unknown packets
 dataplaneRxIPCksum:1 -> dataplaneRxIPCksumFail::Sink()

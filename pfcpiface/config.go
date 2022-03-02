@@ -25,28 +25,29 @@ const (
 
 // Conf : Json conf struct.
 type Conf struct {
-	Mode              string           `json:"mode"`
-	AccessIface       IfaceType        `json:"access"`
-	CoreIface         IfaceType        `json:"core"`
-	CPIface           CPIfaceInfo      `json:"cpiface"`
-	P4rtcIface        P4rtcInfo        `json:"p4rtciface"`
-	EnableP4rt        bool             `json:"enable_p4rt"`
-	EnableAether      bool             `json:"enable_aether"`
-	EnableFlowMeasure bool             `json:"measure_flow"`
-	SimInfo           SimModeInfo      `json:"sim"`
-	ConnTimeout       uint32           `json:"conn_timeout"` // TODO(max): unused, remove
-	ReadTimeout       uint32           `json:"read_timeout"` // TODO(max): convert to duration string
-	EnableNotifyBess  bool             `json:"enable_notify_bess"`
-	EnableEndMarker   bool             `json:"enable_end_marker"`
-	NotifySockAddr    string           `json:"notify_sockaddr"`
-	EndMarkerSockAddr string           `json:"endmarker_sockaddr"`
-	LogLevel          log.Level        `json:"log_level"`
-	QciQosConfig      []QciQosConfig   `json:"qci_qos_config"`
-	SliceMeterConfig  SliceMeterConfig `json:"slice_rate_limit_config"`
-	MaxReqRetries     uint8            `json:"max_req_retries"`
-	RespTimeout       string           `json:"resp_timeout"`
-	EnableHBTimer     bool             `json:"enable_hbTimer"`
-	HeartBeatInterval string           `json:"heart_beat_interval"`
+	Mode               string           `json:"mode"`
+	AccessIface        IfaceType        `json:"access"`
+	CoreIface          IfaceType        `json:"core"`
+	CPIface            CPIfaceInfo      `json:"cpiface"`
+	P4rtcIface         P4rtcInfo        `json:"p4rtciface"`
+	EnableP4rt         bool             `json:"enable_p4rt"`
+	EnableAether       bool             `json:"enable_aether"`
+	EnableFlowMeasure  bool             `json:"measure_flow"`
+	SimInfo            SimModeInfo      `json:"sim"`
+	ConnTimeout        uint32           `json:"conn_timeout"` // TODO(max): unused, remove
+	ReadTimeout        uint32           `json:"read_timeout"` // TODO(max): convert to duration string
+	EnableNotifyBess   bool             `json:"enable_notify_bess"`
+	EnableEndMarker    bool             `json:"enable_end_marker"`
+	NotifySockAddr     string           `json:"notify_sockaddr"`
+	EndMarkerSockAddr  string           `json:"endmarker_sockaddr"`
+	LogLevel           log.Level        `json:"log_level"`
+	QciQosConfig       []QciQosConfig   `json:"qci_qos_config"`
+	SliceMeterConfig   SliceMeterConfig `json:"slice_rate_limit_config"`
+	MaxReqRetries      uint8            `json:"max_req_retries"`
+	RespTimeout        string           `json:"resp_timeout"`
+	EnableHBTimer      bool             `json:"enable_hbTimer"`
+	HeartBeatInterval  string           `json:"heart_beat_interval"`
+	DataplaneInterface string           `json:"dataplane_interface"`
 }
 
 // QciQosConfig : Qos configured attributes.

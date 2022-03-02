@@ -15,12 +15,12 @@ metrics_port=8080
 # "af_packet" uses AF_PACKET sockets via DPDK's vdev for pkt I/O.
 # "sim" uses Source() modules to simulate traffic generation
 mode="dpdk"
-#mode="af_xdp"
-#mode="af_packet"
+# mode="af_xdp"
+# mode="af_packet"
 # mode="sim"
 
-# Gateway interface
-ifaces=("dataplane")
+# veth interface used for packet io between BESS and PFCP agent.
+ifaces=("pktio")
 
 # Static IP addresses of gateway interface(s) in cidr format
 #
@@ -75,27 +75,10 @@ function setup_addrs() {
 # ARP/ICMP responses are captured and relayed out of the dpdk ports.
 function setup_mirror_links() {
 	for ((i = 0; i < num_ifaces; i++)); do
-		sudo ip netns exec pause ip link add "${ifaces[$i]}" type veth peer name "${ifaces[$i]}"-vdev
+		sudo ip netns exec pause ip link add "${ifaces[$i]}" type veth peer name "${ifaces[$i]}"-dpdk
 		sudo ip netns exec pause ip link set "${ifaces[$i]}" up
-		sudo ip netns exec pause ip link set "${ifaces[$i]}-vdev" up
-		sudo ip netns exec pause ip link set dev "${ifaces[$i]}" address "${macaddrs[$i]}"
-	done
-	setup_addrs
-}
-
-# Set up interfaces in the network namespace. For non-"dpdk" mode(s)
-function move_ifaces() {
-	for ((i = 0; i < num_ifaces; i++)); do
-		sudo ip link set "${ifaces[$i]}" netns pause up
-		sudo ip netns exec pause ip link set "${ifaces[$i]}" promisc off
-		sudo ip netns exec pause ip link set "${ifaces[$i]}" xdp off
-		if [ "$mode" == 'af_xdp' ]; then
-			sudo ip netns exec pause ethtool --features "${ifaces[$i]}" ntuple off
-			sudo ip netns exec pause ethtool --features "${ifaces[$i]}" ntuple on
-			sudo ip netns exec pause ethtool -N "${ifaces[$i]}" flow-type udp4 action 0
-			sudo ip netns exec pause ethtool -N "${ifaces[$i]}" flow-type tcp4 action 0
-			sudo ip netns exec pause ethtool -u "${ifaces[$i]}"
-		fi
+		sudo ip netns exec pause ip link set "${ifaces[$i]}-dpdk" up
+		# sudo ip netns exec pause ip link set dev "${ifaces[$i]}" address "${macaddrs[$i]}"
 	done
 	setup_addrs
 }
@@ -136,9 +119,8 @@ sudo ln -s "$sandbox" /var/run/netns/pause
 case $mode in
 "dpdk" | "sim") setup_mirror_links ;;
 "af_xdp" | "af_packet")
-	move_ifaces
-	# Make sure that kernel does not send back icmp dest unreachable msg(s)
-	sudo ip netns exec pause iptables -I OUTPUT -p icmp --icmp-type port-unreachable -j DROP
+	echo "Unsupported mode"
+	exit 1
 	;;
 *) ;;
 
@@ -182,8 +164,25 @@ docker run --name bess-pfcpiface -td --restart on-failure \
 	#  -simulate create_continue
 
 
-# Run simulator
+# Run simulator to create forwarding state.
 docker container run --rm -d --net=container:pause --name pfcpsim pfcpsim:0.1.0-dev
-docker exec pfcpsim pfcpctl -c configure --n3-addr 172.17.0.1 --remote-peer 127.0.0.1:8805
+docker exec pfcpsim pfcpctl -c configure --n3-addr 10.17.0.1 --remote-peer 127.0.0.1:8805
 docker exec pfcpsim pfcpctl -c associate
 docker exec pfcpsim pfcpctl -c create --count 1 --baseID 2 --ue-pool 10.250.0.0/29 --nb-addr 11.0.0.1
+
+# Send some packets with scapy
+# TODO(max): For development only, remove before merging
+
+# Downlink packet
+# sendp( (
+#      Ether(src="00:00:00:11:11:11", dst="0c:c4:7a:19:6d:ca") /
+#          IP(src="8.8.8.8", dst="10.250.0.1") /
+#              UDP(sport=80, dport=8888) /
+#                  ("A"*30)
+#                  ), iface='enp175s0f0', count=1)
+
+# Inside netns pause:
+# tcpdump -lenvvi pktio
+
+# ARPs from sim eNB:
+# sudo arping -i enp175s0f0 -S 10.17.0.2 10.17.0.1

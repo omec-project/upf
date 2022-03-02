@@ -59,7 +59,11 @@
     "": "Whether to enable flow measurement feature",
     "measure_flow": true,
 
-    "dataplane_interface": "dataplane",
+    "dataplane_interface": "pktio",
+    "": "This device MAC selects the interface DPDK will use as the dataplane",
+    "dataplane_interface_mac": "0c:c4:7a:19:6d:ca",
+    "": "This sets the local IP address on the access/core dataplane interface",
+    "dataplane_interface_ip": "10.0.0.1",
 
     "": "Number of worker threads. Default: 1",
     "workers": 1,
@@ -115,7 +119,7 @@
 
     "": "p4rtc interface settings",
     "p4rtciface": {
-        "access_ip": "172.17.0.1/32",
+        "access_ip": "10.17.0.1/32",
         "p4rtc_server": "onos",
         "p4rtc_port": "51001"
     }
