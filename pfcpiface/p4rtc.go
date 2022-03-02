@@ -311,7 +311,9 @@ func (c *P4rtClient) ClearTable(tableID uint32) error {
 }
 
 func (c *P4rtClient) ClearTables(tableIDs []uint32) error {
-	log.Traceln("Clearing P4 tables")
+	log.WithFields(log.Fields{
+		"table IDs": tableIDs,
+	}).Traceln("Clearing P4 tables")
 
 	updates := []*p4.Update{}
 

@@ -12,7 +12,7 @@ jobs:
   unit-test-pfcpiface:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2.4.0
+      - uses: actions/checkout@v3
       - uses: actions/setup-go@v2
 
       - name: Run unit tests for PFCP Agent
