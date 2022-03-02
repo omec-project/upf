@@ -13,10 +13,8 @@
 #include <rte_hash_crc.h>
 
 #include "../pb/module_msg.pb.h"
-#include "../utils/cuckoo_map.h"
 #include "../utils/metering.h"
 
-using bess::utils::CuckooMap;
 using bess::utils::Metering;
 using bess::utils::MeteringKey;
 
@@ -40,7 +38,7 @@ enum { FieldType = 0, ValueType };
 struct value {
   gate_idx_t ogate;
   int64_t deduct_len;
-  struct rte_meter_trtcm_profile *p;
+  struct rte_meter_trtcm_profile p;
   struct rte_meter_trtcm m;
   MeteringKey Data;
 } __attribute__((packed));
@@ -55,21 +53,6 @@ class Qos final : public Module {
   static const gate_idx_t kNumOGates = MAX_GATES;
 
   static const Commands cmds;
-
-  struct Hash {
-    bess::utils::HashResult operator()(
-        const rte_meter_trtcm_params &key) const {
-      return rte_hash_crc(&key, sizeof(rte_meter_trtcm_params), 0);
-    }
-  };
-
-  struct EqualTo {
-    bool operator()(const rte_meter_trtcm_params &p1,
-                    const rte_meter_trtcm_params &p2) const {
-      return (p1.cir == p2.cir) && (p1.pir == p2.pir) && (p1.cbs == p2.cbs) &&
-             (p1.pbs == p2.pbs);
-    }
-  };
 
   Qos() : Module(), default_gate_(), total_key_size_(), fields_() {
     max_allowed_workers_ = Worker::kMaxWorkers;
@@ -106,8 +89,6 @@ class Qos final : public Module {
   std::vector<struct MeteringField> values_;
   Metering<value> table_;
   uint64_t mask[MAX_FIELDS];
-  CuckooMap<rte_meter_trtcm_params, rte_meter_trtcm_profile, Hash, EqualTo>
-      params_map_;
 };
 
 #endif  // BESS_MODULES_QOS_H
