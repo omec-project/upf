@@ -365,6 +365,7 @@ func (up4 *UP4) clearTables() error {
 		p4constants.TablePreQosPipeTerminationsDownlink,
 		p4constants.TablePreQosPipeTunnelPeers,
 		p4constants.TablePreQosPipeInterfaces,
+		p4constants.TablePreQosPipeApplications,
 	}
 
 	if err := up4.p4client.ClearTables(tableIDs); err != nil {
