@@ -35,6 +35,9 @@ func TestUPFBasedUeIPAllocation(t *testing.T) {
 		expected: p4RtValues{
 			// first IP address from pool configured in ue_ip_alloc.json
 			ueAddress: "10.250.0.1",
+			// no application filtering rule expected
+			appID:        0,
+			tunnelPeerID: 2,
 		},
 		desc: "UPF-based UE IP allocation",
 	}
@@ -82,7 +85,8 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 80,
 					},
 				},
-				appID: 1,
+				appID:        1,
+				tunnelPeerID: 2,
 			},
 			desc: "APPLICATION FILTERING permit out udp from any 80-80 to assigned",
 		},
@@ -108,7 +112,8 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				},
 				// FIXME: there is a dependency on previous test because pfcpiface doesn't clear application IDs properly
 				//  See SDFAB-960
-				appID: 2,
+				appID:        2,
+				tunnelPeerID: 2,
 			},
 			desc: "APPLICATION FILTERING permit out udp from 192.168.1.1/32 to assigned 80-80",
 		},
@@ -125,7 +130,8 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 			},
 			expected: p4RtValues{
 				// no application filtering rule expected
-				appID: 0,
+				appID:        0,
+				tunnelPeerID: 2,
 			},
 			desc: "APPLICATION FILTERING ALLOW_ALL",
 		},
@@ -157,7 +163,8 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 80,
 					},
 				},
-				appID: 1,
+				appID:        1,
+				tunnelPeerID: 2,
 			},
 			desc: "QER_METERING - 1 session QER, 2 app QERs",
 		},
@@ -189,7 +196,8 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 80,
 					},
 				},
-				appID: 1,
+				appID:        1,
+				tunnelPeerID: 2,
 			},
 			desc: "QER_METERING - session QER only",
 		},
@@ -221,8 +229,9 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 80,
 					},
 				},
-				appID: 1,
-				tc:    3,
+				appID:        1,
+				tunnelPeerID: 2,
+				tc:           3,
 			},
 			desc: "QER_METERING - TC for QFI",
 		},
@@ -259,7 +268,8 @@ func TestUEBuffering(t *testing.T) {
 					80, 80,
 				},
 			},
-			appID: 1,
+			appID:        1,
+			tunnelPeerID: 2,
 		},
 	}
 

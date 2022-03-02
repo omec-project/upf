@@ -16,7 +16,7 @@ jobs:
     steps:
     # Checkout and build
     - uses: actions/checkout@v2.4.0
-    - uses: docker/login-action@v1.14.0
+    - uses: docker/login-action@v1.14.1
       with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -37,9 +37,7 @@ jobs:
       - run: echo GIT_SHA_SHORT=$(git rev-parse --short HEAD) >> $GITHUB_ENV
 
       - id: docker-login
-        # Secrets from the main repo are not used if PR comes from fork. We skip pushing Docker image then.
-        if: github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'
-        uses: docker/login-action@v1.13.0
+        uses: docker/login-action@v1.14.1
         with:
           registry: docker.io
           username: ${{ secrets.DOCKERHUB_LOGIN }}
