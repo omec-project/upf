@@ -37,7 +37,7 @@ func TestParseFAR(t *testing.T) {
 			op: createOp,
 			input: pfcpsimLib.NewFARBuilder().
 				WithID(999).
-				WithMethod(pfcpsimLib.IEMethod(createOp)).
+				WithMethod(pfcpsimLib.Create).
 				WithAction(ActionDrop).
 				WithDstInterface(core).
 				BuildFAR(),
@@ -53,7 +53,7 @@ func TestParseFAR(t *testing.T) {
 			input: pfcpsimLib.NewFARBuilder().
 				WithID(1).
 				WithAction(ActionForward).
-				WithMethod(pfcpsimLib.IEMethod(updateOp)).
+				WithMethod(pfcpsimLib.Update).
 				WithDstInterface(access).
 				WithDownlinkIP(UEAddressForDownlink.String()).
 				WithTEID(100).

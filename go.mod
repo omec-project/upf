@@ -17,7 +17,7 @@ require (
 	github.com/libp2p/go-reuseport v0.1.0
 	github.com/moby/term v0.0.0-20210619224110-3f7ff695adc6 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
-	github.com/omec-project/pfcpsim v0.0.0-20220202164427-6284bedae567
+	github.com/omec-project/pfcpsim v0.0.0-20220224085126-19a69dc4b36c
 	github.com/p4lang/p4runtime v1.3.0
 	github.com/prometheus/client_golang v1.11.0
 	github.com/sirupsen/logrus v1.8.1
@@ -25,7 +25,7 @@ require (
 	github.com/wmnsk/go-pfcp v0.0.14
 	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11 // indirect
 	google.golang.org/genproto v0.0.0-20201110150050-8816d57aaa9a
-	google.golang.org/grpc v1.43.0
+	google.golang.org/grpc v1.44.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 	gotest.tools/v3 v3.1.0 // indirect
