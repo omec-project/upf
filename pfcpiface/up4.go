@@ -378,7 +378,7 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 
 func (up4 *UP4) clearAllTables() error {
 	tables := []string{TableUplinkSessions, TableDownlinkSessions, TableUplinkTerminations, TableDownlinkTerminations, TableTunnelPeers, TableApplications}
-	tableIDs := make([]uint32, len(tables))
+	tableIDs := make([]uint32, 0, len(tables))
 
 	for _, table := range tables {
 		tableID, err := up4.p4RtTranslator.getTableIDByName(table)
@@ -408,7 +408,7 @@ func (up4 *UP4) clearAllTables() error {
 }
 
 func (up4 *UP4) initUEPool() error {
-	entry, err := up4.p4RtTranslator.BuildInterfaceTableEntry(up4.ueIPPool, true)
+	entry, err := up4.p4RtTranslator.BuildInterfaceTableEntry(up4.ueIPPool, up4.conf.SliceID, true)
 	if err != nil {
 		return err
 	}
@@ -425,7 +425,7 @@ func (up4 *UP4) initUEPool() error {
 }
 
 func (up4 *UP4) initN3Address() error {
-	entry, err := up4.p4RtTranslator.BuildInterfaceTableEntry(up4.accessIP, false)
+	entry, err := up4.p4RtTranslator.BuildInterfaceTableEntry(up4.accessIP, up4.conf.SliceID, false)
 	if err != nil {
 		return err
 	}
@@ -808,8 +808,8 @@ func getMeterConfigurationFromQER(mbr uint64, gbr uint64) *p4.MeterConfig {
 	logger.Debug("Converting GBR/MBR to P4 Meter configuration")
 
 	// FIXME: calculate from rate once P4-UPF supports GBRs
-	cbs := 1
-	cir := 1
+	cbs := 0
+	cir := 0
 
 	pbs := calcBurstSizeFromRate(mbr, uint64(defaultBurstDurationMs))
 
@@ -871,13 +871,12 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 			up4.releaseSessionMeterCellID(appMeter.uplinkCellID)
 		}
 
-		if appMeter.downlinkCellID != 0 {
+		if appMeter.downlinkCellID != appMeter.uplinkCellID {
 			up4.releaseSessionMeterCellID(appMeter.downlinkCellID)
 		}
 	}
 
 	if appMeter.uplinkCellID != 0 {
-		// according to the SD-Core/SD-Fabric contract, UL and DL MBRs/GBRs are always equal for Application QERs.
 		meterConfig := getMeterConfigurationFromQER(q.ulMbr, q.ulGbr)
 
 		meterEntry := up4.p4RtTranslator.BuildMeterEntry(applicationMeter, appMeter.uplinkCellID, meterConfig)
@@ -885,8 +884,7 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 		entries = append(entries, meterEntry)
 	}
 
-	if appMeter.downlinkCellID != 0 {
-		// according to the SD-Core/SD-Fabric contract, UL and DL MBRs/GBRs are always equal for Application QERs.
+	if appMeter.downlinkCellID != appMeter.uplinkCellID {
 		meterConfig := getMeterConfigurationFromQER(q.dlMbr, q.dlGbr)
 
 		meterEntry := up4.p4RtTranslator.BuildMeterEntry(applicationMeter, appMeter.downlinkCellID, meterConfig)
@@ -1162,7 +1160,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 		// TODO: the same app filter can be simultaneously used by another UE session. We cannot remove it.
 		//  We should come up with a way to check if an app filter is still in use.
 		if applicationID != 0 && methodType != p4.Update_DELETE {
-			applicationsEntry, err = up4.p4RtTranslator.BuildApplicationsTableEntry(pdr, applicationID)
+			applicationsEntry, err = up4.p4RtTranslator.BuildApplicationsTableEntry(pdr, up4.conf.SliceID, applicationID)
 			if err != nil {
 				return ErrOperationFailedWithReason("build P4rt table entry for Applications table", err.Error())
 			}

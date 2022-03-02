@@ -504,7 +504,7 @@ func (t *P4rtTranslator) BuildInterfaceTableEntryNoAction() *p4.TableEntry {
 	return entry
 }
 
-func (t *P4rtTranslator) BuildInterfaceTableEntry(ipNet *net.IPNet, isCore bool) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) BuildInterfaceTableEntry(ipNet *net.IPNet, sliceID uint8, isCore bool) (*p4.TableEntry, error) {
 	tableID := t.tableID(TableInterfaces)
 
 	srcIface := access
@@ -537,8 +537,7 @@ func (t *P4rtTranslator) BuildInterfaceTableEntry(ipNet *net.IPNet, isCore bool)
 		return nil, err
 	}
 
-	// slice ID is overwritten by UP4, so it's safe to set 0
-	if err := t.withActionParam(action, FieldSliceID, uint8(0)); err != nil {
+	if err := t.withActionParam(action, FieldSliceID, sliceID); err != nil {
 		return nil, err
 	}
 
@@ -549,7 +548,7 @@ func (t *P4rtTranslator) BuildInterfaceTableEntry(ipNet *net.IPNet, isCore bool)
 	return entry, nil
 }
 
-func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, internalAppID uint8) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, sliceID uint8, internalAppID uint8) (*p4.TableEntry, error) {
 	applicationsBuilderLog := log.WithFields(log.Fields{
 		"pdr": pdr,
 	})
@@ -576,6 +575,10 @@ func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, internalAppID uint
 	}
 
 	appProto, appProtoMask := pdr.appFilter.proto, pdr.appFilter.protoMask
+
+	if err := t.withExactMatchField(entry, FieldSliceID, sliceID); err != nil {
+		return nil, err
+	}
 
 	appIPPrefixLen := 32 - bits.TrailingZeros32(appIPMask)
 	if appIPPrefixLen > 0 {

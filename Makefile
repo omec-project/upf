@@ -37,8 +37,13 @@ PTF_PB_DIR ?= ptf/lib
 # https://docs.docker.com/engine/reference/commandline/build/#specifying-target-build-stage---target
 docker-build:
 	for target in $(DOCKER_TARGETS); do \
+		DOCKER_CACHE_ARG=""; \
+		if [ $(DOCKER_BUILDKIT) = 1 ]; then \
+			DOCKER_CACHE_ARG="--cache-from ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}upf-epc-$$target:${DOCKER_TAG}"; \
+		fi; \
 		DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) \
 			--target $$target \
+			$$DOCKER_CACHE_ARG \
 			--tag ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}upf-epc-$$target:${DOCKER_TAG} \
 			--label org.opencontainers.image.source="https://github.com/omec-project/upf-epc" \
 			--label org.label.schema.version="${VERSION}" \
@@ -63,12 +68,15 @@ output:
 		.;
 	rm -rf output && mkdir output && tar -xf output.tar -C output && rm -f output.tar
 
-test-up4-integration:
+test-up4-integration-docker:
 	docker-compose -f test/integration/infra/docker-compose.yml rm -fsv
 	COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker-compose -f test/integration/infra/docker-compose.yml build $(DOCKER_BUILD_ARGS)
 	docker-compose -f test/integration/infra/docker-compose.yml up -d
-	go test -v -count=1 -failfast ./test/integration/...
+	MODE=docker FASTPATH=up4 go test -v -count=1 -failfast ./test/integration/...
 	docker-compose -f test/integration/infra/docker-compose.yml rm -fsv
+
+test-bess-integration-native:
+	MODE=native FASTPATH=bess go test -v -count=1 -failfast ./test/integration/...
 
 pb:
 	DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) \
@@ -97,12 +105,12 @@ test: .coverage
 			-coverprofile=.coverage/coverage-unit.txt \
 			-covermode=atomic \
 			-v \
-			./pfcpiface
+			./pfcpiface ./cmd/...
 
 p4-constants:
 	$(info *** Generating go constants...)
 	@docker run --rm -v $(CURDIR):/app -w /app \
-		golang:latest go run ./scripts/go_gen_p4_const.go \
+		golang:latest go run ./cmd/p4info_code_gen/p4info_code_gen.go \
 		-output internal/p4constants/p4constants.go -p4info conf/p4/bin/p4info.txt
 	@docker run --rm -v $(CURDIR):/app -w /app \
 		golang:latest gofmt -w internal/p4constants/p4constants.go
