@@ -11,7 +11,7 @@ Copyright 2019 Intel Corporation
 
 This project implements User Plane Function (UPF) - the 4G/5G mobile user plane compliant with 3GPP TS 23.501. 
 It follows the 3GPP CUPS (Control and User Plane Separation) architecture, making use of the PFCP protocol for the communication between SMF (5G) or SPGW-C (4G) and UPF.
-The UPF implementation is a part of the Aether platform. 
+The UPF implementation is a part of [the Aether platform](https://opennetworking.org/aether/). 
 
 ## Overview
 
