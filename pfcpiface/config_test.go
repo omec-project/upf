@@ -8,6 +8,8 @@ import (
 	"io/ioutil"
 	"testing"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -67,12 +69,22 @@ func TestLoadConfigFile(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("empty config has log level info", func(t *testing.T) {
+		s := `{
+			"mode": "dpdk"
+		}`
+		confPath := t.TempDir() + "/conf.json"
+		mustWriteStringToDisk(s, confPath)
+
+		conf, err := LoadConfigFile(confPath)
+		require.NoError(t, err)
+		require.Equal(t, conf.LogLevel, log.InfoLevel)
+	})
+
 	t.Run("all sample configs must be valid", func(t *testing.T) {
 		paths := []string{
 			"../conf/upf.json",
 			"../ptf/config/upf.json",
-			"../test/integration/config/default.json",
-			"../test/integration/config/ue_ip_alloc.json",
 		}
 
 		for _, path := range paths {

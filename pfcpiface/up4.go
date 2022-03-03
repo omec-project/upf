@@ -378,7 +378,7 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 
 func (up4 *UP4) clearAllTables() error {
 	tables := []string{TableUplinkSessions, TableDownlinkSessions, TableUplinkTerminations, TableDownlinkTerminations, TableTunnelPeers, TableApplications}
-	tableIDs := make([]uint32, len(tables))
+	tableIDs := make([]uint32, 0, len(tables))
 
 	for _, table := range tables {
 		tableID, err := up4.p4RtTranslator.getTableIDByName(table)
@@ -803,8 +803,8 @@ func getMeterConfigurationFromQER(mbr uint64, gbr uint64) *p4.MeterConfig {
 	logger.Debug("Converting GBR/MBR to P4 Meter configuration")
 
 	// FIXME: calculate from rate once P4-UPF supports GBRs
-	cbs := 1
-	cir := 1
+	cbs := 0
+	cir := 0
 
 	pbs := calcBurstSizeFromRate(mbr, uint64(defaultBurstDurationMs))
 
@@ -866,13 +866,12 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 			up4.releaseSessionMeterCellID(appMeter.uplinkCellID)
 		}
 
-		if appMeter.downlinkCellID != 0 {
+		if appMeter.downlinkCellID != appMeter.uplinkCellID {
 			up4.releaseSessionMeterCellID(appMeter.downlinkCellID)
 		}
 	}
 
 	if appMeter.uplinkCellID != 0 {
-		// according to the SD-Core/SD-Fabric contract, UL and DL MBRs/GBRs are always equal for Application QERs.
 		meterConfig := getMeterConfigurationFromQER(q.ulMbr, q.ulGbr)
 
 		meterEntry := up4.p4RtTranslator.BuildMeterEntry(applicationMeter, appMeter.uplinkCellID, meterConfig)
@@ -880,8 +879,7 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 		entries = append(entries, meterEntry)
 	}
 
-	if appMeter.downlinkCellID != 0 {
-		// according to the SD-Core/SD-Fabric contract, UL and DL MBRs/GBRs are always equal for Application QERs.
+	if appMeter.downlinkCellID != appMeter.uplinkCellID {
 		meterConfig := getMeterConfigurationFromQER(q.dlMbr, q.dlGbr)
 
 		meterEntry := up4.p4RtTranslator.BuildMeterEntry(applicationMeter, appMeter.downlinkCellID, meterConfig)
