@@ -21,19 +21,28 @@ import (
 	"net"
 )
 
+const (
+	// IP protocol types
+	TcpProto = layers.IPProtocolTCP
+	UdpProto = layers.IPProtocolUDP
+)
+
+var (
+	// dummyAddr is used when writing packets to the AF_PACKET socket. In SOCK_RAW mode the
+	// sockaddr_ll struct is not required as the frame already contains an Ethernet header, but the
+	// packet library still requires passing in an address.
+	dummyAddr = packet.Addr{HardwareAddr: []byte{0, 0, 0, 0, 0, 0}}
+	useUnix   = true
+)
+
 type aether struct {
 	bess
 	accessIP    net.IP
 	ueSubnet    *net.IPNet
 	pktioSock   *packet.Conn
+	unixSock    *net.UnixConn
 	datapathMAC []byte
 }
-
-const (
-	// IP protocol types
-	TcpProto = 6
-	UdpProto = 17
-)
 
 type interfaceClassification struct {
 	// Match
@@ -89,19 +98,32 @@ func (a *aether) setUpfInfo(u *upf, conf *Conf) {
 }
 
 func (a *aether) setupPktioSocket(conf *Conf) error {
-	inf, err := net.InterfaceByName(conf.DataplaneInterface)
-	if err != nil {
-		return err
-	}
+	if useUnix {
+		// unix
+		addr, err := net.ResolveUnixAddr("unixpacket", "/tmp/sockets/pktio.sock")
+		if err != nil {
+			return err
+		}
+		a.unixSock, err = net.DialUnix("unixpacket", nil, addr)
+		if err != nil {
+			return err
+		}
+	} else {
+		// veth
+		inf, err := net.InterfaceByName(conf.DataplaneInterface)
+		if err != nil {
+			return err
+		}
 
-	a.pktioSock, err = packet.Listen(inf, packet.Raw, unix.ETH_P_ALL, nil)
-	if err != nil {
-		return err
-	}
+		a.pktioSock, err = packet.Listen(inf, packet.Raw, unix.ETH_P_ALL, nil)
+		if err != nil {
+			return err
+		}
 
-	err = a.pktioSock.SetPromiscuous(true)
-	if err != nil {
-		return err
+		err = a.pktioSock.SetPromiscuous(true)
+		if err != nil {
+			return err
+		}
 	}
 
 	go func() {
@@ -114,6 +136,28 @@ func (a *aether) setupPktioSocket(conf *Conf) error {
 	return nil
 }
 
+// uds implements the gopacket.PacketDataSource interface.
+type uds struct {
+	conn *net.UnixConn
+}
+
+func (u *uds) ReadPacketData() (data []byte, ci gopacket.CaptureInfo, err error) {
+	buf := make([]byte, 2000)
+	n, raddr, err := u.conn.ReadFrom(buf)
+	if err != nil {
+		return
+	}
+
+	ci.CaptureLength = n
+	ci.Length = n
+	ci.AncillaryData = append(ci.AncillaryData, raddr)
+
+	data = append(data, buf[:n]...)
+
+	return
+}
+
+// pds implements the gopacket.PacketDataSource interface.
 type pds struct {
 	conn *packet.Conn
 }
@@ -135,14 +179,21 @@ func (p *pds) ReadPacketData() (data []byte, ci gopacket.CaptureInfo, err error)
 }
 
 func (a *aether) pktioRecvLoop() error {
-	defer a.pktioSock.Close()
-
-	s := pds{
-		conn: a.pktioSock,
+	var src *gopacket.PacketSource
+	if useUnix {
+		// unix
+		defer a.unixSock.Close()
+		// Start decoding from Ethernet later.
+		src = gopacket.NewPacketSource(&uds{conn: a.unixSock}, layers.LayerTypeEthernet)
+	} else {
+		// veth
+		defer a.pktioSock.Close()
+		s := pds{
+			conn: a.pktioSock,
+		}
+		// Start decoding from Ethernet later.
+		src = gopacket.NewPacketSource(&s, layers.LayerTypeEthernet)
 	}
-
-	// Start decoding from Ethernet later.
-	src := gopacket.NewPacketSource(&s, layers.LayerTypeEthernet)
 
 	for pkt := range src.Packets() {
 		log.Warnln(pkt)
@@ -175,6 +226,24 @@ func (a *aether) pktioRecvLoop() error {
 	return nil
 }
 
+func (a *aether) sendPacketOut(buf gopacket.SerializeBuffer) error {
+	if useUnix {
+		// unix
+		_, err := a.unixSock.Write(buf.Bytes())
+		if err != nil {
+			return err
+		}
+	} else {
+		// veth
+		_, err := a.pktioSock.WriteTo(buf.Bytes(), &dummyAddr)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (a *aether) handleARP(pkt gopacket.Packet, arpLayer gopacket.Layer) error {
 	arp, ok := arpLayer.(*layers.ARP)
 	if !ok {
@@ -194,11 +263,6 @@ func (a *aether) handleARP(pkt gopacket.Packet, arpLayer gopacket.Layer) error {
 		// Not for us.
 		if !a.accessIP.Equal(arp.DstProtAddress) {
 			log.Warnln("Unexpected ARP proto dst address", arp.DstProtAddress)
-			return nil
-		}
-
-		raddr, ok := pkt.Metadata().CaptureInfo.AncillaryData[0].(net.Addr)
-		if !ok {
 			return nil
 		}
 
@@ -232,7 +296,7 @@ func (a *aether) handleARP(pkt gopacket.Packet, arpLayer gopacket.Layer) error {
 			return err
 		}
 
-		_, err = a.pktioSock.WriteTo(buf.Bytes(), raddr)
+		err = a.sendPacketOut(buf)
 		if err != nil {
 			return err
 		}
@@ -275,34 +339,29 @@ func (a *aether) handleICMP(pkt gopacket.Packet, eth *layers.Ethernet, icmpLayer
 		return nil
 	}
 
-	raddr, ok := pkt.Metadata().CaptureInfo.AncillaryData[0].(net.Addr)
-	if !ok {
-		return nil
-	}
-
 	ethResp := &layers.Ethernet{
 		SrcMAC:       a.datapathMAC,
 		DstMAC:       eth.SrcMAC,
 		EthernetType: eth.EthernetType,
 	}
 	ipv4Resp := &layers.IPv4{
-		Version:    ipv4.Version,
+		Version: ipv4.Version,
 		//IHL:        0,
 		//Length:     0,
-		Id:         0, // No ID on purpose
-		Flags:      layers.IPv4DontFragment,
-		TTL:        64,
-		Protocol:   ipv4.Protocol,
-		SrcIP:      a.accessIP,
-		DstIP:      ipv4.SrcIP,
+		Id:       0, // No ID on purpose
+		Flags:    layers.IPv4DontFragment,
+		TTL:      64,
+		Protocol: ipv4.Protocol,
+		SrcIP:    a.accessIP,
+		DstIP:    ipv4.SrcIP,
 		//Options:    nil,
 		//Padding:    nil,
 	}
 	icmpResp := &layers.ICMPv4{
-		TypeCode:  layers.ICMPv4TypeEchoReply,
-		Checksum:  0,
-		Id:        icmp.Id,
-		Seq:       icmp.Seq,
+		TypeCode: layers.ICMPv4TypeEchoReply,
+		Checksum: 0,
+		Id:       icmp.Id,
+		Seq:      icmp.Seq,
 	}
 
 	buf := gopacket.NewSerializeBuffer()
@@ -319,7 +378,7 @@ func (a *aether) handleICMP(pkt gopacket.Packet, eth *layers.Ethernet, icmpLayer
 		return err
 	}
 
-	_, err = a.pktioSock.WriteTo(buf.Bytes(), raddr)
+	err = a.sendPacketOut(buf)
 	if err != nil {
 		return err
 	}
@@ -347,7 +406,7 @@ func (a *aether) setupInterfaceClassification() (err error) {
 		priority:    40,
 		dstIp:       ip2int(a.accessIP),
 		dstIpMask:   math.MaxUint32,
-		ipProto:     UdpProto,
+		ipProto:     uint8(UdpProto),
 		ipProtoMask: math.MaxUint8,
 		dstPort:     tunnelGTPUPort,
 		dstPortMask: math.MaxUint16,

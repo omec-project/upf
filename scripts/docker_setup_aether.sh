@@ -131,11 +131,15 @@ if [ "$mode" != 'sim' ]; then
 	setup_trafficgen_routes
 fi
 
+rm -rf /tmp/sockets
+mkdir -p /tmp/sockets
+
 # Run bessd
 docker run --name bess -td --restart unless-stopped \
 	--cpuset-cpus=5-8 \
 	--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
 	-v "$PWD/conf":/opt/bess/bessctl/conf \
+	-v /tmp/sockets:/tmp/sockets \
 	--net container:pause \
 	$PRIVS \
 	$DEVICES \
@@ -159,6 +163,7 @@ sleep 5
 docker run --name bess-pfcpiface -td --restart on-failure \
 	--net container:pause \
 	-v "$PWD/conf/aether.json":/conf/aether.json \
+	-v /tmp/sockets:/tmp/sockets \
 	upf-epc-pfcpiface:"$(<VERSION)" \
 	-config /conf/aether.json
 	#  -simulate create_continue

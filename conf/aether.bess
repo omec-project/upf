@@ -71,6 +71,11 @@ for wid in range(parser.workers):
 #       Port Setup
 # ====================================================
 
+# Explore unix domain socket for packetio
+pktio2 = UnixSocketPort(name='pktio2', path="/tmp/sockets/pktio.sock")
+pktio2Out::PortOut(port='pktio2')
+pktio2In::PortInc(port='pktio2')
+
 dataplane_port = port.Port(parser.interfaces[parser.dataplane_interface]["ifname"], parser.hwcksum, None)
 # initialize port with the configured driver
 dataplane_port.workers = [i for i in range(len(workers))]
@@ -223,13 +228,15 @@ appQERLookup.set_default_gate(gate=qerFailGate)
 #       BPF Setup
 # ====================================================
 bpfUeGatePass = 0
-bpfPacketOutGatePass = MAX_GATES - 1
+bpfPacketOutGatePass = 2
+# bpfPacketOutGatePass = MAX_GATES - 1
 # bpfPacketOutGatePass = dataplane_port.bpf_gate()
 dataplaneBPF = dataplane_port.bpf
 dataplaneBPF:bpfUeGatePass \
     -> dataplaneRxIPCksum::IPChecksum(verify=True, hw=parser.hwcksum) \
     -> dataplaneRxUDPCksum::L4Checksum(verify=True, hw=parser.hwcksum) \
     -> pktParse
+dataplaneBPF:bpfPacketOutGatePass -> pktio2Out
 
 # Add UE traffic filter rules, i.e.:
 # setting filter to detect gtpu traffic
@@ -263,3 +270,5 @@ executeFAR:farForwardUAction \
 
 executeFAR:farForwardDAction \
     -> postDPQosFlowMeasure
+
+pktio2In -> dataplane_port.rtr
