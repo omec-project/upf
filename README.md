@@ -15,7 +15,7 @@ The UPF implementation is a part of the Aether platform.
 
 ## Overview
 
-![UPF overview](./docs/images/upf-overview.png)
+![UPF overview](./docs/images/upf-overview.jpg)
 
 The UPF implementation consists of two layers: 
 
