@@ -18,6 +18,20 @@ const (
 	upfMsgTypeClear
 )
 
+func (u upfMsgType) String() string {
+	if u == upfMsgTypeAdd {
+		return "add"
+	} else if u == upfMsgTypeMod {
+		return "mod"
+	} else if u == upfMsgTypeDel {
+		return "delete" //nolint
+	} else if u == upfMsgTypeClear {
+		return "clear"
+	} else {
+		return "unknown"
+	}
+}
+
 type fastPath interface {
 	/* Close any pending sessions */
 	exit()
