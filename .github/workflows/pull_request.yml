@@ -60,7 +60,7 @@ jobs:
           echo "::set-output name=PORCELAIN::`git status internal/p4constants/ --porcelain`"
       - name: Check P4 constants are updated
         if: ${{ steps.check.outputs.PORCELAIN != '' }}
-        uses: actions/github-script@v3
+        uses: actions/github-script@v6
         with:
           script: |
             core.setFailed('Please run make p4-constants and commit changes')
