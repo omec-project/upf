@@ -73,7 +73,7 @@ Refer to [the SD-Fabric documentation](https://docs.sd-fabric.org/master/index.h
 
 ## Getting started
 
-The UPF project provides two Docker images: `pfcpiface` (the PFCP Agent) and `bess` (the BESS-based UPF data plane). 
+This repository provides code to build two Docker images: `pfcpiface` (the PFCP Agent) and `bess` (the BESS-based fastpath). 
 
 To build all Docker images run:
 
