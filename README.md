@@ -19,11 +19,15 @@ This UPF implementation is actively used as part of [the Aether platform](https:
 The UPF implementation consists of two layers: 
 
 - **PFCP Agent:** (_pfcpiface_) a Go-based implementation of the PFCP northbound API used to interact with the mobile core control plane.
-- **fastpath** implements a data plane of UPF. The PFCP Agent implements fastpath plugins that translate the 
-  PFCP semantics to the fastpath-specific data plane configuration. We currently support two fastpath implementations: 
-  - BESS-UPF - the UPF implementation that is build on top of [Berkeley Extensible Software Switch](https://github.com/NetSys/bess/) (BESS) programmable framework.
+- **Fastpath:** responsible for the actual data plane packet processing.
+
+The PFCP Agent implements fastpath plugins that translate 
+  PFCP messages to fastpath-specific configurations. We currently support two fastpath implementations: 
+  - BESS: a software-based fastpath built on top of the [Berkeley Extensible Software Switch](https://github.com/NetSys/bess/) (BESS) framework.
     Please see the ONFConnect 2019 [talk](https://www.youtube.com/watch?v=fqJGWcwcOxE) for more details. You can also see demo videos [here](https://www.youtube.com/watch?v=KxK64jalKHw) and [here](https://youtu.be/rWnZuJeUWi4).
-  - [UP4](https://github.com/omec-project/up4) - the open-source P4-based UPF implementation, which is a part of the SD-Fabric project. Note that UP4 and P4-UPF names are exchangeable.
+  - [UP4](https://github.com/omec-project/up4) - an implementation leveraging ONOS and P4-programmable switches to realize a hardware-based fastpath. 
+ 
+The combination of PFCP Agent and UP4 is usually referred to as P4-UPF. While BESS-UPF denotes the combination of PFCP Agent and the BESS fastpath.
   
 The UPF fastpaths are abstracted via the Fastpath API, which provides the means to communicate with the data plane.
 This design makes the UPF implementation extensible, enabling integration of new UPF fastpaths.
