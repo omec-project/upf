@@ -63,6 +63,8 @@ QoS Enforcement Rules (QERs).
 * Service Data Flow (SDF) configuration via N4/PFCP.
 * I-UPF/A-UPF ULCL/Branching i.e., simultaneous N6/N9 support within PFCP session
 * Downlink Data Notification (DDN) - notification only (no buffering)
+* Basic QoS support, with per-slice and per-session rate limiting
+* Per-flow latency and throughput metrics  
 * Network Token Functions (_**experimental**_)
 
 **P4-UPF**
@@ -87,7 +89,7 @@ To build a selected image use `DOCKER_TARGETS`:
 DOCKER_TARGETS=pfcpiface make docker-build
 ```
 
-The latest Docker images are also published in [the OMEC project's Github registry](https://github.com/orgs/omec-project/packages?repo_name=upf).
+The latest Docker images are also published in the OMEC project's DockerHub registry: [upf-epc-bess](https://hub.docker.com/r/omecproject/upf-epc-bess), [upf-epc-pfcpiface](https://hub.docker.com/r/omecproject/upf-epc-pfcpiface).
 
 ### Installation
 
@@ -144,4 +146,4 @@ To report any other kind of problem, feel free to open a GitHub Issue or reach o
 
 ## License
 
-The UPF implementation is licensed under the [Apache License, version 2.0](./LICENSES/Apache-2.0.txt). 
+The project is licensed under the [Apache License, version 2.0](./LICENSES/Apache-2.0.txt). 
