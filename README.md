@@ -9,9 +9,8 @@ Copyright 2019 Intel Corporation
 
 [![Build Status](https://jenkins.onosproject.org/buildStatus/icon?job=bess-upf-linerate-tests&subject=Linerate+Tests)](https://jenkins.onosproject.org/job/bess-upf-linerate-tests/)
 
-This project implements User Plane Function (UPF) - the 4G/5G mobile user plane compliant with 3GPP TS 23.501. 
-It follows the 3GPP CUPS (Control and User Plane Separation) architecture, making use of the PFCP protocol for the communication between SMF (5G) or SPGW-C (4G) and UPF.
-The UPF implementation is a part of [the Aether platform](https://opennetworking.org/aether/). 
+This project implements a 4G/5G User Plane Function (UPF) compliant with 3GPP TS 23.501. It follows the 3GPP Control and User Plane Separation (CUPS) architecture, making use of the PFCP protocol for the communication between SMF (5G) or SPGW-C (4G) and UPF.
+This UPF implementation is actively used as part of [the Aether platform](https://opennetworking.org/aether/) in conjunction with the SD-Core mobile core control plane. 
 
 ## Overview
 
