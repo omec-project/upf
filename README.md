@@ -71,7 +71,7 @@ QoS Enforcement Rules (QERs).
 
 P4-UPF implements a core set of features capable of supporting requirements for a broad range of enterprise use cases.
 See [the ONF's blog post](https://opennetworking.org/news-and-events/blog/using-p4-and-programmable-switches-to-implement-a-4g-5g-upf-in-aether/) for an overview of P4-UPF. 
-Refer to [the SD-Fabric documentation](https://docs.sd-fabric.org/master/index.html) for the detailed feature set.
+Refer to [the SD-Fabric documentation](https://docs.sd-fabric.org/master/advanced/upf.html) for the detailed feature set.
 
 ## Getting started
 
