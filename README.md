@@ -29,9 +29,7 @@ The PFCP Agent implements fastpath plugins that translate
  
 The combination of PFCP Agent and UP4 is usually referred to as P4-UPF. While BESS-UPF denotes the combination of PFCP Agent and the BESS fastpath.
   
-The UPF fastpaths are abstracted via the Fastpath API, which provides the means to communicate with the data plane.
-This design makes the UPF implementation extensible, enabling integration of new UPF fastpaths.
-Note that the PFCP Agent logic (e.g. handling of PFCP messages) is common and does need to be adjusted for new UPF fastpaths.
+PFCP Agent internally abstracts different fastpaths using a common API, while the different plug-ins can use spcific southbound protocols to communicate with the different fastpath instances. Support for new fastpaths can be provided by implementing new plugins.
 
 ### Feature List
 
