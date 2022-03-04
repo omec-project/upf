@@ -108,110 +108,6 @@ def list_port_status(port_status: dict) -> None:
         print("States from port {}: \n{}".format(port, readable_stats))
 
 
-def monitor_port_stats(c: STLClient) -> dict:
-    """
-    List some port stats continuously while traffic is active 
-
-    :parameters:
-    c: STLClient
-        TRex stateless client to continuously grab statistics from
-    """
-    ports = [0, 1, 2, 3]
-
-    results = {
-        "duration": [],
-        0: {"rx_bps": [], "tx_bps": [], "rx_pps": [], "tx_pps": []},
-        1: {"rx_bps": [], "tx_bps": [], "rx_pps": [], "tx_pps": []},
-        2: {"rx_bps": [], "tx_bps": [], "rx_pps": [], "tx_pps": []},
-        3: {"rx_bps": [], "tx_bps": [], "rx_pps": [], "tx_pps": []},
-    }
-
-    prev = {
-        0: {
-            "opackets": 0,
-            "ipackets": 0,
-            "obytes": 0,
-            "ibytes": 0,
-            "time": time.time(),
-        },
-        1: {
-            "opackets": 0,
-            "ipackets": 0,
-            "obytes": 0,
-            "ibytes": 0,
-            "time": time.time(),
-        },
-        2: {
-            "opackets": 0,
-            "ipackets": 0,
-            "obytes": 0,
-            "ibytes": 0,
-            "time": time.time(),
-        },
-        3: {
-            "opackets": 0,
-            "ipackets": 0,
-            "obytes": 0,
-            "ibytes": 0,
-            "time": time.time(),
-        },
-    }
-
-    s_time = time.time()
-    while c.is_traffic_active():
-        stats = c.get_stats(ports=ports)
-        if not stats:
-            break
-
-        print("\nTRAFFIC RUNNING {:.2f} SEC".format(time.time() - s_time))
-        print(
-            "{:^4} | {:<10} | {:<10} | {:<10} | {:<10} |".format(
-                "Port", "RX bps", "TX bps", "RX pps", "TX pps"
-            )
-        )
-        print("----------------------------------------------------------")
-
-        for port in ports:
-
-            opackets = stats[port]["opackets"]
-            ipackets = stats[port]["ipackets"]
-            obytes = stats[port]["obytes"]
-            ibytes = stats[port]["ibytes"]
-            time_diff = time.time() - prev[port]["time"]
-
-            rx_bps = 8 * (ibytes - prev[port]["ibytes"]) / time_diff
-            tx_bps = 8 * (obytes - prev[port]["obytes"]) / time_diff
-            rx_pps = ipackets - prev[port]["ipackets"] / time_diff
-            tx_pps = opackets - prev[port]["opackets"] / time_diff
-
-            print(
-                "{:^4} | {:<10} | {:<10} | {:<10} | {:<10} |".format(
-                    port,
-                    to_readable(rx_bps, "bps"),
-                    to_readable(tx_bps, "bps"),
-                    to_readable(rx_pps, "pps"),
-                    to_readable(tx_pps, "pps"),
-                )
-            )
-
-            results["duration"].append(time.time() - s_time)
-            results[port]["rx_bps"].append(rx_bps)
-            results[port]["tx_bps"].append(tx_bps)
-            results[port]["rx_pps"].append(rx_pps)
-            results[port]["tx_pps"].append(tx_pps)
-
-            prev[port]["opackets"] = opackets
-            prev[port]["ipackets"] = ipackets
-            prev[port]["obytes"] = obytes
-            prev[port]["ibytes"] = ibytes
-            prev[port]["time"] = time.time()
-
-        time.sleep(1)
-        print("")
-
-    return results
-
-
 LatencyStats = collections.namedtuple(
     "LatencyStats",
     [
@@ -265,6 +161,120 @@ PortStats = collections.namedtuple(
         "rx_util",
     ],
 )
+
+
+RateSamples = collections.namedtuple(
+    "RateSamples",
+    [
+        "tx_bps",
+        "tx_pps",
+        "rx_bps",
+        "rx_pps",
+    ],
+)
+
+
+def start_and_monitor_port_stats(
+        client: STLClient, num_samples: int, tx_port: int,
+        rx_port: int, min_tx_bps: int = 0,
+        ramp_up_timeout: int = 3, interval: int = 1) -> RateSamples:
+    """
+    Starts traffic generation and collects port TX/RX rate samples,
+    while verifying that TRex is able to reach the given minimum sending
+    rate.
+
+    :param client: TRex client
+    :param num_samples: number of samples to collect before stopping traffic
+    :param tx_port: sending port
+    :param rx_port: receiving port
+    :param min_tx_bps: minimum sending rate to deem the collected samples valid
+    :param ramp_up_timeout: how many seconds to wait before TRex can reach min_tx_bps
+    :param interval: sampling interval in seconds
+    :return:
+    """
+
+    samples = RateSamples(tx_bps=[], tx_pps=[], rx_bps=[], rx_pps=[])
+    ports = [tx_port, rx_port]
+    duration = (num_samples * interval + ramp_up_timeout) * 2
+    start_time = time.time()
+
+    prev = {
+        p: {
+            "opackets": 0,
+            "ipackets": 0,
+            "obytes": 0,
+            "ibytes": 0,
+            "time": start_time,
+        }
+        for p in ports
+    }
+
+    client.start(ports=[tx_port], duration=duration)
+
+    time.sleep(interval)
+    while client.is_traffic_active():
+        stats = client.get_stats(ports=ports)
+
+        sample_time = time.time()
+        elapsed = sample_time - start_time
+
+        # Compute samples per-port
+        tx_bps, tx_pps, rx_bps, rx_pps = 0, 0, 0, 0
+        for port in ports:
+            opackets = stats[port]["opackets"]
+            ipackets = stats[port]["ipackets"]
+            obytes = stats[port]["obytes"]
+            ibytes = stats[port]["ibytes"]
+            time_diff = sample_time - prev[port]["time"]
+
+            if port == tx_port:
+                tx_bps = 8 * (obytes - prev[port]["obytes"]) / time_diff
+                tx_pps = opackets - prev[port]["opackets"] / time_diff
+                samples.tx_bps.append(tx_bps)
+                samples.tx_pps.append(tx_pps)
+            else:
+                rx_bps = 8 * (ibytes - prev[port]["ibytes"]) / time_diff
+                rx_pps = ipackets - prev[port]["ipackets"] / time_diff
+                samples.rx_bps.append(rx_bps)
+                samples.rx_pps.append(rx_pps)
+
+            prev[port]["opackets"] = opackets
+            prev[port]["ipackets"] = ipackets
+            prev[port]["obytes"] = obytes
+            prev[port]["ibytes"] = ibytes
+            prev[port]["time"] = sample_time
+
+        bad_sample = tx_bps < min_tx_bps
+        # Loss is approximated due to non-atomic reads of TX and RX ports
+        loss_rate = (tx_pps - rx_pps) / tx_pps
+        print(f" {elapsed:.2f}s: "
+              f"TX {to_readable(tx_bps)} ({to_readable(tx_pps, 'pps')}) "
+              f"--> RX {to_readable(rx_bps)} "
+              f"(~{abs(loss_rate):.1%} pkt loss)"
+              f"{' *' if bad_sample else ''}")
+
+        if bad_sample:
+            if elapsed > ramp_up_timeout:
+                client.stop(ports=[tx_port])
+                raise Exception(
+                    f"TX port ({tx_port}) did not reach or sustain "
+                    f"min sending rate ({to_readable(min_tx_bps)})")
+            else:
+                # Discard last sample
+                samples.tx_bps.pop()
+                samples.tx_pps.pop()
+                samples.rx_bps.pop()
+                samples.rx_pps.pop()
+
+        if len(samples.tx_bps) == num_samples:
+            # We have enough samples.
+            client.stop(ports=[tx_port])
+            client.wait_on_traffic(ports=[tx_port], timeout=2)
+            break
+
+        time.sleep(interval - elapsed % interval)
+
+    return samples
 
 
 def get_port_stats(port: int, stats) -> PortStats:
