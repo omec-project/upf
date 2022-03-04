@@ -2,3 +2,4 @@
 # Copyright 2019 Intel Corporation
 *       text    eol=lf
 *.bess  text    diff=python
+*.jpg   binary
