@@ -19,7 +19,7 @@ The UPF implementation is a part of [the Aether platform](https://opennetworking
 
 The UPF implementation consists of two layers: 
 
-- **the PFCP Agent** (_pfcpiface_) implements the northbound interface of UPF and exposes the PFCP endpoint to the 4G/5G control plane.
+- **PFCP Agent:** (_pfcpiface_) a Go-based implementation of the PFCP northbound API used to interact with the mobile core control plane.
 - **fastpath** implements a data plane of UPF. The PFCP Agent implements fastpath plugins that translate the 
   PFCP semantics to the fastpath-specific data plane configuration. We currently support two fastpath implementations: 
   - BESS-UPF - the UPF implementation that is build on top of [Berkeley Extensible Software Switch](https://github.com/NetSys/bess/) (BESS) programmable framework.
