@@ -25,7 +25,7 @@ The PFCP Agent implements fastpath plugins that translate
   PFCP messages to fastpath-specific configurations. We currently support two fastpath implementations: 
   - BESS: a software-based fastpath built on top of the [Berkeley Extensible Software Switch](https://github.com/NetSys/bess/) (BESS) framework.
     Please see the ONFConnect 2019 [talk](https://www.youtube.com/watch?v=fqJGWcwcOxE) for more details. You can also see demo videos [here](https://www.youtube.com/watch?v=KxK64jalKHw) and [here](https://youtu.be/rWnZuJeUWi4).
-  - [UP4](https://github.com/omec-project/up4) - an implementation leveraging ONOS and P4-programmable switches to realize a hardware-based fastpath. 
+  - [UP4](https://github.com/omec-project/up4): an implementation leveraging ONOS and P4-programmable switches to realize a hardware-based fastpath. 
  
 The combination of PFCP Agent and UP4 is usually referred to as P4-UPF. While BESS-UPF denotes the combination of PFCP Agent and the BESS fastpath.
   
