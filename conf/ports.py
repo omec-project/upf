@@ -2,10 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2019 Intel Corporation
 
-from conf.parser import *
-import conf
 import inspect
 import sys
+
+import conf
+from conf.parser import *
 
 
 def setup_globals():
@@ -38,7 +39,7 @@ def scan_dpdk_ports():
         idx += 1
         # RTE_MAX_ETHPORTS is 32 and we need 2 for vdevs
         if idx == 30:
-          break
+            break
     return True if dpdk_ports else False
 
 
@@ -64,15 +65,15 @@ class Port:
             self.bpfgate += 1
             return self.bpfgate
         else:
-            raise Exception('Port {}: Out of BPF gates to allocate'.format(self.name))
+            raise Exception("Port {}: Out of BPF gates to allocate".format(self.name))
 
     def detect_mode(self):
         mode = None
         try:
             peer_by_interface(self.name)
-            mode = 'dpdk'
+            mode = "dpdk"
         except:
-            mode = 'linux'
+            mode = "linux"
         return mode
 
     def configure_flow_profiles(self, iface):
@@ -89,14 +90,17 @@ class Port:
         self.fpo = WorkerSplit(name="{}QSplit".format(name))
 
         for qid in range(self.num_q):
-            fpi = QueueInc(name="{}Q{}FastPI".format(name, qid), port=fast.name, qid=qid)
+            fpi = QueueInc(
+                name="{}Q{}FastPI".format(name, qid), port=fast.name, qid=qid
+            )
             fpi.connect(next_mod=self.fpi)
             # Attach fastpath to worker's root TC
             fpi.attach_task(wid=qid)
 
-            fpo = QueueOut(name="{}Q{}FastPO".format(name, qid), port=fast.name, qid=qid)
+            fpo = QueueOut(
+                name="{}Q{}FastPO".format(name, qid), port=fast.name, qid=qid
+            )
             self.fpo.connect(next_mod=fpo, ogate=qid)
-
 
         # Initialize BPF to classify incoming traffic to go to kernel and/or pipeline
         self.bpf = BPF(name="{}FastBPF".format(name))
@@ -106,50 +110,68 @@ class Port:
         self.rtr = IPLookup(name="{}Routes".format(name))
 
         # Default route goes to Sink
-        self.rtr.add(prefix='0.0.0.0', prefix_len=0, gate=MAX_GATES-1)
+        self.rtr.add(prefix="0.0.0.0", prefix_len=0, gate=MAX_GATES - 1)
         s = Sink(name="{}bad_route".format(name))
-        self.rtr.connect(next_mod=s, ogate=MAX_GATES-1)
+        self.rtr.connect(next_mod=s, ogate=MAX_GATES - 1)
 
     def init_port(self, idx, conf_mode):
 
         name = self.name
         num_q = len(self.workers)
         self.num_q = num_q
-        print('Setting up port {} on worker ids {}'.format(name, self.workers))
+        print("Setting up port {} on worker ids {}".format(name, self.workers))
 
         # Detect the mode of this interface - DPDK/AF_XDP/AF_PACKET
         if conf_mode is None:
             conf_mode = self.detect_mode()
 
-        if conf_mode not in ['af_xdp', 'linux', 'dpdk', 'af_packet', 'sim']:
-            raise Exception('Invalid mode: {} selected.'.format(conf_mode))
+        if conf_mode not in ["af_xdp", "linux", "dpdk", "af_packet", "sim"]:
+            raise Exception("Invalid mode: {} selected.".format(conf_mode))
 
-        if conf_mode in ['af_xdp', 'linux']:
+        if conf_mode in ["af_xdp", "linux"]:
             try:
                 # Initialize kernel fastpath.
                 # AF_XDP requires that num_rx_qs == num_tx_qs
-                kwargs = {"vdev" : "net_af_xdp{},iface={},start_queue=0,queue_count={}"
-                          .format(idx, name, num_q), "num_out_q": num_q, "num_inc_q": num_q}
+                kwargs = {
+                    "vdev": "net_af_xdp{},iface={},start_queue=0,queue_count={}".format(
+                        idx, name, num_q
+                    ),
+                    "num_out_q": num_q,
+                    "num_inc_q": num_q,
+                }
                 self.init_fastpath(**kwargs)
             except:
-                if conf_mode == 'linux':
-                    print('Failed to create AF_XDP socket for {}. Retrying with AF_PACKET socket...'.format(name))
-                    conf_mode = 'af_packet'
+                if conf_mode == "linux":
+                    print(
+                        "Failed to create AF_XDP socket for {}. Retrying with AF_PACKET socket...".format(
+                            name
+                        )
+                    )
+                    conf_mode = "af_packet"
                 else:
-                    print('Failed to create AF_XDP socket for {}. Exiting...'.format(name))
+                    print(
+                        "Failed to create AF_XDP socket for {}. Exiting...".format(name)
+                    )
                     sys.exit()
 
-        if conf_mode == 'af_packet':
+        if conf_mode == "af_packet":
             try:
                 # Initialize kernel fastpath
-                kwargs = {"vdev" : "net_af_packet{},iface={},qpairs={}"
-                          .format(idx, name, num_q), "num_out_q": num_q, "num_inc_q": num_q}
+                kwargs = {
+                    "vdev": "net_af_packet{},iface={},qpairs={}".format(
+                        idx, name, num_q
+                    ),
+                    "num_out_q": num_q,
+                    "num_inc_q": num_q,
+                }
                 self.init_fastpath(**kwargs)
             except:
-                print('Failed to create AF_PACKET socket for {}. Exiting...'.format(name))
+                print(
+                    "Failed to create AF_PACKET socket for {}. Exiting...".format(name)
+                )
                 sys.exit()
 
-        if conf_mode == 'sim':
+        if conf_mode == "sim":
             self.fpi = Source(name="{}_source".format(name))
             self.fpo = Sink(name="{}_out".format(name))
             self.bpf = BPF(name="{}FastBPF".format(name))
@@ -158,29 +180,44 @@ class Port:
             # Attach fastpath to worker's root TC
             self.fpi.attach_task(wid=0)
 
-        if conf_mode == 'dpdk':
+        if conf_mode == "dpdk":
             kwargs = None
             pci = alias_by_interface(name)
             if pci is not None:
-                kwargs = {"pci": pci, "num_out_q": num_q, "num_inc_q": num_q, "hwcksum": self.hwcksum, "flow_profiles": self.flow_profiles}
+                kwargs = {
+                    "pci": pci,
+                    "num_out_q": num_q,
+                    "num_inc_q": num_q,
+                    "hwcksum": self.hwcksum,
+                    "flow_profiles": self.flow_profiles,
+                }
                 try:
                     self.init_fastpath(**kwargs)
                 except:
                     kwargs = None
-                    print('Unable to initialize {} fastpath using alias {},\
-                        falling back to scan'.format(name, pci))
+                    print(
+                        "Unable to initialize {} fastpath using alias {},\
+                        falling back to scan".format(
+                            name, pci
+                        )
+                    )
             if kwargs is None:
                 # Fallback to scanning ports
                 # if port list is empty, scan for dpdk_ports first
                 if not dpdk_ports and scan_dpdk_ports() == False:
-                    print('Registered dpdk ports do not exist.')
+                    print("Registered dpdk ports do not exist.")
                     sys.exit()
                 # Initialize DPDK fastpath
                 fidx = dpdk_ports.get(mac_by_interface(name))
                 if fidx is None:
-                    raise Exception(
-                        'Registered port for {} not detected!'.format(name))
-                kwargs = {"port_id": fidx, "num_out_q": num_q, "num_inc_q": num_q, "hwcksum": self.hwcksum, "flow_profiles": self.flow_profiles}
+                    raise Exception("Registered port for {} not detected!".format(name))
+                kwargs = {
+                    "port_id": fidx,
+                    "num_out_q": num_q,
+                    "num_inc_q": num_q,
+                    "hwcksum": self.hwcksum,
+                    "flow_profiles": self.flow_profiles,
+                }
                 self.init_fastpath(**kwargs)
 
             # Initialize kernel slowpath port and RX/TX modules
@@ -196,8 +233,11 @@ class Port:
                 # Should always be set to lowest priority
                 HostGate = MAX_GATES - 1
                 ips = ips_by_interface(name)
-                host_ip_filter = {"priority": -HostGate, "filter": "dst host "
-                                + " or ".join(str(x) for x in ips), "gate": HostGate}
+                host_ip_filter = {
+                    "priority": -HostGate,
+                    "filter": "dst host " + " or ".join(str(x) for x in ips),
+                    "gate": HostGate,
+                }
 
                 self.bpf.add(filters=[host_ip_filter])
 
@@ -208,9 +248,9 @@ class Port:
                 # Direct control traffic from kernel to DPDK
                 spi.connect(next_mod=self.fpo)
 
-                tc = 'slow{}'.format(0)
+                tc = "slow{}".format(0)
                 try:
-                    bess.add_tc(tc, policy='round_robin', wid=0)
+                    bess.add_tc(tc, policy="round_robin", wid=0)
                 except Exception as e:
                     if e.errmsg == "Name '{}' already exists".format(tc):
                         pass
@@ -218,19 +258,28 @@ class Port:
                         raise e
                 # Limit scheduling slow path RX/TX to 1000 times/second each
                 for mod in spi, qspo:
-                    bess.add_tc(mod.name,
-                            parent=tc,
-                            policy='rate_limit',
-                            resource='count',
-                            limit={'count': 1000})
+                    bess.add_tc(
+                        mod.name,
+                        parent=tc,
+                        policy="rate_limit",
+                        resource="count",
+                        limit={"count": 1000},
+                    )
                     mod.attach_task(mod.name)
             except Exception as e:
-                print('Mirror veth interface: {} misconfigured: {}'.format(name, e))
+                print("Mirror veth interface: {} misconfigured: {}".format(name, e))
 
         # Finall set conf mode
         self.mode = conf_mode
 
-    def setup_port(self, conf_frag_mtu, conf_defrag_flows, conf_measure, type_of_packets = "", **seq_kwargs):
+    def setup_port(
+        self,
+        conf_frag_mtu,
+        conf_defrag_flows,
+        conf_measure,
+        type_of_packets="",
+        **seq_kwargs
+    ):
         out = self.fpo
         inc = self.fpi
         gate = 0
@@ -244,8 +293,10 @@ class Port:
             out = frag
 
         # create rewrite module if mode == 'sim'
-        if self.mode == 'sim':
-            rewrite = Rewrite(name="{}_rewrite".format(self.name), templates=type_of_packets)
+        if self.mode == "sim":
+            rewrite = Rewrite(
+                name="{}_rewrite".format(self.name), templates=type_of_packets
+            )
             update = SequentialUpdate(name="{}_update".format(self.name), **seq_kwargs)
             udpcsum = L4Checksum()
             ipcsum = IPChecksum()
@@ -269,7 +320,11 @@ class Port:
             inc = t
 
         if conf_defrag_flows is not None:
-            defrag = IPDefrag(name="{}IP4Defrag".format(self.name), num_flows=conf_defrag_flows, numa=-1)
+            defrag = IPDefrag(
+                name="{}IP4Defrag".format(self.name),
+                num_flows=conf_defrag_flows,
+                numa=-1,
+            )
             s = Sink(name="{}DefragFail".format(self.name))
             defrag.connect(next_mod=s)
             inc.connect(next_mod=defrag)
@@ -282,12 +337,12 @@ class Port:
         # Attach nat module (if enabled)
         if self.ext_addrs is not None:
             # Tokenize the string
-            addrs = self.ext_addrs.split(' or ')
+            addrs = self.ext_addrs.split(" or ")
             # Make a list of ext_addr
             nat_list = list()
             for addr in addrs:
                 nat_dict = dict()
-                nat_dict['ext_addr'] = addr
+                nat_dict["ext_addr"] = addr
                 nat_list.append(nat_dict)
 
             # Create the NAT module
@@ -296,9 +351,12 @@ class Port:
             out = self.nat
 
         # Set src mac address on Ethernet header for egress pkts
-        update = Update(name="{}SrcEther".format(self.name), fields=[
-            {'offset': 6, 'size': 6, 'value': mac2hex(mac_by_interface(self.name))}
-            ])
+        update = Update(
+            name="{}SrcEther".format(self.name),
+            fields=[
+                {"offset": 6, "size": 6, "value": mac2hex(mac_by_interface(self.name))}
+            ],
+        )
 
         # Attach Update module to the 'outlist' of modules
         update.connect(out)
@@ -309,5 +367,5 @@ class Port:
         # Attach it to merge
         merge.connect(update)
 
-        if self.mode == 'sim':
+        if self.mode == "sim":
             self.rtr = merge

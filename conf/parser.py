@@ -4,6 +4,7 @@
 
 # for errnos
 import errno
+
 # for get_env
 from conf.utils import *
 
@@ -22,7 +23,7 @@ MAX_GATES = 8192
 
 class Parser:
     def __init__(self, fname):
-        self.name = get_env('CONF_FILE', fname)
+        self.name = get_env("CONF_FILE", fname)
         self.conf = get_json_conf(self.name, False)
         self.max_ip_defrag_flows = None
         self.ip_frag_with_eth_mtu = None
@@ -63,36 +64,40 @@ class Parser:
             self.max_ip_defrag_flows = int(self.conf["max_ip_defrag_flows"])
         except ValueError:
             print(
-                'Invalid value for max_ip_defrag_flows. Not installing IP4Defrag module.')
+                "Invalid value for max_ip_defrag_flows. Not installing IP4Defrag module."
+            )
         except KeyError:
-            print('max_ip_defrag_flows value not set. Not installing IP4Defrag module.')
+            print("max_ip_defrag_flows value not set. Not installing IP4Defrag module.")
 
         # Enable ip4 fragmentation
         try:
             self.ip_frag_with_eth_mtu = int(self.conf["ip_frag_with_eth_mtu"])
         except ValueError:
             print(
-                'Invalid value for ip_frag_with_eth_mtu. Not installing IP4Frag module.')
+                "Invalid value for ip_frag_with_eth_mtu. Not installing IP4Frag module."
+            )
         except KeyError:
-            print('ip_frag_with_eth_mtu value not set. Not installing IP4Frag module.')
+            print("ip_frag_with_eth_mtu value not set. Not installing IP4Frag module.")
 
         # Enable PDU Session container
         try:
             self.gtppsc = bool(self.conf["gtppsc"])
         except KeyError:
-            print('gtppsc not set. Default: Not adding PDU Session Container extension header')
+            print(
+                "gtppsc not set. Default: Not adding PDU Session Container extension header"
+            )
 
         # Enable hardware checksum
         try:
             self.hwcksum = bool(self.conf["hwcksum"])
         except KeyError:
-            print('hwcksum not set, using default software fallback')
+            print("hwcksum not set, using default software fallback")
 
         # Enable DDP
         try:
             self.ddp = bool(self.conf["ddp"])
         except KeyError:
-            print('ddp not set, using default software fallback')
+            print("ddp not set, using default software fallback")
 
         # Telemtrics
         # See this link for details:
@@ -100,22 +105,25 @@ class Parser:
         try:
             self.measure_upf = self.conf["measure_upf"]
         except KeyError:
-            print('measure_upf value not set. Not installing Measure module.')
+            print("measure_upf value not set. Not installing Measure module.")
 
         # Fetch interfaces
         for iface in ifaces:
             try:
                 self.interfaces[iface] = self.conf[iface]
             except KeyError:
-                self.interfaces[iface] = {'ifname': iface}
-                print('Can\'t read {} interface. Setting it to default ({}).'.format(
-                    iface, iface))
+                self.interfaces[iface] = {"ifname": iface}
+                print(
+                    "Can't read {} interface. Setting it to default ({}).".format(
+                        iface, iface
+                    )
+                )
 
         # Detect mode. Default is dpdk
         try:
             self.mode = self.conf["mode"]
         except KeyError:
-            print('Autodetecting network driver')
+            print("Autodetecting network driver")
 
         # params for simulation
         try:
@@ -131,15 +139,15 @@ class Parser:
             self.sim_pkt_size = self.conf["sim"]["pkt_size"]
             self.sim_total_flows = self.conf["sim"]["total_flows"]
         except ValueError:
-            print('Invalid sim mode fields added.')
+            print("Invalid sim mode fields added.")
         except KeyError:
-            print('Sim mode not selected.')
+            print("Sim mode not selected.")
 
         # Parse workers
         try:
             self.workers = int(self.conf["workers"])
         except ValueError:
-            print('Invalid workers value! Re-setting # of workers to 1.')
+            print("Invalid workers value! Re-setting # of workers to 1.")
 
         # Interface names
         try:
@@ -148,8 +156,11 @@ class Parser:
         except KeyError:
             self.access_ifname = "access"
             self.core_ifname = "core"
-            print('Can\'t parse interface name(s)! Setting it to default values ({}, {})'.format(
-                "access", "core"))
+            print(
+                "Can't parse interface name(s)! Setting it to default values ({}, {})".format(
+                    "access", "core"
+                )
+            )
 
         # Slice rate limits
         try:
@@ -162,33 +173,41 @@ class Parser:
         try:
             self.notify_sockaddr = self.conf["notify_sockaddr"]
         except KeyError:
-            print('Can\'t parse unix socket paths for notify! Setting it to default values ({})'.format(
-                "/tmp/notifycp"))
+            print(
+                "Can't parse unix socket paths for notify! Setting it to default values ({})".format(
+                    "/tmp/notifycp"
+                )
+            )
 
         # UnixPort Paths
         try:
             self.endmarker_sockaddr = self.conf["endmarker_sockaddr"]
         except KeyError:
-            print('Can\'t parse unix socket paths for end marker! Setting it to default values ({})'.format(
-                "/tmp/pfcpport"))
+            print(
+                "Can't parse unix socket paths for end marker! Setting it to default values ({})".format(
+                    "/tmp/pfcpport"
+                )
+            )
         # Network Token Function
         try:
-            self.enable_ntf = bool(self.conf['enable_ntf'])
+            self.enable_ntf = bool(self.conf["enable_ntf"])
         except KeyError:
-            print('Network Token Function disabled')
+            print("Network Token Function disabled")
 
         # Flow measurements
         try:
-            self.measure_flow = bool(self.conf['measure_flow'])
+            self.measure_flow = bool(self.conf["measure_flow"])
         except KeyError:
-            print('Flow measurement function disabled')
+            print("Flow measurement function disabled")
 
         # Table sizes
         try:
             self.table_size_pdr_lookup = self.conf["table_sizes"]["pdrLookup"]
             self.table_size_flow_measure = self.conf["table_sizes"]["flowMeasure"]
             self.table_size_app_qer_lookup = self.conf["table_sizes"]["appQERLookup"]
-            self.table_size_session_qer_lookup = self.conf["table_sizes"]["sessionQERLookup"]
+            self.table_size_session_qer_lookup = self.conf["table_sizes"][
+                "sessionQERLookup"
+            ]
             self.table_size_far_lookup = self.conf["table_sizes"]["farLookup"]
         except KeyError:
             print("No explicit table sizes")

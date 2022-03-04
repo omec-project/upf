@@ -186,7 +186,10 @@ def main():
         description="Start TRex daemon client and run PTF command"
     )
     parser.add_argument(
-        "--ptf-dir", help="Directory containing PTF tests", type=str, required=True,
+        "--ptf-dir",
+        help="Directory containing PTF tests",
+        type=str,
+        required=True,
     )
     parser.add_argument(
         "--trex-address",
@@ -229,12 +232,14 @@ def main():
             trex_args = None
         else:
             trex_args = "--software --no-hw-flow-stat"
-        
+
         trex_daemon_client = CTRexClient(args.trex_address, trex_args=trex_args)
 
         info("Starting TRex daemon client...")
         success = set_up_trex_server(
-            trex_daemon_client, args.trex_address, args.trex_config,
+            trex_daemon_client,
+            args.trex_address,
+            args.trex_config,
         )
         if not success:
             error("Failed to set up TRex daemon client!")

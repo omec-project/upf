@@ -5,18 +5,16 @@ from collections import namedtuple
 from functools import wraps
 from pprint import pprint
 
+import bess_msg_pb2 as bess_msg
 import grpc
+import module_msg_pb2 as module_msg
 import ptf.testutils as testutils
+import service_pb2_grpc as pb
+import util_msg_pb2 as util_msg
 from google.protobuf import text_format
 from google.protobuf.any_pb2 import Any
 from google.protobuf.json_format import MessageToDict
 from ptf.base_tests import BaseTest
-
-import bess_msg_pb2 as bess_msg
-import module_msg_pb2 as module_msg
-import service_pb2_grpc as pb
-import util_msg_pb2 as util_msg
-
 # initialize useful variables
 from trex_test import TrexTest
 
@@ -39,6 +37,7 @@ GATE_DROP = 0x5
 GATE_UNMETER = 0x6
 
 QFI_DEFAULT = 9
+
 
 class GrpcTest(BaseTest):
     """Define a base test for communicating with BESS over gRPC messages
@@ -70,7 +69,9 @@ class GrpcTest(BaseTest):
             timeout=timeout,
         )
         if raise_error and response.error.code != 0:
-            raise Exception(f"{request.name} {request.cmd}: {response.error.errmsg} (code {response.error.code})")
+            raise Exception(
+                f"{request.name} {request.cmd}: {response.error.errmsg} (code {response.error.code})"
+            )
         return response
 
     def getPortStats(self, ifname):
@@ -78,7 +79,7 @@ class GrpcTest(BaseTest):
         # `docker exec -it bess ./bessctl`
         # `$ show port`
         req = bess_msg.GetPortStatsRequest(
-            name = ifname + "Fast",
+            name=ifname + "Fast",
         )
 
         return self.bess_client.GetPortStats(req)
@@ -95,9 +96,9 @@ class GrpcTest(BaseTest):
 
         response = self.sendModuleCommand(
             bess_msg.CommandRequest(
-                name = module,
-                cmd = "read",
-                arg = any,
+                name=module,
+                cmd="read",
+                arg=any,
             )
         )
 
@@ -153,7 +154,7 @@ class GrpcTest(BaseTest):
             print()
 
         return {
-            "preQos":    qosStatsInResp,
+            "preQos": qosStatsInResp,
             "postDlQos": postDlQosStatsResp,
             "postUlQos": postUlQosStatsResp,
         }
@@ -190,33 +191,31 @@ class GrpcTest(BaseTest):
     ):
 
         fields = (
-            'srcIface',
-            'tunnelIP4Dst',
-            'tunnelTEID',
-            'srcIP',
-            'dstIP',
-            'srcPort',
-            'dstPort',
-            'proto',
-
-            'srcIfaceMask',
-            'tunnelIP4DstMask',
-            'tunnelTEIDMask',
-            'srcIPMask',
-            'dstIPMask',
-            'srcPortMask',
-            'dstPortMask',
-            'protoMask',
-
-            'precedence',
-            'pdrID',
-            'fseID',
-            'fseidIP',
-            'ctrID',
-            'farID',
-            'qerIDList',
-            'needDecap',
-            'allocIPFlag',
+            "srcIface",
+            "tunnelIP4Dst",
+            "tunnelTEID",
+            "srcIP",
+            "dstIP",
+            "srcPort",
+            "dstPort",
+            "proto",
+            "srcIfaceMask",
+            "tunnelIP4DstMask",
+            "tunnelTEIDMask",
+            "srcIPMask",
+            "dstIPMask",
+            "srcPortMask",
+            "dstPortMask",
+            "protoMask",
+            "precedence",
+            "pdrID",
+            "fseID",
+            "fseidIP",
+            "ctrID",
+            "farID",
+            "qerIDList",
+            "needDecap",
+            "allocIPFlag",
         )
         defaults = [
             srcIface,
@@ -227,7 +226,6 @@ class GrpcTest(BaseTest):
             srcPort,
             dstPort,
             proto,
-
             srcIfaceMask,
             tunnelIP4DstMask,
             tunnelTEIDMask,
@@ -236,7 +234,6 @@ class GrpcTest(BaseTest):
             srcPortMask,
             dstPortMask,
             protoMask,
-
             precedence,
             pdrID,
             fseID,
@@ -248,7 +245,7 @@ class GrpcTest(BaseTest):
             allocIPFlag,
         ]
 
-        PDR =  namedtuple('PDR', fields, defaults=defaults)
+        PDR = namedtuple("PDR", fields, defaults=defaults)
         return PDR()
 
     def createFAR(
@@ -266,24 +263,22 @@ class GrpcTest(BaseTest):
         tunnelPort=0,
     ):
         fields = (
-            'farID',
-            'fseID',
-            'fseidIP',
-
-            'dstIntf',
-            'sendEndMarker',
-            'applyAction',
-            'tunnelType',
-            'tunnelIP4Src',
-            'tunnelIP4Dst',
-            'tunnelTEID',
-            'tunnelPort',
+            "farID",
+            "fseID",
+            "fseidIP",
+            "dstIntf",
+            "sendEndMarker",
+            "applyAction",
+            "tunnelType",
+            "tunnelIP4Src",
+            "tunnelIP4Dst",
+            "tunnelTEID",
+            "tunnelPort",
         )
         defaults = [
             farID,
             fseID,
             fseidIP,
-
             dstIntf,
             sendEndMarker,
             applyAction,
@@ -294,7 +289,7 @@ class GrpcTest(BaseTest):
             tunnelPort,
         ]
 
-        FAR = namedtuple('FAR', fields, defaults=defaults)
+        FAR = namedtuple("FAR", fields, defaults=defaults)
         return FAR()
 
     def createQER(
@@ -313,18 +308,18 @@ class GrpcTest(BaseTest):
         burstDurationMs=1000,
     ):
         fields = (
-            'gate',
-            'qerID',
-            'qfi',
-            'ulStatus',
-            'dlStatus',
-            'ulMbr',
-            'dlMbr',
-            'ulGbr',
-            'dlGbr',
-            'fseID',
-            'fseidIP',
-            'burstDurationMs',
+            "gate",
+            "qerID",
+            "qfi",
+            "ulStatus",
+            "dlStatus",
+            "ulMbr",
+            "dlMbr",
+            "ulGbr",
+            "dlGbr",
+            "fseID",
+            "fseidIP",
+            "burstDurationMs",
         )
         defaults = [
             gate,
@@ -332,15 +327,15 @@ class GrpcTest(BaseTest):
             qfi,
             ulStatus,
             dlStatus,
-            ulMbr, # Kbps
-            dlMbr, # Kbps
-            ulGbr, # Kbps
-            dlGbr, # Kbps
+            ulMbr,  # Kbps
+            dlMbr,  # Kbps
+            ulGbr,  # Kbps
+            dlGbr,  # Kbps
             fseID,
             fseidIP,
             burstDurationMs,
         ]
-        QER = namedtuple('QER', fields, defaults=defaults)
+        QER = namedtuple("QER", fields, defaults=defaults)
         return QER()
 
     def addPDR(self, pdr, debug=False):
@@ -350,34 +345,34 @@ class GrpcTest(BaseTest):
 
         # parse params of PDR tuple into a wildcard match message to send to BESS
         f = module_msg.WildcardMatchCommandAddArg(
-            gate = pdr.needDecap,
-            priority = 4294967295 - pdr.precedence, # XXX: golang max 32 bit uint
-            values = [
-                util_msg.FieldData(value_int = pdr.srcIface),
-                util_msg.FieldData(value_int = pdr.tunnelIP4Dst),
-                util_msg.FieldData(value_int = pdr.tunnelTEID),
-                util_msg.FieldData(value_int = pdr.srcIP),
-                util_msg.FieldData(value_int = pdr.dstIP),
-                util_msg.FieldData(value_int = pdr.srcPort),
-                util_msg.FieldData(value_int = pdr.dstPort),
-                util_msg.FieldData(value_int = pdr.proto),
+            gate=pdr.needDecap,
+            priority=4294967295 - pdr.precedence,  # XXX: golang max 32 bit uint
+            values=[
+                util_msg.FieldData(value_int=pdr.srcIface),
+                util_msg.FieldData(value_int=pdr.tunnelIP4Dst),
+                util_msg.FieldData(value_int=pdr.tunnelTEID),
+                util_msg.FieldData(value_int=pdr.srcIP),
+                util_msg.FieldData(value_int=pdr.dstIP),
+                util_msg.FieldData(value_int=pdr.srcPort),
+                util_msg.FieldData(value_int=pdr.dstPort),
+                util_msg.FieldData(value_int=pdr.proto),
             ],
-            masks = [
-                util_msg.FieldData(value_int = pdr.srcIfaceMask),
-                util_msg.FieldData(value_int = pdr.tunnelIP4DstMask),
-                util_msg.FieldData(value_int = pdr.tunnelTEIDMask),
-                util_msg.FieldData(value_int = pdr.srcIPMask),
-                util_msg.FieldData(value_int = pdr.dstIPMask),
-                util_msg.FieldData(value_int = pdr.srcPortMask),
-                util_msg.FieldData(value_int = pdr.dstPortMask),
-                util_msg.FieldData(value_int = pdr.protoMask),
+            masks=[
+                util_msg.FieldData(value_int=pdr.srcIfaceMask),
+                util_msg.FieldData(value_int=pdr.tunnelIP4DstMask),
+                util_msg.FieldData(value_int=pdr.tunnelTEIDMask),
+                util_msg.FieldData(value_int=pdr.srcIPMask),
+                util_msg.FieldData(value_int=pdr.dstIPMask),
+                util_msg.FieldData(value_int=pdr.srcPortMask),
+                util_msg.FieldData(value_int=pdr.dstPortMask),
+                util_msg.FieldData(value_int=pdr.protoMask),
             ],
-            valuesv = [
-                util_msg.FieldData(value_int = pdr.pdrID),
-                util_msg.FieldData(value_int = pdr.fseID),
-                util_msg.FieldData(value_int = pdr.ctrID),
-                util_msg.FieldData(value_int = qerID),
-                util_msg.FieldData(value_int = pdr.farID),
+            valuesv=[
+                util_msg.FieldData(value_int=pdr.pdrID),
+                util_msg.FieldData(value_int=pdr.fseID),
+                util_msg.FieldData(value_int=pdr.ctrID),
+                util_msg.FieldData(value_int=qerID),
+                util_msg.FieldData(value_int=pdr.farID),
             ],
         )
 
@@ -387,11 +382,7 @@ class GrpcTest(BaseTest):
 
         # send request to UPF to add rule
         response = self.sendModuleCommand(
-            bess_msg.CommandRequest(
-                name = "pdrLookup",
-                cmd = "add",
-                arg = any
-            )
+            bess_msg.CommandRequest(name="pdrLookup", cmd="add", arg=any)
         )
         if debug:
             print(response)
@@ -401,25 +392,25 @@ class GrpcTest(BaseTest):
     def delPDR(self, pdr, debug=False):
         # parse params of pdr into WildcardMatchCommandDeleteArg
         f = module_msg.WildcardMatchCommandDeleteArg(
-            values = [
-                util_msg.FieldData(value_int = pdr.srcIface),
-                util_msg.FieldData(value_int = pdr.tunnelIP4Dst),
-                util_msg.FieldData(value_int = pdr.tunnelTEID),
-                util_msg.FieldData(value_int = pdr.srcIP),
-                util_msg.FieldData(value_int = pdr.dstIP),
-                util_msg.FieldData(value_int = pdr.srcPort),
-                util_msg.FieldData(value_int = pdr.dstPort),
-                util_msg.FieldData(value_int = pdr.proto),
+            values=[
+                util_msg.FieldData(value_int=pdr.srcIface),
+                util_msg.FieldData(value_int=pdr.tunnelIP4Dst),
+                util_msg.FieldData(value_int=pdr.tunnelTEID),
+                util_msg.FieldData(value_int=pdr.srcIP),
+                util_msg.FieldData(value_int=pdr.dstIP),
+                util_msg.FieldData(value_int=pdr.srcPort),
+                util_msg.FieldData(value_int=pdr.dstPort),
+                util_msg.FieldData(value_int=pdr.proto),
             ],
-            masks = [
-                util_msg.FieldData(value_int = pdr.srcIfaceMask),
-                util_msg.FieldData(value_int = pdr.tunnelIP4DstMask),
-                util_msg.FieldData(value_int = pdr.tunnelTEIDMask),
-                util_msg.FieldData(value_int = pdr.srcIPMask),
-                util_msg.FieldData(value_int = pdr.dstIPMask),
-                util_msg.FieldData(value_int = pdr.srcPortMask),
-                util_msg.FieldData(value_int = pdr.dstPortMask),
-                util_msg.FieldData(value_int = pdr.protoMask),
+            masks=[
+                util_msg.FieldData(value_int=pdr.srcIfaceMask),
+                util_msg.FieldData(value_int=pdr.tunnelIP4DstMask),
+                util_msg.FieldData(value_int=pdr.tunnelTEIDMask),
+                util_msg.FieldData(value_int=pdr.srcIPMask),
+                util_msg.FieldData(value_int=pdr.dstIPMask),
+                util_msg.FieldData(value_int=pdr.srcPortMask),
+                util_msg.FieldData(value_int=pdr.dstPortMask),
+                util_msg.FieldData(value_int=pdr.protoMask),
             ],
         )
 
@@ -429,11 +420,7 @@ class GrpcTest(BaseTest):
 
         # send request to UPF to delete rule
         response = self.sendModuleCommand(
-            bess_msg.CommandRequest(
-                name = "pdrLookup",
-                cmd = "delete",
-                arg = any
-            )
+            bess_msg.CommandRequest(name="pdrLookup", cmd="delete", arg=any)
         )
         if debug:
             print(response)
@@ -451,7 +438,7 @@ class GrpcTest(BaseTest):
                 return farForwardU
         elif (far.applyAction & ACTION_DROP) != 0:
             return farDrop
-        elif (far.applyAction & ACTION_BUFFER) != 0 :
+        elif (far.applyAction & ACTION_BUFFER) != 0:
             return farNotify
         elif (far.applyAction & ACTION_NOTIFY) != 0:
             return farNotify
@@ -462,18 +449,18 @@ class GrpcTest(BaseTest):
 
         # parse fields of far into ExactMatchCommandAddArg
         f = module_msg.ExactMatchCommandAddArg(
-            gate = far.tunnelType,
-            fields = [
-                util_msg.FieldData(value_int = far.farID),
-                util_msg.FieldData(value_int = far.fseID),
+            gate=far.tunnelType,
+            fields=[
+                util_msg.FieldData(value_int=far.farID),
+                util_msg.FieldData(value_int=far.fseID),
             ],
-            values = [
-                util_msg.FieldData(value_int = action),
-                util_msg.FieldData(value_int = far.tunnelType),
-                util_msg.FieldData(value_int = far.tunnelIP4Src),
-                util_msg.FieldData(value_int = far.tunnelIP4Dst),
-                util_msg.FieldData(value_int = far.tunnelTEID),
-                util_msg.FieldData(value_int = far.tunnelPort),
+            values=[
+                util_msg.FieldData(value_int=action),
+                util_msg.FieldData(value_int=far.tunnelType),
+                util_msg.FieldData(value_int=far.tunnelIP4Src),
+                util_msg.FieldData(value_int=far.tunnelIP4Dst),
+                util_msg.FieldData(value_int=far.tunnelTEID),
+                util_msg.FieldData(value_int=far.tunnelPort),
             ],
         )
 
@@ -483,11 +470,7 @@ class GrpcTest(BaseTest):
 
         # send request to UPF to add rule
         response = self.sendModuleCommand(
-            bess_msg.CommandRequest(
-                name = "farLookup",
-                cmd = "add",
-                arg = any
-            )
+            bess_msg.CommandRequest(name="farLookup", cmd="add", arg=any)
         )
         if debug:
             print(response)
@@ -497,9 +480,9 @@ class GrpcTest(BaseTest):
     def delFAR(self, far, debug=False):
         # parse params of far into ExactMatchCommandDeleteArg
         f = module_msg.ExactMatchCommandDeleteArg(
-            fields = [
-                util_msg.FieldData(value_int = far.farID),
-                util_msg.FieldData(value_int = far.fseID),
+            fields=[
+                util_msg.FieldData(value_int=far.farID),
+                util_msg.FieldData(value_int=far.fseID),
             ],
         )
 
@@ -509,11 +492,7 @@ class GrpcTest(BaseTest):
 
         # send request to UPF to delete rule
         response = self.sendModuleCommand(
-            bess_msg.CommandRequest(
-                name = "farLookup",
-                cmd = "delete",
-                arg = any
-            )
+            bess_msg.CommandRequest(name="farLookup", cmd="delete", arg=any)
         )
         if debug:
             print(response)
@@ -547,18 +526,35 @@ class GrpcTest(BaseTest):
             dlPir = 1
 
         fields = [
-            'ulCbs', 'ulPbs', 'ulEbs', 'ulCir', 'ulPir',
-            'dlCbs', 'dlPbs', 'dlEbs', 'dlCir', 'dlPir',
+            "ulCbs",
+            "ulPbs",
+            "ulEbs",
+            "ulCir",
+            "ulPir",
+            "dlCbs",
+            "dlPbs",
+            "dlEbs",
+            "dlCir",
+            "dlPir",
         ]
         defaults = [
-            ulCbs, ulPbs, ulEbs, ulCir, ulPir, dlCbs, dlPbs, dlEbs, dlCir, dlPir,
+            ulCbs,
+            ulPbs,
+            ulEbs,
+            ulCir,
+            ulPir,
+            dlCbs,
+            dlPbs,
+            dlEbs,
+            dlCir,
+            dlPir,
         ]
 
-        rates = namedtuple('rates', fields, defaults=defaults)
+        rates = namedtuple("rates", fields, defaults=defaults)
         return rates()
 
     def addApplicationQER(self, qer, debug=False):
-        ''' installs uplink and downlink applicaiton QER '''
+        """installs uplink and downlink applicaiton QER"""
         rates = self._calcRates(
             qer.ulGbr,
             qer.ulMbr,
@@ -573,31 +569,25 @@ class GrpcTest(BaseTest):
         # construct UL/DL QosCommandAddArg's and send to BESS
         for srcIface in [ACCESS, CORE]:
             f = module_msg.QosCommandAddArg(
-                gate = qer.gate,
-                cir = int(rates.ulCir) if srcIface == ACCESS else int(rates.dlCir),
-                pir = int(rates.ulPir) if srcIface == ACCESS else int(rates.dlPir),
-                cbs = int(rates.ulCbs) if srcIface == ACCESS else int(rates.dlCbs),
-                pbs = int(rates.ulPbs) if srcIface == ACCESS else int(rates.dlPbs),
-                ebs = int(rates.ulEbs) if srcIface == ACCESS else int(rates.dlEbs),
-                fields = [
-                    util_msg.FieldData(value_int = srcIface),
-                    util_msg.FieldData(value_int = qer.qerID),
-                    util_msg.FieldData(value_int = qer.fseID)
+                gate=qer.gate,
+                cir=int(rates.ulCir) if srcIface == ACCESS else int(rates.dlCir),
+                pir=int(rates.ulPir) if srcIface == ACCESS else int(rates.dlPir),
+                cbs=int(rates.ulCbs) if srcIface == ACCESS else int(rates.dlCbs),
+                pbs=int(rates.ulPbs) if srcIface == ACCESS else int(rates.dlPbs),
+                ebs=int(rates.ulEbs) if srcIface == ACCESS else int(rates.dlEbs),
+                fields=[
+                    util_msg.FieldData(value_int=srcIface),
+                    util_msg.FieldData(value_int=qer.qerID),
+                    util_msg.FieldData(value_int=qer.fseID),
                 ],
-                values = [
-                    util_msg.FieldData(value_int = qer.qfi)
-                ],
+                values=[util_msg.FieldData(value_int=qer.qfi)],
             )
 
             any = Any()
             any.Pack(f)
 
             response = self.sendModuleCommand(
-                bess_msg.CommandRequest(
-                    name = "appQERLookup",
-                    cmd = "add",
-                    arg = any
-                )
+                bess_msg.CommandRequest(name="appQERLookup", cmd="add", arg=any)
             )
             if debug:
                 print(response)
@@ -605,30 +595,26 @@ class GrpcTest(BaseTest):
         self.appQers.append(qer)
 
     def delApplicationQER(self, qer, debug=False):
-        ''' deletes uplink and downlink application QER '''
+        """deletes uplink and downlink application QER"""
         for srcIface in [ACCESS, CORE]:
             f = module_msg.QosCommandDeleteArg(
-                fields =  [
-                    util_msg.FieldData(value_int = srcIface),
-                    util_msg.FieldData(value_int = qer.qerID),
-                    util_msg.FieldData(value_int = qer.fseID),
+                fields=[
+                    util_msg.FieldData(value_int=srcIface),
+                    util_msg.FieldData(value_int=qer.qerID),
+                    util_msg.FieldData(value_int=qer.fseID),
                 ],
             )
             any = Any()
             any.Pack(f)
 
             response = self.sendModuleCommand(
-                bess_msg.CommandRequest(
-                    name = "appQERLookup",
-                    cmd = "delete",
-                    arg = any
-                )
+                bess_msg.CommandRequest(name="appQERLookup", cmd="delete", arg=any)
             )
             if debug:
                 print(response)
 
     def addSessionQER(self, qer, debug=False):
-        ''' installs uplink and downlink session QER '''
+        """installs uplink and downlink session QER"""
         rates = self._calcRates(
             qer.ulGbr,
             qer.ulMbr,
@@ -640,15 +626,15 @@ class GrpcTest(BaseTest):
         # construct UL/DL QosCommandAddArg's and send to BESS
         for srcIface in [ACCESS, CORE]:
             f = module_msg.QosCommandAddArg(
-                gate = qer.gate,
-                cir = int(rates.ulCir) if srcIface == ACCESS else int(rates.dlCir),
-                pir = int(rates.ulPir) if srcIface == ACCESS else int(rates.dlPir),
-                cbs = int(rates.ulCbs) if srcIface == ACCESS else int(rates.dlCbs),
-                pbs = int(rates.ulPbs) if srcIface == ACCESS else int(rates.dlPbs),
-                ebs = int(rates.ulEbs) if srcIface == ACCESS else int(rates.dlEbs),
-                fields = [
-                    util_msg.FieldData(value_int = srcIface),
-                    util_msg.FieldData(value_int = qer.fseID)
+                gate=qer.gate,
+                cir=int(rates.ulCir) if srcIface == ACCESS else int(rates.dlCir),
+                pir=int(rates.ulPir) if srcIface == ACCESS else int(rates.dlPir),
+                cbs=int(rates.ulCbs) if srcIface == ACCESS else int(rates.dlCbs),
+                pbs=int(rates.ulPbs) if srcIface == ACCESS else int(rates.dlPbs),
+                ebs=int(rates.ulEbs) if srcIface == ACCESS else int(rates.dlEbs),
+                fields=[
+                    util_msg.FieldData(value_int=srcIface),
+                    util_msg.FieldData(value_int=qer.fseID),
                 ],
             )
 
@@ -656,11 +642,7 @@ class GrpcTest(BaseTest):
             any.Pack(f)
 
             response = self.sendModuleCommand(
-                bess_msg.CommandRequest(
-                    name = "sessionQERLookup",
-                    cmd = "add",
-                    arg = any
-                )
+                bess_msg.CommandRequest(name="sessionQERLookup", cmd="add", arg=any)
             )
             if debug:
                 print(response)
@@ -668,23 +650,19 @@ class GrpcTest(BaseTest):
         self.sessionQers.append(qer)
 
     def delSessionQER(self, qer, debug=False):
-        ''' deletes uplink and downlink session QER '''
+        """deletes uplink and downlink session QER"""
         for srcIface in [ACCESS, CORE]:
             f = module_msg.QosCommandDeleteArg(
-                fields =  [
-                    util_msg.FieldData(value_int = srcIface),
-                    util_msg.FieldData(value_int = qer.fseID),
+                fields=[
+                    util_msg.FieldData(value_int=srcIface),
+                    util_msg.FieldData(value_int=qer.fseID),
                 ],
             )
             any = Any()
             any.Pack(f)
 
             response = self.sendModuleCommand(
-                bess_msg.CommandRequest(
-                    name = "sessionQERLookup",
-                    cmd = "delete",
-                    arg = any
-                )
+                bess_msg.CommandRequest(name="sessionQERLookup", cmd="delete", arg=any)
             )
             if debug:
                 print(response)
@@ -693,7 +671,9 @@ class GrpcTest(BaseTest):
         print("Closing gRPC channel...")
         self.channel.close()
 
+
 """ Functionality for flow cleanup after tests """
+
 
 def _cleanupRules(test):
     for pdr in test.pdrs:
@@ -710,11 +690,13 @@ def _cleanupRules(test):
 
     return
 
+
 def autocleanup(f):
     """
     Decorator for cleaning up installed rules after a PTF test's
     completion
     """
+
     @wraps(f)
     def handle(*args, **kwargs):
         test = args[0]
