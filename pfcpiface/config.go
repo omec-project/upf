@@ -181,6 +181,7 @@ func LoadConfigFile(filepath string) (Conf, error) {
 	}
 
 	var conf Conf
+	conf.LogLevel = log.InfoLevel
 
 	err = json.Unmarshal(byteValue, &conf)
 	if err != nil {

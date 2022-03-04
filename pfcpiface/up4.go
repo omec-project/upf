@@ -378,7 +378,7 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 
 func (up4 *UP4) clearAllTables() error {
 	tables := []string{TableUplinkSessions, TableDownlinkSessions, TableUplinkTerminations, TableDownlinkTerminations, TableTunnelPeers, TableApplications}
-	tableIDs := make([]uint32, len(tables))
+	tableIDs := make([]uint32, 0, len(tables))
 
 	for _, table := range tables {
 		tableID, err := up4.p4RtTranslator.getTableIDByName(table)
