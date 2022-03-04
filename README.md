@@ -35,15 +35,15 @@ PFCP Agent internally abstracts different fastpaths using a common API, while th
 
 **PFCP Agent**
 
-* The northbound PFCP interface including PFCP Association Setup/Release and Heartbeats 
-* Handling of the following PFCP entities: Packet Detection Rules (PDRs), Forwarding Action Rules (FARs),
+* PFCP Association Setup/Release and Heartbeats 
+* Session Establishment/Modification with support for PFCP entities such as Packet Detection Rules (PDRs), Forwarding Action Rules (FARs),
 QoS Enforcement Rules (QERs).
 * UPF-initiated PFCP association  
 * UPF-based UE IP address assignment
-* Application filtering using the SDF filters
-* Sending of End Marker Packets
+* Application filtering using SDF filters
+* Generation of End Marker Packets
 * Downlink Data Notification (DDN) using PFCP Session Report
-* Integration with Prometheus for metrics about PFCP sessions or data plane level metrics. 
+* Integration with Prometheus for exporting PFCP and data plane-level metrics. 
 * Application filtering using application PFDs (_**experimental**_).
 
 **BESS-UPF**
