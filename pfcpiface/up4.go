@@ -381,28 +381,38 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 		up4.counters[i].allocated = make(map[uint64]uint64)
 	}
 
-	go up4.tryConnect()
+	go up4.keepTryingToConnect()
 }
 
-func (up4 *UP4) tryConnect() {
+func (up4 *UP4) tryConnect() error {
+	if up4.isConnected(nil) {
+		return nil
+	}
+
+	err := up4.setupChannel()
+	if err != nil {
+		return err
+	}
+
+	err = up4.initialize()
+	if err != nil {
+		log.Fatalf("Failed to initialize UP4: %v", err)
+	}
+
+	up4.setConnectedStatus(true)
+
+	return nil
+}
+
+func (up4 *UP4) keepTryingToConnect() {
 	for {
-		if !up4.isConnected(nil) {
-			err := up4.setupChannel()
-			if err != nil {
-				time.Sleep(10 * time.Second)
-				continue
-			}
-
-			err = up4.initialize()
-			if err != nil {
-				log.Fatalf("Failed to initialize UP4: %v", err)
-			}
-
-			up4.setConnectedStatus(true)
-		} else {
-			// check connection open every 2 minutes
-			time.Sleep(120 * time.Second)
+		err := up4.tryConnect()
+		if err != nil {
+			time.Sleep(10 * time.Second)
+			continue
 		}
+
+		time.Sleep(120 * time.Second)
 	}
 }
 
@@ -1321,7 +1331,8 @@ func (up4 *UP4) sendDelete(deleted PacketForwardingRules) error {
 }
 
 func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updated PacketForwardingRules) uint8 {
-	if !up4.isConnected(nil) {
+	err := up4.tryConnect()
+	if err != nil {
 		log.Error("UP4 server not connected")
 		return ie.CauseRequestRejected
 	}
@@ -1332,8 +1343,6 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updat
 		"updated-rules": updated,
 	})
 	up4Log.Debug("Sending PFCP message to UP4..")
-
-	var err error
 
 	switch method {
 	case upfMsgTypeAdd:
