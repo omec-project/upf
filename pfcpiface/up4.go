@@ -91,13 +91,13 @@ type UP4 struct {
 	ueIPPool        *net.IPNet
 	enableEndMarker bool
 
-	p4client    *P4rtClient
+	p4client *P4rtClient
 
-	connected   bool
+	connected bool
 	// connectedMu guards R/W operations to connected status
 	connectedMu sync.RWMutex
 
-	initOnce    sync.Once
+	initOnce sync.Once
 	// tryConnectMu ensures a single re-connection try
 	tryConnectMu sync.Mutex
 
