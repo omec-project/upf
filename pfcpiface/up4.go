@@ -7,12 +7,13 @@ import (
 	"encoding/binary"
 	"flag"
 	"fmt"
-	"google.golang.org/grpc/connectivity"
 	"math"
 	"math/rand"
 	"net"
 	"sync"
 	"time"
+
+	"google.golang.org/grpc/connectivity"
 
 	"google.golang.org/grpc/codes"
 

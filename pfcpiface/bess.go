@@ -7,11 +7,12 @@ import (
 	"context"
 	"encoding/binary"
 	"flag"
-	"google.golang.org/grpc/connectivity"
 	"math"
 	"net"
 	"strconv"
 	"time"
+
+	"google.golang.org/grpc/connectivity"
 
 	"google.golang.org/grpc/credentials/insecure"
 

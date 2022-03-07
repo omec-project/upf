@@ -6,10 +6,11 @@ package pfcpiface
 import (
 	"context"
 	"fmt"
-	"google.golang.org/grpc/connectivity"
 	"io/ioutil"
 	"os"
 	"time"
+
+	"google.golang.org/grpc/connectivity"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
