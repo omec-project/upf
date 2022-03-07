@@ -435,7 +435,7 @@ func (c *P4rtClient) WriteBatchReq(updates []*p4.Update) error {
 func (c *P4rtClient) GetForwardingPipelineConfig() (err error) {
 	getLog := log.WithFields(log.Fields{
 		"device ID": c.deviceID,
-		"conn": c.conn.Target(),
+		"conn":      c.conn.Target(),
 	})
 	getLog.Info("Getting ForwardingPipelineConfig from P4Rt device")
 
