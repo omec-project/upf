@@ -441,7 +441,7 @@ func (c *P4rtClient) GetForwardingPipelineConfig() (err error) {
 
 	pipeline, err := GetPipelineConfig(c.client, c.deviceID)
 	if err != nil {
-		log.Println("set pipeline config error ", err)
+		getLog.Println("set pipeline config error ", err)
 		return
 	}
 
