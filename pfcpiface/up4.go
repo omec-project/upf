@@ -90,10 +90,10 @@ type UP4 struct {
 	ueIPPool        *net.IPNet
 	enableEndMarker bool
 
-	p4client       *P4rtClient
-	connected      bool
-	connectedMu    sync.Mutex
-	initOnce       sync.Once
+	p4client    *P4rtClient
+	connected   bool
+	connectedMu sync.Mutex
+	initOnce    sync.Once
 
 	p4RtTranslator *P4rtTranslator
 
@@ -202,7 +202,7 @@ func (up4 *UP4) exit() {
 func (up4 *UP4) setupChannel() error {
 	setupLog := log.WithFields(log.Fields{
 		"P4Runtime server address": up4.host,
-		"DeviceID": up4.deviceID,
+		"DeviceID":                 up4.deviceID,
 	})
 	setupLog.Debug("Trying to setup P4Rt channel")
 
@@ -405,7 +405,6 @@ func (up4 *UP4) tryConnect() {
 	}
 }
 
-
 func (up4 *UP4) clearAllTables() error {
 	tables := []string{TableUplinkSessions, TableDownlinkSessions, TableUplinkTerminations, TableDownlinkTerminations, TableTunnelPeers, TableApplications}
 	tableIDs := make([]uint32, 0, len(tables))
@@ -462,7 +461,7 @@ func (up4 *UP4) initInterfaces() error {
 
 	log.WithFields(log.Fields{
 		"N3 address": up4.accessIP,
-		"ue pool": up4.ueIPPool,
+		"ue pool":    up4.ueIPPool,
 	}).Debug("N3 address and UE pool successfully initialized in the UP4 pipeline")
 
 	return nil
