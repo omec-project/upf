@@ -181,6 +181,32 @@ This can be done either using a single machine or two machines.
     docker exec -it pktgen ./bessctl run pktgen
     ```
 
+## Troubleshooting 
+
+BESS tools are available out-of-the-box for debugging and/or monitoring; *e.g.*:
+
+* Run `tcpdump` on arbitrary dataplane pipeline module
+
+```bash
+localhost:10514 $ tcpdump s1uFastBPF
+  Running: tcpdump -r /tmp/tmpYUlLw8
+reading from file /tmp/tmpYUlLw8, link-type EN10MB (Ethernet)
+23:51:02.331926 STP 802.1s, Rapid STP, CIST Flags [Learn, Forward], length 102
+tcpdump: pcap_loop: error reading dump file: Interrupted system call
+localhost:10514 $ tcpdump s1uFastBPF
+  Running: tcpdump -r /tmp/tmpUBTGau
+reading from file /tmp/tmpUBTGau, link-type EN10MB (Ethernet)
+00:03:02.286527 STP 802.1s, Rapid STP, CIST Flags [Learn, Forward], length 102
+00:03:04.289155 STP 802.1s, Rapid STP, CIST Flags [Learn, Forward], length 102
+00:03:06.282790 IP 0.0.0.0.bootpc > 255.255.255.255.bootps: BOOTP/DHCP, Request from 68:05:ca:37:e2:80 (oui Unknown), length 300
+00:03:06.291918 STP 802.1s, Rapid STP, CIST Flags [Learn, Forward], length 102
+00:03:07.175420 IP 0.0.0.0.bootpc > 255.255.255.255.bootps: BOOTP/DHCP, Request from 68:05:ca:37:d9:e0 (oui Unknown), length 300
+00:03:07.489266 IP 0.0.0.0.bootpc > 255.255.255.255.bootps: BOOTP/DHCP, Request from 68:05:ca:37:d9:e1 (oui Unknown), length 300
+00:03:08.130884 IP 0.0.0.0.bootpc > 255.255.255.255.bootps: BOOTP/DHCP, Request from 68:05:ca:37:e1:38 (oui Unknown), length 300
+00:03:08.294573 STP 802.1s, Rapid STP, CIST Flags [Learn, Forward], length 102
+00:03:10.247193 STP 802.1s, Rapid STP, CIST Flags [Learn, Forward], length 102
+```
+
 ## Network Token Functions
 
 OMEC includes a Network Token Function (NTF) which provides preliminary support
