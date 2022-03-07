@@ -147,7 +147,7 @@ func init() {
 	logrus.SetReportCaller(true)
 	logrus.SetFormatter(&logrus.TextFormatter{
 		FullTimestamp: true,
-		ForceColors: true,
+		ForceColors:   true,
 	})
 }
 
