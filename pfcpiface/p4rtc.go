@@ -445,6 +445,8 @@ func (c *P4rtClient) GetForwardingPipelineConfig() (err error) {
 		return
 	}
 
+	// P4 spec allows for sending successful response to GetForwardingPipelineConfig
+	// without config. We fail in such a case, because the response without config is useless.
 	if pipeline.GetConfig() == nil {
 		return ErrOperationFailedWithReason("GetForwardingPipelineConfig",
 			"Operation successful, but no P4 config provided.")

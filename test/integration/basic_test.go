@@ -5,7 +5,6 @@ package integration
 
 import (
 	"net"
-	"os"
 	"testing"
 	"time"
 
@@ -16,7 +15,7 @@ import (
 )
 
 func init() {
-	if os.Getenv(EnvFastpath) == FastpathUP4 {
+	if isFastpathUP4() && isModeDocker() {
 		initForwardingPipelineConfig()
 	}
 }
