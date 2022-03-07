@@ -92,9 +92,14 @@ type UP4 struct {
 	enableEndMarker bool
 
 	p4client    *P4rtClient
+
 	connected   bool
-	connectedMu sync.Mutex
+	// connectedMu guards R/W operations to connected status
+	connectedMu sync.RWMutex
+
 	initOnce    sync.Once
+	// tryConnectMu ensures a single re-connection try
+	tryConnectMu sync.Mutex
 
 	p4RtTranslator *P4rtTranslator
 
@@ -385,6 +390,9 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 }
 
 func (up4 *UP4) tryConnect() error {
+	up4.tryConnectMu.Lock()
+	defer up4.tryConnectMu.Unlock()
+
 	if up4.isConnected(nil) {
 		return nil
 	}
@@ -494,11 +502,9 @@ func (up4 *UP4) listenToDDNs() {
 	}
 }
 
+// initialize configures the UP4-related objects.
+// A caller should ensure that P4Client is not nil and the P4Runtime channel is open.
 func (up4 *UP4) initialize() error {
-	if up4.p4client == nil {
-		return ErrInvalidArgumentWithReason("p4client", up4.p4client, "P4Rt client not connected")
-	}
-
 	up4.p4RtTranslator = newP4RtTranslator(up4.p4client.P4Info)
 
 	err := up4.clearAllTables()
