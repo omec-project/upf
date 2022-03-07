@@ -159,7 +159,7 @@ func (up4 *UP4) initCounter(counterID uint8, name string) error {
 	return nil
 }
 
-func releaseCounterID(up4 *UP4, p4counterID uint8, val uint64) {
+func (up4 *UP4) releaseCounterID(p4counterID uint8, val uint64) {
 	log.Println("delete counter val ", val)
 	up4.counters[p4counterID].counterIDsPool.Add(val)
 }
@@ -1266,7 +1266,7 @@ func (up4 *UP4) sendUpdate(all PacketForwardingRules, updated PacketForwardingRu
 
 func (up4 *UP4) sendDelete(deleted PacketForwardingRules) error {
 	for i := range deleted.pdrs {
-		releaseCounterID(up4, preQosCounterID,
+		up4.releaseCounterID(preQosCounterID,
 			uint64(deleted.pdrs[i].ctrID))
 	}
 
