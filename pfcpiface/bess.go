@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/binary"
 	"flag"
+	"google.golang.org/grpc/connectivity"
 	"math"
 	"net"
 	"strconv"
@@ -79,7 +80,7 @@ type bess struct {
 }
 
 func (b *bess) isConnected(accessIP *net.IP) bool {
-	if (b.conn == nil) || (int(b.conn.GetState()) != Ready) {
+	if (b.conn == nil) || (b.conn.GetState() != connectivity.Ready) {
 		return false
 	}
 

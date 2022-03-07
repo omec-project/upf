@@ -6,6 +6,7 @@ package pfcpiface
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/connectivity"
 	"io/ioutil"
 	"os"
 	"time"
@@ -116,8 +117,8 @@ func TimeBasedElectionId() p4.Uint128 {
 }
 
 // CheckStatus ... Check client connection status.
-func (c *P4rtClient) CheckStatus() (state int) {
-	return int(c.conn.GetState())
+func (c *P4rtClient) CheckStatus() connectivity.State {
+	return c.conn.GetState()
 }
 
 // SetMastership .. API.
