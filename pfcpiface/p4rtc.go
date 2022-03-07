@@ -433,7 +433,11 @@ func (c *P4rtClient) WriteBatchReq(updates []*p4.Update) error {
 
 // GetForwardingPipelineConfig ... Get Pipeline config from switch.
 func (c *P4rtClient) GetForwardingPipelineConfig() (err error) {
-	log.Println("GetForwardingPipelineConfig")
+	getLog := log.WithFields(log.Fields{
+		"device ID": c.deviceID,
+		"conn": c.conn.Target(),
+	})
+	getLog.Info("Getting ForwardingPipelineConfig from P4Rt device")
 
 	pipeline, err := GetPipelineConfig(c.client, c.deviceID)
 	if err != nil {
@@ -441,7 +445,14 @@ func (c *P4rtClient) GetForwardingPipelineConfig() (err error) {
 		return
 	}
 
+	if pipeline.GetConfig() == nil {
+		return ErrOperationFailedWithReason("GetForwardingPipelineConfig",
+			"Operation successful, but no P4 config provided.")
+	}
+
 	c.P4Info = *pipeline.Config.P4Info
+
+	getLog.Info("Got ForwardingPipelineConfig from P4Rt device")
 
 	return
 }

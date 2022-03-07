@@ -5,6 +5,7 @@ package integration
 
 import (
 	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -13,6 +14,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
 )
+
+func init() {
+	if os.Getenv(EnvFastpath) == FastpathUP4 {
+		initForwardingPipelineConfig()
+	}
+}
 
 func TestUPFBasedUeIPAllocation(t *testing.T) {
 	setup(t, ConfigUPFBasedIPAllocation)

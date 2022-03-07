@@ -23,11 +23,6 @@ import (
 )
 
 const (
-	p4InfoPath       = "/bin/p4info.txt"
-	deviceConfigPath = "/bin/bmv2.json"
-)
-
-const (
 	preQosCounterID = iota
 	postQosCounterID
 
@@ -206,11 +201,7 @@ func (up4 *UP4) setupChannel() error {
 
 	err = up4.p4client.GetForwardingPipelineConfig()
 	if err != nil {
-		err = up4.p4client.SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath)
-		if err != nil {
-			log.Errorf("set forwarding pipeling config failed: %v", err)
-			return err
-		}
+		return err
 	}
 
 	return nil
