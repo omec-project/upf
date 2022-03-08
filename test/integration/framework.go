@@ -8,7 +8,7 @@ import (
 	"errors"
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim"
 	"github.com/omec-project/upf-epc/pfcpiface"
-	"github.com/omec-project/upf-epc/pkg/bessmock"
+	"github.com/omec-project/upf-epc/pkg/fake_bess"
 	"github.com/omec-project/upf-epc/test/integration/providers"
 	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/prometheus/client_golang/prometheus"
@@ -65,7 +65,7 @@ const (
 )
 
 var (
-	// ReaderElectionID use reader election ID so that pfcpiface doesn't loose mastership.
+	// ReaderElectionID use reader election ID so that pfcpiface doesn't lose mastership.
 	ReaderElectionID = p4_v1.Uint128{High: 0, Low: 1}
 )
 
@@ -74,7 +74,7 @@ var (
 	// pfcpAgent instance is used only in the native mode
 	pfcpAgent *pfcpiface.PFCPIface
 
-	bessMock *bessmock.BESSMock
+	bessFake *fake_bess.FakeBESS
 )
 
 type pfcpSessionData struct {
@@ -210,7 +210,7 @@ func waitForPFCPAgentToStart() error {
 	return waitForPortOpen("udp", "127.0.0.1", "8805")
 }
 
-func waitForBESSMockToStart() error {
+func waitForBESSFakeToStart() error {
 	return waitForPortOpen("tcp", "127.0.0.1", "10514")
 }
 
@@ -237,16 +237,15 @@ func setup(t *testing.T, configType uint32) {
 
 	switch os.Getenv(EnvFastpath) {
 	case FastpathBESS:
-		bessMock = bessmock.NewBESSMock(":10514", "127.0.0.1")
+		bessFake = fake_bess.NewFakeBESS()
 		go func() {
-			if err := bessMock.Run(); err != nil {
+			if err := bessFake.Run(":10514"); err != nil {
 				panic(err)
 			}
 		}()
 
-		// wait for BESS mock to start, blocking
-		err := waitForBESSMockToStart()
-		require.NoErrorf(t, err, "failed to start BESS mock: %v", err)
+		err := waitForBESSFakeToStart()
+		require.NoErrorf(t, err, "failed to start BESS fake: %v", err)
 	}
 
 	switch os.Getenv(EnvMode) {
@@ -308,8 +307,8 @@ func teardown(t *testing.T) {
 
 	switch os.Getenv(EnvFastpath) {
 	case FastpathBESS:
-		if bessMock != nil {
-			bessMock.Stop()
+		if bessFake != nil {
+			bessFake.Stop()
 		}
 	}
 }
@@ -319,7 +318,7 @@ func verifyEntries(t *testing.T, testdata *pfcpSessionData, expectedValues p4RtV
 	case FastpathUP4:
 		verifyP4RuntimeEntries(t, testdata, expectedValues, ueState)
 	case FastpathBESS:
-		// TODO: implement it
+		verifyBessEntries(t, bessFake, testdata, expectedValues, ueState)
 	}
 }
 
@@ -328,6 +327,6 @@ func verifyNoEntries(t *testing.T, expectedValues p4RtValues) {
 	case FastpathUP4:
 		verifyNoP4RuntimeEntries(t, expectedValues)
 	case FastpathBESS:
-		// TODO: implement it
+		verifyNoBessRuntimeEntries(t, bessFake)
 	}
 }

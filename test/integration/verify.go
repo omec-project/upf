@@ -7,6 +7,7 @@ import (
 	"fmt"
 	p4rtc "github.com/antoninbas/p4runtime-go-client/pkg/client"
 	"github.com/antoninbas/p4runtime-go-client/pkg/util/conversion"
+	"github.com/omec-project/upf-epc/pkg/fake_bess"
 	"github.com/omec-project/upf-epc/test/integration/providers"
 	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/stretchr/testify/require"
@@ -408,4 +409,19 @@ func verifyNoP4RuntimeEntries(t *testing.T, expectedValues p4RtValues) {
 		require.Equal(t, 0, len(entries),
 			fmt.Sprintf("%v should not contain any entries", table))
 	}
+}
+
+func verifyBessEntries(t *testing.T, bess *fake_bess.FakeBESS, testdata *pfcpSessionData, expectedValues p4RtValues, ueState UEState) {
+	t.Fatal("not implemented")
+}
+
+func verifyNoBessRuntimeEntries(t *testing.T, bess *fake_bess.FakeBESS) {
+	pdrs := bess.GetPdrTableEntries()
+	require.Equal(t, 0, len(pdrs), "found unexpected PDR entries: %v", pdrs)
+	fars := bess.GetFarTableEntries()
+	require.Equal(t, 0, len(fars), "found unexpected FAR entries: %v", fars)
+	sessionQers := bess.GetSessionQerTableEntries()
+	require.Equal(t, 0, len(sessionQers), "found unexpected session QER entries: %v", sessionQers)
+	appQers := bess.GetAppQerTableEntries()
+	require.Equal(t, 0, len(appQers), "found unexpected app QER entries: %v", appQers)
 }
