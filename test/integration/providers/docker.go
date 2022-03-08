@@ -8,12 +8,10 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
-	"github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
 	"os/exec"
 	"strings"
-	"time"
 )
 
 // RunDockerCommandAttach attaches to a running Docker container and executes a cmd.
@@ -34,27 +32,23 @@ func RunDockerCommandAttach(container string, cmd string) {
 		Stdin:  true,
 		Stream: true,
 	})
-	if err != nil {
-		logrus.Fatalf("Failed to run Docker command: %v", err)
-	}
-	defer waiter.Close()
 
 	// Write to docker container
 	go func(w io.WriteCloser) {
-		timeout := time.After(1 * time.Second)
-
-		select {
-		case data := <-inout:
-			if _, err := w.Write(append(data, '\n')); err != nil {
-				logrus.Fatalf("Failed to run Docker command: %s", cmd)
+		for {
+			data, ok := <-inout
+			if !ok {
+				w.Close()
+				return
 			}
-		case <-timeout:
-			logrus.Fatalf("Failed to run Docker command due to timeout: %s", cmd)
+
+			w.Write(append(data, '\n'))
 		}
 	}(waiter.Conn)
-
-	// blocking
 	inout <- []byte(cmd)
+
+	waiter.Conn.Close()
+	waiter.Close()
 }
 
 // RunDockerExecCommand executes a cmd inside a running Docker container.
