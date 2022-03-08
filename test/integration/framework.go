@@ -281,9 +281,6 @@ func setup(t *testing.T, configType uint32) {
 	// wait for PFCP Agent to initialize, blocking
 	err = waitForPFCPAgentToStart(pfcpClient)
 	require.NoErrorf(t, err, "failed to start PFCP Agent: %v", err)
-
-	// FIXME: waitForPFCPAgentToStart tries to setup PFCP assoc
-
 }
 
 func teardown(t *testing.T) {
@@ -298,8 +295,10 @@ func teardown(t *testing.T) {
 		}
 	}
 
-	err := pfcpClient.TeardownAssociation()
-	require.NoError(t, err)
+	if pfcpClient.IsAssociationAlive() {
+		err := pfcpClient.TeardownAssociation()
+		require.NoError(t, err)
+	}
 
 	if pfcpClient != nil {
 		pfcpClient.DisconnectN4()
