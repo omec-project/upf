@@ -201,8 +201,21 @@ func waitForPortOpen(net string, host string, port string) error {
 	}
 }
 
-func waitForPFCPAgentToStart() error {
-	return waitForPortOpen("udp", "127.0.0.1", "8805")
+func waitForPFCPAgentToStart(pfcpClient *pfcpsim.PFCPClient) error {
+	timeout := time.After(10 * time.Second)
+	ticker := time.Tick(500 * time.Millisecond)
+
+	// Keep trying until we're timed out or get a result/error
+	for {
+		select {
+		case <-timeout:
+			return errors.New("timed out")
+		case <-ticker:
+			if err := pfcpClient.SetupAssociation(); err == nil {
+				return pfcpClient.TeardownAssociation()
+			}
+		}
+	}
 }
 
 func waitForBESSMockToStart() error {
@@ -251,10 +264,6 @@ func setup(t *testing.T, configType uint32) {
 		require.NoError(t, err)
 		providers.RunDockerCommandAttach("pfcpiface",
 			"/bin/pfcpiface -config /config/upf.json")
-		if isFastpathUP4() {
-			// FIXME: remove once we remove sleep in UP4.tryConnect()
-			time.Sleep(1 * time.Second)
-		}
 	case ModeNative:
 		pfcpAgent = pfcpiface.NewPFCPIface(GetConfig(os.Getenv(EnvFastpath), configType))
 		go pfcpAgent.Run()
@@ -262,13 +271,13 @@ func setup(t *testing.T, configType uint32) {
 		t.Fatal("Unexpected test mode")
 	}
 
-	// wait for PFCP Agent to initialize, blocking
-	err := waitForPFCPAgentToStart()
-	require.NoErrorf(t, err, "failed to start PFCP Agent: %v", err)
-
 	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.1")
-	err = pfcpClient.ConnectN4("127.0.0.1")
+	err := pfcpClient.ConnectN4("127.0.0.1")
 	require.NoErrorf(t, err, "failed to connect to UPF")
+
+	// wait for PFCP Agent to initialize, blocking
+	err = waitForPFCPAgentToStart(pfcpClient)
+	require.NoErrorf(t, err, "failed to start PFCP Agent: %v", err)
 }
 
 func teardown(t *testing.T) {
