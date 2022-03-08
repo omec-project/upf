@@ -201,8 +201,24 @@ func waitForPortOpen(net string, host string, port string) error {
 	}
 }
 
-func waitForPFCPAgentToStart() error {
-	return waitForPortOpen("udp", "127.0.0.1", "8805")
+// waitForPFCPAgentToStart checks if PFCP Agent is started by trying to create PFCP association.
+// It retries every 5.5 seconds (0.5 seconds of interval between tries + 5 seconds that PFCP Client waits for response).
+func waitForPFCPAgentToStart(pfcpClient *pfcpsim.PFCPClient) error {
+	timeout := time.After(30 * time.Second)
+	ticker := time.Tick(500 * time.Millisecond)
+
+	// Keep trying until we're timed out or get a result/error
+	for {
+		select {
+		case <-timeout:
+			return errors.New("timed out")
+		case <-ticker:
+			// each test case requires PFCP Association, so we don't teardown it once we notice it's established.
+			if err := pfcpClient.SetupAssociation(); err == nil {
+				return nil
+			}
+		}
+	}
 }
 
 func waitForBESSMockToStart() error {
@@ -251,10 +267,6 @@ func setup(t *testing.T, configType uint32) {
 		require.NoError(t, err)
 		providers.RunDockerCommandAttach("pfcpiface",
 			"/bin/pfcpiface -config /config/upf.json")
-		if isFastpathUP4() {
-			// FIXME: remove once we remove sleep in UP4.tryConnect()
-			time.Sleep(2 * time.Second)
-		}
 	case ModeNative:
 		pfcpAgent = pfcpiface.NewPFCPIface(GetConfig(os.Getenv(EnvFastpath), configType))
 		go pfcpAgent.Run()
@@ -262,13 +274,16 @@ func setup(t *testing.T, configType uint32) {
 		t.Fatal("Unexpected test mode")
 	}
 
+	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.1")
+	err := pfcpClient.ConnectN4("127.0.0.1")
+	require.NoErrorf(t, err, "failed to connect to UPF")
+
 	// wait for PFCP Agent to initialize, blocking
-	err := waitForPFCPAgentToStart()
+	err = waitForPFCPAgentToStart(pfcpClient)
 	require.NoErrorf(t, err, "failed to start PFCP Agent: %v", err)
 
-	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.1")
-	err = pfcpClient.ConnectN4("127.0.0.1")
-	require.NoErrorf(t, err, "failed to connect to UPF")
+	// FIXME: waitForPFCPAgentToStart tries to setup PFCP assoc
+
 }
 
 func teardown(t *testing.T) {
@@ -282,6 +297,9 @@ func teardown(t *testing.T) {
 			p4rtClient.DeleteTableEntry(entry)
 		}
 	}
+
+	err := pfcpClient.TeardownAssociation()
+	require.NoError(t, err)
 
 	if pfcpClient != nil {
 		pfcpClient.DisconnectN4()
