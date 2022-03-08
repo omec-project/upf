@@ -201,9 +201,9 @@ func waitForPortOpen(net string, host string, port string) error {
 	}
 }
 
-// waitForPFCPAgentToStart checks if PFCP Agent is started by trying to create PFCP association.
+// waitForPFCPAssociationSetup checks if PFCP Agent is started by trying to create PFCP association.
 // It retries every 5.5 seconds (0.5 seconds of interval between tries + 5 seconds that PFCP Client waits for response).
-func waitForPFCPAgentToStart(pfcpClient *pfcpsim.PFCPClient) error {
+func waitForPFCPAssociationSetup(pfcpClient *pfcpsim.PFCPClient) error {
 	timeout := time.After(30 * time.Second)
 	ticker := time.Tick(500 * time.Millisecond)
 
@@ -279,7 +279,7 @@ func setup(t *testing.T, configType uint32) {
 	require.NoErrorf(t, err, "failed to connect to UPF")
 
 	// wait for PFCP Agent to initialize, blocking
-	err = waitForPFCPAgentToStart(pfcpClient)
+	err = waitForPFCPAssociationSetup(pfcpClient)
 	require.NoErrorf(t, err, "failed to start PFCP Agent: %v", err)
 }
 
