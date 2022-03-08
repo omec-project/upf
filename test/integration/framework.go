@@ -251,6 +251,10 @@ func setup(t *testing.T, configType uint32) {
 		require.NoError(t, err)
 		providers.RunDockerCommandAttach("pfcpiface",
 			"/bin/pfcpiface -config /config/upf.json")
+		if isFastpathUP4() {
+			// FIXME: remove once we remove sleep in UP4.tryConnect()
+			time.Sleep(1 * time.Second)
+		}
 	case ModeNative:
 		pfcpAgent = pfcpiface.NewPFCPIface(GetConfig(os.Getenv(EnvFastpath), configType))
 		go pfcpAgent.Run()
