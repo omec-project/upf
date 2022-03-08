@@ -5,6 +5,7 @@ import time
 from ipaddress import IPv4Address
 from pprint import pprint
 
+from pkt_utils import GTPU_PORT
 from trex_test import TrexTest
 from grpc_test import *
 from trex_utils import *
@@ -30,7 +31,6 @@ BESS_RECEIVER_PORT = 3
 DURATION = 10
 RATE = 100_000  # 100 Kpps
 UE_COUNT = 10_000 # 10k UEs
-GTPU_PORT = 2152
 PKT_SIZE = 64
 
 class DownlinkPerformanceBaselineTest(TrexTest, GrpcTest):

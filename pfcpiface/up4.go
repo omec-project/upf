@@ -486,6 +486,11 @@ func (up4 *UP4) tryConnect() error {
 		go up4.endMarkerSendLoop(up4.endMarkerChan)
 	}
 
+	// Give UP4 a while to clear all tables, before initializing the interfaces table.
+	// FIXME: this is an ugly, temporary workaround.
+	//  Should be removed once we serialize Writes on UP4 side.
+	time.Sleep(1 * time.Second)
+
 	err = up4.initUEPool()
 	if err != nil {
 		return ErrOperationFailedWithReason("UE pool initialization", err.Error())

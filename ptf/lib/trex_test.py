@@ -17,6 +17,9 @@ class TrexTest(BaseTest):
         self.trex_client = STLClient(server=trex_server_addr)
         self.trex_client.connect()
         self.trex_client.acquire()
+        self.reset()
+
+    def reset(self):
         self.trex_client.reset()  # Resets configs from all ports
         self.trex_client.clear_stats()  # Clear status from all ports
         # Put all ports to promiscuous mode, otherwise they will drop all
