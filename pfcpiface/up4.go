@@ -443,13 +443,15 @@ func (up4 *UP4) initN3Address() error {
 
 func (up4 *UP4) listenToDDNs() {
 	log.Info("Listening to Data Notifications from UP4..")
+	notifier := NewDownlinkDataNotifier(up4.reportNotifyChan)
+	notifier.SetNotificationInterval(20 * time.Second)
 
 	for {
 		digestData := up4.p4client.GetNextDigestData()
 
 		ueAddr := binary.BigEndian.Uint32(digestData)
 		if fseid, exists := up4.ueAddrToFSEID[ueAddr]; exists {
-			up4.reportNotifyChan <- fseid
+			notifier.Notify(fseid)
 		}
 	}
 }

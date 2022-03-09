@@ -5,17 +5,11 @@ package pfcpiface
 
 import (
 	"errors"
-	"net"
-	"strings"
-
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
-)
-
-const (
-	// Default timeout for DDN.
-	DefaultDDNTimeout = 20
+	"net"
+	"strings"
 )
 
 // errors
@@ -339,10 +333,6 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		return sendError(ErrWriteToFastpath)
 	}
 
-	if session.getNotifyFlag() {
-		session.updateNotifyFlag()
-	}
-
 	if upf.enableEndMarker {
 		err := upf.sendEndMarkers(&endMarkerList)
 		if err != nil {
@@ -478,11 +468,6 @@ func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
 		return
 	}
 
-	/* Check if notify is already sent in current time interval */
-	if session.getNotifyFlag() {
-		return
-	}
-
 	seq := pConn.getSeqNum()
 	srreq := message.NewSessionReportRequest(0, /* MO?? <-- what's this */
 		0,                            /* FO <-- what's this? */
@@ -521,10 +506,6 @@ func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
 
 		return
 	}
-
-	go session.runTimerForDDNNotify(DefaultDDNTimeout)
-
-	session.setNotifyFlag(true)
 
 	srreq.DownlinkDataReport = ie.NewDownlinkDataReport(
 		ie.NewPDRID(uint16(pdrID)))

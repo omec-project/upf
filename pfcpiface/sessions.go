@@ -5,15 +5,8 @@ package pfcpiface
 
 import (
 	"fmt"
-	"sync"
-
 	"github.com/omec-project/upf-epc/pfcpiface/metrics"
 )
-
-type notifyFlag struct {
-	flag bool
-	mux  sync.Mutex
-}
 
 type PacketForwardingRules struct {
 	pdrs []pdr
@@ -25,7 +18,6 @@ type PacketForwardingRules struct {
 type PFCPSession struct {
 	localSEID        uint64
 	remoteSEID       uint64
-	notificationFlag notifyFlag
 	metrics          *metrics.Session
 	PacketForwardingRules
 }
