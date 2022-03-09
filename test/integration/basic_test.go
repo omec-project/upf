@@ -115,7 +115,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				appID:        2,
 				tunnelPeerID: 2,
 			},
-			desc: "APPLICATION FILTERING permit out udp from 192.168.1.1/32 to assigned 80-80",
+			desc: "APPLICATION FILTERING permit out udp from 192.168.1.1/32 to assigned 80-100",
 		},
 		{
 			input: &pfcpSessionData{
