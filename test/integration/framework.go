@@ -51,6 +51,9 @@ const (
 
 	directionUplink   = 0x1
 	directionDownlink = 0x2
+
+	p4InfoPath       = "../../conf/p4/bin/p4info.txt"
+	deviceConfigPath = "../../conf/p4/bin/bmv2.json"
 )
 
 type UEState uint8
@@ -228,6 +231,19 @@ func isFastpathUP4() bool {
 
 func isFastpathBESS() bool {
 	return os.Getenv(EnvFastpath) == FastpathBESS
+}
+
+func initForwardingPipelineConfig() {
+	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", ReaderElectionID)
+	if err != nil {
+		panic("Cannot init forwarding pipeline config: " + err.Error())
+	}
+	defer providers.DisconnectP4rt()
+
+	_, err = p4rtClient.SetFwdPipe(deviceConfigPath, p4InfoPath, 0)
+	if err != nil {
+		panic("Cannot init forwarding pipeline config: " + err.Error())
+	}
 }
 
 func setup(t *testing.T, configType uint32) {
