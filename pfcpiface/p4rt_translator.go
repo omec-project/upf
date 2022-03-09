@@ -122,6 +122,16 @@ func (t *P4rtTranslator) getActionByID(actionID uint32) (*p4ConfigV1.Action, err
 	return nil, ErrNotFoundWithParam("action", "ID", actionID)
 }
 
+func (t *P4rtTranslator) getMeterByID(meterID uint32) (*p4ConfigV1.Meter, error) {
+	for _, meter := range t.p4Info.Meters {
+		if meter.Preamble.Id == meterID {
+			return meter, nil
+		}
+	}
+
+	return nil, ErrNotFoundWithParam("meter", "ID", meterID)
+}
+
 func (t *P4rtTranslator) getTableByID(tableID uint32) (*p4ConfigV1.Table, error) {
 	for _, table := range t.p4Info.Tables {
 		if table.Preamble.Id == tableID {
