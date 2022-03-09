@@ -1,4 +1,9 @@
-# PFCP Agent configurations
+<!--
+SPDX-License-Identifier: Apache-2.0
+Copyright 2022-present Open Networking Foundation
+-->
+
+# PFCP Agent configurations 
 
 This document focuses on frequently used configurations.
 Please refer to [upf.json](https://github.com/omec-project/upf/blob/master/conf/upf.json) file for the full list of configurable parameters.
