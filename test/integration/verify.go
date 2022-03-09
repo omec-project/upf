@@ -292,10 +292,8 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, expectedVal
 	expectedInterfacesEntries := buildExpectedInterfacesEntries(p4rtClient, testdata, expectedValues)
 	n3addressEntry := expectedInterfacesEntries[0]
 	uePoolEntry := expectedInterfacesEntries[1]
-	//require.Contains(t, entries, n3addressEntry)
-	//require.Contains(t, entries, uePoolEntry)
-	require.Equal(t, entries[0], uePoolEntry)
-	require.Equal(t, entries[1], n3addressEntry)
+	require.Contains(t, entries, n3addressEntry)
+	require.Contains(t, entries, uePoolEntry)
 
 	entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.applications")
 	require.Equal(t, expectedApplicationsEntries, len(entries),
