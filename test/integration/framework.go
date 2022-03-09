@@ -215,7 +215,7 @@ func waitForPFCPAssociationSetup(pfcpClient *pfcpsim.PFCPClient) error {
 	// Decrease timeout to wait for PFCP responses.
 	// This decreases time to wait for PFCP Agent to start.
 	pfcpClient.SetPFCPResponseTimeout(1 * time.Second)
-	
+
 	// Keep trying until we're timed out or get a result/error
 	for {
 		select {
