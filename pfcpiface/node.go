@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"sync"
 
 	reuse "github.com/libp2p/go-reuseport"
 	log "github.com/sirupsen/logrus"
@@ -30,6 +31,8 @@ type PFCPNode struct {
 	upf *upf
 	// metrics for PFCP messages and sessions
 	metrics metrics.InstrumentPFCP
+
+	mtx sync.Mutex
 }
 
 // NewPFCPNode create a new PFCPNode listening on local address.
@@ -101,7 +104,9 @@ func (node *PFCPNode) handleNewPeers() {
 
 		rAddrStr := rAddr.String()
 
+		node.mtx.Lock()
 		_, ok := node.pConns[rAddrStr]
+		node.mtx.Unlock()
 		if ok {
 			log.Warnln("Drop packet for existing PFCPconn received from", rAddrStr)
 			continue
@@ -121,13 +126,17 @@ func (node *PFCPNode) Serve() {
 		select {
 		case fseid := <-node.upf.reportNotifyChan:
 			// TODO: Logic to distinguish PFCPConn based on SEID
+			node.mtx.Lock()
 			for _, pConn := range node.pConns {
 				pConn.handleDigestReport(fseid)
 				break
 			}
+			node.mtx.Unlock()
 		case rAddr := <-node.pConnDone:
+			node.mtx.Lock()
 			delete(node.pConns, rAddr)
 			log.Infoln("Removed connection to", rAddr)
+			node.mtx.Unlock()
 		case <-node.ctx.Done():
 			shutdown = true
 

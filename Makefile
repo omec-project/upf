@@ -76,7 +76,12 @@ test-up4-integration-docker:
 	docker-compose -f test/integration/infra/docker-compose.yml rm -fsv
 
 test-bess-integration-native:
-	MODE=native FASTPATH=bess go test -v -count=1 -failfast ./test/integration/...
+	MODE=native FASTPATH=bess go test \
+		-race \
+		-v \
+		-count=1 \
+		-failfast \
+		./test/integration/...
 
 pb:
 	DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) \
