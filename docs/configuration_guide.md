@@ -3,12 +3,14 @@ SPDX-License-Identifier: Apache-2.0
 Copyright 2022-present Open Networking Foundation
 -->
 
-# PFCP Agent configurations 
+# Configuration Guide
+
+## PFCP Agent
 
 This document focuses on frequently used configurations.
 Please refer to [upf.json](https://github.com/omec-project/upf/blob/master/conf/upf.json) file for the full list of configurable parameters.
 
-## Common configurations
+### Common configurations
 
 These are configurations commonly shared between P4-UPF and BESS-UPF.
 
@@ -25,7 +27,7 @@ These are configurations commonly shared between P4-UPF and BESS-UPF.
 | `ue_ip_pool` | - | Yes for P4-UPF or when `enable_ue_ip_alloc` is set | IP pool from which we allocate UE IP address |
 | `cpiface.dnn` | - | No | Data Network Name to use during PFCP Association |
 
-## BESS-UPF specific configurations
+### BESS-UPF specific configurations
 
 | Config | Default value | Mandatory | Comments |
 | ------ | ------------- | --------- | -------- |
@@ -35,7 +37,7 @@ These are configurations commonly shared between P4-UPF and BESS-UPF.
 | `core.ifname` | - | Yes | Core-facing network interface name |
 | `enable_notify_bess` | false | No | Whether to enable Notify feature for DDNs |
 
-## P4-UPF specific configurations
+### P4-UPF specific configurations
 
 | Config | Default value | Mandatory | Comments |
 | ------ | ------------- | --------- | -------- |
