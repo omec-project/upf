@@ -475,8 +475,10 @@ github.com/ncw/swift v1.0.47/go.mod h1:23YIA4yWVnGwv2dQlN4bB7egfYX6YLn0Yo/S6zZO/
 github.com/nxadm/tail v1.4.4/go.mod h1:kenIhsEOeOJmVchQTgglprH7qJGnHDVpk1VPCcaMI8A=
 github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn4U=
 github.com/olekukonko/tablewriter v0.0.0-20170122224234-a0225b3f23b5/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
-github.com/omec-project/pfcpsim v0.0.0-20220224085126-19a69dc4b36c h1:HiRMUtwZXNg1ep6XIHNg4Uv/FnqpObW9iTAT0BX3PuA=
-github.com/omec-project/pfcpsim v0.0.0-20220224085126-19a69dc4b36c/go.mod h1:VpozJhKRcQ5QRW1sl7RLwwqVi+Od7y+tId8419o6xz4=
+github.com/omec-project/pfcpsim v0.0.0-20220309065921-4b91bcc14895 h1:TG4qrTzb1zWfu1utBuaaLgcqSL7foRLKY1VcX/J83Pc=
+github.com/omec-project/pfcpsim v0.0.0-20220309065921-4b91bcc14895/go.mod h1:VpozJhKRcQ5QRW1sl7RLwwqVi+Od7y+tId8419o6xz4=
+github.com/omec-project/pfcpsim v0.0.0-20220309084214-9414eb21802a h1:5WAZa30IUgeCmlpkTZDjIRw+n/AeYx0NB88PppsxUE0=
+github.com/omec-project/pfcpsim v0.0.0-20220309084214-9414eb21802a/go.mod h1:VpozJhKRcQ5QRW1sl7RLwwqVi+Od7y+tId8419o6xz4=
 github.com/onsi/ginkgo v0.0.0-20151202141238-7f8ab55aaf3b/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v0.0.0-20170829012221-11459a886d9c/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=

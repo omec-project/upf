@@ -202,11 +202,15 @@ func waitForPortOpen(net string, host string, port string) error {
 }
 
 // waitForPFCPAssociationSetup checks if PFCP Agent is started by trying to create PFCP association.
-// It retries every 5.5 seconds (0.5 seconds of interval between tries + 5 seconds that PFCP Client waits for response).
+// It retries every 1.5 seconds (0.5 seconds of interval between tries + 1 seconds that PFCP Client waits for response).
 func waitForPFCPAssociationSetup(pfcpClient *pfcpsim.PFCPClient) error {
 	timeout := time.After(30 * time.Second)
 	ticker := time.Tick(500 * time.Millisecond)
 
+	// Decrease timeout to wait for PFCP responses.
+	// This decreases time to wait for PFCP Agent to start.
+	pfcpClient.SetPFCPResponseTimeout(1 * time.Second)
+	
 	// Keep trying until we're timed out or get a result/error
 	for {
 		select {
