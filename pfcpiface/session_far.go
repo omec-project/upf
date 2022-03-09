@@ -4,10 +4,11 @@
 package pfcpiface
 
 import (
+	"net"
+
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	log "github.com/sirupsen/logrus"
-	"net"
 )
 
 // CreateFAR appends far to existing list of FARs in the session.

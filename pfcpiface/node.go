@@ -120,7 +120,6 @@ func (node *PFCPNode) Serve() {
 	for !shutdown {
 		select {
 		case fseid := <-node.upf.reportNotifyChan:
-
 			// TODO: Logic to distinguish PFCPConn based on SEID
 			for _, pConn := range node.pConns {
 				pConn.handleDigestReport(fseid)

@@ -5,6 +5,7 @@ package pfcpiface
 
 import (
 	"fmt"
+
 	"github.com/omec-project/upf-epc/pfcpiface/metrics"
 )
 
@@ -16,9 +17,9 @@ type PacketForwardingRules struct {
 
 // PFCPSession implements one PFCP session.
 type PFCPSession struct {
-	localSEID        uint64
-	remoteSEID       uint64
-	metrics          *metrics.Session
+	localSEID  uint64
+	remoteSEID uint64
+	metrics    *metrics.Session
 	PacketForwardingRules
 }
 

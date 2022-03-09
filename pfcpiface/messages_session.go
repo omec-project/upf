@@ -5,11 +5,12 @@ package pfcpiface
 
 import (
 	"errors"
+	"net"
+	"strings"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
-	"net"
-	"strings"
 )
 
 // errors

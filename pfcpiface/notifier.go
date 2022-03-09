@@ -24,7 +24,7 @@ type downlinkDataNotifier struct {
 
 func NewDownlinkDataNotifier(notifyChan chan<- uint64) *downlinkDataNotifier {
 	return &downlinkDataNotifier{
-		notifyChan: notifyChan,
+		notifyChan:           notifyChan,
 		notificationInterval: defaultNotificationInterval,
 	}
 }

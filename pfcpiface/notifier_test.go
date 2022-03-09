@@ -4,9 +4,10 @@
 package pfcpiface
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func Test_downlinkDataNotifier_Notify(t *testing.T) {
@@ -14,7 +15,7 @@ func Test_downlinkDataNotifier_Notify(t *testing.T) {
 		notifyChan:           make(chan<- uint64, 1024),
 		notificationInterval: 5 * time.Second,
 	}
-	
+
 	testFSEID := uint64(0x1)
 
 	n.Notify(testFSEID)
@@ -34,15 +35,15 @@ func Test_downlinkDataNotifier_shouldNotify(t *testing.T) {
 
 		got := n.shouldNotify(testFSEID)
 		require.True(t, got)
-		<-time.After(3*time.Second)
+		<-time.After(3 * time.Second)
 
 		got = n.shouldNotify(testFSEID)
 		require.False(t, got)
-		<-time.After(1*time.Second)
+		<-time.After(1 * time.Second)
 
 		got = n.shouldNotify(testFSEID)
 		require.False(t, got)
-		<-time.After(2*time.Second)
+		<-time.After(2 * time.Second)
 
 		// after ~6 seconds
 		got = n.shouldNotify(testFSEID)
@@ -50,7 +51,7 @@ func Test_downlinkDataNotifier_shouldNotify(t *testing.T) {
 
 		got = n.shouldNotify(testFSEID)
 		require.False(t, got)
-		<-time.After(1*time.Second)
+		<-time.After(1 * time.Second)
 	})
 
 	t.Run("multiple F-SEIDs check rate limiting", func(t *testing.T) {
@@ -59,28 +60,32 @@ func Test_downlinkDataNotifier_shouldNotify(t *testing.T) {
 			notificationInterval: 5 * time.Second,
 		}
 
-		testFSEIDs := []uint64{0x1, 0x2, 0x3, 0x4, 0x5}
+		// generate 100k unique F-SEIDs
+		testFSEIDs := make([]uint64, 0)
+		for i := 1; i < 100000; i++ {
+			testFSEIDs = append(testFSEIDs, uint64(i))
+		}
 
 		for _, fseid := range testFSEIDs {
 			got := n.shouldNotify(fseid)
 			require.True(t, got)
 		}
 
-		<-time.After(3*time.Second)
+		<-time.After(3 * time.Second)
 
 		for _, fseid := range testFSEIDs {
 			got := n.shouldNotify(fseid)
 			require.False(t, got)
 		}
 
-		<-time.After(3*time.Second)
+		<-time.After(3 * time.Second)
 
 		for _, fseid := range testFSEIDs {
 			got := n.shouldNotify(fseid)
 			require.True(t, got)
 		}
 
-		<-time.After(1*time.Second)
+		<-time.After(1 * time.Second)
 
 		for _, fseid := range testFSEIDs {
 			got := n.shouldNotify(fseid)
