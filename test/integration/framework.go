@@ -147,6 +147,11 @@ type testCase struct {
 
 func init() {
 	logrus.SetLevel(logrus.TraceLevel)
+	logrus.SetReportCaller(true)
+	logrus.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp: true,
+		ForceColors:   true,
+	})
 }
 
 func TimeBasedElectionId() p4_v1.Uint128 {
@@ -267,6 +272,10 @@ func setup(t *testing.T, configType uint32) {
 		require.NoError(t, err)
 		providers.RunDockerCommandAttach("pfcpiface",
 			"/bin/pfcpiface -config /config/upf.json")
+		if isFastpathUP4() {
+			// FIXME: remove once we remove sleep in UP4.tryConnect()
+			time.Sleep(2 * time.Second)
+		}
 	case ModeNative:
 		pfcpAgent = pfcpiface.NewPFCPIface(GetConfig(os.Getenv(EnvFastpath), configType))
 		go pfcpAgent.Run()
