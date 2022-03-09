@@ -144,6 +144,11 @@ type testCase struct {
 
 func init() {
 	logrus.SetLevel(logrus.TraceLevel)
+	logrus.SetReportCaller(true)
+	logrus.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp: true,
+		ForceColors:   true,
+	})
 }
 
 func TimeBasedElectionId() p4_v1.Uint128 {

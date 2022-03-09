@@ -97,6 +97,10 @@ Please see [INSTALL.md](docs/INSTALL.md) for details on how to set up the PFCP A
 
 To install the PFCP Agent with UP4 please follow [the SD-Fabric documentation](https://docs.sd-fabric.org/master/index.html). 
 
+### Configuration
+
+Please see [configuration_guide.md](docs/configuration_guide.md) to learn more about configurations.
+
 ### Testing
 
 The UPF project currently implements three types of tests:
