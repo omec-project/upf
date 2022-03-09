@@ -140,7 +140,6 @@ func (q FakeQer) String() string {
 
 type fakeBessService struct {
 	bess_pb.UnimplementedBESSControlServer
-	reqs    []*bess_pb.CommandRequest
 	modules map[string]module
 	mtx     sync.Mutex
 }
@@ -198,8 +197,6 @@ func (b *fakeBessService) ModuleCommand(ctx context.Context, request *bess_pb.Co
 	if err := m.HandleRequest(request.Cmd, request.Arg); err != nil {
 		return nil, err
 	}
-
-	b.reqs = append(b.reqs, request)
 
 	return &bess_pb.CommandResponse{}, nil
 }
