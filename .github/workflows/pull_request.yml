@@ -24,9 +24,9 @@ jobs:
         run: |
           make pb
 
-      - name: Build the BESS-UPF Docker image
-        run: |
-          DOCKER_TARGETS=bess make docker-build
+#      - name: Build the BESS-UPF Docker image
+#        run: |
+#          DOCKER_TARGETS=bess make docker-build
 
       - name: Build the PFCP Agent Docker image
         run: |
@@ -66,9 +66,9 @@ jobs:
             core.setFailed('Please run make p4-constants and commit changes')
 
       # Build again and commit
-      - name: Build the BESS-UPF Docker image (after format)
-        run: |
-          DOCKER_TARGETS=bess make docker-build
+#      - name: Build the BESS-UPF Docker image (after format)
+#        run: |
+#          DOCKER_TARGETS=bess make docker-build
 
       - name: Build the PFCP Agent Docker image (after format)
         run: |
@@ -95,4 +95,4 @@ jobs:
       - name: Push Docker image
         if: steps.docker-login.conclusion == 'success'
         run: |
-          make docker-push
+          DOCKER_TARGETS=pfcpiface make docker-push

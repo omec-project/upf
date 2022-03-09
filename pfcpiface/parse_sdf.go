@@ -128,7 +128,9 @@ func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
 		case "any":
 			fields[i] = "0.0.0.0/0"
 		case "assigned":
-			if ueIP != "" && ueIP != "<nil>" {
+			if ueIP == "0.0.0.0" {
+				fields[i] = "0.0.0.0/0"
+			} else if ueIP != "" && ueIP != "<nil>" {
 				fields[i] = ueIP
 			} else {
 				fields[i] = "0.0.0.0/0"
