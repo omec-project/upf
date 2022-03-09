@@ -96,7 +96,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				nbAddress:    nodeBAddress,
 				ueAddress:    ueAddress,
 				upfN3Address: upfN3Address,
-				sdfFilter:    "permit out udp from 192.168.1.1/32 to assigned 80-400",
+				sdfFilter:    "permit out udp from 192.168.1.1/32 to assigned 80-100",
 				ulTEID:       15,
 				dlTEID:       16,
 				QFI:          0x9,
@@ -107,7 +107,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 					appIP:        net.ParseIP("192.168.1.1"),
 					appPrefixLen: 32,
 					appPort: portRange{
-						80, 400,
+						80, 100,
 					},
 				},
 				// FIXME: there is a dependency on previous test because pfcpiface doesn't clear application IDs properly
@@ -380,6 +380,9 @@ func testUEAttach(t *testing.T, testcase *testCase) {
 	}
 
 	sess, err := pfcpClient.EstablishSession(pdrs, fars, qers)
+	testcase.expected.pdrs = pdrs
+	testcase.expected.fars = fars
+	testcase.expected.qers = qers
 	require.NoErrorf(t, err, "failed to establish PFCP session")
 	testcase.session = sess
 

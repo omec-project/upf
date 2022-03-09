@@ -46,38 +46,52 @@ func (b *FakeBESS) Stop() {
 	b.grpcServer.Stop()
 }
 
-func (b *FakeBESS) GetPdrTableEntries() (entries []*bess_pb.WildcardMatchCommandAddArg) {
+func (b *FakeBESS) GetPdrTableEntries() (entries []FakePdr) {
 	msgs := b.server.GetOrAddModule(pdrLookupModuleName).GetState()
 	for _, m := range msgs {
-		e, _ := m.(*bess_pb.WildcardMatchCommandAddArg)
-		entries = append(entries, e)
+		e, ok := m.(*bess_pb.WildcardMatchCommandAddArg)
+		if !ok {
+			panic("unexpected message type")
+		}
+		entries = append(entries, UnmarshalPdr(e))
 	}
+	entries = AggregateRangeMatchPdr(entries)
+
 	return
 }
 
-func (b *FakeBESS) GetFarTableEntries() (entries []*bess_pb.ExactMatchCommandAddArg) {
+func (b *FakeBESS) GetFarTableEntries() (entries []FakeFar) {
 	msgs := b.server.GetOrAddModule(farLookupModuleName).GetState()
 	for _, m := range msgs {
-		e, _ := m.(*bess_pb.ExactMatchCommandAddArg)
-		entries = append(entries, e)
+		e, ok := m.(*bess_pb.ExactMatchCommandAddArg)
+		if !ok {
+			panic("unexpected message type")
+		}
+		entries = append(entries, UnmarshalFar(e))
 	}
 	return
 }
 
-func (b *FakeBESS) GetSessionQerTableEntries() (entries []*bess_pb.QosCommandAddArg) {
+func (b *FakeBESS) GetSessionQerTableEntries() (entries []FakeQer) {
 	msgs := b.server.GetOrAddModule(sessionQerModuleName).GetState()
 	for _, m := range msgs {
-		e, _ := m.(*bess_pb.QosCommandAddArg)
-		entries = append(entries, e)
+		e, ok := m.(*bess_pb.QosCommandAddArg)
+		if !ok {
+			panic("unexpected message type")
+		}
+		entries = append(entries, UnmarshalSessionQer(e))
 	}
 	return
 }
 
-func (b *FakeBESS) GetAppQerTableEntries() (entries []*bess_pb.QosCommandAddArg) {
+func (b *FakeBESS) GetAppQerTableEntries() (entries []FakeQer) {
 	msgs := b.server.GetOrAddModule(appQerModuleName).GetState()
 	for _, m := range msgs {
-		e, _ := m.(*bess_pb.QosCommandAddArg)
-		entries = append(entries, e)
+		e, ok := m.(*bess_pb.QosCommandAddArg)
+		if !ok {
+			panic("unexpected message type")
+		}
+		entries = append(entries, UnmarshalAppQer(e))
 	}
 	return
 }

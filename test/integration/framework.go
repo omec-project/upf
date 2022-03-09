@@ -14,6 +14,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"github.com/wmnsk/go-pfcp/ie"
 	"io/ioutil"
 	"net"
 	"os"
@@ -125,6 +126,10 @@ type p4RtValues struct {
 	tunnelPeerID uint8
 	appID        uint8
 	appFilter    appFilter
+
+	pdrs []*ie.IE
+	fars []*ie.IE
+	qers []*ie.IE
 }
 
 type testContext struct {

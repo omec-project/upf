@@ -10,6 +10,7 @@ import (
 	"github.com/omec-project/upf-epc/pkg/fake_bess"
 	"github.com/omec-project/upf-epc/test/integration/providers"
 	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"math"
 	"testing"
@@ -412,7 +413,45 @@ func verifyNoP4RuntimeEntries(t *testing.T, expectedValues p4RtValues) {
 }
 
 func verifyBessEntries(t *testing.T, bess *fake_bess.FakeBESS, testdata *pfcpSessionData, expectedValues p4RtValues, ueState UEState) {
-	t.Fatal("not implemented")
+	log.Warnf("%+v, %+v, %+v", testdata, expectedValues, ueState)
+
+	// Check we have all expected PDRs.
+	pdrs := bess.GetPdrTableEntries()
+	require.Equal(t, len(expectedValues.pdrs), len(pdrs), "found unexpected PDR entries %v", pdrs)
+	for _, expectedPdr := range expectedValues.pdrs {
+		id, err := expectedPdr.PDRID()
+		require.NoError(t, err)
+
+		found := false
+		for _, installedPdr := range pdrs {
+			if installedPdr.PdrID == uint32(id) {
+				found = true
+				break
+			}
+		}
+		require.True(t, found, "missing PDR", "expected PDR with ID %v: %+v, got %+v", id, expectedPdr, pdrs)
+	}
+
+	// Check we have all expected FARs.
+	fars := bess.GetFarTableEntries()
+	require.Equal(t, len(expectedValues.pdrs), len(fars), "found unexpected FAR entries %v", fars)
+	for _, expectedFar := range expectedValues.fars {
+		id, err := expectedFar.FARID()
+		require.NoError(t, err)
+
+		found := false
+		for _, installedFar := range fars {
+			if installedFar.FarID == id {
+				found = true
+				break
+			}
+		}
+		require.True(t, found, "missing FAR", "expected FAR with ID %v: %+v, got %+v", id, expectedFar, fars)
+	}
+
+	// Check we have all expected session and app QERs.
+	qers := append(bess.GetSessionQerTableEntries(), bess.GetAppQerTableEntries()...)
+	require.Equal(t, len(expectedValues.qers)*2 /* up and down link */, len(qers), "found unexpected QER entries %v", qers)
 }
 
 func verifyNoBessRuntimeEntries(t *testing.T, bess *fake_bess.FakeBESS) {
