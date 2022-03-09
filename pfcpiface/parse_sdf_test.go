@@ -84,11 +84,11 @@ func Test_endpoint_parsePort(t *testing.T) {
 		want    endpoint
 		wantErr bool
 	}{
-		{name: "single-port",
+		{name: "single port",
 			args:    "8080",
 			want:    endpoint{ports: newExactMatchPortRange(8080)},
 			wantErr: false},
-		{name: "single-port range",
+		{name: "single port range",
 			args:    "8080-8080",
 			want:    endpoint{ports: newExactMatchPortRange(8080)},
 			wantErr: false},
@@ -311,7 +311,7 @@ func Test_parseFlowDesc(t *testing.T) {
 					ports: newWildcardPortRange(),
 				},
 			}, wantErr: false},
-		{name: "from single-port",
+		{name: "from single port",
 			args: args{
 				flowDesc: "permit out ip from 60.60.0.1 8888 to 60.60.0.102/26",
 				ueIP:     ueIpString,
@@ -328,7 +328,7 @@ func Test_parseFlowDesc(t *testing.T) {
 					ports: newWildcardPortRange(),
 				},
 			}, wantErr: false},
-		{name: "from single-port range",
+		{name: "from single port range",
 			args: args{
 				flowDesc: "permit out ip from 60.60.0.1 8888-8888 to 60.60.0.102/26",
 				ueIP:     ueIpString,
@@ -345,7 +345,7 @@ func Test_parseFlowDesc(t *testing.T) {
 					ports: newWildcardPortRange(),
 				},
 			}, wantErr: false},
-		{name: "to single-port",
+		{name: "to single port",
 			args: args{
 				flowDesc: "permit out ip from 60.60.0.1 to 60.60.0.102 9999",
 				ueIP:     ueIpString,
@@ -362,7 +362,7 @@ func Test_parseFlowDesc(t *testing.T) {
 					ports: newExactMatchPortRange(9999),
 				},
 			}, wantErr: false},
-		{name: "from single-port to single-port",
+		{name: "from single port to single port",
 			args: args{
 				flowDesc: "permit out ip from 60.60.0.1 8888 to 60.60.0.102 9999",
 				ueIP:     ueIpString,
@@ -379,7 +379,7 @@ func Test_parseFlowDesc(t *testing.T) {
 					ports: newExactMatchPortRange(9999),
 				},
 			}, wantErr: false},
-		{name: "from single-port range to single-port range",
+		{name: "from single port range to single port range",
 			args: args{
 				flowDesc: "permit out ip from 60.60.0.1 8888-8888 to 60.60.0.102 9999-9999",
 				ueIP:     ueIpString,
