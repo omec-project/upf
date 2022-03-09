@@ -227,10 +227,12 @@ func Test_parseFlowDesc(t *testing.T) {
 		ueIP     string
 	}
 
-	const ueIpString = "10.0.0.1"
-	const udpProto = 17
-	const tcpProto = 6
-	const reservedProto = 255
+	const (
+		ueIpString    = "10.0.0.1"
+		udpProto      = 17
+		tcpProto      = 6
+		reservedProto = 255
+	)
 
 	tests := []struct {
 		name    string
@@ -247,7 +249,8 @@ func Test_parseFlowDesc(t *testing.T) {
 			args: args{
 				flowDesc: "permit out ip from any to assigned",
 				ueIP:     ueIpString,
-			}, want: &ipFilterRule{
+			},
+			want: &ipFilterRule{
 				action:    "permit",
 				direction: "out",
 				proto:     reservedProto,
@@ -264,7 +267,8 @@ func Test_parseFlowDesc(t *testing.T) {
 			args: args{
 				flowDesc: "permit out tcp from 60.60.0.102/32 to assigned",
 				ueIP:     ueIpString,
-			}, want: &ipFilterRule{
+			},
+			want: &ipFilterRule{
 				action:    "permit",
 				direction: "out",
 				proto:     tcpProto,
@@ -281,7 +285,8 @@ func Test_parseFlowDesc(t *testing.T) {
 			args: args{
 				flowDesc: "permit out udp from any to 60.60.0.102",
 				ueIP:     ueIpString,
-			}, want: &ipFilterRule{
+			},
+			want: &ipFilterRule{
 				action:    "permit",
 				direction: "out",
 				proto:     udpProto,
@@ -298,7 +303,8 @@ func Test_parseFlowDesc(t *testing.T) {
 			args: args{
 				flowDesc: "permit out ip from 60.60.0.1/26 to 60.60.0.102",
 				ueIP:     ueIpString,
-			}, want: &ipFilterRule{
+			},
+			want: &ipFilterRule{
 				action:    "permit",
 				direction: "out",
 				proto:     reservedProto,
@@ -315,7 +321,8 @@ func Test_parseFlowDesc(t *testing.T) {
 			args: args{
 				flowDesc: "permit out ip from 60.60.0.1 8888 to 60.60.0.102/26",
 				ueIP:     ueIpString,
-			}, want: &ipFilterRule{
+			},
+			want: &ipFilterRule{
 				action:    "permit",
 				direction: "out",
 				proto:     reservedProto,
@@ -332,7 +339,8 @@ func Test_parseFlowDesc(t *testing.T) {
 			args: args{
 				flowDesc: "permit out ip from 60.60.0.1 8888-8888 to 60.60.0.102/26",
 				ueIP:     ueIpString,
-			}, want: &ipFilterRule{
+			},
+			want: &ipFilterRule{
 				action:    "permit",
 				direction: "out",
 				proto:     reservedProto,
@@ -349,7 +357,8 @@ func Test_parseFlowDesc(t *testing.T) {
 			args: args{
 				flowDesc: "permit out ip from 60.60.0.1 to 60.60.0.102 9999",
 				ueIP:     ueIpString,
-			}, want: &ipFilterRule{
+			},
+			want: &ipFilterRule{
 				action:    "permit",
 				direction: "out",
 				proto:     reservedProto,
@@ -366,7 +375,8 @@ func Test_parseFlowDesc(t *testing.T) {
 			args: args{
 				flowDesc: "permit out ip from 60.60.0.1 8888 to 60.60.0.102 9999",
 				ueIP:     ueIpString,
-			}, want: &ipFilterRule{
+			},
+			want: &ipFilterRule{
 				action:    "permit",
 				direction: "out",
 				proto:     reservedProto,
@@ -383,7 +393,8 @@ func Test_parseFlowDesc(t *testing.T) {
 			args: args{
 				flowDesc: "permit out ip from 60.60.0.1 8888-8888 to 60.60.0.102 9999-9999",
 				ueIP:     ueIpString,
-			}, want: &ipFilterRule{
+			},
+			want: &ipFilterRule{
 				action:    "permit",
 				direction: "out",
 				proto:     reservedProto,
