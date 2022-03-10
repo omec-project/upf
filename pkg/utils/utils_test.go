@@ -23,7 +23,7 @@ func TestInt2ip(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				got := Int2ip(tt.args)
+				got := Uint32ToIp4(tt.args)
 				require.Equal(t, tt.want, got)
 			},
 		)
@@ -43,8 +43,8 @@ func TestIp2int(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				if got := Ip2int(tt.ip); got != tt.want {
-					t.Errorf("Ip2int() = %v, want %v", got, tt.want)
+				if got := Ip4ToUint32(tt.ip); got != tt.want {
+					t.Errorf("Ip4ToUint32() = %v, want %v", got, tt.want)
 				}
 			},
 		)
@@ -60,8 +60,8 @@ func TestIp2int2IpTransitive(t *testing.T) {
 	}
 	for _, i := range tests {
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			ip := Int2ip(i)
-			got := Ip2int(ip)
+			ip := Uint32ToIp4(i)
+			got := Ip4ToUint32(ip)
 			require.Equal(t, i, got, "value %v failed transitive conversion with intermediate ip %v", ip)
 		},
 		)

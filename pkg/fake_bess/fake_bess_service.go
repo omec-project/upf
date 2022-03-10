@@ -76,8 +76,8 @@ func (p FakePdr) String() string {
 	return fmt.Sprintf("PDR(id=%v, F-SEID=%v, srcIface=%v, tunnelIPv4Dst=%v/%x, "+
 		"tunnelTEID=%v/%x, ueAddress=%v, applicationFilter=%v, precedence=%v, F-SEID IP=%v, "+
 		"counterID=%v, farID=%v, qerIDs=%v, needDecap=%v, allocIPFlag=%v)",
-		p.PdrID, p.fseID, p.srcIface, utils.Int2ip(p.tunnelIP4Dst), p.tunnelIP4DstMask,
-		p.tunnelTEID, p.tunnelTEIDMask, utils.Int2ip(p.ueAddress), "todo", p.precedence,
+		p.PdrID, p.fseID, p.srcIface, utils.Uint32ToIp4(p.tunnelIP4Dst), p.tunnelIP4DstMask,
+		p.tunnelTEID, p.tunnelTEIDMask, utils.Uint32ToIp4(p.ueAddress), "todo", p.precedence,
 		p.fseidIP, p.ctrID, p.farID, p.qerID, p.needDecap, p.allocIPFlag)
 }
 
@@ -99,8 +99,8 @@ type FakeFar struct {
 func (f FakeFar) String() string {
 	return fmt.Sprintf("FAR(id=%v, F-SEID=%v, F-SEID IPv4=%v, dstInterface=%v, tunnelType=%v, "+
 		"tunnelIPv4Src=%v, tunnelIPv4Dst=%v, tunnelTEID=%v, tunnelSrcPort=%v, "+
-		"sendEndMarker=%v, drops=%v, forwards=%v, buffers=%v)", f.FarID, f.fseID, utils.Int2ip(f.fseidIP), f.dstIntf,
-		f.tunnelType, utils.Int2ip(f.tunnelIP4Src), utils.Int2ip(f.tunnelIP4Dst), f.tunnelTEID, f.tunnelPort, f.sendEndMarker,
+		"sendEndMarker=%v, drops=%v, forwards=%v, buffers=%v)", f.FarID, f.fseID, utils.Uint32ToIp4(f.fseidIP), f.dstIntf,
+		f.tunnelType, utils.Uint32ToIp4(f.tunnelIP4Src), utils.Uint32ToIp4(f.tunnelIP4Dst), f.tunnelTEID, f.tunnelPort, f.sendEndMarker,
 		f.Drops(), f.Forwards(), f.Buffers())
 }
 
