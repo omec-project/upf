@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	reservedProto = uint8(0xff)
+	reservedProto         = uint8(0xff)
+	Ipv4WildcardNetString = "0.0.0.0/0"
 )
 
 var errBadFilterDesc = errors.New("unsupported Filter Description format")
@@ -126,12 +127,14 @@ func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
 	xform := func(i int) {
 		switch fields[i] {
 		case "any":
-			fields[i] = "0.0.0.0/0"
+			fields[i] = Ipv4WildcardNetString
 		case "assigned":
-			if ueIP != "" && ueIP != "<nil>" {
+			if ueIP == "0.0.0.0" {
+				fields[i] = Ipv4WildcardNetString
+			} else if ueIP != "" && ueIP != "<nil>" {
 				fields[i] = ueIP
 			} else {
-				fields[i] = "0.0.0.0/0"
+				fields[i] = Ipv4WildcardNetString
 			}
 		}
 	}
