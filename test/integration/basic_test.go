@@ -433,7 +433,7 @@ func testUEAttach(t *testing.T, testcase *testCase) {
 				ie.NewGateStatus(gateStatus, gateStatus),
 				ie.NewMBR(testcase.input.appMBR, testcase.input.appMBR),
 				ie.NewGBR(testcase.input.appGBR, testcase.input.appGBR),
-				))
+			))
 	}
 
 	if testcase.input.downlinkAppQerID != 0 {
