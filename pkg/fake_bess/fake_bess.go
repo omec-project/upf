@@ -12,13 +12,13 @@ import (
 
 type FakeBESS struct {
 	grpcServer *grpc.Server
-	server     *fakeBessService
+	service    *fakeBessService
 }
 
 // NewFakeBESS creates a new fake BESS server with the
 func NewFakeBESS() *FakeBESS {
 	return &FakeBESS{
-		server: newFakeBESSService(),
+		service: newFakeBESSService(),
 	}
 }
 
@@ -30,7 +30,7 @@ func (b *FakeBESS) Run(address string) error {
 	}
 
 	b.grpcServer = grpc.NewServer()
-	bess_pb.RegisterBESSControlServer(b.grpcServer, b.server)
+	bess_pb.RegisterBESSControlServer(b.grpcServer, b.service)
 
 	// Blocking
 	err = b.grpcServer.Serve(listener)
@@ -47,7 +47,7 @@ func (b *FakeBESS) Stop() {
 }
 
 func (b *FakeBESS) GetPdrTableEntries() (entries []FakePdr) {
-	msgs := b.server.GetOrAddModule(pdrLookupModuleName).GetState()
+	msgs := b.service.GetOrAddModule(pdrLookupModuleName).GetState()
 	for _, m := range msgs {
 		e, ok := m.(*bess_pb.WildcardMatchCommandAddArg)
 		if !ok {
@@ -61,7 +61,7 @@ func (b *FakeBESS) GetPdrTableEntries() (entries []FakePdr) {
 }
 
 func (b *FakeBESS) GetFarTableEntries() (entries []FakeFar) {
-	msgs := b.server.GetOrAddModule(farLookupModuleName).GetState()
+	msgs := b.service.GetOrAddModule(farLookupModuleName).GetState()
 	for _, m := range msgs {
 		e, ok := m.(*bess_pb.ExactMatchCommandAddArg)
 		if !ok {
@@ -73,7 +73,7 @@ func (b *FakeBESS) GetFarTableEntries() (entries []FakeFar) {
 }
 
 func (b *FakeBESS) GetSessionQerTableEntries() (entries []FakeQer) {
-	msgs := b.server.GetOrAddModule(sessionQerModuleName).GetState()
+	msgs := b.service.GetOrAddModule(sessionQerModuleName).GetState()
 	for _, m := range msgs {
 		e, ok := m.(*bess_pb.QosCommandAddArg)
 		if !ok {
@@ -85,7 +85,7 @@ func (b *FakeBESS) GetSessionQerTableEntries() (entries []FakeQer) {
 }
 
 func (b *FakeBESS) GetAppQerTableEntries() (entries []FakeQer) {
-	msgs := b.server.GetOrAddModule(appQerModuleName).GetState()
+	msgs := b.service.GetOrAddModule(appQerModuleName).GetState()
 	for _, m := range msgs {
 		e, ok := m.(*bess_pb.QosCommandAddArg)
 		if !ok {
