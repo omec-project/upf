@@ -234,6 +234,76 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 			},
 			desc: "QER_METERING - TC for QFI",
 		},
+		{
+			input: &pfcpSessionData{
+				sliceID:      1,
+				nbAddress:    nodeBAddress,
+				ueAddress:    ueAddress,
+				upfN3Address: upfN3Address,
+				sdfFilter:    defaultSDFFilter,
+				ulTEID:       15,
+				dlTEID:       16,
+
+				QFI:              0x08,
+				uplinkAppQerID:   1,
+				downlinkAppQerID: 2,
+				sessQerID:        4,
+				sessGBR:          0,
+				sessMBR:          500000,
+				appGBR:           30000,
+				appMBR:           50000,
+				ulGateClosed:     true,
+			},
+			expected: p4RtValues{
+				appFilter: appFilter{
+					proto:        0x11,
+					appIP:        net.ParseIP("0.0.0.0"),
+					appPrefixLen: 0,
+					appPort: portRange{
+						80, 80,
+					},
+				},
+				appID:        1,
+				tunnelPeerID: 2,
+				tc:           3,
+			},
+			desc: "QER UL gating",
+		},
+		{
+			input: &pfcpSessionData{
+				sliceID:      1,
+				nbAddress:    nodeBAddress,
+				ueAddress:    ueAddress,
+				upfN3Address: upfN3Address,
+				sdfFilter:    defaultSDFFilter,
+				ulTEID:       15,
+				dlTEID:       16,
+
+				QFI:              0x08,
+				uplinkAppQerID:   1,
+				downlinkAppQerID: 2,
+				sessQerID:        4,
+				sessGBR:          0,
+				sessMBR:          500000,
+				appGBR:           30000,
+				appMBR:           50000,
+				dlGateClosed:     true,
+			},
+			expected: p4RtValues{
+				appFilter: appFilter{
+					proto:        0x11,
+					appIP:        net.ParseIP("0.0.0.0"),
+					appPrefixLen: 0,
+					appPort: portRange{
+						80, 80,
+					},
+				},
+				appID:        1,
+				tunnelPeerID: 2,
+				tc:           3,
+			},
+			desc: "QER DL gating",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -351,25 +421,35 @@ func testUEAttach(t *testing.T, testcase *testCase) {
 	}
 
 	if testcase.input.uplinkAppQerID != 0 {
+		gateStatus := ie.GateStatusOpen
+		if testcase.input.ulGateClosed {
+			gateStatus = ie.GateStatusClosed
+		}
 		qers = append(qers,
 			// uplink application QER
-			session.NewQERBuilder().WithMethod(session.Create).WithID(testcase.input.uplinkAppQerID).
-				WithQFI(testcase.input.QFI).
-				WithUplinkMBR(50000).
-				WithDownlinkMBR(50000).
-				WithUplinkGBR(30000).
-				WithDownlinkGBR(30000).Build())
+			ie.NewCreateQER(
+				ie.NewQERID(testcase.input.uplinkAppQerID),
+				ie.NewQFI(testcase.input.QFI),
+				ie.NewGateStatus(gateStatus, gateStatus),
+				ie.NewMBR(testcase.input.appMBR, testcase.input.appMBR),
+				ie.NewGBR(testcase.input.appGBR, testcase.input.appGBR),
+				))
 	}
 
 	if testcase.input.downlinkAppQerID != 0 {
+		gateStatus := ie.GateStatusOpen
+		if testcase.input.dlGateClosed {
+			gateStatus = ie.GateStatusClosed
+		}
 		qers = append(qers,
 			// downlink application QER
-			session.NewQERBuilder().WithMethod(session.Create).WithID(testcase.input.downlinkAppQerID).
-				WithQFI(testcase.input.QFI).
-				WithUplinkMBR(50000).
-				WithDownlinkMBR(50000).
-				WithUplinkGBR(30000).
-				WithDownlinkGBR(30000).Build())
+			ie.NewCreateQER(
+				ie.NewQERID(testcase.input.downlinkAppQerID),
+				ie.NewQFI(testcase.input.QFI),
+				ie.NewGateStatus(gateStatus, gateStatus),
+				ie.NewMBR(testcase.input.appMBR, testcase.input.appMBR),
+				ie.NewGBR(testcase.input.appGBR, testcase.input.appGBR),
+			))
 	}
 
 	sess, err := pfcpClient.EstablishSession(pdrs, fars, qers)
