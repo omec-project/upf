@@ -10,7 +10,6 @@ import (
 	"github.com/omec-project/upf-epc/pkg/fake_bess"
 	"github.com/omec-project/upf-epc/test/integration/providers"
 	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"math"
 	"testing"
@@ -422,8 +421,6 @@ func verifyNoP4RuntimeEntries(t *testing.T, expectedValues p4RtValues) {
 }
 
 func verifyBessEntries(t *testing.T, bess *fake_bess.FakeBESS, testdata *pfcpSessionData, expectedValues p4RtValues, ueState UEState) {
-	log.Warnf("%+v, %+v, %+v", testdata, expectedValues, ueState)
-
 	// Check we have all expected PDRs.
 	pdrs := bess.GetPdrTableEntries()
 	require.Equal(t, len(expectedValues.pdrs), len(pdrs), "found unexpected PDR entries %v", pdrs)
