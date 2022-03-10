@@ -105,15 +105,15 @@ func (f FakeFar) String() string {
 }
 
 func (f *FakeFar) Drops() bool {
-	return utils.Has1stBit(f.applyAction)
+	return utils.Uint8Has1stBit(f.applyAction)
 }
 
 func (f *FakeFar) Forwards() bool {
-	return utils.Has2ndBit(f.applyAction)
+	return utils.Uint8Has2ndBit(f.applyAction)
 }
 
 func (f *FakeFar) Buffers() bool {
-	return utils.Has3rdBit(f.applyAction)
+	return utils.Uint8Has3rdBit(f.applyAction)
 }
 
 type FakeQer struct {

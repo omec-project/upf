@@ -36,14 +36,14 @@ func MinUint16(x, y uint16) uint16 {
 	return x
 }
 
-func Has3rdBit(f uint8) bool {
+func Uint8Has3rdBit(f uint8) bool {
 	return (f&0x04)>>2 == 1
 }
 
-func Has2ndBit(f uint8) bool {
+func Uint8Has2ndBit(f uint8) bool {
 	return (f&0x02)>>1 == 1
 }
 
-func Has1stBit(f uint8) bool {
+func Uint8Has1stBit(f uint8) bool {
 	return (f & 0x01) == 1
 }
