@@ -118,7 +118,6 @@ RUN mkdir /bess_pb && \
 
 FROM golang AS pfcpiface-build
 ARG GOFLAGS
-
 WORKDIR /pfcpiface
 
 COPY go.mod /pfcpiface/go.mod
