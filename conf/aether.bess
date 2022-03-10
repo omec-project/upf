@@ -242,8 +242,8 @@ check_gtpu_port = " and udp dst port 2152"
 downlink_bpf_rule = {"priority": -bpfUeGatePass, "filter": check_ip +
                      check_spgwu_ip + check_gtpu_port, "gate": bpfUeGatePass}
 
-# ARP and ICMP filter to veth interface.
-pktout_filter = "arp or icmp"
+# ARP, ICMP and DHCP filter to veth interface.
+pktout_filter = "arp or icmp or (udp and (port 67 or port 68))"
 pktout_bpf_rule = {"priority": -bpfPacketOutGatePass, "filter": pktout_filter, "gate": bpfPacketOutGatePass}
 
 dataplaneBPF.add(filters=[downlink_bpf_rule, pktout_bpf_rule])
