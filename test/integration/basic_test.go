@@ -47,15 +47,14 @@ func TestUPFBasedUeIPAllocation(t *testing.T) {
 	})
 }
 
-func TestBasicPFCPAssociation(t *testing.T) {
+func TestPFCPHeartbeats(t *testing.T) {
 	setup(t, ConfigDefault)
 	defer teardown(t)
 
-	err := pfcpClient.SetupAssociation()
-	require.NoErrorf(t, err, "failed to setup PFCP association")
-
 	time.Sleep(time.Second * 10)
 
+	// Heartbeats interval is 5 seconds by default.
+	// If the association is alive after 10 seconds it means that PFCP Agent handles heartbeats properly.
 	require.True(t, pfcpClient.IsAssociationAlive())
 }
 
@@ -96,7 +95,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				nbAddress:    nodeBAddress,
 				ueAddress:    ueAddress,
 				upfN3Address: upfN3Address,
-				sdfFilter:    "permit out udp from 192.168.1.1/32 to assigned 80-400",
+				sdfFilter:    "permit out udp from 192.168.1.1/32 to assigned 80-100",
 				ulTEID:       15,
 				dlTEID:       16,
 				QFI:          0x9,
@@ -107,7 +106,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 					appIP:        net.ParseIP("192.168.1.1"),
 					appPrefixLen: 32,
 					appPort: portRange{
-						80, 400,
+						80, 100,
 					},
 				},
 				// FIXME: there is a dependency on previous test because pfcpiface doesn't clear application IDs properly
@@ -115,7 +114,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				appID:        2,
 				tunnelPeerID: 2,
 			},
-			desc: "APPLICATION FILTERING permit out udp from 192.168.1.1/32 to assigned 80-80",
+			desc: "APPLICATION FILTERING permit out udp from 192.168.1.1/32 to assigned 80-100",
 		},
 		{
 			input: &pfcpSessionData{
@@ -273,15 +272,9 @@ func TestUEBuffering(t *testing.T) {
 		},
 	}
 
-	err := pfcpClient.SetupAssociation()
-	require.NoErrorf(t, err, "failed to setup PFCP association")
-
 	testUEAttach(t, fillExpected(&tc))
 	testUEBuffer(t, fillExpected(&tc))
 	testUEDetach(t, fillExpected(&tc))
-
-	err = pfcpClient.TeardownAssociation()
-	require.NoErrorf(t, err, "failed to gracefully release PFCP association")
 }
 
 func fillExpected(tc *testCase) *testCase {
@@ -433,14 +426,8 @@ func testUEDetach(t *testing.T, testcase *testCase) {
 }
 
 func testUEAttachDetach(t *testing.T, testcase *testCase) {
-	err := pfcpClient.SetupAssociation()
-	require.NoErrorf(t, err, "failed to setup PFCP association")
-
 	testUEAttach(t, testcase)
 	testUEDetach(t, testcase)
-
-	err = pfcpClient.TeardownAssociation()
-	require.NoErrorf(t, err, "failed to gracefully release PFCP association")
 
 	if isFastpathUP4() {
 		// clear Applications table
