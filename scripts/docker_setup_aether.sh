@@ -116,8 +116,7 @@ docker run --name bess-pfcpiface -td --restart on-failure \
 	-v "$PWD/conf/aether.json":/conf/aether.json \
 	upf-epc-pfcpiface:"$(<VERSION)" \
 	-config /conf/aether.json
-	#  -simulate create_continue
-
+#  -simulate create_continue
 
 # Run simulator to create forwarding state.
 docker container run --rm -d --net=container:pause --name pfcpsim pfcpsim:0.1.0-dev

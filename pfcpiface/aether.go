@@ -33,7 +33,7 @@ const (
 	vethIfaceNameBess   = "fabveth-d"
 
 	// Time to wait for IP assignment on veth interface.
-	vethIpDiscoveryTimeout = time.Second*2
+	vethIpDiscoveryTimeout = time.Second * 2
 )
 
 type interfaceClassification struct {
