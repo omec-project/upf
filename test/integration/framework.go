@@ -289,7 +289,7 @@ func setup(t *testing.T, configType uint32) {
 		jsonConf, _ := json.Marshal(GetConfig(os.Getenv(EnvFastpath), configType))
 		err := ioutil.WriteFile("./infra/upf.json", jsonConf, os.ModePerm)
 		require.NoError(t, err)
-		providers.RunDockerCommandAttach("pfcpiface",
+		providers.MustRunDockerCommandAttach("pfcpiface",
 			"/bin/pfcpiface -config /config/upf.json")
 	case ModeNative:
 		pfcpAgent = pfcpiface.NewPFCPIface(GetConfig(os.Getenv(EnvFastpath), configType))
