@@ -95,16 +95,15 @@ type pfcpSessionData struct {
 	sessQerID        uint32
 	uplinkAppQerID   uint32
 	downlinkAppQerID uint32
-
 	// only single QFI is fine, QFI is passed in session QER, but not considered.
-	QFI uint8
-
+	QFI     uint8
 	sessMBR uint64
 	sessGBR uint64
-
 	// uplink/downlink GBR/MBR is always the same
-	appMBR uint64
-	appGBR uint64
+	appMBR       uint64
+	appGBR       uint64
+	ulGateClosed bool
+	dlGateClosed bool
 }
 
 type portRange struct {
@@ -144,6 +143,11 @@ type testCase struct {
 
 func init() {
 	logrus.SetLevel(logrus.TraceLevel)
+	logrus.SetReportCaller(true)
+	logrus.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp: true,
+		ForceColors:   true,
+	})
 }
 
 func TimeBasedElectionId() p4_v1.Uint128 {
@@ -201,8 +205,28 @@ func waitForPortOpen(net string, host string, port string) error {
 	}
 }
 
-func waitForPFCPAgentToStart() error {
-	return waitForPortOpen("udp", "127.0.0.1", "8805")
+// waitForPFCPAssociationSetup checks if PFCP Agent is started by trying to create PFCP association.
+// It retries every 1.5 seconds (0.5 seconds of interval between tries + 1 seconds that PFCP Client waits for response).
+func waitForPFCPAssociationSetup(pfcpClient *pfcpsim.PFCPClient) error {
+	timeout := time.After(30 * time.Second)
+	ticker := time.Tick(500 * time.Millisecond)
+
+	// Decrease timeout to wait for PFCP responses.
+	// This decreases time to wait for PFCP Agent to start.
+	pfcpClient.SetPFCPResponseTimeout(1 * time.Second)
+
+	// Keep trying until we're timed out or get a result/error
+	for {
+		select {
+		case <-timeout:
+			return errors.New("timed out")
+		case <-ticker:
+			// each test case requires PFCP Association, so we don't teardown it once we notice it's established.
+			if err := pfcpClient.SetupAssociation(); err == nil {
+				return nil
+			}
+		}
+	}
 }
 
 func waitForBESSMockToStart() error {
@@ -251,10 +275,6 @@ func setup(t *testing.T, configType uint32) {
 		require.NoError(t, err)
 		providers.RunDockerCommandAttach("pfcpiface",
 			"/bin/pfcpiface -config /config/upf.json")
-		if isFastpathUP4() {
-			// FIXME: remove once we remove sleep in UP4.tryConnect()
-			time.Sleep(2 * time.Second)
-		}
 	case ModeNative:
 		pfcpAgent = pfcpiface.NewPFCPIface(GetConfig(os.Getenv(EnvFastpath), configType))
 		go pfcpAgent.Run()
@@ -262,13 +282,13 @@ func setup(t *testing.T, configType uint32) {
 		t.Fatal("Unexpected test mode")
 	}
 
-	// wait for PFCP Agent to initialize, blocking
-	err := waitForPFCPAgentToStart()
-	require.NoErrorf(t, err, "failed to start PFCP Agent: %v", err)
-
 	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.1")
-	err = pfcpClient.ConnectN4("127.0.0.1")
+	err := pfcpClient.ConnectN4("127.0.0.1")
 	require.NoErrorf(t, err, "failed to connect to UPF")
+
+	// wait for PFCP Agent to initialize, blocking
+	err = waitForPFCPAssociationSetup(pfcpClient)
+	require.NoErrorf(t, err, "failed to start PFCP Agent: %v", err)
 }
 
 func teardown(t *testing.T) {
@@ -281,6 +301,11 @@ func teardown(t *testing.T) {
 		for _, entry := range entries {
 			p4rtClient.DeleteTableEntry(entry)
 		}
+	}
+
+	if pfcpClient.IsAssociationAlive() {
+		err := pfcpClient.TeardownAssociation()
+		require.NoError(t, err)
 	}
 
 	if pfcpClient != nil {

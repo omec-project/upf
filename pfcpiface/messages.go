@@ -21,7 +21,7 @@ type HandlePFCPMsgError struct {
 }
 
 func (e *HandlePFCPMsgError) Error() string {
-	return "Error during " + e.Op + e.Err.Error()
+	return "Error during " + e.Op + ": " + e.Err.Error()
 }
 
 func errUnmarshal(err error) *HandlePFCPMsgError {
