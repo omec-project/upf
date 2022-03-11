@@ -1,17 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2020 Intel Corporation
+// Copyright 2022 Open Networking Foundation
 
 package pfcpiface
 
 import (
 	"context"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
-	"github.com/mdlayher/packet"
 	"github.com/prometheus/client_golang/prometheus"
-	"golang.org/x/sys/unix"
-
-	_ "github.com/google/gopacket/layers"
+	"time"
 
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
 	log "github.com/sirupsen/logrus"
@@ -23,16 +18,22 @@ import (
 
 type aether struct {
 	bess
-	accessIP    net.IP
+	ownIp       net.IP
 	ueSubnet    *net.IPNet
-	pktioSock   *packet.Conn
 	datapathMAC []byte
 }
 
 const (
-	// IP protocol types
+	// IP protocol types.
 	TcpProto = 6
 	UdpProto = 17
+
+	// veth pair names. DO NOT MODIFY.
+	vethIfaceNameKernel = "fabveth"
+	vethIfaceNameBess   = "fabveth-d"
+
+	// Time to wait for IP assignment on veth interface.
+	vethIpDiscoveryTimeout = time.Second*2
 )
 
 type interfaceClassification struct {
@@ -50,15 +51,16 @@ func (a *aether) setUpfInfo(u *upf, conf *Conf) {
 	a.bess.setUpfInfo(u, conf)
 	var err error
 
-	// GTP-U packets from eNB are uplink, to core.
-	a.accessIP, _, err = net.ParseCIDR(conf.P4rtcIface.AccessIP)
-	if err != nil {
-		log.Fatalf("unable to parse IP %v that we should parse", conf.P4rtcIface.AccessIP)
+	// TODO(max): make sure we're not getting a IPv6 address.
+	// Wait for external assignment of veth IP address and store it.
+	if a.ownIp, err = waitForIpConfigured(vethIfaceNameKernel, vethIpDiscoveryTimeout); err != nil {
+		log.Fatalf("could not get IP on %v interface: %v", vethIfaceNameKernel, err)
 	}
+
 	// Truncate slice to 4 bytes for later use.
-	a.accessIP = a.accessIP.To4()
-	if a.accessIP == nil {
-		log.Fatalln("access IP is not a IPv4 address")
+	a.ownIp = a.ownIp.To4()
+	if a.ownIp == nil {
+		log.Fatalln("upf IP is not a IPv4 address")
 	}
 
 	// IP packets to UE subnet are downlink, from core.
@@ -74,8 +76,9 @@ func (a *aether) setUpfInfo(u *upf, conf *Conf) {
 		log.Fatalln("invalid mac address", a.datapathMAC)
 	}
 
+	// Needed for legacy code.
 	u.coreIP = net.ParseIP(net.IPv4zero.String())
-	u.accessIP = a.accessIP
+	u.accessIP = a.ownIp
 
 	u.enableFlowMeasure = true
 
@@ -83,250 +86,26 @@ func (a *aether) setUpfInfo(u *upf, conf *Conf) {
 		log.Fatalln(err)
 	}
 
-	if err = a.setupPktioSocket(conf); err != nil {
+	if err = a.setupBpfRules(); err != nil {
 		log.Fatalln(err)
 	}
 }
 
-func (a *aether) setupPktioSocket(conf *Conf) error {
-	inf, err := net.InterfaceByName(conf.DataplaneInterface)
-	if err != nil {
-		return err
-	}
-
-	a.pktioSock, err = packet.Listen(inf, packet.Raw, unix.ETH_P_ALL, nil)
-	if err != nil {
-		return err
-	}
-
-	err = a.pktioSock.SetPromiscuous(true)
-	if err != nil {
-		return err
-	}
-
-	go func() {
-		err := a.pktioRecvLoop()
-		if err != nil {
-			log.Errorln("pktioRecvLoop:", err)
-		}
-	}()
-
-	return nil
-}
-
-type pds struct {
-	conn *packet.Conn
-}
-
-func (p *pds) ReadPacketData() (data []byte, ci gopacket.CaptureInfo, err error) {
-	buf := make([]byte, 2000)
-	n, raddr, err := p.conn.ReadFrom(buf)
-	if err != nil {
-		return
-	}
-
-	ci.CaptureLength = n
-	ci.Length = n
-	ci.AncillaryData = append(ci.AncillaryData, raddr)
-
-	data = append(data, buf[:n]...)
-
-	return
-}
-
-func (a *aether) pktioRecvLoop() error {
-	defer a.pktioSock.Close()
-
-	s := pds{
-		conn: a.pktioSock,
-	}
-
-	// Start decoding from Ethernet later.
-	src := gopacket.NewPacketSource(&s, layers.LayerTypeEthernet)
-
-	for pkt := range src.Packets() {
-		log.Warnln(pkt)
-		ethLayer := pkt.Layer(layers.LayerTypeEthernet)
-		if ethLayer == nil {
-			log.Warnln("Unknown packet", pkt)
-			continue
-		}
-		eth, ok := ethLayer.(*layers.Ethernet)
-		if !ok {
-			log.Warnln("failed to parse Ethernet layer", ethLayer)
-			continue
-		}
-		// TODO: check dst mac for us or broadcast
-
-		if arpLayer := pkt.Layer(layers.LayerTypeARP); arpLayer != nil {
-			if err := a.handleARP(pkt, arpLayer); err != nil {
-				log.Errorln(err)
+func waitForIpConfigured(iface string, timeout time.Duration) (net.IP, error) {
+	deadline := time.After(timeout)
+	ticker := time.NewTicker(time.Millisecond * 250)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			ip, err := GetUnicastAddressFromInterface(iface)
+			if err == nil {
+				return ip, nil
 			}
-			continue
-		}
-		if icmpLayer := pkt.Layer(layers.LayerTypeICMPv4); icmpLayer != nil {
-			if err := a.handleICMP(pkt, eth, icmpLayer); err != nil {
-				log.Errorln(err)
-			}
-			continue
+		case <-deadline:
+			return nil, errTimeout
 		}
 	}
-
-	return nil
-}
-
-func (a *aether) handleARP(pkt gopacket.Packet, arpLayer gopacket.Layer) error {
-	arp, ok := arpLayer.(*layers.ARP)
-	if !ok {
-		return ErrInvalidArgument("handleARP", arpLayer)
-	}
-
-	if arp.ProtAddressSize != net.IPv4len {
-		log.Warnln("Unexpected ARP proto addr size", arp.ProtAddressSize)
-		return nil
-	}
-	if int(arp.HwAddressSize) != len(layers.EthernetBroadcast) {
-		log.Warnln("Unexpected ARP hw addr size", arp.HwAddressSize)
-		return nil
-	}
-
-	if arp.Operation == layers.ARPRequest {
-		// Not for us.
-		if !a.accessIP.Equal(arp.DstProtAddress) {
-			log.Warnln("Unexpected ARP proto dst address", arp.DstProtAddress)
-			return nil
-		}
-
-		raddr, ok := pkt.Metadata().CaptureInfo.AncillaryData[0].(net.Addr)
-		if !ok {
-			return nil
-		}
-
-		ethResp := &layers.Ethernet{
-			BaseLayer:    layers.BaseLayer{},
-			SrcMAC:       a.datapathMAC,
-			DstMAC:       arp.SourceHwAddress,
-			EthernetType: layers.EthernetTypeARP,
-		}
-		arpResp := &layers.ARP{
-			AddrType:          layers.LinkTypeEthernet,
-			Protocol:          layers.EthernetTypeIPv4,
-			HwAddressSize:     arp.HwAddressSize,
-			ProtAddressSize:   arp.ProtAddressSize,
-			Operation:         layers.ARPReply,
-			SourceHwAddress:   a.datapathMAC,
-			SourceProtAddress: a.accessIP,
-			DstHwAddress:      arp.SourceHwAddress,
-			DstProtAddress:    arp.SourceProtAddress,
-		}
-
-		buf := gopacket.NewSerializeBuffer()
-		err := gopacket.SerializeLayers(buf, gopacket.SerializeOptions{
-			FixLengths:       true,
-			ComputeChecksums: true,
-		}, ethResp, arpResp)
-		if err != nil {
-			log.Error(err)
-			log.Errorln(gopacket.LayerDump(ethResp))
-			log.Errorln(gopacket.LayerDump(arpResp))
-			return err
-		}
-
-		_, err = a.pktioSock.WriteTo(buf.Bytes(), raddr)
-		if err != nil {
-			return err
-		}
-		txPkt := gopacket.NewPacket(buf.Bytes(), layers.LayerTypeEthernet, gopacket.Default)
-		log.Tracef("Sent ARP reply: %v", txPkt)
-	} else if arp.Operation == layers.ARPReply {
-
-	} else {
-		log.Warnln("Unknown ARP operation", arp.Operation)
-		return nil
-	}
-
-	return nil
-}
-
-func (a *aether) handleICMP(pkt gopacket.Packet, eth *layers.Ethernet, icmpLayer gopacket.Layer) error {
-	ipv4Layer := pkt.Layer(layers.LayerTypeIPv4)
-	if ipv4Layer == nil {
-		return ErrInvalidArgument("handleICMP", pkt)
-	}
-	ipv4, ok := ipv4Layer.(*layers.IPv4)
-	if !ok {
-		return ErrInvalidArgument("handleICMP", ipv4Layer)
-	}
-	icmp, ok := icmpLayer.(*layers.ICMPv4)
-	if !ok {
-		return ErrInvalidArgument("handleICMP", icmpLayer)
-	}
-	payloadLayer := pkt.Layer(gopacket.LayerTypePayload)
-	if payloadLayer == nil {
-		return ErrInvalidArgument("handleICMP", pkt)
-	}
-	payload, ok := payloadLayer.(*gopacket.Payload)
-	if !ok {
-		return ErrInvalidArgument("handleICMP", payloadLayer)
-	}
-
-	if icmp.TypeCode.Type() != layers.ICMPv4TypeEchoRequest {
-		log.Infoln("unsupported ICMP type:", icmp.TypeCode)
-		return nil
-	}
-
-	raddr, ok := pkt.Metadata().CaptureInfo.AncillaryData[0].(net.Addr)
-	if !ok {
-		return nil
-	}
-
-	ethResp := &layers.Ethernet{
-		SrcMAC:       a.datapathMAC,
-		DstMAC:       eth.SrcMAC,
-		EthernetType: eth.EthernetType,
-	}
-	ipv4Resp := &layers.IPv4{
-		Version:    ipv4.Version,
-		//IHL:        0,
-		//Length:     0,
-		Id:         0, // No ID on purpose
-		Flags:      layers.IPv4DontFragment,
-		TTL:        64,
-		Protocol:   ipv4.Protocol,
-		SrcIP:      a.accessIP,
-		DstIP:      ipv4.SrcIP,
-		//Options:    nil,
-		//Padding:    nil,
-	}
-	icmpResp := &layers.ICMPv4{
-		TypeCode:  layers.ICMPv4TypeEchoReply,
-		Checksum:  0,
-		Id:        icmp.Id,
-		Seq:       icmp.Seq,
-	}
-
-	buf := gopacket.NewSerializeBuffer()
-	err := gopacket.SerializeLayers(buf, gopacket.SerializeOptions{
-		FixLengths:       true,
-		ComputeChecksums: true,
-	}, ethResp, ipv4Resp, icmpResp, payload)
-	if err != nil {
-		log.Error(err)
-		log.Errorln(gopacket.LayerDump(ethResp))
-		log.Errorln(gopacket.LayerDump(ipv4Resp))
-		log.Errorln(gopacket.LayerDump(icmpResp))
-		log.Errorln(gopacket.LayerDump(payload))
-		return err
-	}
-
-	_, err = a.pktioSock.WriteTo(buf.Bytes(), raddr)
-	if err != nil {
-		return err
-	}
-	txPkt := gopacket.NewPacket(buf.Bytes(), layers.LayerTypeEthernet, gopacket.Default)
-	log.Tracef("Sent ICMP reply: %v", txPkt)
-
-	return nil
 }
 
 func (a *aether) sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) (err error) {
@@ -335,17 +114,119 @@ func (a *aether) sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric
 	return
 }
 
+func (a *aether) setupBpfRules() (err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel()
+
+	// Do not modify. Hard-coded gates from aether.bess pipeline.
+	const ueTrafficPassGate = 0
+	const signalTrafficPassGate = 8192 - 1 // MAX_GATE - 1
+
+	// Pass-through filter for GTPU UE traffic.
+	ueFilter := "ip and dst host " + a.ownIp.String() + " and udp dst port 2152"
+	if err = a.addBpfRule(ctx, ueFilter, -ueTrafficPassGate, ueTrafficPassGate); err != nil {
+		return
+	}
+
+	// ARP, ICMP and DHCP filter to veth interface.
+	const signalFilter = "arp or icmp or (udp and (port 67 or port 68))"
+	if err = a.addBpfRule(ctx, signalFilter, -signalTrafficPassGate, signalTrafficPassGate); err != nil {
+		return
+	}
+
+	return
+}
+
+func (a *aether) pauseBessWorkers(ctx context.Context) error {
+	resp, err := a.client.PauseAll(ctx, &pb.EmptyRequest{})
+	if err != nil || resp.GetError() != nil {
+		log.Errorf("PauseAll rpc failed with resp: %v, err: %v\n", resp, err)
+		return err
+	}
+
+	return nil
+}
+
+func (a *aether) resumeBessWorkers(ctx context.Context) error {
+	resp, err := a.client.ResumeAll(ctx, &pb.EmptyRequest{})
+	if err != nil || resp.GetError() != nil {
+		log.Errorf("ResumeAll rpc failed with resp: %v, err: %v\n", resp, err)
+		return err
+	}
+
+	return nil
+}
+
+func (a *aether) addBpfRule(ctx context.Context, filter string, priority, gate int64) error {
+	f := pb.BPFArg_Filter{
+		Priority: priority,
+		Filter:   filter,
+		Gate:     gate,
+	}
+	bpfArg := &pb.BPFArg{Filters: []*pb.BPFArg_Filter{&f}}
+
+	// BPF module is not thread-safe, need to pause processing.
+	if err := a.pauseBessWorkers(ctx); err != nil {
+		log.Errorln(err)
+		return err
+	}
+
+	err := a.processBpf(ctx, bpfArg, "add")
+	if err != nil {
+		log.Errorln(err)
+		return err
+	}
+
+	if err := a.resumeBessWorkers(ctx); err != nil {
+		log.Errorln(err)
+		return err
+	}
+
+	return nil
+}
+
+func (a *aether) processBpf(ctx context.Context, msg proto.Message, method string) error {
+	switch method {
+	case "add":
+		fallthrough
+	case "delete":
+		fallthrough
+	case "clear":
+		fallthrough
+	case "get_initial_arg":
+	default:
+		return ErrInvalidArgumentWithReason("method", method, "invalid method name")
+	}
+
+	any, err := anypb.New(msg)
+	if err != nil {
+		log.Error("Error marshalling the rule", msg, err)
+		return err
+	}
+
+	resp, err := a.client.ModuleCommand(ctx, &pb.CommandRequest{
+		Name: vethIfaceNameKernel + "FastBPF",
+		Cmd:  method,
+		Arg:  any,
+	})
+
+	if err != nil || resp.GetError() != nil {
+		log.Errorf("processBpf method failed with resp: %v, err: %v\n", resp, err)
+		return err
+	}
+
+	return nil
+}
+
 // setupInterfaceClassification inserts the necessary interface classification rules.
 func (a *aether) setupInterfaceClassification() (err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
-	done := make(chan bool)
-	calls := 0
 
 	// Other GTP packets directly to UPF are uplink, from access.
 	ifc := interfaceClassification{
 		priority:    40,
-		dstIp:       ip2int(a.accessIP),
+		dstIp:       ip2int(a.ownIp),
 		dstIpMask:   math.MaxUint32,
 		ipProto:     UdpProto,
 		ipProtoMask: math.MaxUint8,
@@ -355,11 +236,10 @@ func (a *aether) setupInterfaceClassification() (err error) {
 		gate:     0,
 		srcIface: access,
 	}
-	if err = a.addInterfaceClassification(ctx, done, ifc); err != nil {
+	if err = a.addInterfaceClassification(ctx, ifc); err != nil {
 		log.Errorln(err)
 		return
 	}
-	calls++
 
 	ifc = interfaceClassification{
 		priority:  30,
@@ -369,63 +249,52 @@ func (a *aether) setupInterfaceClassification() (err error) {
 		gate:     0,
 		srcIface: core,
 	}
-	if err = a.addInterfaceClassification(ctx, done, ifc); err != nil {
+	if err = a.addInterfaceClassification(ctx, ifc); err != nil {
 		log.Errorln(err)
 		return
 	}
-	calls++
 
 	// Other packets addressed to the UPF are packet ins.
 	ifc = interfaceClassification{
 		priority:  1,
-		dstIp:     ip2int(a.accessIP),
+		dstIp:     ip2int(a.ownIp),
 		dstIpMask: math.MaxUint32,
 
 		gate:     0,
 		srcIface: 0,
 	}
-	if err = a.addInterfaceClassification(ctx, done, ifc); err != nil {
+	if err = a.addInterfaceClassification(ctx, ifc); err != nil {
 		log.Errorln(err)
 		return
-	}
-	calls++
-
-	rc := a.GRPCJoin(calls, Timeout, done)
-	if !rc {
-		return ErrOperationFailedWithReason("GRPCJoin", "Unable to make GRPC calls")
 	}
 
 	return
 }
 
-func (a *aether) addInterfaceClassification(ctx context.Context, done chan<- bool, ifc interfaceClassification) error {
-	go func() {
-		f := &pb.WildcardMatchCommandAddArg{
-			Gate:     ifc.gate,
-			Priority: ifc.priority,
-			Values: []*pb.FieldData{
-				intEnc(uint64(ifc.dstIp)),   /* dst_ip */
-				intEnc(uint64(ifc.ipProto)), /* ip_proto */
-				intEnc(uint64(ifc.dstPort)), /* dst_port */
-			},
-			Masks: []*pb.FieldData{
-				intEnc(uint64(ifc.dstIpMask)),   /* dst_ip mask */
-				intEnc(uint64(ifc.ipProtoMask)), /* ip_proto mask */
-				intEnc(uint64(ifc.dstPortMask)), /* dst_port mask */
-			},
-			Valuesv: []*pb.FieldData{
-				intEnc(uint64(ifc.srcIface)), /* src_iface */
-			},
-		}
+func (a *aether) addInterfaceClassification(ctx context.Context, ifc interfaceClassification) error {
+	f := &pb.WildcardMatchCommandAddArg{
+		Gate:     ifc.gate,
+		Priority: ifc.priority,
+		Values: []*pb.FieldData{
+			intEnc(uint64(ifc.dstIp)),   /* dst_ip */
+			intEnc(uint64(ifc.ipProto)), /* ip_proto */
+			intEnc(uint64(ifc.dstPort)), /* dst_port */
+		},
+		Masks: []*pb.FieldData{
+			intEnc(uint64(ifc.dstIpMask)),   /* dst_ip mask */
+			intEnc(uint64(ifc.ipProtoMask)), /* ip_proto mask */
+			intEnc(uint64(ifc.dstPortMask)), /* dst_port mask */
+		},
+		Valuesv: []*pb.FieldData{
+			intEnc(uint64(ifc.srcIface)), /* src_iface */
+		},
+	}
 
-		err := a.processInterfaceClassification(ctx, f, upfMsgTypeAdd)
-		if err != nil {
-			log.Errorln(err)
-			return
-		}
-
-		done <- true
-	}()
+	err := a.processInterfaceClassification(ctx, f, upfMsgTypeAdd)
+	if err != nil {
+		log.Errorln(err)
+		return err
+	}
 
 	return nil
 }
@@ -440,8 +309,6 @@ func (a *aether) processInterfaceClassification(ctx context.Context, msg proto.M
 		log.Println("Error marshalling the rule", msg, err)
 		return err
 	}
-
-	log.Tracef("%+v", any)
 
 	methods := [...]string{"add", "add", "delete", "clear"}
 

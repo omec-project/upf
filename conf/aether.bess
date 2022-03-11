@@ -1,7 +1,5 @@
-# vim: syntax=py
-# -*- mode: python -*-
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2019 Intel Corporation
+# Copyright 2022 Open Networking Foundation
 
 from conf.parser import *
 import conf.ports as port
@@ -14,8 +12,6 @@ port.setup_globals()
 #	Read json config file (START HERE)
 # ====================================================
 
-Access = 1
-Core = 2
 noGTPUDecap = 0
 GTPUDecap = 1
 noGTPUEncap = 0
@@ -35,24 +31,20 @@ qerFailGate = 4
 qerStatusDropGate = 5
 qerUnmeteredGate = 6
 parser = Parser('conf/aether.json')
-interface_name = "pktio"
-parser.parse([interface_name])
+veth_interface_name = "fabveth"
+parser.parse([veth_interface_name])
 
-if parser.mode == 'sim':
-    print("not supported")
+if parser.mode != 'dpdk':
+    print("unsupported mode: " + parser.mode)
     exit(1)
 
-# Look up interface addresses
-# TODO(max): remove and do in agent
-dataplane_ip = ips_by_interface(parser.dataplane_interface)
-dataplane_mac = parser.dataplane_interface_mac
 # TODO(max): lookup from config or similar
 dataplane_dpdk_interface_index = 0
 
-# ====================================================
-#       Core Setup
-# ====================================================
 
+# ====================================================
+#       CPU Core Setup
+# ====================================================
 
 # Initialize workers
 cores = get_process_affinity()
@@ -70,8 +62,7 @@ for wid in range(parser.workers):
 # ====================================================
 #       Port Setup
 # ====================================================
-
-dataplane_port = port.Port(parser.interfaces[parser.dataplane_interface]["ifname"], parser.hwcksum, None)
+dataplane_port = port.Port(veth_interface_name, parser.hwcksum, None)
 # initialize port with the configured driver
 dataplane_port.workers = [i for i in range(len(workers))]
 dataplane_port.init_port(dataplane_dpdk_interface_index, parser.mode)
@@ -224,29 +215,11 @@ appQERLookup.set_default_gate(gate=qerFailGate)
 # ====================================================
 bpfUeGatePass = 0
 bpfPacketOutGatePass = MAX_GATES - 1
-# bpfPacketOutGatePass = dataplane_port.bpf_gate()
 dataplaneBPF = dataplane_port.bpf
 dataplaneBPF:bpfUeGatePass \
     -> dataplaneRxIPCksum::IPChecksum(verify=True, hw=parser.hwcksum) \
     -> dataplaneRxUDPCksum::L4Checksum(verify=True, hw=parser.hwcksum) \
     -> pktParse
-
-# Add UE traffic filter rules, i.e.:
-# setting filter to detect gtpu traffic
-# and dst host x.x.x.x                         # check S/PGWU IP
-# and udp dst port 2152                         # check GTPU port
-check_ip = "ip"
-check_spgwu_ip = " and dst host " + \
-    " or ".join(str(x) for x in dataplane_ip)
-check_gtpu_port = " and udp dst port 2152"
-downlink_bpf_rule = {"priority": -bpfUeGatePass, "filter": check_ip +
-                     check_spgwu_ip + check_gtpu_port, "gate": bpfUeGatePass}
-
-# ARP, ICMP and DHCP filter to veth interface.
-pktout_filter = "arp or icmp or (udp and (port 67 or port 68))"
-pktout_bpf_rule = {"priority": -bpfPacketOutGatePass, "filter": pktout_filter, "gate": bpfPacketOutGatePass}
-
-dataplaneBPF.add(filters=[downlink_bpf_rule, pktout_bpf_rule])
 
 # Drop unknown packets
 dataplaneRxIPCksum:1 -> dataplaneRxIPCksumFail::Sink()

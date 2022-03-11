@@ -122,6 +122,10 @@ func GetUnicastAddressFromInterface(interfaceName string) (net.IP, error) {
 		return nil, err
 	}
 
+	if len(addresses) == 0 {
+		return nil, ErrOperationFailedWithReason("iface.Addrs()", "no addresses on interface "+interfaceName)
+	}
+
 	ip, _, err := net.ParseCIDR(addresses[0].String())
 	if err != nil {
 		return nil, err

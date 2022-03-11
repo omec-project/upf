@@ -13,6 +13,7 @@ var (
 	errInvalidOperation = errors.New("invalid operation")
 	errFailed           = errors.New("failed")
 	errUnsupported      = errors.New("unsupported")
+	errTimeout          = errors.New("timeout")
 )
 
 func ErrUnsupported(what string, value interface{}) error {

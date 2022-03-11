@@ -191,6 +191,7 @@ class Port:
             try:
                 peer = peer_by_interface(name)
                 vdev = "net_af_packet{},iface={}".format(idx, peer)
+                print("vdev", vdev)
                 slow = PMDPort(name="{}Slow".format(name), vdev=vdev)
                 spi = PortInc(name="{}SlowPI".format(name), port=slow.name)
                 spo = PortOut(name="{}SlowPO".format(name), port=slow.name)

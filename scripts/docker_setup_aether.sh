@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2019 Intel Corporation
+# Copyright 2022 Open Networking Foundation
 
 set -ex
 # TCP port of bess/web monitor
@@ -20,67 +20,27 @@ mode="dpdk"
 # mode="sim"
 
 # veth interface used for packet io between BESS and PFCP agent.
-ifaces=("pktio")
+ifaces=("fabveth")
+veth_iface_name="fabveth"
+veth_iface_ip="198.18.0.1/24"
+veth_iface_gateway="198.18.0.2"
 
-# Static IP addresses of gateway interface(s) in cidr format
-#
-# In the order of (s1u sgi)
-ipaddrs=(198.18.0.1/30)
-
-# MAC addresses of gateway interface(s)
-#
-# In the order of (s1u sgi)
-macaddrs=(0c:c4:7a:19:6d:ca)
-
-# Static IP addresses of the neighbors of gateway interface(s)
-#
-# In the order of (n-s1u n-sgi)
-nhipaddrs=(198.18.0.2)
-
-# Static MAC addresses of the neighbors of gateway interface(s)
-#
-# In the order of (n-s1u n-sgi)
-nhmacaddrs=(22:53:7a:15:58:50)
-
-# IPv4 route table entries in cidr format per port
-#
-# In the order of ("{r-s1u}" "{r-sgi}")
-routes=("11.1.1.128/25" "0.0.0.0/0")
-
-num_ifaces=${#ifaces[@]}
-num_ipaddrs=${#ipaddrs[@]}
-
-# Set up static route and neighbor table entries of the SPGW
-function setup_trafficgen_routes() {
-	for ((i = 0; i < num_ipaddrs; i++)); do
-		sudo ip netns exec pause ip neighbor add "${nhipaddrs[$i]}" lladdr "${nhmacaddrs[$i]}" dev "${ifaces[$i % num_ifaces]}"
-		routelist=${routes[$i]}
-		for route in $routelist; do
-			sudo ip netns exec pause ip route add "$route" via "${nhipaddrs[$i]}" metric 100
-		done
-	done
-}
-
-# Assign IP address(es) of gateway interface(s) within the network namespace
-function setup_addrs() {
-	for ((i = 0; i < num_ipaddrs; i++)); do
-		sudo ip netns exec pause ip addr add "${ipaddrs[$i]}" dev "${ifaces[$i % $num_ifaces]}"
-	done
-}
-
-# Set up mirror links to communicate with the kernel
-#
-# These vdev interfaces are used for ARP + ICMP updates.
+# Set up mirror link to communicate with the kernel
+# This vdev interface is used for ARP + ICMP + DHCP updates.
 # ARP/ICMP requests are sent via the vdev interface to the kernel.
 # ARP/ICMP responses are captured and relayed out of the dpdk ports.
-function setup_mirror_links() {
-	for ((i = 0; i < num_ifaces; i++)); do
-		sudo ip netns exec pause ip link add "${ifaces[$i]}" type veth peer name "${ifaces[$i]}"-dpdk
-		sudo ip netns exec pause ip link set "${ifaces[$i]}" up
-		sudo ip netns exec pause ip link set "${ifaces[$i]}-dpdk" up
-		# sudo ip netns exec pause ip link set dev "${ifaces[$i]}" address "${macaddrs[$i]}"
-	done
-	setup_addrs
+function setup_veth_interface() {
+	# Device setup.
+	sudo ip netns exec pause ip link add "${veth_iface_name}" type veth peer name "${veth_iface_name}-d"
+	sudo ip netns exec pause ip link set "${veth_iface_name}" up
+	sudo ip netns exec pause ip link set "${veth_iface_name}-d" up
+
+	# Address setup.
+	sudo ip netns exec pause ip addr add "${veth_iface_ip}" dev "${veth_iface_name}"
+	# sudo ip netns exec pause ip link set dev "${veth_iface_name}" address "00:00:00:aa:aa:aa"
+
+	# Route setup.
+	# sudo ip netns exec pause ip route add 0.0.0.0/0 via "${veth_iface_gateway}" metric 100
 }
 
 # Stop previous instances of bess* before restarting
@@ -117,7 +77,7 @@ sandbox=$(docker inspect --format='{{.NetworkSettings.SandboxKey}}' pause)
 sudo ln -s "$sandbox" /var/run/netns/pause
 
 case $mode in
-"dpdk" | "sim") setup_mirror_links ;;
+"dpdk" | "sim") setup_veth_interface ;;
 "af_xdp" | "af_packet")
 	echo "Unsupported mode"
 	exit 1
@@ -125,11 +85,6 @@ case $mode in
 *) ;;
 
 esac
-
-# Setup trafficgen routes
-if [ "$mode" != 'sim' ]; then
-	setup_trafficgen_routes
-fi
 
 # Run bessd
 docker run --name bess -td --restart unless-stopped \
@@ -182,7 +137,7 @@ docker exec pfcpsim pfcpctl -c create --count 1 --baseID 2 --ue-pool 10.250.0.0/
 #                  ), iface='enp175s0f0', count=1)
 
 # Inside netns pause:
-# tcpdump -lenvvi pktio
+# tcpdump -lenvvi fabveth
 
 # ARPs from sim eNB:
 # sudo arping -i enp175s0f0 -S 10.17.0.2 10.17.0.1
