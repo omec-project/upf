@@ -14,6 +14,7 @@ import (
 	p4ConfigV1 "github.com/p4lang/p4runtime/go/p4/config/v1"
 	p4 "github.com/p4lang/p4runtime/go/p4/v1"
 	log "github.com/sirupsen/logrus"
+	"github.com/wmnsk/go-pfcp/ie"
 )
 
 // P4 constants
@@ -635,7 +636,7 @@ func (t *P4rtTranslator) BuildSessionsTableEntry(pdr pdr, sessionMeter meter, tu
 	}
 }
 
-func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, appMeterIdx uint32, shouldDrop bool, internalAppID uint8, tc uint8) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, appMeterIdx uint32, shouldDrop bool, internalAppID uint8, tc uint8, relatedQER qer) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
 		"pdr":           pdr,
 		"appMeterIndex": appMeterIdx,
@@ -646,6 +647,11 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, appMeterIdx uint3
 	entry := &p4.TableEntry{
 		TableId:  p4constants.TablePreQosPipeTerminationsUplink,
 		Priority: DefaultPriority,
+	}
+
+	// QER gating
+	if relatedQER.ulStatus == ie.GateStatusClosed {
+		shouldDrop = true
 	}
 
 	if err := t.withExactMatchField(entry, FieldUEAddress, pdr.ueAddress); err != nil {
@@ -695,7 +701,7 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, appMeterIdx uint3
 }
 
 func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uint32, relatedFAR far,
-	internalAppID uint8, qfi uint8, tc uint8) (*p4.TableEntry, error) {
+	internalAppID uint8, qfi uint8, tc uint8, relatedQER qer) (*p4.TableEntry, error) {
 	builderLog := log.WithFields(log.Fields{
 		"pdr":           pdr,
 		"appMeterIndex": appMeterIdx,
@@ -709,6 +715,11 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uin
 		Priority: DefaultPriority,
 	}
 
+	shouldDrop := false
+	if relatedFAR.Drops() || relatedQER.dlStatus == ie.GateStatusClosed {
+		shouldDrop = true
+	}
+
 	if err := t.withExactMatchField(entry, FieldUEAddress, pdr.ueAddress); err != nil {
 		return nil, err
 	}
@@ -718,11 +729,11 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uin
 	}
 
 	var action *p4.Action
-	if relatedFAR.Drops() {
+	if shouldDrop {
 		action = &p4.Action{
 			ActionId: p4constants.ActionPreQosPipeDownlinkTermDrop,
 		}
-	} else if !relatedFAR.Drops() && tc != NoTC {
+	} else if !shouldDrop && tc != NoTC {
 		action = &p4.Action{
 			ActionId: p4constants.ActionPreQosPipeDownlinkTermFwd,
 		}
@@ -773,12 +784,12 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uin
 	return entry, nil
 }
 
-func (t *P4rtTranslator) BuildTerminationsTableEntry(pdr pdr, appMeter meter, relatedFAR far, internalAppID uint8, qfi uint8, tc uint8) (*p4.TableEntry, error) {
+func (t *P4rtTranslator) BuildTerminationsTableEntry(pdr pdr, appMeter meter, relatedFAR far, internalAppID uint8, qfi uint8, tc uint8, relatedQER qer) (*p4.TableEntry, error) {
 	switch pdr.srcIface {
 	case access:
-		return t.buildUplinkTerminationsEntry(pdr, appMeter.uplinkCellID, relatedFAR.Drops(), internalAppID, tc)
+		return t.buildUplinkTerminationsEntry(pdr, appMeter.uplinkCellID, relatedFAR.Drops(), internalAppID, tc, relatedQER)
 	case core:
-		return t.buildDownlinkTerminationsEntry(pdr, appMeter.downlinkCellID, relatedFAR, internalAppID, qfi, tc)
+		return t.buildDownlinkTerminationsEntry(pdr, appMeter.downlinkCellID, relatedFAR, internalAppID, qfi, tc, relatedQER)
 	default:
 		return nil, ErrUnsupported("source interface type of PDR", pdr.srcIface)
 	}
