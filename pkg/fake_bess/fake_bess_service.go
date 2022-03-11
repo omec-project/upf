@@ -191,8 +191,6 @@ func (b *fakeBessService) ModuleCommand(ctx context.Context, request *bess_pb.Co
 	b.mtx.Lock()
 	defer b.mtx.Unlock()
 
-	log.Warn(request)
-
 	m := b.unsafeGetOrAddModule(request.Name)
 	if err := m.HandleRequest(request.Cmd, request.Arg); err != nil {
 		return nil, err
@@ -348,7 +346,6 @@ func (w *wildcardModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 		if err != nil {
 			return err
 		}
-		log.Warn(wc)
 		var existing *bess_pb.WildcardMatchCommandAddArg
 		for _, e := range w.entries {
 			if fieldsAreEqual(e.GetValues(), wc.GetValues()) &&
@@ -370,7 +367,6 @@ func (w *wildcardModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 		if err != nil {
 			return err
 		}
-		log.Warn(wc)
 		idx := -1
 		for i, e := range w.entries {
 			if fieldsAreEqual(e.GetValues(), wc.GetValues()) &&
@@ -416,7 +412,6 @@ func (e *exactMatchModule) HandleRequest(cmd string, arg *anypb.Any) (err error)
 		if err != nil {
 			return err
 		}
-		log.Warn(em)
 		var existing *bess_pb.ExactMatchCommandAddArg
 		for _, et := range e.entries {
 			if fieldsAreEqual(et.GetFields(), em.GetFields()) {
@@ -424,9 +419,11 @@ func (e *exactMatchModule) HandleRequest(cmd string, arg *anypb.Any) (err error)
 			}
 		}
 		if existing != nil {
+			log.Tracef("updated existing entry %v", em)
 			existing.Reset()
 			proto.Merge(existing, em)
 		} else {
+			log.Tracef("added new entry %v", em)
 			e.entries = append(e.entries, em)
 		}
 	} else if cmd == "delete" {
@@ -435,7 +432,6 @@ func (e *exactMatchModule) HandleRequest(cmd string, arg *anypb.Any) (err error)
 		if err != nil {
 			return err
 		}
-		log.Warn(em)
 		idx := -1
 		for i, et := range e.entries {
 			if fieldsAreEqual(et.GetFields(), em.GetFields()) {
@@ -445,6 +441,7 @@ func (e *exactMatchModule) HandleRequest(cmd string, arg *anypb.Any) (err error)
 		if idx == -1 {
 			return status.Errorf(codes.NotFound, "entry not found: %v", em)
 		} else {
+			log.Tracef("deleted existing entry %v", e.entries[idx])
 			e.entries = append(e.entries[:idx], e.entries[idx+1:]...)
 		}
 	} else {
@@ -479,7 +476,6 @@ func (q *qosModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 		if err != nil {
 			return err
 		}
-		log.Warn(wc)
 		var existing *bess_pb.QosCommandAddArg
 		for _, e := range q.entries {
 			if fieldsAreEqual(e.GetFields(), wc.GetFields()) {
@@ -500,7 +496,6 @@ func (q *qosModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 		if err != nil {
 			return err
 		}
-		log.Warn(qc)
 		idx := -1
 		for i, e := range q.entries {
 			if fieldsAreEqual(e.GetFields(), qc.GetFields()) {
