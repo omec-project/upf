@@ -480,9 +480,10 @@ func (up4 *UP4) listenToDDNs() {
 func (up4 *UP4) initialize() error {
 	up4.p4RtTranslator = newP4RtTranslator(up4.p4client.P4Info)
 
-	err := up4.clearAllTables()
+	err := up4.clearTables()
 	if err != nil {
 		log.Warningf("failed to clear tables: %v", err)
+		return err
 	}
 
 	up4.initAllCounters()
