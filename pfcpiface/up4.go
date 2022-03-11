@@ -216,7 +216,6 @@ func (up4 *UP4) initAllCounters() {
 
 		switch counterID {
 		case p4constants.CounterPreQosPipePreQosCounter:
-			//FIXME to fully exploit p4constants, counters should be a map instead of a slice
 			up4.initCounter(preQosCounterID, counterName, uint64(counterSize))
 		case p4constants.CounterPostQosPipePostQosCounter:
 			up4.initCounter(postQosCounterID, counterName, uint64(counterSize))
@@ -1001,7 +1000,7 @@ func (up4 *UP4) resetMeter(meterID uint32, meter meter) {
 
 	err := up4.p4client.ApplyMeterEntries(p4.Update_MODIFY, entries...)
 	if err != nil {
-		log.Errorf("Failed to reset %v meter entries: %v", meterID, err)
+		log.Errorf("Failed to reset %v meter entries: %v", p4constants.GetMeterIDToNameMap()[meterID], err)
 	}
 }
 
