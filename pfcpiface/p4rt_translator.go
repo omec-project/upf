@@ -133,6 +133,16 @@ func (t *P4rtTranslator) getMeterSizeByID(meterID uint32) (int64, error) {
 	return 0, ErrNotFoundWithParam("meter", "ID", meterID)
 }
 
+func (t *P4rtTranslator) getCounterSizeByID(counterID uint32) (int64, error) {
+	for _, counter := range t.p4Info.Counters {
+		if counter.Preamble.Id == counterID {
+			return counter.GetSize(), nil
+		}
+	}
+
+	return 0, ErrNotFoundWithParam("counter", "ID", counterID)
+}
+
 func (t *P4rtTranslator) getTableByID(tableID uint32) (*p4ConfigV1.Table, error) {
 	for _, table := range t.p4Info.Tables {
 		if table.Preamble.Id == tableID {

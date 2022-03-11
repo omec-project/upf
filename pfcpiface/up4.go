@@ -199,57 +199,68 @@ func (up4 *UP4) setupChannel() error {
 }
 
 func (up4 *UP4) initAllCounters() {
-	log.Debug("Initializing counter for UP4")
+	log.Debug("Initializing counters for UP4")
 
-	counterID, counterSize := p4constants.CounterPreQosPipePreQosCounter, p4constants.CounterSizePreQosPipePreQosCounter
-	counterName := p4constants.GetCounterIDToNameMap()[counterID]
+	counters := []uint32{
+		p4constants.CounterPreQosPipePreQosCounter,
+		p4constants.CounterPostQosPipePostQosCounter,
+	}
 
-	up4.initCounter(preQosCounterID, counterName, counterSize)
+	for _, counterID := range counters {
+		counterName := p4constants.GetCounterIDToNameMap()[counterID]
 
-	counterID, counterSize = p4constants.CounterPostQosPipePostQosCounter, p4constants.CounterSizePostQosPipePostQosCounter
-	counterName = p4constants.GetCounterIDToNameMap()[counterID]
+		counterSize, err := up4.p4RtTranslator.getCounterSizeByID(counterID)
+		if err != nil {
+			log.Error(err)
+		}
 
-	up4.initCounter(postQosCounterID, counterName, counterSize)
+		switch counterID { //FIXME initCounter should accept a uint32 but doing so will break integration tests (PFCP Agent cannot connect). Need to investigate on why
+		case p4constants.CounterPreQosPipePreQosCounter:
+			up4.initCounter(preQosCounterID, counterName, uint64(counterSize))
+		case p4constants.CounterPostQosPipePostQosCounter:
+			up4.initCounter(postQosCounterID, counterName, uint64(counterSize))
+		}
+	}
 }
 
 func (up4 *UP4) initMetersPools() {
 	log.Debug("Initializing P4 Meters pools for UP4")
 
-	appMeterID := p4constants.MeterPreQosPipeAppMeter
-	appMeterName := p4constants.GetMeterIDToNameMap()[appMeterID]
-	appMeterSize, err := up4.p4RtTranslator.getMeterSizeByID(appMeterID)
-	if err != nil {
-		log.Errorf("Could not find meter size of %v", appMeterName)
+	meters := []uint32{
+		p4constants.MeterPreQosPipeAppMeter,
+		p4constants.MeterPreQosPipeSessionMeter,
 	}
 
-	log.WithFields(log.Fields{
-		"name": appMeterName,
-	}).Trace("Found P4 meter by name")
+	for _, meterID := range meters {
+		meterName, exists := p4constants.GetMeterIDToNameMap()[meterID]
+		if exists {
+			log.WithFields(log.Fields{
+				"name": meterName,
+			}).Trace("Found P4 meter")
+		}
 
-	up4.appMeterCellIDsPool = set.NewSet()
-	for i := 1; i < int(appMeterSize); i++ {
-		up4.appMeterCellIDsPool.Add(uint32(i))
+		meterSize, err := up4.p4RtTranslator.getMeterSizeByID(meterID)
+		if err != nil {
+			log.Errorf("Could not find meter size of %v", meterName)
+		}
+
+		switch meterID {
+		case p4constants.MeterPreQosPipeAppMeter:
+			up4.appMeterCellIDsPool = set.NewSet()
+			for i := 1; i < int(meterSize); i++ {
+				up4.appMeterCellIDsPool.Add(uint32(i))
+			}
+
+			log.Trace("Application meter IDs pool initialized: ", up4.appMeterCellIDsPool.String())
+		case p4constants.MeterPreQosPipeSessionMeter:
+			up4.sessMeterCellIDsPool = set.NewSet()
+			for i := 1; i < int(meterSize); i++ {
+				up4.sessMeterCellIDsPool.Add(uint32(i))
+			}
+
+			log.Trace("Session meter IDs pool initialized: ", up4.sessMeterCellIDsPool.String())
+		}
 	}
-
-	log.Trace("Application meter IDs pool initialized: ", up4.appMeterCellIDsPool.String())
-
-	sessMeterID := p4constants.MeterPreQosPipeSessionMeter
-	sessMeterName := p4constants.GetMeterIDToNameMap()[sessMeterID]
-	sessMeterSize, err := up4.p4RtTranslator.getMeterSizeByID(sessMeterID)
-	if err != nil {
-		log.Errorf("Could not find meter size of %v", sessMeterName)
-	}
-
-	log.WithFields(log.Fields{
-		"name": sessMeterName,
-	}).Trace("Found P4 meter by name")
-
-	up4.sessMeterCellIDsPool = set.NewSet()
-	for i := 1; i < int(sessMeterSize); i++ {
-		up4.sessMeterCellIDsPool.Add(uint32(i))
-	}
-
-	log.Trace("Session meter IDs pool initialized: ", up4.sessMeterCellIDsPool.String())
 
 	log.WithFields(log.Fields{
 		"applicationMeter pool size": up4.appMeterCellIDsPool.Cardinality(),
