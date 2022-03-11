@@ -12,6 +12,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/omec-project/upf-epc/internal/p4constants"
 	"google.golang.org/grpc/codes"
 
 	p4 "github.com/p4lang/p4runtime/go/p4/v1"
@@ -29,9 +30,6 @@ const (
 	// 253 base stations + 1 dbuf (fixed in UP4) + 1 reserved (fixed in P4 pipeline)
 	maxGTPTunnelPeerIDs = 253
 	maxApplicationIDs   = 254
-
-	applicationMeter = "PreQosPipe.app_meter"
-	sessionMeter     = "PreQosPipe.session_meter"
 
 	meterTypeApplication uint8 = 1
 	meterTypeSession     uint8 = 2
@@ -132,23 +130,16 @@ func (up4 *UP4) sessionStats(*PfcpNodeCollector, chan<- prometheus.Metric) error
 func (up4 *UP4) portStats(uc *upfCollector, ch chan<- prometheus.Metric) {
 }
 
-func (up4 *UP4) initCounter(counterID uint8, name string) error {
-	ctr, err := up4.p4RtTranslator.getCounterByName(name)
-	if err != nil {
-		return err
-	}
-
-	up4.counters[counterID].maxSize = uint64(ctr.Size)
-	up4.counters[counterID].counterID = uint64(ctr.Preamble.Id)
+func (up4 *UP4) initCounter(counterID uint8, name string, counterSize uint64) {
+	up4.counters[counterID].maxSize = counterSize
+	up4.counters[counterID].counterID = uint64(counterID)
 
 	log.WithFields(log.Fields{
 		"counterID":      counterID,
 		"name":           name,
-		"max-size":       ctr.Size,
-		"UP4 counter ID": ctr.Preamble.Id,
+		"max-size":       counterSize,
+		"UP4 counter ID": counterID,
 	}).Debug("Counter initialized successfully")
-
-	return nil
 }
 
 func resetCounterVal(p *UP4, counterID uint8, val uint64) {
@@ -207,54 +198,54 @@ func (up4 *UP4) setupChannel() error {
 	return nil
 }
 
-func (up4 *UP4) initAllCounters() error {
+func (up4 *UP4) initAllCounters() {
 	log.Debug("Initializing counter for UP4")
 
-	err := up4.initCounter(preQosCounterID, "PreQosPipe.pre_qos_counter")
-	if err != nil {
-		return ErrOperationFailedWithReason("init preQosCounterID counter", err.Error())
-	}
+	counterID, counterSize := p4constants.CounterPreQosPipePreQosCounter, p4constants.CounterSizePreQosPipePreQosCounter
+	counterName := p4constants.GetCounterIDToNameMap()[counterID]
 
-	err = up4.initCounter(postQosCounterID, "PostQosPipe.post_qos_counter")
-	if err != nil {
-		return ErrOperationFailedWithReason("init postQosCounterID counter", err.Error())
-	}
+	up4.initCounter(preQosCounterID, counterName, counterSize)
 
-	return nil
+	counterID, counterSize = p4constants.CounterPostQosPipePostQosCounter, p4constants.CounterSizePostQosPipePostQosCounter
+	counterName = p4constants.GetCounterIDToNameMap()[counterID]
+
+	up4.initCounter(postQosCounterID, counterName, counterSize)
 }
 
-func (up4 *UP4) initMetersPools() error {
+func (up4 *UP4) initMetersPools() {
 	log.Debug("Initializing P4 Meters pools for UP4")
 
-	appMeter, err := up4.p4RtTranslator.getMeterByName(applicationMeter)
+	appMeterID := p4constants.MeterPreQosPipeAppMeter
+	appMeterName := p4constants.GetMeterIDToNameMap()[appMeterID]
+	appMeterSize, err := up4.p4RtTranslator.getMeterSizeByID(appMeterID)
 	if err != nil {
-		return err
+		log.Errorf("Could not find meter size of %v", appMeterName)
 	}
 
 	log.WithFields(log.Fields{
-		"name":  applicationMeter,
-		"meter": appMeter,
+		"name": appMeterName,
 	}).Trace("Found P4 meter by name")
 
 	up4.appMeterCellIDsPool = set.NewSet()
-	for i := 1; i < int(appMeter.Size); i++ {
+	for i := 1; i < int(appMeterSize); i++ {
 		up4.appMeterCellIDsPool.Add(uint32(i))
 	}
 
 	log.Trace("Application meter IDs pool initialized: ", up4.appMeterCellIDsPool.String())
 
-	sessMeter, err := up4.p4RtTranslator.getMeterByName(sessionMeter)
+	sessMeterID := p4constants.MeterPreQosPipeSessionMeter
+	sessMeterName := p4constants.GetMeterIDToNameMap()[sessMeterID]
+	sessMeterSize, err := up4.p4RtTranslator.getMeterSizeByID(sessMeterID)
 	if err != nil {
-		return err
+		log.Errorf("Could not find meter size of %v", sessMeterName)
 	}
 
 	log.WithFields(log.Fields{
-		"name":  sessionMeter,
-		"meter": sessMeter,
+		"name": sessMeterName,
 	}).Trace("Found P4 meter by name")
 
 	up4.sessMeterCellIDsPool = set.NewSet()
-	for i := 1; i < int(sessMeter.Size); i++ {
+	for i := 1; i < int(sessMeterSize); i++ {
 		up4.sessMeterCellIDsPool.Add(uint32(i))
 	}
 
@@ -264,8 +255,6 @@ func (up4 *UP4) initMetersPools() error {
 		"applicationMeter pool size": up4.appMeterCellIDsPool.Cardinality(),
 		"sessMeter pool size":        up4.sessMeterCellIDsPool.Cardinality(),
 	}).Debug("P4 Meters pools initialized successfully")
-
-	return nil
 }
 
 func (up4 *UP4) initTunnelPeerIDs() {
@@ -367,31 +356,18 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	}
 }
 
-func (up4 *UP4) clearAllTables() error {
-	tables := []string{TableUplinkSessions, TableDownlinkSessions, TableUplinkTerminations, TableDownlinkTerminations, TableTunnelPeers, TableApplications}
-	tableIDs := make([]uint32, 0, len(tables))
-
-	for _, table := range tables {
-		tableID, err := up4.p4RtTranslator.getTableIDByName(table)
-		if err != nil {
-			return err
-		}
-
-		tableIDs = append(tableIDs, tableID)
+func (up4 *UP4) clearTables() error {
+	tableIDs := []uint32{
+		p4constants.TablePreQosPipeSessionsUplink,
+		p4constants.TablePreQosPipeSessionsDownlink,
+		p4constants.TablePreQosPipeTerminationsUplink,
+		p4constants.TablePreQosPipeTerminationsDownlink,
+		p4constants.TablePreQosPipeTunnelPeers,
+		p4constants.TablePreQosPipeInterfaces,
+		p4constants.TablePreQosPipeApplications,
 	}
 
-	err := up4.p4client.ClearTables(tableIDs)
-	if err != nil {
-		return err
-	}
-
-	interfacesTableID, err := up4.p4RtTranslator.getTableIDByName(TableInterfaces)
-	if err != nil {
-		return err
-	}
-
-	err = up4.p4client.ClearTable(interfacesTableID)
-	if err != nil {
+	if err := up4.p4client.ClearTables(tableIDs); err != nil {
 		return err
 	}
 
@@ -453,20 +429,13 @@ func (up4 *UP4) tryConnect() error {
 
 	up4.p4RtTranslator = newP4RtTranslator(up4.p4client.P4Info)
 
-	err = up4.clearAllTables()
+	err = up4.clearTables()
 	if err != nil {
 		log.Warningf("failed to clear tables: %v", err)
 	}
 
-	err = up4.initAllCounters()
-	if err != nil {
-		return ErrOperationFailedWithReason("counters initialization", err.Error())
-	}
-
-	err = up4.initMetersPools()
-	if err != nil {
-		return ErrOperationFailedWithReason("meters pools initialization", err.Error())
-	}
+	up4.initAllCounters()
+	up4.initMetersPools()
 
 	go up4.listenToDDNs()
 
@@ -870,7 +839,7 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 	if appMeter.uplinkCellID != 0 {
 		meterConfig := getMeterConfigurationFromQER(q.ulMbr, q.ulGbr)
 
-		meterEntry := up4.p4RtTranslator.BuildMeterEntry(applicationMeter, appMeter.uplinkCellID, meterConfig)
+		meterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.MeterPreQosPipeAppMeter, appMeter.uplinkCellID, meterConfig)
 
 		entries = append(entries, meterEntry)
 	}
@@ -878,7 +847,7 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 	if appMeter.downlinkCellID != appMeter.uplinkCellID {
 		meterConfig := getMeterConfigurationFromQER(q.dlMbr, q.dlGbr)
 
-		meterEntry := up4.p4RtTranslator.BuildMeterEntry(applicationMeter, appMeter.downlinkCellID, meterConfig)
+		meterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.MeterPreQosPipeAppMeter, appMeter.downlinkCellID, meterConfig)
 
 		entries = append(entries, meterEntry)
 	}
@@ -919,10 +888,10 @@ func (up4 *UP4) configureSessionMeter(q qer) (meter, error) {
 	logger.Debug("Configuring Session Meter from QER")
 
 	uplinkMeterConfig := getMeterConfigurationFromQER(q.ulMbr, q.ulGbr)
-	uplinkMeterEntry := up4.p4RtTranslator.BuildMeterEntry(sessionMeter, uplinkCellID, uplinkMeterConfig)
+	uplinkMeterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.MeterPreQosPipeSessionMeter, uplinkCellID, uplinkMeterConfig)
 
 	downlinkMeterConfig := getMeterConfigurationFromQER(q.dlMbr, q.dlGbr)
-	downlinkMeterEntry := up4.p4RtTranslator.BuildMeterEntry(sessionMeter, downlinkCellID, downlinkMeterConfig)
+	downlinkMeterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.MeterPreQosPipeSessionMeter, downlinkCellID, downlinkMeterConfig)
 
 	logger = logger.WithFields(log.Fields{
 		"uplink meter entry":   uplinkMeterEntry,
@@ -1005,8 +974,7 @@ func verifyPDR(pdr pdr) error {
 	return nil
 }
 
-func (up4 *UP4) resetMeter(name string, meter meter) {
-	meterID := up4.p4RtTranslator.meterID(name)
+func (up4 *UP4) resetMeter(meterID uint32, meter meter) {
 	entries := make([]*p4.MeterEntry, 0, 2)
 
 	entry := &p4.MeterEntry{
@@ -1026,7 +994,7 @@ func (up4 *UP4) resetMeter(name string, meter meter) {
 
 	err := up4.p4client.ApplyMeterEntries(p4.Update_MODIFY, entries...)
 	if err != nil {
-		log.Errorf("Failed to reset %v meter entries: %v", name, err)
+		log.Errorf("Failed to reset %v meter entries: %v", meterID, err)
 	}
 }
 
@@ -1051,14 +1019,14 @@ func (up4 *UP4) resetMeters(qers []qer) {
 		}
 
 		if meter.meterType == meterTypeApplication {
-			up4.resetMeter(applicationMeter, meter)
+			up4.resetMeter(p4constants.MeterPreQosPipeAppMeter, meter)
 			up4.releaseAppMeterCellID(meter.uplinkCellID)
 
 			if meter.downlinkCellID != meter.uplinkCellID {
 				up4.releaseAppMeterCellID(meter.downlinkCellID)
 			}
 		} else if meter.meterType == meterTypeSession {
-			up4.resetMeter(sessionMeter, meter)
+			up4.resetMeter(p4constants.MeterPreQosPipeSessionMeter, meter)
 			up4.releaseSessionMeterCellID(meter.uplinkCellID)
 			up4.releaseSessionMeterCellID(meter.downlinkCellID)
 		}
