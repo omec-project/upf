@@ -10,11 +10,11 @@ import (
 	"math/bits"
 	"net"
 
-	"github.com/wmnsk/go-pfcp/ie"
-
+	"github.com/omec-project/upf-epc/internal/p4constants"
 	p4ConfigV1 "github.com/p4lang/p4runtime/go/p4/config/v1"
 	p4 "github.com/p4lang/p4runtime/go/p4/v1"
 	log "github.com/sirupsen/logrus"
+	"github.com/wmnsk/go-pfcp/ie"
 )
 
 // P4 constants
@@ -42,27 +42,6 @@ const (
 	FieldSliceID           = "slice_id"
 	FieldSessionMeterIndex = "session_meter_idx"
 	FieldAppMeterIndex     = "app_meter_idx"
-
-	TableInterfaces           = "PreQosPipe.interfaces"
-	TableTunnelPeers          = "PreQosPipe.tunnel_peers"
-	TableDownlinkTerminations = "PreQosPipe.terminations_downlink"
-	TableUplinkTerminations   = "PreQosPipe.terminations_uplink"
-	TableDownlinkSessions     = "PreQosPipe.sessions_downlink"
-	TableUplinkSessions       = "PreQosPipe.sessions_uplink"
-	TableApplications         = "PreQosPipe.applications"
-
-	ActSetSourceIface         = "PreQosPipe.set_source_iface"
-	ActSetUplinkSession       = "PreQosPipe.set_session_uplink"
-	ActSetDownlinkSession     = "PreQosPipe.set_session_downlink"
-	ActSetDownlinkSessionBuff = "PreQosPipe.set_session_downlink_buff"
-	ActUplinkTermDrop         = "PreQosPipe.uplink_term_drop"
-	ActUplinkTermFwd          = "PreQosPipe.uplink_term_fwd"
-	ActUplinkTermFwdNoTC      = "PreQosPipe.uplink_term_fwd_no_tc"
-	ActDownlinkTermDrop       = "PreQosPipe.downlink_term_drop"
-	ActDownlinkTermFwd        = "PreQosPipe.downlink_term_fwd"
-	ActDownlinkTermFwdNoTC    = "PreQosPipe.downlink_term_fwd_no_tc"
-	ActLoadTunnelParams       = "PreQosPipe.load_tunnel_param"
-	ActSetAppID               = "PreQosPipe.set_app_id"
 
 	DefaultPriority      = 0
 	DefaultApplicationID = 0
@@ -134,36 +113,6 @@ func convertValueToBinary(value interface{}) ([]byte, error) {
 	}
 }
 
-func (t *P4rtTranslator) tableID(name string) uint32 {
-	for _, table := range t.p4Info.Tables {
-		if table.Preamble.Name == name {
-			return table.Preamble.Id
-		}
-	}
-
-	return invalidID
-}
-
-func (t *P4rtTranslator) meterID(name string) uint32 {
-	for _, meter := range t.p4Info.Meters {
-		if meter.Preamble.Name == name {
-			return meter.Preamble.Id
-		}
-	}
-
-	return invalidID
-}
-
-func (t *P4rtTranslator) actionID(name string) uint32 {
-	for _, action := range t.p4Info.Actions {
-		if action.Preamble.Name == name {
-			return action.Preamble.Id
-		}
-	}
-
-	return invalidID
-}
-
 func (t *P4rtTranslator) getActionByID(actionID uint32) (*p4ConfigV1.Action, error) {
 	for _, action := range t.p4Info.Actions {
 		if action.Preamble.Id == actionID {
@@ -174,6 +123,26 @@ func (t *P4rtTranslator) getActionByID(actionID uint32) (*p4ConfigV1.Action, err
 	return nil, ErrNotFoundWithParam("action", "ID", actionID)
 }
 
+func (t *P4rtTranslator) getMeterSizeByID(meterID uint32) (int64, error) {
+	for _, meter := range t.p4Info.Meters {
+		if meter.Preamble.Id == meterID {
+			return meter.GetSize(), nil
+		}
+	}
+
+	return 0, ErrNotFoundWithParam("meter", "ID", meterID)
+}
+
+func (t *P4rtTranslator) getCounterSizeByID(counterID uint32) (int64, error) {
+	for _, counter := range t.p4Info.Counters {
+		if counter.Preamble.Id == counterID {
+			return counter.GetSize(), nil
+		}
+	}
+
+	return 0, ErrNotFoundWithParam("counter", "ID", counterID)
+}
+
 func (t *P4rtTranslator) getTableByID(tableID uint32) (*p4ConfigV1.Table, error) {
 	for _, table := range t.p4Info.Tables {
 		if table.Preamble.Id == tableID {
@@ -182,36 +151,6 @@ func (t *P4rtTranslator) getTableByID(tableID uint32) (*p4ConfigV1.Table, error)
 	}
 
 	return nil, ErrNotFoundWithParam("table", "ID", tableID)
-}
-
-func (t *P4rtTranslator) getTableIDByName(name string) (uint32, error) {
-	for _, table := range t.p4Info.Tables {
-		if table.Preamble.Name == name {
-			return table.Preamble.Id, nil
-		}
-	}
-
-	return 0, ErrNotFoundWithParam("table", "name", name)
-}
-
-func (t *P4rtTranslator) getCounterByName(name string) (*p4ConfigV1.Counter, error) {
-	for _, ctr := range t.p4Info.Counters {
-		if ctr.Preamble.Name == name {
-			return ctr, nil
-		}
-	}
-
-	return nil, ErrNotFoundWithParam("counter", "name", name)
-}
-
-func (t *P4rtTranslator) getMeterByName(name string) (*p4ConfigV1.Meter, error) {
-	for _, mtr := range t.p4Info.Meters {
-		if mtr.Preamble.Name == name {
-			return mtr, nil
-		}
-	}
-
-	return nil, ErrNotFoundWithParam("meter", "name", name)
 }
 
 //nolint:unused
@@ -496,10 +435,8 @@ func (t *P4rtTranslator) getLPMMatchFieldValue(tableEntry *p4.TableEntry, name s
 }
 
 func (t *P4rtTranslator) BuildInterfaceTableEntryNoAction() *p4.TableEntry {
-	tableID := t.tableID(TableInterfaces)
-
 	entry := &p4.TableEntry{
-		TableId:  tableID,
+		TableId:  p4constants.TablePreQosPipeInterfaces,
 		Priority: DefaultPriority,
 	}
 
@@ -507,8 +444,6 @@ func (t *P4rtTranslator) BuildInterfaceTableEntryNoAction() *p4.TableEntry {
 }
 
 func (t *P4rtTranslator) BuildInterfaceTableEntry(ipNet *net.IPNet, sliceID uint8, isCore bool) (*p4.TableEntry, error) {
-	tableID := t.tableID(TableInterfaces)
-
 	srcIface := access
 	direction := DirectionUplink
 
@@ -518,7 +453,7 @@ func (t *P4rtTranslator) BuildInterfaceTableEntry(ipNet *net.IPNet, sliceID uint
 	}
 
 	entry := &p4.TableEntry{
-		TableId:  tableID,
+		TableId:  p4constants.TablePreQosPipeInterfaces,
 		Priority: DefaultPriority,
 	}
 
@@ -528,7 +463,7 @@ func (t *P4rtTranslator) BuildInterfaceTableEntry(ipNet *net.IPNet, sliceID uint
 	}
 
 	action := &p4.Action{
-		ActionId: t.actionID(ActSetSourceIface),
+		ActionId: p4constants.ActionPreQosPipeSetSourceIface,
 	}
 
 	if err := t.withActionParam(action, FieldSrcIface, srcIface); err != nil {
@@ -556,9 +491,8 @@ func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, sliceID uint8, int
 	})
 	applicationsBuilderLog.Trace("Building P4rt table entry for applications table")
 
-	tableID := t.tableID(TableApplications)
 	entry := &p4.TableEntry{
-		TableId: tableID,
+		TableId: p4constants.TablePreQosPipeApplications,
 		// priority for UP4 cannot be greater than 65535
 		Priority: int32(math.MaxUint16 - pdr.precedence),
 	}
@@ -602,7 +536,7 @@ func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, sliceID uint8, int
 	}
 
 	action := &p4.Action{
-		ActionId: t.actionID(ActSetAppID),
+		ActionId: p4constants.ActionPreQosPipeSetAppId,
 	}
 
 	if err := t.withActionParam(action, FieldApplicationID, internalAppID); err != nil {
@@ -626,10 +560,8 @@ func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr, sessMeterIdx uint32) 
 	})
 	uplinkBuilderLog.Trace("Building P4rt table entry for sessions_uplink table")
 
-	tableID := t.tableID(TableUplinkSessions)
-
 	entry := &p4.TableEntry{
-		TableId:  tableID,
+		TableId:  p4constants.TablePreQosPipeSessionsUplink,
 		Priority: DefaultPriority,
 	}
 
@@ -642,7 +574,7 @@ func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr, sessMeterIdx uint32) 
 	}
 
 	action := &p4.Action{
-		ActionId: t.actionID(ActSetUplinkSession),
+		ActionId: p4constants.ActionPreQosPipeSetSessionUplink,
 	}
 
 	if err := t.withActionParam(action, FieldSessionMeterIndex, sessMeterIdx); err != nil {
@@ -667,9 +599,8 @@ func (t *P4rtTranslator) buildDownlinkSessionsEntry(pdr pdr, sessMeterIdx uint32
 	})
 	builderLog.Trace("Building P4rt table entry for sessions_downlink table")
 
-	tableID := t.tableID(TableDownlinkSessions)
 	entry := &p4.TableEntry{
-		TableId:  tableID,
+		TableId:  p4constants.TablePreQosPipeSessionsDownlink,
 		Priority: DefaultPriority,
 	}
 
@@ -680,11 +611,11 @@ func (t *P4rtTranslator) buildDownlinkSessionsEntry(pdr pdr, sessMeterIdx uint32
 	var action *p4.Action
 	if needsBuffering {
 		action = &p4.Action{
-			ActionId: t.actionID(ActSetDownlinkSessionBuff),
+			ActionId: p4constants.ActionPreQosPipeSetSessionDownlinkBuff,
 		}
 	} else {
 		action = &p4.Action{
-			ActionId: t.actionID(ActSetDownlinkSession),
+			ActionId: p4constants.ActionPreQosPipeSetSessionDownlink,
 		}
 		if err := t.withActionParam(action, FieldTunnelPeerID, tunnelPeerID); err != nil {
 			return nil, err
@@ -723,9 +654,8 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, appMeterIdx uint3
 	})
 	builderLog.Debug("Building P4rt table entry for UP4 terminations_uplink table")
 
-	tableID := t.tableID(TableUplinkTerminations)
 	entry := &p4.TableEntry{
-		TableId:  tableID,
+		TableId:  p4constants.TablePreQosPipeTerminationsUplink,
 		Priority: DefaultPriority,
 	}
 
@@ -745,11 +675,11 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, appMeterIdx uint3
 	var action *p4.Action
 	if shouldDrop {
 		action = &p4.Action{
-			ActionId: t.actionID(ActUplinkTermDrop),
+			ActionId: p4constants.ActionPreQosPipeUplinkTermDrop,
 		}
 	} else if !shouldDrop && tc != NoTC {
 		action = &p4.Action{
-			ActionId: t.actionID(ActUplinkTermFwd),
+			ActionId: p4constants.ActionPreQosPipeUplinkTermFwd,
 		}
 
 		if err := t.withActionParam(action, FieldTrafficClass, tc); err != nil {
@@ -760,7 +690,7 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, appMeterIdx uint3
 		}
 	} else {
 		action = &p4.Action{
-			ActionId: t.actionID(ActUplinkTermFwdNoTC),
+			ActionId: p4constants.ActionPreQosPipeUplinkTermFwdNoTc,
 		}
 		if err := t.withActionParam(action, FieldAppMeterIndex, appMeterIdx); err != nil {
 			return nil, err
@@ -790,9 +720,8 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uin
 	})
 	builderLog.Debug("Building P4rt table entry for UP4 terminations_downlink table")
 
-	tableID := t.tableID(TableDownlinkTerminations)
 	entry := &p4.TableEntry{
-		TableId:  tableID,
+		TableId:  p4constants.TablePreQosPipeTerminationsDownlink,
 		Priority: DefaultPriority,
 	}
 
@@ -812,11 +741,11 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uin
 	var action *p4.Action
 	if shouldDrop {
 		action = &p4.Action{
-			ActionId: t.actionID(ActDownlinkTermDrop),
+			ActionId: p4constants.ActionPreQosPipeDownlinkTermDrop,
 		}
 	} else if !shouldDrop && tc != NoTC {
 		action = &p4.Action{
-			ActionId: t.actionID(ActDownlinkTermFwd),
+			ActionId: p4constants.ActionPreQosPipeDownlinkTermFwd,
 		}
 
 		if err := t.withActionParam(action, FieldTEID, relatedFAR.tunnelTEID); err != nil {
@@ -836,7 +765,7 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uin
 		}
 	} else {
 		action = &p4.Action{
-			ActionId: t.actionID(ActDownlinkTermFwdNoTC),
+			ActionId: p4constants.ActionPreQosPipeDownlinkTermFwdNoTc,
 		}
 
 		if err := t.withActionParam(action, FieldTEID, relatedFAR.tunnelTEID); err != nil {
@@ -883,14 +812,13 @@ func (t *P4rtTranslator) BuildGTPTunnelPeerTableEntry(tunnelPeerID uint8, tunnel
 	})
 	builderLog.Trace("Building P4rt table entry for GTP Tunnel Peers table")
 
-	tableID := t.tableID(TableTunnelPeers)
 	entry := &p4.TableEntry{
-		TableId:  tableID,
+		TableId:  p4constants.TablePreQosPipeTunnelPeers,
 		Priority: DefaultPriority,
 		Action: &p4.TableAction{
 			Type: &p4.TableAction_Action{
 				Action: &p4.Action{
-					ActionId: t.actionID(ActLoadTunnelParams),
+					ActionId: p4constants.ActionPreQosPipeLoadTunnelParam,
 				},
 			},
 		},
@@ -917,14 +845,15 @@ func (t *P4rtTranslator) BuildGTPTunnelPeerTableEntry(tunnelPeerID uint8, tunnel
 	return entry, nil
 }
 
-func (t *P4rtTranslator) BuildMeterEntry(meter string, cellID uint32, config *p4.MeterConfig) *p4.MeterEntry {
+func (t *P4rtTranslator) BuildMeterEntry(meterID uint32, cellID uint32, config *p4.MeterConfig) *p4.MeterEntry {
+	meterName := p4constants.GetMeterIDToNameMap()[meterID]
+
 	builderLog := log.WithFields(log.Fields{
-		"Meter":   meter,
+		"Meter":   meterName,
 		"Cell ID": cellID,
 	})
 	builderLog.Trace("Building Meter entry")
 
-	meterID := t.meterID(meter)
 	entry := &p4.MeterEntry{
 		MeterId: meterID,
 		Index:   &p4.Index{Index: int64(cellID)},
