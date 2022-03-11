@@ -215,8 +215,12 @@ func (up4 *UP4) initAllCounters() {
 func (up4 *UP4) initMetersPools() {
 	log.Debug("Initializing P4 Meters pools for UP4")
 
-	appMeterID, appMeterSize := p4constants.MeterPreQosPipeAppMeter, p4constants.MeterSizePreQosPipeAppMeter
+	appMeterID := p4constants.MeterPreQosPipeAppMeter
 	appMeterName := p4constants.GetMeterIDToNameMap()[appMeterID]
+	appMeterSize, err := up4.p4RtTranslator.getMeterSizeByID(appMeterID)
+	if err != nil {
+		log.Errorf("Could not find meter size of %v", appMeterName)
+	}
 
 	log.WithFields(log.Fields{
 		"name": appMeterName,
@@ -229,8 +233,12 @@ func (up4 *UP4) initMetersPools() {
 
 	log.Trace("Application meter IDs pool initialized: ", up4.appMeterCellIDsPool.String())
 
-	sessMeterID, sessMeterSize := p4constants.MeterPreQosPipeSessionMeter, p4constants.MeterSizePreQosPipeSessionMeter
+	sessMeterID := p4constants.MeterPreQosPipeSessionMeter
 	sessMeterName := p4constants.GetMeterIDToNameMap()[sessMeterID]
+	sessMeterSize, err := up4.p4RtTranslator.getMeterSizeByID(sessMeterID)
+	if err != nil {
+		log.Errorf("Could not find meter size of %v", sessMeterName)
+	}
 
 	log.WithFields(log.Fields{
 		"name": sessMeterName,
