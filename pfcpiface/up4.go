@@ -214,8 +214,9 @@ func (up4 *UP4) initAllCounters() {
 			log.Error(err)
 		}
 
-		switch counterID { //FIXME initCounter should accept a uint32 but doing so will break integration tests (PFCP Agent cannot connect). Need to investigate on why
+		switch counterID {
 		case p4constants.CounterPreQosPipePreQosCounter:
+			//FIXME to fully exploit p4constants, counters should be a map instead of a slice
 			up4.initCounter(preQosCounterID, counterName, uint64(counterSize))
 		case p4constants.CounterPostQosPipePostQosCounter:
 			up4.initCounter(postQosCounterID, counterName, uint64(counterSize))
@@ -232,12 +233,7 @@ func (up4 *UP4) initMetersPools() {
 	}
 
 	for _, meterID := range meters {
-		meterName, exists := p4constants.GetMeterIDToNameMap()[meterID]
-		if exists {
-			log.WithFields(log.Fields{
-				"name": meterName,
-			}).Trace("Found P4 meter")
-		}
+		meterName := p4constants.GetMeterIDToNameMap()[meterID]
 
 		meterSize, err := up4.p4RtTranslator.getMeterSizeByID(meterID)
 		if err != nil {
