@@ -4,6 +4,7 @@
 package integration
 
 import (
+	"github.com/wmnsk/go-pfcp/message"
 	"net"
 	"testing"
 	"time"
@@ -21,36 +22,104 @@ func init() {
 }
 
 func TestUPFBasedUeIPAllocation(t *testing.T) {
+	// TODO: verify if UEIP bit is set in the UP Function Features of PFCP Association Response
 	setup(t, ConfigUPFBasedIPAllocation)
 	defer teardown(t)
 
-	tc := testCase{
-		ctx: testContext{
-			UPFBasedUeIPAllocation: true,
-		},
+	testcase := testCase{
 		input: &pfcpSessionData{
 			sliceID:      1,
 			nbAddress:    nodeBAddress,
-			ueAddress:    ueAddress,
 			upfN3Address: upfN3Address,
-			sdfFilter:    "permit out ip from any to assigned",
+			sdfFilter:    "permit out udp from any 80-80 to assigned",
 			ulTEID:       15,
 			dlTEID:       16,
-			QFI:          0x09,
+			QFI:          0x9,
 		},
 		expected: p4RtValues{
 			// first IP address from pool configured in ue_ip_alloc.json
 			ueAddress: "10.250.0.1",
-			// no application filtering rule expected
-			appID:        0,
+			appFilter: appFilter{
+				proto:        0x11,
+				appIP:        net.ParseIP("0.0.0.0"),
+				appPrefixLen: 0,
+				appPort: portRange{
+					80, 80,
+				},
+			},
+			appID:        1,
 			tunnelPeerID: 2,
 		},
-		desc: "UPF-based UE IP allocation",
 	}
 
-	t.Run(tc.desc, func(t *testing.T) {
-		testUEAttachDetach(t, fillExpected(&tc))
-	})
+	pdrs := []*ie.IE{
+		session.NewPDRBuilder().MarkAsUplink().
+			WithMethod(session.Create).
+			WithID(1).
+			WithTEID(testcase.input.ulTEID).
+			WithN3Address(testcase.input.upfN3Address).
+			WithSDFFilter(testcase.input.sdfFilter).
+			WithFARID(1).
+			AddQERID(4).
+			AddQERID(1).BuildPDR(),
+		ie.NewCreatePDR(
+			ie.NewPDRID(2),
+			ie.NewPrecedence(testcase.input.precedence),
+			ie.NewPDI(
+				ie.NewSourceInterface(ie.SrcInterfaceCore),
+				// indicate UP to allocate UE IP Address
+				ie.NewUEIPAddress(0x10, "", "", 0, 0),
+				ie.NewSDFFilter(testcase.input.sdfFilter, "", "", "", 1),
+			),
+			ie.NewFARID(2),
+			ie.NewQERID(2),
+			ie.NewQERID(4),
+		),
+	}
+
+	fars := []*ie.IE{
+		session.NewFARBuilder().
+			WithMethod(session.Create).WithID(1).WithDstInterface(ie.DstInterfaceCore).
+			WithAction(ActionForward).BuildFAR(),
+		session.NewFARBuilder().
+			WithMethod(session.Create).WithID(2).
+			WithDstInterface(ie.DstInterfaceAccess).
+			WithAction(ActionDrop).WithTEID(testcase.input.dlTEID).
+			WithDownlinkIP(testcase.input.nbAddress).BuildFAR(),
+	}
+
+	err := pfcpClient.SendSessionEstablishmentRequest(pdrs, fars, nil)
+	require.NoError(t, err)
+
+	resp, err := pfcpClient.PeekNextResponse()
+	require.NoError(t, err)
+
+	estResp, ok := resp.(*message.SessionEstablishmentResponse)
+	require.True(t, ok)
+
+	remoteSEID, err := estResp.UPFSEID.FSEID()
+	require.NoError(t, err)
+
+	// the PFCP response should contain exactly 1 Create PDR IE
+	require.Len(t, estResp.CreatedPDR, 1)
+
+	// verify if UE Address IE is provided and contains expected IP address
+	ueIPs, err := estResp.CreatedPDR[0].UEIPAddress()
+	require.NoError(t, err)
+
+	require.Equal(t, net.ParseIP(testcase.expected.ueAddress).To4(), ueIPs.IPv4Address.To4())
+
+	verifyEntries(t, testcase.input, testcase.expected, UEStateAttaching)
+
+	// no need to send modification request, we can delete PFCP session
+
+	err = pfcpClient.SendSessionDeletionRequest(0, remoteSEID.SEID)
+	require.NoError(t, err)
+
+	_, err = pfcpClient.PeekNextResponse()
+	require.NoError(t, err)
+
+	verifyNoEntries(t, testcase.expected)
 }
 
 func TestPFCPHeartbeats(t *testing.T) {
@@ -372,35 +441,14 @@ func testUEAttach(t *testing.T, testcase *testCase) {
 			WithFARID(1).
 			AddQERID(4).
 			AddQERID(1).BuildPDR(),
-	}
-
-	if !testcase.ctx.UPFBasedUeIPAllocation {
-		pdrs = append(pdrs,
-			session.NewPDRBuilder().MarkAsDownlink().
-				WithMethod(session.Create).
-				WithID(2).
-				WithUEAddress(testcase.input.ueAddress).
-				WithSDFFilter(testcase.input.sdfFilter).
-				WithFARID(2).
-				AddQERID(4).
-				AddQERID(2).BuildPDR())
-	} else {
-		pdrs = append(pdrs,
-			// TODO: should be replaced by builder?
-			ie.NewCreatePDR(
-				ie.NewPDRID(2),
-				ie.NewPrecedence(testcase.input.precedence),
-				ie.NewPDI(
-					ie.NewSourceInterface(ie.SrcInterfaceCore),
-					// indicate UP to allocate UE IP Address
-					ie.NewUEIPAddress(0x10, "", "", 0, 0),
-					ie.NewSDFFilter(testcase.input.sdfFilter, "", "", "", 1),
-				),
-				ie.NewFARID(2),
-				ie.NewQERID(2),
-				ie.NewQERID(4),
-			),
-		)
+		session.NewPDRBuilder().MarkAsDownlink().
+			WithMethod(session.Create).
+			WithID(2).
+			WithUEAddress(testcase.input.ueAddress).
+			WithSDFFilter(testcase.input.sdfFilter).
+			WithFARID(2).
+			AddQERID(4).
+			AddQERID(2).BuildPDR(),
 	}
 
 	fars := []*ie.IE{

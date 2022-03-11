@@ -129,12 +129,7 @@ type p4RtValues struct {
 	appFilter    appFilter
 }
 
-type testContext struct {
-	UPFBasedUeIPAllocation bool
-}
-
 type testCase struct {
-	ctx      testContext
 	input    *pfcpSessionData
 	expected p4RtValues
 
