@@ -78,6 +78,17 @@ type meter struct {
 	downlinkCellID uint32
 }
 
+type tunnelPeer struct {
+	id uint8
+	// refCount list of F-SEIDs (UE sessions) using this tunnel peer
+	refCount set.Set
+}
+
+func (t tunnelPeer) String() string {
+	return fmt.Sprintf("TunnelPeer{id=%d, refCount=%d, referencing F-SEIDs=%v}",
+		t.id, t.refCount.Cardinality(), t.refCount)
+}
+
 type UP4 struct {
 	conf P4rtcInfo
 
@@ -93,7 +104,7 @@ type UP4 struct {
 
 	// TODO: create UP4Store object and move these fields there
 	counters           []counter
-	tunnelPeerIDs      map[tunnelParams]uint8
+	tunnelPeerIDs      map[tunnelParams]tunnelPeer
 	tunnelPeerIDsPool  []uint8
 	applicationIDs     map[application]uint8
 	applicationIDsPool []uint8
@@ -278,7 +289,7 @@ func (up4 *UP4) initMetersPools() error {
 }
 
 func (up4 *UP4) initTunnelPeerIDs() {
-	up4.tunnelPeerIDs = make(map[tunnelParams]uint8)
+	up4.tunnelPeerIDs = make(map[tunnelParams]tunnelPeer)
 	// a simple queue storing available tunnel peer IDs
 	// 0 is reserved;
 	// 1 is reserved for dbuf
@@ -557,21 +568,30 @@ func (up4 *UP4) allocateGTPTunnelPeerID() (uint8, error) {
 	allocated := up4.tunnelPeerIDsPool[0]
 	up4.tunnelPeerIDsPool = up4.tunnelPeerIDsPool[1:]
 
+	log.WithFields(log.Fields{
+		"ID":   allocated,
+		"pool": up4.tunnelPeerIDsPool,
+	}).Trace("Tunnel peer ID")
+
 	return allocated, nil
 }
 
-// FIXME: SDFAB-960
-//nolint:unused
-func (up4 *UP4) releaseAllocatedGTPTunnelPeerID(tunnelParams tunnelParams) {
+func (up4 *UP4) releaseAllocatedGTPTunnelPeer(tunnelParams tunnelParams) {
 	allocated, exists := up4.tunnelPeerIDs[tunnelParams]
 	if exists {
 		delete(up4.tunnelPeerIDs, tunnelParams)
-		up4.tunnelPeerIDsPool = append(up4.tunnelPeerIDsPool, allocated)
+		up4.tunnelPeerIDsPool = append(up4.tunnelPeerIDsPool, allocated.id)
+
+		log.WithFields(log.Fields{
+			"tunnel params": tunnelParams,
+			"tunnel peer":   allocated,
+			"pool":          up4.tunnelPeerIDsPool,
+		}).Trace("Tunnel peer ID released")
 	}
 }
 
 func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
-	var tunnelPeerID uint8
+	var tnlPeer tunnelPeer
 
 	methodType := p4.Update_MODIFY
 	tunnelParams := tunnelParams{
@@ -580,35 +600,47 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
 		tunnelPort:   far.tunnelPort,
 	}
 
-	tunnelPeerID, exists := up4.tunnelPeerIDs[tunnelParams]
-
+	tnlPeer, exists := up4.tunnelPeerIDs[tunnelParams]
 	if !exists {
-		var err error
-
-		tunnelPeerID, err = up4.allocateGTPTunnelPeerID()
+		newID, err := up4.allocateGTPTunnelPeerID()
 		if err != nil {
 			return err
 		}
 
+		tnlPeer = tunnelPeer{
+			id:       newID,
+			refCount: set.NewSet(far.fseID),
+		}
+
 		methodType = p4.Update_INSERT
+	} else {
+		// tunnel peer already exists, increment ref count.
+		// since we use Set ref count will not be incremented if tunnel peer was already created for this UE session.
+		tnlPeer.refCount.Add(far.fseID)
 	}
 
-	gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(tunnelPeerID, tunnelParams)
+	releaseTnlPeerID := func() {
+		if !exists {
+			up4.releaseAllocatedGTPTunnelPeer(tunnelParams)
+		}
+	}
+
+	gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(tnlPeer.id, tunnelParams)
 	if err != nil {
+		releaseTnlPeerID()
 		return err
 	}
 
 	if err := up4.p4client.ApplyTableEntries(methodType, gtpTunnelPeerEntry); err != nil {
+		releaseTnlPeerID()
 		return err
 	}
 
-	up4.tunnelPeerIDs[tunnelParams] = tunnelPeerID
+	up4.tunnelPeerIDs[tunnelParams] = tnlPeer
 
 	return nil
 }
 
-// FIXME: SDFAB-960
-//nolint:unused
 func (up4 *UP4) removeGTPTunnelPeer(far far) {
 	removeLog := log.WithFields(log.Fields{
 		"far": far,
@@ -619,16 +651,25 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 		tunnelPort:   far.tunnelPort,
 	}
 
-	tunnelPeerID, exists := up4.tunnelPeerIDs[tunnelParams]
+	tnlPeer, exists := up4.tunnelPeerIDs[tunnelParams]
 	if !exists {
 		removeLog.WithField(
-			"tunnel-params", tunnelParams).Error("GTP tunnel peer ID not found for tunnel params")
+			"tunnel-params", tunnelParams).Warn("GTP tunnel peer ID not found for tunnel params")
 		return
 	}
 
-	removeLog.WithField("tunnel-peer-id", tunnelPeerID)
+	removeLog.WithField("tunnel-peer", tnlPeer)
 
-	gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(tunnelPeerID, tunnelParams)
+	removeLog.Debug("Found GTP tunnel peer for tunnel params")
+
+	tnlPeer.refCount.Remove(far.fseID)
+
+	if tnlPeer.refCount.Cardinality() != 0 {
+		removeLog.Debug("GTP tunnel peer was about to be removed, but it's in use by other UE session.")
+		return
+	}
+
+	gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(tnlPeer.id, tunnelParams)
 	if err != nil {
 		removeLog.Error("failed to build GTP tunnel peer entry to remove")
 		return
@@ -640,7 +681,7 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 		removeLog.Error("failed to remove GTP tunnel peer")
 	}
 
-	up4.releaseAllocatedGTPTunnelPeerID(tunnelParams)
+	up4.releaseAllocatedGTPTunnelPeer(tunnelParams)
 }
 
 // Returns error if we reach maximum supported Application IDs.
@@ -764,7 +805,7 @@ func (up4 *UP4) releaseSessionMeterCellID(allocated uint32) {
 }
 
 func (up4 *UP4) updateUEAddrAndFSEIDMappings(pdr pdr) {
-	if !pdr.IsDownlink() {
+	if pdr.IsUplink() {
 		return
 	}
 
@@ -773,7 +814,7 @@ func (up4 *UP4) updateUEAddrAndFSEIDMappings(pdr pdr) {
 }
 
 func (up4 *UP4) removeUeAddrAndFSEIDMappings(pdr pdr) {
-	if !pdr.IsDownlink() {
+	if pdr.IsUplink() {
 		return
 	}
 
@@ -1127,7 +1168,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 			pdrLog.Debug("Application meter found for PDR: ", sessMeter)
 		} // else: if only 1 QER provided, set sessMeterIdx to 0, and use only per-app metering
 
-		sessionsEntry, err := up4.p4RtTranslator.BuildSessionsTableEntry(pdr, sessMeter, tunnelPeerID, far.Buffers())
+		sessionsEntry, err := up4.p4RtTranslator.BuildSessionsTableEntry(pdr, sessMeter, tunnelPeerID.id, far.Buffers())
 		if err != nil {
 			return ErrOperationFailedWithReason("build P4rt table entry for Sessions table", err.Error())
 		}
@@ -1291,6 +1332,10 @@ func (up4 *UP4) sendDelete(deleted PacketForwardingRules) error {
 	}
 
 	up4.resetMeters(deleted.qers)
+
+	for _, f := range deleted.fars {
+		up4.removeGTPTunnelPeer(f)
+	}
 
 	for _, p := range deleted.pdrs {
 		up4.removeUeAddrAndFSEIDMappings(p)
