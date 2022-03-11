@@ -28,7 +28,6 @@ type endpoint struct {
 
 func (ep *endpoint) parseNet(ipnet string) error {
 	ipNetFields := strings.Split(ipnet, "/")
-	log.Println(ipNetFields)
 
 	switch len(ipNetFields) {
 	case 1:

@@ -8,17 +8,17 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
-	"io"
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os/exec"
 	"strings"
+	"time"
 )
 
-// RunDockerCommandAttach attaches to a running Docker container and executes a cmd.
+// MustRunDockerCommandAttach attaches to a running Docker container and executes a cmd.
 // It should be used to spawn a new pfcpiface process inside and redirect its stdout/stderr to `docker logs`.
 // This is equivalent to `docker attach` CLI command.
-func RunDockerCommandAttach(container string, cmd string) {
-	inout := make(chan []byte)
+func MustRunDockerCommandAttach(container string, cmd string) {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -32,23 +32,13 @@ func RunDockerCommandAttach(container string, cmd string) {
 		Stdin:  true,
 		Stream: true,
 	})
-
-	// Write to docker container
-	go func(w io.WriteCloser) {
-		for {
-			data, ok := <-inout
-			if !ok {
-				w.Close()
-				return
-			}
-
-			w.Write(append(data, '\n'))
-		}
-	}(waiter.Conn)
-	inout <- []byte(cmd)
-
-	waiter.Conn.Close()
-	waiter.Close()
+	defer waiter.Close()
+	if err = waiter.Conn.SetWriteDeadline(time.Now().Add(time.Second * 1)); err != nil {
+		logrus.Fatalf("Failed to set deadline: %v", err)
+	}
+	if _, err = waiter.Conn.Write(append([]byte(cmd), '\n')); err != nil {
+		logrus.Fatalf("Failed to write to container: %v", err)
+	}
 }
 
 // RunDockerExecCommand executes a cmd inside a running Docker container.
