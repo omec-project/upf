@@ -15,7 +15,8 @@ type FakeBESS struct {
 	service    *fakeBessService
 }
 
-// NewFakeBESS creates a new fake BESS server with the
+// NewFakeBESS creates a new fake BESS gRPC server. Its modules can be programmed in the same way
+// as the real BESS and keep track of their state.
 func NewFakeBESS() *FakeBESS {
 	return &FakeBESS{
 		service: newFakeBESSService(),

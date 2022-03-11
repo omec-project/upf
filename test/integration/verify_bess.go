@@ -9,6 +9,8 @@ import (
 	"testing"
 )
 
+// TODO: current assertions are limited to quantity verification only. We'd like to extend this
+//       and check entry contents as well.
 func verifyBessEntries(t *testing.T, bess *fake_bess.FakeBESS, testdata *pfcpSessionData, expectedValues p4RtValues, ueState UEState) {
 	// Check we have all expected PDRs.
 	pdrs := bess.GetPdrTableEntries()
