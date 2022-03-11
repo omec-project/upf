@@ -157,7 +157,7 @@ func (b *fakeBessService) GetOrAddModule(name string) module {
 }
 
 func (b *fakeBessService) unsafeGetOrAddModule(name string) module {
-	if b.modules[name] == nil {
+	if _, ok := b.modules[name]; !ok {
 		if name == pdrLookupModuleName {
 			b.modules[name] = &wildcardModule{
 				baseModule{name: name},
