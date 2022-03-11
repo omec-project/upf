@@ -17,13 +17,7 @@ func verifyBessEntries(t *testing.T, bess *fake_bess.FakeBESS, testdata *pfcpSes
 		id, err := expectedPdr.PDRID()
 		require.NoError(t, err)
 
-		found := false
-		for _, installedPdr := range pdrs {
-			if installedPdr.PdrID == uint32(id) {
-				found = true
-				break
-			}
-		}
+		_, found := pdrs[uint32(id)]
 		require.True(t, found, "missing PDR", "expected PDR with ID %v: %+v, got %+v", id, expectedPdr, pdrs)
 	}
 
@@ -34,13 +28,7 @@ func verifyBessEntries(t *testing.T, bess *fake_bess.FakeBESS, testdata *pfcpSes
 		id, err := expectedFar.FARID()
 		require.NoError(t, err)
 
-		found := false
-		for _, installedFar := range fars {
-			if installedFar.FarID == id {
-				found = true
-				break
-			}
-		}
+		_, found := fars[id]
 		require.True(t, found, "missing FAR", "expected FAR with ID %v: %+v, got %+v", id, expectedFar, fars)
 	}
 

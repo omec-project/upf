@@ -247,21 +247,6 @@ func UnmarshalPdr(wc *bess_pb.WildcardMatchCommandAddArg) (p FakePdr) {
 	return
 }
 
-// AggregateRangeMatchPdr merges PDRs with identical IDs.
-func AggregateRangeMatchPdr(pdrs []FakePdr) (out []FakePdr) {
-	m := make(map[uint32][]FakePdr)
-
-	for _, p := range pdrs {
-		m[p.PdrID] = append(m[p.PdrID], p)
-	}
-
-	for _, p := range m {
-		out = append(out, p[0])
-	}
-
-	return
-}
-
 func UnmarshalFar(em *bess_pb.ExactMatchCommandAddArg) (f FakeFar) {
 	// Fields.
 	f.FarID = uint32(em.Fields[0].GetValueInt())

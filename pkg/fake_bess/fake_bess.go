@@ -46,32 +46,36 @@ func (b *FakeBESS) Stop() {
 	b.grpcServer.Stop()
 }
 
-func (b *FakeBESS) GetPdrTableEntries() (entries []FakePdr) {
+func (b *FakeBESS) GetPdrTableEntries() (entries map[uint32][]FakePdr) {
+	entries = make(map[uint32][]FakePdr)
 	msgs := b.service.GetOrAddModule(pdrLookupModuleName).GetState()
 	for _, m := range msgs {
 		e, ok := m.(*bess_pb.WildcardMatchCommandAddArg)
 		if !ok {
 			panic("unexpected message type")
 		}
-		entries = append(entries, UnmarshalPdr(e))
+		pdr := UnmarshalPdr(e)
+		entries[pdr.PdrID] = append(entries[pdr.PdrID], pdr)
 	}
-	entries = AggregateRangeMatchPdr(entries)
 
 	return
 }
 
-func (b *FakeBESS) GetFarTableEntries() (entries []FakeFar) {
+func (b *FakeBESS) GetFarTableEntries() (entries map[uint32]FakeFar) {
+	entries = make(map[uint32]FakeFar)
 	msgs := b.service.GetOrAddModule(farLookupModuleName).GetState()
 	for _, m := range msgs {
 		e, ok := m.(*bess_pb.ExactMatchCommandAddArg)
 		if !ok {
 			panic("unexpected message type")
 		}
-		entries = append(entries, UnmarshalFar(e))
+		far := UnmarshalFar(e)
+		entries[far.FarID] = far
 	}
 	return
 }
 
+// Session QERs are missing a QerID and are therefore returned as a slice, not map.
 func (b *FakeBESS) GetSessionQerTableEntries() (entries []FakeQer) {
 	msgs := b.service.GetOrAddModule(sessionQerModuleName).GetState()
 	for _, m := range msgs {
