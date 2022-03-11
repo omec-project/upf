@@ -95,16 +95,15 @@ type pfcpSessionData struct {
 	sessQerID        uint32
 	uplinkAppQerID   uint32
 	downlinkAppQerID uint32
-
 	// only single QFI is fine, QFI is passed in session QER, but not considered.
-	QFI uint8
-
+	QFI     uint8
 	sessMBR uint64
 	sessGBR uint64
-
 	// uplink/downlink GBR/MBR is always the same
-	appMBR uint64
-	appGBR uint64
+	appMBR       uint64
+	appGBR       uint64
+	ulGateClosed bool
+	dlGateClosed bool
 }
 
 type portRange struct {
