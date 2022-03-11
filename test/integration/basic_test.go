@@ -14,6 +14,12 @@ import (
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
+func init() {
+	if isFastpathUP4() && isModeDocker() {
+		initForwardingPipelineConfig()
+	}
+}
+
 func TestUPFBasedUeIPAllocation(t *testing.T) {
 	setup(t, ConfigUPFBasedIPAllocation)
 	defer teardown(t)
