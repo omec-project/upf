@@ -208,10 +208,10 @@ func (c *P4rtClient) GetNextDigestData() []byte {
 	for _, p4d := range nextDigest.GetData() {
 		if bitstring := p4d.GetBitstring(); bitstring != nil {
 			log.WithFields(log.Fields{
-				"device-id": c.deviceID,
-				"conn": c.conn.Target(),
+				"device-id":     c.deviceID,
+				"conn":          c.conn.Target(),
 				"digest length": len(bitstring),
-				"data": bitstring,
+				"data":          bitstring,
 			}).Trace("Received Digest")
 			return bitstring
 		}
