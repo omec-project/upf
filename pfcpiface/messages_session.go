@@ -511,6 +511,11 @@ func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
 	srreq.DownlinkDataReport = ie.NewDownlinkDataReport(
 		ie.NewPDRID(uint16(pdrID)))
 
+	log.WithFields(log.Fields{
+		"F-SEID": fseid,
+		"PDR ID": pdrID,
+	}).Debug("Sending Downlink Data Report")
+
 	pConn.SendPFCPMsg(srreq)
 }
 
