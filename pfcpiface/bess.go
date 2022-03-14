@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"time"
 
+	"google.golang.org/grpc/connectivity"
+
 	"google.golang.org/grpc/credentials/insecure"
 
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
@@ -79,7 +81,7 @@ type bess struct {
 }
 
 func (b *bess) isConnected(accessIP *net.IP) bool {
-	if (b.conn == nil) || (int(b.conn.GetState()) != Ready) {
+	if (b.conn == nil) || (b.conn.GetState() != connectivity.Ready) {
 		return false
 	}
 

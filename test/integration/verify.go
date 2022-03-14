@@ -7,6 +7,7 @@ import (
 	"fmt"
 	p4rtc "github.com/antoninbas/p4runtime-go-client/pkg/client"
 	"github.com/antoninbas/p4runtime-go-client/pkg/util/conversion"
+	"github.com/omec-project/upf-epc/internal/p4constants"
 	"github.com/omec-project/upf-epc/test/integration/providers"
 	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/stretchr/testify/require"
@@ -28,6 +29,7 @@ const (
 	ActSetUplinkSession       = "PreQosPipe.set_session_uplink"
 	ActSetDownlinkSession     = "PreQosPipe.set_session_downlink"
 	ActSetDownlinkSessionBuff = "PreQosPipe.set_session_downlink_buff"
+	ActUplinkTermDrop         = "PreQosPipe.uplink_term_drop"
 	ActUplinkTermFwd          = "PreQosPipe.uplink_term_fwd"
 	ActUplinkTermFwdNoTC      = "PreQosPipe.uplink_term_fwd_no_tc"
 	ActLoadTunnelParam        = "PreQosPipe.load_tunnel_param"
@@ -35,6 +37,43 @@ const (
 	ActDownlinkTermFwd        = "PreQosPipe.downlink_term_fwd"
 	ActDownlinkTermFwdNoTC    = "PreQosPipe.downlink_term_fwd_no_tc"
 )
+
+var (
+	tablesNames = p4constants.GetTableIDToNameMap()
+	actionNames = p4constants.GetActionIDToNameMap()
+)
+
+func buildExpectedInterfacesEntries(client *p4rtc.Client, testdata *pfcpSessionData, expectedValues p4RtValues) []*p4_v1.TableEntry {
+	entries := make([]*p4_v1.TableEntry, 0, 2)
+
+	n3Addr, _ := conversion.IpToBinary(testdata.upfN3Address)
+
+	te := client.NewTableEntry(tablesNames[p4constants.TablePreQosPipeInterfaces], []p4rtc.MatchInterface{
+		&p4rtc.LpmMatch{
+			Value: n3Addr,
+			PLen:  32,
+		},
+	}, client.NewTableActionDirect(actionNames[p4constants.ActionPreQosPipeSetSourceIface],
+		[][]byte{{directionUplink}, {srcIfaceAccess}, {testdata.sliceID}}),
+		nil)
+
+	entries = append(entries, te)
+
+	ueAddr, _ := conversion.IpToBinary(expectedValues.ueAddress)
+
+	te = client.NewTableEntry(tablesNames[p4constants.TablePreQosPipeInterfaces], []p4rtc.MatchInterface{
+		&p4rtc.LpmMatch{
+			Value: ueAddr,
+			PLen:  16,
+		},
+	}, client.NewTableActionDirect(actionNames[p4constants.ActionPreQosPipeSetSourceIface],
+		[][]byte{{directionDownlink}, {srcIfaceCore}, {testdata.sliceID}}),
+		nil)
+
+	entries = append(entries, te)
+
+	return entries
+}
 
 func buildExpectedApplicationsEntry(client *p4rtc.Client, testdata *pfcpSessionData, expectedValues p4RtValues) *p4_v1.TableEntry {
 	if expectedValues.appFilter.proto == 0 && len(expectedValues.appFilter.appIP) == 0 &&
@@ -141,24 +180,32 @@ func buildExpectedSessionsDownlinkEntry(client *p4rtc.Client, expected p4RtValue
 	}, client.NewTableActionDirect(action, actionParams), nil)
 }
 
-func buildExpectedTerminationsUplinkEntry(client *p4rtc.Client, expected p4RtValues) *p4_v1.TableEntry {
+func buildExpectedTerminationsUplinkEntry(client *p4rtc.Client, testdata *pfcpSessionData, expected p4RtValues) *p4_v1.TableEntry {
 	ueAddr, _ := conversion.IpToBinary(expected.ueAddress)
 	appID, _ := conversion.UInt32ToBinary(uint32(expected.appID), 3)
 
-	action := ActUplinkTermFwdNoTC
+	action := ActUplinkTermDrop
 	params := [][]byte{
 		// dummy counter ID
 		{0x00, 0x00, 0x00, 0x00},
-		// dummy app meter idx
-		{0x00, 0x00}}
-	if expected.tc != 0 {
-		action = ActUplinkTermFwd
+	}
+
+	if !testdata.ulGateClosed {
+		action = ActUplinkTermFwdNoTC
 		params = [][]byte{
 			// dummy counter ID
 			{0x00, 0x00, 0x00, 0x00},
-			{expected.tc},
 			// dummy app meter idx
-			{0x00, 0x00},
+			{0x00, 0x00}}
+		if expected.tc != 0 {
+			action = ActUplinkTermFwd
+			params = [][]byte{
+				// dummy counter ID
+				{0x00, 0x00, 0x00, 0x00},
+				{expected.tc},
+				// dummy app meter idx
+				{0x00, 0x00},
+			}
 		}
 	}
 
@@ -182,7 +229,7 @@ func buildExpectedTerminationsDownlinkEntry(client *p4rtc.Client, testdata *pfcp
 	// dummy counter id, ignored later
 	actionParams = append(actionParams, []byte{0x00, 0x00, 0x00, 0x00})
 
-	if afterModification {
+	if afterModification && !testdata.dlGateClosed {
 		action = ActDownlinkTermFwdNoTC
 
 		teid, _ := conversion.UInt32ToBinary(testdata.dlTEID, 0)
@@ -249,7 +296,15 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, expectedVal
 	//	fmt.Sprintf("UP4 should have exactly %v p4RtEntries installed", expectedNumberOfAllEntries),
 	//	allInstalledEntries)
 
-	entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.applications")
+	entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.interfaces")
+	require.Equal(t, 2, len(entries))
+	expectedInterfacesEntries := buildExpectedInterfacesEntries(p4rtClient, testdata, expectedValues)
+	n3addressEntry := expectedInterfacesEntries[0]
+	uePoolEntry := expectedInterfacesEntries[1]
+	require.Contains(t, entries, n3addressEntry)
+	require.Contains(t, entries, uePoolEntry)
+
+	entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.applications")
 	require.Equal(t, expectedApplicationsEntries, len(entries),
 		fmt.Sprintf("PreQosPipe.applications should contain %v entry", expectedApplicationsEntries))
 	if len(entries) > 0 {
@@ -282,7 +337,7 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, expectedVal
 
 	entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.terminations_uplink")
 	require.Equal(t, 1, len(entries), "PreQosPipe.terminations_uplink should contain 1 entry")
-	expected = buildExpectedTerminationsUplinkEntry(p4rtClient, expectedValues)
+	expected = buildExpectedTerminationsUplinkEntry(p4rtClient, testdata, expectedValues)
 	// we don't compare the entire object because counter ID is auto-generated by pfcpiface
 	require.Equal(t, expected.Action.GetAction().ActionId, entries[0].Action.GetAction().ActionId, "PreQosPipe.terminations_uplink action does not equal expected")
 	require.Equal(t, len(expected.Action.GetAction().Params), len(entries[0].Action.GetAction().Params),
@@ -290,7 +345,7 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, expectedVal
 	require.Equal(t, expected.Match, entries[0].Match, "PreQosPipe.terminations_uplink match fields do not equal expected")
 	// check if counter index doesn't equal 0
 	require.NotEqual(t, []byte{0}, entries[0].Action.GetAction().Params[0].Value)
-	if expectedValues.tc != 0 {
+	if !testdata.ulGateClosed && expectedValues.tc != 0 {
 		require.Equal(t, expected.Action.GetAction().Params[1], entries[0].Action.GetAction().Params[1], "PreQosPipe.terminations_uplink action params do not equal expected")
 	}
 
@@ -305,7 +360,7 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, expectedVal
 	require.NotEqual(t, []byte{0}, entries[0].Action.GetAction().Params[0].Value)
 	// check UE address
 	require.Equal(t, expected.Match, entries[0].Match, "PreQosPipe.terminations_downlink match fields do not equal expected")
-	if ueState == UEStateAttached {
+	if ueState == UEStateAttached && !testdata.dlGateClosed {
 		// ignore counter ID as it is random number generated by pfcpiface
 		require.Equal(t, expected.Action.GetAction().Params[1], entries[0].Action.GetAction().Params[1],
 			fmt.Sprintf("Action param (TEID) of action %v does not equal expected", ActDownlinkTermFwdNoTC))
@@ -399,8 +454,10 @@ func verifyNoP4RuntimeEntries(t *testing.T, expectedValues p4RtValues) {
 		// FIXME: tunnel_peers and applications are not cleared on session deletion/association release
 		//  See SDFAB-960
 		//  Add tunnel_peers and applications to the list, once fixed
-		"PreQosPipe.sessions_uplink", "PreQosPipe.sessions_downlink",
-		"PreQosPipe.terminations_uplink", "PreQosPipe.terminations_downlink",
+		tablesNames[p4constants.TablePreQosPipeSessionsUplink],
+		tablesNames[p4constants.TablePreQosPipeSessionsDownlink],
+		tablesNames[p4constants.TablePreQosPipeTerminationsUplink],
+		tablesNames[p4constants.TablePreQosPipeTerminationsDownlink],
 	}
 
 	for _, table := range tables {
