@@ -10,7 +10,10 @@ import (
 	"math"
 	"math/rand"
 	"net"
+	"sync"
 	"time"
+
+	"google.golang.org/grpc/connectivity"
 
 	"github.com/omec-project/upf-epc/internal/p4constants"
 	"google.golang.org/grpc/codes"
@@ -81,7 +84,16 @@ type UP4 struct {
 	ueIPPool        *net.IPNet
 	enableEndMarker bool
 
-	p4client       *P4rtClient
+	p4client *P4rtClient
+
+	connected bool
+	// connectedMu guards R/W operations to connected status
+	connectedMu sync.RWMutex
+
+	initOnce sync.Once
+	// tryConnectMu ensures a single re-connection try
+	tryConnectMu sync.Mutex
+
 	p4RtTranslator *P4rtTranslator
 
 	// TODO: create UP4Store object and move these fields there
@@ -180,11 +192,15 @@ func (up4 *UP4) exit() {
 }
 
 func (up4 *UP4) setupChannel() error {
-	log.Println("Channel Setup.")
+	setupLog := log.WithFields(log.Fields{
+		"P4Runtime server address": up4.host,
+		"DeviceID":                 up4.deviceID,
+	})
+	setupLog.Debug("Trying to setup P4Rt channel")
 
 	client, err := CreateChannel(up4.host, up4.deviceID)
 	if err != nil {
-		log.Errorf("create channel failed: %v", err)
+		setupLog.Errorf("create channel failed: %v", err)
 		return err
 	}
 
@@ -194,6 +210,8 @@ func (up4 *UP4) setupChannel() error {
 	if err != nil {
 		return err
 	}
+
+	setupLog.Debug("P4Rt channel created")
 
 	return nil
 }
@@ -288,20 +306,19 @@ func (up4 *UP4) initApplicationIDs() {
 
 // This function ensures that PFCP Agent is connected to UP4.
 // Returns true if the connection is already established.
-// Otherwise, tries to connect to UP4. Returns false if fails.
 // FIXME: the argument should be removed from fastpath API
 func (up4 *UP4) isConnected(accessIP *net.IP) bool {
-	if up4.p4client != nil {
-		return true
-	}
+	up4.connectedMu.Lock()
+	defer up4.connectedMu.Unlock()
 
-	err := up4.tryConnect()
-	if err != nil {
-		log.Errorf("failed to connect to UP4: %v", err)
-		return false
-	}
+	return up4.connected && up4.p4client != nil && up4.p4client.CheckStatus() == connectivity.Ready
+}
 
-	return true
+func (up4 *UP4) setConnectedStatus(status bool) {
+	up4.connectedMu.Lock()
+	defer up4.connectedMu.Unlock()
+
+	up4.connected = status
 }
 
 // TODO: rename it to initUPF()
@@ -355,10 +372,41 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 		up4.counters[i].allocated = make(map[uint64]uint64)
 	}
 
-	err := up4.tryConnect()
+	go up4.keepTryingToConnect()
+}
+
+func (up4 *UP4) tryConnect() error {
+	up4.tryConnectMu.Lock()
+	defer up4.tryConnectMu.Unlock()
+
+	if up4.isConnected(nil) {
+		return nil
+	}
+
+	err := up4.setupChannel()
 	if err != nil {
-		log.Errorf("failed to connect to UP4: %v", err)
-		return
+		return err
+	}
+
+	err = up4.initialize()
+	if err != nil {
+		log.Fatalf("Failed to initialize UP4: %v", err)
+	}
+
+	up4.setConnectedStatus(true)
+
+	return nil
+}
+
+func (up4 *UP4) keepTryingToConnect() {
+	for {
+		err := up4.tryConnect()
+		if err != nil {
+			time.Sleep(10 * time.Second)
+			continue
+		}
+
+		time.Sleep(120 * time.Second)
 	}
 }
 
@@ -380,36 +428,33 @@ func (up4 *UP4) clearTables() error {
 	return nil
 }
 
-func (up4 *UP4) initUEPool() error {
-	entry, err := up4.p4RtTranslator.BuildInterfaceTableEntry(up4.ueIPPool, up4.conf.SliceID, true)
+// initInterfaces initializes N3 address and UE pool in the interfaces table.
+// By sending both entries in batch, we ensure that both should always exist in UP4.
+func (up4 *UP4) initInterfaces() error {
+	entries := make([]*p4.TableEntry, 0, 2)
+
+	uePoolEntry, err := up4.p4RtTranslator.BuildInterfaceTableEntry(up4.ueIPPool, up4.conf.SliceID, true)
 	if err != nil {
 		return err
 	}
 
-	if err := up4.p4client.ApplyTableEntries(p4.Update_INSERT, entry); err != nil {
-		return err
-	}
+	entries = append(entries, uePoolEntry)
 
-	log.WithFields(log.Fields{
-		"ue pool": up4.ueIPPool,
-	}).Debug("UE pool successfully initialized in the UP4 pipeline")
-
-	return nil
-}
-
-func (up4 *UP4) initN3Address() error {
-	entry, err := up4.p4RtTranslator.BuildInterfaceTableEntry(up4.accessIP, up4.conf.SliceID, false)
+	n3AddrEntry, err := up4.p4RtTranslator.BuildInterfaceTableEntry(up4.accessIP, up4.conf.SliceID, false)
 	if err != nil {
 		return err
 	}
 
-	if err := up4.p4client.ApplyTableEntries(p4.Update_INSERT, entry); err != nil {
+	entries = append(entries, n3AddrEntry)
+
+	if err := up4.p4client.ApplyTableEntries(p4.Update_INSERT, entries...); err != nil {
 		return err
 	}
 
 	log.WithFields(log.Fields{
 		"N3 address": up4.accessIP,
-	}).Debug("N3 address successfully initialized in the UP4 pipeline")
+		"ue pool":    up4.ueIPPool,
+	}).Debug("N3 address and UE pool successfully initialized in the UP4 pipeline")
 
 	return nil
 }
@@ -418,54 +463,47 @@ func (up4 *UP4) listenToDDNs() {
 	log.Info("Listening to Data Notifications from UP4..")
 
 	for {
-		digestData := up4.p4client.GetNextDigestData()
+		if up4.isConnected(nil) {
+			// blocking
+			digestData := up4.p4client.GetNextDigestData()
 
-		ueAddr := binary.BigEndian.Uint32(digestData)
-		if fseid, exists := up4.ueAddrToFSEID[ueAddr]; exists {
-			up4.reportNotifyChan <- fseid
+			ueAddr := binary.BigEndian.Uint32(digestData)
+			if fseid, exists := up4.ueAddrToFSEID[ueAddr]; exists {
+				up4.reportNotifyChan <- fseid
+			}
 		}
 	}
 }
 
-func (up4 *UP4) tryConnect() error {
-	err := up4.setupChannel()
-	if err != nil {
-		return err
-	}
-
+// initialize configures the UP4-related objects.
+// A caller should ensure that P4Client is not nil and the P4Runtime channel is open.
+func (up4 *UP4) initialize() error {
 	up4.p4RtTranslator = newP4RtTranslator(up4.p4client.P4Info)
 
-	err = up4.clearTables()
+	err := up4.clearTables()
 	if err != nil {
 		log.Warningf("failed to clear tables: %v", err)
+		return err
 	}
 
 	up4.initAllCounters()
 	up4.initMetersPools()
 
-	go up4.listenToDDNs()
-
-	if up4.enableEndMarker {
-		log.Println("Starting end marker loop")
-
-		up4.endMarkerChan = make(chan []byte, 1024)
-		go up4.endMarkerSendLoop(up4.endMarkerChan)
-	}
-
-	// Give UP4 a while to clear all tables, before initializing the interfaces table.
-	// FIXME: this is an ugly, temporary workaround.
-	//  Should be removed once we serialize Writes on UP4 side.
-	time.Sleep(1 * time.Second)
-
-	err = up4.initUEPool()
+	err = up4.initInterfaces()
 	if err != nil {
-		return ErrOperationFailedWithReason("UE pool initialization", err.Error())
+		return ErrOperationFailedWithReason("Interfaces initialization", err.Error())
 	}
 
-	err = up4.initN3Address()
-	if err != nil {
-		return ErrOperationFailedWithReason("N3 address initialization", err.Error())
-	}
+	up4.initOnce.Do(func() {
+		go up4.listenToDDNs()
+
+		if up4.enableEndMarker {
+			log.Println("Starting end marker loop")
+
+			up4.endMarkerChan = make(chan []byte, 1024)
+			go up4.endMarkerSendLoop()
+		}
+	})
 
 	return nil
 }
@@ -478,8 +516,8 @@ func (up4 *UP4) sendEndMarkers(endMarkerList *[][]byte) error {
 	return nil
 }
 
-func (up4 *UP4) endMarkerSendLoop(endMarkerChan chan []byte) {
-	for outPacket := range endMarkerChan {
+func (up4 *UP4) endMarkerSendLoop() {
+	for outPacket := range up4.endMarkerChan {
 		err := up4.p4client.SendPacketOut(outPacket)
 		if err != nil {
 			log.Println("end marker write failed")
@@ -1265,7 +1303,8 @@ func (up4 *UP4) sendDelete(deleted PacketForwardingRules) error {
 }
 
 func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updated PacketForwardingRules) uint8 {
-	if !up4.isConnected(nil) {
+	err := up4.tryConnect()
+	if err != nil {
 		log.Error("UP4 server not connected")
 		return ie.CauseRequestRejected
 	}
@@ -1276,8 +1315,6 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updat
 		"updated-rules": updated,
 	})
 	up4Log.Debug("Sending PFCP message to UP4..")
-
-	var err error
 
 	switch method {
 	case upfMsgTypeAdd:
