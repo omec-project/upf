@@ -213,6 +213,7 @@ func (c *P4rtClient) GetNextDigestData() []byte {
 				"digest length": len(bitstring),
 				"data":          bitstring,
 			}).Trace("Received Digest")
+
 			return bitstring
 		}
 	}
