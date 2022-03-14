@@ -22,7 +22,7 @@ func (u upfMsgType) String() string {
 	if u == upfMsgTypeAdd {
 		return "add"
 	} else if u == upfMsgTypeMod {
-		return "mod"
+		return "modify"
 	} else if u == upfMsgTypeDel {
 		return "delete" //nolint
 	} else if u == upfMsgTypeClear {

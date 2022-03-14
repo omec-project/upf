@@ -149,10 +149,9 @@ func (b *bess) sendMsgToUPF(
 
 		switch method {
 		case upfMsgTypeAdd:
-			b.addPDR(ctx, done, pdr)
+			fallthrough
 		case upfMsgTypeMod:
-			log.Error("PDR modifications are not supported yet")
-			return ie.CauseRequestRejected
+			b.addPDR(ctx, done, pdr)
 		case upfMsgTypeDel:
 			b.delPDR(ctx, done, pdr)
 		}
