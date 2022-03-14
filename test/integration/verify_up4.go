@@ -7,6 +7,7 @@ import (
 	"fmt"
 	p4rtc "github.com/antoninbas/p4runtime-go-client/pkg/client"
 	"github.com/antoninbas/p4runtime-go-client/pkg/util/conversion"
+	"github.com/omec-project/upf-epc/internal/p4constants"
 	"github.com/omec-project/upf-epc/test/integration/providers"
 	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/stretchr/testify/require"
@@ -36,6 +37,43 @@ const (
 	ActDownlinkTermFwd        = "PreQosPipe.downlink_term_fwd"
 	ActDownlinkTermFwdNoTC    = "PreQosPipe.downlink_term_fwd_no_tc"
 )
+
+var (
+	tablesNames = p4constants.GetTableIDToNameMap()
+	actionNames = p4constants.GetActionIDToNameMap()
+)
+
+func buildExpectedInterfacesEntries(client *p4rtc.Client, testdata *pfcpSessionData, expectedValues p4RtValues) []*p4_v1.TableEntry {
+	entries := make([]*p4_v1.TableEntry, 0, 2)
+
+	n3Addr, _ := conversion.IpToBinary(testdata.upfN3Address)
+
+	te := client.NewTableEntry(tablesNames[p4constants.TablePreQosPipeInterfaces], []p4rtc.MatchInterface{
+		&p4rtc.LpmMatch{
+			Value: n3Addr,
+			PLen:  32,
+		},
+	}, client.NewTableActionDirect(actionNames[p4constants.ActionPreQosPipeSetSourceIface],
+		[][]byte{{directionUplink}, {srcIfaceAccess}, {testdata.sliceID}}),
+		nil)
+
+	entries = append(entries, te)
+
+	ueAddr, _ := conversion.IpToBinary(expectedValues.ueAddress)
+
+	te = client.NewTableEntry(tablesNames[p4constants.TablePreQosPipeInterfaces], []p4rtc.MatchInterface{
+		&p4rtc.LpmMatch{
+			Value: ueAddr,
+			PLen:  16,
+		},
+	}, client.NewTableActionDirect(actionNames[p4constants.ActionPreQosPipeSetSourceIface],
+		[][]byte{{directionDownlink}, {srcIfaceCore}, {testdata.sliceID}}),
+		nil)
+
+	entries = append(entries, te)
+
+	return entries
+}
 
 func buildExpectedApplicationsEntry(client *p4rtc.Client, testdata *pfcpSessionData, expectedValues p4RtValues) *p4_v1.TableEntry {
 	if expectedValues.appFilter.proto == 0 && len(expectedValues.appFilter.appIP) == 0 &&
@@ -258,7 +296,15 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, expectedVal
 	//	fmt.Sprintf("UP4 should have exactly %v p4RtEntries installed", expectedNumberOfAllEntries),
 	//	allInstalledEntries)
 
-	entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.applications")
+	entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.interfaces")
+	require.Equal(t, 2, len(entries))
+	expectedInterfacesEntries := buildExpectedInterfacesEntries(p4rtClient, testdata, expectedValues)
+	n3addressEntry := expectedInterfacesEntries[0]
+	uePoolEntry := expectedInterfacesEntries[1]
+	require.Contains(t, entries, n3addressEntry)
+	require.Contains(t, entries, uePoolEntry)
+
+	entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.applications")
 	require.Equal(t, expectedApplicationsEntries, len(entries),
 		fmt.Sprintf("PreQosPipe.applications should contain %v entry", expectedApplicationsEntries))
 	if len(entries) > 0 {
@@ -408,8 +454,10 @@ func verifyNoP4RuntimeEntries(t *testing.T, expectedValues p4RtValues) {
 		// FIXME: tunnel_peers and applications are not cleared on session deletion/association release
 		//  See SDFAB-960
 		//  Add tunnel_peers and applications to the list, once fixed
-		"PreQosPipe.sessions_uplink", "PreQosPipe.sessions_downlink",
-		"PreQosPipe.terminations_uplink", "PreQosPipe.terminations_downlink",
+		tablesNames[p4constants.TablePreQosPipeSessionsUplink],
+		tablesNames[p4constants.TablePreQosPipeSessionsDownlink],
+		tablesNames[p4constants.TablePreQosPipeTerminationsUplink],
+		tablesNames[p4constants.TablePreQosPipeTerminationsDownlink],
 	}
 
 	for _, table := range tables {

@@ -13,11 +13,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// grpc channel state.
-const (
-	Ready = 2
-)
-
 // Bits type.
 type Bits uint8
 
