@@ -573,8 +573,7 @@ func (b *bess) endMarkerSendLoop(endMarkerChan chan []byte) {
 }
 
 func (b *bess) notifyListen(reportNotifyChan chan<- uint64) {
-	notifier := NewDownlinkDataNotifier(reportNotifyChan)
-	notifier.SetNotificationInterval(20 * time.Second)
+	notifier := NewDownlinkDataNotifier(reportNotifyChan, 20 * time.Second)
 
 	for {
 		buf := make([]byte, 512)

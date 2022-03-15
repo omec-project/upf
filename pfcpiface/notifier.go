@@ -8,11 +8,6 @@ import (
 	"time"
 )
 
-const (
-	defaultNotificationInterval = 5 * time.Second
-)
-
-// downlinkDataNotifier
 type downlinkDataNotifier struct {
 	notifyChan chan<- uint64
 
@@ -22,15 +17,11 @@ type downlinkDataNotifier struct {
 	state sync.Map
 }
 
-func NewDownlinkDataNotifier(notifyChan chan<- uint64) *downlinkDataNotifier {
+func NewDownlinkDataNotifier(notifyChan chan<- uint64, notificationInterval time.Duration) *downlinkDataNotifier {
 	return &downlinkDataNotifier{
 		notifyChan:           notifyChan,
-		notificationInterval: defaultNotificationInterval,
+		notificationInterval: notificationInterval,
 	}
-}
-
-func (n *downlinkDataNotifier) SetNotificationInterval(interval time.Duration) {
-	n.notificationInterval = interval
 }
 
 // Notify checks if DDN should be generated and sends event to notifyChan.
