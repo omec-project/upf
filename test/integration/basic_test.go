@@ -14,6 +14,12 @@ import (
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
+func init() {
+	if isFastpathUP4() && isModeDocker() {
+		initForwardingPipelineConfig()
+	}
+}
+
 func TestUPFBasedUeIPAllocation(t *testing.T) {
 	setup(t, ConfigUPFBasedIPAllocation)
 	defer teardown(t)
@@ -443,6 +449,9 @@ func testUEAttach(t *testing.T, testcase *testCase) {
 	}
 
 	sess, err := pfcpClient.EstablishSession(pdrs, fars, qers)
+	testcase.expected.pdrs = pdrs
+	testcase.expected.fars = fars
+	testcase.expected.qers = qers
 	require.NoErrorf(t, err, "failed to establish PFCP session")
 	testcase.session = sess
 

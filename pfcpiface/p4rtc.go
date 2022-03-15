@@ -10,6 +10,8 @@ import (
 	"os"
 	"time"
 
+	"google.golang.org/grpc/connectivity"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -116,8 +118,8 @@ func TimeBasedElectionId() p4.Uint128 {
 }
 
 // CheckStatus ... Check client connection status.
-func (c *P4rtClient) CheckStatus() (state int) {
-	return int(c.conn.GetState())
+func (c *P4rtClient) CheckStatus() connectivity.State {
+	return c.conn.GetState()
 }
 
 // SetMastership .. API.
@@ -433,15 +435,28 @@ func (c *P4rtClient) WriteBatchReq(updates []*p4.Update) error {
 
 // GetForwardingPipelineConfig ... Get Pipeline config from switch.
 func (c *P4rtClient) GetForwardingPipelineConfig() (err error) {
-	log.Println("GetForwardingPipelineConfig")
+	getLog := log.WithFields(log.Fields{
+		"device ID": c.deviceID,
+		"conn":      c.conn.Target(),
+	})
+	getLog.Info("Getting ForwardingPipelineConfig from P4Rt device")
 
 	pipeline, err := GetPipelineConfig(c.client, c.deviceID)
 	if err != nil {
-		log.Println("set pipeline config error ", err)
+		getLog.Println("set pipeline config error ", err)
 		return
 	}
 
+	// P4 spec allows for sending successful response to GetForwardingPipelineConfig
+	// without config. We fail in such a case, because the response without config is useless.
+	if pipeline.GetConfig() == nil {
+		return ErrOperationFailedWithReason("GetForwardingPipelineConfig",
+			"Operation successful, but no P4 config provided.")
+	}
+
 	c.P4Info = *pipeline.Config.P4Info
+
+	getLog.Info("Got ForwardingPipelineConfig from P4Rt device")
 
 	return
 }

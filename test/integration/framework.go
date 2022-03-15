@@ -8,12 +8,13 @@ import (
 	"errors"
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim"
 	"github.com/omec-project/upf-epc/pfcpiface"
-	"github.com/omec-project/upf-epc/pkg/bessmock"
+	"github.com/omec-project/upf-epc/pkg/fake_bess"
 	"github.com/omec-project/upf-epc/test/integration/providers"
 	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"github.com/wmnsk/go-pfcp/ie"
 	"io/ioutil"
 	"net"
 	"os"
@@ -51,6 +52,9 @@ const (
 
 	directionUplink   = 0x1
 	directionDownlink = 0x2
+
+	p4InfoPath       = "../../conf/p4/bin/p4info.txt"
+	deviceConfigPath = "../../conf/p4/bin/bmv2.json"
 )
 
 type UEState uint8
@@ -65,7 +69,7 @@ const (
 )
 
 var (
-	// ReaderElectionID use reader election ID so that pfcpiface doesn't loose mastership.
+	// ReaderElectionID use reader election ID so that pfcpiface doesn't lose mastership.
 	ReaderElectionID = p4_v1.Uint128{High: 0, Low: 1}
 )
 
@@ -74,7 +78,7 @@ var (
 	// pfcpAgent instance is used only in the native mode
 	pfcpAgent *pfcpiface.PFCPIface
 
-	bessMock *bessmock.BESSMock
+	bessFake *fake_bess.FakeBESS
 )
 
 type pfcpSessionData struct {
@@ -119,10 +123,14 @@ type appFilter struct {
 }
 
 type p4RtValues struct {
-	tc        uint8
-	ueAddress string
-	appID     uint8
-	appFilter appFilter
+	tc           uint8
+	ueAddress    string
+	appID        uint8
+	appFilter    appFilter
+
+	pdrs []*ie.IE
+	fars []*ie.IE
+	qers []*ie.IE
 }
 
 type testContext struct {
@@ -228,7 +236,7 @@ func waitForPFCPAssociationSetup(pfcpClient *pfcpsim.PFCPClient) error {
 	}
 }
 
-func waitForBESSMockToStart() error {
+func waitForBESSFakeToStart() error {
 	return waitForPortOpen("tcp", "127.0.0.1", "10514")
 }
 
@@ -248,6 +256,19 @@ func isFastpathBESS() bool {
 	return os.Getenv(EnvFastpath) == FastpathBESS
 }
 
+func initForwardingPipelineConfig() {
+	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", ReaderElectionID)
+	if err != nil {
+		panic("Cannot init forwarding pipeline config: " + err.Error())
+	}
+	defer providers.DisconnectP4rt()
+
+	_, err = p4rtClient.SetFwdPipe(deviceConfigPath, p4InfoPath, 0)
+	if err != nil {
+		panic("Cannot init forwarding pipeline config: " + err.Error())
+	}
+}
+
 func setup(t *testing.T, configType uint32) {
 	// TODO: we currently need to reset the DefaultRegisterer between tests, as some leave the
 	// 		 the registry in a bad state. Use custom registries to avoid global state.
@@ -255,16 +276,15 @@ func setup(t *testing.T, configType uint32) {
 
 	switch os.Getenv(EnvFastpath) {
 	case FastpathBESS:
-		bessMock = bessmock.NewBESSMock(":10514", "127.0.0.1")
+		bessFake = fake_bess.NewFakeBESS()
 		go func() {
-			if err := bessMock.Run(); err != nil {
+			if err := bessFake.Run(":10514"); err != nil {
 				panic(err)
 			}
 		}()
 
-		// wait for BESS mock to start, blocking
-		err := waitForBESSMockToStart()
-		require.NoErrorf(t, err, "failed to start BESS mock: %v", err)
+		err := waitForBESSFakeToStart()
+		require.NoErrorf(t, err, "failed to start BESS fake: %v", err)
 	}
 
 	switch os.Getenv(EnvMode) {
@@ -272,7 +292,7 @@ func setup(t *testing.T, configType uint32) {
 		jsonConf, _ := json.Marshal(GetConfig(os.Getenv(EnvFastpath), configType))
 		err := ioutil.WriteFile("./infra/upf.json", jsonConf, os.ModePerm)
 		require.NoError(t, err)
-		providers.RunDockerCommandAttach("pfcpiface",
+		providers.MustRunDockerCommandAttach("pfcpiface",
 			"/bin/pfcpiface -config /config/upf.json")
 	case ModeNative:
 		pfcpAgent = pfcpiface.NewPFCPIface(GetConfig(os.Getenv(EnvFastpath), configType))
@@ -316,8 +336,8 @@ func teardown(t *testing.T) {
 
 	switch os.Getenv(EnvFastpath) {
 	case FastpathBESS:
-		if bessMock != nil {
-			bessMock.Stop()
+		if bessFake != nil {
+			bessFake.Stop()
 		}
 	}
 }
@@ -327,7 +347,7 @@ func verifyEntries(t *testing.T, testdata *pfcpSessionData, expectedValues p4RtV
 	case FastpathUP4:
 		verifyP4RuntimeEntries(t, testdata, expectedValues, ueState)
 	case FastpathBESS:
-		// TODO: implement it
+		verifyBessEntries(t, bessFake, testdata, expectedValues, ueState)
 	}
 }
 
@@ -336,6 +356,6 @@ func verifyNoEntries(t *testing.T, expectedValues p4RtValues) {
 	case FastpathUP4:
 		verifyNoP4RuntimeEntries(t, expectedValues)
 	case FastpathBESS:
-		// TODO: implement it
+		verifyNoBessRuntimeEntries(t, bessFake)
 	}
 }
