@@ -109,7 +109,7 @@ type UP4 struct {
 	p4RtTranslator *P4rtTranslator
 
 	// TODO: create UP4Store object and move these fields there
-	counters           []counter
+	counters []counter
 	// tunnelPeerMu guards concurrent R/W access to tunnel peers,
 	// as tunnel peers are likely to be shared between different UE sessions.
 	tunnelPeerMu       sync.Mutex
