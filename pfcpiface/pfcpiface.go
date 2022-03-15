@@ -44,9 +44,9 @@ func NewPFCPIface(conf Conf) *PFCPIface {
 	}
 
 	if conf.EnableP4rt {
-		pfcpIface.fp = &UP4{}
+		pfcpIface.fp = NewUP4(conf)
 	} else {
-		pfcpIface.fp = &bess{}
+		pfcpIface.fp = NewBESS(conf)
 	}
 
 	httpPort := "8080"

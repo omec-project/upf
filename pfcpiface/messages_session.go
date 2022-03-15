@@ -135,14 +135,14 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 	// session.PacketForwardingRules stores all PFCP rules that has been installed so far,
 	// while 'updated' stores only the PFCP rules that have been provided in this particular message.
-	updated := PacketForwardingRules{
+	created := PacketForwardingRules{
 		pdrs: addPDRs,
 		fars: addFARs,
 		qers: addQERs,
 	}
 
-	cause := upf.sendMsgToUPF(upfMsgTypeAdd, session.PacketForwardingRules, updated)
-	if cause == ie.CauseRequestRejected {
+	err = upf.Create(session, created)
+	if err != nil {
 		pConn.RemoveSession(session.localSEID)
 		return errProcessReply(ErrWriteToFastpath,
 			ie.CauseRequestRejected)
@@ -334,8 +334,8 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		qers: addQERs,
 	}
 
-	cause := upf.sendMsgToUPF(upfMsgTypeMod, session.PacketForwardingRules, updated)
-	if cause == ie.CauseRequestRejected {
+	err := upf.Modify(session, updated)
+	if err != nil {
 		return sendError(ErrWriteToFastpath)
 	}
 
@@ -344,7 +344,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 	}
 
 	if upf.enableEndMarker {
-		err := upf.sendEndMarkers(&endMarkerList)
+		err := upf.SendEndMarkers(&endMarkerList)
 		if err != nil {
 			log.Errorln("Sending End Markers Failed : ", err)
 		}
@@ -402,8 +402,8 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		qers: delQERs,
 	}
 
-	cause = upf.sendMsgToUPF(upfMsgTypeDel, deleted, PacketForwardingRules{})
-	if cause == ie.CauseRequestRejected {
+	err = upf.Remove(session, deleted)
+	if err != nil {
 		return sendError(ErrWriteToFastpath)
 	}
 
@@ -447,8 +447,8 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 		return sendError(ErrNotFoundWithParam("PFCP session", "localSEID", localSEID))
 	}
 
-	cause := upf.sendMsgToUPF(upfMsgTypeDel, session.PacketForwardingRules, PacketForwardingRules{})
-	if cause == ie.CauseRequestRejected {
+	err := upf.RemoveAll(session)
+	if err != nil {
 		return sendError(ErrWriteToFastpath)
 	}
 
@@ -557,14 +557,13 @@ func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) error {
 
 		log.Warnln("context not found, deleting session locally")
 
-		pConn.RemoveSession(seid)
-
-		cause := upf.sendMsgToUPF(
-			upfMsgTypeDel, sessItem.PacketForwardingRules, PacketForwardingRules{})
-		if cause == ie.CauseRequestRejected {
+		err := upf.RemoveAll(sessItem)
+		if err != nil {
 			return errProcess(
 				ErrOperationFailedWithParam("delete session from fastpath", "seid", seid))
 		}
+
+		pConn.RemoveSession(seid)
 
 		return nil
 	}

@@ -74,18 +74,14 @@ const (
 	n9 = 0x2
 )
 
-func (u *upf) isConnected() bool {
-	return u.fastPath.isConnected(&u.accessIP)
-}
-
-func (u *upf) addSliceInfo(sliceInfo *SliceInfo) error {
+func (u *upf) SetSliceConfig(sliceInfo *SliceInfo) error {
 	if sliceInfo == nil {
 		return ErrInvalidArgument("sliceInfo", sliceInfo)
 	}
 
 	u.sliceInfo = sliceInfo
 
-	return u.fastPath.addSliceInfo(sliceInfo)
+	return u.fastPath.SetSliceConfig(sliceInfo)
 }
 
 func NewUPF(conf *Conf, fp fastPath) *upf {

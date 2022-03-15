@@ -80,7 +80,12 @@ type bess struct {
 	qciQosMap        map[uint8]*QosConfigVal
 }
 
-func (b *bess) isConnected(accessIP *net.IP) bool {
+func NewBESS(conf Conf) *bess {
+	bess := &bess{}
+	return bess
+}
+
+func (b *bess) IsConnected() bool {
 	if (b.conn == nil) || (b.conn.GetState() != connectivity.Ready) {
 		return false
 	}
@@ -116,6 +121,18 @@ func (b *bess) addSliceInfo(sliceInfo *SliceInfo) error {
 		log.Errorln("Unable to make GRPC calls")
 	}
 
+	return nil
+}
+
+func (b *bess) CreateSession(session *PFCPSession) error {
+	return nil
+}
+
+func (b *bess) ModifySession(session *PFCPSession) error {
+	return nil
+}
+
+func (b *bess) RemoveSession(session *PFCPSession) error {
 	return nil
 }
 
@@ -191,7 +208,7 @@ func (b *bess) sendMsgToUPF(
 	return cause
 }
 
-func (b *bess) exit() {
+func (b *bess) Exit() {
 	log.Println("Exit function Bess")
 	b.conn.Close()
 }

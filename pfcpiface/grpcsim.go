@@ -259,10 +259,14 @@ func (u *upf) sim(mode simMode, s *SimModeInfo) {
 			qers: qers,
 		}
 
+		session := &PFCPSession{
+			PacketForwardingRules: allRules,
+		}
+
 		if mode.create() {
-			u.sendMsgToUPF(upfMsgTypeAdd, allRules, PacketForwardingRules{})
+			u.Create(session, allRules)
 		} else if mode.delete() {
-			u.sendMsgToUPF(upfMsgTypeDel, allRules, PacketForwardingRules{})
+			u.RemoveAll(session)
 		} else {
 			log.Fatalln("Unsupported method", mode)
 		}

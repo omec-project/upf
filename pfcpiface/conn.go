@@ -55,7 +55,7 @@ type PFCPConn struct {
 	sessions   map[uint64]*PFCPSession
 	nodeID     nodeID
 	upf        *upf
-	// channel to signal PFCPNode on exit
+	// channel to signal PFCPNode on Exit
 	done     chan<- string
 	shutdown chan struct{}
 
@@ -239,7 +239,11 @@ func (pConn *PFCPConn) Shutdown() {
 
 	// Cleanup all sessions in this conn
 	for seid, sess := range pConn.sessions {
-		pConn.upf.sendMsgToUPF(upfMsgTypeDel, sess.PacketForwardingRules, PacketForwardingRules{})
+		if err := pConn.upf.RemoveAll(sess); err != nil {
+			log.WithFields(log.Fields{
+				"session": sess,
+			}).Errorf("Failed to remove PFCP session state from fastpath: %v", err)
+		}
 		pConn.RemoveSession(seid)
 	}
 

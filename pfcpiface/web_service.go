@@ -148,7 +148,7 @@ func handleSliceConfig(nwSlice *NetworkSlice, upf *upf) {
 		}
 	}
 
-	err := upf.addSliceInfo(&sliceInfo)
+	err := upf.SetSliceConfig(&sliceInfo)
 	if err != nil {
 		log.Errorln("adding slice info to fastpath failed : ", err)
 	}

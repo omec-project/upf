@@ -147,7 +147,7 @@ func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (messa
 	asres := message.NewAssociationSetupResponse(asreq.SequenceNumber,
 		pConn.associationIEs()...)
 
-	if !upf.isConnected() {
+	if !upf.IsConnected() {
 		asres.Cause = ie.NewCause(ie.CauseRequestRejected)
 		return asres, errProcess(errFastpathDown)
 	}

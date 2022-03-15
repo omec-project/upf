@@ -74,6 +74,11 @@ type meter struct {
 	downlinkCellID uint32
 }
 
+func (m meter) String() string {
+	return fmt.Sprintf("Meter(type=%d, uplinkCellID=%d, downlinkCellID=%d)",
+		m.meterType, m.uplinkCellID, m.downlinkCellID)
+}
+
 type UP4 struct {
 	conf P4rtcInfo
 
@@ -122,9 +127,8 @@ type UP4 struct {
 	endMarkerChan    chan []byte
 }
 
-func (m meter) String() string {
-	return fmt.Sprintf("Meter(type=%d, uplinkCellID=%d, downlinkCellID=%d)",
-		m.meterType, m.uplinkCellID, m.downlinkCellID)
+func NewUP4(conf Conf) *UP4 {
+	return &UP4{}
 }
 
 func (up4 *UP4) addSliceInfo(sliceInfo *SliceInfo) error {
@@ -187,7 +191,7 @@ func (up4 *UP4) getCounterVal(counterID uint8) (uint64, error) {
 	return 0, ErrOperationFailedWithParam("counter allocation", "final val", val)
 }
 
-func (up4 *UP4) exit() {
+func (up4 *UP4) Exit() {
 	log.Println("Exit function P4rtc")
 }
 
@@ -304,10 +308,9 @@ func (up4 *UP4) initApplicationIDs() {
 	}
 }
 
-// This function ensures that PFCP Agent is connected to UP4.
+// IsConnected ensures that PFCP Agent is connected to UP4.
 // Returns true if the connection is already established.
-// FIXME: the argument should be removed from fastpath API
-func (up4 *UP4) isConnected(accessIP *net.IP) bool {
+func (up4 *UP4) IsConnected() bool {
 	up4.connectedMu.Lock()
 	defer up4.connectedMu.Unlock()
 
@@ -379,7 +382,7 @@ func (up4 *UP4) tryConnect() error {
 	up4.tryConnectMu.Lock()
 	defer up4.tryConnectMu.Unlock()
 
-	if up4.isConnected(nil) {
+	if up4.IsConnected() {
 		return nil
 	}
 
@@ -463,7 +466,7 @@ func (up4 *UP4) listenToDDNs() {
 	log.Info("Listening to Data Notifications from UP4..")
 
 	for {
-		if up4.isConnected(nil) {
+		if up4.IsConnected() {
 			// blocking
 			digestData := up4.p4client.GetNextDigestData()
 
@@ -1232,6 +1235,18 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 		}
 	}
 
+	return nil
+}
+
+func (up4 *UP4) CreateSession(session *PFCPSession) error {
+	return nil
+}
+
+func (up4 *UP4) ModifySession(session *PFCPSession) error {
+	return nil
+}
+
+func (up4 *UP4) RemoveSession(session *PFCPSession) error {
 	return nil
 }
 

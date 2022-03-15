@@ -22,7 +22,7 @@ type PFCPNode struct {
 	net.PacketConn
 	// done is closed to signal shutdown complete
 	done chan struct{}
-	// channel for PFCPConn to signal exit by sending their remote address
+	// channel for PFCPConn to signal Exit by sending their remote address
 	pConnDone chan string
 	// map of existing connections
 	pConns map[string]*PFCPConn
@@ -148,7 +148,7 @@ func (node *PFCPNode) Serve() {
 			close(node.pConnDone)
 			log.Infoln("Done waiting for PFCPConn completions")
 
-			node.upf.exit()
+			node.upf.Exit()
 		}
 	}
 
