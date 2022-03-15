@@ -462,7 +462,7 @@ func (up4 *UP4) initInterfaces() error {
 func (up4 *UP4) listenToDDNs() {
 	log.Info("Listening to Data Notifications from UP4..")
 
-	notifier := NewDownlinkDataNotifier(up4.reportNotifyChan, 20 * time.Second)
+	notifier := NewDownlinkDataNotifier(up4.reportNotifyChan, 20*time.Second)
 
 	for {
 		if up4.isConnected(nil) {
