@@ -76,7 +76,8 @@ type meter struct {
 
 type tunnelPeer struct {
 	id uint8
-	// refCount list of F-SEIDs (UE sessions) using this tunnel peer
+	// refCount keeps track of F-SEIDs (UE sessions) using this tunnel peer.
+	// It's implemented as Set to avoid duplicated F-SEIDs.
 	refCount set.Set
 }
 
@@ -109,6 +110,9 @@ type UP4 struct {
 
 	// TODO: create UP4Store object and move these fields there
 	counters           []counter
+	// tunnelPeerMu guards concurrent R/W access to tunnel peers,
+	// as tunnel peers are likely to be shared between different UE sessions.
+	tunnelPeerMu       sync.Mutex
 	tunnelPeerIDs      map[tunnelParams]tunnelPeer
 	tunnelPeerIDsPool  []uint8
 	applicationIDs     map[application]uint8
@@ -562,7 +566,7 @@ func findRelatedApplicationQER(pdr pdr, qers []qer) (qer, error) {
 }
 
 // Returns error if we reach maximum supported GTP Tunnel Peers.
-func (up4 *UP4) allocateGTPTunnelPeerID() (uint8, error) {
+func (up4 *UP4) unsafeAllocateGTPTunnelPeerID() (uint8, error) {
 	if len(up4.tunnelPeerIDsPool) == 0 {
 		return 0, ErrOperationFailedWithReason("allocate GTP Tunnel Peer ID",
 			"no free tunnel peer IDs available")
@@ -580,7 +584,7 @@ func (up4 *UP4) allocateGTPTunnelPeerID() (uint8, error) {
 	return allocated, nil
 }
 
-func (up4 *UP4) releaseAllocatedGTPTunnelPeer(tunnelParams tunnelParams) {
+func (up4 *UP4) unsafeReleaseAllocatedGTPTunnelPeer(tunnelParams tunnelParams) {
 	allocated, exists := up4.tunnelPeerIDs[tunnelParams]
 	if exists {
 		delete(up4.tunnelPeerIDs, tunnelParams)
@@ -594,7 +598,19 @@ func (up4 *UP4) releaseAllocatedGTPTunnelPeer(tunnelParams tunnelParams) {
 	}
 }
 
+func (up4 *UP4) getGTPTunnelPeer(tnlParams tunnelParams) (tunnelPeer, bool) {
+	up4.tunnelPeerMu.Lock()
+	defer up4.tunnelPeerMu.Unlock()
+
+	tnlPeer, exists := up4.tunnelPeerIDs[tnlParams]
+
+	return tnlPeer, exists
+}
+
 func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
+	up4.tunnelPeerMu.Lock()
+	defer up4.tunnelPeerMu.Unlock()
+
 	var tnlPeer tunnelPeer
 
 	methodType := p4.Update_MODIFY
@@ -606,7 +622,7 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
 
 	tnlPeer, exists := up4.tunnelPeerIDs[tunnelParams]
 	if !exists {
-		newID, err := up4.allocateGTPTunnelPeerID()
+		newID, err := up4.unsafeAllocateGTPTunnelPeerID()
 		if err != nil {
 			return err
 		}
@@ -625,7 +641,7 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
 
 	releaseTnlPeerID := func() {
 		if !exists {
-			up4.releaseAllocatedGTPTunnelPeer(tunnelParams)
+			up4.unsafeReleaseAllocatedGTPTunnelPeer(tunnelParams)
 		}
 	}
 
@@ -646,6 +662,9 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
 }
 
 func (up4 *UP4) removeGTPTunnelPeer(far far) {
+	up4.tunnelPeerMu.Lock()
+	defer up4.tunnelPeerMu.Unlock()
+
 	removeLog := log.WithFields(log.Fields{
 		"far": far,
 	})
@@ -685,7 +704,7 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 		removeLog.Error("failed to remove GTP tunnel peer")
 	}
 
-	up4.releaseAllocatedGTPTunnelPeer(tunnelParams)
+	up4.unsafeReleaseAllocatedGTPTunnelPeer(tunnelParams)
 }
 
 // Returns error if we reach maximum supported Application IDs.
@@ -1156,7 +1175,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 			tunnelPort:   far.tunnelPort,
 		}
 
-		tunnelPeerID, exists := up4.tunnelPeerIDs[tunnelParams]
+		tunnelPeerID, exists := up4.getGTPTunnelPeer(tunnelParams)
 		if !exists && far.tunnelTEID != 0 {
 			return ErrNotFoundWithParam("allocated GTP tunnel peer ID", "tunnel params", tunnelParams)
 		}
