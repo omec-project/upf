@@ -73,8 +73,9 @@ func UP4ConfigDefault() pfcpiface.Conf {
 		P4rtcServer: up4Server,
 		P4rtcPort:   "50001",
 		QFIToTC: map[uint8]uint8{
-			8: 3,
+			8: 2,
 		},
+		DefaultTC: 3,
 	}
 
 	config.CPIface = pfcpiface.CPIfaceInfo{

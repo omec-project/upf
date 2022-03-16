@@ -139,7 +139,7 @@ func (up4 *UP4) addSliceInfo(sliceInfo *SliceInfo) error {
 		sliceBurstBytes = sliceInfo.dlBurstBytes
 	}
 
-	meterCellId := uint32((up4.conf.SliceID << 2) + (up4.conf.DefaultTc & 0b11))
+	meterCellId := uint32((up4.conf.SliceID << 2) + (up4.conf.DefaultTC & 0b11))
 	meterConfig := p4.MeterConfig{
 		Cir:    int64(0),
 		Cburst: int64(0),
@@ -1224,7 +1224,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 
 		tc, exists := up4.conf.QFIToTC[relatedQER.qfi]
 		if !exists {
-			tc = up4.conf.DefaultTc
+			tc = up4.conf.DefaultTC
 		}
 
 		terminationsEntry, err := up4.p4RtTranslator.BuildTerminationsTableEntry(pdr, appMeter, far,
