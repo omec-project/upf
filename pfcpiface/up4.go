@@ -138,6 +138,7 @@ func (up4 *UP4) addSliceInfo(sliceInfo *SliceInfo) error {
 		sliceMbr = sliceInfo.downlinkMbr
 		sliceBurstBytes = sliceInfo.dlBurstBytes
 	}
+
 	meterCellId := uint32((up4.conf.SliceID << 2) + (up4.conf.DefaultTc & 0b11))
 	meterConfig := p4.MeterConfig{
 		Cir:    int64(0),
@@ -146,13 +147,17 @@ func (up4 *UP4) addSliceInfo(sliceInfo *SliceInfo) error {
 		Pburst: int64(sliceBurstBytes),
 	}
 	sliceMeterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.MeterPreQosPipeSliceTcMeter, meterCellId, &meterConfig)
+
 	log.WithFields(log.Fields{
 		"Slice meter entry": sliceMeterEntry,
 	}).Debug("Installing slice P4 Meter entry")
+
 	err := up4.p4client.ApplyMeterEntries(p4.Update_MODIFY, sliceMeterEntry)
+
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
