@@ -229,7 +229,7 @@ func generateConstants(p4info *p4ConfigV1.P4Info) string {
 		for _, member := range value.GetMembers() {
 			name := eName + "_" + member.GetName()
 			if len(member.GetValue()) > 4 {
-				log.Errorln("Enumerator cannot fit in Uint32")
+				log.Errorln(name, " cannot fit in Uint32")
 				continue
 			}
 			constBuilder.WriteString(emitEntityConstant(enumVarPrefix, name, getUint32FromByteArray(member.GetValue())))

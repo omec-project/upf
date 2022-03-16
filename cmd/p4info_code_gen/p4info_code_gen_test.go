@@ -115,6 +115,18 @@ type_info {
 		  }
 		}
 	}
+	serializable_enums {
+		key: "Fake"
+		value {
+				underlying_type {
+				bitwidth: 48
+		  }
+		  members {
+				name: "FAKE"
+				value: "aaaaaa"
+		  }
+		}
+	}
 }
 `
 
@@ -280,6 +292,18 @@ func Test_generator(t *testing.T) {
 				ID:   3,
 				name: "EnumTrafficClassElastic",
 			},
+		},
+		{
+			name: "verify serializable enumerator non parsable",
+			args: &args{
+				p4config: mustGetP4Config(p4infoPath),
+				genType:  constant,
+			},
+			want: &want{
+				ID:   0,
+				name: "EnumFakeFake",
+			},
+			wantErr: true,
 		},
 	}
 
