@@ -111,6 +111,10 @@ const (
 	MeterPreQosPipeSliceTcMeter     uint32 = 336833095
 	MeterSizePreQosPipeSliceTcMeter uint64 = 64
 	// Enumerators
+	EnumDirectionUnknown       uint32 = 0
+	EnumDirectionUplink        uint32 = 1
+	EnumDirectionDownlink      uint32 = 2
+	EnumDirectionOther         uint32 = 3
 	EnumInterfaceTypeUnknown   uint32 = 0
 	EnumInterfaceTypeAccess    uint32 = 1
 	EnumInterfaceTypeCore      uint32 = 2
@@ -118,10 +122,6 @@ const (
 	EnumTrafficClassControl    uint32 = 1
 	EnumTrafficClassRealTime   uint32 = 2
 	EnumTrafficClassElastic    uint32 = 3
-	EnumDirectionUnknown       uint32 = 0
-	EnumDirectionUplink        uint32 = 1
-	EnumDirectionDownlink      uint32 = 2
-	EnumDirectionOther         uint32 = 3
 )
 
 func GetTableIDToNameMap() map[uint32]string {
