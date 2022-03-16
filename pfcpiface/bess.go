@@ -658,7 +658,7 @@ func (b *bess) clearState() {
 	}
 }
 
-// setUpfInfo is only initialized at pfcp-agent's startup
+// setUpfInfo is only called at pfcp-agent's startup
 // it clears all the state in BESS
 func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 	var err error
