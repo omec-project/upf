@@ -145,7 +145,7 @@ func (b *bess) sendMsgToUPF(
 	done := make(chan bool)
 
 	for _, pdr := range pdrs {
-		log.Traceln(pdr)
+		log.Traceln(method, pdr)
 
 		switch method {
 		case upfMsgTypeAdd:
@@ -158,7 +158,7 @@ func (b *bess) sendMsgToUPF(
 	}
 
 	for _, far := range fars {
-		log.Traceln(far)
+		log.Traceln(method, far)
 
 		switch method {
 		case upfMsgTypeAdd:
@@ -171,7 +171,7 @@ func (b *bess) sendMsgToUPF(
 	}
 
 	for _, qer := range qers {
-		log.Traceln("qer:", qer)
+		log.Traceln(method, qer)
 
 		switch method {
 		case upfMsgTypeAdd:
