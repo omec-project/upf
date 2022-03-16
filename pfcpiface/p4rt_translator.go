@@ -45,9 +45,6 @@ const (
 
 	DefaultPriority      = 0
 	DefaultApplicationID = 0
-	// NoTC assuming bit<2> type of TC in UP4,
-	// it's safe to use 255 as "unspecified TC" value
-	NoTC = 255
 )
 
 type tunnelParams struct {
@@ -677,20 +674,13 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, appMeterIdx uint3
 		action = &p4.Action{
 			ActionId: p4constants.ActionPreQosPipeUplinkTermDrop,
 		}
-	} else if !shouldDrop && tc != NoTC {
+	} else {
 		action = &p4.Action{
 			ActionId: p4constants.ActionPreQosPipeUplinkTermFwd,
 		}
 
 		if err := t.withActionParam(action, FieldTrafficClass, tc); err != nil {
 			return nil, err
-		}
-		if err := t.withActionParam(action, FieldAppMeterIndex, appMeterIdx); err != nil {
-			return nil, err
-		}
-	} else {
-		action = &p4.Action{
-			ActionId: p4constants.ActionPreQosPipeUplinkTermFwdNoTc,
 		}
 		if err := t.withActionParam(action, FieldAppMeterIndex, appMeterIdx); err != nil {
 			return nil, err
@@ -743,7 +733,7 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uin
 		action = &p4.Action{
 			ActionId: p4constants.ActionPreQosPipeDownlinkTermDrop,
 		}
-	} else if !shouldDrop && tc != NoTC {
+	} else {
 		action = &p4.Action{
 			ActionId: p4constants.ActionPreQosPipeDownlinkTermFwd,
 		}
@@ -757,22 +747,6 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uin
 		}
 
 		if err := t.withActionParam(action, FieldTrafficClass, tc); err != nil {
-			return nil, err
-		}
-
-		if err := t.withActionParam(action, FieldAppMeterIndex, appMeterIdx); err != nil {
-			return nil, err
-		}
-	} else {
-		action = &p4.Action{
-			ActionId: p4constants.ActionPreQosPipeDownlinkTermFwdNoTc,
-		}
-
-		if err := t.withActionParam(action, FieldTEID, relatedFAR.tunnelTEID); err != nil {
-			return nil, err
-		}
-
-		if err := t.withActionParam(action, FieldQFI, qfi); err != nil {
 			return nil, err
 		}
 

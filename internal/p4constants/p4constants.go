@@ -57,10 +57,8 @@ const (
 	ActionPreQosPipeSetSessionDownlink     uint32 = 21848329
 	ActionPreQosPipeSetSessionDownlinkDrop uint32 = 20229579
 	ActionPreQosPipeSetSessionDownlinkBuff uint32 = 20249483
-	ActionPreQosPipeUplinkTermFwdNoTc      uint32 = 21760615
 	ActionPreQosPipeUplinkTermFwd          uint32 = 28305359
 	ActionPreQosPipeUplinkTermDrop         uint32 = 20977365
-	ActionPreQosPipeDownlinkTermFwdNoTc    uint32 = 26185804
 	ActionPreQosPipeDownlinkTermFwd        uint32 = 32699713
 	ActionPreQosPipeDownlinkTermDrop       uint32 = 31264233
 	ActionPreQosPipeSetAppId               uint32 = 23010411
@@ -79,16 +77,10 @@ const (
 	ActionParamPreQosPipeSetSessionDownlinkTunnelPeerId        uint32 = 1
 	ActionParamPreQosPipeSetSessionDownlinkSessionMeterIdx     uint32 = 2
 	ActionParamPreQosPipeSetSessionDownlinkBuffSessionMeterIdx uint32 = 1
-	ActionParamPreQosPipeUplinkTermFwdNoTcCtrIdx               uint32 = 1
-	ActionParamPreQosPipeUplinkTermFwdNoTcAppMeterIdx          uint32 = 2
 	ActionParamPreQosPipeUplinkTermFwdCtrIdx                   uint32 = 1
 	ActionParamPreQosPipeUplinkTermFwdTc                       uint32 = 2
 	ActionParamPreQosPipeUplinkTermFwdAppMeterIdx              uint32 = 3
 	ActionParamPreQosPipeUplinkTermDropCtrIdx                  uint32 = 1
-	ActionParamPreQosPipeDownlinkTermFwdNoTcCtrIdx             uint32 = 1
-	ActionParamPreQosPipeDownlinkTermFwdNoTcTeid               uint32 = 2
-	ActionParamPreQosPipeDownlinkTermFwdNoTcQfi                uint32 = 3
-	ActionParamPreQosPipeDownlinkTermFwdNoTcAppMeterIdx        uint32 = 4
 	ActionParamPreQosPipeDownlinkTermFwdCtrIdx                 uint32 = 1
 	ActionParamPreQosPipeDownlinkTermFwdTeid                   uint32 = 2
 	ActionParamPreQosPipeDownlinkTermFwdQfi                    uint32 = 3
@@ -116,6 +108,20 @@ const (
 	MeterSizePreQosPipeAppMeter     uint64 = 1024
 	MeterPreQosPipeSessionMeter     uint32 = 347593234
 	MeterSizePreQosPipeSessionMeter uint64 = 1024
+	MeterPreQosPipeSliceTcMeter     uint32 = 336833095
+	MeterSizePreQosPipeSliceTcMeter uint64 = 64
+	// Enumerators
+	EnumInterfaceTypeUnknown   uint32 = 0
+	EnumInterfaceTypeAccess    uint32 = 1
+	EnumInterfaceTypeCore      uint32 = 2
+	EnumTrafficClassBestEffort uint32 = 0
+	EnumTrafficClassControl    uint32 = 1
+	EnumTrafficClassRealTime   uint32 = 2
+	EnumTrafficClassElastic    uint32 = 3
+	EnumDirectionUnknown       uint32 = 0
+	EnumDirectionUplink        uint32 = 1
+	EnumDirectionDownlink      uint32 = 2
+	EnumDirectionOther         uint32 = 3
 )
 
 func GetTableIDToNameMap() map[uint32]string {
@@ -165,10 +171,8 @@ func GetActionIDToNameMap() map[uint32]string {
 		21848329: "PreQosPipe.set_session_downlink",
 		20229579: "PreQosPipe.set_session_downlink_drop",
 		20249483: "PreQosPipe.set_session_downlink_buff",
-		21760615: "PreQosPipe.uplink_term_fwd_no_tc",
 		28305359: "PreQosPipe.uplink_term_fwd",
 		20977365: "PreQosPipe.uplink_term_drop",
-		26185804: "PreQosPipe.downlink_term_fwd_no_tc",
 		32699713: "PreQosPipe.downlink_term_fwd",
 		31264233: "PreQosPipe.downlink_term_drop",
 		23010411: "PreQosPipe.set_app_id",
@@ -195,10 +199,8 @@ func GetActionIDList() []uint32 {
 		21848329,
 		20229579,
 		20249483,
-		21760615,
 		28305359,
 		20977365,
-		26185804,
 		32699713,
 		31264233,
 		23010411,
@@ -250,6 +252,7 @@ func GetMeterIDToNameMap() map[uint32]string {
 	return map[uint32]string{
 		338231090: "PreQosPipe.app_meter",
 		347593234: "PreQosPipe.session_meter",
+		336833095: "PreQosPipe.slice_tc_meter",
 	}
 }
 
@@ -257,6 +260,7 @@ func GetMeterIDList() []uint32 {
 	return []uint32{
 		338231090,
 		347593234,
+		336833095,
 	}
 }
 

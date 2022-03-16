@@ -4,8 +4,10 @@
 package main
 
 import (
+	"encoding/binary"
 	"flag"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -43,6 +45,7 @@ const (
 	packetmetaVarPrefix = "PacketMeta_"
 	mtrVarPrefix        = "Meter_"
 	mtrSizeVarPrefix    = "MeterSize_"
+	enumVarPrefix       = "Enum_"
 )
 
 func emitEntityConstant(prefix string, p4EntityName string, id uint32) string {
@@ -220,9 +223,28 @@ func generateConstants(p4info *p4ConfigV1.P4Info) string {
 		constBuilder.WriteString(emitEntitySizeConstant(mtrSizeVarPrefix, name, element.GetSize()))
 	}
 
+	// Enums
+	constBuilder.WriteString("// Enumerators\n")
+	for eName, value := range p4info.GetTypeInfo().GetSerializableEnums() {
+		for _, member := range value.GetMembers() {
+			name := eName + "_" + member.GetName()
+			if len(member.GetValue()) > 4 {
+				log.Errorln("Enumerator cannot fit in Uint32")
+				continue
+			}
+			constBuilder.WriteString(emitEntityConstant(enumVarPrefix, name, getUint32FromByteArray(member.GetValue())))
+		}
+	}
+
 	constBuilder.WriteString(constOrVarClose + "\n")
 
 	return constBuilder.String()
+}
+
+func getUint32FromByteArray(s []byte) uint32 {
+	var b [4]byte
+	copy(b[4-len(s):], s)
+	return binary.BigEndian.Uint32(b[:])
 }
 
 func mustGetP4Config(p4infopath string) *p4ConfigV1.P4Info {

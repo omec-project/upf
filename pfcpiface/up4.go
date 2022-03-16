@@ -128,7 +128,31 @@ func (m meter) String() string {
 }
 
 func (up4 *UP4) addSliceInfo(sliceInfo *SliceInfo) error {
-	log.Errorln("Slice Info not supported in P4")
+	//FIXME: UP4 currently supports a single slice meter rate common between UL and DL traffic. For this reason, we
+	//  configure the meter with the largest slice MBR between UL and DL.
+	var sliceMbr, sliceBurstBytes uint64
+	if sliceInfo.uplinkMbr > sliceInfo.downlinkMbr {
+		sliceMbr = sliceInfo.uplinkMbr
+		sliceBurstBytes = sliceInfo.ulBurstBytes
+	} else {
+		sliceMbr = sliceInfo.downlinkMbr
+		sliceBurstBytes = sliceInfo.dlBurstBytes
+	}
+	meterCellId := uint32((up4.conf.SliceID << 2) + (up4.conf.DefaultTc & 0b11))
+	meterConfig := p4.MeterConfig{
+		Cir:    int64(0),
+		Cburst: int64(0),
+		Pir:    int64(sliceMbr),
+		Pburst: int64(sliceBurstBytes),
+	}
+	sliceMeterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.MeterPreQosPipeSliceTcMeter, meterCellId, &meterConfig)
+	log.WithFields(log.Fields{
+		"Slice meter entry": sliceMeterEntry,
+	}).Debug("Installing slice P4 Meter entry")
+	err := up4.p4client.ApplyMeterEntries(p4.Update_MODIFY, sliceMeterEntry)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -1195,7 +1219,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 
 		tc, exists := up4.conf.QFIToTC[relatedQER.qfi]
 		if !exists {
-			tc = NoTC
+			tc = up4.conf.DefaultTc
 		}
 
 		terminationsEntry, err := up4.p4RtTranslator.BuildTerminationsTableEntry(pdr, appMeter, far,

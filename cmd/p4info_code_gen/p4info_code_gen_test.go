@@ -90,6 +90,32 @@ counters {
   }
   size: 1024
 }
+type_info {
+	serializable_enums {
+		key: "TrafficClass"
+		value {
+				underlying_type {
+				bitwidth: 2
+		  }
+		  members {
+				name: "BEST_EFFORT"
+				value: "\000"
+		  }
+		  members {
+				name: "CONTROL"
+				value: "\001"
+		  }
+		  members {
+				name: "REAL_TIME"
+				value: "\002"
+		  }
+		  members {
+				name: "ELASTIC"
+				value: "\003"
+		  }
+		}
+	}
+}
 `
 
 func mustWriteStringToDisk(s string, path string) {
@@ -243,6 +269,17 @@ func Test_generator(t *testing.T) {
 				name: "test",
 			},
 			wantErr: true,
+		},
+		{
+			name: "verify serializable enumerator",
+			args: &args{
+				p4config: mustGetP4Config(p4infoPath),
+				genType:  constant,
+			},
+			want: &want{
+				ID:   3,
+				name: "EnumTrafficClassElastic",
+			},
 		},
 	}
 
