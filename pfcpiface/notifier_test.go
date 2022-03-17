@@ -12,7 +12,7 @@ import (
 
 func Test_downlinkDataNotifier_Notify(t *testing.T) {
 	ch := make(chan<- uint64, 1024)
-	n := NewDownlinkDataNotifier(ch, 5 * time.Second)
+	n := NewDownlinkDataNotifier(ch, 5*time.Second)
 
 	testFSEID := uint64(0x1)
 
@@ -26,7 +26,7 @@ func Test_downlinkDataNotifier_Notify(t *testing.T) {
 func Test_downlinkDataNotifier_shouldNotify(t *testing.T) {
 	t.Run("single F-SEID check rate limiting", func(t *testing.T) {
 		ch := make(chan<- uint64, 1024)
-		n := NewDownlinkDataNotifier(ch, 5 * time.Second)
+		n := NewDownlinkDataNotifier(ch, 5*time.Second)
 		testFSEID := uint64(0x1)
 
 		got := n.shouldNotify(testFSEID)
@@ -52,7 +52,7 @@ func Test_downlinkDataNotifier_shouldNotify(t *testing.T) {
 
 	t.Run("multiple F-SEIDs check rate limiting", func(t *testing.T) {
 		ch := make(chan<- uint64, 1024)
-		n := NewDownlinkDataNotifier(ch, 5 * time.Second)
+		n := NewDownlinkDataNotifier(ch, 5*time.Second)
 
 		// generate 100k unique F-SEIDs
 		testFSEIDs := make([]uint64, 0)
