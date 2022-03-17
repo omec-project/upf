@@ -6,7 +6,7 @@ Copyright 2022 Open Networking Foundation
 
 ## Testing local Go dependencies
 
-The `upf-epc` repository relies on some external Go dependencies, which are not mature yet (e.g. pfcpsim or p4runtime-go-client).
+The `upf` repository relies on some external Go dependencies, which are not mature yet (e.g. pfcpsim or p4runtime-go-client).
 It's often needed to extend those dependencies first, before adding a new feature to the PFCP Agent. However, when using Go modules and Dockerized environment,
 it's hard to test WIP changes to local dependencies. Therefore, this repository come up with a way to use Go vendoring, instead of Go modules, for development purposes.
 
@@ -25,5 +25,5 @@ DOCKER_BUILD_ARGS="--build-arg GOFLAGS=-mod=vendor" make docker-build
 To run E2E integration tests with the local dependency:
 
 ```
-DOCKER_BUILD_ARGS="--build-arg GOFLAGS=-mod=vendor" make test-up4-integration 
+DOCKER_BUILD_ARGS="--build-arg GOFLAGS=-mod=vendor" make test-up4-integration
 ```
