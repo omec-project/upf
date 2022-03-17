@@ -6,10 +6,11 @@ package pfcpiface
 import (
 	"context"
 	"errors"
-	reuse "github.com/libp2p/go-reuseport"
-	log "github.com/sirupsen/logrus"
 	"net"
 	"sync"
+
+	reuse "github.com/libp2p/go-reuseport"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/omec-project/upf-epc/pfcpiface/metrics"
 )
@@ -138,25 +139,24 @@ func (node *PFCPNode) Serve() {
 				log.Errorln("Error closing PFCPNode conn", err)
 			}
 
-
 			// Clear out the remaining pconn completions
-clearLoop:
+		clearLoop:
 			for {
 				select {
-				case rAddr, ok := <- node.pConnDone: {
-					if !ok {
-						// channel is closed, break
-						break clearLoop
+				case rAddr, ok := <-node.pConnDone:
+					{
+						if !ok {
+							// channel is closed, break
+							break clearLoop
+						}
+						node.pConns.Delete(rAddr)
+						log.Infoln("Removed connection to", rAddr)
 					}
-					node.pConns.Delete(rAddr)
-					log.Infoln("Removed connection to", rAddr)
-				}
 				default:
 					// nothing to read from channel
 					break clearLoop
 				}
 			}
-
 
 			if len(node.pConnDone) > 0 {
 				for rAddr := range node.pConnDone {
