@@ -19,7 +19,7 @@ jobs:
         with:
           # NOTE: at now only orgs is supported
           owner: omec-project
-          name: upf-epc/${{ matrix.package }}
+          name: upf/${{ matrix.package }}
           # NOTE: using Personal Access Token
           token: ${{ secrets.CR_PAT }}
           untagged-keep-latest: 1
