@@ -99,7 +99,7 @@ ENTRYPOINT ["bessd", "-f"]
 
 # Stage build bess golang pb
 FROM golang AS protoc-gen
-RUN go get github.com/golang/protobuf/protoc-gen-go
+RUN go install github.com/golang/protobuf/protoc-gen-go@latest
 
 FROM bess-deps AS go-pb
 COPY --from=protoc-gen /go/bin/protoc-gen-go /bin
