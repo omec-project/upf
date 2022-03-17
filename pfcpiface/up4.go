@@ -74,16 +74,23 @@ type meter struct {
 	downlinkCellID uint32
 }
 
+// tnlPeerReference <F-SEIDs (UE sessions); FAR-ID> pair that
+// uniquely identifies tunnel peer among different FAR IEs of the same UE session.
+type tnlPeerReference struct {
+	fseid uint64
+	farID uint32
+}
+
 type tunnelPeer struct {
 	id uint8
-	// refCount keeps track of F-SEIDs (UE sessions) using this tunnel peer.
+	// usedBy keeps track of <F-SEIDs (UE sessions); FAR-ID> pairs using this tunnel peer.
 	// It's implemented as Set to avoid duplicated F-SEIDs.
-	refCount set.Set
+	usedBy set.Set
 }
 
 func (t tunnelPeer) String() string {
-	return fmt.Sprintf("TunnelPeer{id=%d, refCount=%d, referencing F-SEIDs=%v}",
-		t.id, t.refCount.Cardinality(), t.refCount)
+	return fmt.Sprintf("TunnelPeer{id=%d, usedBy=%d, referencing F-SEIDs=%v}",
+		t.id, t.usedBy.Cardinality(), t.usedBy)
 }
 
 type UP4 struct {
@@ -628,15 +635,19 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
 		}
 
 		tnlPeer = tunnelPeer{
-			id:       newID,
-			refCount: set.NewSet(far.fseID),
+			id:     newID,
+			usedBy: set.NewSet(tnlPeerReference{
+				far.fseID, far.farID,
+			}),
 		}
 
 		methodType = p4.Update_INSERT
 	} else {
 		// tunnel peer already exists, increment ref count.
 		// since we use Set ref count will not be incremented if tunnel peer was already created for this UE session.
-		tnlPeer.refCount.Add(far.fseID)
+		tnlPeer.usedBy.Add(tnlPeerReference{
+			far.fseID, far.farID,
+		})
 	}
 
 	releaseTnlPeerID := func() {
@@ -685,9 +696,11 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 
 	removeLog.Debug("Found GTP tunnel peer for tunnel params")
 
-	tnlPeer.refCount.Remove(far.fseID)
+	tnlPeer.usedBy.Remove(tnlPeerReference{
+		far.fseID, far.farID,
+	})
 
-	if tnlPeer.refCount.Cardinality() != 0 {
+	if tnlPeer.usedBy.Cardinality() != 0 {
 		removeLog.Debug("GTP tunnel peer was about to be removed, but it's in use by other UE session.")
 		return
 	}
