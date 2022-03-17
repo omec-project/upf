@@ -5,3 +5,5 @@
 *.pyc
 *.swp
 output
+
+pfcpiface/bess_pb/github.com/omec-project/upf-epc/pfcpiface/bess_pb/service_grpc.pb.go
