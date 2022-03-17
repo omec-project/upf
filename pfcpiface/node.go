@@ -6,10 +6,10 @@ package pfcpiface
 import (
 	"context"
 	"errors"
-	"net"
-
 	reuse "github.com/libp2p/go-reuseport"
 	log "github.com/sirupsen/logrus"
+	"net"
+	"sync"
 
 	"github.com/omec-project/upf-epc/pfcpiface/metrics"
 )
@@ -25,7 +25,7 @@ type PFCPNode struct {
 	// channel for PFCPConn to signal exit by sending their remote address
 	pConnDone chan string
 	// map of existing connections
-	pConns map[string]*PFCPConn
+	pConns sync.Map
 	// upf
 	upf *upf
 	// metrics for PFCP messages and sessions
@@ -52,7 +52,6 @@ func NewPFCPNode(upf *upf) *PFCPNode {
 		PacketConn: conn,
 		done:       make(chan struct{}),
 		pConnDone:  make(chan string, 100),
-		pConns:     make(map[string]*PFCPConn),
 		upf:        upf,
 		metrics:    metrics,
 	}
@@ -101,7 +100,7 @@ func (node *PFCPNode) handleNewPeers() {
 
 		rAddrStr := rAddr.String()
 
-		_, ok := node.pConns[rAddrStr]
+		_, ok := node.pConns.Load(rAddrStr)
 		if ok {
 			log.Warnln("Drop packet for existing PFCPconn received from", rAddrStr)
 			continue
@@ -121,12 +120,13 @@ func (node *PFCPNode) Serve() {
 		select {
 		case fseid := <-node.upf.reportNotifyChan:
 			// TODO: Logic to distinguish PFCPConn based on SEID
-			for _, pConn := range node.pConns {
+			node.pConns.Range(func(key, value interface{}) bool {
+				pConn := value.(*PFCPConn)
 				pConn.handleDigestReport(fseid)
-				break
-			}
+				return false
+			})
 		case rAddr := <-node.pConnDone:
-			delete(node.pConns, rAddr)
+			node.pConns.Delete(rAddr)
 			log.Infoln("Removed connection to", rAddr)
 		case <-node.ctx.Done():
 			shutdown = true
@@ -138,11 +138,31 @@ func (node *PFCPNode) Serve() {
 				log.Errorln("Error closing PFCPNode conn", err)
 			}
 
+
 			// Clear out the remaining pconn completions
-			for len(node.pConns) > 0 {
-				rAddr := <-node.pConnDone
-				delete(node.pConns, rAddr)
-				log.Infoln("Removed connection to", rAddr)
+clearLoop:
+			for {
+				select {
+				case rAddr, ok := <- node.pConnDone: {
+					if !ok {
+						// channel is closed, break
+						break clearLoop
+					}
+					node.pConns.Delete(rAddr)
+					log.Infoln("Removed connection to", rAddr)
+				}
+				default:
+					// nothing to read from channel
+					break clearLoop
+				}
+			}
+
+
+			if len(node.pConnDone) > 0 {
+				for rAddr := range node.pConnDone {
+					node.pConns.Delete(rAddr)
+					log.Infoln("Removed connection to", rAddr)
+				}
 			}
 
 			close(node.pConnDone)
