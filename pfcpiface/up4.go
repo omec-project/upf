@@ -37,7 +37,6 @@ const (
 
 	meterTypeApplication uint8 = 1
 	meterTypeSession     uint8 = 2
-	meterTypeSlice       uint8 = 3
 
 	// DefaultQFI is set if no QER is sent by a control plane in PFCP messages.
 	// QFI=9 is used as a default value, because many Aether configurations uses it as default.
@@ -46,8 +45,9 @@ const (
 )
 
 var (
-	p4RtcServerIP   = flag.String("p4RtcServerIP", "", "P4 Server ip")
-	p4RtcServerPort = flag.String("p4RtcServerPort", "", "P4 Server port")
+	p4RtcServerIP        = flag.String("p4RtcServerIP", "", "P4 Server ip")
+	p4RtcServerPort      = flag.String("p4RtcServerPort", "", "P4 Server port")
+	fastpathDisconnected = errors.New("fastpath is not connected")
 )
 
 type application struct {
@@ -133,8 +133,9 @@ func (up4 *UP4) addSliceInfo(sliceInfo *SliceInfo) error {
 	//FIXME: UP4 currently supports a single slice meter rate common between UL and DL traffic. For this reason, we
 	//  configure the meter with the largest slice MBR between UL and DL.
 	if !up4.isConnected(nil) {
-		return errors.New("fastpath is not connected yet")
+		return fastpathDisconnected
 	}
+
 	var sliceMbr, sliceBurstBytes uint64
 	if sliceInfo.uplinkMbr > sliceInfo.downlinkMbr {
 		sliceMbr = sliceInfo.uplinkMbr
@@ -1006,8 +1007,13 @@ func (up4 *UP4) configureSessionMeter(q qer) (meter, error) {
 
 func (up4 *UP4) resetSliceMeter() error {
 	log.Debug("Resetting slice meter")
-	meterCellId := uint32((up4.conf.SliceID << 2) + (up4.conf.DefaultTC & 0b11))
-	return up4.resetMeter(p4constants.MeterPreQosPipeSliceTcMeter, meter{meterTypeSlice, meterCellId, meterCellId})
+
+	entry := &p4.MeterEntry{
+		MeterId: p4constants.MeterPreQosPipeSliceTcMeter,
+		Index:   &p4.Index{Index: int64((up4.conf.SliceID << 2) + (up4.conf.DefaultTC & 0b11))},
+	}
+
+	return up4.p4client.ApplyMeterEntries(p4.Update_MODIFY, entry)
 }
 
 func (up4 *UP4) configureMeters(qers []qer) error {
@@ -1070,7 +1076,7 @@ func verifyPDR(pdr pdr) error {
 	return nil
 }
 
-func (up4 *UP4) resetMeter(meterID uint32, meter meter) error {
+func (up4 *UP4) resetMeter(meterID uint32, meter meter) {
 	entries := make([]*p4.MeterEntry, 0, 2)
 
 	entry := &p4.MeterEntry{
@@ -1091,9 +1097,7 @@ func (up4 *UP4) resetMeter(meterID uint32, meter meter) error {
 	err := up4.p4client.ApplyMeterEntries(p4.Update_MODIFY, entries...)
 	if err != nil {
 		log.Errorf("Failed to reset %v meter entries: %v", p4constants.GetMeterIDToNameMap()[meterID], err)
-		return err
 	}
-	return nil
 }
 
 func (up4 *UP4) resetMeters(qers []qer) {
