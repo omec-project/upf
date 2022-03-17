@@ -365,6 +365,14 @@ func (w *wildcardModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 			log.Tracef("deleted existing entry %v", w.entries[idx])
 			w.entries = append(w.entries[:idx], w.entries[idx+1:]...)
 		}
+	} else if cmd == "clear" {
+		wc := &bess_pb.WildcardMatchCommandClearArg{}
+		err = arg.UnmarshalTo(wc)
+		if err != nil {
+			return err
+		}
+		// clear all rules
+		w.entries = nil
 	} else {
 		panic("should not happen")
 	}
@@ -429,6 +437,14 @@ func (e *exactMatchModule) HandleRequest(cmd string, arg *anypb.Any) (err error)
 			log.Tracef("deleted existing entry %v", e.entries[idx])
 			e.entries = append(e.entries[:idx], e.entries[idx+1:]...)
 		}
+	} else if cmd == "clear" {
+		em := &bess_pb.ExactMatchCommandClearArg{}
+		err = arg.UnmarshalTo(em)
+		if err != nil {
+			return err
+		}
+		// clear all rules
+		e.entries = nil
 	} else {
 		panic("should not happen")
 	}
@@ -493,6 +509,14 @@ func (q *qosModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 			log.Tracef("deleted existing entry %v", q.entries[idx])
 			q.entries = append(q.entries[:idx], q.entries[idx+1:]...)
 		}
+	} else if cmd == "clear" {
+		qc := &bess_pb.QosCommandClearArg{}
+		err = arg.UnmarshalTo(qc)
+		if err != nil {
+			return err
+		}
+		// clear all rules
+		q.entries = nil
 	} else {
 		panic("should not happen")
 	}
@@ -503,6 +527,8 @@ func (q *qosModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 func isValidCommand(cmd string) bool {
 	switch cmd {
 	case "add":
+		fallthrough
+	case "clear":
 		fallthrough
 	case "delete":
 		return true
