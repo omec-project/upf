@@ -479,6 +479,8 @@ github.com/omec-project/pfcpsim v0.0.0-20220309065921-4b91bcc14895 h1:TG4qrTzb1z
 github.com/omec-project/pfcpsim v0.0.0-20220309065921-4b91bcc14895/go.mod h1:VpozJhKRcQ5QRW1sl7RLwwqVi+Od7y+tId8419o6xz4=
 github.com/omec-project/pfcpsim v0.0.0-20220309084214-9414eb21802a h1:5WAZa30IUgeCmlpkTZDjIRw+n/AeYx0NB88PppsxUE0=
 github.com/omec-project/pfcpsim v0.0.0-20220309084214-9414eb21802a/go.mod h1:VpozJhKRcQ5QRW1sl7RLwwqVi+Od7y+tId8419o6xz4=
+github.com/omec-project/pfcpsim v0.0.0-20220314155633-b303ec1aaad7 h1:nmicnDsqshaoVaxPbp1G/r6xXdSl8+Sq4gvSWEjrTe4=
+github.com/omec-project/pfcpsim v0.0.0-20220314155633-b303ec1aaad7/go.mod h1:VpozJhKRcQ5QRW1sl7RLwwqVi+Od7y+tId8419o6xz4=
 github.com/onsi/ginkgo v0.0.0-20151202141238-7f8ab55aaf3b/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v0.0.0-20170829012221-11459a886d9c/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
