@@ -67,7 +67,7 @@ RUN ./build_bess.sh && \
     cp -r core/pb /pb
 
 # Stage bess: creates the runtime image of BESS
-FROM python:3.9.10-slim AS bess
+FROM python:3.9.11-slim AS bess
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         gcc \
@@ -99,7 +99,7 @@ ENTRYPOINT ["bessd", "-f"]
 
 # Stage build bess golang pb
 FROM golang AS protoc-gen
-RUN go get github.com/golang/protobuf/protoc-gen-go
+RUN go install github.com/golang/protobuf/protoc-gen-go@latest
 
 FROM bess-deps AS go-pb
 COPY --from=protoc-gen /go/bin/protoc-gen-go /bin

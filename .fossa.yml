@@ -10,10 +10,10 @@ version: 2
 cli:
   server: https://app.fossa.com
   fetcher: custom
-  project: upf-epc
+  project: upf
 analyze:
   modules:
-  - name: upf-epc
+  - name: upf
     type: raw
-    target: ../upf-epc
-    path: ../upf-epc
+    target: ../upf
+    path: ../upf
