@@ -13,11 +13,6 @@ import (
 	"github.com/wmnsk/go-pfcp/message"
 )
 
-const (
-	// Default timeout for DDN.
-	DefaultDDNTimeout = 20
-)
-
 // errors
 var (
 	ErrWriteToFastpath = errors.New("write to FastPath failed")
@@ -339,10 +334,6 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		return sendError(ErrWriteToFastpath)
 	}
 
-	if session.getNotifyFlag() {
-		session.updateNotifyFlag()
-	}
-
 	if upf.enableEndMarker {
 		err := upf.sendEndMarkers(&endMarkerList)
 		if err != nil {
@@ -478,11 +469,6 @@ func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
 		return
 	}
 
-	/* Check if notify is already sent in current time interval */
-	if session.getNotifyFlag() {
-		return
-	}
-
 	seq := pConn.getSeqNum()
 	srreq := message.NewSessionReportRequest(0, /* MO?? <-- what's this */
 		0,                            /* FO <-- what's this? */
@@ -522,12 +508,13 @@ func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
 		return
 	}
 
-	go session.runTimerForDDNNotify(DefaultDDNTimeout)
-
-	session.setNotifyFlag(true)
-
 	srreq.DownlinkDataReport = ie.NewDownlinkDataReport(
 		ie.NewPDRID(uint16(pdrID)))
+
+	log.WithFields(log.Fields{
+		"F-SEID": fseid,
+		"PDR ID": pdrID,
+	}).Debug("Sending Downlink Data Report")
 
 	pConn.SendPFCPMsg(srreq)
 }

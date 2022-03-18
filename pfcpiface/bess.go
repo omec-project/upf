@@ -573,6 +573,8 @@ func (b *bess) endMarkerSendLoop(endMarkerChan chan []byte) {
 }
 
 func (b *bess) notifyListen(reportNotifyChan chan<- uint64) {
+	notifier := NewDownlinkDataNotifier(reportNotifyChan, 20*time.Second)
+
 	for {
 		buf := make([]byte, 512)
 
@@ -583,7 +585,8 @@ func (b *bess) notifyListen(reportNotifyChan chan<- uint64) {
 
 		d := buf[0:8]
 		fseid := binary.LittleEndian.Uint64(d)
-		reportNotifyChan <- fseid
+
+		notifier.Notify(fseid)
 	}
 }
 
