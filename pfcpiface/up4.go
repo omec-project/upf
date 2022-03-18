@@ -113,9 +113,9 @@ type UP4 struct {
 	p4RtTranslator *P4rtTranslator
 
 	// TODO: create UP4Store object and move these fields there
-	counters           []counter
-	tunnelPeerIDs      map[tunnelParams]uint8
-	tunnelPeerIDsPool  []uint8
+	counters          []counter
+	tunnelPeerIDs     map[tunnelParams]uint8
+	tunnelPeerIDsPool []uint8
 
 	applicationMu      sync.Mutex
 	applicationIDs     map[up4ApplicationFilter]application
@@ -726,7 +726,6 @@ func (up4 *UP4) removeInternalApplicationID(pdr pdr) {
 		return
 	}
 
-
 }
 
 func (up4 *UP4) getInternalApplication(pdr pdr) (application, bool) {
@@ -818,7 +817,7 @@ func (up4 *UP4) addInternalApplication(pdr pdr) (*p4.TableEntry, uint8, error) {
 	}
 
 	up4Application := application{
-		id:     newAppID,
+		id: newAppID,
 		usedBy: set.NewSet(appReference{
 			pdr.fseID, pdr.pdrID,
 		}),
@@ -913,7 +912,7 @@ func (up4 *UP4) getOrAllocateInternalApplication(pdr pdr) (application, error) {
 	}
 
 	up4Application := application{
-		id:     newAppID,
+		id: newAppID,
 		usedBy: set.NewSet(appReference{
 			pdr.fseID, pdr.pdrID,
 		}),
