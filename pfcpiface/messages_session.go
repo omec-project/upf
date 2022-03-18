@@ -140,7 +140,10 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 			ie.CauseRequestRejected)
 	}
 
-	pConn.store.PutSession(session)
+	err = pConn.store.PutSession(session)
+	if err != nil {
+		log.Errorf("Failed to put PFCP session to store: %v", err)
+	}
 
 	var localFSEID *ie.IE
 
@@ -397,7 +400,10 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		return sendError(ErrWriteToFastpath)
 	}
 
-	pConn.store.PutSession(session)
+	err := pConn.store.PutSession(session)
+	if err != nil {
+		log.Errorf("Failed to put PFCP session to store: %v", err)
+	}
 
 	// Build response message
 	smres := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */

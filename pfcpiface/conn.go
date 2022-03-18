@@ -123,6 +123,7 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 	log.Infoln("Created PFCPConn from:", conn.LocalAddr(), "to:", conn.RemoteAddr())
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano())) // #nosec G404
+
 	var p = &PFCPConn{
 		ctx:            node.ctx,
 		Conn:           conn,
@@ -137,6 +138,7 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 		hbReset:        make(chan struct{}, 100),
 		hbCtxCancel:    nil,
 	}
+
 	p.setLocalNodeID(node.upf.nodeID)
 
 	if buf != nil {

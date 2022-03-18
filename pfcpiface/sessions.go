@@ -6,6 +6,8 @@ package pfcpiface
 import (
 	"fmt"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/omec-project/upf-epc/pfcpiface/metrics"
 )
 
@@ -62,5 +64,7 @@ func (pConn *PFCPConn) RemoveSession(session PFCPSession) {
 	session.metrics.Delete()
 	pConn.SaveSessions(session.metrics)
 
-	pConn.store.DeleteSession(session.localSEID)
+	if err := pConn.store.DeleteSession(session.localSEID); err != nil {
+		log.Errorf("Failed to delete PFCP session from store: %v", err)
+	}
 }
