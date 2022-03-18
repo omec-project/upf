@@ -280,8 +280,8 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, expectedVal
 	defer providers.DisconnectP4rt()
 
 	var (
-		expectedApplicationsEntries = 1
-		applicationID uint8 = 0
+		expectedApplicationsEntries       = 1
+		applicationID               uint8 = 0
 	)
 
 	if ueState == UEStateAttaching {
