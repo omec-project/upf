@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022-present Open Networking Foundation
+
+# protoc-generated files
+*_pb2.py
+*_pb2_grpc.py

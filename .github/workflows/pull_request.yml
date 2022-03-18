@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Checkout and build
-      - uses: actions/checkout@v2.4.0
+      - uses: actions/checkout@v3
 
       - name: Generate protobuf
         run: |
@@ -52,6 +52,18 @@ jobs:
       - name: Show all CI changes
         run: |
           git --no-pager diff
+      # Verify P4 constants
+      - name: Build P4 constants
+        id: check
+        run: |
+          make p4-constants
+          echo "::set-output name=PORCELAIN::`git status internal/p4constants/ --porcelain`"
+      - name: Check P4 constants are updated
+        if: ${{ steps.check.outputs.PORCELAIN != '' }}
+        uses: actions/github-script@v6
+        with:
+          script: |
+            core.setFailed('Please run make p4-constants and commit changes')
 
       # Build again and commit
       - name: Build the BESS-UPF Docker image (after format)
@@ -75,7 +87,7 @@ jobs:
       - id: docker-login
         # Secrets from the main repo are not used if PR comes from fork. We skip pushing Docker image then.
         if: github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'
-        uses: docker/login-action@v1.12.0
+        uses: docker/login-action@v1.14.1
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}

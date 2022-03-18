@@ -5,15 +5,9 @@ package pfcpiface
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/omec-project/upf-epc/pfcpiface/metrics"
 )
-
-type notifyFlag struct {
-	flag bool
-	mux  sync.Mutex
-}
 
 type PacketForwardingRules struct {
 	pdrs []pdr
@@ -23,10 +17,9 @@ type PacketForwardingRules struct {
 
 // PFCPSession implements one PFCP session.
 type PFCPSession struct {
-	localSEID        uint64
-	remoteSEID       uint64
-	notificationFlag notifyFlag
-	metrics          *metrics.Session
+	localSEID  uint64
+	remoteSEID uint64
+	metrics    *metrics.Session
 	PacketForwardingRules
 }
 
@@ -35,7 +28,7 @@ func (p PacketForwardingRules) String() string {
 }
 
 // NewPFCPSession allocates an session with ID.
-func (pConn *PFCPConn) NewPFCPSession(rseid uint64) uint64 {
+func (pConn *PFCPConn) NewPFCPSession(rseid uint64) (PFCPSession, bool) {
 	for i := 0; i < pConn.maxRetries; i++ {
 		lseid := pConn.rng.Uint64()
 		// Check if it already exists
@@ -54,27 +47,20 @@ func (pConn *PFCPConn) NewPFCPSession(rseid uint64) uint64 {
 		}
 		s.metrics = metrics.NewSession(pConn.nodeID.remote)
 
-		pConn.store.UpdateSession(s)
-
 		// Metrics update
 		pConn.SaveSessions(s.metrics)
 
-		return lseid
+		return s, true
 	}
 
-	return 0
+	return PFCPSession{}, false
 }
 
 // RemoveSession removes session using lseid.
-func (pConn *PFCPConn) RemoveSession(lseid uint64) {
-	s, ok := pConn.store.GetSession(lseid)
-	if !ok {
-		return
-	}
-
+func (pConn *PFCPConn) RemoveSession(session PFCPSession) {
 	// Metrics update
-	s.metrics.Delete()
-	pConn.SaveSessions(s.metrics)
+	session.metrics.Delete()
+	pConn.SaveSessions(session.metrics)
 
-	pConn.store.RemoveSession(lseid)
+	pConn.store.DeleteSession(session.localSEID)
 }

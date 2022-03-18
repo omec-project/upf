@@ -3,7 +3,7 @@ SPDX-License-Identifier: Apache-2.0
 Copyright 2019 Intel Corporation
 -->
 
-# UPF-EPC - Installation Instructions
+# UPF - Installation Instructions
 
 ## Pre-reqs
 
@@ -17,7 +17,7 @@ You need the following dependencies.
 * Update [`scripts/docker_setup.sh`](../scripts/docker_setup.sh) and [`conf/up4.bess`](../conf/up4.bess) to run pktgen tests
 * Update [`scripts/docker_setup.sh`](../scripts/docker_setup.sh) and [`conf/up4.bess`](../conf/up4.bess) to run sim mode tests
 
->`scripts/docker_setup.sh` is a quick start guide to set up UPF-EPC for evaluation.
+>`scripts/docker_setup.sh` is a quick start guide to set up UPF for evaluation.
 
 ## Run
 
@@ -81,14 +81,14 @@ localhost:10514 $ tcpdump gtpuEncap out 1 -c 128 -w conf/gtpuEncapOut.pcap
 
 #### Simulation mode
 
-UPF-EPC has a simulation mode that enables testing the pipeline on a single machine,
+UPF has a simulation mode that enables testing the pipeline on a single machine,
 without the need for external interfaces.
 
 > Note: This mode does not support multiple workers currently.
 
 ![ubench-sim](images/ubench-sim.svg)
 
-To start UPF-EPC in simulation mode:
+To start UPF in simulation mode:
 
 1. Enable sim mode in configuration files
 
@@ -180,6 +180,32 @@ This can be done either using a single machine or two machines.
     ```bash
     docker exec -it pktgen ./bessctl run pktgen
     ```
+
+## Troubleshooting
+
+BESS tools are available out-of-the-box for debugging and/or monitoring; *e.g.*:
+
+* Run `tcpdump` on arbitrary dataplane pipeline module
+
+```bash
+localhost:10514 $ tcpdump s1uFastBPF
+  Running: tcpdump -r /tmp/tmpYUlLw8
+reading from file /tmp/tmpYUlLw8, link-type EN10MB (Ethernet)
+23:51:02.331926 STP 802.1s, Rapid STP, CIST Flags [Learn, Forward], length 102
+tcpdump: pcap_loop: error reading dump file: Interrupted system call
+localhost:10514 $ tcpdump s1uFastBPF
+  Running: tcpdump -r /tmp/tmpUBTGau
+reading from file /tmp/tmpUBTGau, link-type EN10MB (Ethernet)
+00:03:02.286527 STP 802.1s, Rapid STP, CIST Flags [Learn, Forward], length 102
+00:03:04.289155 STP 802.1s, Rapid STP, CIST Flags [Learn, Forward], length 102
+00:03:06.282790 IP 0.0.0.0.bootpc > 255.255.255.255.bootps: BOOTP/DHCP, Request from 68:05:ca:37:e2:80 (oui Unknown), length 300
+00:03:06.291918 STP 802.1s, Rapid STP, CIST Flags [Learn, Forward], length 102
+00:03:07.175420 IP 0.0.0.0.bootpc > 255.255.255.255.bootps: BOOTP/DHCP, Request from 68:05:ca:37:d9:e0 (oui Unknown), length 300
+00:03:07.489266 IP 0.0.0.0.bootpc > 255.255.255.255.bootps: BOOTP/DHCP, Request from 68:05:ca:37:d9:e1 (oui Unknown), length 300
+00:03:08.130884 IP 0.0.0.0.bootpc > 255.255.255.255.bootps: BOOTP/DHCP, Request from 68:05:ca:37:e1:38 (oui Unknown), length 300
+00:03:08.294573 STP 802.1s, Rapid STP, CIST Flags [Learn, Forward], length 102
+00:03:10.247193 STP 802.1s, Rapid STP, CIST Flags [Learn, Forward], length 102
+```
 
 ## Network Token Functions
 

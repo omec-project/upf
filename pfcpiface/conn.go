@@ -241,7 +241,7 @@ func (pConn *PFCPConn) Shutdown() {
 	// Cleanup all sessions in this conn
 	for _, sess := range pConn.store.GetAllSessions() {
 		pConn.upf.sendMsgToUPF(upfMsgTypeDel, sess.PacketForwardingRules, PacketForwardingRules{})
-		pConn.RemoveSession(sess.localSEID)
+		pConn.RemoveSession(sess)
 	}
 
 	rAddr := pConn.RemoteAddr().String()

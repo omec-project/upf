@@ -10,6 +10,8 @@ import (
 	"os"
 	"time"
 
+	"google.golang.org/grpc/connectivity"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -99,9 +101,25 @@ func convertError(err error) error {
 	return p4RtError
 }
 
+// TimeBasedElectionId Generates an election id that is monotonically increasing with time.
+// Specifically, the upper 64 bits are the unix timestamp in seconds, and the
+// lower 64 bits are the remaining nanoseconds. This is compatible with
+// election-systems that use the same epoch-based election IDs, and in that
+// case, this election ID will be guaranteed to be higher than any previous
+// election ID. This is useful in tests where repeated connections need to
+// acquire mastership reliably.
+func TimeBasedElectionId() p4.Uint128 {
+	now := time.Now()
+
+	return p4.Uint128{
+		High: uint64(now.Unix()),
+		Low:  uint64(now.UnixNano() % 1e9),
+	}
+}
+
 // CheckStatus ... Check client connection status.
-func (c *P4rtClient) CheckStatus() (state int) {
-	return int(c.conn.GetState())
+func (c *P4rtClient) CheckStatus() connectivity.State {
+	return c.conn.GetState()
 }
 
 // SetMastership .. API.
@@ -187,10 +205,15 @@ func (c *P4rtClient) GetNextDigestData() []byte {
 	// blocking
 	nextDigest := <-c.digests
 
-	log.Debug("Received Digest")
-
 	for _, p4d := range nextDigest.GetData() {
 		if bitstring := p4d.GetBitstring(); bitstring != nil {
+			log.WithFields(log.Fields{
+				"device-id":     c.deviceID,
+				"conn":          c.conn.Target(),
+				"digest length": len(bitstring),
+				"data":          bitstring,
+			}).Trace("Received Digest")
+
 			return bitstring
 		}
 	}
@@ -295,7 +318,9 @@ func (c *P4rtClient) ClearTable(tableID uint32) error {
 }
 
 func (c *P4rtClient) ClearTables(tableIDs []uint32) error {
-	log.Traceln("Clearing P4 tables")
+	log.WithFields(log.Fields{
+		"table IDs": tableIDs,
+	}).Traceln("Clearing P4 tables")
 
 	updates := []*p4.Update{}
 
@@ -415,15 +440,28 @@ func (c *P4rtClient) WriteBatchReq(updates []*p4.Update) error {
 
 // GetForwardingPipelineConfig ... Get Pipeline config from switch.
 func (c *P4rtClient) GetForwardingPipelineConfig() (err error) {
-	log.Println("GetForwardingPipelineConfig")
+	getLog := log.WithFields(log.Fields{
+		"device ID": c.deviceID,
+		"conn":      c.conn.Target(),
+	})
+	getLog.Info("Getting ForwardingPipelineConfig from P4Rt device")
 
 	pipeline, err := GetPipelineConfig(c.client, c.deviceID)
 	if err != nil {
-		log.Println("set pipeline config error ", err)
+		getLog.Println("set pipeline config error ", err)
 		return
 	}
 
+	// P4 spec allows for sending successful response to GetForwardingPipelineConfig
+	// without config. We fail in such a case, because the response without config is useless.
+	if pipeline.GetConfig() == nil {
+		return ErrOperationFailedWithReason("GetForwardingPipelineConfig",
+			"Operation successful, but no P4 config provided.")
+	}
+
 	c.P4Info = *pipeline.Config.P4Info
+
+	getLog.Info("Got ForwardingPipelineConfig from P4Rt device")
 
 	return
 }
@@ -562,7 +600,7 @@ func CreateChannel(host string, deviceID uint64) (*P4rtClient, error) {
 		return nil, err
 	}
 
-	err = client.SetMastership(p4.Uint128{High: 1, Low: 1})
+	err = client.SetMastership(TimeBasedElectionId())
 	if err != nil {
 		log.Println("Set Mastership error: ", err)
 		return nil, err

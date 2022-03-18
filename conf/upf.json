@@ -146,10 +146,11 @@
 
     "": "p4rtc interface settings",
     "p4rtciface": {
+        "": "Set the UP4 slice identifier that this PFCP Agent instance belongs to. Default: 0",
+        "slice_id": 0,
+
         "access_ip": "172.17.0.1/32",
         "p4rtc_server": "onos",
-        "p4rtc_port": "51001",
-        "" : "p4info: /bin/p4info.txt",
-        "" : "device_config: /bin/bmv2.json"
+        "p4rtc_port": "51001"
     }
 }

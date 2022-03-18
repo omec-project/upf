@@ -13,11 +13,6 @@ import (
 	"github.com/wmnsk/go-pfcp/message"
 )
 
-const (
-	// Default timeout for DDN.
-	DefaultDDNTimeout = 20
-)
-
 // errors
 var (
 	ErrWriteToFastpath = errors.New("write to FastPath failed")
@@ -81,14 +76,11 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 		return errProcessReply(ErrAssocNotFound, ie.CauseNoEstablishedPFCPAssociation)
 	}
 
-	/* Read CreatePDRs and CreateFARs from payload */
-	localSEID := pConn.NewPFCPSession(remoteSEID)
-	if localSEID == 0 {
+	session, ok := pConn.NewPFCPSession(remoteSEID)
+	if !ok {
 		return errProcessReply(ErrAllocateSession,
 			ie.CauseNoResourcesAvailable)
 	}
-
-	session, _ := pConn.store.GetSession(localSEID)
 
 	addPDRs := make([]pdr, 0, MaxItems)
 	addFARs := make([]far, 0, MaxItems)
@@ -143,10 +135,12 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 	cause := upf.sendMsgToUPF(upfMsgTypeAdd, session.PacketForwardingRules, updated)
 	if cause == ie.CauseRequestRejected {
-		pConn.RemoveSession(session.localSEID)
+		pConn.RemoveSession(session)
 		return errProcessReply(ErrWriteToFastpath,
 			ie.CauseRequestRejected)
 	}
+
+	pConn.store.PutSession(session)
 
 	var localFSEID *ie.IE
 
@@ -156,8 +150,6 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 	} else {
 		localFSEID = ie.NewFSEID(session.localSEID, nil, localIP)
 	}
-
-	pConn.store.UpdateSession(session)
 
 	// Build response message
 	seres := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
@@ -341,10 +333,6 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		return sendError(ErrWriteToFastpath)
 	}
 
-	if session.getNotifyFlag() {
-		session.updateNotifyFlag()
-	}
-
 	if upf.enableEndMarker {
 		err := upf.sendEndMarkers(&endMarkerList)
 		if err != nil {
@@ -409,7 +397,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		return sendError(ErrWriteToFastpath)
 	}
 
-	pConn.store.UpdateSession(session)
+	pConn.store.PutSession(session)
 
 	// Build response message
 	smres := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */
@@ -461,7 +449,7 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 	}
 
 	/* delete sessionRecord */
-	pConn.RemoveSession(localSEID)
+	pConn.RemoveSession(session)
 
 	// Build response message
 	smres := message.NewSessionDeletionResponse(0, /* MO?? <-- what's this */
@@ -479,11 +467,6 @@ func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
 	session, ok := pConn.store.GetSession(fseid)
 	if !ok {
 		log.Warnln("No session found for fseid : ", fseid)
-		return
-	}
-
-	/* Check if notify is already sent in current time interval */
-	if session.getNotifyFlag() {
 		return
 	}
 
@@ -526,14 +509,13 @@ func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
 		return
 	}
 
-	go session.runTimerForDDNNotify(DefaultDDNTimeout)
-
-	session.setNotifyFlag(true)
-
-	pConn.store.UpdateSession(session)
-
 	srreq.DownlinkDataReport = ie.NewDownlinkDataReport(
 		ie.NewPDRID(uint16(pdrID)))
+
+	log.WithFields(log.Fields{
+		"F-SEID": fseid,
+		"PDR ID": pdrID,
+	}).Debug("Sending Downlink Data Report")
 
 	pConn.SendPFCPMsg(srreq)
 }
@@ -563,7 +545,7 @@ func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) error {
 
 		log.Warnln("context not found, deleting session locally")
 
-		pConn.RemoveSession(seid)
+		pConn.RemoveSession(sessItem)
 
 		cause := upf.sendMsgToUPF(
 			upfMsgTypeDel, sessItem.PacketForwardingRules, PacketForwardingRules{})
