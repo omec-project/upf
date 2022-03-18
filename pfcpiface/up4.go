@@ -640,7 +640,7 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
 		}
 
 		tnlPeer = tunnelPeer{
-			id:     newID,
+			id: newID,
 			usedBy: set.NewSet(tnlPeerReference{
 				far.fseID, far.farID,
 			}),
