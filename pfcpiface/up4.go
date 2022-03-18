@@ -462,6 +462,8 @@ func (up4 *UP4) initInterfaces() error {
 func (up4 *UP4) listenToDDNs() {
 	log.Info("Listening to Data Notifications from UP4..")
 
+	notifier := NewDownlinkDataNotifier(up4.reportNotifyChan, 20*time.Second)
+
 	for {
 		if up4.isConnected(nil) {
 			// blocking
@@ -469,7 +471,7 @@ func (up4 *UP4) listenToDDNs() {
 
 			ueAddr := binary.BigEndian.Uint32(digestData)
 			if fseid, exists := up4.ueAddrToFSEID[ueAddr]; exists {
-				up4.reportNotifyChan <- fseid
+				notifier.Notify(fseid)
 			}
 		}
 	}
