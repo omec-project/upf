@@ -437,15 +437,12 @@ func verifyNoP4RuntimeEntries(t *testing.T, expectedValues p4RtValues) {
 	}
 	require.Equal(t, 0, nrOfConfiguredMeters, "application meter should not have any cells configured")
 
-	// 2 interfaces entries + 1 applications + 1 tunnel_peers
-	expectedAllEntries := 4
-	if expectedValues.appFilter.isEmpty() {
-		expectedAllEntries--
-	}
+	// 2 interfaces entries + 1 tunnel_peers
+	expectedAllEntries := 3
 
 	allInstalledEntries, _ := p4rtClient.ReadTableEntryWildcard("")
 	// table entries for interfaces table are not removed by pfcpiface
-	// FIXME: tunnel_peers and applications are not cleared on session deletion/association release
+	// FIXME: tunnel_peers are not cleared on session deletion/association release
 	//  See SDFAB-960
 	require.Equal(t, expectedAllEntries, len(allInstalledEntries),
 		fmt.Sprintf("UP4 should have only %d entry installed", expectedAllEntries), allInstalledEntries)
@@ -454,6 +451,7 @@ func verifyNoP4RuntimeEntries(t *testing.T, expectedValues p4RtValues) {
 		// FIXME: tunnel_peers and applications are not cleared on session deletion/association release
 		//  See SDFAB-960
 		//  Add tunnel_peers and applications to the list, once fixed
+		tablesNames[p4constants.TablePreQosPipeApplications],
 		tablesNames[p4constants.TablePreQosPipeSessionsUplink],
 		tablesNames[p4constants.TablePreQosPipeSessionsDownlink],
 		tablesNames[p4constants.TablePreQosPipeTerminationsUplink],

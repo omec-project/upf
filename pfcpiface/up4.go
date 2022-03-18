@@ -48,7 +48,23 @@ var (
 	p4RtcServerPort = flag.String("p4RtcServerPort", "", "P4 Server port")
 )
 
+type appReference struct {
+	fseid uint64
+	pdrID uint32
+}
+
 type application struct {
+	id uint8
+	// usedBy keeps track of <F-SEIDs (UE sessions); PDR-ID> pairs using this application filter.
+	// It's implemented as Set to avoid duplicated F-SEIDs+PDR ID pairs.
+	usedBy set.Set
+}
+
+func (a application) IsInUse() bool {
+	return a.usedBy.Cardinality() != 0
+}
+
+type up4ApplicationFilter struct {
 	appIP     uint32
 	appL4Port portRange
 	appProto  uint8
@@ -100,7 +116,9 @@ type UP4 struct {
 	counters           []counter
 	tunnelPeerIDs      map[tunnelParams]uint8
 	tunnelPeerIDsPool  []uint8
-	applicationIDs     map[application]uint8
+
+	applicationMu      sync.Mutex
+	applicationIDs     map[up4ApplicationFilter]application
 	applicationIDsPool []uint8
 
 	// meters stores the mapping from <F-SEID; QER ID> -> P4 Meter Cell ID.
@@ -294,8 +312,8 @@ func (up4 *UP4) initTunnelPeerIDs() {
 }
 
 func (up4 *UP4) initApplicationIDs() {
-	up4.applicationIDs = make(map[application]uint8)
-	// a simple queue storing available application IDs
+	up4.applicationIDs = make(map[up4ApplicationFilter]application)
+	// a simple queue storing available up4ApplicationFilter IDs
 	// 0 is reserved;
 	up4.applicationIDsPool = make([]uint8, 0, maxApplicationIDs)
 
@@ -545,8 +563,8 @@ func findRelatedFAR(pdr pdr, fars []far) (far, error) {
 func findRelatedApplicationQER(pdr pdr, qers []qer) (qer, error) {
 	for _, qer := range qers {
 		if len(pdr.qerIDList) != 0 {
-			// if only 1 QER provided, it's an application QER
-			// if 2 QERs provided, the first one is an application QER
+			// if only 1 QER provided, it's an up4ApplicationFilter QER
+			// if 2 QERs provided, the first one is an up4ApplicationFilter QER
 			// if more than 2 QERs provided, TODO: not supported
 			if pdr.qerIDList[0] == qer.qerID {
 				return qer, nil
@@ -554,7 +572,7 @@ func findRelatedApplicationQER(pdr pdr, qers []qer) (qer, error) {
 		}
 	}
 
-	return qer{}, ErrNotFoundWithParam("related application QER for PDR", "PDR", pdr)
+	return qer{}, ErrNotFoundWithParam("related up4ApplicationFilter QER for PDR", "PDR", pdr)
 }
 
 // Returns error if we reach maximum supported GTP Tunnel Peers.
@@ -655,46 +673,222 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 }
 
 // Returns error if we reach maximum supported Application IDs.
-func (up4 *UP4) allocateInternalApplicationID(app application) (uint8, error) {
+func (up4 *UP4) unsafeAllocateInternalApplicationID(app up4ApplicationFilter) (uint8, error) {
 	if len(up4.applicationIDsPool) == 0 {
 		return 0, ErrOperationFailedWithReason("allocate Application ID",
-			"no free application IDs available")
+			"no free up4ApplicationFilter IDs available")
 	}
 
 	// pick top from queue
 	allocated := up4.applicationIDsPool[0]
 	up4.applicationIDsPool = up4.applicationIDsPool[1:]
 
-	up4.applicationIDs[app] = allocated
-
 	return allocated, nil
 }
 
-// FIXME: SDFAB-960
-//nolint:unused
-func (up4 *UP4) releaseInternalApplicationID(appFilter applicationFilter) {
-	app := application{
-		appIP:     appFilter.srcIP,
-		appL4Port: appFilter.srcPortRange,
-		appProto:  appFilter.proto,
-	}
-
-	allocated, exists := up4.applicationIDs[app]
+func (up4 *UP4) unsafeReleaseInternalApplicationID(appFilter up4ApplicationFilter) {
+	allocated, exists := up4.applicationIDs[appFilter]
 	if exists {
-		delete(up4.applicationIDs, app)
-		up4.applicationIDsPool = append(up4.applicationIDsPool, allocated)
+		up4.applicationIDsPool = append(up4.applicationIDsPool, allocated.id)
+		delete(up4.applicationIDs, appFilter)
 	}
 }
 
-func (up4 *UP4) getOrAllocateInternalApplicationID(pdr pdr) (uint8, error) {
-	var app application
+func (up4 *UP4) removeInternalApplicationID(pdr pdr) {
+	up4.applicationMu.Lock()
+	defer up4.applicationMu.Unlock()
+
+	var appFilter up4ApplicationFilter
 	if pdr.IsUplink() {
-		app = application{
+		appFilter = up4ApplicationFilter{
 			appIP:     pdr.appFilter.dstIP,
 			appL4Port: pdr.appFilter.dstPortRange,
 		}
 	} else if pdr.IsDownlink() {
-		app = application{
+		appFilter = up4ApplicationFilter{
+			appIP:     pdr.appFilter.srcIP,
+			appL4Port: pdr.appFilter.srcPortRange,
+		}
+	}
+
+	appFilter.appProto = pdr.appFilter.proto
+
+	app, exists := up4.applicationIDs[appFilter]
+	if !exists {
+		return
+	}
+
+	app.usedBy.Remove(appReference{
+		pdr.fseID, pdr.pdrID,
+	})
+
+	if app.usedBy.Cardinality() != 0 {
+		return
+	}
+
+
+}
+
+func (up4 *UP4) getInternalApplication(pdr pdr) (application, bool) {
+	up4.applicationMu.Lock()
+	defer up4.applicationMu.Unlock()
+
+	var appFilter up4ApplicationFilter
+	if pdr.IsUplink() {
+		appFilter = up4ApplicationFilter{
+			appIP:     pdr.appFilter.dstIP,
+			appL4Port: pdr.appFilter.dstPortRange,
+		}
+	} else if pdr.IsDownlink() {
+		appFilter = up4ApplicationFilter{
+			appIP:     pdr.appFilter.srcIP,
+			appL4Port: pdr.appFilter.srcPortRange,
+		}
+	}
+
+	appFilter.appProto = pdr.appFilter.proto
+
+	app, exists := up4.applicationIDs[appFilter]
+	return app, exists
+}
+
+func (up4 *UP4) IsApplicationInUse(pdr pdr) bool {
+	up4.applicationMu.Lock()
+	defer up4.applicationMu.Unlock()
+
+	var app up4ApplicationFilter
+	if pdr.IsUplink() {
+		app = up4ApplicationFilter{
+			appIP:     pdr.appFilter.dstIP,
+			appL4Port: pdr.appFilter.dstPortRange,
+		}
+	} else if pdr.IsDownlink() {
+		app = up4ApplicationFilter{
+			appIP:     pdr.appFilter.srcIP,
+			appL4Port: pdr.appFilter.srcPortRange,
+		}
+	}
+
+	up4Application, exists := up4.applicationIDs[app]
+
+	if !exists {
+		return false
+	}
+
+	return up4Application.IsInUse()
+}
+
+func (up4 *UP4) addInternalApplication(pdr pdr) (*p4.TableEntry, uint8, error) {
+	up4.applicationMu.Lock()
+	defer up4.applicationMu.Unlock()
+
+	var appFilter up4ApplicationFilter
+	if pdr.IsUplink() {
+		appFilter = up4ApplicationFilter{
+			appIP:     pdr.appFilter.dstIP,
+			appL4Port: pdr.appFilter.dstPortRange,
+		}
+	} else if pdr.IsDownlink() {
+		appFilter = up4ApplicationFilter{
+			appIP:     pdr.appFilter.srcIP,
+			appL4Port: pdr.appFilter.srcPortRange,
+		}
+	}
+
+	appFilter.appProto = pdr.appFilter.proto
+
+	if up4Application, exists := up4.applicationIDs[appFilter]; exists {
+		// application already exists, increment ref count.
+		// since we use Set usedBy will not be incremented if
+		// application was already created for this UE session + PDR ID.
+		up4Application.usedBy.Add(appReference{
+			pdr.fseID, pdr.pdrID,
+		})
+
+		return nil, up4Application.id, nil
+	}
+
+	newAppID, err := up4.unsafeAllocateInternalApplicationID(appFilter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	releaseID := func() {
+		up4.unsafeReleaseInternalApplicationID(appFilter)
+	}
+
+	up4Application := application{
+		id:     newAppID,
+		usedBy: set.NewSet(appReference{
+			pdr.fseID, pdr.pdrID,
+		}),
+	}
+
+	applicationsEntry, err := up4.p4RtTranslator.BuildApplicationsTableEntry(pdr, up4.conf.SliceID, newAppID)
+	if err != nil {
+		releaseID()
+		return nil, 0, ErrOperationFailedWithReason("build P4rt table entry for Applications table", err.Error())
+	}
+
+	up4.applicationIDs[appFilter] = up4Application
+
+	return applicationsEntry, up4Application.id, nil
+}
+
+func (up4 *UP4) removeInternalApplication(pdr pdr) (*p4.TableEntry, uint8) {
+	up4.applicationMu.Lock()
+	defer up4.applicationMu.Unlock()
+
+	var appFilter up4ApplicationFilter
+	if pdr.IsUplink() {
+		appFilter = up4ApplicationFilter{
+			appIP:     pdr.appFilter.dstIP,
+			appL4Port: pdr.appFilter.dstPortRange,
+		}
+	} else if pdr.IsDownlink() {
+		appFilter = up4ApplicationFilter{
+			appIP:     pdr.appFilter.srcIP,
+			appL4Port: pdr.appFilter.srcPortRange,
+		}
+	}
+
+	appFilter.appProto = pdr.appFilter.proto
+
+	internalApp, exists := up4.applicationIDs[appFilter]
+	if !exists {
+		return nil, 0
+	}
+
+	internalApp.usedBy.Remove(appReference{
+		pdr.fseID, pdr.pdrID,
+	})
+
+	if internalApp.usedBy.Cardinality() != 0 {
+		return nil, internalApp.id
+	}
+
+	applicationsEntry, err := up4.p4RtTranslator.BuildApplicationsTableEntry(pdr, up4.conf.SliceID, internalApp.id)
+	if err != nil {
+		return nil, internalApp.id
+	}
+
+	up4.unsafeReleaseInternalApplicationID(appFilter)
+
+	return applicationsEntry, internalApp.id
+}
+
+func (up4 *UP4) getOrAllocateInternalApplication(pdr pdr) (application, error) {
+	up4.applicationMu.Lock()
+	defer up4.applicationMu.Unlock()
+
+	var app up4ApplicationFilter
+	if pdr.IsUplink() {
+		app = up4ApplicationFilter{
+			appIP:     pdr.appFilter.dstIP,
+			appL4Port: pdr.appFilter.dstPortRange,
+		}
+	} else if pdr.IsDownlink() {
+		app = up4ApplicationFilter{
 			appIP:     pdr.appFilter.srcIP,
 			appL4Port: pdr.appFilter.srcPortRange,
 		}
@@ -702,16 +896,32 @@ func (up4 *UP4) getOrAllocateInternalApplicationID(pdr pdr) (uint8, error) {
 
 	app.appProto = pdr.appFilter.proto
 
-	if allocated, exists := up4.applicationIDs[app]; exists {
-		return allocated, nil
+	if up4Application, exists := up4.applicationIDs[app]; exists {
+		// application already exists, increment ref count.
+		// since we use Set usedBy will not be incremented if
+		// application was already created for this UE session + PDR ID.
+		up4Application.usedBy.Add(appReference{
+			pdr.fseID, pdr.pdrID,
+		})
+
+		return up4Application, nil
 	}
 
-	newAppID, err := up4.allocateInternalApplicationID(app)
+	newAppID, err := up4.unsafeAllocateInternalApplicationID(app)
 	if err != nil {
-		return 0, err
+		return application{}, err
 	}
 
-	return newAppID, nil
+	up4Application := application{
+		id:     newAppID,
+		usedBy: set.NewSet(appReference{
+			pdr.fseID, pdr.pdrID,
+		}),
+	}
+
+	up4.applicationIDs[app] = up4Application
+
+	return up4Application, nil
 }
 
 func (up4 *UP4) allocateAppMeterCellID() (uint32, error) {
@@ -1155,27 +1365,23 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 			pdr.ueAddress = ueAddr
 		}
 
-		var applicationsEntry *p4.TableEntry
-
-		// as a default value is installed if no application filtering rule exists
+		// as a default value is installed if no up4ApplicationFilter filtering rule exists
 		var applicationID uint8 = DefaultApplicationID
 		if !pdr.IsAppFilterEmpty() {
-			applicationID, err = up4.getOrAllocateInternalApplicationID(pdr)
-			if err != nil {
-				pdrLog.Error("failed to get or allocate internal application ID")
-				return err
+			if methodType != p4.Update_DELETE {
+				if entry, appID, err := up4.addInternalApplication(pdr); err == nil {
+					if entry != nil {
+						entriesToApply = append(entriesToApply, entry)
+					}
+					applicationID = appID
+				}
+			} else {
+				entry, appID := up4.removeInternalApplication(pdr)
+				if entry != nil {
+					entriesToApply = append(entriesToApply, entry)
+				}
+				applicationID = appID
 			}
-		}
-
-		// TODO: the same app filter can be simultaneously used by another UE session. We cannot remove it.
-		//  We should come up with a way to check if an app filter is still in use.
-		if applicationID != 0 && methodType != p4.Update_DELETE {
-			applicationsEntry, err = up4.p4RtTranslator.BuildApplicationsTableEntry(pdr, up4.conf.SliceID, applicationID)
-			if err != nil {
-				return ErrOperationFailedWithReason("build P4rt table entry for Applications table", err.Error())
-			}
-
-			entriesToApply = append(entriesToApply, applicationsEntry)
 		}
 
 		var appMeter = meter{meterTypeApplication, 0, 0}
@@ -1236,6 +1442,10 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 
 				return ErrOperationFailedWithReason("applying table entries to UP4", p4Error.Error())
 			}
+		}
+
+		if methodType == p4.Update_DELETE {
+			up4.removeInternalApplicationID(pdr)
 		}
 	}
 
