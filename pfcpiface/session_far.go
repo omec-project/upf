@@ -5,7 +5,6 @@ package pfcpiface
 
 import (
 	"net"
-	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -86,44 +85,6 @@ func (s *PFCPSession) UpdateFAR(f *far, endMarkerList *[][]byte) error {
 	}
 
 	return ErrNotFound("FAR")
-}
-
-func (s *PFCPSession) setNotifyFlag(flag bool) {
-	s.notificationFlag.mux.Lock()
-	defer s.notificationFlag.mux.Unlock()
-	s.notificationFlag.flag = flag
-}
-
-func (s *PFCPSession) getNotifyFlag() bool {
-	s.notificationFlag.mux.Lock()
-	defer s.notificationFlag.mux.Unlock()
-
-	return s.notificationFlag.flag
-}
-
-func (s *PFCPSession) runTimerForDDNNotify(timeout time.Duration) {
-	endTime := time.After(timeout)
-	for range endTime {
-		log.Println("DDN notify send timeout")
-		s.setNotifyFlag(false)
-
-		return
-	}
-}
-
-// UpdateFAR updates existing far in the session.
-func (s *PFCPSession) updateNotifyFlag() {
-	unset := true
-
-	for _, v := range s.fars {
-		if v.applyAction&ActionNotify != 0 {
-			unset = false
-		}
-	}
-
-	if unset {
-		s.setNotifyFlag(false)
-	}
 }
 
 // RemoveFAR removes far from existing list of FARs in the session.
