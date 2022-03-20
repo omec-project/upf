@@ -145,7 +145,7 @@ func (b *bess) sendMsgToUPF(
 	done := make(chan bool)
 
 	for _, pdr := range pdrs {
-		log.Traceln(pdr)
+		log.Traceln(method, pdr)
 
 		switch method {
 		case upfMsgTypeAdd:
@@ -158,7 +158,7 @@ func (b *bess) sendMsgToUPF(
 	}
 
 	for _, far := range fars {
-		log.Traceln(far)
+		log.Traceln(method, far)
 
 		switch method {
 		case upfMsgTypeAdd:
@@ -171,7 +171,7 @@ func (b *bess) sendMsgToUPF(
 	}
 
 	for _, qer := range qers {
-		log.Traceln("qer:", qer)
+		log.Traceln(method, qer)
 
 		switch method {
 		case upfMsgTypeAdd:
@@ -487,7 +487,7 @@ func (b *bess) sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 			ueIpString := "unknown"
 
 			if con != nil {
-				session, ok := con.sessions[pre.Fseid]
+				session, ok := con.store.GetSession(pre.Fseid)
 				if !ok {
 					log.Errorln("Invalid or unknown FSEID", pre.Fseid)
 					continue
@@ -573,6 +573,8 @@ func (b *bess) endMarkerSendLoop(endMarkerChan chan []byte) {
 }
 
 func (b *bess) notifyListen(reportNotifyChan chan<- uint64) {
+	notifier := NewDownlinkDataNotifier(reportNotifyChan, 20*time.Second)
+
 	for {
 		buf := make([]byte, 512)
 
@@ -583,7 +585,8 @@ func (b *bess) notifyListen(reportNotifyChan chan<- uint64) {
 
 		d := buf[0:8]
 		fseid := binary.LittleEndian.Uint64(d)
-		reportNotifyChan <- fseid
+
+		notifier.Notify(fseid)
 	}
 }
 
@@ -612,6 +615,54 @@ func (b *bess) readQciQosMap(conf *Conf) {
 	}
 }
 
+// clearState removes all rules from pdrLookup, farLookup, appQerLookup and sessQerLookup.
+// It doesn't clear sliceMeter, because slice config is dynamically provided via REST API
+// and there is no guarantee that the config will be pushed again after pfcp-agent's restart.
+func (b *bess) clearState() {
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel()
+
+	log.Debug("Clearing all the state in BESS")
+
+	clearWildcardCmd := &pb.WildcardMatchCommandClearArg{}
+
+	anyWildcardClear, err := anypb.New(clearWildcardCmd)
+	if err != nil {
+		log.Errorf("Error marshalling the rule %v: %v", clearWildcardCmd, err)
+		return
+	}
+
+	b.processPDR(ctx, anyWildcardClear, upfMsgTypeClear)
+
+	clearExactCmd := &pb.ExactMatchCommandClearArg{}
+
+	anyExactClear, err := anypb.New(clearExactCmd)
+	if err != nil {
+		log.Errorf("Error marshalling the rule %v: %v", anyExactClear, err)
+		return
+	}
+
+	b.processFAR(ctx, anyExactClear, upfMsgTypeClear)
+
+	clearQoSCmd := &pb.QosCommandClearArg{}
+
+	anyQoSClear, err := anypb.New(clearQoSCmd)
+	if err != nil {
+		log.Errorf("Error marshalling the rule %v: %v", anyQoSClear, err)
+		return
+	}
+
+	if err := b.processQER(ctx, anyQoSClear, upfMsgTypeClear, AppQerLookup); err != nil {
+		log.Errorf("Failed to clear %v", AppQerLookup)
+	}
+
+	if err := b.processQER(ctx, anyQoSClear, upfMsgTypeClear, SessQerLookup); err != nil {
+		log.Errorf("Failed to clear %v", SessQerLookup)
+	}
+}
+
+// setUpfInfo is only called at pfcp-agent's startup
+// it clears all the state in BESS
 func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 	var err error
 
@@ -629,6 +680,8 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 	}
 
 	b.client = pb.NewBESSControlClient(b.conn)
+
+	b.clearState()
 
 	if conf.EnableNotifyBess {
 		notifySockAddr := conf.NotifySockAddr

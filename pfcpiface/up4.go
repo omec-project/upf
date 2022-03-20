@@ -456,6 +456,8 @@ func (up4 *UP4) initInterfaces() error {
 func (up4 *UP4) listenToDDNs() {
 	log.Info("Listening to Data Notifications from UP4..")
 
+	notifier := NewDownlinkDataNotifier(up4.reportNotifyChan, 20*time.Second)
+
 	for {
 		if up4.isConnected(nil) {
 			// blocking
@@ -463,7 +465,7 @@ func (up4 *UP4) listenToDDNs() {
 
 			ueAddr := binary.BigEndian.Uint32(digestData)
 			if fseid, exists := up4.ueAddrToFSEID[ueAddr]; exists {
-				up4.reportNotifyChan <- fseid
+				notifier.Notify(fseid)
 			}
 		}
 	}
@@ -479,6 +481,11 @@ func (up4 *UP4) initialize() error {
 		log.Warningf("failed to clear tables: %v", err)
 		return err
 	}
+
+	// Give UP4 a while to clear all tables, before initializing the interfaces table.
+	// FIXME: this is an ugly, temporary workaround.
+	//  Should be removed once we serialize Writes on UP4 side.
+	time.Sleep(1 * time.Second)
 
 	up4.initAllCounters()
 	up4.initMetersPools()

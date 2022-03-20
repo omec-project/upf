@@ -20,7 +20,7 @@ high-speed traffic generator built on top of DPDK, containing a Python API
 
 ## Overview
 
-The aim of implementing a test framework for UPF-EPC is to create a
+The aim of implementing a test framework for UPF is to create a
 developer-friendly infrastructure for creating either single-packet or
 high-speed tests that assess UPF features at a component level.
 
@@ -57,12 +57,12 @@ API](https://github.com/cisco-system-traffic-generator/trex-core/blob/master/doc
     downlink traffic from 10,000 unique UEs.
 
 ## Workflow
-Tests require two separate machines to run, since both TRex and UPF-EPC
+Tests require two separate machines to run, since both TRex and UPF
 use DPDK. Currently, the test workflow is as such:
 
 ![Test](docs/test-run.svg)
 
-In **step 1**, rules are installed onto the UPF-EPC instance by the test
+In **step 1**, rules are installed onto the UPF instance by the test
 framework via BESS gRPC messages.
 
 In **step 2**, TRex or Scapy (depending on the type of test case)
@@ -72,7 +72,7 @@ In **step 3**, traffic routes through the UPF and back to the machine
 hosting TRex, where results are asserted.
 
 ## Steps to run tests
-The run script assumes that the TRex daemon server and the UPF-EPC
+The run script assumes that the TRex daemon server and the UPF
 instance are already running on their respective machines. It also
 assumes that all config files in `config/` are configured correctly to
 route traffic to the UPF.
