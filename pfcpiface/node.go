@@ -168,7 +168,7 @@ func (node *PFCPNode) Serve() {
 			close(node.pConnDone)
 			log.Infoln("Done waiting for PFCPConn completions")
 
-			node.upf.exit()
+			node.upf.Exit()
 		}
 	}
 

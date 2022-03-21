@@ -147,19 +147,19 @@ func (m meter) String() string {
 		m.meterType, m.uplinkCellID, m.downlinkCellID)
 }
 
-func (up4 *UP4) addSliceInfo(sliceInfo *SliceInfo) error {
+func (up4 *UP4) AddSliceInfo(sliceInfo *SliceInfo) error {
 	log.Errorln("Slice Info not supported in P4")
 	return nil
 }
 
-func (up4 *UP4) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric) {
+func (up4 *UP4) SummaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric) {
 }
 
-func (up4 *UP4) sessionStats(*PfcpNodeCollector, chan<- prometheus.Metric) error {
+func (up4 *UP4) SessionStats(*PfcpNodeCollector, chan<- prometheus.Metric) error {
 	return nil
 }
 
-func (up4 *UP4) portStats(uc *upfCollector, ch chan<- prometheus.Metric) {
+func (up4 *UP4) PortStats(uc *upfCollector, ch chan<- prometheus.Metric) {
 }
 
 func (up4 *UP4) initCounter(counterID uint8, name string, counterSize uint64) {
@@ -200,7 +200,7 @@ func (up4 *UP4) allocateCounterID(p4counterID uint8) (uint64, error) {
 	return allocated.(uint64), nil
 }
 
-func (up4 *UP4) exit() {
+func (up4 *UP4) Exit() {
 	log.Println("Exit function P4rtc")
 }
 
@@ -320,7 +320,7 @@ func (up4 *UP4) initApplicationIDs() {
 // This function ensures that PFCP Agent is connected to UP4.
 // Returns true if the connection is already established.
 // FIXME: the argument should be removed from datapath API
-func (up4 *UP4) isConnected(accessIP *net.IP) bool {
+func (up4 *UP4) IsConnected(accessIP *net.IP) bool {
 	up4.connectedMu.Lock()
 	defer up4.connectedMu.Unlock()
 
@@ -335,8 +335,8 @@ func (up4 *UP4) setConnectedStatus(status bool) {
 }
 
 // TODO: rename it to initUPF()
-func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
-	log.Println("setUpfInfo UP4")
+func (up4 *UP4) SetUpfInfo(u *upf, conf *Conf) {
+	log.Println("SetUpfInfo UP4")
 
 	up4.conf = conf.P4rtcIface
 
@@ -388,7 +388,7 @@ func (up4 *UP4) tryConnect() error {
 	up4.tryConnectMu.Lock()
 	defer up4.tryConnectMu.Unlock()
 
-	if up4.isConnected(nil) {
+	if up4.IsConnected(nil) {
 		return nil
 	}
 
@@ -474,7 +474,7 @@ func (up4 *UP4) listenToDDNs() {
 	notifier := NewDownlinkDataNotifier(up4.reportNotifyChan, 20*time.Second)
 
 	for {
-		if up4.isConnected(nil) {
+		if up4.IsConnected(nil) {
 			// blocking
 			digestData := up4.p4client.GetNextDigestData()
 
@@ -524,7 +524,7 @@ func (up4 *UP4) initialize() error {
 	return nil
 }
 
-func (up4 *UP4) sendEndMarkers(endMarkerList *[][]byte) error {
+func (up4 *UP4) SendEndMarkers(endMarkerList *[][]byte) error {
 	for _, eMarker := range *endMarkerList {
 		up4.endMarkerChan <- eMarker
 	}
@@ -1374,7 +1374,7 @@ func (up4 *UP4) sendDelete(deleted PacketForwardingRules) error {
 	return nil
 }
 
-func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updated PacketForwardingRules) uint8 {
+func (up4 *UP4) SendMsgToUPF(method upfMsgType, all PacketForwardingRules, updated PacketForwardingRules) uint8 {
 	err := up4.tryConnect()
 	if err != nil {
 		log.Error("UP4 server not connected")
