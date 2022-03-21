@@ -28,7 +28,7 @@ type PFCPIface struct {
 	conf Conf
 
 	node *PFCPNode
-	fp   fastPath
+	fp   datapath
 	upf  *upf
 
 	httpSrv      *http.Server
