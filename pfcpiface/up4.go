@@ -141,20 +141,14 @@ func (up4 *UP4) sessionStats(*PfcpNodeCollector, chan<- prometheus.Metric) error
 func (up4 *UP4) portStats(uc *upfCollector, ch chan<- prometheus.Metric) {
 }
 
-func (up4 *UP4) initCounter(counterID uint8, name string) error {
-	ctr, err := up4.p4RtTranslator.getCounterByName(name)
-	if err != nil {
-		return err
-	}
-
-	up4.counters[counterID].maxSize = uint64(ctr.Size)
-	up4.counters[counterID].counterID = uint64(ctr.Preamble.Id)
+func (up4 *UP4) initCounter(counterID uint8, name string, counterSize uint64) {
+	up4.counters[counterID].maxSize = uint64(counterSize)
+	up4.counters[counterID].counterID = uint64(counterID)
 	up4.counters[counterID].counterIDsPool = set.NewSet()
 
 	for i := uint64(0); i < up4.counters[counterID].maxSize+1; i++ {
 		up4.counters[counterID].counterIDsPool.Add(uint64(i))
 	}
-
 
 	log.WithFields(log.Fields{
 		"counterID":      counterID,
