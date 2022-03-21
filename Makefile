@@ -78,6 +78,7 @@ test-up4-integration-docker:
 test-bess-integration-native:
 	MODE=native DATAPATH=bess go test \
        -v \
+       -race \
        -count=1 \
        -failfast \
        ./test/integration/...
