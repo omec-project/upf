@@ -133,7 +133,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 		qers: addQERs,
 	}
 
-	cause := upf.sendMsgToUPF(upfMsgTypeAdd, session.PacketForwardingRules, updated)
+	cause := upf.SendMsgToUPF(upfMsgTypeAdd, session.PacketForwardingRules, updated)
 	if cause == ie.CauseRequestRejected {
 		pConn.RemoveSession(session)
 		return errProcessReply(ErrWriteToDatapath,
@@ -331,13 +331,13 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		qers: addQERs,
 	}
 
-	cause := upf.sendMsgToUPF(upfMsgTypeMod, session.PacketForwardingRules, updated)
+	cause := upf.SendMsgToUPF(upfMsgTypeMod, session.PacketForwardingRules, updated)
 	if cause == ie.CauseRequestRejected {
 		return sendError(ErrWriteToDatapath)
 	}
 
 	if upf.enableEndMarker {
-		err := upf.sendEndMarkers(&endMarkerList)
+		err := upf.SendEndMarkers(&endMarkerList)
 		if err != nil {
 			log.Errorln("Sending End Markers Failed : ", err)
 		}
@@ -395,7 +395,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		qers: delQERs,
 	}
 
-	cause = upf.sendMsgToUPF(upfMsgTypeDel, deleted, PacketForwardingRules{})
+	cause = upf.SendMsgToUPF(upfMsgTypeDel, deleted, PacketForwardingRules{})
 	if cause == ie.CauseRequestRejected {
 		return sendError(ErrWriteToDatapath)
 	}
@@ -445,7 +445,7 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 		return sendError(ErrNotFoundWithParam("PFCP session", "localSEID", localSEID))
 	}
 
-	cause := upf.sendMsgToUPF(upfMsgTypeDel, session.PacketForwardingRules, PacketForwardingRules{})
+	cause := upf.SendMsgToUPF(upfMsgTypeDel, session.PacketForwardingRules, PacketForwardingRules{})
 	if cause == ie.CauseRequestRejected {
 		return sendError(ErrWriteToDatapath)
 	}
@@ -553,7 +553,7 @@ func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) error {
 
 		pConn.RemoveSession(sessItem)
 
-		cause := upf.sendMsgToUPF(
+		cause := upf.SendMsgToUPF(
 			upfMsgTypeDel, sessItem.PacketForwardingRules, PacketForwardingRules{})
 		if cause == ie.CauseRequestRejected {
 			return errProcess(

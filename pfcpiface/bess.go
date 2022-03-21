@@ -80,7 +80,7 @@ type bess struct {
 	qciQosMap        map[uint8]*QosConfigVal
 }
 
-func (b *bess) isConnected(accessIP *net.IP) bool {
+func (b *bess) IsConnected(accessIP *net.IP) bool {
 	if (b.conn == nil) || (b.conn.GetState() != connectivity.Ready) {
 		return false
 	}
@@ -88,7 +88,7 @@ func (b *bess) isConnected(accessIP *net.IP) bool {
 	return true
 }
 
-func (b *bess) sendEndMarkers(endMarkerList *[][]byte) error {
+func (b *bess) SendEndMarkers(endMarkerList *[][]byte) error {
 	for _, eMarker := range *endMarkerList {
 		b.endMarkerChan <- eMarker
 	}
@@ -96,7 +96,7 @@ func (b *bess) sendEndMarkers(endMarkerList *[][]byte) error {
 	return nil
 }
 
-func (b *bess) addSliceInfo(sliceInfo *SliceInfo) error {
+func (b *bess) AddSliceInfo(sliceInfo *SliceInfo) error {
 	var sliceMeterConfig SliceMeterConfig
 	sliceMeterConfig.N6RateBps = sliceInfo.uplinkMbr
 	sliceMeterConfig.N3RateBps = sliceInfo.downlinkMbr
@@ -119,7 +119,7 @@ func (b *bess) addSliceInfo(sliceInfo *SliceInfo) error {
 	return nil
 }
 
-func (b *bess) sendMsgToUPF(
+func (b *bess) SendMsgToUPF(
 	method upfMsgType, rules PacketForwardingRules, updated PacketForwardingRules) uint8 {
 	// create context
 	var cause uint8 = ie.CauseRequestAccepted
@@ -191,7 +191,7 @@ func (b *bess) sendMsgToUPF(
 	return cause
 }
 
-func (b *bess) exit() {
+func (b *bess) Exit() {
 	log.Println("Exit function Bess")
 	b.conn.Close()
 }
@@ -250,7 +250,7 @@ func (b *bess) getPortStats(ifname string) *pb.GetPortStatsResponse {
 	return res
 }
 
-func (b *bess) portStats(uc *upfCollector, ch chan<- prometheus.Metric) {
+func (b *bess) PortStats(uc *upfCollector, ch chan<- prometheus.Metric) {
 	portstats := func(ifaceLabel, ifaceName string) {
 		packets := func(packets uint64, direction string) {
 			p := prometheus.MustNewConstMetric(
@@ -299,7 +299,7 @@ func (b *bess) portStats(uc *upfCollector, ch chan<- prometheus.Metric) {
 	portstats("Core", uc.upf.coreIface)
 }
 
-func (b *bess) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric) {
+func (b *bess) SummaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric) {
 	measureIface := func(ifaceLabel, ifaceName string) {
 		req := &pb.MeasureCommandGetSummaryArg{
 			Clear:              true,
@@ -419,7 +419,7 @@ func (b *bess) readFlowMeasurement(
 	return
 }
 
-func (b *bess) sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) (err error) {
+func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) (err error) {
 	// Clearing table data with large tables is slow, let's wait for a little longer since this is
 	// non-blocking for the dataplane anyway.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
@@ -663,10 +663,10 @@ func (b *bess) clearState() {
 
 // setUpfInfo is only called at pfcp-agent's startup
 // it clears all the state in BESS
-func (b *bess) setUpfInfo(u *upf, conf *Conf) {
+func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 	var err error
 
-	log.Println("setUpfInfo bess")
+	log.Println("SetUpfInfo bess")
 
 	b.readQciQosMap(conf)
 	// get bess grpc client
