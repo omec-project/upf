@@ -72,11 +72,11 @@ test-up4-integration-docker:
 	docker-compose -f test/integration/infra/docker-compose.yml rm -fsv
 	COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker-compose -f test/integration/infra/docker-compose.yml build $(DOCKER_BUILD_ARGS)
 	docker-compose -f test/integration/infra/docker-compose.yml up -d
-	MODE=docker FASTPATH=up4 go test -v -count=1 -failfast ./test/integration/...
+	MODE=docker DATAPATH=up4 go test -v -count=1 -failfast ./test/integration/...
 	docker-compose -f test/integration/infra/docker-compose.yml rm -fsv
 
 test-bess-integration-native:
-	MODE=native FASTPATH=bess go test \
+	MODE=native DATAPATH=bess go test \
        -v \
        -count=1 \
        -failfast \

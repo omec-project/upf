@@ -15,7 +15,7 @@ import (
 
 // errors
 var (
-	ErrWriteToFastpath = errors.New("write to FastPath failed")
+	ErrWriteToDatapath = errors.New("write to datapath failed")
 	ErrAssocNotFound   = errors.New("no association found for NodeID")
 	ErrAllocateSession = errors.New("unable to allocate new PFCP session")
 )
@@ -136,7 +136,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 	cause := upf.sendMsgToUPF(upfMsgTypeAdd, session.PacketForwardingRules, updated)
 	if cause == ie.CauseRequestRejected {
 		pConn.RemoveSession(session)
-		return errProcessReply(ErrWriteToFastpath,
+		return errProcessReply(ErrWriteToDatapath,
 			ie.CauseRequestRejected)
 	}
 
@@ -333,7 +333,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 
 	cause := upf.sendMsgToUPF(upfMsgTypeMod, session.PacketForwardingRules, updated)
 	if cause == ie.CauseRequestRejected {
-		return sendError(ErrWriteToFastpath)
+		return sendError(ErrWriteToDatapath)
 	}
 
 	if upf.enableEndMarker {
@@ -397,7 +397,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 
 	cause = upf.sendMsgToUPF(upfMsgTypeDel, deleted, PacketForwardingRules{})
 	if cause == ie.CauseRequestRejected {
-		return sendError(ErrWriteToFastpath)
+		return sendError(ErrWriteToDatapath)
 	}
 
 	err := pConn.store.PutSession(session)
@@ -447,7 +447,7 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 
 	cause := upf.sendMsgToUPF(upfMsgTypeDel, session.PacketForwardingRules, PacketForwardingRules{})
 	if cause == ie.CauseRequestRejected {
-		return sendError(ErrWriteToFastpath)
+		return sendError(ErrWriteToDatapath)
 	}
 
 	if err := releaseAllocatedIPs(upf.ippool, &session); err != nil {
@@ -557,7 +557,7 @@ func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) error {
 			upfMsgTypeDel, sessItem.PacketForwardingRules, PacketForwardingRules{})
 		if cause == ie.CauseRequestRejected {
 			return errProcess(
-				ErrOperationFailedWithParam("delete session from fastpath", "seid", seid))
+				ErrOperationFailedWithParam("delete session from datapath", "seid", seid))
 		}
 
 		return nil
