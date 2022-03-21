@@ -228,11 +228,12 @@ func generateConstants(p4info *p4ConfigV1.P4Info) string {
 	for eName, value := range p4info.GetTypeInfo().GetSerializableEnums() {
 		for _, member := range value.GetMembers() {
 			name := eName + "_" + member.GetName()
-			if len(member.GetValue()) > 4 {
-				log.Errorln(name, " cannot fit in Uint32")
-				continue
+			enumVal, err := getUint32FromByteArray(member.GetValue())
+			if err != nil {
+				log.Errorln(name, err)
+			} else {
+				constBuilder.WriteString(emitEntityConstant(enumVarPrefix, name, enumVal))
 			}
-			constBuilder.WriteString(emitEntityConstant(enumVarPrefix, name, getUint32FromByteArray(member.GetValue())))
 		}
 	}
 
@@ -241,8 +242,13 @@ func generateConstants(p4info *p4ConfigV1.P4Info) string {
 	return constBuilder.String()
 }
 
-func getUint32FromByteArray(s []byte) uint32 {
-	return binary.BigEndian.Uint32(s[4-len(s):])
+func getUint32FromByteArray(s []byte) (uint32, error) {
+	if len(s) > 4 {
+		return 0, fmt.Errorf("getUint32FromByteArray failed due to: cannot fit in Uint32")
+	}
+	var b [4]byte
+	copy(b[4-len(s):], s)
+	return binary.BigEndian.Uint32(b[:]), nil
 }
 
 func mustGetP4Config(p4infopath string) *p4ConfigV1.P4Info {

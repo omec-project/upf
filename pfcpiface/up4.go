@@ -144,7 +144,7 @@ func (up4 *UP4) addSliceInfo(sliceInfo *SliceInfo) error {
 		sliceBurstBytes = sliceInfo.dlBurstBytes
 	}
 
-	meterCellId := uint32((up4.conf.SliceID << 2) + (up4.conf.DefaultTC & 0b11))
+	meterCellId := up4.getSliceMeterIndex()
 	meterConfig := p4.MeterConfig{
 		Cir:    int64(0),
 		Cburst: int64(0),
@@ -164,6 +164,10 @@ func (up4 *UP4) addSliceInfo(sliceInfo *SliceInfo) error {
 	}
 
 	return nil
+}
+
+func (up4 *UP4) getSliceMeterIndex() uint32 {
+	return uint32((up4.conf.SliceID << 2) + (up4.conf.DefaultTC & 0b11))
 }
 
 func (up4 *UP4) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric) {
@@ -508,13 +512,6 @@ func (up4 *UP4) initialize() error {
 	err := up4.clearTables()
 	if err != nil {
 		log.Warningf("failed to clear tables: %v", err)
-		return err
-	}
-
-	// Slice meter will be pushed again by ROC
-	err = up4.resetSliceMeter()
-	if err != nil {
-		log.Warningf("failed to reset slice meter: %v", err)
 		return err
 	}
 
@@ -993,17 +990,6 @@ func (up4 *UP4) configureSessionMeter(q qer) (meter, error) {
 		uplinkCellID:   uplinkCellID,
 		downlinkCellID: downlinkCellID,
 	}, nil
-}
-
-func (up4 *UP4) resetSliceMeter() error {
-	log.Debug("Resetting slice meter")
-
-	entry := &p4.MeterEntry{
-		MeterId: p4constants.MeterPreQosPipeSliceTcMeter,
-		Index:   &p4.Index{Index: int64((up4.conf.SliceID << 2) + (up4.conf.DefaultTC & 0b11))},
-	}
-
-	return up4.p4client.ApplyMeterEntries(p4.Update_MODIFY, entry)
 }
 
 func (up4 *UP4) configureMeters(qers []qer) error {
