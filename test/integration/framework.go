@@ -26,10 +26,10 @@ import (
 
 const (
 	EnvMode     = "MODE"
-	EnvFastpath = "FASTPATH"
+	EnvDatapath = "DATAPATH"
 
-	FastpathUP4  = "up4"
-	FastpathBESS = "bess"
+	DatapathUP4  = "up4"
+	DatapathBESS = "bess"
 
 	ModeDocker = "docker"
 	ModeNative = "native"
@@ -249,12 +249,12 @@ func isModeDocker() bool {
 	return os.Getenv(EnvMode) == ModeDocker
 }
 
-func isFastpathUP4() bool {
-	return os.Getenv(EnvFastpath) == FastpathUP4
+func isDatapathUP4() bool {
+	return os.Getenv(EnvDatapath) == DatapathUP4
 }
 
-func isFastpathBESS() bool {
-	return os.Getenv(EnvFastpath) == FastpathBESS
+func isDatapathBESS() bool {
+	return os.Getenv(EnvDatapath) == DatapathBESS
 }
 
 func initForwardingPipelineConfig() {
@@ -275,8 +275,8 @@ func setup(t *testing.T, configType uint32) {
 	// 		 the registry in a bad state. Use custom registries to avoid global state.
 	prometheus.DefaultRegisterer = prometheus.NewRegistry()
 
-	switch os.Getenv(EnvFastpath) {
-	case FastpathBESS:
+	switch os.Getenv(EnvDatapath) {
+	case DatapathBESS:
 		bessFake = fake_bess.NewFakeBESS()
 		go func() {
 			if err := bessFake.Run(":10514"); err != nil {
@@ -290,13 +290,13 @@ func setup(t *testing.T, configType uint32) {
 
 	switch os.Getenv(EnvMode) {
 	case ModeDocker:
-		jsonConf, _ := json.Marshal(GetConfig(os.Getenv(EnvFastpath), configType))
+		jsonConf, _ := json.Marshal(GetConfig(os.Getenv(EnvDatapath), configType))
 		err := ioutil.WriteFile("./infra/upf.json", jsonConf, os.ModePerm)
 		require.NoError(t, err)
 		providers.MustRunDockerCommandAttach("pfcpiface",
 			"/bin/pfcpiface -config /config/upf.json")
 	case ModeNative:
-		pfcpAgent = pfcpiface.NewPFCPIface(GetConfig(os.Getenv(EnvFastpath), configType))
+		pfcpAgent = pfcpiface.NewPFCPIface(GetConfig(os.Getenv(EnvDatapath), configType))
 		go pfcpAgent.Run()
 	default:
 		t.Fatal("Unexpected test mode")
@@ -312,7 +312,7 @@ func setup(t *testing.T, configType uint32) {
 }
 
 func teardown(t *testing.T) {
-	if isFastpathUP4() {
+	if isDatapathUP4() {
 		// clear Tunnel Peers table
 		// FIXME: Temporary solution. They should be cleared by pfcpiface, see SDFAB-960
 		p4rtClient, _ := providers.ConnectP4rt("127.0.0.1:50001", TimeBasedElectionId())
@@ -346,8 +346,8 @@ func teardown(t *testing.T) {
 		t.Fatal("Unexpected test mode")
 	}
 
-	switch os.Getenv(EnvFastpath) {
-	case FastpathBESS:
+	switch os.Getenv(EnvDatapath) {
+	case DatapathBESS:
 		if bessFake != nil {
 			bessFake.Stop()
 		}
@@ -355,19 +355,19 @@ func teardown(t *testing.T) {
 }
 
 func verifyEntries(t *testing.T, testdata *pfcpSessionData, expectedValues p4RtValues, ueState UEState) {
-	switch os.Getenv(EnvFastpath) {
-	case FastpathUP4:
+	switch os.Getenv(EnvDatapath) {
+	case DatapathUP4:
 		verifyP4RuntimeEntries(t, testdata, expectedValues, ueState)
-	case FastpathBESS:
+	case DatapathBESS:
 		verifyBessEntries(t, bessFake, testdata, expectedValues, ueState)
 	}
 }
 
 func verifyNoEntries(t *testing.T, expectedValues p4RtValues) {
-	switch os.Getenv(EnvFastpath) {
-	case FastpathUP4:
+	switch os.Getenv(EnvDatapath) {
+	case DatapathUP4:
 		verifyNoP4RuntimeEntries(t, expectedValues)
-	case FastpathBESS:
+	case DatapathBESS:
 		verifyNoBessRuntimeEntries(t, bessFake)
 	}
 }

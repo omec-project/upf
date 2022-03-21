@@ -32,21 +32,21 @@ func (u upfMsgType) String() string {
 	}
 }
 
-type fastPath interface {
+type datapath interface {
 	/* Close any pending sessions */
 	exit()
-	/* setup internal parameters and channel with fastPath */
+	/* setup internal parameters and channel with datapath */
 	setUpfInfo(u *upf, conf *Conf)
 	/* set up slice info */
 	addSliceInfo(sliceInfo *SliceInfo) error
-	/* write endMarker to fastpath */
+	/* write endMarker to datapath */
 	sendEndMarkers(endMarkerList *[][]byte) error
-	/* write pdr/far/qer to fastpath */
+	/* write pdr/far/qer to datapath */
 	// "master" function to send create/update/delete messages to UPF.
 	// "new" PacketForwardingRules are only used for update messages to UPF.
 	// TODO: we should have better CRUD API, with a single function per message type.
 	sendMsgToUPF(method upfMsgType, all PacketForwardingRules, new PacketForwardingRules) uint8
-	/* check of communication channel to fastpath is setup */
+	/* check of communication channel to datapath is setup */
 	isConnected(accessIP *net.IP) bool
 	summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric)
 	portStats(uc *upfCollector, ch chan<- prometheus.Metric)
