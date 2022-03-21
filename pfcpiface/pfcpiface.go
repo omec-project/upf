@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -36,6 +37,8 @@ type PFCPIface struct {
 
 	uc *upfCollector
 	nc *PfcpNodeCollector
+
+	mu sync.Mutex
 }
 
 func NewPFCPIface(conf Conf) *PFCPIface {
@@ -61,17 +64,11 @@ func NewPFCPIface(conf Conf) *PFCPIface {
 	return pfcpIface
 }
 
-func (p *PFCPIface) Run() {
-	if simulate.enable() {
-		p.upf.sim(simulate, &p.conf.SimInfo)
-
-		if !simulate.keepGoing() {
-			return
-		}
-	}
+func (p *PFCPIface) mustInit() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
 	p.node = NewPFCPNode(p.upf)
-
 	httpMux := http.NewServeMux()
 
 	setupConfigHandler(httpMux, p.upf)
@@ -85,6 +82,18 @@ func (p *PFCPIface) Run() {
 	}
 
 	p.httpSrv = &http.Server{Addr: p.httpEndpoint, Handler: httpMux}
+}
+
+func (p *PFCPIface) Run() {
+	if simulate.enable() {
+		p.upf.sim(simulate, &p.conf.SimInfo)
+
+		if !simulate.keepGoing() {
+			return
+		}
+	}
+
+	p.mustInit()
 
 	go func() {
 		if err := p.httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -110,6 +119,9 @@ func (p *PFCPIface) Run() {
 
 // Stop sends cancellation signal to main Go routine and waits for shutdown to complete.
 func (p *PFCPIface) Stop() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	ctxHttpShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer func() {
 		cancel()
