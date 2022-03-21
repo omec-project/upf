@@ -298,7 +298,7 @@ func (up4 *UP4) initApplicationIDs() {
 
 // This function ensures that PFCP Agent is connected to UP4.
 // Returns true if the connection is already established.
-// FIXME: the argument should be removed from fastpath API
+// FIXME: the argument should be removed from datapath API
 func (up4 *UP4) isConnected(accessIP *net.IP) bool {
 	up4.connectedMu.Lock()
 	defer up4.connectedMu.Unlock()

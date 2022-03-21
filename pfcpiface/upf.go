@@ -51,7 +51,7 @@ type upf struct {
 	sliceInfo         *SliceInfo
 	readTimeout       time.Duration
 
-	fastPath
+	datapath
 	maxReqRetries uint8
 	respTimeout   time.Duration
 	enableHBTimer bool
@@ -75,7 +75,7 @@ const (
 )
 
 func (u *upf) isConnected() bool {
-	return u.fastPath.isConnected(&u.accessIP)
+	return u.datapath.isConnected(&u.accessIP)
 }
 
 func (u *upf) addSliceInfo(sliceInfo *SliceInfo) error {
@@ -85,10 +85,10 @@ func (u *upf) addSliceInfo(sliceInfo *SliceInfo) error {
 
 	u.sliceInfo = sliceInfo
 
-	return u.fastPath.addSliceInfo(sliceInfo)
+	return u.datapath.addSliceInfo(sliceInfo)
 }
 
-func NewUPF(conf *Conf, fp fastPath) *upf {
+func NewUPF(conf *Conf, fp datapath) *upf {
 	var (
 		err    error
 		nodeID string
@@ -120,7 +120,7 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 		coreIface:         conf.CoreIface.IfName,
 		ippoolCidr:        conf.CPIface.UEIPPool,
 		nodeID:            nodeID,
-		fastPath:          fp,
+		datapath:          fp,
 		dnn:               conf.CPIface.Dnn,
 		peers:             conf.CPIface.Peers,
 		reportNotifyChan:  make(chan uint64, 1024),
@@ -173,7 +173,7 @@ func NewUPF(conf *Conf, fp fastPath) *upf {
 		}
 	}
 
-	u.fastPath.setUpfInfo(u, conf)
+	u.datapath.setUpfInfo(u, conf)
 
 	return u
 }
