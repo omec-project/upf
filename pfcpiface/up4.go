@@ -5,7 +5,6 @@ package pfcpiface
 
 import (
 	"encoding/binary"
-	"errors"
 	"flag"
 	"fmt"
 	"math"
@@ -45,9 +44,8 @@ const (
 )
 
 var (
-	p4RtcServerIP        = flag.String("p4RtcServerIP", "", "P4 Server ip")
-	p4RtcServerPort      = flag.String("p4RtcServerPort", "", "P4 Server port")
-	fastpathDisconnected = errors.New("fastpath is not connected")
+	p4RtcServerIP   = flag.String("p4RtcServerIP", "", "P4 Server ip")
+	p4RtcServerPort = flag.String("p4RtcServerPort", "", "P4 Server port")
 )
 
 type application struct {
@@ -132,8 +130,10 @@ func (m meter) String() string {
 func (up4 *UP4) addSliceInfo(sliceInfo *SliceInfo) error {
 	//FIXME: UP4 currently supports a single slice meter rate common between UL and DL traffic. For this reason, we
 	//  configure the meter with the largest slice MBR between UL and DL.
-	if !up4.isConnected(nil) {
-		return fastpathDisconnected
+	err := up4.tryConnect()
+	if err != nil {
+		log.Error("UP4 server not connected")
+		return ErrOperationFailedWithReason("addSliceInfo", "data plane is not connected")
 	}
 
 	var sliceMbr, sliceBurstBytes uint64
@@ -158,7 +158,7 @@ func (up4 *UP4) addSliceInfo(sliceInfo *SliceInfo) error {
 		"Slice meter entry": sliceMeterEntry,
 	}).Debug("Installing slice P4 Meter entry")
 
-	err := up4.p4client.ApplyMeterEntries(p4.Update_MODIFY, sliceMeterEntry)
+	err = up4.p4client.ApplyMeterEntries(p4.Update_MODIFY, sliceMeterEntry)
 
 	if err != nil {
 		return err

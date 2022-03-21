@@ -242,9 +242,7 @@ func generateConstants(p4info *p4ConfigV1.P4Info) string {
 }
 
 func getUint32FromByteArray(s []byte) uint32 {
-	var b [4]byte
-	copy(b[4-len(s):], s)
-	return binary.BigEndian.Uint32(b[:])
+	return binary.BigEndian.Uint32(s[4-len(s):])
 }
 
 func mustGetP4Config(p4infopath string) *p4ConfigV1.P4Info {
