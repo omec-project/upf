@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/ettle/strcase"
@@ -225,8 +226,16 @@ func generateConstants(p4info *p4ConfigV1.P4Info) string {
 
 	// Enums
 	constBuilder.WriteString("// Enumerators\n")
-	for eName, value := range p4info.GetTypeInfo().GetSerializableEnums() {
-		for _, member := range value.GetMembers() {
+	serializableEnums := p4info.GetTypeInfo().GetSerializableEnums()
+	orderedEnumNames := make([]string, 0, len(serializableEnums))
+	for k := range serializableEnums {
+		orderedEnumNames = append(orderedEnumNames, k)
+	}
+
+	sort.Strings(orderedEnumNames)
+
+	for _, eName := range orderedEnumNames {
+		for _, member := range serializableEnums[eName].GetMembers() {
 			name := eName + "_" + member.GetName()
 			enumVal, err := getUint32FromByteArray(member.GetValue())
 			if err != nil {
