@@ -123,11 +123,10 @@ type appFilter struct {
 }
 
 type p4RtValues struct {
-	tc           uint8
-	ueAddress    string
-	tunnelPeerID uint8
-	appID        uint8
-	appFilter    appFilter
+	tc        uint8
+	ueAddress string
+	appID     uint8
+	appFilter appFilter
 
 	pdrs []*ie.IE
 	fars []*ie.IE
@@ -312,17 +311,6 @@ func setup(t *testing.T, configType uint32) {
 }
 
 func teardown(t *testing.T) {
-	if isDatapathUP4() {
-		// clear Tunnel Peers table
-		// FIXME: Temporary solution. They should be cleared by pfcpiface, see SDFAB-960
-		p4rtClient, _ := providers.ConnectP4rt("127.0.0.1:50001", TimeBasedElectionId())
-		defer providers.DisconnectP4rt()
-		entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.tunnel_peers")
-		for _, entry := range entries {
-			p4rtClient.DeleteTableEntry(entry)
-		}
-	}
-
 	if pfcpClient.IsAssociationAlive() {
 		err := pfcpClient.TeardownAssociation()
 		require.NoError(t, err)
