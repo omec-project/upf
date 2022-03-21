@@ -73,7 +73,7 @@ type meter struct {
 	downlinkCellID uint32
 }
 
-// tnlPeerReference <F-SEIDs (UE sessions); FAR-ID> pair that
+// tnlPeerReference <F-SEID (UE session); FAR-ID> pair that
 // uniquely identifies tunnel peer among different FAR IEs of the same UE session.
 type tnlPeerReference struct {
 	fseid uint64
@@ -82,8 +82,7 @@ type tnlPeerReference struct {
 
 type tunnelPeer struct {
 	id uint8
-	// usedBy keeps track of <F-SEIDs (UE sessions); FAR-ID> pairs using this tunnel peer.
-	// It's implemented as Set to avoid duplicated F-SEIDs.
+	// usedBy keeps track of <F-SEID (UE session); FAR-ID> pairs using this tunnel peer.
 	usedBy set.Set
 }
 
@@ -638,8 +637,9 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
 
 		methodType = p4.Update_INSERT
 	} else {
-		// tunnel peer already exists, increment ref count.
-		// since we use Set ref count will not be incremented if tunnel peer was already created for this UE session.
+		// tunnel peer already exists.
+		// since we use Set to keep track of tunnel peers in use,
+		// it will not be added to the set if tunnel peer was already created for this UE session.
 		tnlPeer.usedBy.Add(tnlPeerReference{
 			far.fseID, far.farID,
 		})
