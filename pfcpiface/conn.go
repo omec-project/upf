@@ -147,7 +147,7 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 	}
 
 	// Update map of connections
-	node.pConns[rAddr] = p
+	node.pConns.Store(rAddr, p)
 
 	go p.Serve()
 

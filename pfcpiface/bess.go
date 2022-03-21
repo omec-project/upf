@@ -454,10 +454,16 @@ func (b *bess) sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 
 	// TODO: pick first connection for now
 	var con *PFCPConn
-	for _, c := range pc.node.pConns {
-		con = c
-		break
-	}
+
+	pc.node.pConns.Range(func(key, value interface{}) bool {
+		pConn, ok := value.(*PFCPConn)
+		if !ok {
+			return false
+		}
+
+		con = pConn
+		return false
+	})
 
 	if con == nil {
 		log.Warnln("No active PFCP connection, UE IP lookup disabled")
