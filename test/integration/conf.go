@@ -94,16 +94,16 @@ func UP4ConfigUPFBasedIPAllocation() pfcpiface.Conf {
 	return config
 }
 
-func GetConfig(fastpath string, configType uint32) pfcpiface.Conf {
-	switch fastpath {
-	case FastpathUP4:
+func GetConfig(datapath string, configType uint32) pfcpiface.Conf {
+	switch datapath {
+	case DatapathUP4:
 		switch configType {
 		case ConfigDefault:
 			return UP4ConfigDefault()
 		case ConfigUPFBasedIPAllocation:
 			return UP4ConfigUPFBasedIPAllocation()
 		}
-	case FastpathBESS:
+	case DatapathBESS:
 		switch configType {
 		case ConfigDefault:
 			return BESSConfigDefault()
@@ -112,7 +112,7 @@ func GetConfig(fastpath string, configType uint32) pfcpiface.Conf {
 		}
 	}
 
-	panic("Wrong fastpath or config type provided")
+	panic("Wrong datapath or config type provided")
 
 	return pfcpiface.Conf{}
 }

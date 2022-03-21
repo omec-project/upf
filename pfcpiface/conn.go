@@ -52,9 +52,11 @@ type PFCPConn struct {
 	rng        *rand.Rand
 	maxRetries int
 	appPFDs    map[string]appPFD
-	sessions   map[uint64]*PFCPSession
-	nodeID     nodeID
-	upf        *upf
+
+	store SessionsStore
+
+	nodeID nodeID
+	upf    *upf
 	// channel to signal PFCPNode on exit
 	done     chan<- string
 	shutdown chan struct{}
@@ -121,13 +123,14 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 	log.Infoln("Created PFCPConn from:", conn.LocalAddr(), "to:", conn.RemoteAddr())
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano())) // #nosec G404
-	p := &PFCPConn{
+
+	var p = &PFCPConn{
 		ctx:            node.ctx,
 		Conn:           conn,
 		ts:             ts,
 		rng:            rng,
 		maxRetries:     100,
-		sessions:       make(map[uint64]*PFCPSession),
+		store:          NewInMemoryStore(),
 		upf:            node.upf,
 		done:           node.pConnDone,
 		shutdown:       make(chan struct{}),
@@ -238,9 +241,9 @@ func (pConn *PFCPConn) Shutdown() {
 	}
 
 	// Cleanup all sessions in this conn
-	for seid, sess := range pConn.sessions {
+	for _, sess := range pConn.store.GetAllSessions() {
 		pConn.upf.sendMsgToUPF(upfMsgTypeDel, sess.PacketForwardingRules, PacketForwardingRules{})
-		pConn.RemoveSession(seid)
+		pConn.RemoveSession(sess)
 	}
 
 	rAddr := pConn.RemoteAddr().String()

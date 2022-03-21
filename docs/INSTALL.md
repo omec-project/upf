@@ -144,7 +144,7 @@ To start UPF in simulation mode:
 
 #### [Pktgen](../conf/pktgen.bess)
 
-Pktgen allows us to test the upf pipeline with external fastpath interfaces.
+Pktgen allows us to test the upf pipeline with external datapath interfaces.
 This can be done either using a single machine or two machines.
 
 > Make sure the mode is not set to sim in scripts/docker_setup.sh and upf.json
