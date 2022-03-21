@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"math"
-	"math/rand"
 	"net"
 	"sync"
 	"time"
@@ -55,9 +54,9 @@ type application struct {
 }
 
 type counter struct {
-	maxSize   uint64
-	counterID uint64
-	allocated map[uint64]uint64
+	maxSize        uint64
+	counterID      uint64
+	counterIDsPool set.Set
 	// free      map[uint64]uint64
 }
 
@@ -178,8 +177,13 @@ func (up4 *UP4) portStats(uc *upfCollector, ch chan<- prometheus.Metric) {
 }
 
 func (up4 *UP4) initCounter(counterID uint8, name string, counterSize uint64) {
-	up4.counters[counterID].maxSize = counterSize
+	up4.counters[counterID].maxSize = uint64(counterSize)
 	up4.counters[counterID].counterID = uint64(counterID)
+	up4.counters[counterID].counterIDsPool = set.NewSet()
+
+	for i := uint64(0); i < up4.counters[counterID].maxSize+1; i++ {
+		up4.counters[counterID].counterIDsPool.Add(uint64(i))
+	}
 
 	log.WithFields(log.Fields{
 		"counterID":      counterID,
@@ -189,37 +193,25 @@ func (up4 *UP4) initCounter(counterID uint8, name string, counterSize uint64) {
 	}).Debug("Counter initialized successfully")
 }
 
-func resetCounterVal(p *UP4, counterID uint8, val uint64) {
+func (up4 *UP4) releaseCounterID(p4counterID uint8, val uint64) {
 	log.Println("delete counter val ", val)
-	delete(p.counters[counterID].allocated, val)
+	up4.counters[p4counterID].counterIDsPool.Add(val)
 }
 
-func (up4 *UP4) getCounterVal(counterID uint8) (uint64, error) {
-	/*
-	   loop :
-	      random counter generate
-	      check allocated map
-	      if not in map then return counter val.
-	      if present continue
-	      if loop reaches max break and fail.
-	*/
-	var val uint64
-
-	ctr := &up4.counters[counterID]
-	for i := 0; i < int(ctr.maxSize); i++ {
-		rand.Seed(time.Now().UnixNano())
-
-		val = uint64(rand.Intn(int(ctr.maxSize)-1) + 1) // #nosec G404
-		if _, ok := ctr.allocated[val]; !ok {
-			log.Debug("Counter index is not in allocated map, assigning: ", val)
-
-			ctr.allocated[val] = 1
-
-			return val, nil
-		}
+func (up4 *UP4) allocateCounterID(p4counterID uint8) (uint64, error) {
+	if up4.counters[p4counterID].counterIDsPool.Cardinality() == 0 {
+		return 0, ErrOperationFailedWithReason("allocate Counter ID",
+			"no free Counter IDs available")
 	}
 
-	return 0, ErrOperationFailedWithParam("counter allocation", "final val", val)
+	allocated := up4.counters[p4counterID].counterIDsPool.Pop()
+
+	if allocated == nil {
+		return 0, ErrOperationFailedWithReason("allocate Counter ID",
+			"no free Counter IDs available")
+	}
+
+	return allocated.(uint64), nil
 }
 
 func (up4 *UP4) exit() {
@@ -402,10 +394,6 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	up4.fseidToUEAddr = make(map[uint64]uint32)
 
 	up4.counters = make([]counter, 2)
-	for i := range up4.counters {
-		// initialize allocated counters map
-		up4.counters[i].allocated = make(map[uint64]uint64)
-	}
 
 	go up4.keepTryingToConnect()
 }
@@ -1297,7 +1285,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 
 func (up4 *UP4) sendCreate(all PacketForwardingRules, updated PacketForwardingRules) error {
 	for i := range updated.pdrs {
-		val, err := up4.getCounterVal(preQosCounterID)
+		val, err := up4.allocateCounterID(preQosCounterID)
 		if err != nil {
 			return ErrOperationFailedWithReason("Counter ID allocation", err.Error())
 		}
@@ -1345,7 +1333,7 @@ func (up4 *UP4) sendUpdate(all PacketForwardingRules, updated PacketForwardingRu
 
 func (up4 *UP4) sendDelete(deleted PacketForwardingRules) error {
 	for i := range deleted.pdrs {
-		resetCounterVal(up4, preQosCounterID,
+		up4.releaseCounterID(preQosCounterID,
 			uint64(deleted.pdrs[i].ctrID))
 	}
 
