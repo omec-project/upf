@@ -487,7 +487,7 @@ func (b *bess) sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 			ueIpString := "unknown"
 
 			if con != nil {
-				session, ok := con.sessions[pre.Fseid]
+				session, ok := con.store.GetSession(pre.Fseid)
 				if !ok {
 					log.Errorln("Invalid or unknown FSEID", pre.Fseid)
 					continue
