@@ -1403,7 +1403,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(up4Tx *UP4Transaction, pdrs []p
 func (up4 *UP4) sendCreate(all PacketForwardingRules, updated PacketForwardingRules) error {
 	up4Tx := up4.BeginTx(TransactionCreate)
 	defer func() {
-		if up4Tx.Failed() {
+		if !up4Tx.Success() {
 			up4.RollbackTx(up4Tx)
 		}
 	}()
@@ -1447,7 +1447,7 @@ func (up4 *UP4) sendCreate(all PacketForwardingRules, updated PacketForwardingRu
 func (up4 *UP4) sendUpdate(all PacketForwardingRules, updated PacketForwardingRules) error {
 	up4Tx := up4.BeginTx(TransactionModify)
 	defer func() {
-		if up4Tx.Failed() {
+		if !up4Tx.Success() {
 			up4.RollbackTx(up4Tx)
 		}
 	}()
@@ -1479,7 +1479,7 @@ func (up4 *UP4) sendUpdate(all PacketForwardingRules, updated PacketForwardingRu
 func (up4 *UP4) sendDelete(deleted PacketForwardingRules) error {
 	up4Tx := up4.BeginTx(TransactionDelete)
 	defer func() {
-		if up4Tx.Failed() {
+		if !up4Tx.Success() {
 			up4.RollbackTx(up4Tx)
 		}
 	}()
@@ -1558,7 +1558,6 @@ func (up4 *UP4) CommitTx(transaction *UP4Transaction) error {
 	if err != nil {
 		p4Error, ok := err.(*P4RuntimeError)
 		if !ok {
-			transaction.failed = true
 			// not a P4Runtime error, returning err
 			return ErrOperationFailedWithReason("push entries to UP4", err.Error())
 		}
@@ -1571,12 +1570,12 @@ func (up4 *UP4) CommitTx(transaction *UP4Transaction) error {
 				continue
 			}
 
-			transaction.failed = true
-
 			return ErrOperationFailedWithReasonAndParam("push entries to UP4", p4Error.Error(),
 				"update index", idx)
 		}
 	}
+
+	transaction.success = true
 
 	return nil
 }

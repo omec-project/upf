@@ -28,7 +28,7 @@ type transactionContext struct {
 // All operations on UP4Transaction are NOT thread-safe.
 type UP4Transaction struct {
 	txType transactionType
-	failed bool
+	success bool
 
 	ctx transactionContext
 
@@ -66,8 +66,8 @@ func (t *UP4Transaction) GetTunnelPeerID(farID uint32) (uint8, bool) {
 	return tunnelPeerID, exists
 }
 
-func (t *UP4Transaction) Failed() bool {
-	return t.failed
+func (t *UP4Transaction) Success() bool {
+	return t.success
 }
 
 func (t *UP4Transaction) containsP4Update(update *p4.Update) bool {
