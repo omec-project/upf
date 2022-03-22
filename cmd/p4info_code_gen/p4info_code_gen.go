@@ -4,10 +4,13 @@
 package main
 
 import (
+	"encoding/binary"
 	"flag"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/ettle/strcase"
@@ -43,6 +46,7 @@ const (
 	packetmetaVarPrefix = "PacketMeta_"
 	mtrVarPrefix        = "Meter_"
 	mtrSizeVarPrefix    = "MeterSize_"
+	enumVarPrefix       = "Enum_"
 )
 
 func emitEntityConstant(prefix string, p4EntityName string, id uint32) string {
@@ -220,9 +224,40 @@ func generateConstants(p4info *p4ConfigV1.P4Info) string {
 		constBuilder.WriteString(emitEntitySizeConstant(mtrSizeVarPrefix, name, element.GetSize()))
 	}
 
+	// Enums
+	constBuilder.WriteString("// Enumerators\n")
+	serializableEnums := p4info.GetTypeInfo().GetSerializableEnums()
+	orderedEnumNames := make([]string, 0, len(serializableEnums))
+	for k := range serializableEnums {
+		orderedEnumNames = append(orderedEnumNames, k)
+	}
+
+	sort.Strings(orderedEnumNames)
+
+	for _, eName := range orderedEnumNames {
+		for _, member := range serializableEnums[eName].GetMembers() {
+			name := eName + "_" + member.GetName()
+			enumVal, err := getUint32FromByteArray(member.GetValue())
+			if err != nil {
+				log.Errorln(name, err)
+			} else {
+				constBuilder.WriteString(emitEntityConstant(enumVarPrefix, name, enumVal))
+			}
+		}
+	}
+
 	constBuilder.WriteString(constOrVarClose + "\n")
 
 	return constBuilder.String()
+}
+
+func getUint32FromByteArray(s []byte) (uint32, error) {
+	if len(s) > 4 {
+		return 0, fmt.Errorf("getUint32FromByteArray failed due to: cannot fit in Uint32")
+	}
+	var b [4]byte
+	copy(b[4-len(s):], s)
+	return binary.BigEndian.Uint32(b[:]), nil
 }
 
 func mustGetP4Config(p4infopath string) *p4ConfigV1.P4Info {

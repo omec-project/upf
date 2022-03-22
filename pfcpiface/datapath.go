@@ -34,21 +34,21 @@ func (u upfMsgType) String() string {
 
 type datapath interface {
 	/* Close any pending sessions */
-	exit()
+	Exit()
 	/* setup internal parameters and channel with datapath */
-	setUpfInfo(u *upf, conf *Conf)
+	SetUpfInfo(u *upf, conf *Conf)
 	/* set up slice info */
-	addSliceInfo(sliceInfo *SliceInfo) error
+	AddSliceInfo(sliceInfo *SliceInfo) error
 	/* write endMarker to datapath */
-	sendEndMarkers(endMarkerList *[][]byte) error
+	SendEndMarkers(endMarkerList *[][]byte) error
 	/* write pdr/far/qer to datapath */
 	// "master" function to send create/update/delete messages to UPF.
 	// "new" PacketForwardingRules are only used for update messages to UPF.
 	// TODO: we should have better CRUD API, with a single function per message type.
-	sendMsgToUPF(method upfMsgType, all PacketForwardingRules, new PacketForwardingRules) uint8
+	SendMsgToUPF(method upfMsgType, all PacketForwardingRules, new PacketForwardingRules) uint8
 	/* check of communication channel to datapath is setup */
-	isConnected(accessIP *net.IP) bool
-	summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric)
-	portStats(uc *upfCollector, ch chan<- prometheus.Metric)
-	sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) error
+	IsConnected(accessIP *net.IP) bool
+	SummaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric)
+	PortStats(uc *upfCollector, ch chan<- prometheus.Metric)
+	SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) error
 }
