@@ -681,7 +681,6 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) (tunnelPeer, bool, error) {
 		far.fseID, far.farID,
 	})
 
-
 	return tnlPeer, false, nil
 }
 
