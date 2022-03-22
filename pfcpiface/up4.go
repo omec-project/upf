@@ -147,7 +147,7 @@ func (m meter) String() string {
 		m.meterType, m.uplinkCellID, m.downlinkCellID)
 }
 
-func (up4 *UP4) addSliceInfo(sliceInfo *SliceInfo) error {
+func (up4 *UP4) AddSliceInfo(sliceInfo *SliceInfo) error {
 	//FIXME: UP4 currently supports a single slice meter rate common between UL and DL traffic. For this reason, we
 	//  configure the meter with the largest slice MBR between UL and DL.
 	err := up4.tryConnect()
@@ -165,7 +165,7 @@ func (up4 *UP4) addSliceInfo(sliceInfo *SliceInfo) error {
 		sliceBurstBytes = sliceInfo.dlBurstBytes
 	}
 
-	meterCellId := up4.GetSliceMeterIndex()
+	meterCellId := up4.getSliceMeterIndex()
 	meterConfig := p4.MeterConfig{
 		Cir:    int64(0),
 		Cburst: int64(0),
@@ -190,7 +190,7 @@ func (up4 *UP4) addSliceInfo(sliceInfo *SliceInfo) error {
 func (up4 *UP4) SummaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric) {
 }
 
-func (up4 *UP4) GetSliceMeterIndex() uint32 {
+func (up4 *UP4) getSliceMeterIndex() uint32 {
 	return uint32((up4.conf.SliceID << 2) + (up4.conf.DefaultTC & 0b11))
 }
 
