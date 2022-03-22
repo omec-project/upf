@@ -19,17 +19,17 @@ This UPF implementation is actively used as part of [the Aether platform](https:
 The UPF implementation consists of two layers:
 
 - **PFCP Agent:** (_pfcpiface_) a Go-based implementation of the PFCP northbound API used to interact with the mobile core control plane.
-- **Fastpath:** responsible for the actual data plane packet processing.
+- **Datapath:** responsible for the actual data plane packet processing.
 
-The PFCP Agent implements fastpath plugins that translate
-  PFCP messages to fastpath-specific configurations. We currently support two fastpath implementations:
-  - BESS: a software-based fastpath built on top of the [Berkeley Extensible Software Switch](https://github.com/NetSys/bess/) (BESS) framework.
+The PFCP Agent implements datapath plugins that translate
+  PFCP messages to datapath-specific configurations. We currently support two datapath implementations:
+  - BESS: a software-based datapath built on top of the [Berkeley Extensible Software Switch](https://github.com/NetSys/bess/) (BESS) framework.
     Please see the ONFConnect 2019 [talk](https://www.youtube.com/watch?v=fqJGWcwcOxE) for more details. You can also see demo videos [here](https://www.youtube.com/watch?v=KxK64jalKHw) and [here](https://youtu.be/rWnZuJeUWi4).
-  - [UP4](https://github.com/omec-project/up4): an implementation leveraging ONOS and P4-programmable switches to realize a hardware-based fastpath.
+  - [UP4](https://github.com/omec-project/up4): an implementation leveraging ONOS and P4-programmable switches to realize a hardware-based datapath.
 
-The combination of PFCP Agent and UP4 is usually referred to as P4-UPF. While BESS-UPF denotes the combination of PFCP Agent and the BESS fastpath.
+The combination of PFCP Agent and UP4 is usually referred to as P4-UPF. While BESS-UPF denotes the combination of PFCP Agent and the BESS datapath.
 
-PFCP Agent internally abstracts different fastpaths using a common API, while the different plug-ins can use spcific southbound protocols to communicate with the different fastpath instances. Support for new fastpaths can be provided by implementing new plugins.
+PFCP Agent internally abstracts different datapaths using a common API, while the different plug-ins can use spcific southbound protocols to communicate with the different datapath instances. Support for new datapaths can be provided by implementing new plugins.
 
 ### Feature List
 
@@ -75,7 +75,7 @@ Refer to [the SD-Fabric documentation](https://docs.sd-fabric.org/master/advance
 
 ## Getting started
 
-This repository provides code to build two Docker images: `pfcpiface` (the PFCP Agent) and `bess` (the BESS-based fastpath).
+This repository provides code to build two Docker images: `pfcpiface` (the PFCP Agent) and `bess` (the BESS-based datapath).
 
 To build all Docker images run:
 
@@ -111,10 +111,10 @@ The UPF project currently implements three types of tests:
 make test
 ```
 
-**E2E integration tests** that verify the inter-working between the PFCP Agent and a fastpath.
+**E2E integration tests** that verify the inter-working between the PFCP Agent and a datapath.
 We provide two modes of E2E integration tests: `native` and `docker`.
 The `native` mode invokes Go objects directly from the `go test` framework, thus it makes the test cases easier to debug.
-The `docker` mode uses fully Dockerized environment and runs all components (the PFCP Agent and a fastpath mock) as Docker containers. It ensures the correct behavior of the package produced by the UPF project.
+The `docker` mode uses fully Dockerized environment and runs all components (the PFCP Agent and a datapath mock) as Docker containers. It ensures the correct behavior of the package produced by the UPF project.
 
 To run E2E integration tests for UP4 in the `docker` mode use:
 
@@ -130,12 +130,12 @@ make test-bess-integration-native
 
 > NOTE! The `docker` mode for BESS-UPF and the `native` mode for UP4 are not implemented yet.
 
-**PTF tests for BESS-UPF** verify the BESS-based implementation of the UPF fastpath (data plane).
+**PTF tests for BESS-UPF** verify the BESS-based implementation of the UPF datapath (data plane).
 Follow the included [README](./ptf/README.md) to run PTF tests for BESS-UPF.
 
 ## Contributing
 
-The UPF project welcomes new contributors. Feel free to propose a new feature, integrate a new UPF fastpath or fix bugs!
+The UPF project welcomes new contributors. Feel free to propose a new feature, integrate a new UPF datapath or fix bugs!
 
 Before contributing, please follow the below guidelines:
 

@@ -147,7 +147,7 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 	}
 
 	// Update map of connections
-	node.pConns[rAddr] = p
+	node.pConns.Store(rAddr, p)
 
 	go p.Serve()
 
@@ -242,7 +242,7 @@ func (pConn *PFCPConn) Shutdown() {
 
 	// Cleanup all sessions in this conn
 	for _, sess := range pConn.store.GetAllSessions() {
-		pConn.upf.sendMsgToUPF(upfMsgTypeDel, sess.PacketForwardingRules, PacketForwardingRules{})
+		pConn.upf.SendMsgToUPF(upfMsgTypeDel, sess.PacketForwardingRules, PacketForwardingRules{})
 		pConn.RemoveSession(sess)
 	}
 
