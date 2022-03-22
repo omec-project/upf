@@ -21,7 +21,7 @@ type transactionContext struct {
 	// PDR ID -> application ID
 	applicationIDs map[uint32]uint8
 	// FAR ID -> tunnel peer ID
-	tunnelPeerIDs  map[uint32]uint8
+	tunnelPeerIDs map[uint32]uint8
 }
 
 // UP4Transaction represents single, atomic operation performed within the UP4 device context.
@@ -39,7 +39,7 @@ type UP4Transaction struct {
 
 func NewUP4Transaction(t transactionType) *UP4Transaction {
 	return &UP4Transaction{
-		txType: t,
+		txType:  t,
 		updates: make([]*p4.Update, 0),
 		ctx: transactionContext{
 			applicationIDs: make(map[uint32]uint8),
@@ -119,8 +119,3 @@ func (t *UP4Transaction) WithTableEntryOverwriteType(entry *p4.TableEntry, updat
 func (t *UP4Transaction) OnRollback(f func()) {
 	t.onRollback = append(t.onRollback, f)
 }
-
-
-
-
-
