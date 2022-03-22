@@ -599,22 +599,17 @@ func (up4 *UP4) unsafeReleaseAllocatedGTPTunnelPeer(tunnelParams tunnelParams) {
 	}
 }
 
-func (up4 *UP4) getGTPTunnelPeer(tnlParams tunnelParams) (tunnelPeer, bool) {
-	up4.tunnelPeerMu.Lock()
-	defer up4.tunnelPeerMu.Unlock()
-
-	tnlPeer, exists := up4.tunnelPeerIDs[tnlParams]
-
-	return tnlPeer, exists
-}
-
-func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
+// addOrUpdateGTPTunnelPeer allocates or updates tunnel peer references.
+// It returns:
+//  1) tunnel peer that has been created or updated.
+//  2) whether a tunnel peer has been newly added.
+//  3) an error, if operation fails
+func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) (tunnelPeer, bool, error) {
 	up4.tunnelPeerMu.Lock()
 	defer up4.tunnelPeerMu.Unlock()
 
 	var tnlPeer tunnelPeer
 
-	methodType := p4.Update_MODIFY
 	tunnelParams := tunnelParams{
 		tunnelIP4Src: ip2int(up4.accessIP.IP),
 		tunnelIP4Dst: far.tunnelIP4Dst,
@@ -625,7 +620,7 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
 	if !exists {
 		newID, err := up4.unsafeAllocateGTPTunnelPeerID()
 		if err != nil {
-			return err
+			return tunnelPeer{}, false, err
 		}
 
 		tnlPeer = tunnelPeer{
@@ -635,39 +630,27 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
 			}),
 		}
 
-		methodType = p4.Update_INSERT
-	} else {
-		// tunnel peer already exists.
-		// since we use Set to keep track of tunnel peers in use,
-		// it will not be added to the set if tunnel peer was already created for this UE session.
-		tnlPeer.usedBy.Add(tnlPeerReference{
-			far.fseID, far.farID,
-		})
+		up4.tunnelPeerIDs[tunnelParams] = tnlPeer
+
+		return tnlPeer, true, nil
 	}
 
-	releaseTnlPeerID := func() {
-		if !exists {
-			up4.unsafeReleaseAllocatedGTPTunnelPeer(tunnelParams)
-		}
-	}
+	// tunnel peer already exists.
+	// since we use Set to keep track of tunnel peers in use,
+	// it will not be added to the set if tunnel peer was already created for this UE session.
+	tnlPeer.usedBy.Add(tnlPeerReference{
+		far.fseID, far.farID,
+	})
 
-	gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(tnlPeer.id, tunnelParams)
-	if err != nil {
-		releaseTnlPeerID()
-		return err
-	}
 
-	if err := up4.p4client.ApplyTableEntries(methodType, gtpTunnelPeerEntry); err != nil {
-		releaseTnlPeerID()
-		return err
-	}
-
-	up4.tunnelPeerIDs[tunnelParams] = tnlPeer
-
-	return nil
+	return tnlPeer, false, nil
 }
 
-func (up4 *UP4) removeGTPTunnelPeer(far far) {
+// removeGTPTunnelPeer removes or updates "usedBy" references for allocated tunnel peer.
+// If tunnel peer is not used by any UE session anymore, it releases the tunnel peer ID.
+// Returns tunnel peer that has been removed and the status whether tunnel peer has been actually removed.
+// Returns 'false' status if tunnel peer's "userBy" has only been updated.
+func (up4 *UP4) removeGTPTunnelPeer(far far) (tunnelPeer, bool) {
 	up4.tunnelPeerMu.Lock()
 	defer up4.tunnelPeerMu.Unlock()
 
@@ -684,7 +667,7 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 	if !exists {
 		removeLog.WithField(
 			"tunnel-params", tunnelParams).Warn("GTP tunnel peer ID not found for tunnel params")
-		return
+		return tunnelPeer{}, false
 	}
 
 	removeLog.WithField("tunnel-peer", tnlPeer)
@@ -697,22 +680,73 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 
 	if tnlPeer.usedBy.Cardinality() != 0 {
 		removeLog.Debug("GTP tunnel peer was about to be removed, but it's in use by other UE session.")
-		return
+		return tnlPeer, false
+	}
+
+	up4.unsafeReleaseAllocatedGTPTunnelPeer(tunnelParams)
+
+	return tnlPeer, true
+}
+
+func (up4 *UP4) AddGTPTunnelPeer(up4Tx *UP4Transaction, far far) error {
+	tnlPeer, newlyAdded, err := up4.addOrUpdateGTPTunnelPeer(far)
+	if err != nil {
+		return err
+	}
+
+	up4Tx.WithTunnelPeerID(far.farID, tnlPeer.id)
+	up4Tx.OnRollback(func() {
+		up4.removeGTPTunnelPeer(far)
+	})
+
+	tunnelParams := tunnelParams{
+		tunnelIP4Src: ip2int(up4.accessIP.IP),
+		tunnelIP4Dst: far.tunnelIP4Dst,
+		tunnelPort:   far.tunnelPort,
 	}
 
 	gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(tnlPeer.id, tunnelParams)
 	if err != nil {
-		removeLog.Error("failed to build GTP tunnel peer entry to remove")
-		return
+		return err
 	}
 
-	removeLog.Debug("Removing GTP Tunnel Peer ID")
+	if newlyAdded {
+		up4Tx.WithTableEntryOverwriteType(gtpTunnelPeerEntry, p4.Update_INSERT)
 
-	if err := up4.p4client.ApplyTableEntries(p4.Update_DELETE, gtpTunnelPeerEntry); err != nil {
-		removeLog.Error("failed to remove GTP tunnel peer")
+		return nil
 	}
 
-	up4.unsafeReleaseAllocatedGTPTunnelPeer(tunnelParams)
+	up4Tx.WithTableEntry(gtpTunnelPeerEntry)
+
+	return nil
+}
+
+func (up4 *UP4) RemoveGTPTunnelPeer(up4Tx *UP4Transaction, far far) error {
+	tnlPeer, removed := up4.removeGTPTunnelPeer(far)
+
+	up4Tx.WithTunnelPeerID(far.farID, tnlPeer.id)
+	up4Tx.OnRollback(func() {
+		up4.addOrUpdateGTPTunnelPeer(far)
+	})
+
+	if !removed {
+		return nil
+	}
+
+	tunnelParams := tunnelParams{
+		tunnelIP4Src: ip2int(up4.accessIP.IP),
+		tunnelIP4Dst: far.tunnelIP4Dst,
+		tunnelPort:   far.tunnelPort,
+	}
+
+	gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(tnlPeer.id, tunnelParams)
+	if err != nil {
+		return err
+	}
+
+	up4Tx.WithTableEntryOverwriteType(gtpTunnelPeerEntry, p4.Update_DELETE)
+
+	return nil
 }
 
 // Returns error if we reach maximum supported Application IDs.
@@ -835,6 +869,7 @@ func (up4 *UP4) releaseSessionMeterCellID(allocated uint32) {
 	}).Debug("Session meter cell ID released")
 }
 
+// updateUEAddrAndFSEIDMappings runs in the UP4 Transaction scope.
 func (up4 *UP4) updateUEAddrAndFSEIDMappings(pdr pdr) {
 	if pdr.IsUplink() {
 		return
@@ -853,15 +888,32 @@ func (up4 *UP4) removeUeAddrAndFSEIDMappings(pdr pdr) {
 	delete(up4.fseidToUEAddr, pdr.fseID)
 }
 
-func (up4 *UP4) updateTunnelPeersBasedOnFARs(fars []far) error {
+func (up4 *UP4) updateTunnelPeersBasedOnFARs(up4Tx *UP4Transaction, fars []far) error {
 	for _, far := range fars {
 		logger := log.WithFields(log.Fields{
 			"far": far,
 		})
 		// downlink FAR with tunnel params that does encapsulation
 		if far.Forwards() && far.dstIntf == ie.DstInterfaceAccess && far.tunnelTEID != 0 {
-			if err := up4.addOrUpdateGTPTunnelPeer(far); err != nil {
+			if err := up4.AddGTPTunnelPeer(up4Tx, far); err != nil {
 				logger.Errorf("Failed to add or update GTP tunnel peer: %v", err)
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (up4 *UP4) removeTunnelPeersBasedOnFARs(up4Tx *UP4Transaction, fars []far) error {
+	for _, far := range fars {
+		logger := log.WithFields(log.Fields{
+			"far": far,
+		})
+		// downlink FAR with tunnel params that does encapsulation
+		if far.Forwards() && far.dstIntf == ie.DstInterfaceAccess && far.tunnelTEID != 0 {
+			if err := up4.RemoveGTPTunnelPeer(up4Tx, far); err != nil {
+				logger.Errorf("Failed to remove GTP tunnel peer: %v", err)
 				return err
 			}
 		}
@@ -1153,57 +1205,112 @@ func (up4 *UP4) resetMeters(qers []qer) {
 	}
 }
 
+func (up4 *UP4) WithSession(up4Tx *UP4Transaction, pdr pdr, far far) error {
+	tunnelPeerID, exists := up4Tx.GetTunnelPeerID(far.farID)
+	if !exists && far.tunnelTEID != 0 {
+		return ErrNotFound("allocated GTP tunnel peer ID")
+	}
+
+	var sessMeter = meter{meterTypeSession, 0, 0}
+	if len(pdr.qerIDList) == 2 {
+		// if 2 QERs are provided, the second one is Session QER
+		sessMeter = up4.meters[meterID{
+			qerID: pdr.qerIDList[1],
+			fseid: pdr.fseID,
+		}]
+	} // else: if only 1 QER provided, set sessMeterIdx to 0, and use only per-app metering
+
+	sessionsEntry, err := up4.p4RtTranslator.BuildSessionsTableEntry(pdr, sessMeter, tunnelPeerID, far.Buffers())
+	if err != nil {
+		return ErrOperationFailedWithReason("build P4rt table entry for Sessions table", err.Error())
+	}
+
+	up4Tx.WithTableEntry(sessionsEntry)
+	// no need to rollback any state as this function doesn't change it.
+
+	return nil
+}
+
+func (up4 *UP4) WithApplication(up4Tx *UP4Transaction, pdr pdr) error {
+	// as a default value is installed if no application filtering rule exists
+	var applicationID uint8 = DefaultApplicationID
+
+	if !pdr.IsAppFilterEmpty() {
+		var err error
+		applicationID, err = up4.getOrAllocateInternalApplicationID(pdr)
+		if err != nil {
+			return err
+		}
+
+		up4Tx.OnRollback(func() {
+			// FIXME: this will release app ID if it was already allocated
+			//  It will be fixed once "usedBy" list is added.
+			up4.releaseInternalApplicationID(pdr.appFilter)
+		})
+	}
+
+	up4Tx.WithApplicationID(pdr.pdrID, applicationID)
+
+	// TODO: the same app filter can be simultaneously used by another UE session. We cannot remove it.
+	//  We should come up with a way to check if an app filter is still in use.
+	if applicationID != DefaultApplicationID {
+		applicationsEntry, err := up4.p4RtTranslator.BuildApplicationsTableEntry(pdr, up4.conf.SliceID, applicationID)
+		if err != nil {
+			return ErrOperationFailedWithReason("build P4rt table entry for Applications table", err.Error())
+		}
+
+		up4Tx.WithTableEntry(applicationsEntry)
+	}
+
+	return nil
+}
+
+func (up4 *UP4) WithTermination(up4Tx *UP4Transaction, pdr pdr, far far, relatedQER qer) error {
+	var appMeter = meter{meterTypeApplication, 0, 0}
+	if len(pdr.qerIDList) != 0 {
+		// if only 1 QER provided, it's an application QER
+		// if 2 QERs provided, the first one is an application QER
+		// if more than 2 QERs provided, TODO: not supported
+		appMeter = up4.meters[meterID{
+			qerID: pdr.qerIDList[0],
+			fseid: pdr.fseID,
+		}]
+	}
+
+	var qfi uint8 = DefaultQFI
+	if relatedQER != (qer{}) {
+		qfi = relatedQER.qfi
+	}
+
+	tc, exists := up4.conf.QFIToTC[relatedQER.qfi]
+	if !exists {
+		tc = NoTC
+	}
+
+	appID, exists := up4Tx.GetApplicationID(pdr.pdrID)
+	if !exists {
+		return ErrOperationFailedWithReason("add termination", "internal application ID not found")
+	}
+
+	terminationsEntry, err := up4.p4RtTranslator.BuildTerminationsTableEntry(pdr, appMeter, far,
+		appID, qfi, tc, relatedQER)
+	if err != nil {
+		return ErrOperationFailedWithReason("build P4rt table entry for Terminations table", err.Error())
+	}
+
+	up4Tx.WithTableEntry(terminationsEntry)
+	// no need to rollback any state as this function doesn't change it.
+
+	return nil
+}
+
 // modifyUP4ForwardingConfiguration builds P4Runtime table entries and
-// inserts/modifies/removes table entries from UP4 device, according to methodType.
-func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers []qer, methodType p4.Update_Type) error {
+// inserts/modifies table entries to UP4 device.
+func (up4 *UP4) modifyUP4ForwardingConfiguration(up4Tx *UP4Transaction, pdrs []pdr, allFARs []far, qers []qer) error {
 	for _, pdr := range pdrs {
 		if err := verifyPDR(pdr); err != nil {
 			return err
 		}
-
-		entriesToApply := make([]*p4.TableEntry, 0)
-
-		pdrLog := log.WithFields(log.Fields{
-			"pdr": pdr,
-		})
-		pdrLog.Debug("Installing P4 table entries for PDR")
-
-		far, err := findRelatedFAR(pdr, allFARs)
-		if err != nil {
-			pdrLog.Warning("no related FAR for PDR found: ", err)
-			return err
-		}
-
-		pdrLog = pdrLog.WithField("related FAR", far)
-		pdrLog.Debug("Found related FAR for PDR")
-
-		tunnelParams := tunnelParams{
-			tunnelIP4Src: ip2int(up4.accessIP.IP),
-			tunnelIP4Dst: far.tunnelIP4Dst,
-			tunnelPort:   far.tunnelPort,
-		}
-
-		tunnelPeerID, exists := up4.getGTPTunnelPeer(tunnelParams)
-		if !exists && far.tunnelTEID != 0 {
-			return ErrNotFoundWithParam("allocated GTP tunnel peer ID", "tunnel params", tunnelParams)
-		}
-
-		var sessMeter = meter{meterTypeSession, 0, 0}
-		if len(pdr.qerIDList) == 2 {
-			// if 2 QERs are provided, the second one is Session QER
-			sessMeter = up4.meters[meterID{
-				qerID: pdr.qerIDList[1],
-				fseid: pdr.fseID,
-			}]
-			pdrLog.Debug("Application meter found for PDR: ", sessMeter)
-		} // else: if only 1 QER provided, set sessMeterIdx to 0, and use only per-app metering
-
-		sessionsEntry, err := up4.p4RtTranslator.BuildSessionsTableEntry(pdr, sessMeter, tunnelPeerID.id, far.Buffers())
-		if err != nil {
-			return ErrOperationFailedWithReason("build P4rt table entry for Sessions table", err.Error())
-		}
-
-		entriesToApply = append(entriesToApply, sessionsEntry)
 
 		if pdr.IsUplink() {
 			ueAddr, exists := up4.fseidToUEAddr[pdr.fseID]
@@ -1216,87 +1323,38 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 			pdr.ueAddress = ueAddr
 		}
 
-		var applicationsEntry *p4.TableEntry
+		pdrLog := log.WithFields(log.Fields{
+			"pdr": pdr,
+		})
+		pdrLog.Debug("Installing P4 table entries for PDR")
 
-		// as a default value is installed if no application filtering rule exists
-		var applicationID uint8 = DefaultApplicationID
-		if !pdr.IsAppFilterEmpty() {
-			applicationID, err = up4.getOrAllocateInternalApplicationID(pdr)
-			if err != nil {
-				pdrLog.Error("failed to get or allocate internal application ID")
-				return err
-			}
+		relatedFAR, err := findRelatedFAR(pdr, allFARs)
+		if err != nil {
+			pdrLog.Warning("no related FAR for PDR found: ", err)
+			return err
 		}
 
-		// TODO: the same app filter can be simultaneously used by another UE session. We cannot remove it.
-		//  We should come up with a way to check if an app filter is still in use.
-		if applicationID != 0 && methodType != p4.Update_DELETE {
-			applicationsEntry, err = up4.p4RtTranslator.BuildApplicationsTableEntry(pdr, up4.conf.SliceID, applicationID)
-			if err != nil {
-				return ErrOperationFailedWithReason("build P4rt table entry for Applications table", err.Error())
-			}
-
-			entriesToApply = append(entriesToApply, applicationsEntry)
-		}
-
-		var appMeter = meter{meterTypeApplication, 0, 0}
-		if len(pdr.qerIDList) != 0 {
-			// if only 1 QER provided, it's an application QER
-			// if 2 QERs provided, the first one is an application QER
-			// if more than 2 QERs provided, TODO: not supported
-			appMeter = up4.meters[meterID{
-				qerID: pdr.qerIDList[0],
-				fseid: pdr.fseID,
-			}]
-			pdrLog.Debug("Application meter found for PDR: ", appMeter)
-		}
-
-		var qfi uint8 = DefaultQFI
+		pdrLog = pdrLog.WithField("related FAR", relatedFAR)
+		pdrLog.Debug("Found related FAR for PDR")
 
 		relatedQER, err := findRelatedApplicationQER(pdr, qers)
 		if err != nil {
-			pdrLog.Warning(err)
-		} else {
-			pdrLog.Debug("Related QER found for PDR: ", relatedQER)
-			qfi = relatedQER.qfi
+			pdrLog.Warning("no related app QER for PDR found: ", err)
 		}
 
-		tc, exists := up4.conf.QFIToTC[relatedQER.qfi]
-		if !exists {
-			tc = NoTC
+		pdrLog = pdrLog.WithField("related app QER", relatedQER)
+		pdrLog.Debug("Related QER found for PDR")
+
+		if err := up4.WithSession(up4Tx, pdr, relatedFAR); err != nil {
+			return err
 		}
 
-		terminationsEntry, err := up4.p4RtTranslator.BuildTerminationsTableEntry(pdr, appMeter, far,
-			applicationID, qfi, tc, relatedQER)
-		if err != nil {
-			return ErrOperationFailedWithReason("build P4rt table entry for Terminations table", err.Error())
+		if err := up4.WithApplication(up4Tx, pdr); err != nil {
+			return err
 		}
 
-		entriesToApply = append(entriesToApply, terminationsEntry)
-
-		pdrLog = pdrLog.WithFields(log.Fields{
-			"entries":     entriesToApply,
-			"method type": p4.Update_Type_name[int32(methodType)],
-		})
-		pdrLog.Debug("Applying table entries")
-
-		err = up4.p4client.ApplyTableEntries(methodType, entriesToApply...)
-		if err != nil {
-			p4Error, ok := err.(*P4RuntimeError)
-			if !ok {
-				// not a P4Runtime error, returning err
-				return ErrOperationFailedWithReason("applying table entries to UP4", err.Error())
-			}
-
-			for _, status := range p4Error.Get() {
-				// ignore ALREADY_EXISTS or OK
-				if status.GetCanonicalCode() == int32(codes.AlreadyExists) ||
-					status.GetCanonicalCode() == int32(codes.OK) {
-					continue
-				}
-
-				return ErrOperationFailedWithReason("applying table entries to UP4", p4Error.Error())
-			}
+		if err := up4.WithTermination(up4Tx, pdr, relatedFAR, relatedQER); err != nil {
+			return err
 		}
 	}
 
@@ -1304,6 +1362,13 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 }
 
 func (up4 *UP4) sendCreate(all PacketForwardingRules, updated PacketForwardingRules) error {
+	up4Tx := up4.BeginTx(TransactionCreate)
+	defer func() {
+		if up4Tx.Failed() {
+			up4.RollbackTx(up4Tx)
+		}
+	}()
+
 	for i := range updated.pdrs {
 		val, err := up4.allocateCounterID(preQosCounterID)
 		if err != nil {
@@ -1315,19 +1380,25 @@ func (up4 *UP4) sendCreate(all PacketForwardingRules, updated PacketForwardingRu
 
 	for _, p := range updated.pdrs {
 		up4.updateUEAddrAndFSEIDMappings(p)
+		up4Tx.OnRollback(func() {
+			up4.removeUeAddrAndFSEIDMappings(p)
+		})
 	}
 
 	if err := up4.configureMeters(updated.qers); err != nil {
 		return err
 	}
 
-	if err := up4.updateTunnelPeersBasedOnFARs(updated.fars); err != nil {
-		// TODO: revert operations (e.g. reset counter)
+	if err := up4.updateTunnelPeersBasedOnFARs(up4Tx, updated.fars); err != nil {
 		return err
 	}
 
-	if err := up4.modifyUP4ForwardingConfiguration(all.pdrs, all.fars, all.qers, p4.Update_INSERT); err != nil {
-		// TODO: revert operations (e.g. reset counter)
+	if err := up4.modifyUP4ForwardingConfiguration(up4Tx, all.pdrs, all.fars, all.qers); err != nil {
+		return err
+	}
+
+	err := up4.CommitTx(up4Tx)
+	if err != nil {
 		return err
 	}
 
@@ -1335,16 +1406,31 @@ func (up4 *UP4) sendCreate(all PacketForwardingRules, updated PacketForwardingRu
 }
 
 func (up4 *UP4) sendUpdate(all PacketForwardingRules, updated PacketForwardingRules) error {
+	up4Tx := up4.BeginTx(TransactionModify)
+	defer func() {
+		if up4Tx.Failed() {
+			up4.RollbackTx(up4Tx)
+		}
+	}()
+
 	// Update PDR IE might modify UE IP <-> F-SEID mappings
 	for _, p := range updated.pdrs {
 		up4.updateUEAddrAndFSEIDMappings(p)
+		up4Tx.OnRollback(func() {
+			up4.removeUeAddrAndFSEIDMappings(p)
+		})
 	}
 
-	if err := up4.updateTunnelPeersBasedOnFARs(updated.fars); err != nil {
+	if err := up4.updateTunnelPeersBasedOnFARs(up4Tx, updated.fars); err != nil {
 		return err
 	}
 
-	if err := up4.modifyUP4ForwardingConfiguration(all.pdrs, all.fars, all.qers, p4.Update_MODIFY); err != nil {
+	if err := up4.modifyUP4ForwardingConfiguration(up4Tx, all.pdrs, all.fars, all.qers); err != nil {
+		return err
+	}
+
+	err := up4.CommitTx(up4Tx)
+	if err != nil {
 		return err
 	}
 
@@ -1352,23 +1438,39 @@ func (up4 *UP4) sendUpdate(all PacketForwardingRules, updated PacketForwardingRu
 }
 
 func (up4 *UP4) sendDelete(deleted PacketForwardingRules) error {
+	up4Tx := up4.BeginTx(TransactionDelete)
+	defer func() {
+		if up4Tx.Failed() {
+			up4.RollbackTx(up4Tx)
+		}
+	}()
+
+	// TODO: make counter allocation part of UP4 transaction
 	for i := range deleted.pdrs {
 		up4.releaseCounterID(preQosCounterID,
 			uint64(deleted.pdrs[i].ctrID))
 	}
 
-	if err := up4.modifyUP4ForwardingConfiguration(deleted.pdrs, deleted.fars, deleted.qers, p4.Update_DELETE); err != nil {
+	up4.resetMeters(deleted.qers)
+
+	if err := up4.removeTunnelPeersBasedOnFARs(up4Tx, deleted.fars); err != nil {
 		return err
 	}
 
-	up4.resetMeters(deleted.qers)
-
-	for _, f := range deleted.fars {
-		up4.removeGTPTunnelPeer(f)
+	if err := up4.modifyUP4ForwardingConfiguration(up4Tx, deleted.pdrs, deleted.fars, deleted.qers); err != nil {
+		return err
 	}
 
 	for _, p := range deleted.pdrs {
 		up4.removeUeAddrAndFSEIDMappings(p)
+		up4Tx.OnRollback(func() {
+			up4.updateUEAddrAndFSEIDMappings(p)
+		})
+	}
+
+	err := up4.CommitTx(up4Tx)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -1406,4 +1508,46 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updat
 	}
 
 	return ie.CauseRequestAccepted
+}
+
+func (up4 *UP4) BeginTx(t transactionType) *UP4Transaction {
+	return NewUP4Transaction(t)
+}
+
+func (up4 *UP4) CommitTx(transaction *UP4Transaction) error {
+	err := up4.p4client.WriteBatchReq(transaction.updates)
+	if err != nil {
+		p4Error, ok := err.(*P4RuntimeError)
+		if !ok {
+			transaction.failed = true
+			// not a P4Runtime error, returning err
+			return ErrOperationFailedWithReason("push entries to UP4", err.Error())
+		}
+
+		for idx, status := range p4Error.Get() {
+			// ignore ALREADY_EXISTS or OK
+			if status.GetCanonicalCode() == int32(codes.AlreadyExists) ||
+				status.GetCanonicalCode() == int32(codes.OK) ||
+				(transaction.updates[idx].Type == p4.Update_DELETE && status.GetCanonicalCode() == int32(codes.NotFound)) {
+				continue
+			}
+
+			transaction.failed = true
+
+			return ErrOperationFailedWithReasonAndParam("push entries to UP4", p4Error.Error(),
+				"update index", idx)
+		}
+	}
+
+	return nil
+}
+
+func (up4 *UP4) RollbackTx(transaction *UP4Transaction) {
+	log.Trace("Executing rollback of UP4 transaction")
+
+	for _, rollbackFn := range transaction.onRollback {
+		rollbackFn()
+	}
+
+	log.Trace("Rollback of UP4 transaction finished")
 }

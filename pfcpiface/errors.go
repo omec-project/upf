@@ -43,6 +43,10 @@ func ErrOperationFailedWithReason(operation interface{}, reason string) error {
 	return fmt.Errorf("%v %w due to: : %s", operation, errFailed, reason)
 }
 
+func ErrOperationFailedWithReasonAndParam(operation interface{}, reason string, paramName string, paramValue interface{}) error {
+	return fmt.Errorf("%v %w due to: : %s, %s=%v", operation, errFailed, reason, paramName, paramValue)
+}
+
 func ErrOperationFailedWithParam(operation interface{}, paramName string, paramValue interface{}) error {
 	return fmt.Errorf("'%v' %w for %s=%v", operation, errFailed, paramName, paramValue)
 }

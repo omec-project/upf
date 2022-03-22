@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim/session"
-	"github.com/omec-project/upf-epc/test/integration/providers"
 	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
 )
@@ -507,19 +506,4 @@ func testUEDetach(t *testing.T, testcase *testCase) {
 func testUEAttachDetach(t *testing.T, testcase *testCase) {
 	testUEAttach(t, testcase)
 	testUEDetach(t, testcase)
-
-	if isDatapathUP4() {
-		// clear Applications table
-		// FIXME: Temporary solution. They should be cleared by pfcpiface, see SDFAB-960
-		p4rtClient, _ := providers.ConnectP4rt("127.0.0.1:50001", TimeBasedElectionId())
-		defer func() {
-			providers.DisconnectP4rt()
-			// give pfcpiface time to become master controller again
-			time.Sleep(3 * time.Second)
-		}()
-		entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.applications")
-		for _, entry := range entries {
-			p4rtClient.DeleteTableEntry(entry)
-		}
-	}
 }
