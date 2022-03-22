@@ -103,6 +103,19 @@ func (t *UP4Transaction) WithTableEntry(entry *p4.TableEntry) {
 	}
 }
 
+func (t *UP4Transaction) WithMeterEntry(entry *p4.MeterEntry) {
+	p4Update := &p4.Update{
+		Type: p4.Update_MODIFY,  // it's always MODIFY for Meters
+		Entity: &p4.Entity{
+			Entity: &p4.Entity_MeterEntry{MeterEntry: entry},
+		},
+	}
+
+	if !t.containsP4Update(p4Update) {
+		t.updates = append(t.updates, p4Update)
+	}
+}
+
 func (t *UP4Transaction) WithTableEntryOverwriteType(entry *p4.TableEntry, updateType p4.Update_Type) {
 	p4Update := &p4.Update{
 		Type: updateType,
