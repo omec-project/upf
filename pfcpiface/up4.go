@@ -705,6 +705,14 @@ func (up4 *UP4) restoreGTPTunnelPeer(far far, tnlPeerID uint8) {
 			}),
 		}
 
+		indexToRemove := 0
+		for idx, peerID := range up4.tunnelPeerIDsPool {
+			if tnlPeerID == peerID {
+				indexToRemove = idx
+			}
+		}
+
+		up4.tunnelPeerIDsPool = append(up4.tunnelPeerIDsPool[:indexToRemove], up4.tunnelPeerIDsPool[indexToRemove+1:]...)
 		up4.tunnelPeerIDs[tunnelParams] = tnlPeer
 
 		return
