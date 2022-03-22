@@ -8,34 +8,28 @@ gui_port=8000
 bessd_port=10514
 metrics_port=8080
 
-# Driver options. Choose any one of the three
-#
+# Driver options. Choose any one of the two:
 # "dpdk" set as default
-# "af_xdp" uses AF_XDP sockets via DPDK's vdev for pkt I/O. This version is non-zc version. ZC version still needs to be evaluated.
-# "af_packet" uses AF_PACKET sockets via DPDK's vdev for pkt I/O.
 # "sim" uses Source() modules to simulate traffic generation
 mode="dpdk"
-# mode="af_xdp"
-# mode="af_packet"
 # mode="sim"
 
-# veth interface used for packet io between BESS and PFCP agent.
-ifaces=("fabveth")
-veth_iface_name="fabveth"
+# The veth interface used for packet io between BESS and PFCP agent.
+veth_iface_name="fab"
 veth_iface_ip="198.18.0.1/24"
 veth_iface_gateway="198.18.0.2"
 
 # Set up mirror link to communicate with the kernel
 # This vdev interface is used for ARP + ICMP + DHCP updates.
-# ARP/ICMP requests are sent via the vdev interface to the kernel.
-# ARP/ICMP responses are captured and relayed out of the dpdk ports.
+# ARP/ICMP/DHCP requests are sent via the vdev interface to the kernel.
+# ARP/ICMP/DHCP responses are captured and relayed out of the dpdk ports.
 function setup_veth_interface() {
 	# Device setup.
-	sudo ip netns exec pause ip link add "${veth_iface_name}" type veth peer name "${veth_iface_name}-d"
+	sudo ip netns exec pause ip link add "${veth_iface_name}" type veth peer name "${veth_iface_name}veth"
 	sudo ip netns exec pause ip link set "${veth_iface_name}" up
-	sudo ip netns exec pause ip link set "${veth_iface_name}-d" up
+	sudo ip netns exec pause ip link set "${veth_iface_name}veth" up
 
-	# Address setup.
+	# Address setup. Here we assign a static IP, but in other deployments this is DHCP assigned.
 	sudo ip netns exec pause ip addr add "${veth_iface_ip}" dev "${veth_iface_name}"
 	# sudo ip netns exec pause ip link set dev "${veth_iface_name}" address "00:00:00:aa:aa:aa"
 
@@ -136,7 +130,7 @@ docker exec pfcpsim pfcpctl -c create --count 1 --baseID 2 --ue-pool 10.250.0.0/
 #                  ), iface='enp175s0f0', count=1)
 
 # Inside netns pause:
-# tcpdump -lenvvi fabveth
+# tcpdump -lenvvi fab
 
 # ARPs from sim eNB:
 # sudo arping -i enp175s0f0 -S 10.17.0.2 10.17.0.1

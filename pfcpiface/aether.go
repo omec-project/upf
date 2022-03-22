@@ -6,6 +6,8 @@ package pfcpiface
 import (
 	"context"
 	"github.com/prometheus/client_golang/prometheus"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"time"
 
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
@@ -29,8 +31,8 @@ const (
 	UdpProto = 17
 
 	// veth pair names. DO NOT MODIFY.
-	vethIfaceNameKernel = "fabveth"
-	vethIfaceNameBess   = "fabveth-d"
+	vethIfaceNameKernel = "fab"
+	vethIfaceNameBess   = "fabveth"
 
 	// Time to wait for IP assignment on veth interface.
 	vethIpDiscoveryTimeout = time.Second * 2
@@ -47,8 +49,8 @@ type interfaceClassification struct {
 	gate     uint64 // 0 pass, 1 fail
 }
 
-func (a *aether) setUpfInfo(u *upf, conf *Conf) {
-	a.bess.setUpfInfo(u, conf)
+func (a *aether) SetUpfInfo(u *upf, conf *Conf) {
+	a.bess.SetUpfInfo(u, conf)
 	var err error
 
 	// TODO(max): make sure we're not getting a IPv6 address.
@@ -76,9 +78,12 @@ func (a *aether) setUpfInfo(u *upf, conf *Conf) {
 		log.Fatalln("invalid mac address", a.datapathMAC)
 	}
 
-	// Needed for legacy code.
-	u.coreIP = net.ParseIP(net.IPv4zero.String())
+	// Needed for legacy code. Remove once refactored.
+	u.coreIP = net.IPv4zero.To4()
 	u.accessIP = a.ownIp
+	if u.coreIP == nil  || u.accessIP == nil {
+		log.Fatalln("upf IP is not a IPv4 address")
+	}
 
 	u.enableFlowMeasure = true
 
@@ -205,14 +210,19 @@ func (a *aether) processBpf(ctx context.Context, msg proto.Message, method strin
 	}
 
 	resp, err := a.client.ModuleCommand(ctx, &pb.CommandRequest{
-		Name: vethIfaceNameKernel + "FastBPF",
+		Name: vethIfaceNameBess + "FastBPF",
 		Cmd:  method,
 		Arg:  any,
 	})
 
-	if err != nil || resp.GetError() != nil {
-		log.Errorf("processBpf method failed with resp: %v, err: %v\n", resp, err)
+	if err != nil {
+		log.Errorf("processBpf ModuleCommand RPC failed with err: %v\n", err)
 		return err
+	}
+
+	if resp.GetError() != nil {
+		log.Errorf("processBpf method failed with resp: %v, err: %v\n", resp, resp.GetError())
+		return status.Error(codes.Code(resp.GetError().Code), resp.GetError().Errmsg)
 	}
 
 	return nil
