@@ -433,11 +433,13 @@ func (up4 *UP4) tryConnect() error {
 
 	err := up4.setupChannel()
 	if err != nil {
+		log.Errorf("Failed to setup UP4 channel: %v", err)
 		return err
 	}
 
 	err = up4.initialize()
 	if err != nil {
+		log.Errorf("Failed to initialize UP4: %v", err)
 		return err
 	}
 
