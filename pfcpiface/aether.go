@@ -81,7 +81,7 @@ func (a *aether) SetUpfInfo(u *upf, conf *Conf) {
 	// Needed for legacy code. Remove once refactored.
 	u.coreIP = net.IPv4zero.To4()
 	u.accessIP = a.ownIp
-	if u.coreIP == nil  || u.accessIP == nil {
+	if u.coreIP == nil || u.accessIP == nil {
 		log.Fatalln("upf IP is not a IPv4 address")
 	}
 
