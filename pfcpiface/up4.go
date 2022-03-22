@@ -438,7 +438,7 @@ func (up4 *UP4) tryConnect() error {
 
 	err = up4.initialize()
 	if err != nil {
-		log.Fatalf("Failed to initialize UP4: %v", err)
+		return err
 	}
 
 	up4.setConnectedStatus(true)
