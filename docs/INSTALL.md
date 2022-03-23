@@ -221,3 +221,15 @@ ENABLE_NTF=1 ./scripts/docker_setup.sh
 
 Update [`conf/spgwu.json`](conf/spgwu.json) and set the `enable_ntf` option to
 `true`.
+
+
+## Aether UPF pipeline
+
+The Aether UPF pipeline is a tailored BESS pipeline for the Aether use case and
+its requirements.
+
+Start it with:
+
+```bash
+./scripts/docker_setup_aether.sh
+```
