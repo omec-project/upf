@@ -97,6 +97,9 @@ func TestUPFBasedUeIPAllocation(t *testing.T) {
 	estResp, ok := resp.(*message.SessionEstablishmentResponse)
 	require.True(t, ok)
 
+	testcase.expected.pdrs = pdrs
+	testcase.expected.fars = fars
+
 	remoteSEID, err := estResp.UPFSEID.FSEID()
 	require.NoError(t, err)
 
