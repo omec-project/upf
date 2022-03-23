@@ -6,26 +6,25 @@ package pfcpiface
 import (
 	"context"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"time"
-
-	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
-	log "github.com/sirupsen/logrus"
-	"github.com/vishvananda/netlink"
-
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"math"
 	"net"
+	"time"
+
+	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
+	log "github.com/sirupsen/logrus"
 )
 
 type aether struct {
 	bess
 	ownIp        net.IP
 	ueSubnet     *net.IPNet
-	fabricSubnet net.IPNet
+	fabricSubnet *net.IPNet
 	datapathMAC  []byte
 }
 
@@ -37,10 +36,16 @@ const (
 	// veth pair names. DO NOT MODIFY.
 	datapathIfaceName   = "datapath"
 	vethIfaceNameKernel = "fab"
-	vethIfaceNameBess   = "fab-vdev"
 
 	// Time to wait for IP assignment on veth interface.
 	vethIpDiscoveryTimeout = time.Second * 2
+)
+
+const (
+	moduleMethodAdd           = "add"
+	moduleMethodDelete        = "delete"
+	moduleMethodClear         = "clear"
+	moduleMethodGetInitialArg = "get_initial_arg"
 )
 
 type interfaceClassification struct {
@@ -56,6 +61,7 @@ type interfaceClassification struct {
 
 func (a *aether) SetUpfInfo(u *upf, conf *Conf) {
 	a.bess.SetUpfInfo(u, conf)
+
 	var err error
 
 	// TODO(max): make sure we're not getting a IPv6 address.
@@ -91,6 +97,7 @@ func (a *aether) SetUpfInfo(u *upf, conf *Conf) {
 	// Needed for legacy code. Remove once refactored.
 	u.coreIP = net.IPv4zero.To4()
 	u.accessIP = a.ownIp
+
 	if u.coreIP == nil || u.accessIP == nil {
 		log.Fatalln("upf IP is not a IPv4 address")
 	}
@@ -108,8 +115,10 @@ func (a *aether) SetUpfInfo(u *upf, conf *Conf) {
 
 func waitForIpConfigured(iface string, timeout time.Duration) (net.IP, error) {
 	deadline := time.After(timeout)
+
 	ticker := time.NewTicker(time.Millisecond * 250)
 	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ticker.C:
@@ -135,36 +144,56 @@ func (a *aether) syncRoutes(iface string) (err error) {
 	}
 
 	for _, r := range routes {
-		log.Warnf("%+v", r)
 		if r.Scope == netlink.SCOPE_LINK {
-			log.Traceln("Found scope link route")
-			a.fabricSubnet = *r.Dst
+			a.fabricSubnet = r.Dst
+
+			log.Traceln("Found route with scope link:", r)
 		}
+	}
+
+	if a.fabricSubnet == nil {
+		return ErrOperationFailedWithReason("syncRoutes", "found no fabric route")
 	}
 
 	return a.setupRoutingRules()
 }
 
-
-
-
 func (a *aether) setupRoutingRules() (err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel()
 
+	if err = a.addIPLookupRule(ctx, *a.fabricSubnet, 0); err != nil {
+		return
+	}
 
+	// TODO(max): create next hop dmac modules and link
+	//return ErrUnsupported("setupRoutingRules", "not implemented")
 
 	return
 }
 
+func (a *aether) addIPLookupRule(ctx context.Context, dst net.IPNet, gate uint64) error {
+	ones, zeros := dst.Mask.Size()
+	if ones+zeros == 0 {
+		return ErrInvalidArgumentWithReason("addIPLookupRule", dst, "not a CIDR mask")
+	}
+
+	msg := &pb.IPLookupCommandAddArg{
+		Prefix:    dst.IP.String(),
+		PrefixLen: uint64(ones),
+		Gate:      gate,
+	}
+
+	return a.processIPLookup(ctx, msg, moduleMethodAdd)
+}
 
 func (a *aether) processIPLookup(ctx context.Context, msg proto.Message, method string) error {
 	switch method {
-	case "add":
+	case moduleMethodAdd:
 		fallthrough
-	case "delete":
+	case moduleMethodDelete:
 		fallthrough
-	case "clear":
-		fallthrough
-	case "get_initial_arg":
+	case moduleMethodClear:
 	default:
 		return ErrInvalidArgumentWithReason("method", method, "invalid method name")
 	}
@@ -175,20 +204,31 @@ func (a *aether) processIPLookup(ctx context.Context, msg proto.Message, method 
 		return err
 	}
 
+	// IPLookup module is not thread-safe, need to pause processing.
+	if err := a.pauseBessWorkers(ctx); err != nil {
+		log.Errorln(err)
+		return err
+	}
+
 	resp, err := a.client.ModuleCommand(ctx, &pb.CommandRequest{
-		Name: datapathIfaceName + "FastBPF",
+		Name: datapathIfaceName + "Routes",
 		Cmd:  method,
 		Arg:  any,
 	})
 
 	if err != nil {
-		log.Errorf("processBpf ModuleCommand RPC failed with err: %v\n", err)
+		log.Errorf("processIPLookup ModuleCommand RPC failed with err: %v\n", err)
 		return err
 	}
 
 	if resp.GetError() != nil {
-		log.Errorf("processBpf method failed with resp: %v, err: %v\n", resp, resp.GetError())
+		log.Errorf("processIPLookup method failed with resp: %v, err: %v\n", resp, resp.GetError())
 		return status.Error(codes.Code(resp.GetError().Code), resp.GetError().Errmsg)
+	}
+
+	if err := a.resumeBessWorkers(ctx); err != nil {
+		log.Errorln(err)
+		return err
 	}
 
 	return nil
@@ -205,8 +245,10 @@ func (a *aether) setupBpfRules() (err error) {
 	defer cancel()
 
 	// Do not modify. Hard-coded gates from aether.bess pipeline.
-	const ueTrafficPassGate = 0
-	const signalTrafficPassGate = 8192 - 1 // MAX_GATE - 1
+	const (
+		ueTrafficPassGate     = 0
+		signalTrafficPassGate = 8192 - 1 // MAX_GATE - 1
+	)
 
 	// Pass-through filter for GTPU UE traffic.
 	ueFilter := "ip and dst host " + a.ownIp.String() + " and udp dst port 2152"
@@ -251,19 +293,8 @@ func (a *aether) addBpfRule(ctx context.Context, filter string, priority, gate i
 	}
 	bpfArg := &pb.BPFArg{Filters: []*pb.BPFArg_Filter{&f}}
 
-	// BPF module is not thread-safe, need to pause processing.
-	if err := a.pauseBessWorkers(ctx); err != nil {
-		log.Errorln(err)
-		return err
-	}
-
-	err := a.processBpf(ctx, bpfArg, "add")
+	err := a.processBpf(ctx, bpfArg, moduleMethodAdd)
 	if err != nil {
-		log.Errorln(err)
-		return err
-	}
-
-	if err := a.resumeBessWorkers(ctx); err != nil {
 		log.Errorln(err)
 		return err
 	}
@@ -273,13 +304,13 @@ func (a *aether) addBpfRule(ctx context.Context, filter string, priority, gate i
 
 func (a *aether) processBpf(ctx context.Context, msg proto.Message, method string) error {
 	switch method {
-	case "add":
+	case moduleMethodAdd:
 		fallthrough
-	case "delete":
+	case moduleMethodDelete:
 		fallthrough
-	case "clear":
+	case moduleMethodClear:
 		fallthrough
-	case "get_initial_arg":
+	case moduleMethodGetInitialArg:
 	default:
 		return ErrInvalidArgumentWithReason("method", method, "invalid method name")
 	}
@@ -287,6 +318,12 @@ func (a *aether) processBpf(ctx context.Context, msg proto.Message, method strin
 	any, err := anypb.New(msg)
 	if err != nil {
 		log.Error("Error marshalling the rule", msg, err)
+		return err
+	}
+
+	// BPF module is not thread-safe, need to pause processing.
+	if err := a.pauseBessWorkers(ctx); err != nil {
+		log.Errorln(err)
 		return err
 	}
 
@@ -304,6 +341,11 @@ func (a *aether) processBpf(ctx context.Context, msg proto.Message, method strin
 	if resp.GetError() != nil {
 		log.Errorf("processBpf method failed with resp: %v, err: %v\n", resp, resp.GetError())
 		return status.Error(codes.Code(resp.GetError().Code), resp.GetError().Errmsg)
+	}
+
+	if err := a.resumeBessWorkers(ctx); err != nil {
+		log.Errorln(err)
+		return err
 	}
 
 	return nil
@@ -381,7 +423,7 @@ func (a *aether) addInterfaceClassification(ctx context.Context, ifc interfaceCl
 		},
 	}
 
-	err := a.processInterfaceClassification(ctx, f, upfMsgTypeAdd)
+	err := a.processInterfaceClassification(ctx, f, moduleMethodAdd)
 	if err != nil {
 		log.Errorln(err)
 		return err
@@ -390,8 +432,8 @@ func (a *aether) addInterfaceClassification(ctx context.Context, ifc interfaceCl
 	return nil
 }
 
-func (a *aether) processInterfaceClassification(ctx context.Context, msg proto.Message, method upfMsgType) error {
-	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
+func (a *aether) processInterfaceClassification(ctx context.Context, msg proto.Message, method string) error {
+	if method != moduleMethodAdd && method != moduleMethodDelete && method != moduleMethodClear {
 		return ErrInvalidArgumentWithReason("method", method, "invalid method name")
 	}
 
@@ -401,16 +443,15 @@ func (a *aether) processInterfaceClassification(ctx context.Context, msg proto.M
 		return err
 	}
 
-	methods := [...]string{"add", "add", "delete", "clear"}
-
 	resp, err := a.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "interfaceClassification",
-		Cmd:  methods[method],
+		Cmd:  method,
 		Arg:  any,
 	})
 
 	if err != nil || resp.GetError() != nil {
 		log.Errorf("interfaceClassification method failed with resp: %v, err: %v\n", resp, err)
 	}
+
 	return nil
 }
