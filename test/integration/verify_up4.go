@@ -434,8 +434,10 @@ func verifyNoP4RuntimeEntries(t *testing.T, expectedValues p4RtValues) {
 
 	allInstalledEntries, _ := p4rtClient.ReadTableEntryWildcard("")
 	// table entries for interfaces table are not removed by pfcpiface
+	// FIXME: applications are not cleared on session deletion/association release
+	//  See SDFAB-960
 	require.Equal(t, expectedAllEntries, len(allInstalledEntries),
-	fmt.Sprintf("UP4 should have only %d entry installed", expectedAllEntries), allInstalledEntries)
+		fmt.Sprintf("UP4 should have only %d entry installed", expectedAllEntries), allInstalledEntries)
 
 	tables := []string{
 		// FIXME: applications are not cleared on session deletion/association release
