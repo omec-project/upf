@@ -626,7 +626,7 @@ func (up4 *UP4) unsafeAllocateGTPTunnelPeerID() (uint8, error) {
 	return allocated, nil
 }
 
-func (up4 *UP4) unsafeReleaseAllocatedGTPTunnelPeer(tunnelParams tunnelParams) {
+func (up4 *UP4) unsafeReleaseAllocatedGTPTunnelPeerID(tunnelParams tunnelParams) {
 	allocated, exists := up4.tunnelPeerIDs[tunnelParams]
 	if exists {
 		delete(up4.tunnelPeerIDs, tunnelParams)
@@ -640,12 +640,12 @@ func (up4 *UP4) unsafeReleaseAllocatedGTPTunnelPeer(tunnelParams tunnelParams) {
 	}
 }
 
-// addOrUpdateGTPTunnelPeer allocates or updates tunnel peer references.
+// addOrUpdateGTPTunnelPeerID allocates or updates tunnel peer references.
 // It returns:
 //  1) tunnel peer that has been created or updated.
 //  2) whether a tunnel peer has been newly added.
 //  3) an error, if operation fails
-func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) (tunnelPeer, bool, error) {
+func (up4 *UP4) addOrUpdateGTPTunnelPeerID(far far) (tunnelPeer, bool, error) {
 	up4.tunnelPeerMu.Lock()
 	defer up4.tunnelPeerMu.Unlock()
 
@@ -686,9 +686,9 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) (tunnelPeer, bool, error) {
 	return tnlPeer, false, nil
 }
 
-// restoreGTPTunnelPeer reverts addOrUpdateGTPTunnelPeer operation by allocating and
+// restoreGTPTunnelPeerID reverts addOrUpdateGTPTunnelPeerID operation by allocating and
 // storing the previously allocated tnlPeerID.
-func (up4 *UP4) restoreGTPTunnelPeer(far far, tnlPeerID uint8) {
+func (up4 *UP4) restoreGTPTunnelPeerID(far far, tnlPeerID uint8) {
 	up4.tunnelPeerMu.Lock()
 	defer up4.tunnelPeerMu.Unlock()
 
@@ -728,11 +728,11 @@ func (up4 *UP4) restoreGTPTunnelPeer(far far, tnlPeerID uint8) {
 	})
 }
 
-// removeGTPTunnelPeer removes or updates "usedBy" references for allocated tunnel peer.
+// removeGTPTunnelPeerID removes or updates "usedBy" references for allocated tunnel peer.
 // If tunnel peer is not used by any UE session anymore, it releases the tunnel peer ID.
 // Returns tunnel peer that has been removed and the status whether tunnel peer has been actually removed.
 // Returns 'false' status if tunnel peer's "userBy" has only been updated.
-func (up4 *UP4) removeGTPTunnelPeer(far far) (tunnelPeer, bool) {
+func (up4 *UP4) removeGTPTunnelPeerID(far far) (tunnelPeer, bool) {
 	up4.tunnelPeerMu.Lock()
 	defer up4.tunnelPeerMu.Unlock()
 
@@ -765,20 +765,20 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) (tunnelPeer, bool) {
 		return tnlPeer, false
 	}
 
-	up4.unsafeReleaseAllocatedGTPTunnelPeer(tunnelParams)
+	up4.unsafeReleaseAllocatedGTPTunnelPeerID(tunnelParams)
 
 	return tnlPeer, true
 }
 
 func (up4 *UP4) AddGTPTunnelPeer(up4Tx *UP4Transaction, far far) error {
-	tnlPeer, newlyAdded, err := up4.addOrUpdateGTPTunnelPeer(far)
+	tnlPeer, newlyAdded, err := up4.addOrUpdateGTPTunnelPeerID(far)
 	if err != nil {
 		return err
 	}
 
 	up4Tx.WithTunnelPeerID(far.farID, tnlPeer.id)
 	up4Tx.OnRollback(func() {
-		up4.removeGTPTunnelPeer(far)
+		up4.removeGTPTunnelPeerID(far)
 	})
 
 	tunnelParams := tunnelParams{
@@ -804,11 +804,11 @@ func (up4 *UP4) AddGTPTunnelPeer(up4Tx *UP4Transaction, far far) error {
 }
 
 func (up4 *UP4) RemoveGTPTunnelPeer(up4Tx *UP4Transaction, far far) error {
-	tnlPeer, removed := up4.removeGTPTunnelPeer(far)
+	tnlPeer, removed := up4.removeGTPTunnelPeerID(far)
 
 	up4Tx.WithTunnelPeerID(far.farID, tnlPeer.id)
 	up4Tx.OnRollback(func() {
-		up4.restoreGTPTunnelPeer(far, tnlPeer.id)
+		up4.restoreGTPTunnelPeerID(far, tnlPeer.id)
 	})
 
 	if !removed {
