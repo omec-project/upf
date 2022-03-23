@@ -47,6 +47,8 @@ var (
 	p4RtcServerPort = flag.String("p4RtcServerPort", "", "P4 Server port")
 )
 
+// appReference <F-SEID (UE session); PDR-ID> pair that
+// uniquely identifies application filter among different PDR IEs of the same UE session.
 type appReference struct {
 	fseid uint64
 	pdrID uint32
@@ -54,13 +56,8 @@ type appReference struct {
 
 type application struct {
 	id uint8
-	// usedBy keeps track of <F-SEIDs (UE sessions); PDR-ID> pairs using this application filter.
-	// It's implemented as Set to avoid duplicated F-SEIDs+PDR ID pairs.
+	// usedBy keeps track of <F-SEID (UE session); PDR-ID> pairs using this application filter.
 	usedBy set.Set
-}
-
-func (a application) IsInUse() bool {
-	return a.usedBy.Cardinality() != 0
 }
 
 type up4ApplicationFilter struct {
@@ -364,7 +361,7 @@ func (up4 *UP4) initTunnelPeerIDs() {
 
 func (up4 *UP4) initApplicationIDs() {
 	up4.applicationIDs = make(map[up4ApplicationFilter]application)
-	// a simple queue storing available up4ApplicationFilter IDs
+	// a simple queue storing available application IDs
 	// 0 is reserved;
 	up4.applicationIDsPool = make([]uint8, 0, maxApplicationIDs)
 
@@ -795,90 +792,7 @@ func (up4 *UP4) unsafeReleaseInternalApplicationID(appFilter up4ApplicationFilte
 	}
 }
 
-func (up4 *UP4) removeInternalApplicationID(pdr pdr) {
-	up4.applicationMu.Lock()
-	defer up4.applicationMu.Unlock()
-
-	var appFilter up4ApplicationFilter
-	if pdr.IsUplink() {
-		appFilter = up4ApplicationFilter{
-			appIP:     pdr.appFilter.dstIP,
-			appL4Port: pdr.appFilter.dstPortRange,
-		}
-	} else if pdr.IsDownlink() {
-		appFilter = up4ApplicationFilter{
-			appIP:     pdr.appFilter.srcIP,
-			appL4Port: pdr.appFilter.srcPortRange,
-		}
-	}
-
-	appFilter.appProto = pdr.appFilter.proto
-
-	app, exists := up4.applicationIDs[appFilter]
-	if !exists {
-		return
-	}
-
-	app.usedBy.Remove(appReference{
-		pdr.fseID, pdr.pdrID,
-	})
-
-	if app.usedBy.Cardinality() != 0 {
-		return
-	}
-
-}
-
-func (up4 *UP4) getInternalApplication(pdr pdr) (application, bool) {
-	up4.applicationMu.Lock()
-	defer up4.applicationMu.Unlock()
-
-	var appFilter up4ApplicationFilter
-	if pdr.IsUplink() {
-		appFilter = up4ApplicationFilter{
-			appIP:     pdr.appFilter.dstIP,
-			appL4Port: pdr.appFilter.dstPortRange,
-		}
-	} else if pdr.IsDownlink() {
-		appFilter = up4ApplicationFilter{
-			appIP:     pdr.appFilter.srcIP,
-			appL4Port: pdr.appFilter.srcPortRange,
-		}
-	}
-
-	appFilter.appProto = pdr.appFilter.proto
-
-	app, exists := up4.applicationIDs[appFilter]
-	return app, exists
-}
-
-func (up4 *UP4) IsApplicationInUse(pdr pdr) bool {
-	up4.applicationMu.Lock()
-	defer up4.applicationMu.Unlock()
-
-	var app up4ApplicationFilter
-	if pdr.IsUplink() {
-		app = up4ApplicationFilter{
-			appIP:     pdr.appFilter.dstIP,
-			appL4Port: pdr.appFilter.dstPortRange,
-		}
-	} else if pdr.IsDownlink() {
-		app = up4ApplicationFilter{
-			appIP:     pdr.appFilter.srcIP,
-			appL4Port: pdr.appFilter.srcPortRange,
-		}
-	}
-
-	up4Application, exists := up4.applicationIDs[app]
-
-	if !exists {
-		return false
-	}
-
-	return up4Application.IsInUse()
-}
-
-func (up4 *UP4) addAndGetInternalApplication(pdr pdr) (*p4.TableEntry, uint8, error) {
+func (up4 *UP4) addInternalApplicationIDAndGetP4rtEntry(pdr pdr) (*p4.TableEntry, uint8, error) {
 	up4.applicationMu.Lock()
 	defer up4.applicationMu.Unlock()
 
@@ -935,7 +849,7 @@ func (up4 *UP4) addAndGetInternalApplication(pdr pdr) (*p4.TableEntry, uint8, er
 	return applicationsEntry, up4Application.id, nil
 }
 
-func (up4 *UP4) removeAndGetInternalApplication(pdr pdr) (*p4.TableEntry, uint8) {
+func (up4 *UP4) removeInternalApplicationIDAndGetP4rtEntry(pdr pdr) (*p4.TableEntry, uint8) {
 	up4.applicationMu.Lock()
 	defer up4.applicationMu.Unlock()
 
@@ -975,53 +889,6 @@ func (up4 *UP4) removeAndGetInternalApplication(pdr pdr) (*p4.TableEntry, uint8)
 	up4.unsafeReleaseInternalApplicationID(appFilter)
 
 	return applicationsEntry, internalApp.id
-}
-
-func (up4 *UP4) getOrAllocateInternalApplication(pdr pdr) (application, error) {
-	up4.applicationMu.Lock()
-	defer up4.applicationMu.Unlock()
-
-	var app up4ApplicationFilter
-	if pdr.IsUplink() {
-		app = up4ApplicationFilter{
-			appIP:     pdr.appFilter.dstIP,
-			appL4Port: pdr.appFilter.dstPortRange,
-		}
-	} else if pdr.IsDownlink() {
-		app = up4ApplicationFilter{
-			appIP:     pdr.appFilter.srcIP,
-			appL4Port: pdr.appFilter.srcPortRange,
-		}
-	}
-
-	app.appProto = pdr.appFilter.proto
-
-	if up4Application, exists := up4.applicationIDs[app]; exists {
-		// application already exists, increment ref count.
-		// since we use Set usedBy will not be incremented if
-		// application was already created for this UE session + PDR ID.
-		up4Application.usedBy.Add(appReference{
-			pdr.fseID, pdr.pdrID,
-		})
-
-		return up4Application, nil
-	}
-
-	newAppID, err := up4.unsafeAllocateInternalApplicationID()
-	if err != nil {
-		return application{}, err
-	}
-
-	up4Application := application{
-		id: newAppID,
-		usedBy: set.NewSet(appReference{
-			pdr.fseID, pdr.pdrID,
-		}),
-	}
-
-	up4.applicationIDs[app] = up4Application
-
-	return up4Application, nil
 }
 
 func (up4 *UP4) allocateAppMeterCellID() (uint32, error) {
@@ -1469,14 +1336,14 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 		var applicationID uint8 = DefaultApplicationID
 		if !pdr.IsAppFilterEmpty() {
 			if methodType != p4.Update_DELETE {
-				if entry, appID, err := up4.addAndGetInternalApplication(pdr); err == nil {
+				if entry, appID, err := up4.addInternalApplicationIDAndGetP4rtEntry(pdr); err == nil {
 					if entry != nil {
 						entriesToApply = append(entriesToApply, entry)
 					}
 					applicationID = appID
 				}
 			} else {
-				entry, appID := up4.removeAndGetInternalApplication(pdr)
+				entry, appID := up4.removeInternalApplicationIDAndGetP4rtEntry(pdr)
 				if entry != nil {
 					entriesToApply = append(entriesToApply, entry)
 				}
@@ -1542,10 +1409,6 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 
 				return ErrOperationFailedWithReason("applying table entries to UP4", p4Error.Error())
 			}
-		}
-
-		if methodType == p4.Update_DELETE {
-			up4.removeInternalApplicationID(pdr)
 		}
 	}
 
