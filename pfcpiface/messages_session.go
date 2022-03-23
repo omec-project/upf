@@ -15,7 +15,7 @@ import (
 
 // errors
 var (
-	ErrWriteToFastpath = errors.New("write to FastPath failed")
+	ErrWriteToDatapath = errors.New("write to datapath failed")
 	ErrAssocNotFound   = errors.New("no association found for NodeID")
 	ErrAllocateSession = errors.New("unable to allocate new PFCP session")
 )
@@ -76,14 +76,11 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 		return errProcessReply(ErrAssocNotFound, ie.CauseNoEstablishedPFCPAssociation)
 	}
 
-	/* Read CreatePDRs and CreateFARs from payload */
-	localSEID := pConn.NewPFCPSession(remoteSEID)
-	if localSEID == 0 {
+	session, ok := pConn.NewPFCPSession(remoteSEID)
+	if !ok {
 		return errProcessReply(ErrAllocateSession,
 			ie.CauseNoResourcesAvailable)
 	}
-
-	session := pConn.sessions[localSEID]
 
 	addPDRs := make([]pdr, 0, MaxItems)
 	addFARs := make([]far, 0, MaxItems)
@@ -136,11 +133,16 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 		qers: addQERs,
 	}
 
-	cause := upf.sendMsgToUPF(upfMsgTypeAdd, session.PacketForwardingRules, updated)
+	cause := upf.SendMsgToUPF(upfMsgTypeAdd, session.PacketForwardingRules, updated)
 	if cause == ie.CauseRequestRejected {
-		pConn.RemoveSession(session.localSEID)
-		return errProcessReply(ErrWriteToFastpath,
+		pConn.RemoveSession(session)
+		return errProcessReply(ErrWriteToDatapath,
 			ie.CauseRequestRejected)
+	}
+
+	err = pConn.store.PutSession(session)
+	if err != nil {
+		log.Errorf("Failed to put PFCP session to store: %v", err)
 	}
 
 	var localFSEID *ie.IE
@@ -163,7 +165,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 		localFSEID,
 	)
 
-	addPdrInfo(seres, session)
+	addPdrInfo(seres, &session)
 
 	return seres, nil
 }
@@ -194,7 +196,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 
 	localSEID := smreq.SEID()
 
-	session, ok := pConn.sessions[localSEID]
+	session, ok := pConn.store.GetSession(localSEID)
 	if !ok {
 		return sendError(ErrNotFoundWithParam("PFCP session", "localSEID", localSEID))
 	}
@@ -329,13 +331,13 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		qers: addQERs,
 	}
 
-	cause := upf.sendMsgToUPF(upfMsgTypeMod, session.PacketForwardingRules, updated)
+	cause := upf.SendMsgToUPF(upfMsgTypeMod, session.PacketForwardingRules, updated)
 	if cause == ie.CauseRequestRejected {
-		return sendError(ErrWriteToFastpath)
+		return sendError(ErrWriteToDatapath)
 	}
 
 	if upf.enableEndMarker {
-		err := upf.sendEndMarkers(&endMarkerList)
+		err := upf.SendEndMarkers(&endMarkerList)
 		if err != nil {
 			log.Errorln("Sending End Markers Failed : ", err)
 		}
@@ -393,9 +395,14 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		qers: delQERs,
 	}
 
-	cause = upf.sendMsgToUPF(upfMsgTypeDel, deleted, PacketForwardingRules{})
+	cause = upf.SendMsgToUPF(upfMsgTypeDel, deleted, PacketForwardingRules{})
 	if cause == ie.CauseRequestRejected {
-		return sendError(ErrWriteToFastpath)
+		return sendError(ErrWriteToDatapath)
+	}
+
+	err := pConn.store.PutSession(session)
+	if err != nil {
+		log.Errorf("Failed to put PFCP session to store: %v", err)
 	}
 
 	// Build response message
@@ -433,22 +440,22 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 	/* retrieve sessionRecord */
 	localSEID := sdreq.SEID()
 
-	session, ok := pConn.sessions[localSEID]
+	session, ok := pConn.store.GetSession(localSEID)
 	if !ok {
 		return sendError(ErrNotFoundWithParam("PFCP session", "localSEID", localSEID))
 	}
 
-	cause := upf.sendMsgToUPF(upfMsgTypeDel, session.PacketForwardingRules, PacketForwardingRules{})
+	cause := upf.SendMsgToUPF(upfMsgTypeDel, session.PacketForwardingRules, PacketForwardingRules{})
 	if cause == ie.CauseRequestRejected {
-		return sendError(ErrWriteToFastpath)
+		return sendError(ErrWriteToDatapath)
 	}
 
-	if err := releaseAllocatedIPs(upf.ippool, session); err != nil {
+	if err := releaseAllocatedIPs(upf.ippool, &session); err != nil {
 		return sendError(ErrOperationFailedWithReason("session IP dealloc", err.Error()))
 	}
 
 	/* delete sessionRecord */
-	pConn.RemoveSession(localSEID)
+	pConn.RemoveSession(session)
 
 	// Build response message
 	smres := message.NewSessionDeletionResponse(0, /* MO?? <-- what's this */
@@ -463,7 +470,7 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 }
 
 func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
-	session, ok := pConn.sessions[fseid]
+	session, ok := pConn.store.GetSession(fseid)
 	if !ok {
 		log.Warnln("No session found for fseid : ", fseid)
 		return
@@ -537,20 +544,20 @@ func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) error {
 	seid := srres.SEID()
 
 	if cause == ie.CauseSessionContextNotFound {
-		sessItem, ok := pConn.sessions[seid]
+		sessItem, ok := pConn.store.GetSession(seid)
 		if !ok {
 			return errProcess(ErrNotFoundWithParam("PFCP session context", "SEID", seid))
 		}
 
 		log.Warnln("context not found, deleting session locally")
 
-		pConn.RemoveSession(seid)
+		pConn.RemoveSession(sessItem)
 
-		cause := upf.sendMsgToUPF(
+		cause := upf.SendMsgToUPF(
 			upfMsgTypeDel, sessItem.PacketForwardingRules, PacketForwardingRules{})
 		if cause == ie.CauseRequestRejected {
 			return errProcess(
-				ErrOperationFailedWithParam("delete session from fastpath", "seid", seid))
+				ErrOperationFailedWithParam("delete session from datapath", "seid", seid))
 		}
 
 		return nil

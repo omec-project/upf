@@ -4,6 +4,7 @@
 package pfcpiface
 
 import (
+	"github.com/omec-project/upf-epc/internal/p4constants"
 	log "github.com/sirupsen/logrus"
 
 	"net"
@@ -99,6 +100,7 @@ type P4rtcInfo struct {
 	P4rtcServer string          `json:"p4rtc_server"`
 	P4rtcPort   string          `json:"p4rtc_port"`
 	QFIToTC     map[uint8]uint8 `json:"qfi_tc_mapping"`
+	DefaultTC   uint8           `json:"default_tc"`
 }
 
 // validateConf checks that the given config reaches a baseline of correctness.
@@ -182,6 +184,7 @@ func LoadConfigFile(filepath string) (Conf, error) {
 
 	var conf Conf
 	conf.LogLevel = log.InfoLevel
+	conf.P4rtcIface.DefaultTC = uint8(p4constants.EnumTrafficClassElastic)
 
 	err = json.Unmarshal(byteValue, &conf)
 	if err != nil {

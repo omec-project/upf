@@ -260,9 +260,9 @@ func (u *upf) sim(mode simMode, s *SimModeInfo) {
 		}
 
 		if mode.create() {
-			u.sendMsgToUPF(upfMsgTypeAdd, allRules, PacketForwardingRules{})
+			u.SendMsgToUPF(upfMsgTypeAdd, allRules, PacketForwardingRules{})
 		} else if mode.delete() {
-			u.sendMsgToUPF(upfMsgTypeDel, allRules, PacketForwardingRules{})
+			u.SendMsgToUPF(upfMsgTypeDel, allRules, PacketForwardingRules{})
 		} else {
 			log.Fatalln("Unsupported method", mode)
 		}

@@ -45,3 +45,4 @@ These are configurations commonly shared between P4-UPF and BESS-UPF.
 | `p4rtciface.access_ip` | - | Yes | N3/S1u address for 5G/4G |
 | `p4rtciface.p4rtc_server` | - | Yes | IP address of the P4Runtime server exposed by UP4 |
 | `p4rtciface.p4rtc_port` | - | Yes | TCP port of the P4Runtime server exposed by UP4 |
+| `p4rtciface.default_tc` | 3 | No | Default Traffic Class (default value is ELASTIC - TC=3) |
