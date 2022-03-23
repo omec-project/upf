@@ -45,7 +45,7 @@ def scan_dpdk_ports():
 
 
 class Port:
-    def __init__(self, name, veth_name, hwcksum, ext_addrs):
+    def __init__(self, name, veth_name, hwcksum):
         self.name = name
         self.veth_name = veth_name
         self.workers = None
@@ -57,7 +57,6 @@ class Port:
         self.bpfgate = 0
         self.routes_table = None
         self.nat = None
-        self.ext_addrs = ext_addrs
         self.mode = None
         self.hwcksum = hwcksum
 
@@ -246,22 +245,6 @@ class Port:
 
         # Connect inc to bpf
         inc.connect(next_mod=self.bpf, ogate=gate)
-
-        # Attach nat module (if enabled)
-        if self.ext_addrs is not None:
-            # Tokenize the string
-            addrs = self.ext_addrs.split(" or ")
-            # Make a list of ext_addr
-            nat_list = list()
-            for addr in addrs:
-                nat_dict = dict()
-                nat_dict["ext_addr"] = addr
-                nat_list.append(nat_dict)
-
-            # Create the NAT module
-            self.nat = NAT(name="{}NAT".format(self.name), ext_addrs=nat_list)
-            self.nat.connect(next_mod=out, ogate=1)
-            out = self.nat
 
         # Set src mac address on Ethernet header for egress pkts
         # TODO(max): move to aether plugin

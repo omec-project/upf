@@ -64,7 +64,7 @@ for wid in range(parser.workers):
 #       Port Setup
 # ====================================================
 # TODO(max): extract port setup
-dataplane_port = port.Port(datapath_interface_name, veth_interface_name, parser.hwcksum, None)
+dataplane_port = port.Port(datapath_interface_name, veth_interface_name, parser.hwcksum)
 # initialize port with the configured driver
 dataplane_port.workers = [i for i in range(len(workers))]
 dataplane_port.init_port(dataplane_dpdk_interface_index, parser.mode)
