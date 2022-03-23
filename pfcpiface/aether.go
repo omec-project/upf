@@ -6,12 +6,15 @@ package pfcpiface
 import (
 	"context"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sys/unix"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"time"
 
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
 	log "github.com/sirupsen/logrus"
+	"github.com/vishvananda/netlink"
+
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"math"
@@ -20,9 +23,10 @@ import (
 
 type aether struct {
 	bess
-	ownIp       net.IP
-	ueSubnet    *net.IPNet
-	datapathMAC []byte
+	ownIp        net.IP
+	ueSubnet     *net.IPNet
+	fabricSubnet net.IPNet
+	datapathMAC  []byte
 }
 
 const (
@@ -31,8 +35,9 @@ const (
 	UdpProto = 17
 
 	// veth pair names. DO NOT MODIFY.
+	datapathIfaceName   = "datapath"
 	vethIfaceNameKernel = "fab"
-	vethIfaceNameBess   = "fabveth"
+	vethIfaceNameBess   = "fab-vdev"
 
 	// Time to wait for IP assignment on veth interface.
 	vethIpDiscoveryTimeout = time.Second * 2
@@ -78,6 +83,11 @@ func (a *aether) SetUpfInfo(u *upf, conf *Conf) {
 		log.Fatalln("invalid mac address", a.datapathMAC)
 	}
 
+	// Setup route configs.
+	if err = a.syncRoutes(vethIfaceNameKernel); err != nil {
+		log.Fatalf("could not get routes on %v interface: %v", vethIfaceNameKernel, err)
+	}
+
 	// Needed for legacy code. Remove once refactored.
 	u.coreIP = net.IPv4zero.To4()
 	u.accessIP = a.ownIp
@@ -111,6 +121,77 @@ func waitForIpConfigured(iface string, timeout time.Duration) (net.IP, error) {
 			return nil, errTimeout
 		}
 	}
+}
+
+func (a *aether) syncRoutes(iface string) (err error) {
+	link, err := netlink.LinkByName(iface)
+	if err != nil {
+		return
+	}
+
+	routes, err := netlink.RouteList(link, unix.AF_INET)
+	if err != nil {
+		return
+	}
+
+	for _, r := range routes {
+		log.Warnf("%+v", r)
+		if r.Scope == netlink.SCOPE_LINK {
+			log.Traceln("Found scope link route")
+			a.fabricSubnet = *r.Dst
+		}
+	}
+
+	return a.setupRoutingRules()
+}
+
+
+
+
+func (a *aether) setupRoutingRules() (err error) {
+
+
+
+	return
+}
+
+
+func (a *aether) processIPLookup(ctx context.Context, msg proto.Message, method string) error {
+	switch method {
+	case "add":
+		fallthrough
+	case "delete":
+		fallthrough
+	case "clear":
+		fallthrough
+	case "get_initial_arg":
+	default:
+		return ErrInvalidArgumentWithReason("method", method, "invalid method name")
+	}
+
+	any, err := anypb.New(msg)
+	if err != nil {
+		log.Error("Error marshalling the rule", msg, err)
+		return err
+	}
+
+	resp, err := a.client.ModuleCommand(ctx, &pb.CommandRequest{
+		Name: datapathIfaceName + "FastBPF",
+		Cmd:  method,
+		Arg:  any,
+	})
+
+	if err != nil {
+		log.Errorf("processBpf ModuleCommand RPC failed with err: %v\n", err)
+		return err
+	}
+
+	if resp.GetError() != nil {
+		log.Errorf("processBpf method failed with resp: %v, err: %v\n", resp, resp.GetError())
+		return status.Error(codes.Code(resp.GetError().Code), resp.GetError().Errmsg)
+	}
+
+	return nil
 }
 
 func (a *aether) sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) (err error) {
@@ -210,7 +291,7 @@ func (a *aether) processBpf(ctx context.Context, msg proto.Message, method strin
 	}
 
 	resp, err := a.client.ModuleCommand(ctx, &pb.CommandRequest{
-		Name: vethIfaceNameBess + "FastBPF",
+		Name: datapathIfaceName + "FastBPF",
 		Cmd:  method,
 		Arg:  any,
 	})

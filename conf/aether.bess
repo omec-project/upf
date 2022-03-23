@@ -2,7 +2,7 @@
 # Copyright 2022 Open Networking Foundation
 
 from conf.parser import *
-import conf.ports as port
+import conf.aether_ports as port
 import conf.sim as sim
 
 port.setup_globals()
@@ -31,7 +31,8 @@ qerFailGate = 4
 qerStatusDropGate = 5
 qerUnmeteredGate = 6
 parser = Parser('conf/aether.json')
-veth_interface_name = "fabveth"
+datapath_interface_name = "datapath"
+veth_interface_name = "fab"
 parser.parse([veth_interface_name])
 
 if parser.mode != 'dpdk':
@@ -62,7 +63,8 @@ for wid in range(parser.workers):
 # ====================================================
 #       Port Setup
 # ====================================================
-dataplane_port = port.Port(veth_interface_name, parser.hwcksum, None)
+# TODO(max): extract port setup
+dataplane_port = port.Port(datapath_interface_name, veth_interface_name, parser.hwcksum, None)
 # initialize port with the configured driver
 dataplane_port.workers = [i for i in range(len(workers))]
 dataplane_port.init_port(dataplane_dpdk_interface_index, parser.mode)

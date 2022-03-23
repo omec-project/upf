@@ -17,7 +17,8 @@ mode="dpdk"
 # The veth interface used for packet io between BESS and PFCP agent.
 veth_iface_name="fab"
 veth_iface_ip="198.18.0.1/24"
-veth_iface_gateway="198.18.0.2"
+veth_iface_gateway_ip="198.18.0.2"
+veth_iface_gateway_mac="00:00:00:bb:bb:bb"
 
 # Set up mirror link to communicate with the kernel
 # This vdev interface is used for ARP + ICMP + DHCP updates.
@@ -25,16 +26,19 @@ veth_iface_gateway="198.18.0.2"
 # ARP/ICMP/DHCP responses are captured and relayed out of the dpdk ports.
 function setup_veth_interface() {
 	# Device setup.
-	sudo ip netns exec pause ip link add "${veth_iface_name}" type veth peer name "${veth_iface_name}veth"
+	sudo ip netns exec pause ip link add "${veth_iface_name}" type veth peer name "${veth_iface_name}-vdev"
 	sudo ip netns exec pause ip link set "${veth_iface_name}" up
-	sudo ip netns exec pause ip link set "${veth_iface_name}veth" up
+	sudo ip netns exec pause ip link set "${veth_iface_name}-vdev" up
 
 	# Address setup. Here we assign a static IP, but in other deployments this is DHCP assigned.
 	sudo ip netns exec pause ip addr add "${veth_iface_ip}" dev "${veth_iface_name}"
 	# sudo ip netns exec pause ip link set dev "${veth_iface_name}" address "00:00:00:aa:aa:aa"
 
 	# Route setup.
-	# sudo ip netns exec pause ip route add 0.0.0.0/0 via "${veth_iface_gateway}" metric 100
+	# sudo ip netns exec pause ip route add 0.0.0.0/0 via "${veth_iface_gateway_ip}" metric 100
+
+	# Simulated GW neighbor setup.
+	sudo ip netns exec pause ip neigh add "${veth_iface_gateway_ip}" lladdr "${veth_iface_gateway_mac}" dev "${veth_iface_name}" nud permanent
 }
 
 # Stop previous instances of bess* before restarting
@@ -47,12 +51,6 @@ make docker-build
 
 if [ "$mode" == 'dpdk' ]; then
 	DEVICES=${DEVICES:-'--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio'}
-	PRIVS='--cap-add IPC_LOCK'
-
-elif [ "$mode" == 'af_xdp' ]; then
-	PRIVS='--privileged'
-
-elif [ "$mode" == 'af_packet' ]; then
 	PRIVS='--cap-add IPC_LOCK'
 fi
 
@@ -70,15 +68,7 @@ sudo mkdir -p /var/run/netns
 sandbox=$(docker inspect --format='{{.NetworkSettings.SandboxKey}}' pause)
 sudo ln -s "$sandbox" /var/run/netns/pause
 
-case $mode in
-"dpdk" | "sim") setup_veth_interface ;;
-"af_xdp" | "af_packet")
-	echo "Unsupported mode"
-	exit 1
-	;;
-*) ;;
-
-esac
+setup_veth_interface
 
 # Run bessd
 docker run --name bess -td --restart unless-stopped \
