@@ -47,14 +47,14 @@ var (
 	p4RtcServerPort = flag.String("p4RtcServerPort", "", "P4 Server port")
 )
 
-// appReference <F-SEID (UE session); PDR-ID> pair that
+// internalAppReference <F-SEID (UE session); PDR-ID> pair that
 // uniquely identifies application filter among different PDR IEs of the same UE session.
-type appReference struct {
+type internalAppReference struct {
 	fseid uint64
 	pdrID uint32
 }
 
-type application struct {
+type internalApp struct {
 	id uint8
 	// usedBy keeps track of <F-SEID (UE session); PDR-ID> pairs using this application filter.
 	usedBy set.Set
@@ -134,7 +134,7 @@ type UP4 struct {
 	tunnelPeerIDs      map[tunnelParams]tunnelPeer
 	tunnelPeerIDsPool  []uint8
 	applicationMu      sync.Mutex
-	applicationIDs     map[up4ApplicationFilter]application
+	applicationIDs     map[up4ApplicationFilter]internalApp
 	applicationIDsPool []uint8
 
 	// meters stores the mapping from <F-SEID; QER ID> -> P4 Meter Cell ID.
@@ -360,7 +360,7 @@ func (up4 *UP4) initTunnelPeerIDs() {
 }
 
 func (up4 *UP4) initApplicationIDs() {
-	up4.applicationIDs = make(map[up4ApplicationFilter]application)
+	up4.applicationIDs = make(map[up4ApplicationFilter]internalApp)
 	// a simple queue storing available application IDs
 	// 0 is reserved;
 	up4.applicationIDsPool = make([]uint8, 0, maxApplicationIDs)
@@ -815,7 +815,7 @@ func (up4 *UP4) addInternalApplicationIDAndGetP4rtEntry(pdr pdr) (*p4.TableEntry
 		// application already exists, increment ref count.
 		// since we use Set usedBy will not be incremented if
 		// application was already created for this UE session + PDR ID.
-		up4Application.usedBy.Add(appReference{
+		up4Application.usedBy.Add(internalAppReference{
 			pdr.fseID, pdr.pdrID,
 		})
 
@@ -831,9 +831,9 @@ func (up4 *UP4) addInternalApplicationIDAndGetP4rtEntry(pdr pdr) (*p4.TableEntry
 		up4.unsafeReleaseInternalApplicationID(appFilter)
 	}
 
-	up4Application := application{
+	up4Application := internalApp{
 		id: newAppID,
-		usedBy: set.NewSet(appReference{
+		usedBy: set.NewSet(internalAppReference{
 			pdr.fseID, pdr.pdrID,
 		}),
 	}
@@ -873,7 +873,7 @@ func (up4 *UP4) removeInternalApplicationIDAndGetP4rtEntry(pdr pdr) (*p4.TableEn
 		return nil, 0
 	}
 
-	internalApp.usedBy.Remove(appReference{
+	internalApp.usedBy.Remove(internalAppReference{
 		pdr.fseID, pdr.pdrID,
 	})
 
