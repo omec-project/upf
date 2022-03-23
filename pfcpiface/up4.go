@@ -1334,12 +1334,14 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 
 		// as a default value is installed if no application filtering rule exists
 		var applicationID uint8 = DefaultApplicationID
+
 		if !pdr.IsAppFilterEmpty() {
 			if methodType != p4.Update_DELETE {
 				if entry, appID, err := up4.addInternalApplicationIDAndGetP4rtEntry(pdr); err == nil {
 					if entry != nil {
 						entriesToApply = append(entriesToApply, entry)
 					}
+
 					applicationID = appID
 				}
 			} else {
@@ -1347,6 +1349,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 				if entry != nil {
 					entriesToApply = append(entriesToApply, entry)
 				}
+
 				applicationID = appID
 			}
 		}

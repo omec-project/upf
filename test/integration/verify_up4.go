@@ -39,6 +39,8 @@ const (
 const (
 	minGTPTunnelPeerID uint8 = 2
 	maxGTPTunnelPeerID uint8 = 255
+	minApplicationID   uint8 = 1
+	maxApplicationID   uint8 = 255
 )
 
 var (
@@ -301,8 +303,8 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, expectedVal
 	if len(entries) > 0 && expectedApplicationsEntry != nil {
 		require.Equal(t, expectedApplicationsEntry.Match, entries[0].Match)
 		require.Equal(t, expectedApplicationsEntry.Action.GetAction().ActionId, entries[0].Action.GetAction().ActionId)
-		require.GreaterOrEqual(t, entries[0].Action.GetAction().Params[0].Value[0], uint8(1))
-		require.LessOrEqual(t, entries[0].Action.GetAction().Params[0].Value[0], uint8(255))
+		require.GreaterOrEqual(t, entries[0].Action.GetAction().Params[0].Value[0], minApplicationID)
+		require.LessOrEqual(t, entries[0].Action.GetAction().Params[0].Value[0], maxApplicationID)
 		applicationID = entries[0].Action.GetAction().Params[0].Value[0]
 	}
 
