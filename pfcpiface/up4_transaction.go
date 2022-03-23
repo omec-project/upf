@@ -27,7 +27,7 @@ type transactionContext struct {
 // UP4Transaction represents single, atomic operation performed within the UP4 device context.
 // All operations on UP4Transaction are NOT thread-safe.
 type UP4Transaction struct {
-	txType transactionType
+	txType  transactionType
 	success bool
 
 	ctx transactionContext
@@ -105,7 +105,7 @@ func (t *UP4Transaction) WithTableEntry(entry *p4.TableEntry) {
 
 func (t *UP4Transaction) WithMeterEntry(entry *p4.MeterEntry) {
 	p4Update := &p4.Update{
-		Type: p4.Update_MODIFY,  // it's always MODIFY for Meters
+		Type: p4.Update_MODIFY, // it's always MODIFY for Meters
 		Entity: &p4.Entity{
 			Entity: &p4.Entity_MeterEntry{MeterEntry: entry},
 		},

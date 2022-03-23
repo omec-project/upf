@@ -1334,7 +1334,6 @@ func (up4 *UP4) resetMeters(up4Tx *UP4Transaction, qers []qer) error {
 		})
 		logger.Debug("Resetting P4 Meter")
 
-
 		err := up4.resetMeter(up4Tx, qer)
 		if err != nil {
 			return err
