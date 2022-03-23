@@ -29,7 +29,6 @@ def scan_dpdk_ports():
                 # Need to declare mac so that we don't lose key during destroy_port
                 mac = intf.mac_addr
                 dpdk_ports[mac] = idx
-                dpdk_ports[idx] = mac
                 bess.destroy_port(intf.name)
         except bess.Error as e:
             if e.code == errno.ENODEV:
@@ -85,7 +84,6 @@ class Port:
     def init_datapath(self, **kwargs):
         # Initialize PMDPort and RX/TX modules
         name = self.name
-        kwargs["promiscuous_mode"] = True
         fast = PMDPort(name="{}Fast".format(name), **kwargs)
         self.fpi = Merge(name="{}PortMerge".format(name))
         self.fpo = WorkerSplit(name="{}QSplit".format(name))
@@ -178,9 +176,7 @@ class Port:
                     print('Registered dpdk ports do not exist.')
                     sys.exit()
                 # Initialize DPDK datapath
-                # fidx = dpdk_ports.get(mac_by_interface(name))
-                fidx = idx
-
+                fidx = dpdk_ports.get(mac_by_interface(name))
                 if fidx is None:
                     raise Exception(
                         'Registered port for {} not detected!'.format(name))
@@ -191,7 +187,6 @@ class Port:
             try:
                 peer = peer_by_interface(name)
                 vdev = "net_af_packet{},iface={}".format(idx, peer)
-                print("vdev", vdev)
                 slow = PMDPort(name="{}Slow".format(name), vdev=vdev)
                 spi = PortInc(name="{}SlowPI".format(name), port=slow.name)
                 spo = PortOut(name="{}SlowPO".format(name), port=slow.name)
@@ -204,7 +199,7 @@ class Port:
                 host_ip_filter = {"priority": -HostGate, "filter": "dst host "
                                 + " or ".join(str(x) for x in ips), "gate": HostGate}
 
-                # self.bpf.add(filters=[host_ip_filter])
+                self.bpf.add(filters=[host_ip_filter])
 
                 # Direct control traffic from DPDK to kernel
                 self.bpf.connect(next_mod=qspo, ogate=HostGate)
@@ -313,8 +308,6 @@ class Port:
 
         # Attach it to merge
         merge.connect(update)
-
-        self.rtr = merge
 
         if self.mode == 'sim':
             self.rtr = merge
