@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"time"
 
+	"google.golang.org/grpc/connectivity"
+
 	"google.golang.org/grpc/credentials/insecure"
 
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
@@ -78,15 +80,15 @@ type bess struct {
 	qciQosMap        map[uint8]*QosConfigVal
 }
 
-func (b *bess) isConnected(accessIP *net.IP) bool {
-	if (b.conn == nil) || (int(b.conn.GetState()) != Ready) {
+func (b *bess) IsConnected(accessIP *net.IP) bool {
+	if (b.conn == nil) || (b.conn.GetState() != connectivity.Ready) {
 		return false
 	}
 
 	return true
 }
 
-func (b *bess) sendEndMarkers(endMarkerList *[][]byte) error {
+func (b *bess) SendEndMarkers(endMarkerList *[][]byte) error {
 	for _, eMarker := range *endMarkerList {
 		b.endMarkerChan <- eMarker
 	}
@@ -94,7 +96,7 @@ func (b *bess) sendEndMarkers(endMarkerList *[][]byte) error {
 	return nil
 }
 
-func (b *bess) addSliceInfo(sliceInfo *SliceInfo) error {
+func (b *bess) AddSliceInfo(sliceInfo *SliceInfo) error {
 	var sliceMeterConfig SliceMeterConfig
 	sliceMeterConfig.N6RateBps = sliceInfo.uplinkMbr
 	sliceMeterConfig.N3RateBps = sliceInfo.downlinkMbr
@@ -117,7 +119,7 @@ func (b *bess) addSliceInfo(sliceInfo *SliceInfo) error {
 	return nil
 }
 
-func (b *bess) sendMsgToUPF(
+func (b *bess) SendMsgToUPF(
 	method upfMsgType, rules PacketForwardingRules, updated PacketForwardingRules) uint8 {
 	// create context
 	var cause uint8 = ie.CauseRequestAccepted
@@ -143,7 +145,7 @@ func (b *bess) sendMsgToUPF(
 	done := make(chan bool)
 
 	for _, pdr := range pdrs {
-		log.Traceln(pdr)
+		log.Traceln(method, pdr)
 
 		switch method {
 		case upfMsgTypeAdd:
@@ -156,7 +158,7 @@ func (b *bess) sendMsgToUPF(
 	}
 
 	for _, far := range fars {
-		log.Traceln(far)
+		log.Traceln(method, far)
 
 		switch method {
 		case upfMsgTypeAdd:
@@ -169,7 +171,7 @@ func (b *bess) sendMsgToUPF(
 	}
 
 	for _, qer := range qers {
-		log.Traceln("qer:", qer)
+		log.Traceln(method, qer)
 
 		switch method {
 		case upfMsgTypeAdd:
@@ -189,7 +191,7 @@ func (b *bess) sendMsgToUPF(
 	return cause
 }
 
-func (b *bess) exit() {
+func (b *bess) Exit() {
 	log.Println("Exit function Bess")
 	b.conn.Close()
 }
@@ -248,7 +250,7 @@ func (b *bess) getPortStats(ifname string) *pb.GetPortStatsResponse {
 	return res
 }
 
-func (b *bess) portStats(uc *upfCollector, ch chan<- prometheus.Metric) {
+func (b *bess) PortStats(uc *upfCollector, ch chan<- prometheus.Metric) {
 	portstats := func(ifaceLabel, ifaceName string) {
 		packets := func(packets uint64, direction string) {
 			p := prometheus.MustNewConstMetric(
@@ -297,7 +299,7 @@ func (b *bess) portStats(uc *upfCollector, ch chan<- prometheus.Metric) {
 	portstats("Core", uc.upf.coreIface)
 }
 
-func (b *bess) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric) {
+func (b *bess) SummaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric) {
 	measureIface := func(ifaceLabel, ifaceName string) {
 		req := &pb.MeasureCommandGetSummaryArg{
 			Clear:              true,
@@ -417,7 +419,7 @@ func (b *bess) readFlowMeasurement(
 	return
 }
 
-func (b *bess) sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) (err error) {
+func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) (err error) {
 	// Clearing table data with large tables is slow, let's wait for a little longer since this is
 	// non-blocking for the dataplane anyway.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
@@ -452,10 +454,16 @@ func (b *bess) sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 
 	// TODO: pick first connection for now
 	var con *PFCPConn
-	for _, c := range pc.node.pConns {
-		con = c
-		break
-	}
+
+	pc.node.pConns.Range(func(key, value interface{}) bool {
+		pConn, ok := value.(*PFCPConn)
+		if !ok {
+			return false
+		}
+
+		con = pConn
+		return false
+	})
 
 	if con == nil {
 		log.Warnln("No active PFCP connection, UE IP lookup disabled")
@@ -485,7 +493,7 @@ func (b *bess) sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 			ueIpString := "unknown"
 
 			if con != nil {
-				session, ok := con.sessions[pre.Fseid]
+				session, ok := con.store.GetSession(pre.Fseid)
 				if !ok {
 					log.Errorln("Invalid or unknown FSEID", pre.Fseid)
 					continue
@@ -571,6 +579,8 @@ func (b *bess) endMarkerSendLoop(endMarkerChan chan []byte) {
 }
 
 func (b *bess) notifyListen(reportNotifyChan chan<- uint64) {
+	notifier := NewDownlinkDataNotifier(reportNotifyChan, 20*time.Second)
+
 	for {
 		buf := make([]byte, 512)
 
@@ -581,7 +591,8 @@ func (b *bess) notifyListen(reportNotifyChan chan<- uint64) {
 
 		d := buf[0:8]
 		fseid := binary.LittleEndian.Uint64(d)
-		reportNotifyChan <- fseid
+
+		notifier.Notify(fseid)
 	}
 }
 
@@ -610,10 +621,58 @@ func (b *bess) readQciQosMap(conf *Conf) {
 	}
 }
 
-func (b *bess) setUpfInfo(u *upf, conf *Conf) {
+// clearState removes all rules from pdrLookup, farLookup, appQerLookup and sessQerLookup.
+// It doesn't clear sliceMeter, because slice config is dynamically provided via REST API
+// and there is no guarantee that the config will be pushed again after pfcp-agent's restart.
+func (b *bess) clearState() {
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel()
+
+	log.Debug("Clearing all the state in BESS")
+
+	clearWildcardCmd := &pb.WildcardMatchCommandClearArg{}
+
+	anyWildcardClear, err := anypb.New(clearWildcardCmd)
+	if err != nil {
+		log.Errorf("Error marshalling the rule %v: %v", clearWildcardCmd, err)
+		return
+	}
+
+	b.processPDR(ctx, anyWildcardClear, upfMsgTypeClear)
+
+	clearExactCmd := &pb.ExactMatchCommandClearArg{}
+
+	anyExactClear, err := anypb.New(clearExactCmd)
+	if err != nil {
+		log.Errorf("Error marshalling the rule %v: %v", anyExactClear, err)
+		return
+	}
+
+	b.processFAR(ctx, anyExactClear, upfMsgTypeClear)
+
+	clearQoSCmd := &pb.QosCommandClearArg{}
+
+	anyQoSClear, err := anypb.New(clearQoSCmd)
+	if err != nil {
+		log.Errorf("Error marshalling the rule %v: %v", anyQoSClear, err)
+		return
+	}
+
+	if err := b.processQER(ctx, anyQoSClear, upfMsgTypeClear, AppQerLookup); err != nil {
+		log.Errorf("Failed to clear %v", AppQerLookup)
+	}
+
+	if err := b.processQER(ctx, anyQoSClear, upfMsgTypeClear, SessQerLookup); err != nil {
+		log.Errorf("Failed to clear %v", SessQerLookup)
+	}
+}
+
+// setUpfInfo is only called at pfcp-agent's startup
+// it clears all the state in BESS
+func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 	var err error
 
-	log.Println("setUpfInfo bess")
+	log.Println("SetUpfInfo bess")
 
 	b.readQciQosMap(conf)
 	// get bess grpc client
@@ -627,6 +686,8 @@ func (b *bess) setUpfInfo(u *upf, conf *Conf) {
 	}
 
 	b.client = pb.NewBESSControlClient(b.conn)
+
+	b.clearState()
 
 	if conf.EnableNotifyBess {
 		notifySockAddr := conf.NotifySockAddr

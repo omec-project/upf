@@ -8,12 +8,13 @@ import (
 	"errors"
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim"
 	"github.com/omec-project/upf-epc/pfcpiface"
-	"github.com/omec-project/upf-epc/pkg/bessmock"
+	"github.com/omec-project/upf-epc/pkg/fake_bess"
 	"github.com/omec-project/upf-epc/test/integration/providers"
 	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"github.com/wmnsk/go-pfcp/ie"
 	"io/ioutil"
 	"net"
 	"os"
@@ -25,10 +26,10 @@ import (
 
 const (
 	EnvMode     = "MODE"
-	EnvFastpath = "FASTPATH"
+	EnvDatapath = "DATAPATH"
 
-	FastpathUP4  = "up4"
-	FastpathBESS = "bess"
+	DatapathUP4  = "up4"
+	DatapathBESS = "bess"
 
 	ModeDocker = "docker"
 	ModeNative = "native"
@@ -68,7 +69,7 @@ const (
 )
 
 var (
-	// ReaderElectionID use reader election ID so that pfcpiface doesn't loose mastership.
+	// ReaderElectionID use reader election ID so that pfcpiface doesn't lose mastership.
 	ReaderElectionID = p4_v1.Uint128{High: 0, Low: 1}
 )
 
@@ -77,7 +78,7 @@ var (
 	// pfcpAgent instance is used only in the native mode
 	pfcpAgent *pfcpiface.PFCPIface
 
-	bessMock *bessmock.BESSMock
+	bessFake *fake_bess.FakeBESS
 )
 
 type pfcpSessionData struct {
@@ -122,11 +123,14 @@ type appFilter struct {
 }
 
 type p4RtValues struct {
-	tc           uint8
-	ueAddress    string
-	tunnelPeerID uint8
-	appID        uint8
-	appFilter    appFilter
+	tc        uint8
+	ueAddress string
+	appID     uint8
+	appFilter appFilter
+
+	pdrs []*ie.IE
+	fars []*ie.IE
+	qers []*ie.IE
 }
 
 type testCase struct {
@@ -227,7 +231,7 @@ func waitForPFCPAssociationSetup(pfcpClient *pfcpsim.PFCPClient) error {
 	}
 }
 
-func waitForBESSMockToStart() error {
+func waitForBESSFakeToStart() error {
 	return waitForPortOpen("tcp", "127.0.0.1", "10514")
 }
 
@@ -239,12 +243,12 @@ func isModeDocker() bool {
 	return os.Getenv(EnvMode) == ModeDocker
 }
 
-func isFastpathUP4() bool {
-	return os.Getenv(EnvFastpath) == FastpathUP4
+func isDatapathUP4() bool {
+	return os.Getenv(EnvDatapath) == DatapathUP4
 }
 
-func isFastpathBESS() bool {
-	return os.Getenv(EnvFastpath) == FastpathBESS
+func isDatapathBESS() bool {
+	return os.Getenv(EnvDatapath) == DatapathBESS
 }
 
 func initForwardingPipelineConfig() {
@@ -265,29 +269,28 @@ func setup(t *testing.T, configType uint32) {
 	// 		 the registry in a bad state. Use custom registries to avoid global state.
 	prometheus.DefaultRegisterer = prometheus.NewRegistry()
 
-	switch os.Getenv(EnvFastpath) {
-	case FastpathBESS:
-		bessMock = bessmock.NewBESSMock(":10514", "127.0.0.1")
+	switch os.Getenv(EnvDatapath) {
+	case DatapathBESS:
+		bessFake = fake_bess.NewFakeBESS()
 		go func() {
-			if err := bessMock.Run(); err != nil {
+			if err := bessFake.Run(":10514"); err != nil {
 				panic(err)
 			}
 		}()
 
-		// wait for BESS mock to start, blocking
-		err := waitForBESSMockToStart()
-		require.NoErrorf(t, err, "failed to start BESS mock: %v", err)
+		err := waitForBESSFakeToStart()
+		require.NoErrorf(t, err, "failed to start BESS fake: %v", err)
 	}
 
 	switch os.Getenv(EnvMode) {
 	case ModeDocker:
-		jsonConf, _ := json.Marshal(GetConfig(os.Getenv(EnvFastpath), configType))
+		jsonConf, _ := json.Marshal(GetConfig(os.Getenv(EnvDatapath), configType))
 		err := ioutil.WriteFile("./infra/upf.json", jsonConf, os.ModePerm)
 		require.NoError(t, err)
 		providers.MustRunDockerCommandAttach("pfcpiface",
 			"/bin/pfcpiface -config /config/upf.json")
 	case ModeNative:
-		pfcpAgent = pfcpiface.NewPFCPIface(GetConfig(os.Getenv(EnvFastpath), configType))
+		pfcpAgent = pfcpiface.NewPFCPIface(GetConfig(os.Getenv(EnvDatapath), configType))
 		go pfcpAgent.Run()
 	default:
 		t.Fatal("Unexpected test mode")
@@ -303,17 +306,6 @@ func setup(t *testing.T, configType uint32) {
 }
 
 func teardown(t *testing.T) {
-	if isFastpathUP4() {
-		// clear Tunnel Peers table
-		// FIXME: Temporary solution. They should be cleared by pfcpiface, see SDFAB-960
-		p4rtClient, _ := providers.ConnectP4rt("127.0.0.1:50001", TimeBasedElectionId())
-		defer providers.DisconnectP4rt()
-		entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.tunnel_peers")
-		for _, entry := range entries {
-			p4rtClient.DeleteTableEntry(entry)
-		}
-	}
-
 	if pfcpClient.IsAssociationAlive() {
 		err := pfcpClient.TeardownAssociation()
 		require.NoError(t, err)
@@ -337,28 +329,28 @@ func teardown(t *testing.T) {
 		t.Fatal("Unexpected test mode")
 	}
 
-	switch os.Getenv(EnvFastpath) {
-	case FastpathBESS:
-		if bessMock != nil {
-			bessMock.Stop()
+	switch os.Getenv(EnvDatapath) {
+	case DatapathBESS:
+		if bessFake != nil {
+			bessFake.Stop()
 		}
 	}
 }
 
 func verifyEntries(t *testing.T, testdata *pfcpSessionData, expectedValues p4RtValues, ueState UEState) {
-	switch os.Getenv(EnvFastpath) {
-	case FastpathUP4:
+	switch os.Getenv(EnvDatapath) {
+	case DatapathUP4:
 		verifyP4RuntimeEntries(t, testdata, expectedValues, ueState)
-	case FastpathBESS:
-		// TODO: implement it
+	case DatapathBESS:
+		verifyBessEntries(t, bessFake, testdata, expectedValues, ueState)
 	}
 }
 
 func verifyNoEntries(t *testing.T, expectedValues p4RtValues) {
-	switch os.Getenv(EnvFastpath) {
-	case FastpathUP4:
+	switch os.Getenv(EnvDatapath) {
+	case DatapathUP4:
 		verifyNoP4RuntimeEntries(t, expectedValues)
-	case FastpathBESS:
-		// TODO: implement it
+	case DatapathBESS:
+		verifyNoBessRuntimeEntries(t, bessFake)
 	}
 }

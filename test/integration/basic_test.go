@@ -16,7 +16,7 @@ import (
 )
 
 func init() {
-	if isFastpathUP4() && isModeDocker() {
+	if isDatapathUP4() && isModeDocker() {
 		initForwardingPipelineConfig()
 	}
 }
@@ -48,7 +48,7 @@ func TestUPFBasedUeIPAllocation(t *testing.T) {
 				},
 			},
 			appID:        1,
-			tunnelPeerID: 2,
+			tc:           3,
 		},
 	}
 
@@ -159,8 +159,8 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 80,
 					},
 				},
-				appID:        1,
-				tunnelPeerID: 2,
+				appID: 1,
+				tc:    3,
 			},
 			desc: "APPLICATION FILTERING permit out udp from any 80-80 to assigned",
 		},
@@ -186,8 +186,8 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				},
 				// FIXME: there is a dependency on previous test because pfcpiface doesn't clear application IDs properly
 				//  See SDFAB-960
-				appID:        2,
-				tunnelPeerID: 2,
+				appID: 2,
+				tc:    3,
 			},
 			desc: "APPLICATION FILTERING permit out udp from 192.168.1.1/32 to assigned 80-100",
 		},
@@ -204,8 +204,8 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 			},
 			expected: p4RtValues{
 				// no application filtering rule expected
-				appID:        0,
-				tunnelPeerID: 2,
+				appID: 0,
+				tc:    3,
 			},
 			desc: "APPLICATION FILTERING ALLOW_ALL",
 		},
@@ -237,8 +237,8 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 80,
 					},
 				},
-				appID:        1,
-				tunnelPeerID: 2,
+				appID: 1,
+				tc:    3,
 			},
 			desc: "QER_METERING - 1 session QER, 2 app QERs",
 		},
@@ -270,8 +270,8 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 80,
 					},
 				},
-				appID:        1,
-				tunnelPeerID: 2,
+				appID: 1,
+				tc:    3,
 			},
 			desc: "QER_METERING - session QER only",
 		},
@@ -303,9 +303,8 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 80,
 					},
 				},
-				appID:        1,
-				tunnelPeerID: 2,
-				tc:           3,
+				appID: 1,
+				tc:    2,
 			},
 			desc: "QER_METERING - TC for QFI",
 		},
@@ -338,9 +337,8 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 80,
 					},
 				},
-				appID:        1,
-				tunnelPeerID: 2,
-				tc:           3,
+				appID: 1,
+				tc:    2,
 			},
 			desc: "QER UL gating",
 		},
@@ -373,9 +371,8 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 80,
 					},
 				},
-				appID:        1,
-				tunnelPeerID: 2,
-				tc:           3,
+				appID: 1,
+				tc:    2,
 			},
 			desc: "QER DL gating",
 		},
@@ -412,8 +409,8 @@ func TestUEBuffering(t *testing.T) {
 					80, 80,
 				},
 			},
-			appID:        1,
-			tunnelPeerID: 2,
+			appID: 1,
+			tc:    3,
 		},
 	}
 
@@ -507,6 +504,9 @@ func testUEAttach(t *testing.T, testcase *testCase) {
 	}
 
 	sess, err := pfcpClient.EstablishSession(pdrs, fars, qers)
+	testcase.expected.pdrs = pdrs
+	testcase.expected.fars = fars
+	testcase.expected.qers = qers
 	require.NoErrorf(t, err, "failed to establish PFCP session")
 	testcase.session = sess
 
@@ -563,7 +563,7 @@ func testUEAttachDetach(t *testing.T, testcase *testCase) {
 	testUEAttach(t, testcase)
 	testUEDetach(t, testcase)
 
-	if isFastpathUP4() {
+	if isDatapathUP4() {
 		// clear Applications table
 		// FIXME: Temporary solution. They should be cleared by pfcpiface, see SDFAB-960
 		p4rtClient, _ := providers.ConnectP4rt("127.0.0.1:50001", TimeBasedElectionId())

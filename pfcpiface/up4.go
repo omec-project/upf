@@ -8,10 +8,13 @@ import (
 	"flag"
 	"fmt"
 	"math"
-	"math/rand"
 	"net"
+	"sync"
 	"time"
 
+	"google.golang.org/grpc/connectivity"
+
+	"github.com/omec-project/upf-epc/internal/p4constants"
 	"google.golang.org/grpc/codes"
 
 	p4 "github.com/p4lang/p4runtime/go/p4/v1"
@@ -29,9 +32,6 @@ const (
 	// 253 base stations + 1 dbuf (fixed in UP4) + 1 reserved (fixed in P4 pipeline)
 	maxGTPTunnelPeerIDs = 253
 	maxApplicationIDs   = 254
-
-	applicationMeter = "PreQosPipe.app_meter"
-	sessionMeter     = "PreQosPipe.session_meter"
 
 	meterTypeApplication uint8 = 1
 	meterTypeSession     uint8 = 2
@@ -54,9 +54,9 @@ type application struct {
 }
 
 type counter struct {
-	maxSize   uint64
-	counterID uint64
-	allocated map[uint64]uint64
+	maxSize        uint64
+	counterID      uint64
+	counterIDsPool set.Set
 	// free      map[uint64]uint64
 }
 
@@ -73,6 +73,24 @@ type meter struct {
 	downlinkCellID uint32
 }
 
+// tnlPeerReference <F-SEID (UE session); FAR-ID> pair that
+// uniquely identifies tunnel peer among different FAR IEs of the same UE session.
+type tnlPeerReference struct {
+	fseid uint64
+	farID uint32
+}
+
+type tunnelPeer struct {
+	id uint8
+	// usedBy keeps track of <F-SEID (UE session); FAR-ID> pairs using this tunnel peer.
+	usedBy set.Set
+}
+
+func (t tunnelPeer) String() string {
+	return fmt.Sprintf("TunnelPeer{id=%d, usedBy=%d, referencing F-SEIDs=%v}",
+		t.id, t.usedBy.Cardinality(), t.usedBy)
+}
+
 type UP4 struct {
 	conf P4rtcInfo
 
@@ -83,12 +101,24 @@ type UP4 struct {
 	ueIPPool        *net.IPNet
 	enableEndMarker bool
 
-	p4client       *P4rtClient
+	p4client *P4rtClient
+
+	connected bool
+	// connectedMu guards R/W operations to connected status
+	connectedMu sync.RWMutex
+
+	initOnce sync.Once
+	// tryConnectMu ensures a single re-connection try
+	tryConnectMu sync.Mutex
+
 	p4RtTranslator *P4rtTranslator
 
 	// TODO: create UP4Store object and move these fields there
-	counters           []counter
-	tunnelPeerIDs      map[tunnelParams]uint8
+	counters []counter
+	// tunnelPeerMu guards concurrent R/W access to tunnel peers,
+	// as tunnel peers are likely to be shared between different UE sessions.
+	tunnelPeerMu       sync.Mutex
+	tunnelPeerIDs      map[tunnelParams]tunnelPeer
 	tunnelPeerIDsPool  []uint8
 	applicationIDs     map[application]uint8
 	applicationIDsPool []uint8
@@ -117,83 +147,112 @@ func (m meter) String() string {
 		m.meterType, m.uplinkCellID, m.downlinkCellID)
 }
 
-func (up4 *UP4) addSliceInfo(sliceInfo *SliceInfo) error {
-	log.Errorln("Slice Info not supported in P4")
-	return nil
-}
+func (up4 *UP4) AddSliceInfo(sliceInfo *SliceInfo) error {
+	//FIXME: UP4 currently supports a single slice meter rate common between UL and DL traffic. For this reason, we
+	//  configure the meter with the largest slice MBR between UL and DL.
+	err := up4.tryConnect()
+	if err != nil {
+		log.Error("UP4 server not connected")
+		return ErrOperationFailedWithReason("addSliceInfo", "data plane is not connected")
+	}
 
-func (up4 *UP4) summaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric) {
-}
+	var sliceMbr, sliceBurstBytes uint64
+	if sliceInfo.uplinkMbr > sliceInfo.downlinkMbr {
+		sliceMbr = sliceInfo.uplinkMbr
+		sliceBurstBytes = sliceInfo.ulBurstBytes
+	} else {
+		sliceMbr = sliceInfo.downlinkMbr
+		sliceBurstBytes = sliceInfo.dlBurstBytes
+	}
 
-func (up4 *UP4) sessionStats(*PfcpNodeCollector, chan<- prometheus.Metric) error {
-	return nil
-}
+	meterCellId := up4.getSliceMeterIndex()
+	meterConfig := p4.MeterConfig{
+		Cir:    int64(0),
+		Cburst: int64(0),
+		Pir:    int64(sliceMbr),
+		Pburst: int64(sliceBurstBytes),
+	}
+	sliceMeterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.MeterPreQosPipeSliceTcMeter, meterCellId, &meterConfig)
 
-func (up4 *UP4) portStats(uc *upfCollector, ch chan<- prometheus.Metric) {
-}
+	log.WithFields(log.Fields{
+		"Slice meter entry": sliceMeterEntry,
+	}).Debug("Installing slice P4 Meter entry")
 
-func (up4 *UP4) initCounter(counterID uint8, name string) error {
-	ctr, err := up4.p4RtTranslator.getCounterByName(name)
+	err = up4.p4client.ApplyMeterEntries(p4.Update_MODIFY, sliceMeterEntry)
+
 	if err != nil {
 		return err
 	}
 
-	up4.counters[counterID].maxSize = uint64(ctr.Size)
-	up4.counters[counterID].counterID = uint64(ctr.Preamble.Id)
+	return nil
+}
+
+func (up4 *UP4) SummaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric) {
+}
+
+func (up4 *UP4) getSliceMeterIndex() uint32 {
+	return uint32((up4.conf.SliceID << 2) + (up4.conf.DefaultTC & 0b11))
+}
+
+func (up4 *UP4) SessionStats(*PfcpNodeCollector, chan<- prometheus.Metric) error {
+	return nil
+}
+
+func (up4 *UP4) PortStats(uc *upfCollector, ch chan<- prometheus.Metric) {
+}
+
+func (up4 *UP4) initCounter(counterID uint8, name string, counterSize uint64) {
+	up4.counters[counterID].maxSize = counterSize
+	up4.counters[counterID].counterID = uint64(counterID)
+	up4.counters[counterID].counterIDsPool = set.NewSet()
+
+	for i := uint64(0); i < up4.counters[counterID].maxSize; i++ {
+		up4.counters[counterID].counterIDsPool.Add(i)
+	}
 
 	log.WithFields(log.Fields{
 		"counterID":      counterID,
 		"name":           name,
-		"max-size":       ctr.Size,
-		"UP4 counter ID": ctr.Preamble.Id,
+		"max-size":       counterSize,
+		"UP4 counter ID": counterID,
 	}).Debug("Counter initialized successfully")
-
-	return nil
 }
 
-func resetCounterVal(p *UP4, counterID uint8, val uint64) {
+func (up4 *UP4) releaseCounterID(p4counterID uint8, val uint64) {
 	log.Println("delete counter val ", val)
-	delete(p.counters[counterID].allocated, val)
+	up4.counters[p4counterID].counterIDsPool.Add(val)
 }
 
-func (up4 *UP4) getCounterVal(counterID uint8) (uint64, error) {
-	/*
-	   loop :
-	      random counter generate
-	      check allocated map
-	      if not in map then return counter val.
-	      if present continue
-	      if loop reaches max break and fail.
-	*/
-	var val uint64
-
-	ctr := &up4.counters[counterID]
-	for i := 0; i < int(ctr.maxSize); i++ {
-		rand.Seed(time.Now().UnixNano())
-
-		val = uint64(rand.Intn(int(ctr.maxSize)-1) + 1) // #nosec G404
-		if _, ok := ctr.allocated[val]; !ok {
-			log.Debug("Counter index is not in allocated map, assigning: ", val)
-
-			ctr.allocated[val] = 1
-
-			return val, nil
-		}
+func (up4 *UP4) allocateCounterID(p4counterID uint8) (uint64, error) {
+	if up4.counters[p4counterID].counterIDsPool.Cardinality() == 0 {
+		return 0, ErrOperationFailedWithReason("allocate Counter ID",
+			"no free Counter IDs available")
 	}
 
-	return 0, ErrOperationFailedWithParam("counter allocation", "final val", val)
+	allocated := up4.counters[p4counterID].counterIDsPool.Pop()
+
+	if allocated == nil {
+		return 0, ErrOperationFailedWithReason("allocate Counter ID",
+			"no free Counter IDs available")
+	}
+
+	return allocated.(uint64), nil
 }
 
-func (up4 *UP4) exit() {
+func (up4 *UP4) Exit() {
 	log.Println("Exit function P4rtc")
 }
 
 func (up4 *UP4) setupChannel() error {
-	log.Println("Channel Setup.")
+	setupLog := log.WithFields(log.Fields{
+		"P4Runtime server address": up4.host,
+		"DeviceID":                 up4.deviceID,
+	})
+	setupLog.Debug("Trying to setup P4Rt channel")
 
 	client, err := CreateChannel(up4.host, up4.deviceID)
 	if err != nil {
-		log.Errorf("create channel failed: %v", err)
+		setupLog.Errorf("create channel failed: %v", err)
 		return err
 	}
 
@@ -204,72 +263,78 @@ func (up4 *UP4) setupChannel() error {
 		return err
 	}
 
-	return nil
-}
-
-func (up4 *UP4) initAllCounters() error {
-	log.Debug("Initializing counter for UP4")
-
-	err := up4.initCounter(preQosCounterID, "PreQosPipe.pre_qos_counter")
-	if err != nil {
-		return ErrOperationFailedWithReason("init preQosCounterID counter", err.Error())
-	}
-
-	err = up4.initCounter(postQosCounterID, "PostQosPipe.post_qos_counter")
-	if err != nil {
-		return ErrOperationFailedWithReason("init postQosCounterID counter", err.Error())
-	}
+	setupLog.Debug("P4Rt channel created")
 
 	return nil
 }
 
-func (up4 *UP4) initMetersPools() error {
+func (up4 *UP4) initAllCounters() {
+	log.Debug("Initializing counters for UP4")
+
+	counters := []uint32{
+		p4constants.CounterPreQosPipePreQosCounter,
+		p4constants.CounterPostQosPipePostQosCounter,
+	}
+
+	for _, counterID := range counters {
+		counterName := p4constants.GetCounterIDToNameMap()[counterID]
+
+		counterSize, err := up4.p4RtTranslator.getCounterSizeByID(counterID)
+		if err != nil {
+			log.Error(err)
+		}
+
+		switch counterID {
+		case p4constants.CounterPreQosPipePreQosCounter:
+			up4.initCounter(preQosCounterID, counterName, uint64(counterSize))
+		case p4constants.CounterPostQosPipePostQosCounter:
+			up4.initCounter(postQosCounterID, counterName, uint64(counterSize))
+		}
+	}
+}
+
+func (up4 *UP4) initMetersPools() {
 	log.Debug("Initializing P4 Meters pools for UP4")
 
-	appMeter, err := up4.p4RtTranslator.getMeterByName(applicationMeter)
-	if err != nil {
-		return err
+	meters := []uint32{
+		p4constants.MeterPreQosPipeAppMeter,
+		p4constants.MeterPreQosPipeSessionMeter,
 	}
 
-	log.WithFields(log.Fields{
-		"name":  applicationMeter,
-		"meter": appMeter,
-	}).Trace("Found P4 meter by name")
+	for _, meterID := range meters {
+		meterName := p4constants.GetMeterIDToNameMap()[meterID]
 
-	up4.appMeterCellIDsPool = set.NewSet()
-	for i := 1; i < int(appMeter.Size); i++ {
-		up4.appMeterCellIDsPool.Add(uint32(i))
+		meterSize, err := up4.p4RtTranslator.getMeterSizeByID(meterID)
+		if err != nil {
+			log.Errorf("Could not find meter size of %v", meterName)
+		}
+
+		switch meterID {
+		case p4constants.MeterPreQosPipeAppMeter:
+			up4.appMeterCellIDsPool = set.NewSet()
+			for i := 1; i < int(meterSize); i++ {
+				up4.appMeterCellIDsPool.Add(uint32(i))
+			}
+
+			log.Trace("Application meter IDs pool initialized: ", up4.appMeterCellIDsPool.String())
+		case p4constants.MeterPreQosPipeSessionMeter:
+			up4.sessMeterCellIDsPool = set.NewSet()
+			for i := 1; i < int(meterSize); i++ {
+				up4.sessMeterCellIDsPool.Add(uint32(i))
+			}
+
+			log.Trace("Session meter IDs pool initialized: ", up4.sessMeterCellIDsPool.String())
+		}
 	}
-
-	log.Trace("Application meter IDs pool initialized: ", up4.appMeterCellIDsPool.String())
-
-	sessMeter, err := up4.p4RtTranslator.getMeterByName(sessionMeter)
-	if err != nil {
-		return err
-	}
-
-	log.WithFields(log.Fields{
-		"name":  sessionMeter,
-		"meter": sessMeter,
-	}).Trace("Found P4 meter by name")
-
-	up4.sessMeterCellIDsPool = set.NewSet()
-	for i := 1; i < int(sessMeter.Size); i++ {
-		up4.sessMeterCellIDsPool.Add(uint32(i))
-	}
-
-	log.Trace("Session meter IDs pool initialized: ", up4.sessMeterCellIDsPool.String())
 
 	log.WithFields(log.Fields{
 		"applicationMeter pool size": up4.appMeterCellIDsPool.Cardinality(),
 		"sessMeter pool size":        up4.sessMeterCellIDsPool.Cardinality(),
 	}).Debug("P4 Meters pools initialized successfully")
-
-	return nil
 }
 
 func (up4 *UP4) initTunnelPeerIDs() {
-	up4.tunnelPeerIDs = make(map[tunnelParams]uint8)
+	up4.tunnelPeerIDs = make(map[tunnelParams]tunnelPeer)
 	// a simple queue storing available tunnel peer IDs
 	// 0 is reserved;
 	// 1 is reserved for dbuf
@@ -293,25 +358,24 @@ func (up4 *UP4) initApplicationIDs() {
 
 // This function ensures that PFCP Agent is connected to UP4.
 // Returns true if the connection is already established.
-// Otherwise, tries to connect to UP4. Returns false if fails.
-// FIXME: the argument should be removed from fastpath API
-func (up4 *UP4) isConnected(accessIP *net.IP) bool {
-	if up4.p4client != nil {
-		return true
-	}
+// FIXME: the argument should be removed from datapath API
+func (up4 *UP4) IsConnected(accessIP *net.IP) bool {
+	up4.connectedMu.Lock()
+	defer up4.connectedMu.Unlock()
 
-	err := up4.tryConnect()
-	if err != nil {
-		log.Errorf("failed to connect to UP4: %v", err)
-		return false
-	}
+	return up4.connected && up4.p4client != nil && up4.p4client.CheckStatus() == connectivity.Ready
+}
 
-	return true
+func (up4 *UP4) setConnectedStatus(status bool) {
+	up4.connectedMu.Lock()
+	defer up4.connectedMu.Unlock()
+
+	up4.connected = status
 }
 
 // TODO: rename it to initUPF()
-func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
-	log.Println("setUpfInfo UP4")
+func (up4 *UP4) SetUpfInfo(u *upf, conf *Conf) {
+	log.Println("SetUpfInfo UP4")
 
 	up4.conf = conf.P4rtcIface
 
@@ -355,79 +419,92 @@ func (up4 *UP4) setUpfInfo(u *upf, conf *Conf) {
 	up4.fseidToUEAddr = make(map[uint64]uint32)
 
 	up4.counters = make([]counter, 2)
-	for i := range up4.counters {
-		// initialize allocated counters map
-		up4.counters[i].allocated = make(map[uint64]uint64)
-	}
 
-	err := up4.tryConnect()
-	if err != nil {
-		log.Errorf("failed to connect to UP4: %v", err)
-		return
-	}
+	go up4.keepTryingToConnect()
 }
 
-func (up4 *UP4) clearAllTables() error {
-	tables := []string{TableUplinkSessions, TableDownlinkSessions, TableUplinkTerminations, TableDownlinkTerminations, TableTunnelPeers, TableApplications}
-	tableIDs := make([]uint32, 0, len(tables))
+func (up4 *UP4) tryConnect() error {
+	up4.tryConnectMu.Lock()
+	defer up4.tryConnectMu.Unlock()
 
-	for _, table := range tables {
-		tableID, err := up4.p4RtTranslator.getTableIDByName(table)
+	if up4.IsConnected(nil) {
+		return nil
+	}
+
+	err := up4.setupChannel()
+	if err != nil {
+		log.Errorf("Failed to setup UP4 channel: %v", err)
+		return err
+	}
+
+	err = up4.initialize()
+	if err != nil {
+		log.Errorf("Failed to initialize UP4: %v", err)
+		return err
+	}
+
+	up4.setConnectedStatus(true)
+
+	return nil
+}
+
+func (up4 *UP4) keepTryingToConnect() {
+	for {
+		err := up4.tryConnect()
 		if err != nil {
-			return err
+			time.Sleep(10 * time.Second)
+			continue
 		}
 
-		tableIDs = append(tableIDs, tableID)
+		time.Sleep(120 * time.Second)
+	}
+}
+
+func (up4 *UP4) clearTables() error {
+	tableIDs := []uint32{
+		p4constants.TablePreQosPipeSessionsUplink,
+		p4constants.TablePreQosPipeSessionsDownlink,
+		p4constants.TablePreQosPipeTerminationsUplink,
+		p4constants.TablePreQosPipeTerminationsDownlink,
+		p4constants.TablePreQosPipeTunnelPeers,
+		p4constants.TablePreQosPipeInterfaces,
+		p4constants.TablePreQosPipeApplications,
 	}
 
-	err := up4.p4client.ClearTables(tableIDs)
-	if err != nil {
-		return err
-	}
-
-	interfacesTableID, err := up4.p4RtTranslator.getTableIDByName(TableInterfaces)
-	if err != nil {
-		return err
-	}
-
-	err = up4.p4client.ClearTable(interfacesTableID)
-	if err != nil {
+	if err := up4.p4client.ClearTables(tableIDs); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (up4 *UP4) initUEPool() error {
-	entry, err := up4.p4RtTranslator.BuildInterfaceTableEntry(up4.ueIPPool, up4.conf.SliceID, true)
+// initInterfaces initializes N3 address and UE pool in the interfaces table.
+// By sending both entries in batch, we ensure that both should always exist in UP4.
+func (up4 *UP4) initInterfaces() error {
+	entries := make([]*p4.TableEntry, 0, 2)
+
+	uePoolEntry, err := up4.p4RtTranslator.BuildInterfaceTableEntry(up4.ueIPPool, up4.conf.SliceID, true)
 	if err != nil {
 		return err
 	}
 
-	if err := up4.p4client.ApplyTableEntries(p4.Update_INSERT, entry); err != nil {
-		return err
-	}
+	entries = append(entries, uePoolEntry)
 
-	log.WithFields(log.Fields{
-		"ue pool": up4.ueIPPool,
-	}).Debug("UE pool successfully initialized in the UP4 pipeline")
-
-	return nil
-}
-
-func (up4 *UP4) initN3Address() error {
-	entry, err := up4.p4RtTranslator.BuildInterfaceTableEntry(up4.accessIP, up4.conf.SliceID, false)
+	n3AddrEntry, err := up4.p4RtTranslator.BuildInterfaceTableEntry(up4.accessIP, up4.conf.SliceID, false)
 	if err != nil {
 		return err
 	}
 
-	if err := up4.p4client.ApplyTableEntries(p4.Update_INSERT, entry); err != nil {
+	entries = append(entries, n3AddrEntry)
+
+	if err := up4.p4client.ApplyTableEntries(p4.Update_INSERT, entries...); err != nil {
 		return err
 	}
 
 	log.WithFields(log.Fields{
 		"N3 address": up4.accessIP,
-	}).Debug("N3 address successfully initialized in the UP4 pipeline")
+		"ue pool":    up4.ueIPPool,
+	}).Debug("N3 address and UE pool successfully initialized in the UP4 pipeline")
 
 	return nil
 }
@@ -435,46 +512,30 @@ func (up4 *UP4) initN3Address() error {
 func (up4 *UP4) listenToDDNs() {
 	log.Info("Listening to Data Notifications from UP4..")
 
-	for {
-		digestData := up4.p4client.GetNextDigestData()
+	notifier := NewDownlinkDataNotifier(up4.reportNotifyChan, 20*time.Second)
 
-		ueAddr := binary.BigEndian.Uint32(digestData)
-		if fseid, exists := up4.ueAddrToFSEID[ueAddr]; exists {
-			up4.reportNotifyChan <- fseid
+	for {
+		if up4.IsConnected(nil) {
+			// blocking
+			digestData := up4.p4client.GetNextDigestData()
+
+			ueAddr := binary.BigEndian.Uint32(digestData)
+			if fseid, exists := up4.ueAddrToFSEID[ueAddr]; exists {
+				notifier.Notify(fseid)
+			}
 		}
 	}
 }
 
-func (up4 *UP4) tryConnect() error {
-	err := up4.setupChannel()
-	if err != nil {
-		return err
-	}
-
+// initialize configures the UP4-related objects.
+// A caller should ensure that P4Client is not nil and the P4Runtime channel is open.
+func (up4 *UP4) initialize() error {
 	up4.p4RtTranslator = newP4RtTranslator(up4.p4client.P4Info)
 
-	err = up4.clearAllTables()
+	err := up4.clearTables()
 	if err != nil {
 		log.Warningf("failed to clear tables: %v", err)
-	}
-
-	err = up4.initAllCounters()
-	if err != nil {
-		return ErrOperationFailedWithReason("counters initialization", err.Error())
-	}
-
-	err = up4.initMetersPools()
-	if err != nil {
-		return ErrOperationFailedWithReason("meters pools initialization", err.Error())
-	}
-
-	go up4.listenToDDNs()
-
-	if up4.enableEndMarker {
-		log.Println("Starting end marker loop")
-
-		up4.endMarkerChan = make(chan []byte, 1024)
-		go up4.endMarkerSendLoop(up4.endMarkerChan)
+		return err
 	}
 
 	// Give UP4 a while to clear all tables, before initializing the interfaces table.
@@ -482,20 +543,29 @@ func (up4 *UP4) tryConnect() error {
 	//  Should be removed once we serialize Writes on UP4 side.
 	time.Sleep(1 * time.Second)
 
-	err = up4.initUEPool()
+	up4.initAllCounters()
+	up4.initMetersPools()
+
+	err = up4.initInterfaces()
 	if err != nil {
-		return ErrOperationFailedWithReason("UE pool initialization", err.Error())
+		return ErrOperationFailedWithReason("Interfaces initialization", err.Error())
 	}
 
-	err = up4.initN3Address()
-	if err != nil {
-		return ErrOperationFailedWithReason("N3 address initialization", err.Error())
-	}
+	up4.initOnce.Do(func() {
+		go up4.listenToDDNs()
+
+		if up4.enableEndMarker {
+			log.Println("Starting end marker loop")
+
+			up4.endMarkerChan = make(chan []byte, 1024)
+			go up4.endMarkerSendLoop()
+		}
+	})
 
 	return nil
 }
 
-func (up4 *UP4) sendEndMarkers(endMarkerList *[][]byte) error {
+func (up4 *UP4) SendEndMarkers(endMarkerList *[][]byte) error {
 	for _, eMarker := range *endMarkerList {
 		up4.endMarkerChan <- eMarker
 	}
@@ -503,8 +573,8 @@ func (up4 *UP4) sendEndMarkers(endMarkerList *[][]byte) error {
 	return nil
 }
 
-func (up4 *UP4) endMarkerSendLoop(endMarkerChan chan []byte) {
-	for outPacket := range endMarkerChan {
+func (up4 *UP4) endMarkerSendLoop() {
+	for outPacket := range up4.endMarkerChan {
 		err := up4.p4client.SendPacketOut(outPacket)
 		if err != nil {
 			log.Println("end marker write failed")
@@ -538,7 +608,7 @@ func findRelatedApplicationQER(pdr pdr, qers []qer) (qer, error) {
 }
 
 // Returns error if we reach maximum supported GTP Tunnel Peers.
-func (up4 *UP4) allocateGTPTunnelPeerID() (uint8, error) {
+func (up4 *UP4) unsafeAllocateGTPTunnelPeerID() (uint8, error) {
 	if len(up4.tunnelPeerIDsPool) == 0 {
 		return 0, ErrOperationFailedWithReason("allocate GTP Tunnel Peer ID",
 			"no free tunnel peer IDs available")
@@ -548,21 +618,42 @@ func (up4 *UP4) allocateGTPTunnelPeerID() (uint8, error) {
 	allocated := up4.tunnelPeerIDsPool[0]
 	up4.tunnelPeerIDsPool = up4.tunnelPeerIDsPool[1:]
 
+	log.WithFields(log.Fields{
+		"ID":   allocated,
+		"pool": up4.tunnelPeerIDsPool,
+	}).Trace("Tunnel peer ID")
+
 	return allocated, nil
 }
 
-// FIXME: SDFAB-960
-//nolint:unused
-func (up4 *UP4) releaseAllocatedGTPTunnelPeerID(tunnelParams tunnelParams) {
+func (up4 *UP4) unsafeReleaseAllocatedGTPTunnelPeer(tunnelParams tunnelParams) {
 	allocated, exists := up4.tunnelPeerIDs[tunnelParams]
 	if exists {
 		delete(up4.tunnelPeerIDs, tunnelParams)
-		up4.tunnelPeerIDsPool = append(up4.tunnelPeerIDsPool, allocated)
+		up4.tunnelPeerIDsPool = append(up4.tunnelPeerIDsPool, allocated.id)
+
+		log.WithFields(log.Fields{
+			"tunnel params": tunnelParams,
+			"tunnel peer":   allocated,
+			"pool":          up4.tunnelPeerIDsPool,
+		}).Trace("Tunnel peer ID released")
 	}
 }
 
+func (up4 *UP4) getGTPTunnelPeer(tnlParams tunnelParams) (tunnelPeer, bool) {
+	up4.tunnelPeerMu.Lock()
+	defer up4.tunnelPeerMu.Unlock()
+
+	tnlPeer, exists := up4.tunnelPeerIDs[tnlParams]
+
+	return tnlPeer, exists
+}
+
 func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
-	var tunnelPeerID uint8
+	up4.tunnelPeerMu.Lock()
+	defer up4.tunnelPeerMu.Unlock()
+
+	var tnlPeer tunnelPeer
 
 	methodType := p4.Update_MODIFY
 	tunnelParams := tunnelParams{
@@ -571,36 +662,56 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
 		tunnelPort:   far.tunnelPort,
 	}
 
-	tunnelPeerID, exists := up4.tunnelPeerIDs[tunnelParams]
-
+	tnlPeer, exists := up4.tunnelPeerIDs[tunnelParams]
 	if !exists {
-		var err error
-
-		tunnelPeerID, err = up4.allocateGTPTunnelPeerID()
+		newID, err := up4.unsafeAllocateGTPTunnelPeerID()
 		if err != nil {
 			return err
 		}
 
+		tnlPeer = tunnelPeer{
+			id: newID,
+			usedBy: set.NewSet(tnlPeerReference{
+				far.fseID, far.farID,
+			}),
+		}
+
 		methodType = p4.Update_INSERT
+	} else {
+		// tunnel peer already exists.
+		// since we use Set to keep track of tunnel peers in use,
+		// it will not be added to the set if tunnel peer was already created for this UE session.
+		tnlPeer.usedBy.Add(tnlPeerReference{
+			far.fseID, far.farID,
+		})
 	}
 
-	gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(tunnelPeerID, tunnelParams)
+	releaseTnlPeerID := func() {
+		if !exists {
+			up4.unsafeReleaseAllocatedGTPTunnelPeer(tunnelParams)
+		}
+	}
+
+	gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(tnlPeer.id, tunnelParams)
 	if err != nil {
+		releaseTnlPeerID()
 		return err
 	}
 
 	if err := up4.p4client.ApplyTableEntries(methodType, gtpTunnelPeerEntry); err != nil {
+		releaseTnlPeerID()
 		return err
 	}
 
-	up4.tunnelPeerIDs[tunnelParams] = tunnelPeerID
+	up4.tunnelPeerIDs[tunnelParams] = tnlPeer
 
 	return nil
 }
 
-// FIXME: SDFAB-960
-//nolint:unused
 func (up4 *UP4) removeGTPTunnelPeer(far far) {
+	up4.tunnelPeerMu.Lock()
+	defer up4.tunnelPeerMu.Unlock()
+
 	removeLog := log.WithFields(log.Fields{
 		"far": far,
 	})
@@ -610,16 +721,27 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 		tunnelPort:   far.tunnelPort,
 	}
 
-	tunnelPeerID, exists := up4.tunnelPeerIDs[tunnelParams]
+	tnlPeer, exists := up4.tunnelPeerIDs[tunnelParams]
 	if !exists {
 		removeLog.WithField(
-			"tunnel-params", tunnelParams).Error("GTP tunnel peer ID not found for tunnel params")
+			"tunnel-params", tunnelParams).Warn("GTP tunnel peer ID not found for tunnel params")
 		return
 	}
 
-	removeLog.WithField("tunnel-peer-id", tunnelPeerID)
+	removeLog.WithField("tunnel-peer", tnlPeer)
 
-	gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(tunnelPeerID, tunnelParams)
+	removeLog.Debug("Found GTP tunnel peer for tunnel params")
+
+	tnlPeer.usedBy.Remove(tnlPeerReference{
+		far.fseID, far.farID,
+	})
+
+	if tnlPeer.usedBy.Cardinality() != 0 {
+		removeLog.Debug("GTP tunnel peer was about to be removed, but it's in use by other UE session.")
+		return
+	}
+
+	gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(tnlPeer.id, tunnelParams)
 	if err != nil {
 		removeLog.Error("failed to build GTP tunnel peer entry to remove")
 		return
@@ -631,7 +753,7 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 		removeLog.Error("failed to remove GTP tunnel peer")
 	}
 
-	up4.releaseAllocatedGTPTunnelPeerID(tunnelParams)
+	up4.unsafeReleaseAllocatedGTPTunnelPeer(tunnelParams)
 }
 
 // Returns error if we reach maximum supported Application IDs.
@@ -755,7 +877,7 @@ func (up4 *UP4) releaseSessionMeterCellID(allocated uint32) {
 }
 
 func (up4 *UP4) updateUEAddrAndFSEIDMappings(pdr pdr) {
-	if !pdr.IsDownlink() {
+	if pdr.IsUplink() {
 		return
 	}
 
@@ -764,7 +886,7 @@ func (up4 *UP4) updateUEAddrAndFSEIDMappings(pdr pdr) {
 }
 
 func (up4 *UP4) removeUeAddrAndFSEIDMappings(pdr pdr) {
-	if !pdr.IsDownlink() {
+	if pdr.IsUplink() {
 		return
 	}
 
@@ -870,7 +992,7 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 	if appMeter.uplinkCellID != 0 {
 		meterConfig := getMeterConfigurationFromQER(q.ulMbr, q.ulGbr)
 
-		meterEntry := up4.p4RtTranslator.BuildMeterEntry(applicationMeter, appMeter.uplinkCellID, meterConfig)
+		meterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.MeterPreQosPipeAppMeter, appMeter.uplinkCellID, meterConfig)
 
 		entries = append(entries, meterEntry)
 	}
@@ -878,7 +1000,7 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 	if appMeter.downlinkCellID != appMeter.uplinkCellID {
 		meterConfig := getMeterConfigurationFromQER(q.dlMbr, q.dlGbr)
 
-		meterEntry := up4.p4RtTranslator.BuildMeterEntry(applicationMeter, appMeter.downlinkCellID, meterConfig)
+		meterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.MeterPreQosPipeAppMeter, appMeter.downlinkCellID, meterConfig)
 
 		entries = append(entries, meterEntry)
 	}
@@ -919,10 +1041,10 @@ func (up4 *UP4) configureSessionMeter(q qer) (meter, error) {
 	logger.Debug("Configuring Session Meter from QER")
 
 	uplinkMeterConfig := getMeterConfigurationFromQER(q.ulMbr, q.ulGbr)
-	uplinkMeterEntry := up4.p4RtTranslator.BuildMeterEntry(sessionMeter, uplinkCellID, uplinkMeterConfig)
+	uplinkMeterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.MeterPreQosPipeSessionMeter, uplinkCellID, uplinkMeterConfig)
 
 	downlinkMeterConfig := getMeterConfigurationFromQER(q.dlMbr, q.dlGbr)
-	downlinkMeterEntry := up4.p4RtTranslator.BuildMeterEntry(sessionMeter, downlinkCellID, downlinkMeterConfig)
+	downlinkMeterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.MeterPreQosPipeSessionMeter, downlinkCellID, downlinkMeterConfig)
 
 	logger = logger.WithFields(log.Fields{
 		"uplink meter entry":   uplinkMeterEntry,
@@ -1005,8 +1127,7 @@ func verifyPDR(pdr pdr) error {
 	return nil
 }
 
-func (up4 *UP4) resetMeter(name string, meter meter) {
-	meterID := up4.p4RtTranslator.meterID(name)
+func (up4 *UP4) resetMeter(meterID uint32, meter meter) {
 	entries := make([]*p4.MeterEntry, 0, 2)
 
 	entry := &p4.MeterEntry{
@@ -1026,7 +1147,7 @@ func (up4 *UP4) resetMeter(name string, meter meter) {
 
 	err := up4.p4client.ApplyMeterEntries(p4.Update_MODIFY, entries...)
 	if err != nil {
-		log.Errorf("Failed to reset %v meter entries: %v", name, err)
+		log.Errorf("Failed to reset %v meter entries: %v", p4constants.GetMeterIDToNameMap()[meterID], err)
 	}
 }
 
@@ -1051,14 +1172,14 @@ func (up4 *UP4) resetMeters(qers []qer) {
 		}
 
 		if meter.meterType == meterTypeApplication {
-			up4.resetMeter(applicationMeter, meter)
+			up4.resetMeter(p4constants.MeterPreQosPipeAppMeter, meter)
 			up4.releaseAppMeterCellID(meter.uplinkCellID)
 
 			if meter.downlinkCellID != meter.uplinkCellID {
 				up4.releaseAppMeterCellID(meter.downlinkCellID)
 			}
 		} else if meter.meterType == meterTypeSession {
-			up4.resetMeter(sessionMeter, meter)
+			up4.resetMeter(p4constants.MeterPreQosPipeSessionMeter, meter)
 			up4.releaseSessionMeterCellID(meter.uplinkCellID)
 			up4.releaseSessionMeterCellID(meter.downlinkCellID)
 		}
@@ -1103,7 +1224,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 			tunnelPort:   far.tunnelPort,
 		}
 
-		tunnelPeerID, exists := up4.tunnelPeerIDs[tunnelParams]
+		tunnelPeerID, exists := up4.getGTPTunnelPeer(tunnelParams)
 		if !exists && far.tunnelTEID != 0 {
 			return ErrNotFoundWithParam("allocated GTP tunnel peer ID", "tunnel params", tunnelParams)
 		}
@@ -1118,7 +1239,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 			pdrLog.Debug("Application meter found for PDR: ", sessMeter)
 		} // else: if only 1 QER provided, set sessMeterIdx to 0, and use only per-app metering
 
-		sessionsEntry, err := up4.p4RtTranslator.BuildSessionsTableEntry(pdr, sessMeter, tunnelPeerID, far.Buffers())
+		sessionsEntry, err := up4.p4RtTranslator.BuildSessionsTableEntry(pdr, sessMeter, tunnelPeerID.id, far.Buffers())
 		if err != nil {
 			return ErrOperationFailedWithReason("build P4rt table entry for Sessions table", err.Error())
 		}
@@ -1183,7 +1304,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 
 		tc, exists := up4.conf.QFIToTC[relatedQER.qfi]
 		if !exists {
-			tc = NoTC
+			tc = up4.conf.DefaultTC
 		}
 
 		terminationsEntry, err := up4.p4RtTranslator.BuildTerminationsTableEntry(pdr, appMeter, far,
@@ -1225,7 +1346,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 
 func (up4 *UP4) sendCreate(all PacketForwardingRules, updated PacketForwardingRules) error {
 	for i := range updated.pdrs {
-		val, err := up4.getCounterVal(preQosCounterID)
+		val, err := up4.allocateCounterID(preQosCounterID)
 		if err != nil {
 			return ErrOperationFailedWithReason("Counter ID allocation", err.Error())
 		}
@@ -1273,7 +1394,7 @@ func (up4 *UP4) sendUpdate(all PacketForwardingRules, updated PacketForwardingRu
 
 func (up4 *UP4) sendDelete(deleted PacketForwardingRules) error {
 	for i := range deleted.pdrs {
-		resetCounterVal(up4, preQosCounterID,
+		up4.releaseCounterID(preQosCounterID,
 			uint64(deleted.pdrs[i].ctrID))
 	}
 
@@ -1283,6 +1404,10 @@ func (up4 *UP4) sendDelete(deleted PacketForwardingRules) error {
 
 	up4.resetMeters(deleted.qers)
 
+	for _, f := range deleted.fars {
+		up4.removeGTPTunnelPeer(f)
+	}
+
 	for _, p := range deleted.pdrs {
 		up4.removeUeAddrAndFSEIDMappings(p)
 	}
@@ -1290,8 +1415,9 @@ func (up4 *UP4) sendDelete(deleted PacketForwardingRules) error {
 	return nil
 }
 
-func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updated PacketForwardingRules) uint8 {
-	if !up4.isConnected(nil) {
+func (up4 *UP4) SendMsgToUPF(method upfMsgType, all PacketForwardingRules, updated PacketForwardingRules) uint8 {
+	err := up4.tryConnect()
+	if err != nil {
 		log.Error("UP4 server not connected")
 		return ie.CauseRequestRejected
 	}
@@ -1302,8 +1428,6 @@ func (up4 *UP4) sendMsgToUPF(method upfMsgType, all PacketForwardingRules, updat
 		"updated-rules": updated,
 	})
 	up4Log.Debug("Sending PFCP message to UP4..")
-
-	var err error
 
 	switch method {
 	case upfMsgTypeAdd:

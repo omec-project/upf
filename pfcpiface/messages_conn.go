@@ -12,7 +12,7 @@ import (
 )
 
 var errFlowDescAbsent = errors.New("flow description not present")
-var errFastpathDown = errors.New("fastpath down")
+var errDatapathDown = errors.New("datapath down")
 var errReqRejected = errors.New("request rejected")
 
 func (pConn *PFCPConn) sendAssociationRequest() {
@@ -149,7 +149,7 @@ func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (messa
 
 	if !upf.isConnected() {
 		asres.Cause = ie.NewCause(ie.CauseRequestRejected)
-		return asres, errProcess(errFastpathDown)
+		return asres, errProcess(errDatapathDown)
 	}
 
 	if pConn.ts.remote.IsZero() {
