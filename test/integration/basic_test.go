@@ -20,6 +20,13 @@ func init() {
 	}
 }
 
+func TestDatabaseConnection(t *testing.T) {
+	client, ctx, cancel, err := connect("mongodb://localhost:27017/")
+	require.NoErrorf(t, err, "failed to connect to mongodb")
+	require.NoErrorf(t, ping(client, ctx), "failed to ping to mongodb")
+	defer close(client, ctx, cancel)
+}
+
 func TestUPFBasedUeIPAllocation(t *testing.T) {
 	setup(t, ConfigUPFBasedIPAllocation)
 	defer teardown(t)

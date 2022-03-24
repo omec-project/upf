@@ -130,7 +130,7 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 		ts:             ts,
 		rng:            rng,
 		maxRetries:     100,
-		store:          NewInMemoryStore(),
+		store:          NewMongoBDStore(),
 		upf:            node.upf,
 		done:           node.pConnDone,
 		shutdown:       make(chan struct{}),

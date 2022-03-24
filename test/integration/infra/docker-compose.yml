@@ -36,3 +36,10 @@ services:
     command: [ "--topo", "single"]
     expose:
       - 50001
+  mongo:
+    image: mongo
+    restart: always
+    ports:
+      - 27017:27017
+    expose:
+      - 27017
