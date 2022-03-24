@@ -3,13 +3,13 @@
 
 PROJECT_NAME             := upf-epc
 VERSION                  ?= $(shell cat ./VERSION)
-OSTYPE				     := $(shell uname -s)
+OSTYPE                   := $(shell uname -s)
 ifeq ($(OSTYPE),Linux)
-	NPROCS:=$(shell nproc)
+NPROCS                   := $(shell nproc)
 else ifeq ($(OSTYPE),Darwin) # Assume Mac OS X
-	NPROCS:=$(shell sysctl -n hw.physicalcpu)
+NPROCS                   := $(shell sysctl -n hw.physicalcpu)
 else
-	NPROCS:=1
+NPROCS                   := 1
 endif
 
 # Note that we set the target platform of Docker images to native
