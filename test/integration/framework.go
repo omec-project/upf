@@ -69,11 +69,6 @@ const (
 )
 
 var (
-	// ReaderElectionID use reader election ID so that pfcpiface doesn't lose mastership.
-	ReaderElectionID = p4_v1.Uint128{High: 0, Low: 1}
-)
-
-var (
 	pfcpClient *pfcpsim.PFCPClient
 	// pfcpAgent instance is used only in the native mode
 	pfcpAgent *pfcpiface.PFCPIface
@@ -256,7 +251,7 @@ func isDatapathBESS() bool {
 }
 
 func initForwardingPipelineConfig() {
-	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", ReaderElectionID)
+	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", true)
 	if err != nil {
 		panic("Cannot init forwarding pipeline config: " + err.Error())
 	}
