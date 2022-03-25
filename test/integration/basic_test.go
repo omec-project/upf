@@ -46,7 +46,7 @@ func TestUPFBasedUeIPAllocation(t *testing.T) {
 					80, 80,
 				},
 			},
-			tc:        3,
+			tc: 3,
 		},
 	}
 
