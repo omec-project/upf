@@ -156,6 +156,25 @@ type UP4 struct {
 	endMarkerChan    chan []byte
 }
 
+func toUP4ApplicationFilter(p pdr) up4ApplicationFilter {
+	var appFilter up4ApplicationFilter
+	if p.IsUplink() {
+		appFilter = up4ApplicationFilter{
+			appIP:     p.appFilter.dstIP,
+			appL4Port: p.appFilter.dstPortRange,
+		}
+	} else if p.IsDownlink() {
+		appFilter = up4ApplicationFilter{
+			appIP:     p.appFilter.srcIP,
+			appL4Port: p.appFilter.srcPortRange,
+		}
+	}
+
+	appFilter.appProto = p.appFilter.proto
+
+	return appFilter
+}
+
 func (m meter) String() string {
 	return fmt.Sprintf("Meter(type=%d, uplinkCellID=%d, downlinkCellID=%d)",
 		m.meterType, m.uplinkCellID, m.downlinkCellID)
@@ -796,23 +815,9 @@ func (up4 *UP4) addInternalApplicationIDAndGetP4rtEntry(pdr pdr) (*p4.TableEntry
 	up4.applicationMu.Lock()
 	defer up4.applicationMu.Unlock()
 
-	var appFilter up4ApplicationFilter
-	if pdr.IsUplink() {
-		appFilter = up4ApplicationFilter{
-			appIP:     pdr.appFilter.dstIP,
-			appL4Port: pdr.appFilter.dstPortRange,
-		}
-	} else if pdr.IsDownlink() {
-		appFilter = up4ApplicationFilter{
-			appIP:     pdr.appFilter.srcIP,
-			appL4Port: pdr.appFilter.srcPortRange,
-		}
-	}
-
-	appFilter.appProto = pdr.appFilter.proto
-
+	appFilter := toUP4ApplicationFilter(pdr)
 	if up4Application, exists := up4.applicationIDs[appFilter]; exists {
-		// application already exists, increment ref count.
+		// application already exists, increment 'usedBy'.
 		// since we use Set usedBy will not be incremented if
 		// application was already created for this UE session + PDR ID.
 		up4Application.usedBy.Add(internalAppReference{
@@ -827,10 +832,6 @@ func (up4 *UP4) addInternalApplicationIDAndGetP4rtEntry(pdr pdr) (*p4.TableEntry
 		return nil, 0, err
 	}
 
-	releaseID := func() {
-		up4.unsafeReleaseInternalApplicationID(appFilter)
-	}
-
 	up4Application := internalApp{
 		id: newAppID,
 		usedBy: set.NewSet(internalAppReference{
@@ -840,7 +841,7 @@ func (up4 *UP4) addInternalApplicationIDAndGetP4rtEntry(pdr pdr) (*p4.TableEntry
 
 	applicationsEntry, err := up4.p4RtTranslator.BuildApplicationsTableEntry(pdr, up4.conf.SliceID, newAppID)
 	if err != nil {
-		releaseID()
+		up4.unsafeReleaseInternalApplicationID(appFilter)
 		return nil, 0, ErrOperationFailedWithReason("build P4rt table entry for Applications table", err.Error())
 	}
 
@@ -853,21 +854,8 @@ func (up4 *UP4) removeInternalApplicationIDAndGetP4rtEntry(pdr pdr) (*p4.TableEn
 	up4.applicationMu.Lock()
 	defer up4.applicationMu.Unlock()
 
-	var appFilter up4ApplicationFilter
-	if pdr.IsUplink() {
-		appFilter = up4ApplicationFilter{
-			appIP:     pdr.appFilter.dstIP,
-			appL4Port: pdr.appFilter.dstPortRange,
-		}
-	} else if pdr.IsDownlink() {
-		appFilter = up4ApplicationFilter{
-			appIP:     pdr.appFilter.srcIP,
-			appL4Port: pdr.appFilter.srcPortRange,
-		}
-	}
-
-	appFilter.appProto = pdr.appFilter.proto
-
+	appFilter := toUP4ApplicationFilter(pdr)
+	
 	internalApp, exists := up4.applicationIDs[appFilter]
 	if !exists {
 		return nil, 0
