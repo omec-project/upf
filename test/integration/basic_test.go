@@ -518,7 +518,7 @@ func testUEAttachDetach(t *testing.T, testcase *testCase) {
 	if isDatapathUP4() {
 		// clear Applications table
 		// FIXME: Temporary solution. They should be cleared by pfcpiface, see SDFAB-960
-		p4rtClient, _ := providers.ConnectP4rt("127.0.0.1:50001", TimeBasedElectionId())
+		p4rtClient, _ := providers.ConnectP4rt("127.0.0.1:50001", true)
 		defer func() {
 			providers.DisconnectP4rt()
 			// give pfcpiface time to become master controller again

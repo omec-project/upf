@@ -264,7 +264,7 @@ func buildExpectedTunnelPeersEntry(client *p4rtc.Client, testdata *pfcpSessionDa
 
 // TODO: we should pass a list of pfcpSessionData if we will test multiple UEs
 func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, expectedValues p4RtValues, ueState UEState) {
-	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", ReaderElectionID)
+	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", false)
 	require.NoErrorf(t, err, "failed to connect to P4Runtime server")
 	defer providers.DisconnectP4rt()
 
@@ -404,7 +404,7 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, expectedVal
 }
 
 func verifyNoP4RuntimeEntries(t *testing.T, expectedValues p4RtValues) {
-	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", ReaderElectionID)
+	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", false)
 	require.NoErrorf(t, err, "failed to connect to P4Runtime server")
 	defer providers.DisconnectP4rt()
 
