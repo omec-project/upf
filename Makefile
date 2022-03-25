@@ -3,6 +3,14 @@
 
 PROJECT_NAME             := upf-epc
 VERSION                  ?= $(shell cat ./VERSION)
+OSTYPE                   := $(shell uname -s)
+ifeq ($(OSTYPE),Linux)
+NPROCS                   := $(shell nproc)
+else ifeq ($(OSTYPE),Darwin) # Assume Mac OS X
+NPROCS                   := $(shell sysctl -n hw.physicalcpu)
+else
+NPROCS                   := 1
+endif
 
 # Note that we set the target platform of Docker images to native
 # For a more portable image set CPU=haswell
@@ -18,7 +26,7 @@ DOCKER_REPOSITORY        ?=
 DOCKER_TAG               ?= ${VERSION}
 DOCKER_IMAGENAME         := ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}${PROJECT_NAME}:${DOCKER_TAG}
 DOCKER_BUILDKIT          ?= 1
-DOCKER_BUILD_ARGS        ?= --build-arg MAKEFLAGS=-j$(shell nproc) --build-arg CPU
+DOCKER_BUILD_ARGS        ?= --build-arg MAKEFLAGS=-j${NPROCS} --build-arg CPU
 DOCKER_BUILD_ARGS        += --build-arg ENABLE_NTF=$(ENABLE_NTF)
 DOCKER_PULL              ?= --pull
 
