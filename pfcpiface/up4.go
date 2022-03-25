@@ -855,7 +855,7 @@ func (up4 *UP4) removeInternalApplicationIDAndGetP4rtEntry(pdr pdr) (*p4.TableEn
 	defer up4.applicationMu.Unlock()
 
 	appFilter := toUP4ApplicationFilter(pdr)
-	
+
 	internalApp, exists := up4.applicationIDs[appFilter]
 	if !exists {
 		return nil, 0
