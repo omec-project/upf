@@ -10,7 +10,6 @@ import (
 	"github.com/omec-project/upf-epc/pfcpiface"
 	"github.com/omec-project/upf-epc/pkg/fake_bess"
 	"github.com/omec-project/upf-epc/test/integration/providers"
-	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -149,14 +148,6 @@ func init() {
 		FullTimestamp: true,
 		ForceColors:   true,
 	})
-}
-
-func TimeBasedElectionId() p4_v1.Uint128 {
-	now := time.Now()
-	return p4_v1.Uint128{
-		High: uint64(now.Unix()),
-		Low:  uint64(now.UnixNano() % 1e9),
-	}
 }
 
 func (af appFilter) isEmpty() bool {

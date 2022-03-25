@@ -16,10 +16,15 @@ import (
 var (
 	stopCh   chan struct{}
 	grpcConn *grpc.ClientConn
-
-	// DefaultElectionID use reader election ID so that pfcpiface doesn't lose mastership.
-	DefaultElectionID = p4_v1.Uint128{High: 0, Low: 1}
 )
+
+func TimeBasedElectionId() p4_v1.Uint128 {
+	now := time.Now()
+	return p4_v1.Uint128{
+		High: uint64(now.Unix()),
+		Low:  uint64(now.UnixNano() % 1e9),
+	}
+}
 
 func ConnectP4rt(addr string, asMaster bool) (*client.Client, error) {
 	grpcConn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -29,7 +34,8 @@ func ConnectP4rt(addr string, asMaster bool) (*client.Client, error) {
 
 	c := p4_v1.NewP4RuntimeClient(grpcConn)
 
-	p4RtC := client.NewClient(c, 1, DefaultElectionID, client.DisableCanonicalBytestrings)
+	// Election only happens if asMaster is true.
+	p4RtC := client.NewClient(c, 1, TimeBasedElectionId(), client.DisableCanonicalBytestrings)
 
 	if asMaster {
 		// perform Master Arbitration
