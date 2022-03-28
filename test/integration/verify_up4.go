@@ -8,6 +8,7 @@ import (
 	p4rtc "github.com/antoninbas/p4runtime-go-client/pkg/client"
 	"github.com/antoninbas/p4runtime-go-client/pkg/util/conversion"
 	"github.com/omec-project/upf-epc/internal/p4constants"
+	"github.com/omec-project/upf-epc/pfcpiface"
 	"github.com/omec-project/upf-epc/test/integration/providers"
 	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/stretchr/testify/require"
@@ -19,7 +20,6 @@ const (
 	// TODO: auto-generate P4 constants from P4Info and share them with p4rt_translator
 	MeterSession              = "PreQosPipe.session_meter"
 	MeterApp                  = "PreQosPipe.app_meter"
-	MeterSliceTc              = "PreQosPipe.slice_tc_meter"
 	TableApplications         = "PreQosPipe.applications"
 	TableDownlinkSessions     = "PreQosPipe.sessions_downlink"
 	TableSessionsUplink       = "PreQosPipe.sessions_uplink"
@@ -263,9 +263,13 @@ func buildExpectedTunnelPeersEntry(client *p4rtc.Client, testdata *pfcpSessionDa
 	}, client.NewTableActionDirect(ActLoadTunnelParam, [][]byte{srcAddr, dstAddr, srcPort}), nil)
 }
 
-func buildExpectedSliceTcMeter(expectedValues sliceMeter) *p4_v1.MeterEntry {
-	meterIndex := getSliceTcMeterIndex(expectedValues.sliceID, expectedValues.TC)
+func buildExpectedSliceTcMeter(expectedValues sliceMeter) (*p4_v1.MeterEntry, error) {
+	meterIndex, err := pfcpiface.GetSliceTCMeterIndex(expectedValues.sliceID, expectedValues.TC)
+	if err != nil {
+		return nil, err
+	}
 
+	// slice_TC meters are expected to support only peak bands (Maximum BitRate)
 	meterConfig := &p4_v1.MeterConfig{
 		Cir:    int64(0),
 		Cburst: int64(0),
@@ -277,11 +281,7 @@ func buildExpectedSliceTcMeter(expectedValues sliceMeter) *p4_v1.MeterEntry {
 		MeterId: 336833095,
 		Index:   &p4_v1.Index{Index: meterIndex},
 		Config:  meterConfig,
-	}
-}
-
-func getSliceTcMeterIndex(sliceID uint8, TC uint8) int64 {
-	return int64((sliceID << 2) + (TC & 0b11))
+	}, nil
 }
 
 // TODO: we should pass a list of pfcpSessionData if we will test multiple UEs
@@ -480,11 +480,12 @@ func verifyNoP4RuntimeEntries(t *testing.T, expectedValues p4RtValues) {
 }
 
 func verifyP4RuntimeSliceMeter(t *testing.T, expectedValues p4RtValues) {
-	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", ReaderElectionID)
+	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", false)
 	require.NoErrorf(t, err, "failed to connect to P4Runtime server")
 	defer providers.DisconnectP4rt()
 
-	meters, _ := p4rtClient.ReadMeterEntryWildcard(MeterSliceTc)
+	sliceTcMeter := p4constants.GetMeterIDToNameMap()[p4constants.MeterPreQosPipeSliceTcMeter]
+	meters, _ := p4rtClient.ReadMeterEntryWildcard(sliceTcMeter)
 
 	nrOfConfiguredMeters := 0
 	for _, m := range meters {
@@ -494,11 +495,14 @@ func verifyP4RuntimeSliceMeter(t *testing.T, expectedValues p4RtValues) {
 	}
 
 	if expectedValues.sliceMeter != nil {
-		expectedMeter := buildExpectedSliceTcMeter(*expectedValues.sliceMeter)
+		expectedMeter, err := buildExpectedSliceTcMeter(*expectedValues.sliceMeter)
+		if err != nil {
+			t.Errorf("Error obtaining expected SliceTC meter: %v", err)
+		}
 
 		require.Equal(t, 1, nrOfConfiguredMeters, "A single slice TC meter is expected")
 
-		meter, _ := p4rtClient.ReadMeterEntry(MeterSliceTc, expectedMeter.Index.GetIndex())
+		meter, _ := p4rtClient.ReadMeterEntry(sliceTcMeter, expectedMeter.Index.GetIndex())
 		require.Equal(t, expectedMeter.Config, meter, "Slice TC meter does not equal expected", meters)
 	} else {
 		require.Equal(t, 0, nrOfConfiguredMeters, "slice TC meter should not have any cells configured")

@@ -32,8 +32,9 @@ const (
 	listFormatString = "%v,\n"
 	constOrVarClose  = ")\n"
 
-	idTypeString   = "uint32"
-	sizeTypeString = "uint64"
+	uint32TypeString = "uint32"
+	int32TypeString  = "int32"
+	int54TypeString  = "uint64"
 
 	hfVarPrefix         = "Hdr_"
 	tblVarPrefix        = "Table_"
@@ -47,23 +48,33 @@ const (
 	mtrVarPrefix        = "Meter_"
 	mtrSizeVarPrefix    = "MeterSize_"
 	enumVarPrefix       = "Enum_"
+	bitwidthMFVarPrefix = "BitwidthMf_"
+	bitwidthAPVarPrefix = "BitwidthAp_"
 )
 
-func emitEntityConstant(prefix string, p4EntityName string, id uint32) string {
+func emitEntityConstantUint32(prefix string, p4EntityName string, id uint32) string {
 	// see: https://go.dev/ref/spec#Identifiers
 	p4EntityName = prefix + "_" + p4EntityName
 	p4EntityName = strings.Replace(p4EntityName, ".", "_", -1)
 	p4EntityName = strcase.ToPascal(p4EntityName)
-	return fmt.Sprintf("%s \t %s = %v\n", p4EntityName, idTypeString, id)
+	return fmt.Sprintf("%s \t %s = %v\n", p4EntityName, uint32TypeString, id)
 }
 
-// TODO: collapse with emitEntityConstant
+func emitEntityConstantInt32(prefix string, p4EntityName string, value int32) string {
+	// see: https://go.dev/ref/spec#Identifiers
+	p4EntityName = prefix + "_" + p4EntityName
+	p4EntityName = strings.Replace(p4EntityName, ".", "_", -1)
+	p4EntityName = strcase.ToPascal(p4EntityName)
+	return fmt.Sprintf("%s \t %s = %v\n", p4EntityName, int32TypeString, value)
+}
+
+// TODO: collapse with emitEntityConstantUint32
 func emitEntitySizeConstant(prefix string, p4EntityName string, id int64) string {
 	// see: https://go.dev/ref/spec#Identifiers
 	p4EntityName = prefix + "_" + p4EntityName
 	p4EntityName = strings.Replace(p4EntityName, ".", "_", -1)
 	p4EntityName = strcase.ToPascal(p4EntityName)
-	return fmt.Sprintf("%s \t %s = %v\n", p4EntityName, sizeTypeString, id)
+	return fmt.Sprintf("%s \t %s = %v\n", p4EntityName, int54TypeString, id)
 }
 
 func getPreambles(info *p4ConfigV1.P4Info, p4Type string) (preambles []*p4ConfigV1.Preamble) {
@@ -124,8 +135,8 @@ func generateP4DataFunctions(info *p4ConfigV1.P4Info, p4Type string) string {
 	const listFuncTemplate = "func Get%sIDList() []%s {\n return []%s {\n"
 
 	mapBuilder, listBuilder := strings.Builder{}, strings.Builder{}
-	mapBuilder.WriteString(fmt.Sprintf(mapFuncTemplate, p4Type, idTypeString, idTypeString))
-	listBuilder.WriteString(fmt.Sprintf(listFuncTemplate, p4Type, idTypeString, idTypeString))
+	mapBuilder.WriteString(fmt.Sprintf(mapFuncTemplate, p4Type, uint32TypeString, uint32TypeString))
+	listBuilder.WriteString(fmt.Sprintf(listFuncTemplate, p4Type, uint32TypeString, uint32TypeString))
 
 	preambles := getPreambles(info, p4Type)
 
@@ -143,6 +154,8 @@ func generateP4DataFunctions(info *p4ConfigV1.P4Info, p4Type string) string {
 
 func generateConstants(p4info *p4ConfigV1.P4Info) string {
 	constBuilder := strings.Builder{}
+	matchFieldBitwidth := map[string]int32{}
+	actionParamBitwidth := map[string]int32{}
 
 	constBuilder.WriteString(constOpen)
 
@@ -152,7 +165,7 @@ func generateConstants(p4info *p4ConfigV1.P4Info) string {
 		for _, matchField := range element.MatchFields {
 			tableName, name := element.GetPreamble().GetName(), matchField.GetName()
 
-			constBuilder.WriteString(emitEntityConstant(hfVarPrefix+tableName, name, matchField.GetId()))
+			constBuilder.WriteString(emitEntityConstantUint32(hfVarPrefix+tableName, name, matchField.GetId()))
 		}
 	}
 
@@ -161,7 +174,11 @@ func generateConstants(p4info *p4ConfigV1.P4Info) string {
 	for _, element := range p4info.GetTables() {
 		name, ID := element.GetPreamble().GetName(), element.GetPreamble().GetId()
 
-		constBuilder.WriteString(emitEntityConstant(tblVarPrefix, name, ID))
+		constBuilder.WriteString(emitEntityConstantUint32(tblVarPrefix, name, ID))
+
+		for _, mf := range element.GetMatchFields() {
+			matchFieldBitwidth[mf.GetName()] = mf.GetBitwidth()
+		}
 	}
 
 	// Actions
@@ -169,7 +186,11 @@ func generateConstants(p4info *p4ConfigV1.P4Info) string {
 	for _, element := range p4info.GetActions() {
 		name, ID := element.GetPreamble().GetName(), element.GetPreamble().GetId()
 
-		constBuilder.WriteString(emitEntityConstant(actVarPrefix, name, ID))
+		constBuilder.WriteString(emitEntityConstantUint32(actVarPrefix, name, ID))
+
+		for _, ap := range element.GetParams() {
+			actionParamBitwidth[ap.GetName()] = ap.GetBitwidth()
+		}
 	}
 
 	// Action Param IDs
@@ -178,7 +199,7 @@ func generateConstants(p4info *p4ConfigV1.P4Info) string {
 		for _, actionParam := range element.GetParams() {
 			actionName, name := element.GetPreamble().GetName(), actionParam.GetName()
 
-			constBuilder.WriteString(emitEntityConstant(actparamVarPrefix+actionName, name, actionParam.GetId()))
+			constBuilder.WriteString(emitEntityConstantUint32(actparamVarPrefix+actionName, name, actionParam.GetId()))
 		}
 	}
 
@@ -187,7 +208,7 @@ func generateConstants(p4info *p4ConfigV1.P4Info) string {
 	for _, element := range p4info.GetCounters() {
 		name, ID := element.GetPreamble().GetName(), element.GetPreamble().GetId()
 
-		constBuilder.WriteString(emitEntityConstant(ctrVarPrefix, name, ID))
+		constBuilder.WriteString(emitEntityConstantUint32(ctrVarPrefix, name, ID))
 		constBuilder.WriteString(emitEntitySizeConstant(ctrSizeVarPrefix, name, element.GetSize()))
 	}
 
@@ -196,7 +217,7 @@ func generateConstants(p4info *p4ConfigV1.P4Info) string {
 	for _, element := range p4info.GetDirectCounters() {
 		name, ID := element.GetPreamble().GetName(), element.GetPreamble().GetId()
 
-		constBuilder.WriteString(emitEntityConstant(dirCtrVarPrefix, name, ID))
+		constBuilder.WriteString(emitEntityConstantUint32(dirCtrVarPrefix, name, ID))
 	}
 
 	// Action profiles
@@ -204,7 +225,7 @@ func generateConstants(p4info *p4ConfigV1.P4Info) string {
 	for _, element := range p4info.GetActionProfiles() {
 		name, ID := element.GetPreamble().GetName(), element.GetPreamble().GetId()
 
-		constBuilder.WriteString(emitEntityConstant(actprofVarPrefix, name, ID))
+		constBuilder.WriteString(emitEntityConstantUint32(actprofVarPrefix, name, ID))
 	}
 
 	// Packet metadata
@@ -212,7 +233,7 @@ func generateConstants(p4info *p4ConfigV1.P4Info) string {
 	for _, element := range p4info.GetControllerPacketMetadata() {
 		name, ID := element.GetPreamble().GetName(), element.GetPreamble().GetId()
 
-		constBuilder.WriteString(emitEntityConstant(packetmetaVarPrefix, name, ID))
+		constBuilder.WriteString(emitEntityConstantUint32(packetmetaVarPrefix, name, ID))
 	}
 
 	// Meters
@@ -220,7 +241,7 @@ func generateConstants(p4info *p4ConfigV1.P4Info) string {
 	for _, element := range p4info.GetMeters() {
 		name, ID := element.GetPreamble().GetName(), element.GetPreamble().GetId()
 
-		constBuilder.WriteString(emitEntityConstant(mtrVarPrefix, name, ID))
+		constBuilder.WriteString(emitEntityConstantUint32(mtrVarPrefix, name, ID))
 		constBuilder.WriteString(emitEntitySizeConstant(mtrSizeVarPrefix, name, element.GetSize()))
 	}
 
@@ -241,9 +262,21 @@ func generateConstants(p4info *p4ConfigV1.P4Info) string {
 			if err != nil {
 				log.Errorln(name, err)
 			} else {
-				constBuilder.WriteString(emitEntityConstant(enumVarPrefix, name, enumVal))
+				constBuilder.WriteString(emitEntityConstantUint32(enumVarPrefix, name, enumVal))
 			}
 		}
+	}
+
+	// match field bitwidth
+	orderedMfBitwidth := *getOrderedMapKeys(matchFieldBitwidth)
+	for _, name := range orderedMfBitwidth {
+		constBuilder.WriteString(emitEntityConstantInt32(bitwidthMFVarPrefix, name, matchFieldBitwidth[name]))
+	}
+
+	// action param bitwidth
+	orderedApBitwidth := *getOrderedMapKeys(actionParamBitwidth)
+	for _, name := range orderedApBitwidth {
+		constBuilder.WriteString(emitEntityConstantInt32(bitwidthAPVarPrefix, name, actionParamBitwidth[name]))
 	}
 
 	constBuilder.WriteString(constOrVarClose + "\n")
@@ -274,6 +307,16 @@ func mustGetP4Config(p4infopath string) *p4ConfigV1.P4Info {
 	}
 
 	return &p4info
+}
+
+func getOrderedMapKeys(fieldMap map[string]int32) *[]string {
+	ordered := make([]string, 0, len(fieldMap))
+	for k := range fieldMap {
+		ordered = append(ordered, k)
+	}
+
+	sort.Strings(ordered)
+	return &ordered
 }
 
 func main() {
