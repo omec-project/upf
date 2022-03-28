@@ -10,7 +10,6 @@ import (
 	"github.com/omec-project/upf-epc/pfcpiface"
 	"github.com/omec-project/upf-epc/pkg/fake_bess"
 	"github.com/omec-project/upf-epc/test/integration/providers"
-	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -66,11 +65,6 @@ const (
 	UEStateAttached
 	// UEStateBuffering state after PFCP Session Modification with buffering flags is done.
 	UEStateBuffering
-)
-
-var (
-	// ReaderElectionID use reader election ID so that pfcpiface doesn't lose mastership.
-	ReaderElectionID = p4_v1.Uint128{High: 0, Low: 1}
 )
 
 var (
@@ -166,14 +160,6 @@ func init() {
 	})
 }
 
-func TimeBasedElectionId() p4_v1.Uint128 {
-	now := time.Now()
-	return p4_v1.Uint128{
-		High: uint64(now.Unix()),
-		Low:  uint64(now.UnixNano() % 1e9),
-	}
-}
-
 func (af appFilter) isEmpty() bool {
 	return af.proto == 0 && len(af.appIP) == 0 &&
 		af.appPort.low == 0 && af.appPort.high == 0
@@ -266,7 +252,7 @@ func isDatapathBESS() bool {
 }
 
 func initForwardingPipelineConfig() {
-	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", ReaderElectionID)
+	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", true)
 	if err != nil {
 		panic("Cannot init forwarding pipeline config: " + err.Error())
 	}
