@@ -268,15 +268,5 @@ class Port:
         # Attach it to merge
         merge.connect(update)
 
-        # Dummy dst MAC update module
-        # TODO(max): create dynamically in plugin
-        gw_mac = mac2hex("00:00:00:cc:cc:cc")
-        dst_update = Update(
-            name="{}DstEther{:X}".format(self.name, gw_mac),
-            fields=[{"offset": 0, "size": 6, "value": gw_mac}],
-        )
-        dst_update.connect(merge)
-        self.rtr.connect(next_mod=dst_update, ogate=0)
-
         if self.mode == "sim":
             self.rtr = merge

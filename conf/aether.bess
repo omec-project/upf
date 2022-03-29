@@ -223,18 +223,26 @@ dataplaneBPF:bpfUeGatePass \
     -> dataplaneRxUDPCksum::L4Checksum(verify=True, hw=parser.hwcksum) \
     -> pktParse
 
+# Add ARP, ICMP and DHCP filter to veth interface.
+# This rule is statically created, and not by the agent at runtime, so that
+# these kinds of packets are always forwarded to the Linux-managed veth. This
+# allows external DHCP assignment to happen independent of the agent running.
+pktout_filter = "arp or icmp or (udp and (port 67 or port 68))"
+pktout_bpf_rule = {"priority": -bpfPacketOutGatePass, "filter": pktout_filter, "gate": bpfPacketOutGatePass}
+dataplaneBPF.add(filters=[pktout_bpf_rule])
+
 # Drop unknown packets
 dataplaneRxIPCksum:1 -> dataplaneRxIPCksumFail::Sink()
 dataplaneRxUDPCksum:1 -> dataplaneRxUDPCksumFail::Sink()
 
 executeFAR:farSpecialAction \
-    -> postDPQosFlowMeasure::FlowMeasure(leader=False,
+    -> postQosFlowMeasure::FlowMeasure(leader=False,
                                             flag_attr_name="buffer_flag",
                                             entries=parser.table_size_flow_measure) \
     -> dataplane_port.rtr
 
 executeFAR:farForwardUAction \
-    -> postDPQosFlowMeasure
+    -> postQosFlowMeasure
 
 executeFAR:farForwardDAction \
-    -> postDPQosFlowMeasure
+    -> postQosFlowMeasure

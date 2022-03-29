@@ -49,7 +49,7 @@ func NewPFCPIface(conf Conf) *PFCPIface {
 	if conf.EnableP4rt {
 		pfcpIface.fp = &UP4{}
 	} else if conf.EnableAether {
-		pfcpIface.fp = &aether{}
+		pfcpIface.fp = NewAether()
 	} else {
 		pfcpIface.fp = &bess{}
 	}

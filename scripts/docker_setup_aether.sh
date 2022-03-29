@@ -17,8 +17,9 @@ mode="dpdk"
 # The veth interface used for packet io between BESS and PFCP agent.
 veth_iface_name="fab"
 veth_iface_ip="198.18.0.1/24"
-veth_iface_gateway_ip="198.18.0.2"
+veth_iface_gateway_ip="198.18.0.100"
 veth_iface_gateway_mac="00:00:00:bb:bb:bb"
+alt_route_table=201
 
 # Set up mirror link to communicate with the kernel
 # This vdev interface is used for ARP + ICMP + DHCP updates.
@@ -32,13 +33,14 @@ function setup_veth_interface() {
 
 	# Address setup. Here we assign a static IP, but in other deployments this is DHCP assigned.
 	sudo ip netns exec pause ip addr add "${veth_iface_ip}" dev "${veth_iface_name}"
-	# sudo ip netns exec pause ip link set dev "${veth_iface_name}" address "00:00:00:aa:aa:aa"
 
 	# Route setup.
-	# sudo ip netns exec pause ip route add 0.0.0.0/0 via "${veth_iface_gateway_ip}" metric 100
+	# Default route setup via fabric gateway with policy-based routing.
+	sudo ip netns exec pause ip rule add from "${veth_iface_ip}" table "${alt_route_table}" prio 1
+	sudo ip netns exec pause ip route add default via "${veth_iface_gateway_ip}" dev "${veth_iface_name}" table "${alt_route_table}"
 
 	# Simulated GW neighbor setup.
-	sudo ip netns exec pause ip neigh add "${veth_iface_gateway_ip}" lladdr "${veth_iface_gateway_mac}" dev "${veth_iface_name}" nud permanent
+	# sudo ip netns exec pause ip neigh add "${veth_iface_gateway_ip}" lladdr "${veth_iface_gateway_mac}" dev "${veth_iface_name}" nud permanent
 }
 
 # Stop previous instances of bess* before restarting

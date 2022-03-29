@@ -37,10 +37,8 @@ const (
 	SessQerLookup = "sessionQERLookup"
 	// PreQosFlowMeasure: Pre QoS measurement module name.
 	PreQosFlowMeasure = "preQosFlowMeasure"
-	// PostDlQosFlowMeasure: Post QoS measurement downlink module name.
-	PostDlQosFlowMeasure = "postDLQosFlowMeasure"
-	// PostUlQosFlowMeasure: Post QoS measurement uplink module name.
-	PostUlQosFlowMeasure = "postULQosFlowMeasure"
+	// PostQosFlowMeasure: Post QoS measurement module name.
+	PostQosFlowMeasure = "postQosFlowMeasure"
 	// far-action specific values.
 	farForwardD = 0x0
 	farForwardU = 0x1
@@ -440,15 +438,9 @@ func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 		return
 	}
 
-	postDlQosStatsResp, err := b.readFlowMeasurement(ctx, PostDlQosFlowMeasure, flip.OldFlag, true, q)
+	postQosStatsResp, err := b.readFlowMeasurement(ctx, PostQosFlowMeasure, flip.OldFlag, true, q)
 	if err != nil {
-		log.Errorln(PostDlQosFlowMeasure, " read failed!:", err)
-		return
-	}
-
-	postUlQosStatsResp, err := b.readFlowMeasurement(ctx, PostUlQosFlowMeasure, flip.OldFlag, true, q)
-	if err != nil {
-		log.Errorln(PostUlQosFlowMeasure, " read failed!:", err)
+		log.Errorln(PostQosFlowMeasure, " read failed!:", err)
 		return
 	}
 
@@ -563,8 +555,7 @@ func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 		}
 	}
 
-	createStats(&qosStatsInResp, &postUlQosStatsResp)
-	createStats(&qosStatsInResp, &postDlQosStatsResp)
+	createStats(&qosStatsInResp, &postQosStatsResp)
 
 	return
 }
