@@ -126,7 +126,7 @@ type sliceMeter struct {
 type p4RtValues struct {
 	tc         uint8
 	ueAddress  string
-	appID      uint8
+
 	appFilter  appFilter
 	sliceMeter *sliceMeter
 

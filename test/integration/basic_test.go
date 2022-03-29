@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim/session"
-	"github.com/omec-project/upf-epc/test/integration/providers"
 	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
 )
@@ -42,9 +41,7 @@ func TestUPFBasedUeIPAllocation(t *testing.T) {
 		expected: p4RtValues{
 			// first IP address from pool configured in ue_ip_alloc.json
 			ueAddress: "10.250.0.1",
-			// no application filtering rule expected
-			appID: 0,
-			tc:    3,
+			tc:        3,
 		},
 		desc: "UPF-based UE IP allocation",
 	}
@@ -91,8 +88,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 80,
 					},
 				},
-				appID: 1,
-				tc:    3,
+				tc: 3,
 			},
 			desc: "APPLICATION FILTERING permit out udp from any 80-80 to assigned",
 		},
@@ -116,10 +112,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 100,
 					},
 				},
-				// FIXME: there is a dependency on previous test because pfcpiface doesn't clear application IDs properly
-				//  See SDFAB-960
-				appID: 2,
-				tc:    3,
+				tc: 3,
 			},
 			desc: "APPLICATION FILTERING permit out udp from 192.168.1.1/32 to assigned 80-100",
 		},
@@ -136,8 +129,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 			},
 			expected: p4RtValues{
 				// no application filtering rule expected
-				appID: 0,
-				tc:    3,
+				tc: 3,
 			},
 			desc: "APPLICATION FILTERING ALLOW_ALL",
 		},
@@ -169,8 +161,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 80,
 					},
 				},
-				appID: 1,
-				tc:    3,
+				tc: 3,
 			},
 			desc: "QER_METERING - 1 session QER, 2 app QERs",
 		},
@@ -202,8 +193,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 80,
 					},
 				},
-				appID: 1,
-				tc:    3,
+				tc: 3,
 			},
 			desc: "QER_METERING - session QER only",
 		},
@@ -235,8 +225,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 80,
 					},
 				},
-				appID: 1,
-				tc:    2,
+				tc: 2,
 			},
 			desc: "QER_METERING - TC for QFI",
 		},
@@ -269,8 +258,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 80,
 					},
 				},
-				appID: 1,
-				tc:    2,
+				tc: 2,
 			},
 			desc: "QER UL gating",
 		},
@@ -303,8 +291,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 80,
 					},
 				},
-				appID: 1,
-				tc:    2,
+				tc: 2,
 			},
 			desc: "QER DL gating",
 		},
@@ -341,8 +328,7 @@ func TestUEBuffering(t *testing.T) {
 					80, 80,
 				},
 			},
-			appID: 1,
-			tc:    3,
+			tc: 3,
 		},
 	}
 
@@ -575,21 +561,6 @@ func testUEDetach(t *testing.T, testcase *testCase) {
 func testUEAttachDetach(t *testing.T, testcase *testCase) {
 	testUEAttach(t, testcase)
 	testUEDetach(t, testcase)
-
-	if isDatapathUP4() {
-		// clear Applications table
-		// FIXME: Temporary solution. They should be cleared by pfcpiface, see SDFAB-960
-		p4rtClient, _ := providers.ConnectP4rt("127.0.0.1:50001", true)
-		defer func() {
-			providers.DisconnectP4rt()
-			// give pfcpiface time to become master controller again
-			time.Sleep(3 * time.Second)
-		}()
-		entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.applications")
-		for _, entry := range entries {
-			p4rtClient.DeleteTableEntry(entry)
-		}
-	}
 }
 
 func testSliceMeter(t *testing.T, testcase *testCase) {
