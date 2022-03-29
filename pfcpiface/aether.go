@@ -81,10 +81,11 @@ const (
 
 type interfaceClassification struct {
 	// Match
-	dstIp, dstIpMask     uint32
-	ipProto, ipProtoMask uint8
-	dstPort, dstPortMask uint16
-	priority             int64
+	tunnelDstIp, tunnelDstIpMask uint32
+	dstIp, dstIpMask             uint32
+	ipProto, ipProtoMask         uint8
+	dstPort, dstPortMask         uint16
+	priority                     int64
 	// Action
 	srcIface uint8
 	gate     uint64 // 0 pass, 1 fail
@@ -159,7 +160,6 @@ func (a *aether) SendMsgToUPF(method upfMsgType, all PacketForwardingRules, upda
 			IP:   utils.Uint32ToIp4(far.tunnelIP4Dst),
 			Mask: net.CIDRMask(net.IPv4len*8, net.IPv4len*8), // a /32 mask
 		}
-		enbIP.IP = enbIP.IP.Mask(enbIP.Mask) // Mask out lower bits.
 		var err error
 		var nhmac net.HardwareAddr
 		// Check if received eNB IP is in fabric subnet, i.e. directly attached.
@@ -255,8 +255,8 @@ func (a *aether) syncInterface(ctx context.Context, iface string) (err error) {
 		// Bridging
 		if r.Scope == netlink.SCOPE_LINK {
 			log.Traceln("Found route with scope link:", r)
-
 			a.routeToFabric = r
+			break
 		}
 	}
 
@@ -376,14 +376,14 @@ func (a *aether) setupRoutingRules() (err error) {
 		return
 	}
 
-	// Route UE traffic over fabric.
-	// TODO: should match on eNB address, not ue pool because it's encaped
-	if err = a.addIPLookupRule(ctx, a.ueSubnet, a.gatewayMAC); err != nil {
+	// Default route over Fabric gateway for encaped uplink traffic.
+	defaultRoute := &net.IPNet{
+		IP:   net.IPv4zero,
+		Mask: net.CIDRMask(0, net.IPv4len * 8),
+	}
+	if err = a.addIPLookupRule(ctx, defaultRoute, a.gatewayMAC); err != nil {
 		return
 	}
-
-	// TODO(max): create next hop dmac modules and link
-	//return ErrUnsupported("setupRoutingRules", "not implemented")
 
 	return
 }
@@ -739,15 +739,13 @@ func (a *aether) setupInterfaceClassification() (err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
 
-	// Other GTP packets directly to UPF are uplink, from access.
+	// GTP encaped packets directly to UPF (outer IP dst) are uplink, from access.
 	ifc := interfaceClassification{
-		priority:    40,
-		dstIp:       ip2int(a.ownIp.IP),
-		dstIpMask:   math.MaxUint32,
-		ipProto:     UdpProto,
-		ipProtoMask: math.MaxUint8,
-		dstPort:     tunnelGTPUPort,
-		dstPortMask: math.MaxUint16,
+		priority: 40,
+		// Presence of a tunnel IP implies an outer UDP header and port 2152, as verified by the GTP
+		// parser. No need (and possibility) to match on them here.
+		tunnelDstIp:     ip2int(a.ownIp.IP),
+		tunnelDstIpMask: math.MaxUint32,
 
 		gate:     0,
 		srcIface: access,
@@ -757,6 +755,7 @@ func (a *aether) setupInterfaceClassification() (err error) {
 		return
 	}
 
+	// Packets to UEs are downlink, from core.
 	ifc = interfaceClassification{
 		priority:  30,
 		dstIp:     ip2int(a.ueSubnet.IP),
@@ -792,14 +791,16 @@ func (a *aether) addInterfaceClassification(ctx context.Context, ifc interfaceCl
 		Gate:     ifc.gate,
 		Priority: ifc.priority,
 		Values: []*pb.FieldData{
-			intEnc(uint64(ifc.dstIp)),   /* dst_ip */
-			intEnc(uint64(ifc.ipProto)), /* ip_proto */
-			intEnc(uint64(ifc.dstPort)), /* dst_port */
+			intEnc(uint64(ifc.tunnelDstIp)), /* tunnel_ipv4_dst */
+			intEnc(uint64(ifc.dstIp)),       /* dst_ip */
+			intEnc(uint64(ifc.ipProto)),     /* ip_proto */
+			intEnc(uint64(ifc.dstPort)),     /* dst_port */
 		},
 		Masks: []*pb.FieldData{
-			intEnc(uint64(ifc.dstIpMask)),   /* dst_ip mask */
-			intEnc(uint64(ifc.ipProtoMask)), /* ip_proto mask */
-			intEnc(uint64(ifc.dstPortMask)), /* dst_port mask */
+			intEnc(uint64(ifc.tunnelDstIpMask)), /* tunnel_ipv4_dst mask */
+			intEnc(uint64(ifc.dstIpMask)),       /* dst_ip mask */
+			intEnc(uint64(ifc.ipProtoMask)),     /* ip_proto mask */
+			intEnc(uint64(ifc.dstPortMask)),     /* dst_port mask */
 		},
 		Valuesv: []*pb.FieldData{
 			intEnc(uint64(ifc.srcIface)), /* src_iface */
@@ -832,9 +833,17 @@ func (a *aether) processInterfaceClassification(ctx context.Context, msg proto.M
 		Arg:  any,
 	})
 
-	if err != nil || resp.GetError() != nil {
-		log.Errorf("interfaceClassification method failed with resp: %v, err: %v\n", resp, err)
+	if err != nil {
+		log.Errorf("interfaceClassification %v RPC failed with err: %v\n", method, err)
+		return err
 	}
+
+	if resp.GetError() != nil && resp.GetError().Code != 0 {
+		log.Errorf("interfaceClassification %v request '%+v' failed with err: %v\n", method, msg, resp.GetError())
+		return status.Error(codes.Code(resp.GetError().Code), resp.GetError().Errmsg)
+	}
+
+	log.Tracef("%ved interfaceClassification '%+v'", method, msg)
 
 	return nil
 }

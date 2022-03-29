@@ -84,7 +84,8 @@ src_interface_access = 1
 src_interface_core = 2
 interface_classification_gate_pass = 0
 interface_classification_gate_fail = 1
-interfaceClassification::WildcardMatch(fields=[{'attr_name':'dst_ip', 'num_bytes':4},
+interfaceClassification::WildcardMatch(fields=[{'attr_name':'tunnel_ipv4_dst', 'num_bytes':4},
+                                               {'attr_name':'dst_ip', 'num_bytes':4},
                                                {'attr_name':'ip_proto', 'num_bytes':1},
                                                {'attr_name':'dst_port', 'num_bytes':2}],
                                        values=[{'attr_name':'src_iface', 'num_bytes':1}],
