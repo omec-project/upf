@@ -4,6 +4,7 @@
 package integration
 
 import (
+	"github.com/omec-project/upf-epc/test/integration/providers"
 	"net"
 	"testing"
 	"time"
@@ -14,9 +15,7 @@ import (
 )
 
 func init() {
-	if isDatapathUP4() && isModeDocker() {
-		initForwardingPipelineConfig()
-	}
+	providers.MustCreateNetwork("testnet")
 }
 
 func TestUPFBasedUeIPAllocation(t *testing.T) {
