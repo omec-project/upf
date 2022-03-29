@@ -379,7 +379,7 @@ func (a *aether) setupRoutingRules() (err error) {
 	// Default route over Fabric gateway for encaped uplink traffic.
 	defaultRoute := &net.IPNet{
 		IP:   net.IPv4zero,
-		Mask: net.CIDRMask(0, net.IPv4len * 8),
+		Mask: net.CIDRMask(0, net.IPv4len*8),
 	}
 	if err = a.addIPLookupRule(ctx, defaultRoute, a.gatewayMAC); err != nil {
 		return
