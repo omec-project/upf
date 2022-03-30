@@ -28,7 +28,7 @@ const (
 	ContainerNamePFCPAgent = "pfcpiface"
 	ContainerNameMockUP4   = "mock-up4"
 	ImageNamePFCPAgent     = "upf-epc-pfcpiface:integration"
-	ImageNameMockUP4       = "opennetworking/mn-stratum:21.12"
+	ImageNameMockUP4       = "docker.io/opennetworking/mn-stratum:21.12"
 	DockerTestNetwork      = "testnet"
 
 	EnvMode     = "MODE"
@@ -161,6 +161,7 @@ func init() {
 		ForceColors:   true,
 	})
 
+	providers.MustPullDockerImage(ImageNameMockUP4)
 	providers.MustCreateNetworkIfNotExists(DockerTestNetwork)
 }
 
@@ -287,7 +288,7 @@ func MustStopMockUP4() {
 
 func MustStartPFCPAgent() {
 	providers.MustRunDockerContainer(ContainerNamePFCPAgent, ImageNamePFCPAgent, "-config /config/upf.json",
-		[]string{"8805/udp"}, "/tmp:/config", DockerTestNetwork)
+		[]string{"8805/udp", "8080/tcp"}, "/tmp:/config", DockerTestNetwork)
 }
 
 func MustStopPFCPAgent() {

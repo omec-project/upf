@@ -175,7 +175,7 @@ func MustRunDockerContainer(name, image, cmd string, exposedPorts []string, mnt 
 
 	hostCfg := &container.HostConfig{
 		Privileged: true,
-		//AutoRemove: true,
+		AutoRemove: true,
 		PortBindings: nat.PortMap{},
 		Mounts:       []mount.Mount{},
 	}
@@ -207,11 +207,6 @@ func MustRunDockerContainer(name, image, cmd string, exposedPorts []string, mnt 
 
 	if net != "" {
 		networkingConfig.EndpointsConfig[net] = &network.EndpointSettings{}
-	}
-
-	_, err = cli.ImagePull(ctx, image, types.ImagePullOptions{})
-	if err != nil {
-		panic(err)
 	}
 
 	resp, err := cli.ContainerCreate(ctx, baseCfg, hostCfg, networkingConfig, nil, name)
@@ -247,5 +242,19 @@ func MustStopDockerContainer(name string) {
 	})
 	if err != nil {
 		logrus.Fatalf("Failed to stop Docker container %s: %v", name, err)
+	}
+}
+
+func MustPullDockerImage(image string) {
+	ctx := context.Background()
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		panic(err)
+	}
+	defer cli.Close()
+
+	_, err = cli.ImagePull(ctx, image, types.ImagePullOptions{})
+	if err != nil {
+		panic(err)
 	}
 }
