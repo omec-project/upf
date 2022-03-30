@@ -174,8 +174,8 @@ func MustRunDockerContainer(name, image, cmd string, exposedPorts []string, mnt 
 	}
 
 	hostCfg := &container.HostConfig{
-		Privileged: true,
-		AutoRemove: true,
+		Privileged:   true,
+		AutoRemove:   true,
 		PortBindings: nat.PortMap{},
 		Mounts:       []mount.Mount{},
 	}
