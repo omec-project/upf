@@ -34,7 +34,7 @@ const (
 
 	uint32TypeString = "uint32"
 	int32TypeString  = "int32"
-	int54TypeString  = "uint64"
+	int64TypeString  = "uint64"
 
 	hfVarPrefix         = "Hdr_"
 	tblVarPrefix        = "Table_"
@@ -74,7 +74,7 @@ func emitEntitySizeConstant(prefix string, p4EntityName string, id int64) string
 	p4EntityName = prefix + "_" + p4EntityName
 	p4EntityName = strings.Replace(p4EntityName, ".", "_", -1)
 	p4EntityName = strcase.ToPascal(p4EntityName)
-	return fmt.Sprintf("%s \t %s = %v\n", p4EntityName, int54TypeString, id)
+	return fmt.Sprintf("%s \t %s = %v\n", p4EntityName, int64TypeString, id)
 }
 
 func getPreambles(info *p4ConfigV1.P4Info, p4Type string) (preambles []*p4ConfigV1.Preamble) {
