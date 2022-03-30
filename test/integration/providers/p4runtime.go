@@ -41,7 +41,7 @@ func ConnectP4rt(addr string, asMaster bool) (*client.Client, error) {
 
 	waitForChannelToBeReady := func() error {
 		// Wait for ready
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		for src := grpcConn.GetState(); src != connectivity.Ready; src = grpcConn.GetState() {
 			if !grpcConn.WaitForStateChange(ctx, src) {
