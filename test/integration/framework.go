@@ -135,12 +135,7 @@ type p4RtValues struct {
 	qers []*ie.IE
 }
 
-type testContext struct {
-	UPFBasedUeIPAllocation bool
-}
-
 type testCase struct {
-	ctx         testContext
 	input       *pfcpSessionData
 	sliceConfig *pfcpiface.NetworkSlice
 	expected    p4RtValues
