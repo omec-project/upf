@@ -352,8 +352,8 @@ func teardown(t *testing.T) {
 		err := os.Remove(ConfigPath)
 		require.NoError(t, err)
 
+		// leave for troubleshooting
 		if !t.Failed() {
-			// leave for troubleshooting
 			MustStopPFCPAgent()
 			MustStopMockUP4()
 		}

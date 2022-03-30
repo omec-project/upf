@@ -175,7 +175,6 @@ func MustRunDockerContainer(name, image, cmd string, exposedPorts []string, mnt 
 
 	hostCfg := &container.HostConfig{
 		Privileged:   true,
-		AutoRemove:   true,
 		PortBindings: nat.PortMap{},
 		Mounts:       []mount.Mount{},
 	}
@@ -253,8 +252,11 @@ func MustPullDockerImage(image string) {
 	}
 	defer cli.Close()
 
-	_, err = cli.ImagePull(ctx, image, types.ImagePullOptions{})
+	resp, err := cli.ImagePull(ctx, image, types.ImagePullOptions{})
 	if err != nil {
 		panic(err)
 	}
+
+	// waits for image to be pulled
+	ioutil.ReadAll(resp)
 }
