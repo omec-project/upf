@@ -133,12 +133,7 @@ type p4RtValues struct {
 	qers []*ie.IE
 }
 
-type testContext struct {
-	UPFBasedUeIPAllocation bool
-}
-
 type testCase struct {
-	ctx      testContext
 	input    *pfcpSessionData
 	expected p4RtValues
 
