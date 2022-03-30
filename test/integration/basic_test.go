@@ -6,6 +6,7 @@ package integration
 import (
 	"github.com/wmnsk/go-pfcp/message"
 	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -115,6 +116,48 @@ func TestUPFBasedUeIPAllocation(t *testing.T) {
 	require.NoError(t, err)
 
 	verifyNoEntries(t, testcase.expected)
+}
+
+func TestDetectUP4Restart(t *testing.T) {
+	if !isDatapathUP4() {
+		t.Skipf("Skipping UP4-specific test for datapath: %s", os.Getenv(EnvDatapath))
+	}
+
+	setup(t, ConfigDefault)
+	defer teardown(t)
+
+	// restart UP4, it will close P4Runtime channel between pfcpiface and mock-up4
+	MustStopMockUP4()
+	time.Sleep(3*time.Second)
+	MustStartMockUP4()
+
+	tc := testCase{
+		input: &pfcpSessionData{
+			sliceID:      1,
+			nbAddress:    nodeBAddress,
+			ueAddress:    ueAddress,
+			upfN3Address: upfN3Address,
+			sdfFilter:    "permit out udp from any 80-80 to assigned",
+			ulTEID:       15,
+			dlTEID:       16,
+			QFI:          0x9,
+		},
+		expected: p4RtValues{
+			appFilter: appFilter{
+				proto:        0x11,
+				appIP:        net.ParseIP("0.0.0.0"),
+				appPrefixLen: 0,
+				appPort: portRange{
+					80, 80,
+				},
+			},
+			tc: 3,
+		},
+	}
+
+	// pfcpiface should be able to setup session even after UP4 restart (P4Runtime channel should be restored).
+	testUEAttach(t, fillExpected(&tc))
+	testUEDetach(t, fillExpected(&tc))
 }
 
 func TestPFCPHeartbeats(t *testing.T) {
