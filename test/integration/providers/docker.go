@@ -5,6 +5,7 @@ package providers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -88,7 +89,8 @@ func RunDockerExecCommand(container string, cmd string) (
 	return 0, string(stdoutBytes), string(stderrBytes), nil
 }
 
-func MustCreateNetwork(name string) {
+// MustCreateNetworkIfNotExists tries to create a Docker network with 'name' (if not exists) and panics if it fails.
+func MustCreateNetworkIfNotExists(name string) {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -114,7 +116,46 @@ func MustCreateNetwork(name string) {
 	}
 }
 
-func MustRunDockerContainer(name, image, cmd string, exposedPorts []string, mnt string) {
+// WaitForContainerRunning periodically (every 0.5 seconds) checks if a Docker container is in the 'Running' state.
+// The function times out after 10 seconds.
+func WaitForContainerRunning(name string) error {
+	ctx := context.Background()
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		panic(err)
+	}
+	defer cli.Close()
+
+	timeout := time.After(10 * time.Second)
+	ticker := time.Tick(500 * time.Millisecond)
+
+	// Keep trying until we're timed out or get a result/error
+	for {
+		select {
+		case <-timeout:
+			return errors.New("timed out")
+		case <-ticker:
+			info, err := cli.ContainerInspect(ctx, name)
+			if err != nil {
+				return errors.New("failed to get container status")
+			}
+
+			if info.State.Running {
+				return nil
+			}
+		}
+	}
+}
+
+// MustRunDockerContainer is equivalent of 'docker run'.
+// The function takes the following parameters:
+// - name specifies a container name. The name is also used as a container hostname.
+// - image specifies a name of Docker image to use.
+// - cmd defines the initial command to pass to a container. It's optional and can be left empty.
+// - exposedPorts specifies the list of L4 ports to expose. The format should be port_no/proto (e.g., 8080/tcp). It's optional.
+// - mnt defines the mount paths. The format should be `<local_path>:<target_path>`. It's optional.
+// - net defines a Docker network for a container (optional).
+func MustRunDockerContainer(name, image, cmd string, exposedPorts []string, mnt string, net string) {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -123,20 +164,20 @@ func MustRunDockerContainer(name, image, cmd string, exposedPorts []string, mnt 
 	defer cli.Close()
 
 	baseCfg := &container.Config{
-		Hostname: name,
-		Image: image,
-		OpenStdin: true,
-		Tty: true,
-		Cmd: strings.Split(cmd, " "),
+		Hostname:     name,
+		Image:        image,
+		OpenStdin:    true,
+		Tty:          true,
+		Cmd:          strings.Split(cmd, " "),
 		ExposedPorts: nat.PortSet{},
-		Volumes: map[string]struct{}{},
+		Volumes:      map[string]struct{}{},
 	}
 
 	hostCfg := &container.HostConfig{
 		Privileged: true,
 		//AutoRemove: true,
 		PortBindings: nat.PortMap{},
-		Mounts: []mount.Mount{},
+		Mounts:       []mount.Mount{},
 	}
 
 	if mnt != "" {
@@ -146,9 +187,9 @@ func MustRunDockerContainer(name, image, cmd string, exposedPorts []string, mnt 
 
 		baseCfg.Volumes[targetPath] = struct{}{}
 		hostCfg.Mounts = append(hostCfg.Mounts, mount.Mount{
-			Type:          mount.TypeBind,
-			Source:        localPath,
-			Target:        targetPath,
+			Type:   mount.TypeBind,
+			Source: localPath,
+			Target: targetPath,
 		})
 	}
 
@@ -161,9 +202,11 @@ func MustRunDockerContainer(name, image, cmd string, exposedPorts []string, mnt 
 	}
 
 	networkingConfig := &network.NetworkingConfig{
-		EndpointsConfig: map[string]*network.EndpointSettings{
-			"testnet": {},
-		},
+		EndpointsConfig: map[string]*network.EndpointSettings{},
+	}
+
+	if net != "" {
+		networkingConfig.EndpointsConfig[net] = &network.EndpointSettings{}
 	}
 
 	resp, err := cli.ContainerCreate(ctx, baseCfg, hostCfg, networkingConfig, nil, name)
@@ -174,8 +217,13 @@ func MustRunDockerContainer(name, image, cmd string, exposedPorts []string, mnt 
 	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		panic(err)
 	}
+
+	if err := WaitForContainerRunning(resp.ID); err != nil {
+		panic(err)
+	}
 }
 
+// MustStopDockerContainer sends SIGKILL to the container process and removes a killed container.
 func MustStopDockerContainer(name string) {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())

@@ -43,7 +43,7 @@ func ConnectP4rt(addr string, asMaster bool) (*client.Client, error) {
 		arbitrationCh := make(chan bool)
 		go p4RtC.Run(stopCh, arbitrationCh, nil)
 
-		timeout := 5 * time.Second
+		timeout := 10 * time.Second
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		select {

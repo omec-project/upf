@@ -24,10 +24,12 @@ import (
 // this file should contain all the struct defs/constants used among different test cases.
 
 const (
+	ConfigPath             = "/tmp/upf.json"
 	ContainerNamePFCPAgent = "pfcpiface"
-	ContainerNameMockUP4 = "mock-up4"
-	ImageNamePFCPAgent = "upf-epc-pfcpiface:integration"
-	ImageNameMockUP4 = "opennetworking/mn-stratum:21.12"
+	ContainerNameMockUP4   = "mock-up4"
+	ImageNamePFCPAgent     = "upf-epc-pfcpiface:integration"
+	ImageNameMockUP4       = "opennetworking/mn-stratum:21.12"
+	DockerTestNetwork      = "testnet"
 
 	EnvMode     = "MODE"
 	EnvDatapath = "DATAPATH"
@@ -153,6 +155,8 @@ func init() {
 		FullTimestamp: true,
 		ForceColors:   true,
 	})
+
+	providers.MustCreateNetworkIfNotExists(DockerTestNetwork)
 }
 
 func (af appFilter) isEmpty() bool {
@@ -196,23 +200,6 @@ func waitForPortOpen(net string, host string, port string) error {
 			return errors.New("timed out")
 		case <-ticker:
 			if IsConnectionOpen(net, host, port) {
-				return nil
-			}
-		}
-	}
-}
-
-func waitForPortClosed(net string, host string, port string) error {
-	timeout := time.After(5 * time.Second)
-	ticker := time.Tick(500 * time.Millisecond)
-
-	// Keep trying until we're timed out or get a result/error
-	for {
-		select {
-		case <-timeout:
-			return errors.New("timed out")
-		case <-ticker:
-			if !IsConnectionOpen(net, host, port) {
 				return nil
 			}
 		}
@@ -281,7 +268,7 @@ func initForwardingPipelineConfig() {
 }
 
 func MustStartMockUP4() {
-	providers.MustRunDockerContainer(ContainerNameMockUP4, ImageNameMockUP4, "--topo single", []string{"50001/tcp"}, "")
+	providers.MustRunDockerContainer(ContainerNameMockUP4, ImageNameMockUP4, "--topo single", []string{"50001/tcp"}, "", DockerTestNetwork)
 	err := waitForMockUP4ToStart()
 	if err != nil {
 		panic(err)
@@ -291,11 +278,11 @@ func MustStartMockUP4() {
 
 func MustStopMockUP4() {
 	providers.MustStopDockerContainer(ContainerNameMockUP4)
-	waitForPortClosed("tcp", "127.0.0.1", "50001")
 }
 
 func MustStartPFCPAgent() {
-	providers.MustRunDockerContainer(ContainerNamePFCPAgent, ImageNamePFCPAgent, "-config /config/upf.json", []string{"8805/udp"}, "/tmp:/config")
+	providers.MustRunDockerContainer(ContainerNamePFCPAgent, ImageNamePFCPAgent, "-config /config/upf.json",
+		[]string{"8805/udp"}, "/tmp:/config", DockerTestNetwork)
 }
 
 func MustStopPFCPAgent() {
@@ -325,7 +312,7 @@ func setup(t *testing.T, configType uint32) {
 	switch os.Getenv(EnvMode) {
 	case ModeDocker:
 		jsonConf, _ := json.Marshal(GetConfig(os.Getenv(EnvDatapath), configType))
-		err := ioutil.WriteFile("/tmp/upf.json", jsonConf, os.ModePerm)
+		err := ioutil.WriteFile(ConfigPath, jsonConf, os.ModePerm)
 		require.NoError(t, err)
 		MustStartPFCPAgent()
 	case ModeNative:
@@ -356,14 +343,14 @@ func teardown(t *testing.T) {
 
 	switch os.Getenv(EnvMode) {
 	case ModeDocker:
+		err := os.Remove(ConfigPath)
+		require.NoError(t, err)
+
 		if !t.Failed() {
 			// leave for troubleshooting
 			MustStopPFCPAgent()
 			MustStopMockUP4()
 		}
-
-		err := os.Remove("/tmp/upf.json")
-		require.NoError(t, err)
 	case ModeNative:
 		pfcpAgent.Stop()
 	default:

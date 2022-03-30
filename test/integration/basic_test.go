@@ -4,7 +4,6 @@
 package integration
 
 import (
-	"github.com/omec-project/upf-epc/test/integration/providers"
 	"net"
 	"testing"
 	"time"
@@ -13,10 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
 )
-
-func init() {
-	providers.MustCreateNetwork("testnet")
-}
 
 func TestUPFBasedUeIPAllocation(t *testing.T) {
 	setup(t, ConfigUPFBasedIPAllocation)
