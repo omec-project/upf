@@ -80,7 +80,7 @@ test-up4-integration-docker: DOCKER_TARGETS=pfcpiface
 test-up4-integration-docker: DOCKER_TAG=integration
 test-up4-integration-docker: docker-build
 	docker rm -f mock-up4 pfcpiface
-	docker network rm testnet
+	docker network prune -f
 	MODE=docker DATAPATH=up4 go test -v -count=1 -failfast ./test/integration/...
 
 test-bess-integration-native:
