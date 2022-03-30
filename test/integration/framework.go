@@ -10,7 +10,6 @@ import (
 	"github.com/omec-project/upf-epc/pfcpiface"
 	"github.com/omec-project/upf-epc/pkg/fake_bess"
 	"github.com/omec-project/upf-epc/test/integration/providers"
-	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -69,11 +68,6 @@ const (
 )
 
 var (
-	// ReaderElectionID use reader election ID so that pfcpiface doesn't lose mastership.
-	ReaderElectionID = p4_v1.Uint128{High: 0, Low: 1}
-)
-
-var (
 	pfcpClient *pfcpsim.PFCPClient
 	// pfcpAgent instance is used only in the native mode
 	pfcpAgent *pfcpiface.PFCPIface
@@ -122,25 +116,29 @@ type appFilter struct {
 	appPort      portRange
 }
 
+type sliceMeter struct {
+	rate    int64
+	burst   int64
+	sliceID uint8
+	TC      uint8
+}
+
 type p4RtValues struct {
-	tc        uint8
-	ueAddress string
-	appID     uint8
-	appFilter appFilter
+	tc         uint8
+	ueAddress  string
+
+	appFilter  appFilter
+	sliceMeter *sliceMeter
 
 	pdrs []*ie.IE
 	fars []*ie.IE
 	qers []*ie.IE
 }
 
-type testContext struct {
-	UPFBasedUeIPAllocation bool
-}
-
 type testCase struct {
-	ctx      testContext
-	input    *pfcpSessionData
-	expected p4RtValues
+	input       *pfcpSessionData
+	sliceConfig *pfcpiface.NetworkSlice
+	expected    p4RtValues
 
 	desc string
 
@@ -155,14 +153,6 @@ func init() {
 		FullTimestamp: true,
 		ForceColors:   true,
 	})
-}
-
-func TimeBasedElectionId() p4_v1.Uint128 {
-	now := time.Now()
-	return p4_v1.Uint128{
-		High: uint64(now.Unix()),
-		Low:  uint64(now.UnixNano() % 1e9),
-	}
 }
 
 func (af appFilter) isEmpty() bool {
@@ -257,7 +247,7 @@ func isDatapathBESS() bool {
 }
 
 func initForwardingPipelineConfig() {
-	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", ReaderElectionID)
+	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", true)
 	if err != nil {
 		panic("Cannot init forwarding pipeline config: " + err.Error())
 	}
@@ -348,6 +338,15 @@ func verifyEntries(t *testing.T, testdata *pfcpSessionData, expectedValues p4RtV
 		verifyP4RuntimeEntries(t, testdata, expectedValues, ueState)
 	case DatapathBESS:
 		verifyBessEntries(t, bessFake, testdata, expectedValues, ueState)
+	}
+}
+
+func verifySliceMeter(t *testing.T, expectedValues p4RtValues) {
+	switch os.Getenv(EnvDatapath) {
+	case DatapathUP4:
+		verifyP4RuntimeSliceMeter(t, expectedValues)
+	case DatapathBESS:
+		t.Skip("Unimplemented")
 	}
 }
 

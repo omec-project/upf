@@ -17,9 +17,11 @@ services:
     entrypoint: "/bin/sh"
     working_dir: /bin/
     ports:
-      - "8805:8805/udp"
+      - "8805:8805/udp" # PFCP
+      - "8080:8080/tcp" # REST APIs
     expose:
       - 8805
+      - 8080
     depends_on:
       - mock-up4
   mock-up4:

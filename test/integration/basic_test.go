@@ -4,12 +4,13 @@
 package integration
 
 import (
+	"github.com/wmnsk/go-pfcp/message"
+	"github.com/omec-project/upf-epc/pfcpiface"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim/session"
-	"github.com/omec-project/upf-epc/test/integration/providers"
 	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
 )
@@ -21,36 +22,106 @@ func init() {
 }
 
 func TestUPFBasedUeIPAllocation(t *testing.T) {
+	// TODO: verify if UEIP bit is set in the UP Function Features of PFCP Association Response
 	setup(t, ConfigUPFBasedIPAllocation)
 	defer teardown(t)
 
-	tc := testCase{
-		ctx: testContext{
-			UPFBasedUeIPAllocation: true,
-		},
+	testcase := testCase{
 		input: &pfcpSessionData{
 			sliceID:      1,
 			nbAddress:    nodeBAddress,
-			ueAddress:    ueAddress,
 			upfN3Address: upfN3Address,
-			sdfFilter:    "permit out ip from any to assigned",
+			sdfFilter:    "permit out udp from any 80-80 to assigned",
 			ulTEID:       15,
 			dlTEID:       16,
-			QFI:          0x09,
+			QFI:          0x9,
 		},
 		expected: p4RtValues{
 			// first IP address from pool configured in ue_ip_alloc.json
 			ueAddress: "10.250.0.1",
-			// no application filtering rule expected
-			appID: 0,
-			tc:    3,
+			appFilter: appFilter{
+				proto:        0x11,
+				appIP:        net.ParseIP("0.0.0.0"),
+				appPrefixLen: 0,
+				appPort: portRange{
+					80, 80,
+				},
+			},
+			tc: 3,
 		},
-		desc: "UPF-based UE IP allocation",
 	}
 
-	t.Run(tc.desc, func(t *testing.T) {
-		testUEAttachDetach(t, fillExpected(&tc))
-	})
+	pdrs := []*ie.IE{
+		session.NewPDRBuilder().MarkAsUplink().
+			WithMethod(session.Create).
+			WithID(1).
+			WithTEID(testcase.input.ulTEID).
+			WithN3Address(testcase.input.upfN3Address).
+			WithSDFFilter(testcase.input.sdfFilter).
+			WithFARID(1).
+			AddQERID(4).
+			AddQERID(1).BuildPDR(),
+		ie.NewCreatePDR(
+			ie.NewPDRID(2),
+			ie.NewPrecedence(testcase.input.precedence),
+			ie.NewPDI(
+				ie.NewSourceInterface(ie.SrcInterfaceCore),
+				// indicate UP to allocate UE IP Address
+				ie.NewUEIPAddress(0x10, "", "", 0, 0),
+				ie.NewSDFFilter(testcase.input.sdfFilter, "", "", "", 1),
+			),
+			ie.NewFARID(2),
+			ie.NewQERID(2),
+			ie.NewQERID(4),
+		),
+	}
+
+	fars := []*ie.IE{
+		session.NewFARBuilder().
+			WithMethod(session.Create).WithID(1).WithDstInterface(ie.DstInterfaceCore).
+			WithAction(ActionForward).BuildFAR(),
+		session.NewFARBuilder().
+			WithMethod(session.Create).WithID(2).
+			WithDstInterface(ie.DstInterfaceAccess).
+			WithAction(ActionDrop).WithTEID(testcase.input.dlTEID).
+			WithDownlinkIP(testcase.input.nbAddress).BuildFAR(),
+	}
+
+	err := pfcpClient.SendSessionEstablishmentRequest(pdrs, fars, nil)
+	require.NoError(t, err)
+
+	resp, err := pfcpClient.PeekNextResponse()
+	require.NoError(t, err)
+
+	estResp, ok := resp.(*message.SessionEstablishmentResponse)
+	require.True(t, ok)
+
+	testcase.expected.pdrs = pdrs
+	testcase.expected.fars = fars
+
+	remoteSEID, err := estResp.UPFSEID.FSEID()
+	require.NoError(t, err)
+
+	// the PFCP response should contain exactly 1 Create PDR IE
+	require.Len(t, estResp.CreatedPDR, 1)
+
+	// verify if UE Address IE is provided and contains expected IP address
+	ueIPs, err := estResp.CreatedPDR[0].UEIPAddress()
+	require.NoError(t, err)
+
+	require.Equal(t, net.ParseIP(testcase.expected.ueAddress).To4(), ueIPs.IPv4Address.To4())
+
+	verifyEntries(t, testcase.input, testcase.expected, UEStateAttaching)
+
+	// no need to send modification request, we can delete PFCP session
+
+	err = pfcpClient.SendSessionDeletionRequest(0, remoteSEID.SEID)
+	require.NoError(t, err)
+
+	_, err = pfcpClient.PeekNextResponse()
+	require.NoError(t, err)
+
+	verifyNoEntries(t, testcase.expected)
 }
 
 func TestPFCPHeartbeats(t *testing.T) {
@@ -90,8 +161,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 80,
 					},
 				},
-				appID: 1,
-				tc:    3,
+				tc: 3,
 			},
 			desc: "APPLICATION FILTERING permit out udp from any 80-80 to assigned",
 		},
@@ -115,10 +185,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 100,
 					},
 				},
-				// FIXME: there is a dependency on previous test because pfcpiface doesn't clear application IDs properly
-				//  See SDFAB-960
-				appID: 2,
-				tc:    3,
+				tc: 3,
 			},
 			desc: "APPLICATION FILTERING permit out udp from 192.168.1.1/32 to assigned 80-100",
 		},
@@ -135,8 +202,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 			},
 			expected: p4RtValues{
 				// no application filtering rule expected
-				appID: 0,
-				tc:    3,
+				tc: 3,
 			},
 			desc: "APPLICATION FILTERING ALLOW_ALL",
 		},
@@ -168,8 +234,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 80,
 					},
 				},
-				appID: 1,
-				tc:    3,
+				tc: 3,
 			},
 			desc: "QER_METERING - 1 session QER, 2 app QERs",
 		},
@@ -201,8 +266,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 80,
 					},
 				},
-				appID: 1,
-				tc:    3,
+				tc: 3,
 			},
 			desc: "QER_METERING - session QER only",
 		},
@@ -234,8 +298,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 80,
 					},
 				},
-				appID: 1,
-				tc:    2,
+				tc: 2,
 			},
 			desc: "QER_METERING - TC for QFI",
 		},
@@ -268,8 +331,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 80,
 					},
 				},
-				appID: 1,
-				tc:    2,
+				tc: 2,
 			},
 			desc: "QER UL gating",
 		},
@@ -302,8 +364,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 						80, 80,
 					},
 				},
-				appID: 1,
-				tc:    2,
+				tc: 2,
 			},
 			desc: "QER DL gating",
 		},
@@ -340,14 +401,73 @@ func TestUEBuffering(t *testing.T) {
 					80, 80,
 				},
 			},
-			appID: 1,
-			tc:    3,
+			tc: 3,
 		},
 	}
 
 	testUEAttach(t, fillExpected(&tc))
 	testUEBuffer(t, fillExpected(&tc))
 	testUEDetach(t, fillExpected(&tc))
+}
+
+func TestSliceMeter(t *testing.T) {
+	setup(t, ConfigDefault)
+	defer teardown(t)
+
+	testCases := []testCase{
+		{
+			sliceConfig: &pfcpiface.NetworkSlice{
+				SliceName: "P4-UPF-1",
+				SliceQos: pfcpiface.SliceQos{
+					UplinkMbr:    20000,
+					UlBurstBytes: 10000,
+					DownlinkMbr:  10000,
+					DlBurstBytes: 10000,
+					BitrateUnit:  "Kbps",
+				},
+			},
+			expected: p4RtValues{
+				sliceMeter: &sliceMeter{
+					sliceID: 1,
+					TC:      3,
+					rate:    20000000,
+					burst:   10000,
+				},
+			},
+			desc: "Uplink rate higher",
+		},
+		{
+			sliceConfig: &pfcpiface.NetworkSlice{
+				SliceName: "P4-UPF-1",
+				SliceQos: pfcpiface.SliceQos{
+					UplinkMbr:    5000,
+					UlBurstBytes: 10000,
+					DownlinkMbr:  10000,
+					DlBurstBytes: 10000,
+					BitrateUnit:  "Kbps",
+				},
+			},
+			expected: p4RtValues{
+				sliceMeter: &sliceMeter{
+					sliceID: 1,
+					TC:      3,
+					rate:    10000000,
+					burst:   10000,
+				},
+			},
+			desc: "Downlink rate higher",
+		},
+	}
+
+	t.Run("No Slice Meters", func(t *testing.T) {
+		verifySliceMeter(t, p4RtValues{})
+	})
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			testSliceMeter(t, &tc)
+		})
+	}
 }
 
 func fillExpected(tc *testCase) *testCase {
@@ -369,35 +489,14 @@ func testUEAttach(t *testing.T, testcase *testCase) {
 			WithFARID(1).
 			AddQERID(4).
 			AddQERID(1).BuildPDR(),
-	}
-
-	if !testcase.ctx.UPFBasedUeIPAllocation {
-		pdrs = append(pdrs,
-			session.NewPDRBuilder().MarkAsDownlink().
-				WithMethod(session.Create).
-				WithID(2).
-				WithUEAddress(testcase.input.ueAddress).
-				WithSDFFilter(testcase.input.sdfFilter).
-				WithFARID(2).
-				AddQERID(4).
-				AddQERID(2).BuildPDR())
-	} else {
-		pdrs = append(pdrs,
-			// TODO: should be replaced by builder?
-			ie.NewCreatePDR(
-				ie.NewPDRID(2),
-				ie.NewPrecedence(testcase.input.precedence),
-				ie.NewPDI(
-					ie.NewSourceInterface(ie.SrcInterfaceCore),
-					// indicate UP to allocate UE IP Address
-					ie.NewUEIPAddress(0x10, "", "", 0, 0),
-					ie.NewSDFFilter(testcase.input.sdfFilter, "", "", "", 1),
-				),
-				ie.NewFARID(2),
-				ie.NewQERID(2),
-				ie.NewQERID(4),
-			),
-		)
+		session.NewPDRBuilder().MarkAsDownlink().
+			WithMethod(session.Create).
+			WithID(2).
+			WithUEAddress(testcase.input.ueAddress).
+			WithSDFFilter(testcase.input.sdfFilter).
+			WithFARID(2).
+			AddQERID(4).
+			AddQERID(2).BuildPDR(),
 	}
 
 	fars := []*ie.IE{
@@ -514,19 +613,17 @@ func testUEDetach(t *testing.T, testcase *testCase) {
 func testUEAttachDetach(t *testing.T, testcase *testCase) {
 	testUEAttach(t, testcase)
 	testUEDetach(t, testcase)
+}
 
+func testSliceMeter(t *testing.T, testcase *testCase) {
 	if isDatapathUP4() {
-		// clear Applications table
-		// FIXME: Temporary solution. They should be cleared by pfcpiface, see SDFAB-960
-		p4rtClient, _ := providers.ConnectP4rt("127.0.0.1:50001", TimeBasedElectionId())
-		defer func() {
-			providers.DisconnectP4rt()
-			// give pfcpiface time to become master controller again
-			time.Sleep(3 * time.Second)
-		}()
-		entries, _ := p4rtClient.ReadTableEntryWildcard("PreQosPipe.applications")
-		for _, entry := range entries {
-			p4rtClient.DeleteTableEntry(entry)
+		err := PushSliceMeterConfig(*testcase.sliceConfig)
+		if err != nil {
+			t.Error("Error when pushing slice meter config via REST APIs", err)
 		}
+
+		verifySliceMeter(t, testcase.expected)
+	} else {
+		t.Skip("TODO: implement slice meter test for BESS")
 	}
 }

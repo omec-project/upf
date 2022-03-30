@@ -4,8 +4,11 @@
 package integration
 
 import (
+	"bytes"
+	"encoding/json"
 	"github.com/omec-project/upf-epc/pfcpiface"
 	"github.com/sirupsen/logrus"
+	"net/http"
 	"os"
 	"runtime"
 )
@@ -116,4 +119,18 @@ func GetConfig(datapath string, configType uint32) pfcpiface.Conf {
 	panic("Wrong datapath or config type provided")
 
 	return pfcpiface.Conf{}
+}
+
+func PushSliceMeterConfig(sliceConfig pfcpiface.NetworkSlice) error {
+	rawSliceConfig, err := json.Marshal(sliceConfig)
+	if err != nil {
+		return err
+	}
+
+	_, err = http.Post("http://127.0.0.1:8080/v1/config/network-slices", "application/json", bytes.NewBuffer(rawSliceConfig))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

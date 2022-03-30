@@ -8,6 +8,7 @@ import (
 	p4rtc "github.com/antoninbas/p4runtime-go-client/pkg/client"
 	"github.com/antoninbas/p4runtime-go-client/pkg/util/conversion"
 	"github.com/omec-project/upf-epc/internal/p4constants"
+	"github.com/omec-project/upf-epc/pfcpiface"
 	"github.com/omec-project/upf-epc/test/integration/providers"
 	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/stretchr/testify/require"
@@ -39,6 +40,8 @@ const (
 const (
 	minGTPTunnelPeerID uint8 = 2
 	maxGTPTunnelPeerID uint8 = 255
+	minApplicationID   uint8 = 1
+	maxApplicationID   uint8 = 255
 )
 
 var (
@@ -115,7 +118,8 @@ func buildExpectedApplicationsEntry(client *p4rtc.Client, testdata *pfcpSessionD
 		})
 	}
 
-	appID, _ := conversion.UInt32ToBinary(uint32(expectedValues.appID), 3)
+	dummyAppID := 0x00
+	appID, _ := conversion.UInt32ToBinary(uint32(dummyAppID), 3)
 
 	te := client.NewTableEntry(TableApplications, mfs,
 		client.NewTableActionDirect(ActSetAppID, [][]byte{appID}), nil)
@@ -184,7 +188,8 @@ func buildExpectedSessionsDownlinkEntry(client *p4rtc.Client, expected p4RtValue
 
 func buildExpectedTerminationsUplinkEntry(client *p4rtc.Client, testdata *pfcpSessionData, expected p4RtValues) *p4_v1.TableEntry {
 	ueAddr, _ := conversion.IpToBinary(expected.ueAddress)
-	appID, _ := conversion.UInt32ToBinary(uint32(expected.appID), 3)
+	dummyAppID := 0x00
+	appID, _ := conversion.UInt32ToBinary(uint32(dummyAppID), 3)
 
 	action := ActUplinkTermDrop
 	params := [][]byte{
@@ -215,7 +220,8 @@ func buildExpectedTerminationsUplinkEntry(client *p4rtc.Client, testdata *pfcpSe
 
 func buildExpectedTerminationsDownlinkEntry(client *p4rtc.Client, testdata *pfcpSessionData, expected p4RtValues, afterModification bool) *p4_v1.TableEntry {
 	ueAddr, _ := conversion.IpToBinary(expected.ueAddress)
-	appID, _ := conversion.UInt32ToBinary(uint32(expected.appID), 3)
+	dummyAppID := 0x00
+	appID, _ := conversion.UInt32ToBinary(uint32(dummyAppID), 3)
 
 	var actionParams [][]byte
 	action := ActDownlinkTermDrop
@@ -262,14 +268,36 @@ func buildExpectedTunnelPeersEntry(client *p4rtc.Client, testdata *pfcpSessionDa
 	}, client.NewTableActionDirect(ActLoadTunnelParam, [][]byte{srcAddr, dstAddr, srcPort}), nil)
 }
 
+func buildExpectedSliceTcMeter(expectedValues sliceMeter) (*p4_v1.MeterEntry, error) {
+	meterIndex, err := pfcpiface.GetSliceTCMeterIndex(expectedValues.sliceID, expectedValues.TC)
+	if err != nil {
+		return nil, err
+	}
+
+	// slice_TC meters are expected to support only peak bands (Maximum BitRate)
+	meterConfig := &p4_v1.MeterConfig{
+		Cir:    int64(0),
+		Cburst: int64(0),
+		Pir:    expectedValues.rate,
+		Pburst: expectedValues.burst,
+	}
+
+	return &p4_v1.MeterEntry{
+		MeterId: 336833095,
+		Index:   &p4_v1.Index{Index: meterIndex},
+		Config:  meterConfig,
+	}, nil
+}
+
 // TODO: we should pass a list of pfcpSessionData if we will test multiple UEs
 func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, expectedValues p4RtValues, ueState UEState) {
-	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", ReaderElectionID)
+	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", false)
 	require.NoErrorf(t, err, "failed to connect to P4Runtime server")
 	defer providers.DisconnectP4rt()
 
 	var (
-		expectedApplicationsEntries = 1
+		expectedApplicationsEntries       = 1
+		applicationID               uint8 = 0
 	)
 
 	expectedApplicationsEntry := buildExpectedApplicationsEntry(p4rtClient, testdata, expectedValues)
@@ -294,9 +322,12 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, expectedVal
 	entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.applications")
 	require.Equal(t, expectedApplicationsEntries, len(entries),
 		fmt.Sprintf("PreQosPipe.applications should contain %v entry", expectedApplicationsEntries))
-	if len(entries) > 0 {
-		require.Equal(t, expectedApplicationsEntry, entries[0], "PreQosPipe.applications does not equal expected",
-			entries)
+	if len(entries) > 0 && expectedApplicationsEntry != nil {
+		require.Equal(t, expectedApplicationsEntry.Match, entries[0].Match)
+		require.Equal(t, expectedApplicationsEntry.Action.GetAction().ActionId, entries[0].Action.GetAction().ActionId)
+		require.GreaterOrEqual(t, entries[0].Action.GetAction().Params[0].Value[0], minApplicationID)
+		require.LessOrEqual(t, entries[0].Action.GetAction().Params[0].Value[0], maxApplicationID)
+		applicationID = entries[0].Action.GetAction().Params[0].Value[0]
 	}
 
 	entries, _ = p4rtClient.ReadTableEntryWildcard("PreQosPipe.sessions_uplink")
@@ -330,7 +361,8 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, expectedVal
 	require.Equal(t, expected.Action.GetAction().ActionId, entries[0].Action.GetAction().ActionId, "PreQosPipe.terminations_uplink action does not equal expected")
 	require.Equal(t, len(expected.Action.GetAction().Params), len(entries[0].Action.GetAction().Params),
 		"Number of action params for terminations_uplink does not equal expected")
-	require.Equal(t, expected.Match, entries[0].Match, "PreQosPipe.terminations_uplink match fields do not equal expected")
+	require.Equal(t, applicationID, entries[0].Match[1].GetExact().Value[0])
+	require.Equal(t, expected.Match[0], entries[0].Match[0], "PreQosPipe.terminations_uplink match fields do not equal expected")
 	// check if counter index doesn't equal 0
 	require.NotEqual(t, []byte{0}, entries[0].Action.GetAction().Params[0].Value)
 	if !testdata.ulGateClosed {
@@ -346,8 +378,10 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, expectedVal
 		"Number of action params for terminations_downlink does not equal expected")
 	// check if counter index doesn't equal 0
 	require.NotEqual(t, []byte{0}, entries[0].Action.GetAction().Params[0].Value)
+	// check app ID
+	require.Equal(t, applicationID, entries[0].Match[1].GetExact().Value[0])
 	// check UE address
-	require.Equal(t, expected.Match, entries[0].Match, "PreQosPipe.terminations_downlink match fields do not equal expected")
+	require.Equal(t, expected.Match[0], entries[0].Match[0], "PreQosPipe.terminations_downlink match fields do not equal expected")
 	if ueState == UEStateAttached && !testdata.dlGateClosed {
 		// ignore counter ID as it is random number generated by pfcpiface
 		require.Equal(t, expected.Action.GetAction().Params[1], entries[0].Action.GetAction().Params[1],
@@ -404,7 +438,7 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, expectedVal
 }
 
 func verifyNoP4RuntimeEntries(t *testing.T, expectedValues p4RtValues) {
-	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", ReaderElectionID)
+	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", false)
 	require.NoErrorf(t, err, "failed to connect to P4Runtime server")
 	defer providers.DisconnectP4rt()
 
@@ -426,23 +460,16 @@ func verifyNoP4RuntimeEntries(t *testing.T, expectedValues p4RtValues) {
 	}
 	require.Equal(t, 0, nrOfConfiguredMeters, "application meter should not have any cells configured")
 
-	// 2 interfaces entries + 1 applications
-	expectedAllEntries := 3
-	if expectedValues.appFilter.isEmpty() {
-		expectedAllEntries--
-	}
+	// 2 interfaces entries
+	expectedAllEntries := 2
 
 	allInstalledEntries, _ := p4rtClient.ReadTableEntryWildcard("")
 	// table entries for interfaces table are not removed by pfcpiface
-	// FIXME: tunnel_peers and applications are not cleared on session deletion/association release
-	//  See SDFAB-960
 	require.Equal(t, expectedAllEntries, len(allInstalledEntries),
 		fmt.Sprintf("UP4 should have only %d entry installed", expectedAllEntries), allInstalledEntries)
 
 	tables := []string{
-		// FIXME: applications are not cleared on session deletion/association release
-		//  See SDFAB-960
-		//  Add applications to the list, once fixed
+		tablesNames[p4constants.TablePreQosPipeApplications],
 		tablesNames[p4constants.TablePreQosPipeTunnelPeers],
 		tablesNames[p4constants.TablePreQosPipeSessionsUplink],
 		tablesNames[p4constants.TablePreQosPipeSessionsDownlink],
@@ -454,5 +481,35 @@ func verifyNoP4RuntimeEntries(t *testing.T, expectedValues p4RtValues) {
 		entries, _ := p4rtClient.ReadTableEntryWildcard(table)
 		require.Equal(t, 0, len(entries),
 			fmt.Sprintf("%v should not contain any entries", table))
+	}
+}
+
+func verifyP4RuntimeSliceMeter(t *testing.T, expectedValues p4RtValues) {
+	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", false)
+	require.NoErrorf(t, err, "failed to connect to P4Runtime server")
+	defer providers.DisconnectP4rt()
+
+	sliceTcMeter := p4constants.GetMeterIDToNameMap()[p4constants.MeterPreQosPipeSliceTcMeter]
+	meters, _ := p4rtClient.ReadMeterEntryWildcard(sliceTcMeter)
+
+	nrOfConfiguredMeters := 0
+	for _, m := range meters {
+		if m.Config != nil {
+			nrOfConfiguredMeters++
+		}
+	}
+
+	if expectedValues.sliceMeter != nil {
+		expectedMeter, err := buildExpectedSliceTcMeter(*expectedValues.sliceMeter)
+		if err != nil {
+			t.Errorf("Error obtaining expected SliceTC meter: %v", err)
+		}
+
+		require.Equal(t, 1, nrOfConfiguredMeters, "A single slice TC meter is expected")
+
+		meter, _ := p4rtClient.ReadMeterEntry(sliceTcMeter, expectedMeter.Index.GetIndex())
+		require.Equal(t, expectedMeter.Config, meter, "Slice TC meter does not equal expected", meters)
+	} else {
+		require.Equal(t, 0, nrOfConfiguredMeters, "slice TC meter should not have any cells configured")
 	}
 }
