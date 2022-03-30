@@ -13,36 +13,36 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type MongoBDStore struct {
-	coll *mongo.Collection
+type MongoDBStore struct {
+	client *mongo.Client
+	db     string
+	coll   string
 }
 
-// type PFCPSessionDocument struct {
-// 	fseid       uint64
-// 	PFCPSession PFCPSession
-// }
-
-func NewMongoBDStore() *MongoBDStore {
+func NewMongoDBStore() *MongoDBStore {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 
 	defer cancel()
 
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://datastore:27017/"))
+	serverAPIOptions := options.ServerAPI(options.ServerAPIVersion1)
+	clientOptions := options.Client().
+		ApplyURI("mongodb+srv://onf:opennetworking@cluster0.ld6zn.mongodb.net/myFirstDatabase?retryWrites=true&w=majority").
+		SetServerAPIOptions(serverAPIOptions)
+	client, err := mongo.Connect(ctx, clientOptions)
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	sessionsCollection := client.Database("sessionsDatabase").Collection("sessions")
-
-	return &MongoBDStore{sessionsCollection}
+	database := client.Database("sessionsDatabase")
+	database.RunCommand(context.TODO(), bson.M{"create": "sessions"})
+	return &MongoDBStore{client, "sessionsDatabase", "sessions"}
 }
 
-func (i *MongoBDStore) GetAllSessions() []PFCPSession {
+func (i *MongoDBStore) GetAllSessions() []PFCPSession {
 	sessions := make([]PFCPSession, 0)
 
-	opts := options.Find().SetProjection(bson.D{{"fseid", 0}, {"session", 1}})
-	cur, err := i.coll.Find(context.TODO(), bson.D{}, opts)
+	cur, err := i.client.Database(i.db).Collection(i.coll).Find(context.TODO(), bson.M{})
 
 	if err != nil {
 		log.Fatal(err)
@@ -72,13 +72,12 @@ func (i *MongoBDStore) GetAllSessions() []PFCPSession {
 	return sessions
 }
 
-func (i *MongoBDStore) PutSession(session PFCPSession) error {
+func (i *MongoDBStore) PutSession(session PFCPSession) error {
 	if session.localSEID == 0 {
 		return ErrInvalidArgument("session.localSEID", session.localSEID)
 	}
 
-	doc := bson.D{{"fseid", session.localSEID}, {"session", session}}
-	_, err := i.coll.InsertOne(context.TODO(), doc)
+	_, err := i.client.Database(i.db).Collection(i.coll).InsertOne(context.TODO(), bson.M{"fseid": uint64(session.localSEID), "session": session})
 
 	if err != nil {
 		log.Fatal(err)
@@ -91,8 +90,9 @@ func (i *MongoBDStore) PutSession(session PFCPSession) error {
 	return nil
 }
 
-func (i *MongoBDStore) DeleteSession(fseid uint64) error {
-	_, err := i.coll.DeleteOne(context.TODO(), bson.D{{"fseid", fseid}})
+func (i *MongoDBStore) DeleteSession(fseid uint64) error {
+	_, err := i.client.Database(i.db).Collection(i.coll).DeleteOne(context.TODO(), bson.M{"fseid": fseid})
+
 	if err != nil {
 		return err
 	}
@@ -104,8 +104,8 @@ func (i *MongoBDStore) DeleteSession(fseid uint64) error {
 	return nil
 }
 
-func (i *MongoBDStore) DeleteAllSessions() bool {
-	_, err := i.coll.DeleteMany(context.TODO(), bson.D{})
+func (i *MongoDBStore) DeleteAllSessions() bool {
+	_, err := i.client.Database(i.db).Collection(i.coll).DeleteMany(context.TODO(), bson.M{})
 
 	if err != nil {
 		log.Fatal(err)
@@ -116,20 +116,20 @@ func (i *MongoBDStore) DeleteAllSessions() bool {
 	return true
 }
 
-func (i *MongoBDStore) GetSession(fseid uint64) (PFCPSession, bool) {
-	filter := bson.D{{"fseid", fseid}}
+func (i *MongoDBStore) GetSession(fseid uint64) (PFCPSession, bool) {
+	filter := bson.M{"fseid": int64(fseid)}
 
 	var session PFCPSession
 
-	err := i.coll.FindOne(context.TODO(), filter).Decode(&session)
+	err := i.client.Database(i.db).Collection(i.coll).FindOne(context.TODO(), filter).Decode(&session)
 
 	if err != nil {
 		log.Fatal(err)
+		return PFCPSession{}, false
 	}
 
 	log.WithFields(log.Fields{
 		"session": session,
 	}).Trace("Got PFCP session from local store")
-
 	return session, true
 }
