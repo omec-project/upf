@@ -18,7 +18,7 @@ jobs:
           go-version: '1.16'
       - name: Run integration tests for PFCP Agent & UP4
         run: |
-            make test-up4-integration-docker || (docker logs mock-up4; exit 1)
+            make test-up4-integration-docker || (docker logs pfcpiface; exit 1)
   test-integration-bess-native:
     runs-on: ubuntu-latest
     steps:
