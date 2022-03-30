@@ -4,8 +4,8 @@
 package integration
 
 import (
-	"github.com/wmnsk/go-pfcp/message"
 	"github.com/omec-project/upf-epc/pfcpiface"
+	"github.com/wmnsk/go-pfcp/message"
 	"net"
 	"testing"
 	"time"
