@@ -30,31 +30,16 @@ func ConnectP4rt(addr string, asMaster bool) (*client.Client, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	grpcConn, err := grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	var err error
+
+	grpcConn, err = grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
 	if err != nil {
 		return nil, err
 	}
 
 	c := p4_v1.NewP4RuntimeClient(grpcConn)
-
 	// Election only happens if asMaster is true.
 	p4RtC := client.NewClient(c, 1, TimeBasedElectionId(), client.DisableCanonicalBytestrings)
-
-	//waitForChannelToBeReady := func() error {
-	//	// Wait for ready
-	//	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	//	defer cancel()
-	//	for src := grpcConn.GetState(); src != connectivity.Ready; src = grpcConn.GetState() {
-	//		if !grpcConn.WaitForStateChange(ctx, src) {
-	//			return errors.New("timed out waiting for gRPC channel to be ready")
-	//		}
-	//	}
-	//	return nil
-	//}
-	//
-	//if err := waitForChannelToBeReady(); err != nil {
-	//	return nil, err
-	//}
 
 	if asMaster {
 		// perform Master Arbitration
@@ -85,6 +70,10 @@ func DisconnectP4rt() {
 	if stopCh != nil {
 		stopCh <- struct{}{}
 	}
+	// wait for P4rt stream to be closed
+	// FIXME: p4runtime-go-client fatals if gRPC channel is closed before P4rt stream is terminated.
+	//  The lib doesn't give a better way to wait for stream to be terminated.
+	time.Sleep(1 * time.Second)
 	if grpcConn != nil {
 		grpcConn.Close()
 	}
