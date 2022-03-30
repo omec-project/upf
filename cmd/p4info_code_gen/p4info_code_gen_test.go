@@ -305,6 +305,28 @@ func Test_generator(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "verify match field bitwidth",
+			args: &args{
+				p4config: mustGetP4Config(p4infoPath),
+				genType:  constant,
+			},
+			want: &want{
+				ID:   48,
+				name: "BitwidthMfDstMac",
+			},
+		},
+		{
+			name: "verify action parameter bitwidth",
+			args: &args{
+				p4config: mustGetP4Config(p4infoPath),
+				genType:  constant,
+			},
+			want: &want{
+				ID:   8,
+				name: "BitwidthApSrcIface",
+			},
+		},
 	}
 
 	for _, tt := range tests {

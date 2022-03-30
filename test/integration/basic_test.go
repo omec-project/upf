@@ -4,6 +4,7 @@
 package integration
 
 import (
+	"github.com/omec-project/upf-epc/pfcpiface"
 	"github.com/wmnsk/go-pfcp/message"
 	"net"
 	"testing"
@@ -403,6 +404,66 @@ func TestUEBuffering(t *testing.T) {
 	testUEDetach(t, fillExpected(&tc))
 }
 
+func TestSliceMeter(t *testing.T) {
+	setup(t, ConfigDefault)
+	defer teardown(t)
+
+	testCases := []testCase{
+		{
+			sliceConfig: &pfcpiface.NetworkSlice{
+				SliceName: "P4-UPF-1",
+				SliceQos: pfcpiface.SliceQos{
+					UplinkMbr:    20000,
+					UlBurstBytes: 10000,
+					DownlinkMbr:  10000,
+					DlBurstBytes: 10000,
+					BitrateUnit:  "Kbps",
+				},
+			},
+			expected: p4RtValues{
+				sliceMeter: &sliceMeter{
+					sliceID: 1,
+					TC:      3,
+					rate:    20000000,
+					burst:   10000,
+				},
+			},
+			desc: "Uplink rate higher",
+		},
+		{
+			sliceConfig: &pfcpiface.NetworkSlice{
+				SliceName: "P4-UPF-1",
+				SliceQos: pfcpiface.SliceQos{
+					UplinkMbr:    5000,
+					UlBurstBytes: 10000,
+					DownlinkMbr:  10000,
+					DlBurstBytes: 10000,
+					BitrateUnit:  "Kbps",
+				},
+			},
+			expected: p4RtValues{
+				sliceMeter: &sliceMeter{
+					sliceID: 1,
+					TC:      3,
+					rate:    10000000,
+					burst:   10000,
+				},
+			},
+			desc: "Downlink rate higher",
+		},
+	}
+
+	t.Run("No Slice Meters", func(t *testing.T) {
+		verifySliceMeter(t, p4RtValues{})
+	})
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			testSliceMeter(t, &tc)
+		})
+	}
+}
+
 func fillExpected(tc *testCase) *testCase {
 	if tc.expected.ueAddress == "" {
 		tc.expected.ueAddress = tc.input.ueAddress
@@ -546,4 +607,17 @@ func testUEDetach(t *testing.T, testcase *testCase) {
 func testUEAttachDetach(t *testing.T, testcase *testCase) {
 	testUEAttach(t, testcase)
 	testUEDetach(t, testcase)
+}
+
+func testSliceMeter(t *testing.T, testcase *testCase) {
+	if isDatapathUP4() {
+		err := PushSliceMeterConfig(*testcase.sliceConfig)
+		if err != nil {
+			t.Error("Error when pushing slice meter config via REST APIs", err)
+		}
+
+		verifySliceMeter(t, testcase.expected)
+	} else {
+		t.Skip("TODO: implement slice meter test for BESS")
+	}
 }

@@ -122,6 +122,46 @@ const (
 	EnumTrafficClassControl    uint32 = 1
 	EnumTrafficClassRealTime   uint32 = 2
 	EnumTrafficClassElastic    uint32 = 3
+	BitwidthMfAppId            int32  = 8
+	BitwidthMfAppIpAddr        int32  = 32
+	BitwidthMfAppIpProto       int32  = 8
+	BitwidthMfAppL4Port        int32  = 16
+	BitwidthMfDstMac           int32  = 48
+	BitwidthMfDstPrefix        int32  = 32
+	BitwidthMfEthDst           int32  = 48
+	BitwidthMfEthSrc           int32  = 48
+	BitwidthMfEthType          int32  = 16
+	BitwidthMfInport           int32  = 9
+	BitwidthMfIpv4Dst          int32  = 32
+	BitwidthMfIpv4DstPrefix    int32  = 32
+	BitwidthMfIpv4Proto        int32  = 8
+	BitwidthMfIpv4Src          int32  = 32
+	BitwidthMfL4Dport          int32  = 16
+	BitwidthMfL4Sport          int32  = 16
+	BitwidthMfN3Address        int32  = 32
+	BitwidthMfSliceId          int32  = 4
+	BitwidthMfSrcIface         int32  = 8
+	BitwidthMfTeid             int32  = 32
+	BitwidthMfTunnelPeerId     int32  = 8
+	BitwidthMfUeAddress        int32  = 32
+	BitwidthApAppId            int32  = 8
+	BitwidthApAppMeterIdx      int32  = 32
+	BitwidthApCtrIdx           int32  = 32
+	BitwidthApDirection        int32  = 8
+	BitwidthApDstAddr          int32  = 32
+	BitwidthApDstMac           int32  = 48
+	BitwidthApEgressPort       int32  = 9
+	BitwidthApPort             int32  = 9
+	BitwidthApQfi              int32  = 6
+	BitwidthApSessionMeterIdx  int32  = 32
+	BitwidthApSliceId          int32  = 4
+	BitwidthApSport            int32  = 16
+	BitwidthApSrcAddr          int32  = 32
+	BitwidthApSrcIface         int32  = 8
+	BitwidthApSrcMac           int32  = 48
+	BitwidthApTc               int32  = 2
+	BitwidthApTeid             int32  = 32
+	BitwidthApTunnelPeerId     int32  = 8
 )
 
 func GetTableIDToNameMap() map[uint32]string {
