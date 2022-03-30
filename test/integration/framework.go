@@ -116,10 +116,19 @@ type appFilter struct {
 	appPort      portRange
 }
 
+type sliceMeter struct {
+	rate    int64
+	burst   int64
+	sliceID uint8
+	TC      uint8
+}
+
 type p4RtValues struct {
-	tc        uint8
-	ueAddress string
-	appFilter appFilter
+	tc         uint8
+	ueAddress  string
+
+	appFilter  appFilter
+	sliceMeter *sliceMeter
 
 	pdrs []*ie.IE
 	fars []*ie.IE
@@ -127,8 +136,9 @@ type p4RtValues struct {
 }
 
 type testCase struct {
-	input    *pfcpSessionData
-	expected p4RtValues
+	input       *pfcpSessionData
+	sliceConfig *pfcpiface.NetworkSlice
+	expected    p4RtValues
 
 	desc string
 
@@ -328,6 +338,15 @@ func verifyEntries(t *testing.T, testdata *pfcpSessionData, expectedValues p4RtV
 		verifyP4RuntimeEntries(t, testdata, expectedValues, ueState)
 	case DatapathBESS:
 		verifyBessEntries(t, bessFake, testdata, expectedValues, ueState)
+	}
+}
+
+func verifySliceMeter(t *testing.T, expectedValues p4RtValues) {
+	switch os.Getenv(EnvDatapath) {
+	case DatapathUP4:
+		verifyP4RuntimeSliceMeter(t, expectedValues)
+	case DatapathBESS:
+		t.Skip("Unimplemented")
 	}
 }
 

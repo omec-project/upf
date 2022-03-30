@@ -198,14 +198,18 @@ func (up4 *UP4) AddSliceInfo(sliceInfo *SliceInfo) error {
 		sliceBurstBytes = sliceInfo.dlBurstBytes
 	}
 
-	meterCellId := up4.getSliceMeterIndex()
+	meterCellId, err := GetSliceTCMeterIndex(up4.conf.SliceID, up4.conf.DefaultTC)
+	if err != nil {
+		return err
+	}
+
 	meterConfig := p4.MeterConfig{
 		Cir:    int64(0),
 		Cburst: int64(0),
 		Pir:    int64(sliceMbr),
 		Pburst: int64(sliceBurstBytes),
 	}
-	sliceMeterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.MeterPreQosPipeSliceTcMeter, meterCellId, &meterConfig)
+	sliceMeterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.MeterPreQosPipeSliceTcMeter, uint32(meterCellId), &meterConfig)
 
 	log.WithFields(log.Fields{
 		"Slice meter entry": sliceMeterEntry,
@@ -221,10 +225,6 @@ func (up4 *UP4) AddSliceInfo(sliceInfo *SliceInfo) error {
 }
 
 func (up4 *UP4) SummaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric) {
-}
-
-func (up4 *UP4) getSliceMeterIndex() uint32 {
-	return uint32((up4.conf.SliceID << 2) + (up4.conf.DefaultTC & 0b11))
 }
 
 func (up4 *UP4) SessionStats(*PfcpNodeCollector, chan<- prometheus.Metric) error {
