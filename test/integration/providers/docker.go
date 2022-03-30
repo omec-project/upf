@@ -209,6 +209,11 @@ func MustRunDockerContainer(name, image, cmd string, exposedPorts []string, mnt 
 		networkingConfig.EndpointsConfig[net] = &network.EndpointSettings{}
 	}
 
+	_, err = cli.ImagePull(ctx, image, types.ImagePullOptions{})
+	if err != nil {
+		panic(err)
+	}
+
 	resp, err := cli.ContainerCreate(ctx, baseCfg, hostCfg, networkingConfig, nil, name)
 	if err != nil {
 		panic(err)
