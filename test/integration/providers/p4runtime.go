@@ -5,10 +5,12 @@ package providers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/antoninbas/p4runtime-go-client/pkg/client"
 	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 	"time"
 )
@@ -36,6 +38,22 @@ func ConnectP4rt(addr string, asMaster bool) (*client.Client, error) {
 
 	// Election only happens if asMaster is true.
 	p4RtC := client.NewClient(c, 1, TimeBasedElectionId(), client.DisableCanonicalBytestrings)
+
+	waitForChannelToBeReady := func() error {
+		// Wait for ready
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		for src := grpcConn.GetState(); src != connectivity.Ready; src = grpcConn.GetState() {
+			if !grpcConn.WaitForStateChange(ctx, src) {
+				return errors.New("timed out waiting for gRPC channel to be ready")
+			}
+		}
+		return nil
+	}
+
+	if err := waitForChannelToBeReady(); err != nil {
+		return nil, err
+	}
 
 	if asMaster {
 		// perform Master Arbitration
