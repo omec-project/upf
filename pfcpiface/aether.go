@@ -26,6 +26,32 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const (
+	// veth pair names. DO NOT MODIFY.
+	datapathIfaceName   = "datapath"
+	vethIfaceNameKernel = "fab"
+	bessRoutingTable    = 201
+	maxGates            = 8192
+
+	// Time to wait for IP assignment on veth interface.
+	vethIpDiscoveryTimeout = time.Second * 2
+
+	// BESS module names.
+	datapathIPLookModule = datapathIfaceName + "Routes"
+
+	// PreQosFlowMeasure is the pre QoS measurement module name.
+	PreQosFlowMeasure = "preQosFlowMeasure"
+	// PostQosFlowMeasure is the post QoS measurement module name.
+	PostQosFlowMeasure = "postQosFlowMeasure"
+)
+
+const (
+	moduleMethodAdd           = "add"
+	moduleMethodDelete        = "delete"
+	moduleMethodClear         = "clear"
+	moduleMethodGetInitialArg = "get_initial_arg"
+)
+
 type neighborCacheItem struct {
 	nhopMAC          net.HardwareAddr
 	routeCount       int
@@ -54,32 +80,6 @@ func NewAether() *aether {
 		neighborCache:   make(map[string]neighborCacheItem),
 	}
 }
-
-const (
-	// veth pair names. DO NOT MODIFY.
-	datapathIfaceName   = "datapath"
-	vethIfaceNameKernel = "fab"
-	bessRoutingTable    = 201
-	maxGates            = 8192
-
-	// Time to wait for IP assignment on veth interface.
-	vethIpDiscoveryTimeout = time.Second * 2
-
-	// BESS module names.
-	datapathIPLookModule = datapathIfaceName + "Routes"
-
-	// PreQosFlowMeasure is the pre QoS measurement module name.
-	PreQosFlowMeasure = "preQosFlowMeasure"
-	// PostQosFlowMeasure is the post QoS measurement module name.
-	PostQosFlowMeasure = "postQosFlowMeasure"
-)
-
-const (
-	moduleMethodAdd           = "add"
-	moduleMethodDelete        = "delete"
-	moduleMethodClear         = "clear"
-	moduleMethodGetInitialArg = "get_initial_arg"
-)
 
 type interfaceClassification struct {
 	// Match
@@ -156,7 +156,7 @@ func (a *aether) SendMsgToUPF(method upfMsgType, all PacketForwardingRules, upda
 		if far.Forwards() && far.dstIntf != ie.DstInterfaceAccess {
 			// Not a downlink rule.
 			log.Traceln("skipping", far)
-			// TODO: insert uplink route?
+			// TODO: do we need to insert uplink route? The default route the fabric GW covers this.
 			continue
 		}
 		enbIP := &net.IPNet{
