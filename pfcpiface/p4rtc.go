@@ -54,6 +54,13 @@ type P4rtClient struct {
 	P4Info p4ConfigV1.P4Info
 }
 
+func NewP4rtClient(deviceID uint64) *P4rtClient {
+	return &P4rtClient{
+		deviceID: deviceID,
+		digests: make(chan *p4.DigestList, 1024),
+	}
+}
+
 type P4RuntimeError struct {
 	errors []*p4.Error
 }
@@ -154,12 +161,6 @@ func (c *P4rtClient) SendPacketOut(packet []byte) (err error) {
 
 // Init .. Initialize Client.
 func (c *P4rtClient) Init() (err error) {
-	// Initialize stream for mastership and packet I/O
-	// ctx, cancel := context.WithTimeout(context.Background(),
-	//                                   time.Duration(timeout) * time.Second)
-	// defer cancel()
-	c.digests = make(chan *p4.DigestList, 1024)
-
 	c.stream, err = c.client.StreamChannel(
 		context.Background(),
 		grpcRetry.WithMax(3),
@@ -188,13 +189,6 @@ func (c *P4rtClient) Init() (err error) {
 			}
 		}
 	}()
-
-	/*
-		select {
-			case <-ctx.Done():
-			log.Println(ctx.Err()) // prints "context deadline exceeded"
-		}
-	*/
 
 	log.Println("exited from recv thread.")
 
@@ -581,7 +575,7 @@ func LoadDeviceConfig(deviceConfigPath string) (P4DeviceConfig, error) {
 // CreateChannel ... Create p4runtime client channel.
 func CreateChannel(host string, deviceID uint64) (*P4rtClient, error) {
 	log.Println("create channel")
-	// Second, check to see if we can reuse the gRPC connection for a new P4RT client
+
 	conn, err := GetConnection(host)
 	if err != nil {
 		log.Println("grpc connection failed")
@@ -589,6 +583,7 @@ func CreateChannel(host string, deviceID uint64) (*P4rtClient, error) {
 	}
 
 	client := &P4rtClient{
+		digests:  make(chan *p4.DigestList, 1024),
 		client:   p4.NewP4RuntimeClient(conn),
 		conn:     conn,
 		deviceID: deviceID,
@@ -602,9 +597,11 @@ func CreateChannel(host string, deviceID uint64) (*P4rtClient, error) {
 
 	err = client.SetMastership(TimeBasedElectionId())
 	if err != nil {
-		log.Println("Set Mastership error: ", err)
+		log.Error("Set Mastership error: ", err)
 		return nil, err
 	}
 
 	return client, nil
 }
+
+

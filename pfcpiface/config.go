@@ -95,12 +95,13 @@ type IfaceType struct {
 
 // P4rtcInfo : P4 runtime interface settings.
 type P4rtcInfo struct {
-	SliceID     uint8           `json:"slice_id"`
-	AccessIP    string          `json:"access_ip"`
-	P4rtcServer string          `json:"p4rtc_server"`
-	P4rtcPort   string          `json:"p4rtc_port"`
-	QFIToTC     map[uint8]uint8 `json:"qfi_tc_mapping"`
-	DefaultTC   uint8           `json:"default_tc"`
+	SliceID             uint8           `json:"slice_id"`
+	AccessIP            string          `json:"access_ip"`
+	P4rtcServer         string          `json:"p4rtc_server"`
+	P4rtcPort           string          `json:"p4rtc_port"`
+	QFIToTC             map[uint8]uint8 `json:"qfi_tc_mapping"`
+	DefaultTC           uint8           `json:"default_tc"`
+	ClearStateOnRestart bool            `json:"clear_state_on_restart"`
 }
 
 // validateConf checks that the given config reaches a baseline of correctness.

@@ -437,6 +437,17 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, expectedVal
 		fmt.Sprintf("app meter should have %d cells configured", expectedNrOfConfiguredMeters))
 }
 
+func verifyNumberOfEntries(t *testing.T, tableID uint32, expectedNoOfEntries int) {
+	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", false)
+	require.NoErrorf(t, err, "failed to connect to P4Runtime server")
+	defer providers.DisconnectP4rt()
+
+	entries, err := p4rtClient.ReadTableEntryWildcard(p4constants.GetTableIDToNameMap()[tableID])
+	require.NoError(t, err)
+
+	require.Len(t, entries, expectedNoOfEntries)
+}
+
 func verifyNoP4RuntimeEntries(t *testing.T, expectedValues p4RtValues) {
 	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", false)
 	require.NoErrorf(t, err, "failed to connect to P4Runtime server")

@@ -296,6 +296,8 @@ func (up4 *UP4) setupChannel() error {
 		return err
 	}
 
+	up4.p4RtTranslator = newP4RtTranslator(up4.p4client.P4Info)
+
 	setupLog.Debug("P4Rt channel created")
 
 	return nil
@@ -464,13 +466,16 @@ func (up4 *UP4) tryConnect() error {
 		return nil
 	}
 
+	// p4client is nil only if it's a first attempt to connect to UP4.
+	firstRun := up4.p4client == nil
+
 	err := up4.setupChannel()
 	if err != nil {
 		log.Errorf("Failed to setup UP4 channel: %v", err)
 		return err
 	}
 
-	err = up4.initialize()
+	err = up4.initialize(firstRun)
 	if err != nil {
 		log.Errorf("Failed to initialize UP4: %v", err)
 		return err
@@ -560,11 +565,7 @@ func (up4 *UP4) listenToDDNs() {
 	}
 }
 
-// initialize configures the UP4-related objects.
-// A caller should ensure that P4Client is not nil and the P4Runtime channel is open.
-func (up4 *UP4) initialize() error {
-	up4.p4RtTranslator = newP4RtTranslator(up4.p4client.P4Info)
-
+func (up4 *UP4) clearDatapathState() error {
 	err := up4.clearTables()
 	if err != nil {
 		log.Warningf("failed to clear tables: %v", err)
@@ -577,6 +578,20 @@ func (up4 *UP4) initialize() error {
 	err = up4.initInterfaces()
 	if err != nil {
 		return ErrOperationFailedWithReason("Interfaces initialization", err.Error())
+	}
+
+	return nil
+}
+
+// initialize configures the UP4-related objects.
+// A caller should ensure that P4Client is not nil and the P4Runtime channel is open.
+func (up4 *UP4) initialize(firstRun bool) error {
+	// always clear datapath state at startup or
+	// on UP4 datapath restart if ClearStateOnRestart is enabled.
+	if firstRun || up4.conf.ClearStateOnRestart {
+		if err := up4.clearDatapathState(); err != nil {
+			return err
+		}
 	}
 
 	up4.initOnce.Do(func() {

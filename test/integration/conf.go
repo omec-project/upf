@@ -16,6 +16,7 @@ import (
 const (
 	ConfigDefault = iota
 	ConfigUPFBasedIPAllocation
+	ConfigWipeOutOnUP4Restart
 )
 
 const (
@@ -98,6 +99,13 @@ func UP4ConfigUPFBasedIPAllocation() pfcpiface.Conf {
 	return config
 }
 
+func UP4ConfigWipeOutOnUP4Restart() pfcpiface.Conf {
+	config := UP4ConfigDefault()
+	config.P4rtcIface.ClearStateOnRestart = true
+
+	return config
+}
+
 func GetConfig(datapath string, configType uint32) pfcpiface.Conf {
 	switch datapath {
 	case DatapathUP4:
@@ -106,6 +114,8 @@ func GetConfig(datapath string, configType uint32) pfcpiface.Conf {
 			return UP4ConfigDefault()
 		case ConfigUPFBasedIPAllocation:
 			return UP4ConfigUPFBasedIPAllocation()
+		case ConfigWipeOutOnUP4Restart:
+			return UP4ConfigWipeOutOnUP4Restart()
 		}
 	case DatapathBESS:
 		switch configType {
