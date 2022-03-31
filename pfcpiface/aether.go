@@ -55,10 +55,6 @@ func NewAether() *aether {
 }
 
 const (
-	// IP protocol types.
-	TcpProto = 6
-	UdpProto = 17
-
 	// veth pair names. DO NOT MODIFY.
 	datapathIfaceName   = "datapath"
 	vethIfaceNameKernel = "fab"
