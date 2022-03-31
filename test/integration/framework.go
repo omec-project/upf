@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"os"
 	"testing"
@@ -22,6 +23,16 @@ import (
 )
 
 // this file should contain all the struct defs/constants used among different test cases.
+
+// defaults for test cases
+const (
+	defaultSliceID = 0
+
+	defaultNodeBAddress = "198.18.0.10"
+	defaultUpfN3Address = "198.18.0.1"
+
+	defaultTC = 3
+)
 
 const (
 	EnvMode     = "MODE"
@@ -33,13 +44,9 @@ const (
 	ModeDocker = "docker"
 	ModeNative = "native"
 
-	defaultSliceID = 0
-
 	defaultSDFFilter = "permit out udp from any to assigned 80-80"
 
 	ueAddress    = "17.0.0.1"
-	upfN3Address = "198.18.0.1"
-	nodeBAddress = "198.18.0.10"
 
 	ActionForward uint8 = 0x2
 	ActionDrop    uint8 = 0x1
@@ -75,6 +82,18 @@ var (
 	bessFake *fake_bess.FakeBESS
 )
 
+type portRange struct {
+	low  uint16
+	high uint16
+}
+
+type appFilter struct {
+	proto        uint8
+	appIP        net.IP
+	appPrefixLen uint32
+	appPort      portRange
+}
+
 type pfcpSessionData struct {
 	sliceID uint8
 
@@ -104,16 +123,27 @@ type pfcpSessionData struct {
 	dlGateClosed bool
 }
 
-type portRange struct {
-	low  uint16
-	high uint16
-}
-
-type appFilter struct {
-	proto        uint8
-	appIP        net.IP
-	appPrefixLen uint32
-	appPort      portRange
+func NewUEWithDefaultSettings() *pfcpSessionData {
+	return &pfcpSessionData{
+		sliceID:          defaultSliceID,
+		nbAddress:        defaultNodeBAddress,
+		ueAddress:        "",
+		upfN3Address:     defaultUpfN3Address,
+		// no SDF filter by default
+		// default precedence = 0
+		ulTEID:           15,
+		dlTEID:           16,
+		sessQerID:        0,
+		uplinkAppQerID:   0,
+		downlinkAppQerID: 0,
+		QFI:              0,
+		sessMBR:          0,
+		sessGBR:          0,
+		appMBR:           0,
+		appGBR:           0,
+		ulGateClosed:     false,
+		dlGateClosed:     false,
+	}
 }
 
 type sliceMeter struct {
@@ -123,7 +153,7 @@ type sliceMeter struct {
 	TC      uint8
 }
 
-type p4RtValues struct {
+type TestExpectations struct {
 	tc         uint8
 	ueAddress  string
 
@@ -135,18 +165,65 @@ type p4RtValues struct {
 	qers []*ie.IE
 }
 
-type testCase struct {
-	input       *pfcpSessionData
-	sliceConfig *pfcpiface.NetworkSlice
-	expected    p4RtValues
+func NewTestExpectations(overrides ...func(expectations *TestExpectations)) *TestExpectations {
+	te := &TestExpectations{
+		tc: defaultTC,
+	}
 
+	for _, fn := range overrides {
+		fn(te)
+	}
+
+	return te
+}
+
+type TestInput struct {
+	UE *pfcpSessionData
+
+	sliceConfig *pfcpiface.NetworkSlice
+}
+
+func NewTestInput() *TestInput {
+	return &TestInput{}
+}
+
+func (ti *TestInput) WithUE(modifiers ...func(ueData *pfcpSessionData)) *TestInput {
+	ti.UE = NewUEWithDefaultSettings()
+
+	for _, fn := range modifiers {
+		fn(ti.UE)
+	}
+
+	return ti
+}
+
+func (ti *TestInput) WithSliceConfig(sliceConfig *pfcpiface.NetworkSlice) *TestInput {
+	ti.sliceConfig = sliceConfig
+	return ti
+}
+
+type TestCase struct {
 	desc string
+
+	input    *TestInput
+	expected *TestExpectations
 
 	// modified by test cases only
 	session *pfcpsim.PFCPSession
 }
 
+// Prepare should be run before every test case run
+func (t *TestCase) Prepare() {
+	if t.expected.ueAddress == "" {
+		t.expected.ueAddress = t.input.UE.ueAddress
+	}
+
+	
+}
+
 func init() {
+	rand.Seed(time.Now().UnixNano())
+
 	logrus.SetLevel(logrus.TraceLevel)
 	logrus.SetReportCaller(true)
 	logrus.SetFormatter(&logrus.TextFormatter{
@@ -332,7 +409,7 @@ func teardown(t *testing.T) {
 	}
 }
 
-func verifyEntries(t *testing.T, testdata *pfcpSessionData, expectedValues p4RtValues, ueState UEState) {
+func verifyEntries(t *testing.T, testdata *pfcpSessionData, expectedValues TestExpectations, ueState UEState) {
 	switch os.Getenv(EnvDatapath) {
 	case DatapathUP4:
 		verifyP4RuntimeEntries(t, testdata, expectedValues, ueState)
@@ -341,7 +418,7 @@ func verifyEntries(t *testing.T, testdata *pfcpSessionData, expectedValues p4RtV
 	}
 }
 
-func verifySliceMeter(t *testing.T, expectedValues p4RtValues) {
+func verifySliceMeter(t *testing.T, expectedValues TestExpectations) {
 	switch os.Getenv(EnvDatapath) {
 	case DatapathUP4:
 		verifyP4RuntimeSliceMeter(t, expectedValues)
@@ -350,7 +427,7 @@ func verifySliceMeter(t *testing.T, expectedValues p4RtValues) {
 	}
 }
 
-func verifyNoEntries(t *testing.T, expectedValues p4RtValues) {
+func verifyNoEntries(t *testing.T, expectedValues TestExpectations) {
 	switch os.Getenv(EnvDatapath) {
 	case DatapathUP4:
 		verifyNoP4RuntimeEntries(t, expectedValues)

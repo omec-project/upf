@@ -72,7 +72,7 @@ func UP4ConfigDefault() pfcpiface.Conf {
 	config.EnableP4rt = true
 	config.P4rtcIface = pfcpiface.P4rtcInfo{
 		SliceID:     1,
-		AccessIP:    upfN3Address + "/32",
+		AccessIP:    defaultUpfN3Address + "/32",
 		P4rtcServer: up4Server,
 		P4rtcPort:   "50001",
 		QFIToTC: map[uint8]uint8{
