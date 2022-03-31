@@ -9,7 +9,6 @@ import (
 	"flag"
 	"math"
 	"net"
-	"strconv"
 	"time"
 
 	"google.golang.org/grpc/connectivity"
@@ -35,10 +34,6 @@ const (
 	AppQerLookup = "appQERLookup"
 	// SessQerLookup: Session Qos table Name.
 	SessQerLookup = "sessionQERLookup"
-	// PreQosFlowMeasure: Pre QoS measurement module name.
-	PreQosFlowMeasure = "preQosFlowMeasure"
-	// PostQosFlowMeasure: Post QoS measurement module name.
-	PostQosFlowMeasure = "postQosFlowMeasure"
 	// far-action specific values.
 	farForwardD = 0x0
 	farForwardU = 0x1
@@ -375,189 +370,8 @@ func (b *bess) flipFlowMeasurementBufferFlag(ctx context.Context, module string)
 	return
 }
 
-func (b *bess) readFlowMeasurement(
-	ctx context.Context, module string, flagToRead uint64, clear bool, q []float64,
-) (stats pb.FlowMeasureReadResponse, err error) {
-	req := &pb.FlowMeasureCommandReadArg{
-		Clear:              clear,
-		LatencyPercentiles: q,
-		JitterPercentiles:  q,
-		FlagToRead:         flagToRead,
-	}
-
-	any, err := anypb.New(req)
-	if err != nil {
-		log.Errorln("Error marshalling request", req, err)
-		return
-	}
-
-	resp, err := b.client.ModuleCommand(
-		ctx, &pb.CommandRequest{
-			Name: module,
-			Cmd:  "read",
-			Arg:  any,
-		},
-	)
-
-	if err != nil {
-		log.Errorln(module, "read failed!:", err)
-		return
-	}
-
-	if resp.GetError() != nil {
-		log.Errorln(module, "error reading flow stats:", resp.GetError().Errmsg)
-		return
-	}
-
-	if err = resp.Data.UnmarshalTo(&stats); err != nil {
-		log.Errorln(err, resp)
-		return
-	}
-
-	return
-}
-
 func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) (err error) {
-	// Clearing table data with large tables is slow, let's wait for a little longer since this is
-	// non-blocking for the dataplane anyway.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	// Flips the buffer flag, automatically waits for in-flight packets to drain.
-	flip, err := b.flipFlowMeasurementBufferFlag(ctx, PreQosFlowMeasure)
-	if err != nil {
-		log.Errorln(PreQosFlowMeasure, " read failed!:", err)
-		return
-	}
-
-	q := []float64{50, 90, 99}
-
-	// Read stats from the now inactive side, and clear if needed.
-	qosStatsInResp, err := b.readFlowMeasurement(ctx, PreQosFlowMeasure, flip.OldFlag, true, q)
-	if err != nil {
-		log.Errorln(PreQosFlowMeasure, " read failed!:", err)
-		return
-	}
-
-	postQosStatsResp, err := b.readFlowMeasurement(ctx, PostQosFlowMeasure, flip.OldFlag, true, q)
-	if err != nil {
-		log.Errorln(PostQosFlowMeasure, " read failed!:", err)
-		return
-	}
-
-	// TODO: pick first connection for now
-	var con *PFCPConn
-
-	pc.node.pConns.Range(func(key, value interface{}) bool {
-		pConn, ok := value.(*PFCPConn)
-		if !ok {
-			return false
-		}
-
-		con = pConn
-		return false
-	})
-
-	if con == nil {
-		log.Warnln("No active PFCP connection, UE IP lookup disabled")
-	}
-
-	// Prepare session stats.
-	createStats := func(preResp, postResp *pb.FlowMeasureReadResponse) {
-		for i := 0; i < len(postResp.Statistics); i++ {
-			var pre *pb.FlowMeasureReadResponse_Statistic
-
-			post := postResp.Statistics[i]
-			// Find preQos values.
-			for _, v := range preResp.Statistics {
-				if post.Pdr == v.Pdr && post.Fseid == v.Fseid {
-					pre = v
-					break
-				}
-			}
-
-			if pre == nil {
-				log.Infof("Found no pre QoS statistics for PDR %v FSEID %v", post.Pdr, post.Fseid)
-				continue
-			}
-
-			fseidString := strconv.FormatUint(pre.Fseid, 10)
-			pdrString := strconv.FormatUint(pre.Pdr, 10)
-			ueIpString := "unknown"
-
-			if con != nil {
-				session, ok := con.store.GetSession(pre.Fseid)
-				if !ok {
-					log.Errorln("Invalid or unknown FSEID", pre.Fseid)
-					continue
-				}
-
-				// Try to find the N6 uplink PDR with the UE IP.
-				for _, p := range session.pdrs {
-					if p.IsUplink() && p.ueAddress > 0 {
-						ueIpString = int2ip(p.ueAddress).String()
-						log.Traceln(p.fseID, " -> ", ueIpString)
-
-						break
-					}
-				}
-			}
-
-			ch <- prometheus.MustNewConstMetric(
-				pc.sessionTxPackets,
-				prometheus.GaugeValue,
-				float64(post.TotalPackets),
-				fseidString,
-				pdrString,
-				ueIpString,
-			)
-			ch <- prometheus.MustNewConstMetric(
-				pc.sessionRxPackets,
-				prometheus.GaugeValue,
-				float64(pre.TotalPackets),
-				fseidString,
-				pdrString,
-				ueIpString,
-			)
-			ch <- prometheus.MustNewConstMetric(
-				pc.sessionTxBytes,
-				prometheus.GaugeValue,
-				float64(post.TotalBytes),
-				fseidString,
-				pdrString,
-				ueIpString,
-			)
-			ch <- prometheus.MustNewConstSummary(
-				pc.sessionLatency,
-				post.TotalPackets,
-				0,
-				map[float64]float64{
-					q[0]: float64(post.Latency.PercentileValuesNs[0]),
-					q[1]: float64(post.Latency.PercentileValuesNs[1]),
-					q[2]: float64(post.Latency.PercentileValuesNs[2]),
-				},
-				fseidString,
-				pdrString,
-				ueIpString,
-			)
-			ch <- prometheus.MustNewConstSummary(
-				pc.sessionJitter,
-				post.TotalPackets,
-				0,
-				map[float64]float64{
-					q[0]: float64(post.Jitter.PercentileValuesNs[0]),
-					q[1]: float64(post.Jitter.PercentileValuesNs[1]),
-					q[2]: float64(post.Jitter.PercentileValuesNs[2]),
-				},
-				fseidString,
-				pdrString,
-				ueIpString,
-			)
-		}
-	}
-
-	createStats(&qosStatsInResp, &postQosStatsResp)
-
-	return
+	return ErrUnsupported("SessionStats", "UPF pipeline does not support session statistics")
 }
 
 func (b *bess) endMarkerSendLoop(endMarkerChan chan []byte) {
