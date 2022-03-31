@@ -1,7 +1,5 @@
 {
-    "": "Vdev or sim support. Enable `\"mode\": \"af_xdp\"` to enable AF_XDP mode, or `\"mode\": \"af_packet\"` to enable AF_PACKET mode, `\"mode\": \"sim\"` to generate synthetic traffic from BESS's Source module or \"mode\": \"\" when running with UP4",
-    "": "mode: af_xdp",
-    "": "mode: af_packet",
+    "": "DPDK or sim support. Enable `\"mode\": \"dpdk\"` to use NICs or `\"mode\": \"sim\"` to generate synthetic traffic from BESS's Source module or \"mode\": \"\" when running with UP4",
     "": "mode\": \"sim",
     "mode": "dpdk",
 
@@ -38,12 +36,6 @@
         "total_flows": 10
     },
 
-    "": "max IP frag table entries (for IPv4 reassembly). Update the line below to `\"max_ip_defrag_flows\": 1000` to enable",
-    "": "max_ip_defrag_flows: 1000",
-
-    "": "Update the line below to `\"ip_frag_with_eth_mtu\": 1518` to enable",
-    "": "ip_frag_with_eth_mtu: 1518",
-
     "": "Enable hardware offload of checksum. Might disable vector PMD",
     "hwcksum": false,
 
@@ -55,9 +47,6 @@
 
     "": "Telemetrics-See this link for details: https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py",
     "measure_upf": true,
-
-    "": "Whether to enable flow measurement feature",
-    "measure_flow": true,
 
     "": "Number of worker threads. Default: 1",
     "workers": 1,
