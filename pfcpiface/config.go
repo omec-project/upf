@@ -184,8 +184,10 @@ func LoadConfigFile(filepath string) (Conf, error) {
 	}
 
 	var conf Conf
+	// Set overwrittable defaults for missing keys.
 	conf.LogLevel = log.InfoLevel
 	conf.P4rtcIface.DefaultTC = uint8(p4constants.EnumTrafficClassElastic)
+	conf.CPIface.EnableUeIPAlloc = true
 
 	err = json.Unmarshal(byteValue, &conf)
 	if err != nil {
