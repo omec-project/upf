@@ -16,21 +16,21 @@ var qosLevelName = map[QosLevel]string{
 }
 
 type qer struct {
-	qerID    uint32
-	qosLevel QosLevel
-	qfi      uint8
-	ulStatus uint8
-	dlStatus uint8
-	ulMbr    uint64 // in kilobits/sec
-	dlMbr    uint64 // in kilobits/sec
-	ulGbr    uint64 // in kilobits/sec
-	dlGbr    uint64 // in kilobits/sec
-	fseID    uint64
-	fseidIP  uint32
+	QerID    uint32
+	QosLevel QosLevel
+	Qfi      uint8
+	UlStatus uint8
+	DlStatus uint8
+	UlMbr    uint64 // in kilobits/sec
+	DlMbr    uint64 // in kilobits/sec
+	UlGbr    uint64 // in kilobits/sec
+	DlGbr    uint64 // in kilobits/sec
+	FseID    uint64
+	FseidIP  uint32
 }
 
 func (q qer) String() string {
-	qosLevel, ok := qosLevelName[q.qosLevel]
+	qosLevel, ok := qosLevelName[q.QosLevel]
 	if !ok {
 		qosLevel = "invalid"
 	}
@@ -38,8 +38,8 @@ func (q qer) String() string {
 	return fmt.Sprintf("QER(id=%v, F-SEID=%v, F-SEID IP=%v, QFI=%v, "+
 		"uplinkMBR=%v, downlinkMBR=%v, uplinkGBR=%v, downlinkGBR=%v, type=%s, "+
 		"uplinkStatus=%v, downlinkStatus=%v)",
-		q.qerID, q.fseID, q.fseidIP, q.qfi, q.ulMbr, q.dlMbr, q.ulGbr, q.dlGbr,
-		qosLevel, q.ulStatus, q.dlStatus)
+		q.QerID, q.FseID, q.FseidIP, q.Qfi, q.UlMbr, q.DlMbr, q.UlGbr, q.DlGbr,
+		qosLevel, q.UlStatus, q.DlStatus)
 }
 
 func (q *qer) parseQER(ie1 *ie.IE, seid uint64) error {
@@ -84,15 +84,15 @@ func (q *qer) parseQER(ie1 *ie.IE, seid uint64) error {
 		log.Println("Could not read GBRDL!")
 	}
 
-	q.qerID = qerID
-	q.qfi = qfi
-	q.ulStatus = gsUL
-	q.dlStatus = gsDL
-	q.ulMbr = mbrUL
-	q.dlMbr = mbrDL
-	q.ulGbr = gbrUL
-	q.dlGbr = gbrDL
-	q.fseID = seid
+	q.QerID = qerID
+	q.Qfi = qfi
+	q.UlStatus = gsUL
+	q.DlStatus = gsDL
+	q.UlMbr = mbrUL
+	q.DlMbr = mbrDL
+	q.UlGbr = gbrUL
+	q.DlGbr = gbrDL
+	q.FseID = seid
 
 	return nil
 }

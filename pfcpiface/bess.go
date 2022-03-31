@@ -495,9 +495,9 @@ func (b *bess) sessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 
 				// Try to find the N6 uplink PDR with the UE IP.
 				for _, p := range session.pdrs {
-					if p.IsUplink() && p.ueAddress > 0 {
-						ueIpString = int2ip(p.ueAddress).String()
-						log.Traceln(p.fseID, " -> ", ueIpString)
+					if p.IsUplink() && p.UeAddress > 0 {
+						ueIpString = int2ip(p.UeAddress).String()
+						log.Traceln(p.FseID, " -> ", ueIpString)
 
 						break
 					}
@@ -761,13 +761,13 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 		var qerID uint32
 
-		for _, qer := range p.qerIDList {
+		for _, qer := range p.QerIDList {
 			qerID = qer
 			break
 		}
 
 		// Translate port ranges into ternary rule(s) and insert them one-by-one.
-		portRules, err := CreatePortRangeCartesianProduct(p.appFilter.srcPortRange, p.appFilter.dstPortRange)
+		portRules, err := CreatePortRangeCartesianProduct(p.AppFilter.SrcPortRange, p.AppFilter.DstPortRange)
 		if err != nil {
 			log.Errorln(err)
 			return
@@ -777,34 +777,34 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 		for _, r := range portRules {
 			f := &pb.WildcardMatchCommandAddArg{
-				Gate:     uint64(p.needDecap),
-				Priority: int64(math.MaxUint32 - p.precedence),
+				Gate:     uint64(p.NeedDecap),
+				Priority: int64(math.MaxUint32 - p.Precedence),
 				Values: []*pb.FieldData{
-					intEnc(uint64(p.srcIface)),        /* src_iface */
-					intEnc(uint64(p.tunnelIP4Dst)),    /* tunnel_ipv4_dst */
-					intEnc(uint64(p.tunnelTEID)),      /* enb_teid */
-					intEnc(uint64(p.appFilter.srcIP)), /* ueaddr ip*/
-					intEnc(uint64(p.appFilter.dstIP)), /* inet ip */
+					intEnc(uint64(p.SrcIface)),        /* src_iface */
+					intEnc(uint64(p.TunnelIP4Dst)),    /* tunnel_ipv4_dst */
+					intEnc(uint64(p.TunnelTEID)),      /* enb_teid */
+					intEnc(uint64(p.AppFilter.SrcIP)), /* ueaddr ip*/
+					intEnc(uint64(p.AppFilter.DstIP)), /* inet ip */
 					intEnc(uint64(r.srcPort)),         /* ue port */
 					intEnc(uint64(r.dstPort)),         /* inet port */
-					intEnc(uint64(p.appFilter.proto)), /* proto id */
+					intEnc(uint64(p.AppFilter.Proto)), /* proto id */
 				},
 				Masks: []*pb.FieldData{
-					intEnc(uint64(p.srcIfaceMask)),        /* src_iface-mask */
-					intEnc(uint64(p.tunnelIP4DstMask)),    /* tunnel_ipv4_dst-mask */
-					intEnc(uint64(p.tunnelTEIDMask)),      /* enb_teid-mask */
-					intEnc(uint64(p.appFilter.srcIPMask)), /* ueaddr ip-mask */
-					intEnc(uint64(p.appFilter.dstIPMask)), /* inet ip-mask */
+					intEnc(uint64(p.SrcIfaceMask)),        /* src_iface-mask */
+					intEnc(uint64(p.TunnelIP4DstMask)),    /* tunnel_ipv4_dst-mask */
+					intEnc(uint64(p.TunnelTEIDMask)),      /* enb_teid-mask */
+					intEnc(uint64(p.AppFilter.SrcIPMask)), /* ueaddr ip-mask */
+					intEnc(uint64(p.AppFilter.DstIPMask)), /* inet ip-mask */
 					intEnc(uint64(r.srcMask)),             /* ue port-mask */
 					intEnc(uint64(r.dstMask)),             /* inet port-mask */
-					intEnc(uint64(p.appFilter.protoMask)), /* proto id-mask */
+					intEnc(uint64(p.AppFilter.ProtoMask)), /* proto id-mask */
 				},
 				Valuesv: []*pb.FieldData{
-					intEnc(uint64(p.pdrID)), /* pdr-id */
-					intEnc(p.fseID),         /* fseid */
-					intEnc(uint64(p.ctrID)), /* ctr_id */
+					intEnc(uint64(p.PdrID)), /* pdr-id */
+					intEnc(p.FseID),         /* fseid */
+					intEnc(uint64(p.CtrID)), /* ctr_id */
 					intEnc(uint64(qerID)),   /* qer_id */
-					intEnc(uint64(p.farID)), /* far_id */
+					intEnc(uint64(p.FarID)), /* far_id */
 				},
 			}
 
@@ -828,7 +828,7 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 		)
 
 		// Translate port ranges into ternary rule(s) and insert them one-by-one.
-		portRules, err := CreatePortRangeCartesianProduct(p.appFilter.srcPortRange, p.appFilter.dstPortRange)
+		portRules, err := CreatePortRangeCartesianProduct(p.AppFilter.SrcPortRange, p.AppFilter.DstPortRange)
 		if err != nil {
 			log.Errorln(err)
 			return
@@ -837,24 +837,24 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 		for _, r := range portRules {
 			f := &pb.WildcardMatchCommandDeleteArg{
 				Values: []*pb.FieldData{
-					intEnc(uint64(p.srcIface)),        /* src_iface */
-					intEnc(uint64(p.tunnelIP4Dst)),    /* tunnel_ipv4_dst */
-					intEnc(uint64(p.tunnelTEID)),      /* enb_teid */
-					intEnc(uint64(p.appFilter.srcIP)), /* ueaddr ip*/
-					intEnc(uint64(p.appFilter.dstIP)), /* inet ip */
+					intEnc(uint64(p.SrcIface)),        /* src_iface */
+					intEnc(uint64(p.TunnelIP4Dst)),    /* tunnel_ipv4_dst */
+					intEnc(uint64(p.TunnelTEID)),      /* enb_teid */
+					intEnc(uint64(p.AppFilter.SrcIP)), /* ueaddr ip*/
+					intEnc(uint64(p.AppFilter.DstIP)), /* inet ip */
 					intEnc(uint64(r.srcPort)),         /* ue port */
 					intEnc(uint64(r.dstPort)),         /* inet port */
-					intEnc(uint64(p.appFilter.proto)), /* proto id */
+					intEnc(uint64(p.AppFilter.Proto)), /* proto id */
 				},
 				Masks: []*pb.FieldData{
-					intEnc(uint64(p.srcIfaceMask)),        /* src_iface-mask */
-					intEnc(uint64(p.tunnelIP4DstMask)),    /* tunnel_ipv4_dst-mask */
-					intEnc(uint64(p.tunnelTEIDMask)),      /* enb_teid-mask */
-					intEnc(uint64(p.appFilter.srcIPMask)), /* ueaddr ip-mask */
-					intEnc(uint64(p.appFilter.dstIPMask)), /* inet ip-mask */
+					intEnc(uint64(p.SrcIfaceMask)),        /* src_iface-mask */
+					intEnc(uint64(p.TunnelIP4DstMask)),    /* tunnel_ipv4_dst-mask */
+					intEnc(uint64(p.TunnelTEIDMask)),      /* enb_teid-mask */
+					intEnc(uint64(p.AppFilter.SrcIPMask)), /* ueaddr ip-mask */
+					intEnc(uint64(p.AppFilter.DstIPMask)), /* inet ip-mask */
 					intEnc(uint64(r.srcMask)),             /* ue port-mask */
 					intEnc(uint64(r.dstMask)),             /* inet port-mask */
-					intEnc(uint64(p.appFilter.protoMask)), /* proto id-mask */
+					intEnc(uint64(p.AppFilter.ProtoMask)), /* proto id-mask */
 				},
 			}
 
@@ -881,32 +881,32 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 		srcIface = access
 
 		// Lookup QCI from QFI, else try default QCI.
-		qosVal, ok := b.qciQosMap[qer.qfi]
+		qosVal, ok := b.qciQosMap[qer.Qfi]
 		if !ok {
-			log.Debug("No config for qfi/qci : ", qer.qfi, ". Using default burst size.")
+			log.Debug("No config for qfi/qci : ", qer.Qfi, ". Using default burst size.")
 
 			qosVal = b.qciQosMap[0]
 		}
 
-		cbs = maxUint64(calcBurstSizeFromRate(qer.ulGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
-		ebs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
-		pbs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
+		cbs = maxUint64(calcBurstSizeFromRate(qer.UlGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
+		ebs = maxUint64(calcBurstSizeFromRate(qer.UlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
+		pbs = maxUint64(calcBurstSizeFromRate(qer.UlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 
-		if qer.ulStatus != ie.GateStatusOpen {
+		if qer.UlStatus != ie.GateStatusOpen {
 			gate = qerGateStatusDrop
-		} else if qer.ulMbr != 0 || qer.ulGbr != 0 {
+		} else if qer.UlMbr != 0 || qer.UlGbr != 0 {
 			/* MBR/GBR is received in Kilobits/sec.
 			   CIR/PIR is sent in bytes */
-			cir = maxUint64(((qer.ulGbr * 1000) / 8), 1)
-			pir = maxUint64(((qer.ulMbr * 1000) / 8), cir)
+			cir = maxUint64(((qer.UlGbr * 1000) / 8), 1)
+			pir = maxUint64(((qer.UlMbr * 1000) / 8), cir)
 			gate = qerGateMeter
 		} else {
 			gate = qerGateUnmeter
 		}
 
-		if qer.qosLevel == ApplicationQos {
+		if qer.QosLevel == ApplicationQos {
 			b.addApplicationQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
-		} else if qer.qosLevel == SessionQos {
+		} else if qer.QosLevel == SessionQos {
 			b.addSessionQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
 		}
 
@@ -914,32 +914,32 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 		srcIface = core
 
 		// Lookup QCI from QFI, else try default QCI.
-		qosVal, ok = b.qciQosMap[qer.qfi]
+		qosVal, ok = b.qciQosMap[qer.Qfi]
 		if !ok {
-			log.Debug("No config for qfi/qci : ", qer.qfi, ". Using default burst size.")
+			log.Debug("No config for qfi/qci : ", qer.Qfi, ". Using default burst size.")
 
 			qosVal = b.qciQosMap[0]
 		}
 
-		cbs = maxUint64(calcBurstSizeFromRate(qer.dlGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
-		ebs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
-		pbs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
+		cbs = maxUint64(calcBurstSizeFromRate(qer.DlGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
+		ebs = maxUint64(calcBurstSizeFromRate(qer.DlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
+		pbs = maxUint64(calcBurstSizeFromRate(qer.DlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 
-		if qer.dlStatus != ie.GateStatusOpen {
+		if qer.DlStatus != ie.GateStatusOpen {
 			gate = qerGateStatusDrop
-		} else if qer.dlMbr != 0 || qer.dlGbr != 0 {
+		} else if qer.DlMbr != 0 || qer.DlGbr != 0 {
 			/* MBR/GBR is received in Kilobits/sec.
 			   CIR/PIR is sent in bytes */
-			cir = maxUint64(((qer.dlGbr * 1000) / 8), 1)
-			pir = maxUint64(((qer.dlMbr * 1000) / 8), cir)
+			cir = maxUint64(((qer.DlGbr * 1000) / 8), 1)
+			pir = maxUint64(((qer.DlMbr * 1000) / 8), cir)
 			gate = qerGateMeter
 		} else {
 			gate = qerGateUnmeter
 		}
 
-		if qer.qosLevel == ApplicationQos {
+		if qer.QosLevel == ApplicationQos {
 			b.addApplicationQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
-		} else if qer.qosLevel == SessionQos {
+		} else if qer.QosLevel == SessionQos {
 			b.addSessionQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
 		}
 
@@ -964,11 +964,11 @@ func (b *bess) addApplicationQER(ctx context.Context, gate uint64, srcIface uint
 		Ebs:  ebs, /* Excess burst size */
 		Fields: []*pb.FieldData{
 			intEnc(uint64(srcIface)),  /* Src Intf */
-			intEnc(uint64(qer.qerID)), /* qer_id */
-			intEnc(qer.fseID),         /* fseid */
+			intEnc(uint64(qer.QerID)), /* qer_id */
+			intEnc(qer.FseID),         /* fseid */
 		},
 		Values: []*pb.FieldData{
-			intEnc(uint64(qer.qfi)), /* QFI */
+			intEnc(uint64(qer.Qfi)), /* QFI */
 		},
 	}
 
@@ -993,18 +993,18 @@ func (b *bess) delQER(ctx context.Context, done chan<- bool, qer qer) {
 		// Uplink QER
 		srcIface = access
 
-		if qer.qosLevel == ApplicationQos {
+		if qer.QosLevel == ApplicationQos {
 			b.delApplicationQER(ctx, srcIface, qer)
-		} else if qer.qosLevel == SessionQos {
+		} else if qer.QosLevel == SessionQos {
 			b.delSessionQER(ctx, srcIface, qer)
 		}
 
 		// Downlink QER
 		srcIface = core
 
-		if qer.qosLevel == ApplicationQos {
+		if qer.QosLevel == ApplicationQos {
 			b.delApplicationQER(ctx, srcIface, qer)
-		} else if qer.qosLevel == SessionQos {
+		} else if qer.QosLevel == SessionQos {
 			b.delSessionQER(ctx, srcIface, qer)
 		}
 
@@ -1022,8 +1022,8 @@ func (b *bess) delApplicationQER(
 	q := &pb.QosCommandDeleteArg{
 		Fields: []*pb.FieldData{
 			intEnc(uint64(srcIface)),  /* Src Intf */
-			intEnc(uint64(qer.qerID)), /* qer_id */
-			intEnc(qer.fseID),         /* fseid */
+			intEnc(uint64(qer.QerID)), /* qer_id */
+			intEnc(qer.FseID),         /* fseid */
 		},
 	}
 
@@ -1063,17 +1063,17 @@ func (b *bess) processFAR(ctx context.Context, any *anypb.Any, method upfMsgType
 }
 
 func (b *bess) setActionValue(f far) uint8 {
-	if (f.applyAction & ActionForward) != 0 {
-		if f.dstIntf == ie.DstInterfaceAccess {
+	if (f.ApplyAction & ActionForward) != 0 {
+		if f.DstIntf == ie.DstInterfaceAccess {
 			return farForwardD
-		} else if (f.dstIntf == ie.DstInterfaceCore) || (f.dstIntf == ie.DstInterfaceSGiLANN6LAN) {
+		} else if (f.DstIntf == ie.DstInterfaceCore) || (f.DstIntf == ie.DstInterfaceSGiLANN6LAN) {
 			return farForwardU
 		}
-	} else if (f.applyAction & ActionDrop) != 0 {
+	} else if (f.ApplyAction & ActionDrop) != 0 {
 		return farDrop
-	} else if (f.applyAction & ActionBuffer) != 0 {
+	} else if (f.ApplyAction & ActionBuffer) != 0 {
 		return farNotify
-	} else if (f.applyAction & ActionNotify) != 0 {
+	} else if (f.ApplyAction & ActionNotify) != 0 {
 		return farNotify
 	}
 
@@ -1090,18 +1090,18 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 
 		action := b.setActionValue(far)
 		f := &pb.ExactMatchCommandAddArg{
-			Gate: uint64(far.tunnelType),
+			Gate: uint64(far.TunnelType),
 			Fields: []*pb.FieldData{
-				intEnc(uint64(far.farID)), /* far_id */
-				intEnc(far.fseID),         /* fseid */
+				intEnc(uint64(far.FarID)), /* far_id */
+				intEnc(far.FseID),         /* fseid */
 			},
 			Values: []*pb.FieldData{
 				intEnc(uint64(action)),           /* action */
-				intEnc(uint64(far.tunnelType)),   /* tunnel_out_type */
-				intEnc(uint64(far.tunnelIP4Src)), /* access-ip */
-				intEnc(uint64(far.tunnelIP4Dst)), /* enb ip */
-				intEnc(uint64(far.tunnelTEID)),   /* enb teid */
-				intEnc(uint64(far.tunnelPort)),   /* udp gtpu port */
+				intEnc(uint64(far.TunnelType)),   /* tunnel_out_type */
+				intEnc(uint64(far.TunnelIP4Src)), /* access-ip */
+				intEnc(uint64(far.TunnelIP4Dst)), /* enb ip */
+				intEnc(uint64(far.TunnelTEID)),   /* enb teid */
+				intEnc(uint64(far.TunnelPort)),   /* udp gtpu port */
 			},
 		}
 
@@ -1125,8 +1125,8 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 
 		f := &pb.ExactMatchCommandDeleteArg{
 			Fields: []*pb.FieldData{
-				intEnc(uint64(far.farID)), /* far_id */
-				intEnc(far.fseID),         /* fseid */
+				intEnc(uint64(far.FarID)), /* far_id */
+				intEnc(far.FseID),         /* fseid */
 			},
 		}
 
@@ -1300,7 +1300,7 @@ func (b *bess) addSessionQER(ctx context.Context, gate uint64, srcIface uint8,
 		Ebs:  ebs, /* Excess burst size */
 		Fields: []*pb.FieldData{
 			intEnc(uint64(srcIface)), /* Src Intf */
-			intEnc(qer.fseID),        /* fseid */
+			intEnc(qer.FseID),        /* fseid */
 		},
 	}
 
@@ -1327,7 +1327,7 @@ func (b *bess) delSessionQER(ctx context.Context, srcIface uint8, qer qer) {
 	q := &pb.QosCommandDeleteArg{
 		Fields: []*pb.FieldData{
 			intEnc(uint64(srcIface)), /* Src Intf */
-			intEnc(qer.fseID),        /* fseid */
+			intEnc(qer.FseID),        /* fseid */
 		},
 	}
 

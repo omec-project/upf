@@ -18,7 +18,7 @@ func (s *PFCPSession) CreateFAR(f far) {
 
 func addEndMarker(farItem far, endMarkerList *[][]byte) {
 	// This time lets fill out some information
-	log.Println("Adding end Marker for farID : ", farItem.farID)
+	log.Println("Adding end Marker for farID : ", farItem.FarID)
 
 	options := gopacket.SerializeOptions{
 		ComputeChecksums: true,
@@ -28,8 +28,8 @@ func addEndMarker(farItem far, endMarkerList *[][]byte) {
 	ipLayer := &layers.IPv4{
 		Version:  4,
 		TTL:      64,
-		SrcIP:    int2ip(farItem.tunnelIP4Src),
-		DstIP:    int2ip(farItem.tunnelIP4Dst),
+		SrcIP:    int2ip(farItem.TunnelIP4Src),
+		DstIP:    int2ip(farItem.TunnelIP4Dst),
 		Protocol: layers.IPProtocolUDP,
 	}
 	ethernetLayer := &layers.Ethernet{
@@ -51,8 +51,8 @@ func addEndMarker(farItem far, endMarkerList *[][]byte) {
 	gtpLayer := &layers.GTPv1U{
 		Version:      1,
 		MessageType:  254,
-		ProtocolType: farItem.tunnelType,
-		TEID:         farItem.tunnelTEID,
+		ProtocolType: farItem.TunnelType,
+		TEID:         farItem.TunnelTEID,
 	}
 	// And create the packet with the layers
 	err = gopacket.SerializeLayers(buffer, options,
@@ -73,8 +73,8 @@ func addEndMarker(farItem far, endMarkerList *[][]byte) {
 // UpdateFAR updates existing far in the session.
 func (s *PFCPSession) UpdateFAR(f *far, endMarkerList *[][]byte) error {
 	for idx, v := range s.fars {
-		if v.farID == f.farID {
-			if f.sendEndMarker {
+		if v.FarID == f.FarID {
+			if f.SendEndMarker {
 				addEndMarker(v, endMarkerList)
 			}
 
@@ -90,7 +90,7 @@ func (s *PFCPSession) UpdateFAR(f *far, endMarkerList *[][]byte) error {
 // RemoveFAR removes far from existing list of FARs in the session.
 func (s *PFCPSession) RemoveFAR(id uint32) (*far, error) {
 	for idx, v := range s.fars {
-		if v.farID == id {
+		if v.FarID == id {
 			s.fars = append(s.fars[:idx], s.fars[idx+1:]...)
 			return &v, nil
 		}

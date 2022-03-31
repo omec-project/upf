@@ -31,49 +31,49 @@ const (
 )
 
 type far struct {
-	farID   uint32
-	fseID   uint64
-	fseidIP uint32
+	FarID   uint32
+	FseID   uint64
+	FseidIP uint32
 
-	dstIntf       uint8
-	sendEndMarker bool
-	applyAction   uint8
-	tunnelType    uint8
-	tunnelIP4Src  uint32
-	tunnelIP4Dst  uint32
-	tunnelTEID    uint32
-	tunnelPort    uint16
+	DstIntf       uint8
+	SendEndMarker bool
+	ApplyAction   uint8
+	TunnelType    uint8
+	TunnelIP4Src  uint32
+	TunnelIP4Dst  uint32
+	TunnelTEID    uint32
+	TunnelPort    uint16
 }
 
 func (f far) String() string {
 	return fmt.Sprintf("FAR(id=%v, F-SEID=%v, F-SEID IPv4=%v, dstInterface=%v, tunnelType=%v, "+
 		"tunnelIPv4Src=%v, tunnelIPv4Dst=%v, tunnelTEID=%v, tunnelSrcPort=%v, "+
-		"sendEndMarker=%v, drops=%v, forwards=%v, buffers=%v)", f.farID, f.fseID, int2ip(f.fseidIP), f.dstIntf,
-		f.tunnelType, int2ip(f.tunnelIP4Src), int2ip(f.tunnelIP4Dst), f.tunnelTEID, f.tunnelPort, f.sendEndMarker,
+		"sendEndMarker=%v, drops=%v, forwards=%v, buffers=%v)", f.FarID, f.FseID, int2ip(f.FseidIP), f.DstIntf,
+		f.TunnelType, int2ip(f.TunnelIP4Src), int2ip(f.TunnelIP4Dst), f.TunnelTEID, f.TunnelPort, f.SendEndMarker,
 		f.Drops(), f.Forwards(), f.Buffers())
 }
 
 func (f *far) Drops() bool {
-	return f.applyAction&ActionDrop != 0
+	return f.ApplyAction&ActionDrop != 0
 }
 
 func (f *far) Buffers() bool {
-	return f.applyAction&ActionBuffer != 0
+	return f.ApplyAction&ActionBuffer != 0
 }
 
 func (f *far) Forwards() bool {
-	return f.applyAction&ActionForward != 0
+	return f.ApplyAction&ActionForward != 0
 }
 
 func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error {
-	f.fseID = (fseid)
+	f.FseID = (fseid)
 
 	farID, err := farIE.FARID()
 	if err != nil {
 		return err
 	}
 
-	f.farID = farID
+	f.FarID = farID
 
 	action, err := farIE.ApplyAction()
 	if err != nil {
@@ -84,13 +84,13 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 		return ErrInvalidArgument("FAR Action", action)
 	}
 
-	f.applyAction = action
+	f.ApplyAction = action
 
 	var fwdIEs []*ie.IE
 
 	switch op {
 	case create:
-		if (f.applyAction & ActionForward) != 0 {
+		if (f.ApplyAction & ActionForward) != 0 {
 			fwdIEs, err = farIE.ForwardingParameters()
 		}
 	case update:
@@ -103,7 +103,7 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 		return err
 	}
 
-	f.sendEndMarker = false
+	f.SendEndMarker = false
 
 	var fields Bits
 
@@ -118,23 +118,23 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 				continue
 			}
 
-			f.tunnelTEID = ohcFields.TEID
-			f.tunnelIP4Dst = ip2int(ohcFields.IPv4Address)
-			f.tunnelType = uint8(1) // FIXME: what does it mean?
-			f.tunnelPort = tunnelGTPUPort
+			f.TunnelTEID = ohcFields.TEID
+			f.TunnelIP4Dst = ip2int(ohcFields.IPv4Address)
+			f.TunnelType = uint8(1) // FIXME: what does it mean?
+			f.TunnelPort = tunnelGTPUPort
 		case ie.DestinationInterface:
 			fields = Set(fields, FwdIEDestinationIntf)
 
-			f.dstIntf, err = fwdIE.DestinationInterface()
+			f.DstIntf, err = fwdIE.DestinationInterface()
 			if err != nil {
 				log.Println("Unable to parse DestinationInterface field")
 				continue
 			}
 
-			if f.dstIntf == ie.DstInterfaceAccess {
-				f.tunnelIP4Src = ip2int(upf.accessIP)
-			} else if f.dstIntf == ie.DstInterfaceCore {
-				f.tunnelIP4Src = ip2int(upf.coreIP)
+			if f.DstIntf == ie.DstInterfaceAccess {
+				f.TunnelIP4Src = ip2int(upf.accessIP)
+			} else if f.DstIntf == ie.DstInterfaceCore {
+				f.TunnelIP4Src = ip2int(upf.coreIP)
 			}
 		case ie.PFCPSMReqFlags:
 			fields = Set(fields, FwdIEPfcpSMReqFlags)
@@ -146,7 +146,7 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 			}
 
 			if has2ndBit(smReqFlags) {
-				f.sendEndMarker = true
+				f.SendEndMarker = true
 			}
 		}
 	}

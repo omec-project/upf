@@ -543,7 +543,7 @@ func (up4 *UP4) endMarkerSendLoop() {
 
 func findRelatedFAR(pdr pdr, fars []far) (far, error) {
 	for _, far := range fars {
-		if pdr.farID == far.farID {
+		if pdr.FarID == far.FarID {
 			return far, nil
 		}
 	}
@@ -553,11 +553,11 @@ func findRelatedFAR(pdr pdr, fars []far) (far, error) {
 
 func findRelatedApplicationQER(pdr pdr, qers []qer) (qer, error) {
 	for _, qer := range qers {
-		if len(pdr.qerIDList) != 0 {
+		if len(pdr.QerIDList) != 0 {
 			// if only 1 QER provided, it's an application QER
 			// if 2 QERs provided, the first one is an application QER
 			// if more than 2 QERs provided, TODO: not supported
-			if pdr.qerIDList[0] == qer.qerID {
+			if pdr.QerIDList[0] == qer.QerID {
 				return qer, nil
 			}
 		}
@@ -617,8 +617,8 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
 	methodType := p4.Update_MODIFY
 	tunnelParams := tunnelParams{
 		tunnelIP4Src: ip2int(up4.accessIP.IP),
-		tunnelIP4Dst: far.tunnelIP4Dst,
-		tunnelPort:   far.tunnelPort,
+		tunnelIP4Dst: far.TunnelIP4Dst,
+		tunnelPort:   far.TunnelPort,
 	}
 
 	tnlPeer, exists := up4.tunnelPeerIDs[tunnelParams]
@@ -631,7 +631,7 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
 		tnlPeer = tunnelPeer{
 			id: newID,
 			usedBy: set.NewSet(tnlPeerReference{
-				far.fseID, far.farID,
+				far.FseID, far.FarID,
 			}),
 		}
 
@@ -641,7 +641,7 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
 		// since we use Set to keep track of tunnel peers in use,
 		// it will not be added to the set if tunnel peer was already created for this UE session.
 		tnlPeer.usedBy.Add(tnlPeerReference{
-			far.fseID, far.farID,
+			far.FseID, far.FarID,
 		})
 	}
 
@@ -676,8 +676,8 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 	})
 	tunnelParams := tunnelParams{
 		tunnelIP4Src: ip2int(up4.accessIP.IP),
-		tunnelIP4Dst: far.tunnelIP4Dst,
-		tunnelPort:   far.tunnelPort,
+		tunnelIP4Dst: far.TunnelIP4Dst,
+		tunnelPort:   far.TunnelPort,
 	}
 
 	tnlPeer, exists := up4.tunnelPeerIDs[tunnelParams]
@@ -692,7 +692,7 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 	removeLog.Debug("Found GTP tunnel peer for tunnel params")
 
 	tnlPeer.usedBy.Remove(tnlPeerReference{
-		far.fseID, far.farID,
+		far.FseID, far.FarID,
 	})
 
 	if tnlPeer.usedBy.Cardinality() != 0 {
@@ -735,9 +735,9 @@ func (up4 *UP4) allocateInternalApplicationID(app application) (uint8, error) {
 //nolint:unused
 func (up4 *UP4) releaseInternalApplicationID(appFilter applicationFilter) {
 	app := application{
-		appIP:     appFilter.srcIP,
-		appL4Port: appFilter.srcPortRange,
-		appProto:  appFilter.proto,
+		appIP:     appFilter.SrcIP,
+		appL4Port: appFilter.SrcPortRange,
+		appProto:  appFilter.Proto,
 	}
 
 	allocated, exists := up4.applicationIDs[app]
@@ -751,17 +751,17 @@ func (up4 *UP4) getOrAllocateInternalApplicationID(pdr pdr) (uint8, error) {
 	var app application
 	if pdr.IsUplink() {
 		app = application{
-			appIP:     pdr.appFilter.dstIP,
-			appL4Port: pdr.appFilter.dstPortRange,
+			appIP:     pdr.AppFilter.DstIP,
+			appL4Port: pdr.AppFilter.DstPortRange,
 		}
 	} else if pdr.IsDownlink() {
 		app = application{
-			appIP:     pdr.appFilter.srcIP,
-			appL4Port: pdr.appFilter.srcPortRange,
+			appIP:     pdr.AppFilter.SrcIP,
+			appL4Port: pdr.AppFilter.SrcPortRange,
 		}
 	}
 
-	app.appProto = pdr.appFilter.proto
+	app.appProto = pdr.AppFilter.Proto
 
 	if allocated, exists := up4.applicationIDs[app]; exists {
 		return allocated, nil
@@ -841,7 +841,7 @@ func (up4 *UP4) updateUEAddrAndFSEIDMappings(pdr pdr) {
 	}
 
 	// update both maps in one shot
-	up4.ueAddrToFSEID[pdr.ueAddress], up4.fseidToUEAddr[pdr.fseID] = pdr.fseID, pdr.ueAddress
+	up4.ueAddrToFSEID[pdr.UeAddress], up4.fseidToUEAddr[pdr.FseID] = pdr.FseID, pdr.UeAddress
 }
 
 func (up4 *UP4) removeUeAddrAndFSEIDMappings(pdr pdr) {
@@ -849,8 +849,8 @@ func (up4 *UP4) removeUeAddrAndFSEIDMappings(pdr pdr) {
 		return
 	}
 
-	delete(up4.ueAddrToFSEID, pdr.ueAddress)
-	delete(up4.fseidToUEAddr, pdr.fseID)
+	delete(up4.ueAddrToFSEID, pdr.UeAddress)
+	delete(up4.fseidToUEAddr, pdr.FseID)
 }
 
 func (up4 *UP4) updateTunnelPeersBasedOnFARs(fars []far) error {
@@ -859,7 +859,7 @@ func (up4 *UP4) updateTunnelPeersBasedOnFARs(fars []far) error {
 			"far": far,
 		})
 		// downlink FAR with tunnel params that does encapsulation
-		if far.Forwards() && far.dstIntf == ie.DstInterfaceAccess && far.tunnelTEID != 0 {
+		if far.Forwards() && far.DstIntf == ie.DstInterfaceAccess && far.TunnelTEID != 0 {
 			if err := up4.addOrUpdateGTPTunnelPeer(far); err != nil {
 				logger.Errorf("Failed to add or update GTP tunnel peer: %v", err)
 				return err
@@ -949,7 +949,7 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 	}
 
 	if appMeter.uplinkCellID != 0 {
-		meterConfig := getMeterConfigurationFromQER(q.ulMbr, q.ulGbr)
+		meterConfig := getMeterConfigurationFromQER(q.UlMbr, q.UlGbr)
 
 		meterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.MeterPreQosPipeAppMeter, appMeter.uplinkCellID, meterConfig)
 
@@ -957,7 +957,7 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 	}
 
 	if appMeter.downlinkCellID != appMeter.uplinkCellID {
-		meterConfig := getMeterConfigurationFromQER(q.dlMbr, q.dlGbr)
+		meterConfig := getMeterConfigurationFromQER(q.DlMbr, q.DlGbr)
 
 		meterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.MeterPreQosPipeAppMeter, appMeter.downlinkCellID, meterConfig)
 
@@ -999,10 +999,10 @@ func (up4 *UP4) configureSessionMeter(q qer) (meter, error) {
 	})
 	logger.Debug("Configuring Session Meter from QER")
 
-	uplinkMeterConfig := getMeterConfigurationFromQER(q.ulMbr, q.ulGbr)
+	uplinkMeterConfig := getMeterConfigurationFromQER(q.UlMbr, q.UlGbr)
 	uplinkMeterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.MeterPreQosPipeSessionMeter, uplinkCellID, uplinkMeterConfig)
 
-	downlinkMeterConfig := getMeterConfigurationFromQER(q.dlMbr, q.dlGbr)
+	downlinkMeterConfig := getMeterConfigurationFromQER(q.DlMbr, q.DlGbr)
 	downlinkMeterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.MeterPreQosPipeSessionMeter, downlinkCellID, downlinkMeterConfig)
 
 	logger = logger.WithFields(log.Fields{
@@ -1045,7 +1045,7 @@ func (up4 *UP4) configureMeters(qers []qer) error {
 			meter meter
 		)
 
-		switch qer.qosLevel {
+		switch qer.QosLevel {
 		case ApplicationQos:
 			if len(qers) == 1 {
 				// if only a single QER is created, the QER is marked as Application QER,
@@ -1070,8 +1070,8 @@ func (up4 *UP4) configureMeters(qers []qer) error {
 		logger.Debug("P4 meter successfully configured!")
 
 		up4.meters[meterID{
-			qerID: qer.qerID,
-			fseid: qer.fseID,
+			qerID: qer.QerID,
+			fseid: qer.FseID,
 		}] = meter
 	}
 
@@ -1079,8 +1079,8 @@ func (up4 *UP4) configureMeters(qers []qer) error {
 }
 
 func verifyPDR(pdr pdr) error {
-	if pdr.precedence > math.MaxUint16 {
-		return ErrUnsupported("precedence greater than 65535", pdr.precedence)
+	if pdr.Precedence > math.MaxUint16 {
+		return ErrUnsupported("precedence greater than 65535", pdr.Precedence)
 	}
 
 	return nil
@@ -1122,8 +1122,8 @@ func (up4 *UP4) resetMeters(qers []qer) {
 		logger.Debug("Resetting P4 Meter")
 
 		meter, exists := up4.meters[meterID{
-			qerID: qer.qerID,
-			fseid: qer.fseID,
+			qerID: qer.QerID,
+			fseid: qer.FseID,
 		}]
 		if !exists {
 			logger.Error("P4 meter for QER ID not found, cannot reset!")
@@ -1147,8 +1147,8 @@ func (up4 *UP4) resetMeters(qers []qer) {
 		logger.Debug("Removing P4 meter from allocated meters pool")
 
 		delete(up4.meters, meterID{
-			qerID: qer.qerID,
-			fseid: qer.fseID,
+			qerID: qer.QerID,
+			fseid: qer.FseID,
 		})
 	}
 }
@@ -1179,21 +1179,21 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 
 		tunnelParams := tunnelParams{
 			tunnelIP4Src: ip2int(up4.accessIP.IP),
-			tunnelIP4Dst: far.tunnelIP4Dst,
-			tunnelPort:   far.tunnelPort,
+			tunnelIP4Dst: far.TunnelIP4Dst,
+			tunnelPort:   far.TunnelPort,
 		}
 
 		tunnelPeerID, exists := up4.getGTPTunnelPeer(tunnelParams)
-		if !exists && far.tunnelTEID != 0 {
+		if !exists && far.TunnelTEID != 0 {
 			return ErrNotFoundWithParam("allocated GTP tunnel peer ID", "tunnel params", tunnelParams)
 		}
 
 		var sessMeter = meter{meterTypeSession, 0, 0}
-		if len(pdr.qerIDList) == 2 {
+		if len(pdr.QerIDList) == 2 {
 			// if 2 QERs are provided, the second one is Session QER
 			sessMeter = up4.meters[meterID{
-				qerID: pdr.qerIDList[1],
-				fseid: pdr.fseID,
+				qerID: pdr.QerIDList[1],
+				fseid: pdr.FseID,
 			}]
 			pdrLog.Debug("Application meter found for PDR: ", sessMeter)
 		} // else: if only 1 QER provided, set sessMeterIdx to 0, and use only per-app metering
@@ -1206,14 +1206,14 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 		entriesToApply = append(entriesToApply, sessionsEntry)
 
 		if pdr.IsUplink() {
-			ueAddr, exists := up4.fseidToUEAddr[pdr.fseID]
+			ueAddr, exists := up4.fseidToUEAddr[pdr.FseID]
 			if !exists {
 				// this is only possible if a linked DL PDR was not provided in the same PFCP Establishment message
 				log.Error("UE Address not found for uplink PDR, a linked DL PDR was not provided?")
 				return ErrOperationFailedWithReason("adding UP4 entries", "UE Address not found for uplink PDR, a linked DL PDR was not provided?")
 			}
 
-			pdr.ueAddress = ueAddr
+			pdr.UeAddress = ueAddr
 		}
 
 		var applicationsEntry *p4.TableEntry
@@ -1240,13 +1240,13 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 		}
 
 		var appMeter = meter{meterTypeApplication, 0, 0}
-		if len(pdr.qerIDList) != 0 {
+		if len(pdr.QerIDList) != 0 {
 			// if only 1 QER provided, it's an application QER
 			// if 2 QERs provided, the first one is an application QER
 			// if more than 2 QERs provided, TODO: not supported
 			appMeter = up4.meters[meterID{
-				qerID: pdr.qerIDList[0],
-				fseid: pdr.fseID,
+				qerID: pdr.QerIDList[0],
+				fseid: pdr.FseID,
 			}]
 			pdrLog.Debug("Application meter found for PDR: ", appMeter)
 		}
@@ -1258,10 +1258,10 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 			pdrLog.Warning(err)
 		} else {
 			pdrLog.Debug("Related QER found for PDR: ", relatedQER)
-			qfi = relatedQER.qfi
+			qfi = relatedQER.Qfi
 		}
 
-		tc, exists := up4.conf.QFIToTC[relatedQER.qfi]
+		tc, exists := up4.conf.QFIToTC[relatedQER.Qfi]
 		if !exists {
 			tc = NoTC
 		}
@@ -1310,7 +1310,7 @@ func (up4 *UP4) sendCreate(all PacketForwardingRules, updated PacketForwardingRu
 			return ErrOperationFailedWithReason("Counter ID allocation", err.Error())
 		}
 
-		all.pdrs[i].ctrID = uint32(val)
+		all.pdrs[i].CtrID = uint32(val)
 	}
 
 	for _, p := range updated.pdrs {
@@ -1354,7 +1354,7 @@ func (up4 *UP4) sendUpdate(all PacketForwardingRules, updated PacketForwardingRu
 func (up4 *UP4) sendDelete(deleted PacketForwardingRules) error {
 	for i := range deleted.pdrs {
 		up4.releaseCounterID(preQosCounterID,
-			uint64(deleted.pdrs[i].ctrID))
+			uint64(deleted.pdrs[i].CtrID))
 	}
 
 	if err := up4.modifyUP4ForwardingConfiguration(deleted.pdrs, deleted.fars, deleted.qers, p4.Update_DELETE); err != nil {

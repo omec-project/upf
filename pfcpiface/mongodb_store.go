@@ -7,6 +7,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/omec-project/upf-epc/pfcpiface/metrics"
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -19,6 +20,14 @@ type MongoDBStore struct {
 	coll   string
 }
 
+type PFCPSessionDoc struct {
+	Fseid      uint64
+	LocalSEID  uint64
+	RemoteSEID uint64
+	Metrics    *metrics.Session
+	PacketForwardingRules
+}
+
 func NewMongoDBStore() *MongoDBStore {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 
@@ -27,6 +36,7 @@ func NewMongoDBStore() *MongoDBStore {
 	serverAPIOptions := options.ServerAPI(options.ServerAPIVersion1)
 	clientOptions := options.Client().
 		ApplyURI("mongodb+srv://onf:opennetworking@cluster0.ld6zn.mongodb.net/myFirstDatabase?retryWrites=true&w=majority").
+		// ApplyURI("mongodb://mongo:5001").
 		SetServerAPIOptions(serverAPIOptions)
 	client, err := mongo.Connect(ctx, clientOptions)
 
@@ -36,6 +46,7 @@ func NewMongoDBStore() *MongoDBStore {
 
 	database := client.Database("sessionsDatabase")
 	database.RunCommand(context.TODO(), bson.M{"create": "sessions"})
+
 	return &MongoDBStore{client, "sessionsDatabase", "sessions"}
 }
 
@@ -77,7 +88,11 @@ func (i *MongoDBStore) PutSession(session PFCPSession) error {
 		return ErrInvalidArgument("session.localSEID", session.localSEID)
 	}
 
-	_, err := i.client.Database(i.db).Collection(i.coll).InsertOne(context.TODO(), bson.M{"fseid": uint64(session.localSEID), "session": session})
+	_, err := i.client.Database(i.db).Collection(i.coll).InsertOne(context.TODO(), bson.M{"fseid": int64(session.localSEID), "localSEID": int64(session.localSEID),
+		"remoteSEID":            int64(session.remoteSEID),
+		"metrics":               session.metrics,
+		"PacketForwardingRules": bson.M{"fars": session.PacketForwardingRules.fars, "pdrs": session.PacketForwardingRules.pdrs, "qers": session.PacketForwardingRules.qers},
+	})
 
 	if err != nil {
 		log.Fatal(err)
@@ -119,17 +134,18 @@ func (i *MongoDBStore) DeleteAllSessions() bool {
 func (i *MongoDBStore) GetSession(fseid uint64) (PFCPSession, bool) {
 	filter := bson.M{"fseid": int64(fseid)}
 
-	var session PFCPSession
+	var session PFCPSessionDoc
 
 	err := i.client.Database(i.db).Collection(i.coll).FindOne(context.TODO(), filter).Decode(&session)
 
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
 		return PFCPSession{}, false
 	}
 
 	log.WithFields(log.Fields{
 		"session": session,
 	}).Trace("Got PFCP session from local store")
-	return session, true
+
+	return PFCPSession{localSEID: session.LocalSEID, remoteSEID: session.RemoteSEID, metrics: session.Metrics, PacketForwardingRules: session.PacketForwardingRules}, true
 }

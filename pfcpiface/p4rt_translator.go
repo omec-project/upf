@@ -494,7 +494,7 @@ func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, sliceID uint8, int
 	entry := &p4.TableEntry{
 		TableId: p4constants.TablePreQosPipeApplications,
 		// priority for UP4 cannot be greater than 65535
-		Priority: int32(math.MaxUint16 - pdr.precedence),
+		Priority: int32(math.MaxUint16 - pdr.Precedence),
 	}
 
 	var (
@@ -502,15 +502,15 @@ func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, sliceID uint8, int
 		appPort          portRange
 	)
 
-	if pdr.srcIface == access {
-		appIP, appIPMask = pdr.appFilter.dstIP, pdr.appFilter.dstIPMask
-		appPort = pdr.appFilter.dstPortRange
-	} else if pdr.srcIface == core {
-		appIP, appIPMask = pdr.appFilter.srcIP, pdr.appFilter.srcIPMask
-		appPort = pdr.appFilter.srcPortRange
+	if pdr.SrcIface == access {
+		appIP, appIPMask = pdr.AppFilter.DstIP, pdr.AppFilter.DstIPMask
+		appPort = pdr.AppFilter.DstPortRange
+	} else if pdr.SrcIface == core {
+		appIP, appIPMask = pdr.AppFilter.SrcIP, pdr.AppFilter.SrcIPMask
+		appPort = pdr.AppFilter.SrcPortRange
 	}
 
-	appProto, appProtoMask := pdr.appFilter.proto, pdr.appFilter.protoMask
+	appProto, appProtoMask := pdr.AppFilter.Proto, pdr.AppFilter.ProtoMask
 
 	if err := t.withExactMatchField(entry, FieldSliceID, sliceID); err != nil {
 		return nil, err
@@ -524,7 +524,7 @@ func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, sliceID uint8, int
 	}
 
 	if !appPort.isWildcardMatch() {
-		if err := t.withRangeMatchField(entry, FieldAppL4Port, appPort.low, appPort.high); err != nil {
+		if err := t.withRangeMatchField(entry, FieldAppL4Port, appPort.Low, appPort.High); err != nil {
 			return nil, err
 		}
 	}
@@ -565,11 +565,11 @@ func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr, sessMeterIdx uint32) 
 		Priority: DefaultPriority,
 	}
 
-	if err := t.withExactMatchField(entry, FieldN3Address, pdr.tunnelIP4Dst); err != nil {
+	if err := t.withExactMatchField(entry, FieldN3Address, pdr.TunnelIP4Dst); err != nil {
 		return nil, err
 	}
 
-	if err := t.withExactMatchField(entry, FieldTEID, pdr.tunnelTEID); err != nil {
+	if err := t.withExactMatchField(entry, FieldTEID, pdr.TunnelTEID); err != nil {
 		return nil, err
 	}
 
@@ -604,7 +604,7 @@ func (t *P4rtTranslator) buildDownlinkSessionsEntry(pdr pdr, sessMeterIdx uint32
 		Priority: DefaultPriority,
 	}
 
-	if err := t.withExactMatchField(entry, FieldUEAddress, pdr.ueAddress); err != nil {
+	if err := t.withExactMatchField(entry, FieldUEAddress, pdr.UeAddress); err != nil {
 		return nil, err
 	}
 
@@ -636,13 +636,13 @@ func (t *P4rtTranslator) buildDownlinkSessionsEntry(pdr pdr, sessMeterIdx uint32
 }
 
 func (t *P4rtTranslator) BuildSessionsTableEntry(pdr pdr, sessionMeter meter, tunnelPeerID uint8, needsBuffering bool) (*p4.TableEntry, error) {
-	switch pdr.srcIface {
+	switch pdr.SrcIface {
 	case access:
 		return t.buildUplinkSessionsEntry(pdr, sessionMeter.uplinkCellID)
 	case core:
 		return t.buildDownlinkSessionsEntry(pdr, sessionMeter.downlinkCellID, tunnelPeerID, needsBuffering)
 	default:
-		return nil, ErrUnsupported("source interface type of PDR", pdr.srcIface)
+		return nil, ErrUnsupported("source interface type of PDR", pdr.SrcIface)
 	}
 }
 
@@ -660,11 +660,11 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, appMeterIdx uint3
 	}
 
 	// QER gating
-	if relatedQER.ulStatus == ie.GateStatusClosed {
+	if relatedQER.UlStatus == ie.GateStatusClosed {
 		shouldDrop = true
 	}
 
-	if err := t.withExactMatchField(entry, FieldUEAddress, pdr.ueAddress); err != nil {
+	if err := t.withExactMatchField(entry, FieldUEAddress, pdr.UeAddress); err != nil {
 		return nil, err
 	}
 
@@ -697,7 +697,7 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, appMeterIdx uint3
 		}
 	}
 
-	if err := t.withActionParam(action, FieldCounterIndex, pdr.ctrID); err != nil {
+	if err := t.withActionParam(action, FieldCounterIndex, pdr.CtrID); err != nil {
 		return nil, err
 	}
 
@@ -726,11 +726,11 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uin
 	}
 
 	shouldDrop := false
-	if relatedFAR.Drops() || relatedQER.dlStatus == ie.GateStatusClosed {
+	if relatedFAR.Drops() || relatedQER.DlStatus == ie.GateStatusClosed {
 		shouldDrop = true
 	}
 
-	if err := t.withExactMatchField(entry, FieldUEAddress, pdr.ueAddress); err != nil {
+	if err := t.withExactMatchField(entry, FieldUEAddress, pdr.UeAddress); err != nil {
 		return nil, err
 	}
 
@@ -748,7 +748,7 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uin
 			ActionId: p4constants.ActionPreQosPipeDownlinkTermFwd,
 		}
 
-		if err := t.withActionParam(action, FieldTEID, relatedFAR.tunnelTEID); err != nil {
+		if err := t.withActionParam(action, FieldTEID, relatedFAR.TunnelTEID); err != nil {
 			return nil, err
 		}
 
@@ -768,7 +768,7 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uin
 			ActionId: p4constants.ActionPreQosPipeDownlinkTermFwdNoTc,
 		}
 
-		if err := t.withActionParam(action, FieldTEID, relatedFAR.tunnelTEID); err != nil {
+		if err := t.withActionParam(action, FieldTEID, relatedFAR.TunnelTEID); err != nil {
 			return nil, err
 		}
 
@@ -781,7 +781,7 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uin
 		}
 	}
 
-	if err := t.withActionParam(action, FieldCounterIndex, pdr.ctrID); err != nil {
+	if err := t.withActionParam(action, FieldCounterIndex, pdr.CtrID); err != nil {
 		return nil, err
 	}
 
@@ -795,13 +795,13 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uin
 }
 
 func (t *P4rtTranslator) BuildTerminationsTableEntry(pdr pdr, appMeter meter, relatedFAR far, internalAppID uint8, qfi uint8, tc uint8, relatedQER qer) (*p4.TableEntry, error) {
-	switch pdr.srcIface {
+	switch pdr.SrcIface {
 	case access:
 		return t.buildUplinkTerminationsEntry(pdr, appMeter.uplinkCellID, relatedFAR.Drops(), internalAppID, tc, relatedQER)
 	case core:
 		return t.buildDownlinkTerminationsEntry(pdr, appMeter.downlinkCellID, relatedFAR, internalAppID, qfi, tc, relatedQER)
 	default:
-		return nil, ErrUnsupported("source interface type of PDR", pdr.srcIface)
+		return nil, ErrUnsupported("source interface type of PDR", pdr.SrcIface)
 	}
 }
 

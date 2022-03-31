@@ -44,18 +44,18 @@ func Test_parsePDR(t *testing.T) {
 				ie.NewQERID(qerID),
 			),
 			expected: &pdr{
-				pdrID:            uint32(pdrID), // go-pfcp uses uint16 to create PDRIDs, while in pfcpiface we use uint32
-				precedence:       precedence,
-				tunnelIP4Dst:     ip2int(N3Address),
-				tunnelIP4DstMask: 0xffffffff, // 32 bit mask
-				srcIface:         access,
-				srcIfaceMask:     0xff,
-				fseID:            FSEID,
-				tunnelTEID:       teid,
-				tunnelTEIDMask:   0xffffffff,
-				farID:            farID,
-				qerIDList:        []uint32{qerID},
-				needDecap:        0x1, // OuterHeaderRemoval IE is present for uplink PDRs
+				PdrID:            uint32(pdrID), // go-pfcp uses uint16 to create PDRIDs, while in pfcpiface we use uint32
+				Precedence:       precedence,
+				TunnelIP4Dst:     ip2int(N3Address),
+				TunnelIP4DstMask: 0xffffffff, // 32 bit mask
+				SrcIface:         access,
+				SrcIfaceMask:     0xff,
+				FseID:            FSEID,
+				TunnelTEID:       teid,
+				TunnelTEIDMask:   0xffffffff,
+				FarID:            farID,
+				QerIDList:        []uint32{qerID},
+				NeedDecap:        0x1, // OuterHeaderRemoval IE is present for uplink PDRs
 			},
 			description: "Valid Uplink Create PDR input",
 		},
@@ -71,16 +71,16 @@ func Test_parsePDR(t *testing.T) {
 				ie.NewQERID(qerID),
 			),
 			expected: &pdr{
-				pdrID:        uint32(pdrID),
-				fseID:        FSEID,
-				farID:        farID,
-				srcIface:     core,
-				srcIfaceMask: 0xff,
-				ueAddress:    ip2int(UEAddress),
-				qerIDList:    []uint32{qerID},
-				appFilter: applicationFilter{
-					dstIPMask: math.MaxUint32,
-					dstIP:     ip2int(UEAddress),
+				PdrID:        uint32(pdrID),
+				FseID:        FSEID,
+				FarID:        farID,
+				SrcIface:     core,
+				SrcIfaceMask: 0xff,
+				UeAddress:    ip2int(UEAddress),
+				QerIDList:    []uint32{qerID},
+				AppFilter: applicationFilter{
+					DstIPMask: math.MaxUint32,
+					DstIP:     ip2int(UEAddress),
 				},
 			},
 			description: "Valid downlink Update PDR input",
@@ -97,16 +97,16 @@ func Test_parsePDR(t *testing.T) {
 				ie.NewQERID(qerID),
 			),
 			expected: &pdr{
-				pdrID:        uint32(pdrID),
-				fseID:        FSEID,
-				farID:        farID,
-				srcIface:     core,
-				srcIfaceMask: 0xff,
-				ueAddress:    ip2int(UEAddress),
-				qerIDList:    []uint32{qerID},
-				appFilter: applicationFilter{
-					dstIPMask: math.MaxUint32,
-					dstIP:     ip2int(UEAddress),
+				PdrID:        uint32(pdrID),
+				FseID:        FSEID,
+				FarID:        farID,
+				SrcIface:     core,
+				SrcIfaceMask: 0xff,
+				UeAddress:    ip2int(UEAddress),
+				QerIDList:    []uint32{qerID},
+				AppFilter: applicationFilter{
+					DstIPMask: math.MaxUint32,
+					DstIP:     ip2int(UEAddress),
 				},
 			},
 			description: "Valid downlink Create PDR input",
@@ -145,8 +145,8 @@ func TestParsePDRShouldError(t *testing.T) {
 				ie.NewFARID(2),
 			),
 			expected: &pdr{
-				qerIDList: []uint32{},
-				fseID:     FSEID,
+				QerIDList: []uint32{},
+				FseID:     FSEID,
 			},
 			description: "Malformed Uplink PDR input without PDR ID",
 		},
@@ -334,8 +334,8 @@ func Test_portRange_isWildcardMatch(t *testing.T) {
 	}{
 		// TODO: Add test cases.
 		{name: "foo", pr: portRange{
-			low:  0,
-			high: 0,
+			Low:  0,
+			High: 0,
 		}, want: true},
 	}
 
@@ -371,8 +371,8 @@ func Test_portRange_asComplexTernaryMatches(t *testing.T) {
 	}{
 		{name: "Exact match port range",
 			pr: portRange{
-				low:  8888,
-				high: 8888,
+				Low:  8888,
+				High: 8888,
 			},
 			want: []portRangeTernaryRule{
 				{port: 8888, mask: 0xffff},
@@ -380,8 +380,8 @@ func Test_portRange_asComplexTernaryMatches(t *testing.T) {
 			wantErr: false},
 		{name: "wildcard port range",
 			pr: portRange{
-				low:  0,
-				high: math.MaxUint16,
+				Low:  0,
+				High: math.MaxUint16,
 			},
 			want: []portRangeTernaryRule{
 				{port: 0, mask: 0},
@@ -389,8 +389,8 @@ func Test_portRange_asComplexTernaryMatches(t *testing.T) {
 			wantErr: false},
 		{name: "Simplest port range",
 			pr: portRange{
-				low:  0b0, // 0
-				high: 0b1, // 1
+				Low:  0b0, // 0
+				High: 0b1, // 1
 			},
 			//want: []portRangeTernaryRule{
 			//	{port: 0b0, mask: 0xfffe},
@@ -398,8 +398,8 @@ func Test_portRange_asComplexTernaryMatches(t *testing.T) {
 			wantErr: false},
 		{name: "Simplest port range2",
 			pr: portRange{
-				low:  0b01, // 1
-				high: 0b10, // 2
+				Low:  0b01, // 1
+				High: 0b10, // 2
 			},
 			//want: []portRangeTernaryRule{
 			//	{port: 0b01, mask: 0xffff},
@@ -408,8 +408,8 @@ func Test_portRange_asComplexTernaryMatches(t *testing.T) {
 			wantErr: false},
 		{name: "Trivial ternary port range",
 			pr: portRange{
-				low:  0x0100, // 256
-				high: 0x01ff, // 511
+				Low:  0x0100, // 256
+				High: 0x01ff, // 511
 			},
 			strategy: Ternary,
 			//want: []portRangeTernaryRule{
@@ -418,8 +418,8 @@ func Test_portRange_asComplexTernaryMatches(t *testing.T) {
 			wantErr: false},
 		{name: "one to three range",
 			pr: portRange{
-				low:  0b01, // 1
-				high: 0b11, // 3
+				Low:  0b01, // 1
+				High: 0b11, // 3
 			},
 			//want: []portRangeTernaryRule{
 			//	{port: 0b01, mask: 0xffff},
@@ -428,28 +428,28 @@ func Test_portRange_asComplexTernaryMatches(t *testing.T) {
 			wantErr: false},
 		{name: "True port range",
 			pr: portRange{
-				low:  0b00010, //  2
-				high: 0b11101, // 29
+				Low:  0b00010, //  2
+				High: 0b11101, // 29
 			},
 			wantErr: false},
 		{name: "Worst case port range",
 			pr: portRange{
-				low:  1,
-				high: 65534,
+				Low:  1,
+				High: 65534,
 			},
 			strategy: Ternary,
 			wantErr:  false},
 		{name: "low port filter",
 			pr: portRange{
-				low:  0,
-				high: 1023,
+				Low:  0,
+				High: 1023,
 			},
 			strategy: Ternary,
 			wantErr:  false},
 		{name: "some small app filter",
 			pr: portRange{
-				low:  8080,
-				high: 8084,
+				Low:  8080,
+				High: 8084,
 			},
 			wantErr: false},
 	}
@@ -466,7 +466,7 @@ func Test_portRange_asComplexTernaryMatches(t *testing.T) {
 				}
 				// Do exhaustive test over entire value range.
 				for port := 0; port <= math.MaxUint16; port++ {
-					expectMatch := port >= int(tt.pr.low) && port <= int(tt.pr.high)
+					expectMatch := port >= int(tt.pr.Low) && port <= int(tt.pr.High)
 					if matchesTernary(uint16(port), got) != expectMatch {
 						mod := " "
 						if !expectMatch {
@@ -489,16 +489,16 @@ func Test_portRange_asTrivialTernaryMatch(t *testing.T) {
 		wantErr  bool
 	}{
 		{name: "Wildcard range", pr: portRange{
-			low:  0,
-			high: 0,
+			Low:  0,
+			High: 0,
 		}, wantPort: 0, wantMask: 0, wantErr: false},
 		{name: "Exact match range", pr: portRange{
-			low:  100,
-			high: 100,
+			Low:  100,
+			High: 100,
 		}, wantPort: 100, wantMask: 0xffff, wantErr: false},
 		{name: "True range match fail", pr: portRange{
-			low:  100,
-			high: 200,
+			Low:  100,
+			High: 200,
 		}, wantPort: 0, wantMask: 0, wantErr: true},
 		// TODO: Add test cases.
 	}
@@ -564,14 +564,14 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 			sdfIE:     newFilter("permit out udp from 192.168.1.1/32 to assigned 80-400"),
 			direction: core,
 			wantAppFilter: applicationFilter{
-				srcIP:        ip2int(net.ParseIP("192.168.1.1")),
-				dstIP:        ip2int(net.ParseIP(ueAddress)),
-				srcPortRange: newRangeMatchPortRange(80, 400),
-				dstPortRange: newWildcardPortRange(),
-				proto:        17,
-				srcIPMask:    math.MaxUint32,
-				dstIPMask:    math.MaxUint32,
-				protoMask:    math.MaxUint8,
+				SrcIP:        ip2int(net.ParseIP("192.168.1.1")),
+				DstIP:        ip2int(net.ParseIP(ueAddress)),
+				SrcPortRange: newRangeMatchPortRange(80, 400),
+				DstPortRange: newWildcardPortRange(),
+				Proto:        17,
+				SrcIPMask:    math.MaxUint32,
+				DstIPMask:    math.MaxUint32,
+				ProtoMask:    math.MaxUint8,
 			},
 			wantErr: false,
 		},
@@ -580,14 +580,14 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 			sdfIE:     newFilter("permit out udp from 192.168.1.1/32 to assigned 80-400"),
 			direction: access,
 			wantAppFilter: applicationFilter{
-				srcIP:        ip2int(net.ParseIP(ueAddress)),
-				dstIP:        ip2int(net.ParseIP("192.168.1.1")),
-				srcPortRange: newWildcardPortRange(),
-				dstPortRange: newRangeMatchPortRange(80, 400),
-				proto:        17,
-				srcIPMask:    math.MaxUint32,
-				dstIPMask:    math.MaxUint32,
-				protoMask:    math.MaxUint8,
+				SrcIP:        ip2int(net.ParseIP(ueAddress)),
+				DstIP:        ip2int(net.ParseIP("192.168.1.1")),
+				SrcPortRange: newWildcardPortRange(),
+				DstPortRange: newRangeMatchPortRange(80, 400),
+				Proto:        17,
+				SrcIPMask:    math.MaxUint32,
+				DstIPMask:    math.MaxUint32,
+				ProtoMask:    math.MaxUint8,
 			},
 			wantErr: false,
 		},
@@ -596,14 +596,14 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 			sdfIE:     newFilter("permit out udp from 192.168.1.1/32 80-400 to assigned"),
 			direction: core,
 			wantAppFilter: applicationFilter{
-				srcIP:        ip2int(net.ParseIP("192.168.1.1")),
-				dstIP:        ip2int(net.ParseIP(ueAddress)),
-				srcPortRange: newRangeMatchPortRange(80, 400),
-				dstPortRange: newWildcardPortRange(),
-				proto:        17,
-				srcIPMask:    math.MaxUint32,
-				dstIPMask:    math.MaxUint32,
-				protoMask:    math.MaxUint8,
+				SrcIP:        ip2int(net.ParseIP("192.168.1.1")),
+				DstIP:        ip2int(net.ParseIP(ueAddress)),
+				SrcPortRange: newRangeMatchPortRange(80, 400),
+				DstPortRange: newWildcardPortRange(),
+				Proto:        17,
+				SrcIPMask:    math.MaxUint32,
+				DstIPMask:    math.MaxUint32,
+				ProtoMask:    math.MaxUint8,
 			},
 			wantErr: false,
 		},
@@ -612,14 +612,14 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 			sdfIE:     newFilter("permit out udp from 192.168.1.1/32 80-400 to assigned"),
 			direction: access,
 			wantAppFilter: applicationFilter{
-				srcIP:        ip2int(net.ParseIP(ueAddress)),
-				dstIP:        ip2int(net.ParseIP("192.168.1.1")),
-				srcPortRange: newWildcardPortRange(),
-				dstPortRange: newRangeMatchPortRange(80, 400),
-				proto:        17,
-				srcIPMask:    math.MaxUint32,
-				dstIPMask:    math.MaxUint32,
-				protoMask:    math.MaxUint8,
+				SrcIP:        ip2int(net.ParseIP(ueAddress)),
+				DstIP:        ip2int(net.ParseIP("192.168.1.1")),
+				SrcPortRange: newWildcardPortRange(),
+				DstPortRange: newRangeMatchPortRange(80, 400),
+				Proto:        17,
+				SrcIPMask:    math.MaxUint32,
+				DstIPMask:    math.MaxUint32,
+				ProtoMask:    math.MaxUint8,
 			},
 			wantErr: false,
 		},
@@ -637,15 +637,15 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := &pdr{
-				ueAddress: ip2int(net.ParseIP("17.0.0.1")),
-				srcIface:  tt.direction,
+				UeAddress: ip2int(net.ParseIP("17.0.0.1")),
+				SrcIface:  tt.direction,
 			}
 			if err := p.parseSDFFilter(tt.sdfIE); (err != nil) != tt.wantErr {
 				t.Errorf("parseSDFFilter() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
 			if !tt.wantErr {
-				require.Equal(t, tt.wantAppFilter, p.appFilter)
+				require.Equal(t, tt.wantAppFilter, p.AppFilter)
 			}
 		})
 	}
@@ -676,12 +676,12 @@ func Test_pdr_parsePDI(t *testing.T) {
 				},
 			},
 			wantPDR: pdr{
-				srcIface:     access,
-				srcIfaceMask: math.MaxUint8,
-				ueAddress:    ip2int(net.ParseIP(ueAddress)),
-				appFilter: applicationFilter{
-					srcIP:     ip2int(net.ParseIP(ueAddress)),
-					srcIPMask: math.MaxUint32,
+				SrcIface:     access,
+				SrcIfaceMask: math.MaxUint8,
+				UeAddress:    ip2int(net.ParseIP(ueAddress)),
+				AppFilter: applicationFilter{
+					SrcIP:     ip2int(net.ParseIP(ueAddress)),
+					SrcIPMask: math.MaxUint32,
 				},
 			},
 			wantErr: false,
@@ -695,12 +695,12 @@ func Test_pdr_parsePDI(t *testing.T) {
 				},
 			},
 			wantPDR: pdr{
-				srcIface:     core,
-				srcIfaceMask: math.MaxUint8,
-				ueAddress:    ip2int(net.ParseIP(ueAddress)),
-				appFilter: applicationFilter{
-					dstIP:     ip2int(net.ParseIP(ueAddress)),
-					dstIPMask: math.MaxUint32,
+				SrcIface:     core,
+				SrcIfaceMask: math.MaxUint8,
+				UeAddress:    ip2int(net.ParseIP(ueAddress)),
+				AppFilter: applicationFilter{
+					DstIP:     ip2int(net.ParseIP(ueAddress)),
+					DstIPMask: math.MaxUint32,
 				},
 			},
 			wantErr: false,

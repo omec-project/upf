@@ -29,9 +29,9 @@ func TestParseQER(t *testing.T) {
 				WithMethod(pfcpsimLib.IEMethod(create)).
 				WithQFI(0x09).Build(),
 			expected: &qer{
-				qerID: 999,
-				qfi:   0x09,
-				fseID: FSEID,
+				QerID: 999,
+				Qfi:   0x09,
+				FseID: FSEID,
 			},
 			description: "Valid Create QER input",
 		},
@@ -41,9 +41,9 @@ func TestParseQER(t *testing.T) {
 				WithMethod(pfcpsimLib.IEMethod(update)).
 				WithQFI(0x09).Build(),
 			expected: &qer{
-				qerID: 999,
-				qfi:   0x09,
-				fseID: FSEID,
+				QerID: 999,
+				Qfi:   0x09,
+				FseID: FSEID,
 			},
 			description: "Valid Update QER input",
 		},

@@ -92,163 +92,163 @@ func (u *upf) sim(mode simMode, s *SimModeInfo) {
 
 		// create/delete downlink pdr
 		pdrN6Down := pdr{
-			srcIface: core,
-			appFilter: applicationFilter{
-				dstIP:     ip2int(ueip) + i,
-				dstIPMask: 0xFFFFFFFF,
+			SrcIface: core,
+			AppFilter: applicationFilter{
+				DstIP:     ip2int(ueip) + i,
+				DstIPMask: 0xFFFFFFFF,
 			},
 
-			srcIfaceMask: 0xFF,
+			SrcIfaceMask: 0xFF,
 
-			precedence: 255,
+			Precedence: 255,
 
-			pdrID:     1,
-			fseID:     uint64(n3TEID + i),
-			ctrID:     i,
-			farID:     n3,
-			qerIDList: []uint32{n6, 1},
-			needDecap: 0,
+			PdrID:     1,
+			FseID:     uint64(n3TEID + i),
+			CtrID:     i,
+			FarID:     n3,
+			QerIDList: []uint32{n6, 1},
+			NeedDecap: 0,
 		}
 
 		pdrN9Down := pdr{
-			srcIface:     core,
-			tunnelTEID:   n9TEID + i,
-			tunnelIP4Dst: ip2int(u.coreIP),
+			SrcIface:     core,
+			TunnelTEID:   n9TEID + i,
+			TunnelIP4Dst: ip2int(u.coreIP),
 
-			srcIfaceMask:     0xFF,
-			tunnelTEIDMask:   0xFFFFFFFF,
-			tunnelIP4DstMask: 0xFFFFFFFF,
+			SrcIfaceMask:     0xFF,
+			TunnelTEIDMask:   0xFFFFFFFF,
+			TunnelIP4DstMask: 0xFFFFFFFF,
 
-			precedence: 1,
+			Precedence: 1,
 
-			pdrID:     2,
-			fseID:     uint64(n3TEID + i),
-			ctrID:     i,
-			farID:     n3,
-			qerIDList: []uint32{n9, 1},
-			needDecap: 1,
+			PdrID:     2,
+			FseID:     uint64(n3TEID + i),
+			CtrID:     i,
+			FarID:     n3,
+			QerIDList: []uint32{n9, 1},
+			NeedDecap: 1,
 		}
 
 		// create/delete uplink pdr
 		pdrN6Up := pdr{
-			srcIface:     access,
-			tunnelIP4Dst: ip2int(u.accessIP),
-			tunnelTEID:   n3TEID + i,
-			appFilter: applicationFilter{
-				srcIP:     ip2int(ueip) + i,
-				srcIPMask: 0xFFFFFFFF,
+			SrcIface:     access,
+			TunnelIP4Dst: ip2int(u.accessIP),
+			TunnelTEID:   n3TEID + i,
+			AppFilter: applicationFilter{
+				SrcIP:     ip2int(ueip) + i,
+				SrcIPMask: 0xFFFFFFFF,
 			},
 
-			srcIfaceMask:     0xFF,
-			tunnelIP4DstMask: 0xFFFFFFFF,
-			tunnelTEIDMask:   0xFFFFFFFF,
+			SrcIfaceMask:     0xFF,
+			TunnelIP4DstMask: 0xFFFFFFFF,
+			TunnelTEIDMask:   0xFFFFFFFF,
 
-			precedence: 255,
+			Precedence: 255,
 
-			pdrID:     3,
-			fseID:     uint64(n3TEID + i),
-			ctrID:     i,
-			farID:     n6,
-			qerIDList: []uint32{n6, 1},
-			needDecap: 1,
+			PdrID:     3,
+			FseID:     uint64(n3TEID + i),
+			CtrID:     i,
+			FarID:     n6,
+			QerIDList: []uint32{n6, 1},
+			NeedDecap: 1,
 		}
 
 		pdrN9Up := pdr{
-			srcIface:     access,
-			tunnelIP4Dst: ip2int(u.accessIP),
-			tunnelTEID:   n3TEID + i,
-			appFilter: applicationFilter{
-				dstIP:     ip2int(n9appip),
-				dstIPMask: 0xFFFFFFFF,
+			SrcIface:     access,
+			TunnelIP4Dst: ip2int(u.accessIP),
+			TunnelTEID:   n3TEID + i,
+			AppFilter: applicationFilter{
+				DstIP:     ip2int(n9appip),
+				DstIPMask: 0xFFFFFFFF,
 			},
 
-			srcIfaceMask:     0xFF,
-			tunnelIP4DstMask: 0xFFFFFFFF,
-			tunnelTEIDMask:   0xFFFFFFFF,
+			SrcIfaceMask:     0xFF,
+			TunnelIP4DstMask: 0xFFFFFFFF,
+			TunnelTEIDMask:   0xFFFFFFFF,
 
-			precedence: 1,
+			Precedence: 1,
 
-			pdrID:     4,
-			fseID:     uint64(n3TEID + i),
-			ctrID:     i,
-			farID:     n9,
-			qerIDList: []uint32{n9, 1},
-			needDecap: 1,
+			PdrID:     4,
+			FseID:     uint64(n3TEID + i),
+			CtrID:     i,
+			FarID:     n9,
+			QerIDList: []uint32{n9, 1},
+			NeedDecap: 1,
 		}
 
 		pdrs := []pdr{pdrN6Down, pdrN9Down, pdrN6Up, pdrN9Up}
 
 		// create/delete downlink far
 		farDown := far{
-			farID: n3,
-			fseID: uint64(n3TEID + i),
+			FarID: n3,
+			FseID: uint64(n3TEID + i),
 
-			applyAction:  ActionForward,
-			dstIntf:      ie.DstInterfaceAccess,
-			tunnelType:   0x1,
-			tunnelIP4Src: ip2int(u.accessIP),
-			tunnelIP4Dst: ip2int(enbip) + enbIdx,
-			tunnelTEID:   n3TEID + i,
-			tunnelPort:   tunnelGTPUPort,
+			ApplyAction:  ActionForward,
+			DstIntf:      ie.DstInterfaceAccess,
+			TunnelType:   0x1,
+			TunnelIP4Src: ip2int(u.accessIP),
+			TunnelIP4Dst: ip2int(enbip) + enbIdx,
+			TunnelTEID:   n3TEID + i,
+			TunnelPort:   tunnelGTPUPort,
 		}
 
 		// create/delete uplink far
 		farN6Up := far{
-			farID: n6,
-			fseID: uint64(n3TEID + i),
+			FarID: n6,
+			FseID: uint64(n3TEID + i),
 
-			applyAction: ActionForward,
-			dstIntf:     ie.DstInterfaceCore,
+			ApplyAction: ActionForward,
+			DstIntf:     ie.DstInterfaceCore,
 		}
 
 		farN9Up := far{
-			farID: n9,
-			fseID: uint64(n3TEID + i),
+			FarID: n9,
+			FseID: uint64(n3TEID + i),
 
-			applyAction:  ActionForward,
-			dstIntf:      ie.DstInterfaceCore,
-			tunnelType:   0x1,
-			tunnelIP4Src: ip2int(u.coreIP),
-			tunnelIP4Dst: ip2int(aupfip),
-			tunnelTEID:   n9TEID + i,
-			tunnelPort:   tunnelGTPUPort,
+			ApplyAction:  ActionForward,
+			DstIntf:      ie.DstInterfaceCore,
+			TunnelType:   0x1,
+			TunnelIP4Src: ip2int(u.coreIP),
+			TunnelIP4Dst: ip2int(aupfip),
+			TunnelTEID:   n9TEID + i,
+			TunnelPort:   tunnelGTPUPort,
 		}
 
 		fars := []far{farDown, farN6Up, farN9Up}
 
 		// create/delete uplink qer
 		qerN6 := qer{
-			qerID: n6,
-			fseID: uint64(n3TEID + i),
-			qfi:   9,
-			ulGbr: 50000,
-			ulMbr: 90000,
-			dlGbr: 60000,
-			dlMbr: 80000,
+			QerID: n6,
+			FseID: uint64(n3TEID + i),
+			Qfi:   9,
+			UlGbr: 50000,
+			UlMbr: 90000,
+			DlGbr: 60000,
+			DlMbr: 80000,
 		}
 
 		qerN9 := qer{
-			qerID: n9,
-			fseID: uint64(n3TEID + i),
-			qfi:   8,
-			ulGbr: 50000,
-			ulMbr: 60000,
-			dlGbr: 70000,
-			dlMbr: 90000,
+			QerID: n9,
+			FseID: uint64(n3TEID + i),
+			Qfi:   8,
+			UlGbr: 50000,
+			UlMbr: 60000,
+			DlGbr: 70000,
+			DlMbr: 90000,
 		}
 
 		qers := []qer{qerN6, qerN9}
 
 		// create/delete session qers
 		sessionQer := qer{
-			qerID:    1,
-			fseID:    uint64(n3TEID + i),
-			qosLevel: SessionQos,
-			qfi:      0,
-			ulGbr:    0,
-			ulMbr:    100000,
-			dlGbr:    0,
-			dlMbr:    500000,
+			QerID:    1,
+			FseID:    uint64(n3TEID + i),
+			QosLevel: SessionQos,
+			Qfi:      0,
+			UlGbr:    0,
+			UlMbr:    100000,
+			DlGbr:    0,
+			DlMbr:    500000,
 		}
 
 		qers = append(qers, sessionQer)

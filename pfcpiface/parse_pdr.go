@@ -17,24 +17,24 @@ import (
 // portRange encapsulates a L4 port range as seen in PDRs. A zero value portRange represents
 // a wildcard match, but use of the dedicated new*PortRange() functions is encouraged.
 type portRange struct {
-	low  uint16
-	high uint16
+	Low  uint16
+	High uint16
 }
 
 // newWildcardPortRange returns a portRange that matches on every possible port, i.e., implements
 // no filtering.
 func newWildcardPortRange() portRange {
 	return portRange{
-		low:  0,
-		high: math.MaxUint16,
+		Low:  0,
+		High: math.MaxUint16,
 	}
 }
 
 // newExactMatchPortRange returns a portRange that matches on exactly the given port.
 func newExactMatchPortRange(port uint16) portRange {
 	return portRange{
-		low:  port,
-		high: port,
+		Low:  port,
+		High: port,
 	}
 }
 
@@ -47,13 +47,13 @@ func newRangeMatchPortRange(low, high uint16) portRange {
 	}
 
 	return portRange{
-		low:  low,
-		high: high,
+		Low:  low,
+		High: high,
 	}
 }
 
 func (pr portRange) String() string {
-	return fmt.Sprintf("{%v-%v}", pr.low, pr.high)
+	return fmt.Sprintf("{%v-%v}", pr.Low, pr.High)
 }
 
 // Width returns the number of ports covered by this portRange.
@@ -62,17 +62,17 @@ func (pr portRange) Width() uint16 {
 	if pr.isWildcardMatch() {
 		return math.MaxUint16
 	} else {
-		return pr.high - pr.low + 1
+		return pr.High - pr.Low + 1
 	}
 }
 
 func (pr portRange) isWildcardMatch() bool {
-	return pr.low == 0 && pr.high == math.MaxUint16 ||
-		pr.low == 0 && pr.high == 0
+	return pr.Low == 0 && pr.High == math.MaxUint16 ||
+		pr.Low == 0 && pr.High == 0
 }
 
 func (pr portRange) isExactMatch() bool {
-	return pr.low == pr.high && pr.high != 0
+	return pr.Low == pr.High && pr.High != 0
 }
 
 func (pr portRange) isRangeMatch() bool {
@@ -82,7 +82,7 @@ func (pr portRange) isRangeMatch() bool {
 // Returns portRange as an exact match, without checking if it is one. isExactMatch() must be true
 // before calling asExactMatchUnchecked.
 func (pr portRange) asExactMatchUnchecked() portRangeTernaryRule {
-	return portRangeTernaryRule{port: pr.low, mask: math.MaxUint16}
+	return portRangeTernaryRule{port: pr.Low, mask: math.MaxUint16}
 }
 
 // Return portRange as a trivial, single value and mask, ternary match. Will fail if conversion is
@@ -125,7 +125,7 @@ func (pr portRange) asComplexTernaryMatches(strategy RangeConversionStrategy) ([
 				"port range too wide for exact match strategy")
 		}
 
-		for port := int(pr.low); port <= int(pr.high); port++ {
+		for port := int(pr.Low); port <= int(pr.High); port++ {
 			rules = append(rules, portRangeTernaryRule{uint16(port), math.MaxUint16})
 		}
 	} else if strategy == Ternary {
@@ -159,9 +159,9 @@ func (pr portRange) asComplexTernaryMatches(strategy RangeConversionStrategy) ([
 			return mask
 		}
 
-		port := uint32(pr.low) // Promote to higher bit width for greater-equals check.
-		for port <= uint32(pr.high) {
-			mask := portMask(uint16(port), pr.high)
+		port := uint32(pr.Low) // Promote to higher bit width for greater-equals check.
+		for port <= uint32(pr.High) {
+			mask := portMask(uint16(port), pr.High)
 			rules = append(rules, portRangeTernaryRule{uint16(port), mask})
 			port = uint32(maxPort(uint16(port), mask)) + 1
 		}
@@ -257,38 +257,38 @@ func CreatePortRangeCartesianProduct(src, dst portRange) ([]portRangeTernaryCart
 }
 
 type applicationFilter struct {
-	srcIP        uint32
-	dstIP        uint32
-	srcPortRange portRange
-	dstPortRange portRange
-	proto        uint8
+	SrcIP        uint32
+	DstIP        uint32
+	SrcPortRange portRange
+	DstPortRange portRange
+	Proto        uint8
 
-	srcIPMask uint32
-	dstIPMask uint32
-	protoMask uint8
+	SrcIPMask uint32
+	DstIPMask uint32
+	ProtoMask uint8
 }
 
 type pdr struct {
-	srcIface     uint8
-	tunnelIP4Dst uint32
-	tunnelTEID   uint32
-	ueAddress    uint32
+	SrcIface     uint8
+	TunnelIP4Dst uint32
+	TunnelTEID   uint32
+	UeAddress    uint32
 
-	srcIfaceMask     uint8
-	tunnelIP4DstMask uint32
-	tunnelTEIDMask   uint32
+	SrcIfaceMask     uint8
+	TunnelIP4DstMask uint32
+	TunnelTEIDMask   uint32
 
-	appFilter applicationFilter
+	AppFilter applicationFilter
 
-	precedence  uint32
-	pdrID       uint32
-	fseID       uint64
-	fseidIP     uint32
-	ctrID       uint32
-	farID       uint32
-	qerIDList   []uint32
-	needDecap   uint8
-	allocIPFlag bool
+	Precedence  uint32
+	PdrID       uint32
+	FseID       uint64
+	FseidIP     uint32
+	CtrID       uint32
+	FarID       uint32
+	QerIDList   []uint32
+	NeedDecap   uint8
+	AllocIPFlag bool
 }
 
 func needAllocIP(ueIPaddr *ie.UEIPAddressFields) bool {
@@ -301,31 +301,31 @@ func needAllocIP(ueIPaddr *ie.UEIPAddressFields) bool {
 
 func (af applicationFilter) String() string {
 	return fmt.Sprintf("ApplicationFilter(srcIP=%v/%x, dstIP=%v/%x, proto=%v/%x, srcPort=%v, dstPort=%v)",
-		int2ip(af.srcIP), af.srcIPMask, int2ip(af.dstIP), af.dstIPMask, af.proto,
-		af.protoMask, af.srcPortRange, af.dstPortRange)
+		int2ip(af.SrcIP), af.SrcIPMask, int2ip(af.DstIP), af.DstIPMask, af.Proto,
+		af.ProtoMask, af.SrcPortRange, af.DstPortRange)
 }
 
 func (p pdr) String() string {
-	return fmt.Sprintf("PDR(id=%v, F-SEID=%v, srcIface=%v, tunnelIPv4Dst=%v/%x, "+
-		"tunnelTEID=%v/%x, ueAddress=%v, applicationFilter=%v, precedence=%v, F-SEID IP=%v, "+
-		"counterID=%v, farID=%v, qerIDs=%v, needDecap=%v, allocIPFlag=%v)",
-		p.pdrID, p.fseID, p.srcIface, int2ip(p.tunnelIP4Dst), p.tunnelIP4DstMask,
-		p.tunnelTEID, p.tunnelTEIDMask, int2ip(p.ueAddress), p.appFilter, p.precedence,
-		p.fseidIP, p.ctrID, p.farID, p.qerIDList, p.needDecap, p.allocIPFlag)
+	return fmt.Sprintf("PDR(id=%v, F-SEID=%v, SrcIface=%v, tunnelIPv4Dst=%v/%x, "+
+		"tunnelTEID=%v/%x, UeAddress=%v, applicationFilter=%v, precedence=%v, F-SEID IP=%v, "+
+		"counterID=%v, farID=%v, qerIDs=%v, needDecap=%v, AllocIPFlag=%v)",
+		p.PdrID, p.FseID, p.SrcIface, int2ip(p.TunnelIP4Dst), p.TunnelIP4DstMask,
+		p.TunnelTEID, p.TunnelTEIDMask, int2ip(p.UeAddress), p.AppFilter, p.Precedence,
+		p.FseidIP, p.CtrID, p.FarID, p.QerIDList, p.NeedDecap, p.AllocIPFlag)
 }
 
 func (p pdr) IsAppFilterEmpty() bool {
-	return p.appFilter.proto == 0 &&
-		((p.IsUplink() && p.appFilter.dstIP == 0 && p.appFilter.dstPortRange.isWildcardMatch()) ||
-			(p.IsDownlink() && p.appFilter.srcIP == 0 && p.appFilter.srcPortRange.isWildcardMatch()))
+	return p.AppFilter.Proto == 0 &&
+		((p.IsUplink() && p.AppFilter.DstIP == 0 && p.AppFilter.DstPortRange.isWildcardMatch()) ||
+			(p.IsDownlink() && p.AppFilter.SrcIP == 0 && p.AppFilter.SrcPortRange.isWildcardMatch()))
 }
 
 func (p pdr) IsUplink() bool {
-	return p.srcIface == access
+	return p.SrcIface == access
 }
 
 func (p pdr) IsDownlink() bool {
-	return p.srcIface == core
+	return p.SrcIface == core
 }
 
 func (p *pdr) parseUEAddressIE(ueAddrIE *ie.IE, ippool *IPPool) error {
@@ -338,9 +338,9 @@ func (p *pdr) parseUEAddressIE(ueAddrIE *ie.IE, ippool *IPPool) error {
 
 	if needAllocIP(ueIPaddr) {
 		/* alloc IPV6 if CHV6 is enabled : TBD */
-		log.Infof("UPF should alloc UE IP for SEID %v. CHV4 flag set", p.fseID)
+		log.Infof("UPF should alloc UE IP for SEID %v. CHV4 flag set", p.FseID)
 
-		ueIP4, err = ippool.LookupOrAllocIP(p.fseID)
+		ueIP4, err = ippool.LookupOrAllocIP(p.FseID)
 		if err != nil {
 			log.Errorln("failed to allocate UE IP")
 			return err
@@ -348,7 +348,7 @@ func (p *pdr) parseUEAddressIE(ueAddrIE *ie.IE, ippool *IPPool) error {
 
 		log.Traceln("Found or allocated new IP", ueIP4, "from pool", ippool)
 
-		p.allocIPFlag = true
+		p.AllocIPFlag = true
 	} else {
 		ueIP4 = ueIPaddr.IPv4Address
 	}
@@ -359,7 +359,7 @@ func (p *pdr) parseUEAddressIE(ueAddrIE *ie.IE, ippool *IPPool) error {
 			"IP address length", len(ueIP4))
 	}
 
-	p.ueAddress = ip2int(ueIP4)
+	p.UeAddress = ip2int(ueIP4)
 
 	return nil
 }
@@ -373,11 +373,11 @@ func (p *pdr) parseSourceInterfaceIE(srcIfaceIE *ie.IE) error {
 	if srcIface == ie.SrcInterfaceCPFunction {
 		return ErrUnsupported("Source Interface CP Function", srcIface)
 	} else if srcIface == ie.SrcInterfaceAccess {
-		p.srcIface = access
-		p.srcIfaceMask = 0xFF
+		p.SrcIface = access
+		p.SrcIfaceMask = 0xFF
 	} else if srcIface == ie.SrcInterfaceCore {
-		p.srcIface = core
-		p.srcIfaceMask = 0xFF
+		p.SrcIface = core
+		p.SrcIfaceMask = 0xFF
 	}
 
 	return nil
@@ -393,10 +393,10 @@ func (p *pdr) parseFTEID(teidIE *ie.IE) error {
 	tunnelIPv4Address := fteid.IPv4Address
 
 	if teid != 0 {
-		p.tunnelTEID = teid
-		p.tunnelTEIDMask = 0xFFFFFFFF
-		p.tunnelIP4Dst = ip2int(tunnelIPv4Address)
-		p.tunnelIP4DstMask = 0xFFFFFFFF
+		p.TunnelTEID = teid
+		p.TunnelTEIDMask = 0xFFFFFFFF
+		p.TunnelIP4Dst = ip2int(tunnelIPv4Address)
+		p.TunnelIP4DstMask = 0xFFFFFFFF
 	}
 
 	return nil
@@ -424,26 +424,26 @@ func (p *pdr) parseApplicationID(ie *ie.IE, appPFDs map[string]appPFD) error {
 		})
 		logger.Debug("Parsing flow description of Application ID IE")
 
-		ipf, err := parseFlowDesc(flowDesc, int2ip(p.ueAddress).String())
+		ipf, err := parseFlowDesc(flowDesc, int2ip(p.UeAddress).String())
 		if err != nil {
 			return errBadFilterDesc
 		}
 
-		if (p.srcIface == access && ipf.direction == "out") ||
-			(p.srcIface == core && ipf.direction == "in") {
+		if (p.SrcIface == access && ipf.direction == "out") ||
+			(p.SrcIface == core && ipf.direction == "in") {
 			logger.Debug("Found a matching flow description")
 
 			if ipf.proto != reservedProto {
-				p.appFilter.proto = ipf.proto
-				p.appFilter.protoMask = math.MaxUint8
+				p.AppFilter.Proto = ipf.proto
+				p.AppFilter.ProtoMask = math.MaxUint8
 			}
 			// TODO: Verify assumption that flow description in case of PFD is to be taken as-is
-			p.appFilter.dstIP = ip2int(ipf.dst.IPNet.IP)
-			p.appFilter.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
-			p.appFilter.srcIP = ip2int(ipf.src.IPNet.IP)
-			p.appFilter.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
-			p.appFilter.dstPortRange = ipf.dst.ports
-			p.appFilter.srcPortRange = ipf.src.ports
+			p.AppFilter.DstIP = ip2int(ipf.dst.IPNet.IP)
+			p.AppFilter.DstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
+			p.AppFilter.SrcIP = ip2int(ipf.src.IPNet.IP)
+			p.AppFilter.SrcIPMask = ipMask2int(ipf.src.IPNet.Mask)
+			p.AppFilter.DstPortRange = ipf.dst.ports
+			p.AppFilter.SrcPortRange = ipf.src.ports
 
 			return nil
 		}
@@ -467,44 +467,44 @@ func (p *pdr) parseSDFFilter(ie *ie.IE) error {
 		"Flow Description": flowDesc,
 	}).Debug("Parsing Flow Description from SDF Filter")
 
-	ipf, err := parseFlowDesc(flowDesc, int2ip(p.ueAddress).String())
+	ipf, err := parseFlowDesc(flowDesc, int2ip(p.UeAddress).String())
 	if err != nil {
 		return errBadFilterDesc
 	}
 
 	if ipf.proto != reservedProto {
-		p.appFilter.proto = ipf.proto
-		p.appFilter.protoMask = math.MaxUint8
+		p.AppFilter.Proto = ipf.proto
+		p.AppFilter.ProtoMask = math.MaxUint8
 	}
 
-	if p.srcIface == core {
-		p.appFilter.dstIP = ip2int(ipf.dst.IPNet.IP)
-		p.appFilter.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
-		p.appFilter.srcIP = ip2int(ipf.src.IPNet.IP)
-		p.appFilter.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
-		p.appFilter.dstPortRange = ipf.dst.ports
-		p.appFilter.srcPortRange = ipf.src.ports
+	if p.SrcIface == core {
+		p.AppFilter.DstIP = ip2int(ipf.dst.IPNet.IP)
+		p.AppFilter.DstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
+		p.AppFilter.SrcIP = ip2int(ipf.src.IPNet.IP)
+		p.AppFilter.SrcIPMask = ipMask2int(ipf.src.IPNet.Mask)
+		p.AppFilter.DstPortRange = ipf.dst.ports
+		p.AppFilter.SrcPortRange = ipf.src.ports
 
 		// FIXME: temporary workaround for SDF Filter,
 		//  remove once we meet spec compliance
-		if !p.appFilter.dstPortRange.isWildcardMatch() {
-			p.appFilter.srcPortRange = p.appFilter.dstPortRange
-			p.appFilter.dstPortRange = newWildcardPortRange()
+		if !p.AppFilter.DstPortRange.isWildcardMatch() {
+			p.AppFilter.SrcPortRange = p.AppFilter.DstPortRange
+			p.AppFilter.DstPortRange = newWildcardPortRange()
 		}
-	} else if p.srcIface == access {
-		p.appFilter.srcIP = ip2int(ipf.dst.IPNet.IP)
-		p.appFilter.srcIPMask = ipMask2int(ipf.dst.IPNet.Mask)
-		p.appFilter.dstIP = ip2int(ipf.src.IPNet.IP)
-		p.appFilter.dstIPMask = ipMask2int(ipf.src.IPNet.Mask)
+	} else if p.SrcIface == access {
+		p.AppFilter.SrcIP = ip2int(ipf.dst.IPNet.IP)
+		p.AppFilter.SrcIPMask = ipMask2int(ipf.dst.IPNet.Mask)
+		p.AppFilter.DstIP = ip2int(ipf.src.IPNet.IP)
+		p.AppFilter.DstIPMask = ipMask2int(ipf.src.IPNet.Mask)
 		// Ports are flipped for access PDRs
-		p.appFilter.dstPortRange = ipf.src.ports
-		p.appFilter.srcPortRange = ipf.dst.ports
+		p.AppFilter.DstPortRange = ipf.src.ports
+		p.AppFilter.SrcPortRange = ipf.dst.ports
 
 		// FIXME: temporary workaround for SDF Filter,
 		//  remove once we meet spec compliance
-		if !p.appFilter.srcPortRange.isWildcardMatch() {
-			p.appFilter.dstPortRange = p.appFilter.srcPortRange
-			p.appFilter.srcPortRange = newWildcardPortRange()
+		if !p.AppFilter.SrcPortRange.isWildcardMatch() {
+			p.AppFilter.DstPortRange = p.AppFilter.SrcPortRange
+			p.AppFilter.SrcPortRange = newWildcardPortRange()
 		}
 	}
 
@@ -534,12 +534,12 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, ippool *IPPoo
 
 	// initialize application filter with UE address;
 	// it can be overwritten by parseSDFFilter() later.
-	if p.IsDownlink() && p.ueAddress != 0 {
-		p.appFilter.dstIP = p.ueAddress
-		p.appFilter.dstIPMask = math.MaxUint32 // /32
-	} else if p.IsUplink() && p.ueAddress != 0 {
-		p.appFilter.srcIP = p.ueAddress
-		p.appFilter.srcIPMask = math.MaxUint32 // /32
+	if p.IsDownlink() && p.UeAddress != 0 {
+		p.AppFilter.DstIP = p.UeAddress
+		p.AppFilter.DstIPMask = math.MaxUint32 // /32
+	} else if p.IsUplink() && p.UeAddress != 0 {
+		p.AppFilter.SrcIP = p.UeAddress
+		p.AppFilter.SrcIPMask = math.MaxUint32 // /32
 	}
 
 	// make another iteration because Application ID and SDF Filter depend on UE IP Address IE
@@ -564,8 +564,8 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, ippool *IPPoo
 func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, ippool *IPPool) error {
 	/* reset outerHeaderRemoval to begin with */
 	outerHeaderRemoval := uint8(0)
-	p.qerIDList = make([]uint32, 0)
-	p.fseID = seid
+	p.QerIDList = make([]uint32, 0)
+	p.FseID = seid
 
 	pdrID, err := ie1.PDRID()
 	if err != nil {
@@ -628,7 +628,7 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, ippoo
 				log.Errorln("qerID read failed")
 				continue
 			} else {
-				p.qerIDList = append(p.qerIDList, qerID)
+				p.QerIDList = append(p.QerIDList, qerID)
 			}
 		}
 	}
@@ -637,11 +637,11 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, ippoo
 		log.Println("Could not read QER ID!")
 	}*/
 
-	p.precedence = precedence
-	p.pdrID = uint32(pdrID)
-	p.farID = farID // farID currently not being set <--- FIXIT/TODO/XXX
+	p.Precedence = precedence
+	p.PdrID = uint32(pdrID)
+	p.FarID = farID // farID currently not being set <--- FIXIT/TODO/XXX
 	/*p.qerID = qerID*/
-	p.needDecap = outerHeaderRemoval
+	p.NeedDecap = outerHeaderRemoval
 
 	return nil
 }

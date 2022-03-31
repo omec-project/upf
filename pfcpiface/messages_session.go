@@ -92,7 +92,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 			return errProcessReply(err, ie.CauseRequestRejected)
 		}
 
-		p.fseidIP = fseidIP
+		p.FseidIP = fseidIP
 		session.CreatePDR(p)
 		addPDRs = append(addPDRs, p)
 	}
@@ -103,7 +103,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 			return errProcessReply(err, ie.CauseRequestRejected)
 		}
 
-		f.fseidIP = fseidIP
+		f.FseidIP = fseidIP
 		session.CreateFAR(f)
 		addFARs = append(addFARs, f)
 	}
@@ -114,7 +114,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 			return errProcessReply(err, ie.CauseRequestRejected)
 		}
 
-		q.fseidIP = fseidIP
+		q.FseidIP = fseidIP
 		session.CreateQER(q)
 		addQERs = append(addQERs, q)
 	}
@@ -226,7 +226,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 			return sendError(err)
 		}
 
-		p.fseidIP = fseidIP
+		p.FseidIP = fseidIP
 
 		session.CreatePDR(p)
 		addPDRs = append(addPDRs, p)
@@ -238,7 +238,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 			return sendError(err)
 		}
 
-		f.fseidIP = fseidIP
+		f.FseidIP = fseidIP
 
 		session.CreateFAR(f)
 		addFARs = append(addFARs, f)
@@ -250,7 +250,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 			return sendError(err)
 		}
 
-		q.fseidIP = fseidIP
+		q.FseidIP = fseidIP
 
 		session.CreateQER(q)
 		addQERs = append(addQERs, q)
@@ -266,7 +266,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 			return sendError(err)
 		}
 
-		p.fseidIP = fseidIP
+		p.FseidIP = fseidIP
 
 		err = session.UpdatePDR(p)
 		if err != nil {
@@ -287,7 +287,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 			return sendError(err)
 		}
 
-		f.fseidIP = fseidIP
+		f.FseidIP = fseidIP
 
 		err = session.UpdateFAR(&f, &endMarkerList)
 		if err != nil {
@@ -308,7 +308,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 			return sendError(err)
 		}
 
-		q.fseidIP = fseidIP
+		q.FseidIP = fseidIP
 
 		err = session.UpdateQER(q)
 		if err != nil {
@@ -491,18 +491,18 @@ func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
 	var farID uint32
 
 	for _, pdr := range session.pdrs {
-		if pdr.srcIface == core {
-			pdrID = pdr.pdrID
+		if pdr.SrcIface == core {
+			pdrID = pdr.PdrID
 
-			farID = pdr.farID
+			farID = pdr.FarID
 
 			break
 		}
 	}
 
 	for _, far := range session.fars {
-		if far.farID == farID {
-			if far.applyAction&ActionNotify == 0 {
+		if far.FarID == farID {
+			if far.ApplyAction&ActionNotify == 0 {
 				log.Errorln("packet received for forwarding far. discard")
 				return
 			}
