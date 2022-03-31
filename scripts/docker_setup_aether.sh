@@ -106,9 +106,11 @@ docker run --name bess-pfcpiface -td --restart on-failure \
 
 # Run simulator to create forwarding state.
 docker container run --rm -d --net=container:pause --name pfcpsim pfcpsim:0.1.0-dev
-docker exec pfcpsim pfcpctl -c configure --n3-addr 198.18.0.1 --remote-peer 127.0.0.1:8805
+docker exec pfcpsim pfcpctl -c configure --n3-addr ${veth_iface_ip%/*} --remote-peer 127.0.0.1:8805
 docker exec pfcpsim pfcpctl -c associate
-docker exec pfcpsim pfcpctl -c create --count 1 --baseID 2 --ue-pool 10.250.0.0/29 --nb-addr 11.0.0.1
+docker exec pfcpsim pfcpctl -c create --count 2 --baseID 2 --ue-pool 10.250.0.0/29 --nb-addr 11.0.0.1
+# docker exec pfcpsim pfcpctl -c delete --baseID 2 --count=2
+# docker exec pfcpsim pfcpctl -c dissassociate
 
 # Send some packets with scapy
 # TODO(max): For development only, remove before merging
