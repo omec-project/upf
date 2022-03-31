@@ -163,7 +163,7 @@ func TestDetectUP4Restart(t *testing.T) {
 				WithDownlinkGBR(0).Build(),
 		})
 	}
-	
+
 	t.Run("Do not clear on UP4 restart", func(t *testing.T) {
 		setup(t, ConfigDefault)
 		defer teardown(t)
@@ -173,7 +173,6 @@ func TestDetectUP4Restart(t *testing.T) {
 		// The assumption is that the ONOS cluster preserves them, but BMv2 doesn't.
 		verifyNumberOfEntries(t, p4constants.TablePreQosPipeInterfaces, 0)
 	})
-
 
 	t.Run("Clear on UP4 restart", func(t *testing.T) {
 		setup(t, ConfigWipeOutOnUP4Restart)

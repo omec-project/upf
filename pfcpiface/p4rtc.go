@@ -54,13 +54,6 @@ type P4rtClient struct {
 	P4Info p4ConfigV1.P4Info
 }
 
-func NewP4rtClient(deviceID uint64) *P4rtClient {
-	return &P4rtClient{
-		deviceID: deviceID,
-		digests: make(chan *p4.DigestList, 1024),
-	}
-}
-
 type P4RuntimeError struct {
 	errors []*p4.Error
 }
@@ -603,5 +596,3 @@ func CreateChannel(host string, deviceID uint64) (*P4rtClient, error) {
 
 	return client, nil
 }
-
-
