@@ -27,22 +27,31 @@ import (
 )
 
 const (
-	// veth pair names. DO NOT MODIFY.
-	datapathIfaceName   = "datapath"
-	vethIfaceNameKernel = "fab"
-	bessRoutingTable    = 201
-	maxGates            = 8192
-
 	// Time to wait for IP assignment on veth interface.
 	vethIpDiscoveryTimeout = time.Second * 2
 
-	// BESS module names.
-	datapathIPLookModule = datapathIfaceName + "Routes"
+	// DO NOT MODIFY!
+	// These variables contain hard-coded values from inside the aether.bess pipeline.
+	maxModuleGates    = 8192
+	datapathIfaceName = "datapath"
 
-	// PreQosFlowMeasure is the pre QoS measurement module name.
-	PreQosFlowMeasure = "preQosFlowMeasure"
-	// PostQosFlowMeasure is the post QoS measurement module name.
-	PostQosFlowMeasure = "postQosFlowMeasure"
+	// veth interface pair related constants.
+	vethIfaceNameKernel                 = "fab"
+	vethIfaceNameBess                   = vethIfaceNameKernel + "-vdev"
+	vethAlternativeKernelRoutingTableID = 201
+
+	// Hard-coded BPF gates of the data path module. Doubles as priority
+	// where the lowest gate comes first.
+	ueTrafficPassBpfGate     = 0
+	signalTrafficPassBpfGate = maxModuleGates - 1 // Rule installed statically in aether.bess
+
+	// Module names.
+	// datapathIPLookupModule is the routing module name in the data path.
+	datapathIPLookupModule = datapathIfaceName + "Routes"
+	// preQosFlowMeasure is the pre QoS measurement module name.
+	preQosFlowMeasure = "preQosFlowMeasure"
+	// postQosFlowMeasure is the post QoS measurement module name.
+	postQosFlowMeasure = "postQosFlowMeasure"
 )
 
 const (
@@ -318,24 +327,24 @@ func (a *aether) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	// Flips the buffer flag, automatically waits for in-flight packets to drain.
-	flip, err := a.flipFlowMeasurementBufferFlag(ctx, PreQosFlowMeasure)
+	flip, err := a.flipFlowMeasurementBufferFlag(ctx, preQosFlowMeasure)
 	if err != nil {
-		log.Errorln(PreQosFlowMeasure, " read failed!:", err)
+		log.Errorln(preQosFlowMeasure, " read failed!:", err)
 		return
 	}
 
 	q := []float64{50, 90, 99}
 
 	// Read stats from the now inactive side, and clear if needed.
-	qosStatsInResp, err := a.readFlowMeasurement(ctx, PreQosFlowMeasure, flip.OldFlag, true, q)
+	qosStatsInResp, err := a.readFlowMeasurement(ctx, preQosFlowMeasure, flip.OldFlag, true, q)
 	if err != nil {
-		log.Errorln(PreQosFlowMeasure, " read failed!:", err)
+		log.Errorln(preQosFlowMeasure, " read failed!:", err)
 		return
 	}
 
-	postQosStatsResp, err := a.readFlowMeasurement(ctx, PostQosFlowMeasure, flip.OldFlag, true, q)
+	postQosStatsResp, err := a.readFlowMeasurement(ctx, postQosFlowMeasure, flip.OldFlag, true, q)
 	if err != nil {
-		log.Errorln(PostQosFlowMeasure, " read failed!:", err)
+		log.Errorln(postQosFlowMeasure, " read failed!:", err)
 		return
 	}
 
@@ -563,7 +572,7 @@ func (a *aether) syncInterface(ctx context.Context, iface string) (err error) {
 	// Fetch default route and gateway from alternative routing table.
 	altRoutes, err := netlink.RouteListFiltered(
 		unix.AF_INET,
-		&netlink.Route{Table: bessRoutingTable},
+		&netlink.Route{Table: vethAlternativeKernelRoutingTableID},
 		netlink.RT_FILTER_TABLE)
 	if err != nil {
 		return
@@ -602,12 +611,12 @@ func (a *aether) startInterfaceWatchTask(iface string) (err error) {
 		return
 	}
 
-	go a.interfaceWatchTask(link, updates)
+	go interfaceWatchTask(link, updates)
 
 	return
 }
 
-func (a *aether) interfaceWatchTask(link netlink.Link, updates <-chan netlink.AddrUpdate) {
+func interfaceWatchTask(link netlink.Link, updates <-chan netlink.AddrUpdate) {
 	for {
 		update, ok := <-updates
 		if !ok {
@@ -709,7 +718,7 @@ func (a *aether) findNextFreeOgate(ctx context.Context, module string) (ogate ui
 	}
 
 outer:
-	for i := uint64(0); i < maxGates; i++ {
+	for i := uint64(0); i < maxModuleGates; i++ {
 		for _, og := range resp.Ogates {
 			if og.Ogate == i {
 				continue outer
@@ -738,13 +747,13 @@ func (a *aether) addIPLookupRule(ctx context.Context, dst *net.IPNet, nhopMAC ne
 			return err
 		}
 
-		n.ogate, err = a.findNextFreeOgate(ctx, datapathIPLookModule)
+		n.ogate, err = a.findNextFreeOgate(ctx, datapathIPLookupModule)
 		if err != nil {
 			return err
 		}
 
 		// Place module in between the IP lookup and merge modules.
-		if err = a.linkBessModules(ctx, datapathIPLookModule, n.ogate, n.updateModuleName, 0); err != nil {
+		if err = a.linkBessModules(ctx, datapathIPLookupModule, n.ogate, n.updateModuleName, 0); err != nil {
 			return err
 		}
 		if err = a.linkBessModules(ctx, n.updateModuleName, 0, datapathIfaceName+"Merge", 0); err != nil {
@@ -823,7 +832,7 @@ func (a *aether) processIPLookup(ctx context.Context, msg proto.Message, method 
 	}
 
 	resp, err := a.client.ModuleCommand(ctx, &pb.CommandRequest{
-		Name: datapathIPLookModule,
+		Name: datapathIPLookupModule,
 		Cmd:  method,
 		Arg:  any,
 	})
@@ -923,15 +932,9 @@ func (a *aether) setupBpfRules() (err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
 
-	// Do not modify. Hard-coded gates from aether.bess pipeline.
-	const (
-		ueTrafficPassGate     = 0
-		signalTrafficPassGate = 8192 - 1 // MAX_GATE - 1
-	)
-
 	// Pass-through filter for GTPU UE traffic.
 	ueFilter := "ip and dst host " + a.ownIp.IP.String() + " and udp dst port 2152"
-	if err = a.addBpfRule(ctx, ueFilter, -ueTrafficPassGate, ueTrafficPassGate); err != nil {
+	if err = a.addBpfRule(ctx, ueFilter, -ueTrafficPassBpfGate, ueTrafficPassBpfGate); err != nil {
 		return
 	}
 
