@@ -27,13 +27,17 @@ func TimeBasedElectionId() p4_v1.Uint128 {
 }
 
 func ConnectP4rt(addr string, asMaster bool) (*client.Client, error) {
-	grpcConn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var err error
+
+	grpcConn, err = grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
 	if err != nil {
 		return nil, err
 	}
 
 	c := p4_v1.NewP4RuntimeClient(grpcConn)
-
 	// Election only happens if asMaster is true.
 	p4RtC := client.NewClient(c, 1, TimeBasedElectionId(), client.DisableCanonicalBytestrings)
 
@@ -66,6 +70,10 @@ func DisconnectP4rt() {
 	if stopCh != nil {
 		stopCh <- struct{}{}
 	}
+	// wait for P4rt stream to be closed
+	// FIXME: p4runtime-go-client fatals if gRPC channel is closed before P4rt stream is terminated.
+	//  The lib doesn't give a better way to wait for stream to be terminated.
+	time.Sleep(1 * time.Second)
 	if grpcConn != nil {
 		grpcConn.Close()
 	}

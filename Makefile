@@ -76,12 +76,12 @@ output:
 		.;
 	rm -rf output && mkdir output && tar -xf output.tar -C output && rm -f output.tar
 
-test-up4-integration-docker:
-	docker-compose -f test/integration/infra/docker-compose.yml rm -fsv
-	COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker-compose -f test/integration/infra/docker-compose.yml build $(DOCKER_BUILD_ARGS)
-	docker-compose -f test/integration/infra/docker-compose.yml up -d
+test-up4-integration-docker: DOCKER_TARGETS=pfcpiface
+test-up4-integration-docker: DOCKER_TAG=integration
+test-up4-integration-docker: docker-build
+	docker rm -f mock-up4 pfcpiface
+	docker network prune -f
 	MODE=docker DATAPATH=up4 go test -v -count=1 -failfast ./test/integration/...
-	docker-compose -f test/integration/infra/docker-compose.yml rm -fsv
 
 test-bess-integration-native:
 	MODE=native DATAPATH=bess go test \

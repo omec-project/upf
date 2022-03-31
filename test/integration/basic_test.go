@@ -4,8 +4,8 @@
 package integration
 
 import (
-	"github.com/wmnsk/go-pfcp/message"
 	"github.com/omec-project/upf-epc/pfcpiface"
+	"github.com/wmnsk/go-pfcp/message"
 	"net"
 	"testing"
 	"time"
@@ -14,12 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
 )
-
-func init() {
-	if isDatapathUP4() && isModeDocker() {
-		initForwardingPipelineConfig()
-	}
-}
 
 func TestUPFBasedUeIPAllocation(t *testing.T) {
 	// TODO: verify if UEIP bit is set in the UP Function Features of PFCP Association Response

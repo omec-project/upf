@@ -24,6 +24,13 @@ import (
 // this file should contain all the struct defs/constants used among different test cases.
 
 const (
+	ConfigPath             = "/tmp/upf.json"
+	ContainerNamePFCPAgent = "pfcpiface"
+	ContainerNameMockUP4   = "mock-up4"
+	ImageNamePFCPAgent     = "upf-epc-pfcpiface:integration"
+	ImageNameMockUP4       = "docker.io/opennetworking/mn-stratum:21.12"
+	DockerTestNetwork      = "testnet"
+
 	EnvMode     = "MODE"
 	EnvDatapath = "DATAPATH"
 
@@ -124,8 +131,8 @@ type sliceMeter struct {
 }
 
 type p4RtValues struct {
-	tc         uint8
-	ueAddress  string
+	tc        uint8
+	ueAddress string
 
 	appFilter  appFilter
 	sliceMeter *sliceMeter
@@ -153,6 +160,9 @@ func init() {
 		FullTimestamp: true,
 		ForceColors:   true,
 	})
+
+	providers.MustPullDockerImage(ImageNameMockUP4)
+	providers.MustCreateNetworkIfNotExists(DockerTestNetwork)
 }
 
 func (af appFilter) isEmpty() bool {
@@ -226,6 +236,10 @@ func waitForPFCPAssociationSetup(pfcpClient *pfcpsim.PFCPClient) error {
 	}
 }
 
+func waitForMockUP4ToStart() error {
+	return waitForPortOpen("tcp", "127.0.0.1", "50001")
+}
+
 func waitForBESSFakeToStart() error {
 	return waitForPortOpen("tcp", "127.0.0.1", "10514")
 }
@@ -259,6 +273,28 @@ func initForwardingPipelineConfig() {
 	}
 }
 
+func MustStartMockUP4() {
+	providers.MustRunDockerContainer(ContainerNameMockUP4, ImageNameMockUP4, "--topo single", []string{"50001/tcp"}, "", DockerTestNetwork)
+	err := waitForMockUP4ToStart()
+	if err != nil {
+		panic(err)
+	}
+	initForwardingPipelineConfig()
+}
+
+func MustStopMockUP4() {
+	providers.MustStopDockerContainer(ContainerNameMockUP4)
+}
+
+func MustStartPFCPAgent() {
+	providers.MustRunDockerContainer(ContainerNamePFCPAgent, ImageNamePFCPAgent, "-config /config/upf.json",
+		[]string{"8805/udp", "8080/tcp"}, "/tmp:/config", DockerTestNetwork)
+}
+
+func MustStopPFCPAgent() {
+	providers.MustStopDockerContainer(ContainerNamePFCPAgent)
+}
+
 func setup(t *testing.T, configType uint32) {
 	// TODO: we currently need to reset the DefaultRegisterer between tests, as some leave the
 	// 		 the registry in a bad state. Use custom registries to avoid global state.
@@ -275,15 +311,16 @@ func setup(t *testing.T, configType uint32) {
 
 		err := waitForBESSFakeToStart()
 		require.NoErrorf(t, err, "failed to start BESS fake: %v", err)
+	case DatapathUP4:
+		MustStartMockUP4()
 	}
 
 	switch os.Getenv(EnvMode) {
 	case ModeDocker:
 		jsonConf, _ := json.Marshal(GetConfig(os.Getenv(EnvDatapath), configType))
-		err := ioutil.WriteFile("./infra/upf.json", jsonConf, os.ModePerm)
+		err := ioutil.WriteFile(ConfigPath, jsonConf, os.ModePerm)
 		require.NoError(t, err)
-		providers.MustRunDockerCommandAttach("pfcpiface",
-			"/bin/pfcpiface -config /config/upf.json")
+		MustStartPFCPAgent()
 	case ModeNative:
 		pfcpAgent = pfcpiface.NewPFCPIface(GetConfig(os.Getenv(EnvDatapath), configType))
 		go pfcpAgent.Run()
@@ -312,12 +349,14 @@ func teardown(t *testing.T) {
 
 	switch os.Getenv(EnvMode) {
 	case ModeDocker:
-		// kill pfcpiface process inside container
-		_, _, _, err := providers.RunDockerExecCommand("pfcpiface", "killall -9 pfcpiface")
-		require.NoError(t, err, "failed to kill pfcpiface process")
-
-		err = os.Remove("./infra/upf.json")
+		err := os.Remove(ConfigPath)
 		require.NoError(t, err)
+
+		// leave for troubleshooting
+		if !t.Failed() {
+			MustStopPFCPAgent()
+			MustStopMockUP4()
+		}
 	case ModeNative:
 		pfcpAgent.Stop()
 	default:
