@@ -117,8 +117,9 @@ func (a *aether) SetUpfInfo(u *upf, conf *Conf) {
 		log.Fatalf("could not start watch task on %v interface: %v", vethIfaceNameKernel, err)
 	}
 
-	// Needed for legacy code. Remove once refactored.
-	u.coreIP = net.IPv4zero.To4()
+	// FIXME: Only needed due to legacy code in `parseFAR` and `associationIEs`.
+	//        Remove once refactored. Use aether.ownIp directly instead!
+	u.coreIP = a.ownIp.IP
 	u.accessIP = a.ownIp.IP
 
 	if u.coreIP == nil || u.accessIP == nil {
