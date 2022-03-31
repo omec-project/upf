@@ -129,7 +129,7 @@ func TestDetectUP4Restart(t *testing.T) {
 
 	// restart UP4, it will close P4Runtime channel between pfcpiface and mock-up4
 	MustStopMockUP4()
-	time.Sleep(3*time.Second)
+	time.Sleep(3 * time.Second)
 	MustStartMockUP4()
 
 	tc := testCase{
