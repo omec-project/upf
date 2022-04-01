@@ -4,9 +4,11 @@
 package integration
 
 import (
+	"github.com/omec-project/upf-epc/internal/p4constants"
 	"github.com/omec-project/upf-epc/pfcpiface"
 	"github.com/wmnsk/go-pfcp/message"
 	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -116,6 +118,70 @@ func TestUPFBasedUeIPAllocation(t *testing.T) {
 	require.NoError(t, err)
 
 	verifyNoEntries(t, testcase.expected)
+}
+
+func TestDetectUP4Restart(t *testing.T) {
+	if !isDatapathUP4() {
+		t.Skipf("Skipping UP4-specific test for datapath: %s", os.Getenv(EnvDatapath))
+	}
+
+	run := func(t *testing.T) {
+		// restart UP4, it will close P4Runtime channel between pfcpiface and mock-up4
+		MustStopMockUP4()
+		MustStartMockUP4()
+
+		// establish session, it forces pfcpiface to re-connect to UP4.
+		// Otherwise, we would need to wait about 2 minutes for pfcpiface to re-connect.
+		pfcpClient.EstablishSession([]*ie.IE{
+			session.NewPDRBuilder().MarkAsUplink().
+				WithMethod(session.Create).
+				WithID(1).
+				WithTEID(15).
+				WithN3Address(upfN3Address).
+				WithFARID(1).
+				AddQERID(1).BuildPDR(),
+			session.NewPDRBuilder().MarkAsDownlink().
+				WithMethod(session.Create).
+				WithID(2).
+				WithUEAddress(ueAddress).
+				WithFARID(2).
+				AddQERID(1).BuildPDR(),
+		}, []*ie.IE{
+			session.NewFARBuilder().
+				WithMethod(session.Create).WithID(1).WithDstInterface(ie.DstInterfaceCore).
+				WithAction(ActionForward).BuildFAR(),
+			session.NewFARBuilder().
+				WithMethod(session.Create).WithID(2).
+				WithDstInterface(ie.DstInterfaceAccess).
+				WithAction(ActionDrop).WithTEID(16).
+				WithDownlinkIP(nodeBAddress).BuildFAR(),
+		}, []*ie.IE{
+			session.NewQERBuilder().WithMethod(session.Create).WithID(1).
+				WithUplinkMBR(500000).
+				WithDownlinkMBR(500000).
+				WithUplinkGBR(0).
+				WithDownlinkGBR(0).Build(),
+		})
+	}
+
+	t.Run("Do not clear on UP4 restart", func(t *testing.T) {
+		setup(t, ConfigDefault)
+		defer teardown(t)
+
+		run(t)
+		// do not clear state on UP4 restart means that interfaces will not be re-installed.
+		// The assumption is that the ONOS cluster preserves them, but BMv2 doesn't.
+		verifyNumberOfEntries(t, p4constants.TablePreQosPipeInterfaces, 0)
+	})
+
+	t.Run("Clear on UP4 restart", func(t *testing.T) {
+		setup(t, ConfigWipeOutOnUP4Restart)
+		defer teardown(t)
+
+		run(t)
+		// clear state on UP4 restart means that interfaces entries will be re-installed.
+		verifyNumberOfEntries(t, p4constants.TablePreQosPipeInterfaces, 2)
+	})
 }
 
 func TestPFCPHeartbeats(t *testing.T) {

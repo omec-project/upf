@@ -46,3 +46,4 @@ These are configurations commonly shared between P4-UPF and BESS-UPF.
 | `p4rtciface.p4rtc_server` | - | Yes | IP address of the P4Runtime server exposed by UP4 |
 | `p4rtciface.p4rtc_port` | - | Yes | TCP port of the P4Runtime server exposed by UP4 |
 | `p4rtciface.default_tc` | 3 | No | Default Traffic Class (default value is ELASTIC - TC=3) |
+| `p4rtciface.clear_state_on_restart` | false | No | Whether to wipe out PFCP state from UP4 datapath on UP4 restart. |
