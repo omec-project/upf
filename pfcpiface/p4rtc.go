@@ -10,6 +10,8 @@ import (
 	"os"
 	"time"
 
+	"google.golang.org/grpc/connectivity"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -116,8 +118,8 @@ func TimeBasedElectionId() p4.Uint128 {
 }
 
 // CheckStatus ... Check client connection status.
-func (c *P4rtClient) CheckStatus() (state int) {
-	return int(c.conn.GetState())
+func (c *P4rtClient) CheckStatus() connectivity.State {
+	return c.conn.GetState()
 }
 
 // SetMastership .. API.
@@ -152,12 +154,6 @@ func (c *P4rtClient) SendPacketOut(packet []byte) (err error) {
 
 // Init .. Initialize Client.
 func (c *P4rtClient) Init() (err error) {
-	// Initialize stream for mastership and packet I/O
-	// ctx, cancel := context.WithTimeout(context.Background(),
-	//                                   time.Duration(timeout) * time.Second)
-	// defer cancel()
-	c.digests = make(chan *p4.DigestList, 1024)
-
 	c.stream, err = c.client.StreamChannel(
 		context.Background(),
 		grpcRetry.WithMax(3),
@@ -187,13 +183,6 @@ func (c *P4rtClient) Init() (err error) {
 		}
 	}()
 
-	/*
-		select {
-			case <-ctx.Done():
-			log.Println(ctx.Err()) // prints "context deadline exceeded"
-		}
-	*/
-
 	log.Println("exited from recv thread.")
 
 	return
@@ -203,10 +192,15 @@ func (c *P4rtClient) GetNextDigestData() []byte {
 	// blocking
 	nextDigest := <-c.digests
 
-	log.Debug("Received Digest")
-
 	for _, p4d := range nextDigest.GetData() {
 		if bitstring := p4d.GetBitstring(); bitstring != nil {
+			log.WithFields(log.Fields{
+				"device-id":     c.deviceID,
+				"conn":          c.conn.Target(),
+				"digest length": len(bitstring),
+				"data":          bitstring,
+			}).Trace("Received Digest")
+
 			return bitstring
 		}
 	}
@@ -433,15 +427,28 @@ func (c *P4rtClient) WriteBatchReq(updates []*p4.Update) error {
 
 // GetForwardingPipelineConfig ... Get Pipeline config from switch.
 func (c *P4rtClient) GetForwardingPipelineConfig() (err error) {
-	log.Println("GetForwardingPipelineConfig")
+	getLog := log.WithFields(log.Fields{
+		"device ID": c.deviceID,
+		"conn":      c.conn.Target(),
+	})
+	getLog.Info("Getting ForwardingPipelineConfig from P4Rt device")
 
 	pipeline, err := GetPipelineConfig(c.client, c.deviceID)
 	if err != nil {
-		log.Println("set pipeline config error ", err)
+		getLog.Println("set pipeline config error ", err)
 		return
 	}
 
+	// P4 spec allows for sending successful response to GetForwardingPipelineConfig
+	// without config. We fail in such a case, because the response without config is useless.
+	if pipeline.GetConfig() == nil {
+		return ErrOperationFailedWithReason("GetForwardingPipelineConfig",
+			"Operation successful, but no P4 config provided.")
+	}
+
 	c.P4Info = *pipeline.Config.P4Info
+
+	getLog.Info("Got ForwardingPipelineConfig from P4Rt device")
 
 	return
 }
@@ -561,7 +568,7 @@ func LoadDeviceConfig(deviceConfigPath string) (P4DeviceConfig, error) {
 // CreateChannel ... Create p4runtime client channel.
 func CreateChannel(host string, deviceID uint64) (*P4rtClient, error) {
 	log.Println("create channel")
-	// Second, check to see if we can reuse the gRPC connection for a new P4RT client
+
 	conn, err := GetConnection(host)
 	if err != nil {
 		log.Println("grpc connection failed")
@@ -569,6 +576,7 @@ func CreateChannel(host string, deviceID uint64) (*P4rtClient, error) {
 	}
 
 	client := &P4rtClient{
+		digests:  make(chan *p4.DigestList, 1024),
 		client:   p4.NewP4RuntimeClient(conn),
 		conn:     conn,
 		deviceID: deviceID,
@@ -582,7 +590,7 @@ func CreateChannel(host string, deviceID uint64) (*P4rtClient, error) {
 
 	err = client.SetMastership(TimeBasedElectionId())
 	if err != nil {
-		log.Println("Set Mastership error: ", err)
+		log.Error("Set Mastership error: ", err)
 		return nil, err
 	}
 

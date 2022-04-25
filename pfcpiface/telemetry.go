@@ -81,11 +81,11 @@ func (uc *upfCollector) Collect(ch chan<- prometheus.Metric) {
 
 func (uc *upfCollector) portStats(ch chan<- prometheus.Metric) {
 	// When operating in sim mode there are no BESS ports
-	uc.upf.portStats(uc, ch)
+	uc.upf.PortStats(uc, ch)
 }
 
 func (uc *upfCollector) summaryLatencyJitter(ch chan<- prometheus.Metric) {
-	uc.upf.summaryLatencyJitter(uc, ch)
+	uc.upf.SummaryLatencyJitter(uc, ch)
 }
 
 // PfcpNodeCollector makes a PFCPNode Prometheus observable.
@@ -135,7 +135,7 @@ func (col PfcpNodeCollector) Describe(ch chan<- *prometheus.Desc) {
 
 func (col PfcpNodeCollector) Collect(ch chan<- prometheus.Metric) {
 	if col.node.upf.enableFlowMeasure {
-		err := col.node.upf.sessionStats(&col, ch)
+		err := col.node.upf.SessionStats(&col, ch)
 		if err != nil {
 			log.Errorln(err)
 			return

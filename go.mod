@@ -1,6 +1,6 @@
 module github.com/omec-project/upf-epc
 
-go 1.13
+go 1.16
 
 require (
 	github.com/Showmax/go-fqdn v1.0.0
@@ -8,7 +8,7 @@ require (
 	github.com/containerd/containerd v1.5.9 // indirect
 	github.com/deckarep/golang-set v1.8.0
 	github.com/docker/docker v20.10.12+incompatible
-	github.com/docker/go-connections v0.4.0 // indirect
+	github.com/docker/go-connections v0.4.0
 	github.com/ettle/strcase v0.1.1
 	github.com/golang/protobuf v1.5.2
 	github.com/google/gopacket v1.1.19
@@ -17,7 +17,7 @@ require (
 	github.com/libp2p/go-reuseport v0.1.0
 	github.com/moby/term v0.0.0-20210619224110-3f7ff695adc6 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
-	github.com/omec-project/pfcpsim v0.0.0-20220224085126-19a69dc4b36c
+	github.com/omec-project/pfcpsim v0.0.0-20220317111127-6be4ce2180b6
 	github.com/p4lang/p4runtime v1.3.0
 	github.com/prometheus/client_golang v1.11.0
 	github.com/sirupsen/logrus v1.8.1

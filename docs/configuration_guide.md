@@ -23,8 +23,8 @@ These are configurations commonly shared between P4-UPF and BESS-UPF.
 | `resp_timeout` | 2s | No | Period to wait for a response from SMF/SPGW-C |
 | `enable_end_marker` | false | No | |
 | `enable_p4rt` | false | Yes for P4-UPF only | |
-| `enable_ue_ip_alloc` | false | No | Whether to enable UPF-based UE IP allocation |
-| `ue_ip_pool` | - | Yes for P4-UPF or when `enable_ue_ip_alloc` is set | IP pool from which we allocate UE IP address |
+| `cpiface.enable_ue_ip_alloc` | false | No | Whether to enable UPF-based UE IP allocation |
+| `cpiface.ue_ip_pool` | - | Yes for P4-UPF or when `enable_ue_ip_alloc` is set | IP pool from which we allocate UE IP address |
 | `cpiface.dnn` | - | No | Data Network Name to use during PFCP Association |
 
 ### BESS-UPF specific configurations
@@ -45,3 +45,5 @@ These are configurations commonly shared between P4-UPF and BESS-UPF.
 | `p4rtciface.access_ip` | - | Yes | N3/S1u address for 5G/4G |
 | `p4rtciface.p4rtc_server` | - | Yes | IP address of the P4Runtime server exposed by UP4 |
 | `p4rtciface.p4rtc_port` | - | Yes | TCP port of the P4Runtime server exposed by UP4 |
+| `p4rtciface.default_tc` | 3 | No | Default Traffic Class (default value is ELASTIC - TC=3) |
+| `p4rtciface.clear_state_on_restart` | false | No | Whether to wipe out PFCP state from UP4 datapath on UP4 restart. |

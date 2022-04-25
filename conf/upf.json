@@ -151,6 +151,10 @@
 
         "access_ip": "172.17.0.1/32",
         "p4rtc_server": "onos",
-        "p4rtc_port": "51001"
+        "p4rtc_port": "51001",
+        "": "Default TC is ELASTIC",
+        "default_tc": 3,
+        "": "Whether to wipe out PFCP state from UP4 datapath on UP4 restart. Default: false",
+        "clear_state_on_restart": false
     }
 }

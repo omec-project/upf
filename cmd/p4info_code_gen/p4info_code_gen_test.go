@@ -90,6 +90,44 @@ counters {
   }
   size: 1024
 }
+type_info {
+	serializable_enums {
+		key: "TrafficClass"
+		value {
+				underlying_type {
+				bitwidth: 2
+		  }
+		  members {
+				name: "BEST_EFFORT"
+				value: "\000"
+		  }
+		  members {
+				name: "CONTROL"
+				value: "\001"
+		  }
+		  members {
+				name: "REAL_TIME"
+				value: "\002"
+		  }
+		  members {
+				name: "ELASTIC"
+				value: "\003"
+		  }
+		}
+	}
+	serializable_enums {
+		key: "Fake"
+		value {
+				underlying_type {
+				bitwidth: 48
+		  }
+		  members {
+				name: "FAKE"
+				value: "aaaaaa"
+		  }
+		}
+	}
+}
 `
 
 func mustWriteStringToDisk(s string, path string) {
@@ -243,6 +281,51 @@ func Test_generator(t *testing.T) {
 				name: "test",
 			},
 			wantErr: true,
+		},
+		{
+			name: "verify serializable enumerator",
+			args: &args{
+				p4config: mustGetP4Config(p4infoPath),
+				genType:  constant,
+			},
+			want: &want{
+				ID:   3,
+				name: "EnumTrafficClassElastic",
+			},
+		},
+		{
+			name: "verify serializable enumerator non parsable",
+			args: &args{
+				p4config: mustGetP4Config(p4infoPath),
+				genType:  constant,
+			},
+			want: &want{
+				ID:   0,
+				name: "EnumFakeFake",
+			},
+			wantErr: true,
+		},
+		{
+			name: "verify match field bitwidth",
+			args: &args{
+				p4config: mustGetP4Config(p4infoPath),
+				genType:  constant,
+			},
+			want: &want{
+				ID:   48,
+				name: "BitwidthMfDstMac",
+			},
+		},
+		{
+			name: "verify action parameter bitwidth",
+			args: &args{
+				p4config: mustGetP4Config(p4infoPath),
+				genType:  constant,
+			},
+			want: &want{
+				ID:   8,
+				name: "BitwidthApSrcIface",
+			},
 		},
 	}
 
