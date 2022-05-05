@@ -389,7 +389,7 @@ func (c *P4rtClient) ApplyMeterEntries(methodType p4.Update_Type, entries ...*p4
 				Entity: &p4.Entity_MeterEntry{MeterEntry: entry},
 			},
 		}
-		log.Traceln("Writing table entry: ", proto.MarshalTextString(update))
+		log.Traceln("Writing meter entry: ", proto.MarshalTextString(update))
 		updates = append(updates, update)
 	}
 
