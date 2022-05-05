@@ -1275,22 +1275,23 @@ func (up4 *UP4) resetCounter(pdr pdr) error {
 	})
 	builderLog.Debug("Clearing Counter cells")
 
+	resetValue := &p4.CounterData{
+		ByteCount:   0,
+		PacketCount: 0,
+	}
+
+	cntrIndex := &p4.Index{Index: int64(pdr.ctrID)}
+
 	ingressCntrEntry := &p4.CounterEntry{
 		CounterId: p4constants.CounterPreQosPipePreQosCounter,
-		Index:     &p4.Index{Index: int64(pdr.ctrID)},
-		Data: &p4.CounterData{
-			ByteCount:   0,
-			PacketCount: 0,
-		},
+		Index:     cntrIndex,
+		Data:      resetValue,
 	}
 
 	egressCntrEntry := &p4.CounterEntry{
 		CounterId: p4constants.CounterPostQosPipePostQosCounter,
-		Index:     &p4.Index{Index: int64(pdr.ctrID)},
-		Data: &p4.CounterData{
-			ByteCount:   0,
-			PacketCount: 0,
-		},
+		Index:     cntrIndex,
+		Data:      resetValue,
 	}
 
 	updates := []*p4.Update{
