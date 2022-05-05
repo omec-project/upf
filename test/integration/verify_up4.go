@@ -442,9 +442,8 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, expectedVal
 	verifyCounter := func(counterID uint32) {
 		nrOfResetCounters := 0
 		counters, _ := p4rtClient.ReadCounterEntryWildcard(p4constants.GetCounterIDToNameMap()[counterID])
-		for idx, c := range counters {
+		for _, c := range counters {
 			if c.PacketCount == 0 && c.ByteCount == 0 {
-				fmt.Println("Cell ID: ", idx)
 				nrOfResetCounters++
 			}
 		}
