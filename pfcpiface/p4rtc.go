@@ -588,9 +588,25 @@ func CreateChannel(host string, deviceID uint64) (*P4rtClient, error) {
 		return nil, err
 	}
 
+	closeStreamOnError := func() {
+		if client.stream != nil {
+			err := client.stream.CloseSend()
+			if err != nil {
+				log.Errorf("Failed to close P4Rt stream with %v: %v", client.conn.Target(), err)
+			}
+		}
+	}
+
 	err = client.SetMastership(TimeBasedElectionId())
 	if err != nil {
 		log.Error("Set Mastership error: ", err)
+		closeStreamOnError()
+		return nil, err
+	}
+
+	err = client.GetForwardingPipelineConfig()
+	if err != nil {
+		closeStreamOnError()
 		return nil, err
 	}
 

@@ -291,11 +291,6 @@ func (up4 *UP4) setupChannel() error {
 
 	up4.p4client = client
 
-	err = up4.p4client.GetForwardingPipelineConfig()
-	if err != nil {
-		return err
-	}
-
 	up4.p4RtTranslator = newP4RtTranslator(up4.p4client.P4Info)
 
 	setupLog.Debug("P4Rt channel created")
