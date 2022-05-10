@@ -466,8 +466,8 @@ func (up4 *UP4) tryConnect() error {
 		return nil
 	}
 
-	// p4client is nil only if it's a first attempt to connect to UP4.
-	firstRun := up4.p4client == nil
+	// datapath state should be cleared & initialized if P4Rt connection or ForwardingConfig is not setup yet.
+	shouldClearAndInitialize := up4.p4client == nil || up4.p4client.P4Info == nil
 
 	err := up4.setupChannel()
 	if err != nil {
@@ -475,7 +475,7 @@ func (up4 *UP4) tryConnect() error {
 		return err
 	}
 
-	err = up4.initialize(firstRun)
+	err = up4.initialize(shouldClearAndInitialize)
 	if err != nil {
 		log.Errorf("Failed to initialize UP4: %v", err)
 		return err
@@ -585,10 +585,10 @@ func (up4 *UP4) clearDatapathState() error {
 
 // initialize configures the UP4-related objects.
 // A caller should ensure that P4Client is not nil and the P4Runtime channel is open.
-func (up4 *UP4) initialize(firstRun bool) error {
+func (up4 *UP4) initialize(shouldClear bool) error {
 	// always clear datapath state at startup or
 	// on UP4 datapath restart if ClearStateOnRestart is enabled.
-	if firstRun || up4.conf.ClearStateOnRestart {
+	if shouldClear || up4.conf.ClearStateOnRestart {
 		if err := up4.clearDatapathState(); err != nil {
 			return err
 		}
