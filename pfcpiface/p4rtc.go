@@ -601,6 +601,7 @@ func CreateChannel(host string, deviceID uint64) (*P4rtClient, error) {
 	if err != nil {
 		log.Error("Set Mastership error: ", err)
 		closeStreamOnError()
+
 		return nil, err
 	}
 
