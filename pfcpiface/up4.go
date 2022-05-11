@@ -1262,6 +1262,51 @@ func (up4 *UP4) resetMeters(qers []qer) {
 	}
 }
 
+func (up4 *UP4) resetCounter(pdr pdr) error {
+	builderLog := log.WithFields(log.Fields{
+		"Cell ID": pdr.ctrID,
+		"PDR ID":  pdr.pdrID,
+		"F-SEID":  pdr.fseID,
+	})
+	builderLog.Debug("Clearing Counter cells")
+
+	resetValue := &p4.CounterData{
+		ByteCount:   0,
+		PacketCount: 0,
+	}
+
+	cntrIndex := &p4.Index{Index: int64(pdr.ctrID)}
+
+	ingressCntrEntry := &p4.CounterEntry{
+		CounterId: p4constants.CounterPreQosPipePreQosCounter,
+		Index:     cntrIndex,
+		Data:      resetValue,
+	}
+
+	egressCntrEntry := &p4.CounterEntry{
+		CounterId: p4constants.CounterPostQosPipePostQosCounter,
+		Index:     cntrIndex,
+		Data:      resetValue,
+	}
+
+	updates := []*p4.Update{
+		{
+			Type: p4.Update_MODIFY,
+			Entity: &p4.Entity{
+				Entity: &p4.Entity_CounterEntry{CounterEntry: ingressCntrEntry},
+			},
+		},
+		{
+			Type: p4.Update_MODIFY,
+			Entity: &p4.Entity{
+				Entity: &p4.Entity_CounterEntry{CounterEntry: egressCntrEntry},
+			},
+		},
+	}
+
+	return up4.p4client.WriteBatchReq(updates)
+}
+
 // modifyUP4ForwardingConfiguration builds P4Runtime table entries and
 // inserts/modifies/removes table entries from UP4 device, according to methodType.
 func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers []qer, methodType p4.Update_Type) error {
@@ -1419,6 +1464,10 @@ func (up4 *UP4) sendCreate(all PacketForwardingRules, updated PacketForwardingRu
 		}
 
 		all.pdrs[i].ctrID = uint32(val)
+
+		if err := up4.resetCounter(all.pdrs[i]); err != nil {
+			return ErrOperationFailedWithReason("Reset Counters", err.Error())
+		}
 	}
 
 	for _, p := range updated.pdrs {

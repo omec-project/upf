@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim"
+	"github.com/omec-project/upf-epc/internal/p4constants"
 	"github.com/omec-project/upf-epc/pfcpiface"
 	"github.com/omec-project/upf-epc/pkg/fake_bess"
 	"github.com/omec-project/upf-epc/test/integration/providers"
+	v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -273,6 +275,35 @@ func initForwardingPipelineConfig() {
 	}
 }
 
+// initCounterValues is a helper function that initializes counters values to 1.
+// The initialization is required to check if counter cells are properly cleared
+// on session establishment by PFCP Agent.
+func mustInitCountersWithDummyValue() {
+	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", true)
+	if err != nil {
+		panic("Cannot init counter values: " + err.Error())
+	}
+	defer providers.DisconnectP4rt()
+
+	igCounterName := p4constants.GetCounterIDToNameMap()[p4constants.CounterPreQosPipePreQosCounter]
+	egCounterName := p4constants.GetCounterIDToNameMap()[p4constants.CounterPostQosPipePostQosCounter]
+
+	for i, maxSize := uint64(0), p4constants.CounterSizePreQosPipePreQosCounter; i < maxSize; i++ {
+		dummyValue := &v1.CounterData{
+			ByteCount:   1,
+			PacketCount: 1,
+		}
+
+		if err := p4rtClient.ModifyCounterEntry(igCounterName, int64(i), dummyValue); err != nil {
+			panic(err)
+		}
+
+		if err := p4rtClient.ModifyCounterEntry(egCounterName, int64(i), dummyValue); err != nil {
+			panic(err)
+		}
+	}
+}
+
 func MustStartMockUP4() {
 	providers.MustRunDockerContainer(ContainerNameMockUP4, ImageNameMockUP4, "--topo single", []string{"50001/tcp"}, "", DockerTestNetwork)
 	err := waitForMockUP4ToStart()
@@ -280,6 +311,7 @@ func MustStartMockUP4() {
 		panic(err)
 	}
 	initForwardingPipelineConfig()
+	mustInitCountersWithDummyValue()
 }
 
 func MustStopMockUP4() {

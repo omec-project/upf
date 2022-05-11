@@ -435,6 +435,25 @@ func verifyP4RuntimeEntries(t *testing.T, testdata *pfcpSessionData, expectedVal
 	}
 	require.Equal(t, expectedNrOfConfiguredMeters, nrOfConfiguredMeters,
 		fmt.Sprintf("app meter should have %d cells configured", expectedNrOfConfiguredMeters))
+
+	// we allocate & reset a Counter cell ID for each PDR
+	expectedNrOfResetCounters := len(expectedValues.pdrs)
+
+	verifyCounter := func(counterID uint32) {
+		nrOfResetCounters := 0
+		counters, _ := p4rtClient.ReadCounterEntryWildcard(p4constants.GetCounterIDToNameMap()[counterID])
+		for _, c := range counters {
+			if c.PacketCount == 0 && c.ByteCount == 0 {
+				nrOfResetCounters++
+			}
+		}
+		require.Equal(t, expectedNrOfResetCounters, nrOfResetCounters)
+	}
+
+	// verify ingress counter
+	verifyCounter(p4constants.CounterPreQosPipePreQosCounter)
+	// verify egress counter
+	verifyCounter(p4constants.CounterPostQosPipePostQosCounter)
 }
 
 func verifyNumberOfEntries(t *testing.T, tableID uint32, expectedNoOfEntries int) {
