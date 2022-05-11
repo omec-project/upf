@@ -54,10 +54,10 @@ type tunnelParams struct {
 }
 
 type P4rtTranslator struct {
-	p4Info p4ConfigV1.P4Info
+	p4Info *p4ConfigV1.P4Info
 }
 
-func newP4RtTranslator(p4info p4ConfigV1.P4Info) *P4rtTranslator {
+func newP4RtTranslator(p4info *p4ConfigV1.P4Info) *P4rtTranslator {
 	return &P4rtTranslator{
 		p4Info: p4info,
 	}

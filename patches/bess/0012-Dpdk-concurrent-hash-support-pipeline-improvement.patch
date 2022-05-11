@@ -1,19 +1,19 @@
-From ab485b4b9f0af85c9488476c5ad5dae95564f32c Mon Sep 17 00:00:00 2001
-From: Amar Sri <amarsri28@gmail.com>
-Date: Mon, 13 Sep 2021 23:53:43 -0700
-Subject: [PATCH] Concurrent hash Support for Wildcard/ExactMatch & Resolving Bug #329
+From 442c5b8850abadd2c6c4eaa4838c0486e6d7479a Mon Sep 17 00:00:00 2001
+From: Ams <amarsri28@gmail.com>
+Date: Wed, 9 Mar 2022 03:43:43 -0800
+Subject: [PATCH] Dpdk Hash table support for concurrent pipeline
 
 ---
  core/modules/exact_match.cc    |  24 ++--
  core/modules/exact_match.h     |   3 +
  core/modules/wildcard_match.cc | 249 +++++++++++++++++++++++++--------
  core/modules/wildcard_match.h  |  30 +++-
- core/utils/cuckoo_map.h        | 137 +++++++++++++++++-
+ core/utils/cuckoo_map.h        | 117 +++++++++++++++-
  core/utils/exact_match_table.h |  82 ++++++-----
- 6 files changed, 411 insertions(+), 114 deletions(-)
+ 6 files changed, 391 insertions(+), 114 deletions(-)
 
 diff --git a/core/modules/exact_match.cc b/core/modules/exact_match.cc
-index 1ca0fd4e..bb17f5b8 100644
+index b8bb2a6d..fee70a78 100644
 --- a/core/modules/exact_match.cc
 +++ b/core/modules/exact_match.cc
 @@ -134,7 +134,7 @@ CommandResponse ExactMatch::Init(const bess::pb::ExactMatchArg &arg) {
@@ -563,7 +563,7 @@ index 85deeafc..0bd85f6b 100644
  
  #endif  // BESS_MODULES_WILDCARDMATCH_H_
 diff --git a/core/utils/cuckoo_map.h b/core/utils/cuckoo_map.h
-index c855b93d..9a66864d 100644
+index c855b93d..6213ce7d 100644
 --- a/core/utils/cuckoo_map.h
 +++ b/core/utils/cuckoo_map.h
 @@ -50,6 +50,8 @@
@@ -625,24 +625,7 @@ index c855b93d..9a66864d 100644
    // Not allowing copying for now
    CuckooMap(CuckooMap&) = delete;
    CuckooMap& operator=(CuckooMap&) = delete;
-@@ -176,6 +193,16 @@ class CuckooMap {
- 
-   template <typename... Args>
-   Entry* DoEmplace(const K& key, const H& hasher, const E& eq, Args&&... args) {
-+    if (IsDpdk) {
-+      Entry* entry1 = new Entry;
-+      new (&entry1->second) V(std::forward<Args>(args)...);
-+      int ret1 = rte_hash_add_key_data(hash, &key, (void*)(&entry1->second));
-+      if (ret1 < 0)
-+        return nullptr;
-+      entry1->first = key;
-+      return entry1;
-+    }
-+
-     Entry* entry;
-     HashResult primary = Hash(key, hasher);
- 
-@@ -220,6 +247,50 @@ class CuckooMap {
+@@ -220,6 +237,50 @@ class CuckooMap {
      return DoEmplace(key, hasher, eq, std::move(value));
    }
  
@@ -659,7 +642,7 @@ index c855b93d..9a66864d 100644
 +  }
 +
 +  int find_dpdk(const void* key, void** data = 0,
-+                hash_sig_t sig = 0) /*(const K& key, void* out) */
++                hash_sig_t sig = 0)
 +  {
 +    if (IsDpdk) {
 +      if (data && !sig)
@@ -675,7 +658,7 @@ index c855b93d..9a66864d 100644
 +  }
 +
 +  int find_dpdk(const void* key, void** data = 0,
-+                hash_sig_t sig = 0) const /*(const K& key, void* out) */
++                hash_sig_t sig = 0) const
 +  {
 +    if (IsDpdk) {
 +      if (data && !sig)
@@ -693,24 +676,7 @@ index c855b93d..9a66864d 100644
    // Emplace/update-in-place a key value pair
    // On success returns a pointer to the inserted entry, nullptr otherwise.
    // NOTE: when Emplace() returns nullptr, the constructor of `V` may not be
-@@ -242,6 +313,16 @@ class CuckooMap {
-   // const version of Find()
-   const Entry* Find(const K& key, const H& hasher = H(),
-                     const E& eq = E()) const {
-+    if (IsDpdk) {
-+      Entry* ans = new Entry;
-+      V* data;
-+      int ret = rte_hash_lookup_data(hash, &key, (void**)&data);
-+      if (ret < 0)
-+        return NULL;
-+      ans->first = key;
-+      ans->second = *data;
-+      return ans;
-+    }
-     EntryIndex idx = FindWithHash(Hash(key, hasher), key, eq);
-     if (idx == kInvalidEntryIdx) {
-       return nullptr;
-@@ -255,6 +336,13 @@ class CuckooMap {
+@@ -255,6 +316,13 @@ class CuckooMap {
    // Remove the stored entry by the key
    // Return false if not exist.
    bool Remove(const K& key, const H& hasher = H(), const E& eq = E()) {
@@ -724,7 +690,7 @@ index c855b93d..9a66864d 100644
      HashResult pri = Hash(key, hasher);
      if (RemoveFromBucket(pri, pri & bucket_mask_, key, eq)) {
        return true;
-@@ -267,6 +355,12 @@ class CuckooMap {
+@@ -267,6 +335,12 @@ class CuckooMap {
    }
  
    void Clear() {
@@ -737,7 +703,7 @@ index c855b93d..9a66864d 100644
      buckets_.clear();
      entries_.clear();
  
-@@ -286,7 +380,36 @@ class CuckooMap {
+@@ -286,7 +360,36 @@ class CuckooMap {
    }
  
    // Return the number of stored entries
@@ -933,5 +899,5 @@ index 7c0cfda4..ac87e090 100644
  
  #endif  // BESS_UTILS_EXACT_MATCH_TABLE_H_
 -- 
-2.17.1
+2.25.1
 

@@ -51,7 +51,7 @@ type P4rtClient struct {
 	digests    chan *p4.DigestList
 
 	// exported fields
-	P4Info p4ConfigV1.P4Info
+	P4Info *p4ConfigV1.P4Info
 }
 
 type P4RuntimeError struct {
@@ -446,7 +446,7 @@ func (c *P4rtClient) GetForwardingPipelineConfig() (err error) {
 			"Operation successful, but no P4 config provided.")
 	}
 
-	c.P4Info = *pipeline.Config.P4Info
+	c.P4Info = pipeline.Config.P4Info
 
 	getLog.Info("Got ForwardingPipelineConfig from P4Rt device")
 
@@ -479,15 +479,15 @@ func (c *P4rtClient) SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath st
 		return
 	}
 
-	var p4info p4ConfigV1.P4Info
+	p4Info := &p4ConfigV1.P4Info{}
 
-	err = proto.UnmarshalText(string(p4infoBytes), &p4info)
+	err = proto.UnmarshalText(string(p4infoBytes), p4Info)
 	if err != nil {
 		log.Println("Unmarshal test failed for p4info ", err)
 		return
 	}
 
-	c.P4Info = p4info
+	c.P4Info = p4Info
 
 	deviceConfig, err := LoadDeviceConfig(deviceConfigPath)
 	if err != nil {
@@ -496,7 +496,7 @@ func (c *P4rtClient) SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath st
 	}
 
 	var pipeline p4.ForwardingPipelineConfig
-	pipeline.P4Info = &p4info
+	pipeline.P4Info = p4Info
 	pipeline.P4DeviceConfig = deviceConfig
 
 	err = SetPipelineConfig(c.client, c.deviceID, &c.electionID, &pipeline)
@@ -588,9 +588,26 @@ func CreateChannel(host string, deviceID uint64) (*P4rtClient, error) {
 		return nil, err
 	}
 
+	closeStreamOnError := func() {
+		if client.stream != nil {
+			err := client.stream.CloseSend()
+			if err != nil {
+				log.Errorf("Failed to close P4Rt stream with %v: %v", client.conn.Target(), err)
+			}
+		}
+	}
+
 	err = client.SetMastership(TimeBasedElectionId())
 	if err != nil {
 		log.Error("Set Mastership error: ", err)
+		closeStreamOnError()
+
+		return nil, err
+	}
+
+	err = client.GetForwardingPipelineConfig()
+	if err != nil {
+		closeStreamOnError()
 		return nil, err
 	}
 
