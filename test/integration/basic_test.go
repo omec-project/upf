@@ -673,6 +673,11 @@ func testUEDetach(t *testing.T, testcase *testCase) {
 func testUEAttachDetach(t *testing.T, testcase *testCase) {
 	testUEAttach(t, testcase)
 	testUEDetach(t, testcase)
+
+	if isDatapathUP4() {
+		// re-initialize counters so that we can verify if pfcp-agent clears them properly
+		mustInitCountersWithDummyValue()
+	}
 }
 
 func testSliceMeter(t *testing.T, testcase *testCase) {
