@@ -82,7 +82,7 @@ RUN apt-get update && \
         grpcio \
         iptools \
         mitogen \
-        protobuf \
+        protobuf==3.20.0 \
         psutil \
         pyroute2 \
         scapy && \
