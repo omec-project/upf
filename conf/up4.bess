@@ -33,6 +33,7 @@ qerRedGate = 3
 qerFailGate = 4
 qerStatusDropGate = 5
 qerUnmeteredGate = 6
+schedFailGate = 1
 interfaces = ["access", "core"]
 parser = Parser('conf/upf.json')
 parser.parse(interfaces)
@@ -229,6 +230,7 @@ if parser.enable_slice_metering:
     sliceMeter::Qos(fields=[{'attr_name':'action', 'num_bytes':1}, \
                             {'attr_name':'tunnel_out_type', 'num_bytes':1}],\
                             entries=8)
+    scheduler::Sch(fields=[{'attr_name':'qfi', 'num_bytes':1}])
     # Reserved gates, reject rule adds with gate=1/2/3
     m_meter  = 0 # Placeholder gate not connected. Will meter if lookup result returns this gate
     m_green  = 1 # For green traffic
@@ -238,13 +240,14 @@ if parser.enable_slice_metering:
     m_fail   = 4 # For lookup failure traffic
     m_unmeter = 5 # For unmetered traffic
     # Admit green, yellow, unmetered and lookup failures, drop red.
-    sliceMeter:m_green -> executeFAR
-    sliceMeter:m_yellow -> executeFAR
+    sliceMeter:m_green -> scheduler
+    sliceMeter:m_yellow -> scheduler
     sliceMeter:m_red -> sliceMeterRed::Sink()
-    sliceMeter:m_fail -> executeFAR
-    sliceMeter:m_unmeter -> executeFAR
+    sliceMeter:m_fail -> sliceMeterLookupFail::Sink()
+    sliceMeter:m_unmeter -> scheduler
     sliceMeter.set_default_gate(gate=m_fail)
     _in = sliceMeter
+    scheduler -> executeFAR
 
 farLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
                                      {'attr_name':'fseid', 'num_bytes':8}], \
@@ -296,6 +299,7 @@ appQERLookup:qerFailGate -> appQERLookupFail::Sink()
 executeFAR:farDropAction -> farDrop::Sink()
 executeFAR:farBufferAction -> farBuffer::Sink()
 gtpuEncap:0 -> gtpuEncapFail::Sink()
+scheduler:schedFailGate -> schDrop::Sink()
 
 # Set default gates for relevant modules
 pdrLookup.set_default_gate(gate=pdrFailGate)

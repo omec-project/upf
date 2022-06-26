@@ -3,7 +3,7 @@
     "": "mode: af_xdp",
     "": "mode: af_packet",
     "": "mode: sim",
-    "mode": "dpdk",
+    "mode": "sim",
 
     "table_sizes": {
         "": "Example sizes based on sim mode and 50K sessions. Customize as per your control plane",

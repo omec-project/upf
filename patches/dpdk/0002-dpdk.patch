@@ -1,0 +1,90 @@
+From 9074e273997ffda0b012291ce0b2eb9992e1b9ab Mon Sep 17 00:00:00 2001
+From: Amar Sri <amarsri28@gmail.com>
+Date: Tue, 23 Nov 2021 05:06:31 -0800
+Subject: [PATCH] dpdk
+
+---
+ config/rte_config.h | 22 ++++++++++++++++------
+ 1 file changed, 16 insertions(+), 6 deletions(-)
+
+diff --git a/config/rte_config.h b/config/rte_config.h
+index cab4390a97..28379ce719 100644
+--- a/config/rte_config.h
++++ b/config/rte_config.h
+@@ -13,6 +13,7 @@
+ #define _RTE_CONFIG_H_
+ 
+ #include <rte_build_config.h>
++#include "rte_compatibility_defines.h"
+ 
+ /* legacy defines */
+ #ifdef RTE_EXEC_ENV_LINUX
+@@ -50,18 +51,17 @@
+ 
+ /* mbuf defines */
+ #define RTE_MBUF_DEFAULT_MEMPOOL_OPS "ring_mp_mc"
++#define RTE_MBUF_REFCNT_ATOMIC 1
+ #define RTE_PKTMBUF_HEADROOM 128
+ 
+ /* ether defines */
+ #define RTE_MAX_QUEUES_PER_PORT 1024
+ #define RTE_ETHDEV_QUEUE_STAT_CNTRS 16 /* max 256 */
+ #define RTE_ETHDEV_RXTX_CALLBACKS 1
+-#define RTE_MAX_MULTI_HOST_CTRLS 4
+ 
+ /* cryptodev defines */
+ #define RTE_CRYPTO_MAX_DEVS 64
+ #define RTE_CRYPTODEV_NAME_LEN 64
+-#define RTE_CRYPTO_CALLBACKS 1
+ 
+ /* compressdev defines */
+ #define RTE_COMPRESS_MAX_DEVS 64
+@@ -71,7 +71,6 @@
+ 
+ /* eventdev defines */
+ #define RTE_EVENT_MAX_DEVS 16
+-#define RTE_EVENT_MAX_PORTS_PER_DEV 255
+ #define RTE_EVENT_MAX_QUEUES_PER_DEV 255
+ #define RTE_EVENT_TIMER_ADAPTER_NUM_MAX 32
+ #define RTE_EVENT_ETH_INTR_RING_SIZE 1024
+@@ -82,15 +81,16 @@
+ #define RTE_RAWDEV_MAX_DEVS 64
+ 
+ /* ip_fragmentation defines */
+-#define RTE_LIBRTE_IP_FRAG_MAX_FRAG 8
++#define RTE_LIBRTE_IP_FRAG_MAX_FRAG 4
+ #undef RTE_LIBRTE_IP_FRAG_TBL_STAT
+ 
+ /* rte_power defines */
+ #define RTE_MAX_LCORE_FREQS 64
+ 
+ /* rte_sched defines */
+-#undef RTE_SCHED_CMAN
+-#undef RTE_SCHED_COLLECT_STATS
++#def  RTE_SCHED_DEBUG
++#def RTE_SCHED_RED
++#def RTE_SCHED_COLLECT_STATS
+ #undef RTE_SCHED_SUBPORT_TC_OV
+ #define RTE_SCHED_PORT_N_GRINDERS 8
+ #undef RTE_SCHED_VECTOR
+@@ -139,7 +139,17 @@
+ /* QEDE PMD defines */
+ #define RTE_LIBRTE_QEDE_FW ""
+ 
++/* DLB PMD defines */
++#define RTE_LIBRTE_PMD_DLB_POLL_INTERVAL 1000
++#define RTE_LIBRTE_PMD_DLB_UMWAIT_CTL_STATE  0
++#undef RTE_LIBRTE_PMD_DLB_QUELL_STATS
++#define RTE_LIBRTE_PMD_DLB_SW_CREDIT_QUANTA 32
++
+ /* DLB2 defines */
++#define RTE_LIBRTE_PMD_DLB2_POLL_INTERVAL 1000
++#define RTE_LIBRTE_PMD_DLB2_UMWAIT_CTL_STATE  0
+ #undef RTE_LIBRTE_PMD_DLB2_QUELL_STATS
++#define RTE_LIBRTE_PMD_DLB2_SW_CREDIT_QUANTA 32
++#define RTE_PMD_DLB2_DEFAULT_DEPTH_THRESH 256
+ 
+ #endif /* _RTE_CONFIG_H_ */
+-- 
+2.17.1
+
