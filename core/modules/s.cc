@@ -140,13 +140,15 @@ CommandResponse Sch::Init(const bess::pb::SchArg &arg) {
   }
 
   total_value_size_ = align_ceil(value_acc, sizeof(uint64_t));
-  
+  */
 
+  //std::cout << "mask0=" << mask[0]<<mask[1]<<mask[2]<<mask[3]<<mask[4]<<mask[5]<<mask[6]<<mask[7] << std::endl;
   uint8_t *cs = (uint8_t *)&mask;
   for (int i = 0; i < size_acc; i++) {
     cs[i] = 0xff;
   }
-*/
+
+  //std::cout << "mask1=" << mask[0]<<mask[1]<<mask[2]<<mask[3]<<mask[4]<<mask[5]<<mask[6]<<mask[7] << std::endl;
   //table_.Init(total_key_size_, arg.entries());
   //return CommandSuccess();
 ////////////////////////////////////////////////
@@ -229,6 +231,8 @@ void Sch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
       for (size_t i = 0; i < len; i++) {
         keys[j].u64_arr[i] = keys[j].u64_arr[i] & mask[i];
       }
+ std::cout <<"keys0" << keys[j].u64_arr[0] <<"1="<< keys[j].u64_arr[1] <<"2=" << keys[j].u64_arr[2] << "3="<< keys[j].u64_arr[3]<< "4="<<keys[j].u64_arr[4]<<"5"<<keys[j].u64_arr[5]<<"6="<<keys[j].u64_arr[6]<<"7="<<keys[j].u64_arr[7]<<std::endl; 
+
     }
   }
 

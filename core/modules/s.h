@@ -70,7 +70,13 @@ struct SchKey {
 
 class Sch final : public Module {
  public:
- 
+ Sch() : Module(), default_gate_() {
+    max_allowed_workers_ = Worker::kMaxWorkers;
+    size_t len = sizeof(mask) / sizeof(uint64_t);
+    for (size_t i = 0; i < len; i++)
+      mask[i] = 0;
+  }
+
   //static const gate_idx_t kNumOGates = MAX_GATES;
   struct rte_sched_subport_profile_params subport_profile[MAX_SCHED_SUBPORT_PROFILES];
   static const Commands cmds;

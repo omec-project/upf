@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright(c) 2021 Intel Corporation
+
+# Update assignments to hit different QoS entries
+iface, qer, fseid = 1, 2, 4
+ip_pkt_size = 46
+sleep_seconds_before_delete = 30
+
+import struct
+def convert(format, val, bigendian=True):
+    end = '>' if [bigendian] else '<'
+    return struct.pack(end + format, val, )
+
+
+HighPriorityTraffic::SetMetadata(attrs=[{'name': 'qfi', 'size': 1, 'value_int': 1}])
+
+
+LowPriorityTraffic::SetMetadata(attrs=[{'name': 'qfi', 'size': 1, 'value_int': 2}])
+
+
+QosScheduler::Sch(fields=[{'attr_name':'qfi', 'num_bytes':1}])
+
+#M::Merge()
+S::Split(size=1, attribute='qfi')
+
+# Reserved gates, reject rule adds with gate=1/2/3
+m_meter  = 0 # Placeholder gate not connected. Will meter if lookup result returns this gate
+m_green  = 1 # For green traffic
+m_yellow = 2 # For yellow traffic
+m_red    = 3 # For red traffic
+
+# Rules with gate number above 3 are directly sent out w/o metering
+m_fail   = 4 # Default gate for lookup failure
+m_drop   = 5 # Explicitly asked to drop
+m_unmeter= 6 # Unmetered
+
+QosScheduler:m_green -> Lowpriority::Sink()
+QosScheduler:m_yellow -> Highpriority::Sink()
+#QosScheduler:m_red -> red::Sink()
+QosScheduler:m_drop -> drop::Sink()
+QosScheduler:m_unmeter -> S
+
+QosScheduler:m_fail -> fail::Sink()
+QosScheduler.set_default_gate(gate=m_fail)
+
+# Pipeline
+Source() -> HighPriorityTraffic -> QosScheduler
+Source() -> LowPriorityTraffic -> QosScheduler
+##M -> S
+
+#S:0 -> bad::Sink() # If traffic is going to this gate, meta update in QoS is not working
+#S:1 -> gbr1::Sink()
+#S:2 -> gbr5::Sink()
+#S:3 -> gmbr6::Sink()
+#S:4 -> mbr6::Sink()
+#S:5 -> unmeter::Sink()
+
+# Resume workers to test concurrent read-write
+bess.resume_all()
+
+MPPS = pow(10,6) * ip_pkt_size#
+
+
+
+
+
+
