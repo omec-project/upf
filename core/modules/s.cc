@@ -43,6 +43,7 @@
 #include <rte_cfgfile.h>
 #include "cfg_file.c"
 #include "s.h"
+//#include "../utils/a.h"
 //#include "cfg_file.h"
 #include "conf.h"
 //#include "Rte_meter.h"
@@ -70,25 +71,8 @@ CommandResponse Sch::Init(const bess::pb::SchArg &arg) {
 
 ////////////////////////////////
 
-  	struct rte_cfgfile *file = rte_cfgfile_load(cfg_profile, 0);
+  struct rte_cfgfile *file = rte_cfgfile_load(cfg_profile, 0);
     
-  port_params.name = "port_Scheduler_0";
-	port_params.socket = 0; /* computed */
-  port_params.rate = 125000000000; /* computed */
-	port_params.mtu = 6 + 6 + 4 + 4 + 2 + 1500;
-	port_params.frame_overhead = RTE_SCHED_FRAME_OVERHEAD_DEFAULT;
-	port_params.n_subports_per_port = 1;
-	port_params.n_subport_profiles = 1;
-	port_params.subport_profiles = subport_profile;
-	port_params.n_max_subport_profiles = MAX_SCHED_SUBPORT_PROFILES;
-	port_params.n_pipes_per_subport = MAX_SCHED_PIPES;
-  
-   char port_name[32];
-	port_params.socket = rte_socket_id() == LCORE_ID_ANY ? 0 : rte_socket_id();//socketid;
-	port_params.rate = /*(uint64_t) link.link_speed*/ 100* 1000 * 1000 / 8;
-	snprintf(port_name, sizeof(port_name), "port_%d", /*portid*/0);
-	port_params.name = port_name;
-  port_params.rate = 1250000000+10000; 
   cfg_load_port(file, &port_params);
 
 //cfg_load_port(file, &port_params);
@@ -230,8 +214,10 @@ void Sch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 
       for (size_t i = 0; i < len; i++) {
         keys[j].u64_arr[i] = keys[j].u64_arr[i] & mask[i];
+        std::cout << "mask[i]="<<mask[i] << "keys[j].u64_arr[i] ="<<keys[j].u64_arr[i];
       }
- std::cout <<"keys0" << keys[j].u64_arr[0] <<"1="<< keys[j].u64_arr[1] <<"2=" << keys[j].u64_arr[2] << "3="<< keys[j].u64_arr[3]<< "4="<<keys[j].u64_arr[4]<<"5"<<keys[j].u64_arr[5]<<"6="<<keys[j].u64_arr[6]<<"7="<<keys[j].u64_arr[7]<<std::endl; 
+      std::cout<<std::endl;
+// std::cout <<"keys0" << keys[j].u64_arr[0] <<"1="<< keys[j].u64_arr[1] <<"2=" << keys[j].u64_arr[2] << "3="<< keys[j].u64_arr[3]<< "4="<<keys[j].u64_arr[4]<<"5"<<keys[j].u64_arr[5]<<"6="<<keys[j].u64_arr[6]<<"7="<<keys[j].u64_arr[7]<<std::endl; 
 
     }
   }
@@ -511,39 +497,39 @@ for(int i=0; i< MAX_SCHED_SUBPORT_PROFILES; i++)
 for(int i=0; i< MAX_SCHED_PIPE_PROFILES; i++)
 {
 	 /* Profile #0 */
-				pipe_profiles[i].tb_rate = 1250000000;
+				pipe_profiles[i].tb_rate = 305175;
 				pipe_profiles[i].tb_size = 1000000;
 
 				pipe_profiles[i].tc_period = 40;
-#ifdef RTE_SCHED_SUBPORT_TC_OV
+//#ifdef RTE_SCHED_SUBPORT_TC_OV
 				pipe_profiles[i].tc_ov_weight = 1;
-#endif
+//#endif
 
-			//	pipe_profiles[i].wrr_weights = {1, 1, 1, 1},
+				//pipe_profiles[i].wrr_weights = {1, 1, 1, 1},
 
 
    ///////////////////////////////////
 
-    pipe_profiles[i].tc_rate[0] = 1250000000;
-    pipe_profiles[i].tc_rate[1] = 1250000000;
-    pipe_profiles[i].tc_rate[2]= 1250000000;
-    pipe_profiles[i].tc_rate[3]= 1250000000;
-    pipe_profiles[i].tc_rate[4]= 1250000000;
-    pipe_profiles[i].tc_rate[5]= 1250000000;
-    pipe_profiles[i].tc_rate[6]= 1250000000;
-    pipe_profiles[i].tc_rate[7]= 1250000000;
-    pipe_profiles[i].tc_rate[8]= 1250000000;
-    pipe_profiles[i].tc_rate[9]= 1250000000;
-    pipe_profiles[i].tc_rate[10]= 1250000000;
-    pipe_profiles[i].tc_rate[11]= 1250000000;
-    pipe_profiles[i].tc_rate[12]= 1250000000;
+    pipe_profiles[i].tc_rate[0] = 305175;
+    pipe_profiles[i].tc_rate[1] = 305175;//1250000000;
+    pipe_profiles[i].tc_rate[2]= 305175;//1250000000;
+    pipe_profiles[i].tc_rate[3]= 305175;//1250000000;
+    pipe_profiles[i].tc_rate[4]= 305175;//1250000000;
+    pipe_profiles[i].tc_rate[5]= 305175;//1250000000;
+    pipe_profiles[i].tc_rate[6]= 305175;//1250000000;
+    pipe_profiles[i].tc_rate[7]= 305175;//1250000000;
+    pipe_profiles[i].tc_rate[8]= 305175;//1250000000;
+    pipe_profiles[i].tc_rate[9]= 305175;//1250000000;
+    pipe_profiles[i].tc_rate[10]= 305175;//1250000000;
+    pipe_profiles[i].tc_rate[11]= 305175;//1250000000;
+    pipe_profiles[i].tc_rate[12]= 305175;//1250000000;
 
     
     //pipe_profiles[i].tc_rate = {305175, 305175, 305175, 305175, 305175, 305175,
 			//305175, 305175, 305175, 305175, 305175, 305175, 305175};
-		//pipe_profiles[i].tc_period = 40;
+		pipe_profiles[i].tc_period = 40;
 //#ifdef RTE_SCHED_SUBPORT_TC_OV
-		pipe_profiles[i].tc_ov_weight = 1;
+//		pipe_profiles[i].tc_ov_weight = 1;
 //#endif
     pipe_profiles[i].wrr_weights[0]=1;
     pipe_profiles[i].wrr_weights[1]=1;
@@ -647,10 +633,9 @@ subport_params[i].n_pipes_per_subport_enabled = 4096;
 }
 //#endif
 
-///*struct rte_Sched_port_params */port_params = {
-port_params.name = "port_Scheduler_0";
+  port_params.name = "port_Scheduler_0";
 	port_params.socket = 0; /* computed */
-	port_params.rate = 0; /* computed */
+  port_params.rate = 1250000000; /* computed */
 	port_params.mtu = 6 + 6 + 4 + 4 + 2 + 1500;
 	port_params.frame_overhead = RTE_SCHED_FRAME_OVERHEAD_DEFAULT;
 	port_params.n_subports_per_port = 1;
@@ -658,16 +643,13 @@ port_params.name = "port_Scheduler_0";
 	port_params.subport_profiles = subport_profile;
 	port_params.n_max_subport_profiles = MAX_SCHED_SUBPORT_PROFILES;
 	port_params.n_pipes_per_subport = MAX_SCHED_PIPES;
-//};
-//#endif
- char port_name[32];
-	
+  
+   char port_name[32];
 	port_params.socket = rte_socket_id() == LCORE_ID_ANY ? 0 : rte_socket_id();//socketid;
-	port_params.rate = /*(uint64_t) link.link_speed*/ 10* 1000 * 1000 / 8;
 	snprintf(port_name, sizeof(port_name), "port_%d", /*portid*/0);
 	port_params.name = port_name;
 
-port_params.rate = 1250000000; 
+
 std::cout<<"v"<<std::endl;
 	port = rte_sched_port_config(&port_params);
 	if (port == NULL){
