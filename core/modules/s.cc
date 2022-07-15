@@ -214,10 +214,10 @@ void Sch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 
       for (size_t i = 0; i < len; i++) {
         keys[j].u64_arr[i] = keys[j].u64_arr[i] & mask[i];
-        std::cout << "mask[i]="<<mask[i] << "keys[j].u64_arr[i] ="<<keys[j].u64_arr[i];
+   //     std::cout << "mask[i]="<<mask[i] << "keys[j].u64_arr[i] ="<<keys[j].u64_arr[i];
       }
       std::cout<<std::endl;
-// std::cout <<"keys0" << keys[j].u64_arr[0] <<"1="<< keys[j].u64_arr[1] <<"2=" << keys[j].u64_arr[2] << "3="<< keys[j].u64_arr[3]<< "4="<<keys[j].u64_arr[4]<<"5"<<keys[j].u64_arr[5]<<"6="<<keys[j].u64_arr[6]<<"7="<<keys[j].u64_arr[7]<<std::endl; 
+ //std::cout <<"keys0" << keys[j].u64_arr[0] <<" 1="<< keys[j].u64_arr[1] <<" 2=" << keys[j].u64_arr[2] << " 3="<< keys[j].u64_arr[3]<< " 4="<<keys[j].u64_arr[4]<<" 5"<<keys[j].u64_arr[5]<<" 6="<<keys[j].u64_arr[6]<<" 7="<<keys[j].u64_arr[7]<<std::endl; 
 
     }
   }
@@ -235,6 +235,7 @@ void Sch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     pkt = batch->pkts()[j];
     flag=1; 
     ogate = 0;//(uint16_t) d->qfi;//val[j]->ogate;
+    uint8_t key2 = (uint8_t) (keys[j].u64_arr[0]);
   #if 0
     size_t num_values_ = values_.size();
     for (size_t i = 0; i < num_values_; i++) {
@@ -302,12 +303,16 @@ void Sch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     m[j]->l3_len = sizeof(*iph);
     //auto itr = gbr.find(val[j]->q);
     //int h =itr->second.second;
+    
+    //cout << "key2=" << static_cast<unsigned>(key2) << std::endl;
 
+    auto itr = gbr.find(key2);
+    int h =itr->second.second;
   //std::cout <<"g"<<std::endl;
     uint32_t col=RTE_COLOR_GREEN;
     //std::cout<<"ogate=="<<ogate<<std::endl;
     rte_sched_port_pkt_write(port, m[j], /*subport*/ 0, /*pipe*/ 0,
-                             /*tc*/ 0, /*queue*/ 0/*ogate*/, /*color*/ (enum rte_color)col);//RTE_COLOR_YELLLOW);
+                             /*tc*/ 0, /*queue*/ h/*ogate*/, /*color*/ (enum rte_color)col);//RTE_COLOR_YELLLOW);
 
   }
 if(flag)
@@ -650,12 +655,12 @@ subport_params[i].n_pipes_per_subport_enabled = 4096;
 	port_params.name = port_name;
 
 
-std::cout<<"v"<<std::endl;
+//std::cout<<"v"<<std::endl;
 	port = rte_sched_port_config(&port_params);
 	if (port == NULL){
 		rte_exit(EXIT_FAILURE, "Unable to config Sched port\n");
 	}
-std::cout<<"v1"<<std::endl;
+//std::cout<<"v1"<<std::endl;
 	for (subport = 0; subport < port_params.n_subports_per_port; subport ++) {
 
 	 int err = rte_sched_subport_config(port, subport, &subport_params[subport],0);
@@ -666,7 +671,7 @@ std::cout<<"v1"<<std::endl;
 
 		uint32_t n_pipes_per_subport =
 			subport_params[subport].n_pipes_per_subport_enabled;
-std::cout<<"v2"<<std::endl;
+//std::cout<<"v2"<<std::endl;
 		for (pipe = 0; pipe < n_pipes_per_subport; pipe++) {
 			if (app_pipe_to_profile[subport][pipe] != -1) {
 				err = rte_sched_pipe_config(port, subport, pipe,
