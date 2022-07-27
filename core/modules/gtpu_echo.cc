@@ -60,13 +60,13 @@ bool GtpuEcho::process_echo_request(bess::Packet *p) {
 
   /* Swap src and dest IP addresses */
   std::swap(iph->src, iph->dst);
-  iph->length = be16_t(iph->length.value() + sizeof(struct gtpu_recovery_ie_t));
+  iph->length = be16_t(iph->length.value());
   /* Reset checksum. This will be computed by next module in line */
   iph->checksum = 0;
 
   /* Swap src and dst UDP ports */
   std::swap(udp->src_port, udp->dst_port);
-  udp->length = be16_t(udp->length.value() + sizeof(struct gtpu_recovery_ie_t));
+  udp->length = be16_t(udp->length.value());
   /* Reset checksum. This will be computed by next module in line */
   udp->checksum = 0;
   return true;
