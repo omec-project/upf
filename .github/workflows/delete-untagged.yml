@@ -15,7 +15,7 @@ jobs:
         package: ["bess_build", "upf-epc-bess", "upf-epc-pfcpiface"]
     steps:
       - name: Delete image
-        uses: bots-house/ghcr-delete-image-action@9dee3adb4e4082ef06710f3d8aa9f7e73f89d189
+        uses: bots-house/ghcr-delete-image-action@22bf76ed038fa077092ceeaab338c0bb6878f374
         with:
           # NOTE: at now only orgs is supported
           owner: omec-project
