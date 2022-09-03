@@ -37,8 +37,8 @@ bool GtpuEcho::process_echo_request(bess::Packet *p) {
   struct gtpu_recovery_ie_t *recovery_ie = NULL;
 
   /* re-use space (if available) left in Ethernet padding for recovery_ie */
-  if (p->total_len() - (sizeof(Ethernet) + iph->length.value() +
-                        sizeof(struct gtpu_recovery_ie_t))) {
+  if ((p->total_len() - (sizeof(Ethernet) + iph->length.value())) >
+      sizeof(struct gtpu_recovery_ie_t)) {
     recovery_ie = (struct gtpu_recovery_ie_t *)((char *)gtph + sizeof(Gtpv1) +
                                                 gtph->length.value());
   } else {
