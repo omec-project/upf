@@ -22,7 +22,7 @@ mode="sim"
 # Gateway interface(s)
 #
 # In the order of ("s1u" "sgi")
-ifaces=("ens803f2" "ens803f3")
+ifaces=("enp24s17f1" "enp24s17f2")
 
 # Static IP addresses of gateway interface(s) in cidr format
 #
@@ -32,7 +32,7 @@ ipaddrs=(198.18.0.1/30 198.19.0.1/30)
 # MAC addresses of gateway interface(s)
 #
 # In the order of (s1u sgi)
-macaddrs=(9e:b2:d3:34:ab:27 c2:9c:55:d4:8a:f6)
+macaddrs=(22:23:24:25:26:27 32:33:34:35:36:37)
 
 # Static IP addresses of the neighbors of gateway interface(s)
 #
@@ -111,7 +111,7 @@ sudo rm -rf /var/run/netns/pause
 make docker-build
 
 if [ "$mode" == 'dpdk' ]; then
-	DEVICES=${DEVICES:-'--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio'}
+	DEVICES=${DEVICES:-'--device=/dev/vfio/179 --device=/dev/vfio/180 --device=/dev/vfio/vfio'}
 	PRIVS='--cap-add IPC_LOCK'
 
 elif [ "$mode" == 'af_xdp' ]; then
@@ -151,7 +151,7 @@ if [ "$mode" != 'sim' ]; then
 fi
 
 # Run bessd
-docker run --name bess -td --restart unless-stopped \
+docker run --name bess -td --restart unless-stopped -v /home/stack/Amar/qos/upf-epc1/core/modules:/home/stack/Amar/qos/upf-epc1/core/modules \
 	--cpuset-cpus=12-13 \
 	--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
 	-v "$PWD/conf":/opt/bess/bessctl/conf \
