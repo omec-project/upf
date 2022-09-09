@@ -514,6 +514,23 @@ for(int i=0; i< MAX_SCHED_SUBPORT_PROFILES; i++)   //set subport profile values 
 
 for(int i=0; i< MAX_SCHED_PIPE_PROFILES; i++)
 {
+		std::cout<<	"pipe_profiles[i].tb_rate="<< "i="<<i<< " "	<<pipe_profiles[i].tb_rate<<std::endl;// = 305175;
+		std::cout<<	"pipe_profiles[i].tb_size="<<"i="<<i<<" "<<pipe_profiles[i].tb_size <<std::endl;//= 1000000;
+
+		std::cout<<	"pipe_profiles[i].tc_period="<<"i="<<i<< " "<<pipe_profiles[i].tc_period<<std::endl;
+    std::cout<<	"pipe_profiles[i].tc_ov_weight="<<"i="<<i<< " "<<pipe_profiles[i].tc_ov_weight <<std::endl;
+
+    for(int j=0;j<13;j++)
+    {
+    std::cout<< "pipe_profiles[i].tc_rate[0]" <<"j="<<j<< " "<<pipe_profiles[i].tc_rate[j] <<std::endl;
+    }
+  std::cout <<"pipe_profiles[i].wrr_weights="<<"i="<<i<< " "<<pipe_profiles[i].wrr_weights[0]<< " "<< pipe_profiles[i].wrr_weights[1] << " "<< pipe_profiles[i].wrr_weights[2] << " "<< pipe_profiles[i].wrr_weights[3]<<std::endl;
+	std::cout << "\n"<<std::endl;
+ }
+
+#if 0
+for(int i=0; i< MAX_SCHED_PIPE_PROFILES; i++)   //set pipe profile based on line rate
+{
 	 /* Profile #0 */
 				pipe_profiles[i].tb_rate = 305175;
 				pipe_profiles[i].tb_size = 1000000;
@@ -556,6 +573,7 @@ for(int i=0; i< MAX_SCHED_PIPE_PROFILES; i++)
 //		pipe_profiles[i].wrr_weights = {1, 1, 1, 1};
 	
 };
+#endif
 
 
 for(int i=0; i< MAX_SCHED_SUBPORTS; i++)
