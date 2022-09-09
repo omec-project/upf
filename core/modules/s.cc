@@ -150,8 +150,35 @@ CommandResponse Sch::AddFieldOne(const bess::pb::Field &field,
   return CommandSuccess();
 }
 
+#if 0
 void Sch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
+bess::Packet *pkt = nullptr;
+//gate_idx_t default_gate;
+  gate_idx_t  ogate=0;
+ // default_gate = ACCESS_ONCE(default_gate_);
+//
+  int cnt = batch->cnt();
+  std::cout<<"sch:cnt="<<cnt <<std::endl;
 
+
+  for (int j = 0; j < cnt; j++) {
+    pkt = batch->pkts()[j];
+    //if ((hit_mask & ((uint64_t)1ULL << j)) == 0) 
+    {
+      EmitPacket(ctx, pkt, ogate);
+      //continue;
+    }
+  }
+
+
+}
+#endif
+
+
+//#if 0
+void Sch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
+int log=0;
+uint32_t col =-1;
   ////////////////////////////////////////////////////////
   gate_idx_t default_gate;
   uint16_t ogate=0;
@@ -202,7 +229,7 @@ void Sch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   }
 
   ////////////////////////////////////////////////////////
-  
+  if (log)
   std::cout <<"a"<<std::endl;
   //uint64_t hit_mask = table_.Find(keys, val, cnt);
  // std::cout << "enqueue started" << hit_mask<<std::endl;
@@ -282,16 +309,29 @@ void Sch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     m[j]->l3_len = sizeof(*iph);
     //auto itr = gbr.find(val[j]->q);
     //int h =itr->second.second;
-    
-    //cout << "key2=" << static_cast<unsigned>(key2) << std::endl;
+    if(log)
+    cout << "key2=" << static_cast<unsigned>(key2) << std::endl;
 
     auto itr = gbr.find(key2);
     int h =itr->second.second;
-  //std::cout <<"g"<<std::endl;
-    uint32_t col=RTE_COLOR_GREEN;
+    if(log)
+    std::cout <<"h="<<h<<std::endl;
+
+    
+    
+    if(key2==1)
+      col=RTE_COLOR_GREEN;
+    else if(key2==2)
+      col=RTE_COLOR_YELLOW;
+
     //std::cout<<"ogate=="<<ogate<<std::endl;
+    if(key2==1)
+    rte_sched_port_pkt_write(port, m[j], /*subport*/ 0, /*pipe*/ 1,
+                             /*tc*/ 0, /*queue*/ 0, /*color*/ (enum rte_color)col);//RTE_COLOR_YELLLOW);
+
+    else if(key2==0)
     rte_sched_port_pkt_write(port, m[j], /*subport*/ 0, /*pipe*/ 0,
-                             /*tc*/ 0, /*queue*/ h/*ogate*/, /*color*/ (enum rte_color)col);//RTE_COLOR_YELLLOW);
+                             /*tc*/ 0, /*queue*/ 0, /*color*/ (enum rte_color)col);//RTE_COLOR_YELLLOW);
 
   }
 if(flag)
@@ -307,21 +347,26 @@ if(flag)
     // uint16_t queue_length1;     
     int err = rte_sched_queue_read_stats(port, 0, &queue_stats,&queue_length);
 
-    if (err) {
+    if (err) 
+    {
        std::cout << "rte_Sched_queue_read_stats failed-Queue0=" << err <<std::endl;
        return;
-     }
-     else
+    }
+    else
+    {
+    if(log)
      std::cout<< "Queue 0" << ": current length " << queue_length
          << ", packets " << queue_stats.n_pkts << ", packets dropped "
          << queue_stats.n_pkts_dropped << ", bytes " << queue_stats.n_bytes
          << ", bytes dropped " << queue_stats.n_bytes_dropped <<std::endl;
 
-
+    }
   }
   //std::cout << "Enqueue end" << count2<<std::endl;
+    if(log) 
     std::cout<<"a2-u-enqueue-no-of-packets="<<u<<std::endl;
-    struct rte_mbuf *tx_mbufs[queue_length];
+    std::cout << "enqueued =" <<cnt<<"color="<<col<<std::endl;
+    struct rte_mbuf *tx_mbufs[cnt/*queue_length*/];
     int retu = 0;
     uint32_t subport, traffic_class, queue,pipe;
   //  struct rte_mbuf *out_mbufs[1];
@@ -329,12 +374,14 @@ if(flag)
   //std::cout << "dequeue started"<< std::endl;
   //int count1=0;
   //do
-  if (queue_length)
+  if (1/*queue_length*/)
    {   
     retu=0;
     
-  std::cout <<"queue_length="<<queue_length<<std::endl;
-    retu = rte_sched_port_dequeue(port, tx_mbufs, queue_length);
+    if(log)
+    std::cout <<"queue_length="<<queue_length<<std::endl;
+    
+    retu = rte_sched_port_dequeue(port, tx_mbufs, cnt/2/*queue_length*/);
      // std::cout<<"a3"<<std::endl;
     //std::cout <<"l"<<std::endl;
     std::cout << "dequeue-no-of-packets="<<retu<<std::endl;
@@ -344,10 +391,14 @@ if(flag)
     //std::cout << "k="<<k<<std::endl;    
     rte_sched_port_pkt_read_tree_path(port, tx_mbufs[k],
 				&subport, &pipe, &traffic_class, &queue);
+
+    std::cout << k << "." <<"Color=" <<  rte_sched_port_pkt_read_color(tx_mbufs[k]) << std::endl;
+    
+    if (log)
     std::cout << "dequeued packet traffic class =" << traffic_class<< "queue=" << queue << std::endl;
     
     bess::Packet *pkt2 = reinterpret_cast<bess::Packet *>(tx_mbufs[k]);    
-    ogate = traffic_class;
+    ogate = 0;//traffic_class;
       //std::cout<<"a4"<<std::endl;
     //std::cout<<"extracted ogate="<<ogate<<std::endl;
      EmitPacket(ctx, pkt2, ogate);
@@ -355,6 +406,7 @@ if(flag)
      retu--;
      k++;
   } ;//while(retu);
+ std::cout << ".........................................."<<std::endl;
  }
  else
  {
@@ -373,9 +425,11 @@ if(flag)
 
 #if post_enqueue_color
       int olor = rte_Sched_port_pkt_read_color(tx_mbufs[0]);
+      if(log)
       std::cout<<"color-y1="<<olor<<std::endl;
       
        olor = rte_Sched_port_pkt_read_color(tx_mbufs[1]);
+      if(log)
       std::cout<<"color-y2="<<olor<<std::endl;
    
       olor = rte_Sched_port_pkt_read_color(tx_mbufs[2]);
@@ -398,7 +452,7 @@ if(flag)
  #endif  
      
   
-#ifdef stats   
+#ifdef stats1   
    rte_Sched_queue_stats queue_stats;
    //   rte_Sched_queue_stats queue_stats1;
    //for (uint32_t queueno = 0; queueno < 1; ++queue) 
@@ -453,7 +507,17 @@ std::string Sch::GetDesc() const {
 /////////////////////////////////////////////////////////////////
 CommandResponse Sch::SchedulerInit() {
 //struct rte_Sched_subport_profile_params subport_profile[1];
-//#if 0
+#if 0
+int err;
+struct rte_eth_link link;
+	err = rte_eth_link_get(portid, &link);
+	if (err < 0)
+		rte_exit(EXIT_FAILURE,
+			 "rte_eth_link_get: err=%d, port=%u: %s\n",
+			 err, portid, rte_strerror(-err));
+#endif
+
+
   const char *cfg_profile = "/home/stack/Amar/qos/upf-epc1/core/modules/profile1.cfg";
   FILE *f = fopen(cfg_profile, "r");
 	if (f == NULL)
@@ -562,7 +626,6 @@ for(int i=0; i< MAX_SCHED_PIPE_PROFILES; i++)   //set pipe profile based on line
     
     //pipe_profiles[i].tc_rate = {305175, 305175, 305175, 305175, 305175, 305175,
 			//305175, 305175, 305175, 305175, 305175, 305175, 305175};
-		pipe_profiles[i].tc_period = 40;
 //#ifdef RTE_SCHED_SUBPORT_TC_OV
 //		pipe_profiles[i].tc_ov_weight = 1;
 //#endif
