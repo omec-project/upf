@@ -66,27 +66,6 @@ CommandResponse Sch::Init(const bess::pb::SchArg &arg) {
   //int size_acc = 0;
   //int value_acc = 0;
   //uint64_t a = arg.q();
-  const char *cfg_profile = "../utils/profile.cfg";
-////////////////////////////////
-
-////////////////////////////////
-
-  struct rte_cfgfile *file = rte_cfgfile_load(cfg_profile, 0);
-    
-  cfg_load_port(file, &port_params);
-
-//cfg_load_port(file, &port_params);
-
-	cfg_load_subport(file, subport_params);
-  
-	cfg_load_subport_profile(file, subport_profile);
-	
-  cfg_load_pipe(file, pipe_profiles);
-  
-	rte_cfgfile_close(file);
-//if (app_load_cfg_profile(cfg_profile) != 0)
-	//	rte_exit(EXIT_FAILURE, "Invalid configuration profile\n");
-
   
   //default_gate_ = 0;
 //////////////////////////////////////////////////
@@ -475,9 +454,42 @@ std::string Sch::GetDesc() const {
 CommandResponse Sch::SchedulerInit() {
 //struct rte_Sched_subport_profile_params subport_profile[1];
 //#if 0
+  const char *cfg_profile = "/home/stack/Amar/qos/upf-epc1/core/modules/profile1.cfg";
+  FILE *f = fopen(cfg_profile, "r");
+	if (f == NULL)
+	{
+		std::cout << "fopen -s.cc failed"<<std::endl;
+  }
+  else std::cout << "fopen-success"<<std::endl;
+
+  struct rte_cfgfile *file = rte_cfgfile_load(cfg_profile, 0);
+
+  if (file == NULL)
+            std::cout<< "config file not loaded"<<std::endl;
+  else           
+                std::cout<< "config file loaded-hrrah!!!"<<std::endl;
+
+  cfg_load_port(file, &port_params);
+	cfg_load_subport(file, subport_params);
+	cfg_load_subport_profile(file, subport_profile);
+  cfg_load_pipe(file, pipe_profiles);
+
+	rte_cfgfile_close(file);
 for(int i=0; i< MAX_SCHED_SUBPORT_PROFILES; i++)
 {
-  
+    std::cout << "subport_profile[i].tb_rate=" << "i="<<i<<" "<<subport_profile[i].tb_rate <<std::endl;//= 1250000000;
+		std::cout << "subport_profile[i].tb_size=" << "i="<<i<<" "<<subport_profile[i].tb_size<<std::endl;// = 1000000;
+    std::cout << "subport_profile[i].tc_period=" << "i="<<i<<" "<<subport_profile[i].tc_period<<std::endl;// = 10;
+    
+    for(int j=0;j<13;j++)
+    {
+		  std::cout<<"subport_profile[i].tc_rate[j]="<< j << " "<<subport_profile[i].tc_rate[j]<<std::endl;// = 1250000000;    
+    }
+    //std::cout << "\n" << std::endl;
+}
+#if 0
+for(int i=0; i< MAX_SCHED_SUBPORT_PROFILES; i++)   //set subport profile values here based on line rate
+{
     subport_profile[i].tb_rate = 1250000000;
 		subport_profile[i].tb_size = 1000000;
 
@@ -498,6 +510,7 @@ for(int i=0; i< MAX_SCHED_SUBPORT_PROFILES; i++)
     subport_profile[i].tc_period = 10;
 
 }
+#endif
 
 for(int i=0; i< MAX_SCHED_PIPE_PROFILES; i++)
 {
