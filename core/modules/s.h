@@ -50,9 +50,9 @@ static_assert(MAX_FIELD_SIZE <= sizeof(uint64_t),"field cannot be larger than 8 
 
 #define HASH_KEY_SIZE (MAX_FIELDS * MAX_FIELD_SIZE)
 #define MAX_SCHED_SUBPORT_PROFILES 1
-#define MAX_SCHED_PIPES 4096
-#define MAX_SCHED_PIPE_PROFILES 256
-#define MAX_SCHED_SUBPORTS 8
+#define MAX_SCHED_PIPES 2
+#define MAX_SCHED_PIPE_PROFILES 2
+#define MAX_SCHED_SUBPORTS 1
 
 
 struct SchField {
@@ -87,6 +87,7 @@ class Sch final : public Module {
   int cfg_load_pipe(struct rte_cfgfile *cfg, struct rte_sched_pipe_params *pipe_params);
   int cfg_load_subport(struct rte_cfgfile *cfg, struct rte_sched_subport_params *subport_params);
   int cfg_load_subport_profile(struct rte_cfgfile *cfg,struct rte_sched_subport_profile_params *subport_profile);
+  int cfg_load_qfi_profile(struct rte_cfgfile *cfg);
 CommandResponse Init(const bess::pb::SchArg &arg);
   void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
   CommandResponse CommandSetDefaultGate(
@@ -110,6 +111,7 @@ gate_idx_t default_gate_;
   size_t total_key_size_; /* a multiple of sizeof(uint64_t) */
   size_t total_value_size_;
   uint64_t mask[MAX_FIELDS];
+  uint32_t qfi[85][2][2][2][2];  //85 0 1 1 =sub ; 85 1 0 1 pipe ; 85 1 1 0 tc ; 85 1 1 1 0 queue 
 //ffffffffffffffffff
 };
 #endif
