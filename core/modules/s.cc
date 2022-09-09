@@ -575,8 +575,29 @@ for(int i=0; i< MAX_SCHED_PIPE_PROFILES; i++)   //set pipe profile based on line
 };
 #endif
 
+for(int i=0; i< MAX_SCHED_SUBPORTS; i++)  //print subport info and params just
+{
+ subport_params[i].pipe_profiles = pipe_profiles;
+ subport_params[i].n_pipe_profiles = sizeof(pipe_profiles) /	sizeof(struct rte_sched_pipe_params);
+ subport_params[i].n_max_pipe_profiles = MAX_SCHED_PIPE_PROFILES;
+ 
+ std::cout << "i=" << i << " "<< "subport_params[i].n_pipes_per_subport_enabled = " << subport_params[i].n_pipes_per_subport_enabled <<std::endl;
 
-for(int i=0; i< MAX_SCHED_SUBPORTS; i++)
+ std::cout << "i="<<i << " "<< "subport_params[i].pipe_profiles="<<subport_params[i].pipe_profiles << 
+ "subport_params[i].n_pipe_profiles=" << subport_params[i].n_pipe_profiles << 
+ "subport_params[i].n_max_pipe_profiles=" << subport_params[i].n_max_pipe_profiles <<std::endl;
+
+  for(int j=0;j<13;j++)
+  {
+    std::cout << "j=" << j << "subport_params[i].qsize[j] = " << subport_params[i].qsize[j] << std::endl;
+
+  }
+
+
+}
+
+#if 0
+for(int i=0; i< MAX_SCHED_SUBPORTS; i++)  //set subport values based on line rate
 {
 subport_params[i].n_pipes_per_subport_enabled = 4096;
 		subport_params[i].qsize[0] = 64;
@@ -667,11 +688,11 @@ subport_params[i].n_pipes_per_subport_enabled = 4096;
 	},
 #endif /* RTE_SCHED_RED */
 }
-//#endif
+#endif
 
   port_params.name = "port_Scheduler_0";
 	port_params.socket = 0; /* computed */
-  port_params.rate = 1250000000; /* computed */
+  port_params.rate = 1250305175; /* computed */
 	port_params.mtu = 6 + 6 + 4 + 4 + 2 + 1500;
 	port_params.frame_overhead = RTE_SCHED_FRAME_OVERHEAD_DEFAULT;
 	port_params.n_subports_per_port = 1;
@@ -686,33 +707,39 @@ subport_params[i].n_pipes_per_subport_enabled = 4096;
 	port_params.name = port_name;
 
 
-//std::cout<<"v"<<std::endl;
+std::cout << "rte_sched_port_config started"<<std::endl;
 	port = rte_sched_port_config(&port_params);
 	if (port == NULL){
 		rte_exit(EXIT_FAILURE, "Unable to config Sched port\n");
 	}
-//std::cout<<"v1"<<std::endl;
+  std::cout << "rte_sched_port_config end"<<std::endl;
 	for (subport = 0; subport < port_params.n_subports_per_port; subport ++) {
+    std::cout << "rte_sched_subport_config started"<<std::endl;
 
 	 int err = rte_sched_subport_config(port, subport, &subport_params[subport],0);
 		if (err) {
 			rte_exit(EXIT_FAILURE, "Unable to config Sched subport %u, err=%d\n",
 					subport, err);
 		}
+     std::cout << "subport = "<<subport << "done"<<std::endl;
 
-		uint32_t n_pipes_per_subport =
-			subport_params[subport].n_pipes_per_subport_enabled;
-//std::cout<<"v2"<<std::endl;
-		for (pipe = 0; pipe < n_pipes_per_subport; pipe++) {
-			if (app_pipe_to_profile[subport][pipe] != -1) {
+		uint32_t n_pipes_per_subport = subport_params[subport].n_pipes_per_subport_enabled;
+
+    std::cout<<"subport_params[subport].n_pipes_per_subport_enabled="<<subport_params[subport].n_pipes_per_subport_enabled<<std::endl;
+		for (pipe = 0; pipe < n_pipes_per_subport; pipe++) 
+    {
+			if (app_pipe_to_profile[subport][pipe] != -1) 
+      {
 				err = rte_sched_pipe_config(port, subport, pipe,
 						app_pipe_to_profile[subport][pipe]);
-				if (err) {
+				if (err) 
+        {
 					rte_exit(EXIT_FAILURE, "Unable to config Sched pipe %u "
 							"for profile %d, err=%d\n", pipe,
 							app_pipe_to_profile[subport][pipe], err);
 				}
 			}
+      std::cout << "pipe=" <<pipe << "done"<<std::endl;
 		}//pipe end
 	}  //sub-port  end.
 return CommandSuccess();
