@@ -151,7 +151,7 @@ if [ "$mode" != 'sim' ]; then
 fi
 
 # Run bessd
-docker run --name bess -td --restart unless-stopped \
+docker run --name bess -td --restart unless-stopped -v /home/stack/Amar/qos/upf-epc1/core/modules:/home/stack/Amar/qos/upf-epc1/core/modules \
 	--cpuset-cpus=12-13 \
 	--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
 	-v "$PWD/conf":/opt/bess/bessctl/conf \
