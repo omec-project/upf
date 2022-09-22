@@ -9,6 +9,12 @@ concurrency:
   group: ${{ github.event.pull_request.number }}
   cancel-in-progress: true
   
+permissions:
+  contents: read
+  pull-requests: write
+  actions: write
+  packages: write
+  repository-projects: write
 
 jobs:
   build:
