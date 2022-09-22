@@ -34,6 +34,7 @@
 #include "utils/format.h"
 #include "../packet_pool.h"
 
+
 #include <rte_cycles.h>
 #include <string>
 #include <vector>
@@ -46,7 +47,7 @@
 //#include "../utils/a.h"
 //#include "cfg_file.h"
 #include "conf.h"
-//#include "Rte_meter.h"
+#include "../drivers/pmd.h"
 
 using namespace std;
 
@@ -66,27 +67,6 @@ CommandResponse Sch::Init(const bess::pb::SchArg &arg) {
   //int size_acc = 0;
   //int value_acc = 0;
   //uint64_t a = arg.q();
-  const char *cfg_profile = "../utils/profile.cfg";
-////////////////////////////////
-
-////////////////////////////////
-
-  struct rte_cfgfile *file = rte_cfgfile_load(cfg_profile, 0);
-    
-  cfg_load_port(file, &port_params);
-
-//cfg_load_port(file, &port_params);
-
-	cfg_load_subport(file, subport_params);
-  
-	cfg_load_subport_profile(file, subport_profile);
-	
-  cfg_load_pipe(file, pipe_profiles);
-  
-	rte_cfgfile_close(file);
-//if (app_load_cfg_profile(cfg_profile) != 0)
-	//	rte_exit(EXIT_FAILURE, "Invalid configuration profile\n");
-
   
   //default_gate_ = 0;
 //////////////////////////////////////////////////
@@ -137,6 +117,7 @@ CommandResponse Sch::Init(const bess::pb::SchArg &arg) {
   //return CommandSuccess();
 ////////////////////////////////////////////////
   SchedulerInit();
+
   return CommandSuccess();
 }
 
@@ -171,8 +152,34 @@ CommandResponse Sch::AddFieldOne(const bess::pb::Field &field,
   return CommandSuccess();
 }
 
+#if 0
 void Sch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
+bess::Packet *pkt = nullptr;
+//gate_idx_t default_gate;
+  gate_idx_t  ogate=0;
+ // default_gate = ACCESS_ONCE(default_gate_);
+//
+  int cnt = batch->cnt();
+//  std::cout<<"sch:cnt="<<cnt <<std::endl;
 
+
+  for (int j = 0; j < cnt; j++) {
+    pkt = batch->pkts()[j];
+    //if ((hit_mask & ((uint64_t)1ULL << j)) == 0) 
+    {
+      EmitPacket(ctx, pkt, ogate);
+      //continue;
+    }
+  }
+
+
+}
+#endif
+
+//#if 0
+void Sch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
+int log=0;
+uint32_t col =-1;
   ////////////////////////////////////////////////////////
   gate_idx_t default_gate;
   uint16_t ogate=0;
@@ -183,6 +190,7 @@ void Sch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   int cnt = batch->cnt();
   //value *val[cnt];
 
+//#if 0
   for (const auto &field : fields_) {
     int offset;
     int pos = field.pos;
@@ -216,25 +224,23 @@ void Sch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
         keys[j].u64_arr[i] = keys[j].u64_arr[i] & mask[i];
    //     std::cout << "mask[i]="<<mask[i] << "keys[j].u64_arr[i] ="<<keys[j].u64_arr[i];
       }
-      std::cout<<std::endl;
+
  //std::cout <<"keys0" << keys[j].u64_arr[0] <<" 1="<< keys[j].u64_arr[1] <<" 2=" << keys[j].u64_arr[2] << " 3="<< keys[j].u64_arr[3]<< " 4="<<keys[j].u64_arr[4]<<" 5"<<keys[j].u64_arr[5]<<" 6="<<keys[j].u64_arr[6]<<" 7="<<keys[j].u64_arr[7]<<std::endl; 
 
     }
   }
-
+//#endif
   ////////////////////////////////////////////////////////
-  
+  if (log)
   std::cout <<"a"<<std::endl;
-  //uint64_t hit_mask = table_.Find(keys, val, cnt);
- // std::cout << "enqueue started" << hit_mask<<std::endl;
-  //int count2=0;
-
+  // std::cout << "enqueue started" << hit_mask<<std::endl;
+  
   struct rte_mbuf *m[cnt];
   bool flag=0;
   for (int j = 0; j < cnt; j++) {
     pkt = batch->pkts()[j];
     flag=1; 
-    ogate = 0;//(uint16_t) d->qfi;//val[j]->ogate;
+    //ogate = 0;
     uint8_t key2 = (uint8_t) (keys[j].u64_arr[0]);
   #if 0
     size_t num_values_ = values_.size();
@@ -291,36 +297,73 @@ void Sch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 ////////////////////////////////////////////////////////////////////////////////////
 //Schedule packet
 
-  Ethernet *eth = pkt->head_data<Ethernet *>();
+  //Ethernet *eth = pkt->head_data<Ethernet *>();
   
-  Ipv4 *iph = (Ipv4 *)((unsigned char *)eth + sizeof(Ethernet));
+  //Ipv4 *iph = (Ipv4 *)((unsigned char *)eth + sizeof(Ethernet));
 
   
     m[j] = reinterpret_cast<struct rte_mbuf *>(pkt);
     
     //ip = reinterpret_cast<struct rte_ipv4_hdr *>(iph);
-    m[j]->l2_len = sizeof(*eth);
-    m[j]->l3_len = sizeof(*iph);
+    //m[j]->l2_len = sizeof(*eth);
+    //m[j]->l3_len = sizeof(*iph);
     //auto itr = gbr.find(val[j]->q);
     //int h =itr->second.second;
-    
-    //cout << "key2=" << static_cast<unsigned>(key2) << std::endl;
 
-    auto itr = gbr.find(key2);
-    int h =itr->second.second;
-  //std::cout <<"g"<<std::endl;
-    uint32_t col=RTE_COLOR_GREEN;
-    //std::cout<<"ogate=="<<ogate<<std::endl;
-    rte_sched_port_pkt_write(port, m[j], /*subport*/ 0, /*pipe*/ 0,
-                             /*tc*/ 0, /*queue*/ h/*ogate*/, /*color*/ (enum rte_color)col);//RTE_COLOR_YELLLOW);
+    if(log)
+    cout << "key2=" << static_cast<unsigned>(key2) << std::endl;
+
+   // auto itr = gbr.find(key2);
+   // int h =itr->second.second;
+   // if(log)
+   // std::cout <<"h="<<h<<std::endl;
+
+ 
+    //if(key2==1)
+      col=RTE_COLOR_GREEN;
+    //else if(key2==2)
+      //col=RTE_COLOR_YELLOW;
+
+    uint32_t qf= (uint32_t) key2;
+    if( (scheduler_params[qf].subport == -1)||(qf>85)||(qf<=0) )
+    {
+     EmitPacket(ctx, pkt, DROP_PORT);
+     if(log)
+     std::cout << "drop=" <<std::endl;
+     continue;
+    }
+ if(log)
+  {std::cout << "qf=" <<qf << "subport="<< scheduler_params[qf].subport << "pipe=" << scheduler_params[qf].pipe <<
+                             "tc=" <<scheduler_params[qf].tc << "queue=" << scheduler_params[qf].queue <<std::endl;
+  }                          
+  rte_sched_port_pkt_write(port, m[j], /*subport*/ scheduler_params[qf].subport, /*pipe*/ scheduler_params[qf].pipe,
+                             /*tc*/ scheduler_params[qf].tc, /*queue*/ scheduler_params[qf].queue, /*color*/ (enum rte_color)col);//RTE_COLOR_YELLLOW);
+
 
   }
+   
 if(flag)
  {  
   uint16_t queue_length;
   //std::cout<<"a1-cnt="<<cnt<<std::endl;
   //m = reinterpret_cast<struct rte_mbuf *>(batch->pkts()[0]);
   int u = rte_sched_port_enqueue(port, m,cnt );
+  if(log) 
+    {
+    std::cout<<"a2-u-enqueue-no-of-packets="<<u<<"cnt="<<cnt<<std::endl;
+    //std::cout << "enqueued =" <<cnt<<"color="<<col<<std::endl;
+    }
+
+  if(u != cnt)
+  {
+   for(int h =0;h<cnt;h++)
+   {
+    if(log)
+    std::cout << h << "." <<" enqueued pkt Color=" <<  rte_sched_port_pkt_read_color(m[h]) << std::endl;
+    
+   }
+
+  }
   //sleep(1);
   //if(cnt && (u==0))
   {
@@ -328,54 +371,67 @@ if(flag)
     // uint16_t queue_length1;     
     int err = rte_sched_queue_read_stats(port, 0, &queue_stats,&queue_length);
 
-    if (err) {
+    if (err) 
+    {
        std::cout << "rte_Sched_queue_read_stats failed-Queue0=" << err <<std::endl;
        return;
-     }
-     else
+    }
+    else
+    {
+    if(log)
      std::cout<< "Queue 0" << ": current length " << queue_length
          << ", packets " << queue_stats.n_pkts << ", packets dropped "
          << queue_stats.n_pkts_dropped << ", bytes " << queue_stats.n_bytes
          << ", bytes dropped " << queue_stats.n_bytes_dropped <<std::endl;
 
-
+    }
   }
   //std::cout << "Enqueue end" << count2<<std::endl;
-    std::cout<<"a2-u-enqueue-no-of-packets="<<u<<std::endl;
-    struct rte_mbuf *tx_mbufs[queue_length];
+    
+    struct rte_mbuf *tx_mbufs[cnt/*queue_length*/];
     int retu = 0;
     uint32_t subport, traffic_class, queue,pipe;
-  //  struct rte_mbuf *out_mbufs[1];
 
-  //std::cout << "dequeue started"<< std::endl;
-  //int count1=0;
-  //do
-  if (queue_length)
+  if (1/*queue_length*/)
    {   
     retu=0;
+
+    if(log)
+    std::cout <<"queue_length="<<queue_length<<std::endl;
     
-  std::cout <<"queue_length="<<queue_length<<std::endl;
-    retu = rte_sched_port_dequeue(port, tx_mbufs, queue_length);
-     // std::cout<<"a3"<<std::endl;
-    //std::cout <<"l"<<std::endl;
-    std::cout << "dequeue-no-of-packets="<<retu<<std::endl;
+    retu = rte_sched_port_dequeue(port, tx_mbufs, cnt/*queue_length*/);
+    
+    if(log)
+     std::cout << "dequeue-no-of-packets="<<retu<<std::endl;
+
     int k=0;
     while (retu)
     { //count1++;
-    //std::cout << "k="<<k<<std::endl;    
+    if(log)
+    std::cout << "k="<<k<<std::endl;    
     rte_sched_port_pkt_read_tree_path(port, tx_mbufs[k],
 				&subport, &pipe, &traffic_class, &queue);
-    std::cout << "dequeued packet traffic class =" << traffic_class<< "queue=" << queue << std::endl;
+    if(log)
+    std::cout << k << "." <<"dequeued pkt Color=" <<  rte_sched_port_pkt_read_color(tx_mbufs[k]) << std::endl;
+    
+    if (log)
+    std::cout << "dequeued subport=" <<subport << "pipe=" <<pipe << "dequeued packet traffic class =" << traffic_class<< "queue=" << queue << std::endl;
     
     bess::Packet *pkt2 = reinterpret_cast<bess::Packet *>(tx_mbufs[k]);    
-    ogate = traffic_class;
-      //std::cout<<"a4"<<std::endl;
-    //std::cout<<"extracted ogate="<<ogate<<std::endl;
+
+   if(traffic_class != 12)
+    ogate = GBR_PORT;//traffic_class;
+   else if(traffic_class == 12)
+    ogate = NONGBR_PORT;
+   else 
+    ogate = DROP_GATE;
+if(log)
+  std::cout<<"before emit pkt"<<std::endl;
      EmitPacket(ctx, pkt2, ogate);
-       //std::cout<<"a5"<<std::endl;
      retu--;
      k++;
   } ;//while(retu);
+
  }
  else
  {
@@ -394,9 +450,11 @@ if(flag)
 
 #if post_enqueue_color
       int olor = rte_Sched_port_pkt_read_color(tx_mbufs[0]);
+      if(log)
       std::cout<<"color-y1="<<olor<<std::endl;
       
        olor = rte_Sched_port_pkt_read_color(tx_mbufs[1]);
+      if(log)
       std::cout<<"color-y2="<<olor<<std::endl;
    
       olor = rte_Sched_port_pkt_read_color(tx_mbufs[2]);
@@ -419,7 +477,7 @@ if(flag)
  #endif  
      
   
-#ifdef stats   
+#ifdef stats1   
    rte_Sched_queue_stats queue_stats;
    //   rte_Sched_queue_stats queue_stats1;
    //for (uint32_t queueno = 0; queueno < 1; ++queue) 
@@ -455,9 +513,7 @@ if(flag)
 
 
 }
-
-//void Sch::DeInit() {
-//}/
+//#endif
 
 CommandResponse Sch::CommandSetDefaultGate(
     const bess::pb::SchCommandSetDefaultGateArg &arg) {
@@ -474,216 +530,155 @@ std::string Sch::GetDesc() const {
 /////////////////////////////////////////////////////////////////
 CommandResponse Sch::SchedulerInit() {
 //struct rte_Sched_subport_profile_params subport_profile[1];
-//#if 0
-for(int i=0; i< MAX_SCHED_SUBPORT_PROFILES; i++)
-{
+#if 0
+int err;
+struct rte_eth_link link;
+	err = rte_eth_link_get(portid, &link);
+	if (err < 0)
+		rte_exit(EXIT_FAILURE,
+			 "rte_eth_link_get: err=%d, port=%u: %s\n",
+			 err, portid, rte_strerror(-err));
+#endif
   
-    subport_profile[i].tb_rate = 1250000000;
-		subport_profile[i].tb_size = 1000000;
+  char *p;
+  
+  if( ( p = getcwd(NULL, 0)) == NULL) {
+        perror("failed to get current directory\n");
+    } 
+    string s(p);
+    s= s+ "/conf/profile1.cfg";
+    
+    struct rte_cfgfile *file = rte_cfgfile_load(s.c_str(), 0);
 
-		subport_profile[i].tc_rate[0] = 1250000000;    
-    subport_profile[i].tc_rate[1] = 1250000000;
-    subport_profile[i].tc_rate[2] = 1250000000;
-    subport_profile[i].tc_rate[3]= 1250000000;
-    subport_profile[i].tc_rate[4]= 1250000000;
-    subport_profile[i].tc_rate[5]= 1250000000;
-    subport_profile[i].tc_rate[6]= 1250000000;
-    subport_profile[i].tc_rate[7]= 1250000000;
-    subport_profile[i].tc_rate[8]= 1250000000;
-    subport_profile[i].tc_rate[9]= 1250000000;
-    subport_profile[i].tc_rate[10]= 1250000000;
-    subport_profile[i].tc_rate[11]= 1250000000;
-    subport_profile[i].tc_rate[12]= 1250000000;
+  if (file == NULL)
+    {
+      return CommandFailure(EINVAL, "scheduler config file not loaded");      
+    }
+  else           
+      std::cout<< "config file loaded-hrrah!!!"<<std::endl;
 
-    subport_profile[i].tc_period = 10;
+ for(int i=0; i<LAST_QFI; i++)
+  {
+   scheduler_params[i].qfi = scheduler_params[i].subport = scheduler_params[i].pipe = scheduler_params[i].tc = scheduler_params[i].queue =-1;
+  }
+
+  cfg_load_port(file, &port_params);
+	cfg_load_subport(file, subport_params);
+	cfg_load_subport_profile(file, subport_profile);
+  cfg_load_pipe(file, pipe_profiles);
+  cfg_load_qfi_profile(file);
+	rte_cfgfile_close(file);
+ 
+
+for(int i=0; i< MAX_SCHED_SUBPORT_PROFILES; i++)  //print subport profile routine just
+{
+    std::cout << "subport_profile[" << i << "].tb_rate=" << " "<<subport_profile[i].tb_rate <<std::endl;//= 1250000000;
+		std::cout << "subport_profile[" << i << "].tb_size=" << " "<<subport_profile[i].tb_size<<std::endl;// = 1000000;
+    std::cout << "subport_profile[" << i << "].tc_period=" << " "<<subport_profile[i].tc_period<<std::endl;// = 10;
+    
+    for(int j=0;j<13;j++)
+    {
+		  std::cout<<"     " << "subport_profile[" << i << "].tc_rate[" <<j<< "]=" << " "<<subport_profile[i].tc_rate[j]<<std::endl;// = 1250000000;    
+    }
+    //std::cout << "\n" << std::endl;
+}
+
+
+for(int i=0; i< MAX_SCHED_PIPE_PROFILES; i++)  //print pipe profile just 
+{
+		std::cout<<	"pipe_profiles[" << i <<"].tb_rate="<< " "	<<pipe_profiles[i].tb_rate<<std::endl;// = 305175;
+		std::cout<<	"pipe_profiles[" <<i <<"].tb_size="<< " "<<pipe_profiles[i].tb_size <<std::endl;//= 1000000;
+
+		std::cout<<	"pipe_profiles[" <<i <<"].tc_period="<< " "<<pipe_profiles[i].tc_period<<std::endl;
+    std::cout<<	"pipe_profiles[" <<i << "].tc_ov_weight="<< " "<<pipe_profiles[i].tc_ov_weight <<std::endl;
+
+    for(int j=0;j<13;j++)
+    {
+    std::cout<< "pipe_profiles[" << i << "].tc_rate[" <<j<<"]" << " "<<pipe_profiles[i].tc_rate[j] <<std::endl;
+    }
+  std::cout <<"pipe_profiles["<<i << "].wrr_weights[0]="<< " "<<pipe_profiles[i].wrr_weights[0]<< " "<< pipe_profiles[i].wrr_weights[1] << " "<< pipe_profiles[i].wrr_weights[2] << " "<< pipe_profiles[i].wrr_weights[3]<<std::endl;
+	std::cout << "\n"<<std::endl;
+ }
+
+
+for(int i=0; i< MAX_SCHED_SUBPORTS; i++)  //print subport info and params just
+{
+ subport_params[i].pipe_profiles = pipe_profiles;
+ subport_params[i].n_pipe_profiles = sizeof(pipe_profiles) /	sizeof(struct rte_sched_pipe_params);
+ subport_params[i].n_max_pipe_profiles = MAX_SCHED_PIPE_PROFILES;
+ 
+ std::cout << "i=" << i << " "<< "subport_params[i].n_pipes_per_subport_enabled = " << subport_params[i].n_pipes_per_subport_enabled <<std::endl;
+
+ std::cout << "i="<<i << " "<< "subport_params[" << i << "].pipe_profiles="<<subport_params[i].pipe_profiles << 
+ "subport_params[" << i << "].n_pipe_profiles=" << subport_params[i].n_pipe_profiles << 
+ "subport_params[" << i << "].n_max_pipe_profiles=" << subport_params[i].n_max_pipe_profiles <<std::endl;
+
+  for(int j=0;j<13;j++)
+  {
+    std::cout << "subport_params[" << i << "].qsize[" << j << "] = " << subport_params[i].qsize[j] << std::endl;
+
+  }
+
 
 }
 
-for(int i=0; i< MAX_SCHED_PIPE_PROFILES; i++)
-{
-	 /* Profile #0 */
-				pipe_profiles[i].tb_rate = 305175;
-				pipe_profiles[i].tb_size = 1000000;
-
-				pipe_profiles[i].tc_period = 40;
-//#ifdef RTE_SCHED_SUBPORT_TC_OV
-				pipe_profiles[i].tc_ov_weight = 1;
-//#endif
-
-				//pipe_profiles[i].wrr_weights = {1, 1, 1, 1},
-
-
-   ///////////////////////////////////
-
-    pipe_profiles[i].tc_rate[0] = 305175;
-    pipe_profiles[i].tc_rate[1] = 305175;//1250000000;
-    pipe_profiles[i].tc_rate[2]= 305175;//1250000000;
-    pipe_profiles[i].tc_rate[3]= 305175;//1250000000;
-    pipe_profiles[i].tc_rate[4]= 305175;//1250000000;
-    pipe_profiles[i].tc_rate[5]= 305175;//1250000000;
-    pipe_profiles[i].tc_rate[6]= 305175;//1250000000;
-    pipe_profiles[i].tc_rate[7]= 305175;//1250000000;
-    pipe_profiles[i].tc_rate[8]= 305175;//1250000000;
-    pipe_profiles[i].tc_rate[9]= 305175;//1250000000;
-    pipe_profiles[i].tc_rate[10]= 305175;//1250000000;
-    pipe_profiles[i].tc_rate[11]= 305175;//1250000000;
-    pipe_profiles[i].tc_rate[12]= 305175;//1250000000;
-
-    
-    //pipe_profiles[i].tc_rate = {305175, 305175, 305175, 305175, 305175, 305175,
-			//305175, 305175, 305175, 305175, 305175, 305175, 305175};
-		pipe_profiles[i].tc_period = 40;
-//#ifdef RTE_SCHED_SUBPORT_TC_OV
-//		pipe_profiles[i].tc_ov_weight = 1;
-//#endif
-    pipe_profiles[i].wrr_weights[0]=1;
-    pipe_profiles[i].wrr_weights[1]=1;
-    pipe_profiles[i].wrr_weights[2]=1;
-    pipe_profiles[i].wrr_weights[3]=1;
-//		pipe_profiles[i].wrr_weights = {1, 1, 1, 1};
-	
-};
-
-
-for(int i=0; i< MAX_SCHED_SUBPORTS; i++)
-{
-subport_params[i].n_pipes_per_subport_enabled = 4096;
-		subport_params[i].qsize[0] = 64;
-    subport_params[i].qsize[1]  = 64;
-    subport_params[i].qsize[2] = 64;
-    subport_params[i].qsize[3] = 64;
-    subport_params[i].qsize[4] = 64;
-    subport_params[i].qsize[5] = 64;
-    subport_params[i].qsize[6] = 64;
-    subport_params[i].qsize[7] = 64;
-    subport_params[i].qsize[8] = 64;
-    subport_params[i].qsize[9] = 64;
-    subport_params[i].qsize[10] = 64;
-    subport_params[i].qsize[11] = 64;
-    subport_params[i].qsize[12] = 64;
-    
-         //= {64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64},
-		subport_params[i].pipe_profiles = pipe_profiles;
-		subport_params[i].n_pipe_profiles = sizeof(pipe_profiles) /	sizeof(struct rte_sched_pipe_params);
-		subport_params[i].n_max_pipe_profiles = MAX_SCHED_PIPE_PROFILES;
-
-#ifdef RTE_SCHED_RED
-	subport_params[i].red_params = {
-		/* Traffic Class 0 Colors Green / Yellow / Red */
-		[0][0] = {.min_th = 48, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[0][1] = {.min_th = 40, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[0][2] = {.min_th = 32, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-
-		/* Traffic Class 1 - Colors Green / Yellow / Red */
-		[1][0] = {.min_th = 48, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[1][1] = {.min_th = 40, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[1][2] = {.min_th = 32, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-
-		/* Traffic Class 2 - Colors Green / Yellow / Red */
-		[2][0] = {.min_th = 48, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[2][1] = {.min_th = 40, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[2][2] = {.min_th = 32, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-
-		/* Traffic Class 3 - Colors Green / Yellow / Red */
-		[3][0] = {.min_th = 48, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[3][1] = {.min_th = 40, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[3][2] = {.min_th = 32, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-
-		/* Traffic Class 4 - Colors Green / Yellow / Red */
-		[4][0] = {.min_th = 48, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[4][1] = {.min_th = 40, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[4][2] = {.min_th = 32, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-
-		/* Traffic Class 5 - Colors Green / Yellow / Red */
-		[5][0] = {.min_th = 48, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[5][1] = {.min_th = 40, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[5][2] = {.min_th = 32, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-
-		/* Traffic Class 6 - Colors Green / Yellow / Red */
-		[6][0] = {.min_th = 48, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[6][1] = {.min_th = 40, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[6][2] = {.min_th = 32, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-
-		/* Traffic Class 7 - Colors Green / Yellow / Red */
-		[7][0] = {.min_th = 48, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[7][1] = {.min_th = 40, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[7][2] = {.min_th = 32, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-
-		/* Traffic Class 8 - Colors Green / Yellow / Red */
-		[8][0] = {.min_th = 48, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[8][1] = {.min_th = 40, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[8][2] = {.min_th = 32, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-
-		/* Traffic Class 9 - Colors Green / Yellow / Red */
-		[9][0] = {.min_th = 48, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[9][1] = {.min_th = 40, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[9][2] = {.min_th = 32, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-
-		/* Traffic Class 10 - Colors Green / Yellow / Red */
-		[10][0] = {.min_th = 48, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[10][1] = {.min_th = 40, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[10][2] = {.min_th = 32, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-
-		/* Traffic Class 11 - Colors Green / Yellow / Red */
-		[11][0] = {.min_th = 48, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[11][1] = {.min_th = 40, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[11][2] = {.min_th = 32, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-
-		/* Traffic Class 12 - Colors Green / Yellow / Red */
-		[12][0] = {.min_th = 48, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[12][1] = {.min_th = 40, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-		[12][2] = {.min_th = 32, .max_th = 64, .maxp_inv = 10, .wq_log2 = 9},
-	},
-#endif /* RTE_SCHED_RED */
-}
-//#endif
 
   port_params.name = "port_Scheduler_0";
 	port_params.socket = 0; /* computed */
-  port_params.rate = 1250000000; /* computed */
+  //port_params.rate = port_params->rate;//1250305175; /* computed */
+  std::cout<<"rate="<<port_params.rate <<std::endl;
 	port_params.mtu = 6 + 6 + 4 + 4 + 2 + 1500;
 	port_params.frame_overhead = RTE_SCHED_FRAME_OVERHEAD_DEFAULT;
-	port_params.n_subports_per_port = 1;
+	//port_params.n_subports_per_port = port_params->n_subports_per_port;
 	port_params.n_subport_profiles = 1;
 	port_params.subport_profiles = subport_profile;
 	port_params.n_max_subport_profiles = MAX_SCHED_SUBPORT_PROFILES;
 	port_params.n_pipes_per_subport = MAX_SCHED_PIPES;
-  
+  std::cout<<"rate="<<port_params.rate<<std::endl;
    char port_name[32];
 	port_params.socket = rte_socket_id() == LCORE_ID_ANY ? 0 : rte_socket_id();//socketid;
 	snprintf(port_name, sizeof(port_name), "port_%d", /*portid*/0);
 	port_params.name = port_name;
-
-
-//std::cout<<"v"<<std::endl;
+  
+///////....................................................................................////
+std::cout << "rte_sched_port_config started"<<std::endl;
 	port = rte_sched_port_config(&port_params);
 	if (port == NULL){
 		rte_exit(EXIT_FAILURE, "Unable to config Sched port\n");
 	}
-//std::cout<<"v1"<<std::endl;
-	for (subport = 0; subport < port_params.n_subports_per_port; subport ++) {
+  std::cout << "rte_sched_port_config end"<<std::endl;
 
-	 int err = rte_sched_subport_config(port, subport, &subport_params[subport],0);
+	for (subport = 0; subport < port_params.n_subports_per_port; subport ++) {
+    std::cout << "rte_sched_subport_config started"<<std::endl;
+
+	  int err = rte_sched_subport_config(port, subport, &subport_params[subport],0);
 		if (err) {
 			rte_exit(EXIT_FAILURE, "Unable to config Sched subport %u, err=%d\n",
 					subport, err);
 		}
+     std::cout << "subport = "<<subport << "done"<<std::endl;
 
-		uint32_t n_pipes_per_subport =
-			subport_params[subport].n_pipes_per_subport_enabled;
-//std::cout<<"v2"<<std::endl;
-		for (pipe = 0; pipe < n_pipes_per_subport; pipe++) {
-			if (app_pipe_to_profile[subport][pipe] != -1) {
+		uint32_t n_pipes_per_subport = subport_params[subport].n_pipes_per_subport_enabled;
+
+    std::cout<<"subport_params[subport].n_pipes_per_subport_enabled="<<subport_params[subport].n_pipes_per_subport_enabled<<std::endl;
+		for (pipe = 0; pipe < n_pipes_per_subport; pipe++) 
+    { std::cout << "subport="<<subport<<"pipe="<<pipe<<std::endl;
+			if (app_pipe_to_profile[subport][pipe] != -1) 
+      {
 				err = rte_sched_pipe_config(port, subport, pipe,
 						app_pipe_to_profile[subport][pipe]);
-				if (err) {
+				if (err) 
+        {
 					rte_exit(EXIT_FAILURE, "Unable to config Sched pipe %u "
 							"for profile %d, err=%d\n", pipe,
 							app_pipe_to_profile[subport][pipe], err);
 				}
 			}
-		}//pipe end
+      std::cout << "pipe=" <<pipe << "done"<<std::endl;
+		}
+     std::cout << "pipe end"<<std::endl;
 	}  //sub-port  end.
+//  std::cout << "returning s.cc-process"<<std::endl;
 return CommandSuccess();
 }
 ////////////////////////////////////////////////////////////////

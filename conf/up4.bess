@@ -33,7 +33,9 @@ qerRedGate = 3
 qerFailGate = 4
 qerStatusDropGate = 5
 qerUnmeteredGate = 6
-schedFailGate = 1
+schedGbrGate = 0
+schedNGbrGate = 1
+schedFailGate = 2
 interfaces = ["access", "core"]
 parser = Parser('conf/upf.json')
 parser.parse(interfaces)
@@ -225,7 +227,16 @@ pdrLookup:GTPUDecap \
 
 executeFAR::Split(size=1, attribute='action')
 _in = executeFAR
-if parser.enable_slice_metering:
+
+
+if not parser.enable_slice_metering and parser.scheduler:
+    scheduler::Sch(fields=[{'attr_name':'qfi', 'num_bytes':1}])
+    scheduler:schedFailGate -> schDrop::Sink()
+    scheduler:schedGbrGate -> executeFAR
+    scheduler:schedNGbrGate -> executeFAR
+    _in = scheduler
+
+if parser.enable_slice_metering and parser.scheduler:
     # sliceMeter enforces a per slice, per direction meter rate limit
     sliceMeter::Qos(fields=[{'attr_name':'action', 'num_bytes':1}, \
                             {'attr_name':'tunnel_out_type', 'num_bytes':1}],\
@@ -246,8 +257,31 @@ if parser.enable_slice_metering:
     sliceMeter:m_fail -> sliceMeterLookupFail::Sink()
     sliceMeter:m_unmeter -> scheduler
     sliceMeter.set_default_gate(gate=m_fail)
+    scheduler:schedFailGate -> schDrop::Sink()
+    scheduler:schedGbrGate -> executeFAR
+    scheduler:schedNGbrGate -> executeFAR
     _in = sliceMeter
-    scheduler -> executeFAR
+
+if parser.enable_slice_metering and not parser.scheduler:
+    sliceMeter::Qos(fields=[{'attr_name':'action', 'num_bytes':1}, \
+                            {'attr_name':'tunnel_out_type', 'num_bytes':1}],\
+                            entries=8)
+    # Reserved gates, reject rule adds with gate=1/2/3
+    m_meter  = 0 # Placeholder gate not connected. Will meter if lookup result returns this gate
+    m_green  = 1 # For green traffic
+    m_yellow = 2 # For yellow traffic
+    m_red    = 3 # For red traffic
+    # User defined gates
+    m_fail   = 4 # For lookup failure traffic
+    m_unmeter = 5 # For unmetered traffic
+    # Admit green, yellow, unmetered and lookup failures, drop red.
+    sliceMeter:m_green -> executeFAR
+    sliceMeter:m_yellow -> executeFAR
+    sliceMeter:m_red -> sliceMeterRed::Sink()
+    sliceMeter:m_fail -> executeFAR
+    sliceMeter:m_unmeter -> executeFAR
+    sliceMeter.set_default_gate(gate=m_fail)
+    _in = sliceMeter
 
 farLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
                                      {'attr_name':'fseid', 'num_bytes':8}], \
@@ -258,7 +292,7 @@ farLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
                                      {'attr_name':'tunnel_out_teid', 'num_bytes':4}, \
                                      {'attr_name':'tunnel_out_udp_port', 'num_bytes':2}],\
                       entries=parser.table_size_far_lookup):noGTPUEncap \
-    -> farMerge::Merge() \
+    -> farMerge1::Merge() \
     -> _in
 
 # sessionQERLookup enforces a per UE, per direction meter rate limit
@@ -279,7 +313,7 @@ farLookup:GTPUEncap \
     -> gtpuEncap::GtpuEncap(add_psc=parser.gtppsc):1 \
     -> outerUDPCsum::L4Checksum() \
     -> outerIPCsum::IPChecksum() \
-    -> farMerge
+    -> farMerge1
 
 notify = UnixSocketPort(name='notifyCP', path=parser.notify_sockaddr)
 pfcpPort = UnixSocketPort(name='pfcpPort', path=parser.endmarker_sockaddr)
@@ -299,8 +333,8 @@ appQERLookup:qerFailGate -> appQERLookupFail::Sink()
 executeFAR:farDropAction -> farDrop::Sink()
 executeFAR:farBufferAction -> farBuffer::Sink()
 gtpuEncap:0 -> gtpuEncapFail::Sink()
-scheduler:schedFailGate -> schDrop::Sink()
 
+    
 # Set default gates for relevant modules
 pdrLookup.set_default_gate(gate=pdrFailGate)
 farLookup.set_default_gate(gate=farFailGate)

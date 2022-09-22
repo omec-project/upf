@@ -26,7 +26,7 @@
     "sim": {
         "": "At this point we can simulate either N3/N6 or N3/N9 traffic, so choose n6 or n9 below",
         "core": "n6",
-        "max_sessions": 50000,
+        "max_sessions": 500,
         "start_ue_ip": "16.0.0.1",
         "start_enb_ip": "11.1.1.129",
         "start_aupf_ip": "13.1.1.199",
@@ -37,6 +37,9 @@
         "pkt_size": 128,
         "total_flows": 5000
     },
+
+    "": "Scheduler to enable",
+    "scheduler": true,
 
     "": "max IP frag table entries (for IPv4 reassembly). Update the line below to `\"max_ip_defrag_flows\": 1000` to enable",
     "": "max_ip_defrag_flows: 1000",
@@ -61,17 +64,17 @@
 
     "": "Gateway interfaces",
     "access": {
-        "ifname": "ens803f2"
+        "ifname": "enp24s17f1"
     },
 
     "": "UE IP Natting. Update the line below to `\"ip_masquerade\": \"<ip> [or <ip>]\"` to enable",
     "core": {
-        "ifname": "ens803f3",
+        "ifname": "enp24s17f2",
         "": "ip_masquerade: 18.0.0.1 or 18.0.0.2 or 18.0.0.3"
     },
 
     "": "Number of worker threads. Default: 1",
-    "workers": 1,
+    "workers": 2,
 
     "": "Parameters for handling outgoing requests",
     "max_req_retries": 5,

@@ -56,7 +56,7 @@ class Parser:
         self.table_size_app_qer_lookup = 0
         self.table_size_session_qer_lookup = 0
         self.table_size_far_lookup = 0
-
+        self.scheduler = False
     def parse(self, ifaces):
         # Maximum number of flows to manage ip4 frags for re-assembly
         try:
@@ -102,6 +102,14 @@ class Parser:
         except KeyError:
             print('measure_upf value not set. Not installing Measure module.')
 
+        try:
+            self.scheduler = bool(self.conf["scheduler"])
+            import os
+            cwd = os.getcwd()
+            print(cwd)
+        except KeyError:
+            print('scheduler not set. Not installing scheduler module.')
+            
         # Fetch interfaces
         for iface in ifaces:
             try:
