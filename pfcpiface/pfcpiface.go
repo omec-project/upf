@@ -81,7 +81,10 @@ func (p *PFCPIface) mustInit() {
 		log.Fatalln("setupProm failed", err)
 	}
 
-	p.httpSrv = &http.Server{Addr: p.httpEndpoint, Handler: httpMux}
+	// Note: due to error with golangci-lint ("Error: G112: Potential Slowloris Attack
+	// because ReadHeaderTimeout is not configured in the http.Server (gosec)"),
+	// the ReadHeaderTimeout is set to the same value as in nginx (client_header_timeout)
+	p.httpSrv = &http.Server{Addr: p.httpEndpoint, Handler: httpMux, ReadHeaderTimeout: 60 * time.Second}
 }
 
 func (p *PFCPIface) Run() {
