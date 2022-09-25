@@ -347,6 +347,7 @@ if(flag)
   uint16_t queue_length;
   //std::cout<<"a1-cnt="<<cnt<<std::endl;
   //m = reinterpret_cast<struct rte_mbuf *>(batch->pkts()[0]);
+
   int u = rte_sched_port_enqueue(port, m,cnt );
   if(log) 
     {
@@ -354,14 +355,41 @@ if(flag)
     //std::cout << "enqueued =" <<cnt<<"color="<<col<<std::endl;
     }
 
-  if(u != cnt)
-  {
-   for(int h =0;h<cnt;h++)
-   {
-    if(log)
-    std::cout << h << "." <<" enqueued pkt Color=" <<  rte_sched_port_pkt_read_color(m[h]) << std::endl;
-    
-   }
+ if(u != cnt)
+  { //drop packets ji
+    if(u==0)
+     {
+       for (int j = 0; j < cnt; j++) 
+        {
+         pkt = batch->pkts()[j];
+         EmitPacket(ctx, pkt, DROP_PORT);
+         continue;
+        }
+     }
+    else 
+     {
+       for (int j = 0; j < cnt; j++) 
+        {
+        
+        pkt = batch->pkts()[j];          
+        struct rte_mbuf *m = reinterpret_cast<struct rte_mbuf *>(pkt);
+        uint8_t ans = rte_sched_port_pkt_read_color(m);
+       if(log)
+       { std::cout <<"PKT ans-color=" << /*static_cast<unsigned>*/ +ans<<std::endl;}
+
+        if(ans == 254)
+        { EmitPacket(ctx, pkt, DROP_PORT);
+        }
+         //continue;
+        }
+
+
+     }
+    for(int h =0;h<cnt;h++)
+     {
+      if(log)
+      std::cout << h << "." <<" enqueued pkt Color=" <<  rte_sched_port_pkt_read_color(m[h]) << std::endl;
+     }
 
   }
   //sleep(1);
@@ -399,7 +427,7 @@ if(flag)
     if(log)
     std::cout <<"queue_length="<<queue_length<<std::endl;
     
-    retu = rte_sched_port_dequeue(port, tx_mbufs, cnt/*queue_length*/);
+    retu = rte_sched_port_dequeue(port, tx_mbufs, (cnt)/*queue_length*/);
     
     if(log)
      std::cout << "dequeue-no-of-packets="<<retu<<std::endl;

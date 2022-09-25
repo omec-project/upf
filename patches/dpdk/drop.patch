@@ -1,0 +1,26 @@
+From ecbc49a17fc53fe29fe65d1df08f3cd5e87c45d0 Mon Sep 17 00:00:00 2001
+From: Amar Sri <amarsri28@gmail.com>
+Date: Sat, 24 Sep 2022 04:57:59 -0700
+Subject: [PATCH] pkt drop
+
+---
+ lib/librte_sched/rte_sched.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/lib/librte_sched/rte_sched.c b/lib/librte_sched/rte_sched.c
+index a858f61f..80372b7b 100644
+--- a/lib/librte_sched/rte_sched.c
++++ b/lib/librte_sched/rte_sched.c
+@@ -1931,7 +1931,8 @@ rte_sched_port_enqueue_qwa(struct rte_sched_port *port,
+ 	/* Drop the packet (and update drop stats) when queue is full */
+ 	if (unlikely(rte_sched_port_red_drop(port, subport, pkt, qindex, qlen) ||
+ 		     (qlen >= qsize))) {
+-		rte_pktmbuf_free(pkt);
++		/*rte_pktmbuf_free(pkt); */pkt->hash.sched.color = 254;
++
+ #ifdef RTE_SCHED_COLLECT_STATS
+ 		rte_sched_port_update_subport_stats_on_drop(port, subport,
+ 			qindex, pkt, qlen < qsize);
+-- 
+2.17.1
+
