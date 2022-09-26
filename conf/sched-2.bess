@@ -1,0 +1,239 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright(c) 2021 Intel Corporation
+
+# Update assignments to hit different QoS entries
+iface, qer, fseid = 1, 2, 4
+ip_pkt_size = 46
+sleep_seconds_before_delete = 30
+
+import struct
+def convert(format, val, bigendian=True):
+    end = '>' if [bigendian] else '<'
+    return struct.pack(end + format, val, )
+
+Gbr::SetMetadata(attrs=[{'name': 'src_iface', 'size': 1, 'value_int': iface},
+                         {'name': 'qer_id', 'size':4, 'value_int': qer},
+                         {'name': 'fseid', 'size':8, 'value_int': fseid}])
+Gbr1::SetMetadata(attrs=[{'name': 'src_iface', 'size': 1, 'value_int': 1},
+                         {'name': 'qer_id', 'size':4, 'value_int': 3},
+                         {'name': 'fseid', 'size':8, 'value_int': 6}])
+
+Gbr2::SetMetadata(attrs=[{'name': 'src_iface', 'size': 1, 'value_int': 1},
+                         {'name': 'qer_id', 'size':4, 'value_int': 4},
+                         {'name': 'fseid', 'size':8, 'value_int': 8}])
+
+NGbr1::SetMetadata(attrs=[{'name': 'src_iface', 'size': 1, 'value_int': 1},
+                         {'name': 'qer_id', 'size':4, 'value_int': 5},
+                         {'name': 'fseid', 'size':8, 'value_int': 10}])
+
+NGbr2::SetMetadata(attrs=[{'name': 'src_iface', 'size': 1, 'value_int': 1},
+                         {'name': 'qer_id', 'size':4, 'value_int': 6},
+                         {'name': 'fseid', 'size':8, 'value_int': 12}])
+
+
+
+#HighPriorityTraffic::SetMetadata(attrs=[{'name': 'qfi', 'size': 1, 'value_int': 1}])
+#HighPriorityTraffic1::SetMetadata(attrs=[{'name': 'qfi', 'size': 1, 'value_int': 2}])
+#HighPriorityTraffic2::SetMetadata(attrs=[{'name': 'qfi', 'size': 1, 'value_int': 3}])
+#HighPriorityTraffic3::SetMetadata(attrs=[{'name': 'qfi', 'size': 1, 'value_int': 4}])
+
+#LowPriorityTraffic::SetMetadata(attrs=[{'name': 'qfi', 'size': 1, 'value_int': 5}])
+
+Metering::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1},
+                      {'attr_name':'qer_id', 'num_bytes':4},
+                      {'attr_name':'fseid', 'num_bytes':8}],
+              values=[{'attr_name':'qfi', 'num_bytes':1}])
+
+QosScheduler::Sch(fields=[{'attr_name':'qfi', 'num_bytes':1}])
+Sp::Split(size=1, attribute='qfi')
+M::Merge()
+
+Sp1::Split(size=1, attribute='qfi')
+
+
+# Reserved gates, reject rule adds with gate=1/2/3
+sch_gbrport =0;
+sch_Ngbrport =1;
+sch_dropport =2;
+
+m_meter  = 0 # Placeholder gate not connected. Will meter if lookup result returns this gate
+m_green  = 1 # For green traffic
+m_yellow = 2 # For yellow traffic
+m_red    = 3 # For red traffic
+
+# Rules with gate number above 3 are directly sent out w/o metering
+m_fail   = 4 # Default gate for lookup failure
+m_drop   = 5 # Explicitly asked to drop
+m_unmeter= 6 # Unmetered
+
+#QosScheduler:m_green -> Lowpriority::Sink()
+#QosScheduler:m_meter -> Highpriority::Sink()
+#QosScheduler:m_red -> red::Sink()
+#QosScheduler:m_drop -> drop::Sink()
+#QosScheduler:m_unmeter -> S
+
+#QosScheduler:m_fail -> fail::Sink()
+#QosScheduler.set_default_gate(gate=m_fail)
+
+QosScheduler:sch_gbrport -> Sp
+QosScheduler:sch_Ngbrport -> Sp
+QosScheduler:sch_dropport -> Sp1
+
+Sp:0 -> Highpriority::Sink() # If traffic is going to this gate, meta update in QoS is not working
+Sp:1 -> Highpriority1::Sink()
+Sp:2 -> Highpriority2::Sink()
+Sp:3 -> Highpriority3::Sink()
+Sp:4 -> Highpriority4::Sink()
+Sp:5 -> Lowpriority5::Sink()
+Sp:6 -> Lowpriority6::Sink()
+Sp:7 -> Lowpriority7::Sink()
+Sp:8 -> Lowpriority8::Sink()
+Sp:9 -> Lowpriority9::Sink()
+
+Sp1:0 -> Highpriority0::Sink() # If traffic is going to this gate, meta update in QoS is not working
+Sp1:1 -> Highpriority10::Sink()
+Sp1:2 -> Highpriority20::Sink()
+Sp1:3 -> Highpriority30::Sink()
+Sp1:4 -> Highpriority40::Sink()
+Sp1:5 -> Lowpriority50::Sink()
+Sp1:6 -> Lowpriority60::Sink()
+Sp1:7 -> Lowpriority70::Sink()
+Sp1:8 -> Lowpriority80::Sink()
+Sp1:9 -> Lowpriority90::Sink()
+
+
+
+# Pipeline
+#Source() -> HighPriorityTraffic -> M->QosScheduler
+#Source() -> HighPriorityTraffic1 -> M->QosScheduler
+#Source() -> HighPriorityTraffic2 -> M->QosScheduler
+#Source() -> HighPriorityTraffic3 -> M->QosScheduler
+#Source() -> LowPriorityTraffic -> M->QosScheduler
+##M -> S
+
+#Source(pkt_size=100) -> HighPriorityTraffic -> M
+#Source(pkt_size=100) -> HighPriorityTraffic1 -> M
+#Source(pkt_size=100) -> HighPriorityTraffic2 -> M
+#Source(pkt_size=100) -> HighPriorityTraffic3 -> M
+#Source(pkt_size=100) -> LowPriorityTraffic -> M
+#M -> QosScheduler
+
+# Pipeline
+s1::Source(pkt_size=46) -> Gbr -> Metering
+s2::Source(pkt_size=46) -> Gbr1 -> Metering
+s3::Source(pkt_size=46) -> Gbr2 -> Metering
+s4::Source(pkt_size=46) -> NGbr1 -> Metering
+s5::Source(pkt_size=46) -> NGbr2 -> Metering
+
+Metering.set_default_gate(gate=m_fail)
+
+Metering:m_green -> QosScheduler
+Metering:m_yellow -> QosScheduler
+Metering:m_red -> QosScheduler
+#Metering:m_drop -> QosScheduler
+Metering:m_unmeter -> QosScheduler
+Metering:m_fail -> Sink()
+Metering:m_drop -> QosScheduler
+
+
+# Resume workers to test concurrent read-write
+bess.resume_all()
+
+MPPS = pow(10,6) * ip_pkt_size#
+
+
+# Unmeter
+#Metering.add(fields=[{'value_int': 1},
+#                     {'value_bin': convert('L', 6)},
+#                     {'value_bin': convert('Q', 12)}],
+#             values=[{'value_int': 5}], # S:5
+#             gate=m_meter, cir=1 * MPPS, pir=6 * MPPS, cbs=2048, pbs=2048)
+
+"""
+# GBR only
+Metering.add(fields=[{'value_int': 1},
+                     {'value_bin': convert('L', 2)},
+                     {'value_bin': convert('Q', 4)}],
+             values=[{'value_int': 1}], # S:1
+             gate=m_meter, cir=1 * MPPS , pir=1 * MPPS, cbs=2048, pbs=2048)
+
+Metering.add(fields=[{'value_int': 1},
+                     {'value_bin': convert('L', 3)},
+                     {'value_bin': convert('Q', 6)}],
+             values=[{'value_int': 2}], # S:2
+             gate=m_meter, cir=1 * MPPS, pir=1 * MPPS, cbs=2048, pbs=2048)
+
+# GBR/MBR
+Metering.add(fields=[{'value_int': 1},
+                     {'value_bin': convert('L', 4)},
+                     {'value_bin': convert('Q', 8)}],
+             values=[{'value_int': 3}], # S:3
+             gate=m_meter, cir=3 * MPPS, pir=6 * MPPS, cbs=2048, pbs=2048)
+
+
+Metering.add(fields=[{'value_int': 1},
+                     {'value_bin': convert('L', 5)},
+                     {'value_bin': convert('Q', 10)}],
+             values=[{'value_int': 5}], # S:4
+             gate=m_meter, cir=1 * MPPS, pir=6 * MPPS, cbs=2048, pbs=2048)
+
+Metering.add(fields=[{'value_int': 1},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 6}], # S:4
+             gate=m_meter, cir=1 * MPPS, pir=6 * MPPS, cbs=2048, pbs=2048)
+"""
+# Gate closed
+
+# Delete QoS entries after sleep
+import time
+time.sleep(sleep_seconds_before_delete)
+
+# GBR only
+
+# GBR/MBR
+#Metering.delete(fields=[{'value_int': 1},
+#                     {'value_bin': convert('L', 4)},
+#                     {'value_bin': convert('Q', 8)}])
+
+#time.sleep(10)
+
+Metering.add(fields=[{'value_int': 1},
+                     {'value_bin': convert('L', 4)},
+                     {'value_bin': convert('Q', 8)}],
+             values=[{'value_int': 3}], # S:3
+             gate=m_meter, cir=3 * MPPS, pir=6 * MPPS, cbs=2048, pbs=2048)
+
+
+# GBR/MBR
+
+time.sleep(10)
+
+Metering.add(fields=[{'value_int': 1},
+                     {'value_bin': convert('L', 5)},
+                     {'value_bin': convert('Q', 10)}],
+             values=[{'value_int': 5}], # S:4
+             gate=m_meter, cir=1 * MPPS, pir=6 * MPPS, cbs=2048, pbs=2048)
+
+time.sleep(10)
+
+Metering.add(fields=[{'value_int': 1},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 6}], # S:4
+             gate=m_meter, cir=1 * MPPS, pir=6 * MPPS, cbs=2048, pbs=2048)
+
+
+
+"""
+time.sleep(10)
+Metering.delete(fields=[{'value_int': 1},
+                     {'value_bin': convert('L', 5)},
+                     {'value_bin': convert('Q', 10)}])
+
+time.sleep(10)
+Metering.delete(fields=[{'value_int': 1},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}])
+"""
+
