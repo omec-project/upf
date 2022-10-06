@@ -66,7 +66,7 @@ QoS Enforcement Rules (QERs).
 * Basic QoS support, with per-slice and per-session rate limiting
 * Per-flow latency and throughput metrics
 * Network Token Functions (_**experimental**_)
-
+* QOS Scheduler (_**experimental**_)
 **P4-UPF**
 
 P4-UPF implements a core set of features capable of supporting requirements for a broad range of enterprise use cases.
