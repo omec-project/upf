@@ -34,7 +34,7 @@ qerFailGate = 4
 qerStatusDropGate = 5
 qerUnmeteredGate = 6
 schedGbrGate = 0
-schedNGbrGate = 1
+#schedNGbrGate = 1
 schedFailGate = 2
 interfaces = ["access", "core"]
 parser = Parser('conf/upf.json')
@@ -233,7 +233,7 @@ if not parser.enable_slice_metering and parser.scheduler:
     scheduler::Sch(fields=[{'attr_name':'qfi', 'num_bytes':1}])
     scheduler:schedFailGate -> schDrop::Sink()
     scheduler:schedGbrGate -> executeFAR
-    scheduler:schedNGbrGate -> executeFAR
+#    scheduler:schedNGbrGate -> executeFAR
     _in = scheduler
 
 if parser.enable_slice_metering and parser.scheduler:
@@ -259,7 +259,7 @@ if parser.enable_slice_metering and parser.scheduler:
     sliceMeter.set_default_gate(gate=m_fail)
     scheduler:schedFailGate -> schDrop::Sink()
     scheduler:schedGbrGate -> executeFAR
-    scheduler:schedNGbrGate -> executeFAR
+#    scheduler:schedNGbrGate -> executeFAR
     _in = sliceMeter
 
 if parser.enable_slice_metering and not parser.scheduler:

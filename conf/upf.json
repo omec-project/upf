@@ -3,7 +3,7 @@
     "": "mode: af_xdp",
     "": "mode: af_packet",
     "": "mode: sim",
-    "mode": "sim",
+    "mode": "dpdk",
 
     "table_sizes": {
         "": "Example sizes based on sim mode and 50K sessions. Customize as per your control plane",
@@ -26,7 +26,7 @@
     "sim": {
         "": "At this point we can simulate either N3/N6 or N3/N9 traffic, so choose n6 or n9 below",
         "core": "n6",
-        "max_sessions": 500,
+        "max_sessions": 10000,
         "start_ue_ip": "16.0.0.1",
         "start_enb_ip": "11.1.1.129",
         "start_aupf_ip": "13.1.1.199",
@@ -34,7 +34,7 @@
         "n9_app_ip": "9.9.9.9",
         "start_n3_teid": "0x30000000",
         "start_n9_teid": "0x90000000",
-        "pkt_size": 128,
+        "pkt_size": 768,
         "total_flows": 5000
     },
 
@@ -54,7 +54,7 @@
     "gtppsc": false,
 
     "": "Enable Intel Dynamic Device Personalization (DDP)",
-    "ddp": false,
+    "ddp": true,
 
     "": "Telemetrics-See this link for details: https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py",
     "measure_upf": true,
@@ -64,17 +64,17 @@
 
     "": "Gateway interfaces",
     "access": {
-        "ifname": "enp24s17f1"
+        "ifname": "access"
     },
 
     "": "UE IP Natting. Update the line below to `\"ip_masquerade\": \"<ip> [or <ip>]\"` to enable",
     "core": {
-        "ifname": "enp24s17f2",
+        "ifname": "core",
         "": "ip_masquerade: 18.0.0.1 or 18.0.0.2 or 18.0.0.3"
     },
 
     "": "Number of worker threads. Default: 1",
-    "workers": 2,
+    "workers": 16,
 
     "": "Parameters for handling outgoing requests",
     "max_req_retries": 5,

@@ -83,18 +83,15 @@ struct SchKey {
 
 class Sch final : public Module {
  public:
+ std::mutex m_lock;
  Sch() : Module(), default_gate_() {
     max_allowed_workers_ = Worker::kMaxWorkers;
     size_t len = sizeof(mask) / sizeof(uint64_t);
     for (size_t i = 0; i < len; i++)
       mask[i] = 0;
   }
-
-  //static const gate_idx_t kNumOGates = MAX_GATES;
   struct rte_sched_subport_profile_params subport_profile[MAX_SCHED_SUBPORT_PROFILES];
-  //https://www.5gworldpro.com/uncategorized/what-is-5qi-in-5g.html
-  static const Commands cmds;  // tc  {5qi,{5g priorities,tc classes}}
-  std::map<int, std::pair<int,int>>gbr = { {1,{20,4}},{2,{40,4}},{3,{30,4}},{4,{50,5}},{65,{7,5}},{66,{20,5}},{67,{15,6}},{75,{-1,6}},{71,{56,6}},{72,{56,7}},{73,{56,7}},{74,{56,7}},{76,{56,8}},{5,{10,9}},{6,{60,9}},{7,{70,10}},{8,{80,10}},{9,{90,11}},{69,{5,11}},{70,{55,12}},{79,{65,12}},{80,{68,12}},{82,{19,0}},{83,{22,1}},{84,{24,2}},{85,{21,3}} };
+  static const Commands cmds;
 
   static const gate_idx_t kNumOGates = MAX_GATES;
   int cfg_load_port(struct rte_cfgfile *cfg, struct rte_sched_port_params *port_params);
@@ -103,32 +100,30 @@ class Sch final : public Module {
   int cfg_load_subport_profile(struct rte_cfgfile *cfg,struct rte_sched_subport_profile_params *subport_profile);
   int cfg_load_qfi_profile(struct rte_cfgfile *cfg);
   struct schedule scheduler_params[LAST_QFI];
-CommandResponse Init(const bess::pb::SchArg &arg);
+  CommandResponse Init(const bess::pb::SchArg &arg);
   void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
   CommandResponse CommandSetDefaultGate(
-      const bess::pb::SchCommandSetDefaultGateArg &arg);
+  const bess::pb::SchCommandSetDefaultGateArg &arg);
   CommandResponse SchedulerInit();
-   struct rte_sched_port_params port_params ;
- //int cfg_load_subport_profile(struct rte_cfgfile *cfg,	struct rte_sched_subport_profile_params *subport_profile);
-
- struct rte_sched_subport_params subport_params[MAX_SCHED_SUBPORTS];
-struct rte_sched_pipe_params pipe_profiles[MAX_SCHED_PIPE_PROFILES];
-int app_pipe_to_profile[MAX_SCHED_SUBPORTS][MAX_SCHED_PIPES];  
-uint32_t pipe, subport;
-uint32_t pipes_per_subport;
-uint32_t subports_per_port;
-CommandResponse AddFieldOne(const bess::pb::Field &field,
+  struct rte_sched_port_params port_params ;
+ 
+  struct rte_sched_subport_params subport_params[MAX_SCHED_SUBPORTS];
+  struct rte_sched_pipe_params pipe_profiles[MAX_SCHED_PIPE_PROFILES];
+  int app_pipe_to_profile[MAX_SCHED_SUBPORTS][MAX_SCHED_PIPES];  
+  uint32_t pipe, subport;
+  uint32_t pipes_per_subport;
+  uint32_t subports_per_port;
+  CommandResponse AddFieldOne(const bess::pb::Field &field,
                               struct SchField *f, uint8_t type);
 private:
-struct rte_sched_port *port = NULL;
-gate_idx_t default_gate_; 
+  struct rte_sched_port *port = NULL;
+  gate_idx_t default_gate_; 
   std::vector<struct SchField> fields_;
   std::vector<struct SchField> values_;  
 
-  size_t total_key_size_; /* a multiple of sizeof(uint64_t) */
+  size_t total_key_size_; 
   size_t total_value_size_;
   uint64_t mask[MAX_FIELDS];
-  uint32_t qfi[85][2][2][2][2];  //85 0 1 1 =sub ; 85 1 0 1 pipe ; 85 1 1 0 tc ; 85 1 1 1 0 queue 
-//ffffffffffffffffff
+
 };
 #endif

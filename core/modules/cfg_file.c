@@ -2,25 +2,13 @@
  * Copyright(c) 2010-2014 Intel Corporation
  */
 #include "sched.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <rte_string_fns.h>
 #include <rte_sched.h>
-
-//#include "cfg_file.h"
 #include "s.h"
-//#include <rte_sched.h>
-//#include <rte_cfgfile.h>
-
-//int cfg_load_port(struct rte_cfgfile *cfg, struct rte_sched_port_params *port);
-
-//int cfg_load_pipe(struct rte_cfgfile *cfg, struct rte_sched_pipe_params *pipe);
-
-//int cfg_load_subport(struct rte_cfgfile *cfg, struct rte_sched_subport_params *subport);
-
 
 /** when we resize a file structure, how many extra entries
  * for new sections do we add in */
@@ -32,8 +20,7 @@
 uint32_t active_queues[RTE_SCHED_QUEUES_PER_PIPE];
 uint32_t n_active_queues;
 
-int
-Sch::cfg_load_port(struct rte_cfgfile *cfg, struct rte_sched_port_params *port_params)
+int Sch::cfg_load_port(struct rte_cfgfile *cfg, struct rte_sched_port_params *port_params)
 {
 	const char *entry;
 
@@ -154,8 +141,6 @@ Sch::cfg_load_pipe(struct rte_cfgfile *cfg, struct rte_sched_pipe_params *pipe_p
 	}
 	return 0;
 }
-
-
 
 int Sch::cfg_load_subport(struct rte_cfgfile *cfg, struct rte_sched_subport_params *subport_params)
 {
@@ -431,47 +416,39 @@ int Sch::cfg_load_qfi_profile(struct rte_cfgfile *cfg)
 {
 	const char *entry;
 	char *next;
-	
     if (!cfg )
 		return -1;
-	
 	uint32_t qfi_num=0;
-   	entry = rte_cfgfile_get_entry(cfg, "qfi:subport:pipe:tc:queue", "number of qfi");
+   	entry = rte_cfgfile_get_entry(cfg, "mapping", "number of qfi");
 	if(entry)
 		qfi_num = (uint32_t)atoi(entry);
     else 
 	    return 0;
 		
-		char sec_name[32];
-		snprintf(sec_name, sizeof(sec_name), "qfi:subport:pipe:tc:queue");
-       for(uint32_t i=1;i<=qfi_num;i++)
-	   {
-		char q_name[32];
-		snprintf(q_name, sizeof(q_name), "qfi %d", i);
+	char sec_name[32];
+	snprintf(sec_name, sizeof(sec_name), "mapping");
+    for(uint32_t i=1;i<=qfi_num;i++)
+	 {
+	  char q_name[32];
+	  snprintf(q_name, sizeof(q_name), "qfi %d", i);
+	  entry = rte_cfgfile_get_entry(cfg, sec_name, q_name);
+	  if(!entry)
+	   continue;
 
-		entry = rte_cfgfile_get_entry(cfg, sec_name, q_name);
-		if(!entry)
-		  continue;
-
-        uint32_t arr[5]={0};
-
-		for (int j = 0; j < 5; j++) 
-		 { 	
-		        arr[j] = (uint8_t)strtol(entry, &next, 10);
-				if (next == NULL)
-					break;
-				entry = next;
+      uint32_t arr[5]={0};
+	  for (int j = 0; j < 5; j++) 
+	    { 	
+		  arr[j] = (uint8_t)strtol(entry, &next, 10);
+		  if (next == NULL)
+			break;
+		  entry = next;
 		 }
-		 std::cout <<"\n"<<std::endl;
-		 //std::cout << "qfi =arr[0]"<<arr[0]<<std::endl;
-	scheduler_params[arr[0]].qfi = arr[0];
-	scheduler_params[arr[0]].subport = arr[1];
-	scheduler_params[arr[0]].pipe = arr[2];
-	scheduler_params[arr[0]].tc = arr[3];
-	scheduler_params[arr[0]].queue = arr[4];
-         
-		 
-	   }
+	   scheduler_params[arr[0]].qfi = arr[0];
+	   scheduler_params[arr[0]].subport = arr[1];
+	   scheduler_params[arr[0]].pipe = arr[2];
+	   scheduler_params[arr[0]].tc = arr[3];
+	   scheduler_params[arr[0]].queue = arr[4];
+    
+	}
     return 1;
 }
-//#endif

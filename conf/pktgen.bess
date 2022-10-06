@@ -5,7 +5,7 @@
 docker run --name pktgen -td --restart unless-stopped \
            --cpuset-cpus=2-5 --ulimit memlock=-1 --cap-add IPC_LOCK \
            -v /dev/hugepages:/dev/hugepages -v "$PWD/conf":/opt/bess/bessctl/conf \
-           --device=/dev/vfio/vfio --device=/dev/vfio/176 \
+           --device=/dev/vfio/vfio --device=/dev/vfio/181 \
            upf-epc-bess:"$(<VERSION)" -grpc-url=0.0.0.0:10514
 """
 
@@ -16,9 +16,9 @@ flows = 5000
 workers=[2, 3, 4, 5]
 gtppsc = False
 qfi = 9
-smac = "22:53:7a:15:58:50"
-dmac_access = "9e:b2:d3:34:ab:27"
-dmac_core = "c2:9c:55:d4:8a:f6"
+smac = "b4:96:91:b3:cb:c8"
+dmac_access = "access"
+dmac_core = "core"
 
 if gtppsc:
     # flow create 0 ingress pattern eth / ipv4 / udp / gtpu / gtp_psc / ipv4 / end actions rss types ipv4 l3-src-only end key_len 0 queues end / end
