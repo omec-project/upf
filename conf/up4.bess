@@ -289,7 +289,7 @@ farLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
                                      {'attr_name':'tunnel_out_teid', 'num_bytes':4}, \
                                      {'attr_name':'tunnel_out_udp_port', 'num_bytes':2}],\
                       entries=parser.table_size_far_lookup):noGTPUEncap \
-    -> farMerge1::Merge() \
+    -> farMerge::Merge() \
     -> _in
 
 # sessionQERLookup enforces a per UE, per direction meter rate limit
@@ -310,7 +310,7 @@ farLookup:GTPUEncap \
     -> gtpuEncap::GtpuEncap(add_psc=parser.gtppsc):1 \
     -> outerUDPCsum::L4Checksum() \
     -> outerIPCsum::IPChecksum() \
-    -> farMerge1
+    -> farMerge
 
 notify = UnixSocketPort(name='notifyCP', path=parser.notify_sockaddr)
 pfcpPort = UnixSocketPort(name='pfcpPort', path=parser.endmarker_sockaddr)
@@ -331,7 +331,6 @@ executeFAR:farDropAction -> farDrop::Sink()
 executeFAR:farBufferAction -> farBuffer::Sink()
 gtpuEncap:0 -> gtpuEncapFail::Sink()
 
-    
 # Set default gates for relevant modules
 pdrLookup.set_default_gate(gate=pdrFailGate)
 farLookup.set_default_gate(gate=farFailGate)

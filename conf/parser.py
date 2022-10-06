@@ -104,9 +104,6 @@ class Parser:
 
         try:
             self.scheduler = bool(self.conf["scheduler"])
-            import os
-            cwd = os.getcwd()
-            print(cwd)
         except KeyError:
             print('scheduler not set. Not installing scheduler module.')
             

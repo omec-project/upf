@@ -26,7 +26,7 @@
     "sim": {
         "": "At this point we can simulate either N3/N6 or N3/N9 traffic, so choose n6 or n9 below",
         "core": "n6",
-        "max_sessions": 10000,
+        "max_sessions": 50000,
         "start_ue_ip": "16.0.0.1",
         "start_enb_ip": "11.1.1.129",
         "start_aupf_ip": "13.1.1.199",
@@ -34,7 +34,7 @@
         "n9_app_ip": "9.9.9.9",
         "start_n3_teid": "0x30000000",
         "start_n9_teid": "0x90000000",
-        "pkt_size": 768,
+        "pkt_size": 128,
         "total_flows": 5000
     },
 
@@ -64,17 +64,17 @@
 
     "": "Gateway interfaces",
     "access": {
-        "ifname": "access"
+        "ifname": "ens803f2"
     },
 
     "": "UE IP Natting. Update the line below to `\"ip_masquerade\": \"<ip> [or <ip>]\"` to enable",
     "core": {
-        "ifname": "core",
+        "ifname": "ens803f3",
         "": "ip_masquerade: 18.0.0.1 or 18.0.0.2 or 18.0.0.3"
     },
 
     "": "Number of worker threads. Default: 1",
-    "workers": 16,
+    "workers": 1,
 
     "": "Parameters for handling outgoing requests",
     "max_req_retries": 5,
