@@ -44,8 +44,7 @@ using bess::utils::HashResult;
 using bess::utils::CuckooMap;
 
 #define GBR_PORT 0
-#define NONGBR_PORT 1
-#define DROP_PORT 2
+#define DROP_PORT 1
 #define LAST_QFI 86
 #define MAX_FIELDS 8
 #define MAX_FIELD_SIZE 8
