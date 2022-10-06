@@ -4,9 +4,13 @@
 
 set -e
 # TCP port of bess/web monitor
-gui_port=8000
-bessd_port=10514
-metrics_port=8080
+internal_gui_port=8000
+internal_bessd_port=10514
+internal_metrics_port=8080
+
+external_gui_port=8000
+external_bessd_port=10514
+external_metrics_port=8100 
 
 # Driver options. Choose any one of the three
 #
@@ -14,7 +18,7 @@ metrics_port=8080
 # "af_xdp" uses AF_XDP sockets via DPDK's vdev for pkt I/O. This version is non-zc version. ZC version still needs to be evaluated.
 # "af_packet" uses AF_PACKET sockets via DPDK's vdev for pkt I/O.
 # "sim" uses Source() modules to simulate traffic generation
-mode="sim"
+mode="dpdk"
 #mode="af_xdp"
 #mode="af_packet"
 #mode="sim"
@@ -22,27 +26,26 @@ mode="sim"
 # Gateway interface(s)
 #
 # In the order of ("s1u" "sgi")
-ifaces=("enp24s17f1" "enp24s17f2")
+ifaces=("access" "core")
 
 # Static IP addresses of gateway interface(s) in cidr format
 #
 # In the order of (s1u sgi)
-ipaddrs=(198.18.0.1/30 198.19.0.1/30)
+ipaddrs=(198.19.0.1/30 198.18.0.1/30)
 
 # MAC addresses of gateway interface(s)
 #
 # In the order of (s1u sgi)
-macaddrs=(22:23:24:25:26:27 32:33:34:35:36:37)
+macaddrs=(b4:96:91:b3:cb:c9 b4:96:91:b4:48:69)
 
 # Static IP addresses of the neighbors of gateway interface(s)
 #
 # In the order of (n-s1u n-sgi)
-nhipaddrs=(198.18.0.2 198.19.0.2)
-
+nhipaddrs=(198.19.0.2 198.18.0.2)
 # Static MAC addresses of the neighbors of gateway interface(s)
 #
 # In the order of (n-s1u n-sgi)
-nhmacaddrs=(22:53:7a:15:58:50 22:53:7a:15:58:50)
+nhmacaddrs=(b4:96:91:b2:0d:b9 b4:96:91:b3:c7:51)
 
 # IPv4 route table entries in cidr format per port
 #
@@ -111,7 +114,7 @@ sudo rm -rf /var/run/netns/pause
 make docker-build
 
 if [ "$mode" == 'dpdk' ]; then
-	DEVICES=${DEVICES:-'--device=/dev/vfio/179 --device=/dev/vfio/180 --device=/dev/vfio/vfio'}
+	DEVICES=${DEVICES:-'--device=/dev/vfio/182 --device=/dev/vfio/189 --device=/dev/vfio/vfio'}
 	PRIVS='--cap-add IPC_LOCK'
 
 elif [ "$mode" == 'af_xdp' ]; then
@@ -123,9 +126,10 @@ fi
 
 # Run pause
 docker run --name pause -td --restart unless-stopped \
-	-p $bessd_port:$bessd_port \
-	-p $gui_port:$gui_port \
-	-p $metrics_port:$metrics_port \
+	--cpuset-cpus=41-45 \
+	-p $external_bessd_port:$internal_bessd_port \
+	-p $external_gui_port:$internal_gui_port \
+	-p $external_metrics_port:$internal_metrics_port \
 	--hostname $(hostname) \
 	k8s.gcr.io/pause
 
@@ -151,14 +155,14 @@ if [ "$mode" != 'sim' ]; then
 fi
 
 # Run bessd
-docker run --name bess -td --restart unless-stopped -v /home/stack/Amar/qos/upf-epc1/core/modules:/home/stack/Amar/qos/upf-epc1/core/modules \
-	--cpuset-cpus=12-13 \
+docker run --name bess -td --restart unless-stopped -v /lib/firmware/intel/ice/ddp:/lib/firmware/intel/ice/ddp \
+	--cpuset-cpus=46-62 \
 	--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
 	-v "$PWD/conf":/opt/bess/bessctl/conf \
 	--net container:pause \
 	$PRIVS \
 	$DEVICES \
-	upf-epc-bess:"$(<VERSION)" -grpc-url=0.0.0.0:$bessd_port
+	upf-epc-bess:"$(<VERSION)" -grpc-url=0.0.0.0:$internal_bessd_port
 
 docker logs bess
 
@@ -169,12 +173,14 @@ sleep 10
 
 # Run bess-web
 docker run --name bess-web -d --restart unless-stopped \
+	--cpuset-cpus=41-45 \
 	--net container:bess \
 	--entrypoint bessctl \
-	upf-epc-bess:"$(<VERSION)" http 0.0.0.0 $gui_port
+	upf-epc-bess:"$(<VERSION)" http 0.0.0.0 $internal_gui_port
 
 # Run bess-pfcpiface depending on mode type
 docker run --name bess-pfcpiface -td --restart on-failure \
+	--cpuset-cpus=41-45 \
 	--net container:pause \
 	-v "$PWD/conf/upf.json":/conf/upf.json \
 	upf-epc-pfcpiface:"$(<VERSION)" \
@@ -187,7 +193,11 @@ fi
 
 # Run bess-routectl
 docker run --name bess-routectl -td --restart unless-stopped \
+	--cpuset-cpus=41-45 \
 	-v "$PWD/conf/route_control.py":/route_control.py \
 	--net container:pause --pid container:bess \
 	--entrypoint /route_control.py \
 	upf-epc-bess:"$(<VERSION)" -i "${ifaces[@]}"
+
+sleep 5
+docker exec bess-pfcpiface pfcpiface -config /conf/upf.json -simulate create
