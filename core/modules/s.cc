@@ -41,7 +41,6 @@
 #include <rte_cfgfile.h>
 #include "cfg_file.c"
 #include "s.h"
-#include "conf.h"
 #include "../drivers/pmd.h"
 
 using namespace std;
