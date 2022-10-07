@@ -112,7 +112,7 @@ CommandResponse Sch::AddFieldOne(const bess::pb::Field &field,
 }
 
 void Sch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
-  int log=0;
+  //int log=0;
   uint32_t col =-1;
   uint16_t ogate=0;
   SchKey keys[bess::PacketBatch::kMaxBurst] __ymm_aligned;
