@@ -167,7 +167,7 @@ void Sch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     if( (scheduler_params[qf].subport == -1)||(qf>85)||(qf<=0) )
     {
      EmitPacket(ctx, pkt, DROP_PORT);
-     if(log)
+     //if(log)  
      continue;
     }
         
