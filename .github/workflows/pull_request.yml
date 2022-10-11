@@ -23,6 +23,8 @@ jobs:
     steps:
       # Checkout and build
       - uses: actions/checkout@v3
+        with:
+          persist-credentials: false
 
       - name: Generate protobuf
         run: |
