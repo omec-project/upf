@@ -17,6 +17,9 @@ jobs:
       DOCKER_REPOSITORY: "upf-epc/"
       VERSION: "PR-${{ github.event.pull_request.number }}"
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read # Allows to read repo
     steps:
       # Checkout and build
       - uses: actions/checkout@v3
