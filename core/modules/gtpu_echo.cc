@@ -46,8 +46,8 @@ bool GtpuEcho::process_echo_request(bess::Packet *p) {
     recovery_ie = (struct gtpu_recovery_ie_t *)p->append(
         sizeof(struct gtpu_recovery_ie_t));
     if (recovery_ie == NULL) {
-      std::cerr << "Couldn't append " << sizeof(struct gtpu_recovery_ie_t)
-                << " bytes to mbuf" << std::endl;
+      LOG(WARNING) << "Couldn't append " << sizeof(struct gtpu_recovery_ie_t)
+                   << " bytes to mbuf";
       return false;
     }
   }
