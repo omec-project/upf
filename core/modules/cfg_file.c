@@ -1,6 +1,10 @@
-/* SPDX-License-Identifier: BSD-3-Clause
- * Copyright(c) 2010-2014 Intel Corporation
+/*
+ * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright 2014-2016, The Regents of the University of California.
+ * Copyright 2016-2017, Nefeli Networks, Inc.
+ * Copyright 2021-present Intel Corporation
  */
+
 #include "sched.h"
 #include <stdio.h>
 #include <stdlib.h>
