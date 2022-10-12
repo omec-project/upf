@@ -28,9 +28,7 @@ RUN apt-get update && \
         libbpf0
 
 ARG MAKEFLAGS
-
 ENV PKG_CONFIG_PATH=/usr/lib64/pkgconfig
-
 WORKDIR /bess
 
 # Patch BESS, patch and build DPDK
