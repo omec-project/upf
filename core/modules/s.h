@@ -32,7 +32,7 @@
 #define BESS_MODULES_SCARDMATCH_H_
 
 #include "../module.h"
-
+#include <rte_cfgfile.h>
 #include <rte_config.h>
 #include <rte_hash_crc.h>
 
