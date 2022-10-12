@@ -11,8 +11,8 @@ import (
 	"testing"
 )
 
-// TODO: we currently need to reset the DefaultRegisterer between tests, as some leave the
-// 		 the registry in a bad state. Use custom registries to avoid global state.
+// TODO: we currently need to reset the DefaultRegisterer between tests, as some
+// leave the registry in a bad state. Use custom registries to avoid global state.
 var backupGlobalRegistry prometheus.Registerer
 
 func saveReg() {
