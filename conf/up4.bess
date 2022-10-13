@@ -247,13 +247,13 @@ if parser.enable_slice_metering:
     _in = sliceMeter
 
 farLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
-                                     {'attr_name':'fseid', 'num_bytes':8}], \
-                             values=[{'attr_name':'action', 'num_bytes':1}, \
-                                     {'attr_name':'tunnel_out_type', 'num_bytes':1}, \
-                                     {'attr_name':'tunnel_out_src_ip4addr', 'num_bytes':4}, \
-                                     {'attr_name':'tunnel_out_dst_ip4addr', 'num_bytes':4}, \
-                                     {'attr_name':'tunnel_out_teid', 'num_bytes':4}, \
-                                     {'attr_name':'tunnel_out_udp_port', 'num_bytes':2}],\
+                              {'attr_name':'fseid', 'num_bytes':8}], \
+                      values=[{'attr_name':'action', 'num_bytes':1}, \
+                              {'attr_name':'tunnel_out_type', 'num_bytes':1}, \
+                              {'attr_name':'tunnel_out_src_ip4addr', 'num_bytes':4}, \
+                              {'attr_name':'tunnel_out_dst_ip4addr', 'num_bytes':4}, \
+                              {'attr_name':'tunnel_out_teid', 'num_bytes':4}, \
+                              {'attr_name':'tunnel_out_udp_port', 'num_bytes':2}],\
                       entries=parser.table_size_far_lookup):noGTPUEncap \
     -> farMerge::Merge() \
     -> _in
