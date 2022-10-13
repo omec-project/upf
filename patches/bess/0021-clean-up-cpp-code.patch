@@ -20,23 +20,6 @@ index 86484d0c..0a883946 100644
  Ringo:
      Foo() -> Bar()
  Python:
-diff --git a/core/memory_test.cc b/core/memory_test.cc
-index 9849147d..c5e44a16 100644
---- a/core/memory_test.cc
-+++ b/core/memory_test.cc
-@@ -139,9 +139,9 @@ TEST_P(HugepageTest, LeakFree) {
-   } while (get_cpu_time() - start < 0.5);  // 0.5 second for each page size
- }
- 
--INSTANTIATE_TEST_CASE_P(PageSize, HugepageTest,
--                        ::testing::Values(HugepageSize::k2MB,
--                                          HugepageSize::k1GB));
-+INSTANTIATE_TEST_SUITE_P(PageSize, HugepageTest,
-+                         ::testing::Values(HugepageSize::k2MB,
-+                                           HugepageSize::k1GB));
- 
- TEST(DmaMemoryPoolTest, PoolSetup) {
-   if (geteuid() != 0) {
 diff --git a/core/modules/measure.cc b/core/modules/measure.cc
 index e2b6dceb..5092fed4 100644
 --- a/core/modules/measure.cc
