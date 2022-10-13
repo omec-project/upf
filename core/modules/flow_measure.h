@@ -76,7 +76,7 @@ class FlowMeasure final : public Module {
     TableKey() : fseid(0), pdr(0) {}
     std::string ToString() const {
       std::stringstream ss;
-      ss << "{ fseid: " << fseid << ", pdr: " << pdr + " }";
+      ss << "{ fseid: " << fseid << ", pdr: " << pdr << " }";
       return ss.str();
     }
   };
