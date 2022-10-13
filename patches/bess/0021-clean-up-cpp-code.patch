@@ -1,0 +1,109 @@
+diff --git a/bessctl/sugar.py b/bessctl/sugar.py
+index 86484d0c..0a883946 100644
+--- a/bessctl/sugar.py
++++ b/bessctl/sugar.py
+@@ -71,7 +71,7 @@ a:x->b               Connect output gate x of a    a*i + b
+ 
+ a->y:b               Connect a to input gate y     a + y*b
+                      of b                          a.connect(next_mod=b,
+-                     (x should be an integer)        igate=y)
++                     (y should be an integer)        igate=y)
+ 
+ a:3->4:b             Connect output gate 3 of a    a*3 + 4*b
+                      and input gate of 4           a.connect(next_mod=b,
+@@ -95,7 +95,7 @@ Ringo:
+ Python:
+     __bess_module__('a','Foo') + __bess_module__('b', 'Bar')
+ 
+-3. Create anonymous modules and connection them
++3. Create anonymous modules and connect them
+ Ringo:
+     Foo() -> Bar()
+ Python:
+diff --git a/core/memory_test.cc b/core/memory_test.cc
+index 9849147d..c5e44a16 100644
+--- a/core/memory_test.cc
++++ b/core/memory_test.cc
+@@ -139,9 +139,9 @@ TEST_P(HugepageTest, LeakFree) {
+   } while (get_cpu_time() - start < 0.5);  // 0.5 second for each page size
+ }
+ 
+-INSTANTIATE_TEST_CASE_P(PageSize, HugepageTest,
+-                        ::testing::Values(HugepageSize::k2MB,
+-                                          HugepageSize::k1GB));
++INSTANTIATE_TEST_SUITE_P(PageSize, HugepageTest,
++                         ::testing::Values(HugepageSize::k2MB,
++                                           HugepageSize::k1GB));
+ 
+ TEST(DmaMemoryPoolTest, PoolSetup) {
+   if (geteuid() != 0) {
+diff --git a/core/modules/measure.cc b/core/modules/measure.cc
+index e2b6dceb..5092fed4 100644
+--- a/core/modules/measure.cc
++++ b/core/modules/measure.cc
+@@ -63,16 +63,14 @@ const Commands Measure::cmds = {
+ CommandResponse Measure::Init(const bess::pb::MeasureArg &arg) {
+   uint64_t latency_ns_max = arg.latency_ns_max();
+   uint64_t latency_ns_resolution = arg.latency_ns_resolution();
+-  if (latency_ns_max == 0) {
++  if (!latency_ns_max) {
+     latency_ns_max = kDefaultMaxNs;
+   }
+-  if (latency_ns_resolution == 0) {
++  if (!latency_ns_resolution) {
+     latency_ns_resolution = kDefaultNsPerBucket;
+   }
+-  uint64_t quotient = latency_ns_max / latency_ns_resolution;
+-  if ((latency_ns_max % latency_ns_resolution) != 0) {
+-    quotient += 1;  // absorb any remainder
+-  }
++  uint64_t quotient = (latency_ns_max + latency_ns_resolution - 1) / latency_ns_resolution;
++
+   if (quotient > rtt_hist_.max_num_buckets() / 2) {
+     return CommandFailure(E2BIG,
+                           "excessive latency_ns_max / latency_ns_resolution");
+diff --git a/core/modules/source.cc b/core/modules/source.cc
+index db99dbc2..4b0413a0 100644
+--- a/core/modules/source.cc
++++ b/core/modules/source.cc
+@@ -45,7 +45,6 @@ CommandResponse Source::Init(const bess::pb::SourceArg &arg) {
+     return CommandFailure(ENOMEM, "Task creation failed");
+ 
+   pkt_size_ = 60;
+-  burst_ = bess::PacketBatch::kMaxBurst;
+ 
+   if (arg.pkt_size() > 0) {
+     if (arg.pkt_size() > SNBUF_DATA) {
+diff --git a/core/packet.cc b/core/packet.cc
+index a3656b52..8c5a5b8a 100644
+--- a/core/packet.cc
++++ b/core/packet.cc
+@@ -94,7 +94,6 @@ static std::string HexDump(const void *buffer, size_t len) {
+ std::string Packet::Dump() {
+   std::ostringstream dump;
+   Packet *pkt;
+-  uint32_t dump_len = total_len();
+   uint32_t nb_segs;
+   uint32_t len;
+ 
+@@ -142,7 +141,6 @@ std::string Packet::Dump() {
+       dump << HexDump(head_data(), len);
+     }
+ 
+-    dump_len -= len;
+     pkt = pkt->next_;
+     nb_segs--;
+   }
+diff --git a/core/utils/histogram.h b/core/utils/histogram.h
+index 7fbe2ba5..5fe654a6 100644
+--- a/core/utils/histogram.h
++++ b/core/utils/histogram.h
+@@ -191,7 +191,7 @@ class Histogram {
+   // Resize the histogram.  Note that this resets it (i.e., this
+   // does not attempt to redistribute existing counts).
+   void Resize(size_t num_buckets, T bucket_width) {
+-    buckets_ = std::move(std::vector<std::atomic<uint64_t>>(num_buckets + 1));
++    buckets_ = std::vector<std::atomic<uint64_t>>(num_buckets + 1);
+     bucket_width_ = bucket_width;
+   }
+ 
