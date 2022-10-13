@@ -5,7 +5,7 @@ package pfcpiface
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"math"
 	"net/http"
 
@@ -50,7 +50,7 @@ func (c *ConfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "PUT":
 		fallthrough
 	case "POST":
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			log.Errorln("http req read body failed.")
 			sendHTTPResp(http.StatusBadRequest, w)
