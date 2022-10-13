@@ -29,7 +29,7 @@ The PFCP Agent implements datapath plugins that translate
 
 The combination of PFCP Agent and UP4 is usually referred to as P4-UPF. While BESS-UPF denotes the combination of PFCP Agent and the BESS datapath.
 
-PFCP Agent internally abstracts different datapaths using a common API, while the different plug-ins can use spcific southbound protocols to communicate with the different datapath instances. Support for new datapaths can be provided by implementing new plugins.
+PFCP Agent internally abstracts different datapaths using a common API, while the different plug-ins can use specific southbound protocols to communicate with the different datapath instances. Support for new datapaths can be provided by implementing new plugins.
 
 ### Feature List
 

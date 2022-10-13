@@ -8,7 +8,7 @@ Copyright 2022 Open Networking Foundation
 
 The `upf` repository relies on some external Go dependencies, which are not mature yet (e.g. pfcpsim or p4runtime-go-client).
 It's often needed to extend those dependencies first, before adding a new feature to the PFCP Agent. However, when using Go modules and Dockerized environment,
-it's hard to test WIP changes to local dependencies. Therefore, this repository come up with a way to use Go vendoring, instead of Go modules, for development purposes.
+it's hard to test WIP changes to local dependencies. Therefore, this repository comes up with a way to use Go vendoring, instead of Go modules, for development purposes.
 
 To use a local Go dependency add the `replace` directive to `go.mod`. An example:
 
