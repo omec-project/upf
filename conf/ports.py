@@ -247,15 +247,15 @@ class Port:
         if self.mode == 'sim':
             rewrite = Rewrite(name="{}_rewrite".format(self.name), templates=type_of_packets)
             update = SequentialUpdate(name="{}_update".format(self.name), **seq_kwargs)
-            udpcsum = L4Checksum()
-            ipcsum = IPChecksum()
+            l4cksum = L4Checksum()
+            ipcksum = IPChecksum()
 
             self.fpi.connect(next_mod=rewrite)
             rewrite.connect(next_mod=update)
-            update.connect(next_mod=udpcsum)
-            udpcsum.connect(next_mod=ipcsum)
+            update.connect(next_mod=l4cksum)
+            l4cksum.connect(next_mod=ipcksum)
 
-            inc = ipcsum
+            inc = ipcksum
 
         # enable telemetrics (if enabled) (how many bytes seen in and out of port)
         if conf_measure:
