@@ -48,9 +48,9 @@ CommandResponse Counter::RemoveCounter(const bess::pb::CounterRemoveArg &arg) {
 #ifdef HASHMAP_BASED
   /* check_exist is still here for over-protection */
   if (counters.find(ctr_id) != counters.end()) {
-    std::cerr << this->name() << "[" << ctr_id
-              << "]: " << counters[ctr_id].pkt_count << ", "
-              << counters[ctr_id].byte_count << std::endl;
+    DLOG(WARNING) << this->name() << "[" << ctr_id
+                  << "]: " << counters[ctr_id].pkt_count << ", "
+                  << counters[ctr_id].byte_count;
     counters.erase(ctr_id);
   } else {
     return CommandFailure(EINVAL, "Unable to remove ctr");
@@ -59,7 +59,7 @@ CommandResponse Counter::RemoveCounter(const bess::pb::CounterRemoveArg &arg) {
   if (ctr_id < total_count && counters[ctr_id].pkt_count != 0) {
     DLOG(INFO) << this->name() << "[" << ctr_id
                << "]: " << counters[ctr_id].pkt_count << ", "
-               << counters[ctr_id].byte_count << std::endl;
+               << counters[ctr_id].byte_count;
     counters[ctr_id].pkt_count = counters[ctr_id].byte_count = 0;
   }
   curr_count--;

@@ -157,7 +157,7 @@ void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     }
 
     uint16_t ogate = val[j]->ogate;
-    DLOG(INFO) << "ogate : " << ogate << std::endl;
+    DLOG(INFO) << "ogate : " << ogate;
 
     // meter if ogate is 0
     if (ogate == METER_GATE) {
@@ -166,7 +166,7 @@ void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
       uint8_t color = rte_meter_trtcm_color_blind_check(&val[j]->m, &val[j]->p,
                                                         time, pkt_len);
 
-      DLOG(INFO) << "color : " << color << std::endl;
+      DLOG(INFO) << "color : " << color;
       // update ogate to color specific gate
       if (color == RTE_COLOR_GREEN) {
         ogate = METER_GREEN_GATE;
@@ -199,7 +199,7 @@ void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
                    << *(reinterpret_cast<uint64_t *>(buf))
                    << " for attr_id: " << value_attr_id
                    << " of size: " << value_size
-                   << " at value_pos: " << value_pos << std::endl;
+                   << " at value_pos: " << value_pos;
 
         switch (value_size) {
           case 1:
@@ -373,7 +373,7 @@ CommandResponse Qos::CommandAdd(const bess::pb::QosCommandAddArg &arg) {
 
     DLOG(INFO) << "Adding entry"
                << " cir: " << cir << " pir: " << pir << " cbs: " << cbs
-               << " pbs: " << pbs << " ebs: " << ebs << std::endl;
+               << " pbs: " << pbs << " ebs: " << ebs;
 
     struct rte_meter_trtcm_params app_trtcm_params = {
         .cir = cir, .pir = pir, .cbs = cbs, .pbs = pbs};

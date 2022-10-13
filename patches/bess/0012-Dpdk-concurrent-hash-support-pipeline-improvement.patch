@@ -13,7 +13,7 @@ Subject: [PATCH] Dpdk Hash table support for concurrent pipeline
  6 files changed, 391 insertions(+), 114 deletions(-)
 
 diff --git a/core/modules/exact_match.cc b/core/modules/exact_match.cc
-index b8bb2a6d..fee70a78 100644
+index 751d5f32..144e167e 100644
 --- a/core/modules/exact_match.cc
 +++ b/core/modules/exact_match.cc
 @@ -134,7 +134,7 @@ CommandResponse ExactMatch::Init(const bess::pb::ExactMatchArg &arg) {
@@ -51,7 +51,7 @@ index b8bb2a6d..fee70a78 100644
    }
  }
  
-@@ -422,4 +420,8 @@ CommandResponse ExactMatch::CommandSetDefaultGate(
+@@ -421,4 +419,8 @@ CommandResponse ExactMatch::CommandSetDefaultGate(
    return CommandSuccess();
  }
  
@@ -75,7 +75,7 @@ index 99cb2654..d7e3531e 100644
    CommandResponse GetRuntimeConfig(const bess::pb::EmptyArg &arg);
    CommandResponse SetRuntimeConfig(const bess::pb::ExactMatchConfig &arg);
 diff --git a/core/modules/wildcard_match.cc b/core/modules/wildcard_match.cc
-index ec639a7b..51e67c55 100644
+index 82b954be..2214be8f 100644
 --- a/core/modules/wildcard_match.cc
 +++ b/core/modules/wildcard_match.cc
 @@ -40,13 +40,28 @@ using bess::metadata::Attribute;
@@ -146,7 +146,16 @@ index ec639a7b..51e67c55 100644
      }
    }
  
-@@ -232,20 +243,115 @@ inline gate_idx_t WildcardMatch::LookupEntry(const wm_hkey_t &key,
+@@ -187,7 +198,7 @@ inline gate_idx_t WildcardMatch::LookupEntry(const wm_hkey_t &key,
+       int value_attr_id = values_[i].attr_id;
+       uint8_t *data = pkt->head_data<uint8_t *>() + value_off;
+ 
+-      DLOG(INFO) << "off: " << (int)value_off << ", sz: " << value_size;
++      DLOG(INFO) << "off: " << value_off << ", sz: " << value_size;
+ 
+       if (value_attr_id < 0) { /* if it is offset-based */
+         memcpy(data, reinterpret_cast<uint8_t *>(&result.keyv) + value_pos,
+@@ -232,20 +243,114 @@ inline gate_idx_t WildcardMatch::LookupEntry(const wm_hkey_t &key,
    return result.ogate;
  }
  
@@ -199,8 +208,7 @@ index ec639a7b..51e67c55 100644
 +        int value_attr_id = values_[i].attr_id;
 +        uint8_t *data = pkt->head_data<uint8_t *>() + value_off;
 +
-+        DLOG(INFO) << "off: " << (int)value_off << ", sz: " << value_size
-+                   << std::endl;
++        DLOG(INFO) << "off: " << value_off << ", sz: " << value_size;
 +        if (value_attr_id < 0) { /* if it is offset-based */
 +          memcpy(data,
 +                 reinterpret_cast<uint8_t *>(&result[init]->keyv) + value_pos,
@@ -215,7 +223,7 @@ index ec639a7b..51e67c55 100644
 +                     << *(reinterpret_cast<uint64_t *>(buf))
 +                     << " for attr_id: " << value_attr_id
 +                     << " of size: " << value_size
-+                     << " at value_pos: " << value_pos << std::endl;
++                     << " at value_pos: " << value_pos;
 +
 +          switch (value_size) {
 +            case 1:
@@ -266,7 +274,7 @@ index ec639a7b..51e67c55 100644
    for (const auto &field : fields_) {
      int offset;
      int pos = field.pos;
-@@ -272,9 +378,9 @@ void WildcardMatch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
+@@ -272,9 +377,9 @@ void WildcardMatch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
      }
    }
  
@@ -279,7 +287,7 @@ index ec639a7b..51e67c55 100644
    }
  }
  
-@@ -282,7 +388,9 @@ std::string WildcardMatch::GetDesc() const {
+@@ -282,7 +387,9 @@ std::string WildcardMatch::GetDesc() const {
    int num_rules = 0;
  
    for (const auto &tuple : tuples_) {
@@ -290,7 +298,7 @@ index ec639a7b..51e67c55 100644
    }
  
    return bess::utils::Format("%zu fields, %d rules", fields_.size(), num_rules);
-@@ -387,54 +495,60 @@ CommandResponse WildcardMatch::ExtractValue(const T &arg, wm_hkey_t *keyv) {
+@@ -387,54 +494,60 @@ CommandResponse WildcardMatch::ExtractValue(const T &arg, wm_hkey_t *keyv) {
  }
  
  int WildcardMatch::FindTuple(wm_hkey_t *mask) {
@@ -377,7 +385,7 @@ index ec639a7b..51e67c55 100644
    CommandResponse err = ExtractKeyMask(arg, &key, &mask);
    if (err.error().code() != 0) {
      return err;
-@@ -444,14 +558,13 @@ CommandResponse WildcardMatch::CommandAdd(
+@@ -444,14 +557,13 @@ CommandResponse WildcardMatch::CommandAdd(
      return CommandFailure(EINVAL, "Invalid gate: %hu", gate);
    }
  
@@ -393,7 +401,7 @@ index ec639a7b..51e67c55 100644
    int idx = FindTuple(&mask);
    if (idx < 0) {
      idx = AddTuple(&mask);
-@@ -459,13 +572,10 @@ CommandResponse WildcardMatch::CommandAdd(
+@@ -459,13 +571,10 @@ CommandResponse WildcardMatch::CommandAdd(
        return CommandFailure(-idx, "failed to add a new wildcard pattern");
      }
    }
@@ -410,7 +418,7 @@ index ec639a7b..51e67c55 100644
    return CommandSuccess();
  }
  
-@@ -485,7 +595,7 @@ CommandResponse WildcardMatch::CommandDelete(
+@@ -485,7 +594,7 @@ CommandResponse WildcardMatch::CommandDelete(
    }
  
    int ret = DelEntry(idx, &key);
@@ -419,7 +427,7 @@ index ec639a7b..51e67c55 100644
      return CommandFailure(-ret, "failed to delete a rule");
    }
  
-@@ -499,7 +609,10 @@ CommandResponse WildcardMatch::CommandClear(const bess::pb::EmptyArg &) {
+@@ -499,7 +608,10 @@ CommandResponse WildcardMatch::CommandClear(const bess::pb::EmptyArg &) {
  
  void WildcardMatch::Clear() {
    for (auto &tuple : tuples_) {
@@ -431,7 +439,7 @@ index ec639a7b..51e67c55 100644
    }
  }
  
-@@ -521,17 +634,26 @@ CommandResponse WildcardMatch::GetInitialArg(const bess::pb::EmptyArg &) {
+@@ -521,17 +633,26 @@ CommandResponse WildcardMatch::GetInitialArg(const bess::pb::EmptyArg &) {
  // Retrieves a WildcardMatchConfig that would restore this module's
  // runtime configuration.
  CommandResponse WildcardMatch::GetRuntimeConfig(const bess::pb::EmptyArg &) {
@@ -460,7 +468,7 @@ index ec639a7b..51e67c55 100644
        // Create the rule instance
        rule_t *rule = resp.add_rules();
        rule->set_priority(entry.second.priority);
-@@ -596,5 +718,14 @@ CommandResponse WildcardMatch::SetRuntimeConfig(
+@@ -596,5 +717,14 @@ CommandResponse WildcardMatch::SetRuntimeConfig(
    return CommandSuccess();
  }
  

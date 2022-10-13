@@ -118,7 +118,7 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
                << ", tunnel out sip: " << at_tout_sip
                << ", tunnel out dip: " << at_tout_dip
                << ", tunnel out teid: " << at_tout_teid
-               << ", tunnel out udp port: " << at_tout_uport << std::endl;
+               << ", tunnel out udp port: " << at_tout_uport;
 
     uint16_t pkt_len = p->total_len() - sizeof(Ethernet);
     Ethernet *eth = p->head_data<Ethernet *>();
@@ -128,7 +128,7 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     if (new_p == NULL) {
       /* failed to prepend header space for encaped packet */
       EmitPacket(ctx, p, DEFAULT_GATE);
-      DLOG(INFO) << "prepend() failed!" << std::endl;
+      DLOG(INFO) << "prepend() failed!";
       continue;
     }
 
@@ -188,21 +188,21 @@ CommandResponse GtpuEncap::Init(const bess::pb::GtpuEncapArg &arg) {
 
   using AccessMode = bess::metadata::Attribute::AccessMode;
   pdu_type_attr = AddMetadataAttr("action", sizeof(uint8_t), AccessMode::kRead);
-  DLOG(INFO) << "tout_sip_attr: " << tout_sip_attr << std::endl;
+  DLOG(INFO) << "tout_sip_attr: " << tout_sip_attr;
   tout_sip_attr = AddMetadataAttr("tunnel_out_src_ip4addr", sizeof(uint32_t),
                                   AccessMode::kRead);
-  DLOG(INFO) << "tout_sip_attr: " << tout_sip_attr << std::endl;
+  DLOG(INFO) << "tout_sip_attr: " << tout_sip_attr;
   tout_dip_attr = AddMetadataAttr("tunnel_out_dst_ip4addr", sizeof(uint32_t),
                                   AccessMode::kRead);
-  DLOG(INFO) << "tout_dip_attr: " << tout_dip_attr << std::endl;
+  DLOG(INFO) << "tout_dip_attr: " << tout_dip_attr;
   tout_teid =
       AddMetadataAttr("tunnel_out_teid", sizeof(uint32_t), AccessMode::kRead);
-  DLOG(INFO) << "tout_teid: " << tout_teid << std::endl;
+  DLOG(INFO) << "tout_teid: " << tout_teid;
   tout_uport = AddMetadataAttr("tunnel_out_udp_port", sizeof(uint16_t),
                                AccessMode::kRead);
-  DLOG(INFO) << "tout_uport: " << tout_uport << std::endl;
+  DLOG(INFO) << "tout_uport: " << tout_uport;
   qfi_attr = AddMetadataAttr("qfi", sizeof(uint8_t), AccessMode::kRead);
-  DLOG(INFO) << "qfi_attr: " << qfi_attr << std::endl;
+  DLOG(INFO) << "qfi_attr: " << qfi_attr;
 
   return CommandSuccess();
 }

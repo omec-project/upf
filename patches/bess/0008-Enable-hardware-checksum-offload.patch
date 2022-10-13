@@ -25,7 +25,7 @@ index 9b29fc85..1501ea94 100644
    ret = rte_eth_dev_configure(ret_port_id, num_rxq, num_txq, &eth_conf);
    if (ret != 0) {
 +    VLOG(1) << "Failed to configure with hardware checksum offload. "
-+            << "Create PMDPort without hardware offload" << std::endl;
++            << "Create PMDPort without hardware offload";
      return CommandFailure(-ret, "rte_eth_dev_configure() failed");
    }
  

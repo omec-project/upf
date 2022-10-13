@@ -61,7 +61,7 @@ bess::Packet *IPDefrag::IPReassemble(Context *ctx, bess::Packet *p) {
         iph = (Ipv4 *)((unsigned char *)eth + sizeof(Ethernet));
       } else {
         DLOG(INFO) << "Failed to linearize rte_mbuf. "
-                   << "Is there enough tail room?" << std::endl;
+                   << "Is there enough tail room?";
         EmitPacket(ctx, p, DEFAULT_GATE);
         return NULL;
       }
