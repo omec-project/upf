@@ -51,6 +51,7 @@ message PMDPortArg {
     int32 socket_id = 8;
   }
   bool promiscuous_mode = 9;
+  bool hwcksum = 10;
 }
 
 message UnixSocketPortArg {
