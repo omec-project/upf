@@ -50,6 +50,7 @@ message PMDPortArg {
   oneof socket {
     int32 socket_id = 8;
   }
+  bool promiscuous_mode = 9;
 }
 
 message UnixSocketPortArg {

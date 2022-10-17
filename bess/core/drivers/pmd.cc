@@ -320,7 +320,12 @@ CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
     }
   }
 
-  rte_eth_promiscuous_enable(ret_port_id);
+  if (arg.promiscuous_mode()) {
+    ret = rte_eth_promiscuous_enable(ret_port_id);
+    if (ret != 0) {
+      return CommandFailure(-ret, "rte_eth_promiscuous_enable() failed");
+    }
+  }
 
   int offload_mask = 0;
   offload_mask |= arg.vlan_offload_rx_strip() ? ETH_VLAN_STRIP_OFFLOAD : 0;
