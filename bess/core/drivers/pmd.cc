@@ -36,6 +36,13 @@
 #include "../utils/ether.h"
 #include "../utils/format.h"
 
+// TODO: Replace with one time initialized key during InitDriver?
+static uint8_t rss_key[40] = {0xD8, 0x2A, 0x6C, 0x5A, 0xDD, 0x3B, 0x9D, 0x1E,
+                              0x14, 0xCE, 0x2F, 0x37, 0x86, 0xB2, 0x69, 0xF0,
+                              0x44, 0x31, 0x7E, 0xA2, 0x07, 0xA5, 0x0A, 0x99,
+                              0x49, 0xC6, 0xA4, 0xFE, 0x0C, 0x4F, 0x59, 0x02,
+                              0xD4, 0x44, 0xE2, 0x4A, 0xDB, 0xE1, 0x05, 0x82};
+
 static const rte_eth_conf default_eth_conf(const rte_eth_dev_info &dev_info,
                                            int nb_rxq) {
   rte_eth_conf ret = {};
@@ -45,8 +52,8 @@ static const rte_eth_conf default_eth_conf(const rte_eth_dev_info &dev_info,
   ret.rxmode.offloads = 0;
 
   ret.rx_adv_conf.rss_conf = {
-      .rss_key = nullptr,
-      .rss_key_len = 0,
+      .rss_key = rss_key,
+      .rss_key_len = sizeof(rss_key),
       .rss_hf = (ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP | ETH_RSS_SCTP) &
                 dev_info.flow_type_rss_offloads,
   };
