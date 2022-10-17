@@ -31,6 +31,8 @@ syntax = "proto3";
 
 package bess.pb;
 
+option go_package = "github.com/omec-project/upf-epc/pfcpiface/bess_pb";
+
 message Error {
   int32 code = 1;  // 0 for success, errno (>0) for failure
   string errmsg = 2;

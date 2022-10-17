@@ -33,6 +33,8 @@ import "bess_msg.proto";
 
 package bess.pb;
 
+option go_package = "github.com/omec-project/upf-epc/pfcpiface/bess_pb";
+
 service BESSControl {
 
   //  -------------------------------------------------------------------------

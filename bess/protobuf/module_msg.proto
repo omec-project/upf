@@ -31,6 +31,9 @@
 syntax = "proto3";
 
 package bess.pb;
+
+option go_package = "github.com/omec-project/upf-epc/pfcpiface/bess_pb";
+
 import "util_msg.proto";
 
 // Module-specific messages.

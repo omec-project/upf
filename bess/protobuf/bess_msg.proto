@@ -42,6 +42,8 @@ import "error.proto";
 
 package bess.pb;
 
+option go_package = "github.com/omec-project/upf-epc/pfcpiface/bess_pb";
+
 message EmptyRequest {
 }
 

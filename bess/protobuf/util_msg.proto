@@ -32,6 +32,8 @@ syntax="proto3";
 
 package bess.pb;
 
+option go_package = "github.com/omec-project/upf-epc/pfcpiface/bess_pb";
+
 /// The Field message represents one field in a packet -- either stored in metadata or in the packet body.
 message Field {
   oneof position {
