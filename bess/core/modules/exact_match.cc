@@ -134,7 +134,7 @@ CommandResponse ExactMatch::Init(const bess::pb::ExactMatchArg &arg) {
   }
 
   default_gate_ = DROP_GATE;
-
+  table_.Init();
   return CommandSuccess();
 }
 
@@ -326,17 +326,15 @@ void ExactMatch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 
   int cnt = batch->cnt();
   Value default_value(default_gate);
-
-  for (int i = 0; i < cnt; i++) {
-    bess::Packet *pkt = batch->pkts()[i];
-    ValueTuple res;
-    res = table_.Find(keys[i], default_value);
-    if (res.gate != default_gate) {
-      /* setting respecive values */
-      setValues(pkt, res.action);
+  ValueTuple *res[cnt];
+  uint64_t hit_mask = table_.Find(keys, res, cnt);
+  for (int j = 0; j < cnt; j++) {
+    if ((hit_mask & ((uint64_t)1ULL << j)) == 0)
+      EmitPacket(ctx, batch->pkts()[j], default_gate);
+    else {
+      setValues(batch->pkts()[j], res[j]->action);
+      EmitPacket(ctx, batch->pkts()[j], res[j]->gate);
     }
-    gate_idx_t g = res.gate;
-    EmitPacket(ctx, pkt, g);
   }
 }
 
@@ -420,6 +418,10 @@ CommandResponse ExactMatch::CommandSetDefaultGate(
     const bess::pb::ExactMatchCommandSetDefaultGateArg &arg) {
   default_gate_ = arg.gate();
   return CommandSuccess();
+}
+
+void ExactMatch::DeInit() {
+    table_.DeInit();
 }
 
 ADD_MODULE(ExactMatch, "em", "Multi-field classifier with an exact match table")

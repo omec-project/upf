@@ -90,6 +90,9 @@ class ExactMatch final : public Module {
   std::string GetDesc() const override;
 
   CommandResponse Init(const bess::pb::ExactMatchArg &arg);
+
+  void DeInit() override;
+
   CommandResponse GetInitialArg(const bess::pb::EmptyArg &arg);
   CommandResponse GetRuntimeConfig(const bess::pb::EmptyArg &arg);
   CommandResponse SetRuntimeConfig(const bess::pb::ExactMatchConfig &arg);

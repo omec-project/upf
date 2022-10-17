@@ -50,6 +50,8 @@
 
 #include "../debug.h"
 #include "common.h"
+#include <iostream>
+#include <rte_hash.h>
 
 namespace bess {
 namespace utils {
@@ -74,7 +76,13 @@ typedef uint32_t EntryIndex;
 template <typename K, typename V, typename H = std::hash<K>,
           typename E = std::equal_to<K>>
 class CuckooMap {
+ private:
+  bool IsDpdk = false;
+  uint32_t key_len = 0;
+  rte_hash_parameters rt;
+
  public:
+  struct rte_hash* hash = nullptr;
   typedef std::pair<K, V> Entry;
 
   class iterator {
@@ -149,20 +157,29 @@ class CuckooMap {
   };
 
   CuckooMap(size_t reserve_buckets = kInitNumBucket,
-            size_t reserve_entries = kInitNumEntries)
+            size_t reserve_entries = kInitNumEntries, void* dpdk_params = 0)
       : bucket_mask_(reserve_buckets - 1),
         num_entries_(0),
         buckets_(reserve_buckets),
         entries_(reserve_entries),
         free_entry_indices_() {
-    // the number of buckets must be a power of 2
-    CHECK_EQ(align_ceil_pow2(reserve_buckets), reserve_buckets);
+    if (dpdk_params) {
+      if (hash == NULL) {
+        rt = *((rte_hash_parameters*)dpdk_params);
+        hash = rte_hash_create(&rt);
+        if (hash == NULL)
+          return;
+      }
+      IsDpdk = true;
+    } else {
+      // the number of buckets must be a power of 2
+      CHECK_EQ(align_ceil_pow2(reserve_buckets), reserve_buckets);
 
-    for (int i = reserve_entries - 1; i >= 0; --i) {
-      free_entry_indices_.push(i);
+      for (int i = reserve_entries - 1; i >= 0; --i) {
+        free_entry_indices_.push(i);
+      }
     }
   }
-
   // Not allowing copying for now
   CuckooMap(CuckooMap&) = delete;
   CuckooMap& operator=(CuckooMap&) = delete;
@@ -220,6 +237,50 @@ class CuckooMap {
     return DoEmplace(key, hasher, eq, std::move(value));
   }
 
+  int insert_dpdk(const void* key, void* data = 0, hash_sig_t sig = 0) {
+    if (IsDpdk) {
+      if (data && !sig)
+        return rte_hash_add_key_data(hash, key, data);
+      if (data && sig)
+        return rte_hash_add_key_with_hash_data(hash, key, sig, data);
+      if (!data && !sig)
+        return rte_hash_add_key(hash, key);
+    }
+    return -1;
+  }
+
+  int find_dpdk(const void* key, void** data = 0,
+                hash_sig_t sig = 0)
+  {
+    if (IsDpdk) {
+      if (data && !sig)
+        return rte_hash_lookup_data(hash, key, data);
+      if (data && sig)
+        return rte_hash_lookup_with_hash_data(hash, key, sig, data);
+      if (!data && !sig)
+        return rte_hash_lookup(hash, key);
+      if (!data && sig)
+        return rte_hash_lookup_with_hash(hash, key, sig);
+    }
+    return -1;
+  }
+
+  int find_dpdk(const void* key, void** data = 0,
+                hash_sig_t sig = 0) const
+  {
+    if (IsDpdk) {
+      if (data && !sig)
+        return rte_hash_lookup_data(hash, key, data);
+      if (data && sig)
+        return rte_hash_lookup_with_hash_data(hash, key, sig, data);
+      if (!data && !sig)
+        return rte_hash_lookup(hash, key);
+      if (!data && sig)
+        return rte_hash_lookup_with_hash(hash, key, sig);
+    }
+    return -1;
+  }
+
   // Emplace/update-in-place a key value pair
   // On success returns a pointer to the inserted entry, nullptr otherwise.
   // NOTE: when Emplace() returns nullptr, the constructor of `V` may not be
@@ -255,6 +316,13 @@ class CuckooMap {
   // Remove the stored entry by the key
   // Return false if not exist.
   bool Remove(const K& key, const H& hasher = H(), const E& eq = E()) {
+    if (IsDpdk) {
+      int ret = rte_hash_del_key(hash, &key);
+      if (ret < 0)
+        return false;
+      else
+        return true;
+    }
     HashResult pri = Hash(key, hasher);
     if (RemoveFromBucket(pri, pri & bucket_mask_, key, eq)) {
       return true;
@@ -267,6 +335,12 @@ class CuckooMap {
   }
 
   void Clear() {
+    if (IsDpdk) {
+      if (hash) {
+        rte_hash_reset(hash);
+      }
+      return;
+    }
     buckets_.clear();
     entries_.clear();
 
@@ -286,7 +360,36 @@ class CuckooMap {
   }
 
   // Return the number of stored entries
-  size_t Count() const { return num_entries_; }
+  size_t Count() const {
+    if (IsDpdk)
+      return rte_hash_count(hash);
+    else
+      return num_entries_;
+  }
+
+  void DeInit() {
+    if (IsDpdk) {
+      if (hash) {
+        rte_hash_free(hash);
+        hash = nullptr;
+      }
+      return;
+    }
+  }
+
+  // bulk data look up bess func
+  int32_t lookup_bulk_data(const void** keys, uint32_t num_keys,
+                           uint64_t* hit_mask, void* data[]) {
+    if (IsDpdk)
+      return rte_hash_lookup_bulk_data(hash, keys, num_keys, hit_mask, data);
+    return -1;
+  }
+  // iterate for dpdk hash
+  int32_t Iterate(const void** key, void** data, uint32_t* next) {
+    if (IsDpdk)
+      return rte_hash_iterate(hash, key, data, next);
+    return -1;
+  }
 
  protected:
   // Tunable macros

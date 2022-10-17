@@ -155,15 +155,17 @@ typedef std::vector<std::vector<uint8_t>> ExactMatchRuleFields;
 template <typename T>
 class ExactMatchTable {
  public:
+  struct rte_hash_parameters dpdk_params {
+    .name = "test1", .entries = 1 << 20, .reserved = 0,
+    .key_len = sizeof(ExactMatchKey), .hash_func = rte_hash_crc,
+    .hash_func_init_val = 0, .socket_id = (int)rte_socket_id(),
+    .extra_flag = RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY
+  };
+
   using EmTable =
       CuckooMap<ExactMatchKey, T, ExactMatchKeyHash, ExactMatchKeyEq>;
-
   ExactMatchTable()
-      : raw_key_size_(),
-        total_key_size_(),
-        num_fields_(),
-        fields_(),
-        table_() {}
+      : raw_key_size_(), total_key_size_(), num_fields_(), fields_() {}
 
   // Add a new rule.
   //
@@ -183,10 +185,9 @@ class ExactMatchTable {
     if ((err = gather_key(fields, &key)).first != 0) {
       return err;
     }
-
-    table_.Insert(key, val, ExactMatchKeyHash(total_key_size_),
-                  ExactMatchKeyEq(total_key_size_));
-
+    const void *Key_t = (const void *)&key;
+    T *val_t = new T(val);
+    table_->insert_dpdk(Key_t, val_t);
     return MakeError(0);
   }
 
@@ -207,8 +208,8 @@ class ExactMatchTable {
       return err;
     }
 
-    bool ret = table_.Remove(key, ExactMatchKeyHash(total_key_size_),
-                             ExactMatchKeyEq(total_key_size_));
+    bool ret = table_->Remove(key, ExactMatchKeyHash(total_key_size_),
+                              ExactMatchKeyEq(total_key_size_));
     if (!ret) {
       return MakeError(ENOENT, "rule doesn't exist");
     }
@@ -217,9 +218,11 @@ class ExactMatchTable {
   }
 
   // Remove all rules from the table.
-  void ClearRules() { table_.Clear(); }
+  void ClearRules() { table_->Clear(); }
 
-  size_t Size() const { return table_.Count(); }
+  void DeInit() { table_->DeInit(); }
+
+  size_t Size() const { return table_->Count(); }
 
   // Extract an ExactMatchKey from `buf` based on the fields that have been
   // added to this table.
@@ -272,23 +275,27 @@ class ExactMatchTable {
   // Returns the value if `key` matches a rule, otherwise `default_value`.
   T Find(const ExactMatchKey &key, const T &default_value) const {
     const auto &table = table_;
-    const auto *entry = table.Find(key, ExactMatchKeyHash(total_key_size_),
-                                   ExactMatchKeyEq(total_key_size_));
-    return entry ? entry->second : default_value;
+    void *data = nullptr;
+    table->find_dpdk(&key, &data);
+    if (data) {
+      T data_t = *((T *)data);
+      return data_t;
+    } else
+      return default_value;
   }
 
   // Find entries for `n` `keys` in the table and store their values in in
   // `vals`.  Keys without entries will have their corresponding entires in
   // `vals` set to `default_value`.
-  void Find(const ExactMatchKey *keys, T *vals, size_t n,
-            T default_value) const {
+  uint64_t Find(ExactMatchKey *keys, T **vals, int n) {
     const auto &table = table_;
-    for (size_t i = 0; i < n; i++) {
-      const auto *entry =
-          table.Find(keys[i], ExactMatchKeyHash(total_key_size_),
-                     ExactMatchKeyEq(total_key_size_));
-      vals[i] = entry ? entry->second : default_value;
-    }
+    uint64_t hit_mask = 0;
+    ExactMatchKey *key_ptr[n];
+    for (int h = 0; h < n; h++)
+      key_ptr[h] = &keys[h];
+    table->lookup_bulk_data((const void **)&key_ptr, n, &hit_mask,
+                            (void **)vals);
+    return hit_mask;
   }
 
   uint32_t total_key_size() const { return total_key_size_; }
@@ -318,9 +325,20 @@ class ExactMatchTable {
   // Returns the ith field.
   const ExactMatchField &get_field(size_t i) const { return fields_[i]; }
 
-  typename EmTable::iterator begin() { return table_.begin(); }
+  typename EmTable::iterator begin() { return table_->begin(); }
 
-  typename EmTable::iterator end() { return table_.end(); }
+  typename EmTable::iterator end() { return table_->end(); }
+
+  void Init() {
+    std::ostringstream address;
+    address << &table_;
+    std::string name = "Exactmatch" + address.str();
+    dpdk_params.name = name.c_str();
+    dpdk_params.key_len = total_key_size();
+    table_.reset(
+        new CuckooMap<ExactMatchKey, T, ExactMatchKeyHash, ExactMatchKeyEq>(
+            0, 0, &dpdk_params));
+  }
 
  private:
   Error MakeError(int code, const std::string &msg = "") {
@@ -438,23 +456,21 @@ class ExactMatchTable {
     f->pos = raw_key_size_;
     raw_key_size_ += f->size;
     total_key_size_ = align_ceil(raw_key_size_, sizeof(uint64_t));
-
     return MakeError(0);
   }
 
   // unaligend key size, used as an accumulator for calls to AddField()
   size_t raw_key_size_;
-
   // aligned total key size
   size_t total_key_size_;
-
   size_t num_fields_;
   ExactMatchField fields_[MAX_FIELDS];
-
-  EmTable table_;
+  std::unique_ptr<
+      CuckooMap<ExactMatchKey, T, ExactMatchKeyHash, ExactMatchKeyEq>>
+      table_;
 };
 
-}  // namespace bess
 }  // namespace utils
+}  // namespace bess
 
 #endif  // BESS_UTILS_EXACT_MATCH_TABLE_H_
