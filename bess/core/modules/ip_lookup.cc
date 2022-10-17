@@ -32,7 +32,6 @@
 
 #include <rte_config.h>
 #include <rte_errno.h>
-#include <rte_lpm.h>
 
 #include "../utils/bits.h"
 #include "../utils/ether.h"
@@ -54,15 +53,26 @@ const Commands IPLookup::cmds = {
      Command::THREAD_UNSAFE}};
 
 CommandResponse IPLookup::Init(const bess::pb::IPLookupArg &arg) {
+#if RTE_VERSION < RTE_VERSION_NUM(19, 11, 0, 0)
   struct rte_lpm_config conf = {
       .max_rules = arg.max_rules() ? arg.max_rules() : 1024,
       .number_tbl8s = arg.max_tbl8s() ? arg.max_tbl8s() : 128,
       .flags = 0,
   };
+#else
+  conf.type = RTE_FIB_DIR24_8;
+  conf.default_nh = DROP_GATE;
+  conf.max_routes = arg.max_rules() ? (int)arg.max_rules() : 1024;
+  conf.dir24_8.nh_sz = RTE_FIB_DIR24_8_4B;
+  conf.dir24_8.num_tbl8 = arg.max_tbl8s() ? arg.max_tbl8s() : 128;
+#endif
 
   default_gate_ = DROP_GATE;
-
-  lpm_ = rte_lpm_create(name().c_str(), /* socket_id = */ 0, &conf);
+#if RTE_VERSION < RTE_VERSION_NUM(19, 11, 0, 0)
+  lpm_ = rte_lpm_create(name().c_str(), /* socket_id = */ rte_socket_id(), &conf);
+#else
+  lpm_ = rte_fib_create(name().c_str(), /* socket_id = */ rte_socket_id(), &conf);
+#endif
 
   if (!lpm_) {
     return CommandFailure(rte_errno, "DPDK error: %s", rte_strerror(rte_errno));
@@ -73,7 +83,11 @@ CommandResponse IPLookup::Init(const bess::pb::IPLookupArg &arg) {
 
 void IPLookup::DeInit() {
   if (lpm_) {
+#if RTE_VERSION < RTE_VERSION_NUM(19, 11, 0, 0)
     rte_lpm_free(lpm_);
+#else
+    rte_fib_free(lpm_);
+#endif
   }
 }
 
@@ -86,6 +100,7 @@ void IPLookup::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   int cnt = batch->cnt();
   int i;
 
+#if RTE_VERSION < RTE_VERSION_NUM(19, 11, 0, 0)
 #if VECTOR_OPTIMIZATION
   // Convert endianness for four addresses at the same time
   const __m128i bswap_mask =
@@ -148,6 +163,29 @@ void IPLookup::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
       EmitPacket(ctx, batch->pkts()[i], default_gate);
     }
   }
+#else /* RTE_VERSION >= 19.11 */
+  Ethernet *eth;
+  Ipv4 *ip;
+  int ret;
+  uint32_t ip_list[cnt];
+  uint64_t next_hops[cnt];
+
+  for (i = 0; i < cnt; i++) {
+    eth = batch->pkts()[i]->head_data<Ethernet *>();
+    ip = (Ipv4 *)(eth + 1);
+    ip_list[i] = ip->dst.value();
+  }
+
+  ret = rte_fib_lookup_bulk(lpm_, ip_list, next_hops, cnt);
+
+  if (ret != 0)
+    RunNextModule(ctx, batch);
+  else
+    for (i = 0; i < cnt; i++) {
+      EmitPacket(ctx, batch->pkts()[i], (next_hops[i] == DROP_GATE) ? default_gate_ : next_hops[i]);
+    }
+  USED(default_gate);
+#endif
 }
 
 ParsedPrefix IPLookup::ParseIpv4Prefix(
@@ -201,7 +239,12 @@ CommandResponse IPLookup::CommandAdd(
     default_gate_ = gate;
   } else {
     be32_t net_addr = std::get<2>(prefix);
+#if RTE_VERSION < RTE_VERSION_NUM(19, 11, 0, 0)
     int ret = rte_lpm_add(lpm_, net_addr.value(), prefix_len, gate);
+#else
+    uint64_t next_hop = (uint64_t)gate;
+    int ret = rte_fib_add(lpm_, net_addr.value(), prefix_len, next_hop);
+#endif
     if (ret) {
       return CommandFailure(-ret, "rpm_lpm_add() failed");
     }
@@ -223,7 +266,11 @@ CommandResponse IPLookup::CommandDelete(
     default_gate_ = DROP_GATE;
   } else {
     be32_t net_addr = std::get<2>(prefix);
+#if RTE_VERSION < RTE_VERSION_NUM(19, 11, 0, 0)
     int ret = rte_lpm_delete(lpm_, net_addr.value(), prefix_len);
+#else
+    int ret = rte_fib_delete(lpm_, net_addr.value(), prefix_len);
+#endif
     if (ret) {
       return CommandFailure(-ret, "rpm_lpm_delete() failed");
     }
@@ -233,7 +280,17 @@ CommandResponse IPLookup::CommandDelete(
 }
 
 CommandResponse IPLookup::CommandClear(const bess::pb::EmptyArg &) {
+#if RTE_VERSION < RTE_VERSION_NUM(19, 11, 0, 0)
   rte_lpm_delete_all(lpm_);
+#else
+  /* rte_fib_delete_all(lpm_) does not exist! */
+  rte_fib_free(lpm_);
+
+  lpm_ = rte_fib_create(name().c_str(), /* socket_id = */ 0, &conf);
+  if (!lpm_) {
+    return CommandFailure(rte_errno, "DPDK error: %s", rte_strerror(rte_errno));
+  }
+#endif
   return CommandSuccess();
 }
 

@@ -34,6 +34,15 @@
 #include "../module.h"
 #include "../pb/module_msg.pb.h"
 #include "../utils/endian.h"
+#include <rte_version.h>
+#if RTE_VERSION < RTE_VERSION_NUM(19, 11, 0, 0)
+#include <rte_lpm.h>
+#else
+#define USED(x)		(void)(x)
+extern "C" {
+#include <rte_fib.h>
+}
+#endif
 
 using bess::utils::be32_t;
 using ParsedPrefix = std::tuple<int, std::string, be32_t>;
@@ -59,7 +68,12 @@ class IPLookup final : public Module {
   CommandResponse CommandClear(const bess::pb::EmptyArg &arg);
 
  private:
+#if RTE_VERSION < RTE_VERSION_NUM(19, 11, 0, 0)
   struct rte_lpm *lpm_;
+#else
+  struct rte_fib *lpm_;
+  struct rte_fib_conf conf;
+#endif
   gate_idx_t default_gate_;
   ParsedPrefix ParseIpv4Prefix(const std::string &prefix, uint64_t prefix_len);
 };
