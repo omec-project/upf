@@ -1,0 +1,80 @@
+// Copyright (c) 2016-2017, Nefeli Networks, Inc.
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+//
+// * Redistributions of source code must retain the above copyright notice, this
+// list of conditions and the following disclaimer.
+//
+// * Redistributions in binary form must reproduce the above copyright notice,
+// this list of conditions and the following disclaimer in the documentation
+// and/or other materials provided with the distribution.
+//
+// * Neither the names of the copyright holders nor the names of their
+// contributors may be used to endorse or promote products derived from this
+// software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+
+syntax = "proto3";
+
+package bess.pb;
+
+message PCAPPortArg {
+  string dev = 1;
+}
+
+message PMDPortArg {
+  bool loopback = 1;
+  oneof port {
+    uint64 port_id = 2;
+    string pci = 3;
+    string vdev = 4;
+  }
+
+  // See http://dpdk.org/doc/dts/test_plans/dual_vlan_test_plan.html
+  bool vlan_offload_rx_strip = 5;
+  bool vlan_offload_rx_filter = 6;
+  bool vlan_offload_rx_qinq = 7;
+}
+
+message UnixSocketPortArg {
+  /// Set the first character to "@" in place of \0 for abstract path
+  /// See manpage for unix(7).
+  string path = 1;
+
+  /// Minimum RX polling interval for system calls, when *idle*.
+  /// Use a negative number for unthrottled polling. If unspecified or 0,
+  /// it is set to 50,000 (50 microseconds, or 20k polls per second)
+  int64 min_rx_interval_ns = 2;
+
+  /// If set, the port driver will send a confirmation once
+  /// the port is connected.  This lets pybess avoid a race during
+  /// testing.  See bessctl/test_utils.py for details.
+  bool confirm_connect = 3;
+}
+
+message VPortArg {
+  string ifname = 1;
+  oneof cpid {
+    string docker = 2;
+    int64 container_pid = 3;
+    string netns = 4;
+  }
+  repeated int64 rxq_cpus = 5;
+  uint64 tx_tci = 6;
+  uint64 tx_outer_tci = 7;
+  bool loopback = 8;
+  repeated string ip_addrs = 9;
+}

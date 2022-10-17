@@ -1,0 +1,53 @@
+# Copyright (c) 2014-2016, The Regents of the University of California.
+# Copyright (c) 2016-2017, Nefeli Networks, Inc.
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+# list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+#
+# * Neither the names of the copyright holders nor the names of their
+# contributors may be used to endorse or promote products derived from this
+# software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+import os
+
+os.system('docker pull ubuntu > /dev/null')
+os.system('docker run -i -d --sysctl net.ipv6.conf.all.disable_ipv6=0 --net=none --name=vport_test ubuntu /bin/bash > /dev/null')
+
+# Alice lives outside the container, wanting to talk to Bob in the container
+v_bob = VPort(ifname='eth_bob', docker='vport_test', ip_addrs=['10.255.99.2/24', 'fdd4:955b:82c1:0cb7::1/64'])
+v_alice = VPort(ifname='eth_alice', ip_addrs=['10.255.99.1/24', 'fdd4:955b:82c1:0cb7::2/64'])
+
+PortInc(port=v_alice) -> PortOut(port=v_bob)
+PortInc(port=v_bob) -> PortOut(port=v_alice)
+
+bess.resume_all()
+
+os.system('ping -W 1.0 -c 64 -i 0.2 10.255.99.2')
+os.system('ping6 -W 1.0 -c 64 -i 0.2 fdd4:955b:82c1:0cb7::1')
+
+bess.pause_all()
+
+os.system('docker kill vport_test > /dev/null')
+os.system('docker rm vport_test > /dev/null')
+
+bess.reset_all()

@@ -1,0 +1,15 @@
+# Docker is an optional package.
+# Some BESS examples make uee of Docker to demonstrate container networking.
+- hosts: all
+  tags: docker
+  tasks:
+    - name: Add the new GPG key for Docker
+      apt_key: url=https://download.docker.com/linux/ubuntu/gpg
+      become: true
+
+    - apt_repository: repo='deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ansible_distribution_release}} edge'
+      become: true
+
+    - name: Install Docker
+      apt: name=docker-ce state=latest update_cache=yes
+      become: true
