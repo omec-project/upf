@@ -123,8 +123,10 @@ void init_eal(int dpdk_mb_per_socket, std::string nonworker_corelist) {
       "--legacy-mem",
   };
 
+  if (FLAGS_iova != "")
+    rte_args.Append({"--iova", FLAGS_iova});
+
   if (dpdk_mb_per_socket <= 0) {
-    rte_args.Append({"--iova", (FLAGS_iova != "") ? FLAGS_iova : "va"});
     rte_args.Append({"--no-huge"});
 
     // even if we opt out of using hugepages, many DPDK libraries still rely on
@@ -132,8 +134,6 @@ void init_eal(int dpdk_mb_per_socket, std::string nonworker_corelist) {
     // memory in advance. We allocate 512MB (this is shared among nodes).
     rte_args.Append({"-m", "512"});
   } else {
-    rte_args.Append({"--iova", (FLAGS_iova != "") ? FLAGS_iova : "pa"});
-
     std::string opt_socket_mem = std::to_string(dpdk_mb_per_socket);
     for (int i = 1; i < NumNumaNodes(); i++) {
       opt_socket_mem += "," + std::to_string(dpdk_mb_per_socket);
