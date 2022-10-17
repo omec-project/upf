@@ -123,6 +123,10 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     uint16_t pkt_len = p->total_len() - sizeof(Ethernet);
     Ethernet *eth = p->head_data<Ethernet *>();
 
+    /* get Type of Service from IP packet */
+    Ipv4 *iphIn = (Ipv4 *)((unsigned char *)eth + sizeof(Ethernet));
+    uint8_t type_of_service = iphIn->type_of_service;
+
     /* pre-allocate space for encaped header(s) */
     char *new_p = static_cast<char *>(p->prepend(encap_size));
     if (new_p == NULL) {
@@ -173,6 +177,7 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     iph->length = (be16_t)(iplen);
     iph->src = (be32_t)(at_tout_sip);
     iph->dst = (be32_t)(at_tout_dip);
+    iph->type_of_service = type_of_service;
 
     EmitPacket(ctx, p, FORWARD_GATE);
   }
