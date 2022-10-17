@@ -69,6 +69,7 @@ message BPFCommandClearArg {
 message ExactMatchCommandAddArg {
   uint64 gate = 1; /// The gate to forward out packets that mach this rule.
   repeated FieldData fields = 2; /// The exact match values to check for
+  repeated FieldData values = 3; /// The exact match values to check for
 }
 
 /**
@@ -377,6 +378,7 @@ message WildcardMatchCommandAddArg {
   int64 priority = 2; ///If a packet matches multiple rules, the rule with higher priority will be applied. If priorities are equal behavior is undefined.
   repeated FieldData values = 3; /// The values to check for in each field.
   repeated FieldData masks = 4; /// The bitmask for each field -- set `0x0` to ignore the field altogether.
+  repeated FieldData valuesv = 5; /// The values to check for in each fieldv.
 }
 
 /**
@@ -501,6 +503,8 @@ message EtherEncapArg {
 message ExactMatchArg {
   repeated Field fields = 1; ///A list of ExactMatch Fields
   repeated FieldData masks = 2; /// mask(i) corresponds to the mask for field(i)
+  repeated Field values = 3; /// A list of ExactMatch Values
+  repeated FieldData masksv = 4; /// mask(i) corresponds to the mask for value(i)
 }
 
 /**
@@ -996,6 +1000,7 @@ message SourceArg {
 */
 message IPChecksumArg {
  bool verify = 1; /// check checksum
+ bool hw = 2; /// enable hardware offload
 }
 
 /**
@@ -1009,6 +1014,85 @@ message IPChecksumArg {
 */
 message L4ChecksumArg {
  bool verify = 1; /// check checksum
+ bool hw = 2; /// enable hardware offload
+}
+
+/**
+ * The GtpuEcho module processes the GTPv1 echo packet and prepares
+ * corresponding IP packet containing GTP echo response. It assumes
+ * Recovery IE is always zero.
+ *
+ * __Input Gates__: 1
+ * __Output Gates__: 1
+ */
+message GtpuEchoArg {
+  uint32 s1u_sgw_ip = 1; /// IP address of S1U interface
+}
+
+/**
+ * The IPDefrag module scans the IP datagram and checks whether
+ * it is fragmented. It returns a fully reassembled datagram or
+ * an unfragmented IP datagram
+ *
+ * __Input Gates__: 1
+ * __Output Gates__: 1
+ */
+message IPDefragArg {
+  uint32 num_flows = 1; /// max number of flows the module can handle
+  int32 numa = 2; /// numa placement for ip frags memory management
+}
+
+/**
+ * The IPDFrag module scans the IP datagram and checks whether
+ * it needs to be fragmented.
+ *
+ * __Input Gates__: 1
+ * __Output Gates__: 1
+ */
+message IPFragArg {
+  int32 mtu = 1; /// full Ethernet frame size (including CRC) for encapsulated ipv4 frag datagrams
+}
+
+/**
+ * The Counter module has a command `add(...)` which takes one
+ * parameters.  This function accepts the counter id of a
+ * session record.
+ * Example use in bessctl: `counter.add(ctr_id=0x1)`
+ */
+message CounterAddArg {
+  uint32 ctr_id = 1; /// counter id
+}
+
+/**
+ * The Counter module has a command `remove(...)` which takes one
+ * parameter.  This function accepts ctr_id, and removes the
+ * respective counter.
+ * Example use in bessctl: `counter.remove(ctr_id=0x1)`
+ */
+message CounterRemoveArg {
+  uint32 ctr_id = 1; /// counter id
+}
+
+/**
+ * The Counter module counts the number of packets and bytes it passes
+ *
+ * __Input Gates__: 1
+ * __Output Gates__: 1
+*/
+message CounterArg {
+  string name_id = 1; /// Name of the counter_id
+  bool check_exist = 2; /// verify each counter pre-exists before any operation (default = False)
+  uint32 total = 3; /// Total number of entries it can support
+}
+
+/**
+ * The GtpuEncap module inserts GTP header in an ethernet frame
+ *
+ * __Input Gates__: 1
+ * __Output Gates__: 1
+*/
+message GtpuEncapArg {
+  bool add_psc = 1; /// Add PDU session container in encap (default = False)
 }
 
 /**
@@ -1151,6 +1235,7 @@ message VXLANEncapArg {
  */
 message WildcardMatchArg {
   repeated Field fields = 1; /// A list of WildcardMatch fields.
+  repeated Field values = 2; /// A list of WildcardMatch values.
 }
 
 /**
