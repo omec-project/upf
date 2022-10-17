@@ -134,7 +134,7 @@ function graph_to_dot(modules) {
         var ogates = module.show_ogates ? gates_to_str(module.ogates, 'ogate') : '';
 
         nodes += `
-  ${module_name} [shape=plaintext label=
+  "${module_name}" [shape=plaintext label=
     <<table port="mod" border="1" cellborder="0" cellspacing="0" cellpadding="1">
       ${igates}<tr>
         <td width="60">${module_name}</td>
