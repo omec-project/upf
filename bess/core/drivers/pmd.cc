@@ -32,6 +32,7 @@
 
 #include <rte_bus_pci.h>
 #include <rte_ethdev.h>
+#include <rte_flow.h>
 
 #include "../utils/ether.h"
 #include "../utils/format.h"
@@ -206,6 +207,122 @@ static CommandResponse find_dpdk_vdev(const std::string &vdev,
   return CommandSuccess();
 }
 
+CommandResponse flow_create_one(dpdk_port_t port_id,
+                                const uint32_t &flow_profile, int size,
+                                uint64_t rss_types,
+                                rte_flow_item_type *pattern) {
+  struct rte_flow_item items[size];
+  memset(items, 0, sizeof(items));
+
+  for (int i = 0; i < size; i++) {
+    items[i].type = pattern[i];
+    items[i].spec = nullptr;
+    items[i].mask = nullptr;
+  }
+
+  struct rte_flow *handle;
+  struct rte_flow_error err;
+  memset(&err, 0, sizeof(err));
+
+  struct rte_flow_action actions[2];
+  memset(actions, 0, sizeof(actions));
+
+  struct rte_flow_attr attributes;
+  memset(&attributes, 0, sizeof(attributes));
+  attributes.ingress = 1;
+
+  struct rte_flow_action_rss action_rss;
+  memset(&action_rss, 0, sizeof(action_rss));
+  action_rss.func = RTE_ETH_HASH_FUNCTION_DEFAULT;
+  action_rss.key_len = 0;
+  action_rss.types = rss_types;
+
+  actions[0].type = RTE_FLOW_ACTION_TYPE_RSS;
+  actions[0].conf = &action_rss;
+  actions[1].type = RTE_FLOW_ACTION_TYPE_END;
+
+  int ret = rte_flow_validate(port_id, &attributes, items, actions, &err);
+  if (ret)
+    return CommandFailure(EINVAL,
+                          "Port %u: Failed to validate flow profile %u %s",
+                          port_id, flow_profile, err.message);
+
+  handle = rte_flow_create(port_id, &attributes, items, actions, &err);
+  if (handle == nullptr)
+    return CommandFailure(EINVAL, "Port %u: Failed to create flow %s", port_id,
+                          err.message);
+
+  return CommandSuccess();
+}
+
+#define NUM_ELEMENTS(x) (sizeof(x) / sizeof((x)[0]))
+
+enum FlowProfile : uint32_t
+{
+  profileN3 = 3,
+  profileN6 = 6,
+  profileN9 = 9,
+};
+
+CommandResponse flow_create(dpdk_port_t port_id, const uint32_t &flow_profile) {
+  CommandResponse err;
+
+  rte_flow_item_type N39_NSA[] = {
+      RTE_FLOW_ITEM_TYPE_ETH, RTE_FLOW_ITEM_TYPE_IPV4, RTE_FLOW_ITEM_TYPE_UDP,
+      RTE_FLOW_ITEM_TYPE_GTPU, RTE_FLOW_ITEM_TYPE_IPV4,
+      RTE_FLOW_ITEM_TYPE_END};
+
+  rte_flow_item_type N39_SA[] = {
+      RTE_FLOW_ITEM_TYPE_ETH, RTE_FLOW_ITEM_TYPE_IPV4, RTE_FLOW_ITEM_TYPE_UDP,
+      RTE_FLOW_ITEM_TYPE_GTPU, RTE_FLOW_ITEM_TYPE_GTP_PSC,
+      RTE_FLOW_ITEM_TYPE_IPV4,
+      RTE_FLOW_ITEM_TYPE_END};
+
+  rte_flow_item_type N6[] = {
+      RTE_FLOW_ITEM_TYPE_ETH, RTE_FLOW_ITEM_TYPE_IPV4,
+      RTE_FLOW_ITEM_TYPE_END};
+
+  switch (flow_profile) {
+    uint64_t rss_types;
+    // N3 traffic with and without PDU Session container
+    case profileN3:
+      rss_types = ETH_RSS_IPV4 | ETH_RSS_L3_SRC_ONLY;
+      err = flow_create_one(port_id, flow_profile, NUM_ELEMENTS(N39_NSA),
+                            rss_types, N39_NSA);
+      if (err.error().code() != 0) {
+        return err;
+      }
+
+      err = flow_create_one(port_id, flow_profile, NUM_ELEMENTS(N39_SA),
+                            rss_types, N39_SA);
+      break;
+
+    // N6 traffic
+    case profileN6:
+      rss_types = ETH_RSS_IPV4 | ETH_RSS_L3_DST_ONLY;
+      err = flow_create_one(port_id, flow_profile, NUM_ELEMENTS(N6),
+                            rss_types, N6);
+      break;
+
+    // N9 traffic with and without PDU Session container
+    case profileN9:
+      rss_types = ETH_RSS_IPV4 | ETH_RSS_L3_DST_ONLY;
+      err = flow_create_one(port_id, flow_profile, NUM_ELEMENTS(N39_NSA),
+                            rss_types, N39_NSA);
+      if (err.error().code() != 0) {
+        return err;
+      }
+
+      err = flow_create_one(port_id, flow_profile, NUM_ELEMENTS(N39_SA),
+                            rss_types, N39_SA);
+      break;
+
+    default:
+      return CommandFailure(EINVAL, "Unknown flow profile %u", flow_profile);
+  }
+  return err;
+}
+
 CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
   dpdk_port_t ret_port_id = DPDK_PORT_UNKNOWN;
 
@@ -363,6 +480,15 @@ CommandResponse PMDPort::Init(const bess::pb::PMDPortArg &arg) {
   CollectStats(true);
 
   driver_ = dev_info.driver_name ?: "unknown";
+
+  if (arg.flow_profiles_size() > 0){
+    for (int i = 0; i < arg.flow_profiles_size(); ++i) {
+      err = flow_create(ret_port_id, arg.flow_profiles(i));
+      if (err.error().code() != 0) {
+        return err;
+      }
+    }
+  }
 
   return CommandSuccess();
 }

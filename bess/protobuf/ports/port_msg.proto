@@ -52,6 +52,10 @@ message PMDPortArg {
   }
   bool promiscuous_mode = 9;
   bool hwcksum = 10;
+
+  // N3 -> 3; N6 -> 6; N9 -> 9
+  // [3] or [6, 9]
+  repeated uint32 flow_profiles = 11;
 }
 
 message UnixSocketPortArg {
