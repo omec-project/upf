@@ -37,7 +37,9 @@
 // Compute IP checksum on packet
 class IPChecksum final : public Module {
  public:
-  IPChecksum() : Module(), verify_(false) { max_allowed_workers_ = Worker::kMaxWorkers; }
+  IPChecksum() : Module(), verify_(false) {
+    max_allowed_workers_ = Worker::kMaxWorkers;
+  }
 
   /* Gates: (0) Default, (1) Drop */
   static const gate_idx_t kNumOGates = 2;
@@ -47,6 +49,8 @@ class IPChecksum final : public Module {
  private:
   /* enable checksum verification */
   bool verify_;
+  /* enable hardware offload */
+  bool hw_;
 };
 
 #endif  // BESS_MODULES_IP_CHECKSUM_H_

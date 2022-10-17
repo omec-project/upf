@@ -56,8 +56,8 @@ void IPChecksum::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
       data = qinq + 1;
       ether_type = qinq->ether_type;
       if (ether_type != be16_t(Ethernet::Type::kVlan)) {
-	EmitPacket(ctx, batch->pkts()[i], FORWARD_GATE);
-	continue;
+        EmitPacket(ctx, batch->pkts()[i], FORWARD_GATE);
+        continue;
       }
     }
 
@@ -75,7 +75,17 @@ void IPChecksum::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     }
 
     if (verify_) {
-      EmitPacket(ctx, batch->pkts()[i], (VerifyIpv4Checksum(*ip)) ? FORWARD_GATE : FAIL_GATE);
+      if (hw_) {
+        struct rte_mbuf *m = (struct rte_mbuf *)batch->pkts()[i];
+        if (unlikely((m->ol_flags & PKT_RX_IP_CKSUM_MASK) ==
+                     PKT_RX_IP_CKSUM_BAD))
+          EmitPacket(ctx, (bess::Packet *)m, FAIL_GATE);
+        else
+          EmitPacket(ctx, (bess::Packet *)m, FORWARD_GATE);
+      } else {
+        EmitPacket(ctx, batch->pkts()[i],
+                   (VerifyIpv4Checksum(*ip)) ? FORWARD_GATE : FAIL_GATE);
+      }
     } else {
       ip->checksum = CalculateIpv4Checksum(*ip);
       EmitPacket(ctx, batch->pkts()[i], FORWARD_GATE);
@@ -85,6 +95,7 @@ void IPChecksum::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 
 CommandResponse IPChecksum::Init(const bess::pb::IPChecksumArg &arg) {
   verify_ = arg.verify();
+  hw_ = arg.hw();
   return CommandSuccess();
 }
 

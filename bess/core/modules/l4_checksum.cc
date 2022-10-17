@@ -63,27 +63,52 @@ void L4Checksum::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
       Udp *udp =
           reinterpret_cast<Udp *>(reinterpret_cast<uint8_t *>(ip) + ip_bytes);
       if (verify_) {
-	EmitPacket(ctx, batch->pkts()[i],
-		   (VerifyIpv4UdpChecksum(*ip, *udp)) ? FORWARD_GATE : FAIL_GATE);
+        if (hw_) {
+          struct rte_mbuf *m = (struct rte_mbuf *)batch->pkts()[i];
+          if (unlikely((m->ol_flags & PKT_RX_L4_CKSUM_MASK) ==
+                       PKT_RX_L4_CKSUM_BAD))
+            EmitPacket(ctx, (bess::Packet *)m, FAIL_GATE);
+          else
+            EmitPacket(ctx, (bess::Packet *)m, FORWARD_GATE);
+        } else {
+          EmitPacket(
+              ctx, batch->pkts()[i],
+              (VerifyIpv4UdpChecksum(*ip, *udp)) ? FORWARD_GATE : FAIL_GATE);
+        }
       } else {
-	udp->checksum = CalculateIpv4UdpChecksum(*ip, *udp);
-	EmitPacket(ctx, batch->pkts()[i], FORWARD_GATE);
+        udp->checksum = CalculateIpv4UdpChecksum(*ip, *udp);
+        EmitPacket(ctx, batch->pkts()[i], FORWARD_GATE);
       }
     } else if (ip->protocol == Ipv4::Proto::kTcp) {
       size_t ip_bytes = (ip->header_length) << 2;
       Tcp *tcp =
           reinterpret_cast<Tcp *>(reinterpret_cast<uint8_t *>(ip) + ip_bytes);
-      if (verify_)
-	EmitPacket(ctx, batch->pkts()[i],
-		   (VerifyIpv4TcpChecksum(*ip, *tcp)) ? FORWARD_GATE : FAIL_GATE);
-      else
-	tcp->checksum = CalculateIpv4TcpChecksum(*ip, *tcp);
+      if (verify_) {
+        if (hw_) {
+          struct rte_mbuf *m = (struct rte_mbuf *)batch->pkts()[i];
+          if (unlikely((m->ol_flags & PKT_RX_L4_CKSUM_MASK) ==
+                       PKT_RX_L4_CKSUM_BAD))
+            EmitPacket(ctx, (bess::Packet *)m, FAIL_GATE);
+          else
+            EmitPacket(ctx, (bess::Packet *)m, FORWARD_GATE);
+        } else {
+          EmitPacket(
+              ctx, batch->pkts()[i],
+              (VerifyIpv4TcpChecksum(*ip, *tcp)) ? FORWARD_GATE : FAIL_GATE);
+        }
+      } else {
+        tcp->checksum = CalculateIpv4TcpChecksum(*ip, *tcp);
+        EmitPacket(ctx, batch->pkts()[i], FORWARD_GATE);
+      }
+    } else { /* fail-safe condition */
+      EmitPacket(ctx, batch->pkts()[i], FORWARD_GATE);
     }
   }
 }
 
 CommandResponse L4Checksum::Init(const bess::pb::L4ChecksumArg &arg) {
   verify_ = arg.verify();
+  hw_ = arg.hw();
   return CommandSuccess();
 }
 
