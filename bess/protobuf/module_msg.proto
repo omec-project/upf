@@ -1335,3 +1335,40 @@ message QosCommandClearArg {
 message QosCommandSetDefaultGateArg {
   uint64 gate = 1;
 }
+
+message FlowMeasureArg {
+  string flag_attr_name = 1;
+  uint64 entries = 2;
+  bool leader = 3; // If true, this module will decide the buffer side
+}
+message FlowMeasureCommandReadArg {
+  bool clear = 1; // If true, the data will be all cleared after read
+  repeated double latency_percentiles = 2; /// ascending list of real numbers in [0.0, 100.0]
+  repeated double jitter_percentiles = 3; /// ascending list of real numbers in [0.0, 100.0]
+  uint64 flag_to_read = 4; /// Which buffer to read from
+}
+message FlowMeasureReadResponse {
+  message Statistic {
+    message Histogram {
+      uint64 count = 1; /// Total # of measured data points, including above_range
+      uint64 above_range = 2; /// # of data points for the "too large value" bucket
+      uint64 resolution_ns = 8; /// resolution of measured data
+      uint64 min_ns = 3;
+      uint64 avg_ns = 4;
+      uint64 max_ns = 5;
+      uint64 total_ns = 6;
+      repeated uint64 percentile_values_ns = 7;
+    }
+    uint64 fseid = 1;
+    uint64 pdr = 2;
+    Histogram latency = 3;
+    Histogram jitter = 4;
+    uint64 total_bytes = 11;
+    uint64 total_packets = 12;
+  }
+  repeated Statistic statistics = 1;
+}
+message FlowMeasureCommandFlipArg {}
+message FlowMeasureFlipResponse {
+  uint64 old_flag = 1;
+}
