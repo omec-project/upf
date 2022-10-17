@@ -1291,3 +1291,41 @@ message MplsPopArg {
 message WorkerSplitArg {
   map<uint32, uint32> worker_gates = 1; // ogate -> worker mask
 }
+
+message QosArg {
+  repeated Field fields = 1;
+  repeated Field values = 2;
+}
+
+message QosCommandAddArg {
+  uint64 gate = 1;
+  uint64 cir = 2;
+  uint64 pir = 3;
+  uint64 cbs = 4;
+  uint64 pbs = 5;
+  uint64 ebs = 6;
+  oneof optional_deduct_len {
+    int64 deduct_len = 9;
+  }
+  repeated FieldData fields = 7;
+  repeated FieldData values = 8;
+}
+
+message QosCommandDeleteArg {
+  repeated FieldData fields = 2;
+}
+
+/**
+ * The function `clear()` for WildcardMatch takes no parameters, it clears
+ * all state in the WildcardMatch module (is equivalent to calling delete for all rules)
+ */
+message QosCommandClearArg {
+}
+
+/**
+ * For traffic which does not match any rule in the WildcardMatch module,
+ * the `set_default_gate(...)` function specifies which gate to send this extra traffic to.
+ */
+message QosCommandSetDefaultGateArg {
+  uint64 gate = 1;
+}
