@@ -42,7 +42,7 @@
 using bess::utils::CuckooMap;
 using bess::utils::HashResult;
 
-#define MAX_TUPLES 8
+#define MAX_TUPLES 16
 #define MAX_FIELDS 8
 #define MAX_FIELD_SIZE 8
 #define BULK_SIZE 32
