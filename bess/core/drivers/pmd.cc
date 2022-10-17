@@ -599,9 +599,10 @@ void PMDPort::CollectStats(bool reset) {
 
   port_stats_.inc.dropped = stats.imissed;
 
-  // i40e/net_e1000_igb PMD drivers, ixgbevf and net_bonding vdevs don't support
-  // per-queue stats
-  if (driver_ == "net_i40e" || driver_ == "net_i40e_vf" ||
+  // ice/i40e/net_e1000_igb PMD drivers, ixgbevf and net_bonding vdevs don't
+  // support per-queue stats
+  if (driver_ == "net_ice" || driver_ == "net_iavf" ||
+      driver_ == "net_i40e" || driver_ == "net_i40e_vf" ||
       driver_ == "net_ixgbe_vf" || driver_ == "net_bonding" ||
       driver_ == "net_e1000_igb") {
     // NOTE:
