@@ -39,8 +39,8 @@
 #include "../pb/module_msg.pb.h"
 #include "../utils/cuckoo_map.h"
 
-using bess::utils::HashResult;
 using bess::utils::CuckooMap;
+using bess::utils::HashResult;
 
 #define MAX_TUPLES 8
 #define MAX_FIELDS 8
@@ -53,11 +53,6 @@ static_assert(MAX_FIELD_SIZE <= sizeof(uint64_t),
 #if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
 #error this code assumes little endian architecture (x86)
 #endif
-
-struct WmData {
-  int priority;
-  gate_idx_t ogate;
-};
 
 struct WmField {
   int attr_id; /* -1 for offset-based fields */
@@ -73,6 +68,12 @@ struct WmField {
 
 struct wm_hkey_t {
   uint64_t u64_arr[MAX_FIELDS];
+};
+
+struct WmData {
+  int priority;
+  gate_idx_t ogate;
+  wm_hkey_t keyv;
 };
 
 class wm_eq {
@@ -135,7 +136,13 @@ class WildcardMatch final : public Module {
   static const Commands cmds;
 
   WildcardMatch()
-      : Module(), default_gate_(), total_key_size_(), fields_(), tuples_() {
+      : Module(),
+        default_gate_(),
+        total_key_size_(),
+        total_value_size_(),
+        fields_(),
+        values_(),
+        tuples_() {
     max_allowed_workers_ = Worker::kMaxWorkers;
   }
 
@@ -161,25 +168,31 @@ class WildcardMatch final : public Module {
     wm_hkey_t mask;
   };
 
-  gate_idx_t LookupEntry(const wm_hkey_t &key, gate_idx_t def_gate);
+  gate_idx_t LookupEntry(const wm_hkey_t &key, gate_idx_t def_gate,
+                         bess::Packet *pkt);
 
-  CommandResponse AddFieldOne(const bess::pb::Field &field, struct WmField *f);
+  CommandResponse AddFieldOne(const bess::pb::Field &field, struct WmField *f,
+                              uint8_t type);
 
   template <typename T>
   CommandResponse ExtractKeyMask(const T &arg, wm_hkey_t *key, wm_hkey_t *mask);
+  template <typename T>
+  CommandResponse ExtractValue(const T &arg, wm_hkey_t *keyv);
 
   int FindTuple(wm_hkey_t *mask);
   int AddTuple(wm_hkey_t *mask);
-  int DelEntry(int idx, wm_hkey_t *key);
+  bool DelEntry(int idx, wm_hkey_t *key);
 
   void Clear();
 
   gate_idx_t default_gate_;
 
-  size_t total_key_size_; /* a multiple of sizeof(uint64_t) */
+  size_t total_key_size_;   /* a multiple of sizeof(uint64_t) */
+  size_t total_value_size_; /* a multiple of sizeof(uint64_t) */
 
   // TODO(melvinw): this can be refactored to use ExactMatchTable
   std::vector<struct WmField> fields_;
+  std::vector<struct WmField> values_;
   std::vector<struct WmTuple> tuples_;
 };
 
