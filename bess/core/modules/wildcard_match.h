@@ -130,7 +130,7 @@ class wm_hash {
   size_t len_;
 };
 struct rte_hash_parameters dpdk_params1 {
-  .name = "test2", .entries = 1 << 20, .reserved = 0,
+  .name = "test2", .entries = 1 << 15, .reserved = 0,
   .key_len = sizeof(wm_hkey_t), .hash_func = rte_hash_crc,
   .hash_func_init_val = 0, .socket_id = (int)rte_socket_id(),
   .extra_flag = RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY
@@ -210,6 +210,7 @@ class WildcardMatch final : public Module {
 
   size_t total_key_size_;   /* a multiple of sizeof(uint64_t) */
   size_t total_value_size_; /* a multiple of sizeof(uint64_t) */
+  size_t entries_;           /* a power of 2 */
 
   // TODO(melvinw): this can be refactored to use ExactMatchTable
   std::vector<struct WmField> fields_;

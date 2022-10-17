@@ -147,6 +147,7 @@ CommandResponse WildcardMatch::Init(const bess::pb::WildcardMatchArg &arg) {
   }
   default_gate_ = DROP_GATE;
   total_key_size_ = align_ceil(size_acc, sizeof(uint64_t));
+  entries_ = arg.entries();
   // reset size_acc
   size_acc = 0;
   for (int i = 0; i < arg.values_size(); i++) {
@@ -510,6 +511,9 @@ int WildcardMatch::AddTuple(wm_hkey_t *mask) {
     if (tuples_[i].occupied == 0) {
       bess::utils::Copy(&tuples_[i].mask, mask, sizeof(*mask));
       tuples_[i].params.key_len = total_key_size_;
+      if (entries_) {
+        tuples_[i].params.entries = entries_;
+      }
       temp = new CuckooMap<wm_hkey_t, struct WmData, wm_hash, wm_eq>(
           0, 0, &tuples_[i].params);
       if (temp == nullptr)

@@ -508,6 +508,7 @@ message ExactMatchArg {
   repeated FieldData masks = 2; /// mask(i) corresponds to the mask for field(i)
   repeated Field values = 3; /// A list of ExactMatch Values
   repeated FieldData masksv = 4; /// mask(i) corresponds to the mask for value(i)
+  uint64 entries = 5;
 }
 
 /**
@@ -1239,6 +1240,7 @@ message VXLANEncapArg {
 message WildcardMatchArg {
   repeated Field fields = 1; /// A list of WildcardMatch fields.
   repeated Field values = 2; /// A list of WildcardMatch values.
+  uint64 entries = 3;
 }
 
 /**
@@ -1298,6 +1300,7 @@ message WorkerSplitArg {
 message QosArg {
   repeated Field fields = 1;
   repeated Field values = 2;
+  uint64 entries = 3;
 }
 
 message QosCommandAddArg {

@@ -156,7 +156,7 @@ template <typename T>
 class ExactMatchTable {
  public:
   struct rte_hash_parameters dpdk_params {
-    .name = "test1", .entries = 1 << 20, .reserved = 0,
+    .name = "test1", .entries = 1 << 15, .reserved = 0,
     .key_len = sizeof(ExactMatchKey), .hash_func = rte_hash_crc,
     .hash_func_init_val = 0, .socket_id = (int)rte_socket_id(),
     .extra_flag = RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY
@@ -329,12 +329,15 @@ class ExactMatchTable {
 
   typename EmTable::iterator end() { return table_->end(); }
 
-  void Init() {
+  void Init(uint32_t entries) {
     std::ostringstream address;
     address << &table_;
     std::string name = "Exactmatch" + address.str();
     dpdk_params.name = name.c_str();
     dpdk_params.key_len = total_key_size();
+    if (entries) {
+      dpdk_params.entries = entries;
+    }
     table_.reset(
         new CuckooMap<ExactMatchKey, T, ExactMatchKeyHash, ExactMatchKeyEq>(
             0, 0, &dpdk_params));
