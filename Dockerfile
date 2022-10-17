@@ -8,11 +8,7 @@
 FROM ghcr.io/omec-project/upf-epc/bess_build AS bess-deps
 # BESS pre-reqs
 WORKDIR /bess
-ARG BESS_COMMIT=dpdk-2011-focal
-RUN curl -L https://github.com/NetSys/bess/tarball/${BESS_COMMIT} | \
-    tar xz -C . --strip-components=1
-COPY patches/bess patches
-RUN cat patches/* | patch -p1
+COPY bess/ .
 RUN cp -a protobuf /protobuf
 
 # Stage bess-build: builds bess with its dependencies
@@ -56,7 +52,6 @@ COPY scripts/install_ntf.sh .
 RUN ./install_ntf.sh
 
 # Build and copy artifacts
-COPY core/ core/
 COPY scripts/build_bess.sh .
 RUN ./build_bess.sh && \
     cp bin/bessd /bin && \
