@@ -133,6 +133,7 @@ struct PortRange {
 // igate/ogate 1: reverse dir
 class NAT final : public Module {
  public:
+  NAT() { max_allowed_workers_ = 2; }
   enum Direction {
     kForward = 0,  // internal -> external
     kReverse = 1,  // external -> internal
