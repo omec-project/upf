@@ -299,7 +299,6 @@ def probe_addr(item, src_mac):
 
     try:
         ipb = ipaddress.ip_address(item.neighbor_ip)
-        print("The IP address {} is valid.".format(ipb))
         if isinstance(ipb, ipaddress.IPv4Address):
           print("The IP address {} is valid ipv4 address".format(ipb))
         else:
