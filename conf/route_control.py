@@ -303,7 +303,7 @@ def probe_addr(item, src_mac):
         if isinstance(ipb, ipaddress.IPv4Address):
           print("The IP address {} is valid ipv4 address".format(ipb))
         else:
-          print("The IP address {} is valid ipv6 address. Ignore ".format(ipb)
+          print("The IP address {} is valid ipv6 address. Ignore ".format(ipb))
           return
     except:
         print("The IP address {} is invalid".format(item.neighbor_ip))
