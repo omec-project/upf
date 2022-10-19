@@ -349,7 +349,7 @@ def parse_new_route(msg):
 
     # if mac is 0, send ARP request
     if gateway_mac == 0:
-        print('Adding entry {} in arp probe table. Neighbor - {}'.format(item.iface,item.neighbor_ip))
+        print('Adding entry {} in arp probe table. Neighbor: {}'.format(item.iface,item.neighbor_ip))
         probe_addr(item, ipdb.interfaces[item.iface].address)
 
     else:  # if gateway_mac is set
