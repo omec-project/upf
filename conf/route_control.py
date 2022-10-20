@@ -6,6 +6,7 @@ import argparse
 import signal
 import sys
 import time
+import ipaddress
 
 # for retrieving neighbor info
 from pyroute2 import IPDB, IPRoute
@@ -296,6 +297,16 @@ def probe_addr(item, src_mac):
     arpcache[item.neighbor_ip] = item
     print('Adding entry {} in arp probe table'.format(item))
 
+    try:
+        ipb = ipaddress.ip_address(item.neighbor_ip)
+        if isinstance(ipb, ipaddress.IPv4Address):
+          print("The IP address {} is valid ipv4 address".format(ipb))
+        else:
+          print("The IP address {} is valid ipv6 address. Ignore ".format(ipb))
+          return
+    except:
+        print("The IP address {} is invalid".format(item.neighbor_ip))
+        return
     # Probe ARP request by sending ping
     send_ping(item.neighbor_ip)
 
@@ -308,7 +319,7 @@ def parse_new_route(msg):
     # Fetch prefix_len
     item.prefix_len = msg['dst_len']
     # Default route
-    if item.prefix_len is 0:
+    if item.prefix_len == 0:
         item.iprange = '0.0.0.0'
 
     for att in msg['attrs']:
@@ -337,7 +348,7 @@ def parse_new_route(msg):
 
     # if mac is 0, send ARP request
     if gateway_mac == 0:
-        print('Adding entry {} in arp probe table'.format(item.iface))
+        print('Adding entry {} in arp probe table. Neighbor: {}'.format(item.iface,item.neighbor_ip))
         probe_addr(item, ipdb.interfaces[item.iface].address)
 
     else:  # if gateway_mac is set
