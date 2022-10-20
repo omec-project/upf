@@ -110,9 +110,7 @@ void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   MeteringKey keys[bess::PacketBatch::kMaxBurst] __ymm_aligned;
   bess::Packet *pkt = nullptr;
   default_gate = ACCESS_ONCE(default_gate_);
-
-  int cnt = batch->cnt();
-  
+  int cnt = batch->cnt();  
   for (const auto &field : fields_) {
     int offset;
     int pos = field.pos;
@@ -160,44 +158,44 @@ void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
         continue;
       }
 
-     uint16_t ogate = val[j]->ogate;
-     DLOG(INFO) << "ogate : " << ogate << std::endl;
+    uint16_t ogate = val[j]->ogate;
+    DLOG(INFO) << "ogate : " << ogate << std::endl;
 
     // meter if ogate is 0
-     if (ogate == METER_GATE) {
-       uint64_t time = rte_rdtsc();
-       uint32_t pkt_len = pkt->total_len() - val[j]->deduct_len;
-       uint8_t color = rte_meter_trtcm_color_blind_check(&val[j]->m, &val[j]->p,
+    if (ogate == METER_GATE) {
+      uint64_t time = rte_rdtsc();
+      uint32_t pkt_len = pkt->total_len() - val[j]->deduct_len;
+      uint8_t color = rte_meter_trtcm_color_blind_check(&val[j]->m, &val[j]->p,
                                                         time, pkt_len);
 
-       DLOG(INFO) << "color : " << color << std::endl;
+      DLOG(INFO) << "color : " << color << std::endl;
       // update ogate to color specific gate
-       if (color == RTE_COLOR_GREEN) {
-         ogate = METER_GREEN_GATE;
-       } else if (color == RTE_COLOR_YELLOW) {
-         ogate = METER_YELLOW_GATE;
-       } else if (color == RTE_COLOR_RED) {
+      if (color == RTE_COLOR_GREEN) {
+        ogate = METER_GREEN_GATE;
+      } else if (color == RTE_COLOR_YELLOW) {
+        ogate = METER_YELLOW_GATE;
+      } else if (color == RTE_COLOR_RED) {
        ogate = METER_RED_GATE;
        }
       }
 
       // update values
-      size_t num_values_ = values_.size();
-      for (size_t i = 0; i < num_values_; i++) {
-       int value_size = values_[i].size;
-       int value_pos = values_[i].pos;
-       int value_off = values_[i].offset;
-       int value_attr_id = values_[i].attr_id;
-       uint8_t *data = pkt->head_data<uint8_t *>() + value_off;
+     size_t num_values_ = values_.size();
+     for (size_t i = 0; i < num_values_; i++) {
+      int value_size = values_[i].size;
+      int value_pos = values_[i].pos;
+      int value_off = values_[i].offset;
+      int value_attr_id = values_[i].attr_id;
+      uint8_t *data = pkt->head_data<uint8_t *>() + value_off;
 
-       if (value_attr_id < 0) { /* if it is offset-based */
-          memcpy(data, reinterpret_cast<uint8_t *>(&(val[j]->Data)) + value_pos,
+      if (value_attr_id < 0) { /* if it is offset-based */
+        memcpy(data, reinterpret_cast<uint8_t *>(&(val[j]->Data)) + value_pos,
                value_size);
-        } else { /* if it is attribute-based */
+       } else { /* if it is attribute-based */
         typedef struct {
           uint8_t bytes[bess::metadata::kMetadataAttrMaxSize];
-        } value_t;
-        uint8_t *buf = (uint8_t *)(&(val[j]->Data)) + value_pos;
+       } value_t;
+       uint8_t *buf = (uint8_t *)(&(val[j]->Data)) + value_pos;
 
         DLOG(INFO) << "Setting value " << std::hex
                    << *(reinterpret_cast<uint64_t *>(buf))
