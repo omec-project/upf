@@ -179,9 +179,9 @@ index ec639a7b..187692df 100644
 +    if (num == 0)
 +      continue;
 +
-+    for (int init = 0; (init < cnt) && (num); init++) {
-+      if ((hitmask & ((uint64_t)1 << init))) {
-+        if ((prev_hitmask & ((uint64_t)1 << init)) == 0)
++   for (int init = 0; (init < cnt) && (num); init++) {
++     if ((hitmask & ((uint64_t)1 << init))) {
++       if ((prev_hitmask & ((uint64_t)1 << init)) == 0)
 +          result[init] = entry[init];
 +        else if ((prev_hitmask & ((uint64_t)1 << init)) &&
 +                 (entry[init]->priority >= result[init]->priority)) {
@@ -191,7 +191,7 @@ index ec639a7b..187692df 100644
 +        num--;
 +      }
 +    }
-+    prev_hitmask = prev_hitmask | hitmask;
++   prev_hitmask = prev_hitmask | hitmask;
 +  }
 +
 +  for (int init = 0; init < cnt; init++) {
