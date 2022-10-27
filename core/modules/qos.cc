@@ -110,10 +110,7 @@ void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   MeteringKey keys[bess::PacketBatch::kMaxBurst] __ymm_aligned;
   bess::Packet *pkt = nullptr;
   default_gate = ACCESS_ONCE(default_gate_);
-
-  int cnt = batch->cnt();
-  value *val[cnt];
-
+  int cnt = batch->cnt();  
   for (const auto &field : fields_) {
     int offset;
     int pos = field.pos;
@@ -147,14 +144,19 @@ void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     }
   }
 
-  uint64_t hit_mask = table_.Find(keys, val, cnt);
+  int icnt=0;
+  for(int lcnt=0; lcnt<cnt ;lcnt=lcnt+icnt )
+   {
+    icnt = ((cnt-lcnt)>=64) ? 64 : cnt-lcnt  ;
+    value *val[icnt];
+    uint64_t hit_mask = table_.Find(keys+lcnt, val, icnt);
 
-  for (int j = 0; j < cnt; j++) {
-    pkt = batch->pkts()[j];
-    if ((hit_mask & ((uint64_t)1ULL << j)) == 0) {
-      EmitPacket(ctx, pkt, default_gate);
-      continue;
-    }
+    for (int j = 0; j < icnt; j++) {
+      pkt = batch->pkts()[j+lcnt];
+      if ((hit_mask & ((uint64_t)1ULL << j)) == 0) {
+        EmitPacket(ctx, pkt, default_gate);
+        continue;
+      }
 
     uint16_t ogate = val[j]->ogate;
     DLOG(INFO) << "ogate : " << ogate << std::endl;
@@ -173,13 +175,13 @@ void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
       } else if (color == RTE_COLOR_YELLOW) {
         ogate = METER_YELLOW_GATE;
       } else if (color == RTE_COLOR_RED) {
-        ogate = METER_RED_GATE;
+       ogate = METER_RED_GATE;
+       }
       }
-    }
 
-    // update values
-    size_t num_values_ = values_.size();
-    for (size_t i = 0; i < num_values_; i++) {
+      // update values
+     size_t num_values_ = values_.size();
+     for (size_t i = 0; i < num_values_; i++) {
       int value_size = values_[i].size;
       int value_pos = values_[i].pos;
       int value_off = values_[i].offset;
@@ -189,11 +191,11 @@ void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
       if (value_attr_id < 0) { /* if it is offset-based */
         memcpy(data, reinterpret_cast<uint8_t *>(&(val[j]->Data)) + value_pos,
                value_size);
-      } else { /* if it is attribute-based */
+       } else { /* if it is attribute-based */
         typedef struct {
           uint8_t bytes[bess::metadata::kMetadataAttrMaxSize];
-        } value_t;
-        uint8_t *buf = (uint8_t *)(&(val[j]->Data)) + value_pos;
+       } value_t;
+       uint8_t *buf = (uint8_t *)(&(val[j]->Data)) + value_pos;
 
         DLOG(INFO) << "Setting value " << std::hex
                    << *(reinterpret_cast<uint64_t *>(buf))
@@ -225,9 +227,10 @@ void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
         }
       }
     }
-
     EmitPacket(ctx, pkt, ogate);
   }
+}
+
 }
 
 template <typename T>
