@@ -14,8 +14,6 @@ WORKDIR /bess
 ARG BESS_COMMIT=dpdk-2011-focal
 RUN git clone https://github.com/omec-project/bess.git .
 RUN git checkout ${BESS_COMMIT}
-COPY patches/bess patches
-RUN cat patches/* | patch -p1
 RUN cp -a protobuf /protobuf
 
 # Stage bess-build: builds bess with its dependencies
@@ -31,7 +29,7 @@ ARG MAKEFLAGS
 ENV PKG_CONFIG_PATH=/usr/lib64/pkgconfig
 WORKDIR /bess
 
-# Patch BESS, patch and build DPDK
+# Patch and build DPDK
 COPY patches/dpdk/* deps/
 RUN ./build.py dpdk
 
