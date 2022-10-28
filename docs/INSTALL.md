@@ -25,7 +25,7 @@ You need the following dependencies.
 * Enable virtualization in the BIOS
 * Hugepages mounted at `/dev/hugepages` or updated location in [`scripts/docker_setup.sh`](../scripts/docker_setup.sh)
   - Reserve 1G HugePage and disable Transparent HugePages by setting: `default_hugepagesz=2G hugepagesz=2G hugepages=<# of hugepages> transparent_hugepage=never`, where <# of hugepages> = 2 x number of BESS UPF instances
-    To make this change permanent, do the following:
+  - To make this change permanent, do the following:
     ```
     sudo vim /etc/default/grub
 	GRUB_CMDLINE_LINUX="intel_iommu=on iommu=pt default_hugepagesz=1G hugepagesz=1G hugepages=2 transparent_hugepage=never"
@@ -33,9 +33,8 @@ You need the following dependencies.
     sudo update-grub
     ```
 * Update mode for devices: `dpdk`, `af_xdp` or `af_packet` in [`scripts/docker_setup.sh`](../scripts/docker_setup.sh), along with device details
-  - If planning to use DPDK, follow [these](dpdk-configuration.md) directions before moving to the next steps
+  - If planning to use DPDK, the [Installation: DPDK mode](#installation-dpdk-mode) section provides all the details
 
->`./scripts/docker_setup.sh` is a quick start guide to set up UPF for evaluation.
 
 ## Installation Simulation mode
 
