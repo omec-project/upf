@@ -7,6 +7,24 @@ Copyright 2022 Intel Corporation
 
 If you are planning to use the UPF with DPDK, the following steps are required to properly configure the devices:
 
+- Let's assume that interfaces `ens801f0` and `ens801f1` are the ones to be used for DPDK
+  - Get their MAC addresses
+```bash
+$ ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+       valid_lft forever preferred_lft forever
+...
+3: ens801f0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc mq state UP group default qlen 1000
+    link/ether b4:96:91:b1:ff:f0 brd ff:ff:ff:ff:ff:ff
+4: ens801f1: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc mq state UP group default qlen 1000
+    link/ether b4:96:91:b1:ff:f1 brd ff:ff:ff:ff:ff:ff
+...
+```
+
 - Clone `dpdk`
 > Note: This clone of DPDK is used only to bind the devices. This is NOT used to build BESS
 ```bash
@@ -28,23 +46,6 @@ Network devices using kernel driver
 No 'Baseband' devices detected
 ==============================
 
-...
-```
-- Let's assume that interfaces `ens801f0` and `ens801f1` are the ones to be used
-  - Get their MAC addresses
-```bash
-$ ip a
-1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
-    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
-    inet 127.0.0.1/8 scope host lo
-       valid_lft forever preferred_lft forever
-    inet6 ::1/128 scope host
-       valid_lft forever preferred_lft forever
-...
-3: ens801f0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc mq state UP group default qlen 1000
-    link/ether b4:96:91:b1:ff:f0 brd ff:ff:ff:ff:ff:ff
-4: ens801f1: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc mq state UP group default qlen 1000
-    link/ether b4:96:91:b1:ff:f1 brd ff:ff:ff:ff:ff:ff
 ...
 ```
 

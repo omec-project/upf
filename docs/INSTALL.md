@@ -108,49 +108,16 @@ To install the UPF in simulation mode, the following changes are required:
 
 To install the UPF in DPDK mode, the following changes are required:
 
-1. Make appropriate changes in configuration file
+1. Follow the directions [here](dpdk-configuration.md) to get details about MAC addresses, VFIO groups, and others. This information is used in the next step.
 
-    ```patch
-    $ git diff conf/upf.json
-    diff --git a/conf/upf.json b/conf/upf.json
-    index 1f84803..3896c1e 100644
-    --- a/conf/upf.json
-    +++ b/conf/upf.json
-    @@ -61,12 +61,12 @@
-
-         "": "Gateway interfaces",
-         "access": {
-    -        "ifname": "ens803f2"
-    +        "ifname": "access"
-         },
-
-         "": "UE IP Natting. Update the line below to `\"ip_masquerade\": \"<ip> [or <ip>]\"` to enable",
-         "core": {
-    -        "ifname": "ens803f3",
-    +        "ifname": "core",
-             "": "ip_masquerade: 18.0.0.1 or 18.0.0.2 or 18.0.0.3"
-         },
-    ```
-
-2. Follow [these](dpdk-configuration.md) directions to get details about MAC addresses, VFIO groups, and others. This information is used in the next step.
-
-3. Update parameters in script file
+2. Update parameters in script file
 
     ```patch
     $ git diff scripts/docker_setup.sh
     diff --git a/scripts/docker_setup.sh b/scripts/docker_setup.sh
-    index f5946c1..637d62b 100755
+    index f5946c1..6c0f009 100755
     --- a/scripts/docker_setup.sh
     +++ b/scripts/docker_setup.sh
-    @@ -22,7 +22,7 @@ mode="dpdk"
-     # Gateway interface(s)
-     #
-     # In the order of ("s1u" "sgi")
-    -ifaces=("ens803f2" "ens803f3")
-    +ifaces=("access" "core")
-
-     # Static IP addresses of gateway interface(s) in cidr format
-     #
     @@ -32,7 +32,7 @@ ipaddrs=(198.18.0.1/30 198.19.0.1/30)
      # MAC addresses of gateway interface(s)
      #
@@ -180,13 +147,13 @@ To install the UPF in DPDK mode, the following changes are required:
      elif [ "$mode" == 'af_xdp' ]; then
     ```
 
-4. Start installation from UPF's root directory
+3. Start installation from UPF's root directory
 
     ```bash
     ./scripts/docker_setup.sh
     ```
 
-5. Insert rules into PDR and FAR tables
+4. Insert rules into PDR and FAR tables
 
     Use gRPC sim mode to directly install PFCP forwarding rules via gRPC API (works only for BESS)
 
@@ -199,7 +166,7 @@ To install the UPF in DPDK mode, the following changes are required:
     Use the [pfcpsim](https://github.com/omec-project/pfcpsim) tool to generate PFCP messages towards the PFCP Agent.
 
 
-6. (optional) Observe the pipeline in GUI
+5. (optional) Observe the pipeline in GUI
 
    To display GUI of the pipeline visit [http://[hostip]:8000](http://[hostip]:8000)
 
