@@ -109,18 +109,9 @@ To install the UPF in DPDK mode, the following changes are required:
     ```patch
     $ git diff conf/upf.json
     diff --git a/conf/upf.json b/conf/upf.json
-    index c6531cc..335e33b 100644
+    index 1f84803..3896c1e 100644
     --- a/conf/upf.json
     +++ b/conf/upf.json
-    @@ -51,7 +51,7 @@
-         "gtppsc": false,
-
-         "": "Enable Intel Dynamic Device Personalization (DDP)",
-    -    "ddp": false,
-    +    "ddp": true,
-
-         "": "Telemetrics-See this link for details: https://github.com/omec-project/bess/blob/master/bessctl/module_tests/timestamp.py",
-         "measure_upf": true,
     @@ -61,12 +61,12 @@
 
          "": "Gateway interfaces",
