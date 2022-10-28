@@ -6,11 +6,14 @@
 
 # Stage bess-deps: fetch BESS dependencies
 FROM ghcr.io/omec-project/upf-epc/bess_build AS bess-deps
+RUN apt-get update && \
+    apt-get install -y git
+
 # BESS pre-reqs
 WORKDIR /bess
 ARG BESS_COMMIT=dpdk-2011-focal
-RUN curl -L https://github.com/NetSys/bess/tarball/${BESS_COMMIT} | \
-    tar xz -C . --strip-components=1
+RUN git clone https://github.com/omec-project/bess.git .
+RUN git checkout ${BESS_COMMIT}
 COPY patches/bess patches
 RUN cat patches/* | patch -p1
 RUN cp -a protobuf /protobuf
@@ -21,22 +24,11 @@ ARG CPU=native
 RUN apt-get update && \
     apt-get -y install --no-install-recommends \
         ca-certificates \
-        libelf-dev
+        libelf-dev \
+        libbpf0
 
 ARG MAKEFLAGS
-
 ENV PKG_CONFIG_PATH=/usr/lib64/pkgconfig
-
-# linux ver should match target machine's kernel
-WORKDIR /libbpf
-ARG LIBBPF_VER=v0.3
-RUN curl -L https://github.com/libbpf/libbpf/tarball/${LIBBPF_VER} | \
-    tar xz -C . --strip-components=1 && \
-    cp include/uapi/linux/if_xdp.h /usr/include/linux && \
-    cd src && \
-    make install && \
-    ldconfig
-
 WORKDIR /bess
 
 # Patch BESS, patch and build DPDK
