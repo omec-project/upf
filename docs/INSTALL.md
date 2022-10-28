@@ -119,7 +119,7 @@ To install the UPF in DPDK mode, the following changes are required:
     -    "ddp": false,
     +    "ddp": true,
 
-         "": "Telemetrics-See this link for details: https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py",
+         "": "Telemetrics-See this link for details: https://github.com/omec-project/bess/blob/master/bessctl/module_tests/timestamp.py",
          "measure_upf": true,
     @@ -61,12 +61,12 @@
 

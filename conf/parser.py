@@ -96,7 +96,7 @@ class Parser:
 
         # Telemtrics
         # See this link for details:
-        # https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py
+        # https://github.com/omec-project/bess/blob/master/bessctl/module_tests/timestamp.py
         try:
             self.measure_upf = self.conf["measure_upf"]
         except KeyError:

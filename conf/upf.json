@@ -53,7 +53,7 @@
     "": "Enable Intel Dynamic Device Personalization (DDP)",
     "ddp": false,
 
-    "": "Telemetrics-See this link for details: https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py",
+    "": "Telemetrics-See this link for details: https://github.com/omec-project/bess/blob/master/bessctl/module_tests/timestamp.py",
     "measure_upf": true,
 
     "": "Whether to enable flow measurement feature",
