@@ -7,7 +7,7 @@ Copyright 2019 Intel Corporation
 
 ### Table Of Contents
   * [Prerequisites](#prerequisites)
-  * [Installation: Simulation mode](#installation-sim-mode)
+  * [Installation: Simulation mode](#installation-simulation-mode)
   * [Installation: DPDK mode](#installation-dpdk-mode)
   * [General Execution Commands](#general-execution-commands)
   * [Testing (Microbenchmarks)](#testing-microbenchmarks)
@@ -253,7 +253,7 @@ localhost:10514 $ tcpdump gtpuEncap out 1 -c 128 -w conf/gtpuEncapOut.pcap
 
 UPF has a simulation mode that enables testing the pipeline on a single machine,
 without the need for external interfaces. Instructions to enable simulation mode
-are provided in the [Installation: Simulation mode](#installation-sim-mode) section.
+are provided in the [Installation: Simulation mode](#installation-simulation-mode) section.
 
 > Note: This mode does not support multiple workers currently.
 
