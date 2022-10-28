@@ -7,8 +7,8 @@ Copyright 2019 Intel Corporation
 
 ### Table Of Contents
   * [Prerequisites](#prerequisites)
-  * [Installation: Simulation mode](installation-sim-mode)
-  * [Installation: DPDK mode](installation-dpdk-mode)
+  * [Installation: Simulation mode](#installation-sim-mode)
+  * [Installation: DPDK mode](#installation-dpdk-mode)
   * [General Execution Commands](#general-execution-commands)
   * [Testing (Microbenchmarks)](#testing-microbenchmarks)
   * [Troubleshooting](#troubleshooting)
@@ -22,6 +22,7 @@ You need the following dependencies.
   - [Here](https://docs.docker.com/engine/install/ubuntu/) are the installation instructions on Ubuntu, or find the installation instructions for the Linux flavor you are using
 * Linux kernel version >= 4.15 for Docker; >= 4.19 for AF_XDP
   - Type `uname -r` in the terminal to verify the kernel version
+* Enable virtualization in the BIOS
 * Hugepages mounted at `/dev/hugepages` or updated location in [`scripts/docker_setup.sh`](../scripts/docker_setup.sh)
   - Reserve 1G HugePage and disable Transparent HugePages by setting: `default_hugepagesz=2G hugepagesz=2G hugepages=<# of hugepages> transparent_hugepage=never`, where <# of hugepages> = 2 x number of BESS UPF instances
     To make this change permanent, do the following:
@@ -63,18 +64,22 @@ To install the UPF in simulation mode, the following changes are required:
 2. Enable sim mode in script file
     ```patch
     diff --git a/scripts/docker_setup.sh b/scripts/docker_setup.sh
-    index 086ad2f..79d81bd 100755
+    index f5946c1..0a7b937 100755
     --- a/scripts/docker_setup.sh
     +++ b/scripts/docker_setup.sh
-    @@ -16,7 +16,7 @@ bessd_port=10514
-    mode="dpdk"
-    #mode="af_xdp"
-    #mode="af_packet"
+    @@ -14,10 +14,10 @@ metrics_port=8080
+     # "af_xdp" uses AF_XDP sockets via DPDK's vdev for pkt I/O. This version is non-zc version. ZC version still needs to be evaluated.
+     # "af_packet" uses AF_PACKET sockets via DPDK's vdev for pkt I/O.
+     # "sim" uses Source() modules to simulate traffic generation
+    -mode="dpdk"
+    +#mode="dpdk"
+     #mode="af_xdp"
+     #mode="af_packet"
     -#mode="sim"
     +mode="sim"
 
-    # Gateway interface(s)
-    #
+     # Gateway interface(s)
+     #
     ```
 
 3. Start installation from UPF's root directory
@@ -128,12 +133,13 @@ To install the UPF in DPDK mode, the following changes are required:
          },
     ```
 
-2. Update parameters in script file
-> NOTE: Please remeber to follow [these](dpdk-configuration.md) directions before executing the next step
+2. Follow [these](dpdk-configuration.md) directions to get details about MAC addresses, VFIO groups, and others. This information is used in the next step.
+
+3. Update parameters in script file
 
     ```patch
     $ git diff scripts/docker_setup.sh
-            diff --git a/scripts/docker_setup.sh b/scripts/docker_setup.sh
+    diff --git a/scripts/docker_setup.sh b/scripts/docker_setup.sh
     index f5946c1..637d62b 100755
     --- a/scripts/docker_setup.sh
     +++ b/scripts/docker_setup.sh
@@ -173,23 +179,15 @@ To install the UPF in DPDK mode, the following changes are required:
         PRIVS='--cap-add IPC_LOCK'
 
      elif [ "$mode" == 'af_xdp' ]; then
-    @@ -152,6 +152,7 @@ fi
-
-     # Run bessd
-     docker run --name bess -td --restart unless-stopped \
-    +  -v /lib/firmware/updates/intel/ice/ddp:/lib/firmware/updates/intel/ice/ddp \
-            --cpuset-cpus=12-13 \
-            --ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
-            -v "$PWD/conf":/opt/bess/bessctl/conf \
     ```
 
-3. Start installation from UPF's root directory
+4. Start installation from UPF's root directory
 
     ```bash
     ./scripts/docker_setup.sh
     ```
 
-4. Insert rules into PDR and FAR tables
+5. Insert rules into PDR and FAR tables
 
     Use gRPC sim mode to directly install PFCP forwarding rules via gRPC API (works only for BESS)
 
@@ -202,7 +200,7 @@ To install the UPF in DPDK mode, the following changes are required:
     Use the [pfcpsim](https://github.com/omec-project/pfcpsim) tool to generate PFCP messages towards the PFCP Agent.
 
 
-5. (optional) Observe the pipeline in GUI
+6. (optional) Observe the pipeline in GUI
 
    To display GUI of the pipeline visit [http://[hostip]:8000](http://[hostip]:8000)
 
@@ -254,7 +252,8 @@ localhost:10514 $ tcpdump gtpuEncap out 1 -c 128 -w conf/gtpuEncapOut.pcap
 ### Simulation mode
 
 UPF has a simulation mode that enables testing the pipeline on a single machine,
-without the need for external interfaces.
+without the need for external interfaces. Instructions to enable simulation mode
+are provided in the [Installation: Simulation mode](#installation-sim-mode) section.
 
 > Note: This mode does not support multiple workers currently.
 

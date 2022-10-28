@@ -8,6 +8,7 @@ Copyright 2022 Intel Corporation
 If you are planning to use the UPF with DPDK, the following steps are required to properly configure the devices:
 
 - Clone `dpdk`
+> Note: This clone of DPDK is used only to bind the devices. This is NOT used to build BESS
 ```bash
 $ git clone https://github.com/DPDK/dpdk.git
 $ cd dpdk
