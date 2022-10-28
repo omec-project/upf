@@ -3,34 +3,223 @@ SPDX-License-Identifier: Apache-2.0
 Copyright 2019 Intel Corporation
 -->
 
-# UPF - Installation Instructions
+# UPF: Installation Instructions
 
-## Pre-reqs
+### Table Of Contents
+  * [Prerequisites](#prerequisites)
+  * [Installation: Simulation mode](installation-sim-mode)
+  * [Installation: DPDK mode](installation-dpdk-mode)
+  * [General Execution Commands](#general-execution-commands)
+  * [Testing (Microbenchmarks)](#testing-microbenchmarks)
+  * [Troubleshooting](#troubleshooting)
+  * [Network Token Functions](#network-token-functions)
+
+## Prerequisites
 
 You need the following dependencies.
 
 * Docker CE >= 19.03
+  - [Here](https://docs.docker.com/engine/install/ubuntu/) are the installation instructions on Ubuntu, or find the installation instructions for the Linux flavor you are using
 * Linux kernel version >= 4.15 for Docker; >= 4.19 for AF_XDP
+  - Type `uname -r` in the terminal to verify the kernel version
 * Hugepages mounted at `/dev/hugepages` or updated location in [`scripts/docker_setup.sh`](../scripts/docker_setup.sh)
-* Update mode for devices: `dpdk`, `af_xdp` or `af_packet` in [`scripts/docker_setup.sh`](../scripts/docker_setup.sh),
-    along with device details
-* Update [`scripts/docker_setup.sh`](../scripts/docker_setup.sh) and [`conf/up4.bess`](../conf/up4.bess) to run pktgen tests
-* Update [`scripts/docker_setup.sh`](../scripts/docker_setup.sh) and [`conf/up4.bess`](../conf/up4.bess) to run sim mode tests
+  - Reserve 1G HugePage and disable Transparent HugePages by setting: `default_hugepagesz=2G hugepagesz=2G hugepages=<# of hugepages> transparent_hugepage=never`, where <# of hugepages> = 2 x number of BESS UPF instances
+    To make this change permanent, do the following:
+    ```
+    sudo vim /etc/default/grub
+	GRUB_CMDLINE_LINUX="intel_iommu=on iommu=pt default_hugepagesz=1G hugepagesz=1G hugepages=2 transparent_hugepage=never"
 
->`scripts/docker_setup.sh` is a quick start guide to set up UPF for evaluation.
+    sudo update-grub
+    ```
+* Update mode for devices: `dpdk`, `af_xdp` or `af_packet` in [`scripts/docker_setup.sh`](../scripts/docker_setup.sh), along with device details
+  - If planning to use DPDK, follow [these](dpdk-configuration.md) directions before moving to the next steps
 
-## Run
+>`./scripts/docker_setup.sh` is a quick start guide to set up UPF for evaluation.
+
+## Installation Simulation mode
+
+To install the UPF in simulation mode, the following changes are required:
+
+1. Enable sim mode in configuration file
+
+    ```patch
+    diff --git a/conf/upf.json b/conf/upf.json
+    index c6531cc..928a503 100644
+    --- a/conf/upf.json
+    +++ b/conf/upf.json
+    @@ -2,8 +2,8 @@
+         "": "Vdev or sim support. Enable `\"mode\": \"af_xdp\"` to enable AF_XDP mode, or `\"mode\": \"af_packet\"` to enable AF_PACKET mode, `\"mode\": \"sim\"` to generate synthetic traffic from BESS's Source module or \"mode\": \"\" when running with UP4",
+         "": "mode: af_xdp",
+         "": "mode: af_packet",
+    -    "": "mode: sim",
+    -    "mode": "dpdk",
+    +    "mode": "sim",
+    +    "": "mode: dpdk",
+
+         "table_sizes": {
+             "": "Example sizes based on sim mode and 50K sessions. Customize as per your control plane",
+    ```
+
+2. Enable sim mode in script file
+    ```patch
+    diff --git a/scripts/docker_setup.sh b/scripts/docker_setup.sh
+    index 086ad2f..79d81bd 100755
+    --- a/scripts/docker_setup.sh
+    +++ b/scripts/docker_setup.sh
+    @@ -16,7 +16,7 @@ bessd_port=10514
+    mode="dpdk"
+    #mode="af_xdp"
+    #mode="af_packet"
+    -#mode="sim"
+    +mode="sim"
+
+    # Gateway interface(s)
+    #
+    ```
+
+3. Start installation from UPF's root directory
+
+    ```bash
+    ./scripts/docker_setup.sh
+    ```
+
+4. Insert rules into PDR and FAR tables
+
+    Use gRPC sim mode to directly install PFCP forwarding rules via gRPC API (works only for BESS)
+
+    ```bash
+    docker exec -ti bess-pfcpiface pfcpiface -config /conf/upf.json -simulate create
+    ```
+
+    OR
+
+    Use the [pfcpsim](https://github.com/omec-project/pfcpsim) tool to generate PFCP messages towards the PFCP Agent.
+
+5. (optional) Observe the pipeline in GUI
+
+   To display GUI of the pipeline visit [http://[hostip]:8000](http://[hostip]:8000)
+
+
+## Installation DPDK mode
+
+To install the UPF in DPDK mode, the following changes are required:
+
+1. Make appropriate changes in configuration file
+
+    ```patch
+    $ git diff conf/upf.json
+    diff --git a/conf/upf.json b/conf/upf.json
+    index c6531cc..335e33b 100644
+    --- a/conf/upf.json
+    +++ b/conf/upf.json
+    @@ -51,7 +51,7 @@
+         "gtppsc": false,
+
+         "": "Enable Intel Dynamic Device Personalization (DDP)",
+    -    "ddp": false,
+    +    "ddp": true,
+
+         "": "Telemetrics-See this link for details: https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py",
+         "measure_upf": true,
+    @@ -61,12 +61,12 @@
+
+         "": "Gateway interfaces",
+         "access": {
+    -        "ifname": "ens803f2"
+    +        "ifname": "access"
+         },
+
+         "": "UE IP Natting. Update the line below to `\"ip_masquerade\": \"<ip> [or <ip>]\"` to enable",
+         "core": {
+    -        "ifname": "ens803f3",
+    +        "ifname": "core",
+             "": "ip_masquerade: 18.0.0.1 or 18.0.0.2 or 18.0.0.3"
+         },
+    ```
+
+2. Update parameters in script file
+    ```patch
+    $ git diff scripts/docker_setup.sh
+            diff --git a/scripts/docker_setup.sh b/scripts/docker_setup.sh
+    index f5946c1..637d62b 100755
+    --- a/scripts/docker_setup.sh
+    +++ b/scripts/docker_setup.sh
+    @@ -22,7 +22,7 @@ mode="dpdk"
+     # Gateway interface(s)
+     #
+     # In the order of ("s1u" "sgi")
+    -ifaces=("ens803f2" "ens803f3")
+    +ifaces=("access" "core")
+
+     # Static IP addresses of gateway interface(s) in cidr format
+     #
+    @@ -32,7 +32,7 @@ ipaddrs=(198.18.0.1/30 198.19.0.1/30)
+     # MAC addresses of gateway interface(s)
+     #
+     # In the order of (s1u sgi)
+    -macaddrs=(9e:b2:d3:34:ab:27 c2:9c:55:d4:8a:f6)
+    +macaddrs=(b4:96:91:b1:ff:f0 b4:96:91:b1:ff:f1)
+
+     # Static IP addresses of the neighbors of gateway interface(s)
+     #
+    @@ -42,7 +42,7 @@ nhipaddrs=(198.18.0.2 198.19.0.2)
+     # Static MAC addresses of the neighbors of gateway interface(s)
+     #
+     # In the order of (n-s1u n-sgi)
+    -nhmacaddrs=(22:53:7a:15:58:50 22:53:7a:15:58:50)
+    +nhmacaddrs=(b4:96:91:b4:47:b8 b4:96:91:b4:47:b9)
+
+     # IPv4 route table entries in cidr format per port
+     #
+    @@ -111,7 +111,7 @@ sudo rm -rf /var/run/netns/pause
+     make docker-build
+
+     if [ "$mode" == 'dpdk' ]; then
+    -       DEVICES=${DEVICES:-'--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio'}
+    +       DEVICES=${DEVICES:-'--device=/dev/vfio/184 --device=/dev/vfio/185 --device=/dev/vfio/vfio'}
+        PRIVS='--cap-add IPC_LOCK'
+
+     elif [ "$mode" == 'af_xdp' ]; then
+    @@ -152,6 +152,7 @@ fi
+
+     # Run bessd
+     docker run --name bess -td --restart unless-stopped \
+    +  -v /lib/firmware/updates/intel/ice/ddp:/lib/firmware/updates/intel/ice/ddp \
+            --cpuset-cpus=12-13 \
+            --ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
+            -v "$PWD/conf":/opt/bess/bessctl/conf \
+    ```
+
+3. Start installation from UPF's root directory
+
+    ```bash
+    ./scripts/docker_setup.sh
+    ```
+
+4. Insert rules into PDR and FAR tables
+
+    Use gRPC sim mode to directly install PFCP forwarding rules via gRPC API (works only for BESS)
+
+    ```bash
+    docker exec -ti bess-pfcpiface pfcpiface -config /conf/upf.json -simulate create
+    ```
+
+    OR
+
+    Use the [pfcpsim](https://github.com/omec-project/pfcpsim) tool to generate PFCP messages towards the PFCP Agent.
+
+
+5. (optional) Observe the pipeline in GUI
+
+   To display GUI of the pipeline visit [http://[hostip]:8000](http://[hostip]:8000)
+
+
+## General Execution Commands
 
 | VAR            | DEFAULT    | NOTES                                              |
 |----------------|------------|----------------------------------------------------|
 | MAKEFLAGS      | -j$(nproc) | Customize if build fails due to memory exhaustion  |
 | DOCKER_BUIDKIT |          1 | Turn off to try legacy builder on older Docker ver |
-
-To run BESS daemon with NGIC modules' code:
-
-```bash
-./scripts/docker_setup.sh
-```
 
 To update the pipeline, reflect changes to [`conf/up4.bess`](../conf/up4.bess)
 and/or [`conf/upf.json`](../conf/upf.json)
@@ -67,19 +256,9 @@ localhost:10514 $ monitor tc
 localhost:10514 $ tcpdump gtpuEncap out 1 -c 128 -w conf/gtpuEncapOut.pcap
 ```
 
-## Components
+## Testing (Microbenchmarks)
 
-![upf](images/upf.svg)
-
-### Zoom-in
-
-![bess-programming](images/bess-programming.svg)
-
-## Testing
-
-### Microbenchmarks
-
-#### Simulation mode
+### Simulation mode
 
 UPF has a simulation mode that enables testing the pipeline on a single machine,
 without the need for external interfaces.
@@ -88,61 +267,7 @@ without the need for external interfaces.
 
 ![ubench-sim](images/ubench-sim.svg)
 
-To start UPF in simulation mode:
-
-1. Enable sim mode in configuration files
-
-    ```patch
-    diff --git a/conf/upf.json b/conf/upf.json
-    index 15042f9..e5a4588 100644
-    --- a/conf/upf.json
-    +++ b/conf/upf.json
-    @@ -2,7 +2,7 @@
-        "": "Vdev or sim support. Enable `\"mode\": \"af_xdp\"` to enable AF_XDP mode, or `\"mode\": \"af_packet\"` to enable AF_PACKET mode, or `\"mode\": \"sim\"` to generate synthetic traffic from BESS's Source module",
-        "": "mode: af_xdp",
-        "": "mode: af_packet",
-    -    "": "mode: sim",
-    +    "mode": "sim",
-
-        "": "max UE sessions",
-        "max_sessions": 50000,
-    diff --git a/scripts/docker_setup.sh b/scripts/docker_setup.sh
-    index 086ad2f..79d81bd 100755
-    --- a/scripts/docker_setup.sh
-    +++ b/scripts/docker_setup.sh
-    @@ -16,7 +16,7 @@ bessd_port=10514
-    mode="dpdk"
-    #mode="af_xdp"
-    #mode="af_packet"
-    -#mode="sim"
-    +mode="sim"
-
-    # Gateway interface(s)
-    #
-    ```
-
-2. Start UPF
-
-    ```bash
-    ./scripts/docker_setup.sh
-    ```
-
-3. Insert rules into relevant PDR and FAR tables
-
-    Use gRPC sim mode to directly install PFCP forwarding rules via gRPC API (works only for BESS)
-
-    ```bash
-    docker exec -ti bess-pfcpiface pfcpiface -config /conf/upf.json -simulate create
-    ```
-
-    OR
-
-    Use the [pfcpsim](https://github.com/omec-project/pfcpsim) tool to generate PFCP messages towards the PFCP Agent.
-
-
-4. (optional) Observe the pipeline in GUI
-
-#### [Pktgen](../conf/pktgen.bess)
+### [Pktgen](../conf/pktgen.bess)
 
 Pktgen allows us to test the upf pipeline with external datapath interfaces.
 This can be done either using a single machine or two machines.

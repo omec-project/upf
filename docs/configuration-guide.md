@@ -8,7 +8,8 @@ Copyright 2022-present Open Networking Foundation
 ## PFCP Agent
 
 This document focuses on frequently used configurations.
-Please refer to [upf.json](https://github.com/omec-project/upf/blob/master/conf/upf.json) file for the full list of configurable parameters.
+
+Please refer to [upf.json](../conf/upf.json) file for the full list of configurable parameters.
 
 ### Common configurations
 
