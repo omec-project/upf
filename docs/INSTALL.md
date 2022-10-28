@@ -7,8 +7,9 @@ Copyright 2019 Intel Corporation
 
 ### Table Of Contents
   * [Prerequisites](#prerequisites)
-  * [Installation: Simulation mode](#installation-simulation-mode)
-  * [Installation: DPDK mode](#installation-dpdk-mode)
+  * [Configuration: Simulation mode](#configuration-simulation-mode)
+  * [Configuration: DPDK mode](#configuration-dpdk-mode)
+  * [Installation](#installation)
   * [General Execution Commands](#general-execution-commands)
   * [Testing (Microbenchmarks)](#testing-microbenchmarks)
   * [Troubleshooting](#troubleshooting)
@@ -33,12 +34,12 @@ You need the following dependencies.
     sudo update-grub
     ```
 * Update mode for devices: `dpdk`, `af_xdp` or `af_packet` in [`scripts/docker_setup.sh`](../scripts/docker_setup.sh), along with device details
-  - If planning to use DPDK, the [Installation: DPDK mode](#installation-dpdk-mode) section provides all the details
+  - If planning to use DPDK, the [Configuration: DPDK mode](#configuration-dpdk-mode) section provides all the details
 
 
-## Installation Simulation mode
+## Configuration: Simulation mode
 
-To install the UPF in simulation mode, the following changes are required:
+To configure/install the UPF in simulation mode, the following changes are required:
 
 1. Enable sim mode in configuration file
 
@@ -81,32 +82,10 @@ To install the UPF in simulation mode, the following changes are required:
      #
     ```
 
-3. Start installation from UPF's root directory
 
-    ```bash
-    ./scripts/docker_setup.sh
-    ```
+## Configuration: DPDK mode
 
-4. Insert rules into PDR and FAR tables
-
-    Use gRPC sim mode to directly install PFCP forwarding rules via gRPC API (works only for BESS)
-
-    ```bash
-    docker exec -ti bess-pfcpiface pfcpiface -config /conf/upf.json -simulate create
-    ```
-
-    OR
-
-    Use the [pfcpsim](https://github.com/omec-project/pfcpsim) tool to generate PFCP messages towards the PFCP Agent.
-
-5. (optional) Observe the pipeline in GUI
-
-   To display GUI of the pipeline visit [http://[hostip]:8000](http://[hostip]:8000)
-
-
-## Installation DPDK mode
-
-To install the UPF in DPDK mode, the following changes are required:
+To configure/install the UPF in DPDK mode, the following changes are required:
 
 1. Follow the directions [here](dpdk-configuration.md) to get details about MAC addresses, VFIO groups, and others. This information is used in the next step.
 
@@ -147,28 +126,26 @@ To install the UPF in DPDK mode, the following changes are required:
      elif [ "$mode" == 'af_xdp' ]; then
     ```
 
-3. Start installation from UPF's root directory
+
+## Installation
+
+1. Start installation from UPF's root directory
 
     ```bash
     ./scripts/docker_setup.sh
     ```
 
-4. Insert rules into PDR and FAR tables
+2. Insert rules into PDR and FAR tables
 
     Use gRPC sim mode to directly install PFCP forwarding rules via gRPC API (works only for BESS)
 
     ```bash
-    docker exec -ti bess-pfcpiface pfcpiface -config /conf/upf.json -simulate create
+    docker exec bess-pfcpiface pfcpiface -config conf/upf.json -simulate create
     ```
 
     OR
 
     Use the [pfcpsim](https://github.com/omec-project/pfcpsim) tool to generate PFCP messages towards the PFCP Agent.
-
-
-5. (optional) Observe the pipeline in GUI
-
-   To display GUI of the pipeline visit [http://[hostip]:8000](http://[hostip]:8000)
 
 
 ## General Execution Commands
@@ -191,7 +168,7 @@ To display the ASCII pipeline, do:
 docker exec bess ./bessctl show pipeline > pipeline.txt
 ```
 
-To display GUI of the pipeline visit [http://[hostip]:8000](http://[hostip]:8000)
+To observe the pipeline in GUI visit [http://[hostip]:8000](http://[hostip]:8000)
 
 To drop into BESS shell
 
@@ -219,7 +196,7 @@ localhost:10514 $ tcpdump gtpuEncap out 1 -c 128 -w conf/gtpuEncapOut.pcap
 
 UPF has a simulation mode that enables testing the pipeline on a single machine,
 without the need for external interfaces. Instructions to enable simulation mode
-are provided in the [Installation: Simulation mode](#installation-simulation-mode) section.
+are provided in the [Configuration: Simulation mode](#configuration-simulation-mode) section.
 
 > Note: This mode does not support multiple workers currently.
 
@@ -234,19 +211,7 @@ This can be done either using a single machine or two machines.
 
 ![ubench-pktgen](images/ubench-pktgen.svg)
 
-1. Configure the mode/cores/memory/devices as per your environment and start UPF
-
-    ```bash
-    ./scripts/docker_setup.sh
-    ```
-
-2. Insert rules into relevant PDR and FAR tables
-
-    ```bash
-    docker exec -ti bess-pfcpiface pfcpiface -config /conf/upf.json -simulate create
-    ```
-
-3. On the same machine using an extra VF or from a different machine run pktgen instance
+1. On the same machine using an extra VF or from a different machine run pktgen instance
 
     ```bash
     docker run --name pktgen -td --restart unless-stopped \
@@ -256,7 +221,7 @@ This can be done either using a single machine or two machines.
             upf-epc-bess:"$(<VERSION)" -grpc-url=0.0.0.0:10514
     ```
 
-4. Customize [pktgen.bess](../conf/pktgen.bess) to match [sim config](../conf/upf.json) used in step 2
+4. Customize [conf/pktgen.bess](../conf/pktgen.bess) to match [conf/upf](../conf/upf.json) used in the [Configuration: Simulation mode](#configuration-simulation-mode) section.
 
 5. Start pktgen
 
@@ -271,7 +236,7 @@ BESS tools are available out-of-the-box for debugging and/or monitoring; *e.g.*:
 * Run `tcpdump` on arbitrary dataplane pipeline module
 
 ```bash
-localhost:10514 $ tcpdump s1uFastBPF
+localhost:10514 $ tcpdump accessFastBPF in 0
   Running: tcpdump -r /tmp/tmpYUlLw8
 reading from file /tmp/tmpYUlLw8, link-type EN10MB (Ethernet)
 23:51:02.331926 STP 802.1s, Rapid STP, CIST Flags [Learn, Forward], length 102
@@ -296,11 +261,27 @@ OMEC includes a Network Token Function (NTF) which provides preliminary support
 for Network Tokens, a new protocol to expose datapath services to end users and
 application providers. More details are available at [networktokens.org](https://networktokens.org)
 
-In order to compile NTF support, run the following:
+In order to compile NTF support, update [`conf/upf.json`](conf/upf.json) as follows:
+
+```patch
+$ git diff conf/upf.json
+diff --git a/conf/upf.json b/conf/upf.json
+index 1f84803..f3428b5 100644
+--- a/conf/upf.json
++++ b/conf/upf.json
+@@ -78,7 +78,7 @@
+     "resp_timeout": "2s",
+
+     "": "Whether to enable Network Token Functions",
+-    "enable_ntf": false,
++    "enable_ntf": true,
+
+     "": "Whether to enable End Marker Support",
+     "": "enable_end_marker: false",
+```
+
+And run the [scripts/docker_setup.sh](scripts/docker_setup.sh) as follows:
 
 ```bash
 ENABLE_NTF=1 ./scripts/docker_setup.sh
 ```
-
-Update [`conf/spgwu.json`](conf/spgwu.json) and set the `enable_ntf` option to
-`true`.
