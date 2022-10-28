@@ -94,7 +94,7 @@ class Parser:
         except KeyError:
             print('ddp not set, using default software fallback')
 
-        # Telemtrics
+        # Telemetrics
         # See this link for details:
         # https://github.com/omec-project/bess/blob/master/bessctl/module_tests/timestamp.py
         try:
