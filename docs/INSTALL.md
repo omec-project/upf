@@ -138,6 +138,8 @@ To install the UPF in DPDK mode, the following changes are required:
     ```
 
 2. Update parameters in script file
+> NOTE: Please remeber to follow [these](dpdk-configuration.md) directions before executing the next step
+
     ```patch
     $ git diff scripts/docker_setup.sh
             diff --git a/scripts/docker_setup.sh b/scripts/docker_setup.sh
