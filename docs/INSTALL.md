@@ -39,6 +39,13 @@ You need the following dependencies.
 
 ## Configuration: Simulation mode
 
+The simulation mode is a good way to explore the UPF functionalities
+without the need for configuring DPDK and other hardware-related aspects. For
+specifics on what can be customized, the user may refer to the UPF's config file
+[here](./../conf/upf.json), where it is possible to modify/set different
+parameters such as tables sizes, maximum number of flows, enable/disable
+measurements, among several others.
+
 To configure/install the UPF in simulation mode, the following changes are required:
 
 1. Enable sim mode in configuration file
