@@ -94,9 +94,9 @@ class Parser:
         except KeyError:
             print('ddp not set, using default software fallback')
 
-        # Telemtrics
+        # Telemetrics
         # See this link for details:
-        # https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py
+        # https://github.com/omec-project/bess/blob/master/bessctl/module_tests/timestamp.py
         try:
             self.measure_upf = self.conf["measure_upf"]
         except KeyError:
