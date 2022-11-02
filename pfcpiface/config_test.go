@@ -5,7 +5,7 @@ package pfcpiface
 
 import (
 	"io/fs"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
@@ -15,7 +15,7 @@ import (
 )
 
 func mustWriteStringToDisk(s string, path string) {
-	err := ioutil.WriteFile(path, []byte(s), fs.ModePerm)
+	err := os.WriteFile(path, []byte(s), fs.ModePerm)
 	if err != nil {
 		panic(err)
 	}
