@@ -30,7 +30,6 @@ ENV PKG_CONFIG_PATH=/usr/lib64/pkgconfig
 WORKDIR /bess
 
 # Patch and build DPDK
-COPY patches/dpdk/* deps/
 RUN ./build.py dpdk
 
 # Plugins
