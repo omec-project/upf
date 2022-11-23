@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"os"
 )
 
@@ -178,7 +178,7 @@ func LoadConfigFile(filepath string) (Conf, error) {
 	defer jsonFile.Close()
 
 	// Read our file into memory.
-	byteValue, err := ioutil.ReadAll(jsonFile)
+	byteValue, err := io.ReadAll(jsonFile)
 	if err != nil {
 		return Conf{}, err
 	}
