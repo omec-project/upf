@@ -6,7 +6,6 @@ package pfcpiface
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"time"
 
@@ -473,7 +472,7 @@ func GetPipelineConfig(client p4.P4RuntimeClient, deviceID uint64) (*p4.GetForwa
 func (c *P4rtClient) SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath string) (err error) {
 	log.Println("P4 Info: ", p4InfoPath)
 
-	p4infoBytes, err := ioutil.ReadFile(p4InfoPath)
+	p4infoBytes, err := os.ReadFile(p4InfoPath)
 	if err != nil {
 		log.Println("Read p4info file error ", err)
 		return
