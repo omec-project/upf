@@ -14,7 +14,9 @@ metrics_port=8080
 # "af_xdp" uses AF_XDP sockets via DPDK's vdev for pkt I/O. This version is non-zc version. ZC version still needs to be evaluated.
 # "af_packet" uses AF_PACKET sockets via DPDK's vdev for pkt I/O.
 # "sim" uses Source() modules to simulate traffic generation
+# "cndp" use kernel AF-XDP. It supports ZC and XDP offload if driver and NIC supports it. It's tested on Intel 800 series n/w adapter.
 mode="dpdk"
+#mode="cndp"
 #mode="af_xdp"
 #mode="af_packet"
 #mode="sim"
@@ -98,8 +100,61 @@ function move_ifaces() {
 			sudo ip netns exec pause ethtool -N "${ifaces[$i]}" flow-type tcp4 action 0
 			sudo ip netns exec pause ethtool -u "${ifaces[$i]}"
 		fi
+		if [ "$mode" == 'cndp' ]; then
+			# num queues
+			num_q=1
+			# start queue index
+			start_q_idx=22
+			# RSS using TC filter
+			setup_tc "${ifaces[$i]}" $num_q $start_q_idx
+		fi
 	done
 	setup_addrs
+}
+
+# Setup TC
+# Note: This function is used only for cndp mode.
+# Parameters: $1 = interface, $2 = number of queues, $3 = start queue index
+function setup_tc() {
+	# Interface name
+	iface=$1
+	# Number of queues
+	num_q=$2
+	# Start queue index
+	sq_idx=$3
+	sudo ip netns exec pause ethtool --offload $iface hw-tc-offload on
+	# Create two traffic control groups for the two queue sets - set 0 and set 1.
+	# queue set 1 will be used for dataplane traffic.
+	# queue set 0 will handle rest of the traffic (eg: control plane traffic).
+	# for e.g., 22@0 means 22 queues starting from queue id 0.
+	# 4@22 mean 4 queues starting from queue id 22.
+	sudo ip netns exec pause tc qdisc add dev $iface root mqprio \
+		num_tc 2 map 0 1 queues $sq_idx@0 $num_q@$sq_idx hw 1 mode channel
+	sudo ip netns exec pause tc qdisc add dev $iface clsact
+}
+
+# Add TC rules for N3/N6/N9 access and core interface.
+# Note: This function is used only for cndp mode.
+# Parameters: $1 = access interface, $2 = core interface
+# Inner UE IP address range and GTPU port is hardcoded for now.
+# UE IP address should match the generated traffic pattern.
+function add_tc_rules() {
+	# Encapuslated traffic N3 on access interface.
+	# RSS GTPU filter (Note: hw_tc 1 has >1 queues which results in implict RSS)
+	sudo ip netns exec pause tc filter add dev $1 protocol ip ingress \
+		prio 1 flower src_ip 16.0.0.0/16 enc_dst_port 2152 skip_sw hw_tc 1
+	# List TC rules on access interface.
+	sudo ip netns exec pause tc filter show dev $1 ingress
+
+	# Encapsulated traffic N9 on core interface.
+	# RSS GTPU filter (Note: hw_tc 1 has >1 queues which results in implict RSS)
+	sudo ip netns exec pause tc filter add dev $2 protocol ip ingress \
+		prio 1 flower dst_ip 16.0.0.0/16 enc_dst_port 2152 skip_sw hw_tc 1
+	# un-encapsulated traffic N6 on core interface
+	sudo ip netns exec pause tc filter add dev $2 protocol ip ingress \
+		prio 1 flower dst_ip 16.0.0.0/16 skip_sw hw_tc 1
+	# List TC rules on core interface.
+	sudo ip netns exec pause tc filter show dev $2 ingress
 }
 
 # Stop previous instances of bess* before restarting
@@ -114,7 +169,7 @@ if [ "$mode" == 'dpdk' ]; then
 	DEVICES=${DEVICES:-'--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio'}
 	PRIVS='--cap-add IPC_LOCK'
 
-elif [ "$mode" == 'af_xdp' ]; then
+elif [[ "$mode" == 'af_xdp' || "$mode" == 'cndp' ]]; then
 	PRIVS='--privileged'
 
 elif [ "$mode" == 'af_packet' ]; then
@@ -141,6 +196,10 @@ case $mode in
 	# Make sure that kernel does not send back icmp dest unreachable msg(s)
 	sudo ip netns exec pause iptables -I OUTPUT -p icmp --icmp-type port-unreachable -j DROP
 	;;
+"cndp")
+	move_ifaces
+	add_tc_rules "${ifaces[0]}" "${ifaces[1]}"
+	;;
 *) ;;
 
 esac
@@ -148,6 +207,13 @@ esac
 # Setup trafficgen routes
 if [ "$mode" != 'sim' ]; then
 	setup_trafficgen_routes
+fi
+
+# Specify per-socket hugepages to allocate (in MBs) by bess daemon (default: 1024)
+HUGEPAGES=''
+# Use more hugepages for CNDP
+if [ "$mode" == 'cndp' ]; then
+	HUGEPAGES='-m 2048'
 fi
 
 # Run bessd
@@ -158,7 +224,7 @@ docker run --name bess -td --restart unless-stopped \
 	--net container:pause \
 	$PRIVS \
 	$DEVICES \
-	upf-epc-bess:"$(<VERSION)" -grpc-url=0.0.0.0:$bessd_port
+	upf-epc-bess:"$(<VERSION)" -grpc-url=0.0.0.0:$bessd_port $HUGEPAGES
 
 docker logs bess
 

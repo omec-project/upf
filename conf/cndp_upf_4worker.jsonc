@@ -1,0 +1,249 @@
+{
+    // (R) - Required entry
+    // (O) - Optional entry
+    // All descriptions are optional and short form is 'desc'
+    // The order of the entries in this file are handled when it is parsed and the
+    // entries can be in any order.
+
+    // (R) Application information
+    //    name        - (O) The name of the application
+    //    description - (O) The description of the application
+    "application": {
+        "name": "cndp-upf",
+        "description": "CNDP OMEC-UPF configuration"
+    },
+
+    // (O) Default values
+    //    bufcnt - (O) UMEM default buffer count in 1K increments
+    //    bufsz  - (O) UMEM buffer size in 1K increments
+    //    rxdesc - (O) Number of RX ring descriptors in 1K increments
+    //    txdesc - (O) Number of TX ring descriptors in 1K increments
+    //    cache  - (O) MBUF Pool cache size in number of entries
+    //    mtype  - (O) Memory type for mmap allocations
+    "defaults": {
+        "bufcnt": 32,
+        "bufsz": 2,
+        "rxdesc": 2,
+        "txdesc": 2,
+        "cache": 256,
+        "mtype": "2MB"
+    },
+
+    // List of all UMEM's to be created
+    // key/val - (R) The 'key' is the name of the umem for later reference.
+    //               The 'val' is the object describing the UMEM buffer.
+    //               Multiple umem regions can be defined.
+    // A UMEM can support multiple lports using the regions array. Each lports can use
+    // one of the regions.
+    //    bufcnt  - (R) The number of buffers in 1K increments in the UMEM space.
+    //    bufsz   - (R) The size in 1K increments of each buffer in the UMEM space.
+    //    mtype   - (O) If missing or empty string or missing means use 4KB or default system pages.
+    //    regions - (O) Array of sizes one per region in 1K increments, total must be <= bufcnt
+    //    rxdesc  - (O) Number of RX descriptors to be allocated in 1K increments,
+    //                  if not present or zero use defaults.rxdesc, normally zero.
+    //    txdesc  - (O) Number of TX descriptors to be allocated in 1K increments,
+    //                  if not present or zero use defaults.txdesc, normally zero.
+    //    description | desc - (O) Description of the umem space.
+        "umems": {
+           "umem0": {
+            "bufcnt": 32,
+            "bufsz": 2,
+            "mtype": "2MB",
+            "regions": [
+                            16,16
+                        ],
+            "rxdesc": 0,
+            "txdesc": 0,
+            "description": "UMEM Description 0"
+            },
+           "umem1": {
+            "bufcnt": 32,
+            "bufsz": 2,
+            "mtype": "2MB",
+            "regions": [
+                            16,16
+                        ],
+            "rxdesc": 0,
+            "txdesc": 0,
+            "description": "UMEM Description 1"
+            },
+            "umem2": {
+            "bufcnt": 32,
+            "bufsz": 2,
+            "mtype": "2MB",
+            "regions": [
+                            16,16
+                        ],
+            "rxdesc": 0,
+            "txdesc": 0,
+            "description": "UMEM Description 2"
+            },
+            "umem3": {
+            "bufcnt": 32,
+            "bufsz": 2,
+            "mtype": "2MB",
+            "regions": [
+                            16,16
+                        ],
+            "rxdesc": 0,
+            "txdesc": 0,
+            "description": "UMEM Description 3"
+            }
+         },
+
+
+    // List of all lports to be used in the application
+    // A lport is defined by a netdev/queue ID pair, which is a socket containing a Rx/Tx ring pair.
+    // Each queue ID is assigned to a single socket or a socket is the lport defined by netdev/qid.
+    // Note: A netdev can be shared between lports as the qid is unique per lport
+    //       If netdev is not defined or empty then it must be a virtual interface and not
+    //       associated with a netdev/queue ID.
+    // key/val - (R) The 'key' is the logical name e.g., 'eth0:0', 'eth1:0', ... to be used by the
+    //               application to reference a lport. The 'val' object contains information about
+    //               each lport.
+    //    netdev        - (R) The netdev device to be used, the part before the colon
+    //                     must reflect the netdev name
+    //    pmd           - (R) All PMDs have a name i.e., 'net_af_xdp', 'ring', ...
+    //    qid           - (R) Is the queue id to use for this lport, defined by ethtool command line
+    //    umem          - (R) The UMEM assigned to this lport
+    //    region        - (O) UMEM region index value, default region 0
+    //    busy_poll     - (O) Enable busy polling support, true or false, default false
+    //    busy_timeout  - (O) 1-65535 or 0 - use default value, values in milliseconds
+    //    busy_budget   - (O) 0xFFFF disabled, 0 use default, >0 budget value
+    //    inhibit_prog_load - (O) Inhibit loading the BPF program if true, default false
+    //    force_wakeup  - (O) Force TX wakeup calls for CVL NIC, default false
+    //    skb_mode      - (O) Enable XDP_FLAGS_SKB_MODE when creating af_xdp socket, forces copy mode, default false
+    //    description   - (O) The description, 'desc' can be used as well
+    "lports": {
+        "enp134s0:0": {
+            "pmd": "net_af_xdp",
+            "qid": 22,
+            "umem": "umem0",
+            "region": 0,
+            "busy_poll": true,
+            "busy_budget": 64,
+            "busy_timeout": 20,
+            "description": "Access LAN 0 port"
+        },
+        "enp134s0:1": {
+            "pmd": "net_af_xdp",
+            "qid": 23,
+            "umem": "umem1",
+            "region": 0,
+            "busy_poll": true,
+            "busy_budget": 64,
+            "busy_timeout": 20,
+            "description": "Access LAN 1 port"
+        },
+        "enp134s0:2": {
+            "pmd": "net_af_xdp",
+            "qid": 24,
+            "umem": "umem2",
+            "region": 0,
+            "busy_poll": true,
+            "busy_budget": 64,
+            "busy_timeout": 20,
+            "description": "Access LAN 2 port"
+        },
+        "enp134s0:3": {
+            "pmd": "net_af_xdp",
+            "qid": 25,
+            "umem": "umem3",
+            "region": 0,
+            "busy_poll": true,
+            "busy_budget": 64,
+            "busy_timeout": 20,
+            "description": "Access LAN 3 port"
+        },
+        "enp136s0:0": {
+            "pmd": "net_af_xdp",
+            "qid": 22,
+            "umem": "umem0",
+            "region": 1,
+            "busy_poll": true,
+            "busy_budget": 64,
+            "busy_timeout": 20,
+            "description": "Core LAN 0 port"
+        },
+        "enp136s0:1": {
+            "pmd": "net_af_xdp",
+            "qid": 23,
+            "umem": "umem1",
+            "region": 1,
+            "busy_poll": true,
+            "busy_budget": 64,
+            "busy_timeout": 20,
+            "description": "Core LAN 1 port"
+        },
+        "enp136s0:2": {
+            "pmd": "net_af_xdp",
+            "qid": 24,
+            "umem": "umem2",
+            "region": 1,
+            "busy_poll": true,
+            "busy_budget": 64,
+            "busy_timeout": 20,
+            "description": "Core LAN 2 port"
+        },
+        "enp136s0:3": {
+            "pmd": "net_af_xdp",
+            "qid": 25,
+            "umem": "umem3",
+            "region": 1,
+            "busy_poll": true,
+            "busy_budget": 64,
+            "busy_timeout": 20,
+            "description": "Core LAN 3 port"
+        }
+    },
+
+    // (O) Define the lcore groups for each thread to run
+    //     Can be integers or a string for a range of lcores
+    //     e.g., [10], [10-14,16], [10-12, 14-15, 17-18, 20]
+    // Names of a lcore group and its lcores assigned to the group.
+    // The initial group is for the main thread of the application.
+    // The default group is special and is used if a thread if not assigned to a group.
+    //
+    // CNDP BESS Port does not use this section.
+    "lcore-groups": {
+        "initial": [22],
+        "group0": [25],
+        "group1": [35],
+        "default": ["22-35"]
+    },
+
+    // (O) Set of common options application defined.
+    //     The Key can be any string and value can be boolean, string, array or integer
+    //     An array must contain only a single value type, boolean, integer, string and
+    //     can't be a nested array.
+    //   pkt_api    - (O) Set the type of packet API xskdev or pktdev
+    //   no-metrics - (O) Disable metrics gathering and thread
+    //   no-restapi - (O) Disable RestAPI support
+    //   cli        - (O) Enable/Disable CLI supported
+    //   mode       - (O) Mode type [drop | rx-only], tx-only, [lb | loopback], fwd, acl-strict, acl-permissive
+    "options": {
+        "pkt_api": "xskdev",
+        "no-metrics": false,
+        "no-restapi": false,
+        "cli": true,
+        "mode": "drop"
+    },
+
+    // List of threads to start and information for that thread. Application can start
+    // its own threads for any reason and are not required to be configured by this file.
+    //
+    //   Key/Val   - (R) A unique thread name.
+    //                   The format is <type-string>[:<identifier>] the ':' and identifier
+    //                   are optional if all thread names are unique
+    //      group  - (O) The lcore-group this thread belongs to. The
+    //      lports - (O) The list of lports assigned to this thread and cannot share lports.
+    //      description | desc - (O) The description
+    //
+    // CNDP BESS Port does not use this section.
+    "threads": {
+        "main": {
+            "group": "initial",
+            "description": "CLI Thread"
+        }
+    }
+}

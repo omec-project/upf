@@ -3,6 +3,7 @@
     "": "mode: af_xdp",
     "": "mode: af_packet",
     "": "mode: sim",
+    "": "mode: cndp",
     "mode": "dpdk",
 
     "table_sizes": {
@@ -61,12 +62,14 @@
 
     "": "Gateway interfaces",
     "access": {
-        "ifname": "ens803f2"
+        "ifname": "ens803f2",
+        "": "cndp_jsonc_file: /opt/bess/bessctl/conf/cndp_upf_1worker.jsonc"
     },
 
     "": "UE IP Natting. Update the line below to `\"ip_masquerade\": \"<ip> [or <ip>]\"` to enable",
     "core": {
         "ifname": "ens803f3",
+        "": "cndp_jsonc_file: /opt/bess/bessctl/conf/cndp_upf_1worker.jsonc",
         "": "ip_masquerade: 18.0.0.1 or 18.0.0.2 or 18.0.0.3"
     },
 
