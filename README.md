@@ -163,7 +163,7 @@ Before contributing, please follow these guidelines:
 
 ## Support
 
-To report any other kind of problem, feel free to open a GitHub Issue or reach out to the project maintainers on the ONF Community Slack ([aether-dev](https://app.slack.com/client/T095Z193Q/C01E4HMLBNV), [omec-dev](https://app.slack.com/client/T095Z193Q/C01DNRLRRDK)).
+To report any other kind of problem, feel free to open a GitHub Issue or reach out to the project maintainers on the ONF Community Slack ([aether-dev](https://app.slack.com/client/T095Z193Q/C01E4HMLBNV).
 
 ## License
 
