@@ -66,7 +66,7 @@ QoS Enforcement Rules (QERs).
 * IPv4 support
 * N3, N4, N6, N9 interfacing
 * Single & Multi-port support
-* Monitoring/Debugging capabilties using
+* Monitoring/Debugging capabilities using
   - tcpdump on individual BESS modules
   - visualization web interface
   - command line shell interface for displaying statistics
@@ -75,7 +75,7 @@ QoS Enforcement Rules (QERs).
 * Support for IPv4 datagrams reassembly
 * Support for IPv4 packets fragmentation
 * Support for UE IP NAT
-* Service Data Flow (SDF) configuration via N4/PFCP.
+* Service Data Flow (SDF) configuration via N4/PFCP
 * I-UPF/A-UPF ULCL/Branching i.e., simultaneous N6/N9 support within PFCP session
 * Downlink Data Notification (DDN) - notification only (no buffering)
 * Basic QoS support, with per-slice and per-session rate limiting
