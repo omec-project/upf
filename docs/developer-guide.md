@@ -4,11 +4,69 @@ Copyright 2022 Open Networking Foundation
 -->
 # Developer guide
 
+## New Features or Improvements to the BESS pipeline
+
+When implementing new features or making improvements to the `BESS` pipeline,
+the easiest way to do so is by:
+
+- Clone the `bess` repo inside the UPF repo
+```bash
+$ cd <path/to/upf>
+$ git clone https://github.com/<your-user>/bess.git
+```
+
+- **Temporarily** modify Dockerfile to use the `bess` cloned in the previous
+step
+```diff
+diff --git a/Dockerfile b/Dockerfile
+index 052456d..03b7d33 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -11,9 +11,7 @@ RUN apt-get update && \
+
+ # BESS pre-reqs
+ WORKDIR /bess
+-ARG BESS_COMMIT=dpdk-2011-focal
+-RUN git clone https://github.com/omec-project/bess.git .
+-RUN git checkout ${BESS_COMMIT}
++COPY bess/ .
+ RUN cp -a protobuf /protobuf
+
+ # Stage bess-build: builds bess with its dependencies
+```
+
+- Implement a feature or make modifications
+
+- Test the modifications
+
+- Revert change in Dockerfile
+```diff
+diff --git a/Dockerfile b/Dockerfile
+index 03b7d33..052456d 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -11,7 +11,9 @@ RUN apt-get update && \
+
+ # BESS pre-reqs
+ WORKDIR /bess
+-COPY bess/ .
++ARG BESS_COMMIT=dpdk-2011-focal
++RUN git clone https://github.com/omec-project/bess.git .
++RUN git checkout ${BESS_COMMIT}
+ RUN cp -a protobuf /protobuf
+
+ # Stage bess-build: builds bess with its dependencies
+```
+
+- Commit your changes to `bess` repo and, if needed, `upf` repo
+- Open pull request in `bess` repo and, if needed, `upf` repo
+
+
 ## Testing local Go dependencies
 
 The `upf` repository relies on some external Go dependencies, which are not mature yet (e.g. pfcpsim or p4runtime-go-client).
 It's often needed to extend those dependencies first, before adding a new feature to the PFCP Agent. However, when using Go modules and Dockerized environment,
-it's hard to test WIP changes to local dependencies. Therefore, this repository come up with a way to use Go vendoring, instead of Go modules, for development purposes.
+it's hard to test WIP changes to local dependencies. Therefore, this repository comes up with a way to use Go vendoring, instead of Go modules, for development purposes.
 
 To use a local Go dependency add the `replace` directive to `go.mod`. An example:
 
