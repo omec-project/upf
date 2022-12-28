@@ -191,14 +191,14 @@ func IsConnectionOpen(network string, host string, port string) bool {
 
 func waitForPortOpen(net string, host string, port string) error {
 	timeout := time.After(5 * time.Second)
-	ticker := time.Tick(500 * time.Millisecond)
+	ticker := time.NewTicker(500 * time.Millisecond)
 
 	// Keep trying until we're timed out or get a result/error
 	for {
 		select {
 		case <-timeout:
 			return errors.New("timed out")
-		case <-ticker:
+		case <-ticker.C:
 			if IsConnectionOpen(net, host, port) {
 				return nil
 			}
@@ -210,7 +210,7 @@ func waitForPortOpen(net string, host string, port string) error {
 // It retries every 1.5 seconds (0.5 seconds of interval between tries + 1 seconds that PFCP Client waits for response).
 func waitForPFCPAssociationSetup(pfcpClient *pfcpsim.PFCPClient) error {
 	timeout := time.After(30 * time.Second)
-	ticker := time.Tick(500 * time.Millisecond)
+	ticker := time.NewTicker(500 * time.Millisecond)
 
 	// Decrease timeout to wait for PFCP responses.
 	// This decreases time to wait for PFCP Agent to start.
@@ -221,7 +221,7 @@ func waitForPFCPAssociationSetup(pfcpClient *pfcpsim.PFCPClient) error {
 		select {
 		case <-timeout:
 			return errors.New("timed out")
-		case <-ticker:
+		case <-ticker.C:
 			// each test case requires PFCP Association, so we don't teardown it once we notice it's established.
 			if err := pfcpClient.SetupAssociation(); err == nil {
 				return nil
