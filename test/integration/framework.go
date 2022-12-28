@@ -16,7 +16,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
-	"io/ioutil"
 	"net"
 	"os"
 	"testing"
@@ -350,7 +349,7 @@ func setup(t *testing.T, configType uint32) {
 	switch os.Getenv(EnvMode) {
 	case ModeDocker:
 		jsonConf, _ := json.Marshal(GetConfig(os.Getenv(EnvDatapath), configType))
-		err := ioutil.WriteFile(ConfigPath, jsonConf, os.ModePerm)
+		err := os.WriteFile(ConfigPath, jsonConf, os.ModePerm)
 		require.NoError(t, err)
 		MustStartPFCPAgent()
 	case ModeNative:
