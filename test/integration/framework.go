@@ -41,8 +41,6 @@ const (
 	ModeDocker = "docker"
 	ModeNative = "native"
 
-	defaultSliceID = 0
-
 	defaultSDFFilter = "permit out udp from any to assigned 80-80"
 
 	ueAddress    = "17.0.0.1"
@@ -166,11 +164,6 @@ func init() {
 	providers.MustCreateNetworkIfNotExists(DockerTestNetwork)
 }
 
-func (af appFilter) isEmpty() bool {
-	return af.proto == 0 && len(af.appIP) == 0 &&
-		af.appPort.low == 0 && af.appPort.high == 0
-}
-
 func IsConnectionOpen(network string, host string, port string) bool {
 	target := net.JoinHostPort(host, port)
 
@@ -245,20 +238,8 @@ func waitForBESSFakeToStart() error {
 	return waitForPortOpen("tcp", "127.0.0.1", "10514")
 }
 
-func isModeNative() bool {
-	return os.Getenv(EnvMode) == ModeNative
-}
-
-func isModeDocker() bool {
-	return os.Getenv(EnvMode) == ModeDocker
-}
-
 func isDatapathUP4() bool {
 	return os.Getenv(EnvDatapath) == DatapathUP4
-}
-
-func isDatapathBESS() bool {
-	return os.Getenv(EnvDatapath) == DatapathBESS
 }
 
 func initForwardingPipelineConfig() {
