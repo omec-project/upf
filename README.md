@@ -66,7 +66,7 @@ QoS Enforcement Rules (QERs).
 * IPv4 support
 * N3, N4, N6, N9 interfacing
 * Single & Multi-port support
-* Monitoring/Debugging capabilties using
+* Monitoring/Debugging capabilities using
   - tcpdump on individual BESS modules
   - visualization web interface
   - command line shell interface for displaying statistics
@@ -75,7 +75,7 @@ QoS Enforcement Rules (QERs).
 * Support for IPv4 datagrams reassembly
 * Support for IPv4 packets fragmentation
 * Support for UE IP NAT
-* Service Data Flow (SDF) configuration via N4/PFCP.
+* Service Data Flow (SDF) configuration via N4/PFCP
 * I-UPF/A-UPF ULCL/Branching i.e., simultaneous N6/N9 support within PFCP session
 * Downlink Data Notification (DDN) - notification only (no buffering)
 * Basic QoS support, with per-slice and per-session rate limiting
@@ -163,7 +163,7 @@ Before contributing, please follow these guidelines:
 
 ## Support
 
-To report any other kind of problem, feel free to open a GitHub Issue or reach out to the project maintainers on the ONF Community Slack ([aether-dev](https://app.slack.com/client/T095Z193Q/C01E4HMLBNV), [omec-dev](https://app.slack.com/client/T095Z193Q/C01DNRLRRDK)).
+To report any other kind of problem, feel free to open a GitHub Issue or reach out to the project maintainers on the ONF Community Slack ([aether-dev](https://app.slack.com/client/T095Z193Q/C01E4HMLBNV).
 
 ## License
 
