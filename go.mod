@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/Showmax/go-fqdn v1.0.0
 	github.com/antoninbas/p4runtime-go-client v0.0.0-20220204221603-49eba9f248c1
-	github.com/containerd/containerd v1.5.9 // indirect
+	github.com/containerd/containerd v1.5.16 // indirect
 	github.com/deckarep/golang-set v1.8.0
 	github.com/docker/docker v20.10.12+incompatible
 	github.com/docker/go-connections v0.4.0
