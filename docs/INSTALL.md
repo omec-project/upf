@@ -19,6 +19,7 @@ Copyright 2019 Intel Corporation
 
 You need the following dependencies.
 
+* Atleast 16-17 CPU are required for deploying BESS successfully on your system. So, allocate around ```18 cores/vCPU```.
 * Docker CE >= 19.03
   - [Here](https://docs.docker.com/engine/install/ubuntu/) are the installation instructions on Ubuntu, or find the installation instructions for the Linux flavor you are using
 * Linux kernel version >= 4.15 for Docker; >= 4.19 for AF_XDP
