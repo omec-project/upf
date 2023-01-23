@@ -26,6 +26,7 @@ You need the following dependencies.
 * Enable virtualization in the BIOS
 * Hugepages mounted at `/dev/hugepages` or updated location in [`scripts/docker_setup.sh`](../scripts/docker_setup.sh)
   - Reserve 1G HugePage and disable Transparent HugePages by setting: `default_hugepagesz=2G hugepagesz=2G hugepages=<# of hugepages> transparent_hugepage=never`, where <# of hugepages> = 2 x number of BESS UPF instances
+  - ```sudo sysctl -w vm.nr_hugepages=102400```
   - To make this change permanent, do the following:
     ```
     sudo vim /etc/default/grub
