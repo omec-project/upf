@@ -138,9 +138,19 @@ To configure/install the UPF in DPDK mode, the following changes are required:
 
 1. Start installation from UPF's root directory
 
-    ```bash
-    ./scripts/docker_setup.sh
-    ```
+    ```patch
+	diff --git a/docs/INSTALL.md b/docs/INSTALL.md
+	index 39abb84..6da1820 100644
+	--- a/docs/INSTALL.md
+	+++ b/docs/INSTALL.md
+	@@ -142,6 +142,9 @@ To configure/install the UPF in DPDK mode, the following changes are required:
+	     
+   	     ./scripts/docker_setup.sh
+    	      
+	+    Note: By default, docker_startup.sh uses/sets 2 CPUs for the BESS container (`--cpuset-cpus=12-13`),
+	+    so, if needed, accordingly adjust `--cpuset-cpus` to the available CPUs in your System.
+   ```
+    
 
 2. Insert rules into PDR and FAR tables
 
