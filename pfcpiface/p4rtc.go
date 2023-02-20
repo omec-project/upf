@@ -31,7 +31,7 @@ import (
 // P4DeviceConfig ... Device config.
 type P4DeviceConfig []byte
 
-const invalidID = 0
+const invalidID = 0 //nolint:unused
 
 // Table Entry Function Type.
 const (
