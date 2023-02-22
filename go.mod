@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/Showmax/go-fqdn v1.0.0
 	github.com/antoninbas/p4runtime-go-client v0.0.0-20220204221603-49eba9f248c1
-	github.com/containerd/containerd v1.5.9 // indirect
+	github.com/containerd/containerd v1.5.18 // indirect
 	github.com/deckarep/golang-set v1.8.0
 	github.com/docker/docker v20.10.12+incompatible
 	github.com/docker/go-connections v0.4.0
@@ -19,7 +19,7 @@ require (
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/omec-project/pfcpsim v0.0.0-20220317111127-6be4ce2180b6
 	github.com/p4lang/p4runtime v1.3.0
-	github.com/prometheus/client_golang v1.11.0
+	github.com/prometheus/client_golang v1.11.1
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
 	github.com/wmnsk/go-pfcp v0.0.14
