@@ -81,7 +81,7 @@ test-up4-integration-docker: DOCKER_TAG=integration
 test-up4-integration-docker: docker-build
 	docker rm -f mock-up4 pfcpiface
 	docker network prune -f
-	MODE=docker DATAPATH=up4 go test -v -count=1 -failfast ./test/integration/...
+	MODE=docker DATAPATH=up4 go test -v -count=1 -failfast -timeout 15m ./test/integration/...
 
 test-bess-integration-native:
 	MODE=native DATAPATH=bess go test \
