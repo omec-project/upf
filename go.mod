@@ -19,7 +19,7 @@ require (
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/omec-project/pfcpsim v0.0.0-20220317111127-6be4ce2180b6
 	github.com/p4lang/p4runtime v1.3.0
-	github.com/prometheus/client_golang v1.11.0
+	github.com/prometheus/client_golang v1.11.1
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
 	github.com/wmnsk/go-pfcp v0.0.14
