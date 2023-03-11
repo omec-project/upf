@@ -2,6 +2,8 @@
 // Copyright (c) 2017, The Regents of the University of California.
 // All rights reserved.
 //
+// SPDX-License-Identifier: BSD-3-Clause
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
 //
@@ -674,8 +676,8 @@ type isTrafficClass_Arg interface {
 
 type TrafficClass_Priority struct {
 	/// Used by "priority". Lower number == high priority.
-	//  FIXME: should be higher number == higher priority, to be consistent
-	//         other uses of "priority" in BESS
+	//	FIXME: should be higher number == higher priority, to be consistent
+	//	       other uses of "priority" in BESS
 	Priority int64 `protobuf:"varint,6,opt,name=priority,proto3,oneof"`
 }
 
