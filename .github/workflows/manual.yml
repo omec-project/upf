@@ -5,8 +5,8 @@
 
 name: BESS Build Base Image
 
-# Controls when the action will run. Workflow runs when manually triggered using the UI
-# or API.
+# Controls when the action will run. Workflow runs when manually triggered using
+# the UI or API.
 on:
   schedule:
     - cron: '0 0 * * SUN'
@@ -20,21 +20,20 @@ jobs:
       DOCKER_PULL: ""
     runs-on: ubuntu-20.04
     steps:
-    - name: docker build
-      run: |
-        git clone -b ${{ env.BESS_DPDK_BRANCH }} https://github.com/NetSys/bess.git
-        cd bess/env
-        yes n | ./rebuild_images.py focal64
-        docker tag nefelinetworks/bess_build:latest ${{ env.REPO }}:${{ env.TAG }}
-    - uses: actions/checkout@v3
-    - name: Build UPF with new base
-      run: |
-        make docker-build
-    - uses: docker/login-action@v2.1.0
-      with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.CR_PAT }}
-    - name: docker push
-      run: |
-        docker push ${{ env.REPO }}:${{ env.TAG }}
+      - name: docker build
+        run: |
+          git clone -b ${{ env.BESS_DPDK_BRANCH }} https://github.com/omec-project/bess.git
+          cd bess/env
+          yes n | ./rebuild_images.py focal64
+      - uses: actions/checkout@v3
+      - name: Build UPF with new base
+        run: |
+          make docker-build
+      - uses: docker/login-action@v2.1.0
+        with:
+            registry: ghcr.io
+            username: ${{ github.repository_owner }}
+            password: ${{ secrets.CR_PAT }}
+      - name: docker push
+        run: |
+          docker push ${{ env.REPO }}:${{ env.TAG }}
