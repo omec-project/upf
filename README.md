@@ -40,6 +40,22 @@ The combination of PFCP Agent and UP4 is usually referred to as P4-UPF. While BE
 
 PFCP Agent internally abstracts different datapaths using a common API, while the different plug-ins can use specific southbound protocols to communicate with the different datapath instances. Support for new datapaths can be provided by implementing new plugins.
 
+This repository provides code to build two Docker images: `pfcpiface` (the PFCP Agent) and `bess` (the BESS-based datapath).
+
+To build all Docker images run:
+
+```
+make docker-build
+```
+
+To build a selected image use `DOCKER_TARGETS`:
+
+```
+DOCKER_TARGETS=pfcpiface make docker-build
+```
+
+The latest Docker images are also published in the OMEC project's DockerHub registry: [upf-epc-bess](https://hub.docker.com/r/omecproject/upf-epc-bess), [upf-epc-pfcpiface](https://hub.docker.com/r/omecproject/upf-epc-pfcpiface).
+
 ### BESS-UPF Components
 
 ![upf](docs/images/upf.svg)
@@ -89,22 +105,6 @@ P4-UPF implements a core set of features capable of supporting requirements for 
 See the [ONF's blog post](https://opennetworking.org/news-and-events/blog/using-p4-and-programmable-switches-to-implement-a-4g-5g-upf-in-aether/) for an overview of P4-UPF. Additionally, refer to the [SD-Fabric documentation](https://docs.sd-fabric.org/master/advanced/p4-upf.html) for the detailed feature set.
 
 ## Getting started
-
-This repository provides code to build two Docker images: `pfcpiface` (the PFCP Agent) and `bess` (the BESS-based datapath).
-
-To build all Docker images run:
-
-```
-make docker-build
-```
-
-To build a selected image use `DOCKER_TARGETS`:
-
-```
-DOCKER_TARGETS=pfcpiface make docker-build
-```
-
-The latest Docker images are also published in the OMEC project's DockerHub registry: [upf-epc-bess](https://hub.docker.com/r/omecproject/upf-epc-bess), [upf-epc-pfcpiface](https://hub.docker.com/r/omecproject/upf-epc-pfcpiface).
 
 ### Installation
 
@@ -163,7 +163,7 @@ Before contributing, please follow these guidelines:
 
 ## Support
 
-To report any other kind of problem, feel free to open a GitHub Issue or reach out to the project maintainers on the ONF Community Slack ([aether-dev](https://app.slack.com/client/T095Z193Q/C01E4HMLBNV).
+To report any other kind of problem, feel free to open a GitHub Issue or reach out to the project maintainers on the ONF Community Slack ([aether-dev](https://app.slack.com/client/T095Z193Q/C01E4HMLBNV)).
 
 ## License
 
