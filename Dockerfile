@@ -11,9 +11,12 @@ RUN apt-get update && \
 
 # BESS pre-reqs
 WORKDIR /bess
-ARG BESS_COMMIT=dpdk-2011-focal
-RUN git clone https://github.com/omec-project/bess.git .
+# GA: Temporarily using own fork/branch
+# This will be reverted when the BESS PR is merged https://github.com/omec-project/bess/pull/19
+ARG BESS_COMMIT=gtpu-path-monitoring
+RUN git clone https://github.com/gab-arrobo/bess.git .
 RUN git checkout ${BESS_COMMIT}
+# End GA
 RUN cp -a protobuf /protobuf
 
 # Stage bess-build: builds bess with its dependencies

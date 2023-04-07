@@ -97,6 +97,7 @@ QoS Enforcement Rules (QERs).
 * Basic QoS support, with per-slice and per-session rate limiting
 * Per-flow latency and throughput metrics
 * DSCP marking of GTPU packets by copying the DSCP value from the inner IP packet
+* GTPu path monitoring
 * Network Token Functions (_**experimental**_)
 
 ### P4-UPF

@@ -376,6 +376,12 @@ upf_packets_count{dir="rx",iface="Access"} 3.20726192e+08
 upf_packets_count{dir="rx",iface="Core"} 3.2073401e+08
 upf_packets_count{dir="tx",iface="Access"} 1.26494177e+08
 upf_packets_count{dir="tx",iface="Core"} 1.27662469e+08
+# HELP upf_gtpu Shows the Gtpu latency of packets received by the UPF
+# TYPE upf_gtpu summary
+upf_gtpuPackets_count{ipAddress="11.1.1.129"} 3.20726192e+08
+upf_gtpuLatencyMin_ns{ipAddress="11.1.1.129"} 0
+upf_gtpuLatencyMean_ns{ipAddress="11.1.1.129"} 0
+upf_gtpuLatencyMax_ns{ipAddress="11.1.1.129"} 0
 # HELP upf_session_jitter_ns Shows the jitter of a session in UPF
 # TYPE upf_session_jitter_ns summary
 upf_session_jitter_ns{fseid="805306368",pdr="1",ue_ip="10.0.0.1",quantile="50"} 0

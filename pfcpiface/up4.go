@@ -234,6 +234,9 @@ func (up4 *UP4) SessionStats(*PfcpNodeCollector, chan<- prometheus.Metric) error
 func (up4 *UP4) PortStats(uc *upfCollector, ch chan<- prometheus.Metric) {
 }
 
+func (up4 *UP4) SummaryGtpuLatency(uc *upfCollector, ch chan<- prometheus.Metric) {
+}
+
 func (up4 *UP4) initCounter(counterID uint8, name string, counterSize uint64) {
 	up4.counters[counterID].maxSize = counterSize
 	up4.counters[counterID].counterID = uint64(counterID)
