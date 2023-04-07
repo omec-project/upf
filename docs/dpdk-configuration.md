@@ -5,10 +5,11 @@ Copyright 2022 Intel Corporation
 
 # DPDK Configuration
 
-If you are planning to use the UPF with DPDK, the following steps are required to properly configure the devices:
+The following steps are required to properly configure the devices to deploy the
+UPF in DPDK mode. Let's assume that interfaces `ens801f0` and `ens801f1` are the
+ones to be used for this purpose.
 
-- Let's assume that interfaces `ens801f0` and `ens801f1` are the ones to be used for DPDK
-  - Get their MAC addresses
+- Get their MAC addresses
 ```bash
 $ ip a
 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
@@ -25,15 +26,18 @@ $ ip a
 ...
 ```
 
-- Clone `dpdk`
-> Note: This clone of DPDK is used only to bind the devices. This is NOT used to build BESS
+- Download a copy of dpdk-devbind script
+
+The dpdk-devbind script from DPDK is used for this purpose. To get a copy of it,
+execute the following command from the UPF's root directory:
 ```bash
-$ git clone https://github.com/DPDK/dpdk.git
-$ cd dpdk
+$ wget https://raw.githubusercontent.com/DPDK/dpdk/main/usertools/dpdk-devbind.py -O dpdk-devbind.py
+$ chmod +x dpdk-devbind.py
 ```
-- Display status of the devices
+
+- Get the PCI addresses of interest
 ```bash
-$ ./usertools/dpdk-devbind.py -s
+$ ./dpdk-devbind.py -s
 Network devices using kernel driver
 ===================================
 0000:17:00.0 'Ethernet Controller X710 for 10GBASE-T 15ff' if=ens260f0 drv=i40e unused=vfio-pci *Active*
@@ -49,11 +53,16 @@ No 'Baseband' devices detected
 ...
 ```
 
-  - Bind devices
+- Bind devices to `DPDK-compatible driver`
+
 ```bash
-$ sudo ./usertools/dpdk-devbind.py -b vfio-pci 0000:b1:00.0
-$ sudo ./usertools/dpdk-devbind.py -b vfio-pci 0000:b1:00.1
-$ ./usertools/dpdk-devbind.py -s
+$ sudo ./dpdk-devbind.py -b vfio-pci 0000:b1:00.0
+$ sudo ./dpdk-devbind.py -b vfio-pci 0000:b1:00.1
+```
+
+- Verify that the binding was successful
+```bash
+$ ./dpdk-devbind.py -s
 
 Network devices using DPDK-compatible driver
 ============================================
@@ -72,7 +81,8 @@ No 'Baseband' devices detected
 
 ...
 ```
-- Now, we need to see the group that these two interfaces got assigned
+
+- Now, check the group that these two interfaces got assigned
 ```bash
 $ ls /dev/vfio/
 184  185  vfio
