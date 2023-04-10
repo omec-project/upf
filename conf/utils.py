@@ -3,7 +3,6 @@
 # Copyright 2019 Intel Corporation
 
 import os
-import signal
 import socket
 import sys
 import struct

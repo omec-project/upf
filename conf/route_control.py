@@ -222,7 +222,6 @@ def del_route_entry(server, item):
     iprange = item.iprange
     prefix_len = item.prefix_len
     route_module = item.iface + 'Routes'
-    last_module = item.iface + 'Merge'
 
     neighbor_exists = neighborcache.get(item.neighbor_ip)
     if neighbor_exists:
