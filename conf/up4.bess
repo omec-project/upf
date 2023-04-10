@@ -6,6 +6,7 @@
 from conf.parser import *
 import conf.ports as port
 import conf.sim as sim
+import signal
 
 port.setup_globals()
 
@@ -247,13 +248,13 @@ if parser.enable_slice_metering:
     _in = sliceMeter
 
 farLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
-                                     {'attr_name':'fseid', 'num_bytes':8}], \
-                             values=[{'attr_name':'action', 'num_bytes':1}, \
-                                     {'attr_name':'tunnel_out_type', 'num_bytes':1}, \
-                                     {'attr_name':'tunnel_out_src_ip4addr', 'num_bytes':4}, \
-                                     {'attr_name':'tunnel_out_dst_ip4addr', 'num_bytes':4}, \
-                                     {'attr_name':'tunnel_out_teid', 'num_bytes':4}, \
-                                     {'attr_name':'tunnel_out_udp_port', 'num_bytes':2}],\
+                              {'attr_name':'fseid', 'num_bytes':8}], \
+                      values=[{'attr_name':'action', 'num_bytes':1}, \
+                              {'attr_name':'tunnel_out_type', 'num_bytes':1}, \
+                              {'attr_name':'tunnel_out_src_ip4addr', 'num_bytes':4}, \
+                              {'attr_name':'tunnel_out_dst_ip4addr', 'num_bytes':4}, \
+                              {'attr_name':'tunnel_out_teid', 'num_bytes':4}, \
+                              {'attr_name':'tunnel_out_udp_port', 'num_bytes':2}],\
                       entries=parser.table_size_far_lookup):noGTPUEncap \
     -> farMerge::Merge() \
     -> _in
@@ -274,8 +275,8 @@ sessionQERLookup.set_default_gate(gate=qerFailGate)
 # Add logical pipeline when gtpuencap is needed
 farLookup:GTPUEncap \
     -> gtpuEncap::GtpuEncap(add_psc=parser.gtppsc):1 \
-    -> outerUDPCsum::L4Checksum() \
-    -> outerIPCsum::IPChecksum() \
+    -> outerL4Cksum::L4Checksum() \
+    -> outerIPCksum::IPChecksum() \
     -> farMerge
 
 notify = UnixSocketPort(name='notifyCP', path=parser.notify_sockaddr)
@@ -318,10 +319,10 @@ if ports[parser.core_ifname].ext_addrs is not None:
 # 1. Build initial DL pipeline here
 coreFastBPF:UEGate \
     -> coreRxIPCksum::IPChecksum(verify=True, hw=parser.hwcksum) \
-    -> coreRxUDPCksum::L4Checksum(verify=True, hw=parser.hwcksum)
+    -> coreRxL4Cksum::L4Checksum(verify=True, hw=parser.hwcksum)
 
 # Record last module to chain up optional modules
-_in = coreRxUDPCksum
+_in = coreRxL4Cksum
 gate = 0
 
 # Append nat module (if enabled)
@@ -333,7 +334,7 @@ if ports[parser.core_ifname].nat is not None:
 # 2. Build the remaining first half of the DL pipeline before entering the shared pipeline
 #ports[parser.core_ifname].rewrite \
 _in:gate \
-    -> SetMetadata(attrs=[{'name':'src_iface', 'size':1, 'value_int':Core}]) \
+    -> coreMetadata::SetMetadata(attrs=[{'name':'src_iface', 'size':1, 'value_int':Core}]) \
     -> linkMerge # Start of the shared pipeline
 
 
@@ -350,7 +351,7 @@ else:
 
 # Drop unknown packets
 coreRxIPCksum:1 -> coreRxIPCksumFail::Sink()
-coreRxUDPCksum:1 -> coreRxUDPCksumFail::Sink()
+coreRxL4Cksum:1 -> coreRxL4CksumFail::Sink()
 
 # Add Core filter rules, i.e.:
 # setting filter to detect ue_filter traffic
@@ -389,16 +390,16 @@ GTPUGate = 0
 # 1. Build initial UL pipeline here
 accessFastBPF:GTPUGate \
     -> accessRxIPCksum::IPChecksum(verify=True, hw=parser.hwcksum) \
-    -> accessRxUDPCksum::L4Checksum(verify=True, hw=parser.hwcksum)
+    -> accessRxL4Cksum::L4Checksum(verify=True, hw=parser.hwcksum)
 
 # Record last module to chain up option modules
-_in = accessRxUDPCksum
+_in = accessRxL4Cksum
 gate = 0
 
 # 2. Build the remaining first half of the UL pipeline before entering the shared pipeline
 #ports[parser.access_ifname].rewrite \
 _in:gate \
-    -> SetMetadata(attrs=[{'name':'src_iface', 'size':1, 'value_int':Access}]) \
+    -> accessMetadata::SetMetadata(attrs=[{'name':'src_iface', 'size':1, 'value_int':Access}]) \
     -> linkMerge # Start of the shared pipeline
 
 # 3. Complete the last part of the UL pipeline
@@ -416,14 +417,14 @@ else:
 accessFastBPF:GTPUEchoGate \
     -> gtpuEcho::GtpuEcho(s1u_sgw_ip=ip2long(access_ip[0])):1 \
     -> ethSwap::MACSwap() \
-    -> echoOuterUDPCsum::L4Checksum() \
-    -> echoOuterIPCsum::IPChecksum() \
+    -> echoOuterL4Cksum::L4Checksum() \
+    -> echoOuterIPCksum::IPChecksum() \
     -> ports[parser.access_ifname].rtr
 
 # Drop unknown packets
 gtpuEcho:0 -> badGtpuEchoPkt::Sink()
 accessRxIPCksum:1 -> accessRxIPCksumFail::Sink()
-accessRxUDPCksum:1 -> accessRxUDPCksumFail::Sink()
+accessRxL4Cksum:1 -> accessRxL4CksumFail::Sink()
 
 # Add Access filter rules, i.e.:
 # setting filter to detect gtpu traffic

@@ -2,8 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2019 Intel Corporation
 
-# for errnos
-import errno
 # for get_env
 from conf.utils import *
 
