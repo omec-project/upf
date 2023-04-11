@@ -43,7 +43,7 @@ currently provide two general types of test cases:
 performance in specific scenarios. Packets are crafted and sent to the
 UPF using the `Scapy` packet library.
     > *Example*: a unary test could use Scapy to send a single
-    unencapsulated UDP packet to the core interface of the UPF, and
+    non-encapsulated UDP packet to the core interface of the UPF, and
     assert that a GTP-encapsulated packet was received from the access
     interface.
 
@@ -52,7 +52,7 @@ at high speeds.  This allows UPF features to be verified that they
 perform as expected in an environment more representative of *production
 level*. Traffic is generated using the [TRex Python
 API](https://github.com/cisco-system-traffic-generator/trex-core/blob/master/doc/trex_cookbook.asciidoc).
-    > *Example*: a linerate test could assert the baseline throughput,
+    > *Example*: a line rate test could assert the baseline throughput,
     latency, etc. of the UPF is as expected when handling high-speed
     downlink traffic from 10,000 unique UEs.
 
