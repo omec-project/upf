@@ -84,6 +84,14 @@ COPY --from=bess-build /bin/bessd /bin/bessd
 COPY --from=bess-build /bin/modules /bin/modules
 COPY conf /opt/bess/bessctl/conf
 RUN ln -s /opt/bess/bessctl/bessctl /bin
+
+# CNDP: Install dependencies
+RUN apt-get update && apt-get install -y \
+    libgflags2.2 \
+    libjson-c[45]
+COPY --from=bess-build /usr/local/lib/x86_64-linux-gnu/*.so /usr/local/lib/x86_64-linux-gnu/
+COPY --from=bess-build /lib/x86_64-linux-gnu/libjson-c.so* /lib/x86_64-linux-gnu/
+
 ENV PYTHONPATH="/opt/bess"
 WORKDIR /opt/bess/bessctl
 ENTRYPOINT ["bessd", "-f"]

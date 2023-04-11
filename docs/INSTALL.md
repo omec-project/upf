@@ -20,12 +20,16 @@ Copyright 2019 Intel Corporation
 You need the following dependencies.
 
 * Docker CE >= 19.03
-  - [Here](https://docs.docker.com/engine/install/ubuntu/) are the installation instructions on Ubuntu, or find the installation instructions for the Linux flavor you are using
+  - [Here](https://docs.docker.com/engine/install/ubuntu/) are the installation
+    instructions on Ubuntu, or find the installation instructions for the Linux
+    flavor you are using
 * Linux kernel version >= 4.15 for Docker; >= 4.19 for AF_XDP
   - Type `uname -r` in the terminal to verify the kernel version
 * Enable virtualization in the BIOS
-* Hugepages mounted at `/dev/hugepages` or updated location in [`scripts/docker_setup.sh`](../scripts/docker_setup.sh)
-  - Reserve 1G HugePage and disable Transparent HugePages by setting: `default_hugepagesz=2G hugepagesz=2G hugepages=<# of hugepages> transparent_hugepage=never`, where <# of hugepages> = 2 x number of BESS UPF instances
+* HugePages mounted at `/dev/hugepages` or updated location in [`scripts/docker_setup.sh`](../scripts/docker_setup.sh)
+  - Reserve 1G HugePages and disable Transparent HugePages by setting:
+    `default_hugepagesz=1G hugepagesz=1G hugepages=<# of hugepages> transparent_hugepage=never`,
+    where <# of hugepages> = 2 x number of BESS UPF instances
   - To make this change permanent, do the following:
     ```
     sudo vim /etc/default/grub
@@ -46,7 +50,8 @@ specifics on what can be customized, the user may refer to the UPF's config file
 parameters such as tables sizes, maximum number of flows, enable/disable
 measurements, among several others.
 
-To configure/install the UPF in simulation mode, the following changes are required:
+To configure/install the UPF in simulation mode, the following changes are
+required:
 
 1. Enable sim mode in configuration file
 
@@ -94,7 +99,8 @@ To configure/install the UPF in simulation mode, the following changes are requi
 
 To configure/install the UPF in DPDK mode, the following changes are required:
 
-1. Follow the directions [here](dpdk-configuration.md) to get details about MAC addresses, VFIO groups, and others. This information is used in the next step.
+1. Follow the directions [here](dpdk-configuration.md) to get details about MAC
+   addresses, VFIO groups, and others. This information is used in the next step.
 
 2. Update parameters in script file
 
@@ -141,13 +147,15 @@ To configure/install the UPF in DPDK mode, the following changes are required:
     ```bash
     ./scripts/docker_setup.sh
     ```
-    
-    > **_NOTE:_** By default, docker_startup.sh uses/sets 2 CPUs for the BESS container (`--cpuset-cpus=12-13`),
-so, if needed, accordingly adjust `--cpuset-cpus` to the available CPUs in your System.
+
+    > **_NOTE:_** By default, docker_startup.sh uses/sets 2 CPUs for the BESS
+      container (`--cpuset-cpus=12-13`), so, if needed, accordingly adjust
+      `--cpuset-cpus` to the available CPUs in your System.
 
 2. Insert rules into PDR and FAR tables
 
-    Use gRPC sim mode to directly install PFCP forwarding rules via gRPC API (works only for BESS)
+    Use gRPC sim mode to directly install PFCP forwarding rules via gRPC API
+    (works only for BESS)
 
     ```bash
     docker exec bess-pfcpiface pfcpiface -config conf/upf.json -simulate create
@@ -155,15 +163,16 @@ so, if needed, accordingly adjust `--cpuset-cpus` to the available CPUs in your 
 
     OR
 
-    Use the [pfcpsim](https://github.com/omec-project/pfcpsim) tool to generate PFCP messages towards the PFCP Agent.
+    Use the [pfcpsim](https://github.com/omec-project/pfcpsim) tool to generate
+    PFCP messages towards the PFCP Agent.
 
 
 ## General Execution Commands
 
-| VAR            | DEFAULT    | NOTES                                              |
-|----------------|------------|----------------------------------------------------|
-| MAKEFLAGS      | -j$(nproc) | Customize if build fails due to memory exhaustion  |
-| DOCKER_BUIDKIT |          1 | Turn off to try legacy builder on older Docker ver |
+| VAR            | DEFAULT    | NOTES                                                   |
+|----------------|------------|---------------------------------------------------------|
+| MAKEFLAGS      | -j$(nproc) | Customize if build fails due to memory exhaustion       |
+| DOCKER_BUIDKIT |     1      | Turn off to try legacy builder on older Docker versions |
 
 To update the pipeline, reflect changes to [`conf/up4.bess`](../conf/up4.bess)
 and/or [`conf/upf.json`](../conf/upf.json)
@@ -231,9 +240,11 @@ This can be done either using a single machine or two machines.
             upf-epc-bess:"$(<VERSION)" -grpc-url=0.0.0.0:10514
     ```
 
-4. Customize [conf/pktgen.bess](../conf/pktgen.bess) to match [conf/upf](../conf/upf.json) used in the [Configuration: Simulation mode](#configuration-simulation-mode) section.
+2. Customize [conf/pktgen.bess](../conf/pktgen.bess) to match [conf/upf](../conf/upf.json)
+   used in the [Configuration: Simulation mode](#configuration-simulation-mode)
+   section.
 
-5. Start pktgen
+3. Start pktgen
 
     ```bash
     docker exec -it pktgen ./bessctl run pktgen
@@ -243,7 +254,7 @@ This can be done either using a single machine or two machines.
 
 BESS tools are available out-of-the-box for debugging and/or monitoring; *e.g.*:
 
-* Run `tcpdump` on arbitrary dataplane pipeline module
+* Run `tcpdump` on arbitrary user plane pipeline module
 
 ```bash
 localhost:10514 $ tcpdump accessFastBPF in 0
