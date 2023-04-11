@@ -10,38 +10,53 @@ This guide walks you through how to set up and configure EC2 to run BESS UPF.
 - Overview
 - Step 1: VPC prerequisites
 - Step 2: Launch an instance
-- Step 3: Set up OSs
+- Step 3: Set up OS
 - Step 4: Set up K8S
 - Step 5: Install BESS-UPF
 
-Before you begin, be sure that you've completed the steps in [Set up to use Amazon EC2](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/get-set-up-for-amazon-ec2.html).
+Before you begin, be sure that you've completed the steps in
+[Set up to use Amazon EC2](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/get-set-up-for-amazon-ec2.html).
 
 #### Overview
 
-The following diagram illustrates an exmple deployment architecture. To help your understanding, this example be used in the rest of the guide.
+The following diagram illustrates an example deployment architecture. To help
+your understanding, this example be used in the rest of the guide.
 
 ![BESS UPF on EC2](images/bess-upf-on-ec2.svg "BESS UPF on EC2")
 
 
 #### Step 1: VPC prerequisites
 
-Create a VPC network and three subnets, `mgmt`, `access` and `core` and make the `mgmt` and `core` subnets accessible to the Internet. There are several ways to achieve this, but in the example deployment, we added a separate public subnet containing a NAT gateway and configured route table for the two subnets to the NAT gateway. If you have eNB or gNB in your on-premise, configure routes for it in the `access` subnet route table.
+Create a VPC network and three subnets, `mgmt`, `access` and `core` and make the
+`mgmt` and `core` subnets accessible to the Internet. There are several ways to
+achieve this, but in the example deployment, we added a separate public subnet
+containing a NAT gateway and configured route table for the two subnets to the
+NAT gateway. If you have eNB or gNB in your on-premise, configure routes for it
+in the `access` subnet route table.
 
-After you've created the subnets and configured routes, create one network interface(ENI) for each `access` and `core` subnets. Also, disable source/destination check for the `core` subnet ENI. Lastly, add a route for the UE pool subnet to the public subnet's route table with the `core` subnet ENI as the destination.
+After you've created the subnets and configured routes, create one network
+interface (ENI) for each `access` and `core` subnets. Also, disable
+source/destination check for the `core` subnet ENI. Lastly, add a route for the
+UE pool subnet to the public subnet's route table with the `core` subnet ENI as
+the destination.
 
 #### Step 2: Launch an instance
 
-Create an instance with Elastic Network Adapter(ENA) support, which is enabled in most of the instance types by default. To learn more about ENA, visit [this site](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/enhanced-networking-ena.html).
+Create an instance with Elastic Network Adapter (ENA) support, which is enabled
+in most of the instance types by default. To learn more about ENA, visit
+[this site](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/enhanced-networking-ena.html).
 
 Here is the most tested instance settings.
 * Type: c5.2xlarge
 * AMI: Ubuntu 20.04 HVM
 
-When you create a VM, attach the `mgmt` subnet only, and after the VM is provisioned successfully, attach `access` and `core` subnet ENIs created in the previous step in order.
+When you create a VM, attach the `mgmt` subnet only, and after the VM is
+provisioned successfully, attach `access` and `core` subnet ENIs created in the
+previous step in order.
 
 #### Step 3: Set up OS
 
-SSH into the VM and update Grub to enable 1Gi HugePage.
+SSH into the VM and update Grub to enable 1Gi HugePages.
 
 ```
 $ sudo vi /etc/default/grub
@@ -78,7 +93,9 @@ Y
 ```
 
 Lastly, bind `access` and `core` interfaces to vfio driver.
-Before proceeding, take note of MAC addresses of the two ENIs specified in EC2 dashboard or in the `aws ec2 describe-network-interfaces` result. They are required to find PCI address of the interfaces.
+Before proceeding, take note of MAC addresses of the two ENIs specified in EC2
+dashboard or in the `aws ec2 describe-network-interfaces` result. They are
+required to find PCI address of the interfaces.
 
 ```
 # Find interface name of the access and core subnet ENIs by comparing the MAC address
@@ -121,7 +138,8 @@ crw-rw-rw- 1 root root  10, 196 Aug 17 21:51 vfio
 
 #### Step 4: Set up K8S
 
-How to install K8S is beyound the scope of this guide. Once K8S is ready on the VM, you'll need to install `Multus` and `sriov-device-plugin`.
+How to install K8S is beyond the scope of this guide. Once K8S is ready on the
+VM, you'll need to install `Multus` and `sriov-device-plugin`.
 
 ```
 # Install Multus
@@ -168,7 +186,8 @@ NAME                             DESIRED   CURRENT   READY   UP-TO-DATE   AVAILA
 kube-sriov-device-plugin-amd64   1         1         1       1            1
 ```
 
-Check the allocatable resources in the node. Make sure there are 2 1Gi HugePages, 1 `intel_sriov_vfio_access` and 1 `intel_sriov_vfio_core`.
+Check the allocatable resources in the node. Make sure there are 2 1Gi HugePages,
+1 `intel_sriov_vfio_access` and 1 `intel_sriov_vfio_core`.
 ```
 $ kubectl get node  -o json | jq '.items[].status.allocatable'
 {
@@ -192,7 +211,10 @@ sudo chmod +x /opt/cni/bin/vfioveth
 
 #### Step 5: Install BESS-UPF
 
-BESS UPF helm chart is currently under the ONF members only license. If you already have an access to the helm chart, provide the following overriding values when deploying the chart. Don't forget to replace IP addresses and MAC addresses properly.
+BESS UPF helm chart is currently under the ONF members only license. If you
+already have an access to the helm chart, provide the following overriding
+values when deploying the chart. Don't forget to replace IP addresses and MAC
+addresses properly.
 
 ```
 $ cat >> overriding-values.yaml << EOF

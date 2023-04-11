@@ -9,7 +9,7 @@ Copyright 2022 Open Networking Foundation
 When implementing new features or making improvements to the `BESS` pipeline,
 the easiest way to do so is by:
 
-- Clone the `bess` repo inside the UPF repo
+- Clone the `bess` repository inside the UPF repository
 ```bash
 $ cd <path/to/upf>
 $ git clone https://github.com/<your-user>/bess.git
@@ -58,15 +58,19 @@ index 03b7d33..052456d 100644
  # Stage bess-build: builds bess with its dependencies
 ```
 
-- Commit your changes to `bess` repo and, if needed, `upf` repo
-- Open pull request in `bess` repo and, if needed, `upf` repo
+- Commit your changes to `bess` repository and, if needed, `upf` repository
+- Open pull request in `bess` repository and, if needed, `upf` repository
 
 
 ## Testing local Go dependencies
 
-The `upf` repository relies on some external Go dependencies, which are not mature yet (e.g. pfcpsim or p4runtime-go-client).
-It's often needed to extend those dependencies first, before adding a new feature to the PFCP Agent. However, when using Go modules and Dockerized environment,
-it's hard to test WIP changes to local dependencies. Therefore, this repository comes up with a way to use Go vendoring, instead of Go modules, for development purposes.
+The `upf` repository relies on some external Go dependencies, which are not
+mature yet (e.g. pfcpsim or p4runtime-go-client).
+It's often needed to extend those dependencies first, before adding a new
+feature to the PFCP Agent. However, when using Go modules and containerized
+environment, it's hard to test work-in-progress (WIP) changes to local
+dependencies. Therefore, this repository comes up with a way to use Go
+vendoring, instead of Go modules, for development purposes.
 
 To use a local Go dependency add the `replace` directive to `go.mod`. An example:
 
