@@ -24,6 +24,7 @@ These are configurations commonly shared between P4-UPF and BESS-UPF.
 | `resp_timeout` | 2s | No | Period to wait for a response from SMF/SPGW-C |
 | `enable_end_marker` | false | No | |
 | `enable_p4rt` | false | Yes for P4-UPF only | |
+| `enable_gtpu_path_monitoring` | false | No | |
 | `cpiface.enable_ue_ip_alloc` | false | No | Whether to enable UPF-based UE IP allocation |
 | `cpiface.ue_ip_pool` | - | Yes for P4-UPF or when `enable_ue_ip_alloc` is set | IP pool from which we allocate UE IP address |
 | `cpiface.dnn` | - | No | Data Network Name to use during PFCP Association |

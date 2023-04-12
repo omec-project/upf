@@ -73,6 +73,8 @@ var intEnc = func(u uint64) *pb.FieldData {
 
 var bessIP = flag.String("bess", "localhost:10514", "BESS IP/port combo")
 
+var enableGtpuPathMonitoring = false
+
 type bess struct {
 	client           pb.BESSControlClient
 	conn             *grpc.ClientConn
@@ -828,6 +830,10 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 			log.Errorln("Unable to make GRPC calls")
 		}
 	}
+
+	if conf.EnableGtpuPathMonitoring {
+		enableGtpuPathMonitoring = true
+	}
 }
 
 func (b *bess) processPDR(ctx context.Context, any *anypb.Any, method upfMsgType) {
@@ -1233,17 +1239,19 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 
 		b.processFAR(ctx, any, upfMsgTypeAdd)
 
-		g := &pb.GtpuPathMonitoringCommandAddDeleteArg{
-			GnbIp: far.tunnelIP4Dst, /* gnb ip */
-		}
+		if enableGtpuPathMonitoring {
+			g := &pb.GtpuPathMonitoringCommandAddDeleteArg{
+				GnbIp: far.tunnelIP4Dst, /* gnb ip */
+			}
 
-		any, err = anypb.New(g)
-		if err != nil {
-			log.Println("Error marshalling data", g, err)
-			return
-		}
+			any, err = anypb.New(g)
+			if err != nil {
+				log.Println("Error marshalling data", g, err)
+				return
+			}
 
-		b.processGtpuPathMonitoring(ctx, any, upfMsgTypeAdd)
+			b.processGtpuPathMonitoring(ctx, any, upfMsgTypeAdd)
+		}
 
 		done <- true
 	}()

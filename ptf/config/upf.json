@@ -91,6 +91,9 @@
     "" : "notify_sockaddr: /tmp/notifycp",
     "" : "endmarker_sockaddr: /tmp/pfcpport",
 
+    "": "Whether to enable GTPu Path Monitoring",
+    "enable_gtpu_path_monitoring": false,
+
     "qci_qos_config": [
         {
             "": "Default values for QERs with QCI/QFI not listed below",
