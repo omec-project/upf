@@ -3,7 +3,7 @@
 # Copyright 2019 Intel Corporation
 
 from conf.parser import *
-import conf
+import errno
 import inspect
 import sys
 
