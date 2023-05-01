@@ -5,3 +5,4 @@
 *.pyc
 *.swp
 output
+dpdk-devbind.py
