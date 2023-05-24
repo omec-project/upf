@@ -25,11 +25,11 @@ $ make docker-build
 
 Following diagram shows is a test setup. 
 
-![Test setup] (./images/cndp-omec-upf-test-setup.jpg)
+![Test setup](./images/cndp-omec-upf-test-setup.jpg)
 
-There are two systems: System 1 is runs CNDP BESS UPF and System 2 runs DPDK based packet generator which simulates traffic generated from multiple UEs and App servers. 
+There are two systems: System 1 runs CNDP BESS UPF and System 2 runs DPDK based packet generator which simulates traffic generated from multiple UEs and App servers.
 
-Install NIC driver in System 1 from this link :  https://sourceforge.net/projects/e1000/files/ice%20stable/1.9.7/. This driver is used instead of in-tree kernel driver since this driver supports tc filter for creating queue groups and RSS for GTPU packet traffic steering. We need to compile and install this driver in your system with ADQ (Application Device Queues). As mentioned in the NIC driver README, use the following command to install the NIC driver.
+Install NIC driver version 1.9.11 in System 1 from this link: https://www.intel.com/content/www/us/en/download/19630/738725/intel-network-adapter-driver-for-e810-series-devices-under-linux.html. This driver is used instead of in-tree kernel driver since this driver supports tc filter for creating queue groups and RSS for GTPU packet traffic steering. We need to compile and install this driver in your system with ADQ (Application Device Queues). As mentioned in the NIC driver README, use the following command to install the NIC driver.
 ```
 $ sudo make -j CFLAGS_EXTRA='-DADQ_PERF_COUNTERS' install
 ```
@@ -47,9 +47,15 @@ System 1 and System 2 are connected using  physical links. Setup uses two networ
 
 ### Step 3: Run UPF in System 1
 
-1) Setup hugepages in the system 1. For example, to setup 8GB of total huge pages (8 pages each of size 1GB in each NUMA node) using DPDK script, use the command `dpdk-hugepages.py -p 1G --setup 8G`
+1) Setup hugepages in the system 1. The dpdk-hugepages script from DPDK is used for this purpose. To get a copy of it,
+execute the following command from the UPF's root directory:
+```
+$ wget https://raw.githubusercontent.com/DPDK/dpdk/main/usertools/dpdk-hugepages.py -O dpdk-hugepages.py
+$ chmod +x dpdk-devbind.py
+```
+For example, to setup 8GB of total huge pages (8 pages each of size 1GB in each NUMA node) using DPDK script, use the command `dpdk-hugepages.py -p 1G --setup 8G`
 
-2) Enable cndp mode, use appropriate netdev interface and uncomment jsonc config file in configuration file  [upf.json](./conf/upf.json)
+2) Enable cndp mode, use appropriate netdev interface and uncomment jsonc config file in configuration file  [upf.json](../conf/upf.json)
 
 ```
 diff --git a/conf/upf.json b/conf/upf.json
@@ -72,22 +78,22 @@ index 62fa435..169dc5a 100644
      "": "Gateway interfaces",
      "access": {
 -        "ifname": "ens803f2",
--        "": "cndp_jsonc_file: /opt/bess/bessctl/conf/cndp_upf_1worker.jsonc"
+-        "": "cndp_jsonc_file: conf/cndp_upf_1worker.jsonc"
 +        "ifname": "enp134s0",
-+        "cndp_jsonc_file": "/opt/bess/bessctl/conf/cndp_upf_1worker.jsonc"
++        "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc"
      },
 
      "": "UE IP Natting. Update the line below to `\"ip_masquerade\": \"<ip> [or <ip>]\"` to enable",
      "core": {
 -        "ifname": "ens803f3",
--        "": "cndp_jsonc_file: /opt/bess/bessctl/conf/cndp_upf_1worker.jsonc",
+-        "": "cndp_jsonc_file: conf/cndp_upf_1worker.jsonc",
 +        "ifname": "enp136s0",
-+        "cndp_jsonc_file": "/opt/bess/bessctl/conf/cndp_upf_1worker.jsonc",
++        "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
          "": "ip_masquerade: 18.0.0.1 or 18.0.0.2 or 18.0.0.3"
      },
 ```
 
-3) Enable cndp mode in script file  [docker_setup.sh](./scripts/docker_setup.sh)
+3) Enable cndp mode in script file  [docker_setup.sh](../scripts/docker_setup.sh)
 
 ```
 diff --git a/scripts/docker_setup.sh b/scripts/docker_setup.sh
@@ -107,9 +113,40 @@ index 7aff6a6..1a8e2fd 100755
  #mode="sim"
 ```
 
-4) Modify [cndp_upf_1worker.jsonc](./conf/cndp_upf_1worker.jsonc) file lports section to update the access and core netdev interface name and required queue id.
+4) Modify [cndp_upf_1worker.jsonc](../conf/cndp_upf_1worker.jsonc) file lports section to update the access and core netdev interface name and required queue id.
 
-5) Modify the script [docker_setup.sh](./scripts/docker_setup.sh) and update the access and core interface names (s1u, sgi), access/core interface mac addresses and neighbor gateway interfaces mac addresses. This should match the access/core netdev interface name used in jsonc file in previous step. In our example test setup, neighbor mac address (n-s1u, n-sgi) corresponds to access/core interfaces used by packet generator in system 2 to send/receive n/w packets. Update following values based on your system configuration.
+```
+diff --git a/conf/cndp_upf_1worker.jsonc b/conf/cndp_upf_1worker.jsonc
+index 5c2fdaf..8d7b8da 100644
+--- a/conf/cndp_upf_1worker.jsonc
++++ b/conf/cndp_upf_1worker.jsonc
+@@ -84,9 +84,9 @@
+     //    description   - (O) The description, 'desc' can be used as well
+     // CNDP lports for Access network followed by lports for Core network.
+     "lports": {
+-        "enp134s0:0": {
++        "enp124f0:0": {
+             "pmd": "net_af_xdp",
+-            "qid": 22,
++            "qid": 6,
+             "umem": "umem0",
+             "region": 0,
+             "busy_poll": true,
+@@ -94,9 +94,9 @@
+             "busy_timeout": 20,
+             "description": "Access LAN 0 port"
+         },
+-        "enp136s0:0": {
++        "enp126f0:0": {
+             "pmd": "net_af_xdp",
+-            "qid": 22,
++            "qid": 6,
+             "umem": "umem0",
+             "region": 1,
+             "busy_poll": true,
+```
+
+5) Modify the script [docker_setup.sh](../scripts/docker_setup.sh) and update the access and core interface names (s1u, sgi), access/core interface mac addresses and neighbor gateway interfaces mac addresses. This should match the access/core netdev interface name used in jsonc file in previous step. In our example test setup, neighbor mac address (n-s1u, n-sgi) corresponds to access/core interfaces used by packet generator in system 2 to send/receive n/w packets. Update following values based on your system configuration.
 
 ```
 diff --git a/scripts/docker_setup.sh b/scripts/docker_setup.sh
@@ -142,7 +179,7 @@ index 7aff6a6..09d640b 100755
 +nhmacaddrs=(40:a6:b7:78:3f:bc 40:a6:b7:78:3f:b8)
 ```
 
-6) Modify the script [docker_setup.sh](./scripts/docker_setup.sh) and update the function `move_ifaces()` in condition `if [ "$mode" == 'cndp' ]` . Update `start_q_idx` to choose the start queue index to receive n/w packets. This should match the queue id used in lports section of [cndp_upf_1worker.jsonc](./conf/cndp_upf_1worker.jsonc).To get better performance (optional step), assign `cpuset-cpus` in [docker_setup.sh](./scripts/docker_setup.sh) to cores ids same as queue ids used to receive n/w packets.
+6) Modify the script [docker_setup.sh](../scripts/docker_setup.sh) and update the function `move_ifaces()` in condition `if [ "$mode" == 'cndp' ]` . Update `start_q_idx` to choose the start queue index to receive n/w packets. This should match the queue id used in lports section of [cndp_upf_1worker.jsonc](../conf/cndp_upf_1worker.jsonc). To get better performance (optional step), assign `cpuset-cpus` in [docker_setup.sh](../scripts/docker_setup.sh) to cores ids same as queue ids used to receive n/w packets.
 
 ```
 diff --git a/conf/cndp_upf_1worker.jsonc b/conf/cndp_upf_1worker.jsonc
@@ -194,7 +231,7 @@ index 9058839..2e4e505 100755
 
 ```
 
-7) Modify the script [cndp_reset_upf.sh](./scripts/cndp_reset_upf.sh) to use appropriate PCIe device address, network interface name and set_irq_affinity script in NIC driver.
+7) Modify the script [cndp_reset_upf.sh](../scripts/cndp_reset_upf.sh) to use appropriate PCIe device address, network interface name and set_irq_affinity script in NIC driver.
 
 ```
 ACCESS_PCIE=0000:86:00.0
@@ -212,7 +249,12 @@ This script is used to stop any running containers, disable irqbalance, set irq 
 $ ./scripts/cndp_reset_upf.sh
 $ ./scripts/docker_setup.sh
 ```
-Note: The script [cndp_reset_upf.sh](./scripts/cndp_reset_upf.sh) needs to be executed once before running [docker_setup.sh](./scripts/docker_setup.sh). After that we can execute [docker_setup.sh](./scripts/docker_setup.sh) multiple times if required.
+Note: The script [cndp_reset_upf.sh](../scripts/cndp_reset_upf.sh) needs to be executed once before running [docker_setup.sh](../scripts/docker_setup.sh). After that we can execute [docker_setup.sh](../scripts/docker_setup.sh) multiple times if required. The script [cndp_reset_upf.sh](../scripts/cndp_reset_upf.sh) uses dpdk-devbind script from DPDK. To get a copy of it, execute the following command from the UPF's root directory:
+
+```
+$ wget https://raw.githubusercontent.com/DPDK/dpdk/main/usertools/dpdk-devbind.py -O dpdk-devbind.py
+$ chmod +x dpdk-devbind.py
+```
 
 Insert rules into relevant PDR and FAR tables
 
@@ -229,11 +271,17 @@ $ docker exec bess-pfcpiface pfcpiface -config /conf/upf.json -simulate create
 
 ### Step 4: Run DPDK packet generator in System 2
 
+Build UPF docker image in System 2. Note: If you are behind a proxy make sure to export/setenv http_proxy and https_proxy
+From the top level directory call:
+
+```
+$ make docker-build
+```
 From system 2, bind the two interfaces used by pktgen to DPDK (used to send n/w packets to access/core ). Also setup huge pages in the system.
 
-Modify [pktgen_cndp.bess](conf/pktgen_cndp.bess) script as follows.
+Modify [pktgen_cndp.bess](../conf/pktgen_cndp.bess) script as follows.
 
-1) Update source and destination interface mac addresses of the access and core interface  - smac_access, smac_core, dmac_access, dmac_core. Here smac_xxx corresponds to mac address of NIC in system 2 where we run pktgen and dst_xxx corresponds to mac address of NIC in system 1 which runs UPF pipeline.
+1) Update source and destination interface mac addresses of the access and core interface - smac_access, smac_core, dmac_access, dmac_core. Here smac_xxx corresponds to mac address of NIC in system 2 where we run pktgen and dst_xxx corresponds to mac address of NIC in system 1 which runs UPF pipeline.
 
 2) Update worker core ids to use core id in NUMA node where NIC is attached. For example if NIC is attached to NUMA node 1, use worker core ids in NUMA node 1. For example, `workers=[22, 23, 24, 25]`
 
@@ -268,21 +316,21 @@ docker exec -it pktgen ./bessctl daemon reset
 
 Modify OMEC UPF and CNDP configuration files to support multiple worker threads. Each thread will run UPF pipeline in a different core.
 
-To test multiple worker thread, we need to use CNDP jsonc file with appropriate configuration. An example CNDP jsonc file for 4 worker threads is in [cndp_upf_4worker.jsonc](./conf/cndp_upf_4worker.jsonc). Follow below steps to configure OMEC-UPF pipeline using 4 worker threads which runs on 5 cores (4 BESS worker threads and 1 main thread).
+To test multiple worker thread, we need to use CNDP jsonc file with appropriate configuration. An example CNDP jsonc file for 4 worker threads is in [cndp_upf_4worker.jsonc](../conf/cndp_upf_4worker.jsonc). Follow below steps to configure OMEC-UPF pipeline using 4 worker threads which runs on 5 cores (4 BESS worker threads and 1 main thread).
 
-1) Update [upf.json](./conf/upf.json) to set number if worker threads as 4. `"workers": 4,`
+1) Update [upf.json](../conf/upf.json) to set number if worker threads as 4. `"workers": 4,`
 
-2) Update [upf.json](./conf/upf.json) to use appropriate CNDP jsonc file with required number of lports (netdev/qid pair).
+2) Update [upf.json](../conf/upf.json) to use appropriate CNDP jsonc file with required number of lports (netdev/qid pair).
 
-`"cndp_jsonc_file": "/opt/bess/bessctl/conf/cndp_upf_4worker.jsonc"`
+`"cndp_jsonc_file": "conf/cndp_upf_4worker.jsonc"`
 
-3) Modify the script [docker_setup.sh](./scripts/docker_setup.sh) and update the function `move_ifaces()` in condition `if [ "$mode" == 'cndp' ]`.
+3) Modify the script [docker_setup.sh](../scripts/docker_setup.sh) and update the function `move_ifaces()` in condition `if [ "$mode" == 'cndp' ]`.
 
 Update `num_q` value same as number of worker threads
 
 Update `start_q_idx` to choose the start queue index to receive n/w packets.
 
-4) Modify the script  [docker_setup.sh](./scripts/docker_setup.sh) to assign 5 cores (4 worker thread, 1 main thread) to run BESS UPF pipeline. To get better performance (optional step), assign `cpuset-cpus` to cores ids same as queue ids used to receive n/w packets.
+4) Modify the script  [docker_setup.sh](../scripts/docker_setup.sh) to assign 5 cores (4 worker thread, 1 main thread) to run BESS UPF pipeline. To get better performance (optional step), assign `cpuset-cpus` to cores ids same as queue ids used to receive n/w packets.
 
 ```
 diff --git a/scripts/docker_setup.sh b/scripts/docker_setup.sh
