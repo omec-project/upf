@@ -9,9 +9,16 @@ Cloud Native Data Plane (CNDP) is a collection of user space libraries for accel
 
 CNDP BESS port enables sending/receiving packets to/from network interface using AF-XDP.  CNDP integration with OMEC BESS UPF enables a software-based datapath and also provides deployment flexibility for kubernetes based deployments where CNDP uses [AF-XDP device plugin](https://github.com/intel/afxdp-plugins-for-kubernetes).
 
+### Table Of Contents
+  * [Step 1: Build the OMEC UPF docker container](#step-1-build-the-omec-upf-docker-container)
+  * [Step 2: Test setup](#step-2-test-setup)
+  * [Step 3: Run UPF in System 1](#step-3-run-upf-in-system-1)
+  * [Step 4: Run DPDK packet generator in System 2](#step-4-run-dpdk-packet-generator-in-system-2)
+  * [CNDP OMEC UPF multiple worker threads setup](#cndp-omec-upf-multiple-worker-threads-setup)
+
 Following are the steps required to build and test CNDP BESS UPF docker image:
 
-### Step 1: Build the OMEC UPF docker container
+## Step 1: Build the OMEC UPF docker container
 
 > Note: If you are behind a proxy make sure to export/setenv http_proxy and https_proxy
 
@@ -21,7 +28,7 @@ From the top level directory call:
 $ make docker-build
 ```
 
-### Step 2: Test setup
+## Step 2: Test setup
 
 Following diagram shows is a test setup. 
 
@@ -45,13 +52,13 @@ The setup uses Physical Function (PF) of PCIe network adaptor (where the driver 
 
 System 1 and System 2 are connected using  physical links. Setup uses two network ports which represents access and core interface. This test setup uses Intel Ethernet 800 series network adapter (hereafter referred to as NIC).  NIC in System 1 has Intel Dynamics Device Personalization (DDP) for telecommunications workload enabled. DDP profile can help in GTPU packet traffic steering to required NIC hardware queues using RSS (Receive Side Scaling). DDP feature works along with XDP offload feature in NIC hardware to redirect GTPU packets directly to user space via AF-XDP sockets. Refer the Deployment section in this [document](https://builders.intel.com/docs/networkbuilders/intel-ethernet-controller-800-series-device-personalization-ddp-for-telecommunications-workloads-technology-guide.pdf) to enable DDP. Please follow Intel ethernet controller E810 DDP for telecommunications technology guide.
 
-### Step 3: Run UPF in System 1
+## Step 3: Run UPF in System 1
 
 1) Setup hugepages in the system 1. The dpdk-hugepages script from DPDK is used for this purpose. To get a copy of it,
 execute the following command from the UPF's root directory:
 ```
 $ wget https://raw.githubusercontent.com/DPDK/dpdk/main/usertools/dpdk-hugepages.py -O dpdk-hugepages.py
-$ chmod +x dpdk-devbind.py
+$ chmod +x dpdk-hugepages.py
 ```
 For example, to setup 8GB of total huge pages (8 pages each of size 1GB in each NUMA node) using DPDK script, use the command `dpdk-hugepages.py -p 1G --setup 8G`
 
@@ -125,10 +132,10 @@ index 5c2fdaf..8d7b8da 100644
      // CNDP lports for Access network followed by lports for Core network.
      "lports": {
 -        "enp134s0:0": {
-+        "enp124f0:0": {
++        "ens803f2:0": {
              "pmd": "net_af_xdp",
 -            "qid": 22,
-+            "qid": 6,
++            "qid": 10,
              "umem": "umem0",
              "region": 0,
              "busy_poll": true,
@@ -137,10 +144,10 @@ index 5c2fdaf..8d7b8da 100644
              "description": "Access LAN 0 port"
          },
 -        "enp136s0:0": {
-+        "enp126f0:0": {
++        "ens803f3:0": {
              "pmd": "net_af_xdp",
 -            "qid": 22,
-+            "qid": 6,
++            "qid": 10,
              "umem": "umem0",
              "region": 1,
              "busy_poll": true,
@@ -188,19 +195,19 @@ index da60d51..b1c3df6 100644
 +++ b/conf/cndp_upf_1worker.jsonc
 @@ -86,7 +86,7 @@
      "lports": {
-         "enp134s0:0": {
+         "ens803f2:0": {
              "pmd": "net_af_xdp",
 -            "qid": 22,
-+            "qid": 6,
++            "qid": 10,
              "umem": "umem0",
              "region": 0,
              "busy_poll": true,
 @@ -96,7 +96,7 @@
          },
-         "enp136s0:0": {
+         "ens803f3:0": {
              "pmd": "net_af_xdp",
 -            "qid": 22,
-+            "qid": 6,
++            "qid": 10,
              "umem": "umem0",
              "region": 1,
              "busy_poll": true,
@@ -216,7 +223,7 @@ index 9058839..2e4e505 100755
                         num_q=1
                         # start queue index
 -                       start_q_idx=22
-+                       start_q_idx=6
++                       start_q_idx=10
                         # RSS using TC filter
                         setup_tc "${ifaces[$i]}" $num_q $start_q_idx
                 fi
@@ -224,21 +231,39 @@ index 9058839..2e4e505 100755
  # Run bessd
  docker run --name bess -td --restart unless-stopped \
 -       --cpuset-cpus=12-13 \
-+       --cpuset-cpus=6-7 \
++       --cpuset-cpus=10-11 \
         --ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
         -v "$PWD/conf":/opt/bess/bessctl/conf \
         --net container:pause \
 
 ```
 
-7) Modify the script [cndp_reset_upf.sh](../scripts/cndp_reset_upf.sh) to use appropriate PCIe device address, network interface name and set_irq_affinity script in NIC driver.
+7) Modify the script [reset_upf.sh](../scripts/reset_upf.sh) to use appropriate PCIe device address, network interface name and set_irq_affinity script in NIC driver.
 
 ```
-ACCESS_PCIE=0000:86:00.0
-CORE_PCIE=0000:88:00.0
-ACCESS_IFACE=enp134s0
-CORE_IFACE=enp136s0
-SET_IRQ_AFFINITY=~/nic/driver/ice-1.9.7/scripts/set_irq_affinity
+diff --git a/scripts/reset_upf.sh b/scripts/reset_upf.sh
+index ca90130..202049d 100755
+--- a/scripts/reset_upf.sh
++++ b/scripts/reset_upf.sh
+@@ -8,13 +8,13 @@ MODE=${1:-cndp}
+
+ BUSY_POLL=${2:-true}
+
+-ACCESS_PCIE=0000:86:00.0
+-CORE_PCIE=0000:88:00.0
++ACCESS_PCIE=0000:84:00.0
++CORE_PCIE=0000:85:00.0
+
+-ACCESS_IFACE=enp134s0
+-CORE_IFACE=enp136s0
++ACCESS_IFACE=ens803f2
++CORE_IFACE=ens803f3
+
+-SET_IRQ_AFFINITY=~/nic/driver/ice-1.9.7/scripts/set_irq_affinity
++SET_IRQ_AFFINITY=~/nic/driver/ice-1.9.11/scripts/set_irq_affinity
+
+ sudo dpdk-devbind.py -u $ACCESS_PCIE --force
+ sudo dpdk-devbind.py -u $CORE_PCIE --force
 ```
 
 This script is used to stop any running containers, disable irqbalance, set irq affinity to all queues for access and core interface. The script also set XDP socket busy poll settings for access and core interfaces. `set_irq_affinity` script used by this script can be found in the NIC driver install path. irq affinity and AF_XDP busypoll settings are done to get improved network I/O performance. These settings are recommended but not mandatory.
@@ -246,10 +271,10 @@ This script is used to stop any running containers, disable irqbalance, set irq 
 8) From the top level directory call:
 
 ```
-$ ./scripts/cndp_reset_upf.sh
+$ ./scripts/reset_upf.sh
 $ ./scripts/docker_setup.sh
 ```
-Note: The script [cndp_reset_upf.sh](../scripts/cndp_reset_upf.sh) needs to be executed once before running [docker_setup.sh](../scripts/docker_setup.sh). After that we can execute [docker_setup.sh](../scripts/docker_setup.sh) multiple times if required. The script [cndp_reset_upf.sh](../scripts/cndp_reset_upf.sh) uses dpdk-devbind script from DPDK. To get a copy of it, execute the following command from the UPF's root directory:
+Note: The script [reset_upf.sh](../scripts/reset_upf.sh) needs to be executed once before running [docker_setup.sh](../scripts/docker_setup.sh). After that we can execute [docker_setup.sh](../scripts/docker_setup.sh) multiple times if required. The script [reset_upf.sh](../scripts/reset_upf.sh) uses dpdk-devbind script from DPDK. To get a copy of it, execute the following command from the UPF's root directory:
 
 ```
 $ wget https://raw.githubusercontent.com/DPDK/dpdk/main/usertools/dpdk-devbind.py -O dpdk-devbind.py
@@ -266,10 +291,10 @@ $ docker exec bess-pfcpiface pfcpiface -config /conf/upf.json -simulate create
 10) To stop the containers run following command
 
 ```
-./scripts/cndp_reset_upf.sh
+./scripts/reset_upf.sh
 ```
 
-### Step 4: Run DPDK packet generator in System 2
+## Step 4: Run DPDK packet generator in System 2
 
 Build UPF docker image in System 2. Note: If you are behind a proxy make sure to export/setenv http_proxy and https_proxy
 From the top level directory call:
@@ -279,7 +304,7 @@ $ make docker-build
 ```
 From system 2, bind the two interfaces used by pktgen to DPDK (used to send n/w packets to access/core ). Also setup huge pages in the system.
 
-Modify [pktgen_cndp.bess](../conf/pktgen_cndp.bess) script as follows.
+[pktgen_cndp.bess](../conf/pktgen_cndp.bess) script is used for generating n/w traffic using DPDK pktgen for CNDP test setup. Modify [pktgen_cndp.bess](../conf/pktgen_cndp.bess) script as follows.
 
 1) Update source and destination interface mac addresses of the access and core interface - smac_access, smac_core, dmac_access, dmac_core. Here smac_xxx corresponds to mac address of NIC in system 2 where we run pktgen and dst_xxx corresponds to mac address of NIC in system 1 which runs UPF pipeline.
 
@@ -312,25 +337,50 @@ If we need to stop sending packets at some point use the following command:
 docker exec -it pktgen ./bessctl daemon reset
 ```
 
-### CNDP OMEC-UPF multiple worker threads setup
+## CNDP OMEC UPF multiple worker threads setup
 
 Modify OMEC UPF and CNDP configuration files to support multiple worker threads. Each thread will run UPF pipeline in a different core.
 
 To test multiple worker thread, we need to use CNDP jsonc file with appropriate configuration. An example CNDP jsonc file for 4 worker threads is in [cndp_upf_4worker.jsonc](../conf/cndp_upf_4worker.jsonc). Follow below steps to configure OMEC-UPF pipeline using 4 worker threads which runs on 5 cores (4 BESS worker threads and 1 main thread).
 
-1) Update [upf.json](../conf/upf.json) to set number if worker threads as 4. `"workers": 4,`
+1) Update [upf.json](../conf/upf.json) to set number if worker threads as 4. Also use appropriate CNDP jsonc file with required number of lports (netdev/qid pair)
 
-2) Update [upf.json](../conf/upf.json) to use appropriate CNDP jsonc file with required number of lports (netdev/qid pair).
+```
+diff --git a/conf/upf.json b/conf/upf.json
+index 37447b7..3bb3c27 100644
+--- a/conf/upf.json
++++ b/conf/upf.json
+@@ -63,18 +63,18 @@
+     "": "Gateway interfaces",
+     "access": {
+         "ifname": "ens803f2",
+-        "": "cndp_jsonc_file: conf/cndp_upf_1worker.jsonc"
++        "cndp_jsonc_file": "conf/cndp_upf_4worker.jsonc"
+     },
 
-`"cndp_jsonc_file": "conf/cndp_upf_4worker.jsonc"`
+     "": "UE IP Natting. Update the line below to `\"ip_masquerade\": \"<ip> [or <ip>]\"` to enable",
+     "core": {
+         "ifname": "ens803f3",
+-        "": "cndp_jsonc_file: conf/cndp_upf_1worker.jsonc",
++        "cndp_jsonc_file": "conf/cndp_upf_4worker.jsonc",
+         "": "ip_masquerade: 18.0.0.1 or 18.0.0.2 or 18.0.0.3"
+     },
 
-3) Modify the script [docker_setup.sh](../scripts/docker_setup.sh) and update the function `move_ifaces()` in condition `if [ "$mode" == 'cndp' ]`.
+     "": "Number of worker threads. Default: 1",
+-    "workers": 1,
++    "workers": 4,
 
-Update `num_q` value same as number of worker threads
+     "": "Parameters for handling outgoing requests",
+     "max_req_retries": 5,
 
-Update `start_q_idx` to choose the start queue index to receive n/w packets.
+```
 
-4) Modify the script  [docker_setup.sh](../scripts/docker_setup.sh) to assign 5 cores (4 worker thread, 1 main thread) to run BESS UPF pipeline. To get better performance (optional step), assign `cpuset-cpus` to cores ids same as queue ids used to receive n/w packets.
+2) Modify the script [docker_setup.sh](../scripts/docker_setup.sh) and update the function `move_ifaces()` in condition `if [ "$mode" == 'cndp' ]`.
+
+Update `num_q` value same as number of worker threads. Update `start_q_idx` to choose the start queue index to receive n/w packets.
+Please note that the driver implementation requires `start_q_idx` to be greater than `num_q`. For example if `num_q` is 4, then keep `start_q_idx` > 4.
+
+Assign 5 cores (4 worker thread, 1 main thread) to run BESS UPF pipeline. To get better performance (optional step), assign `cpuset-cpus` to cores ids same as queue ids used to receive n/w packets.
 
 ```
 diff --git a/scripts/docker_setup.sh b/scripts/docker_setup.sh
@@ -345,7 +395,7 @@ index 9058839..7b4ef76 100755
 +                       num_q=4
                         # start queue index
 -                       start_q_idx=22
-+                       start_q_idx=6
++                       start_q_idx=10
                         # RSS using TC filter
                         setup_tc "${ifaces[$i]}" $num_q $start_q_idx
                 fi
@@ -353,7 +403,7 @@ index 9058839..7b4ef76 100755
  # Run bessd
  docker run --name bess -td --restart unless-stopped \
 -       --cpuset-cpus=12-13 \
-+       --cpuset-cpus=6-10 \
++       --cpuset-cpus=10-14 \
         --ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
         -v "$PWD/conf":/opt/bess/bessctl/conf \
         --net container:pause \
@@ -361,7 +411,7 @@ index 9058839..7b4ef76 100755
 
 5) From the top level directory call:
 ```
-$ ./scripts/cndp_reset_upf.sh
+$ ./scripts/reset_upf.sh
 $ ./scripts/docker_setup.sh
 ```
 Insert rules into relevant PDR and FAR tables

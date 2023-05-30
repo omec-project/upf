@@ -46,6 +46,7 @@ gNB
 gRPC
 GTP
 GTPu
+html
 http
 https
 hugepages
@@ -61,6 +62,7 @@ jsonc
 kubernetes
 linerate
 Linerate
+linux
 localhost
 lports
 MAKEFLAGS
@@ -98,6 +100,7 @@ RSS
 runtime
 Scapy
 SDF
+setenv
 SMF
 SPGW
 smac
@@ -125,6 +128,7 @@ vendoring
 vfio
 VPC
 VM
+www
 WIP
 YAML
 # Words with numbers or symbols

@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2020 Intel Corporation
 #
-# Usage: cndp_reset_upf.sh cndp|dpdk true|false
+# Usage: reset_upf.sh cndp|dpdk true|false
+# Currently this script only supports CNDP and DPDK modes.
 
 MODE=${1:-cndp}
 
@@ -14,7 +15,7 @@ CORE_PCIE=0000:88:00.0
 ACCESS_IFACE=enp134s0
 CORE_IFACE=enp136s0
 
-SET_IRQ_AFFINITY=~/nic/driver/ice-1.9.7/scripts/set_irq_affinity
+SET_IRQ_AFFINITY=~/nic/driver/ice-1.9.11/scripts/set_irq_affinity
 
 sudo dpdk-devbind.py -u $ACCESS_PCIE --force
 sudo dpdk-devbind.py -u $CORE_PCIE --force
