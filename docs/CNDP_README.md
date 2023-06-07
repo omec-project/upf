@@ -186,7 +186,7 @@ index 7aff6a6..09d640b 100755
 +nhmacaddrs=(40:a6:b7:78:3f:bc 40:a6:b7:78:3f:b8)
 ```
 
-6) Modify the script [docker_setup.sh](../scripts/docker_setup.sh) and update the function `move_ifaces()` in condition `if [ "$mode" == 'cndp' ]` . Update `start_q_idx` to choose the start queue index to receive n/w packets. This should match the queue id used in lports section of [cndp_upf_1worker.jsonc](../conf/cndp_upf_1worker.jsonc). To get better performance (optional step), assign `cpuset-cpus` in [docker_setup.sh](../scripts/docker_setup.sh) to cores ids same as queue ids used to receive n/w packets.
+6) Modify the script [docker_setup.sh](../scripts/docker_setup.sh) and update the function `move_ifaces()` in condition `if [ "$mode" == 'cndp' ]`. Update `start_q_idx` to choose the start queue index to receive n/w packets. This should match the queue id used in lports section of [cndp_upf_1worker.jsonc](../conf/cndp_upf_1worker.jsonc). To get better performance (optional step), assign `cpuset-cpus` in [docker_setup.sh](../scripts/docker_setup.sh) to cores ids same as queue ids used to receive n/w packets.
 
 ```
 diff --git a/conf/cndp_upf_1worker.jsonc b/conf/cndp_upf_1worker.jsonc
@@ -377,8 +377,8 @@ index 37447b7..3bb3c27 100644
 
 2) Modify the script [docker_setup.sh](../scripts/docker_setup.sh) and update the function `move_ifaces()` in condition `if [ "$mode" == 'cndp' ]`.
 
-Update `num_q` value same as number of worker threads. Update `start_q_idx` to choose the start queue index to receive n/w packets.
-Please note that the driver implementation requires `start_q_idx` to be greater than `num_q`. For example if `num_q` is 4, then keep `start_q_idx` > 4.
+Update `num_q` value same as number of worker threads (should be a power of 2). Update `start_q_idx` to choose the start queue index to receive n/w packets.
+Note: Choose `start_q_idx` value greater than `num_q`. For example if `num_q` is 4, then keep `start_q_idx` > 4. This restriction comes with the current SW and HW limitations of having to share a RSS lookup table for all the queue sets. We can have only one queue set with non power of 2 queue count and that should be the max queue count of all the queue sets. For OMEC-UPF, we use two queue sets - Set 0 and Set 1. Set 1 will be used for handling data packets (GTPU encapsulated traffic in N3 access and N9 core interface, unencapsulated traffic in N6 core interface). Set 0 will be used to handle rest of the traffic not belonging to Set 1.
 
 Assign 5 cores (4 worker thread, 1 main thread) to run BESS UPF pipeline. To get better performance (optional step), assign `cpuset-cpus` to cores ids same as queue ids used to receive n/w packets.
 
@@ -409,7 +409,7 @@ index 9058839..7b4ef76 100755
         --net container:pause \
 ```
 
-5) From the top level directory call:
+3) From the top level directory call:
 ```
 $ ./scripts/reset_upf.sh
 $ ./scripts/docker_setup.sh
@@ -418,4 +418,4 @@ Insert rules into relevant PDR and FAR tables
 ```
 $ docker exec bess-pfcpiface pfcpiface -config /conf/upf.json -simulate create
 ```
-6) From browser, use localhost:8000 to view the UPF pipeline in GUI. If you are remotely connecting to system via ssh, you need to setup a tunnel with local port forwarding.
+4) From browser, use localhost:8000 to view the UPF pipeline in GUI. If you are remotely connecting to system via ssh, you need to setup a tunnel with local port forwarding.

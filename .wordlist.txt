@@ -51,6 +51,7 @@ http
 https
 hugepages
 HugePages
+HW
 HVM
 IOMMU
 IOV
@@ -121,6 +122,7 @@ ULCL
 unary
 Unary
 uncomment
+unencapsulated
 upf
 UPF
 UPF's
