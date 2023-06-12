@@ -9,6 +9,7 @@ Copyright 2019 Intel Corporation
   * [Prerequisites](#prerequisites)
   * [Configuration: Simulation mode](#configuration-simulation-mode)
   * [Configuration: DPDK mode](#configuration-dpdk-mode)
+  * [Configuration: CNDP mode](#configuration-cndp-mode)
   * [Installation](#installation)
   * [General Execution Commands](#general-execution-commands)
   * [Testing (Microbenchmarks)](#testing-microbenchmarks)
@@ -138,6 +139,29 @@ To configure/install the UPF in DPDK mode, the following changes are required:
 
      elif [ "$mode" == 'af_xdp' ]; then
     ```
+
+3. If testing with Intel 800 series network adapter (for example, E810 NIC) with DDP (Dynamic Device Personalization) enabled for GTPU, update the script file
+
+   ```
+   $ git diff scripts/docker_setup.sh
+   diff --git a/scripts/docker_setup.sh b/scripts/docker_setup.sh
+   index 7aff6a6..c5afb42 100755
+   --- a/scripts/docker_setup.sh
+   +++ b/scripts/docker_setup.sh
+   @@ -218,6 +218,7 @@ fi
+    docker run --name bess -td --restart unless-stopped \
+           --cpuset-cpus=12-13 \
+           --ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
+   +       -v /lib/firmware/intel:/lib/firmware/intel \
+           -v "$PWD/conf":/opt/bess/bessctl/conf \
+           --net container:pause \
+           $PRIVS \
+   ```
+
+## Configuration: CNDP mode
+
+To configure/install the UPF in CNDP mode, please refer [CNDP_README.md](./CNDP_README.md)
+
 
 
 ## Installation

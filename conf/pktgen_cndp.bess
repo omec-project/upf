@@ -1,0 +1,81 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2020-2022 Intel Corporation
+
+"""
+docker run --name pktgen -td --restart unless-stopped \
+           --cpuset-cpus=2-5 --ulimit memlock=-1 --cap-add IPC_LOCK \
+           -v /dev/hugepages:/dev/hugepages -v "$PWD/conf":/opt/bess/bessctl/conf \
+           -v /lib/firmware/intel:/lib/firmware/intel \
+           --device=/dev/vfio/vfio --device=/dev/vfio/119 --device=/dev/vfio/120 \
+           upf-epc-bess:"$(<VERSION)" -grpc-url=0.0.0.0:10514
+"""
+
+import conf.sim as sim
+
+pkt_size = 128
+flows = 5000
+workers=[22, 23, 24, 25]
+gtppsc = False
+qfi = 9
+smac_access = "40:a6:b7:78:3f:bc"
+smac_core = "40:a6:b7:78:3f:b8"
+dmac_access = "40:a6:b7:78:3f:ec"
+dmac_core = "40:a6:b7:78:3f:e8"
+
+if gtppsc:
+    # flow create 0 ingress pattern eth / ipv4 / udp / gtpu / gtp_psc / ipv4 / end actions rss types ipv4 l3-src-only end key_len 0 queues end / end
+    n39_pkts = [sim.gen_gtpu_packet(pkt_size, smac_access, dmac_access, "11.1.1.129", "198.18.0.1", "16.0.0.1", "9.9.9.9", 0x30000000, 1, qfi),]
+    n36_pkts = [sim.gen_gtpu_packet(pkt_size, smac_access, dmac_access, "11.1.1.129", "198.18.0.1", "16.0.0.1", "6.6.6.6", 0x30000000, 1, qfi),]
+
+    # flow create 1 ingress pattern eth / ipv4 / udp / gtpu / gtp_psc / ipv4 / end actions rss types ipv4 l3-dst-only end key_len 0 queues end / end
+    n9_pkts = [sim.gen_gtpu_packet(pkt_size, smac_core, dmac_core, "13.1.1.199", "198.19.0.1", "9.9.9.9", "16.0.0.1", 0x90000000, 0, qfi),]
+
+    n3seq_offset = 70
+    n9seq_offset = 74
+
+else:
+    # flow create 0 ingress pattern eth / ipv4 / udp / gtpu / ipv4 / end actions rss types ipv4 l3-src-only end key_len 0 queues end / end
+    n39_pkts = [sim.gen_gtpu_packet(pkt_size, smac_access, dmac_access, "11.1.1.129", "198.18.0.1", "16.0.0.1", "9.9.9.9", 0x30000000),]
+    n36_pkts = [sim.gen_gtpu_packet(pkt_size, smac_access, dmac_access, "11.1.1.129", "198.18.0.1", "16.0.0.1", "6.6.6.6", 0x30000000),]
+
+    # flow create 1 ingress pattern eth / ipv4 / udp / gtpu / ipv4 / end actions rss types ipv4 l3-dst-only end key_len 0 queues end / end
+    n9_pkts = [sim.gen_gtpu_packet(pkt_size, smac_core, dmac_core, "13.1.1.199", "198.19.0.1", "9.9.9.9", "16.0.0.1", 0x90000000),]
+
+    n3seq_offset = 62
+    n9seq_offset = 66
+
+#flow create 1 ingress pattern eth / ipv4 / end actions rss types ipv4 l3-dst-only end key_len 0 queues end / end
+n6_pkts = [sim.gen_inet_packet(pkt_size, smac_core, dmac_core, "6.6.6.6", "16.0.0.1"),]
+
+for wid in range(len(workers)):
+    bess.add_worker(wid=wid, core=int(workers[wid % len(workers)]))
+
+num_q = len(workers)
+kwargs = {'size_inc_q': 512,
+          'size_out_q': 512,
+          'num_inc_q': num_q,
+          'num_out_q': num_q}
+p = PMDPort(port_id=0, **kwargs)
+p1 = PMDPort(port_id=1, **kwargs)
+
+n3seq_kwargs = sim.gen_gtpu_sequpdate_args(flows, "16.0.0.1", n3seq_offset, 0x30000000)
+n9seq_kwargs = sim.gen_gtpu_sequpdate_args(flows, "16.0.0.1", n9seq_offset, 0x90000000)
+n6seq_kwargs = sim.gen_inet_sequpdate_args(flows, "16.0.0.1")
+
+# 25 Gbps each to saturate 100 Gbps
+bess.add_tc('39_limit', wid=0, policy='rate_limit', resource='bit', limit={'bit': 25000000000})
+bess.add_tc('36_limit', wid=1, policy='rate_limit', resource='bit', limit={'bit': 25000000000})
+bess.add_tc('6_limit',  wid=2, policy='rate_limit', resource='bit', limit={'bit': 25000000000})
+bess.add_tc('9_limit',  wid=3, policy='rate_limit', resource='bit', limit={'bit': 25000000000})
+
+src39::Source(pkt_size=pkt_size) -> Rewrite(templates=n39_pkts) -> n39update::SequentialUpdate(**n3seq_kwargs) -> L4Checksum() -> IPChecksum() -> QueueOut(port=p.name, qid=0)
+src36::Source(pkt_size=pkt_size) -> Rewrite(templates=n36_pkts) -> n36update::SequentialUpdate(**n3seq_kwargs) -> L4Checksum() -> IPChecksum() -> QueueOut(port=p.name, qid=1)
+
+src9::Source(pkt_size=pkt_size) -> Rewrite(templates=n9_pkts) -> n9update::SequentialUpdate(**n9seq_kwargs) -> L4Checksum() -> IPChecksum() -> QueueOut(port=p1.name, qid=0)
+src6::Source(pkt_size=pkt_size) -> Rewrite(templates=n6_pkts) -> n6update::SequentialUpdate(**n6seq_kwargs) -> L4Checksum() -> IPChecksum() -> QueueOut(port=p1.name, qid=1)
+
+src39.attach_task(parent='39_limit')
+src36.attach_task(parent='36_limit')
+
+src9.attach_task(parent='9_limit')
+src6.attach_task(parent='6_limit')

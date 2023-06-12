@@ -83,10 +83,25 @@ COPY conf /opt/bess/bessctl/conf
 RUN ln -s /opt/bess/bessctl/bessctl /bin
 
 # CNDP: Install dependencies
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
+    build-essential \
+    ethtool \
+    libbsd0 \
+    libbpf0 \
+    libelf1 \
     libgflags2.2 \
-    libjson-c[45]
+    libjson-c[45] \
+    libnl-3-200 \
+    libnl-cli-3-200 \
+    libnuma1 \
+    libpcap0.8 \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=bess-build /usr/bin/cndpfwd /usr/bin/
 COPY --from=bess-build /usr/local/lib/x86_64-linux-gnu/*.so /usr/local/lib/x86_64-linux-gnu/
+COPY --from=bess-build /usr/local/lib/x86_64-linux-gnu/*.a /usr/local/lib/x86_64-linux-gnu/
+COPY --from=bess-build /usr/lib/libxdp* /usr/lib/
 COPY --from=bess-build /lib/x86_64-linux-gnu/libjson-c.so* /lib/x86_64-linux-gnu/
 
 ENV PYTHONPATH="/opt/bess"
