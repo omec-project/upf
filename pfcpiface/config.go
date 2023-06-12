@@ -126,6 +126,7 @@ func validateConf(conf Conf) error {
 		validModes := map[string]struct{}{
 			"af_xdp":    {},
 			"af_packet": {},
+			"cndp":      {},
 			"dpdk":      {},
 			"sim":       {},
 		}

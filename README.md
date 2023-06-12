@@ -119,6 +119,7 @@ registry: [upf-epc-bess](https://hub.docker.com/r/omecproject/upf-epc-bess),
 * DSCP marking of GTPU packets by copying the DSCP value from the inner IP packet
 * GTPu path monitoring
 * Network Token Functions (_**experimental**_)
+* Support for DPDK, CNDP
 
 ### P4-UPF
 P4-UPF implements a core set of features capable of supporting requirements for

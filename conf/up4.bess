@@ -133,6 +133,9 @@ for idx, iface in enumerate(interfaces):
     if parser.ddp:
         p.configure_flow_profiles(iface)
 
+    if parser.mode == 'cndp':
+        p.configure_cndp(parser.interfaces[iface]["cndp_jsonc_file"], iface, len(workers))
+
     # initialize port with the configured driver
     p.workers = [i for i in range(len(workers))]
     p.init_port(idx, parser.mode)
