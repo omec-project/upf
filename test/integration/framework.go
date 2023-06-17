@@ -25,7 +25,7 @@ import (
 // this file should contain all the struct defs/constants used among different test cases.
 
 const (
-	ConfigPath             = "/tmp/upf.json"
+	ConfigPath             = "/tmp/upf.jsonc"
 	ContainerNamePFCPAgent = "pfcpiface"
 	ContainerNameMockUP4   = "mock-up4"
 	ImageNamePFCPAgent     = "upf-epc-pfcpiface:integration"
@@ -299,7 +299,7 @@ func MustStopMockUP4() {
 }
 
 func MustStartPFCPAgent() {
-	providers.MustRunDockerContainer(ContainerNamePFCPAgent, ImageNamePFCPAgent, "-config /config/upf.json",
+	providers.MustRunDockerContainer(ContainerNamePFCPAgent, ImageNamePFCPAgent, "-config /config/upf.jsonc",
 		[]string{"8805/udp", "8080/tcp"}, "/tmp:/config", DockerTestNetwork)
 }
 

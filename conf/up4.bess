@@ -36,7 +36,7 @@ qerFailGate = 4
 qerStatusDropGate = 5
 qerUnmeteredGate = 6
 interfaces = ["access", "core"]
-parser = Parser('conf/upf.json')
+parser = Parser('conf/upf.jsonc')
 parser.parse(interfaces)
 
 # Catch core & access MAC/IPv4 addresses

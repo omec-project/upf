@@ -62,7 +62,7 @@ func TestLoadConfigFile(t *testing.T) {
 				"priority": 7
 			}]
 		}`
-		confPath := t.TempDir() + "/conf.json"
+		confPath := t.TempDir() + "/conf.jsonc"
 		mustWriteStringToDisk(s, confPath)
 
 		_, err := LoadConfigFile(confPath)
@@ -73,7 +73,7 @@ func TestLoadConfigFile(t *testing.T) {
 		s := `{
 			"mode": "dpdk"
 		}`
-		confPath := t.TempDir() + "/conf.json"
+		confPath := t.TempDir() + "/conf.jsonc"
 		mustWriteStringToDisk(s, confPath)
 
 		conf, err := LoadConfigFile(confPath)
@@ -83,8 +83,8 @@ func TestLoadConfigFile(t *testing.T) {
 
 	t.Run("all sample configs must be valid", func(t *testing.T) {
 		paths := []string{
-			"../conf/upf.json",
-			"../ptf/config/upf.json",
+			"../conf/upf.jsonc",
+			"../ptf/config/upf.jsonc",
 		}
 
 		for _, path := range paths {

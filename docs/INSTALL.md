@@ -46,7 +46,7 @@ You need the following dependencies.
 The simulation mode is a good way to explore the UPF functionalities
 without the need for configuring DPDK and other hardware-related aspects. For
 specifics on what can be customized, the user may refer to the UPF's config file
-[here](./../conf/upf.json), where it is possible to modify/set different
+[here](./../conf/upf.jsonc), where it is possible to modify/set different
 parameters such as tables sizes, maximum number of flows, enable/disable
 measurements, among several others.
 
@@ -56,21 +56,19 @@ required:
 1. Enable sim mode in configuration file
 
     ```patch
-    diff --git a/conf/upf.json b/conf/upf.json
-    index c6531cc..928a503 100644
-    --- a/conf/upf.json
-    +++ b/conf/upf.json
-    @@ -2,8 +2,8 @@
-         "": "Vdev or sim support. Enable `\"mode\": \"af_xdp\"` to enable AF_XDP mode, or `\"mode\": \"af_packet\"` to enable AF_PACKET mode, `\"mode\": \"sim\"` to generate synthetic traffic from BESS's Source module or \"mode\": \"\" when running with UP4",
-         "": "mode: af_xdp",
-         "": "mode: af_packet",
-    -    "": "mode: sim",
+    diff --git a/conf/upf.jsonc b/conf/upf.jsonc
+    index f8f4e4e..c82748a 100644
+    --- a/conf/upf.jsonc
+    +++ b/conf/upf.jsonc
+    @@ -9,7 +9,7 @@
+         // "dpdk" to enable DPDK mode,
+         // "cndp" to enable CNDP mode,
+         // "" when running with UP4"
     -    "mode": "dpdk",
     +    "mode": "sim",
-    +    "": "mode: dpdk",
 
          "table_sizes": {
-             "": "Example sizes based on sim mode and 50K sessions. Customize as per your control plane",
+             // Example sizes based on sim mode and 50K sessions. Customize as per your control plane
     ```
 
 2. Enable sim mode in script file
@@ -277,7 +275,7 @@ To configure/install the UPF in CNDP mode, please refer [CNDP_README.md](./CNDP_
     (works only for BESS)
 
     ```bash
-    docker exec bess-pfcpiface pfcpiface -config conf/upf.json -simulate create
+    docker exec bess-pfcpiface pfcpiface -config conf/upf.jsonc -simulate create
     ```
 
     OR
@@ -294,7 +292,7 @@ To configure/install the UPF in CNDP mode, please refer [CNDP_README.md](./CNDP_
 | DOCKER_BUIDKIT |     1      | Turn off to try legacy builder on older Docker versions |
 
 To update the pipeline, reflect changes to [`conf/up4.bess`](../conf/up4.bess)
-and/or [`conf/upf.json`](../conf/upf.json)
+and/or [`conf/upf.jsonc`](../conf/upf.jsonc)
 
 ```bash
 docker exec bess ./bessctl run up4
@@ -345,7 +343,7 @@ are provided in the [Configuration: Simulation mode](#configuration-simulation-m
 Pktgen allows us to test the upf pipeline with external datapath interfaces.
 This can be done either using a single machine or two machines.
 
-> Make sure the mode is not set to sim in scripts/docker_setup.sh and upf.json
+> Make sure the mode is not set to sim in scripts/docker_setup.sh and upf.jsonc
 
 ![ubench-pktgen](images/ubench-pktgen.svg)
 
@@ -359,7 +357,7 @@ This can be done either using a single machine or two machines.
             upf-epc-bess:"$(<VERSION)" -grpc-url=0.0.0.0:10514
     ```
 
-2. Customize [conf/pktgen.bess](../conf/pktgen.bess) to match [conf/upf](../conf/upf.json)
+2. Customize [conf/pktgen.bess](../conf/pktgen.bess) to match [conf/upf](../conf/upf.jsonc)
    used in the [Configuration: Simulation mode](#configuration-simulation-mode)
    section.
 
@@ -401,23 +399,22 @@ OMEC includes a Network Token Function (NTF) which provides preliminary support
 for Network Tokens, a new protocol to expose datapath services to end users and
 application providers. More details are available at [networktokens.org](https://networktokens.org)
 
-In order to compile NTF support, update [`conf/upf.json`](conf/upf.json) as follows:
+In order to compile NTF support, update [`conf/upf.jsonc`](conf/upf.jsonc) as follows:
 
 ```patch
-$ git diff conf/upf.json
-diff --git a/conf/upf.json b/conf/upf.json
-index 1f84803..f3428b5 100644
---- a/conf/upf.json
-+++ b/conf/upf.json
-@@ -78,7 +78,7 @@
+diff --git a/conf/upf.jsonc b/conf/upf.jsonc
+index f8f4e4e..c052755 100644
+--- a/conf/upf.jsonc
++++ b/conf/upf.jsonc
+@@ -86,7 +86,7 @@
      "resp_timeout": "2s",
 
-     "": "Whether to enable Network Token Functions",
+     // Whether to enable Network Token Functions
 -    "enable_ntf": false,
 +    "enable_ntf": true,
 
-     "": "Whether to enable End Marker Support",
-     "": "enable_end_marker: false",
+     // [Optional] Whether to enable End Marker Support
+     // "enable_end_marker": false,
 ```
 
 And run the [scripts/docker_setup.sh](scripts/docker_setup.sh) as follows:

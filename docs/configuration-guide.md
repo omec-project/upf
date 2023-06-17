@@ -9,7 +9,7 @@ Copyright 2022-present Open Networking Foundation
 
 This document focuses on frequently used configurations.
 
-Please refer to [upf.json](../conf/upf.json) file for the full list of configurable parameters.
+Please refer to [upf.jsonc](../conf/upf.jsonc) file for the full list of configurable parameters.
 
 ### Common configurations
 

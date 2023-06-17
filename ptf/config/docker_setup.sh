@@ -187,9 +187,9 @@ docker run --name bess-web -d --restart unless-stopped \
 # modify ptf to do initial setup instead of pfcpiface
 docker run --name bess-pfcpiface -td --restart on-failure \
 	--net container:pause \
-	-v "$PWD/conf/upf.json":/conf/upf.json \
+	-v "$PWD/conf/upf.jsonc":/conf/upf.jsonc \
 	upf-epc-pfcpiface:"$(<VERSION)" \
-	-config /conf/upf.json
+	-config /conf/upf.jsonc
 
 # Don't run any other container if mode is "sim"
 if [ "$mode" == 'sim' ]; then

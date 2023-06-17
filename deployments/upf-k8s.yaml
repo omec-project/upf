@@ -47,7 +47,7 @@ kind: ConfigMap
 metadata:
   name: upf-conf
 data:
-  upf.json: |
+  upf.jsonc: |
     {
       "access": {
         "ifname": "access"
@@ -130,7 +130,7 @@ spec:
     - -grpc-url=0.0.0.0:10514
     env:
     - name: CONF_FILE
-      value: /conf/upf.json
+      value: /conf/upf.jsonc
     livenessProbe:
       tcpSocket:
         port: 10514
@@ -172,7 +172,7 @@ spec:
     command: ["pfcpiface"]
     args:
     - -config
-    - /conf/upf.json
+    - /conf/upf.jsonc
     volumeMounts:
     - name: upf-conf
       mountPath: /conf

@@ -9,6 +9,7 @@ import struct
 import sys
 
 import iptools
+from jsoncomment import JsonComment
 import psutil
 from pyroute2 import IPDB
 
@@ -37,9 +38,12 @@ def getpythonpid(process_name):
 
 
 def get_json_conf(path, dump):
-    conf = json.loads(open(path).read())
+    with open(path, 'r') as f:
+        jsonc_data = f.read()
+    jc = JsonComment()
+    conf = jc.loads(jsonc_data)
     if dump:
-        print(json.dumps(conf, indent=4, sort_keys=True))
+        print(jc.dumps(conf, indent=4, sort_keys=True))
     return conf
 
 
