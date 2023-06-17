@@ -75,7 +75,7 @@
     "core": {
         // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
         // "ip_masquerade": "18.0.0.1 or 18.0.0.2 or 18.0.0.3",
-        "ifname": "core",
+        "ifname": "core"
     },
 
     // Number of worker threads. Default: 1
