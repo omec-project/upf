@@ -6,3 +6,4 @@
 *.swp
 output
 dpdk-devbind.py
+dpdk-hugepages.py
