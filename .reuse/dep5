@@ -13,11 +13,6 @@ Copyright: 2019-present Intel Corporation
 Copyright: 2020-present Open Networking Foundation
 License: Apache-2.0
 
-Files: patches/**/*.patch
-Copyright: 2019-present Intel Corporation
-Copyright: 2021-present Open Networking Foundation
-License: Apache-2.0
-
 Files: conf/**/*.json conf/*.json test/integration/config/*.json conf/p4/bin/p4info.bin conf/p4/bin/p4info.txt conf/prometheus.yml
 Copyright: 2019-present Intel Corporation
 Copyright: 2020-present Open Networking Foundation
