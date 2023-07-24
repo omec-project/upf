@@ -3,10 +3,12 @@
 # Copyright 2019 Intel Corporation
 
 import argparse
+import ipaddress
+import logging
 import signal
 import sys
+import threading
 import time
-import ipaddress
 
 # for retrieving neighbor info
 from pyroute2 import IPDB, IPRoute
@@ -16,12 +18,15 @@ from scapy.all import *
 try:
     from pybess.bess import *
 except ImportError:
-    print('Cannot import the API module (pybess)')
+    print("Cannot import the API module (pybess)")
     raise
 
 MAX_RETRIES = 5
 SLEEP_S = 2
 
+LOG_FORMAT = "%(asctime)s %(levelname)s %(message)s"
+logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class NeighborEntry:
     def __init__(self):
@@ -34,15 +39,25 @@ class NeighborEntry:
         self.macstr = None
 
     def __str__(self):
-        return ('{neigh: %s, iface: %s, ip-range: %s/%s}' %
-                (self.neighbor_ip, self.iface, self.iprange, self.prefix_len))
+        return "{neigh: %s, iface: %s, ip-range: %s/%s}" % (
+            self.neighbor_ip,
+            self.iface,
+            self.iprange,
+            self.prefix_len,
+        )
 
 
 def mac2hex(mac):
-    return int(mac.replace(':', ''), 16)
+    return int(mac.replace(":", ""), 16)
 
 
 def send_ping(neighbor_ip):
+    """Send an ICMP echo request to neighbor_ip.
+
+    Does not wait for a response. Expected to have the side
+    effect of populating the arp table entry for neighbor_ip.
+    """
+    print(f"Send ping to {neighbor_ip}")
     send(IP(dst=neighbor_ip) / ICMP())
 
 
@@ -54,22 +69,22 @@ def send_arp(neighbor_ip, src_mac, iface):
 
 
 def fetch_mac(dip):
-    ip = ''
-    _mac = ''
+    ip = ""
+    _mac = ""
     neighbors = ipr.get_neighbours(dst=dip)
     for i in range(len(neighbors)):
-        for att in neighbors[i]['attrs']:
-            if 'NDA_DST' in att and dip == att[1]:
+        for att in neighbors[i]["attrs"]:
+            if "NDA_DST" in att and dip == att[1]:
                 # ('NDA_DST', dip)
                 ip = att[1]
-            if 'NDA_LLADDR' in att:
+            if "NDA_LLADDR" in att:
                 # ('NDA_LLADDR', _mac)
                 _mac = att[1]
                 return _mac
 
 
 def link_modules(server, module, next_module, ogate=0, igate=0):
-    print('Linking {} module'.format(next_module))
+    print("Linking {} module".format(next_module))
 
     # Pause bess first
     bess.pause_all()
@@ -78,39 +93,45 @@ def link_modules(server, module, next_module, ogate=0, igate=0):
         try:
             server.connect_modules(module, next_module, ogate, igate)
         except BESS.Error as e:
+            print(f"Got BESS.Error with code {e.code}")
             bess.resume_all()
             if e.code == errno.EBUSY:
+                print("Got code EBUSY, breaking")
                 break
             else:
+                print(f"Got unknown code, returning: {e}")
                 return  #raise
         except Exception as e:
             print(
-                'Error connecting module {}:{}->{}:{}: {}. Retrying in {} secs...'
-                .format(module, ogate, igate, next_module, e, SLEEP_S))
+                "Error connecting module {}:{}->{}:{}: {}. Retrying in {} secs...".format(
+                    module, ogate, igate, next_module, e, SLEEP_S
+                )
+            )
             time.sleep(SLEEP_S)
         else:
             bess.resume_all()
             break
     else:
         bess.resume_all()
-        print('BESS module connection ({}:{}->{}:{}) failure.'.format(
-            module, ogate, igate, next_module))
+        print(
+            "BESS module connection ({}:{}->{}:{}) failure.".format(
+                module, ogate, igate, next_module
+            )
+        )
         return
-        #raise Exception('BESS module connection ({}:{}->{}:{}) failure.'.
+        # raise Exception('BESS module connection ({}:{}->{}:{}) failure.'.
         #                format(module, ogate, igate, next_module))
 
 
 def link_route_module(server, gateway_mac, item):
     iprange = item.iprange
     prefix_len = item.prefix_len
-    route_module = item.iface + 'Routes'
-    last_module = item.iface + 'Merge'
-    gateway_mac_str = '{:X}'.format(gateway_mac)
-    print('Adding route entry {}/{} for {}'.format(iprange, prefix_len,
-                                                   route_module))
+    route_module = item.iface + "Routes"
+    last_module = item.iface + "Merge"
+    gateway_mac_str = "{:X}".format(gateway_mac)
+    print("Adding route entry {}/{} for {}".format(iprange, prefix_len, route_module))
 
-    print('Trying to retrieve neighbor entry {} from neighbor cache'.format(
-        item.neighbor_ip))
+    print("Trying to retrieve neighbor entry {} from neighbor cache".format(item.neighbor_ip))
     neighbor_exists = neighborcache.get(item.neighbor_ip)
 
     # How many gates does this module have?
@@ -132,69 +153,82 @@ def link_route_module(server, gateway_mac, item):
     # Pass routing entry to bessd's route module
     for _ in range(MAX_RETRIES):
         try:
-            server.run_module_command(route_module, 'add',
-                                      'IPLookupCommandAddArg', {
-                                          'prefix': iprange,
-                                          'prefix_len': int(prefix_len),
-                                          'gate': gate_idx
-                                      })
-        except:
-            print('Error adding route entry {}/{} in {}. Retrying in {}sec...'.
-                  format(iprange, prefix_len, route_module, SLEEP_S))
+            server.run_module_command(
+                route_module,
+                "add",
+                "IPLookupCommandAddArg",
+                {"prefix": iprange, "prefix_len": int(prefix_len), "gate": gate_idx},
+            )
+        except Exception as e:
+            print(
+                "Error adding route entry {}/{} in {}. Retrying in {}sec...".format(
+                    iprange, prefix_len, route_module, SLEEP_S
+                )
+            )
+            print(f"Exception was: {e}")
             time.sleep(SLEEP_S)
         else:
             bess.resume_all()
             break
     else:
         bess.resume_all()
-        print('BESS route entry ({}/{}) insertion failure in module {}'.format(
-            iprange, prefix_len, route_module))
-        return
-        #raise Exception('BESS route entry ({}/{}) insertion failure in module {}'.
+        print(
+            "BESS route entry ({}/{}) insertion failure in module {}".format(
+                iprange, prefix_len, route_module
+            )
+        )
+        return False
+        # raise Exception('BESS route entry ({}/{}) insertion failure in module {}'.
         #                format(iprange, prefix_len, route_module))
 
     if not neighbor_exists:
-        print('Neighbor does not exist')
         # Create Update module
-        update_module = route_module + 'DstMAC' + gateway_mac_str
+        update_module = route_module + "DstMAC" + gateway_mac_str
 
         # Pause bess first
         bess.pause_all()
         for _ in range(MAX_RETRIES):
             try:
-                server.create_module('Update', update_module, {
-                    'fields': [{
-                        'offset': 0,
-                        'size': 6,
-                        'value': gateway_mac
-                    }]
-                })
+                print(f"Inserting {update_module}")
+                server.create_module(
+                    "Update",
+                    update_module,
+                    {"fields": [{"offset": 0, "size": 6, "value": gateway_mac}]},
+                )
             except BESS.Error as e:
                 bess.resume_all()
+                print(f"Got BESS error with code {e.code}")
                 if e.code == errno.EEXIST:
+                    print(f"Module {update_module} already exists")
                     break
                 else:
+                    print(f"Unknown error when inserting {update_module}: {e}")
                     return  #raise
             except Exception as e:
                 print(
-                    'Error creating update module {}: {}. Retrying in {} secs...'
-                    .format(update_module, e, SLEEP_S))
+                    "Error creating update module {}: {}. Retrying in {} secs...".format(
+                        update_module, e, SLEEP_S
+                    )
+                )
                 time.sleep(SLEEP_S)
             else:
+                print(f"Add Update module {update_module} success")
                 bess.resume_all()
                 break
         else:
             bess.resume_all()
-            print('BESS module {} creation failure.'.format(update_module))
-            return  #raise Exception('BESS module {} creation failure.'.
+            print("BESS module {} creation failure.".format(update_module))
+            return False  # raise Exception('BESS module {} creation failure.'.
             #        format(update_module))
 
-        print('Update module created')
+        print("Update module created")
 
         # Connect Update module to route module
+        print(f"Link module {route_module} to {update_module}")
         link_modules(server, route_module, update_module, gate_idx, 0)
 
         # Connect Update module to dpdk_out module
+        print(f"Link module {update_module} to {last_module}")
         link_modules(server, update_module, last_module, 0, 0)
 
         # Add a new neighbor in neighbor cache
@@ -212,16 +246,17 @@ def link_route_module(server, gateway_mac, item):
         neighbor_exists = item
 
     else:
-        print('Neighbor already exists')
+        print("Neighbor already exists")
 
     # Finally increment route count
     neighborcache[item.neighbor_ip].route_count += 1
 
 
 def del_route_entry(server, item):
+    print(f"Deleting route entry for {item}")
     iprange = item.iprange
     prefix_len = item.prefix_len
-    route_module = item.iface + 'Routes'
+    route_module = item.iface + "Routes"
 
     neighbor_exists = neighborcache.get(item.neighbor_ip)
     if neighbor_exists:
@@ -230,71 +265,79 @@ def del_route_entry(server, item):
         # Delete routing entry from bessd's route module
         for i in range(MAX_RETRIES):
             try:
-                server.run_module_command(route_module, 'delete',
-                                          'IPLookupCommandDeleteArg', {
-                                              'prefix': iprange,
-                                              'prefix_len': int(prefix_len)
-                                          })
+                server.run_module_command(
+                    route_module,
+                    "delete",
+                    "IPLookupCommandDeleteArg",
+                    {"prefix": iprange, "prefix_len": int(prefix_len)},
+                )
             except:
                 print(
-                    'Error while deleting route entry for {}. Retrying in {} sec...'
-                    .format(route_module, SLEEP_S))
+                    "Error while deleting route entry for {}. Retrying in {} sec...".format(
+                        route_module, SLEEP_S
+                    )
+                )
                 time.sleep(SLEEP_S)
             else:
                 bess.resume_all()
                 break
         else:
             bess.resume_all()
-            print('Route entry deletion failure.')
+            print("Route entry deletion failure.")
             return
-            #raise Exception('Route entry deletion failure.')
+            # raise Exception('Route entry deletion failure.')
 
-        print('Route entry {}/{} deleted from {}'.format(
-            iprange, prefix_len, route_module))
+        print("Route entry {}/{} deleted from {}".format(iprange, prefix_len, route_module))
 
         # Decrementing route count for the registered neighbor
         neighbor_exists.route_count -= 1
 
         # If route count is 0, then delete the whole module
         if neighbor_exists.route_count == 0:
-            update_module = route_module + 'DstMAC' + neighbor_exists.macstr
+            update_module = route_module + "DstMAC" + neighbor_exists.macstr
             # Pause bess first
             bess.pause_all()
             for i in range(MAX_RETRIES):
                 try:
                     server.destroy_module(update_module)
                 except:
-                    print('Error destroying module {}. Retrying in {}sec...'.
-                          format(update_module, SLEEP_S))
+                    print(
+                        "Error destroying module {}. Retrying in {}sec...".format(
+                            update_module, SLEEP_S
+                        )
+                    )
                     time.sleep(SLEEP_S)
                 else:
                     bess.resume_all()
                     break
             else:
                 bess.resume_all()
-                print('Module {} deletion failure.'.format(update_module))
+                print("Module {} deletion failure.".format(update_module))
                 return
-                #raise Exception('Module {} deletion failure.'.
+                # raise Exception('Module {} deletion failure.'.
                 #                format(update_module))
 
-            print('Module {} destroyed'.format(update_module))
+            print("Module {} destroyed".format(update_module))
 
             # Delete entry from the neighbor cache
             del neighborcache[item.neighbor_ip]
-            print('Deleting item from neighborcache')
+            print("Deleting item from neighborcache")
             del neighbor_exists
         else:
-            print('Route count for {}  decremented to {}'.format(
-                item.neighbor_ip, neighbor_exists.route_count))
+            print(
+                "Route count for {}  decremented to {}".format(
+                    item.neighbor_ip, neighbor_exists.route_count
+                )
+            )
             neighborcache[item.neighbor_ip] = neighbor_exists
     else:
-        print('Neighbor {} does not exist'.format(item.neighbor_ip))
+        print("Neighbor {} does not exist".format(item.neighbor_ip))
 
 
 def probe_addr(item, src_mac):
     # Store entry if entry does not exist in ARP cache
     arpcache[item.neighbor_ip] = item
-    print('Adding entry {} in arp probe table'.format(item))
+    print("Adding entry {} in arp probe table".format(item))
 
     try:
         ipb = ipaddress.ip_address(item.neighbor_ip)
@@ -316,17 +359,17 @@ def probe_addr(item, src_mac):
 def parse_new_route(msg):
     item = NeighborEntry()
     # Fetch prefix_len
-    item.prefix_len = msg['dst_len']
+    item.prefix_len = msg["dst_len"]
     # Default route
     if item.prefix_len == 0:
-        item.iprange = '0.0.0.0'
+        item.iprange = "0.0.0.0"
 
-    for att in msg['attrs']:
-        if 'RTA_DST' in att:
+    for att in msg["attrs"]:
+        if "RTA_DST" in att:
             # Fetch IP range
             # ('RTA_DST', iprange)
             item.iprange = att[1]
-        if 'RTA_GATEWAY' in att:
+        if "RTA_GATEWAY" in att:
             # Fetch gateway MAC address
             # ('RTA_GATEWAY', neighbor_ip)
             item.neighbor_ip = att[1]
@@ -335,7 +378,7 @@ def parse_new_route(msg):
                 gateway_mac = 0
             else:
                 gateway_mac = mac2hex(_mac)
-        if 'RTA_OIF' in att:
+        if "RTA_OIF" in att:
             # Fetch interface name
             # ('RTA_OIF', iface)
             item.iface = ipdb.interfaces[int(att[1])].ifname
@@ -347,12 +390,15 @@ def parse_new_route(msg):
 
     # if mac is 0, send ARP request
     if gateway_mac == 0:
-        print('Adding entry {} in arp probe table. Neighbor: {}'.format(item.iface,item.neighbor_ip))
+        print("Adding entry {} in arp probe table. Neighbor: {}".format(item.iface,item.neighbor_ip))
         probe_addr(item, ipdb.interfaces[item.iface].address)
 
     else:  # if gateway_mac is set
-        print('Linking module {}Routes with {}Merge (Dest MAC: {})'.format(
-            item.iface, item.iface, _mac))
+        print(
+            "Linking module {}Routes with {}Merge (Dest MAC: {})".format(
+                item.iface, item.iface, _mac
+            )
+        )
 
         link_route_module(bess, gateway_mac, item)
 
@@ -380,16 +426,16 @@ def parse_new_neighbor(msg):
 
 def parse_del_route(msg):
     item = NeighborEntry()
-    for att in msg['attrs']:
-        if 'RTA_DST' in att:
+    for att in msg["attrs"]:
+        if "RTA_DST" in att:
             # Fetch IP range
             # ('RTA_DST', iprange)
             item.iprange = att[1]
-        if 'RTA_GATEWAY' in att:
+        if "RTA_GATEWAY" in att:
             # Fetch gateway MAC address
             # ('RTA_GATEWAY', neighbor_ip)
             item.neighbor_ip = att[1]
-        if 'RTA_OIF' in att:
+        if "RTA_OIF" in att:
             # Fetch interface name
             # ('RTA_OIF', iface)
             item.iface = ipdb.interfaces[int(att[1])].ifname
@@ -401,6 +447,7 @@ def parse_del_route(msg):
 
     # Fetch prefix_len
     item.prefix_len = msg['dst_len']
+    print(f"Deleting route: {item}")
 
     del_route_entry(bess, item)
 
@@ -413,70 +460,80 @@ def netlink_event_listener(ipdb, netlink_message, action):
     # If you get a netlink message, parse it
     msg = netlink_message
 
-    if action == 'RTM_NEWROUTE':
-        parse_new_route(msg)
+    if action == "RTM_NEWROUTE":
+        with lock:
+            parse_new_route(msg)
 
-    if action == 'RTM_NEWNEIGH':
-        parse_new_neighbor(msg)
+    if action == "RTM_NEWNEIGH":
+        with lock:
+            parse_new_neighbor(msg)
 
-    if action == 'RTM_DELROUTE':
-        parse_del_route(msg)
+    if action == "RTM_DELROUTE":
+        with lock:
+            parse_del_route(msg)
 
 
 def bootstrap_routes():
     routes = ipr.get_routes()
     for i in routes:
-        if i['event'] == 'RTM_NEWROUTE':
+        if i["event"] == "RTM_NEWROUTE":
             parse_new_route(i)
 
 
 def connect_bessd():
-    print('Connecting to BESS daemon...'),
-    # Connect to BESS (assuming host=localhost, port=10514 (default))
+    logger.info("Connecting to BESS daemon...")
     for i in range(MAX_RETRIES):
         try:
             if not bess.is_connected():
-                bess.connect(grpc_url=args.ip + ':' + args.port)
+                bess.connect(grpc_url=args.ip + ":" + args.port)
         except BESS.RPCError:
-            print(
-                'Error connecting to BESS daemon. Retrying in {}sec...'.format(
-                    SLEEP_S))
+            logger.error("Error connecting to BESS daemon. Retrying in {}sec...".format(SLEEP_S))
             time.sleep(SLEEP_S)
         else:
             break
     else:
-        raise Exception('BESS connection failure.')
+        raise Exception("BESS connection failure.")
 
-    print('Done.')
+    logger.info("Connected to BESS daemon")
 
 
 def reconfigure(number, frame):
-    print('Received: {} Reloading routes'.format(number))
-    # clear arpcache
-    for ip in list(arpcache):
-        item = arpcache.get(ip)
-        del item
-    arpcache.clear()
-    for ip in list(neighborcache):
-        item = neighborcache.get(ip)
-        del item
-    neighborcache.clear()
-    for modname in list(modgatecnt):
-        item = modgatecnt.get(modname)
-        del item
-    modgatecnt.clear()
-    bootstrap_routes()
+    print("Received: {} Reloading routes".format(number))
+    with lock:
+        # clear arpcache
+        for ip in list(arpcache):
+            item = arpcache.get(ip)
+            del item
+        arpcache.clear()
+        for ip in list(neighborcache):
+            item = neighborcache.get(ip)
+            del item
+        neighborcache.clear()
+        for modname in list(modgatecnt):
+            item = modgatecnt.get(modname)
+            del item
+        modgatecnt.clear()
+        bootstrap_routes()
     signal.pause()
 
 
 def cleanup(number, frame):
     ipdb.unregister_callback(event_callback)
-    print('Received: {} Exiting'.format(number))
+    print("Received: {} Exiting".format(number))
     sys.exit()
 
+def ping_missing_entries():
+    print("Starting pinging thread")
+    while True:
+        with lock:
+            print(f"Missing {len(arpcache)} ARP entries")
+            for ip in arpcache.keys():
+                print(f"Pinging {ip}")
+                send_ping(ip)
+        time.sleep(10)
 
 def main():
-    global arpcache, neighborcache, modgatecnt, ipdb, event_callback, bess, ipr
+    global arpcache, neighborcache, modgatecnt, ipdb, event_callback, bess, ipr, lock
     # for holding unresolved ARP queries
     arpcache = {}
     # for holding list of registered neighbors
@@ -492,13 +549,19 @@ def main():
     # connect to bessd
     connect_bessd()
 
-    # program current routes
-    bootstrap_routes()
+    lock = threading.Lock()
+
+    with lock:
+        # program current routes
+        bootstrap_routes()
 
     # listen for netlink events
-    print('Registering netlink event listener callback...'),
+    print("Registering netlink event listener callback..."),
     event_callback = ipdb.register_callback(netlink_event_listener)
-    print('Done.')
+    print("Done.")
+
+    ping_missing = threading.Thread(target=ping_missing_entries, daemon=True)
+    ping_missing.start()
 
     signal.signal(signal.SIGHUP, reconfigure)
     signal.signal(signal.SIGINT, cleanup)
@@ -506,18 +569,11 @@ def main():
     signal.pause()
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description='Basic IPv4 Routing Controller')
-    parser.add_argument('-i',
-                        type=str,
-                        nargs='+',
-                        help='interface(s) to control')
-    parser.add_argument('--ip',
-                        type=str,
-                        default='localhost',
-                        help='BESSD address')
-    parser.add_argument('--port', type=str, default='10514', help='BESSD port')
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Basic IPv4 Routing Controller")
+    parser.add_argument("-i", type=str, nargs="+", help="interface(s) to control")
+    parser.add_argument("--ip", type=str, default="localhost", help="BESSD address")
+    parser.add_argument("--port", type=str, default="10514", help="BESSD port")
 
     # for holding command-line arguments
     global args
