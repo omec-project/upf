@@ -14,7 +14,6 @@ from dataclasses import dataclass, field
 from threading import Lock, Thread
 from typing import Optional, Union, Dict
 
-# for retrieving neighbor info
 from pyroute2 import IPDB, IPRoute
 
 from pyroute2.netlink.rtnl.rtmsg import rtmsg
@@ -417,9 +416,9 @@ class RouteControl:
         The goal is to populate the ARP cache.
         If the target host does not respond it will be pinged in the next cycle.
         """
-        while True:  # Example of a stop variable
+        while True:
             with self.lock:
-                missing_arp_entries = list(self.unresolved_arp_queries_cahce.keys())  # Create a local copy of keys
+                missing_arp_entries = list(self.unresolved_arp_queries_cahce.keys())
                 logger.info("Missing ARP entries: {}".format(missing_arp_entries))
             for ip in missing_arp_entries:
                 try:
@@ -461,10 +460,9 @@ class RouteControl:
                     unresolved_next_hop.iface, unresolved_next_hop.iface, gateway_mac
                 )
             )
-            # Add route entry, and add item in the registered neighbor cache
+
             self.add_neighbor(unresolved_next_hop, mac2hex(gateway_mac))
 
-            # Remove entry from unresolved arp cache
             del self.unresolved_arp_queries_cahce[unresolved_next_hop.next_hop_ip]
 
     def get_gate_idx(self, route_entry: RouteEntry, module_name: str) -> int:
@@ -536,17 +534,14 @@ class RouteControl:
         next_hop = self.neighbor_cache.get(route_entry.next_hop_ip)
 
         if next_hop:
-            # Delete routing entry from bessd's route module
             try:
                 self.bess_controller.del_module_route_entry(route_entry)
             except:
                 logger.error("Error deleting route entry {}".format(route_entry))
                 return
 
-            # Decrementing route count for the registered neighbor
             next_hop.route_count -= 1
 
-            # If route count is 0, then delete the whole module
             if next_hop.route_count == 0:
                 route_module = route_entry.iface + "Routes"
                 update_module_name = route_module + "DstMAC" + next_hop.macstr
