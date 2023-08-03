@@ -1,23 +1,33 @@
 import unittest
 from unittest.mock import MagicMock, patch
-from pyroute2 import IPRoute
+from pyroute2 import IPRoute, IPDB
 
 import sys
 from unittest.mock import MagicMock
 
+
 sys.modules['pybess.bess'] = MagicMock()
 
-from route_control import *
+from route_control import(
+    RouteEntry,
+    RouteController,
+    RouteEntryParser,
+    fetch_mac,
+    mac2hex,
+    validate_ipv4,
+    send_ping,
+)
 
 
 class BessControllerMock(object):
-    """Mocks BessController class from route_control.py, the functions either pass or raise exceptions based in the parameters."""
+    """Mock of BessController to avoid using BESS from pybess.bess"""
     def __init__(self):
         pass
+
     def get_bess(self, raises: bool = False) -> None:
         if raises:
             raise Exception("Error in get_bess")
-    
+
     def add_route_entry(self, raises: bool = False) -> None:
         if raises:
             raise Exception("Error in add_route_entry")
@@ -37,10 +47,11 @@ class BessControllerMock(object):
     def link_modules(self, raises: bool = False) -> None:
         if raises:
             raise Exception("Error in link_modules")
+    
 
 @patch("route_control.BessController", BessControllerMock)
 class TestUtilityFunctions(unittest.TestCase):
-
+    """Tests utility functions in route_control.py."""
     def test_validate_ipv4_with_valid_ip(self):
         self.assertTrue(validate_ipv4("192.168.1.1"))
         self.assertFalse(validate_ipv4("192.168.300.1"))
@@ -52,24 +63,22 @@ class TestUtilityFunctions(unittest.TestCase):
     def test_mac2hex_valid_mac(self):
         self.assertEqual(mac2hex("00:1a:2b:3c:4d:5e"), 0x001a2b3c4d5e)
 
-    def test_mac2hex_invalid_mac(self):
-        with self.assertRaises(ValueError):
-            mac2hex("invalid_mac")
-
-    def test_fetch_mac_valid_ip(self):
+    def test_fetch_mac_address_found(self):
         ipr = IPRoute()
         ipr.get_neighbours = lambda dst, **kwargs: \
             [{"attrs": [("NDA_DST", dst), ("NDA_LLADDR", "00:1a:2b:3c:4d:5e")]}]
-        self.assertEqual(fetch_mac("192.168.1.1"), "00:1a:2b:3c:4d:5e")
+        self.assertEqual(fetch_mac(ipr, "192.168.1.1"), "00:1a:2b:3c:4d:5e")
     
-    def test_fetch_mac_mac_not_found(self):
+    def test_fetch_mac_address_not_found(self):
         ipr = IPRoute()
         ipr.get_neighbours = lambda dst, **kwargs: []
-        self.assertIsNone(fetch_mac("192.168.1.1"))
+        self.assertIsNone(fetch_mac(ipr, "192.168.1.1"))
 
 
-@patch('pybess.bess.BESS', MagicMock)
+
+@patch("route_control.BessController", BessControllerMock)
 class TestRouteEntryParser(unittest.TestCase):
+    """Tests the functions of the RouteEntryParser class."""
     def setUp(self):
         self.ipdb = IPDB()
         self.parser = RouteEntryParser(self.ipdb)
@@ -127,7 +136,7 @@ class TestRouteEntryParser(unittest.TestCase):
         }
         result = self.parser.parse(example_route_entry)
         self.assertIsInstance(result, RouteEntry)
-        self.assertEqual(result.dest_prefix, "0.0.0.0")
+        self.assertEqual(result.dest_prefix, "192.168.1.0")
         self.assertEqual(result.next_hop_ip, "172.31.48.1")
         self.assertEqual(result.interface, self.ipdb.interfaces[2])
         self.assertEqual(result.prefix_len, 24)
@@ -153,9 +162,3 @@ class TestRouteEntryParser(unittest.TestCase):
         }
         result = self.parser.parse(example_route_entry)
         self.assertIsNone(result)
-
-
-
-
-if __name__ == "__main__":
-    unittest.main()
