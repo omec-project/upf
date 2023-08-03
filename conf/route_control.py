@@ -12,12 +12,9 @@ import time
 
 from dataclasses import dataclass, field
 from threading import Lock, Thread
-from typing import Optional, Union, Dict
+from typing import Optional, Dict
 
 from pyroute2 import IPDB, IPRoute
-
-from pyroute2.netlink.rtnl.rtmsg import rtmsg
-from pyroute2.netlink.rtnl.ndmsg import ndmsg
 
 from scapy.all import IP, ICMP, send
 
@@ -53,12 +50,12 @@ class RouteEntryParser:
     def __init__(self, ipdb):
         self.ipdb = ipdb
 
-    def parse(self, route_entry: rtmsg) -> RouteEntry:
+    def parse(self, route_entry: dict) -> RouteEntry:
         """Parses a route entry message.
         If the entry passes the checks, it is returned as a NeighborEntry.
 
         Args:
-            route_entry (rtmsg): A netlink route entry message.
+            route_entry (dict): A netlink route entry message.
 
         Returns:
             NeighborEntry: A neighbor entry.
@@ -388,11 +385,11 @@ class RouteControl:
 
             self.neighbor_cache[route_entry.next_hop_ip].route_count += 1
     
-    def netlink_event_listener(self, netlink_message: Union[ndmsg, rtmsg], action: str) -> None:
+    def netlink_event_listener(self, netlink_message: dict, action: str) -> None:
         """Listens for netlink events and handles them.
         
         Args:
-            netlink_message (Union[ndmsg, rtmsg]): The netlink message.
+            netlink_message (dict): The netlink message.
             action (str): The action.
         """
         route_entry = self.route_parser.parse(netlink_message)
@@ -445,11 +442,11 @@ class RouteControl:
         logger.info("{} is a valid IPv4 address".format(route_entry.next_hop_ip))
         send_ping(route_entry.next_hop_ip)
 
-    def parse_new_neighbor(self, netlink_message: ndmsg) -> None:
+    def parse_new_neighbor(self, netlink_message: dict) -> None:
         """Handle new neighbor event.
 
         Args:
-            netlink_message (ndmsg): The netlink message.
+            netlink_message (dict): The netlink message.
         """
         attr_dict = dict(netlink_message["attrs"])
         unresolved_next_hop = self.unresolved_arp_queries_cahce.get(attr_dict["NDA_DST"])
@@ -657,3 +654,6 @@ if __name__ == "__main__":
         signal.pause()
     else:
         parser.print_help()
+
+# TODO Understand module creation and deletion
+# TODO linting
