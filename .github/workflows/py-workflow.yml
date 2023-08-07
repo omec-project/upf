@@ -1,0 +1,33 @@
+name: Python Lint and Test
+
+on: [push, pull_request]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+      
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.11'
+
+    - name: Create virtual environment
+      run: python -m venv venv
+
+    - name: Install dependencies
+      run: ./venv/bin/pip install -r conf/test_requirements.txt
+
+    - name: Lint with flake8
+      run: ./venv/bin/flake8 conf/route_control.py conf/test_route_control.py
+    
+    - name: Static Analysis with mypy
+      run: |
+        ./venv/bin/mypy path/to/your_script.py another_path/to/another_script.py
+
+    - name: Run tests
+      run: ./venv/bin/pytest conf/test_route_control.py
