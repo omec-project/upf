@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from threading import Lock, Thread
 from typing import Dict, List, Optional, Tuple
 
-from pybess.bess import *  # type: ignore[import]  # noqa: F403
+from pybess.bess import *  # type: ignore[import]
 from pyroute2 import IPDB, IPRoute  # type: ignore[import]
 from scapy.all import ICMP, IP, send  # type: ignore[import]
 
@@ -62,15 +62,15 @@ class BessController:
         """
         self.bess = self.get_bess(ip=bess_ip, port=bess_port)
 
-    def get_bess(self, ip: str, port: str) -> "BESS":  # type: ignore[name-defined]  # noqa: name 'BESS' may be undefined
+    def get_bess(self, ip: str, port: str) -> "BESS":  # type: ignore[name-defined]
         """Connects to the BESS daemon."""
-        bess = BESS()  # type: ignore[name-defined]  # noqa: name 'BESS' may be undefined
+        bess = BESS()  # type: ignore[name-defined]
         logger.info("Connecting to BESS daemon...")
         for _ in range(MAX_RETRIES):
             try:
                 if not bess.is_connected():
                     bess.connect(grpc_url=ip + ":" + port)
-            except BESS.RPCError:  # type: ignore[name-defined]  # noqa: name 'BESS' may be undefined
+            except BESS.RPCError:  # type: ignore[name-defined]
                 logger.error(
                     "Error connecting to BESS daemon. Retrying in %s sec...",
                     SLEEP_S,
@@ -84,7 +84,7 @@ class BessController:
                 return bess
         else:
             raise Exception(
-                "BESS connection failure after {} attempts.".format(MAX_RETRIES)  # noqa: E501
+                "BESS connection failure after {} attempts.".format(MAX_RETRIES)
             )
 
     def add_route_to_module(
@@ -118,7 +118,7 @@ class BessController:
                 )
             except Exception:
                 logger.exception(
-                    "Error adding route entry %s/%i in %s. Retrying in %i sec...",  # noqa: E501
+                    "Error adding route entry %s/%i in %s. Retrying in %i sec...",
                     route_entry.dest_prefix,
                     route_entry.prefix_len,
                     module_name,
@@ -137,7 +137,7 @@ class BessController:
                 self.bess.resume_all()
         else:
             raise Exception(
-                "BESS route entry ({}/{}) insertion failure in module {}".format(  # noqa: E501
+                "BESS route entry ({}/{}) insertion failure in module {}".format(
                     route_entry.dest_prefix,
                     route_entry.prefix_len,
                     module_name,
@@ -176,7 +176,7 @@ class BessController:
                 self.bess.resume_all()
         else:
             raise Exception(
-                "BESS route entry ({}/{}) deletion failure in module {}".format(  # noqa: E501
+                "BESS route entry ({}/{}) deletion failure in module {}".format(
                     route_entry.dest_prefix,
                     route_entry.prefix_len,
                     route_module,
@@ -200,10 +200,10 @@ class BessController:
                 self.bess.create_module(
                     module_class,
                     module_name,
-                    {"fields": [{"offset": 0, "size": 6, "value": gateway_mac}]},  # noqa: E501
+                    {"fields": [{"offset": 0, "size": 6, "value": gateway_mac}]},
                 )
-            except BESS.Error as e:  # type: ignore[name-defined]  # noqa: name 'BESS' may be undefined
-                if e.code == errno.EEXIST:  # type: ignore[name-defined]  # noqa: name 'BESS' may be undefined
+            except BESS.Error as e:  # type: ignore[name-defined]
+                if e.code == errno.EEXIST:  # type: ignore[name-defined]
                     logger.error("Module %s already exists", module_name)
                     break
                 else:
@@ -243,9 +243,9 @@ class BessController:
             try:
                 self.bess.pause_all()
                 self.bess.connect_modules(module, next_module, ogate, igate)
-            except BESS.Error as e:  # type: ignore[name-defined]  # noqa: name 'BESS' may be undefined
+            except BESS.Error as e:  # type: ignore[name-defined]
                 logger.exception("Got BESS error")
-                if e.code == errno.EBUSY:  # type: ignore[name-defined]  # noqa: name 'BESS' may be undefined
+                if e.code == errno.EBUSY:  # type: ignore[name-defined]
                     logger.error(
                         "Got code EBUSY. Retrying in %i secs...", SLEEP_S
                     )
@@ -256,7 +256,7 @@ class BessController:
                     )
             except Exception:
                 logger.exception(
-                    "Error connecting module: %s:%i->%i/%s. Retrying in %s secs...",  # noqa: E501
+                    "Error connecting module: %s:%i->%i/%s. Retrying in %s secs...",
                     module,
                     ogate,
                     igate,
@@ -348,19 +348,19 @@ class RouteController:
         self.ipdb = ipdb
         self.ipr = ipr
         self.bess_controller = bess_controller
-        self.ping_missing = Thread(target=self._ping_missing_entries, daemon=True)  # noqa: E501
+        self.ping_missing_thread = Thread(target=self._ping_missing_entries, daemon=True)
         self.event_callback = None
         self.interfaces = interfaces
 
     def register_callbacks(self) -> None:
         """Register callback function."""
         logger.info("Registering netlink event listener callback...")
-        self.event_callback = self.ipdb.register_callback(self._netlink_event_listener)  # noqa: E501
+        self.event_callback = self.ipdb.register_callback(self._netlink_event_listener)
 
     def start_pinging_missing_entries(self) -> None:
         """Starts a new thread for ping missing entries."""
-        if not self.ping_missing or not self.ping_missing.is_alive():
-            self.ping_missing.start()
+        if not self.ping_missing_thread or not self.ping_missing_thread.is_alive():
+            self.ping_missing_thread.start()
             logger.info("Ping missing entries thread started")
 
     def bootstrap_routes(self) -> None:
@@ -380,10 +380,9 @@ class RouteController:
         """
         if not (next_hop_mac := fetch_mac(self.ipdb, route_entry.next_hop_ip)):
             logger.info(
-                "mac address of the next hop %s is not stored in ARP table. Probing...",  # noqa: E501
+                "mac address of the next hop %s is not stored in ARP table. Probing...",
                 route_entry.next_hop_ip,
             )
-            # TODO maybe wait instead of threading
             self._probe_addr(route_entry)
             return
 
@@ -400,7 +399,6 @@ class RouteController:
             next_hop_mac (str): The MAC address of the next hop.
         """
         route_module_name = self.get_route_module_name(route_entry.interface)
-
         try:
             self.bess_controller.add_route_to_module(
                 route_entry,
@@ -598,7 +596,7 @@ class RouteController:
         """
         while True:
             with self.lock:
-                missing_arp_entries = list(self.unresolved_arp_queries_cache.keys())  # noqa: E501
+                missing_arp_entries = list(self.unresolved_arp_queries_cache.keys())
                 logger.info("Missing ARP entries: %s", missing_arp_entries)
             for ip in missing_arp_entries:
                 try:
@@ -700,14 +698,18 @@ class RouteController:
         Returns:
             RouteEntry: A route entry object.
         """
-        attr_dict = dict(route_entry["attrs"])  # type: ignore[arg-type]
+        try:
+            attr_dict = dict(route_entry["attrs"])  # type: ignore[arg-type]
+        except Exception:
+            logger.exception("Error parsing route entry message")
+            return None
 
         if not (next_hop_ip := attr_dict.get(DESTINATION_GATEWAY_IP)):
             return None
 
         if not attr_dict.get(INTERFACE):
             return None
-        interface_index = int(attr_dict.get(INTERFACE))  # type: ignore[arg-type]  # noqa: E501
+        interface_index = int(attr_dict.get(INTERFACE))  # type: ignore[arg-type]
         interface = self.ipdb.interfaces[interface_index].ifname
         if interface not in self.interfaces:
             return None
@@ -819,7 +821,7 @@ def mac_to_int(mac: str) -> int:
     try:
         return int(mac.replace(":", ""), 16)
     except ValueError:
-        raise Exception("Invalid MAC address: %s", mac)
+        raise ValueError("Invalid MAC address: %s", mac)
 
 
 def mac_to_hex(mac: str) -> str:
