@@ -403,13 +403,13 @@ class TestRouteController(unittest.TestCase):
             "event": "RTM_NEWROUTE",
         }
         self.route_controller._netlink_event_listener(
-            example_route_entry, "RTM_NEWROUTE"
+            self.ipdb, example_route_entry, "RTM_NEWROUTE"
         )
         mock_handle_new_route_entry.assert_called()
 
-    @patch.object(RouteController, "_del_route")
+    @patch.object(RouteController, "_delete_route")
     def test_given_netlink_message_when_rtm_delroute_event_then_del_route_is_called(
-        self, mock_del_route
+        self, mock_delete_route
     ):
         self.ipdb.interfaces = {2: Mock(ifname='core')}
         example_route_entry = {
@@ -433,15 +433,15 @@ class TestRouteController(unittest.TestCase):
             "event": "RTM_DELROUTE",
         }
         self.route_controller._netlink_event_listener(
-            example_route_entry, "RTM_DELROUTE"
+            self.ipdb, example_route_entry, "RTM_DELROUTE"
         )
-        mock_del_route.assert_called()
+        mock_delete_route.assert_called()
 
     @patch.object(RouteController, "_parse_new_neighbor")
     def test_given_netlink_message_when_rtm_newneigh_event_then_parse_new_neighbor_is_called(
         self, mock_parse_new_neighbor
     ):
         self.route_controller._netlink_event_listener(
-            "new neighbour message", "RTM_NEWNEIGH"
+            self.ipdb, "new neighbour message", "RTM_NEWNEIGH"
         )
         mock_parse_new_neighbor.assert_called()
