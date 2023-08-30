@@ -66,7 +66,6 @@ class BessController:
     def _get_bess(self, ip: str, port: str) -> "BESS":
         """Connects to the BESS daemon."""
         bess = BESS()
-        logger.info("Connecting to BESS daemon...")
         for _ in range(self.MAX_RETRIES):
             try:
                 if not bess.is_connected():
@@ -98,12 +97,6 @@ class BessController:
             gate_idx (int): Gate of the module used in the route.
             module_name (str): The name of the module.
         """
-        logger.info(
-            "Adding route entry %s/%i for %s",
-            route_entry.dest_prefix,
-            route_entry.prefix_len,
-            module_name,
-        )
         for _ in range(self.MAX_RETRIES):
             try:
                 self.bess.pause_all()
@@ -172,6 +165,7 @@ class BessController:
                 )
                 time.sleep(self.SLEEP_S)
             else:
+                logger.info("Route entry deleted for %s", route_module)
                 break
             finally:
                 self.bess.resume_all()
@@ -196,7 +190,6 @@ class BessController:
         """
         for _ in range(self.MAX_RETRIES):
             try:
-                logger.info("Inserting %s", module_name)
                 self.bess.pause_all()
                 self.bess.create_module(
                     module_class,
@@ -239,7 +232,6 @@ class BessController:
             ogate (int, optional): The output gate of the first module.
             igate (int, optional): The input gate of the second module.
         """
-        logger.info("Linking %s module to %s module", module, next_module)
         for _ in range(self.MAX_RETRIES):
             try:
                 self.bess.pause_all()
@@ -257,7 +249,7 @@ class BessController:
                     )
             except Exception:
                 logger.exception(
-                    "Error connecting module: %s:%i->%i/%s. Retrying in %s secs...",
+                    "Error linking module: %s:%i->%i/%s. Retrying in %s secs...",
                     module,
                     ogate,
                     igate,
@@ -267,7 +259,7 @@ class BessController:
                 time.sleep(self.SLEEP_S)
             else:
                 logger.info(
-                    "Module %s:%i->%i/%s connected",
+                    "Module %s:%i->%i/%s linked",
                     module,
                     ogate,
                     igate,
@@ -304,7 +296,6 @@ class BessController:
                 logger.info("Module %s destroyed", module_name)
                 break
             finally:
-                logger.info("BESS resume all")
                 self.bess.resume_all()
         else:
             raise Exception("Module {} deletion failure.".format(module_name))
@@ -413,10 +404,6 @@ class RouteController:
             )
             return
 
-        logger.info(
-            "Trying to retrieve next hop entry %s from neighbor cache",
-            route_entry.next_hop_ip,
-        )
         if not self.neighbor_cache.get(route_entry.next_hop_ip):
             logger.info("Neighbor entry does not exist, creating modules.")
             update_module_name = self.get_update_module_name(
@@ -507,11 +494,6 @@ class RouteController:
             route_module_name (str): The name of the route module.
             merge_module_name (str): The name of the merge module.
         """
-        logger.info(
-            "Linking module %s to module %s",
-            route_module_name,
-            update_module_name,
-        )
         try:
             self.bess_controller.link_modules(
                 route_module_name, update_module_name, gate_idx, 0
@@ -523,12 +505,6 @@ class RouteController:
                 route_module_name,
             )
             return
-
-        logger.info(
-            "Linking module %s to module %s",
-            update_module_name,
-            merge_module_name,
-        )
 
         try:
             self.bess_controller.link_modules(
@@ -544,7 +520,6 @@ class RouteController:
 
     def _delete_route(self, route_entry: RouteEntry) -> None:
         """Deletes a route entry from BESS and the neighbor cache."""
-        logger.info("Deleting route entry for %s", route_entry)
         next_hop = self.neighbor_cache.get(route_entry.next_hop_ip)
 
         if next_hop:
@@ -579,7 +554,7 @@ class RouteController:
                 logger.info("Module deleted %s", update_module_name)
 
                 del self.neighbor_cache[route_entry.next_hop_ip]
-                logger.info("Deleting item from neighbor cache")
+                logger.info("Deleted item from neighbor cache")
             else:
                 logger.info(
                     "Route count for %s decremented to %i",
@@ -601,7 +576,6 @@ class RouteController:
                 logger.info("Missing ARP entries: %s", missing_arp_entries)
             for ip in missing_arp_entries:
                 try:
-                    logger.info("Pinging %s", ip)
                     send_ping(ip)
                 except Exception as e:
                     logger.exception("Error when pinging %s: %s", ip, e)
@@ -653,7 +627,7 @@ class RouteController:
             netlink_message (dict): The netlink message.
             action (str): The action.
         """
-        logger.info("%s event received.", action)
+        logger.info("%s netlink event received.", action)
         route_entry = self._parse_route_entry_msg(netlink_message)
         if action == KEY_NEW_ROUTE_ACTION and route_entry:
             with self.lock:
@@ -669,9 +643,9 @@ class RouteController:
 
     def cleanup(self, number: int) -> None:
         """Unregisters the netlink event listener callback and exits."""
+        logger.info("Received: %i Exiting", number)
         self.ipdb.unregister_callback(self.event_callback)
         logger.info("Unregistered netlink event listener callback")
-        logger.info("Received: %i Exiting", number)
         sys.exit()
 
     def reconfigure(self, number: int) -> None:
@@ -781,21 +755,6 @@ def send_ping(neighbor_ip):
     """
     logger.info("Sending ping to %s", neighbor_ip)
     send(IP(dst=neighbor_ip) / ICMP())
-
-
-"""
-# TODO, use it instead of ping
-def send_arp_request(ip):
-    # Create an ARP request packet to get the MAC address of the specified IP
-    arp_packet = ARP(pdst=ip)
-    # Broadcast the packet on the network
-    ether_frame = Ether(dst="ff:ff:ff:ff:ff:ff")
-    packet = ether_frame/arp_packet
-    result = srp(packet, timeout=3, verbose=0)[0]
-
-    # Get the MAC address from the response
-    return result[0][1].hwsrc
-"""
 
 
 def fetch_mac(ipdb: IPDB, target_ip: str) -> Optional[str]:
