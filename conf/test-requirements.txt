@@ -1,3 +1,2 @@
 pyroute2
 scapy
-pytest

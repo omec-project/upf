@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2019 Intel Corporation
+# Copyright 2023 Canonical Ltd.
 
 import argparse
 import ipaddress

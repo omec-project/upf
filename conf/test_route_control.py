@@ -1,3 +1,9 @@
+#!/usr/bin/env python
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2023 Canonical Ltd.
+# Copyright 2023 Open Networking Foundation
+
+
 import sys
 import unittest
 from unittest.mock import MagicMock, Mock, patch
@@ -301,7 +307,7 @@ class TestRouteController(unittest.TestCase):
 
         mock_fetch_mac.return_value = "mac"
         mock_get_gate_index.return_value = 0
-        self.route_controller.neighbor_cache[mock_valid_route_entry.next_hop_ip] = NeighborEntry(mac_address="mac")
+        self.route_controller._neighbor_cache[mock_valid_route_entry.next_hop_ip] = NeighborEntry(mac_address="mac")
 
         self.route_controller.bootstrap_routes()
 
@@ -333,15 +339,15 @@ class TestRouteController(unittest.TestCase):
 
         mock_fetch_mac.return_value = "mac"
         mock_get_gate_index.return_value = 0
-        self.route_controller.neighbor_cache[mock_valid_route_entry.next_hop_ip] = NeighborEntry(mac_address="mac")
+        self.route_controller._neighbor_cache[mock_valid_route_entry.next_hop_ip] = NeighborEntry(mac_address="mac")
         self.assertEqual(
-            self.route_controller.neighbor_cache[mock_valid_route_entry.next_hop_ip].route_count, 0
+            self.route_controller._neighbor_cache[mock_valid_route_entry.next_hop_ip].route_count, 0
         )
 
         self.route_controller.bootstrap_routes()
 
         self.assertEqual(
-            self.route_controller.neighbor_cache[mock_valid_route_entry.next_hop_ip].route_count, 1
+            self.route_controller._neighbor_cache[mock_valid_route_entry.next_hop_ip].route_count, 1
         )
 
     @patch.object(RouteController, "_parse_route_entry_msg")
@@ -372,7 +378,7 @@ class TestRouteController(unittest.TestCase):
         self.route_controller.bootstrap_routes()
 
         self.assertEqual(
-            self.route_controller.neighbor_cache[mock_valid_route_entry.next_hop_ip].route_count, 1
+            self.route_controller._neighbor_cache[mock_valid_route_entry.next_hop_ip].route_count, 1
         )
         self.mock_bess_controller.create_module.assert_called()
         self.mock_bess_controller.link_modules.assert_called()
