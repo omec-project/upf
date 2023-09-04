@@ -20,7 +20,7 @@ jobs:
       run: python -m venv venv
 
     - name: Install dependencies
-      run: ./venv/bin/pip install -r conf/test_requirements.txt
+      run: ./venv/bin/pip install -r conf/test-requirements.txt
 
     - name: Run tests
       run: ./venv/bin/pytest conf/test_route_control.py
