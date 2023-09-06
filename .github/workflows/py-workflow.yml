@@ -1,13 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2023 Canonical Ltd.
-# Copyright 2023 Open Networking Foundation
+
 name: Python Lint and Test
 
 on: [push, pull_request]
 
 jobs:
-  build:
-
+  route-control-tests:
     runs-on: ubuntu-latest
 
     steps:
@@ -30,4 +29,4 @@ jobs:
     - name: Run tests
       run: |
         source ./venv/bin/activate
-        python -m unittest conf/test_route_control.py
+        python -m unittest ./conf/test_route_control.py

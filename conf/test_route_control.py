@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2023 Canonical Ltd.
-# Copyright 2023 Open Networking Foundation
-
 
 import sys
 import unittest
@@ -12,7 +10,7 @@ from pyroute2 import IPDB  # type: ignore[import]
 
 sys.modules["pybess.bess"] = MagicMock()
 
-from route_control import (  # noqa: E402
+from conf.route_control import (  # noqa: E402
     NeighborEntry,
     RouteController,
     RouteEntry,
