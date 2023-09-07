@@ -46,7 +46,7 @@ class BessControllerMock(object):
         pass
 
 
-@patch("route_control.BessController", BessControllerMock)
+@patch("conf.route_control.BessController", BessControllerMock)
 class TestUtilityFunctions(unittest.TestCase):
     """Tests utility functions in route_control.py."""
 
@@ -253,7 +253,7 @@ class TestRouteController(unittest.TestCase):
 
     @patch.object(RouteController, "_parse_route_entry_msg")
     @patch.object(RouteController, "_probe_addr")
-    @patch("route_control.fetch_mac")
+    @patch("conf.route_control.fetch_mac")
     def test_given_valid_route_entry_and_mac_not_know_when_bootstrap_routes_then_calls_probe_address(
         self,
         mock_fetch_mac,
@@ -282,7 +282,7 @@ class TestRouteController(unittest.TestCase):
         mock_probe_addr.assert_called_with(mock_valid_route_entry)
 
     @patch.object(RouteController, "_parse_route_entry_msg")
-    @patch("route_control.fetch_mac")
+    @patch("conf.route_control.fetch_mac")
     @patch.object(RouteController, "_get_gate_idx")
     def test_given_valid_route_entry_and_mac_is_known_and_neighbor_known_when_bootstrap_routes_then_route_is_added_in_bess(
         self,
@@ -314,7 +314,7 @@ class TestRouteController(unittest.TestCase):
         self.mock_bess_controller.add_route_to_module.assert_called()
 
     @patch.object(RouteController, "_parse_route_entry_msg")
-    @patch("route_control.fetch_mac")
+    @patch("conf.route_control.fetch_mac")
     @patch.object(RouteController, "_get_gate_idx")
     def test_given_valid_route_entry_and_mac_is_known_when_bootstrap_routes_then_route_count_is_increased(
         self,
@@ -349,7 +349,7 @@ class TestRouteController(unittest.TestCase):
         )
 
     @patch.object(RouteController, "_parse_route_entry_msg")
-    @patch("route_control.fetch_mac")
+    @patch("conf.route_control.fetch_mac")
     @patch.object(RouteController, "_get_gate_idx")
     def test_given_valid_route_entry_and_mac_is_known_and_neighbor_not_known_when_bootstrap_routes_then_update_module_is_created_and_modules_are_linked(
         self,
