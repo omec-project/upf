@@ -107,7 +107,7 @@ class BessController:
                     "IPLookupCommandAddArg",
                     {
                         "prefix": route_entry.dest_prefix,
-                        "prefix_len": int(route_entry.prefix_len),
+                        "prefix_len": route_entry.prefix_len,
                         "gate": gate_idx,
                     },
                 )
@@ -791,7 +791,7 @@ def mac_to_int(mac: str) -> int:
 
 def mac_to_hex(mac: str) -> str:
     """Converts a MAC address to a hexadecimal string."""
-    return '{:X}'.format(mac_to_int(mac))
+    return '{:012X}'.format(mac_to_int(mac))
 
 
 def parse_args() -> Tuple[List[str], str, str]:

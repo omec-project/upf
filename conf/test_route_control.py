@@ -70,7 +70,7 @@ class TestUtilityFunctions(unittest.TestCase):
     def test_given_valid_mac_when_mac_to_hex_then_return_hex_string_representation(
         self
     ):
-        self.assertEqual(mac_to_hex("00:1a:2b:3c:4d:5e"), "1A2B3C4D5E")
+        self.assertEqual(mac_to_hex("00:1a:2b:3c:4d:5e"), "001A2B3C4D5E")
 
     def test_given_known_destination_when_fetch_mac_then_returns_mac(self):
         ipdb = IPDB()
