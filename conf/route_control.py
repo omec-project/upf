@@ -307,6 +307,8 @@ class RouteController:
 
     Listens for netlink events and handling them.
     Creates BESS modules for route entries."""
+
+    MAX_GATES = 8192
     def __init__(
         self,
         bess_controller: BessController,
@@ -363,9 +365,9 @@ class RouteController:
             if route["event"] == KEY_NEW_ROUTE_ACTION:
                 if route_entry := self._parse_route_entry_msg(route):
                     with self._lock:
-                        self._handle_new_route_entry(route_entry)
+                        self.add_new_route_entry(route_entry)
 
-    def _handle_new_route_entry(self, route_entry: RouteEntry) -> None:
+    def add_new_route_entry(self, route_entry: RouteEntry) -> None:
         """Handles a new route entry.
 
         Args:
@@ -384,7 +386,7 @@ class RouteController:
     def _add_neighbor(
         self, route_entry: RouteEntry, next_hop_mac: str
     ) -> None:
-        """Adds the route to next hop in BESS.
+        """Adds the route in BESS module.
         Creates required BESS modules.
 
         Args:
@@ -392,10 +394,14 @@ class RouteController:
             next_hop_mac (str): The MAC address of the next hop.
         """
         route_module_name = self.get_route_module_name(route_entry.interface)
+        if route_entry.prefix_len == 0 and route_entry.dest_prefix == "0.0.0.0":
+            gate_idx = self.MAX_GATES - 1
+        else:
+            gate_idx = self._get_gate_idx(route_entry, route_module_name)
         try:
             self._bess_controller.add_route_to_module(
                 route_entry,
-                self._get_gate_idx(route_entry, route_module_name),
+                gate_idx=gate_idx,
                 module_name=route_module_name,
             )
 
@@ -418,7 +424,6 @@ class RouteController:
                 destination_mac=next_hop_mac,
                 update_module_name=update_module_name,
             )
-            gate_idx = self._get_gate_idx(route_entry, route_module_name)
             self._create_module_links(
                 gate_idx=gate_idx,
                 update_module_name=update_module_name,
@@ -459,8 +464,10 @@ class RouteController:
             )
             return
 
-    def _parse_new_neighbor(self, netlink_message: dict) -> None:
+    def add_unresolved_new_neighbor(self, netlink_message: dict) -> None:
         """Handle new neighbor event.
+
+        It will add the neighbor if it was in the unresolved ARP queries cache.
 
         Args:
             netlink_message (dict): The netlink message.
@@ -471,11 +478,9 @@ class RouteController:
         )
         gateway_mac = attr_dict[KEY_LINK_LAYER_ADDRESS]
         if route_entry:
-
             self._add_neighbor(
                 route_entry, gateway_mac
             )
-
             del self._unresolved_arp_queries_cache[
                 route_entry.next_hop_ip
             ]
@@ -519,7 +524,7 @@ class RouteController:
             )
             return
 
-    def _delete_route(self, route_entry: RouteEntry) -> None:
+    def delete_route_entry(self, route_entry: RouteEntry) -> None:
         """Deletes a route entry from BESS and the neighbor cache."""
         next_hop = self._neighbor_cache.get(route_entry.next_hop_ip)
 
@@ -632,15 +637,15 @@ class RouteController:
         route_entry = self._parse_route_entry_msg(netlink_message)
         if action == KEY_NEW_ROUTE_ACTION and route_entry:
             with self._lock:
-                self._handle_new_route_entry(route_entry)
+                self.add_new_route_entry(route_entry)
 
         elif action == KEY_DELETE_ROUTE_ACTION and route_entry:
             with self._lock:
-                self._delete_route(route_entry)
+                self.delete_route_entry(route_entry)
 
         elif action == KEY_NEW_NEIGHBOR_ACTION:
             with self._lock:
-                self._parse_new_neighbor(netlink_message)
+                self.add_unresolved_new_neighbor(netlink_message)
 
     def cleanup(self, number: int) -> None:
         """Unregisters the netlink event listener callback and exits."""
