@@ -8,7 +8,7 @@ Copyright 2019 Intel Corporation
 ### Table Of Contents
   * [Prerequisites](#prerequisites)
   * [Configuration: Simulation mode](#configuration-simulation-mode)
-  * [Configuration: AF_PACKET mode](#configuration-af-packet-mode)
+  * [Configuration: AF_PACKET mode](#configuration-af_packet-mode)
   * [Configuration: DPDK mode](#configuration-dpdk-mode)
   * [Configuration: CNDP mode](#configuration-cndp-mode)
   * [Installation](#installation)
