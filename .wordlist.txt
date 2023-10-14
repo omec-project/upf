@@ -53,8 +53,11 @@ hugepages
 HugePages
 HW
 HVM
+ifaces
+ifname
 IOMMU
 IOV
+ip
 irq
 irqbalance
 jpg
@@ -69,6 +72,7 @@ lports
 MAKEFLAGS
 md
 Microbenchmarks
+Natting
 netdev
 NIC
 NICs
