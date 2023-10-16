@@ -7,3 +7,4 @@
 output
 dpdk-devbind.py
 dpdk-hugepages.py
+dictionary.dic
