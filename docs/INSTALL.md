@@ -8,6 +8,7 @@ Copyright 2019 Intel Corporation
 ### Table Of Contents
   * [Prerequisites](#prerequisites)
   * [Configuration: Simulation mode](#configuration-simulation-mode)
+  * [Configuration: AF_PACKET mode](#configuration-af_packet-mode)
   * [Configuration: DPDK mode](#configuration-dpdk-mode)
   * [Configuration: CNDP mode](#configuration-cndp-mode)
   * [Installation](#installation)
@@ -38,8 +39,6 @@ You need the following dependencies.
 
     sudo update-grub
     ```
-* Update mode for devices: `dpdk`, `af_xdp` or `af_packet` in [`scripts/docker_setup.sh`](../scripts/docker_setup.sh), along with device details
-  - If planning to use DPDK, the [Configuration: DPDK mode](#configuration-dpdk-mode) section provides all the details
 
 
 ## Configuration: Simulation mode
@@ -92,6 +91,102 @@ required:
     +mode="sim"
 
      # Gateway interface(s)
+     #
+    ```
+
+
+## Configuration: AF_PACKET mode
+
+To configure/install the UPF in AF_PACKET mode, the following changes are required:
+
+1. Enable AF_PACKET mode in configuration file
+
+    ```patch
+    diff --git a/conf/upf.json b/conf/upf.json
+    index 37447b7..b56e1fd 100644
+    --- a/conf/upf.json
+    +++ b/conf/upf.json
+    @@ -1,10 +1,10 @@
+     {
+         "": "Vdev or sim support. Enable `\"mode\": \"af_xdp\"` to enable AF_XDP mode, or `\"mode\": \"af_packet\"` to enable AF_PACKET mode, `\"mode\": \"sim\"` to generate synthetic traffic from BESS's Source module or \"mode\": \"\" when running with UP4",
+         "": "mode: af_xdp",
+    -    "": "mode: af_packet",
+    +    "mode": "af_packet",
+         "": "mode: sim",
+         "": "mode: cndp",
+    -    "mode": "dpdk",
+    +    "": "mode: dpdk",
+
+         "table_sizes": {
+             "": "Example sizes based on sim mode and 50K sessions. Customize as per your control plane",
+    @@ -62,13 +62,13 @@
+
+         "": "Gateway interfaces",
+         "access": {
+    -        "ifname": "ens803f2",
+    +        "ifname": "ens801f0",
+             "": "cndp_jsonc_file: conf/cndp_upf_1worker.jsonc"
+         },
+
+         "": "UE IP Natting. Update the line below to `\"ip_masquerade\": \"<ip> [or <ip>]\"` to enable",
+         "core": {
+    -        "ifname": "ens803f3",
+    +        "ifname": "ens801f1",
+             "": "cndp_jsonc_file: conf/cndp_upf_1worker.jsonc",
+             "": "ip_masquerade: 18.0.0.1 or 18.0.0.2 or 18.0.0.3"
+         },
+    ```
+
+2. Enable AF_PACKET mode and, accordingly, update the script file with the interfaces, IP addresses and MAC addresses including the `ipaddrs` and `nhipaddrs`
+
+    ```patch
+    diff --git a/scripts/docker_setup.sh b/scripts/docker_setup.sh
+    index e3ad773..7f1d71a 100755
+    --- a/scripts/docker_setup.sh
+    +++ b/scripts/docker_setup.sh
+    @@ -15,36 +15,36 @@ metrics_port=8080
+     # "af_packet" uses AF_PACKET sockets via DPDK's vdev for pkt I/O.
+     # "sim" uses Source() modules to simulate traffic generation
+     # "cndp" uses kernel AF-XDP. It supports ZC and XDP offload if driver and NIC supports it. It's tested on Intel 800 series n/w adapter.
+    -mode="dpdk"
+    +#mode="dpdk"
+     #mode="cndp"
+     #mode="af_xdp"
+    -#mode="af_packet"
+    +mode="af_packet"
+     #mode="sim"
+
+     # Gateway interface(s)
+     #
+     # In the order of ("s1u" "sgi")
+    -ifaces=("ens803f2" "ens803f3")
+    +ifaces=("ens801f0" "ens801f1")
+
+     # Static IP addresses of gateway interface(s) in cidr format
+     #
+     # In the order of (s1u sgi)
+    -ipaddrs=(198.18.0.1/30 198.19.0.1/30)
+    +ipaddrs=(198.168.0.1/24 198.168.1.1/24)
+
+     # MAC addresses of gateway interface(s)
+     #
+     # In the order of (s1u sgi)
+    -macaddrs=(9e:b2:d3:34:ab:27 c2:9c:55:d4:8a:f6)
+    +macaddrs=(b4:96:91:b4:47:b8 b4:96:91:b4:47:b9)
+
+     # Static IP addresses of the neighbors of gateway interface(s)
+     #
+     # In the order of (n-s1u n-sgi)
+    -nhipaddrs=(198.18.0.2 198.19.0.2)
+    +nhipaddrs=(198.168.0.2 198.168.1.2)
+
+     # Static MAC addresses of the neighbors of gateway interface(s)
+     #
+     # In the order of (n-s1u n-sgi)
+    -nhmacaddrs=(22:53:7a:15:58:50 22:53:7a:15:58:50)
+    +nhmacaddrs=(b4:96:91:b4:44:b0 b4:96:91:b4:44:b1)
+
+     # IPv4 route table entries in cidr format per port
      #
     ```
 
