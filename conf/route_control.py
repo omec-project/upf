@@ -394,10 +394,7 @@ class RouteController:
             next_hop_mac (str): The MAC address of the next hop.
         """
         route_module_name = self.get_route_module_name(route_entry.interface)
-        if route_entry.prefix_len == 0 and route_entry.dest_prefix == "0.0.0.0":
-            gate_idx = self.MAX_GATES - 1
-        else:
-            gate_idx = self._get_gate_idx(route_entry, route_module_name)
+        gate_idx = self._get_gate_idx(route_entry, route_module_name)
         try:
             self._bess_controller.add_route_to_module(
                 route_entry,
