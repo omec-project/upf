@@ -737,13 +737,15 @@ func (b *bess) clearState() {
 
 	clearGtpuPathMonitoringCmd := &pb.GtpuPathMonitoringCommandClearArg{}
 
-	anyGtpuPathMonitoringClear, err := anypb.New(clearGtpuPathMonitoringCmd)
-	if err != nil {
-		log.Errorf("Error marshalling the rule %v: %v", anyGtpuPathMonitoringClear, err)
-		return
-	}
+	if enableGtpuPathMonitoring {
+		anyGtpuPathMonitoringClear, err := anypb.New(clearGtpuPathMonitoringCmd)
+		if err != nil {
+			log.Errorf("Error marshalling the rule %v: %v", anyGtpuPathMonitoringClear, err)
+			return
+		}
 
-	b.processGtpuPathMonitoring(ctx, anyGtpuPathMonitoringClear, upfMsgTypeClear)
+		b.processGtpuPathMonitoring(ctx, anyGtpuPathMonitoringClear, upfMsgTypeClear)
+	}
 
 	clearQoSCmd := &pb.QosCommandClearArg{}
 
@@ -1279,14 +1281,16 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 
 		b.processFAR(ctx, any, upfMsgTypeDel)
 
-		g := &pb.GtpuPathMonitoringCommandAddDeleteArg{
-			GnbIp: far.tunnelIP4Dst, /* gnb ip */
-		}
+		if enableGtpuPathMonitoring {
+			g := &pb.GtpuPathMonitoringCommandAddDeleteArg{
+				GnbIp: far.tunnelIP4Dst, /* gnb ip */
+			}
 
-		any, err = anypb.New(g)
-		if err != nil {
-			log.Println("Error marshalling data", g, err)
-			return
+			any, err = anypb.New(g)
+			if err != nil {
+				log.Println("Error marshalling data", g, err)
+				return
+			}
 		}
 
 		b.processGtpuPathMonitoring(ctx, any, upfMsgTypeDel)
