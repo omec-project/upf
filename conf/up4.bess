@@ -465,20 +465,24 @@ accessFastBPF.add(filters=[uplink_filter])
 # ====================================================
 
 # Create GTP Echo Request packets
-gtpuSrc::Source() -> gtpuEchoReq::Rewrite(templates=[gtp_echo_request(access_ip[0])]) \
-                  -> gtpuPathMonitoring::GtpuPathMonitoring() \
-                  -> gtpuL4Cksum::L4Checksum() -> gtpuIPCksum::IPChecksum() \
-                  -> ports[parser.access_ifname].rtr
-gtpuSrc.set_burst(burst=1)
+if parser.enable_gtpu_path_monitoring:
+    gtpuSrc::Source() -> gtpuEchoReq::Rewrite(templates=[gtp_echo_request(access_ip[0])]) \
+                      -> gtpuPathMonitoring::GtpuPathMonitoring() \
+                      -> gtpuL4Cksum::L4Checksum() -> gtpuIPCksum::IPChecksum() \
+                      -> ports[parser.access_ifname].rtr
+    gtpuSrc.set_burst(burst=1)
 
-bess.add_tc('schedule_limit',
-            policy='rate_limit',
-            resource='count',
-            limit={'count': 1})
-gtpuSrc.attach_task(parent='schedule_limit')
+    bess.add_tc('schedule_limit',
+                policy='rate_limit',
+                resource='count',
+                limit={'count': 1}, wid=0)
+    gtpuSrc.attach_task(parent='schedule_limit')
 
-# Process GTP Echo Response packets
-accessFastBPF:GTPUEchoResGate -> gtpuPathMonitoring
+    # Process GTP Echo Response packets
+    accessFastBPF:GTPUEchoResGate -> gtpuPathMonitoring
+else:
+    # Process GTP Echo Response packets
+    accessFastBPF:GTPUEchoResGate -> gtpuPathMonDisable::Sink()
 
 # ====================================================
 #       Route Control
