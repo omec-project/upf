@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2023 Intel Corporation
+
+flask
+grpcio
+iptools
+mitogen
+protobuf==3.20.0
+psutil
+pyroute2
+scapy
