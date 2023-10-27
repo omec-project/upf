@@ -114,7 +114,7 @@ WORKDIR /opt/bess/bessctl
 ENTRYPOINT ["bessd", "-f"]
 
 # Stage build bess golang pb
-FROM golang:1.20.5 AS protoc-gen
+FROM golang:1.21.3 AS protoc-gen
 RUN go install github.com/golang/protobuf/protoc-gen-go@latest
 
 FROM bess-deps AS go-pb
@@ -132,7 +132,7 @@ RUN mkdir /bess_pb && \
         --python_out=plugins=grpc:/bess_pb \
         --grpc_python_out=/bess_pb
 
-FROM golang:1.20.5 AS pfcpiface-build
+FROM golang:1.21.3 AS pfcpiface-build
 ARG GOFLAGS
 WORKDIR /pfcpiface
 
@@ -146,7 +146,7 @@ COPY . /pfcpiface
 RUN CGO_ENABLED=0 go build $GOFLAGS -o /bin/pfcpiface ./cmd/pfcpiface
 
 # Stage pfcpiface: runtime image of pfcpiface toward SMF/SPGW-C
-FROM alpine:3.18.2 AS pfcpiface
+FROM alpine:3.18.4 AS pfcpiface
 COPY conf /opt/bess/bessctl/conf
 COPY --from=pfcpiface-build /bin/pfcpiface /bin
 ENTRYPOINT [ "/bin/pfcpiface" ]
