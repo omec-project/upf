@@ -106,7 +106,7 @@ COPY --from=bess-build /usr/bin/cndpfwd /usr/bin/
 COPY --from=bess-build /usr/local/lib/x86_64-linux-gnu/*.so /usr/local/lib/x86_64-linux-gnu/
 COPY --from=bess-build /usr/local/lib/x86_64-linux-gnu/*.a /usr/local/lib/x86_64-linux-gnu/
 COPY --from=bess-build /usr/lib/libxdp* /usr/lib/
-COPY --from=bess-build /lib/x86_64-linux-gnu/libjson-c.so* /lib/x86_64-linux-gnu/
+COPY --from=bess-build /usr/lib/x86_64-linux-gnu/libjson-c.so* /lib/x86_64-linux-gnu/
 COPY --from=bess-build /usr/lib/x86_64-linux-gnu/libbpf.so* /usr/lib/x86_64-linux-gnu/
 
 ENV PYTHONPATH="/opt/bess"
@@ -114,7 +114,7 @@ WORKDIR /opt/bess/bessctl
 ENTRYPOINT ["bessd", "-f"]
 
 # Stage build bess golang pb
-FROM golang:1.21.3 AS protoc-gen
+FROM golang:1.21.4 AS protoc-gen
 RUN go install github.com/golang/protobuf/protoc-gen-go@latest
 
 FROM bess-deps AS go-pb
@@ -132,7 +132,7 @@ RUN mkdir /bess_pb && \
         --python_out=plugins=grpc:/bess_pb \
         --grpc_python_out=/bess_pb
 
-FROM golang:1.21.3 AS pfcpiface-build
+FROM golang:1.21.4 AS pfcpiface-build
 ARG GOFLAGS
 WORKDIR /pfcpiface
 
