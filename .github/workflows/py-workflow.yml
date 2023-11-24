@@ -15,11 +15,8 @@ jobs:
 
     - name: Set up Python
       uses: actions/setup-python@v4
-        with:
-          python-version: "3.10"
-          cache: "pip"
-        env:
-          AGENT_TOOLSDIRECTORY: /opt/hostedtoolcach
+      with:
+        python-version: '3.10.12'
 
     - name: Create virtual environment
       run: python -m venv venv
