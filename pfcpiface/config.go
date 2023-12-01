@@ -75,6 +75,8 @@ type SimModeInfo struct {
 	N9AppIP     net.IP `json:"n9_app_ip"`
 	StartN3TEID string `json:"start_n3_teid"`
 	StartN9TEID string `json:"start_n9_teid"`
+	UplinkMBR   uint64 `json:"uplink_mbr"`
+	DownlinkMBR uint64 `json:"downlink_mbr"`
 }
 
 // CPIfaceInfo : CPIface interface settings.

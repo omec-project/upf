@@ -222,9 +222,9 @@ func (u *upf) sim(mode simMode, s *SimModeInfo) {
 			fseID: uint64(n3TEID + i),
 			qfi:   9,
 			ulGbr: 50000,
-			ulMbr: 90000,
+			ulMbr: s.UplinkMBR,
 			dlGbr: 60000,
-			dlMbr: 80000,
+			dlMbr: s.DownlinkMBR,
 		}
 
 		qerN9 := qer{
@@ -232,9 +232,9 @@ func (u *upf) sim(mode simMode, s *SimModeInfo) {
 			fseID: uint64(n3TEID + i),
 			qfi:   8,
 			ulGbr: 50000,
-			ulMbr: 60000,
+			ulMbr: s.UplinkMBR,
 			dlGbr: 70000,
-			dlMbr: 90000,
+			dlMbr: s.DownlinkMBR,
 		}
 
 		qers := []qer{qerN6, qerN9}
