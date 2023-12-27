@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2020 Intel Corporation
+# Copyright 2020-Present Intel Corporation
 
 # https://help.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
 version: 2
@@ -12,6 +12,11 @@ updates:
 
   - package-ecosystem: "docker"
     directory: "/"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "docker"
+    directory: "/ptf"
     schedule:
       interval: "daily"
 

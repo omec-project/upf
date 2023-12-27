@@ -22,10 +22,10 @@ matrix:
         - title
         - alt
         ignores:
-        - ':matches(code, pre)'
-        - 'code'
-        - 'pre'
-        - 'blockquote'
+        - :matches(code, pre)
+        - code
+        - pre
+        - blockquote
   sources:
   - '**/*.md'
   default_encoding: utf-8
