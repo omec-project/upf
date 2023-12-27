@@ -10,15 +10,9 @@ from pyroute2 import IPDB  # type: ignore[import]
 
 sys.modules["pybess.bess"] = MagicMock()
 
-from conf.route_control import (
-    NeighborEntry,
-    RouteController,
-    RouteEntry,
-    fetch_mac,
-    mac_to_hex,
-    mac_to_int,
-    validate_ipv4,
-)
+from conf.route_control import (NeighborEntry, RouteController, RouteEntry,
+                                fetch_mac, mac_to_hex, mac_to_int,
+                                validate_ipv4)
 
 
 class BessControllerMock(object):
@@ -60,9 +54,7 @@ class TestUtilityFunctions(unittest.TestCase):
         self.assertFalse(validate_ipv4("::1"))
         self.assertFalse(validate_ipv4(""))
 
-    def test_given_valid_mac_when_mac_to_int_then_returns_int_representation(
-        self
-    ):
+    def test_given_valid_mac_when_mac_to_int_then_returns_int_representation(self):
         self.assertEqual(mac_to_int("00:1a:2b:3c:4d:5e"), 112394521950)
 
     def test_given_invalid_mac_when_mac_to_int_then_raises_exception(self):
@@ -70,7 +62,7 @@ class TestUtilityFunctions(unittest.TestCase):
             mac_to_int("not a mac")
 
     def test_given_valid_mac_when_mac_to_hex_then_return_hex_string_representation(
-        self
+        self,
     ):
         self.assertEqual(mac_to_hex("00:1a:2b:3c:4d:5e"), "001A2B3C4D5E")
 
@@ -92,7 +84,7 @@ class TestRouteController(unittest.TestCase):
         self.mock_bess_controller = Mock(BessControllerMock)
         self.ipdb = Mock()
         self.ipr = Mock()
-        interfaces = ['access', 'core']
+        interfaces = ["access", "core"]
         self.route_controller = RouteController(
             self.mock_bess_controller,
             self.ipdb,
@@ -123,10 +115,8 @@ class TestRouteController(unittest.TestCase):
         self.route_controller.add_new_route_entry(route_entry)
         return route_entry
 
-    def test_given_valid_route_message_when_parse_message_then_parses_message(
-        self
-    ):
-        self.ipdb.interfaces = {2: Mock(ifname='core')}
+    def test_given_valid_route_message_when_parse_message_then_parses_message(self):
+        self.ipdb.interfaces = {2: Mock(ifname="core")}
         example_route_entry = {
             "family": 2,
             "dst_len": 24,
@@ -147,9 +137,7 @@ class TestRouteController(unittest.TestCase):
             },
             "event": "RTM_NEWROUTE",
         }
-        result = self.route_controller._parse_route_entry_msg(
-            example_route_entry
-        )
+        result = self.route_controller._parse_route_entry_msg(example_route_entry)
         self.assertIsInstance(result, RouteEntry)
         self.assertEqual(result.dest_prefix, "192.168.1.0")
         self.assertEqual(result.next_hop_ip, "172.31.48.1")
@@ -159,7 +147,7 @@ class TestRouteController(unittest.TestCase):
     def test_given_valid_route_message_and_dst_len_is_zero_when_parse_message_then_parses_message_as_default_route(
         self,
     ):
-        self.ipdb.interfaces = {2: Mock(ifname='core')}
+        self.ipdb.interfaces = {2: Mock(ifname="core")}
         example_route_entry = {
             "family": 2,
             "dst_len": 0,
@@ -179,21 +167,15 @@ class TestRouteController(unittest.TestCase):
             },
             "event": "RTM_NEWROUTE",
         }
-        result = self.route_controller._parse_route_entry_msg(
-            example_route_entry
-        )
+        result = self.route_controller._parse_route_entry_msg(example_route_entry)
         self.assertIsInstance(result, RouteEntry)
         self.assertEqual(result.dest_prefix, "0.0.0.0")
         self.assertEqual(result.next_hop_ip, "172.31.48.1")
-        self.assertEqual(
-            result.interface, self.ipdb.interfaces[2].ifname
-        )
+        self.assertEqual(result.interface, self.ipdb.interfaces[2].ifname)
         self.assertEqual(result.prefix_len, 0)
 
-    def test_given_invalid_route_message_when_parse_message_then_returns_none(
-        self
-    ):
-        self.ipdb.interfaces = {2: Mock(ifname='not the needed interface')}
+    def test_given_invalid_route_message_when_parse_message_then_returns_none(self):
+        self.ipdb.interfaces = {2: Mock(ifname="not the needed interface")}
         example_route_entry = {
             "family": 2,
             "flags": 0,
@@ -212,9 +194,7 @@ class TestRouteController(unittest.TestCase):
             },
             "event": "RTM_NEWROUTE",
         }
-        result = self.route_controller._parse_route_entry_msg(
-            example_route_entry
-        )
+        result = self.route_controller._parse_route_entry_msg(example_route_entry)
         self.assertIsNone(result)
 
     @patch("conf.route_control.send_ping")
@@ -238,10 +218,7 @@ class TestRouteController(unittest.TestCase):
         self.ipdb.nl.get_neighbours = lambda dst, **kwargs: [
             {"attrs": [("NDA_DST", dst), ("NDA_LLADDR", "00:1a:2b:3c:4d:5e")]}
         ]
-        mock_routes = [
-            {"event": "RTM_NEWROUTE"},
-            {"event": "OTHER_ACTION"}
-        ]
+        mock_routes = [{"event": "RTM_NEWROUTE"}, {"event": "OTHER_ACTION"}]
         self.ipr.get_routes.return_value = mock_routes
         route_entry = RouteEntry(
             next_hop_ip="1.2.3.4",
@@ -258,10 +235,7 @@ class TestRouteController(unittest.TestCase):
         self.ipdb.nl.get_neighbours = lambda dst, **kwargs: [
             {"attrs": [("NDA_DST", dst), ("NDA_LLADDR", "00:1a:2b:3c:4d:5e")]}
         ]
-        mock_routes = [
-            {"event": "RTM_NEWROUTE"},
-            {"event": "OTHER_ACTION"}
-        ]
+        mock_routes = [{"event": "RTM_NEWROUTE"}, {"event": "OTHER_ACTION"}]
         self.ipr.get_routes.return_value = mock_routes
         route_entry = RouteEntry(
             next_hop_ip="1.2.3.4",
@@ -288,10 +262,10 @@ class TestRouteController(unittest.TestCase):
                 },
                 "dst_len": 24,
             },
-            {"event": "OTHER_ACTION"}
+            {"event": "OTHER_ACTION"},
         ]
         self.ipr.get_routes.return_value = mock_routes
-        self.ipdb.interfaces = {2: Mock(ifname='core')}
+        self.ipdb.interfaces = {2: Mock(ifname="core")}
         valid_route_entry = RouteEntry(
             next_hop_ip="1.2.3.4",
             interface="core",
@@ -318,7 +292,7 @@ class TestRouteController(unittest.TestCase):
                 },
                 "dst_len": 24,
             },
-            {"event": "OTHER_ACTION"}
+            {"event": "OTHER_ACTION"},
         ]
         self.ipr.get_routes.return_value = mock_routes
         self.route_controller._parse_route_entry_msg = Mock()
@@ -336,7 +310,7 @@ class TestRouteController(unittest.TestCase):
                 "event": "RTM_NEWROUTE",
                 "attrs": {},
             },
-            {"event": "OTHER_ACTION"}
+            {"event": "OTHER_ACTION"},
         ]
         self.ipr.get_routes.return_value = mock_routes
         self.route_controller.bootstrap_routes()
@@ -348,7 +322,7 @@ class TestRouteController(unittest.TestCase):
     def test_given_netlink_message_when_rtm_newroute_event_then_add_new_route_entry_is_called(
         self, mock_add_new_route_entry
     ):
-        self.ipdb.interfaces = {2: Mock(ifname='core')}
+        self.ipdb.interfaces = {2: Mock(ifname="core")}
         example_route_entry = {
             "family": 2,
             "dst_len": 24,
@@ -374,7 +348,9 @@ class TestRouteController(unittest.TestCase):
         )
         mock_add_new_route_entry.assert_called()
 
-    def test_given_existing_neighbor_and_route_count_not_zero_when_delete_route_entry_then_route_entry_deleted_in_bess(self):
+    def test_given_existing_neighbor_and_route_count_not_zero_when_delete_route_entry_then_route_entry_deleted_in_bess(
+        self,
+    ):
         route_entry = RouteEntry(
             next_hop_ip="1.2.3.4",
             interface="random_interface",
@@ -385,7 +361,9 @@ class TestRouteController(unittest.TestCase):
         self.route_controller.delete_route_entry(route_entry)
         self.mock_bess_controller.delete_module_route_entry.assert_called_once()
 
-    def test_given_existing_neighbor_and_route_count_greater_than_one_when_delete_route_entry_then_module_not_deleted(self):
+    def test_given_existing_neighbor_and_route_count_greater_than_one_when_delete_route_entry_then_module_not_deleted(
+        self,
+    ):
         route_entry_1 = RouteEntry(
             next_hop_ip="1.2.3.4",
             interface="random_interface",
@@ -403,7 +381,9 @@ class TestRouteController(unittest.TestCase):
         self.route_controller.delete_route_entry(route_entry_1)
         self.mock_bess_controller.delete_module.assert_not_called()
 
-    def test_given_existing_neighbor_and_route_count_is_one_when_delete_route_entry_then_module_deleted(self):
+    def test_given_existing_neighbor_and_route_count_is_one_when_delete_route_entry_then_module_deleted(
+        self,
+    ):
         route_entry = RouteEntry(
             next_hop_ip="1.2.3.4",
             interface="random_interface",
@@ -418,7 +398,7 @@ class TestRouteController(unittest.TestCase):
     def test_given_netlink_message_when_rtm_delroute_event_then_delete_route_entry_is_called(
         self, mock_delete_route_entry
     ):
-        self.ipdb.interfaces = {2: Mock(ifname='core')}
+        self.ipdb.interfaces = {2: Mock(ifname="core")}
         example_route_entry = {
             "family": 2,
             "dst_len": 24,
@@ -458,10 +438,7 @@ class TestRouteController(unittest.TestCase):
                 "NDA_LLADDR": "00:1a:2b:3c:4d:5e",
             }
         }
-        mock_routes = [
-            {"event": "RTM_NEWROUTE"},
-            {"event": "OTHER_ACTION"}
-        ]
+        mock_routes = [{"event": "RTM_NEWROUTE"}, {"event": "OTHER_ACTION"}]
         self.ipr.get_routes.return_value = mock_routes
         route_entry = RouteEntry(
             next_hop_ip="1.2.3.4",

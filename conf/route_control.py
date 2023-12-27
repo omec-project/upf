@@ -36,6 +36,7 @@ KEY_DESTINATION_PREFIX_LENGTH = "dst_len"
 @dataclass
 class RouteEntry:
     """A representation of a neighbor in route entry."""
+
     next_hop_ip: str = field(default=None)
     interface: str = field(default=None)
     dest_prefix: str = field(default=None)
@@ -45,6 +46,7 @@ class RouteEntry:
 @dataclass
 class NeighborEntry:
     """A representation of a neighbor in neighbor cache."""
+
     gate_idx: int = field(default=0)
     mac_address: str = field(default=None)
     route_count: int = field(default=0)
@@ -52,6 +54,7 @@ class NeighborEntry:
 
 class BessController:
     """Wraps commands from bess client."""
+
     MAX_RETRIES = 5
     SLEEP_S = 2
 
@@ -203,9 +206,7 @@ class BessController:
                     break
                 else:
                     raise Exception(
-                        "Unknown error when inserting {}: {}".format(
-                            module_name, e
-                        )
+                        "Unknown error when inserting {}: {}".format(module_name, e)
                     )
             except Exception:
                 logger.exception(
@@ -220,9 +221,7 @@ class BessController:
             finally:
                 self._bess.resume_all()
         else:
-            raise Exception(
-                "BESS module {} creation failure.".format(module_name)
-            )
+            raise Exception("BESS module {} creation failure.".format(module_name))
 
     def link_modules(self, module, next_module, ogate, igate) -> None:
         """Links two BESS modules together.
@@ -240,14 +239,10 @@ class BessController:
             except BESS.Error as e:
                 logger.exception("Got BESS error")
                 if e.code == errno.EBUSY:
-                    logger.error(
-                        "Got code EBUSY. Retrying in %i secs...", self.SLEEP_S
-                    )
+                    logger.error("Got code EBUSY. Retrying in %i secs...", self.SLEEP_S)
                     time.sleep(self.SLEEP_S)
                 else:
-                    raise Exception(
-                        "Unknown error when linking modules: {}".format(e)
-                    )
+                    raise Exception("Unknown error when linking modules: {}".format(e))
             except Exception:
                 logger.exception(
                     "Error linking module: %s:%i->%i/%s. Retrying in %s secs...",
@@ -309,6 +304,7 @@ class RouteController:
     Creates BESS modules for route entries."""
 
     MAX_GATES = 8192
+
     def __init__(
         self,
         bess_controller: BessController,
@@ -343,14 +339,18 @@ class RouteController:
         self._ipdb = ipdb
         self._ipr = ipr
         self._bess_controller = bess_controller
-        self._ping_missing_thread = Thread(target=self._ping_missing_entries, daemon=True)
+        self._ping_missing_thread = Thread(
+            target=self._ping_missing_entries, daemon=True
+        )
         self._event_callback = None
         self._interfaces = interfaces
 
     def register_callbacks(self) -> None:
         """Register callback function."""
         logger.info("Registering netlink event listener callback...")
-        self._event_callback = self._ipdb.register_callback(self._netlink_event_listener)
+        self._event_callback = self._ipdb.register_callback(
+            self._netlink_event_listener
+        )
 
     def start_pinging_missing_entries(self) -> None:
         """Starts a new thread for ping missing entries."""
@@ -383,9 +383,7 @@ class RouteController:
 
         self._add_neighbor(route_entry, next_hop_mac)
 
-    def _add_neighbor(
-        self, route_entry: RouteEntry, next_hop_mac: str
-    ) -> None:
+    def _add_neighbor(self, route_entry: RouteEntry, next_hop_mac: str) -> None:
         """Adds the route in BESS module.
         Creates required BESS modules.
 
@@ -403,9 +401,7 @@ class RouteController:
             )
 
         except Exception:
-            logger.exception(
-                "Error adding route entry to BESS: %s", route_entry
-            )
+            logger.exception("Error adding route entry to BESS: %s", route_entry)
             return
 
         if not self._neighbor_cache.get(route_entry.next_hop_ip):
@@ -414,9 +410,7 @@ class RouteController:
                 route_entry.interface,
                 next_hop_mac,
             )
-            merge_module_name = self.get_merge_module_name(
-                route_entry.interface
-            )
+            merge_module_name = self.get_merge_module_name(route_entry.interface)
             self._create_update_module(
                 destination_mac=next_hop_mac,
                 update_module_name=update_module_name,
@@ -456,9 +450,7 @@ class RouteController:
                 gateway_mac=mac_in_hexadecimal,
             )
         except Exception:
-            logger.exception(
-                "Error creating update module %s", update_module_name
-            )
+            logger.exception("Error creating update module %s", update_module_name)
             return
 
     def add_unresolved_new_neighbor(self, netlink_message: dict) -> None:
@@ -475,12 +467,8 @@ class RouteController:
         )
         gateway_mac = attr_dict[KEY_LINK_LAYER_ADDRESS]
         if route_entry:
-            self._add_neighbor(
-                route_entry, gateway_mac
-            )
-            del self._unresolved_arp_queries_cache[
-                route_entry.next_hop_ip
-            ]
+            self._add_neighbor(route_entry, gateway_mac)
+            del self._unresolved_arp_queries_cache[route_entry.next_hop_ip]
 
     def _create_module_links(
         self,
@@ -529,17 +517,13 @@ class RouteController:
             try:
                 self._bess_controller.delete_module_route_entry(route_entry)
             except Exception:
-                logger.exception(
-                    "Error deleting route entry %s", route_entry
-                )
+                logger.exception("Error deleting route entry %s", route_entry)
                 return
 
             next_hop.route_count -= 1
 
             if next_hop.route_count == 0:
-                route_module = self.get_route_module_name(
-                    route_entry.interface
-                )
+                route_module = self.get_route_module_name(route_entry.interface)
                 update_module_name = self.get_update_module_name(
                     route_module_name=route_module,
                     mac_address=next_hop.mac_address,
@@ -593,9 +577,7 @@ class RouteController:
             neighbor (NeighborEntry): The neighbor entry.
         """
 
-        self._unresolved_arp_queries_cache[
-            route_entry.next_hop_ip
-        ] = route_entry
+        self._unresolved_arp_queries_cache[route_entry.next_hop_ip] = route_entry
         logger.info("Adding entry %s in arp table by pinging", route_entry)
         if not validate_ipv4(route_entry.next_hop_ip):
             return
@@ -663,9 +645,7 @@ class RouteController:
         self.bootstrap_routes()
         signal.pause()
 
-    def _parse_route_entry_msg(
-        self, route_entry: dict
-    ) -> Optional[RouteEntry]:
+    def _parse_route_entry_msg(self, route_entry: dict) -> Optional[RouteEntry]:
         """Parses a route entry message.
         If the entry passes the checks, it is returned as a RouteEntry object.
 
@@ -716,9 +696,7 @@ class RouteController:
         """
         return interface_name + "Routes"
 
-    def get_update_module_name(
-        self, route_module_name: str, mac_address: str
-    ) -> str:
+    def get_update_module_name(self, route_module_name: str, mac_address: str) -> str:
         """Returns the name of the update module.
 
         Args:
@@ -744,9 +722,7 @@ def validate_ipv4(ip: str) -> bool:
     try:
         return isinstance(ipaddress.ip_address(ip), ipaddress.IPv4Address)
     except ValueError:
-        logger.error(
-                "The IP address %s is invalid", ip
-            )
+        logger.error("The IP address %s is invalid", ip)
         return False
 
 
@@ -772,13 +748,14 @@ def fetch_mac(ipdb: IPDB, target_ip: str) -> Optional[str]:
     """
     neighbors = ipdb.nl.get_neighbours(dst=target_ip)
     for neighbor in neighbors:
-        attrs = dict(neighbor['attrs'])
-        if attrs.get(KEY_NETWORK_LAYER_DEST_ADDR, '') == target_ip:
+        attrs = dict(neighbor["attrs"])
+        if attrs.get(KEY_NETWORK_LAYER_DEST_ADDR, "") == target_ip:
             logger.info(
                 "Mac address found for %s, Mac: %s",
-                target_ip, attrs.get(KEY_LINK_LAYER_ADDRESS, ''),
+                target_ip,
+                attrs.get(KEY_LINK_LAYER_ADDRESS, ""),
             )
-            return attrs.get(KEY_LINK_LAYER_ADDRESS, '')
+            return attrs.get(KEY_LINK_LAYER_ADDRESS, "")
     logger.info("Mac address not found for %s", target_ip)
     return None
 
@@ -793,22 +770,14 @@ def mac_to_int(mac: str) -> int:
 
 def mac_to_hex(mac: str) -> str:
     """Converts a MAC address to a hexadecimal string."""
-    return '{:012X}'.format(mac_to_int(mac))
+    return "{:012X}".format(mac_to_int(mac))
 
 
 def parse_args() -> Tuple[List[str], str, str]:
-    parser = argparse.ArgumentParser(
-        description="Basic IPv4 Routing Controller"
-    )
-    parser.add_argument(
-        "-i", type=str, nargs="+", help="interface(s) to control"
-    )
-    parser.add_argument(
-        "--ip", type=str, default="localhost", help="BESSD address"
-    )
-    parser.add_argument(
-        "--port", type=str, default="10514", help="BESSD port"
-    )
+    parser = argparse.ArgumentParser(description="Basic IPv4 Routing Controller")
+    parser.add_argument("-i", type=str, nargs="+", help="interface(s) to control")
+    parser.add_argument("--ip", type=str, default="localhost", help="BESSD address")
+    parser.add_argument("--port", type=str, default="10514", help="BESSD port")
     args = parser.parse_args()
     if not args.i:
         parser.print_help()
@@ -823,15 +792,9 @@ def register_signal_handlers(route_controller: RouteController) -> None:
         controller (RouteController): The route controller.
     """
     logger.info("Registering signals handlers.")
-    signal.signal(
-        signal.SIGHUP, lambda number, _: route_controller.reconfigure(number)
-    )
-    signal.signal(
-        signal.SIGINT, lambda number, _: route_controller.cleanup(number)
-    )
-    signal.signal(
-        signal.SIGTERM, lambda number, _: route_controller.cleanup(number)
-    )
+    signal.signal(signal.SIGHUP, lambda number, _: route_controller.reconfigure(number))
+    signal.signal(signal.SIGINT, lambda number, _: route_controller.cleanup(number))
+    signal.signal(signal.SIGTERM, lambda number, _: route_controller.cleanup(number))
 
 
 if __name__ == "__main__":
