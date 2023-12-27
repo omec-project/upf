@@ -1,9 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2023 Canonical Ltd.
+# Copyright 2023 Intel Corporation
 
 name: Python Lint and Test
 
-on: [push, pull_request]
+on:
+  - push
+  - pull_request
 
 jobs:
   route-control-tests:
@@ -30,3 +33,6 @@ jobs:
       run: |
         source ./venv/bin/activate
         python -m unittest ./conf/test_route_control.py
+
+    - name: Clean up virtual environment
+      run: rm -rf venv
