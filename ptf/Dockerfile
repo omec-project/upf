@@ -38,7 +38,7 @@ RUN apt update && \
 RUN pip3 install --no-cache-dir --root /python_output $PIP_DEPS
 
 # Install TRex traffic gen and library for TRex API
-FROM alpine:3.12.1 as trex-builder
+FROM alpine:3.19.0 as trex-builder
 ARG TREX_VER
 ARG TREX_EXT_LIBS
 ARG TREX_LIBS
