@@ -221,9 +221,9 @@ func (u *upf) sim(mode simMode, s *SimModeInfo) {
 			qerID: n6,
 			fseID: uint64(n3TEID + i),
 			qfi:   9,
-			ulGbr: 50000,
+			ulGbr: s.UplinkGBR,
 			ulMbr: s.UplinkMBR,
-			dlGbr: 60000,
+			dlGbr: s.DownlinkGBR,
 			dlMbr: s.DownlinkMBR,
 		}
 
@@ -231,9 +231,9 @@ func (u *upf) sim(mode simMode, s *SimModeInfo) {
 			qerID: n9,
 			fseID: uint64(n3TEID + i),
 			qfi:   8,
-			ulGbr: 50000,
+			ulGbr: s.UplinkGBR,
 			ulMbr: s.UplinkMBR,
-			dlGbr: 70000,
+			dlGbr: s.DownlinkGBR,
 			dlMbr: s.DownlinkMBR,
 		}
 
@@ -245,10 +245,10 @@ func (u *upf) sim(mode simMode, s *SimModeInfo) {
 			fseID:    uint64(n3TEID + i),
 			qosLevel: SessionQos,
 			qfi:      0,
-			ulGbr:    0,
-			ulMbr:    100000,
-			dlGbr:    0,
-			dlMbr:    500000,
+			ulGbr:    s.UplinkGBR,
+			ulMbr:    s.UplinkMBR,
+			dlGbr:    s.DownlinkGBR,
+			dlMbr:    s.DownlinkMBR,
 		}
 
 		qers = append(qers, sessionQer)

@@ -77,6 +77,8 @@ type SimModeInfo struct {
 	StartN9TEID string `json:"start_n9_teid"`
 	UplinkMBR   uint64 `json:"uplink_mbr"`
 	DownlinkMBR uint64 `json:"downlink_mbr"`
+	UplinkGBR   uint64 `json:"uplink_gbr"`
+	DownlinkGBR uint64 `json:"downlink_gbr"`
 }
 
 // CPIfaceInfo : CPIface interface settings.
