@@ -217,6 +217,8 @@ func (u *upf) sim(mode simMode, s *SimModeInfo) {
 		fars := []far{farDown, farN6Up, farN9Up}
 
 		// create/delete uplink qer
+		// For Non-GBR flows, the ulGbr/dlGbr values assigend
+		// below is ignored and has no impact
 		qerN6 := qer{
 			qerID: n6,
 			fseID: uint64(n3TEID + i),
@@ -227,6 +229,8 @@ func (u *upf) sim(mode simMode, s *SimModeInfo) {
 			dlMbr: s.DownlinkMBR,
 		}
 
+		// For Non-GBR flows, the ulGbr/dlGbr values assigend
+		// below is ignored and has no impact
 		qerN9 := qer{
 			qerID: n9,
 			fseID: uint64(n3TEID + i),
