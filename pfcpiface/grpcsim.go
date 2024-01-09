@@ -217,24 +217,28 @@ func (u *upf) sim(mode simMode, s *SimModeInfo) {
 		fars := []far{farDown, farN6Up, farN9Up}
 
 		// create/delete uplink qer
+		// For Non-GBR flows, the ulGbr/dlGbr values assigend
+		// below is ignored and has no impact
 		qerN6 := qer{
 			qerID: n6,
 			fseID: uint64(n3TEID + i),
 			qfi:   9,
-			ulGbr: 50000,
-			ulMbr: 90000,
-			dlGbr: 60000,
-			dlMbr: 80000,
+			ulGbr: s.UplinkGBR,
+			ulMbr: s.UplinkMBR,
+			dlGbr: s.DownlinkGBR,
+			dlMbr: s.DownlinkMBR,
 		}
 
+		// For Non-GBR flows, the ulGbr/dlGbr values assigend
+		// below is ignored and has no impact
 		qerN9 := qer{
 			qerID: n9,
 			fseID: uint64(n3TEID + i),
 			qfi:   8,
-			ulGbr: 50000,
-			ulMbr: 60000,
-			dlGbr: 70000,
-			dlMbr: 90000,
+			ulGbr: s.UplinkGBR,
+			ulMbr: s.UplinkMBR,
+			dlGbr: s.DownlinkGBR,
+			dlMbr: s.DownlinkMBR,
 		}
 
 		qers := []qer{qerN6, qerN9}
@@ -245,10 +249,10 @@ func (u *upf) sim(mode simMode, s *SimModeInfo) {
 			fseID:    uint64(n3TEID + i),
 			qosLevel: SessionQos,
 			qfi:      0,
-			ulGbr:    0,
-			ulMbr:    100000,
-			dlGbr:    0,
-			dlMbr:    500000,
+			ulGbr:    s.UplinkGBR,
+			ulMbr:    s.UplinkMBR,
+			dlGbr:    s.DownlinkGBR,
+			dlMbr:    s.DownlinkMBR,
 		}
 
 		qers = append(qers, sessionQer)
