@@ -35,6 +35,12 @@
         "n9_app_ip": "9.9.9.9",
         "start_n3_teid": "0x30000000",
         "start_n9_teid": "0x90000000",
+	"uplink_mbr": 500000,
+	"": "Make sure uplink_gbr is configured less than uplink_mbr if 'qfi' in pfcpiface/grpcsim.go is for GBR flows. Current default 'qfi' value is for Non-GBR flows",
+	"uplink_gbr": 50000,
+	"downlink_mbr": 1000000,
+	"": "Make sure downlink_gbr is configured less than downlink_mbr if 'qfi' in pfcpiface/grpcsim.go is for GBR flows. Current default 'qfi' value is for Non-GBR flows",
+	"downlink_gbr": 100000,
         "pkt_size": 128,
         "total_flows": 5000
     },
