@@ -14,7 +14,7 @@ RUN apt-get update && \
 
 # BESS pre-reqs
 WORKDIR /bess
-ARG BESS_COMMIT=dpdk-2011-focal
+ARG BESS_COMMIT=master
 RUN git clone https://github.com/omec-project/bess.git . \
     && git checkout ${BESS_COMMIT} \
     && cp -a protobuf /protobuf
