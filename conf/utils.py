@@ -2,13 +2,13 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2019 Intel Corporation
 
+import json
 import os
 import socket
-import sys
 import struct
+import sys
 
 import iptools
-import json
 import psutil
 from pyroute2 import IPDB
 
@@ -19,17 +19,20 @@ def exit(code, msg):
 
 
 def getpid(process_name):
-    for proc in psutil.process_iter(attrs=['pid', 'name']):
-        if process_name == proc.info['name']:
-            return proc.info['pid']
+    for proc in psutil.process_iter(attrs=["pid", "name"]):
+        if process_name == proc.info["name"]:
+            return proc.info["pid"]
 
 
 def getpythonpid(process_name):
-    for proc in psutil.process_iter(attrs=['pid', 'cmdline']):
-        if len(proc.info['cmdline']) < 2:
+    for proc in psutil.process_iter(attrs=["pid", "cmdline"]):
+        if len(proc.info["cmdline"]) < 2:
             continue
-        if process_name in proc.info['cmdline'][1] and 'python' in proc.info['cmdline'][0]:
-            return proc.info['pid']
+        if (
+            process_name in proc.info["cmdline"][1]
+            and "python" in proc.info["cmdline"][0]
+        ):
+            return proc.info["pid"]
     return
 
 
@@ -46,14 +49,14 @@ def get_env(varname, default=None):
         return var
     except KeyError:
         if default is not None:
-            return '{}'.format(default)
+            return "{}".format(default)
         else:
-            exit(1, 'Empty env var {}'.format(varname))
+            exit(1, "Empty env var {}".format(varname))
 
 
 def ips_by_interface(name):
     ipdb = IPDB()
-    return [ipobj[0] for ipobj in ipdb.interfaces[name]['ipaddr'].ipv4]
+    return [ipobj[0] for ipobj in ipdb.interfaces[name]["ipaddr"].ipv4]
 
 
 def atoh(ip):
@@ -62,25 +65,25 @@ def atoh(ip):
 
 def alias_by_interface(name):
     ipdb = IPDB()
-    return ipdb.interfaces[name]['ifalias']
+    return ipdb.interfaces[name]["ifalias"]
 
 
 def mac_by_interface(name):
     ipdb = IPDB()
-    return ipdb.interfaces[name]['address']
+    return ipdb.interfaces[name]["address"]
 
 
 def mac2hex(mac):
-    return int(mac.replace(':', ''), 16)
+    return int(mac.replace(":", ""), 16)
 
 
 def peer_by_interface(name):
     ipdb = IPDB()
     try:
-        peer_idx = ipdb.interfaces[name]['link']
-        peer_name = ipdb.interfaces[peer_idx]['ifname']
+        peer_idx = ipdb.interfaces[name]["link"]
+        peer_name = ipdb.interfaces[peer_idx]["ifname"]
     except:
-        raise Exception('veth interface {} does not exist'.format(name))
+        raise Exception("veth interface {} does not exist".format(name))
     else:
         return peer_name
 
@@ -94,8 +97,8 @@ def validate_cidr(cidr):
 
 
 def cidr2mask(cidr):
-    _, prefix = cidr.split('/')
-    return format(0xffffffff << (32 - int(prefix)), '08x')
+    _, prefix = cidr.split("/")
+    return format(0xFFFFFFFF << (32 - int(prefix)), "08x")
 
 
 def cidr2block(cidr):
@@ -107,9 +110,9 @@ def ip2hex(ip):
 
 
 def cidr2netmask(cidr):
-    network, net_bits = cidr.split('/')
+    network, net_bits = cidr.split("/")
     host_bits = 32 - int(net_bits)
-    netmask = socket.inet_ntoa(struct.pack('!I', (1 << 32) - (1 << host_bits)))
+    netmask = socket.inet_ntoa(struct.pack("!I", (1 << 32) - (1 << host_bits)))
     return network, netmask
 
 

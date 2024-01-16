@@ -3,16 +3,11 @@
 
 from ipaddress import IPv4Address
 
-from scapy.layers.l2 import Ether
-from trex.stl.trex_stl_streams import STLFlowLatencyStats
-from trex_stl_lib.api import (
-    STLPktBuilder,
-    STLStream,
-    STLTXCont,
-)
-
 from grpc_test import *
 from pkt_utils import GTPU_PORT, pkt_add_gtpu
+from scapy.layers.l2 import Ether
+from trex.stl.trex_stl_streams import STLFlowLatencyStats
+from trex_stl_lib.api import STLPktBuilder, STLStream, STLTXCont
 from trex_test import TrexTest
 from trex_utils import *
 
@@ -29,9 +24,9 @@ DURATION = 3
 PKT_SIZE = 1400
 
 # TODO: move to global constant file (or env)
-UE_IP = IPv4Address('16.0.0.1')
-ENB_IP = IPv4Address('10.27.19.99')
-N3_IP = IPv4Address('10.128.13.29')
+UE_IP = IPv4Address("16.0.0.1")
+ENB_IP = IPv4Address("10.27.19.99")
+N3_IP = IPv4Address("10.128.13.29")
 # Must be routable by route_control
 PDN_IP = IPv4Address("11.1.1.129")
 
@@ -86,13 +81,15 @@ class AppMbrTest(TrexTest, GrpcTest):
             pktlen=PKT_SIZE,
             eth_dst=BESS_CORE_MAC,
             ip_dst=str(UE_IP),
-            with_udp_chksum=False
+            with_udp_chksum=False,
         )
         app_payload_size = len(pkt[Ether].payload)
 
         overhead = len(pkt) / app_payload_size
         stream_bps = overhead * stream_bps
-        print(f" TX rate with Ethernet overhead: {to_readable(stream_bps)} ({overhead:.1%})")
+        print(
+            f" TX rate with Ethernet overhead: {to_readable(stream_bps)} ({overhead:.1%})"
+        )
         stream = STLStream(
             packet=STLPktBuilder(pkt=pkt),
             mode=STLTXCont(bps_L2=stream_bps),
@@ -105,7 +102,8 @@ class AppMbrTest(TrexTest, GrpcTest):
             num_samples=num_samples,
             tx_port=BESS_CORE_PORT,
             rx_port=BESS_ACCESS_PORT,
-            min_tx_bps=stream_bps * 0.95)
+            min_tx_bps=stream_bps * 0.95,
+        )
 
         trex_stats = self.trex_client.get_stats()
         return get_flow_stats(0, trex_stats)
@@ -155,7 +153,7 @@ class AppMbrTest(TrexTest, GrpcTest):
             eth_dst=BESS_ACCESS_MAC,
             ip_src=str(UE_IP),
             ip_dst=str(PDN_IP),
-            with_udp_chksum=False
+            with_udp_chksum=False,
         )
         app_payload_size = len(pkt[Ether].payload)
         gtpu_pkt = pkt_add_gtpu(
@@ -167,7 +165,9 @@ class AppMbrTest(TrexTest, GrpcTest):
 
         overhead = len(gtpu_pkt) / app_payload_size
         stream_bps = overhead * stream_bps
-        print(f" TX rate with Ethernet+GTPU overhead: {to_readable(stream_bps)} ({overhead:.1%})")
+        print(
+            f" TX rate with Ethernet+GTPU overhead: {to_readable(stream_bps)} ({overhead:.1%})"
+        )
         stream = STLStream(
             packet=STLPktBuilder(pkt=gtpu_pkt),
             mode=STLTXCont(bps_L2=stream_bps),
@@ -180,7 +180,8 @@ class AppMbrTest(TrexTest, GrpcTest):
             num_samples=num_samples,
             tx_port=BESS_ACCESS_PORT,
             rx_port=BESS_CORE_PORT,
-            min_tx_bps=stream_bps * 0.95)
+            min_tx_bps=stream_bps * 0.95,
+        )
 
         trex_stats = self.trex_client.get_stats()
         return get_flow_stats(0, trex_stats)
@@ -198,7 +199,8 @@ class DlAppMbrConformingTest(AppMbrTest):
         for mbr_bps in mbrs_bps:
             print(f"Testing app MBR {to_readable(mbr_bps)}...")
             flow_stats = self.run_dl_traffic(
-                mbr_bps=mbr_bps, stream_bps=mbr_bps*0.99, num_samples=2)
+                mbr_bps=mbr_bps, stream_bps=mbr_bps * 0.99, num_samples=2
+            )
             self.assertEqual(
                 flow_stats.tx_packets,
                 flow_stats.rx_packets,
@@ -219,8 +221,11 @@ class DlAppMbrNonConformingTest(AppMbrTest):
         for mbr_bps in mbrs_bps:
             print(f"Testing app MBR {to_readable(mbr_bps)}...")
             flow_stats = self.run_dl_traffic(
-                mbr_bps=mbr_bps, stream_bps=mbr_bps*2, num_samples=2)
-            loss = (flow_stats.tx_packets - flow_stats.rx_packets) / flow_stats.tx_packets
+                mbr_bps=mbr_bps, stream_bps=mbr_bps * 2, num_samples=2
+            )
+            loss = (
+                flow_stats.tx_packets - flow_stats.rx_packets
+            ) / flow_stats.tx_packets
             self.assertAlmostEqual(
                 loss,
                 0.5,
@@ -242,7 +247,8 @@ class UlAppMbrConformingTest(AppMbrTest):
         for mbr_bps in mbrs_bps:
             print(f"Testing app MBR {to_readable(mbr_bps)}...")
             flow_stats = self.run_ul_traffic(
-                mbr_bps=mbr_bps, stream_bps=mbr_bps*0.99, num_samples=2)
+                mbr_bps=mbr_bps, stream_bps=mbr_bps * 0.99, num_samples=2
+            )
             self.assertEqual(
                 flow_stats.tx_packets,
                 flow_stats.rx_packets,
@@ -263,8 +269,11 @@ class UlAppMbrNonConformingTest(AppMbrTest):
         for mbr_bps in mbrs_bps:
             print(f"Testing app MBR {to_readable(mbr_bps)}...")
             flow_stats = self.run_ul_traffic(
-                mbr_bps=mbr_bps, stream_bps=mbr_bps*2, num_samples=2)
-            loss = (flow_stats.tx_packets - flow_stats.rx_packets) / flow_stats.tx_packets
+                mbr_bps=mbr_bps, stream_bps=mbr_bps * 2, num_samples=2
+            )
+            loss = (
+                flow_stats.tx_packets - flow_stats.rx_packets
+            ) / flow_stats.tx_packets
             self.assertAlmostEqual(
                 loss,
                 0.5,

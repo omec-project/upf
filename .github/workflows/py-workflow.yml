@@ -1,9 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2023 Canonical Ltd.
+# Copyright 2023 Intel Corporation
 
 name: Python Lint and Test
 
-on: [push, pull_request]
+on:
+  - push
+  - pull_request
 
 jobs:
   route-control-tests:
@@ -11,10 +14,10 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
-      
+      uses: actions/checkout@v4
+
     - name: Set up Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
@@ -24,9 +27,12 @@ jobs:
     - name: Install dependencies
       run: |
         source ./venv/bin/activate
-        pip install -r ./conf/test-requirements.txt
+        pip install -r requirements.txt
 
     - name: Run tests
       run: |
         source ./venv/bin/activate
         python -m unittest ./conf/test_route_control.py
+
+    - name: Clean up virtual environment
+      run: rm -rf venv
