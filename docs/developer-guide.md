@@ -26,7 +26,7 @@ index 052456d..03b7d33 100644
 
  # BESS pre-reqs
  WORKDIR /bess
--ARG BESS_COMMIT=dpdk-2011-focal
+-ARG BESS_COMMIT=master
 -RUN git clone https://github.com/omec-project/bess.git .
 -RUN git checkout ${BESS_COMMIT}
 +COPY bess/ .
@@ -50,7 +50,7 @@ index 03b7d33..052456d 100644
  # BESS pre-reqs
  WORKDIR /bess
 -COPY bess/ .
-+ARG BESS_COMMIT=dpdk-2011-focal
++ARG BESS_COMMIT=master
 +RUN git clone https://github.com/omec-project/bess.git .
 +RUN git checkout ${BESS_COMMIT}
  RUN cp -a protobuf /protobuf

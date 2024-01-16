@@ -23,7 +23,14 @@ def pkt_add_gtpu(
     """
     gtp_pkt = (
         Ether(src=pkt[Ether].src, dst=pkt[Ether].dst)
-        / IP(src=out_ipv4_src, dst=out_ipv4_dst, tos=0, id=0x1513, flags=0, frag=0,)
+        / IP(
+            src=out_ipv4_src,
+            dst=out_ipv4_dst,
+            tos=0,
+            id=0x1513,
+            flags=0,
+            frag=0,
+        )
         / UDP(sport=sport, dport=dport, chksum=0)
         / GTP_U_Header(gtp_type=255, teid=teid)
     )

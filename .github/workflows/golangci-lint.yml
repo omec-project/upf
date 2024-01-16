@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2020 Intel Corporation
+# Copyright 2020-Present Intel Corporation
 # Copyright 2021 Open Networking Foundation
 name: golangci-lint
 on:
@@ -14,10 +14,10 @@ jobs:
     name: lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-go@v4
-        with:
-          go-version: '>1.17'
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3.6.0
         with:

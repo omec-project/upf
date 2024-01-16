@@ -17,6 +17,7 @@ G = 1000 * M
 Library of useful functions for parsing and reading TRex statistics.
 """
 
+
 def to_readable(src: int, unit: str = "bps") -> str:
     """
     Convert number to human readable string.
@@ -134,7 +135,14 @@ LatencyStats = collections.namedtuple(
 )
 
 FlowStats = collections.namedtuple(
-    "FlowStats", ["pg_id", "tx_packets", "rx_packets", "tx_bytes", "rx_bytes",],
+    "FlowStats",
+    [
+        "pg_id",
+        "tx_packets",
+        "rx_packets",
+        "tx_bytes",
+        "rx_bytes",
+    ],
 )
 
 FlowRateShares = collections.namedtuple(
@@ -175,9 +183,14 @@ RateSamples = collections.namedtuple(
 
 
 def start_and_monitor_port_stats(
-        client: STLClient, num_samples: int, tx_port: int,
-        rx_port: int, min_tx_bps: int = 0,
-        ramp_up_timeout: int = 3, interval: int = 1) -> RateSamples:
+    client: STLClient,
+    num_samples: int,
+    tx_port: int,
+    rx_port: int,
+    min_tx_bps: int = 0,
+    ramp_up_timeout: int = 3,
+    interval: int = 1,
+) -> RateSamples:
     """
     Starts traffic generation and collects port TX/RX rate samples,
     while verifying that TRex is able to reach the given minimum sending
@@ -247,18 +260,21 @@ def start_and_monitor_port_stats(
         bad_sample = tx_bps < min_tx_bps
         # Loss is approximated due to non-atomic reads of TX and RX ports
         loss_rate = (tx_pps - rx_pps) / tx_pps
-        print(f" {elapsed:.2f}s: "
-              f"TX {to_readable(tx_bps)} ({to_readable(tx_pps, 'pps')}) "
-              f"--> RX {to_readable(rx_bps)} "
-              f"(~{abs(loss_rate):.1%} pkt loss)"
-              f"{' *' if bad_sample else ''}")
+        print(
+            f" {elapsed:.2f}s: "
+            f"TX {to_readable(tx_bps)} ({to_readable(tx_pps, 'pps')}) "
+            f"--> RX {to_readable(rx_bps)} "
+            f"(~{abs(loss_rate):.1%} pkt loss)"
+            f"{' *' if bad_sample else ''}"
+        )
 
         if bad_sample:
             if elapsed > ramp_up_timeout:
                 client.stop(ports=[tx_port])
                 raise Exception(
                     f"TX port ({tx_port}) did not reach or sustain "
-                    f"min sending rate ({to_readable(min_tx_bps)})")
+                    f"min sending rate ({to_readable(min_tx_bps)})"
+                )
             else:
                 # Discard last sample
                 samples.tx_bps.pop()
