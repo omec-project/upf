@@ -5,7 +5,7 @@ package main
 
 import (
 	"io/fs"
-	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -131,7 +131,7 @@ type_info {
 `
 
 func mustWriteStringToDisk(s string, path string) {
-	err := ioutil.WriteFile(path, []byte(s), fs.ModePerm)
+	err := os.WriteFile(path, []byte(s), fs.ModePerm)
 	if err != nil {
 		panic(err)
 	}

@@ -2,6 +2,8 @@
 // Copyright (c) 2017, The Regents of the University of California.
 // All rights reserved.
 //
+// SPDX-License-Identifier: BSD-3-Clause
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
 //
@@ -131,12 +133,11 @@ func (*BPFCommandClearArg) Descriptor() ([]byte, []int) {
 
 //*
 // The ExactMatch module has a command `add(...)` that takes two parameters.
-// The ExactMatch initializer specifies what fields in a packet to inspect; add() specifies
-// which values to check for over these fields.
-// add() inserts a new rule into the ExactMatch module such that traffic matching
-// that bytestring will be forwarded
-// out a specified gate.
-// Example use: `add(fields=[aton('12.3.4.5'), aton('5.4.3.2')], gate=2)`
+// The ExactMatch initializer specifies what fields in a packet to inspect;
+// add() specifies which values to check for over these fields. add() inserts a
+// new rule into the ExactMatch module such that traffic matching that
+// bytestring will be forwarded out a specified gate. Example use:
+// `add(fields=[aton('12.3.4.5'), aton('5.4.3.2')], gate=2)`
 type ExactMatchCommandAddArg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -201,8 +202,8 @@ func (x *ExactMatchCommandAddArg) GetValues() []*FieldData {
 }
 
 //*
-// The ExactMatch module has a command `delete(...)` which deletes an existing rule.
-// Example use: `delete(fields=[aton('12.3.4.5'), aton('5.4.3.2')])`
+// The ExactMatch module has a command `delete(...)` which deletes an existing
+// rule. Example use: `delete(fields=[aton('12.3.4.5'), aton('5.4.3.2')])`
 type ExactMatchCommandDeleteArg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -292,9 +293,9 @@ func (*ExactMatchCommandClearArg) Descriptor() ([]byte, []int) {
 }
 
 //*
-// The ExactMatch module has a command `set_default_gate(...)` which takes one parameter.
-// This command routes all traffic which does _not_ match a rule to a specified gate.
-// Example use in bessctl: `setDefaultGate(gate=2)`
+// The ExactMatch module has a command `set_default_gate(...)` which takes one
+// parameter. This command routes all traffic which does _not_ match a rule to a
+// specified gate. Example use in bessctl: `setDefaultGate(gate=2)`
 type ExactMatchCommandSetDefaultGateArg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -396,11 +397,10 @@ func (x *FlowGenCommandSetBurstArg) GetBurst() uint64 {
 //*
 // The HashLB module has a command `set_mode(...)` which takes two parameters.
 // The `mode` parameter specifies whether the load balancer will hash over the
-// src/dest ethernet header (`'l2'`), over the src/dest IP addresses (`'l3'`), or over
-// the flow 5-tuple (`'l4'`).  Alternatively, if the `fields` parameter is set, the
-// load balancer will hash over the N-tuple with the specified offsets and
-// sizes.
-// Example use in bessctl: `lb.set_mode('l2')`
+// src/dest ethernet header (`'l2'`), over the src/dest IP addresses (`'l3'`),
+// or over the flow 5-tuple (`'l4'`).  Alternatively, if the `fields` parameter
+// is set, the load balancer will hash over the N-tuple with the specified
+// offsets and sizes. Example use in bessctl: `lb.set_mode('l2')`
 type HashLBCommandSetModeArg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -458,14 +458,14 @@ func (x *HashLBCommandSetModeArg) GetFields() []*Field {
 
 //*
 // The HashLB module has a command `set_gates(...)` which takes one parameter.
-// This function takes in a list of gate numbers to send hashed traffic out over.
-// Example use in bessctl: `lb.setGates(gates=[0,1,2,3])`
+// This function takes in a list of gate numbers to send hashed traffic out
+// over. Example use in bessctl: `lb.setGates(gates=[0,1,2,3])`
 type HashLBCommandSetGatesArg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Gates []int64 `protobuf:"varint,1,rep,packed,name=gates,proto3" json:"gates,omitempty"` ///A list of gate numbers to load balance traffic over
+	Gates []int64 `protobuf:"varint,1,rep,packed,name=gates,proto3" json:"gates,omitempty"` /// A list of gate numbers to load balance traffic over
 }
 
 func (x *HashLBCommandSetGatesArg) Reset() {
@@ -879,8 +879,9 @@ func (x *L2ForwardCommandLookupArg) GetAddrs() []string {
 }
 
 //*
-// This message type provides the reponse to the L2Forward function `lookup(..)`.
-// It returns the gate that a requested MAC address is currently assigned to.
+// This message type provides the reponse to the L2Forward function
+// `lookup(..)`. It returns the gate that a requested MAC address is currently
+// assigned to.
 type L2ForwardCommandLookupResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -929,14 +930,14 @@ func (x *L2ForwardCommandLookupResponse) GetGates() []uint64 {
 }
 
 //*
-// The L2Forward module has a command `populate(...)` which allows for fast creation
-// of the forwarding table given a range of MAC addresses. The function takes in a
-// 'base' MAC address, a count (number of MAC addresses), and a gate_id. The module
-// will route all MAC addresses starting from the base address, up to base+count address
-// round-robin over gate_count total gates.
-// For example, `populate(base='11:22:33:44:00', count = 10, gate_count = 2)` would
-// route addresses `11:22:33:44::(00, 02, 04, 06, 08)` out a gate 0 and the odd-suffixed
-// addresses out gate 1.
+// The L2Forward module has a command `populate(...)` which allows for fast
+// creation of the forwarding table given a range of MAC addresses. The function
+// takes in a 'base' MAC address, a count (number of MAC addresses), and a
+// gate_id. The module will route all MAC addresses starting from the base
+// address, up to base+count address round-robin over gate_count total gates.
+// For example, `populate(base='11:22:33:44:00', count = 10, gate_count = 2)`
+// would route addresses `11:22:33:44::(00, 02, 04, 06, 08)` out a gate 0 and
+// the odd-suffixed addresses out gate 1.
 type L2ForwardCommandPopulateArg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1002,12 +1003,12 @@ func (x *L2ForwardCommandPopulateArg) GetGateCount() int64 {
 
 //*
 // The Measure module measures and collects latency/jitter data for packets
-// annotated by a Timestamp module. Note that Timestamp and Measure module must reside
-// on the server for accurate measurement (as a result, the most typical use case is
-// measuring roundtrip time).
-// Optionally, you can also retrieve percentile values by specifying points in
-// "percentiles". For example, "percentiles" of [50.0, 99.0] will return
-// [median, 99'th %-ile tail latency] in "percentile_values_ns" in the response.
+// annotated by a Timestamp module. Note that Timestamp and Measure module must
+// reside on the server for accurate measurement (as a result, the most typical
+// use case is measuring roundtrip time). Optionally, you can also retrieve
+// percentile values by specifying points in "percentiles". For example,
+// "percentiles" of [50.0, 99.0] will return [median, 99'th %-ile tail latency]
+// in "percentile_values_ns" in the response.
 type MeasureCommandGetSummaryArg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1159,8 +1160,8 @@ func (x *MeasureCommandGetSummaryResponse) GetJitter() *MeasureCommandGetSummary
 
 //*
 // The Module DRR provides fair scheduling of flows based on a quantum which is
-// number of bytes allocated to each flow on each round of going through all flows.
-// Examples can be found [./bessctl/conf/samples/drr.bess]
+// number of bytes allocated to each flow on each round of going through all
+// flows. Examples can be found [./bessctl/conf/samples/drr.bess]
 //
 // __Input_Gates__: 1
 // __Output_Gates__:  1
@@ -1277,9 +1278,9 @@ func (x *DRRQuantumArg) GetQuantum() uint32 {
 }
 
 //*
-// The SetMaxQueueSize function sets a new maximum flow queue size for DRR module.
-// If the flow's queue gets to this size, the module starts dropping packets to
-// that flow until the queue is below this size.
+// The SetMaxQueueSize function sets a new maximum flow queue size for DRR
+// module. If the flow's queue gets to this size, the module starts dropping
+// packets to that flow until the queue is below this size.
 type DRRMaxFlowQueueSizeArg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1328,9 +1329,9 @@ func (x *DRRMaxFlowQueueSizeArg) GetMaxQueueSize() uint32 {
 }
 
 //*
-// The module PortInc has a function `set_burst(...)` that allows you to specify the
-// maximum number of packets to be stored in a single PacketBatch released by
-// the module.
+// The module PortInc has a function `set_burst(...)` that allows you to specify
+// the maximum number of packets to be stored in a single PacketBatch released
+// by the module.
 type PortIncCommandSetBurstArg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1379,9 +1380,9 @@ func (x *PortIncCommandSetBurstArg) GetBurst() uint64 {
 }
 
 //*
-// The module QueueInc has a function `set_burst(...)` that allows you to specify
-// the maximum number of packets to be stored in a single PacketBatch released
-// by the module.
+// The module QueueInc has a function `set_burst(...)` that allows you to
+// specify the maximum number of packets to be stored in a single PacketBatch
+// released by the module.
 type QueueIncCommandSetBurstArg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1861,7 +1862,9 @@ func (x *WildcardMatchCommandAddArg) GetValuesv() []*FieldData {
 }
 
 //*
-// The module WildcardMatch has a command `delete(...)` which removes a rule -- simply specify the values and masks from the previously inserted rule to remove them.
+// The module WildcardMatch has a command `delete(...)` which removes a rule --
+// simply specify the values and masks from the previously inserted rule to
+// remove them.
 type WildcardMatchCommandDeleteArg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1919,7 +1922,8 @@ func (x *WildcardMatchCommandDeleteArg) GetMasks() []*FieldData {
 
 //*
 // The function `clear()` for WildcardMatch takes no parameters, it clears
-// all state in the WildcardMatch module (is equivalent to calling delete for all rules)
+// all state in the WildcardMatch module (is equivalent to calling delete for
+// all rules)
 type WildcardMatchCommandClearArg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1960,7 +1964,8 @@ func (*WildcardMatchCommandClearArg) Descriptor() ([]byte, []int) {
 
 //*
 // For traffic which does not match any rule in the WildcardMatch module,
-// the `set_default_gate(...)` function specifies which gate to send this extra traffic to.
+// the `set_default_gate(...)` function specifies which gate to send this extra
+// traffic to.
 type WildcardMatchCommandSetDefaultGateArg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -2009,8 +2014,10 @@ func (x *WildcardMatchCommandSetDefaultGateArg) GetGate() uint64 {
 }
 
 //*
-// The module ACL creates an access control module which by default blocks all traffic, unless it contains a rule which specifies otherwise.
-// Examples of ACL can be found in [acl.bess](https://github.com/NetSys/bess/blob/master/bessctl/conf/samples/acl.bess)
+// The module ACL creates an access control module which by default blocks all
+// traffic, unless it contains a rule which specifies otherwise. Examples of ACL
+// can be found in
+// [acl.bess](https://github.com/omec-project/bess/blob/master/bessctl/conf/samples/acl.bess)
 //
 // __Input Gates__: 1
 // __Output Gates__: 1
@@ -2019,7 +2026,7 @@ type ACLArg struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Rules []*ACLArg_Rule `protobuf:"bytes,1,rep,name=rules,proto3" json:"rules,omitempty"` ///A list of ACL rules.
+	Rules []*ACLArg_Rule `protobuf:"bytes,1,rep,name=rules,proto3" json:"rules,omitempty"` /// A list of ACL rules.
 }
 
 func (x *ACLArg) Reset() {
@@ -2062,7 +2069,8 @@ func (x *ACLArg) GetRules() []*ACLArg_Rule {
 }
 
 //*
-// The BPF module is an access control module that sends packets out on a particular gate based on whether they match a BPF filter.
+// The BPF module is an access control module that sends packets out on a
+// particular gate based on whether they match a BPF filter.
 //
 // __Input Gates__: 1
 // __Output Gates__: many (configurable)
@@ -2114,9 +2122,10 @@ func (x *BPFArg) GetFilters() []*BPFArg_Filter {
 }
 
 //*
-// The Buffer module takes no parameters to initialize (ie, `Buffer()` is sufficient to create one).
-// Buffer accepts packets and stores them; it may forward them to the next module only after it has
-// received enough packets to fill an entire PacketBatch.
+// The Buffer module takes no parameters to initialize (ie, `Buffer()` is
+// sufficient to create one). Buffer accepts packets and stores them; it may
+// forward them to the next module only after it has received enough packets to
+// fill an entire PacketBatch.
 //
 // __Input Gates__: 1
 // __Output Gates__: 1
@@ -2159,9 +2168,9 @@ func (*BufferArg) Descriptor() ([]byte, []int) {
 }
 
 //*
-// The Bypass module forwards packets by emulating pre-defined packet processing overhead.
-// It burns cpu cycles per_batch, per_packet, and per-bytes.
-// Bypass is useful primarily for testing and performance evaluation.
+// The Bypass module forwards packets by emulating pre-defined packet processing
+// overhead. It burns cpu cycles per_batch, per_packet, and per-bytes. Bypass is
+// useful primarily for testing and performance evaluation.
 //
 // __Input Gates__: 1
 // __Output Gates__: 1
@@ -2229,7 +2238,9 @@ func (x *BypassArg) GetCyclesPerByte() uint32 {
 }
 
 //*
-// The Dump module blindly forwards packets without modifying them. It periodically samples a packet and prints out out to the BESS log (by default stored in `/tmp/bessd.INFO`).
+// The Dump module blindly forwards packets without modifying them. It
+// periodically samples a packet and prints out out to the BESS log (by default
+// stored in `/tmp/bessd.INFO`).
 //
 // __Input Gates__: 1
 // __Output Gates__: 1
@@ -2238,7 +2249,7 @@ type DumpArg struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Interval float64 `protobuf:"fixed64,1,opt,name=interval,proto3" json:"interval,omitempty"` ///How frequently to sample and print a packet, in seconds.
+	Interval float64 `protobuf:"fixed64,1,opt,name=interval,proto3" json:"interval,omitempty"` /// How frequently to sample and print a packet, in seconds.
 }
 
 func (x *DumpArg) Reset() {
@@ -2281,9 +2292,11 @@ func (x *DumpArg) GetInterval() float64 {
 }
 
 //*
-// The EtherEncap module wraps packets in an Ethernet header, but it takes no parameters. Instead, Ethernet source, destination, and type are pulled from a packet's metadata attributes.
-// For example: `SetMetadata('dst_mac', 11:22:33:44:55) -> EtherEncap()`
-// This is useful when upstream modules wish to assign a MAC address to a packet, e.g., due to an ARP request.
+// The EtherEncap module wraps packets in an Ethernet header, but it takes no
+// parameters. Instead, Ethernet source, destination, and type are pulled from a
+// packet's metadata attributes. For example: `SetMetadata('dst_mac',
+// 11:22:33:44:55) -> EtherEncap()` This is useful when upstream modules wish to
+// assign a MAC address to a packet, e.g., due to an ARP request.
 //
 // __Input Gates__: 1
 // __Output Gates__: 1
@@ -2326,11 +2339,13 @@ func (*EtherEncapArg) Descriptor() ([]byte, []int) {
 }
 
 //*
-// The ExactMatch module splits packets along output gates according to exact match values in arbitrary packet fields.
-// To instantiate an ExactMatch module, you must specify which fields in the packet to match over. You can add rules using the function `ExactMatch.add(...)`
-// Fields may be stored either in the packet data or its metadata attributes.
-// An example script using the ExactMatch code is found
-// in [`bess/bessctl/conf/samples/exactmatch.bess`](https://github.com/NetSys/bess/blob/master/bessctl/conf/samples/exactmatch.bess).
+// The ExactMatch module splits packets along output gates according to exact
+// match values in arbitrary packet fields. To instantiate an ExactMatch module,
+// you must specify which fields in the packet to match over. You can add rules
+// using the function `ExactMatch.add(...)` Fields may be stored either in the
+// packet data or its metadata attributes. An example script using the
+// ExactMatch code is found in
+// [`bess/bessctl/conf/samples/exactmatch.bess`](https://github.com/omec-project/bess/blob/master/bessctl/conf/samples/exactmatch.bess).
 //
 // __Input Gates__: 1
 // __Output Gates__: many (configurable)
@@ -2339,7 +2354,7 @@ type ExactMatchArg struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Fields  []*Field     `protobuf:"bytes,1,rep,name=fields,proto3" json:"fields,omitempty"` ///A list of ExactMatch Fields
+	Fields  []*Field     `protobuf:"bytes,1,rep,name=fields,proto3" json:"fields,omitempty"` /// A list of ExactMatch Fields
 	Masks   []*FieldData `protobuf:"bytes,2,rep,name=masks,proto3" json:"masks,omitempty"`   /// mask(i) corresponds to the mask for field(i)
 	Values  []*Field     `protobuf:"bytes,3,rep,name=values,proto3" json:"values,omitempty"` /// A list of ExactMatch Values
 	Masksv  []*FieldData `protobuf:"bytes,4,rep,name=masksv,proto3" json:"masksv,omitempty"` /// mask(i) corresponds to the mask for value(i)
@@ -2473,9 +2488,12 @@ func (x *ExactMatchConfig) GetRules() []*ExactMatchCommandAddArg {
 }
 
 //*
-// The FlowGen module generates simulated TCP flows of packets with correct SYN/FIN flags and sequence numbers.
-// This module is useful for testing, e.g., a NAT module or other flow-aware code.
-// Packets are generated off a base, "template" packet by modifying the IP src/dst and TCP src/dst. By default, only the ports are changed and will be modified by incrementing the template ports by up to 20000 more than the template values.
+// The FlowGen module generates simulated TCP flows of packets with correct
+// SYN/FIN flags and sequence numbers. This module is useful for testing, e.g.,
+// a NAT module or other flow-aware code. Packets are generated off a base,
+// "template" packet by modifying the IP src/dst and TCP src/dst. By default,
+// only the ports are changed and will be modified by incrementing the template
+// ports by up to 20000 more than the template values.
 //
 // __Input Gates__: 0
 // __Output Gates__: 1
@@ -2669,10 +2687,11 @@ func (x *GenericDecapArg) GetBytes() uint64 {
 //                      {'size': 2, 'attribute': 'foo'},
 //                      {'size': 2, 'value': 0x1234}])`
 // will prepend a 8-byte header:
-//    `de ad be ef <xx> <xx> 12 34`
-// where the 2-byte `<xx> <xx>` comes from the value of metadata attribute `'foo'`
-// for each packet.
-// An example script using GenericEncap is in [`bess/bessctl/conf/samples/generic_encap.bess`](https://github.com/NetSys/bess/blob/master/bessctl/conf/samples/generic_encap.bess).
+// `de ad be ef <xx> <xx> 12 34`
+//
+// where the 2-byte `<xx> <xx>` comes from the value of metadata attribute
+// `'foo'` for each packet. An example script using GenericEncap is in
+// [`bess/bessctl/conf/samples/generic_encap.bess`](https://github.com/omec-project/bess/blob/master/bessctl/conf/samples/generic_encap.bess).
 //
 // __Input Gates__: 1
 // __Output Gates__: 1
@@ -2725,8 +2744,8 @@ func (x *GenericEncapArg) GetFields() []*GenericEncapArg_EncapField {
 
 //*
 // The HashLB module partitions packets between output gates according to either
-// a hash over their MAC src/dst (`mode='l2'`), their IP src/dst (`mode='l3'`), the full
-// IP/TCP 5-tuple (`mode='l4'`), or the N-tuple defined by `fields`.
+// a hash over their MAC src/dst (`mode='l2'`), their IP src/dst (`mode='l3'`),
+// the full IP/TCP 5-tuple (`mode='l4'`), or the N-tuple defined by `fields`.
 //
 // __Input Gates__: 1
 // __Output Gates__: many (configurable)
@@ -2794,9 +2813,9 @@ func (x *HashLBArg) GetFields() []*Field {
 }
 
 //*
-// Encapsulates a packet with an IP header, where IP src, dst, and proto are filled in
-// by metadata values carried with the packet. Metadata attributes must include:
-// ip_src, ip_dst, ip_proto, ip_nexthop, and ether_type.
+// Encapsulates a packet with an IP header, where IP src, dst, and proto are
+// filled in by metadata values carried with the packet. Metadata attributes
+// must include: ip_src, ip_dst, ip_proto, ip_nexthop, and ether_type.
 //
 // __Input Gates__: 1
 // __Output Gates__: 1
@@ -2901,10 +2920,9 @@ func (x *IPLookupArg) GetMaxTbl8S() uint32 {
 }
 
 //*
-// An L2Forward module forwards packets to an output gate according to exact-match rules over
-// an Ethernet destination.
-// Note that this is _not_ a learning switch -- forwards according to fixed
-// routes specified by `add(..)`.
+// An L2Forward module forwards packets to an output gate according to
+// exact-match rules over an Ethernet destination. Note that this is _not_ a
+// learning switch -- forwards according to fixed routes specified by `add(..)`.
 //
 // __Input Gates__: 1
 // __Ouput Gates__: many (configurable, depending on rules)
@@ -2964,8 +2982,8 @@ func (x *L2ForwardArg) GetBucket() int64 {
 }
 
 //*
-// The MACSwap module takes no arguments. It swaps the src/destination MAC addresses
-// within a packet.
+// The MACSwap module takes no arguments. It swaps the src/destination MAC
+// addresses within a packet.
 //
 // __Input Gates__: 1
 // __Output Gates__: 1
@@ -3008,11 +3026,13 @@ func (*MACSwapArg) Descriptor() ([]byte, []int) {
 }
 
 //*
-// The measure module tracks latencies, packets per second, and other statistics.
-// It should be paired with a Timestamp module, which attaches a timestamp to packets.
-// The measure module will log how long (in nanoseconds) it has been for each packet it received since it was timestamped.
-// This module is somewhat experimental and undergoing various changes.
-// There is a test for the the Measure module in [`bessctl/module_tests/timestamp.py`](https://github.com/NetSys/bess/blob/master/bessctl/module_tests/timestamp.py).
+// The measure module tracks latencies, packets per second, and other
+// statistics. It should be paired with a Timestamp module, which attaches a
+// timestamp to packets. The measure module will log how long (in nanoseconds)
+// it has been for each packet it received since it was timestamped. This module
+// is somewhat experimental and undergoing various changes. There is a test for
+// the the Measure module in
+// [`bessctl/module_tests/timestamp.py`](https://github.com/omec-project/bess/blob/master/bessctl/module_tests/timestamp.py).
 //
 // __Input Gates__: 1
 // __Output Gates__: 1
@@ -3237,12 +3257,13 @@ func (x *MetadataTestArg) GetUpdate() map[string]int64 {
 // and destination addresses for packets on the reverse direction.
 // L3/L4 checksums are updated correspondingly.
 // To see an example of NAT in use, see:
-// [`bess/bessctl/conf/samples/nat.bess`](https://github.com/NetSys/bess/blob/master/bessctl/conf/samples/nat.bess)
+// [`bess/bessctl/conf/samples/nat.bess`](https://github.com/omec-project/bess/blob/master/bessctl/conf/samples/nat.bess)
 //
 // Currently only supports TCP/UDP/ICMP.
 // Note that address/port in packet payload (e.g., FTP) are NOT translated.
 //
-// __Input Gates__: 2 (0 for internal->external, and 1 for external->internal direction)
+// __Input Gates__: 2 (0 for internal->external, and 1 for external->internal
+// direction)
 // __Output Gates__: 2 (same as the input gate)
 type NATArg struct {
 	state         protoimpl.MessageState
@@ -3296,18 +3317,21 @@ func (x *NATArg) GetExtAddrs() []*NATArg_ExternalAddress {
 // IPv4 addresses. No port number is translated.
 // L3/L4 checksums are updated correspondingly.
 // To see an example of NAT in use, see:
-// [`bess/bessctl/conf/samples/nat.bess`](https://github.com/NetSys/bess/blob/master/bessctl/conf/samples/nat.bess)
+// [`bess/bessctl/conf/samples/nat.bess`](https://github.com/omec-project/bess/blob/master/bessctl/conf/samples/nat.bess)
 //
 // Forward direction (from input gate 0 to output gate 0):
-//  - Source IP address is updated, from internal to external address.
+//   - Source IP address is updated, from internal to external address.
+//
 // Reverse direction (from input gate 1 to output gate 1):
-//  - Destination IP address is updated, from external to internal address.
+//   - Destination IP address is updated, from external to internal address.
+//
 // If the original address is outside any of the ranges, packets are forwarded
 // without NAT.
 //
 // Note that address in packet payload (e.g., FTP) are NOT translated.
 //
-// __Input Gates__: 2 (0 for internal->external, and 1 for external->internal direction)
+// __Input Gates__: 2 (0 for internal->external, and 1 for external->internal
+// direction)
 // __Output Gates__: 2 (same as the input gate)
 type StaticNATArg struct {
 	state         protoimpl.MessageState
@@ -3876,8 +3900,8 @@ func (x *RandomSplitCommandSetGatesArg) GetGates() []int64 {
 }
 
 //*
-// The RandomUpdate module rewrites a specified field (`offset` and `size`) in a packet
-// with a random value between a specified min and max values.
+// The RandomUpdate module rewrites a specified field (`offset` and `size`) in a
+// packet with a random value between a specified min and max values.
 //
 // __Input Gates__: 1
 // __Output Gates__: 1
@@ -4083,8 +4107,8 @@ func (x *RoundRobinCommandSetModeArg) GetMode() string {
 }
 
 //*
-// The RoundRobin module splits packets from one input gate across multiple output
-// gates.
+// The RoundRobin module splits packets from one input gate across multiple
+// output gates.
 //
 // __Input Gates__: 1
 // __Output Gates__: many (configurable)
@@ -4247,9 +4271,9 @@ func (x *ReplicateCommandSetGatesArg) GetGates() []int64 {
 }
 
 //*
-// The SetMetadata module adds metadata attributes to packets, which are not stored
-// or sent out with packet data. For examples of SetMetadata use, see
-// [`bess/bessctl/conf/attr_match.bess`](https://github.com/NetSys/bess/blob/master/bessctl/conf/metadata/attr_match.bess)
+// The SetMetadata module adds metadata attributes to packets, which are not
+// stored or sent out with packet data. For examples of SetMetadata use, see
+// [`bess/bessctl/conf/attr_match.bess`](https://github.com/omec-project/bess/blob/master/bessctl/conf/metadata/attr_match.bess)
 //
 // __Input Gates__: 1
 // __Output Gates__: 1
@@ -5454,7 +5478,8 @@ func (x *VLANPushArg) GetTci() uint64 {
 }
 
 //*
-// Splits packets across output gates according to VLAN id (e.g., id 3 goes out gate 3).
+// Splits packets across output gates according to VLAN id (e.g., id 3 goes out
+// gate 3).
 //
 // __Input Gates__: 1
 // __Output Gates__: many
@@ -5540,7 +5565,8 @@ func (*VXLANDecapArg) Descriptor() ([]byte, []int) {
 }
 
 //*
-// VXLANEncap module wraps a packet in a VXLAN header with a specified destination port.
+// VXLANEncap module wraps a packet in a VXLAN header with a specified
+// destination port.
 //
 // __Input Gates__: 1
 // __Output Gates__: 1
@@ -5593,10 +5619,11 @@ func (x *VXLANEncapArg) GetDstport() uint64 {
 
 //*
 // The WildcardMatch module matches over multiple fields in a packet and
-// pushes packets that do match out a specified gate, and those that don't out a default
-// gate. WildcardMatch is initialized with the fields it should inspect over,
-// rules are added via the `add(...)` function.
-// An example of WildcardMatch is in [`bess/bessctl/conf/samples/wildcardmatch.bess`](https://github.com/NetSys/bess/blob/master/bessctl/conf/samples/wildcardmatch.bess)
+// pushes packets that do match out a specified gate, and those that don't out a
+// default gate. WildcardMatch is initialized with the fields it should inspect
+// over, rules are added via the `add(...)` function. An example of
+// WildcardMatch is in
+// [`bess/bessctl/conf/samples/wildcardmatch.bess`](https://github.com/omec-project/bess/blob/master/bessctl/conf/samples/wildcardmatch.bess)
 //
 // __Input Gates__: 1
 // __Output Gates__: many (configurable)
@@ -5848,11 +5875,11 @@ func (x *MplsPopArg) GetNextEthType() uint32 {
 //*
 // WorkerSplit splits packets based on the worker calling ProcessBatch(). It has
 // two modes.
-// 1) Packets from worker `x` are mapped to output gate `x`. This is the default
-//    mode.
-// 2) When the `worker_gates` field is set, packets from a worker `x` are mapped
-//    to `worker_gates[x]`.  In this mode, packet batches from workers not
-//    mapped to an output gate will be dropped.
+//  1. Packets from worker `x` are mapped to output gate `x`. This is the default
+//     mode.
+//  2. When the `worker_gates` field is set, packets from a worker `x` are mapped
+//     to `worker_gates[x]`.  In this mode, packet batches from workers not
+//     mapped to an output gate will be dropped.
 //
 // Calling the `reset` command with an empty `worker_gates` field will revert
 // WorkerSplit to the default mode.
@@ -6148,7 +6175,8 @@ func (x *QosCommandDeleteArg) GetFields() []*FieldData {
 
 //*
 // The function `clear()` for WildcardMatch takes no parameters, it clears
-// all state in the WildcardMatch module (is equivalent to calling delete for all rules)
+// all state in the WildcardMatch module (is equivalent to calling delete for
+// all rules)
 type QosCommandClearArg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -6189,7 +6217,8 @@ func (*QosCommandClearArg) Descriptor() ([]byte, []int) {
 
 //*
 // For traffic which does not match any rule in the WildcardMatch module,
-// the `set_default_gate(...)` function specifies which gate to send this extra traffic to.
+// the `set_default_gate(...)` function specifies which gate to send this extra
+// traffic to.
 type QosCommandSetDefaultGateArg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -7400,9 +7429,9 @@ func (x *RandomUpdateArg_Field) GetMax() uint64 {
 }
 
 //*
-// SetMetadata Attribute describes a metadata attribute and value to attach to every packet.
-// If copying data from a packet buffer, SetMetadata can also logically shift
-// then mask the value before storing it as metadata, i.e.,
+// SetMetadata Attribute describes a metadata attribute and value to attach to
+// every packet. If copying data from a packet buffer, SetMetadata can also
+// logically shift then mask the value before storing it as metadata, i.e.,
 // metadata_value = (packet_value >> `rshift_bits`) & `mask`.
 type SetMetadataArg_Attribute struct {
 	state         protoimpl.MessageState
@@ -7525,7 +7554,8 @@ func (*SetMetadataArg_Attribute_ValueInt) isSetMetadataArg_Attribute_Value() {}
 func (*SetMetadataArg_Attribute_ValueBin) isSetMetadataArg_Attribute_Value() {}
 
 //*
-// Update Field describes where in a packet's data to rewrite, and with what value.
+// Update Field describes where in a packet's data to rewrite, and with what
+// value.
 type UpdateArg_Field struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

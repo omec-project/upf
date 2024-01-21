@@ -128,8 +128,6 @@ func GetConfig(datapath string, configType uint32) pfcpiface.Conf {
 	}
 
 	panic("Wrong datapath or config type provided")
-
-	return pfcpiface.Conf{}
 }
 
 func PushSliceMeterConfig(sliceConfig pfcpiface.NetworkSlice) error {

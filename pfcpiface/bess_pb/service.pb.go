@@ -1,6 +1,8 @@
 // Copyright (c) 2016-2017, Nefeli Networks, Inc.
 // All rights reserved.
 //
+// SPDX-License-Identifier: BSD-3-Clause
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
 //
@@ -538,7 +540,8 @@ type BESSControlClient interface {
 	///
 	/// Some RPC commands to BESS or individual modules/ports require that
 	/// threads must be inactive, to avoid race conditions.
-	/// For such commands, use PauseWorker at the beginning and ResumeWorker at the end.
+	/// For such commands, use PauseWorker at the beginning and ResumeWorker at
+	/// the end.
 	///  PauseWorker(0)
 	///   SomeCommand1()
 	///   SomeCommand2()
@@ -1178,7 +1181,8 @@ type BESSControlServer interface {
 	///
 	/// Some RPC commands to BESS or individual modules/ports require that
 	/// threads must be inactive, to avoid race conditions.
-	/// For such commands, use PauseWorker at the beginning and ResumeWorker at the end.
+	/// For such commands, use PauseWorker at the beginning and ResumeWorker at
+	/// the end.
 	///  PauseWorker(0)
 	///   SomeCommand1()
 	///   SomeCommand2()
