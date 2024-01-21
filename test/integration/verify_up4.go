@@ -172,11 +172,9 @@ func buildExpectedSessionsDownlinkEntry(client *p4rtc.Client, expected p4RtValue
 	case UEStateAttaching, UEStateAttached:
 		action = ActSetDownlinkSession
 		actionParams = [][]byte{dummyTunnelPeerID, dummySessMeterIndex}
-		break
 	case UEStateBuffering:
 		action = ActSetDownlinkSessionBuff
 		actionParams = [][]byte{dummySessMeterIndex}
-		break
 	}
 
 	return client.NewTableEntry(TableDownlinkSessions, []p4rtc.MatchInterface{

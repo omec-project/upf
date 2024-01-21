@@ -14,7 +14,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/sirupsen/logrus"
-	"io/ioutil"
+	"io"
 	"log"
 	"os/exec"
 	"strings"
@@ -75,8 +75,8 @@ func RunDockerExecCommand(container string, cmd string) (
 		return 0, "", "", fmt.Errorf("error when starting command: %v", err)
 	}
 
-	stdoutBytes, _ := ioutil.ReadAll(stdoutPipe)
-	stderrBytes, _ := ioutil.ReadAll(stderrPipe)
+	stdoutBytes, _ := io.ReadAll(stdoutPipe)
+	stderrBytes, _ := io.ReadAll(stderrPipe)
 
 	if err := dockerCmd.Wait(); err != nil {
 		if e, ok := err.(*exec.ExitError); ok {
@@ -258,5 +258,5 @@ func MustPullDockerImage(image string) {
 	}
 
 	// waits for image to be pulled
-	ioutil.ReadAll(resp)
+	io.ReadAll(resp)
 }
