@@ -623,7 +623,7 @@ func testUEAttach(t *testing.T, testcase *testCase) {
 
 	verifyEntries(t, testcase.input, testcase.expected, UEStateAttaching)
 
-	err = pfcpClient.ModifySession(sess, nil, []*ie.IE{
+	pfcpClient.ModifySession(sess, nil, []*ie.IE{
 		session.NewFARBuilder().
 			WithMethod(session.Update).WithID(2).
 			WithAction(ActionForward).WithDstInterface(ie.DstInterfaceAccess).

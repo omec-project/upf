@@ -16,7 +16,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
-	"io/ioutil"
 	"net"
 	"os"
 	"testing"
@@ -41,8 +40,6 @@ const (
 
 	ModeDocker = "docker"
 	ModeNative = "native"
-
-	defaultSliceID = 0
 
 	defaultSDFFilter = "permit out udp from any to assigned 80-80"
 
@@ -167,11 +164,6 @@ func init() {
 	providers.MustCreateNetworkIfNotExists(DockerTestNetwork)
 }
 
-func (af appFilter) isEmpty() bool {
-	return af.proto == 0 && len(af.appIP) == 0 &&
-		af.appPort.low == 0 && af.appPort.high == 0
-}
-
 func IsConnectionOpen(network string, host string, port string) bool {
 	target := net.JoinHostPort(host, port)
 
@@ -199,14 +191,14 @@ func IsConnectionOpen(network string, host string, port string) bool {
 
 func waitForPortOpen(net string, host string, port string) error {
 	timeout := time.After(5 * time.Second)
-	ticker := time.Tick(500 * time.Millisecond)
+	ticker := time.NewTicker(500 * time.Millisecond)
 
 	// Keep trying until we're timed out or get a result/error
 	for {
 		select {
 		case <-timeout:
 			return errors.New("timed out")
-		case <-ticker:
+		case <-ticker.C:
 			if IsConnectionOpen(net, host, port) {
 				return nil
 			}
@@ -218,7 +210,7 @@ func waitForPortOpen(net string, host string, port string) error {
 // It retries every 1.5 seconds (0.5 seconds of interval between tries + 1 seconds that PFCP Client waits for response).
 func waitForPFCPAssociationSetup(pfcpClient *pfcpsim.PFCPClient) error {
 	timeout := time.After(30 * time.Second)
-	ticker := time.Tick(500 * time.Millisecond)
+	ticker := time.NewTicker(500 * time.Millisecond)
 
 	// Decrease timeout to wait for PFCP responses.
 	// This decreases time to wait for PFCP Agent to start.
@@ -229,7 +221,7 @@ func waitForPFCPAssociationSetup(pfcpClient *pfcpsim.PFCPClient) error {
 		select {
 		case <-timeout:
 			return errors.New("timed out")
-		case <-ticker:
+		case <-ticker.C:
 			// each test case requires PFCP Association, so we don't teardown it once we notice it's established.
 			if err := pfcpClient.SetupAssociation(); err == nil {
 				return nil
@@ -246,20 +238,8 @@ func waitForBESSFakeToStart() error {
 	return waitForPortOpen("tcp", "127.0.0.1", "10514")
 }
 
-func isModeNative() bool {
-	return os.Getenv(EnvMode) == ModeNative
-}
-
-func isModeDocker() bool {
-	return os.Getenv(EnvMode) == ModeDocker
-}
-
 func isDatapathUP4() bool {
 	return os.Getenv(EnvDatapath) == DatapathUP4
-}
-
-func isDatapathBESS() bool {
-	return os.Getenv(EnvDatapath) == DatapathBESS
 }
 
 func initForwardingPipelineConfig() {
@@ -350,7 +330,7 @@ func setup(t *testing.T, configType uint32) {
 	switch os.Getenv(EnvMode) {
 	case ModeDocker:
 		jsonConf, _ := json.Marshal(GetConfig(os.Getenv(EnvDatapath), configType))
-		err := ioutil.WriteFile(ConfigPath, jsonConf, os.ModePerm)
+		err := os.WriteFile(ConfigPath, jsonConf, os.ModePerm)
 		require.NoError(t, err)
 		MustStartPFCPAgent()
 	case ModeNative:

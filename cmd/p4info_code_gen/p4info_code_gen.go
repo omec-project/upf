@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	log "github.com/sirupsen/logrus"
-	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
@@ -294,7 +293,7 @@ func getUint32FromByteArray(s []byte) (uint32, error) {
 }
 
 func mustGetP4Config(p4infopath string) *p4ConfigV1.P4Info {
-	p4infoBytes, err := ioutil.ReadFile(p4infopath)
+	p4infoBytes, err := os.ReadFile(p4infopath)
 	if err != nil {
 		panic(fmt.Sprintf("Could not read P4Info file: %v", err))
 	}
