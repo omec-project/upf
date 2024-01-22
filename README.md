@@ -116,10 +116,10 @@ registry: [upf-epc-bess](https://hub.docker.com/r/omecproject/upf-epc-bess),
 * Downlink Data Notification (DDN) - notification only (no buffering)
 * Basic QoS support, with per-slice and per-session rate limiting
 * Per-flow latency and throughput metrics
-* DSCP marking of GTPU packets by copying the DSCP value from the inner IP packet
+* DSCP marking of GTPu packets by copying the DSCP value from the inner IP packet
 * GTPu path monitoring
 * Network Token Functions (_**experimental**_)
-* Support for DPDK, CNDP
+* Support for DPDK, CNDP, AF_PACKET and AF_XDP modes
 
 ### P4-UPF
 P4-UPF implements a core set of features capable of supporting requirements for
