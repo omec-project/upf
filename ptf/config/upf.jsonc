@@ -3,12 +3,12 @@
 // License: Apache-2.0
 {
     // UPF support various configuration modes:
-    // "af_xdp" to enable AF_XDP mode,
     // "af_packet"` to enable AF_PACKET mode,
-    // "sim" to generate synthetic traffic from BESS's Source module,
-    // "dpdk" to enable DPDK mode,
+    // "af_xdp" to enable AF_XDP mode,
     // "cndp" to enable CNDP mode,
-    // "" when running with UP4"
+    // "dpdk" to enable DPDK mode,
+    // "sim" to generate synthetic traffic from BESS's Source module,
+    // "" when running with UP4
     "mode": "dpdk",
 
     "table_sizes": {
@@ -40,11 +40,17 @@
         "n9_app_ip": "9.9.9.9",
         "start_n3_teid": "0x30000000",
         "start_n9_teid": "0x90000000",
+        "uplink_mbr": 500000,
+        // Make sure uplink_gbr is configured less than uplink_mbr if 'qfi' in pfcpiface/grpcsim.go is for GBR flows. Current default 'qfi' value is for Non-GBR flows
+        "uplink_gbr": 50000,
+        "downlink_mbr": 1000000,
+        // Make sure downlink_gbr is configured less than downlink_mbr if 'qfi' in pfcpiface/grpcsim.go is for GBR flows. Current default 'qfi' value is for Non-GBR flows
+        "downlink_gbr": 100000,
         "pkt_size": 128,
         "total_flows": 100
     },
 
-    // Max IP frag table entries (for IPv4 reassembly). Uncomment line below to to enable
+    // Max IP frag table entries (for IPv4 reassembly). Uncomment line below to enable
     // "max_ip_defrag_flows": "1000",
 
     // Uncomment line below to enable
@@ -59,21 +65,22 @@
     // Enable Intel Dynamic Device Personalization (DDP)
     "ddp": false,
 
-    // [Optional] Telemetrics-See this link for details: https://github.com/omec-project/bess/blob/master/bessctl/module_tests/timestamp.py
+    // [Optional] Telemetry-See this link for details: https://github.com/omec-project/bess/blob/master/bessctl/module_tests/timestamp.py
     "measure_upf": true,
 
-    // [Optional] Whether to enable flow measurement feature
+    // [Optional] Whether to enable flow-level measurements
     "measure_flow": true,
 
-    // Gateway interfaces
+    // N3 interface
     "access": {
         // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
         "ifname": "access"
     },
 
-    // UE IP Natting. Uncomment the line below to `\"ip_masquerade\": \"<ip> [or <ip>]\"` to enable
+    // N6 or N9 interface (depending on the UPF's deployment [PSA-UPF or I-UPF])
     "core": {
         // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
+        // Uncomment line below to enable UE IP natting. It could be a single IP or multiple IPs
         // "ip_masquerade": "18.0.0.1 or 18.0.0.2 or 18.0.0.3",
         "ifname": "core"
     },
@@ -100,6 +107,9 @@
     // Whether to enable UPF HeartBeatTimer feature
     "enable_hbTimer": false,
     // "heart_beat_interval": "5s",
+
+    // Whether to enable GTPu Path Monitoring
+    "enable_gtpu_path_monitoring": false,
 
     "qci_qos_config": [
         {
