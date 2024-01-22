@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2020 Intel Corporation
+// Copyright 2020-present Intel Corporation
 
 package pfcpiface
 
@@ -50,5 +50,6 @@ type datapath interface {
 	IsConnected(accessIP *net.IP) bool
 	SummaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric)
 	PortStats(uc *upfCollector, ch chan<- prometheus.Metric)
+	SummaryGtpuLatency(uc *upfCollector, ch chan<- prometheus.Metric)
 	SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) error
 }

@@ -4,6 +4,7 @@
 # Copyright 2019 Intel Corporation
 
 from conf.parser import *
+from conf.gtp_echo import *
 import conf.ports as port
 import conf.sim as sim
 import signal
@@ -387,6 +388,7 @@ coreFastBPF.add(filters=[downlink_filter])
 # Pick fast-path and echo gates for UL pipeline
 accessFastBPF = ports[parser.access_ifname].bpf
 GTPUEchoGate = ports[parser.access_ifname].bpf_gate()
+GTPUEchoResGate = ports[parser.access_ifname].bpf_gate()
 GTPUGate = 0
 
 
@@ -438,6 +440,7 @@ check_spgwu_ip = " and dst host " + \
     " or ".join(str(x) for x in access_ip)
 check_gtpu_port = " and udp dst port 2152"
 check_gtpu_msg_echo = " and udp[9] = 0x1"
+check_gtpu_msg_echo_res = " and udp[9] = 0x2"
 
 # Echo filter
 uplink_echo_filter = {"priority": GTPUEchoGate, "filter": check_ip +
@@ -445,11 +448,41 @@ uplink_echo_filter = {"priority": GTPUEchoGate, "filter": check_ip +
                       check_gtpu_msg_echo, "gate": GTPUEchoGate}
 accessFastBPF.add(filters=[uplink_echo_filter])
 
+# Echo Response filter
+uplink_echo_res_filter = {"priority": GTPUEchoResGate, "filter": check_ip +
+                          check_spgwu_ip + check_gtpu_port +
+                          check_gtpu_msg_echo_res, "gate": GTPUEchoResGate}
+accessFastBPF.add(filters=[uplink_echo_res_filter])
+
 # PDU rule
 uplink_filter = {"priority": -GTPUGate, "filter": check_ip +
                check_spgwu_ip + check_gtpu_port, "gate": GTPUGate}
 accessFastBPF.add(filters=[uplink_filter])
 
+
+# ====================================================
+#       GTP Echo Request for GTPU Path Monitoring
+# ====================================================
+
+# Create GTP Echo Request packets
+if parser.enable_gtpu_path_monitoring:
+    gtpuSrc::Source() -> gtpuEchoReq::Rewrite(templates=[gtp_echo_request(access_ip[0])]) \
+                      -> gtpuPathMonitoring::GtpuPathMonitoring() \
+                      -> gtpuL4Cksum::L4Checksum() -> gtpuIPCksum::IPChecksum() \
+                      -> ports[parser.access_ifname].rtr
+    gtpuSrc.set_burst(burst=1)
+
+    bess.add_tc('schedule_limit',
+                policy='rate_limit',
+                resource='count',
+                limit={'count': 1}, wid=0)
+    gtpuSrc.attach_task(parent='schedule_limit')
+
+    # Process GTP Echo Response packets
+    accessFastBPF:GTPUEchoResGate -> gtpuPathMonitoring
+else:
+    # Process GTP Echo Response packets
+    accessFastBPF:GTPUEchoResGate -> gtpuPathMonDisable::Sink()
 
 # ====================================================
 #       Route Control

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2020 Intel Corporation
+// Copyright 2020-present Intel Corporation
 
 package pfcpiface
 
@@ -41,6 +41,8 @@ const (
 	PostDlQosFlowMeasure = "postDLQosFlowMeasure"
 	// PostUlQosFlowMeasure: Post QoS measurement uplink module name.
 	PostUlQosFlowMeasure = "postULQosFlowMeasure"
+	// GtpuPathMonitoringMeasure: Gtpu Path Monitoring measurement module name.
+	GtpuPathMonitoringMeasure = "gtpuPathMonitoring"
 	// far-action specific values.
 	farForwardD = 0x0
 	farForwardU = 0x1
@@ -70,6 +72,8 @@ var intEnc = func(u uint64) *pb.FieldData {
 }
 
 var bessIP = flag.String("bess", "localhost:10514", "BESS IP/port combo")
+
+var enableGtpuPathMonitoring = false
 
 type bess struct {
 	client           pb.BESSControlClient
@@ -342,6 +346,44 @@ func (b *bess) SummaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metri
 	measureIface("Core", uc.upf.coreIface)
 }
 
+func (b *bess) SummaryGtpuLatency(uc *upfCollector, ch chan<- prometheus.Metric) {
+	gtpuPathStatsResp := b.readGtpuPathMonitoringStats(GtpuPathMonitoringMeasure, true)
+	if gtpuPathStatsResp == nil {
+		log.Errorln(GtpuPathMonitoringMeasure, " read failed!")
+		return
+	}
+
+	for i := 0; i < len(gtpuPathStatsResp.Statistics); i++ {
+		post := gtpuPathStatsResp.Statistics[i]
+		gnbIpString := int2ip(post.GnbIp).String()
+
+		ch <- prometheus.MustNewConstMetric(
+			uc.gtpupackets,
+			prometheus.CounterValue,
+			float64(post.Count),
+			gnbIpString,
+		)
+		ch <- prometheus.MustNewConstMetric(
+			uc.gtpulatencymin,
+			prometheus.GaugeValue,
+			float64(post.LatencyMin),
+			gnbIpString,
+		)
+		ch <- prometheus.MustNewConstMetric(
+			uc.gtpulatencymean,
+			prometheus.GaugeValue,
+			float64(post.LatencyMean),
+			gnbIpString,
+		)
+		ch <- prometheus.MustNewConstMetric(
+			uc.gtpulatencymax,
+			prometheus.GaugeValue,
+			float64(post.LatencyMax),
+			gnbIpString,
+		)
+	}
+}
+
 func (b *bess) flipFlowMeasurementBufferFlag(ctx context.Context, module string) (flip pb.FlowMeasureFlipResponse, err error) {
 	req := &pb.FlowMeasureCommandFlipArg{}
 
@@ -417,6 +459,49 @@ func (b *bess) readFlowMeasurement(
 	}
 
 	return
+}
+
+func (b *bess) readGtpuPathMonitoringStats(
+	module string, clear bool) *pb.GtpuPathMonitoringCommandReadResponse {
+	req := &pb.GtpuPathMonitoringCommandReadArg{
+		Clear: clear,
+	}
+
+	any, err := anypb.New(req)
+	if err != nil {
+		log.Errorln("Error marshalling request", req, err)
+		return nil
+	}
+
+	ctx := context.Background()
+
+	resp, err := b.client.ModuleCommand(
+		ctx, &pb.CommandRequest{
+			Name: module,
+			Cmd:  "read",
+			Arg:  any,
+		},
+	)
+
+	if err != nil {
+		log.Errorln(module, "read failed!:", err)
+		return nil
+	}
+
+	if resp.GetError() != nil {
+		log.Errorln(module, "error reading gptu path monitoring stats:", resp.GetError().Errmsg)
+		return nil
+	}
+
+	var res pb.GtpuPathMonitoringCommandReadResponse
+	err = resp.Data.UnmarshalTo(&res)
+
+	if err != nil {
+		log.Errorln(err, resp)
+		return nil
+	}
+
+	return &res
 }
 
 func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) (err error) {
@@ -650,6 +735,18 @@ func (b *bess) clearState() {
 
 	b.processFAR(ctx, anyExactClear, upfMsgTypeClear)
 
+	clearGtpuPathMonitoringCmd := &pb.GtpuPathMonitoringCommandClearArg{}
+
+	if enableGtpuPathMonitoring {
+		anyGtpuPathMonitoringClear, err := anypb.New(clearGtpuPathMonitoringCmd)
+		if err != nil {
+			log.Errorf("Error marshalling the rule %v: %v", anyGtpuPathMonitoringClear, err)
+			return
+		}
+
+		b.processGtpuPathMonitoring(ctx, anyGtpuPathMonitoringClear, upfMsgTypeClear)
+	}
+
 	clearQoSCmd := &pb.QosCommandClearArg{}
 
 	anyQoSClear, err := anypb.New(clearQoSCmd)
@@ -734,6 +831,10 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 		if !rc {
 			log.Errorln("Unable to make GRPC calls")
 		}
+	}
+
+	if conf.EnableGtpuPathMonitoring {
+		enableGtpuPathMonitoring = true
 	}
 }
 
@@ -1068,6 +1169,27 @@ func (b *bess) processFAR(ctx context.Context, any *anypb.Any, method upfMsgType
 	}
 }
 
+func (b *bess) processGtpuPathMonitoring(ctx context.Context, any *anypb.Any, method upfMsgType) {
+	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
+		log.Println("Invalid method name: ", method)
+		return
+	}
+
+	methods := [...]string{"add", "add", "delete", "clear"}
+
+	resp, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
+		Name: "gtpuPathMonitoring",
+		Cmd:  methods[method],
+		Arg:  any,
+	})
+
+	log.Traceln("gtpuPathMonitoring resp: ", resp)
+
+	if err != nil || resp.GetError() != nil {
+		log.Errorf("gtpuPathMonitoring method failed with resp: %v, err: %v\n", resp, err)
+	}
+}
+
 func (b *bess) setActionValue(f far) uint8 {
 	if (f.applyAction & ActionForward) != 0 {
 		if f.dstIntf == ie.DstInterfaceAccess {
@@ -1118,6 +1240,21 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 		}
 
 		b.processFAR(ctx, any, upfMsgTypeAdd)
+
+		if enableGtpuPathMonitoring {
+			g := &pb.GtpuPathMonitoringCommandAddDeleteArg{
+				GnbIp: far.tunnelIP4Dst, /* gnb ip */
+			}
+
+			any, err = anypb.New(g)
+			if err != nil {
+				log.Println("Error marshalling data", g, err)
+				return
+			}
+
+			b.processGtpuPathMonitoring(ctx, any, upfMsgTypeAdd)
+		}
+
 		done <- true
 	}()
 }
@@ -1143,6 +1280,21 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 		}
 
 		b.processFAR(ctx, any, upfMsgTypeDel)
+
+		if enableGtpuPathMonitoring {
+			g := &pb.GtpuPathMonitoringCommandAddDeleteArg{
+				GnbIp: far.tunnelIP4Dst, /* gnb ip */
+			}
+
+			any, err = anypb.New(g)
+			if err != nil {
+				log.Println("Error marshalling data", g, err)
+				return
+			}
+		}
+
+		b.processGtpuPathMonitoring(ctx, any, upfMsgTypeDel)
+
 		done <- true
 	}()
 }

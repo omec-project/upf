@@ -18,10 +18,11 @@ import (
 )
 
 const (
-	pdrLookupModuleName  = "pdrLookup"
-	farLookupModuleName  = "farLookup"
-	sessionQerModuleName = "sessionQERLookup"
-	appQerModuleName     = "appQERLookup"
+	pdrLookupModuleName          = "pdrLookup"
+	farLookupModuleName          = "farLookup"
+	sessionQerModuleName         = "sessionQERLookup"
+	appQerModuleName             = "appQERLookup"
+	gtpuPathMonitoringModuleName = "gtpuPathMonitoring"
 )
 
 type FakePdr struct {
@@ -170,6 +171,11 @@ func (b *fakeBessService) unsafeGetOrAddModule(name string) module {
 			}
 		} else if name == appQerModuleName || name == sessionQerModuleName {
 			b.modules[name] = &qosModule{
+				baseModule{name: name},
+				nil,
+			}
+		} else if name == gtpuPathMonitoringModuleName {
+			b.modules[name] = &gtpuPathMonitoringModule{
 				baseModule{name: name},
 				nil,
 			}
@@ -511,6 +517,78 @@ func (q *qosModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 		}
 	} else if cmd == "clear" {
 		qc := &bess_pb.QosCommandClearArg{}
+		err = arg.UnmarshalTo(qc)
+		if err != nil {
+			return err
+		}
+		// clear all rules
+		q.entries = nil
+	} else {
+		panic("should not happen")
+	}
+
+	return nil
+}
+
+type gtpuPathMonitoringModule struct {
+	baseModule
+	entries []*bess_pb.GtpuPathMonitoringCommandAddDeleteArg
+}
+
+func (q *gtpuPathMonitoringModule) GetState() (msgs []proto.Message) {
+	for _, em := range q.entries {
+		msgs = append(msgs, em)
+	}
+	return
+}
+
+func (q *gtpuPathMonitoringModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
+	if err = q.baseModule.HandleRequest(cmd, arg); err != nil {
+		return
+	}
+
+	log := log.WithField("module", q.Name()).WithField("cmd", cmd)
+
+	if cmd == "add" {
+		wc := &bess_pb.GtpuPathMonitoringCommandAddDeleteArg{}
+		err = arg.UnmarshalTo(wc)
+		if err != nil {
+			return err
+		}
+		var existing *bess_pb.GtpuPathMonitoringCommandAddDeleteArg
+		for _, e := range q.entries {
+			if e.GetGnbIp() == wc.GetGnbIp() {
+				existing = e
+			}
+		}
+		if existing != nil {
+			log.Tracef("updated existing entry %v", existing)
+			existing.Reset()
+			proto.Merge(existing, wc)
+		} else {
+			log.Tracef("added new entry %v", wc)
+			q.entries = append(q.entries, wc)
+		}
+	} else if cmd == "delete" {
+		qc := &bess_pb.GtpuPathMonitoringCommandAddDeleteArg{}
+		err = arg.UnmarshalTo(qc)
+		if err != nil {
+			return err
+		}
+		idx := -1
+		for i, e := range q.entries {
+			if e.GetGnbIp() == qc.GetGnbIp() {
+				idx = i
+			}
+		}
+		if idx == -1 {
+			return status.Errorf(codes.NotFound, "entry not found: %v", qc)
+		} else {
+			log.Tracef("deleted existing entry %v", q.entries[idx])
+			q.entries = append(q.entries[:idx], q.entries[idx+1:]...)
+		}
+	} else if cmd == "clear" {
+		qc := &bess_pb.GtpuPathMonitoringCommandClearArg{}
 		err = arg.UnmarshalTo(qc)
 		if err != nil {
 			return err

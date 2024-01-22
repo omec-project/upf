@@ -106,6 +106,9 @@
     "enable_hbTimer": false,
     "": "heart_beat_interval: 5s",
 
+    "": "Whether to enable GTPu Path Monitoring",
+    "enable_gtpu_path_monitoring": false,
+
     "qci_qos_config": [
         {
             "": "Default values for QERs with QCI/QFI not listed below",

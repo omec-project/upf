@@ -71,6 +71,7 @@ func UP4ConfigDefault() pfcpiface.Conf {
 
 	config := baseConfig
 	config.EnableP4rt = true
+	config.EnableGtpuPathMonitoring = false
 	config.P4rtcIface = pfcpiface.P4rtcInfo{
 		SliceID:     1,
 		AccessIP:    upfN3Address + "/32",

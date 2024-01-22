@@ -48,6 +48,7 @@ class Parser:
         self.notify_sockaddr = "/tmp/notifycp"
         self.endmarker_sockaddr = "/tmp/pfcpport"
         self.enable_slice_metering = False
+        self.enable_gtpu_path_monitoring = False
         self.measure_flow = False
         self.table_size_pdr_lookup = 0
         self.table_size_flow_measure = 0
@@ -208,3 +209,10 @@ class Parser:
             self.table_size_far_lookup = self.conf["table_sizes"]["farLookup"]
         except KeyError:
             print("No explicit table sizes")
+
+        # GTPu Path Monitoring
+        try:
+            self.enable_gtpu_path_monitoring = bool(self.conf["enable_gtpu_path_monitoring"])
+        except KeyError:
+            print("GTPu Path monitoring disabled")
+

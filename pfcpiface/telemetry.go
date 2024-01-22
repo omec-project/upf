@@ -34,6 +34,11 @@ type upfCollector struct {
 	latency *prometheus.Desc
 	jitter  *prometheus.Desc
 
+	gtpupackets     *prometheus.Desc
+	gtpulatencymin  *prometheus.Desc
+	gtpulatencymean *prometheus.Desc
+	gtpulatencymax  *prometheus.Desc
+
 	upf *upf
 }
 
@@ -59,6 +64,22 @@ func newUpfCollector(upf *upf) *upfCollector {
 			"Shows the packet processing jitter percentiles in UPF",
 			[]string{"iface"}, nil,
 		),
+		gtpupackets: prometheus.NewDesc(prometheus.BuildFQName("upf", "gtpupackets", "count"),
+			"Shows the number of gtpu packets (replies) received by the UPF for a given gNB",
+			[]string{"ipAddress"}, nil,
+		),
+		gtpulatencymin: prometheus.NewDesc(prometheus.BuildFQName("upf", "gtpulatencymin", "ns"),
+			"Shows the minimum latency for a gtpu path monitoring packet in UPF",
+			[]string{"ipAddress"}, nil,
+		),
+		gtpulatencymean: prometheus.NewDesc(prometheus.BuildFQName("upf", "gtpulatencymean", "ns"),
+			"Shows the mean latency for a gtpu path monitoring packet in UPF",
+			[]string{"ipAddress"}, nil,
+		),
+		gtpulatencymax: prometheus.NewDesc(prometheus.BuildFQName("upf", "gtpulatencymax", "ns"),
+			"Shows the maximum latency for a gtpu path monitoring packet in UPF",
+			[]string{"ipAddress"}, nil,
+		),
 		upf: upf,
 	}
 }
@@ -71,12 +92,18 @@ func (uc *upfCollector) Describe(ch chan<- *prometheus.Desc) {
 
 	ch <- uc.latency
 	ch <- uc.jitter
+
+	ch <- uc.gtpupackets
+	ch <- uc.gtpulatencymin
+	ch <- uc.gtpulatencymean
+	ch <- uc.gtpulatencymax
 }
 
 // Collect writes all metrics to prometheus metric channel.
 func (uc *upfCollector) Collect(ch chan<- prometheus.Metric) {
 	uc.summaryLatencyJitter(ch)
 	uc.portStats(ch)
+	uc.summaryGtpuLatency(ch)
 }
 
 func (uc *upfCollector) portStats(ch chan<- prometheus.Metric) {
@@ -86,6 +113,10 @@ func (uc *upfCollector) portStats(ch chan<- prometheus.Metric) {
 
 func (uc *upfCollector) summaryLatencyJitter(ch chan<- prometheus.Metric) {
 	uc.upf.SummaryLatencyJitter(uc, ch)
+}
+
+func (uc *upfCollector) summaryGtpuLatency(ch chan<- prometheus.Metric) {
+	uc.upf.SummaryGtpuLatency(uc, ch)
 }
 
 // PfcpNodeCollector makes a PFCPNode Prometheus observable.
