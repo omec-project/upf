@@ -38,13 +38,17 @@ def getpythonpid(process_name):
 
 
 def get_json_conf(path, dump):
-    with open(path, 'r') as f:
-        jsonc_data = f.read()
-    jc = JsonComment()
-    conf = jc.loads(jsonc_data)
-    if dump:
-        print(jc.dumps(conf, indent=4, sort_keys=True))
-    return conf
+    try:
+        with open(path, 'r') as f:
+            jsonc_data = f.read()
+        jc = JsonComment()
+        conf = jc.loads(jsonc_data)
+        if dump:
+            print(jc.dumps(conf, indent=4, sort_keys=True))
+        return conf
+    except Exception as e:
+        print("An unexpected error occurred:", str(e))
+        return None
 
 
 def get_env(varname, default=None):
