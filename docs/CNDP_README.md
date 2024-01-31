@@ -30,7 +30,7 @@ $ make docker-build
 
 ## Step 2: Test setup
 
-Following diagram shows is a test setup. 
+Following diagram shows is a test setup.
 
 ![Test setup](./images/cndp-omec-upf-test-setup.jpg)
 
@@ -62,42 +62,42 @@ $ chmod +x dpdk-hugepages.py
 ```
 For example, to setup 8GB of total huge pages (8 pages each of size 1GB in each NUMA node) using DPDK script, use the command `dpdk-hugepages.py -p 1G --setup 8G`
 
-2) Enable cndp mode, use appropriate netdev interface and uncomment jsonc config file in configuration file  [upf.json](../conf/upf.json)
+2) Enable cndp mode, use appropriate netdev interface and uncomment jsonc config file in configuration file  [upf.jsonc](../conf/upf.jsonc)
 
 ```
-diff --git a/conf/upf.json b/conf/upf.json
-index 62fa435..169dc5a 100644
---- a/conf/upf.json
-+++ b/conf/upf.json
-@@ -3,8 +3,8 @@
-     "": "mode: af_xdp",
-     "": "mode: af_packet",
-     "": "mode: sim",
--    "": "mode: cndp",
+diff --git a/conf/upf.jsonc b/conf/upf.jsonc
+index f8f4e4e..f694197 100644
+--- a/conf/upf.jsonc
++++ b/conf/upf.jsonc
+@@ -9,7 +9,7 @@
+     // "dpdk" to enable DPDK mode,
+     // "cndp" to enable CNDP mode,
+     // "" when running with UP4"
 -    "mode": "dpdk",
-+    "": "mode: dpdk",
 +    "mode": "cndp",
 
      "table_sizes": {
-         "": "Example sizes based on sim mode and 50K sessions. Customize as per your control plane",
-@@ -62,14 +62,14 @@
+         // Example sizes based on sim mode and 50K sessions. Customize as per your control plane
+@@ -67,15 +67,15 @@
 
-     "": "Gateway interfaces",
+     // Gateway interfaces
      "access": {
--        "ifname": "ens803f2",
--        "": "cndp_jsonc_file: conf/cndp_upf_1worker.jsonc"
-+        "ifname": "enp134s0",
-+        "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc"
+-        // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
+-        "ifname": "ens803f2"
++        "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
++        "ifname": "enp134s0"
      },
 
-     "": "UE IP Natting. Update the line below to `\"ip_masquerade\": \"<ip> [or <ip>]\"` to enable",
+     // UE IP Natting. Uncomment the line below to `\"ip_masquerade\": \"<ip> [or <ip>]\"` to enable
      "core": {
--        "ifname": "ens803f3",
--        "": "cndp_jsonc_file: conf/cndp_upf_1worker.jsonc",
-+        "ifname": "enp136s0",
+-        // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
 +        "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
-         "": "ip_masquerade: 18.0.0.1 or 18.0.0.2 or 18.0.0.3"
+         // "ip_masquerade": "18.0.0.1 or 18.0.0.2 or 18.0.0.3",
+-        "ifname": "ens803f3"
++        "ifname": "enp136s0"
      },
+
+     // Number of worker threads. Default: 1
 ```
 
 3) Enable cndp mode in script file  [docker_setup.sh](../scripts/docker_setup.sh)
@@ -284,7 +284,7 @@ $ chmod +x dpdk-devbind.py
 Insert rules into relevant PDR and FAR tables
 
 ```
-$ docker exec bess-pfcpiface pfcpiface -config /conf/upf.json -simulate create
+$ docker exec bess-pfcpiface pfcpiface -config /conf/upf.jsonc -simulate create
 ```
 9) From browser, use localhost:8000 to view the UPF pipeline in GUI. If you are remotely connecting to system via ssh, you need to setup a tunnel with local port forwarding.
 
@@ -343,36 +343,47 @@ Modify OMEC UPF and CNDP configuration files to support multiple worker threads.
 
 To test multiple worker thread, we need to use CNDP jsonc file with appropriate configuration. An example CNDP jsonc file for 4 worker threads is in [cndp_upf_4worker.jsonc](../conf/cndp_upf_4worker.jsonc). Follow below steps to configure OMEC-UPF pipeline using 4 worker threads which runs on 5 cores (4 BESS worker threads and 1 main thread).
 
-1) Update [upf.json](../conf/upf.json) to set number if worker threads as 4. Also use appropriate CNDP jsonc file with required number of lports (netdev/qid pair)
+1) Update [upf.jsonc](../conf/upf.jsonc) to set number if worker threads as 4. Also use appropriate CNDP jsonc file with required number of lports (netdev/qid pair)
 
 ```
-diff --git a/conf/upf.json b/conf/upf.json
-index 37447b7..3bb3c27 100644
---- a/conf/upf.json
-+++ b/conf/upf.json
-@@ -63,18 +63,18 @@
-     "": "Gateway interfaces",
+diff --git a/conf/upf.jsonc b/conf/upf.jsonc
+index f8f4e4e..3bd8b88 100644
+--- a/conf/upf.jsonc
++++ b/conf/upf.jsonc
+@@ -9,7 +9,7 @@
+     // "dpdk" to enable DPDK mode,
+     // "cndp" to enable CNDP mode,
+     // "" when running with UP4"
+-    "mode": "dpdk",
++    "mode": "cndp",
+
+     "table_sizes": {
+         // Example sizes based on sim mode and 50K sessions. Customize as per your control plane
+@@ -67,19 +67,19 @@
+
+     // Gateway interfaces
      "access": {
-         "ifname": "ens803f2",
--        "": "cndp_jsonc_file: conf/cndp_upf_1worker.jsonc"
-+        "cndp_jsonc_file": "conf/cndp_upf_4worker.jsonc"
-     },
-
-     "": "UE IP Natting. Update the line below to `\"ip_masquerade\": \"<ip> [or <ip>]\"` to enable",
-     "core": {
-         "ifname": "ens803f3",
--        "": "cndp_jsonc_file: conf/cndp_upf_1worker.jsonc",
+-        // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
+-        "ifname": "ens803f2"
 +        "cndp_jsonc_file": "conf/cndp_upf_4worker.jsonc",
-         "": "ip_masquerade: 18.0.0.1 or 18.0.0.2 or 18.0.0.3"
++        "ifname": "enp134s0"
      },
 
-     "": "Number of worker threads. Default: 1",
+     // UE IP Natting. Uncomment the line below to `\"ip_masquerade\": \"<ip> [or <ip>]\"` to enable
+     "core": {
+-        // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
++        "cndp_jsonc_file": "conf/cndp_upf_4worker.jsonc",
+         // "ip_masquerade": "18.0.0.1 or 18.0.0.2 or 18.0.0.3",
+-        "ifname": "ens803f3"
++        "ifname": "enp136s0"
+     },
+
+     // Number of worker threads. Default: 1
 -    "workers": 1,
 +    "workers": 4,
 
-     "": "Parameters for handling outgoing requests",
+     // Parameters for handling outgoing requests
      "max_req_retries": 5,
-
 ```
 
 2) Modify the script [docker_setup.sh](../scripts/docker_setup.sh) and update the function `move_ifaces()` in condition `if [ "$mode" == 'cndp' ]`.
@@ -416,6 +427,6 @@ $ ./scripts/docker_setup.sh
 ```
 Insert rules into relevant PDR and FAR tables
 ```
-$ docker exec bess-pfcpiface pfcpiface -config /conf/upf.json -simulate create
+$ docker exec bess-pfcpiface pfcpiface -config /conf/upf.jsonc -simulate create
 ```
 4) From browser, use localhost:8000 to view the UPF pipeline in GUI. If you are remotely connecting to system via ssh, you need to setup a tunnel with local port forwarding.

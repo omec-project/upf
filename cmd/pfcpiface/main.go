@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	configPath = flag.String("config", "upf.json", "path to upf config")
+	configPath = flag.String("config", "upf.jsonc", "path to upf config")
 )
 
 func init() {
