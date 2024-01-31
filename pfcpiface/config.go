@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"encoding/json"
-	"io"
 	"os"
+	"regexp"
 )
 
 const (
@@ -174,26 +174,27 @@ func validateConf(conf Conf) error {
 	return nil
 }
 
-// LoadConfigFile : parse json file and populate corresponding struct.
+// Remove comments from JSONC file
+func removeComments(jsonc string) string {
+	commentRegex := regexp.MustCompile(`(?m)//.*$|/\*.*?\*/`)
+	return commentRegex.ReplaceAllString(jsonc, "")
+}
+
+// LoadConfigFile : parse jsonc file and populate corresponding struct
 func LoadConfigFile(filepath string) (Conf, error) {
 	// Open up file.
-	jsonFile, err := os.Open(filepath)
+	jsoncFile, err := os.ReadFile(filepath)
 	if err != nil {
 		return Conf{}, err
 	}
-	defer jsonFile.Close()
 
-	// Read our file into memory.
-	byteValue, err := io.ReadAll(jsonFile)
-	if err != nil {
-		return Conf{}, err
-	}
+	jsonData := removeComments(string(jsoncFile))
 
 	var conf Conf
 	conf.LogLevel = log.InfoLevel
 	conf.P4rtcIface.DefaultTC = uint8(p4constants.EnumTrafficClassElastic)
 
-	err = json.Unmarshal(byteValue, &conf)
+	err = json.Unmarshal([]byte(jsonData), &conf)
 	if err != nil {
 		return Conf{}, err
 	}

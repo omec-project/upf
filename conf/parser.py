@@ -57,6 +57,9 @@ class Parser:
         self.table_size_far_lookup = 0
 
     def parse(self, ifaces):
+        if self.conf is None:
+            print("Error loading configuration file.")
+
         # Maximum number of flows to manage ip4 frags for re-assembly
         try:
             self.max_ip_defrag_flows = int(self.conf["max_ip_defrag_flows"])
