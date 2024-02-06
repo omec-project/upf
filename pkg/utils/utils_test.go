@@ -5,10 +5,11 @@ package utils
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"math"
 	"net"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestInt2ip(t *testing.T) {

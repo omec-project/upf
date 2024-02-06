@@ -697,13 +697,13 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
 	var tnlPeer tunnelPeer
 
 	methodType := p4.Update_MODIFY
-	tunnelParams := tunnelParams{
+	tunnelParameters := tunnelParams{
 		tunnelIP4Src: ip2int(up4.accessIP.IP),
 		tunnelIP4Dst: far.tunnelIP4Dst,
 		tunnelPort:   far.tunnelPort,
 	}
 
-	tnlPeer, exists := up4.tunnelPeerIDs[tunnelParams]
+	tnlPeer, exists := up4.tunnelPeerIDs[tunnelParameters]
 	if !exists {
 		newID, err := up4.unsafeAllocateGTPTunnelPeerID()
 		if err != nil {
@@ -729,11 +729,11 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
 
 	releaseTnlPeerID := func() {
 		if !exists {
-			up4.unsafeReleaseAllocatedGTPTunnelPeer(tunnelParams)
+			up4.unsafeReleaseAllocatedGTPTunnelPeer(tunnelParameters)
 		}
 	}
 
-	gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(tnlPeer.id, tunnelParams)
+	gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(tnlPeer.id, tunnelParameters)
 	if err != nil {
 		releaseTnlPeerID()
 		return err
@@ -744,7 +744,7 @@ func (up4 *UP4) addOrUpdateGTPTunnelPeer(far far) error {
 		return err
 	}
 
-	up4.tunnelPeerIDs[tunnelParams] = tnlPeer
+	up4.tunnelPeerIDs[tunnelParameters] = tnlPeer
 
 	return nil
 }
@@ -756,16 +756,16 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 	removeLog := log.WithFields(log.Fields{
 		"far": far,
 	})
-	tunnelParams := tunnelParams{
+	tunnelParameters := tunnelParams{
 		tunnelIP4Src: ip2int(up4.accessIP.IP),
 		tunnelIP4Dst: far.tunnelIP4Dst,
 		tunnelPort:   far.tunnelPort,
 	}
 
-	tnlPeer, exists := up4.tunnelPeerIDs[tunnelParams]
+	tnlPeer, exists := up4.tunnelPeerIDs[tunnelParameters]
 	if !exists {
 		removeLog.WithField(
-			"tunnel-params", tunnelParams).Warn("GTP tunnel peer ID not found for tunnel params")
+			"tunnel-params", tunnelParameters).Warn("GTP tunnel peer ID not found for tunnel params")
 		return
 	}
 
@@ -782,7 +782,7 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 		return
 	}
 
-	gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(tnlPeer.id, tunnelParams)
+	gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(tnlPeer.id, tunnelParameters)
 	if err != nil {
 		removeLog.Error("failed to build GTP tunnel peer entry to remove")
 		return
@@ -794,7 +794,7 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 		removeLog.Error("failed to remove GTP tunnel peer")
 	}
 
-	up4.unsafeReleaseAllocatedGTPTunnelPeer(tunnelParams)
+	up4.unsafeReleaseAllocatedGTPTunnelPeer(tunnelParameters)
 }
 
 // Returns error if we reach maximum supported Application IDs.
@@ -1024,6 +1024,7 @@ func getMeterConfigurationFromQER(mbr uint64, gbr uint64) *p4.MeterConfig {
 // If bidirectional, this function allocates two independent meter cell IDs, one per direction.
 func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, error) {
 	entries := make([]*p4.MeterEntry, 0)
+	var cellID uint32
 
 	appMeter := meter{
 		meterType:      meterTypeApplication,
@@ -1039,7 +1040,7 @@ func (up4 *UP4) configureApplicationMeter(q qer, bidirectional bool) (meter, err
 	appMeter.uplinkCellID = uplinkCellID
 
 	if bidirectional {
-		cellID, err := up4.allocateAppMeterCellID()
+		cellID, err = up4.allocateAppMeterCellID()
 		if err != nil {
 			up4.releaseAppMeterCellID(uplinkCellID)
 			return meter{}, err
@@ -1153,22 +1154,21 @@ func (up4 *UP4) configureMeters(qers []qer) error {
 		//  (i.e., SessQerId will always be 0).
 
 		var (
-			err   error
-			meter meter
+			err     error
+			p4Meter meter
 		)
-
 		switch qer.qosLevel {
 		case ApplicationQos:
 			if len(qers) == 1 {
 				// if only a single QER is created, the QER is marked as Application QER,
 				// and all PDRs points to the same QER, which is not unique per direction.
 				// Therefore, we have to configure bidirectional meter (two independent cells, one per direction).
-				meter, err = up4.configureApplicationMeter(qer, true)
+				p4Meter, err = up4.configureApplicationMeter(qer, true)
 			} else {
-				meter, err = up4.configureApplicationMeter(qer, false)
+				p4Meter, err = up4.configureApplicationMeter(qer, false)
 			}
 		case SessionQos:
-			meter, err = up4.configureSessionMeter(qer)
+			p4Meter, err = up4.configureSessionMeter(qer)
 		default:
 			// unknown, type of QER
 			continue
@@ -1178,13 +1178,13 @@ func (up4 *UP4) configureMeters(qers []qer) error {
 			return ErrOperationFailedWithReason("configure P4 Meter from QER", err.Error())
 		}
 
-		logger = logger.WithField("P4 meter", meter)
+		logger = logger.WithField("P4 meter", p4Meter)
 		logger.Debug("P4 meter successfully configured!")
 
 		up4.meters[meterID{
 			qerID: qer.qerID,
 			fseid: qer.fseID,
-		}] = meter
+		}] = p4Meter
 	}
 
 	return nil
@@ -1233,7 +1233,7 @@ func (up4 *UP4) resetMeters(qers []qer) {
 		})
 		logger.Debug("Resetting P4 Meter")
 
-		meter, exists := up4.meters[meterID{
+		p4Meter, exists := up4.meters[meterID{
 			qerID: qer.qerID,
 			fseid: qer.fseID,
 		}]
@@ -1242,20 +1242,20 @@ func (up4 *UP4) resetMeters(qers []qer) {
 			continue
 		}
 
-		if meter.meterType == meterTypeApplication {
-			up4.resetMeter(p4constants.MeterPreQosPipeAppMeter, meter)
-			up4.releaseAppMeterCellID(meter.uplinkCellID)
+		if p4Meter.meterType == meterTypeApplication {
+			up4.resetMeter(p4constants.MeterPreQosPipeAppMeter, p4Meter)
+			up4.releaseAppMeterCellID(p4Meter.uplinkCellID)
 
-			if meter.downlinkCellID != meter.uplinkCellID {
-				up4.releaseAppMeterCellID(meter.downlinkCellID)
+			if p4Meter.downlinkCellID != p4Meter.uplinkCellID {
+				up4.releaseAppMeterCellID(p4Meter.downlinkCellID)
 			}
-		} else if meter.meterType == meterTypeSession {
-			up4.resetMeter(p4constants.MeterPreQosPipeSessionMeter, meter)
-			up4.releaseSessionMeterCellID(meter.uplinkCellID)
-			up4.releaseSessionMeterCellID(meter.downlinkCellID)
+		} else if p4Meter.meterType == meterTypeSession {
+			up4.resetMeter(p4constants.MeterPreQosPipeSessionMeter, p4Meter)
+			up4.releaseSessionMeterCellID(p4Meter.uplinkCellID)
+			up4.releaseSessionMeterCellID(p4Meter.downlinkCellID)
 		}
 
-		logger = logger.WithField("P4 meter", meter)
+		logger = logger.WithField("P4 meter", p4Meter)
 		logger.Debug("Removing P4 meter from allocated meters pool")
 
 		delete(up4.meters, meterID{
@@ -1313,8 +1313,15 @@ func (up4 *UP4) resetCounter(pdr pdr) error {
 // modifyUP4ForwardingConfiguration builds P4Runtime table entries and
 // inserts/modifies/removes table entries from UP4 device, according to methodType.
 func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers []qer, methodType p4.Update_Type) error {
+	var (
+		appID  uint8
+		entry  *p4.TableEntry
+		err    error
+		FAR    far
+		ueAddr uint32
+	)
 	for _, pdr := range pdrs {
-		if err := verifyPDR(pdr); err != nil {
+		if err = verifyPDR(pdr); err != nil {
 			return err
 		}
 
@@ -1324,25 +1331,24 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 			"pdr": pdr,
 		})
 		pdrLog.Debug("Installing P4 table entries for PDR")
-
-		far, err := findRelatedFAR(pdr, allFARs)
+		FAR, err = findRelatedFAR(pdr, allFARs)
 		if err != nil {
 			pdrLog.Warning("no related FAR for PDR found: ", err)
 			return err
 		}
 
-		pdrLog = pdrLog.WithField("related FAR", far)
+		pdrLog = pdrLog.WithField("related FAR", FAR)
 		pdrLog.Debug("Found related FAR for PDR")
 
-		tunnelParams := tunnelParams{
+		tunnelParameters := tunnelParams{
 			tunnelIP4Src: ip2int(up4.accessIP.IP),
-			tunnelIP4Dst: far.tunnelIP4Dst,
-			tunnelPort:   far.tunnelPort,
+			tunnelIP4Dst: FAR.tunnelIP4Dst,
+			tunnelPort:   FAR.tunnelPort,
 		}
 
-		tunnelPeerID, exists := up4.getGTPTunnelPeer(tunnelParams)
-		if !exists && far.tunnelTEID != 0 {
-			return ErrNotFoundWithParam("allocated GTP tunnel peer ID", "tunnel params", tunnelParams)
+		tunnelPeerID, exists := up4.getGTPTunnelPeer(tunnelParameters)
+		if !exists && FAR.tunnelTEID != 0 {
+			return ErrNotFoundWithParam("allocated GTP tunnel peer ID", "tunnel params", tunnelParameters)
 		}
 
 		var sessMeter = meter{meterTypeSession, 0, 0}
@@ -1355,7 +1361,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 			pdrLog.Debug("Application meter found for PDR: ", sessMeter)
 		} // else: if only 1 QER provided, set sessMeterIdx to 0, and use only per-app metering
 
-		sessionsEntry, err := up4.p4RtTranslator.BuildSessionsTableEntry(pdr, sessMeter, tunnelPeerID.id, far.Buffers())
+		sessionsEntry, err := up4.p4RtTranslator.BuildSessionsTableEntry(pdr, sessMeter, tunnelPeerID.id, FAR.Buffers())
 		if err != nil {
 			return ErrOperationFailedWithReason("build P4rt table entry for Sessions table", err.Error())
 		}
@@ -1363,7 +1369,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 		entriesToApply = append(entriesToApply, sessionsEntry)
 
 		if pdr.IsUplink() {
-			ueAddr, exists := up4.fseidToUEAddr[pdr.fseID]
+			ueAddr, exists = up4.fseidToUEAddr[pdr.fseID]
 			if !exists {
 				// this is only possible if a linked DL PDR was not provided in the same PFCP Establishment message
 				log.Error("UE Address not found for uplink PDR, a linked DL PDR was not provided?")
@@ -1378,7 +1384,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 
 		if !pdr.IsAppFilterEmpty() {
 			if methodType != p4.Update_DELETE {
-				if entry, appID, err := up4.addInternalApplicationIDAndGetP4rtEntry(pdr); err == nil {
+				if entry, appID, err = up4.addInternalApplicationIDAndGetP4rtEntry(pdr); err == nil {
 					if entry != nil {
 						entriesToApply = append(entriesToApply, entry)
 					}
@@ -1422,7 +1428,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 			tc = up4.conf.DefaultTC
 		}
 
-		terminationsEntry, err := up4.p4RtTranslator.BuildTerminationsTableEntry(pdr, appMeter, far,
+		terminationsEntry, err := up4.p4RtTranslator.BuildTerminationsTableEntry(pdr, appMeter, FAR,
 			applicationID, qfi, tc, relatedQER)
 		if err != nil {
 			return ErrOperationFailedWithReason("build P4rt table entry for Terminations table", err.Error())

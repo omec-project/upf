@@ -6,6 +6,11 @@ package integration
 import (
 	"encoding/json"
 	"errors"
+	"net"
+	"os"
+	"testing"
+	"time"
+
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim"
 	"github.com/omec-project/upf-epc/internal/p4constants"
 	"github.com/omec-project/upf-epc/pfcpiface"
@@ -16,10 +21,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
-	"net"
-	"os"
-	"testing"
-	"time"
 )
 
 // this file should contain all the struct defs/constants used among different test cases.
@@ -388,7 +389,7 @@ func verifyEntries(t *testing.T, testdata *pfcpSessionData, expectedValues p4RtV
 	case DatapathUP4:
 		verifyP4RuntimeEntries(t, testdata, expectedValues, ueState)
 	case DatapathBESS:
-		verifyBessEntries(t, bessFake, testdata, expectedValues, ueState)
+		verifyBessEntries(t, bessFake, expectedValues)
 	}
 }
 
@@ -401,10 +402,10 @@ func verifySliceMeter(t *testing.T, expectedValues p4RtValues) {
 	}
 }
 
-func verifyNoEntries(t *testing.T, expectedValues p4RtValues) {
+func verifyNoEntries(t *testing.T) {
 	switch os.Getenv(EnvDatapath) {
 	case DatapathUP4:
-		verifyNoP4RuntimeEntries(t, expectedValues)
+		verifyNoP4RuntimeEntries(t)
 	case DatapathBESS:
 		verifyNoBessRuntimeEntries(t, bessFake)
 	}

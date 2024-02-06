@@ -4,17 +4,17 @@
 package integration
 
 import (
-	"github.com/omec-project/upf-epc/internal/p4constants"
-	"github.com/omec-project/upf-epc/pfcpiface"
-	"github.com/wmnsk/go-pfcp/message"
 	"net"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim/session"
+	"github.com/omec-project/upf-epc/internal/p4constants"
+	"github.com/omec-project/upf-epc/pfcpiface"
 	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
+	"github.com/wmnsk/go-pfcp/message"
 )
 
 func TestUPFBasedUeIPAllocation(t *testing.T) {
@@ -117,7 +117,7 @@ func TestUPFBasedUeIPAllocation(t *testing.T) {
 	_, err = pfcpClient.PeekNextResponse()
 	require.NoError(t, err)
 
-	verifyNoEntries(t, testcase.expected)
+	verifyNoEntries(t)
 }
 
 func TestDetectUP4Restart(t *testing.T) {
@@ -125,7 +125,7 @@ func TestDetectUP4Restart(t *testing.T) {
 		t.Skipf("Skipping UP4-specific test for datapath: %s", os.Getenv(EnvDatapath))
 	}
 
-	run := func(t *testing.T) {
+	run := func() {
 		// restart UP4, it will close P4Runtime channel between pfcpiface and mock-up4
 		MustStopMockUP4()
 		MustStartMockUP4()
@@ -168,7 +168,7 @@ func TestDetectUP4Restart(t *testing.T) {
 		setup(t, ConfigDefault)
 		defer teardown(t)
 
-		run(t)
+		run()
 		// do not clear state on UP4 restart means that interfaces will not be re-installed.
 		// The assumption is that the ONOS cluster preserves them, but BMv2 doesn't.
 		verifyNumberOfEntries(t, p4constants.TablePreQosPipeInterfaces, 0)
@@ -178,7 +178,7 @@ func TestDetectUP4Restart(t *testing.T) {
 		setup(t, ConfigWipeOutOnUP4Restart)
 		defer teardown(t)
 
-		run(t)
+		run()
 		// clear state on UP4 restart means that interfaces entries will be re-installed.
 		verifyNumberOfEntries(t, p4constants.TablePreQosPipeInterfaces, 2)
 	})
@@ -667,7 +667,7 @@ func testUEDetach(t *testing.T, testcase *testCase) {
 	err := pfcpClient.DeleteSession(testcase.session)
 	require.NoErrorf(t, err, "failed to delete PFCP session")
 
-	verifyNoEntries(t, testcase.expected)
+	verifyNoEntries(t)
 }
 
 func testUEAttachDetach(t *testing.T, testcase *testCase) {

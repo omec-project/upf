@@ -738,7 +738,8 @@ func (b *bess) clearState() {
 	clearGtpuPathMonitoringCmd := &pb.GtpuPathMonitoringCommandClearArg{}
 
 	if enableGtpuPathMonitoring {
-		anyGtpuPathMonitoringClear, err := anypb.New(clearGtpuPathMonitoringCmd)
+		var anyGtpuPathMonitoringClear *anypb.Any
+		anyGtpuPathMonitoringClear, err = anypb.New(clearGtpuPathMonitoringCmd)
 		if err != nil {
 			log.Errorf("Error marshalling the rule %v: %v", anyGtpuPathMonitoringClear, err)
 			return
@@ -748,18 +749,18 @@ func (b *bess) clearState() {
 	}
 
 	clearQoSCmd := &pb.QosCommandClearArg{}
-
-	anyQoSClear, err := anypb.New(clearQoSCmd)
+	var anyQoSClear *anypb.Any
+	anyQoSClear, err = anypb.New(clearQoSCmd)
 	if err != nil {
 		log.Errorf("Error marshalling the rule %v: %v", anyQoSClear, err)
 		return
 	}
 
-	if err := b.processQER(ctx, anyQoSClear, upfMsgTypeClear, AppQerLookup); err != nil {
+	if err = b.processQER(ctx, anyQoSClear, upfMsgTypeClear, AppQerLookup); err != nil {
 		log.Errorf("Failed to clear %v", AppQerLookup)
 	}
 
-	if err := b.processQER(ctx, anyQoSClear, upfMsgTypeClear, SessQerLookup); err != nil {
+	if err = b.processQER(ctx, anyQoSClear, upfMsgTypeClear, SessQerLookup); err != nil {
 		log.Errorf("Failed to clear %v", SessQerLookup)
 	}
 }

@@ -5,6 +5,9 @@ package integration
 
 import (
 	"fmt"
+	"math"
+	"testing"
+
 	p4rtc "github.com/antoninbas/p4runtime-go-client/pkg/client"
 	"github.com/antoninbas/p4runtime-go-client/pkg/util/conversion"
 	"github.com/omec-project/upf-epc/internal/p4constants"
@@ -12,8 +15,6 @@ import (
 	"github.com/omec-project/upf-epc/test/integration/providers"
 	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/stretchr/testify/require"
-	"math"
-	"testing"
 )
 
 const (
@@ -465,7 +466,7 @@ func verifyNumberOfEntries(t *testing.T, tableID uint32, expectedNoOfEntries int
 	require.Len(t, entries, expectedNoOfEntries)
 }
 
-func verifyNoP4RuntimeEntries(t *testing.T, expectedValues p4RtValues) {
+func verifyNoP4RuntimeEntries(t *testing.T) {
 	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", false)
 	require.NoErrorf(t, err, "failed to connect to P4Runtime server")
 	defer providers.DisconnectP4rt()

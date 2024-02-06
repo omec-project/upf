@@ -88,7 +88,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 	for _, cPDR := range sereq.CreatePDR {
 		var p pdr
-		if err := p.parsePDR(cPDR, session.localSEID, pConn.appPFDs, upf.ippool); err != nil {
+		if err = p.parsePDR(cPDR, session.localSEID, pConn.appPFDs, upf.ippool); err != nil {
 			return errProcessReply(err, ie.CauseRequestRejected)
 		}
 
@@ -99,7 +99,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 	for _, cFAR := range sereq.CreateFAR {
 		var f far
-		if err := f.parseFAR(cFAR, session.localSEID, upf, create); err != nil {
+		if err = f.parseFAR(cFAR, session.localSEID, upf, create); err != nil {
 			return errProcessReply(err, ie.CauseRequestRejected)
 		}
 
@@ -110,7 +110,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 	for _, cQER := range sereq.CreateQER {
 		var q qer
-		if err := q.parseQER(cQER, session.localSEID); err != nil {
+		if err = q.parseQER(cQER, session.localSEID); err != nil {
 			return errProcessReply(err, ie.CauseRequestRejected)
 		}
 

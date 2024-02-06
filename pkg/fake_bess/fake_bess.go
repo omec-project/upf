@@ -5,9 +5,10 @@ package fake_bess
 
 import (
 	"fmt"
+	"net"
+
 	"github.com/omec-project/upf-epc/pfcpiface/bess_pb"
 	"google.golang.org/grpc"
-	"net"
 )
 
 type FakeBESS struct {
