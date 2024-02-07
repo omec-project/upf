@@ -6,8 +6,6 @@ import sys
 import unittest
 from unittest.mock import MagicMock, Mock, patch
 
-from pyroute2 import NDB
-
 sys.modules["pybess.bess"] = MagicMock()
 
 from conf.route_control import (NeighborEntry, RouteController, RouteEntry,
@@ -73,8 +71,6 @@ class TestUtilityFunctions(unittest.TestCase):
             "dst": "192.168.1.1",
             "lladdr": "00:1a:2b:3c:4d:5e"
         }
-        neighbour = ndb.neighbours.create(**kwargs)
-        neighbour.commit()
         ndb.neighbours.dump.return_value = [kwargs]
         self.assertEqual(fetch_mac(ndb, "192.168.1.1"), "00:1a:2b:3c:4d:5e")
 
@@ -85,8 +81,6 @@ class TestUtilityFunctions(unittest.TestCase):
             "dst": "192.168.1.1",
             "lladdr": None
         }
-        neighbour = ndb.neighbours.create(**kwargs)
-        neighbour.commit()
         ndb.neighbours.dump.return_value = [kwargs]
         self.assertIsNone(fetch_mac(ndb, "192.168.1.1"))
 
@@ -122,8 +116,6 @@ class TestRouteController(unittest.TestCase):
             "dst": "192.168.1.1",
             "lladdr": "00:1a:2b:3c:4d:5e"
         }
-        neighbour = self.ndb.neighbours.create(**kwargs)
-        neighbour.commit()
         self.ndb.neighbours.dump.return_value = [kwargs]
         mock_get_update_module_name.return_value = "merge_module"
         mock_get_route_module_name.return_value = "route_module"
@@ -224,8 +216,6 @@ class TestRouteController(unittest.TestCase):
             "dst": "192.168.1.1",
             "lladdr": None
         }
-        neighbour = self.ndb.neighbours.create(**kwargs)
-        neighbour.commit()
         self.ndb.neighbours.dump.return_value = [kwargs]
         route_entry = RouteEntry(
             next_hop_ip="1.2.3.4",
@@ -236,16 +226,15 @@ class TestRouteController(unittest.TestCase):
         self.route_controller.add_new_route_entry(route_entry)
         mock_send_ping.assert_called_once()
 
+    @patch("conf.route_control.send_ping")
     def test_given_valid_new_route_when_add_new_route_entry_and_mac_known_then_route_is_added_in_bess(
-        self,
+        self, _
     ):
         kwargs = {
             "ifindex": 1,
             "dst": "192.168.1.1",
             "lladdr": "00:1a:2b:3c:4d:5e"
         }
-        neighbour = self.ndb.neighbours.create(**kwargs)
-        neighbour.commit()
         self.ndb.neighbours.dump.return_value = [kwargs]
         mock_routes = [{"event": "RTM_NEWROUTE"}, {"event": "OTHER_ACTION"}]
         self.ipr.get_routes.return_value = mock_routes
@@ -259,16 +248,15 @@ class TestRouteController(unittest.TestCase):
         self.mock_bess_controller.add_route_to_module()
         self.mock_bess_controller.add_route_to_module.assert_called_once()
 
+    @patch("conf.route_control.send_ping")
     def test_given_valid_new_route_when_add_new_route_entry_and_mac_known_and_neighbor_not_known_then_update_module_is_created_and_modules_are_linked(
-        self,
+        self, _
     ):
         kwargs = {
             "ifindex": 1,
             "dst": "192.168.1.1",
             "lladdr": "00:1a:2b:3c:4d:5e"
         }
-        neighbour = self.ndb.neighbours.create(**kwargs)
-        neighbour.commit()
         self.ndb.neighbours.dump.return_value = [kwargs]
         mock_routes = [{"event": "RTM_NEWROUTE"}, {"event": "OTHER_ACTION"}]
         self.ipr.get_routes.return_value = mock_routes
@@ -471,8 +459,6 @@ class TestRouteController(unittest.TestCase):
             "dst": "192.168.1.1",
             "lladdr": "00:1a:2b:3c:4d:5e"
         }
-        neighbour = self.ndb.neighbours.create(**kwargs)
-        neighbour.commit()
         self.ndb.neighbours.dump.return_value = [kwargs]
         mock_netlink_msg = {
             "attrs": {
