@@ -7,13 +7,15 @@ import (
 	"encoding/binary"
 	"flag"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"os"
 	"sort"
 	"strings"
 
 	"github.com/ettle/strcase"
 	"github.com/golang/protobuf/proto"
+
+	log "github.com/sirupsen/logrus"
+
 	p4ConfigV1 "github.com/p4lang/p4runtime/go/p4/config/v1"
 )
 

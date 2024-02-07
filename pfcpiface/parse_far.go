@@ -106,13 +106,14 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 	f.sendEndMarker = false
 
 	var fields Bits
+	var ohcFields *ie.OuterHeaderCreationFields
 
 	for _, fwdIE := range fwdIEs {
 		switch fwdIE.Type {
 		case ie.OuterHeaderCreation:
 			fields = Set(fields, FwdIEOuterHeaderCreation)
 
-			ohcFields, err := fwdIE.OuterHeaderCreation()
+			ohcFields, err = fwdIE.OuterHeaderCreation()
 			if err != nil {
 				log.Println("Unable to parse OuterHeaderCreationFields!")
 				continue

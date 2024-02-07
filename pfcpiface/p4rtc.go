@@ -234,6 +234,7 @@ func (c *P4rtClient) ReadTableEntry(entry *p4.TableEntry) (*p4.ReadResponse, err
 
 // ReadReqEntities ... Read request Entity.
 func (c *P4rtClient) ReadReqEntities(entities []*p4.Entity) (*p4.ReadResponse, error) {
+	var readRes *p4.ReadResponse
 	req := &p4.ReadRequest{
 		DeviceId: c.deviceID,
 		Entities: entities,
@@ -242,7 +243,7 @@ func (c *P4rtClient) ReadReqEntities(entities []*p4.Entity) (*p4.ReadResponse, e
 
 	readClient, err := c.client.Read(context.Background(), req)
 	if err == nil {
-		readRes, err := readClient.Recv()
+		readRes, err = readClient.Recv()
 		if err == nil {
 			log.Traceln(proto.MarshalTextString(readRes))
 			return readRes, nil
@@ -255,6 +256,7 @@ func (c *P4rtClient) ReadReqEntities(entities []*p4.Entity) (*p4.ReadResponse, e
 // ReadReq ... Read Request.
 func (c *P4rtClient) ReadReq(entity *p4.Entity) (*p4.ReadResponse, error) {
 	var req p4.ReadRequest
+	var readRes *p4.ReadResponse
 	req.DeviceId = c.deviceID
 	req.Entities = []*p4.Entity{entity}
 
@@ -266,7 +268,7 @@ func (c *P4rtClient) ReadReq(entity *p4.Entity) (*p4.ReadResponse, error) {
 
 	readClient, err := c.client.Read(ctx, &req)
 	if err == nil {
-		readRes, err := readClient.Recv()
+		readRes, err = readClient.Recv()
 		if err == nil {
 			log.Traceln(proto.MarshalTextString(readRes))
 			return readRes, nil
@@ -589,7 +591,7 @@ func CreateChannel(host string, deviceID uint64) (*P4rtClient, error) {
 
 	closeStreamOnError := func() {
 		if client.stream != nil {
-			err := client.stream.CloseSend()
+			err = client.stream.CloseSend()
 			if err != nil {
 				log.Errorf("Failed to close P4Rt stream with %v: %v", client.conn.Target(), err)
 			}

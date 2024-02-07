@@ -19,8 +19,7 @@ jobs:
         with:
           go-version-file: 'go.mod'
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3.6.0
+        uses: golangci/golangci-lint-action@v3.7.0
         with:
           version: latest
-          working-directory: pfcpiface
-          args: -v --config ../.golangci.yml
+          args: -v --config ./.golangci.yml
