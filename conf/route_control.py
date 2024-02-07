@@ -345,13 +345,6 @@ class RouteController:
         self._event_callback = None
         self._interfaces = interfaces
 
-    def register_callbacks(self) -> None:
-        """Register callback function."""
-        logger.info("Registering netlink event listener callback...")
-        self._event_callback = self._ndb.register_callback(
-            self._netlink_event_listener
-        )
-
     def start_pinging_missing_entries(self) -> None:
         """Starts a new thread for ping missing entries."""
         if not self._ping_missing_thread or not self._ping_missing_thread.is_alive():
@@ -627,10 +620,8 @@ class RouteController:
                 self.add_unresolved_new_neighbor(netlink_message)
 
     def cleanup(self, number: int) -> None:
-        """Unregisters the netlink event listener callback and exits."""
+        """Exits execution."""
         logger.info("Received: %i Exiting", number)
-        self._ndb.unregister_callback(self._event_callback)
-        logger.info("Unregistered netlink event listener callback")
         sys.exit()
 
     def reconfigure(self, number: int) -> None:
@@ -808,7 +799,6 @@ if __name__ == "__main__":
         interfaces=interface_arg,
     )
     route_controller.bootstrap_routes()
-    route_controller.register_callbacks()
     route_controller.start_pinging_missing_entries()
     register_signal_handlers(route_controller=route_controller)
     logger.info("Sleep until a signal is received")
