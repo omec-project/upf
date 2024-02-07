@@ -6,11 +6,13 @@ package providers
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/antoninbas/p4runtime-go-client/pkg/client"
-	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"time"
+
+	p4_v1 "github.com/p4lang/p4runtime/go/p4/v1"
 )
 
 var (

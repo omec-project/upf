@@ -92,6 +92,7 @@ func NewUPF(conf *Conf, fp datapath) *upf {
 	var (
 		err    error
 		nodeID string
+		hosts  []string
 	)
 
 	nodeID = conf.CPIface.NodeID
@@ -104,7 +105,7 @@ func NewUPF(conf *Conf, fp datapath) *upf {
 
 	// TODO: Delete this once CI config is fixed
 	if nodeID != "" {
-		hosts, err := net.LookupHost(nodeID)
+		hosts, err = net.LookupHost(nodeID)
 		if err != nil {
 			log.Fatalln("Unable to resolve hostname", nodeID, err)
 		}

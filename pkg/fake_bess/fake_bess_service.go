@@ -6,6 +6,9 @@ package fake_bess
 import (
 	"context"
 	"fmt"
+	"math"
+	"sync"
+
 	"github.com/omec-project/upf-epc/pfcpiface/bess_pb"
 	"github.com/omec-project/upf-epc/pkg/utils"
 	log "github.com/sirupsen/logrus"
@@ -13,8 +16,6 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
-	"math"
-	"sync"
 )
 
 const (
@@ -23,6 +24,9 @@ const (
 	sessionQerModuleName         = "sessionQERLookup"
 	appQerModuleName             = "appQERLookup"
 	gtpuPathMonitoringModuleName = "gtpuPathMonitoring"
+	addCmd                       = "add"
+	clearCmd                     = "clear"
+	deleteCmd                    = "delete"
 )
 
 type FakePdr struct {
@@ -331,7 +335,7 @@ func (w *wildcardModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 
 	log := log.WithField("module", w.Name()).WithField("cmd", cmd)
 
-	if cmd == "add" {
+	if cmd == addCmd {
 		wc := &bess_pb.WildcardMatchCommandAddArg{}
 		err = arg.UnmarshalTo(wc)
 		if err != nil {
@@ -352,7 +356,7 @@ func (w *wildcardModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 			log.Tracef("added new entry %v", wc)
 			w.entries = append(w.entries, wc)
 		}
-	} else if cmd == "delete" {
+	} else if cmd == deleteCmd {
 		wc := &bess_pb.WildcardMatchCommandDeleteArg{}
 		err = arg.UnmarshalTo(wc)
 		if err != nil {
@@ -371,7 +375,7 @@ func (w *wildcardModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 			log.Tracef("deleted existing entry %v", w.entries[idx])
 			w.entries = append(w.entries[:idx], w.entries[idx+1:]...)
 		}
-	} else if cmd == "clear" {
+	} else if cmd == clearCmd {
 		wc := &bess_pb.WildcardMatchCommandClearArg{}
 		err = arg.UnmarshalTo(wc)
 		if err != nil {
@@ -405,7 +409,7 @@ func (e *exactMatchModule) HandleRequest(cmd string, arg *anypb.Any) (err error)
 
 	log := log.WithField("module", e.Name()).WithField("cmd", cmd)
 
-	if cmd == "add" {
+	if cmd == addCmd {
 		em := &bess_pb.ExactMatchCommandAddArg{}
 		err = arg.UnmarshalTo(em)
 		if err != nil {
@@ -425,7 +429,7 @@ func (e *exactMatchModule) HandleRequest(cmd string, arg *anypb.Any) (err error)
 			log.Tracef("added new entry %v", em)
 			e.entries = append(e.entries, em)
 		}
-	} else if cmd == "delete" {
+	} else if cmd == deleteCmd {
 		em := &bess_pb.ExactMatchCommandDeleteArg{}
 		err = arg.UnmarshalTo(em)
 		if err != nil {
@@ -443,7 +447,7 @@ func (e *exactMatchModule) HandleRequest(cmd string, arg *anypb.Any) (err error)
 			log.Tracef("deleted existing entry %v", e.entries[idx])
 			e.entries = append(e.entries[:idx], e.entries[idx+1:]...)
 		}
-	} else if cmd == "clear" {
+	} else if cmd == clearCmd {
 		em := &bess_pb.ExactMatchCommandClearArg{}
 		err = arg.UnmarshalTo(em)
 		if err != nil {
@@ -477,7 +481,7 @@ func (q *qosModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 
 	log := log.WithField("module", q.Name()).WithField("cmd", cmd)
 
-	if cmd == "add" {
+	if cmd == addCmd {
 		wc := &bess_pb.QosCommandAddArg{}
 		err = arg.UnmarshalTo(wc)
 		if err != nil {
@@ -497,7 +501,7 @@ func (q *qosModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 			log.Tracef("added new entry %v", wc)
 			q.entries = append(q.entries, wc)
 		}
-	} else if cmd == "delete" {
+	} else if cmd == deleteCmd {
 		qc := &bess_pb.QosCommandDeleteArg{}
 		err = arg.UnmarshalTo(qc)
 		if err != nil {
@@ -515,7 +519,7 @@ func (q *qosModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 			log.Tracef("deleted existing entry %v", q.entries[idx])
 			q.entries = append(q.entries[:idx], q.entries[idx+1:]...)
 		}
-	} else if cmd == "clear" {
+	} else if cmd == clearCmd {
 		qc := &bess_pb.QosCommandClearArg{}
 		err = arg.UnmarshalTo(qc)
 		if err != nil {
@@ -549,7 +553,7 @@ func (q *gtpuPathMonitoringModule) HandleRequest(cmd string, arg *anypb.Any) (er
 
 	log := log.WithField("module", q.Name()).WithField("cmd", cmd)
 
-	if cmd == "add" {
+	if cmd == addCmd {
 		wc := &bess_pb.GtpuPathMonitoringCommandAddDeleteArg{}
 		err = arg.UnmarshalTo(wc)
 		if err != nil {
@@ -569,7 +573,7 @@ func (q *gtpuPathMonitoringModule) HandleRequest(cmd string, arg *anypb.Any) (er
 			log.Tracef("added new entry %v", wc)
 			q.entries = append(q.entries, wc)
 		}
-	} else if cmd == "delete" {
+	} else if cmd == deleteCmd {
 		qc := &bess_pb.GtpuPathMonitoringCommandAddDeleteArg{}
 		err = arg.UnmarshalTo(qc)
 		if err != nil {
@@ -587,7 +591,7 @@ func (q *gtpuPathMonitoringModule) HandleRequest(cmd string, arg *anypb.Any) (er
 			log.Tracef("deleted existing entry %v", q.entries[idx])
 			q.entries = append(q.entries[:idx], q.entries[idx+1:]...)
 		}
-	} else if cmd == "clear" {
+	} else if cmd == clearCmd {
 		qc := &bess_pb.GtpuPathMonitoringCommandClearArg{}
 		err = arg.UnmarshalTo(qc)
 		if err != nil {
@@ -604,11 +608,11 @@ func (q *gtpuPathMonitoringModule) HandleRequest(cmd string, arg *anypb.Any) (er
 
 func isValidCommand(cmd string) bool {
 	switch cmd {
-	case "add":
+	case addCmd:
 		fallthrough
-	case "clear":
+	case clearCmd:
 		fallthrough
-	case "delete":
+	case deleteCmd:
 		return true
 	default:
 		return false

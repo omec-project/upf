@@ -266,7 +266,7 @@ func (pConn *PFCPConn) handlePFDMgmtRequest(msg message.Message) (message.Messag
 		}
 
 		pConn.NewAppPFD(id)
-		appPFD := pConn.appPFDs[id]
+		applicationPFD := pConn.appPFDs[id]
 
 		pfdCtx, err := appIDPFD.PFDContext()
 		if err != nil {
@@ -285,11 +285,11 @@ func (pConn *PFCPConn) handlePFDMgmtRequest(msg message.Message) (message.Messag
 				return errUnmarshalReply(errFlowDescAbsent, appIDPFD)
 			}
 
-			appPFD.flowDescs = append(appPFD.flowDescs, fields.FlowDescription)
+			applicationPFD.flowDescs = append(applicationPFD.flowDescs, fields.FlowDescription)
 		}
 
-		pConn.appPFDs[id] = appPFD
-		log.Traceln("Flow descriptions for AppID", id, ":", appPFD.flowDescs)
+		pConn.appPFDs[id] = applicationPFD
+		log.Traceln("Flow descriptions for AppID", id, ":", applicationPFD.flowDescs)
 	}
 
 	// Build response message

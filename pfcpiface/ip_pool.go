@@ -31,7 +31,7 @@ func NewIPPool(poolSubnet string) (*IPPool, error) {
 		inventory: make(map[uint64]net.IP),
 	}
 
-	for ip := ip.Mask(ipnet.Mask); ipnet.Contains(ip); inc(ip) {
+	for ip = ip.Mask(ipnet.Mask); ipnet.Contains(ip); inc(ip) {
 		ipVal := make(net.IP, len(ip))
 		copy(ipVal, ip)
 		i.freePool = append(i.freePool, ipVal)

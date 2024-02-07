@@ -74,8 +74,9 @@ func TestIPPool_LookupOrAllocIP(t *testing.T) {
 		pool, err := NewIPPool(poolSubnet)
 		require.NoError(t, err)
 		seidToIpMap := map[uint64]net.IP{}
+		var ip net.IP
 		for i := uint64(0); i < usableAddresses; i++ {
-			ip, err := pool.LookupOrAllocIP(baseSeid + i)
+			ip, err = pool.LookupOrAllocIP(baseSeid + i)
 			require.NoError(t, err)
 			seidToIpMap[baseSeid+i] = ip
 		}

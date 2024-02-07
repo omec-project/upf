@@ -7,6 +7,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"log"
+	"os/exec"
+	"strings"
+	"time"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
@@ -14,11 +20,6 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/sirupsen/logrus"
-	"io"
-	"log"
-	"os/exec"
-	"strings"
-	"time"
 )
 
 // MustRunDockerCommandAttach attaches to a running Docker container and executes a cmd.
@@ -38,6 +39,9 @@ func MustRunDockerCommandAttach(container string, cmd string) {
 		Stdin:  true,
 		Stream: true,
 	})
+	if err != nil {
+		logrus.Fatalf("Failed to attach container: %v", err)
+	}
 	defer waiter.Close()
 	if err = waiter.Conn.SetWriteDeadline(time.Now().Add(time.Second * 1)); err != nil {
 		logrus.Fatalf("Failed to set deadline: %v", err)
