@@ -667,7 +667,7 @@ class RouteController:
         if not attr_dict.get(KEY_INTERFACE):
             return None
         interface_index = int(attr_dict.get(KEY_INTERFACE))
-        interface = self._ndb.interfaces[interface_index]["ifname"]
+        interface = self._ndb.interfaces[interface_index].get("ifname")
         if interface not in self._interfaces:
             return None
 

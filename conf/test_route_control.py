@@ -150,7 +150,7 @@ class TestRouteController(unittest.TestCase):
         self.assertIsInstance(result, RouteEntry)
         self.assertEqual(result.dest_prefix, "192.168.1.0")
         self.assertEqual(result.next_hop_ip, "172.31.48.1")
-        self.assertEqual(result.interface, self.ndb.interfaces[2]["ifname"])
+        self.assertEqual(result.interface, self.ndb.interfaces[2].get("ifname"))
         self.assertEqual(result.prefix_len, 24)
 
     def test_given_valid_route_message_and_dst_len_is_zero_when_parse_message_then_parses_message_as_default_route(
@@ -180,7 +180,7 @@ class TestRouteController(unittest.TestCase):
         self.assertIsInstance(result, RouteEntry)
         self.assertEqual(result.dest_prefix, "0.0.0.0")
         self.assertEqual(result.next_hop_ip, "172.31.48.1")
-        self.assertEqual(result.interface, self.ndb.interfaces[2]["ifname"])
+        self.assertEqual(result.interface, self.ndb.interfaces[2].get("ifname"))
         self.assertEqual(result.prefix_len, 0)
 
     def test_given_invalid_route_message_when_parse_message_then_returns_none(self):
