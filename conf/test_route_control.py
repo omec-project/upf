@@ -254,7 +254,7 @@ class TestRouteController(unittest.TestCase):
     ):
         kwargs = {
             "ifindex": 1,
-            "dst": "192.168.1.1",
+            "dst": "1.2.3.4",
             "lladdr": "00:1a:2b:3c:4d:5e"
         }
         self.ndb.neighbours.dump.return_value = [kwargs]
@@ -267,9 +267,7 @@ class TestRouteController(unittest.TestCase):
             prefix_len=24,
         )
         self.route_controller.add_new_route_entry(route_entry)
-        self.mock_bess_controller.create_module()
         self.mock_bess_controller.create_module.assert_called()
-        self.mock_bess_controller.link_modules()
         self.mock_bess_controller.link_modules.assert_called()
 
     @patch.object(RouteController, "add_new_route_entry")
