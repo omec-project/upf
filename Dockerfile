@@ -65,7 +65,7 @@ RUN ./build_bess.sh && \
     cp -r core/pb /pb
 
 # Stage bess: creates the runtime image of BESS
-FROM python:3.12.1-slim AS bess
+FROM python:3.12.2-slim AS bess
 COPY requirements.txt .
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
