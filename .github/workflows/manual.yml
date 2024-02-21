@@ -16,7 +16,7 @@ jobs:
     env:
       REPO: "ghcr.io/omec-project/upf-epc/bess_build"
       TAG: "latest"
-      BESS_DPDK_BRANCH: "dpdk-2011-focal"
+      BESS_DPDK_BRANCH: "master"
       DOCKER_PULL: ""
     runs-on: ubuntu-20.04
     steps:
