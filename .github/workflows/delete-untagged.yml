@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2021 Intel Corporation
-name: Delete untagged images
+name: Untagged images
 
 on:
   schedule:
