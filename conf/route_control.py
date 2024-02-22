@@ -604,25 +604,30 @@ class RouteController:
         return self._module_gate_count_cache[module_name]
 
     def _netlink_event_listener(
-        self, netlink_message: dict, action: str
+        self, ndb: NDB, netlink_message: dict
     ) -> None:
         """Listens for netlink events and handles them.
 
         Args:
             netlink_message (dict): The netlink message.
-            action (str): The action.
         """
-        logger.info("%s netlink event received.", action)
+        try:
+            event = netlink_message['event']
+        except Exception:
+            logger.exception("Error parsing netlink message")
+            return
+
+        logger.info("%s netlink event received.", event)
         route_entry = self._parse_route_entry_msg(netlink_message)
-        if action == KEY_NEW_ROUTE_ACTION and route_entry:
+        if event == KEY_NEW_ROUTE_ACTION and route_entry:
             with self._lock:
                 self.add_new_route_entry(route_entry)
 
-        elif action == KEY_DELETE_ROUTE_ACTION and route_entry:
+        elif event == KEY_DELETE_ROUTE_ACTION and route_entry:
             with self._lock:
                 self.delete_route_entry(route_entry)
 
-        elif action == KEY_NEW_NEIGHBOR_ACTION:
+        elif event == KEY_NEW_NEIGHBOR_ACTION:
             with self._lock:
                 self.add_unresolved_new_neighbor(netlink_message)
 
