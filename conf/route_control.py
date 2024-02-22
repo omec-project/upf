@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from threading import Lock, Thread
 from typing import Dict, List, Optional, Tuple
 
+from pr2modules.netlink.rtnl.ifinfmsg import ifinfmsg
 from pybess.bess import *
 from pyroute2 import NDB, IPRoute
 from scapy.all import ICMP, IP, send
@@ -345,6 +346,13 @@ class RouteController:
         self._event_callback = None
         self._interfaces = interfaces
 
+    def register_handlers(self) -> None:
+        """Register handler function."""
+        logger.info("Registering netlink event listener handler...")
+        self._event_callback = self._ndb.task_manager.register_handler(ifinfmsg,
+            self._netlink_event_listener
+        )
+
     def start_pinging_missing_entries(self) -> None:
         """Starts a new thread for ping missing entries."""
         if not self._ping_missing_thread or not self._ping_missing_thread.is_alive():
@@ -596,12 +604,11 @@ class RouteController:
         return self._module_gate_count_cache[module_name]
 
     def _netlink_event_listener(
-        self, ndb: NDB, netlink_message: dict, action: str
+        self, netlink_message: dict, action: str
     ) -> None:
         """Listens for netlink events and handles them.
 
         Args:
-            ndb (NDB): The NDB object.
             netlink_message (dict): The netlink message.
             action (str): The action.
         """
@@ -620,8 +627,10 @@ class RouteController:
                 self.add_unresolved_new_neighbor(netlink_message)
 
     def cleanup(self, number: int) -> None:
-        """Exits execution."""
+        """Unregisters the netlink event listener callback and exits."""
         logger.info("Received: %i Exiting", number)
+        self._ndb.task_manager.unregister_callback(self._event_callback)
+        logger.info("Unregistered netlink event listener callback")
         sys.exit()
 
     def reconfigure(self, number: int) -> None:
@@ -799,6 +808,7 @@ if __name__ == "__main__":
         interfaces=interface_arg,
     )
     route_controller.bootstrap_routes()
+    route_controller.register_handlers()
     route_controller.start_pinging_missing_entries()
     register_signal_handlers(route_controller=route_controller)
     logger.info("Sleep until a signal is received")
