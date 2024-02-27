@@ -1,6 +1,6 @@
-// Copyright: 2019-present Intel Corporation
-// Copyright: 2020-present Open Networking Foundation
-// License: Apache-2.0
+// SPDX-FileCopyrightText: 2019-present Intel Corporation
+// SPDX-FileCopyrightText: 2020-present Open Networking Foundation
+// SPDX-License-Identifier: Apache-2.0
 {
     // UPF support various configuration modes:
     // "af_packet"` to enable AF_PACKET mode,
