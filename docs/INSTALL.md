@@ -156,31 +156,31 @@ To configure/install the UPF in AF_PACKET mode, the following changes are requir
 
      # Gateway interface(s)
      #
-     # In the order of ("s1u" "sgi")
+     # In the order of ("s1u/n3" "sgi/n6")
     -ifaces=("ens803f2" "ens803f3")
     +ifaces=("ens801f0" "ens801f1")
 
      # Static IP addresses of gateway interface(s) in cidr format
      #
-     # In the order of (s1u sgi)
+     # In the order of (s1u/n3 sgi/n6)
     -ipaddrs=(198.18.0.1/30 198.19.0.1/30)
     +ipaddrs=(198.168.0.1/24 198.168.1.1/24)
 
      # MAC addresses of gateway interface(s)
      #
-     # In the order of (s1u sgi)
+     # In the order of (s1u/n3 sgi/n6)
     -macaddrs=(9e:b2:d3:34:ab:27 c2:9c:55:d4:8a:f6)
     +macaddrs=(b4:96:91:b4:47:b8 b4:96:91:b4:47:b9)
 
      # Static IP addresses of the neighbors of gateway interface(s)
      #
-     # In the order of (n-s1u n-sgi)
+     # In the order of (n-s1u/n3 n-sgi/n6)
     -nhipaddrs=(198.18.0.2 198.19.0.2)
     +nhipaddrs=(198.168.0.2 198.168.1.2)
 
      # Static MAC addresses of the neighbors of gateway interface(s)
      #
-     # In the order of (n-s1u n-sgi)
+     # In the order of (n-s1u/n3 n-sgi/n6)
     -nhmacaddrs=(22:53:7a:15:58:50 22:53:7a:15:58:50)
     +nhmacaddrs=(b4:96:91:b4:44:b0 b4:96:91:b4:44:b1)
 
@@ -207,7 +207,7 @@ To configure/install the UPF in DPDK mode, the following changes are required:
     @@ -32,7 +32,7 @@ ipaddrs=(198.18.0.1/30 198.19.0.1/30)
      # MAC addresses of gateway interface(s)
      #
-     # In the order of (s1u sgi)
+     # In the order of (s1u/n3 sgi/n6)
     -macaddrs=(9e:b2:d3:34:ab:27 c2:9c:55:d4:8a:f6)
     +macaddrs=(b4:96:91:b1:ff:f0 b4:96:91:b1:ff:f1)
 
@@ -216,7 +216,7 @@ To configure/install the UPF in DPDK mode, the following changes are required:
     @@ -42,7 +42,7 @@ nhipaddrs=(198.18.0.2 198.19.0.2)
      # Static MAC addresses of the neighbors of gateway interface(s)
      #
-     # In the order of (n-s1u n-sgi)
+     # In the order of (n-s1u/n3 n-sgi/n6)
     -nhmacaddrs=(22:53:7a:15:58:50 22:53:7a:15:58:50)
     +nhmacaddrs=(b4:96:91:b4:47:b8 b4:96:91:b4:47:b9)
 
