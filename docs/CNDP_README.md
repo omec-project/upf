@@ -153,7 +153,7 @@ index 5c2fdaf..8d7b8da 100644
              "busy_poll": true,
 ```
 
-5) Modify the script [docker_setup.sh](../scripts/docker_setup.sh) and update the access and core interface names (s1u, sgi), access/core interface mac addresses and neighbor gateway interfaces mac addresses. This should match the access/core netdev interface name used in jsonc file in previous step. In our example test setup, neighbor mac address (n-s1u, n-sgi) corresponds to access/core interfaces used by packet generator in system 2 to send/receive n/w packets. Update following values based on your system configuration.
+5) Modify the script [docker_setup.sh](../scripts/docker_setup.sh) and update the access and core interface names (s1u/n3, sgi/n6), access/core interface mac addresses and neighbor gateway interfaces mac addresses. This should match the access/core netdev interface name used in jsonc file in previous step. In our example test setup, neighbor mac address (n-s1u/n3, n-sgi/n6) corresponds to access/core interfaces used by packet generator in system 2 to send/receive n/w packets. Update following values based on your system configuration.
 
 ```
 diff --git a/scripts/docker_setup.sh b/scripts/docker_setup.sh
@@ -163,7 +163,7 @@ index 7aff6a6..09d640b 100755
 @@ -24,7 +24,7 @@ mode="dpdk"
  # Gateway interface(s)
  #
- # In the order of ("s1u" "sgi")
+ # In the order of ("s1u/n3" "sgi/n6")
 -ifaces=("ens803f2" "ens803f3")
 +ifaces=("enp134s0" "enp136s0")
 
@@ -172,7 +172,7 @@ index 7aff6a6..09d640b 100755
 @@ -34,7 +34,7 @@ ipaddrs=(198.18.0.1/30 198.19.0.1/30)
  # MAC addresses of gateway interface(s)
  #
- # In the order of (s1u sgi)
+ # In the order of (s1u/n3 sgi/n6)
 -macaddrs=(9e:b2:d3:34:ab:27 c2:9c:55:d4:8a:f6)
 +macaddrs=(40:a6:b7:78:3f:ec 40:a6:b7:78:3f:e8)
 
@@ -181,7 +181,7 @@ index 7aff6a6..09d640b 100755
 @@ -44,7 +44,7 @@ nhipaddrs=(198.18.0.2 198.19.0.2)
  # Static MAC addresses of the neighbors of gateway interface(s)
  #
- # In the order of (n-s1u n-sgi)
+ # In the order of (n-s1u/n3 n-sgi/n6)
 -nhmacaddrs=(22:53:7a:15:58:50 22:53:7a:15:58:50)
 +nhmacaddrs=(40:a6:b7:78:3f:bc 40:a6:b7:78:3f:b8)
 ```

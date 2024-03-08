@@ -82,16 +82,16 @@ spec:
   - name: routes
     image: omecproject/upf-epc-bess:master-latest
     env:
-    - name: ENB_SUBNET
+    - name: ENB_GNB_SUBNET
       value: '11.1.1.128/25'
-    - name: S1U_GATEWAY
+    - name: S1U_N3_GATEWAY
       value: '198.18.0.1'
-    - name: SGI_GATEWAY
+    - name: SGI_N6_GATEWAY
       value: '198.19.0.1'
     command: ["sh", "-xec"]
     args:
-    - ip route add $ENB_SUBNET via $S1U_GATEWAY;
-      ip route add default via $SGI_GATEWAY metric 110;
+    - ip route add $ENB_GNB_SUBNET via $S1U_N3_GATEWAY;
+      ip route add default via $SGI_N6_GATEWAY metric 110;
     securityContext:
       capabilities:
         add:

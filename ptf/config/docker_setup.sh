@@ -21,40 +21,40 @@ mode="dpdk"
 
 # Gateway interface(s)
 #
-# In the order of ("s1u" "sgi")
+# In the order of ("s1u/n3" "sgi/n6")
 # ifaces=("access" "core")
 ifaces=("core" "access")
 # ifaces=("enp3s0f0" "enp3s0f1")
 
 # Static IP addresses of gateway interface(s) in cidr format
 #
-# In the order of (s1u sgi)
+# In the order of (s1u/n3 sgi/n6)
 ipaddrs=(198.18.0.1/30 198.19.0.1/30)
 
 # MAC addresses of gateway interface(s)
 #
-# In the order of (s1u sgi)
+# In the order of (s1u/n3 sgi/n6)
 macaddrs=(0c:c4:7a:19:6d:ca 0c:c4:7a:19:6d:cb)
 
 # Static IP addresses of the neighbors of gateway interface(s)
 #
-# In the order of (n-s1u n-sgi)
+# In the order of (n-s1u/n3 n-sgi/n6)
 nhipaddrs=(198.18.0.2 198.19.0.2)
 
 # Static MAC addresses of the neighbors of gateway interface(s)
 #
-# In the order of (n-s1u n-sgi)
+# In the order of (n-s1u/n3 n-sgi/n6)
 nhmacaddrs=(22:53:7a:15:58:50 22:53:7a:15:58:50)
 
 # IPv4 route table entries in cidr format per port
 #
-# In the order of ("{r-s1u}" "{r-sgi}")
+# In the order of ("{r-s1u/n3}" "{r-sgi/n6}")
 routes=("11.1.1.128/25" "0.0.0.0/0")
 
 num_ifaces=${#ifaces[@]}
 num_ipaddrs=${#ipaddrs[@]}
 
-# Set up static route and neighbor table entries of the SPGW
+# Set up static route and neighbor table entries of the SPGW/UPF
 function setup_trafficgen_routes() {
 	for ((i = 0; i < num_ipaddrs; i++)); do
 		sudo ip netns exec pause ip neighbor add "${nhipaddrs[$i]}" lladdr "${nhmacaddrs[$i]}" dev "${ifaces[$i % num_ifaces]}"
