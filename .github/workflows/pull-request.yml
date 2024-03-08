@@ -13,8 +13,8 @@ concurrency:
 jobs:
   build:
     env:
-      DOCKER_REGISTRY: "ghcr.io/omec-project/"
-      DOCKER_REPOSITORY: "upf-epc/"
+      DOCKER_REGISTRY: "registry.aetherproject.org/"
+      DOCKER_REPOSITORY: "sdcore/"
       VERSION: "PR-${{ github.event.pull_request.number }}"
     runs-on: ubuntu-latest
     steps:
@@ -71,26 +71,3 @@ jobs:
 
       - name: Build the PFCP Agent Docker image (after format)
         run: DOCKER_TARGETS=pfcpiface make docker-build
-
-#      - name: Update PR with changes
-#        uses: gr2m/create-or-update-pull-request-action@v1.x
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#        with:
-#          body: Updated with changes from CI
-#          branch: ${{ github.event.pull_request.head.ref }}
-#          author: "Github Actions <actions@github>"
-#          commit-message: "Actions: Updated with changes from CI"
-
-      - id: docker-login
-        # Secrets from the main repo are not used if PR comes from fork. We skip pushing Docker image then.
-        if: github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'
-        uses: docker/login-action@v3.0.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.CR_PAT }}
-
-      - name: Push Docker image
-        if: steps.docker-login.conclusion == 'success'
-        run: make docker-push
