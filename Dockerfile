@@ -5,7 +5,7 @@
 # Multi-stage Dockerfile
 
 # Stage bess-deps: fetch BESS dependencies
-FROM ghcr.io/omec-project/upf-epc/bess_build:latest AS bess-deps
+FROM registry.aetherproject.org/sdcore/bess_build:latest AS bess-deps
 RUN apt-get update && \
     apt-get install -y git \
     --no-install-recommends \
