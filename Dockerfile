@@ -1,52 +1,36 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2020-present Open Networking Foundation
-# Copyright 2019 Intel Corporation
+# Copyright 2019-present Intel Corporation
 
-# Multi-stage Dockerfile
-
-# Stage bess-deps: fetch BESS dependencies
-FROM registry.aetherproject.org/sdcore/bess_build:latest AS bess-deps
-RUN apt-get update && \
-    apt-get install -y git \
-    --no-install-recommends \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
-# BESS pre-reqs
-WORKDIR /bess
-ARG BESS_COMMIT=master
-RUN git clone https://github.com/omec-project/bess.git . \
-    && git checkout ${BESS_COMMIT} \
-    && cp -a protobuf /protobuf
-
-# Stage bess-build: builds bess with its dependencies
-FROM bess-deps AS bess-build
+# Stage bess-build: fetch BESS dependencies & pre-reqs
+FROM registry.aetherproject.org/sdcore/bess_build:latest AS bess-build
 ARG CPU=native
-RUN apt-get update && \
-    apt-get -y install --no-install-recommends \
-        ca-certificates \
-        libelf-dev
-
+ARG BESS_COMMIT=master
+ENV PLUGINS_DIR=plugins
 ARG MAKEFLAGS
 ENV PKG_CONFIG_PATH=/usr/lib64/pkgconfig
 
-# linux ver should match target machine's kernel
-WORKDIR /libbpf
-ARG LIBBPF_VER=v0.3
-RUN curl -L https://github.com/libbpf/libbpf/tarball/${LIBBPF_VER} | \
-    tar xz -C . --strip-components=1 && \
-    cp include/uapi/linux/if_xdp.h /usr/include/linux && \
-    cd src && \
-    make install && \
-    ldconfig
+RUN apt-get update && apt-get install -y \
+    --no-install-recommends \
+    git \
+    ca-certificates \
+    libbpf0 \
+    libelf-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
+# BESS pre-reqs
 WORKDIR /bess
+RUN git clone https://github.com/omec-project/bess.git . && \
+    git checkout ${BESS_COMMIT} && \
+    cp -a protobuf /protobuf
 
-# Patch and build DPDK
+# Build DPDK
 RUN ./build.py dpdk
 
 # Plugins: SequentialUpdate
-RUN mkdir -p plugins && mv sample_plugin plugins
+RUN mkdir -p plugins && \
+    mv sample_plugin plugins
 
 ## Network Token
 ARG ENABLE_NTF
@@ -55,8 +39,12 @@ COPY scripts/install_ntf.sh .
 RUN ./install_ntf.sh
 
 # Build and copy artifacts
-COPY scripts/build_bess.sh .
-RUN ./build_bess.sh && \
+RUN PLUGINS=$(find "$PLUGINS_DIR" -mindepth 1 -maxdepth 1 -type d) && \
+    CMD="./build.py bess" && \
+    for PLUGIN in $PLUGINS; do \
+        CMD="$CMD --plugin $PLUGIN"; \
+    done && \
+    eval $CMD && \
     cp bin/bessd /bin && \
     mkdir -p /bin/modules && \
     cp core/modules/*.so /bin/modules && \
@@ -65,21 +53,19 @@ RUN ./build_bess.sh && \
     cp -r core/pb /pb
 
 # Stage bess: creates the runtime image of BESS
-FROM python:3.12.2-slim AS bess
+FROM ubuntu:22.04 AS bess
 COPY requirements.txt .
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        gcc \
-        libgraph-easy-perl \
-        iproute2 \
-        iptables \
-        iputils-ping \
-        tcpdump && \
+RUN apt-get update && apt-get install -y \
+    --no-install-recommends \
+    python3-pip \
+    libgraph-easy-perl \
+    iproute2 \
+    iptables \
+    iputils-ping \
+    tcpdump && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
-    pip install --no-cache-dir \
-    -r requirements.txt && \
-    apt-get --purge remove -y \
-        gcc
+    pip install --no-cache-dir -r requirements.txt
 COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin/bessd
 COPY --from=bess-build /bin/modules /bin/modules
@@ -100,8 +86,9 @@ RUN apt-get update && apt-get install -y \
     libnl-cli-3-200 \
     libnuma1 \
     libpcap0.8 \
-    pkg-config \
-    && rm -rf /var/lib/apt/lists/*
+    pkg-config && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 COPY --from=bess-build /usr/bin/cndpfwd /usr/bin/
 COPY --from=bess-build /usr/local/lib/x86_64-linux-gnu/*.so /usr/local/lib/x86_64-linux-gnu/
 COPY --from=bess-build /usr/local/lib/x86_64-linux-gnu/*.a /usr/local/lib/x86_64-linux-gnu/
@@ -117,20 +104,20 @@ ENTRYPOINT ["bessd", "-f"]
 FROM golang:1.22.1 AS protoc-gen
 RUN go install github.com/golang/protobuf/protoc-gen-go@latest
 
-FROM bess-deps AS go-pb
+FROM bess-build AS go-pb
 COPY --from=protoc-gen /go/bin/protoc-gen-go /bin
 RUN mkdir /bess_pb && \
     protoc -I /usr/include -I /protobuf/ \
-        /protobuf/*.proto /protobuf/ports/*.proto \
-        --go_opt=paths=source_relative --go_out=plugins=grpc:/bess_pb
+    /protobuf/*.proto /protobuf/ports/*.proto \
+    --go_opt=paths=source_relative --go_out=plugins=grpc:/bess_pb
 
-FROM bess-deps AS py-pb
+FROM bess-build AS py-pb
 RUN pip install --no-cache-dir grpcio-tools==1.26
 RUN mkdir /bess_pb && \
     python -m grpc_tools.protoc -I /usr/include -I /protobuf/ \
-        /protobuf/*.proto /protobuf/ports/*.proto \
-        --python_out=plugins=grpc:/bess_pb \
-        --grpc_python_out=/bess_pb
+    /protobuf/*.proto /protobuf/ports/*.proto \
+    --python_out=plugins=grpc:/bess_pb \
+    --grpc_python_out=/bess_pb
 
 FROM golang:1.22.1 AS pfcpiface-build
 ARG GOFLAGS
@@ -153,12 +140,12 @@ ENTRYPOINT [ "/bin/pfcpiface" ]
 
 # Stage pb: dummy stage for collecting protobufs
 FROM scratch AS pb
-COPY --from=bess-deps /bess/protobuf /protobuf
+COPY --from=bess-build /bess/protobuf /protobuf
 COPY --from=go-pb /bess_pb /bess_pb
 
 # Stage ptf-pb: dummy stage for collecting python protobufs
 FROM scratch AS ptf-pb
-COPY --from=bess-deps /bess/protobuf /protobuf
+COPY --from=bess-build /bess/protobuf /protobuf
 COPY --from=py-pb /bess_pb /bess_pb
 
 # Stage binaries: dummy stage for collecting artifacts
