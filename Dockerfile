@@ -5,28 +5,24 @@
 # Stage bess-build: fetch BESS dependencies & pre-reqs
 FROM registry.aetherproject.org/sdcore/bess_build:latest AS bess-build
 ARG CPU=native
-ARG BESS_COMMIT=master
 ENV PLUGINS_DIR=plugins
 ARG MAKEFLAGS
 ENV PKG_CONFIG_PATH=/usr/lib64/pkgconfig
 
-RUN apt-get update && apt-get install -y \
-    --no-install-recommends \
-    git \
-    ca-certificates \
-    libbpf0 \
-    libelf-dev && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# BESS pre-reqs
 WORKDIR /bess
-RUN git clone https://github.com/omec-project/bess.git . && \
-    git checkout ${BESS_COMMIT} && \
-    cp -a protobuf /protobuf
 
-# Build DPDK
-RUN ./build.py dpdk
+## Developers can uncomment the following lines to use their own BESS repo/changes
+# ARG BESS_COMMIT=<your-branch>
+# RUN cd .. && \
+#     rm -rf bess && \
+#     git clone https://github.com/<your-repo>/bess.git && \
+#     cd bess && \
+#     git checkout ${BESS_COMMIT} && \
+#     ./build.py dpdk
+## End comment out section
+
+# Copy protobuf files for use in later stages (below)
+RUN cp -a protobuf /protobuf
 
 # Plugins: SequentialUpdate
 RUN mkdir -p plugins && \
