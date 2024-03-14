@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: docker/login-action@v3.0.0
+      - uses: docker/login-action@v3.1.0
         with:
           registry: registry.aetherproject.org
           username: ${{ secrets.AETHER_REGISTRY_USERNAME }}
@@ -43,7 +43,7 @@ jobs:
 
       - run: echo GIT_SHA_SHORT=$(git rev-parse --short HEAD) >> $GITHUB_ENV
 
-      - uses: docker/login-action@v3.0.0
+      - uses: docker/login-action@v3.1.0
         with:
           registry: docker.io
           username: ${{ secrets.DOCKERHUB_LOGIN }}
