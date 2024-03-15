@@ -133,7 +133,12 @@ def get_process_affinity():
 
 
 def set_process_affinity(pid, cpus):
-    psutil.Process(pid).cpu_affinity(cpus)
+    try:
+        psutil.Process(pid).cpu_affinity(cpus)
+    except OSError as e:
+        # 22 = Invalid argument; PID has PF_NO_SETAFFINITY set
+        if e.errno != 22:
+            raise e
 
 
 def set_process_affinity_all(cpus):
