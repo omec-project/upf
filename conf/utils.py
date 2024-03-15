@@ -39,7 +39,7 @@ def getpythonpid(process_name):
 
 def get_json_conf(path, dump):
     try:
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             jsonc_data = f.read()
         jc = JsonComment()
         conf = jc.loads(jsonc_data)
@@ -126,10 +126,6 @@ def cidr2netmask(cidr):
 
 def ip2long(ip):
     return iptools.ipv4.ip2long(ip)
-
-
-def get_process_affinity():
-    return psutil.Process().cpu_affinity()
 
 
 def set_process_affinity(pid, cpus):
