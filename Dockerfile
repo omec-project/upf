@@ -42,9 +42,9 @@ RUN ./install_ntf.sh
 RUN PLUGINS=$(find "$PLUGINS_DIR" -mindepth 1 -maxdepth 1 -type d) && \
     CMD="./build.py bess" && \
     for PLUGIN in $PLUGINS; do \
-        CMD="$CMD --plugin $PLUGIN"; \
+        CMD="$CMD --plugin \"$PLUGIN\""; \
     done && \
-    eval $CMD && \
+    eval "$CMD" && \
     cp bin/bessd /bin && \
     mkdir -p /bin/modules && \
     cp core/modules/*.so /bin/modules && \
@@ -54,6 +54,7 @@ RUN PLUGINS=$(find "$PLUGINS_DIR" -mindepth 1 -maxdepth 1 -type d) && \
 
 # Stage bess: creates the runtime image of BESS
 FROM ubuntu:22.04 AS bess
+WORKDIR /
 COPY requirements.txt .
 RUN apt-get update && apt-get install -y \
     --no-install-recommends \

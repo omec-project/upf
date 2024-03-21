@@ -29,6 +29,23 @@ jobs:
           version: latest
           args: -v --config ./.golangci.yml
 
+  hadolint:
+    name: hadolint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dockerfile linter
+        uses: hadolint/hadolint-action@v3.1.0
+        # For now, ignoring:
+        # DL3007 warning: Pin the version explicitily to a release tag (no latest);
+        # DL3008 warning: Pin versions in apt get install (e.g., apt-get install <package>=<version>); and
+        # DL3018 warning: Pin versions in apk add (e.g., apk add <package>=<version>)
+        with:
+          dockerfile: Dockerfile
+          ignore: DL3007,DL3008,DL3018
+
   check-spelling:
     name: Markdown spellcheck
     runs-on: ubuntu-latest
