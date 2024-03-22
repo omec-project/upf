@@ -74,8 +74,15 @@ hosting TRex, where results are asserted.
 ## Steps to run tests
 The run script assumes that the TRex daemon server and the UPF
 instance are already running on their respective machines. It also
-assumes that all config files in `config/` are configured correctly to
-route traffic to the UPF.
+assumes that all the following config files are configured correctly to
+route traffic to the UPF and vice versa.
+* `upf/scripts/docker_setup.sh` script updated with proper values for
+  `ifaces`, `macaddrs`, `nhmacaddrs` parameters
+* `upf/ptf/.env` file updated with `UPF_ADDR` and `TREX_ADDR` parameters
+* `upf/ptf/config/4-ports-with-l2.yaml` file updated with proper values for
+  `interfaces`, `port_info`, and `platform` parameters
+* `upf/ptf/tests/linerate/baseline.py` file updated with proper values for
+  `TREX_SRC_MAC` and `UPF_DEST_MAC`
 
 To install TRex onto your server, please refer to the [TRex installation
 guide](https://trex-tgn.cisco.com/trex/doc/trex_manual.html#_download_and_installation)
