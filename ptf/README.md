@@ -79,7 +79,7 @@ route traffic to the UPF and vice versa.
 * `upf/scripts/docker_setup.sh` script updated with proper values for
   `ifaces`, `macaddrs`, `nhmacaddrs` parameters
 * `upf/ptf/.env` file updated with `UPF_ADDR` and `TREX_ADDR` parameters
-* `upf/ptf/config/4-ports-with-l2.yaml` file updated with proper values for
+* `upf/ptf/config/trex-cfg-for-ptf.yaml` file updated with proper values for
   `interfaces`, `port_info`, and `platform` parameters
 * `upf/ptf/tests/linerate/baseline.py` file updated with proper values for
   `TREX_SRC_MAC` and `UPF_DEST_MAC`
