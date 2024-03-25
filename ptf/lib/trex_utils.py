@@ -104,7 +104,7 @@ def list_port_status(port_status: dict) -> None:
     port_status: dict
         Port status from Trex client API
     """
-    for port in [0, 1, 2, 3]:
+    for port in [0, 1]:
         readable_stats = get_readable_port_stats(port_status[port])
         print("States from port {}: \n{}".format(port, readable_stats))
 
