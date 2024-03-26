@@ -7,10 +7,12 @@ Copyright 2019 Intel Corporation
 
 ### Table Of Contents
   * [Prerequisites](#prerequisites)
-  * [Configuration: Simulation mode](#configuration-simulation-mode)
-  * [Configuration: AF_PACKET mode](#configuration-af_packet-mode)
-  * [Configuration: DPDK mode](#configuration-dpdk-mode)
-  * [Configuration: CNDP mode](#configuration-cndp-mode)
+  * [Configuration Modes](#configuration-simulation-mode)
+    * [Simulation mode](#configuration-simulation-mode)
+    * [AF_PACKET mode](#configuration-af_packet-mode)
+    * [AF_XDP mode](#configuration-af_xdp-mode)
+    * [DPDK mode](#configuration-dpdk-mode)
+    * [CNDP mode](#configuration-cndp-mode)
   * [Installation](#installation)
   * [General Execution Commands](#general-execution-commands)
   * [Testing (Microbenchmarks)](#testing-microbenchmarks)
@@ -100,39 +102,37 @@ To configure/install the UPF in AF_PACKET mode, the following changes are requir
 1. Enable AF_PACKET mode in configuration file
 
     ```patch
-    diff --git a/conf/upf.json b/conf/upf.json
-    index 37447b7..b56e1fd 100644
-    --- a/conf/upf.json
-    +++ b/conf/upf.json
-    @@ -1,10 +1,10 @@
-     {
-         "": "Vdev or sim support. Enable `\"mode\": \"af_xdp\"` to enable AF_XDP mode, or `\"mode\": \"af_packet\"` to enable AF_PACKET mode, `\"mode\": \"sim\"` to generate synthetic traffic from BESS's Source module or \"mode\": \"\" when running with UP4",
-         "": "mode: af_xdp",
-    -    "": "mode: af_packet",
-    +    "mode": "af_packet",
-         "": "mode: sim",
-         "": "mode: cndp",
+    diff --git a/conf/upf.jsonc b/conf/upf.jsonc
+    index f332689..6787173 100644
+    --- a/conf/upf.jsonc
+    +++ b/conf/upf.jsonc
+    @@ -9,7 +9,7 @@
+         // "dpdk" to enable DPDK mode,
+         // "sim" to generate synthetic traffic from BESS's Source module,
+         // "" when running with UP4
     -    "mode": "dpdk",
-    +    "": "mode: dpdk",
+    +    "mode": "af_packet",
 
          "table_sizes": {
-             "": "Example sizes based on sim mode and 50K sessions. Customize as per your control plane",
-    @@ -62,13 +62,13 @@
-
-         "": "Gateway interfaces",
+             // Example sizes based on sim mode and 50K sessions. Customize as per your control plane
+    @@ -74,7 +74,7 @@
+         // N3 interface
          "access": {
-    -        "ifname": "ens803f2",
-    +        "ifname": "ens801f0",
-             "": "cndp_jsonc_file: conf/cndp_upf_1worker.jsonc"
+             // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
+    -        "ifname": "ens803f2"
+    +        "ifname": "ens801f0"
          },
 
-         "": "UE IP Natting. Update the line below to `\"ip_masquerade\": \"<ip> [or <ip>]\"` to enable",
-         "core": {
-    -        "ifname": "ens803f3",
-    +        "ifname": "ens801f1",
-             "": "cndp_jsonc_file: conf/cndp_upf_1worker.jsonc",
-             "": "ip_masquerade: 18.0.0.1 or 18.0.0.2 or 18.0.0.3"
+         // N6 or N9 interface (depending on the UPF's deployment [PSA-UPF or I-UPF])
+    @@ -82,7 +82,7 @@
+             // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
+             // Uncomment line below to enable UE IP natting. It could be a single IP or multiple IPs
+             // "ip_masquerade": "18.0.0.1 or 18.0.0.2 or 18.0.0.3",
+    -        "ifname": "ens803f3"
+    +        "ifname": "ens801f1"
          },
+
+         // Number of worker threads. Default: 1
     ```
 
 2. Enable AF_PACKET mode and, accordingly, update the script file with the interfaces, IP addresses and MAC addresses including the `ipaddrs` and `nhipaddrs`
@@ -188,6 +188,92 @@ To configure/install the UPF in AF_PACKET mode, the following changes are requir
      #
     ```
 
+## Configuration: AF_XDP mode
+
+To configure/install the UPF in AF_XDP mode, the following changes are required:
+
+1. Enable AF_XDP mode in configuration file
+
+    ```patch
+    diff --git a/conf/upf.jsonc b/conf/upf.jsonc
+    index f332689..65d3932 100644
+    --- a/conf/upf.jsonc
+    +++ b/conf/upf.jsonc
+    @@ -9,7 +9,7 @@
+         // "dpdk" to enable DPDK mode,
+         // "sim" to generate synthetic traffic from BESS's Source module,
+         // "" when running with UP4
+    -    "mode": "dpdk",
+    +    "mode": "af_xdp",
+
+         "table_sizes": {
+             // Example sizes based on sim mode and 50K sessions. Customize as per your control plane
+    @@ -74,7 +74,7 @@
+         // N3 interface
+         "access": {
+             // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
+    -        "ifname": "ens803f2"
+    +        "ifname": "enp134s0"
+         },
+
+         // N6 or N9 interface (depending on the UPF's deployment [PSA-UPF or I-UPF])
+    @@ -82,7 +82,7 @@
+             // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
+             // Uncomment line below to enable UE IP natting. It could be a single IP or multiple IPs
+             // "ip_masquerade": "18.0.0.1 or 18.0.0.2 or 18.0.0.3",
+    -        "ifname": "ens803f3"
+    +        "ifname": "enp136s0"
+         },
+
+         // Number of worker threads. Default: 1
+    ```
+
+2. Enable AF_XDP mode and, accordingly, update the script file with the interfaces, IP addresses and MAC addresses including the `ipaddrs` and `nhipaddrs`
+
+    ```patch
+    diff --git a/scripts/docker_setup.sh b/scripts/docker_setup.sh
+    index e6bb65c..f589991 100755
+    --- a/scripts/docker_setup.sh
+    +++ b/scripts/docker_setup.sh
+    @@ -15,16 +15,16 @@ metrics_port=8080
+     # "af_packet" uses AF_PACKET sockets via DPDK's vdev for pkt I/O.
+     # "sim" uses Source() modules to simulate traffic generation
+     # "cndp" uses kernel AF-XDP. It supports ZC and XDP offload if driver and NIC supports it. It's tested on Intel 800 series n/w adapter.
+    -mode="dpdk"
+    +#mode="dpdk"
+     #mode="cndp"
+    -#mode="af_xdp"
+    +mode="af_xdp"
+     #mode="af_packet"
+     #mode="sim"
+
+     # Gateway interface(s)
+     #
+     # In the order of ("s1u/n3" "sgi/n6")
+    -ifaces=("ens803f2" "ens803f3")
+    +ifaces=("enp134s0" "enp136s0")
+
+     # Static IP addresses of gateway interface(s) in cidr format
+     #
+    @@ -34,7 +34,7 @@ ipaddrs=(198.18.0.1/30 198.19.0.1/30)
+     # MAC addresses of gateway interface(s)
+     #
+     # In the order of (s1u/n3 sgi/n6)
+    -macaddrs=(9e:b2:d3:34:ab:27 c2:9c:55:d4:8a:f6)
+    +macaddrs=(40:a6:b7:78:3f:ec 40:a6:b7:78:3f:e8)
+
+     # Static IP addresses of the neighbors of gateway interface(s)
+     #
+    @@ -44,7 +44,7 @@ nhipaddrs=(198.18.0.2 198.19.0.2)
+     # Static MAC addresses of the neighbors of gateway interface(s)
+     #
+     # In the order of (n-s1u/n3 n-sgi/n6)
+    -nhmacaddrs=(22:53:7a:15:58:50 22:53:7a:15:58:50)
+    +nhmacaddrs=(40:a6:b7:68:95:d4 40:a6:b7:68:95:d0)
+
+     # IPv4 route table entries in cidr format per port
+     #
+    ```
 
 ## Configuration: DPDK mode
 
