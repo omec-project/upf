@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2019 Intel Corporation
 
-import json
 import os
 import socket
 import struct
@@ -11,7 +10,8 @@ import sys
 import iptools
 from jsoncomment import JsonComment
 import psutil
-from pyroute2 import IPDB
+from pyroute2 import NDB
+from socket import AF_INET
 
 
 def exit(code, msg):
@@ -63,8 +63,8 @@ def get_env(varname, default=None):
 
 
 def ips_by_interface(name):
-    ipdb = IPDB()
-    return [ipobj[0] for ipobj in ipdb.interfaces[name]["ipaddr"].ipv4]
+    ndb = NDB()
+    return [address["local"] for address in ndb.interfaces[name].ipaddr if address["family"] == AF_INET]
 
 
 def atoh(ip):
@@ -72,13 +72,13 @@ def atoh(ip):
 
 
 def alias_by_interface(name):
-    ipdb = IPDB()
-    return ipdb.interfaces[name]["ifalias"]
+    ndb = NDB()
+    return ndb.interfaces[name]["ifalias"]
 
 
 def mac_by_interface(name):
-    ipdb = IPDB()
-    return ipdb.interfaces[name]["address"]
+    ndb = NDB()
+    return ndb.interfaces[name]["address"]
 
 
 def mac2hex(mac):
@@ -86,10 +86,10 @@ def mac2hex(mac):
 
 
 def peer_by_interface(name):
-    ipdb = IPDB()
+    ndb = NDB()
     try:
-        peer_idx = ipdb.interfaces[name]["link"]
-        peer_name = ipdb.interfaces[peer_idx]["ifname"]
+        peer_idx = ndb.interfaces[name]["link"]
+        peer_name = ndb.interfaces[peer_idx]["ifname"]
     except:
         raise Exception("veth interface {} does not exist".format(name))
     else:

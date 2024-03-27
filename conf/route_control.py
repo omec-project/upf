@@ -14,8 +14,9 @@ from dataclasses import dataclass, field
 from threading import Lock, Thread
 from typing import Dict, List, Optional, Tuple
 
+from pr2modules.netlink.rtnl.ifinfmsg import ifinfmsg
 from pybess.bess import *
-from pyroute2 import IPDB, IPRoute
+from pyroute2 import NDB, IPRoute
 from scapy.all import ICMP, IP, send
 
 LOG_FORMAT = "%(asctime)s %(levelname)s %(message)s"
@@ -308,7 +309,7 @@ class RouteController:
     def __init__(
         self,
         bess_controller: BessController,
-        ipdb: IPDB,
+        ndb: NDB,
         ipr: IPRoute,
         interfaces: List[str],
     ):
@@ -319,7 +320,7 @@ class RouteController:
             bess_controller (BessController):
                 Controller for BESS (Berkeley Extensible Software Switch).
             route_parser (RouteEntryParser): Parser for route entries.
-            ipdb (IPDB): IP database to manage IP configurations.
+            ndb (NDB): database to manage Network configurations.
             ipr (IPRoute): IP routing control object.
 
         Attributes:
@@ -336,7 +337,7 @@ class RouteController:
 
         self._lock = Lock()
 
-        self._ipdb = ipdb
+        self._ndb = ndb
         self._ipr = ipr
         self._bess_controller = bess_controller
         self._ping_missing_thread = Thread(
@@ -345,10 +346,10 @@ class RouteController:
         self._event_callback = None
         self._interfaces = interfaces
 
-    def register_callbacks(self) -> None:
-        """Register callback function."""
-        logger.info("Registering netlink event listener callback...")
-        self._event_callback = self._ipdb.register_callback(
+    def register_handlers(self) -> None:
+        """Register handler function."""
+        logger.info("Registering netlink event listener handler...")
+        self._event_callback = self._ndb.task_manager.register_handler(ifinfmsg,
             self._netlink_event_listener
         )
 
@@ -373,7 +374,7 @@ class RouteController:
         Args:
             route_entry (RouteEntry): The route entry.
         """
-        if not (next_hop_mac := fetch_mac(self._ipdb, route_entry.next_hop_ip)):
+        if not (next_hop_mac := fetch_mac(self._ndb, route_entry.next_hop_ip)):
             logger.info(
                 "mac address of the next hop %s is not stored in ARP table. Probing...",
                 route_entry.next_hop_ip,
@@ -603,33 +604,37 @@ class RouteController:
         return self._module_gate_count_cache[module_name]
 
     def _netlink_event_listener(
-        self, ipdb: IPDB, netlink_message: dict, action: str
+        self, ndb: NDB, netlink_message: dict
     ) -> None:
         """Listens for netlink events and handles them.
 
         Args:
-            ipdb (IPDB): The IPDB object.
             netlink_message (dict): The netlink message.
-            action (str): The action.
         """
-        logger.info("%s netlink event received.", action)
+        try:
+            event = netlink_message['event']
+        except Exception:
+            logger.exception("Error parsing netlink message")
+            return
+
+        logger.info("%s netlink event received.", event)
         route_entry = self._parse_route_entry_msg(netlink_message)
-        if action == KEY_NEW_ROUTE_ACTION and route_entry:
+        if event == KEY_NEW_ROUTE_ACTION and route_entry:
             with self._lock:
                 self.add_new_route_entry(route_entry)
 
-        elif action == KEY_DELETE_ROUTE_ACTION and route_entry:
+        elif event == KEY_DELETE_ROUTE_ACTION and route_entry:
             with self._lock:
                 self.delete_route_entry(route_entry)
 
-        elif action == KEY_NEW_NEIGHBOR_ACTION:
+        elif event == KEY_NEW_NEIGHBOR_ACTION:
             with self._lock:
                 self.add_unresolved_new_neighbor(netlink_message)
 
     def cleanup(self, number: int) -> None:
         """Unregisters the netlink event listener callback and exits."""
         logger.info("Received: %i Exiting", number)
-        self._ipdb.unregister_callback(self._event_callback)
+        self._ndb.task_manager.unregister_callback(self._event_callback)
         logger.info("Unregistered netlink event listener callback")
         sys.exit()
 
@@ -667,7 +672,7 @@ class RouteController:
         if not attr_dict.get(KEY_INTERFACE):
             return None
         interface_index = int(attr_dict.get(KEY_INTERFACE))
-        interface = self._ipdb.interfaces[interface_index].ifname
+        interface = self._ndb.interfaces[interface_index].get("ifname")
         if interface not in self._interfaces:
             return None
 
@@ -736,26 +741,25 @@ def send_ping(neighbor_ip):
     send(IP(dst=neighbor_ip) / ICMP())
 
 
-def fetch_mac(ipdb: IPDB, target_ip: str) -> Optional[str]:
-    """Fetches the MAC address of the target IP from the ARP table using IPDB.
+def fetch_mac(ndb: NDB, target_ip: str) -> Optional[str]:
+    """Fetches the MAC address of the target IP from the ARP table using NDB.
 
     Args:
-        ipdb (IPDB): The IPDB object.
+        ndb (NDB): The NDB object.
         target_ip (str): The target IP address.
 
     Returns:
         Optional[str]: The MAC address of the target IP.
     """
-    neighbors = ipdb.nl.get_neighbours(dst=target_ip)
+    neighbors = ndb.neighbours.dump()
     for neighbor in neighbors:
-        attrs = dict(neighbor["attrs"])
-        if attrs.get(KEY_NETWORK_LAYER_DEST_ADDR, "") == target_ip:
+        if neighbor["dst"] == target_ip:
             logger.info(
                 "Mac address found for %s, Mac: %s",
                 target_ip,
-                attrs.get(KEY_LINK_LAYER_ADDRESS, ""),
+                neighbor["lladdr"],
             )
-            return attrs.get(KEY_LINK_LAYER_ADDRESS, "")
+            return neighbor["lladdr"]
     logger.info("Mac address not found for %s", target_ip)
     return None
 
@@ -800,16 +804,16 @@ def register_signal_handlers(route_controller: RouteController) -> None:
 if __name__ == "__main__":
     interface_arg, ip_arg, port_arg = parse_args()
     ipr = IPRoute()
-    ipdb = IPDB()
+    ndb = NDB()
     bess_controller = BessController(ip_arg, port_arg)
     route_controller = RouteController(
         bess_controller=bess_controller,
-        ipdb=ipdb,
+        ndb=ndb,
         ipr=ipr,
         interfaces=interface_arg,
     )
     route_controller.bootstrap_routes()
-    route_controller.register_callbacks()
+    route_controller.register_handlers()
     route_controller.start_pinging_missing_entries()
     register_signal_handlers(route_controller=route_controller)
     logger.info("Sleep until a signal is received")
