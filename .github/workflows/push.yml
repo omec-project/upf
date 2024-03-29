@@ -34,8 +34,11 @@ jobs:
       - name: Build and push "master-latest" Docker image
         env:
           DOCKER_TAG: master-latest
+          CPU: haswell
         run: |
-          make docker-build
+          docker pull ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG
+          docker pull ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG
+          CPU=$CPU make docker-build
           make docker-push
 
       - name: Build and push "master-GIT_SHA" Docker image
@@ -141,8 +144,6 @@ jobs:
           DOCKER_TAG: rel-${{ needs.tag-github.outputs.version }}
           CPU: haswell
         run: |
-          docker pull ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG
-          docker pull ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG
           CPU=$CPU make docker-build
           make docker-push
 
@@ -151,8 +152,6 @@ jobs:
           DOCKER_TAG: rel-${{ needs.tag-github.outputs.version }}-ivybridge
           CPU: ivybridge
         run: |
-          docker pull ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG
-          docker pull ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG
           CPU=$CPU make docker-build
           make docker-push
 
