@@ -21,5 +21,5 @@ jobs:
           owner: omec-project
           name: upf-epc/${{ matrix.package }}
           # NOTE: using Personal Access Token
-          token: ${{ secrets.CR_PAT }}
+          token: ${{ secrets.GH_OMEC_PAT }}
           untagged-keep-latest: 1
