@@ -36,8 +36,8 @@ jobs:
           DOCKER_TAG: master-latest
           CPU: haswell
         run: |
-          docker pull ${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG
-          docker pull ${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG
+          docker pull ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG
+          docker pull ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG
           CPU=$CPU make docker-build
           make docker-push
 
