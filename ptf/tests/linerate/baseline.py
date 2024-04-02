@@ -117,7 +117,7 @@ class DownlinkPerformanceBaselineTest(TrexTest, GrpcTest):
         )
 
         # Wait for sometime before starting traffic. Sometimes the ports are
-        # taking some time to become active. Otherwise the traffic will
+        # taking some time to become active. Otherwise, the test will
         # fail due to port DOWN state
         time.sleep(20)
 
