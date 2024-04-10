@@ -12,6 +12,7 @@ on:
 jobs:
   push-images:
     runs-on: ubuntu-latest
+    if: github.repository_owner == 'omec-project'
     env:
       REGISTRY: registry.aetherproject.org
       DOCKER_REGISTRY: registry.aetherproject.org/
@@ -51,6 +52,7 @@ jobs:
   # CAUTION: Other actions depend on this name "tag-github"
   tag-github:
     runs-on: ubuntu-latest
+    if: github.repository_owner == 'omec-project'
     outputs:
       changed: ${{ steps.version-change.outputs.changed }}
       version: ${{ steps.version-change.outputs.version }}
@@ -111,7 +113,7 @@ jobs:
             https://api.github.com/repos/${{ github.repository }}/releases \
             -d '{
               "tag_name": "v${{ steps.version-change.outputs.version }}",
-              "target_commitish": "master",
+              "target_commitish": "${{ github.event.repository.default_branch }}",
               "name": "v${{ steps.version-change.outputs.version }}",
               "draft": false,
               "prerelease": false,
