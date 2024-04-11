@@ -13,6 +13,25 @@ on:
       - master
 
 jobs:
+  build:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Generate protobuf
+        run: make pb
+
+      - name: Build the BESS-UPF Docker image
+        run: DOCKER_TARGETS=bess make docker-build
+
+      - name: Build the PFCP Agent Docker image
+        run: DOCKER_TARGETS=pfcpiface make docker-build
+
   lint:
     name: lint
     runs-on: ubuntu-latest
