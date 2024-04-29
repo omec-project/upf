@@ -1,10 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2019 Intel Corporation
+# Copyright 2019-present Intel Corporation
 name: Stale issue/pr
 
 on:
   schedule:
   - cron: "0 0 * * *"
+
+env:
+  DAYS_BEFORE_STALE: 120
+  DAYS_BEFORE_CLOSE: 15
 
 jobs:
   stale:
@@ -13,9 +17,9 @@ jobs:
     - uses: actions/stale@v9
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
-        stale-issue-message: 'This issue has been stale for 30 days and will be closed in 5 days. Comment to keep it open.'
-        stale-pr-message: 'This pull request has been stale for 30 days and will be closed in 5 days. Comment to keep it open.'
+        stale-issue-message: 'This issue has been stale for ${{ env.DAYS_BEFORE_STALE }} days and will be closed in ${{ env.DAYS_BEFORE_CLOSE }} days. Comment to keep it open.'
+        stale-pr-message: 'This pull request has been stale for ${{ env.DAYS_BEFORE_STALE }} days and will be closed in ${{ env.DAYS_BEFORE_CLOSE }} days. Comment to keep it open.'
         stale-issue-label: 'stale/issue'
         stale-pr-label: 'stale/pr'
-        days-before-stale: 30
-        days-before-close: 5
+        days-before-stale: ${{ env.DAYS_BEFORE_STALE }}
+        days-before-close: ${{ env.DAYS_BEFORE_CLOSE }}
