@@ -3,22 +3,22 @@
 
 - version: 2
   port_limit: 2
-  interfaces: ['b1:00.0', 'b1:00.1']
+  interfaces: ['4b:00.0', '4b:00.1']
   port_bandwidth_gb: 10
   c: 2
   port_info:
-    - src_mac: b4:96:91:b4:44:b0
-      dest_mac: b4:96:91:b4:47:b8
-    - src_mac: b4:96:91:b4:44:b1
-      dest_mac: b4:96:91:b4:47:b9
+    - src_mac: b4:96:91:b4:4b:08
+      dest_mac: b4:96:91:b2:06:40
+    - src_mac: b4:96:91:b4:4b:09
+      dest_mac: b4:96:91:b2:06:41
   memory:
-    mbuf_64     : 1024
+    mbuf_64     : 4096
     mbuf_128    : 512
     mbuf_256    : 256
     mbuf_512    : 128
     mbuf_1024   : 256
     mbuf_2048   : 128
-    traffic_mbuf_64     : 1024
+    traffic_mbuf_64     : 4096
     traffic_mbuf_128    : 512
     traffic_mbuf_256    : 256
     traffic_mbuf_512    : 128
@@ -26,8 +26,8 @@
     traffic_mbuf_2048   : 128
     dp_flows    : 4096
   platform:
-    master_thread_id: 36
-    rx_thread_id: 37  # replaces latency_thread_id
+    master_thread_id: 10
+    rx_thread_id: 11  # replaces latency_thread_id
     dual_if:
-      - socket: 1
-        threads: [38, 39]
+      - socket: 0
+        threads: [12, 13]

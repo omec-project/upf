@@ -12,8 +12,10 @@ from trex_stl_lib.api import *
 from trex_test import TrexTest
 from trex_utils import *
 
-TREX_SRC_MAC = "b4:96:91:b4:44:b1"
-UPF_DEST_MAC = "b4:96:91:b4:47:b9"
+#Source MAC address for DL traffic
+TREX_SRC_MAC = "b4:96:91:b4:4b:09"
+#Destination MAC address for DL traffic
+UPF_DEST_MAC = "b4:96:91:b2:06:41"
 
 # Port setup
 TREX_SENDER_PORT = 1

@@ -46,7 +46,7 @@ ARG TREX_LIBS
 ENV TREX_SCRIPT_DIR=/trex-core-${TREX_VER}/scripts
 
 RUN apk update && apk add --no-cache -U wget
-RUN wget https://github.com/stratum/trex-core/archive/refs/heads/v${TREX_VER}.zip && \
+RUN wget https://github.com/stratum/trex-core/archive/v${TREX_VER}.zip && \
     unzip -qq v${TREX_VER}.zip && \
     mkdir -p /output/${TREX_EXT_LIBS} && \
     mkdir -p /output/${TREX_LIBS} && \
