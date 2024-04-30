@@ -13,7 +13,7 @@ ARG PROTOBUF_VER=3.12
 ARG GRPC_VER=1.26
 
 # Install dependencies for general PTF test definitions
-FROM ubuntu:20.04 as ptf-deps
+FROM ubuntu:24.04 as ptf-deps
 
 ARG SCAPY_VER
 ARG PTF_VER
@@ -55,7 +55,7 @@ RUN wget https://github.com/stratum/trex-core/archive/v${TREX_VER}.zip && \
     cp -r ${TREX_SCRIPT_DIR}/automation/trex_control_plane/stf/trex_stf_lib /output/${TREX_LIBS}
 
 # Synthesize all dependencies for runtime
-FROM ubuntu:20.04
+FROM ubuntu:24.04
 
 ARG TREX_EXT_LIBS
 ARG TREX_LIBS
