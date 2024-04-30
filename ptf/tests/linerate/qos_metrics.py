@@ -11,13 +11,12 @@ from pkt_utils import GTPU_PORT
 from trex_stl_lib.api import STLVM, STLPktBuilder, STLStream, STLTXCont
 from trex_test import TrexTest
 
-UPF_DEST_MAC = "0c:c4:7a:19:6d:ca"
+#Destination MAC address for DL traffic
+UPF_DEST_MAC = "b4:96:91:b2:06:41"
 
 # Port setup
-TREX_SENDER_PORT = 0
-TREX_RECEIVER_PORT = 1
-BESS_SENDER_PORT = 2
-BESS_RECEIVER_PORT = 3
+BESS_SENDER_PORT = 1
+BESS_RECEIVER_PORT = 0
 
 # Test specs
 DURATION = 10
@@ -40,9 +39,9 @@ class PerFlowQosMetricsTest(TrexTest, GrpcTest):
         startIP = IPv4Address("16.0.0.1")
         endIP = startIP + UE_COUNT - 1
 
-        accessIP = IPv4Address("10.128.13.29")
+        accessIP = IPv4Address("198.19.0.1")
         enbIP = IPv4Address(
-            "10.27.19.99"
+            "11.1.1.129"
         )  # arbitrary ip for non-existent eNodeB for gtpu encap
 
         # program UPF for downlink traffic by installing PDRs and FARs
@@ -128,7 +127,7 @@ class PerFlowQosMetricsTest(TrexTest, GrpcTest):
             postDlQos = stats["postDlQos"]
             postUlQos = stats["postUlQos"]
 
-        self.trex_client.wait_on_traffic(ports=[BESS_SENDER_PORT])
+        self.trex_client.wait_on_traffic(ports=[BESS_RECEIVER_PORT])
         print(f"Duration was {time.time() - s_time}")
         trex_stats = self.trex_client.get_stats()
 

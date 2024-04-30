@@ -74,8 +74,23 @@ hosting TRex, where results are asserted.
 ## Steps to run tests
 The run script assumes that the TRex daemon server and the UPF
 instance are already running on their respective machines. It also
-assumes that all config files in `config/` are configured correctly to
-route traffic to the UPF.
+assumes that all the following config files are configured correctly to
+route traffic to the UPF and vice versa.
+* `upf/scripts/docker_setup.sh` script updated with proper values for
+  `ifaces`, `macaddrs`, `nhmacaddrs` parameters. For reference
+   please refer `upf/ptf/config/docker_setup.sh` file
+* `upf/conf/upf.jsonc` file updated with proper values for
+  `measure_flow`, `measure_upf` parameters. For reference
+   please refer `upf/ptf/config/upf.jsonc` file
+* `upf/ptf/.env` file updated with `UPF_ADDR` and `TREX_ADDR` parameters
+* `upf/ptf/config/trex-cfg-for-ptf.yaml` file updated with proper values for
+  `interfaces`, `port_info`, and `platform` parameters
+* `upf/ptf/tests/linerate/baseline.py` file updated with proper values for
+  `TREX_SRC_MAC` and `UPF_DEST_MAC`
+* `upf/ptf/tests/linerate/mbr.py` file updated with proper values for
+  `BESS_CORE_MAC` and `BESS_ACCESS_MAC`
+* `upf/ptf/tests/linerate/qos_metrics.py` file updated with proper values for
+  `UPF_DEST_MAC`
 
 To install TRex onto your server, please refer to the [TRex installation
 guide](https://trex-tgn.cisco.com/trex/doc/trex_manual.html#_download_and_installation)
@@ -88,14 +103,16 @@ make build
 ```
 2. Run PTF tests using the `run_tests` script:
 ```bash
-./run_tests -t [test-dir] [optional: filename/filename.test_case]
+sudo ./run_tests -t [test-dir] [optional: filename/filename.test_case]
 ```
 ### Examples
 To run all test cases in the `unary/` directory:
 ```bash
-./run_tests -t tests/unary
+sudo ./run_tests -t tests/unary
 ```
 To run a specific test case:
 ```bash
-./run_tests -t tests/linerate/ baseline.DownlinkPerformanceBaselineTest
+sudo ./run_tests -t tests/linerate/ baseline.DownlinkPerformanceBaselineTest
+sudo ./run_tests -t tests/linerate/ mbr
+sudo ./run_tests -t tests/linerate/ qos_metrics
 ```

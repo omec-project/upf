@@ -36,7 +36,7 @@ docker run --name "${runName}" "${it}" \
 	${TREX_PARAMS:-} \
 	--trex-address "${TREX_ADDR}" \
 	--bess-address "${UPF_ADDR}" \
-	--trex-config /upf-tests/config/4-ports-with-l2.yaml \
+	--trex-config /upf-tests/config/trex-cfg-for-ptf.yaml \
 	--xunit \
 	--xunit-dir /tmp/ptf-logs \
 	${testName}

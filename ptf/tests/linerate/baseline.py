@@ -8,18 +8,18 @@ from pprint import pprint
 import ptf.testutils as testutils
 from grpc_test import *
 from pkt_utils import GTPU_PORT
-from trex_stl_lib.api import (STLVM, STLFlowLatencyStats, STLPktBuilder,
-                              STLStream, STLTXCont)
+from trex_stl_lib.api import *
 from trex_test import TrexTest
 from trex_utils import *
 
-UPF_DEST_MAC = "0c:c4:7a:19:6d:ca"
+#Source MAC address for DL traffic
+TREX_SRC_MAC = "b4:96:91:b4:4b:09"
+#Destination MAC address for DL traffic
+UPF_DEST_MAC = "b4:96:91:b2:06:41"
 
 # Port setup
-TREX_SENDER_PORT = 0
-TREX_RECEIVER_PORT = 1
-BESS_SENDER_PORT = 2
-BESS_RECEIVER_PORT = 3
+TREX_SENDER_PORT = 1
+BESS_SENDER_PORT = 1
 
 # test specs
 DURATION = 10
@@ -39,11 +39,12 @@ class DownlinkPerformanceBaselineTest(TrexTest, GrpcTest):
     def runTest(self):
         n3TEID = 0
 
+        app_ip = '10.128.4.22'
         startIP = IPv4Address("16.0.0.1")
         endIP = startIP + UE_COUNT - 1
 
-        accessIP = IPv4Address("10.128.13.29")
-        enbIP = IPv4Address("10.27.19.99")  # arbitrary ip for nonexistent enodeB
+        accessIP = IPv4Address("198.19.0.1")
+        enbIP = IPv4Address("11.1.1.128")  # arbitrary ip for nonexistent gnodeB
 
         # program UPF for downlink traffic by installing PDRs and FARs
         print("Installing PDRs and FARs...")
@@ -104,16 +105,22 @@ class DownlinkPerformanceBaselineTest(TrexTest, GrpcTest):
         vm.write(fv_name="dst", pkt_offset="IP.dst")
         vm.fix_chksum()
 
-        pkt = testutils.simple_udp_packet(
-            pktlen=PKT_SIZE,
-            eth_dst=UPF_DEST_MAC,
-            with_udp_chksum=False,
-        )
+        eth = Ether(dst=UPF_DEST_MAC, src=TREX_SRC_MAC)
+        ip = IP(src=app_ip, id=0)
+        udp = UDP(sport=10002, dport=10001, chksum=0)
+        pkt = eth/ip/udp
+
         stream = STLStream(
             packet=STLPktBuilder(pkt=pkt, vm=vm),
             mode=STLTXCont(pps=RATE),
             flow_stats=STLFlowLatencyStats(pg_id=0),
         )
+
+        # Wait for sometime before starting traffic. Sometimes the ports are
+        # taking some time to become active. Otherwise, the test will
+        # fail due to port DOWN state
+        time.sleep(20)
+
         self.trex_client.add_streams(stream, ports=[BESS_SENDER_PORT])
 
         print("Running traffic...")
@@ -123,8 +130,7 @@ class DownlinkPerformanceBaselineTest(TrexTest, GrpcTest):
             mult="1",
             duration=DURATION,
         )
-
-        self.trex_client.wait_on_traffic(ports=[BESS_SENDER_PORT])
+        self.trex_client.wait_on_traffic(ports=[TREX_SENDER_PORT])
         print(f"Duration was {time.time() - s_time}")
 
         trex_stats = self.trex_client.get_stats()

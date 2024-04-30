@@ -14,10 +14,12 @@ from trex_utils import *
 # TODO: move to global constant file (or env)
 #  since it depends on Trex config and server where BESS is running
 # Port setup
-BESS_CORE_MAC = "0c:c4:7a:19:6d:ca"
-BESS_ACCESS_MAC = "0c:c4:7a:19:6d:cb"
-BESS_CORE_PORT = 2
-BESS_ACCESS_PORT = 3
+# MAC address of N6 for the UPF/BESS
+BESS_CORE_MAC = "b4:96:91:b2:06:41"
+# MAC address of N3 for the UPF/BESS
+BESS_ACCESS_MAC = "b4:96:91:b2:06:40"
+BESS_CORE_PORT = 1
+BESS_ACCESS_PORT = 0
 
 # test specs
 DURATION = 3
@@ -25,10 +27,10 @@ PKT_SIZE = 1400
 
 # TODO: move to global constant file (or env)
 UE_IP = IPv4Address("16.0.0.1")
-ENB_IP = IPv4Address("10.27.19.99")
-N3_IP = IPv4Address("10.128.13.29")
+ENB_IP = IPv4Address("11.1.1.129")
+N3_IP = IPv4Address("198.18.0.1")
 # Must be routable by route_control
-PDN_IP = IPv4Address("11.1.1.129")
+PDN_IP = IPv4Address("6.6.6.6")
 
 
 class AppMbrTest(TrexTest, GrpcTest):
