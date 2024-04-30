@@ -259,6 +259,3 @@ docker run --name bess-routectl -td --restart unless-stopped \
 	--net container:pause --pid container:bess \
 	--entrypoint /route_control.py \
 	upf-epc-bess:"$(<VERSION)" -i "${ifaces[@]}"
-
-sleep 5
-#docker exec bess-pfcpiface pfcpiface -config /conf/upf.jsonc -simulate create

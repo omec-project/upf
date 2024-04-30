@@ -15,8 +15,6 @@ from trex_test import TrexTest
 UPF_DEST_MAC = "b4:96:91:b2:06:41"
 
 # Port setup
-TREX_SENDER_PORT = 1
-TREX_RECEIVER_PORT = 0
 BESS_SENDER_PORT = 1
 BESS_RECEIVER_PORT = 0
 
