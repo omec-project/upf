@@ -53,7 +53,7 @@ RUN PLUGINS=$(find "$PLUGINS_DIR" -mindepth 1 -maxdepth 1 -type d) && \
     cp -r core/pb /pb
 
 # Stage bess: creates the runtime image of BESS
-FROM ubuntu:22.04 AS bess
+FROM ubuntu:24.04 AS bess
 WORKDIR /
 COPY requirements.txt .
 RUN apt-get update && apt-get install -y \
