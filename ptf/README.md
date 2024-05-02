@@ -75,7 +75,10 @@ hosting TRex, where results are asserted.
 The run script assumes that the TRex daemon server and the UPF
 instance are already running on their respective machines. Please see
 [here](../docs/INSTALL.md#configuration-dpdk-mode) for instructions to deploy
-the UPF in DPDK mode. To install TRex onto your server, please refer to the
+the UPF in DPDK mode. Note that the following additional changes are required
+in the `conf/upf.jsonc` file: `"measure_flow": true`, N3 interface set to
+`"ifname": "access"` and N6 interface set to `"ifname": "core"`.
+To install TRex onto your server, please refer to the
 [TRex installation guide](https://trex-tgn.cisco.com/trex/doc/trex_manual.html#_download_and_installation)
 
 ### Steps
