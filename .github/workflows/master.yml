@@ -32,6 +32,18 @@ jobs:
       - name: Build the PFCP Agent Docker image
         run: DOCKER_TARGETS=pfcpiface make docker-build
 
+  build-ptf:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./ptf
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build PTF image
+        run: make build
+
   lint:
     name: lint
     runs-on: ubuntu-latest

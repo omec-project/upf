@@ -11,18 +11,7 @@ from pkt_utils import GTPU_PORT
 from trex_stl_lib.api import STLVM, STLPktBuilder, STLStream, STLTXCont
 from trex_test import TrexTest
 
-#Destination MAC address for DL traffic
-UPF_DEST_MAC = "b4:96:91:b2:06:41"
-
-# Port setup
-BESS_SENDER_PORT = 1
-BESS_RECEIVER_PORT = 0
-
-# Test specs
-DURATION = 10
-RATE = 100_000  # 100 Kpps
-UE_COUNT = 10_000  # 10k UEs
-PKT_SIZE = 64
+from common import *
 
 
 class PerFlowQosMetricsTest(TrexTest, GrpcTest):
@@ -35,14 +24,7 @@ class PerFlowQosMetricsTest(TrexTest, GrpcTest):
     @autocleanup
     def runTest(self):
         n3TEID = 0
-
-        startIP = IPv4Address("16.0.0.1")
-        endIP = startIP + UE_COUNT - 1
-
-        accessIP = IPv4Address("198.19.0.1")
-        enbIP = IPv4Address(
-            "11.1.1.129"
-        )  # arbitrary ip for non-existent eNodeB for gtpu encap
+        endIP = UE_IP_START + UE_COUNT - 1
 
         # program UPF for downlink traffic by installing PDRs and FARs
         print("Installing PDRs and FARs...")
@@ -50,7 +32,7 @@ class PerFlowQosMetricsTest(TrexTest, GrpcTest):
             # install N6 DL PDR to match UE dst IP
             pdrDown = self.createPDR(
                 srcIface=CORE,
-                dstIP=int(startIP + i),
+                dstIP=int(UE_IP_START + i),
                 srcIfaceMask=0xFF,
                 dstIPMask=0xFFFFFFFF,
                 precedence=255,
@@ -69,8 +51,8 @@ class PerFlowQosMetricsTest(TrexTest, GrpcTest):
                 applyAction=ACTION_FORWARD,
                 dstIntf=DST_ACCESS,
                 tunnelType=0x1,
-                tunnelIP4Src=int(accessIP),
-                tunnelIP4Dst=int(enbIP),  # only one eNB to send to downlink
+                tunnelIP4Src=int(N3_IP),
+                tunnelIP4Dst=int(GNB_IP),
                 tunnelTEID=0,
                 tunnelPort=GTPU_PORT,
             )
@@ -95,7 +77,7 @@ class PerFlowQosMetricsTest(TrexTest, GrpcTest):
         vm = STLVM()
         vm.var(
             name="dst",
-            min_value=str(startIP),
+            min_value=str(UE_IP_START),
             max_value=str(endIP),
             size=4,
             op="random",
@@ -105,21 +87,21 @@ class PerFlowQosMetricsTest(TrexTest, GrpcTest):
 
         pkt = testutils.simple_udp_packet(
             pktlen=PKT_SIZE,
-            eth_dst=UPF_DEST_MAC,
+            eth_dst=UPF_CORE_MAC,
             with_udp_chksum=False,
         )
         stream = STLStream(
             packet=STLPktBuilder(pkt=pkt, vm=vm),
             mode=STLTXCont(pps=RATE),
         )
-        self.trex_client.add_streams(stream, ports=[BESS_SENDER_PORT])
+        self.trex_client.add_streams(stream, ports=[UPF_CORE_PORT])
 
         print("Running traffic...")
         s_time = time.time()
-        self.trex_client.start(ports=[BESS_SENDER_PORT], mult="1", duration=DURATION)
+        self.trex_client.start(ports=[UPF_CORE_PORT], mult="1", duration=DURATION)
 
         # FIXME: pull QoS metrics at end instead of while traffic running
-        time.sleep(DURATION - 5)
+        time.sleep(DURATION)
         if self.trex_client.is_traffic_active():
             stats = self.getSessionStats(q=[90, 99, 99.9], quiet=True)
 
@@ -127,7 +109,7 @@ class PerFlowQosMetricsTest(TrexTest, GrpcTest):
             postDlQos = stats["postDlQos"]
             postUlQos = stats["postUlQos"]
 
-        self.trex_client.wait_on_traffic(ports=[BESS_RECEIVER_PORT])
+        self.trex_client.wait_on_traffic(ports=[UPF_ACCESS_PORT])
         print(f"Duration was {time.time() - s_time}")
         trex_stats = self.trex_client.get_stats()
 

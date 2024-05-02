@@ -12,21 +12,7 @@ from trex_stl_lib.api import *
 from trex_test import TrexTest
 from trex_utils import *
 
-#Source MAC address for DL traffic
-TREX_SRC_MAC = "b4:96:91:b4:4b:09"
-#Destination MAC address for DL traffic
-UPF_DEST_MAC = "b4:96:91:b2:06:41"
-
-# Port setup
-TREX_SENDER_PORT = 1
-BESS_SENDER_PORT = 1
-
-# test specs
-DURATION = 10
-RATE = 100_000  # 100 Kpps
-UE_COUNT = 10_000  # 10k UEs
-PKT_SIZE = 64
-
+from common import *
 
 class DownlinkPerformanceBaselineTest(TrexTest, GrpcTest):
     """
@@ -38,13 +24,7 @@ class DownlinkPerformanceBaselineTest(TrexTest, GrpcTest):
     @autocleanup
     def runTest(self):
         n3TEID = 0
-
-        app_ip = '10.128.4.22'
-        startIP = IPv4Address("16.0.0.1")
-        endIP = startIP + UE_COUNT - 1
-
-        accessIP = IPv4Address("198.19.0.1")
-        enbIP = IPv4Address("11.1.1.128")  # arbitrary ip for nonexistent gnodeB
+        endIP = UE_IP_START + UE_COUNT - 1
 
         # program UPF for downlink traffic by installing PDRs and FARs
         print("Installing PDRs and FARs...")
@@ -52,7 +32,7 @@ class DownlinkPerformanceBaselineTest(TrexTest, GrpcTest):
             # install N6 DL PDR to match UE dst IP
             pdrDown = self.createPDR(
                 srcIface=CORE,
-                dstIP=int(startIP + i),
+                dstIP=int(UE_IP_START + i),
                 srcIfaceMask=0xFF,
                 dstIPMask=0xFFFFFFFF,
                 precedence=255,
@@ -71,8 +51,8 @@ class DownlinkPerformanceBaselineTest(TrexTest, GrpcTest):
                 applyAction=ACTION_FORWARD,
                 dstIntf=DST_ACCESS,
                 tunnelType=0x1,
-                tunnelIP4Src=int(accessIP),
-                tunnelIP4Dst=int(enbIP),  # only one eNB to send to downlink
+                tunnelIP4Src=int(N3_IP),
+                tunnelIP4Dst=int(GNB_IP),
                 tunnelTEID=0,
                 tunnelPort=GTPU_PORT,
             )
@@ -97,7 +77,7 @@ class DownlinkPerformanceBaselineTest(TrexTest, GrpcTest):
         vm = STLVM()
         vm.var(
             name="dst",
-            min_value=str(startIP),
+            min_value=str(UE_IP_START),
             max_value=str(endIP),
             size=4,
             op="random",
@@ -105,8 +85,8 @@ class DownlinkPerformanceBaselineTest(TrexTest, GrpcTest):
         vm.write(fv_name="dst", pkt_offset="IP.dst")
         vm.fix_chksum()
 
-        eth = Ether(dst=UPF_DEST_MAC, src=TREX_SRC_MAC)
-        ip = IP(src=app_ip, id=0)
+        eth = Ether(dst=UPF_CORE_MAC, src=TREX_SRC_MAC)
+        ip = IP(src=PDN_IP, id=0)
         udp = UDP(sport=10002, dport=10001, chksum=0)
         pkt = eth/ip/udp
 
@@ -121,21 +101,21 @@ class DownlinkPerformanceBaselineTest(TrexTest, GrpcTest):
         # fail due to port DOWN state
         time.sleep(20)
 
-        self.trex_client.add_streams(stream, ports=[BESS_SENDER_PORT])
+        self.trex_client.add_streams(stream, ports=[UPF_CORE_PORT])
 
         print("Running traffic...")
         s_time = time.time()
         self.trex_client.start(
-            ports=[BESS_SENDER_PORT],
+            ports=[UPF_CORE_PORT],
             mult="1",
             duration=DURATION,
         )
-        self.trex_client.wait_on_traffic(ports=[TREX_SENDER_PORT])
+        self.trex_client.wait_on_traffic(ports=[UPF_CORE_PORT])
         print(f"Duration was {time.time() - s_time}")
 
         trex_stats = self.trex_client.get_stats()
-        lat_stats = get_latency_stats(0, trex_stats)
-        flow_stats = get_flow_stats(0, trex_stats)
+        lat_stats = get_latency_stats(TREX_RECEIVER_PORT, trex_stats)
+        flow_stats = get_flow_stats(TREX_RECEIVER_PORT, trex_stats)
 
         # Verify test results met baseline performance expectations
 

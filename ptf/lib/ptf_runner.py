@@ -114,7 +114,7 @@ def set_up_trex_server(trex_daemon_client, trex_address, trex_config):
         trex_daemon_client.start_stateless(cfg=trex_config_file_on_server)
     except ConnectionRefusedError:
         error(
-            "Unable to connect to server %s.\n" + "Did you start the Trex daemon?",
+            "Unable to connect to server %s. Did you start the Trex daemon?",
             trex_address,
         )
         return False
