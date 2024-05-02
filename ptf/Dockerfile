@@ -5,7 +5,7 @@
 
 ARG SCAPY_VER=2.4.5
 ARG PTF_VER=c5299ea2e27386653209af458757b3b15e5dec5d
-ARG TREX_VER=3b19ddcf67e33934f268b09d3364cd87275d48db
+ARG TREX_VER=2.92-scapy-2.4.5
 ARG TREX_EXT_LIBS=/external_libs
 ARG TREX_LIBS=/trex_python
 ARG UNITTEST_XML_REPORTING_VER=3.0.4
@@ -45,8 +45,9 @@ ARG TREX_LIBS
 
 ENV TREX_SCRIPT_DIR=/trex-core-${TREX_VER}/scripts
 
-RUN wget https://github.com/stratum/trex-core/archive/${TREX_VER}.zip && \
-    unzip -qq ${TREX_VER}.zip && \
+RUN apk update && apk add --no-cache -U wget
+RUN wget https://github.com/stratum/trex-core/archive/v${TREX_VER}.zip && \
+    unzip -qq v${TREX_VER}.zip && \
     mkdir -p /output/${TREX_EXT_LIBS} && \
     mkdir -p /output/${TREX_LIBS} && \
     cp -r ${TREX_SCRIPT_DIR}/automation/trex_control_plane/interactive/* /output/${TREX_LIBS} && \
@@ -77,7 +78,7 @@ ENV RUNTIME_DEPS \
 RUN apt update && \
     apt install -y $RUNTIME_DEPS && \
     rm -rf /var/lib/apt/lists/*
-RUN pip3 install --no-cache-dir scipy==1.5.4 numpy==1.19.4 matplotlib==3.3.3 pyyaml==5.4.1 
+RUN pip3 install --no-cache-dir scipy==1.5.4 numpy==1.19.4 matplotlib==3.3.3 pyyaml==5.4.1
 
 ENV TREX_EXT_LIBS=${TREX_EXT_LIBS}
 ENV PYTHONPATH=${TREX_EXT_LIBS}:${TREX_LIBS}

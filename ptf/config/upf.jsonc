@@ -16,7 +16,7 @@
         // 50K per unique tuple, we send 4 unique PDR patterns
         "pdrLookup": 50000,
         // 4 PDRs per session
-        "flowMeasure": 50000,
+        "flowMeasure": 200000,
         // there are 2 QERs and 2 entries per QER
         "appQERLookup": 200000,
         //  there is 1 session QER and 2 entries per session QER
@@ -32,7 +32,7 @@
     "sim": {
         // At this point we can simulate either N3/N6 or N3/N9 traffic, so choose n6 or n9 below
         "core": "n6",
-        "max_sessions": 100,
+        "max_sessions": 5000,
         "start_ue_ip": "16.0.0.1",
         "start_enb_ip": "11.1.1.129",
         "start_aupf_ip": "13.1.1.199",
@@ -47,7 +47,7 @@
         // Make sure downlink_gbr is configured less than downlink_mbr if 'qfi' in pfcpiface/grpcsim.go is for GBR flows. Current default 'qfi' value is for Non-GBR flows
         "downlink_gbr": 100000,
         "pkt_size": 128,
-        "total_flows": 100
+        "total_flows": 5000
     },
 
     // Max IP frag table entries (for IPv4 reassembly). Uncomment line below to enable
@@ -88,6 +88,10 @@
     // Number of worker threads. Default: 1
     "workers": 1,
 
+    // Parameters for handling outgoing requests
+    "max_req_retries": 5,
+    "resp_timeout": "2s",
+
     // Whether to enable Network Token Functions
     "enable_ntf": false,
 
@@ -120,6 +124,20 @@
             "pbs": 50000,
             "burst_duration_ms": 10,
             "priority": 7
+        },
+        {
+            "qci": 9,
+            "cbs": 2048,
+            "ebs": 2048,
+            "pbs": 2048,
+            "priority": 6
+        },
+        {
+            "qci": 8,
+            "cbs": 2048,
+            "ebs": 2048,
+            "pbs": 2048,
+            "priority": 5
         }
     ],
 
@@ -135,6 +153,7 @@
 
     // Control plane controller settings
     "cpiface": {
+        "peers": ["148.162.12.214"],
         // [Optional] Below parameters
         "dnn": "internet",
         "http_port": "8080",
@@ -148,6 +167,12 @@
     "p4rtciface": {
         "access_ip": "172.17.0.1/32",
         "p4rtc_server": "onos",
-        "p4rtc_port": "51001"
+        "p4rtc_port": "51001",
+        // [Optional] Set the UP4 slice identifier that this PFCP Agent instance belongs to. Default: 0
+        "slice_id": 0,
+        // [Optional] Default TC is ELASTIC
+        "default_tc": 3,
+        // [Optional] Whether to wipe out PFCP state from UP4 datapath on UP4 restart. Default: false
+        "clear_state_on_restart": false
     }
 }

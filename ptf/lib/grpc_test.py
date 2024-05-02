@@ -38,6 +38,10 @@ GATE_UNMETER = 0x6
 
 QFI_DEFAULT = 9
 
+# Flag represents a collection of possible values to select buffer sides
+# (see FlowMeasure module).
+FLAG_VALUE_A = 0x1
+FLAG_VALUE_B = 0x2
 
 class GrpcTest(BaseTest):
     """Define a base test for communicating with BESS over gRPC messages
@@ -84,12 +88,13 @@ class GrpcTest(BaseTest):
 
         return self.bess_client.GetPortStats(req)
 
-    def _readFlowMeasurement(self, module, clear, quantiles):
+    def _readFlowMeasurement(self, module, clear, quantiles, flag):
         # create request for flow measurements and send to bess
         request = module_msg.FlowMeasureCommandReadArg(
             clear=clear,
             latency_percentiles=quantiles,
             jitter_percentiles=quantiles,
+            flag_to_read=flag,
         )
         any = Any()
         any.Pack(request)
@@ -114,7 +119,7 @@ class GrpcTest(BaseTest):
 
         return msg
 
-    def getSessionStats(self, q=[50, 90, 99], quiet=False):
+    def getSessionStats(self, q=[50, 90, 99], flag=FLAG_VALUE_A, quiet=False):
         """
         Get QoS metrics from 3 different modules directly from BESS-UPF
         and return back in Python dictionary format
@@ -125,6 +130,7 @@ class GrpcTest(BaseTest):
             module="preQosFlowMeasure",
             clear=True,
             quantiles=q,
+            flag=flag,
         )
         if not quiet:
             print("Pre-QoS measurement module:")
@@ -136,6 +142,7 @@ class GrpcTest(BaseTest):
             module="postDLQosFlowMeasure",
             clear=True,
             quantiles=q,
+            flag=flag,
         )
         if not quiet:
             print("Post-QoS downlink measurement module:")
@@ -147,6 +154,7 @@ class GrpcTest(BaseTest):
             module="postULQosFlowMeasure",
             clear=True,
             quantiles=q,
+            flag=flag,
         )
         if not quiet:
             print("Post-QoS uplink measurement module:")

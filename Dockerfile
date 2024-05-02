@@ -53,7 +53,7 @@ RUN PLUGINS=$(find "$PLUGINS_DIR" -mindepth 1 -maxdepth 1 -type d) && \
     cp -r core/pb /pb
 
 # Stage bess: creates the runtime image of BESS
-FROM ubuntu:22.04 AS bess
+FROM ubuntu:24.04 AS bess
 WORKDIR /
 COPY requirements.txt .
 RUN apt-get update && apt-get install -y \
@@ -66,7 +66,7 @@ RUN apt-get update && apt-get install -y \
     tcpdump && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir --break-system-packages -r requirements.txt
 COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin/bessd
 COPY --from=bess-build /bin/modules /bin/modules
@@ -115,7 +115,7 @@ RUN mkdir /bess_pb && \
 FROM bess-build AS py-pb
 RUN pip install --no-cache-dir grpcio-tools==1.26
 RUN mkdir /bess_pb && \
-    python -m grpc_tools.protoc -I /usr/include -I /protobuf/ \
+    python3 -m grpc_tools.protoc -I /usr/include -I /protobuf/ \
     /protobuf/*.proto /protobuf/ports/*.proto \
     --python_out=plugins=grpc:/bess_pb \
     --grpc_python_out=/bess_pb
