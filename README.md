@@ -120,6 +120,7 @@ registry: [upf-epc-bess](https://hub.docker.com/r/omecproject/upf-epc-bess),
 * GTPu path monitoring
 * Network Token Functions (_**experimental**_)
 * Support for DPDK, CNDP, AF_PACKET and AF_XDP modes
+  - BESS uses DPDK 22.11.4
 
 ### P4-UPF
 P4-UPF implements a core set of features capable of supporting requirements for
