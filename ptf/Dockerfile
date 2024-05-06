@@ -11,7 +11,7 @@ ARG TREX_LIBS=/trex_python
 ARG UNITTEST_XML_REPORTING_VER=3.0.4
 ARG PROTOBUF_VER=3.20
 # Install dependencies for general PTF test definitions
-FROM ubuntu:22.04 as ptf-deps
+FROM ubuntu:22.10 as ptf-deps
 
 ARG SCAPY_VER
 ARG PTF_VER
@@ -52,7 +52,7 @@ RUN apk update && apk add --no-cache -U wget && \
     cp -r ${TREX_SCRIPT_DIR}/automation/trex_control_plane/stf/trex_stf_lib /output/${TREX_LIBS}
 
 # Synthesize all dependencies for runtime
-FROM ubuntu:22.04
+FROM ubuntu:22.10
 
 ARG TREX_EXT_LIBS
 ARG TREX_LIBS
