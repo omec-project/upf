@@ -4,9 +4,9 @@
 from ipaddress import IPv4Address
 
 # MAC addresses
-TREX_SRC_MAC = "b4:96:91:b4:4b:09" # Source MAC address for DL traffic
-UPF_CORE_MAC = "b4:96:91:b2:06:41" # MAC address of N6 for the UPF/BESS
-UPF_ACCESS_MAC = "b4:96:91:b2:06:40" # MAC address of N3 for the UPF/BESS
+TREX_SRC_MAC = "40:a6:b7:20:c8:25" # Source MAC address for DL traffic
+UPF_CORE_MAC = "40:a6:b7:20:4f:b9" # MAC address of N6 for the UPF/BESS
+UPF_ACCESS_MAC = "40:a6:b7:20:4f:b8" # MAC address of N3 for the UPF/BESS
 
 # Port setup
 TREX_SENDER_PORT = 1

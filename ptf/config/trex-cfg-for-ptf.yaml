@@ -3,14 +3,14 @@
 
 - version: 2
   port_limit: 2
-  interfaces: ['4b:00.0', '4b:00.1']
+  interfaces: ['86:00.0', '86:00.1']
   port_bandwidth_gb: 10
   c: 2
   port_info:
-    - src_mac: b4:96:91:b4:4b:08
-      dest_mac: b4:96:91:b2:06:40
-    - src_mac: b4:96:91:b4:4b:09
-      dest_mac: b4:96:91:b2:06:41
+    - src_mac: 40:a6:b7:20:c8:24
+      dest_mac: 40:a6:b7:20:4f:b8
+    - src_mac: 40:a6:b7:20:c8:25
+      dest_mac: 40:a6:b7:20:4f:b9
   memory:
     mbuf_64     : 4096
     mbuf_128    : 512
