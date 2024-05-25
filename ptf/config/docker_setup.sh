@@ -34,7 +34,7 @@ ipaddrs=(198.18.0.1/30 198.19.0.1/30)
 # MAC addresses of gateway interface(s)
 #
 # In the order of (s1u/n3 sgi/n6)
-macaddrs=(b4:96:91:b2:06:40 b4:96:91:b2:06:41)
+macaddrs=(40:a6:b7:20:4f:b8 40:a6:b7:20:4f:b9)
 
 # Static IP addresses of the neighbors of gateway interface(s)
 #
@@ -44,7 +44,7 @@ nhipaddrs=(198.18.0.2 198.19.0.2)
 # Static MAC addresses of the neighbors of gateway interface(s)
 #
 # In the order of (n-s1u/n3 n-sgi/n6)
-nhmacaddrs=(b4:96:91:b4:4b:08 b4:96:91:b4:4b:09)
+nhmacaddrs=(40:a6:b7:20:c8:24 40:a6:b7:20:c8:25)
 
 # IPv4 route table entries in cidr format per port
 #
@@ -166,7 +166,7 @@ sudo rm -rf /var/run/netns/pause
 make docker-build
 
 if [ "$mode" == 'dpdk' ]; then
-	DEVICES=${DEVICES:-'--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio'}
+	DEVICES=${DEVICES:-'--device=/dev/vfio/115 --device=/dev/vfio/116 --device=/dev/vfio/vfio'}
 	PRIVS='--cap-add IPC_LOCK'
 
 elif [[ "$mode" == 'af_xdp' || "$mode" == 'cndp' ]]; then
@@ -217,10 +217,8 @@ if [ "$mode" == 'cndp' ]; then
 fi
 
 # Run bessd
-	#--cpuset-cpus=42-43 \
 docker run --name bess -td --restart unless-stopped \
-	-v /lib/firmware/updates/intel/ice/ddp:/lib/firmware/updates/intel/ice/ddp \
-	--cpuset-cpus=22-23 \
+	--cpuset-cpus=24-27 \
 	--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
 	-v "$PWD/conf":/opt/bess/bessctl/conf \
 	--net container:pause \
