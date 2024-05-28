@@ -1,8 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2022-present Open Networking Foundation
 
-from ipaddress import IPv4Address
-
 from grpc_test import *
 from pkt_utils import GTPU_PORT, pkt_add_gtpu
 from scapy.layers.l2 import Ether
@@ -11,27 +9,7 @@ from trex_stl_lib.api import STLPktBuilder, STLStream, STLTXCont
 from trex_test import TrexTest
 from trex_utils import *
 
-# TODO: move to global constant file (or env)
-#  since it depends on Trex config and server where BESS is running
-# Port setup
-# MAC address of N6 for the UPF/BESS
-BESS_CORE_MAC = "b4:96:91:b2:06:41"
-# MAC address of N3 for the UPF/BESS
-BESS_ACCESS_MAC = "b4:96:91:b2:06:40"
-BESS_CORE_PORT = 1
-BESS_ACCESS_PORT = 0
-
-# test specs
-DURATION = 3
-PKT_SIZE = 1400
-
-# TODO: move to global constant file (or env)
-UE_IP = IPv4Address("16.0.0.1")
-ENB_IP = IPv4Address("11.1.1.129")
-N3_IP = IPv4Address("198.18.0.1")
-# Must be routable by route_control
-PDN_IP = IPv4Address("6.6.6.6")
-
+from common import *
 
 class AppMbrTest(TrexTest, GrpcTest):
     """Base class for app MBR testing"""
@@ -44,7 +22,7 @@ class AppMbrTest(TrexTest, GrpcTest):
 
         pdrDown = self.createPDR(
             srcIface=CORE,
-            dstIP=int(UE_IP),
+            dstIP=int(UE_IP_START),
             srcIfaceMask=0xFF,
             dstIPMask=0xFFFFFFFF,
             precedence=255,
@@ -63,7 +41,7 @@ class AppMbrTest(TrexTest, GrpcTest):
             dstIntf=DST_ACCESS,
             tunnelType=0x1,  # Replace with constant
             tunnelIP4Src=int(N3_IP),
-            tunnelIP4Dst=int(ENB_IP),
+            tunnelIP4Dst=int(GNB_IP),
             tunnelTEID=teid,
             tunnelPort=GTPU_PORT,
         )
@@ -80,9 +58,9 @@ class AppMbrTest(TrexTest, GrpcTest):
         self.addApplicationQER(qer)
 
         pkt = testutils.simple_udp_packet(
-            pktlen=PKT_SIZE,
-            eth_dst=BESS_CORE_MAC,
-            ip_dst=str(UE_IP),
+            pktlen=PKT_SIZE_L,
+            eth_dst=UPF_CORE_MAC,
+            ip_dst=str(UE_IP_START),
             with_udp_chksum=False,
         )
         app_payload_size = len(pkt[Ether].payload)
@@ -97,13 +75,13 @@ class AppMbrTest(TrexTest, GrpcTest):
             mode=STLTXCont(bps_L2=stream_bps),
             flow_stats=STLFlowLatencyStats(pg_id=0),
         )
-        self.trex_client.add_streams(stream, ports=[BESS_CORE_PORT])
+        self.trex_client.add_streams(stream, ports=[UPF_CORE_PORT])
 
         start_and_monitor_port_stats(
             client=self.trex_client,
             num_samples=num_samples,
-            tx_port=BESS_CORE_PORT,
-            rx_port=BESS_ACCESS_PORT,
+            tx_port=UPF_CORE_PORT,
+            rx_port=UPF_ACCESS_PORT,
             min_tx_bps=stream_bps * 0.95,
         )
 
@@ -151,16 +129,16 @@ class AppMbrTest(TrexTest, GrpcTest):
         self.addApplicationQER(qer)
 
         pkt = testutils.simple_udp_packet(
-            pktlen=PKT_SIZE,
-            eth_dst=BESS_ACCESS_MAC,
-            ip_src=str(UE_IP),
+            pktlen=PKT_SIZE_L,
+            eth_dst=UPF_ACCESS_MAC,
+            ip_src=str(UE_IP_START),
             ip_dst=str(PDN_IP),
             with_udp_chksum=False,
         )
         app_payload_size = len(pkt[Ether].payload)
         gtpu_pkt = pkt_add_gtpu(
             pkt=pkt,
-            out_ipv4_src=str(ENB_IP),
+            out_ipv4_src=str(GNB_IP),
             out_ipv4_dst=str(N3_IP),
             teid=teid,
         )
@@ -175,13 +153,13 @@ class AppMbrTest(TrexTest, GrpcTest):
             mode=STLTXCont(bps_L2=stream_bps),
             flow_stats=STLFlowLatencyStats(pg_id=0),
         )
-        self.trex_client.add_streams(stream, ports=[BESS_ACCESS_PORT])
+        self.trex_client.add_streams(stream, ports=[UPF_ACCESS_PORT])
 
         start_and_monitor_port_stats(
             client=self.trex_client,
             num_samples=num_samples,
-            tx_port=BESS_ACCESS_PORT,
-            rx_port=BESS_CORE_PORT,
+            tx_port=UPF_ACCESS_PORT,
+            rx_port=UPF_CORE_PORT,
             min_tx_bps=stream_bps * 0.95,
         )
 

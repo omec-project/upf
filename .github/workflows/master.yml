@@ -32,6 +32,18 @@ jobs:
       - name: Build the PFCP Agent Docker image
         run: DOCKER_TARGETS=pfcpiface make docker-build
 
+  build-ptf:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./ptf
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build PTF image
+        run: make build
+
   lint:
     name: lint
     runs-on: ubuntu-latest
@@ -43,7 +55,7 @@ jobs:
           go-version-file: 'go.mod'
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v5.1.0
+        uses: golangci/golangci-lint-action@v6.0.1
         with:
           version: latest
           args: -v --config ./.golangci.yml

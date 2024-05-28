@@ -1,32 +1,45 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2020-Present Intel Corporation
 
-# https://help.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
 version: 2
 updates:
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "sunday"
+      time: "21:00"
+      timezone: "America/Los_Angeles"
 
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "sunday"
+      time: "21:00"
+      timezone: "America/Los_Angeles"
 
   - package-ecosystem: "docker"
     directory: "/ptf"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "sunday"
+      time: "21:00"
+      timezone: "America/Los_Angeles"
 
   - package-ecosystem: "gomod"
     directory: "/pfcpiface"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "sunday"
+      time: "21:00"
+      timezone: "America/Los_Angeles"
 
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
-      interval: "daily"
-
+      interval: "weekly"
+      day: "sunday"
+      time: "21:00"
+      timezone: "America/Los_Angeles"

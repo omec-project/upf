@@ -73,46 +73,40 @@ hosting TRex, where results are asserted.
 
 ## Steps to run tests
 The run script assumes that the TRex daemon server and the UPF
-instance are already running on their respective machines. It also
-assumes that all the following config files are configured correctly to
-route traffic to the UPF and vice versa.
-* `upf/scripts/docker_setup.sh` script updated with proper values for
-  `ifaces`, `macaddrs`, `nhmacaddrs` parameters. For reference
-   please refer `upf/ptf/config/docker_setup.sh` file
-* `upf/conf/upf.jsonc` file updated with proper values for
-  `measure_flow`, `measure_upf` parameters. For reference
-   please refer `upf/ptf/config/upf.jsonc` file
+instance are already running on their respective machines. Please see
+[here](../docs/INSTALL.md#configuration-dpdk-mode) for instructions to deploy
+the UPF in DPDK mode. Note that the following additional changes are required
+in the `conf/upf.jsonc` file: `"measure_flow": true`, N3 interface set to
+`"ifname": "access"` and N6 interface set to `"ifname": "core"`.
+To install TRex onto your server, please refer to the
+[TRex installation guide](https://trex-tgn.cisco.com/trex/doc/trex_manual.html#_download_and_installation)
+
+### Steps
+1. Update the following files accordingly to route traffic to the UPF and vice versa.
 * `upf/ptf/.env` file updated with `UPF_ADDR` and `TREX_ADDR` parameters
 * `upf/ptf/config/trex-cfg-for-ptf.yaml` file updated with proper values for
   `interfaces`, `port_info`, and `platform` parameters
-* `upf/ptf/tests/linerate/baseline.py` file updated with proper values for
-  `TREX_SRC_MAC` and `UPF_DEST_MAC`
-* `upf/ptf/tests/linerate/mbr.py` file updated with proper values for
-  `BESS_CORE_MAC` and `BESS_ACCESS_MAC`
-* `upf/ptf/tests/linerate/qos_metrics.py` file updated with proper values for
-  `UPF_DEST_MAC`
+* `upf/ptf/tests/linerate/common.py` file updated with proper MAC address values
+  for `TREX_SRC_MAC`, `UPF_CORE_MAC`, and `UPF_ACCESS_MAC`
 
-To install TRex onto your server, please refer to the [TRex installation
-guide](https://trex-tgn.cisco.com/trex/doc/trex_manual.html#_download_and_installation)
-
-### Steps
-1. Generate BESS Python protobuf files for gRPC library and PTF
-Dockerfile image build dependencies:
+2. Generate BESS Python protobuf files for gRPC library and PTF Dockerfile image
+   build dependencies:
 ```bash
 make build
 ```
-2. Run PTF tests using the `run_tests` script:
+3. Run PTF tests using the `run_tests` script:
 ```bash
-sudo ./run_tests -t [test-dir] [optional: filename/filename.test_case]
+./run_tests -t [test-dir] [optional: filename/filename.test_case]
 ```
 ### Examples
 To run all test cases in the `unary/` directory:
 ```bash
-sudo ./run_tests -t tests/unary
+./run_tests -t tests/unary
 ```
 To run a specific test case:
 ```bash
-sudo ./run_tests -t tests/linerate/ baseline.DownlinkPerformanceBaselineTest
-sudo ./run_tests -t tests/linerate/ mbr
-sudo ./run_tests -t tests/linerate/ qos_metrics
+./run_tests -t tests/linerate/ baseline.DownlinkPerformanceBaselineTest
+./run_tests -t tests/linerate/ mbr
+./run_tests -t tests/linerate/ qos_metrics
 ```
+Note: If the above fails, `sudo` may be needed
