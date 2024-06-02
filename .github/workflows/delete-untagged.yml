@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2021 Intel Corporation
+# Copyright 2021-present Intel Corporation
 name: Untagged images
 
 on:
@@ -10,6 +10,7 @@ jobs:
   purge-image:
     name: Delete image from ghcr.io
     runs-on: ubuntu-latest
+    if: github.repository_owner == 'omec-project'
     strategy:
       matrix:
         package: ["bess_build", "upf-epc-bess", "upf-epc-pfcpiface"]
