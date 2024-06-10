@@ -89,15 +89,18 @@ To install TRex onto your server, please refer to the
 * `upf/ptf/tests/linerate/common.py` file updated with proper MAC address values
   for `TREX_SRC_MAC`, `UPF_CORE_MAC`, and `UPF_ACCESS_MAC`
 
-2. Generate BESS Python protobuf files for gRPC library and PTF Dockerfile image
+2. Move into the `ptf` directory
+
+3. Generate BESS Python protobuf files for gRPC library and PTF Dockerfile image
    build dependencies:
 ```bash
 make build
 ```
-3. Run PTF tests using the `run_tests` script:
+4. Run PTF tests using the `run_tests` script:
 ```bash
 ./run_tests -t [test-dir] [optional: filename/filename.test_case]
 ```
+
 ### Examples
 To run all test cases in the `unary/` directory:
 ```bash
