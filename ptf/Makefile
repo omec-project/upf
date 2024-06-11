@@ -2,7 +2,7 @@
 # Copyright 2020-present Open Networking Foundation
 
 # generates python protobuf files and builds ptf docker image
-build: 
+build:
 	cd .. && make py-pb
 	docker build -t bess-upf-ptf .
 
