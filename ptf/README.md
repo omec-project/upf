@@ -40,37 +40,31 @@ data plane testing framework written in Python
 high-speed traffic generator built on top of DPDK, containing a Python API
 
 ## Directory Structure
-* `tests/`: contains all PTF test case definitions
-    * `unary/`: single-packet test cases
-    * `linerate/`: high-speed test cases
-* `lib/`: general purpose libraries and classes to be imported in PTF
-test definitions
-* `config/`: contains YAML config file definition for TRex along with
+### config
+This directory contains YAML config file definition for TRex along with
 other personalized config files
+### lib
+This directory contains general purpose libraries and classes to be imported in
+PTF test definitions
+### tests
+This directory contains all of the test case definitions (written in Python), as
+well as scripts for running them in a test environment. We currently provide two
+general types of test cases:
+* `unary`: tests are *single packet* tests that assess UPF performance in
+specific scenarios. Packets are crafted and sent to the UPF using the `Scapy`
+packet library.
+  > *Example*: a unary test could use Scapy to send a single non-encapsulated
+  UDP packet to the core interface of the UPF, and assert that a
+  GTP-encapsulated packet was received from the access interface
+* `linerate`: tests assess the UPF's performance in certain scenarios
+at high speeds. This allows UPF features to be verified that they perform as
+expected in an environment more representative of *production level*. Traffic is
+generated using the [TRex Python API](https://github.com/cisco-system-traffic-generator/trex-core/blob/master/doc/trex_cookbook.asciidoc).
+  > *Example*: a line rate test could assert the baseline throughput, latency,
+  etc. of the UPF is as expected when handling high-speed downlink traffic from
+  10,000 unique UEs
 
-## Tests
-This directory maintains all of the test case definitions (written in
-Python), as well as scripts for running them in a test environment. We
-currently provide two general types of test cases:
-
-* **Unary** tests are *single packet* tests that assess UPF
-performance in specific scenarios. Packets are crafted and sent to the
-UPF using the `Scapy` packet library.
-    > *Example*: a unary test could use Scapy to send a single
-    non-encapsulated UDP packet to the core interface of the UPF, and
-    assert that a GTP-encapsulated packet was received from the access
-    interface.
-
-* **Linerate** tests assess the UPF's performance in certain scenarios
-at high speeds.  This allows UPF features to be verified that they
-perform as expected in an environment more representative of *production
-level*. Traffic is generated using the [TRex Python
-API](https://github.com/cisco-system-traffic-generator/trex-core/blob/master/doc/trex_cookbook.asciidoc).
-    > *Example*: a line rate test could assert the baseline throughput,
-    latency, etc. of the UPF is as expected when handling high-speed
-    downlink traffic from 10,000 unique UEs.
-
-## Steps to run tests
+## Run tests
 The run script assumes that the TRex daemon server and the UPF
 instance are already running on their respective machines. Please see
 [here](../docs/INSTALL.md#configuration-dpdk-mode) for instructions to deploy
