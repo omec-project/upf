@@ -2,22 +2,6 @@
 <!-- Copyright 2021 Open Networking Foundation -->
 # PTF tests for BESS-UPF
 
-
-## Structure
-* `tests/`: contains all PTF test case definitions
-    * `unary/`: single-packet test cases
-    * `linerate/`: high-speed test cases
-* `lib/`: general purpose libraries and classes to be imported in PTF
-test definitions
-* `config/`: contains YAML config file definition for TRex along with
-other personalized config files
-
-## Tools
-* [PTF](https://github.com/p4lang/PTF) (Packet Testing Framework): a
-data plane testing framework written in Python
-* [TRex](https://github.com/cisco-system-traffic-generator/trex-core): a
-high-speed traffic generator built on top of DPDK, containing a Python API
-
 ## Overview
 
 The aim of implementing a test framework for UPF is to create a
@@ -34,28 +18,6 @@ this framework, we opt for **BESS gRPC calls** instead of calls to the PFCP
 agent because they allow direct communication between the framework and
 the BESS instance for both installing rules and reading metrics.
 
-## Tests
-This directory maintains all of the test case definitions (written in
-Python), as well as scripts for running them in a test environment. We
-currently provide two general types of test cases:
-
-* **Unary** tests are *single packet* tests that assess UPF
-performance in specific scenarios. Packets are crafted and sent to the
-UPF using the `Scapy` packet library.
-    > *Example*: a unary test could use Scapy to send a single
-    non-encapsulated UDP packet to the core interface of the UPF, and
-    assert that a GTP-encapsulated packet was received from the access
-    interface.
-
-* **Linerate** tests assess the UPF's performance in certain scenarios
-at high speeds.  This allows UPF features to be verified that they
-perform as expected in an environment more representative of *production
-level*. Traffic is generated using the [TRex Python
-API](https://github.com/cisco-system-traffic-generator/trex-core/blob/master/doc/trex_cookbook.asciidoc).
-    > *Example*: a line rate test could assert the baseline throughput,
-    latency, etc. of the UPF is as expected when handling high-speed
-    downlink traffic from 10,000 unique UEs.
-
 ## Workflow
 Tests require two separate machines to run, since both TRex and UPF
 use DPDK. Currently, the test workflow is as such:
@@ -71,7 +33,38 @@ generates traffic to the UPF across NICs and physical links.
 In **step 3**, traffic routes through the UPF and back to the machine
 hosting TRex, where results are asserted.
 
-## Steps to run tests
+## Required Tools/Components
+* [PTF](https://github.com/p4lang/PTF) (Packet Testing Framework): a
+data plane testing framework written in Python
+* [TRex](https://github.com/cisco-system-traffic-generator/trex-core): a
+high-speed traffic generator built on top of DPDK, containing a Python API
+
+## Directory Structure
+### config
+This directory contains YAML config file definition for TRex along with
+other personalized config files
+### lib
+This directory contains general purpose libraries and classes to be imported in
+PTF test definitions
+### tests
+This directory contains all of the test case definitions (written in Python), as
+well as scripts for running them in a test environment. We currently provide two
+general types of test cases:
+* `unary`: tests are *single packet* tests that assess UPF performance in
+specific scenarios. Packets are crafted and sent to the UPF using the `Scapy`
+packet library.
+  > *Example*: a unary test could use Scapy to send a single non-encapsulated
+  UDP packet to the core interface of the UPF, and assert that a
+  GTP-encapsulated packet was received from the access interface
+* `linerate`: tests assess the UPF's performance in certain scenarios
+at high speeds. This allows UPF features to be verified that they perform as
+expected in an environment more representative of *production level*. Traffic is
+generated using the [TRex Python API](https://github.com/cisco-system-traffic-generator/trex-core/blob/master/doc/trex_cookbook.asciidoc).
+  > *Example*: a line rate test could assert the baseline throughput, latency,
+  etc. of the UPF is as expected when handling high-speed downlink traffic from
+  10,000 unique UEs
+
+## Run tests
 The run script assumes that the TRex daemon server and the UPF
 instance are already running on their respective machines. Please see
 [here](../docs/INSTALL.md#configuration-dpdk-mode) for instructions to deploy
@@ -83,21 +76,28 @@ To install TRex onto your server, please refer to the
 
 ### Steps
 1. Update the following files accordingly to route traffic to the UPF and vice versa.
-* `upf/ptf/.env` file updated with `UPF_ADDR` and `TREX_ADDR` parameters
-* `upf/ptf/config/trex-cfg-for-ptf.yaml` file updated with proper values for
+* `ptf/.env` file updated with `UPF_ADDR` and `TREX_ADDR` parameters
+* `ptf/config/trex-cfg-for-ptf.yaml` file updated with proper values for
   `interfaces`, `port_info`, and `platform` parameters
-* `upf/ptf/tests/linerate/common.py` file updated with proper MAC address values
-  for `TREX_SRC_MAC`, `UPF_CORE_MAC`, and `UPF_ACCESS_MAC`
+* `ptf/tests/linerate/common.py` file updated with proper MAC address values for
+  `TREX_SRC_MAC`, `UPF_CORE_MAC`, and `UPF_ACCESS_MAC`
 
-2. Generate BESS Python protobuf files for gRPC library and PTF Dockerfile image
+2. Move into the `ptf` directory
+```bash
+cd ptf
+```
+
+3. Generate BESS Python protobuf files for gRPC library and PTF Dockerfile image
    build dependencies:
 ```bash
 make build
 ```
-3. Run PTF tests using the `run_tests` script:
+
+4. Run PTF tests using the `run_tests` script:
 ```bash
 ./run_tests -t [test-dir] [optional: filename/filename.test_case]
 ```
+
 ### Examples
 To run all test cases in the `unary/` directory:
 ```bash
