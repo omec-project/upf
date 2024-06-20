@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2020-present Open Networking Foundation
 
+
 PROJECT_NAME             := upf-epc
 VERSION                  ?= $(shell cat ./VERSION)
 OSTYPE                   := $(shell uname -s)
