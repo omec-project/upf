@@ -613,7 +613,7 @@ class RouteController:
             netlink_message (dict): The netlink message.
         """
         try:
-            event = netlink_message.get("event")
+            event = netlink_message.get('event')
         except Exception:
             logger.exception("Error parsing netlink message")
             return
