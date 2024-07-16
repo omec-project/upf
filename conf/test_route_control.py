@@ -367,6 +367,7 @@ class TestRouteController(unittest.TestCase):
             "event": "RTM_NEWROUTE",
         }
         self.route_controller._netlink_event_listener(
+            self.ndb,
             example_route_entry
         )
         mock_add_new_route_entry.assert_called()
@@ -443,6 +444,7 @@ class TestRouteController(unittest.TestCase):
             "event": "RTM_DELROUTE",
         }
         self.route_controller._netlink_event_listener(
+            self.ndb,
             example_route_entry
         )
         mock_delete_route_entry.assert_called()
@@ -481,6 +483,7 @@ class TestRouteController(unittest.TestCase):
         self, mock_add_unresolved_new_neighbor
     ):
         self.route_controller._netlink_event_listener(
+            self.ndb,
             {"event": "RTM_NEWNEIGH"}
         )
         mock_add_unresolved_new_neighbor.assert_called()
