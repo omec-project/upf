@@ -99,9 +99,9 @@ class TestRouteController(unittest.TestCase):
         )
 
     @patch("conf.route_control.fetch_mac")
-    @patch.object(RouteController, "get_merge_module_name")
-    @patch.object(RouteController, "get_route_module_name")
-    @patch.object(RouteController, "get_update_module_name")
+    @patch("conf.route_control.get_merge_module_name")
+    @patch("conf.route_control.get_route_module_name")
+    @patch("conf.route_control.get_update_module_name")
     def add_route_entry(
         self,
         route_entry,
@@ -487,3 +487,5 @@ class TestRouteController(unittest.TestCase):
             {"event": "RTM_NEWNEIGH"}
         )
         mock_add_unresolved_new_neighbor.assert_called()
+
+

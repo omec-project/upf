@@ -17,6 +17,8 @@ from typing import Dict, List, Optional, Tuple
 from pr2modules.netlink.rtnl.ifinfmsg import ifinfmsg
 from pybess.bess import *
 from pyroute2 import NDB, IPRoute
+from pyroute2.ndb import events
+from pyroute2.ndb.events import State
 from scapy.all import ICMP, IP, send
 
 LOG_FORMAT = "%(asctime)s %(levelname)s %(message)s"
@@ -394,7 +396,7 @@ class RouteController:
             route_entry (RouteEntry)
             next_hop_mac (str): The MAC address of the next hop.
         """
-        route_module_name = self.get_route_module_name(route_entry.interface)
+        route_module_name = get_route_module_name(route_entry.interface)
         gate_idx = self._get_gate_idx(route_entry, route_module_name)
         try:
             self._bess_controller.add_route_to_module(
@@ -409,11 +411,11 @@ class RouteController:
 
         if not self._neighbor_cache.get(route_entry.next_hop_ip):
             logger.info("Neighbor entry does not exist, creating modules.")
-            update_module_name = self.get_update_module_name(
+            update_module_name = get_update_module_name(
                 route_entry.interface,
                 next_hop_mac,
             )
-            merge_module_name = self.get_merge_module_name(route_entry.interface)
+            merge_module_name = get_merge_module_name(route_entry.interface)
             self._create_update_module(
                 destination_mac=next_hop_mac,
                 update_module_name=update_module_name,
@@ -526,8 +528,8 @@ class RouteController:
             next_hop.route_count -= 1
 
             if next_hop.route_count == 0:
-                route_module = self.get_route_module_name(route_entry.interface)
-                update_module_name = self.get_update_module_name(
+                route_module = get_route_module_name(route_entry.interface)
+                update_module_name = get_update_module_name(
                     route_module_name=route_module,
                     mac_address=next_hop.mac_address,
                 )
@@ -695,33 +697,33 @@ class RouteController:
             prefix_len=route_entry[KEY_DESTINATION_PREFIX_LENGTH],
         )
 
-    @staticmethod
-    def get_route_module_name(interface_name: str) -> str:
-        """Returns the name of the route module.
 
-        Args:
-            interface_name (str): The name of the interface.
-        """
-        return interface_name + "Routes"
+def get_route_module_name(interface_name: str) -> str:
+    """Returns the name of the route module.
 
-    @staticmethod
-    def get_update_module_name(route_module_name: str, mac_address: str) -> str:
-        """Returns the name of the update module.
+    Args:
+        interface_name (str): The name of the interface.
+    """
+    return interface_name + "Routes"
 
-        Args:
-            route_module_name (str): The name of the route module.
-            mac_address (str): The MAC address of the gateway.
-        """
-        return route_module_name + "DstMAC" + mac_to_hex(mac_address)
 
-    @staticmethod
-    def get_merge_module_name(interface_name: str) -> str:
-        """Returns the name of the merge module.
+def get_update_module_name(route_module_name: str, mac_address: str) -> str:
+    """Returns the name of the update module.
 
-        Args:
-            interface_name (str): The name of the interface.
-        """
-        return interface_name + "Merge"
+    Args:
+        route_module_name (str): The name of the route module.
+        mac_address (str): The MAC address of the gateway.
+    """
+    return route_module_name + "DstMAC" + mac_to_hex(mac_address)
+
+
+def get_merge_module_name(interface_name: str) -> str:
+    """Returns the name of the merge module.
+
+    Args:
+        interface_name (str): The name of the interface.
+    """
+    return interface_name + "Merge"
 
 
 def validate_ipv4(ip: str) -> bool:
@@ -809,7 +811,7 @@ def register_signal_handlers(controller: RouteController) -> None:
 if __name__ == "__main__":
     interface_arg, ip_arg, port_arg = parse_args()
     ipr = IPRoute()
-    ndb = NDB()
+    ndb = NDB(log="debug")
     bess_controller = BessController(ip_arg, port_arg)
     route_controller = RouteController(
         bess_controller=bess_controller,
