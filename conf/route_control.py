@@ -608,15 +608,17 @@ class RouteController:
             return cached_entry.gate_idx
         return self._module_gate_count_cache[module_name]
 
-    def _netlink_event_listener(self, _, netlink_message: dict) -> None:
+    def _netlink_event_listener(self, target, netlink_message: dict) -> None:
         """Listens for netlink events and handles them.
 
         Args:
-            _ : target
+            target: target
             netlink_message (dict): The netlink message.
         """
         try:
+            logger.info("target:", target)
             event = netlink_message.get('event')
+            logger.info("event: %s is received.", event)
         except Exception:
             logger.exception("Error parsing netlink message")
             return
