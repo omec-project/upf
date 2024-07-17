@@ -616,7 +616,7 @@ class RouteController:
             netlink_message (dict): The netlink message.
         """
         try:
-            logger.info("target:", target)
+            logger.info("target: %s", target)
             event = netlink_message.get('event')
             logger.info("event: %s is received.", event)
         except Exception:
