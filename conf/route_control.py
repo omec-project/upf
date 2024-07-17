@@ -13,12 +13,10 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from threading import Lock, Thread
 from typing import Dict, List, Optional, Tuple
-
-from pr2modules.netlink.rtnl.ifinfmsg import ifinfmsg
+from pyroute2.netlink.rtnl.rtmsg import rtmsg
+from pyroute2.netlink.rtnl.ndmsg import ndmsg
 from pybess.bess import *
 from pyroute2 import NDB, IPRoute
-from pyroute2.ndb import events
-from pyroute2.ndb.events import State
 from scapy.all import ICMP, IP, send
 
 LOG_FORMAT = "%(asctime)s %(levelname)s %(message)s"
@@ -348,11 +346,15 @@ class RouteController:
         self._interfaces = interfaces
 
     def register_handlers(self) -> None:
-        """Register handler function."""
+        """Register handler functions."""
         logger.info("Registering netlink event listener handler...")
         self._ndb.task_manager.register_handler(
-            ifinfmsg,
-            self._netlink_event_listener,
+            rtmsg,
+            self._netlink_route_handler,
+        )
+        self._ndb.task_manager.register_handler(
+            ndmsg,
+            self._netlink_neighbor_handler,
         )
 
     def start_pinging_missing_entries(self) -> None:
@@ -607,8 +609,27 @@ class RouteController:
             return cached_entry.gate_idx
         return self._module_gate_count_cache[module_name]
 
-    def _netlink_event_listener(self, target, netlink_message: dict) -> None:
-        """Listens for netlink events and handles them.
+    def _netlink_neighbor_handler(self, target, netlink_message: dict) -> None:
+        """Listens for netlink neighbor events and handles them.
+
+        Args:
+            target: target
+            netlink_message (dict): The netlink message.
+        """
+        try:
+            event = netlink_message.get('event')
+        except Exception:
+            logger.exception("Error parsing netlink message")
+            return
+
+        logger.info("%s netlink event received.", event)
+
+        if event == KEY_NEW_NEIGHBOR_ACTION:
+            with self._lock:
+                self.add_unresolved_new_neighbor(netlink_message)
+
+    def _netlink_route_handler(self, target, netlink_message: dict) -> None:
+        """Listens for netlink route events and handles them.
 
         Args:
             target: target
@@ -630,16 +651,16 @@ class RouteController:
             with self._lock:
                 self.delete_route_entry(route_entry)
 
-        elif event == KEY_NEW_NEIGHBOR_ACTION:
-            with self._lock:
-                self.add_unresolved_new_neighbor(netlink_message)
-
     def cleanup(self, number: int) -> None:
         """Unregisters the netlink event listener callback and exits."""
         logger.info("Received: %i Exiting", number)
         self._ndb.task_manager.unregister_handler(
-            ifinfmsg,
-            self._netlink_event_listener,
+            rtmsg,
+            self._netlink_route_handler,
+        )
+        self._ndb.task_manager.unregister_handler(
+            ndmsg,
+            self._netlink_neighbor_handler,
         )
         logger.info("Unregistered netlink event listener callback")
         sys.exit()
