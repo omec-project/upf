@@ -811,7 +811,7 @@ def register_signal_handlers(controller: RouteController) -> None:
 if __name__ == "__main__":
     interface_arg, ip_arg, port_arg = parse_args()
     ipr = IPRoute()
-    ndb = NDB(log="debug")
+    ndb = NDB(rtnl_debug=True)
     bess_controller = BessController(ip_arg, port_arg)
     route_controller = RouteController(
         bess_controller=bess_controller,
