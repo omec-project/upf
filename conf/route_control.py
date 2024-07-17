@@ -345,13 +345,12 @@ class RouteController:
         self._ping_missing_thread = Thread(
             target=self._ping_missing_entries, daemon=True
         )
-        self._event_callback = None
         self._interfaces = interfaces
 
     def register_handlers(self) -> None:
         """Register handler function."""
         logger.info("Registering netlink event listener handler...")
-        self._event_callback = self._ndb.task_manager.register_handler(
+        self._ndb.task_manager.register_handler(
             ifinfmsg,
             self._netlink_event_listener,
         )
@@ -638,7 +637,10 @@ class RouteController:
     def cleanup(self, number: int) -> None:
         """Unregisters the netlink event listener callback and exits."""
         logger.info("Received: %i Exiting", number)
-        self._ndb.task_manager.unregister_callback(self._event_callback)
+        self._ndb.task_manager.unregister_handler(
+            ifinfmsg,
+            self._netlink_event_listener,
+        )
         logger.info("Unregistered netlink event listener callback")
         sys.exit()
 
