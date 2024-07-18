@@ -63,7 +63,7 @@ def get_env(varname, default=None):
             exit(1, "Empty env var {}".format(varname))
 
 
-def ips_by_interface(name) -> list:
+def ips_by_interface(name: str) -> list[str]:
     ndb = NDB()
     interfaces = ndb.interfaces
     if iface_record := interfaces.get(name):
@@ -77,13 +77,13 @@ def atoh(ip):
     return socket.inet_aton(ip)
 
 
-def alias_by_interface(name) -> Optional[str]:
+def alias_by_interface(name: str) -> Optional[str]:
     ndb = NDB()
     if iface_record := ndb.interfaces.get(name):
         return iface_record["ifalias"]
 
 
-def mac_by_interface(name) -> Optional[str]:
+def mac_by_interface(name: str) -> Optional[str]:
     ndb = NDB()
     if iface_record := ndb.interfaces.get(name):
         return iface_record["address"]
@@ -93,7 +93,7 @@ def mac2hex(mac):
     return int(mac.replace(":", ""), 16)
 
 
-def peer_by_interface(name) -> str:
+def peer_by_interface(name: str) -> str:
     ndb = NDB()
     try:
         peer_idx = ndb.interfaces[name]["link"]
