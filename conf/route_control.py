@@ -634,10 +634,9 @@ class RouteController:
             _: target
             netlink_message (dict): The netlink message.
         """
-        try:
-            event = netlink_message.get('event')
-        except Exception:
-            logger.exception("Error parsing netlink message")
+        event = netlink_message.get('event')
+        if event is None:
+            logger.error("Netlink message does not include an event.")
             return
 
         logger.info("%s netlink event received.", event)
@@ -688,7 +687,7 @@ class RouteController:
         """
         try:
             attr_dict = dict(route_entry["attrs"])
-        except Exception:
+        except (ValueError, KeyError):
             logger.exception("Error parsing route entry message")
             return None
 
