@@ -347,7 +347,6 @@ class RouteController:
 
     def register_handlers(self) -> None:
         """Register handler functions."""
-        logger.info("Registering netlink event listener handlers...")
         self._ndb.task_manager.register_handler(
             rtmsg,
             self._netlink_route_handler,
@@ -356,6 +355,7 @@ class RouteController:
             ndmsg,
             self._netlink_neighbor_handler,
         )
+        logger.info("Registered netlink event handlers...")
 
     def start_pinging_missing_entries(self) -> None:
         """Starts a new thread for ping missing entries."""
@@ -583,7 +583,6 @@ class RouteController:
         Args:
             route_entry (NeighborEntry): The neighbor entry.
         """
-
         self._unresolved_arp_queries_cache[route_entry.next_hop_ip] = route_entry
         logger.info("Adding entry %s in arp table by pinging", route_entry)
         if not validate_ipv4(route_entry.next_hop_ip):
@@ -669,13 +668,13 @@ class RouteController:
         """Reconfigures the route controller.
         Clears caches and bootstraps routes.
         """
-        logger.info("Received: %i Reconfiguring", number)
         with self._lock:
             self._unresolved_arp_queries_cache.clear()
             self._neighbor_cache.clear()
             self._module_gate_count_cache.clear()
         self.bootstrap_routes()
         signal.pause()
+        logger.info("Received: %i Reconfigured", number)
 
     def _parse_route_entry_msg(self, route_entry: dict) -> Optional[RouteEntry]:
         """Parses a route entry message.
@@ -767,8 +766,8 @@ def send_ping(neighbor_ip):
     Does not wait for a response. Expected to have the side
     effect of populating the arp table entry for neighbor_ip.
     """
-    logger.info("Sending ping to %s", neighbor_ip)
     send(IP(dst=neighbor_ip) / ICMP())
+    logger.info("Sent ping to %s", neighbor_ip)
 
 
 def fetch_mac(ndb: NDB, target_ip: str) -> Optional[str]:
@@ -825,10 +824,10 @@ def register_signal_handlers(controller: RouteController) -> None:
     Args:
         controller (RouteController): The route controller.
     """
-    logger.info("Registering signals handlers.")
     signal.signal(signal.SIGHUP, lambda number, _: controller.reconfigure(number))
     signal.signal(signal.SIGINT, lambda number, _: controller.cleanup(number))
     signal.signal(signal.SIGTERM, lambda number, _: controller.cleanup(number))
+    logger.info("Registered signals handlers.")
 
 
 if __name__ == "__main__":
