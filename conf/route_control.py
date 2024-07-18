@@ -347,7 +347,7 @@ class RouteController:
 
     def register_handlers(self) -> None:
         """Register handler functions."""
-        logger.info("Registering netlink event listener handler...")
+        logger.info("Registering netlink event listener handlers...")
         self._ndb.task_manager.register_handler(
             rtmsg,
             self._netlink_route_handler,
@@ -609,11 +609,11 @@ class RouteController:
             return cached_entry.gate_idx
         return self._module_gate_count_cache[module_name]
 
-    def _netlink_neighbor_handler(self, target, netlink_message: dict) -> None:
+    def _netlink_neighbor_handler(self, _, netlink_message: dict) -> None:
         """Listens for netlink neighbor events and handles them.
 
         Args:
-            target: target
+            _: target
             netlink_message (dict): The netlink message.
         """
         try:
@@ -628,11 +628,11 @@ class RouteController:
             with self._lock:
                 self.add_unresolved_new_neighbor(netlink_message)
 
-    def _netlink_route_handler(self, target, netlink_message: dict) -> None:
+    def _netlink_route_handler(self, _, netlink_message: dict) -> None:
         """Listens for netlink route events and handles them.
 
         Args:
-            target: target
+            _: target
             netlink_message (dict): The netlink message.
         """
         try:
@@ -652,7 +652,7 @@ class RouteController:
                 self.delete_route_entry(route_entry)
 
     def cleanup(self, number: int) -> None:
-        """Unregisters the netlink event listener callback and exits."""
+        """Unregisters the netlink event handlers and exits."""
         logger.info("Received: %i Exiting", number)
         self._ndb.task_manager.unregister_handler(
             rtmsg,

@@ -79,12 +79,14 @@ def atoh(ip):
 
 def alias_by_interface(name) -> Optional[str]:
     ndb = NDB()
-    return ndb.interfaces[name]["ifalias"]
+    if iface_record := ndb.interfaces.get(name):
+        return iface_record["ifalias"]
 
 
 def mac_by_interface(name) -> Optional[str]:
     ndb = NDB()
-    return ndb.interfaces[name]["address"]
+    if iface_record := ndb.interfaces.get(name):
+        return iface_record["address"]
 
 
 def mac2hex(mac):
