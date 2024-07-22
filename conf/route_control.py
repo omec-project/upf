@@ -673,7 +673,7 @@ class RouteController:
             self._module_gate_count_cache.clear()
         self.bootstrap_routes()
         signal.pause()
-        logger.info("Received: %i Reconfigured", number)
+        logger.info("Received: %i reconfigured", number)
 
     def _parse_route_entry_msg(self, route_entry: dict) -> Optional[RouteEntry]:
         """Parses a route entry message.
