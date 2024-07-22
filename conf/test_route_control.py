@@ -487,5 +487,3 @@ class TestRouteController(unittest.TestCase):
             {"event": "RTM_NEWNEIGH"}
         )
         mock_add_unresolved_new_neighbor.assert_called()
-
-
