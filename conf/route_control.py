@@ -13,9 +13,10 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from threading import Lock, Thread
 from typing import Dict, List, Optional, Tuple
-
+from pyroute2.netlink.rtnl.rtmsg import rtmsg
+from pyroute2.netlink.rtnl.ndmsg import ndmsg
 from pybess.bess import *
-from pyroute2 import IPDB, IPRoute
+from pyroute2 import NDB, IPRoute
 from scapy.all import ICMP, IP, send
 
 LOG_FORMAT = "%(asctime)s %(levelname)s %(message)s"
@@ -188,9 +189,9 @@ class BessController:
         """Creates a BESS module.
 
         Args:
-            gateway_mac (int): MAC address of the gateway as an int.
-            update_module_name (str): The name of the module.
+            module_name (str): The name of the module.
             module_class (str): The class of the module.
+            gateway_mac (int): MAC address of the gateway as an int.
         """
         for _ in range(self.MAX_RETRIES):
             try:
@@ -275,7 +276,7 @@ class BessController:
         """Deletes a BESS module.
 
         Args:
-            update_module (str): The name of the module to delete.
+            module_name (str): The name of the module to delete.
         """
         for _ in range(self.MAX_RETRIES):
             try:
@@ -308,7 +309,7 @@ class RouteController:
     def __init__(
         self,
         bess_controller: BessController,
-        ipdb: IPDB,
+        ndb: NDB,
         ipr: IPRoute,
         interfaces: List[str],
     ):
@@ -318,9 +319,9 @@ class RouteController:
         Args:
             bess_controller (BessController):
                 Controller for BESS (Berkeley Extensible Software Switch).
-            route_parser (RouteEntryParser): Parser for route entries.
-            ipdb (IPDB): IP database to manage IP configurations.
+            ndb (NDB): database to manage Network configurations.
             ipr (IPRoute): IP routing control object.
+            interfaces: list of interfaces
 
         Attributes:
             _unresolved_arp_queries_cache (dict[str, RouteEntry]):
@@ -336,21 +337,25 @@ class RouteController:
 
         self._lock = Lock()
 
-        self._ipdb = ipdb
+        self._ndb = ndb
         self._ipr = ipr
         self._bess_controller = bess_controller
         self._ping_missing_thread = Thread(
             target=self._ping_missing_entries, daemon=True
         )
-        self._event_callback = None
         self._interfaces = interfaces
 
-    def register_callbacks(self) -> None:
-        """Register callback function."""
-        logger.info("Registering netlink event listener callback...")
-        self._event_callback = self._ipdb.register_callback(
-            self._netlink_event_listener
+    def register_handlers(self) -> None:
+        """Register handler functions."""
+        self._ndb.task_manager.register_handler(
+            rtmsg,
+            self._netlink_route_handler,
         )
+        self._ndb.task_manager.register_handler(
+            ndmsg,
+            self._netlink_neighbor_handler,
+        )
+        logger.info("Registered netlink event handlers...")
 
     def start_pinging_missing_entries(self) -> None:
         """Starts a new thread for ping missing entries."""
@@ -359,7 +364,7 @@ class RouteController:
             logger.info("Ping missing entries thread started")
 
     def bootstrap_routes(self) -> None:
-        """Goes through all routes and handles new ones.."""
+        """Goes through all routes and handles new ones."""
         routes = self._ipr.get_routes()
         for route in routes:
             if route["event"] == KEY_NEW_ROUTE_ACTION:
@@ -373,7 +378,7 @@ class RouteController:
         Args:
             route_entry (RouteEntry): The route entry.
         """
-        if not (next_hop_mac := fetch_mac(self._ipdb, route_entry.next_hop_ip)):
+        if not (next_hop_mac := fetch_mac(self._ndb, route_entry.next_hop_ip)):
             logger.info(
                 "mac address of the next hop %s is not stored in ARP table. Probing...",
                 route_entry.next_hop_ip,
@@ -385,13 +390,14 @@ class RouteController:
 
     def _add_neighbor(self, route_entry: RouteEntry, next_hop_mac: str) -> None:
         """Adds the route in BESS module.
+
         Creates required BESS modules.
 
         Args:
             route_entry (RouteEntry)
             next_hop_mac (str): The MAC address of the next hop.
         """
-        route_module_name = self.get_route_module_name(route_entry.interface)
+        route_module_name = get_route_module_name(route_entry.interface)
         gate_idx = self._get_gate_idx(route_entry, route_module_name)
         try:
             self._bess_controller.add_route_to_module(
@@ -406,11 +412,11 @@ class RouteController:
 
         if not self._neighbor_cache.get(route_entry.next_hop_ip):
             logger.info("Neighbor entry does not exist, creating modules.")
-            update_module_name = self.get_update_module_name(
+            update_module_name = get_update_module_name(
                 route_entry.interface,
                 next_hop_mac,
             )
-            merge_module_name = self.get_merge_module_name(route_entry.interface)
+            merge_module_name = get_merge_module_name(route_entry.interface)
             self._create_update_module(
                 destination_mac=next_hop_mac,
                 update_module_name=update_module_name,
@@ -523,8 +529,8 @@ class RouteController:
             next_hop.route_count -= 1
 
             if next_hop.route_count == 0:
-                route_module = self.get_route_module_name(route_entry.interface)
-                update_module_name = self.get_update_module_name(
+                route_module = get_route_module_name(route_entry.interface)
+                update_module_name = get_update_module_name(
                     route_module_name=route_module,
                     mac_address=next_hop.mac_address,
                 )
@@ -554,6 +560,7 @@ class RouteController:
 
     def _ping_missing_entries(self):
         """Pings missing entries every 10 seconds.
+
         The goal is to populate the ARP cache.
         If the target host does not respond it will be pinged again.
         """
@@ -574,9 +581,8 @@ class RouteController:
         Pings the neighbor to trigger the update of the ARP table.
 
         Args:
-            neighbor (NeighborEntry): The neighbor entry.
+            route_entry (NeighborEntry): The neighbor entry.
         """
-
         self._unresolved_arp_queries_cache[route_entry.next_hop_ip] = route_entry
         logger.info("Adding entry %s in arp table by pinging", route_entry)
         if not validate_ipv4(route_entry.next_hop_ip):
@@ -602,34 +608,58 @@ class RouteController:
             return cached_entry.gate_idx
         return self._module_gate_count_cache[module_name]
 
-    def _netlink_event_listener(
-        self, ipdb: IPDB, netlink_message: dict, action: str
-    ) -> None:
-        """Listens for netlink events and handles them.
+    def _netlink_neighbor_handler(self, _, netlink_message: dict) -> None:
+        """Listens for netlink neighbor events and handles them.
 
         Args:
-            ipdb (IPDB): The IPDB object.
+            _: target
             netlink_message (dict): The netlink message.
-            action (str): The action.
         """
-        logger.info("%s netlink event received.", action)
-        route_entry = self._parse_route_entry_msg(netlink_message)
-        if action == KEY_NEW_ROUTE_ACTION and route_entry:
-            with self._lock:
-                self.add_new_route_entry(route_entry)
+        try:
+            event = netlink_message.get("event")
+        except Exception:
+            logger.exception("Error parsing netlink message")
+            return
 
-        elif action == KEY_DELETE_ROUTE_ACTION and route_entry:
-            with self._lock:
-                self.delete_route_entry(route_entry)
+        logger.info("%s netlink event received.", event)
 
-        elif action == KEY_NEW_NEIGHBOR_ACTION:
+        if event == KEY_NEW_NEIGHBOR_ACTION:
             with self._lock:
                 self.add_unresolved_new_neighbor(netlink_message)
 
+    def _netlink_route_handler(self, _, netlink_message: dict) -> None:
+        """Listens for netlink route events and handles them.
+
+        Args:
+            _: target
+            netlink_message (dict): The netlink message.
+        """
+        event = netlink_message.get("event")
+        if event is None:
+            logger.error("Netlink message does not include an event.")
+            return
+
+        logger.info("%s netlink event received.", event)
+        route_entry = self._parse_route_entry_msg(netlink_message)
+        if event == KEY_NEW_ROUTE_ACTION and route_entry:
+            with self._lock:
+                self.add_new_route_entry(route_entry)
+
+        elif event == KEY_DELETE_ROUTE_ACTION and route_entry:
+            with self._lock:
+                self.delete_route_entry(route_entry)
+
     def cleanup(self, number: int) -> None:
-        """Unregisters the netlink event listener callback and exits."""
+        """Unregisters the netlink event handlers and exits."""
         logger.info("Received: %i Exiting", number)
-        self._ipdb.unregister_callback(self._event_callback)
+        self._ndb.task_manager.unregister_handler(
+            rtmsg,
+            self._netlink_route_handler,
+        )
+        self._ndb.task_manager.unregister_handler(
+            ndmsg,
+            self._netlink_neighbor_handler,
+        )
         logger.info("Unregistered netlink event listener callback")
         sys.exit()
 
@@ -637,13 +667,13 @@ class RouteController:
         """Reconfigures the route controller.
         Clears caches and bootstraps routes.
         """
-        logger.info("Received: %i Reconfiguring", number)
         with self._lock:
             self._unresolved_arp_queries_cache.clear()
             self._neighbor_cache.clear()
             self._module_gate_count_cache.clear()
         self.bootstrap_routes()
         signal.pause()
+        logger.info("Received: %i reconfigured", number)
 
     def _parse_route_entry_msg(self, route_entry: dict) -> Optional[RouteEntry]:
         """Parses a route entry message.
@@ -657,7 +687,7 @@ class RouteController:
         """
         try:
             attr_dict = dict(route_entry["attrs"])
-        except Exception:
+        except (ValueError, KeyError):
             logger.exception("Error parsing route entry message")
             return None
 
@@ -667,7 +697,7 @@ class RouteController:
         if not attr_dict.get(KEY_INTERFACE):
             return None
         interface_index = int(attr_dict.get(KEY_INTERFACE))
-        interface = self._ipdb.interfaces[interface_index].ifname
+        interface = self._ndb.interfaces[interface_index].get("ifname")
         if interface not in self._interfaces:
             return None
 
@@ -688,30 +718,33 @@ class RouteController:
             prefix_len=route_entry[KEY_DESTINATION_PREFIX_LENGTH],
         )
 
-    def get_route_module_name(self, interface_name: str) -> str:
-        """Returns the name of the route module.
 
-        Args:
-            interface_name (str): The name of the interface.
-        """
-        return interface_name + "Routes"
+def get_route_module_name(interface_name: str) -> str:
+    """Returns the name of the route module.
 
-    def get_update_module_name(self, route_module_name: str, mac_address: str) -> str:
-        """Returns the name of the update module.
+    Args:
+        interface_name (str): The name of the interface.
+    """
+    return interface_name + "Routes"
 
-        Args:
-            route_module_name (str): The name of the route module.
-            gateway_mac_hex (str): The MAC address of the gateway.
-        """
-        return route_module_name + "DstMAC" + mac_to_hex(mac_address)
 
-    def get_merge_module_name(self, interface_name: str) -> str:
-        """Returns the name of the merge module.
+def get_update_module_name(route_module_name: str, mac_address: str) -> str:
+    """Returns the name of the update module.
 
-        Args:
-            interface_name (str): The name of the interface.
-        """
-        return interface_name + "Merge"
+    Args:
+        route_module_name (str): The name of the route module.
+        mac_address (str): The MAC address of the gateway.
+    """
+    return route_module_name + "DstMAC" + mac_to_hex(mac_address)
+
+
+def get_merge_module_name(interface_name: str) -> str:
+    """Returns the name of the merge module.
+
+    Args:
+        interface_name (str): The name of the interface.
+    """
+    return interface_name + "Merge"
 
 
 def validate_ipv4(ip: str) -> bool:
@@ -732,30 +765,29 @@ def send_ping(neighbor_ip):
     Does not wait for a response. Expected to have the side
     effect of populating the arp table entry for neighbor_ip.
     """
-    logger.info("Sending ping to %s", neighbor_ip)
     send(IP(dst=neighbor_ip) / ICMP())
+    logger.info("Sent ping to %s", neighbor_ip)
 
 
-def fetch_mac(ipdb: IPDB, target_ip: str) -> Optional[str]:
-    """Fetches the MAC address of the target IP from the ARP table using IPDB.
+def fetch_mac(ndb: NDB, target_ip: str) -> Optional[str]:
+    """Fetches the MAC address of the target IP from the ARP table using NDB.
 
     Args:
-        ipdb (IPDB): The IPDB object.
+        ndb (NDB): The NDB object.
         target_ip (str): The target IP address.
 
     Returns:
         Optional[str]: The MAC address of the target IP.
     """
-    neighbors = ipdb.nl.get_neighbours(dst=target_ip)
+    neighbors = ndb.neighbours.dump()
     for neighbor in neighbors:
-        attrs = dict(neighbor["attrs"])
-        if attrs.get(KEY_NETWORK_LAYER_DEST_ADDR, "") == target_ip:
+        if neighbor["dst"] == target_ip:
             logger.info(
                 "Mac address found for %s, Mac: %s",
                 target_ip,
-                attrs.get(KEY_LINK_LAYER_ADDRESS, ""),
+                neighbor["lladdr"],
             )
-            return attrs.get(KEY_LINK_LAYER_ADDRESS, "")
+            return neighbor["lladdr"]
     logger.info("Mac address not found for %s", target_ip)
     return None
 
@@ -782,35 +814,35 @@ def parse_args() -> Tuple[List[str], str, str]:
     if not args.i:
         parser.print_help()
         raise ValueError("interface must be specified")
-    return (args.i, args.ip, args.port)
+    return args.i, args.ip, args.port
 
 
-def register_signal_handlers(route_controller: RouteController) -> None:
+def register_signal_handlers(controller: RouteController) -> None:
     """Register signal handlers for SIGHUP, SIGINT, SIGTERM.
 
     Args:
         controller (RouteController): The route controller.
     """
-    logger.info("Registering signals handlers.")
-    signal.signal(signal.SIGHUP, lambda number, _: route_controller.reconfigure(number))
-    signal.signal(signal.SIGINT, lambda number, _: route_controller.cleanup(number))
-    signal.signal(signal.SIGTERM, lambda number, _: route_controller.cleanup(number))
+    signal.signal(signal.SIGHUP, lambda number, _: controller.reconfigure(number))
+    signal.signal(signal.SIGINT, lambda number, _: controller.cleanup(number))
+    signal.signal(signal.SIGTERM, lambda number, _: controller.cleanup(number))
+    logger.info("Registered signals handlers.")
 
 
 if __name__ == "__main__":
     interface_arg, ip_arg, port_arg = parse_args()
     ipr = IPRoute()
-    ipdb = IPDB()
+    ndb = NDB()
     bess_controller = BessController(ip_arg, port_arg)
     route_controller = RouteController(
         bess_controller=bess_controller,
-        ipdb=ipdb,
+        ndb=ndb,
         ipr=ipr,
         interfaces=interface_arg,
     )
     route_controller.bootstrap_routes()
-    route_controller.register_callbacks()
+    route_controller.register_handlers()
     route_controller.start_pinging_missing_entries()
-    register_signal_handlers(route_controller=route_controller)
+    register_signal_handlers(controller=route_controller)
     logger.info("Sleep until a signal is received")
     signal.pause()
