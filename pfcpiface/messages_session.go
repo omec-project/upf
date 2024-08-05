@@ -99,6 +99,9 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 				return errProcessReply(err, ie.CauseNoResourcesAvailable)
 			}
 			p.tunnelTEID = fteid
+			p.tunnelTEIDMask = 0xFFFFFFFF
+			p.tunnelIP4Dst = ip2int(upf.accessIP)
+			p.tunnelIP4DstMask = 0xFFFFFFFF
 		}
 
 		p.fseidIP = fseidIP
@@ -174,7 +177,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 		localFSEID,
 	)
 
-	addPdrInfo(seres, &session, pConn.upf.accessIP)
+	addPdrInfo(seres, &session)
 
 	return seres, nil
 }

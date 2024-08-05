@@ -29,7 +29,7 @@ func releaseAllocatedIPs(ippool *IPPool, session *PFCPSession) error {
 	return nil
 }
 
-func addPdrInfo(msg *message.SessionEstablishmentResponse, session *PFCPSession, n3Address net.IP) {
+func addPdrInfo(msg *message.SessionEstablishmentResponse, session *PFCPSession) {
 	log.Println("Add PDRs to Establishment response")
 
 	for _, pdr := range session.pdrs {
@@ -52,7 +52,7 @@ func addPdrInfo(msg *message.SessionEstablishmentResponse, session *PFCPSession,
 				msg.CreatedPDR = append(msg.CreatedPDR,
 					ie.NewCreatedPDR(
 						ie.NewPDRID(uint16(pdr.pdrID)),
-						ie.NewFTEID(0x01, pdr.tunnelTEID, n3Address, nil, 0),
+						ie.NewFTEID(0x01, pdr.tunnelTEID, int2ip(pdr.tunnelIP4Dst), nil, 0),
 					))
 			}
 		}
