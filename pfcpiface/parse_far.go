@@ -80,11 +80,11 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 		return err
 	}
 
-	if action == 0 {
+	if action[0] == 0 {
 		return ErrInvalidArgument("FAR Action", action)
 	}
 
-	f.applyAction = action
+	f.applyAction = action[0]
 
 	var fwdIEs []*ie.IE
 
