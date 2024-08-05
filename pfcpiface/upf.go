@@ -129,6 +129,7 @@ func NewUPF(conf *Conf, fp datapath) *upf {
 		maxReqRetries:     conf.MaxReqRetries,
 		enableHBTimer:     conf.EnableHBTimer,
 		readTimeout:       time.Second * time.Duration(conf.ReadTimeout),
+		fteidGenerator:    NewFTEIDGenerator(),
 	}
 
 	if len(conf.CPIface.Peers) > 0 {
