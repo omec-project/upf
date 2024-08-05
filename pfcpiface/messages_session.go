@@ -165,7 +165,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 		localFSEID,
 	)
 
-	addPdrInfo(seres, &session)
+	addPdrInfo(seres, &session, pConn.upf.accessIP)
 
 	return seres, nil
 }
