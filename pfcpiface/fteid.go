@@ -5,16 +5,26 @@ package pfcpiface
 
 import (
 	"errors"
+	"math"
 	"sync"
 )
 
+const (
+	minValue = 1
+	maxValue = math.MaxUint32
+)
+
 type FTEIDGenerator struct {
-	lock       sync.Mutex
-	minValue   uint32
-	maxValue   uint32
-	valueRange uint32
-	offset     uint32
-	usedMap    map[uint32]bool
+	lock    sync.Mutex
+	offset  uint32
+	usedMap map[uint32]bool
+}
+
+func NewFTEIDGenerator() *FTEIDGenerator {
+	return &FTEIDGenerator{
+		offset:  0,
+		usedMap: make(map[uint32]bool),
+	}
 }
 
 // Allocate and return an id in range [minValue, maxValue]
@@ -35,21 +45,31 @@ func (idGenerator *FTEIDGenerator) Allocate() (uint32, error) {
 		}
 	}
 	idGenerator.usedMap[idGenerator.offset] = true
-	id := idGenerator.offset + idGenerator.minValue
+	id := idGenerator.offset + minValue
 	idGenerator.updateOffset()
 	return id, nil
 }
 
 func (idGenerator *FTEIDGenerator) FreeID(id uint32) {
-	if id < idGenerator.minValue || id > idGenerator.maxValue {
+	if id < minValue || id > maxValue {
 		return
 	}
 	idGenerator.lock.Lock()
 	defer idGenerator.lock.Unlock()
-	delete(idGenerator.usedMap, id-idGenerator.minValue)
+	delete(idGenerator.usedMap, id-minValue)
+}
+
+func (idGenerator *FTEIDGenerator) IsAllocated(id uint32) bool {
+	if id < minValue || id > maxValue {
+		return false
+	}
+	idGenerator.lock.Lock()
+	defer idGenerator.lock.Unlock()
+	_, ok := idGenerator.usedMap[id-minValue]
+	return ok
 }
 
 func (idGenerator *FTEIDGenerator) updateOffset() {
 	idGenerator.offset++
-	idGenerator.offset = idGenerator.offset % idGenerator.valueRange
+	idGenerator.offset = idGenerator.offset % maxValue
 }
