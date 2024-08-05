@@ -50,6 +50,7 @@ type upf struct {
 	reportNotifyChan  chan uint64
 	sliceInfo         *SliceInfo
 	readTimeout       time.Duration
+	fteidGenerator    *FTEIDGenerator
 
 	datapath
 	maxReqRetries uint8

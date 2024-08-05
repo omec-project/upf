@@ -92,6 +92,15 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 			return errProcessReply(err, ie.CauseRequestRejected)
 		}
 
+		if p.UPAllocateFteid {
+			var fteid uint32
+			fteid, err = pConn.upf.fteidGenerator.Allocate()
+			if err != nil {
+				return errProcessReply(err, ie.CauseNoResourcesAvailable)
+			}
+			p.tunnelTEID = fteid
+		}
+
 		p.fseidIP = fseidIP
 		session.CreatePDR(p)
 		addPDRs = append(addPDRs, p)
