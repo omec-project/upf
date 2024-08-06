@@ -83,7 +83,7 @@ func TestUPFBasedUeIPAllocation(t *testing.T) {
 			WithDownlinkIP(testcase.input.nbAddress).BuildFAR(),
 	}
 
-	err := pfcpClient.SendSessionEstablishmentRequest(pdrs, fars, nil)
+	err := pfcpClient.SendSessionEstablishmentRequest(pdrs, fars, nil, nil)
 	require.NoError(t, err)
 
 	resp, err := pfcpClient.PeekNextResponse()
@@ -161,7 +161,8 @@ func TestDetectUP4Restart(t *testing.T) {
 				WithDownlinkMBR(500000).
 				WithUplinkGBR(0).
 				WithDownlinkGBR(0).Build(),
-		})
+		},
+			nil)
 	}
 
 	t.Run("Do not clear on UP4 restart", func(t *testing.T) {
@@ -614,7 +615,7 @@ func testUEAttach(t *testing.T, testcase *testCase) {
 			))
 	}
 
-	sess, err := pfcpClient.EstablishSession(pdrs, fars, qers)
+	sess, err := pfcpClient.EstablishSession(pdrs, fars, qers, nil)
 	testcase.expected.pdrs = pdrs
 	testcase.expected.fars = fars
 	testcase.expected.qers = qers
@@ -628,7 +629,7 @@ func testUEAttach(t *testing.T, testcase *testCase) {
 			WithMethod(session.Update).WithID(2).
 			WithAction(ActionForward).WithDstInterface(ie.DstInterfaceAccess).
 			WithTEID(testcase.input.dlTEID).WithDownlinkIP(testcase.input.nbAddress).BuildFAR(),
-	}, nil)
+	}, nil, nil)
 
 	verifyEntries(t, testcase.input, testcase.expected, UEStateAttached)
 }
@@ -643,7 +644,7 @@ func testUEBuffer(t *testing.T, testcase *testCase) {
 			WithDownlinkIP(testcase.input.nbAddress).BuildFAR(),
 	}
 
-	err := pfcpClient.ModifySession(testcase.session, nil, fars, nil)
+	err := pfcpClient.ModifySession(testcase.session, nil, fars, nil, nil)
 	require.NoError(t, err)
 
 	verifyEntries(t, testcase.input, testcase.expected, UEStateBuffering)
@@ -657,7 +658,7 @@ func testUEBuffer(t *testing.T, testcase *testCase) {
 			WithDownlinkIP(testcase.input.nbAddress).BuildFAR(),
 	}
 
-	err = pfcpClient.ModifySession(testcase.session, nil, fars, nil)
+	err = pfcpClient.ModifySession(testcase.session, nil, fars, nil, nil)
 	require.NoError(t, err)
 
 	verifyEntries(t, testcase.input, testcase.expected, UEStateAttached)
