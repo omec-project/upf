@@ -38,6 +38,7 @@ type upf struct {
 	enableUeIPAlloc   bool
 	enableEndMarker   bool
 	enableFlowMeasure bool
+	enableFTUP        bool
 	accessIface       string
 	coreIface         string
 	ippoolCidr        string
@@ -50,6 +51,7 @@ type upf struct {
 	reportNotifyChan  chan uint64
 	sliceInfo         *SliceInfo
 	readTimeout       time.Duration
+	fteidGenerator    *FTEIDGenerator
 
 	datapath
 	maxReqRetries uint8
@@ -116,6 +118,7 @@ func NewUPF(conf *Conf, fp datapath) *upf {
 	u := &upf{
 		enableUeIPAlloc:   conf.CPIface.EnableUeIPAlloc,
 		enableEndMarker:   conf.EnableEndMarker,
+		enableFTUP:        conf.EnableFTUP,
 		enableFlowMeasure: conf.EnableFlowMeasure,
 		accessIface:       conf.AccessIface.IfName,
 		coreIface:         conf.CoreIface.IfName,
@@ -128,6 +131,7 @@ func NewUPF(conf *Conf, fp datapath) *upf {
 		maxReqRetries:     conf.MaxReqRetries,
 		enableHBTimer:     conf.EnableHBTimer,
 		readTimeout:       time.Second * time.Duration(conf.ReadTimeout),
+		fteidGenerator:    NewFTEIDGenerator(),
 	}
 
 	if len(conf.CPIface.Peers) > 0 {

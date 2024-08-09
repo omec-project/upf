@@ -29,9 +29,8 @@ func releaseAllocatedIPs(ippool *IPPool, session *PFCPSession) error {
 	return nil
 }
 
-func addPdrInfo(msg *message.SessionEstablishmentResponse,
-	session *PFCPSession) {
-	log.Println("Add PDRs with UPF alloc IPs to Establishment response")
+func addPdrInfo(msg *message.SessionEstablishmentResponse, session *PFCPSession) {
+	log.Println("Add PDRs to Establishment response")
 
 	for _, pdr := range session.pdrs {
 		if (pdr.allocIPFlag) && (pdr.srcIface == core) {
@@ -42,12 +41,20 @@ func addPdrInfo(msg *message.SessionEstablishmentResponse,
 				ueIP  net.IP = int2ip(pdr.ueAddress)
 			)
 
-			log.Println("ueIP : ", ueIP.String())
-			msg.CreatedPDR = append(msg.CreatedPDR,
-				ie.NewCreatedPDR(
-					ie.NewPDRID(uint16(pdr.pdrID)),
-					ie.NewUEIPAddress(flags, ueIP.String(), "", 0, 0),
-				))
+			if ueIP != nil {
+				log.Println("ueIP : ", ueIP.String())
+				msg.CreatedPDR = append(msg.CreatedPDR,
+					ie.NewCreatedPDR(
+						ie.NewPDRID(uint16(pdr.pdrID)),
+						ie.NewUEIPAddress(flags, ueIP.String(), "", 0, 0),
+					))
+			} else {
+				msg.CreatedPDR = append(msg.CreatedPDR,
+					ie.NewCreatedPDR(
+						ie.NewPDRID(uint16(pdr.pdrID)),
+						ie.NewFTEID(0x01, pdr.tunnelTEID, int2ip(pdr.tunnelIP4Dst), nil, 0),
+					))
+			}
 		}
 	}
 }

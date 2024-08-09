@@ -38,6 +38,7 @@ type Conf struct {
 	ReadTimeout              uint32           `json:"read_timeout"` // TODO(max): convert to duration string
 	EnableNotifyBess         bool             `json:"enable_notify_bess"`
 	EnableEndMarker          bool             `json:"enable_end_marker"`
+	EnableFTUP               bool             `json:"enable_ftup"`
 	NotifySockAddr           string           `json:"notify_sockaddr"`
 	EndMarkerSockAddr        string           `json:"endmarker_sockaddr"`
 	LogLevel                 log.Level        `json:"log_level"`

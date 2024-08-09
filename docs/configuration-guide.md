@@ -23,6 +23,7 @@ These are configurations commonly shared between P4-UPF and BESS-UPF.
 | `max_req_retries` | 5 | No | Max retries for sending PFCP message towards SMF/SPGW-C |
 | `resp_timeout` | 2s | No | Period to wait for a response from SMF/SPGW-C |
 | `enable_end_marker` | false | No | |
+| `enable_ftup` | false | No | Enable TEID Allocation |
 | `enable_p4rt` | false | Yes for P4-UPF only | |
 | `enable_gtpu_path_monitoring` | false | No | |
 | `cpiface.enable_ue_ip_alloc` | false | No | Whether to enable UPF-based UE IP allocation |
