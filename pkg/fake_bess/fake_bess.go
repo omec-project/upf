@@ -4,7 +4,6 @@
 package fake_bess
 
 import (
-	"fmt"
 	"net"
 
 	"github.com/omec-project/upf-epc/pfcpiface/bess_pb"
@@ -26,7 +25,7 @@ func NewFakeBESS() *FakeBESS {
 
 // Run starts and runs the BESS gRPC server on the given address. Blocking until Stop is called.
 func (b *FakeBESS) Run(address string) error {
-	listener, err := net.Listen("tcp", fmt.Sprintf(address))
+	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		return err
 	}
