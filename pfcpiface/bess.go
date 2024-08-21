@@ -1292,9 +1292,9 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 				log.Println("Error marshalling data", g, err)
 				return
 			}
-		}
 
-		b.processGtpuPathMonitoring(ctx, any, upfMsgTypeDel)
+			b.processGtpuPathMonitoring(ctx, any, upfMsgTypeDel)
+		}
 
 		done <- true
 	}()

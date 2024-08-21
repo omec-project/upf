@@ -41,6 +41,7 @@ type upf struct {
 	accessIface       string
 	coreIface         string
 	ippoolCidr        string
+	n4addr            string
 	accessIP          net.IP
 	coreIP            net.IP
 	nodeID            string
@@ -128,6 +129,7 @@ func NewUPF(conf *Conf, fp datapath) *upf {
 		maxReqRetries:     conf.MaxReqRetries,
 		enableHBTimer:     conf.EnableHBTimer,
 		readTimeout:       time.Second * time.Duration(conf.ReadTimeout),
+		n4addr:            conf.N4Addr,
 	}
 
 	if len(conf.CPIface.Peers) > 0 {

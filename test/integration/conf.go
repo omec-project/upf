@@ -137,7 +137,7 @@ func PushSliceMeterConfig(sliceConfig pfcpiface.NetworkSlice) error {
 		return err
 	}
 
-	_, err = http.Post("http://127.0.0.1:8080/v1/config/network-slices", "application/json", bytes.NewBuffer(rawSliceConfig))
+	_, err = http.Post("http://127.0.0.8:8080/v1/config/network-slices", "application/json", bytes.NewBuffer(rawSliceConfig))
 	if err != nil {
 		return err
 	}

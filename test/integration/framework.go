@@ -286,7 +286,7 @@ func mustInitCountersWithDummyValue() {
 }
 
 func MustStartMockUP4() {
-	providers.MustRunDockerContainer(ContainerNameMockUP4, ImageNameMockUP4, "--topo single", []string{"50001/tcp"}, "", DockerTestNetwork)
+	providers.MustRunDockerContainer(ContainerNameMockUP4, ImageNameMockUP4, "--topo single", "127.0.0.1", []string{"50001/tcp"}, "", DockerTestNetwork)
 	err := waitForMockUP4ToStart()
 	if err != nil {
 		panic(err)
@@ -301,7 +301,7 @@ func MustStopMockUP4() {
 
 func MustStartPFCPAgent() {
 	providers.MustRunDockerContainer(ContainerNamePFCPAgent, ImageNamePFCPAgent, "-config /config/upf.jsonc",
-		[]string{"8805/udp", "8080/tcp"}, "/tmp:/config", DockerTestNetwork)
+		"127.0.0.8", []string{"8805/udp", "8080/tcp"}, "/tmp:/config", DockerTestNetwork)
 }
 
 func MustStopPFCPAgent() {
@@ -335,14 +335,16 @@ func setup(t *testing.T, configType uint32) {
 		require.NoError(t, err)
 		MustStartPFCPAgent()
 	case ModeNative:
-		pfcpAgent = pfcpiface.NewPFCPIface(GetConfig(os.Getenv(EnvDatapath), configType))
+		upfConf := GetConfig(os.Getenv(EnvDatapath), configType)
+		upfConf.N4Addr = "127.0.0.8"
+		pfcpAgent = pfcpiface.NewPFCPIface(upfConf)
 		go pfcpAgent.Run()
 	default:
 		t.Fatal("Unexpected test mode")
 	}
 
 	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.1")
-	err := pfcpClient.ConnectN4("127.0.0.1")
+	err := pfcpClient.ConnectN4("127.0.0.8")
 	require.NoErrorf(t, err, "failed to connect to UPF")
 
 	// wait for PFCP Agent to initialize, blocking

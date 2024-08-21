@@ -160,7 +160,7 @@ func WaitForContainerRunning(name string) error {
 // - exposedPorts specifies the list of L4 ports to expose. The format should be port_no/proto (e.g., 8080/tcp). It's optional.
 // - mnt defines the mount paths. The format should be `<local_path>:<target_path>`. It's optional.
 // - net defines a Docker network for a container (optional).
-func MustRunDockerContainer(name, image, cmd string, exposedPorts []string, mnt string, net string) {
+func MustRunDockerContainer(name, image, cmd string, hostIp string, exposedPorts []string, mnt string, net string) {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -200,7 +200,7 @@ func MustRunDockerContainer(name, image, cmd string, exposedPorts []string, mnt 
 	for _, port := range exposedPorts {
 		baseCfg.ExposedPorts[nat.Port(port)] = struct{}{}
 		hostCfg.PortBindings[nat.Port(port)] = []nat.PortBinding{{
-			HostIP:   "127.0.0.1",
+			HostIP:   hostIp,
 			HostPort: port,
 		}}
 	}
