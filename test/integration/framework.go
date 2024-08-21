@@ -343,7 +343,7 @@ func setup(t *testing.T, configType uint32) {
 		t.Fatal("Unexpected test mode")
 	}
 
-	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.7")
+	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.1")
 	err := pfcpClient.ConnectN4("127.0.0.8")
 	require.NoErrorf(t, err, "failed to connect to UPF")
 
