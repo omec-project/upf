@@ -175,8 +175,8 @@ func (b *fakeBessService) unsafeGetOrAddModule(name string) module {
 			}
 		} else if name == appQerModuleName || name == sessionQerModuleName {
 			b.modules[name] = &qosModule{
-				baseModule{name: name},
-				nil,
+				baseModule: baseModule{name: name},
+				entries:    nil,
 			}
 		} else if name == gtpuPathMonitoringModuleName {
 			b.modules[name] = &gtpuPathMonitoringModule{
@@ -463,11 +463,14 @@ func (e *exactMatchModule) HandleRequest(cmd string, arg *anypb.Any) (err error)
 }
 
 type qosModule struct {
+	mutex sync.Mutex
 	baseModule
 	entries []*bess_pb.QosCommandAddArg
 }
 
 func (q *qosModule) GetState() (msgs []proto.Message) {
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
 	for _, em := range q.entries {
 		msgs = append(msgs, em)
 	}
@@ -475,6 +478,8 @@ func (q *qosModule) GetState() (msgs []proto.Message) {
 }
 
 func (q *qosModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
 	if err = q.baseModule.HandleRequest(cmd, arg); err != nil {
 		return
 	}
