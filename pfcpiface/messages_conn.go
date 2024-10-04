@@ -6,7 +6,7 @@ package pfcpiface
 import (
 	"errors"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/omec-project/upf-epc/logger"
 	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
 )
@@ -27,7 +27,7 @@ func (pConn *PFCPConn) sendAssociationRequest() {
 	if reply != nil {
 		err := pConn.handleAssociationSetupResponse(reply)
 		if err != nil {
-			log.Errorln("Handling of Assoc Setup Response Failed ", pConn.RemoteAddr())
+			logger.PfcpLog.Errorln("handling of Assoc Setup Response Failed", pConn.RemoteAddr())
 			pConn.Shutdown()
 
 			return
@@ -67,7 +67,7 @@ func (pConn *PFCPConn) handleHeartbeatRequest(msg message.Message) (message.Mess
 			// timer reset
 		default:
 			// channel full, log warning and ignore
-			log.Warn("failed to reset heartbeat timer")
+			logger.PfcpLog.Warnln("failed to reset heartbeat timer")
 		}
 	}
 
@@ -96,7 +96,7 @@ func (pConn *PFCPConn) associationIEs() []*ie.IE {
 	flags := uint8(0x41)
 
 	if len(upf.dnn) != 0 {
-		log.Infoln("Association Setup with DNN:", upf.dnn)
+		logger.PfcpLog.Infoln("association Setup with DNN:", upf.dnn)
 		// add ASSONI flag to set network instance.
 		flags = uint8(0x61)
 	}
@@ -154,19 +154,19 @@ func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (messa
 
 	if pConn.ts.remote.IsZero() {
 		pConn.ts.remote = ts
-		log.Infoln("Association Setup Request from", addr,
+		logger.PfcpLog.Infoln("association Setup Request from", addr,
 			"with recovery timestamp:", ts)
 	} else if ts.After(pConn.ts.remote) {
 		old := pConn.ts.remote
 		pConn.ts.remote = ts
-		log.Warnln("Association Setup Request from", addr,
+		logger.PfcpLog.Warnln("association Setup Request from", addr,
 			"with newer recovery timestamp:", ts, "older:", old)
 	}
 
 	pConn.nodeID.remote = nodeID
 	asres.Cause = ie.NewCause(ie.CauseRequestAccepted)
 
-	log.Infoln("Association setup done between nodes",
+	logger.PfcpLog.Infoln("association setup done between nodes",
 		"local:", pConn.nodeID.local, "remote:", pConn.nodeID.remote)
 
 	return asres, nil
@@ -186,7 +186,7 @@ func (pConn *PFCPConn) handleAssociationSetupResponse(msg message.Message) error
 	}
 
 	if cause != ie.CauseRequestAccepted {
-		log.Errorln("Association Setup Response from", addr,
+		logger.PfcpLog.Errorln("association Setup Response from", addr,
 			"with Cause:", cause)
 		return errReqRejected
 	}
@@ -203,17 +203,17 @@ func (pConn *PFCPConn) handleAssociationSetupResponse(msg message.Message) error
 
 	if pConn.ts.remote.IsZero() {
 		pConn.ts.remote = ts
-		log.Infoln("Association Setup Response from", addr,
+		logger.PfcpLog.Infoln("association Setup Response from", addr,
 			"with recovery timestamp:", ts)
 	} else if ts.After(pConn.ts.remote) {
 		old := pConn.ts.remote
 		pConn.ts.remote = ts
-		log.Warnln("Association Setup Response from", addr,
+		logger.PfcpLog.Warnln("association Setup Response from", addr,
 			"with newer recovery timestamp:", ts, "older:", old)
 	}
 
 	pConn.nodeID.remote = nodeID
-	log.Infoln("Association setup done between nodes",
+	logger.PfcpLog.Infoln("association setup done between nodes",
 		"local:", pConn.nodeID.local, "remote:", pConn.nodeID.remote)
 
 	return nil
@@ -289,7 +289,7 @@ func (pConn *PFCPConn) handlePFDMgmtRequest(msg message.Message) (message.Messag
 		}
 
 		pConn.appPFDs[id] = applicationPFD
-		log.Traceln("Flow descriptions for AppID", id, ":", applicationPFD.flowDescs)
+		logger.PfcpLog.Debugf("flow descriptions for AppID %v: %v", id, applicationPFD.flowDescs)
 	}
 
 	// Build response message

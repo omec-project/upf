@@ -7,21 +7,14 @@ package main
 import (
 	"flag"
 
+	"github.com/omec-project/upf-epc/logger"
 	"github.com/omec-project/upf-epc/pfcpiface"
-	log "github.com/sirupsen/logrus"
+	"go.uber.org/zap/zapcore"
 )
 
 var (
 	configPath = flag.String("config", "upf.jsonc", "path to upf config")
 )
-
-func init() {
-	// Set up logger
-	log.SetReportCaller(true)
-	log.SetFormatter(&log.TextFormatter{
-		FullTimestamp: true,
-	})
-}
 
 func main() {
 	// cmdline args
@@ -30,12 +23,17 @@ func main() {
 	// Read and parse json startup file.
 	conf, err := pfcpiface.LoadConfigFile(*configPath)
 	if err != nil {
-		log.Fatalln("Error reading conf file:", err)
+		logger.InitLog.Fatalln("error reading conf file:", err)
 	}
 
-	log.SetLevel(conf.LogLevel)
+	lvl, errLevel := zapcore.ParseLevel(conf.LogLevel.String())
+	if errLevel != nil {
+		logger.InitLog.Errorln("can not parse input level")
+	}
+	logger.InitLog.Infoln("setting log level to:", lvl)
+	logger.SetLogLevel(lvl)
 
-	log.Infof("%+v", conf)
+	logger.InitLog.Infof("%+v", conf)
 
 	pfcpi := pfcpiface.NewPFCPIface(conf)
 

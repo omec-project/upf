@@ -9,7 +9,7 @@ import (
 	"math"
 	"net/http"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/omec-project/upf-epc/logger"
 )
 
 // NetworkSlice ... Config received for slice rates and DNN.
@@ -44,7 +44,7 @@ func setupConfigHandler(mux *http.ServeMux, upf *upf) {
 }
 
 func (c *ConfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	log.Infoln("handle http request for /v1/config/network-slices")
+	logger.PfcpLog.Infoln("handle http request for /v1/config/network-slices")
 
 	switch r.Method {
 	case "PUT":
@@ -52,24 +52,24 @@ func (c *ConfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "POST":
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			log.Errorln("http req read body failed.")
+			logger.PfcpLog.Errorln("http req read body failed")
 			sendHTTPResp(http.StatusBadRequest, w)
 		}
 
-		log.Traceln(string(body))
+		logger.PfcpLog.Debugln(string(body))
 
 		var nwSlice NetworkSlice
 
 		err = json.Unmarshal(body, &nwSlice)
 		if err != nil {
-			log.Errorln("Json unmarshal failed for http request")
+			logger.PfcpLog.Errorln("Json unmarshal failed for http request")
 			sendHTTPResp(http.StatusBadRequest, w)
 		}
 
 		handleSliceConfig(&nwSlice, c.upf)
 		sendHTTPResp(http.StatusCreated, w)
 	default:
-		log.Infoln(w, "Sorry, only PUT and POST methods are supported.")
+		logger.PfcpLog.Infoln(w, "sorry, only PUT and POST methods are supported")
 		sendHTTPResp(http.StatusMethodNotAllowed, w)
 	}
 }
@@ -89,12 +89,12 @@ func sendHTTPResp(status int, w http.ResponseWriter) {
 
 	jsonResp, err := json.Marshal(resp)
 	if err != nil {
-		log.Errorln("Error happened in JSON marshal. Err: ", err)
+		logger.PfcpLog.Errorln("error happened in JSON marshal:", err)
 	}
 
 	_, err = w.Write(jsonResp)
 	if err != nil {
-		log.Errorln("http response write failed : ", err)
+		logger.PfcpLog.Errorln("http response write failed:", err)
 	}
 }
 
@@ -123,7 +123,7 @@ func calculateBitRates(mbr uint64, rate string) uint64 {
 }
 
 func handleSliceConfig(nwSlice *NetworkSlice, upf *upf) {
-	log.Infoln("handle slice config : ", nwSlice.SliceName)
+	logger.PfcpLog.Infoln("handle slice config:", nwSlice.SliceName)
 
 	ulMbr := calculateBitRates(nwSlice.SliceQos.UplinkMbr,
 		nwSlice.SliceQos.BitrateUnit)
@@ -150,6 +150,6 @@ func handleSliceConfig(nwSlice *NetworkSlice, upf *upf) {
 
 	err := upf.addSliceInfo(&sliceInfo)
 	if err != nil {
-		log.Errorln("adding slice info to datapath failed : ", err)
+		logger.PfcpLog.Errorln("adding slice info to datapath failed:", err)
 	}
 }

@@ -4,7 +4,7 @@
 package pfcpiface
 
 import (
-	log "github.com/sirupsen/logrus"
+	"github.com/omec-project/upf-epc/logger"
 	"github.com/stretchr/testify/require"
 
 	"net"
@@ -14,7 +14,7 @@ import (
 func mustParseCIDRNet(s string) *net.IPNet {
 	_, ipNet, err := net.ParseCIDR(s)
 	if err != nil {
-		log.Fatal(err)
+		logger.PfcpLog.Fatal(err)
 	}
 
 	return ipNet

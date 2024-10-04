@@ -8,7 +8,7 @@ import (
 	"net"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/omec-project/upf-epc/logger"
 	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
 )
@@ -71,8 +71,8 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 	}
 
 	if strings.Compare(nodeID, pConn.nodeID.remote) != 0 {
-		log.Warnln("Association not found for Establishment request",
-			"with nodeID: ", nodeID, ", Association NodeID: ", pConn.nodeID.remote)
+		logger.PfcpLog.Warnln("association not found for Establishment request",
+			"with nodeID:", nodeID, ", association NodeID:", pConn.nodeID.remote)
 		return errProcessReply(ErrAssocNotFound, ie.CauseNoEstablishedPFCPAssociation)
 	}
 
@@ -142,7 +142,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 	err = pConn.store.PutSession(session)
 	if err != nil {
-		log.Errorf("Failed to put PFCP session to store: %v", err)
+		logger.PfcpLog.Errorf("failed to put PFCP session to store: %v", err)
 	}
 
 	var localFSEID *ie.IE
@@ -181,7 +181,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 	var remoteSEID uint64
 
 	sendError := func(err error) (message.Message, error) {
-		log.Errorln(err)
+		logger.PfcpLog.Errorln(err)
 
 		smres := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */
 			0,                                    /* FO <-- what's this? */
@@ -209,7 +209,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 			session.remoteSEID = fseid.SEID
 			fseidIP = ip2int(fseid.IPv4Address)
 
-			log.Traceln("Updated FSEID from session modification request")
+			logger.PfcpLog.Debugln("updated FSEID from session modification request")
 		}
 	}
 
@@ -270,7 +270,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 
 		err = session.UpdatePDR(p)
 		if err != nil {
-			log.Errorln("session PDR update failed ", err)
+			logger.PfcpLog.Errorln("session PDR update failed", err)
 			continue
 		}
 
@@ -291,7 +291,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 
 		err = session.UpdateFAR(&f, &endMarkerList)
 		if err != nil {
-			log.Errorln("session PDR update failed ", err)
+			logger.PfcpLog.Errorln("session PDR update failed", err)
 			continue
 		}
 
@@ -312,7 +312,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 
 		err = session.UpdateQER(q)
 		if err != nil {
-			log.Errorln("session QER update failed ", err)
+			logger.PfcpLog.Errorln("session QER update failed", err)
 			continue
 		}
 
@@ -339,7 +339,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 	if upf.enableEndMarker {
 		err := upf.SendEndMarkers(&endMarkerList)
 		if err != nil {
-			log.Errorln("Sending End Markers Failed : ", err)
+			logger.PfcpLog.Errorln("sending End Markers Failed:", err)
 		}
 	}
 
@@ -402,7 +402,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 
 	err := pConn.store.PutSession(session)
 	if err != nil {
-		log.Errorf("Failed to put PFCP session to store: %v", err)
+		logger.PfcpLog.Errorf("failed to put PFCP session to store: %v", err)
 	}
 
 	// Build response message
@@ -472,7 +472,7 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
 	session, ok := pConn.store.GetSession(fseid)
 	if !ok {
-		log.Warnln("No session found for fseid : ", fseid)
+		logger.PfcpLog.Warnln("no session found for fseid:", fseid)
 		return
 	}
 
@@ -503,14 +503,14 @@ func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
 	for _, far := range session.fars {
 		if far.farID == farID {
 			if far.applyAction&ActionNotify == 0 {
-				log.Errorln("packet received for forwarding far. discard")
+				logger.PfcpLog.Errorln("packet received for forwarding far. discard")
 				return
 			}
 		}
 	}
 
 	if pdrID == 0 {
-		log.Errorln("No Pdr found for downlink")
+		logger.PfcpLog.Errorln("no Pdr found for downlink")
 
 		return
 	}
@@ -518,10 +518,7 @@ func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
 	srreq.DownlinkDataReport = ie.NewDownlinkDataReport(
 		ie.NewPDRID(uint16(pdrID)))
 
-	log.WithFields(log.Fields{
-		"F-SEID": fseid,
-		"PDR ID": pdrID,
-	}).Debug("Sending Downlink Data Report")
+	logger.PfcpLog.With("F-SEID", fseid, "PDR ID", pdrID).Debugln("sending Downlink Data Report")
 
 	pConn.SendPFCPMsg(srreq)
 }
@@ -539,7 +536,7 @@ func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) error {
 		return nil
 	}
 
-	log.Warnln("session req not accepted seq : ", srres.SequenceNumber)
+	logger.PfcpLog.Warnln("session req not accepted seq:", srres.SequenceNumber)
 
 	seid := srres.SEID()
 
@@ -549,7 +546,7 @@ func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) error {
 			return errProcess(ErrNotFoundWithParam("PFCP session context", "SEID", seid))
 		}
 
-		log.Warnln("context not found, deleting session locally")
+		logger.PfcpLog.Warnln("context not found, deleting session locally")
 
 		pConn.RemoveSession(sessItem)
 
