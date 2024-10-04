@@ -9,9 +9,9 @@ import (
 	"math"
 	"sync"
 
+	"github.com/omec-project/upf-epc/logger"
 	"github.com/omec-project/upf-epc/pfcpiface/bess_pb"
 	"github.com/omec-project/upf-epc/pkg/utils"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -184,7 +184,7 @@ func (b *fakeBessService) unsafeGetOrAddModule(name string) module {
 				nil,
 			}
 		} else {
-			log.Fatalf("unknown module name: %v", name)
+			logger.BessLog.Fatalf("unknown module name: %v", name)
 		}
 	}
 	return b.modules[name]
@@ -333,7 +333,7 @@ func (w *wildcardModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 		return
 	}
 
-	log := log.WithField("module", w.Name()).WithField("cmd", cmd)
+	log := logger.BessLog.With("module", w.Name(), "cmd", cmd)
 
 	if cmd == addCmd {
 		wc := &bess_pb.WildcardMatchCommandAddArg{}
@@ -349,11 +349,11 @@ func (w *wildcardModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 			}
 		}
 		if existing != nil {
-			log.Tracef("updated existing entry %v", existing)
+			log.Debugf("updated existing entry %v", existing)
 			existing.Reset()
 			proto.Merge(existing, wc)
 		} else {
-			log.Tracef("added new entry %v", wc)
+			log.Debugf("added new entry %v", wc)
 			w.entries = append(w.entries, wc)
 		}
 	} else if cmd == deleteCmd {
@@ -372,7 +372,7 @@ func (w *wildcardModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 		if idx == -1 {
 			return status.Errorf(codes.NotFound, "entry not found: %v", wc)
 		} else {
-			log.Tracef("deleted existing entry %v", w.entries[idx])
+			log.Debugf("deleted existing entry %v", w.entries[idx])
 			w.entries = append(w.entries[:idx], w.entries[idx+1:]...)
 		}
 	} else if cmd == clearCmd {
@@ -407,7 +407,7 @@ func (e *exactMatchModule) HandleRequest(cmd string, arg *anypb.Any) (err error)
 		return
 	}
 
-	log := log.WithField("module", e.Name()).WithField("cmd", cmd)
+	log := logger.BessLog.With("module", e.Name(), "cmd", cmd)
 
 	if cmd == addCmd {
 		em := &bess_pb.ExactMatchCommandAddArg{}
@@ -422,11 +422,11 @@ func (e *exactMatchModule) HandleRequest(cmd string, arg *anypb.Any) (err error)
 			}
 		}
 		if existing != nil {
-			log.Tracef("updated existing entry %v", em)
+			log.Debugf("updated existing entry %v", em)
 			existing.Reset()
 			proto.Merge(existing, em)
 		} else {
-			log.Tracef("added new entry %v", em)
+			log.Debugf("added new entry %v", em)
 			e.entries = append(e.entries, em)
 		}
 	} else if cmd == deleteCmd {
@@ -444,7 +444,7 @@ func (e *exactMatchModule) HandleRequest(cmd string, arg *anypb.Any) (err error)
 		if idx == -1 {
 			return status.Errorf(codes.NotFound, "entry not found: %v", em)
 		} else {
-			log.Tracef("deleted existing entry %v", e.entries[idx])
+			log.Debugf("deleted existing entry %v", e.entries[idx])
 			e.entries = append(e.entries[:idx], e.entries[idx+1:]...)
 		}
 	} else if cmd == clearCmd {
@@ -484,7 +484,7 @@ func (q *qosModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 		return
 	}
 
-	log := log.WithField("module", q.Name()).WithField("cmd", cmd)
+	log := logger.BessLog.With("module", q.Name(), "cmd", cmd)
 
 	if cmd == addCmd {
 		wc := &bess_pb.QosCommandAddArg{}
@@ -499,11 +499,11 @@ func (q *qosModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 			}
 		}
 		if existing != nil {
-			log.Tracef("updated existing entry %v", existing)
+			log.Debugf("updated existing entry %v", existing)
 			existing.Reset()
 			proto.Merge(existing, wc)
 		} else {
-			log.Tracef("added new entry %v", wc)
+			log.Debugf("added new entry %v", wc)
 			q.entries = append(q.entries, wc)
 		}
 	} else if cmd == deleteCmd {
@@ -521,7 +521,7 @@ func (q *qosModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 		if idx == -1 {
 			return status.Errorf(codes.NotFound, "entry not found: %v", qc)
 		} else {
-			log.Tracef("deleted existing entry %v", q.entries[idx])
+			log.Debugf("deleted existing entry %v", q.entries[idx])
 			q.entries = append(q.entries[:idx], q.entries[idx+1:]...)
 		}
 	} else if cmd == clearCmd {
@@ -556,7 +556,7 @@ func (q *gtpuPathMonitoringModule) HandleRequest(cmd string, arg *anypb.Any) (er
 		return
 	}
 
-	log := log.WithField("module", q.Name()).WithField("cmd", cmd)
+	log := logger.BessLog.With("module", q.Name(), "cmd", cmd)
 
 	if cmd == addCmd {
 		wc := &bess_pb.GtpuPathMonitoringCommandAddDeleteArg{}
@@ -571,11 +571,11 @@ func (q *gtpuPathMonitoringModule) HandleRequest(cmd string, arg *anypb.Any) (er
 			}
 		}
 		if existing != nil {
-			log.Tracef("updated existing entry %v", existing)
+			log.Debugf("updated existing entry %v", existing)
 			existing.Reset()
 			proto.Merge(existing, wc)
 		} else {
-			log.Tracef("added new entry %v", wc)
+			log.Debugf("added new entry %v", wc)
 			q.entries = append(q.entries, wc)
 		}
 	} else if cmd == deleteCmd {
@@ -593,7 +593,7 @@ func (q *gtpuPathMonitoringModule) HandleRequest(cmd string, arg *anypb.Any) (er
 		if idx == -1 {
 			return status.Errorf(codes.NotFound, "entry not found: %v", qc)
 		} else {
-			log.Tracef("deleted existing entry %v", q.entries[idx])
+			log.Debugf("deleted existing entry %v", q.entries[idx])
 			q.entries = append(q.entries[:idx], q.entries[idx+1:]...)
 		}
 	} else if cmd == clearCmd {

@@ -11,9 +11,9 @@ import (
 	"net"
 
 	"github.com/omec-project/upf-epc/internal/p4constants"
+	"github.com/omec-project/upf-epc/logger"
 	p4ConfigV1 "github.com/p4lang/p4runtime/go/p4/config/v1"
 	p4 "github.com/p4lang/p4runtime/go/p4/v1"
-	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
@@ -105,7 +105,7 @@ func convertValueToBinary(value interface{}) ([]byte, error) {
 
 		return b, nil
 	default:
-		log.Debugf("Type %T", t)
+		logger.P4Log.Debugf("type %T", t)
 		return nil, ErrOperationFailedWithParam("convert type to byte array", "type", t)
 	}
 }
@@ -217,11 +217,8 @@ func (t *P4rtTranslator) withExactMatchField(entry *p4.TableEntry, name string, 
 }
 
 func (t *P4rtTranslator) withLPMField(entry *p4.TableEntry, name string, value uint32, prefixLen uint8) error {
-	lpmFieldLog := log.WithFields(log.Fields{
-		"entry":      entry.String(),
-		"field name": name,
-	})
-	lpmFieldLog.Trace("Adding LPM match field to the entry")
+	lpmFieldLog := logger.P4Log.With("entry", entry.String(), "field name", name)
+	lpmFieldLog.Debugln("adding LPM match field to the entry")
 
 	if entry.TableId == 0 {
 		return ErrInvalidArgumentWithReason("entry.TableId", entry.TableId, "no table ID for entry defined, set table ID before adding match fields")
@@ -259,11 +256,8 @@ func (t *P4rtTranslator) withLPMField(entry *p4.TableEntry, name string, value u
 }
 
 func (t *P4rtTranslator) withRangeMatchField(entry *p4.TableEntry, name string, low interface{}, high interface{}) error {
-	rangeFieldLog := log.WithFields(log.Fields{
-		"entry":      entry.String(),
-		"field name": name,
-	})
-	rangeFieldLog.Trace("Adding range match field to the entry")
+	rangeFieldLog := logger.P4Log.With("entry", entry.String(), "field name", name)
+	rangeFieldLog.Debugln("adding range match field to the entry")
 
 	if entry.TableId == 0 {
 		return ErrInvalidArgumentWithReason("entry.TableId", entry.TableId, "no table ID for entry defined, set table ID before adding match fields")
@@ -306,11 +300,8 @@ func (t *P4rtTranslator) withRangeMatchField(entry *p4.TableEntry, name string, 
 }
 
 func (t *P4rtTranslator) withTernaryMatchField(entry *p4.TableEntry, name string, value interface{}, mask interface{}) error {
-	ternaryFieldLog := log.WithFields(log.Fields{
-		"entry":      entry.String(),
-		"field name": name,
-	})
-	ternaryFieldLog.Trace("Adding ternary match field to the entry")
+	ternaryFieldLog := logger.P4Log.With("entry", entry.String(), "field name", name)
+	ternaryFieldLog.Debugln("adding ternary match field to the entry")
 
 	if entry.TableId == 0 {
 		return ErrInvalidArgumentWithReason("entry.TableId", entry.TableId, "no table name for entry defined, set table name before adding match fields")
@@ -327,7 +318,7 @@ func (t *P4rtTranslator) withTernaryMatchField(entry *p4.TableEntry, name string
 	}
 
 	if len(byteVal) != len(byteMask) {
-		ternaryFieldLog.Trace("value and mask length mismatch")
+		ternaryFieldLog.Debugln("value and mask length mismatch")
 		return ErrOperationFailedWithParam("value and mask length mismatch for ternary field", "field", name)
 	}
 
@@ -483,10 +474,8 @@ func (t *P4rtTranslator) BuildInterfaceTableEntry(ipNet *net.IPNet, sliceID uint
 }
 
 func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, sliceID uint8, internalAppID uint8) (*p4.TableEntry, error) {
-	applicationsBuilderLog := log.WithFields(log.Fields{
-		"pdr": pdr,
-	})
-	applicationsBuilderLog.Trace("Building P4rt table entry for applications table")
+	applicationsBuilderLog := logger.P4Log.With("pdr", pdr)
+	applicationsBuilderLog.Debugln("building P4rt table entry for applications table")
 
 	entry := &p4.TableEntry{
 		TableId: p4constants.TablePreQosPipeApplications,
@@ -544,18 +533,15 @@ func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, sliceID uint8, int
 		Type: &p4.TableAction_Action{Action: action},
 	}
 
-	applicationsBuilderLog = applicationsBuilderLog.WithField("entry", entry)
-	applicationsBuilderLog.Trace("Built P4rt table entry for applications table")
+	applicationsBuilderLog = applicationsBuilderLog.With("entry", entry)
+	applicationsBuilderLog.Debugln("built P4rt table entry for applications table")
 
 	return entry, nil
 }
 
 func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr, sessMeterIdx uint32) (*p4.TableEntry, error) {
-	uplinkBuilderLog := log.WithFields(log.Fields{
-		"pdr":               pdr,
-		"sessionMeterIndex": sessMeterIdx,
-	})
-	uplinkBuilderLog.Trace("Building P4rt table entry for sessions_uplink table")
+	uplinkBuilderLog := logger.P4Log.With("pdr", pdr, "sessionMeterIndex", sessMeterIdx)
+	uplinkBuilderLog.Debugln("building P4rt table entry for sessions_uplink table")
 
 	entry := &p4.TableEntry{
 		TableId:  p4constants.TablePreQosPipeSessionsUplink,
@@ -582,19 +568,14 @@ func (t *P4rtTranslator) buildUplinkSessionsEntry(pdr pdr, sessMeterIdx uint32) 
 		Type: &p4.TableAction_Action{Action: action},
 	}
 
-	uplinkBuilderLog.WithField("entry", entry).Trace("Built P4rt table entry for sessions_uplink table")
+	uplinkBuilderLog.With("entry", entry).Debugln("built P4rt table entry for sessions_uplink table")
 
 	return entry, nil
 }
 
 func (t *P4rtTranslator) buildDownlinkSessionsEntry(pdr pdr, sessMeterIdx uint32, tunnelPeerID uint8, needsBuffering bool) (*p4.TableEntry, error) {
-	builderLog := log.WithFields(log.Fields{
-		"pdr":               pdr,
-		"sessionMeterIndex": sessMeterIdx,
-		"tunnelPeerID":      tunnelPeerID,
-		"needsBuffering":    needsBuffering,
-	})
-	builderLog.Trace("Building P4rt table entry for sessions_downlink table")
+	builderLog := logger.P4Log.With("pdr", pdr, "sessionMeterIndex", sessMeterIdx, "tunnelPeerID", tunnelPeerID, "needsBuffering", needsBuffering)
+	builderLog.Debugln("building P4rt table entry for sessions_downlink table")
 
 	entry := &p4.TableEntry{
 		TableId:  p4constants.TablePreQosPipeSessionsDownlink,
@@ -627,7 +608,7 @@ func (t *P4rtTranslator) buildDownlinkSessionsEntry(pdr pdr, sessMeterIdx uint32
 		Type: &p4.TableAction_Action{Action: action},
 	}
 
-	builderLog.WithField("entry", entry).Trace("Built P4rt table entry for sessions_downlink table")
+	builderLog.With("entry", entry).Debugln("built P4rt table entry for sessions_downlink table")
 
 	return entry, nil
 }
@@ -644,12 +625,8 @@ func (t *P4rtTranslator) BuildSessionsTableEntry(pdr pdr, sessionMeter meter, tu
 }
 
 func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, appMeterIdx uint32, shouldDrop bool, internalAppID uint8, tc uint8, relatedQER qer) (*p4.TableEntry, error) {
-	builderLog := log.WithFields(log.Fields{
-		"pdr":           pdr,
-		"appMeterIndex": appMeterIdx,
-		"tc":            tc,
-	})
-	builderLog.Debug("Building P4rt table entry for UP4 terminations_uplink table")
+	builderLog := logger.P4Log.With("pdr", pdr, "appMeterIndex", appMeterIdx, "tc", tc)
+	builderLog.Debugln("building P4rt table entry for UP4 terminations_uplink table")
 
 	entry := &p4.TableEntry{
 		TableId:  p4constants.TablePreQosPipeTerminationsUplink,
@@ -695,20 +672,15 @@ func (t *P4rtTranslator) buildUplinkTerminationsEntry(pdr pdr, appMeterIdx uint3
 		Type: &p4.TableAction_Action{Action: action},
 	}
 
-	builderLog.WithField("entry", entry).Debug("Built P4rt table entry for terminations_uplink table")
+	builderLog.With("entry", entry).Debugln("built P4rt table entry for terminations_uplink table")
 
 	return entry, nil
 }
 
 func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uint32, relatedFAR far,
 	internalAppID uint8, qfi uint8, tc uint8, relatedQER qer) (*p4.TableEntry, error) {
-	builderLog := log.WithFields(log.Fields{
-		"pdr":           pdr,
-		"appMeterIndex": appMeterIdx,
-		"tc":            tc,
-		"related-far":   relatedFAR,
-	})
-	builderLog.Debug("Building P4rt table entry for UP4 terminations_downlink table")
+	builderLog := logger.P4Log.With("pdr", pdr, "appMeterIndex", appMeterIdx, "tc", tc, "related-far", relatedFAR)
+	builderLog.Debugln("building P4rt table entry for UP4 terminations_downlink table")
 
 	entry := &p4.TableEntry{
 		TableId:  p4constants.TablePreQosPipeTerminationsDownlink,
@@ -763,7 +735,7 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uin
 		Type: &p4.TableAction_Action{Action: action},
 	}
 
-	builderLog.WithField("entry", entry).Debug("Built P4rt table entry for terminations_downlink table")
+	builderLog.With("entry", entry).Debugln("built P4rt table entry for terminations_downlink table")
 
 	return entry, nil
 }
@@ -780,11 +752,8 @@ func (t *P4rtTranslator) BuildTerminationsTableEntry(pdr pdr, appMeter meter, re
 }
 
 func (t *P4rtTranslator) BuildGTPTunnelPeerTableEntry(tunnelPeerID uint8, tunnelParams tunnelParams) (*p4.TableEntry, error) {
-	builderLog := log.WithFields(log.Fields{
-		"tunnelPeerID":  tunnelPeerID,
-		"tunnel-params": tunnelParams,
-	})
-	builderLog.Trace("Building P4rt table entry for GTP Tunnel Peers table")
+	builderLog := logger.P4Log.With("tunnelPeerID", tunnelPeerID, "tunnel-params", tunnelParams)
+	builderLog.Debugln("building P4rt table entry for GTP Tunnel Peers table")
 
 	entry := &p4.TableEntry{
 		TableId:  p4constants.TablePreQosPipeTunnelPeers,
@@ -814,7 +783,7 @@ func (t *P4rtTranslator) BuildGTPTunnelPeerTableEntry(tunnelPeerID uint8, tunnel
 		return nil, err
 	}
 
-	builderLog.WithField("entry", entry).Debug("Built P4rt table entry for GTP Tunnel Peers table")
+	builderLog.With("entry", entry).Debugln("built P4rt table entry for GTP Tunnel Peers table")
 
 	return entry, nil
 }
@@ -822,11 +791,8 @@ func (t *P4rtTranslator) BuildGTPTunnelPeerTableEntry(tunnelPeerID uint8, tunnel
 func (t *P4rtTranslator) BuildMeterEntry(meterID uint32, cellID uint32, config *p4.MeterConfig) *p4.MeterEntry {
 	meterName := p4constants.GetMeterIDToNameMap()[meterID]
 
-	builderLog := log.WithFields(log.Fields{
-		"Meter":   meterName,
-		"Cell ID": cellID,
-	})
-	builderLog.Trace("Building Meter entry")
+	builderLog := logger.P4Log.With("Meter", meterName, "Cell ID", cellID)
+	builderLog.Debugln("building Meter entry")
 
 	entry := &p4.MeterEntry{
 		MeterId: meterID,
@@ -834,8 +800,8 @@ func (t *P4rtTranslator) BuildMeterEntry(meterID uint32, cellID uint32, config *
 		Config:  config,
 	}
 
-	builderLog = builderLog.WithField("meter-entry", entry)
-	builderLog.Debug("Meter entry built successfully")
+	builderLog = builderLog.With("meter-entry", entry)
+	builderLog.Debugln("meter entry built successfully")
 
 	return entry
 }

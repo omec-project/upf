@@ -6,7 +6,7 @@ package pfcpiface
 import (
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/omec-project/upf-epc/logger"
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
@@ -69,7 +69,7 @@ func (s simMode) enable() bool {
 }
 
 func (u *upf) sim(mode simMode, s *SimModeInfo) {
-	log.Infoln(simulate.String(), "sessions:", s.MaxSessions)
+	logger.PfcpLog.Infoln(simulate.String(), "sessions:", s.MaxSessions)
 
 	start := time.Now()
 	ueip := s.StartUEIP
@@ -268,9 +268,9 @@ func (u *upf) sim(mode simMode, s *SimModeInfo) {
 		} else if mode.delete() {
 			u.SendMsgToUPF(upfMsgTypeDel, allRules, PacketForwardingRules{})
 		} else {
-			log.Fatalln("Unsupported method", mode)
+			logger.PfcpLog.Fatalln("unsupported method", mode)
 		}
 	}
 
-	log.Infoln("Sessions/s:", float64(s.MaxSessions)/time.Since(start).Seconds())
+	logger.PfcpLog.Infoln("sessions/s:", float64(s.MaxSessions)/time.Since(start).Seconds())
 }

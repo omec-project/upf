@@ -13,14 +13,15 @@ import (
 
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim"
 	"github.com/omec-project/upf-epc/internal/p4constants"
+	"github.com/omec-project/upf-epc/logger"
 	"github.com/omec-project/upf-epc/pfcpiface"
 	"github.com/omec-project/upf-epc/pkg/fake_bess"
 	"github.com/omec-project/upf-epc/test/integration/providers"
 	v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
+	"go.uber.org/zap"
 )
 
 // this file should contain all the struct defs/constants used among different test cases.
@@ -154,13 +155,7 @@ type testCase struct {
 }
 
 func init() {
-	logrus.SetLevel(logrus.TraceLevel)
-	logrus.SetReportCaller(true)
-	logrus.SetFormatter(&logrus.TextFormatter{
-		FullTimestamp: true,
-		ForceColors:   true,
-	})
-
+	logger.SetLogLevel(zap.DebugLevel)
 	providers.MustPullDockerImage(ImageNameMockUP4)
 	providers.MustCreateNetworkIfNotExists(DockerTestNetwork)
 }

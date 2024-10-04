@@ -10,7 +10,7 @@ import (
 	"math"
 	"net"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/omec-project/upf-epc/logger"
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
@@ -338,15 +338,15 @@ func (p *pdr) parseUEAddressIE(ueAddrIE *ie.IE, ippool *IPPool) error {
 
 	if needAllocIP(ueIPaddr) {
 		/* alloc IPV6 if CHV6 is enabled : TBD */
-		log.Infof("UPF should alloc UE IP for SEID %v. CHV4 flag set", p.fseID)
+		logger.PfcpLog.Infof("UPF should alloc UE IP for SEID %v. CHV4 flag set", p.fseID)
 
 		ueIP4, err = ippool.LookupOrAllocIP(p.fseID)
 		if err != nil {
-			log.Errorln("failed to allocate UE IP")
+			logger.PfcpLog.Errorln("failed to allocate UE IP")
 			return err
 		}
 
-		log.Traceln("Found or allocated new IP", ueIP4, "from pool", ippool)
+		logger.PfcpLog.Debugln("found or allocated new IP", ueIP4, "from pool", ippool)
 
 		p.allocIPFlag = true
 	} else {
@@ -414,14 +414,11 @@ func (p *pdr) parseApplicationID(ie *ie.IE, appPFDs map[string]appPFD) error {
 	}
 
 	if appID != apfd.appID {
-		log.Fatalln("Mismatch in App ID", appID, apfd.appID)
+		logger.PfcpLog.Fatalln("mismatch in App ID", appID, apfd.appID)
 	}
 
 	for _, flowDesc := range apfd.flowDescs {
-		logger := log.WithFields(log.Fields{
-			"Application ID":   apfd.appID,
-			"Flow Description": flowDesc,
-		})
+		logger := logger.PfcpLog.With("Application ID", apfd.appID, "Flow Description", flowDesc)
 		logger.Debug("Parsing flow description of Application ID IE")
 
 		ipf, err := parseFlowDesc(flowDesc, int2ip(p.ueAddress).String())
@@ -463,9 +460,7 @@ func (p *pdr) parseSDFFilter(ie *ie.IE) error {
 		return ErrOperationFailedWithReason("parse SDF Filter", "empty filter description")
 	}
 
-	log.WithFields(log.Fields{
-		"Flow Description": flowDesc,
-	}).Debug("Parsing Flow Description from SDF Filter")
+	logger.PfcpLog.With("Flow Description", flowDesc).Debugln("parsing Flow Description from SDF Filter")
 
 	ipf, err := parseFlowDesc(flowDesc, int2ip(p.ueAddress).String())
 	if err != nil {
@@ -516,17 +511,17 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, ippool *IPPoo
 		switch pdiIE.Type {
 		case ie.UEIPAddress:
 			if err := p.parseUEAddressIE(pdiIE, ippool); err != nil {
-				log.Errorf("Failed to parse UE Address IE: %v", err)
+				logger.PfcpLog.Errorf("failed to parse UE Address IE: %v", err)
 				return err
 			}
 		case ie.SourceInterface:
 			if err := p.parseSourceInterfaceIE(pdiIE); err != nil {
-				log.Errorf("Failed to parse Source Interface IE: %v", err)
+				logger.PfcpLog.Errorf("failed to parse Source Interface IE: %v", err)
 				return err
 			}
 		case ie.FTEID:
 			if err := p.parseFTEID(pdiIE); err != nil {
-				log.Errorf("Failed to parse F-TEID IE: %v", err)
+				logger.PfcpLog.Errorf("failed to parse F-TEID IE: %v", err)
 				return err
 			}
 		}
@@ -547,12 +542,12 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, ippool *IPPoo
 		switch ie2.Type {
 		case ie.ApplicationID:
 			if err := p.parseApplicationID(ie2, appPFDs); err != nil {
-				log.Errorf("Failed to parse Application ID IE: %v", err)
+				logger.PfcpLog.Errorf("failed to parse Application ID IE: %v", err)
 				return err
 			}
 		case ie.SDFFilter:
 			if err := p.parseSDFFilter(ie2); err != nil {
-				log.Errorf("Failed to parse SDF Filter IE: %v", err)
+				logger.PfcpLog.Errorf("failed to parse SDF Filter IE: %v", err)
 				return err
 			}
 		}
@@ -569,19 +564,19 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, ippoo
 
 	pdrID, err := ie1.PDRID()
 	if err != nil {
-		log.Println("Could not read PDR ID!")
+		logger.PfcpLog.Errorln("could not read PDR ID!")
 		return err
 	}
 
 	precedence, err := ie1.Precedence()
 	if err != nil {
-		log.Println("Could not read Precedence!")
+		logger.PfcpLog.Errorln("could not read Precedence!")
 		return err
 	}
 
 	pdi, err := ie1.PDI()
 	if err != nil {
-		log.Println("Could not read PDI!")
+		logger.PfcpLog.Errorln("could not read PDI!")
 		return err
 	}
 
@@ -597,7 +592,7 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, ippoo
 
 	farID, err := ie1.FARID()
 	if err != nil {
-		log.Println("Could not read FAR ID!")
+		logger.PfcpLog.Errorln("could not read FAR ID!")
 		return err
 	}
 
@@ -625,7 +620,7 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, ippoo
 		if x.Type == ie.QERID {
 			qerID, errRead := x.QERID()
 			if errRead != nil {
-				log.Errorln("qerID read failed")
+				logger.PfcpLog.Errorln("qerID read failed")
 				continue
 			} else {
 				p.qerIDList = append(p.qerIDList, qerID)
@@ -634,7 +629,7 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, ippoo
 	}
 	/*qerID, err := ie1.QERID()
 	if err != nil {
-		log.Println("Could not read QER ID!")
+		logger.PfcpLog.Errorln("could not read QER ID!")
 	}*/
 
 	p.precedence = precedence

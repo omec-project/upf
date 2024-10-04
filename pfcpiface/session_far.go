@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	log "github.com/sirupsen/logrus"
+	"github.com/omec-project/upf-epc/logger"
 )
 
 // CreateFAR appends far to existing list of FARs in the session.
@@ -18,7 +18,7 @@ func (s *PFCPSession) CreateFAR(f far) {
 
 func addEndMarker(farItem far, endMarkerList *[][]byte) {
 	// This time lets fill out some information
-	log.Println("Adding end Marker for farID : ", farItem.farID)
+	logger.PfcpLog.Infoln("adding end marker for farID:", farItem.farID)
 
 	options := gopacket.SerializeOptions{
 		ComputeChecksums: true,
@@ -44,7 +44,7 @@ func addEndMarker(farItem far, endMarkerList *[][]byte) {
 
 	err := udpLayer.SetNetworkLayerForChecksum(ipLayer)
 	if err != nil {
-		log.Println("set checksum for UDP layer in endmarker failed")
+		logger.PfcpLog.Errorln("set checksum for UDP layer in endmarker failed")
 		return
 	}
 
@@ -66,7 +66,7 @@ func addEndMarker(farItem far, endMarkerList *[][]byte) {
 		outgoingPacket := buffer.Bytes()
 		*endMarkerList = append(*endMarkerList, outgoingPacket)
 	} else {
-		log.Println("go packet serialize failed : ", err)
+		logger.PfcpLog.Errorln("go packet serialize failed:", err)
 	}
 }
 

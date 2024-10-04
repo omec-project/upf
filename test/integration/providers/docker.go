@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os/exec"
 	"strings"
 	"time"
@@ -20,7 +19,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
-	"github.com/sirupsen/logrus"
+	"github.com/omec-project/upf-epc/logger"
 )
 
 // MustRunDockerCommandAttach attaches to a running Docker container and executes a cmd.
@@ -41,14 +40,14 @@ func MustRunDockerCommandAttach(containerName string, cmd string) {
 		Stream: true,
 	})
 	if err != nil {
-		logrus.Fatalf("Failed to attach container: %v", err)
+		logger.DockerLog.Fatalf("failed to attach container: %v", err)
 	}
 	defer waiter.Close()
 	if err = waiter.Conn.SetWriteDeadline(time.Now().Add(time.Second * 1)); err != nil {
-		logrus.Fatalf("Failed to set deadline: %v", err)
+		logger.DockerLog.Fatalf("failed to set deadline: %v", err)
 	}
 	if _, err = waiter.Conn.Write(append([]byte(cmd), '\n')); err != nil {
-		logrus.Fatalf("Failed to write to container: %v", err)
+		logger.DockerLog.Fatalf("failed to write to container: %v", err)
 	}
 }
 
@@ -105,7 +104,7 @@ func MustCreateNetworkIfNotExists(name string) {
 
 	allNetworks, err := cli.NetworkList(ctx, types.NetworkListOptions{})
 	if err != nil {
-		log.Fatalf("Failed to check if network exists: %v", err)
+		logger.DockerLog.Fatalf("failed to check if network exists: %v", err)
 	}
 
 	for _, net := range allNetworks {
@@ -238,14 +237,14 @@ func MustStopDockerContainer(name string) {
 
 	err = cli.ContainerKill(ctx, name, "SIGKILL")
 	if err != nil {
-		logrus.Fatalf("Failed to stop Docker container %s: %v", name, err)
+		logger.DockerLog.Fatalf("failed to stop Docker container %s: %v", name, err)
 	}
 
 	err = cli.ContainerRemove(ctx, name, container.RemoveOptions{
 		Force: true,
 	})
 	if err != nil {
-		logrus.Fatalf("Failed to stop Docker container %s: %v", name, err)
+		logger.DockerLog.Fatalf("failed to stop Docker container %s: %v", name, err)
 	}
 }
 

@@ -6,6 +6,7 @@
 .coverage/
 *.pyc
 *.swp
+*.log
 output
 dpdk-devbind.py
 dpdk-hugepages.py

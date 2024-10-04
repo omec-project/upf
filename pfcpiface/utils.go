@@ -11,8 +11,7 @@ import (
 	"strings"
 
 	"github.com/omec-project/upf-epc/internal/p4constants"
-
-	log "github.com/sirupsen/logrus"
+	"github.com/omec-project/upf-epc/logger"
 )
 
 // Bits type.
@@ -104,10 +103,10 @@ func calcBurstSizeFromRate(kbps uint64, ms uint64) uint64 {
 func MustParseStrIP(address string) *net.IPNet {
 	ip, ipNet, err := net.ParseCIDR(address)
 	if err != nil {
-		log.Fatalf("unable to parse IP %v that we should parse", address)
+		logger.PfcpLog.Fatalf("unable to parse IP %v that we should parse", address)
 	}
 
-	log.Info("Parsed IP: ", ip)
+	logger.PfcpLog.Infoln("parsed IP:", ip)
 
 	return ipNet
 }
