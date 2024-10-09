@@ -107,6 +107,10 @@ func (pConn *PFCPConn) associationIEs() []*ie.IE {
 		setUeipFeature(features...)
 	}
 
+	if upf.enableFTUP {
+		setFTUPFeature(features...)
+	}
+
 	if upf.enableEndMarker {
 		setEndMarkerFeature(features...)
 	}
