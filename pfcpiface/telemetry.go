@@ -6,8 +6,7 @@ package pfcpiface
 import (
 	"net/http"
 
-	log "github.com/sirupsen/logrus"
-
+	"github.com/omec-project/upf-epc/logger"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -168,7 +167,7 @@ func (col PfcpNodeCollector) Collect(ch chan<- prometheus.Metric) {
 	if col.node.upf.enableFlowMeasure {
 		err := col.node.upf.SessionStats(&col, ch)
 		if err != nil {
-			log.Errorln(err)
+			logger.PfcpLog.Errorln(err)
 			return
 		}
 	}
@@ -192,10 +191,10 @@ func setupProm(mux *http.ServeMux, upf *upf, node *PFCPNode) (*upfCollector, *Pf
 
 func clearProm(uc *upfCollector, nc *PfcpNodeCollector) {
 	if ok := prometheus.Unregister(uc); !ok {
-		log.Warnln("Failed to unregister upfCollector")
+		logger.PfcpLog.Warnln("failed to unregister upfCollector")
 	}
 
 	if ok := prometheus.Unregister(nc); !ok {
-		log.Warnln("Failed to unregister PfcpNodeCollector")
+		logger.PfcpLog.Warnln("failed to unregister PfcpNodeCollector")
 	}
 }

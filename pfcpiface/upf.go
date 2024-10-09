@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/Showmax/go-fqdn"
-	log "github.com/sirupsen/logrus"
+	"github.com/omec-project/upf-epc/logger"
 )
 
 // QosConfigVal : Qos configured value.
@@ -42,6 +42,7 @@ type upf struct {
 	accessIface       string
 	coreIface         string
 	ippoolCidr        string
+	n4addr            string
 	accessIP          net.IP
 	coreIP            net.IP
 	nodeID            string
@@ -101,7 +102,7 @@ func NewUPF(conf *Conf, fp datapath) *upf {
 	if conf.CPIface.UseFQDN && nodeID == "" {
 		nodeID, err = fqdn.FqdnHostname()
 		if err != nil {
-			log.Fatalln("Unable to get hostname", err)
+			logger.PfcpLog.Fatalln("unable to get hostname", err)
 		}
 	}
 
@@ -109,7 +110,7 @@ func NewUPF(conf *Conf, fp datapath) *upf {
 	if nodeID != "" {
 		hosts, err = net.LookupHost(nodeID)
 		if err != nil {
-			log.Fatalln("Unable to resolve hostname", nodeID, err)
+			logger.PfcpLog.Fatalln("unable to resolve hostname", nodeID, err)
 		}
 
 		nodeID = hosts[0]
@@ -132,6 +133,7 @@ func NewUPF(conf *Conf, fp datapath) *upf {
 		enableHBTimer:     conf.EnableHBTimer,
 		readTimeout:       time.Second * time.Duration(conf.ReadTimeout),
 		fteidGenerator:    NewFTEIDGenerator(),
+		n4addr:            conf.N4Addr,
 	}
 
 	if len(conf.CPIface.Peers) > 0 {
@@ -139,34 +141,34 @@ func NewUPF(conf *Conf, fp datapath) *upf {
 		nc := copy(u.peers, conf.CPIface.Peers)
 
 		if nc == 0 {
-			log.Warnln("Failed to parse cpiface peers, PFCP Agent will not initiate connection to N4 peers.")
+			logger.PfcpLog.Warnln("failed to parse cpiface peers, PFCP Agent will not initiate connection to N4 peers.")
 		}
 	}
 
 	if !conf.EnableP4rt {
 		u.accessIP, err = GetUnicastAddressFromInterface(conf.AccessIface.IfName)
 		if err != nil {
-			log.Errorln(err)
+			logger.PfcpLog.Errorln(err)
 			return nil
 		}
 
 		u.coreIP, err = GetUnicastAddressFromInterface(conf.CoreIface.IfName)
 		if err != nil {
-			log.Errorln(err)
+			logger.PfcpLog.Errorln(err)
 			return nil
 		}
 	}
 
 	u.respTimeout, err = time.ParseDuration(conf.RespTimeout)
 	if err != nil {
-		log.Fatalln("Unable to parse resp_timeout")
+		logger.PfcpLog.Fatalln("unable to parse resp_timeout")
 	}
 
 	if u.enableHBTimer {
 		if conf.HeartBeatInterval != "" {
 			u.hbInterval, err = time.ParseDuration(conf.HeartBeatInterval)
 			if err != nil {
-				log.Fatalln("Unable to parse heart_beat_interval")
+				logger.PfcpLog.Fatalln("unable to parse heart_beat_interval")
 			}
 		}
 	}
@@ -174,7 +176,7 @@ func NewUPF(conf *Conf, fp datapath) *upf {
 	if u.enableUeIPAlloc {
 		u.ippool, err = NewIPPool(u.ippoolCidr)
 		if err != nil {
-			log.Fatalln("ip pool init failed", err)
+			logger.PfcpLog.Fatalln("ip pool init failed", err)
 		}
 	}
 

@@ -20,8 +20,8 @@ import (
 	p4 "github.com/p4lang/p4runtime/go/p4/v1"
 
 	set "github.com/deckarep/golang-set"
+	"github.com/omec-project/upf-epc/logger"
 	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
@@ -185,7 +185,7 @@ func (up4 *UP4) AddSliceInfo(sliceInfo *SliceInfo) error {
 	//  configure the meter with the largest slice MBR between UL and DL.
 	err := up4.tryConnect()
 	if err != nil {
-		log.Error("UP4 server not connected")
+		logger.PfcpLog.Error("UP4 server not connected")
 		return ErrOperationFailedWithReason("addSliceInfo", "data plane is not connected")
 	}
 
@@ -211,9 +211,7 @@ func (up4 *UP4) AddSliceInfo(sliceInfo *SliceInfo) error {
 	}
 	sliceMeterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.MeterPreQosPipeSliceTcMeter, uint32(meterCellId), &meterConfig)
 
-	log.WithFields(log.Fields{
-		"Slice meter entry": sliceMeterEntry,
-	}).Debug("Installing slice P4 Meter entry")
+	logger.PfcpLog.With("Slice meter entry", sliceMeterEntry).Debugln("installing slice P4 Meter entry")
 
 	err = up4.p4client.ApplyMeterEntries(p4.Update_MODIFY, sliceMeterEntry)
 
@@ -246,16 +244,11 @@ func (up4 *UP4) initCounter(counterID uint8, name string, counterSize uint64) {
 		up4.counters[counterID].counterIDsPool.Add(i)
 	}
 
-	log.WithFields(log.Fields{
-		"counterID":      counterID,
-		"name":           name,
-		"max-size":       counterSize,
-		"UP4 counter ID": counterID,
-	}).Debug("Counter initialized successfully")
+	logger.PfcpLog.With("counterID", counterID, "name", name, "max-size", counterSize, "UP4 counter ID", counterID).Debugln("counter initialized successfully")
 }
 
 func (up4 *UP4) releaseCounterID(p4counterID uint8, val uint64) {
-	log.Println("delete counter val ", val)
+	logger.PfcpLog.Infoln("delete counter val", val)
 	up4.counters[p4counterID].counterIDsPool.Add(val)
 }
 
@@ -276,15 +269,12 @@ func (up4 *UP4) allocateCounterID(p4counterID uint8) (uint64, error) {
 }
 
 func (up4 *UP4) Exit() {
-	log.Println("Exit function P4rtc")
+	logger.PfcpLog.Infoln("exit function P4rtc")
 }
 
 func (up4 *UP4) setupChannel() error {
-	setupLog := log.WithFields(log.Fields{
-		"P4Runtime server address": up4.host,
-		"DeviceID":                 up4.deviceID,
-	})
-	setupLog.Debug("Trying to setup P4Rt channel")
+	setupLog := logger.PfcpLog.With("P4Runtime server address", up4.host, "DeviceID", up4.deviceID)
+	setupLog.Debugln("trying to setup P4Rt channel")
 
 	client, err := CreateChannel(up4.host, up4.deviceID)
 	if err != nil {
@@ -296,13 +286,13 @@ func (up4 *UP4) setupChannel() error {
 
 	up4.p4RtTranslator = newP4RtTranslator(up4.p4client.P4Info)
 
-	setupLog.Debug("P4Rt channel created")
+	setupLog.Debugln("P4Rt channel created")
 
 	return nil
 }
 
 func (up4 *UP4) initAllCounters() {
-	log.Debug("Initializing counters for UP4")
+	logger.PfcpLog.Debugln("initializing counters for UP4")
 
 	counters := []uint32{
 		p4constants.CounterPreQosPipePreQosCounter,
@@ -314,7 +304,7 @@ func (up4 *UP4) initAllCounters() {
 
 		counterSize, err := up4.p4RtTranslator.getCounterSizeByID(counterID)
 		if err != nil {
-			log.Error(err)
+			logger.PfcpLog.Errorln(err)
 		}
 
 		switch counterID {
@@ -327,7 +317,7 @@ func (up4 *UP4) initAllCounters() {
 }
 
 func (up4 *UP4) initMetersPools() {
-	log.Debug("Initializing P4 Meters pools for UP4")
+	logger.PfcpLog.Debugln("initializing P4 Meters pools for UP4")
 
 	meters := []uint32{
 		p4constants.MeterPreQosPipeAppMeter,
@@ -339,7 +329,7 @@ func (up4 *UP4) initMetersPools() {
 
 		meterSize, err := up4.p4RtTranslator.getMeterSizeByID(meterID)
 		if err != nil {
-			log.Errorf("Could not find meter size of %v", meterName)
+			logger.PfcpLog.Errorf("could not find meter size of %v", meterName)
 		}
 
 		switch meterID {
@@ -349,21 +339,18 @@ func (up4 *UP4) initMetersPools() {
 				up4.appMeterCellIDsPool.Add(uint32(i))
 			}
 
-			log.Trace("Application meter IDs pool initialized: ", up4.appMeterCellIDsPool.String())
+			logger.PfcpLog.Debugln("Application meter IDs pool initialized:", up4.appMeterCellIDsPool.String())
 		case p4constants.MeterPreQosPipeSessionMeter:
 			up4.sessMeterCellIDsPool = set.NewSet()
 			for i := 1; i < int(meterSize); i++ {
 				up4.sessMeterCellIDsPool.Add(uint32(i))
 			}
 
-			log.Trace("Session meter IDs pool initialized: ", up4.sessMeterCellIDsPool.String())
+			logger.PfcpLog.Debugln("session meter IDs pool initialized:", up4.sessMeterCellIDsPool.String())
 		}
 	}
 
-	log.WithFields(log.Fields{
-		"applicationMeter pool size": up4.appMeterCellIDsPool.Cardinality(),
-		"sessMeter pool size":        up4.sessMeterCellIDsPool.Cardinality(),
-	}).Debug("P4 Meters pools initialized successfully")
+	logger.PfcpLog.With("applicationMeter pool size", up4.appMeterCellIDsPool.Cardinality(), "sessMeter pool size", up4.sessMeterCellIDsPool.Cardinality()).Debugln("P4 Meters pools initialized successfully")
 }
 
 func (up4 *UP4) initTunnelPeerIDs() {
@@ -408,18 +395,18 @@ func (up4 *UP4) setConnectedStatus(status bool) {
 
 // TODO: rename it to initUPF()
 func (up4 *UP4) SetUpfInfo(u *upf, conf *Conf) {
-	log.Println("SetUpfInfo UP4")
+	logger.PfcpLog.Infoln("SetUpfInfo UP4")
 
 	up4.conf = conf.P4rtcIface
 
 	up4.accessIP = MustParseStrIP(conf.P4rtcIface.AccessIP)
 	u.accessIP = up4.accessIP.IP
 
-	log.Infof("AccessIP: %v", up4.accessIP)
+	logger.PfcpLog.Infof("AccessIP: %v", up4.accessIP)
 
 	up4.ueIPPool = MustParseStrIP(conf.CPIface.UEIPPool)
 
-	log.Infof("UE IP pool: %v", up4.ueIPPool)
+	logger.PfcpLog.Infof("UE IP pool: %v", up4.ueIPPool)
 
 	p4rtcServer := conf.P4rtcIface.P4rtcServer
 
@@ -438,9 +425,7 @@ func (up4 *UP4) SetUpfInfo(u *upf, conf *Conf) {
 
 	up4.host = p4rtcServer + ":" + p4rtcPort
 
-	log.WithFields(log.Fields{
-		"UP4 endpoint": up4.host,
-	}).Info("UP4 endpoint configured")
+	logger.PfcpLog.With("UP4 endpoint", up4.host).Infoln("UP4 endpoint configured")
 
 	up4.deviceID = 1
 	up4.timeout = 30
@@ -469,13 +454,13 @@ func (up4 *UP4) tryConnect() error {
 
 	err := up4.setupChannel()
 	if err != nil {
-		log.Errorf("Failed to setup UP4 channel: %v", err)
+		logger.PfcpLog.Errorf("failed to setup UP4 channel: %v", err)
 		return err
 	}
 
 	err = up4.initialize(shouldClearAndInitialize)
 	if err != nil {
-		log.Errorf("Failed to initialize UP4: %v", err)
+		logger.PfcpLog.Errorf("failed to initialize UP4: %v", err)
 		return err
 	}
 
@@ -537,16 +522,13 @@ func (up4 *UP4) initInterfaces() error {
 		return err
 	}
 
-	log.WithFields(log.Fields{
-		"N3 address": up4.accessIP,
-		"ue pool":    up4.ueIPPool,
-	}).Debug("N3 address and UE pool successfully initialized in the UP4 pipeline")
+	logger.PfcpLog.With("N3 address", up4.accessIP, "ue pool", up4.ueIPPool).Debugln("N3 address and UE pool successfully initialized in the UP4 pipeline")
 
 	return nil
 }
 
 func (up4 *UP4) listenToDDNs() {
-	log.Info("Listening to Data Notifications from UP4..")
+	logger.PfcpLog.Info("listening to Data Notifications from UP4..")
 
 	notifier := NewDownlinkDataNotifier(up4.reportNotifyChan, 20*time.Second)
 
@@ -566,7 +548,7 @@ func (up4 *UP4) listenToDDNs() {
 func (up4 *UP4) clearDatapathState() error {
 	err := up4.clearTables()
 	if err != nil {
-		log.Warningf("failed to clear tables: %v", err)
+		logger.PfcpLog.Warnf("failed to clear tables: %v", err)
 		return err
 	}
 
@@ -596,7 +578,7 @@ func (up4 *UP4) initialize(shouldClear bool) error {
 		go up4.listenToDDNs()
 
 		if up4.enableEndMarker {
-			log.Println("Starting end marker loop")
+			logger.PfcpLog.Infoln("starting end marker loop")
 
 			up4.endMarkerChan = make(chan []byte, 1024)
 			go up4.endMarkerSendLoop()
@@ -618,7 +600,7 @@ func (up4 *UP4) endMarkerSendLoop() {
 	for outPacket := range up4.endMarkerChan {
 		err := up4.p4client.SendPacketOut(outPacket)
 		if err != nil {
-			log.Println("end marker write failed")
+			logger.PfcpLog.Errorln("end marker write failed")
 		}
 	}
 }
@@ -659,10 +641,7 @@ func (up4 *UP4) unsafeAllocateGTPTunnelPeerID() (uint8, error) {
 	allocated := up4.tunnelPeerIDsPool[0]
 	up4.tunnelPeerIDsPool = up4.tunnelPeerIDsPool[1:]
 
-	log.WithFields(log.Fields{
-		"ID":   allocated,
-		"pool": up4.tunnelPeerIDsPool,
-	}).Trace("Tunnel peer ID")
+	logger.PfcpLog.With("ID", allocated, "pool", up4.tunnelPeerIDsPool).Debugln("tunnel peer ID")
 
 	return allocated, nil
 }
@@ -673,11 +652,7 @@ func (up4 *UP4) unsafeReleaseAllocatedGTPTunnelPeer(tunnelParams tunnelParams) {
 		delete(up4.tunnelPeerIDs, tunnelParams)
 		up4.tunnelPeerIDsPool = append(up4.tunnelPeerIDsPool, allocated.id)
 
-		log.WithFields(log.Fields{
-			"tunnel params": tunnelParams,
-			"tunnel peer":   allocated,
-			"pool":          up4.tunnelPeerIDsPool,
-		}).Trace("Tunnel peer ID released")
+		logger.PfcpLog.With("tunnel params", tunnelParams, "tunnel peer", allocated, "pool", up4.tunnelPeerIDsPool).Debugln("tunnel peer ID released")
 	}
 }
 
@@ -753,9 +728,7 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 	up4.tunnelPeerMu.Lock()
 	defer up4.tunnelPeerMu.Unlock()
 
-	removeLog := log.WithFields(log.Fields{
-		"far": far,
-	})
+	removeLog := logger.PfcpLog.With("far", far)
 	tunnelParameters := tunnelParams{
 		tunnelIP4Src: ip2int(up4.accessIP.IP),
 		tunnelIP4Dst: far.tunnelIP4Dst,
@@ -764,34 +737,33 @@ func (up4 *UP4) removeGTPTunnelPeer(far far) {
 
 	tnlPeer, exists := up4.tunnelPeerIDs[tunnelParameters]
 	if !exists {
-		removeLog.WithField(
-			"tunnel-params", tunnelParameters).Warn("GTP tunnel peer ID not found for tunnel params")
+		removeLog.With("tunnel-params", tunnelParameters).Warnln("GTP tunnel peer ID not found for tunnel params")
 		return
 	}
 
-	removeLog.WithField("tunnel-peer", tnlPeer)
+	removeLog.With("tunnel-peer", tnlPeer)
 
-	removeLog.Debug("Found GTP tunnel peer for tunnel params")
+	removeLog.Debugln("found GTP tunnel peer for tunnel params")
 
 	tnlPeer.usedBy.Remove(tnlPeerReference{
 		far.fseID, far.farID,
 	})
 
 	if tnlPeer.usedBy.Cardinality() != 0 {
-		removeLog.Debug("GTP tunnel peer was about to be removed, but it's in use by other UE session.")
+		removeLog.Debugln("GTP tunnel peer was about to be removed, but it's in use by other UE session.")
 		return
 	}
 
 	gtpTunnelPeerEntry, err := up4.p4RtTranslator.BuildGTPTunnelPeerTableEntry(tnlPeer.id, tunnelParameters)
 	if err != nil {
-		removeLog.Error("failed to build GTP tunnel peer entry to remove")
+		removeLog.Errorln("failed to build GTP tunnel peer entry to remove")
 		return
 	}
 
-	removeLog.Debug("Removing GTP Tunnel Peer ID")
+	removeLog.Debugln("removing GTP Tunnel Peer ID")
 
 	if err := up4.p4client.ApplyTableEntries(p4.Update_DELETE, gtpTunnelPeerEntry); err != nil {
-		removeLog.Error("failed to remove GTP tunnel peer")
+		removeLog.Errorln("failed to remove GTP tunnel peer")
 	}
 
 	up4.unsafeReleaseAllocatedGTPTunnelPeer(tunnelParameters)
@@ -895,10 +867,7 @@ func (up4 *UP4) allocateAppMeterCellID() (uint32, error) {
 			"no free AppMeter Cell IDs available")
 	}
 
-	log.WithFields(log.Fields{
-		"allocated ID":       allocated,
-		"number of free IDs": up4.appMeterCellIDsPool.Cardinality(),
-	}).Debug("Application meter cell ID allocated")
+	logger.PfcpLog.With("allocated ID", allocated, "number of free IDs", up4.appMeterCellIDsPool.Cardinality()).Debugln("application meter cell ID allocated")
 
 	return allocated.(uint32), nil
 }
@@ -911,10 +880,7 @@ func (up4 *UP4) releaseAppMeterCellID(allocated uint32) {
 
 	up4.appMeterCellIDsPool.Add(allocated)
 
-	log.WithFields(log.Fields{
-		"released ID":        allocated,
-		"number of free IDs": up4.appMeterCellIDsPool.Cardinality(),
-	}).Debug("Application meter cell ID released")
+	logger.PfcpLog.With("released ID", allocated, "number of free IDs", up4.appMeterCellIDsPool.Cardinality()).Debugln("application meter cell ID released")
 }
 
 func (up4 *UP4) allocateSessionMeterCellID() (uint32, error) {
@@ -925,10 +891,7 @@ func (up4 *UP4) allocateSessionMeterCellID() (uint32, error) {
 			"no free SessionMeter Cell IDs available")
 	}
 
-	log.WithFields(log.Fields{
-		"allocated ID":       allocated,
-		"number of free IDs": up4.sessMeterCellIDsPool.Cardinality(),
-	}).Debug("Session meter cell ID allocated")
+	logger.PfcpLog.With("allocated ID", allocated, "number of free IDs", up4.sessMeterCellIDsPool.Cardinality()).Debugln("session meter cell ID allocated")
 
 	return allocated.(uint32), nil
 }
@@ -941,10 +904,7 @@ func (up4 *UP4) releaseSessionMeterCellID(allocated uint32) {
 
 	up4.sessMeterCellIDsPool.Add(allocated)
 
-	log.WithFields(log.Fields{
-		"released ID":        allocated,
-		"number of free IDs": up4.sessMeterCellIDsPool.Cardinality(),
-	}).Debug("Session meter cell ID released")
+	logger.PfcpLog.With("released ID", allocated, "number of free IDs", up4.sessMeterCellIDsPool.Cardinality()).Debugln("session meter cell ID released")
 }
 
 func (up4 *UP4) updateUEAddrAndFSEIDMappings(pdr pdr) {
@@ -967,13 +927,11 @@ func (up4 *UP4) removeUeAddrAndFSEIDMappings(pdr pdr) {
 
 func (up4 *UP4) updateTunnelPeersBasedOnFARs(fars []far) error {
 	for _, far := range fars {
-		logger := log.WithFields(log.Fields{
-			"far": far,
-		})
+		logger := logger.PfcpLog.With("far", far)
 		// downlink FAR with tunnel params that does encapsulation
 		if far.Forwards() && far.dstIntf == ie.DstInterfaceAccess && far.tunnelTEID != 0 {
 			if err := up4.addOrUpdateGTPTunnelPeer(far); err != nil {
-				logger.Errorf("Failed to add or update GTP tunnel peer: %v", err)
+				logger.Errorf("failed to add or update GTP tunnel peer: %v", err)
 				return err
 			}
 		}
@@ -984,12 +942,8 @@ func (up4 *UP4) updateTunnelPeersBasedOnFARs(fars []far) error {
 
 func getMeterConfigurationFromQER(mbr uint64, gbr uint64) *p4.MeterConfig {
 	defaultBurstDurationMs := 10
-	logger := log.WithFields(log.Fields{
-		"GBR (Kbps)":         gbr,
-		"MBR (Kbps)":         mbr,
-		"burstDuration (ms)": defaultBurstDurationMs,
-	})
-	logger.Debug("Converting GBR/MBR to P4 Meter configuration")
+	logger := logger.PfcpLog.With("GBR (Kbps)", gbr, "MBR (Kbps)", mbr, "burstDuration (ms)", defaultBurstDurationMs)
+	logger.Debugln("converting GBR/MBR to P4 Meter configuration")
 
 	// FIXME: calculate from rate once P4-UPF supports GBRs
 	cbs := 0
@@ -1004,13 +958,8 @@ func getMeterConfigurationFromQER(mbr uint64, gbr uint64) *p4.MeterConfig {
 		pir = maxUint64((mbr*1000)/8, uint64(cir))
 	}
 
-	logger = logger.WithFields(log.Fields{
-		"CIR": cir,
-		"CBS": cbs,
-		"PIR": pir,
-		"PBS": pbs,
-	})
-	logger.Debug("GBR/MBR has been converted to P4 Meter configuration")
+	logger = logger.With("CIR", cir, "CBS", cbs, "PIR", pir, "PBS", pbs)
+	logger.Debugln("GBR/MBR has been converted to P4 Meter configuration")
 
 	return &p4.MeterConfig{
 		Cir:    int64(cir),
@@ -1105,12 +1054,8 @@ func (up4 *UP4) configureSessionMeter(q qer) (meter, error) {
 		up4.releaseSessionMeterCellID(downlinkCellID)
 	}
 
-	logger := log.WithFields(log.Fields{
-		"uplink cell ID":   uplinkCellID,
-		"downlink cell ID": downlinkCellID,
-		"qer":              q,
-	})
-	logger.Debug("Configuring Session Meter from QER")
+	logger := logger.PfcpLog.With("uplink cell ID", uplinkCellID, "downlink cell ID", downlinkCellID, "qer", q)
+	logger.Debugln("configuring Session Meter from QER")
 
 	uplinkMeterConfig := getMeterConfigurationFromQER(q.ulMbr, q.ulGbr)
 	uplinkMeterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.MeterPreQosPipeSessionMeter, uplinkCellID, uplinkMeterConfig)
@@ -1118,11 +1063,8 @@ func (up4 *UP4) configureSessionMeter(q qer) (meter, error) {
 	downlinkMeterConfig := getMeterConfigurationFromQER(q.dlMbr, q.dlGbr)
 	downlinkMeterEntry := up4.p4RtTranslator.BuildMeterEntry(p4constants.MeterPreQosPipeSessionMeter, downlinkCellID, downlinkMeterConfig)
 
-	logger = logger.WithFields(log.Fields{
-		"uplink meter entry":   uplinkMeterEntry,
-		"downlink meter entry": downlinkMeterEntry,
-	})
-	logger.Debug("Installing P4 Meter entries")
+	logger = logger.With("uplink meter entry", uplinkMeterEntry, "downlink meter entry", downlinkMeterEntry)
+	logger.Debugln("installing P4 Meter entries")
 
 	err = up4.p4client.ApplyMeterEntries(p4.Update_MODIFY, uplinkMeterEntry, downlinkMeterEntry)
 	if err != nil {
@@ -1140,15 +1082,11 @@ func (up4 *UP4) configureSessionMeter(q qer) (meter, error) {
 }
 
 func (up4 *UP4) configureMeters(qers []qer) error {
-	log.WithFields(log.Fields{
-		"qers": qers,
-	}).Debug("Configuring P4 Meters based on QERs")
+	logger.PfcpLog.With("qers", qers).Debugln("configuring P4 Meters based on QERs")
 
 	for _, qer := range qers {
-		logger := log.WithFields(log.Fields{
-			"qer": qer,
-		})
-		logger.Debug("Configuring P4 Meter based on QER")
+		logger := logger.PfcpLog.With("qer", qer)
+		logger.Debugln("configuring P4 Meter based on QER")
 
 		// TODO: In case we have GBR QER, then we are going to program only app-level rate-limiting
 		//  (i.e., SessQerId will always be 0).
@@ -1178,8 +1116,7 @@ func (up4 *UP4) configureMeters(qers []qer) error {
 			return ErrOperationFailedWithReason("configure P4 Meter from QER", err.Error())
 		}
 
-		logger = logger.WithField("P4 meter", p4Meter)
-		logger.Debug("P4 meter successfully configured!")
+		logger.With("P4 meter", p4Meter).Debugln("P4 meter successfully configured!")
 
 		up4.meters[meterID{
 			qerID: qer.qerID,
@@ -1218,27 +1155,23 @@ func (up4 *UP4) resetMeter(meterID uint32, meter meter) {
 
 	err := up4.p4client.ApplyMeterEntries(p4.Update_MODIFY, entries...)
 	if err != nil {
-		log.Errorf("Failed to reset %v meter entries: %v", p4constants.GetMeterIDToNameMap()[meterID], err)
+		logger.PfcpLog.Errorf("failed to reset %v meter entries: %v", p4constants.GetMeterIDToNameMap()[meterID], err)
 	}
 }
 
 func (up4 *UP4) resetMeters(qers []qer) {
-	log.WithFields(log.Fields{
-		"qers": qers,
-	}).Debug("Resetting P4 Meters")
+	logger.PfcpLog.With("qers", qers).Debug("resetting P4 Meters")
 
 	for _, qer := range qers {
-		logger := log.WithFields(log.Fields{
-			"qer": qer,
-		})
-		logger.Debug("Resetting P4 Meter")
+		logger := logger.PfcpLog.With("qer", qer)
+		logger.Debugln("resetting P4 Meter")
 
 		p4Meter, exists := up4.meters[meterID{
 			qerID: qer.qerID,
 			fseid: qer.fseID,
 		}]
 		if !exists {
-			logger.Error("P4 meter for QER ID not found, cannot reset!")
+			logger.Errorln("P4 meter for QER ID not found, cannot reset!")
 			continue
 		}
 
@@ -1255,8 +1188,8 @@ func (up4 *UP4) resetMeters(qers []qer) {
 			up4.releaseSessionMeterCellID(p4Meter.downlinkCellID)
 		}
 
-		logger = logger.WithField("P4 meter", p4Meter)
-		logger.Debug("Removing P4 meter from allocated meters pool")
+		logger = logger.With("P4 meter", p4Meter)
+		logger.Debugln("removing P4 meter from allocated meters pool")
 
 		delete(up4.meters, meterID{
 			qerID: qer.qerID,
@@ -1266,12 +1199,8 @@ func (up4 *UP4) resetMeters(qers []qer) {
 }
 
 func (up4 *UP4) resetCounter(pdr pdr) error {
-	builderLog := log.WithFields(log.Fields{
-		"Cell ID": pdr.ctrID,
-		"PDR ID":  pdr.pdrID,
-		"F-SEID":  pdr.fseID,
-	})
-	builderLog.Debug("Clearing Counter cells")
+	builderLog := logger.PfcpLog.With("Cell ID", pdr.ctrID, "PDR ID", pdr.pdrID, "F-SEID", pdr.fseID)
+	builderLog.Debugln("clearing counter cells")
 
 	resetValue := &p4.CounterData{
 		ByteCount:   0,
@@ -1327,18 +1256,16 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 
 		entriesToApply := make([]*p4.TableEntry, 0)
 
-		pdrLog := log.WithFields(log.Fields{
-			"pdr": pdr,
-		})
-		pdrLog.Debug("Installing P4 table entries for PDR")
+		pdrLog := logger.PfcpLog.With("pdr", pdr)
+		pdrLog.Debugln("installing P4 table entries for PDR")
 		FAR, err = findRelatedFAR(pdr, allFARs)
 		if err != nil {
-			pdrLog.Warning("no related FAR for PDR found: ", err)
+			pdrLog.Warnln("no related FAR for PDR found:", err)
 			return err
 		}
 
-		pdrLog = pdrLog.WithField("related FAR", FAR)
-		pdrLog.Debug("Found related FAR for PDR")
+		pdrLog = pdrLog.With("related FAR", FAR)
+		pdrLog.Debugln("found related FAR for PDR")
 
 		tunnelParameters := tunnelParams{
 			tunnelIP4Src: ip2int(up4.accessIP.IP),
@@ -1372,7 +1299,7 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 			ueAddr, exists = up4.fseidToUEAddr[pdr.fseID]
 			if !exists {
 				// this is only possible if a linked DL PDR was not provided in the same PFCP Establishment message
-				log.Error("UE Address not found for uplink PDR, a linked DL PDR was not provided?")
+				logger.PfcpLog.Errorln("UE Address not found for uplink PDR, a linked DL PDR was not provided?")
 				return ErrOperationFailedWithReason("adding UP4 entries", "UE Address not found for uplink PDR, a linked DL PDR was not provided?")
 			}
 
@@ -1410,16 +1337,16 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 				qerID: pdr.qerIDList[0],
 				fseid: pdr.fseID,
 			}]
-			pdrLog.Debug("Application meter found for PDR: ", appMeter)
+			pdrLog.Debug("Application meter found for PDR:", appMeter)
 		}
 
 		var qfi uint8 = DefaultQFI
 
 		relatedQER, err := findRelatedApplicationQER(pdr, qers)
 		if err != nil {
-			pdrLog.Warning(err)
+			pdrLog.Warnln(err)
 		} else {
-			pdrLog.Debug("Related QER found for PDR: ", relatedQER)
+			pdrLog.Debugln("related QER found for PDR:", relatedQER)
 			qfi = relatedQER.qfi
 		}
 
@@ -1436,11 +1363,8 @@ func (up4 *UP4) modifyUP4ForwardingConfiguration(pdrs []pdr, allFARs []far, qers
 
 		entriesToApply = append(entriesToApply, terminationsEntry)
 
-		pdrLog = pdrLog.WithFields(log.Fields{
-			"entries":     entriesToApply,
-			"method type": p4.Update_Type_name[int32(methodType)],
-		})
-		pdrLog.Debug("Applying table entries")
+		pdrLog = pdrLog.With("entries", entriesToApply, "method type", p4.Update_Type_name[int32(methodType)])
+		pdrLog.Debugln("applying table entries")
 
 		err = up4.p4client.ApplyTableEntries(methodType, entriesToApply...)
 		if err != nil {
@@ -1543,16 +1467,12 @@ func (up4 *UP4) sendDelete(deleted PacketForwardingRules) error {
 func (up4 *UP4) SendMsgToUPF(method upfMsgType, all PacketForwardingRules, updated PacketForwardingRules) uint8 {
 	err := up4.tryConnect()
 	if err != nil {
-		log.Error("UP4 server not connected")
+		logger.PfcpLog.Errorln("UP4 server not connected")
 		return ie.CauseRequestRejected
 	}
 
-	up4Log := log.WithFields(log.Fields{
-		"method-type":   method,
-		"all":           all,
-		"updated-rules": updated,
-	})
-	up4Log.Debug("Sending PFCP message to UP4..")
+	up4Log := logger.PfcpLog.With("method-type", method, "all", all, "updated-rules", updated)
+	up4Log.Debugln("sending PFCP message to UP4..")
 
 	switch method {
 	case upfMsgTypeAdd:

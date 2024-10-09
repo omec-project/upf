@@ -13,14 +13,15 @@ import (
 
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim"
 	"github.com/omec-project/upf-epc/internal/p4constants"
+	"github.com/omec-project/upf-epc/logger"
 	"github.com/omec-project/upf-epc/pfcpiface"
 	"github.com/omec-project/upf-epc/pkg/fake_bess"
 	"github.com/omec-project/upf-epc/test/integration/providers"
 	v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
+	"go.uber.org/zap"
 )
 
 // this file should contain all the struct defs/constants used among different test cases.
@@ -154,13 +155,7 @@ type testCase struct {
 }
 
 func init() {
-	logrus.SetLevel(logrus.TraceLevel)
-	logrus.SetReportCaller(true)
-	logrus.SetFormatter(&logrus.TextFormatter{
-		FullTimestamp: true,
-		ForceColors:   true,
-	})
-
+	logger.SetLogLevel(zap.DebugLevel)
 	providers.MustPullDockerImage(ImageNameMockUP4)
 	providers.MustCreateNetworkIfNotExists(DockerTestNetwork)
 }
@@ -286,7 +281,7 @@ func mustInitCountersWithDummyValue() {
 }
 
 func MustStartMockUP4() {
-	providers.MustRunDockerContainer(ContainerNameMockUP4, ImageNameMockUP4, "--topo single", []string{"50001/tcp"}, "", DockerTestNetwork)
+	providers.MustRunDockerContainer(ContainerNameMockUP4, ImageNameMockUP4, "--topo single", "127.0.0.1", []string{"50001/tcp"}, "", DockerTestNetwork)
 	err := waitForMockUP4ToStart()
 	if err != nil {
 		panic(err)
@@ -301,7 +296,7 @@ func MustStopMockUP4() {
 
 func MustStartPFCPAgent() {
 	providers.MustRunDockerContainer(ContainerNamePFCPAgent, ImageNamePFCPAgent, "-config /config/upf.jsonc",
-		[]string{"8805/udp", "8080/tcp"}, "/tmp:/config", DockerTestNetwork)
+		"127.0.0.8", []string{"8805/udp", "8080/tcp"}, "/tmp:/config", DockerTestNetwork)
 }
 
 func MustStopPFCPAgent() {
@@ -335,14 +330,16 @@ func setup(t *testing.T, configType uint32) {
 		require.NoError(t, err)
 		MustStartPFCPAgent()
 	case ModeNative:
-		pfcpAgent = pfcpiface.NewPFCPIface(GetConfig(os.Getenv(EnvDatapath), configType))
+		upfConf := GetConfig(os.Getenv(EnvDatapath), configType)
+		upfConf.N4Addr = "127.0.0.8"
+		pfcpAgent = pfcpiface.NewPFCPIface(upfConf)
 		go pfcpAgent.Run()
 	default:
 		t.Fatal("Unexpected test mode")
 	}
 
 	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.1")
-	err := pfcpClient.ConnectN4("127.0.0.1")
+	err := pfcpClient.ConnectN4("127.0.0.8")
 	require.NoErrorf(t, err, "failed to connect to UPF")
 
 	// wait for PFCP Agent to initialize, blocking

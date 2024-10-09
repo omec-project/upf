@@ -13,8 +13,7 @@ import (
 
 	"github.com/ettle/strcase"
 	"github.com/golang/protobuf/proto"
-
-	log "github.com/sirupsen/logrus"
+	"github.com/omec-project/upf-epc/logger"
 
 	p4ConfigV1 "github.com/p4lang/p4runtime/go/p4/config/v1"
 )
@@ -261,7 +260,7 @@ func generateConstants(p4info *p4ConfigV1.P4Info) string {
 			name := eName + "_" + member.GetName()
 			enumVal, err := getUint32FromByteArray(member.GetValue())
 			if err != nil {
-				log.Errorln(name, err)
+				logger.P4Log.Errorln(name, err)
 			} else {
 				constBuilder.WriteString(emitEntityConstantUint32(enumVarPrefix, name, enumVal))
 			}
@@ -348,10 +347,10 @@ func main() {
 	result := sb.String()
 
 	if *outputPath == "-" {
-		fmt.Println(result)
+		logger.P4Log.Infoln(result)
 	} else {
 		if err := os.WriteFile(*outputPath, []byte(result), 0644); err != nil {
-			panic(fmt.Sprintf("Error while creating File: %v", err))
+			logger.P4Log.Panicf("Error while creating File: %v", err)
 		}
 	}
 }

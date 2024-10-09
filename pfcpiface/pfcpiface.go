@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/omec-project/upf-epc/logger"
 )
 
 var (
@@ -78,7 +78,7 @@ func (p *PFCPIface) mustInit() {
 	p.uc, p.nc, err = setupProm(httpMux, p.upf, p.node)
 
 	if err != nil {
-		log.Fatalln("setupProm failed", err)
+		logger.PfcpLog.Fatalln("setupProm failed", err)
 	}
 
 	// Note: due to error with golangci-lint ("Error: G112: Potential Slowloris Attack
@@ -100,10 +100,10 @@ func (p *PFCPIface) Run() {
 
 	go func() {
 		if err := p.httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalln("http server failed", err)
+			logger.PfcpLog.Fatalln("http server failed", err)
 		}
 
-		log.Infoln("http server closed")
+		logger.PfcpLog.Infoln("http server closed")
 	}()
 
 	sig := make(chan os.Signal, 1)
@@ -112,7 +112,7 @@ func (p *PFCPIface) Run() {
 
 	go func() {
 		oscall := <-sig
-		log.Infof("System call received: %+v", oscall)
+		logger.PfcpLog.Infof("system call received: %+v", oscall)
 		p.Stop()
 	}()
 
@@ -131,7 +131,7 @@ func (p *PFCPIface) Stop() {
 	}()
 
 	if err := p.httpSrv.Shutdown(ctxHttpShutdown); err != nil {
-		log.Errorln("Failed to shutdown http: ", err)
+		logger.PfcpLog.Errorln("failed to shutdown http:", err)
 	}
 
 	p.node.Stop()

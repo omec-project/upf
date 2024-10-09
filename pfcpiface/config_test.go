@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	log "github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -78,7 +78,7 @@ func TestLoadConfigFile(t *testing.T) {
 
 		conf, err := LoadConfigFile(confPath)
 		require.NoError(t, err)
-		require.Equal(t, conf.LogLevel, log.InfoLevel)
+		require.Equal(t, conf.LogLevel, zap.InfoLevel)
 	})
 
 	t.Run("all sample configs must be valid", func(t *testing.T) {

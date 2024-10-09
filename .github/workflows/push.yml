@@ -174,7 +174,7 @@ jobs:
           echo "Updated version: $NEW_VERSION"
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GH_OMEC_PAT }}
           commit-message: Update version

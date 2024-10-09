@@ -6,7 +6,7 @@ package pfcpiface
 import (
 	"fmt"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/omec-project/upf-epc/logger"
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
@@ -115,7 +115,7 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 
 			ohcFields, err = fwdIE.OuterHeaderCreation()
 			if err != nil {
-				log.Println("Unable to parse OuterHeaderCreationFields!")
+				logger.PfcpLog.Errorln("unable to parse OuterHeaderCreationFields")
 				continue
 			}
 
@@ -128,7 +128,7 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 
 			f.dstIntf, err = fwdIE.DestinationInterface()
 			if err != nil {
-				log.Println("Unable to parse DestinationInterface field")
+				logger.PfcpLog.Errorln("unable to parse DestinationInterface field")
 				continue
 			}
 
@@ -142,7 +142,7 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 
 			smReqFlags, err := fwdIE.PFCPSMReqFlags()
 			if err != nil {
-				log.Println("Unable to parse PFCPSMReqFlags!")
+				logger.PfcpLog.Errorln("unable to parse PFCPSMReqFlags")
 				continue
 			}
 

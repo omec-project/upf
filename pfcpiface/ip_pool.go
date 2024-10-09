@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/omec-project/upf-epc/logger"
 )
 
 type IPPool struct {
@@ -54,7 +54,7 @@ func (i *IPPool) LookupOrAllocIP(seid uint64) (net.IP, error) {
 	// Try to find an exiting session and return the allocated IP.
 	ip, found := i.inventory[seid]
 	if found {
-		log.Traceln("Found existing session", seid, "IP", ip)
+		logger.PfcpLog.Debugln("found existing session", seid, "IP", ip)
 		return ip, nil
 	}
 
@@ -66,7 +66,7 @@ func (i *IPPool) LookupOrAllocIP(seid uint64) (net.IP, error) {
 	ip = i.freePool[0]
 	i.freePool = i.freePool[1:] // Slice off the element once it is dequeued.
 	i.inventory[seid] = ip
-	log.Traceln("Allocated new session", seid, "IP", ip)
+	logger.PfcpLog.Debugln("allocated new session", seid, "IP", ip)
 
 	ipVal := make(net.IP, len(ip))
 	copy(ipVal, ip)
@@ -80,13 +80,13 @@ func (i *IPPool) DeallocIP(seid uint64) error {
 
 	ip, ok := i.inventory[seid]
 	if !ok {
-		log.Warnln("Attempt to dealloc non-existent session", seid)
+		logger.PfcpLog.Warnln("attempt to dealloc non-existent session", seid)
 		return ErrInvalidArgumentWithReason("seid", seid, "can't dealloc non-existent session")
 	}
 
 	delete(i.inventory, seid)
 	i.freePool = append(i.freePool, ip) // Simply append to enqueue.
-	log.Traceln("Deallocated session ", seid, "IP", ip)
+	logger.PfcpLog.Debugln("deallocated session", seid, "IP", ip)
 
 	return nil
 }

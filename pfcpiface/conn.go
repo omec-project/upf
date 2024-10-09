@@ -12,9 +12,9 @@ import (
 	"time"
 
 	reuse "github.com/libp2p/go-reuseport"
-	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
 
+	"github.com/omec-project/upf-epc/logger"
 	"github.com/omec-project/upf-epc/pfcpiface/metrics"
 )
 
@@ -79,23 +79,21 @@ func (pConn *PFCPConn) startHeartBeatMonitor() {
 	hbCtx, hbCancel := context.WithCancel(pConn.ctx)
 	pConn.hbCtxCancel = hbCancel
 
-	log.WithFields(log.Fields{
-		"interval": pConn.upf.hbInterval,
-	}).Infoln("Starting Heartbeat timer")
+	logger.PfcpLog.With("interval", pConn.upf.hbInterval).Infoln("starting Heartbeat timer")
 
 	heartBeatExpiryTimer := time.NewTicker(pConn.upf.hbInterval)
 
 	for {
 		select {
 		case <-hbCtx.Done():
-			log.Infoln("Cancel HeartBeat Timer", pConn.RemoteAddr().String())
+			logger.PfcpLog.Infoln("cancel HeartBeat Timer", pConn.RemoteAddr().String())
 			heartBeatExpiryTimer.Stop()
 
 			return
 		case <-pConn.hbReset:
 			heartBeatExpiryTimer.Reset(pConn.upf.hbInterval)
 		case <-heartBeatExpiryTimer.C:
-			log.Traceln("HeartBeat Interval Timer Expired", pConn.RemoteAddr().String())
+			logger.PfcpLog.Debugln("HeartBeat Interval Timer Expired", pConn.RemoteAddr().String())
 
 			r := pConn.getHeartBeatRequest()
 
@@ -112,7 +110,7 @@ func (pConn *PFCPConn) startHeartBeatMonitor() {
 func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 	conn, err := reuse.Dial("udp", lAddr, rAddr)
 	if err != nil {
-		log.Errorln("dial socket failed", err)
+		logger.PfcpLog.Errorln("dial socket failed", err)
 	}
 
 	ts := recoveryTS{
@@ -120,7 +118,7 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 	}
 
 	// TODO: Get SEID range from PFCPNode for this PFCPConn
-	log.Infoln("Created PFCPConn from:", conn.LocalAddr(), "to:", conn.RemoteAddr())
+	logger.PfcpLog.Infoln("created PFCPConn from:", conn.LocalAddr(), "to:", conn.RemoteAddr())
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano())) // #nosec G404
 
@@ -189,13 +187,13 @@ func (pConn *PFCPConn) Serve() {
 		for {
 			err := pConn.SetReadDeadline(time.Now().Add(pConn.upf.readTimeout))
 			if err != nil {
-				log.Errorf("failed to set read timeout: %v", err)
+				logger.PfcpLog.Errorf("failed to set read timeout: %v", err)
 			}
 
 			n, err := pConn.Read(recvBuf)
 			if err != nil {
 				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-					log.Infof("Read timeout for connection %v<->%v, is the SMF still alive?",
+					logger.PfcpLog.Infof("read timeout for connection %v<->%v, is the SMF still alive?",
 						pConn.LocalAddr(), pConn.RemoteAddr())
 					connTimeout <- struct{}{}
 
@@ -251,11 +249,11 @@ func (pConn *PFCPConn) Shutdown() {
 
 	err := pConn.Close()
 	if err != nil {
-		log.Error("Failed to close PFCP connection..")
+		logger.PfcpLog.Errorln("failed to close PFCP connection")
 		return
 	}
 
-	log.Infoln("Shutdown complete for", rAddr)
+	logger.PfcpLog.Infoln("shutdown complete for", rAddr)
 }
 
 func (pConn *PFCPConn) getSeqNum() uint32 {
