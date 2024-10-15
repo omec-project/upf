@@ -521,7 +521,7 @@ func GetConnection(host string) (conn *grpc.ClientConn, err error) {
 	/* get connection */
 	logger.P4Log.Infoln("get connection")
 
-	conn, err = grpc.Dial(host, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err = grpc.NewClient(host, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logger.P4Log.Errorln("grpc dial err:", err)
 		return nil, err

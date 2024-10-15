@@ -778,7 +778,7 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 
 	b.endMarkerChan = make(chan []byte, 1024)
 
-	b.conn, err = grpc.Dial(*bessIP, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	b.conn, err = grpc.NewClient(*bessIP, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logger.BessLog.Fatalln("did not connect:", err)
 	}
