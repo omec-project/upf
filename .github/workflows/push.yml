@@ -5,7 +5,7 @@ name: GitHub release and Docker images
 on:
   push:
     branches:
-      - master
+      - main
     tags:
       - v*
 
@@ -32,9 +32,9 @@ jobs:
           username: ${{ secrets.AETHER_REGISTRY_USERNAME }}
           password: ${{ secrets.AETHER_REGISTRY_PASSWORD }}
 
-      - name: Build and push "master-latest" Docker image
+      - name: Build and push "main-latest" Docker image
         env:
-          DOCKER_TAG: master-latest
+          DOCKER_TAG: main-latest
           CPU: haswell
         run: |
           docker pull ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG
@@ -42,9 +42,9 @@ jobs:
           CPU=$CPU make docker-build
           make docker-push
 
-      - name: Build and push "master-GIT_SHA" Docker image
+      - name: Build and push "main-GIT_SHA" Docker image
         env:
-          DOCKER_TAG: master-${{ env.GIT_SHA_SHORT }}
+          DOCKER_TAG: main-${{ env.GIT_SHA_SHORT }}
         run: |
           make docker-build
           make docker-push
