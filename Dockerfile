@@ -5,7 +5,7 @@
 # Stage bess-build: fetch BESS dependencies & pre-reqs
 FROM registry.aetherproject.org/sdcore/bess_build:latest AS bess-build
 ARG CPU=native
-ARG BESS_COMMIT=master
+ARG BESS_COMMIT=main
 ENV PLUGINS_DIR=plugins
 ARG MAKEFLAGS
 ENV PKG_CONFIG_PATH=/usr/lib64/pkgconfig
