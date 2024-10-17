@@ -28,13 +28,13 @@ func releaseAllocatedIPs(ippool *IPPool, session *PFCPSession) error {
 
 func addPdrInfo(msg *message.SessionEstablishmentResponse, session *PFCPSession) {
 	logger.PfcpLog.Infoln("add PDRs with UPF alloc IPs to Establishment response")
-
+	logger.PfcpLog.Infoln("PDRs:", session.pdrs)
 	for _, pdr := range session.pdrs {
 		var (
 			flags uint8  = 0x02
 			ueIP  net.IP = int2ip(pdr.ueAddress)
 		)
-		logger.PfcpLog.Debugln("Adding PDR ID:", pdr.pdrID)
+		logger.PfcpLog.Infoln("Adding PDR ID:", pdr.pdrID)
 
 		if ueIP != nil {
 			logger.PfcpLog.Debugln("ueIP:", ueIP.String())

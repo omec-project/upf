@@ -243,6 +243,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		session.CreatePDR(p)
 		addPDRs = append(addPDRs, p)
 	}
+	logger.PfcpLog.Debugln("PDRs added:", addPDRs)
 
 	for _, cFAR := range smreq.CreateFAR {
 		var f far
