@@ -176,8 +176,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 		localFSEID,
 	)
-
-	addPdrInfo(seres, &session)
+	addPdrInfo(seres, addPDRs)
 
 	return seres, nil
 }

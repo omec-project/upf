@@ -26,12 +26,13 @@ func releaseAllocatedIPs(ippool *IPPool, session *PFCPSession) error {
 	return nil
 }
 
-func addPdrInfo(msg *message.SessionEstablishmentResponse, session *PFCPSession) {
+func addPdrInfo(msg *message.SessionEstablishmentResponse, pdrs []pdr) {
 	logger.PfcpLog.Infoln("add PDRs with UPF alloc IPs to Establishment response")
-	logger.PfcpLog.Infoln("PDRs:", session.pdrs)
-	for _, pdr := range session.pdrs {
+	logger.PfcpLog.Infoln("PDRs:", pdrs)
+	for _, pdr := range pdrs {
 		logger.PfcpLog.Infoln("pdrID:", pdr.pdrID)
-		if pdr.tunnelTEID != 0 {
+		if pdr.UPAllocateFteid {
+			logger.PfcpLog.Infoln("Adding PDR with tunnel TEID:", pdr.tunnelTEID)
 			msg.CreatedPDR = append(msg.CreatedPDR,
 				ie.NewCreatedPDR(
 					ie.NewPDRID(uint16(pdr.pdrID)),
