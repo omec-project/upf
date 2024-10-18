@@ -92,6 +92,18 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 			return errProcessReply(err, ie.CauseRequestRejected)
 		}
 
+		if p.UPAllocateFteid {
+			var fteid uint32
+			fteid, err = pConn.upf.fteidGenerator.Allocate()
+			if err != nil {
+				return errProcessReply(err, ie.CauseNoResourcesAvailable)
+			}
+			p.tunnelTEID = fteid
+			p.tunnelTEIDMask = 0xFFFFFFFF
+			p.tunnelIP4Dst = ip2int(upf.accessIP)
+			p.tunnelIP4DstMask = 0xFFFFFFFF
+		}
+
 		p.fseidIP = fseidIP
 		session.CreatePDR(p)
 		addPDRs = append(addPDRs, p)
@@ -164,8 +176,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 		localFSEID,
 	)
-
-	addPdrInfo(seres, &session)
+	addPdrInfo(seres, addPDRs)
 
 	return seres, nil
 }
@@ -231,6 +242,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		session.CreatePDR(p)
 		addPDRs = append(addPDRs, p)
 	}
+	logger.PfcpLog.Debugln("PDRs added:", addPDRs)
 
 	for _, cFAR := range smreq.CreateFAR {
 		var f far

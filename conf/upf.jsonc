@@ -98,6 +98,9 @@
     // [Optional] Whether to enable End Marker Support
     // "enable_end_marker": false,
 
+    // [Optional] Whether to enable TEID Allocation
+    "enable_ftup": false,
+
     // [Optional] Whether to enable Notify BESS feature
     // "enable_notify_bess": false,
 
