@@ -5,7 +5,8 @@ package pfcpiface
 
 import (
 	"github.com/omec-project/upf-epc/internal/p4constants"
-	log "github.com/sirupsen/logrus"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"net"
 	"time"
@@ -40,13 +41,14 @@ type Conf struct {
 	EnableEndMarker          bool             `json:"enable_end_marker"`
 	NotifySockAddr           string           `json:"notify_sockaddr"`
 	EndMarkerSockAddr        string           `json:"endmarker_sockaddr"`
-	LogLevel                 log.Level        `json:"log_level"`
+	LogLevel                 zapcore.Level    `json:"log_level"`
 	QciQosConfig             []QciQosConfig   `json:"qci_qos_config"`
 	SliceMeterConfig         SliceMeterConfig `json:"slice_rate_limit_config"`
 	MaxReqRetries            uint8            `json:"max_req_retries"`
 	RespTimeout              string           `json:"resp_timeout"`
 	EnableHBTimer            bool             `json:"enable_hbTimer"`
 	HeartBeatInterval        string           `json:"heart_beat_interval"`
+	N4Addr                   string           `json:"n4_addr"`
 }
 
 // QciQosConfig : Qos configured attributes.
@@ -191,7 +193,7 @@ func LoadConfigFile(filepath string) (Conf, error) {
 	jsonData := removeComments(string(jsoncFile))
 
 	var conf Conf
-	conf.LogLevel = log.InfoLevel
+	conf.LogLevel = zap.InfoLevel
 	conf.P4rtcIface.DefaultTC = uint8(p4constants.EnumTrafficClassElastic)
 
 	err = json.Unmarshal([]byte(jsonData), &conf)

@@ -21,9 +21,9 @@ import (
 	// as also P4Runtime stubs are based on the deprecated proto.
 	"github.com/golang/protobuf/proto"
 	grpcRetry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
+	"github.com/omec-project/upf-epc/logger"
 	p4ConfigV1 "github.com/p4lang/p4runtime/go/p4/config/v1"
 	p4 "github.com/p4lang/p4runtime/go/p4/v1"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/genproto/googleapis/rpc/code"
 	"google.golang.org/grpc"
 )
@@ -158,7 +158,7 @@ func (c *P4rtClient) Init() (err error) {
 		grpcRetry.WithMax(3),
 		grpcRetry.WithPerRetryTimeout(1*time.Second))
 	if err != nil {
-		log.Println("stream channel error: ", err)
+		logger.P4Log.Errorln("stream channel error:", err)
 		return
 	}
 
@@ -166,23 +166,23 @@ func (c *P4rtClient) Init() (err error) {
 		for {
 			res, err := c.stream.Recv()
 			if err != nil {
-				log.Println("stream recv error: ", err)
+				logger.P4Log.Errorln("stream recv error:", err)
 				return
 			} else if arb := res.GetArbitration(); arb != nil {
 				if code.Code(arb.Status.Code) == code.Code_OK {
-					log.Println("client is master")
+					logger.P4Log.Infoln("client is master")
 				} else {
-					log.Println("client is not master")
+					logger.P4Log.Infoln("client is not master")
 				}
 			} else if dig := res.GetDigest(); dig != nil {
 				c.digests <- dig
 			} else {
-				log.Println("stream recv: ", res)
+				logger.P4Log.Infoln("stream recv:", res)
 			}
 		}
 	}()
 
-	log.Println("exited from recv thread.")
+	logger.P4Log.Infoln("exited from recv thread")
 
 	return
 }
@@ -193,13 +193,7 @@ func (c *P4rtClient) GetNextDigestData() []byte {
 
 	for _, p4d := range nextDigest.GetData() {
 		if bitstring := p4d.GetBitstring(); bitstring != nil {
-			log.WithFields(log.Fields{
-				"device-id":     c.deviceID,
-				"conn":          c.conn.Target(),
-				"digest length": len(bitstring),
-				"data":          bitstring,
-			}).Trace("Received Digest")
-
+			logger.P4Log.With("device-id", c.deviceID, "conn", c.conn.Target(), "digest length", len(bitstring), "data", bitstring).Debugln("received digest")
 			return bitstring
 		}
 	}
@@ -209,25 +203,25 @@ func (c *P4rtClient) GetNextDigestData() []byte {
 
 // ReadCounterEntry .. Read counter Entry.
 func (c *P4rtClient) ReadCounterEntry(entry *p4.CounterEntry) (*p4.ReadResponse, error) {
-	log.Traceln("Read Counter Entry ", entry.CounterId)
+	logger.P4Log.Debugln("read counter entry", entry.CounterId)
 
 	entity := &p4.Entity{
 		Entity: &p4.Entity_CounterEntry{CounterEntry: entry},
 	}
 
-	log.Traceln(proto.MarshalTextString(entity))
+	logger.P4Log.Debugln(proto.MarshalTextString(entity))
 
 	return c.ReadReq(entity)
 }
 
 // ReadTableEntry ... Read table Entry.
 func (c *P4rtClient) ReadTableEntry(entry *p4.TableEntry) (*p4.ReadResponse, error) {
-	log.Println("Read Table Entry for Table ", entry.TableId)
+	logger.P4Log.Infoln("read Table Entry for Table", entry.TableId)
 
 	entity := &p4.Entity{
 		Entity: &p4.Entity_TableEntry{TableEntry: entry},
 	}
-	log.Traceln(proto.MarshalTextString(entity))
+	logger.P4Log.Debugln(proto.MarshalTextString(entity))
 
 	return c.ReadReq(entity)
 }
@@ -239,13 +233,13 @@ func (c *P4rtClient) ReadReqEntities(entities []*p4.Entity) (*p4.ReadResponse, e
 		DeviceId: c.deviceID,
 		Entities: entities,
 	}
-	log.Traceln(proto.MarshalTextString(req))
+	logger.P4Log.Debugln(proto.MarshalTextString(req))
 
 	readClient, err := c.client.Read(context.Background(), req)
 	if err == nil {
 		readRes, err = readClient.Recv()
 		if err == nil {
-			log.Traceln(proto.MarshalTextString(readRes))
+			logger.P4Log.Debugln(proto.MarshalTextString(readRes))
 			return readRes, nil
 		}
 	}
@@ -264,13 +258,13 @@ func (c *P4rtClient) ReadReq(entity *p4.Entity) (*p4.ReadResponse, error) {
 		2*time.Second)
 	defer cancel()
 
-	log.Traceln(proto.MarshalTextString(&req))
+	logger.P4Log.Debugln(proto.MarshalTextString(&req))
 
 	readClient, err := c.client.Read(ctx, &req)
 	if err == nil {
 		readRes, err = readClient.Recv()
 		if err == nil {
-			log.Traceln(proto.MarshalTextString(readRes))
+			logger.P4Log.Debugln(proto.MarshalTextString(readRes))
 			return readRes, nil
 		}
 	}
@@ -279,7 +273,7 @@ func (c *P4rtClient) ReadReq(entity *p4.Entity) (*p4.ReadResponse, error) {
 }
 
 func (c *P4rtClient) ClearTable(tableID uint32) error {
-	log.Traceln("Clearing P4 table: ", tableID)
+	logger.P4Log.Debugln("clearing P4 table:", tableID)
 
 	entry := &p4.TableEntry{
 		TableId:  tableID,
@@ -306,9 +300,7 @@ func (c *P4rtClient) ClearTable(tableID uint32) error {
 }
 
 func (c *P4rtClient) ClearTables(tableIDs []uint32) error {
-	log.WithFields(log.Fields{
-		"table IDs": tableIDs,
-	}).Traceln("Clearing P4 tables")
+	logger.P4Log.With("table IDs", tableIDs).Debugln("clearing P4 tables")
 
 	updates := []*p4.Update{}
 
@@ -339,7 +331,7 @@ func (c *P4rtClient) ClearTables(tableIDs []uint32) error {
 
 // InsertTableEntry .. Insert table Entry.
 func (c *P4rtClient) InsertTableEntry(entry *p4.TableEntry, funcType uint8) error {
-	log.Println("Insert Table Entry for Table ", entry.TableId)
+	logger.P4Log.Infoln("insert Table Entry for Table", entry.TableId)
 
 	var updateType p4.Update_Type
 	if funcType == FunctionTypeUpdate {
@@ -357,7 +349,7 @@ func (c *P4rtClient) InsertTableEntry(entry *p4.TableEntry, funcType uint8) erro
 		},
 	}
 
-	log.Traceln(proto.MarshalTextString(update))
+	logger.P4Log.Debugln(proto.MarshalTextString(update))
 
 	return c.WriteReq(update)
 }
@@ -372,7 +364,7 @@ func (c *P4rtClient) ApplyTableEntries(methodType p4.Update_Type, entries ...*p4
 				Entity: &p4.Entity_TableEntry{TableEntry: entry},
 			},
 		}
-		log.Traceln("Writing table entry: ", proto.MarshalTextString(update))
+		logger.P4Log.Debugln("writing table entry:", proto.MarshalTextString(update))
 
 		updates = append(updates, update)
 	}
@@ -390,7 +382,7 @@ func (c *P4rtClient) ApplyMeterEntries(methodType p4.Update_Type, entries ...*p4
 				Entity: &p4.Entity_MeterEntry{MeterEntry: entry},
 			},
 		}
-		log.Traceln("Writing meter entry: ", proto.MarshalTextString(update))
+		logger.P4Log.Debugln("writing meter entry:", proto.MarshalTextString(update))
 		updates = append(updates, update)
 	}
 
@@ -419,7 +411,7 @@ func (c *P4rtClient) WriteBatchReq(updates []*p4.Update) error {
 
 	req.Updates = append(req.Updates, updates...)
 
-	log.Traceln(proto.MarshalTextString(req))
+	logger.P4Log.Debugln(proto.MarshalTextString(req))
 
 	_, err := c.client.Write(context.Background(), req)
 
@@ -428,15 +420,12 @@ func (c *P4rtClient) WriteBatchReq(updates []*p4.Update) error {
 
 // GetForwardingPipelineConfig ... Get Pipeline config from switch.
 func (c *P4rtClient) GetForwardingPipelineConfig() (err error) {
-	getLog := log.WithFields(log.Fields{
-		"device ID": c.deviceID,
-		"conn":      c.conn.Target(),
-	})
-	getLog.Info("Getting ForwardingPipelineConfig from P4Rt device")
+	getLog := logger.P4Log.With("device ID", c.deviceID, "conn", c.conn.Target())
+	getLog.Infoln("getting ForwardingPipelineConfig from P4Rt device")
 
 	pipeline, err := GetPipelineConfig(c.client, c.deviceID)
 	if err != nil {
-		getLog.Println("set pipeline config error ", err)
+		getLog.Errorln("set pipeline config error", err)
 		return
 	}
 
@@ -463,7 +452,7 @@ func GetPipelineConfig(client p4.P4RuntimeClient, deviceID uint64) (*p4.GetForwa
 
 	configRes, err := client.GetForwardingPipelineConfig(context.Background(), req)
 	if err != nil {
-		log.Println("get forwarding pipeline returned error ", err)
+		logger.P4Log.Errorln("get forwarding pipeline returned error", err)
 		return nil, err
 	}
 
@@ -472,11 +461,11 @@ func GetPipelineConfig(client p4.P4RuntimeClient, deviceID uint64) (*p4.GetForwa
 
 // SetForwardingPipelineConfig ..
 func (c *P4rtClient) SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath string) (err error) {
-	log.Println("P4 Info: ", p4InfoPath)
+	logger.P4Log.Infoln("P4 Info: ", p4InfoPath)
 
 	p4infoBytes, err := os.ReadFile(p4InfoPath)
 	if err != nil {
-		log.Println("Read p4info file error ", err)
+		logger.P4Log.Errorln("read p4info file error", err)
 		return
 	}
 
@@ -484,7 +473,7 @@ func (c *P4rtClient) SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath st
 
 	err = proto.UnmarshalText(string(p4infoBytes), p4Info)
 	if err != nil {
-		log.Println("Unmarshal test failed for p4info ", err)
+		logger.P4Log.Errorln("unmarshal test failed for p4info", err)
 		return
 	}
 
@@ -492,7 +481,7 @@ func (c *P4rtClient) SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath st
 
 	deviceConfig, err := LoadDeviceConfig(deviceConfigPath)
 	if err != nil {
-		log.Println("bmv2 json read failed ", err)
+		logger.P4Log.Errorln("bmv2 json read failed", err)
 		return
 	}
 
@@ -502,7 +491,7 @@ func (c *P4rtClient) SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath st
 
 	err = SetPipelineConfig(c.client, c.deviceID, &c.electionID, &pipeline)
 	if err != nil {
-		log.Println("set pipeline config error ", err)
+		logger.P4Log.Errorln("set pipeline config error", err)
 		return
 	}
 
@@ -521,7 +510,7 @@ func SetPipelineConfig(client p4.P4RuntimeClient, deviceID uint64, electionID *p
 
 	_, err := client.SetForwardingPipelineConfig(context.Background(), req)
 	if err != nil {
-		log.Println("set forwarding pipeline returned error ", err)
+		logger.P4Log.Errorln("set forwarding pipeline returned error", err)
 	}
 
 	return err
@@ -530,11 +519,11 @@ func SetPipelineConfig(client p4.P4RuntimeClient, deviceID uint64, electionID *p
 // GetConnection ... Get Grpc connection.
 func GetConnection(host string) (conn *grpc.ClientConn, err error) {
 	/* get connection */
-	log.Println("Get connection.")
+	logger.P4Log.Infoln("get connection")
 
-	conn, err = grpc.Dial(host, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err = grpc.NewClient(host, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Println("grpc dial err: ", err)
+		logger.P4Log.Errorln("grpc dial err:", err)
 		return nil, err
 	}
 
@@ -543,7 +532,7 @@ func GetConnection(host string) (conn *grpc.ClientConn, err error) {
 
 // LoadDeviceConfig : Load Device config.
 func LoadDeviceConfig(deviceConfigPath string) (P4DeviceConfig, error) {
-	log.Println("BMv2 JSON: ", deviceConfigPath)
+	logger.P4Log.Infoln("BMv2 JSON:", deviceConfigPath)
 
 	deviceConfig, err := os.Open(deviceConfigPath)
 	if err != nil {
@@ -568,11 +557,11 @@ func LoadDeviceConfig(deviceConfigPath string) (P4DeviceConfig, error) {
 
 // CreateChannel ... Create p4runtime client channel.
 func CreateChannel(host string, deviceID uint64) (*P4rtClient, error) {
-	log.Println("create channel")
+	logger.P4Log.Infoln("create channel")
 
 	conn, err := GetConnection(host)
 	if err != nil {
-		log.Println("grpc connection failed")
+		logger.P4Log.Errorln("grpc connection failed")
 		return nil, err
 	}
 
@@ -585,7 +574,7 @@ func CreateChannel(host string, deviceID uint64) (*P4rtClient, error) {
 
 	err = client.Init()
 	if err != nil {
-		log.Println("client Init error: ", err)
+		logger.P4Log.Errorln("client Init error:", err)
 		return nil, err
 	}
 
@@ -593,14 +582,14 @@ func CreateChannel(host string, deviceID uint64) (*P4rtClient, error) {
 		if client.stream != nil {
 			err = client.stream.CloseSend()
 			if err != nil {
-				log.Errorf("Failed to close P4Rt stream with %v: %v", client.conn.Target(), err)
+				logger.P4Log.Errorf("failed to close P4Rt stream with %v: %v", client.conn.Target(), err)
 			}
 		}
 	}
 
 	err = client.SetMastership(TimeBasedElectionId())
 	if err != nil {
-		log.Error("Set Mastership error: ", err)
+		logger.P4Log.Errorln("set Mastership error:", err)
 		closeStreamOnError()
 
 		return nil, err

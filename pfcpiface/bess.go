@@ -16,9 +16,9 @@ import (
 
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/omec-project/upf-epc/logger"
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
 	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/ie"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -117,7 +117,7 @@ func (b *bess) AddSliceInfo(sliceInfo *SliceInfo) error {
 	rc := b.GRPCJoin(1, Timeout, done)
 
 	if !rc {
-		log.Errorln("Unable to make GRPC calls")
+		logger.BessLog.Errorln("unable to make GRPC calls")
 	}
 
 	return nil
@@ -149,7 +149,7 @@ func (b *bess) SendMsgToUPF(
 	done := make(chan bool)
 
 	for _, pdr := range pdrs {
-		log.Traceln(method, pdr)
+		logger.BessLog.Debugln(method, pdr)
 
 		switch method {
 		case upfMsgTypeAdd:
@@ -162,7 +162,7 @@ func (b *bess) SendMsgToUPF(
 	}
 
 	for _, far := range fars {
-		log.Traceln(method, far)
+		logger.BessLog.Debugln(method, far)
 
 		switch method {
 		case upfMsgTypeAdd:
@@ -175,7 +175,7 @@ func (b *bess) SendMsgToUPF(
 	}
 
 	for _, qer := range qers {
-		log.Traceln(method, qer)
+		logger.BessLog.Debugln(method, qer)
 
 		switch method {
 		case upfMsgTypeAdd:
@@ -189,14 +189,14 @@ func (b *bess) SendMsgToUPF(
 
 	rc := b.GRPCJoin(calls, Timeout, done)
 	if !rc {
-		log.Println("Unable to make GRPC calls")
+		logger.BessLog.Errorln("unable to make GRPC calls")
 	}
 
 	return cause
 }
 
 func (b *bess) Exit() {
-	log.Println("Exit function Bess")
+	logger.BessLog.Infoln("exit function Bess")
 	b.conn.Close()
 }
 
@@ -207,7 +207,7 @@ func (b *bess) measureUpf(ifName string, f *pb.MeasureCommandGetSummaryArg) *pb.
 
 	any, err := anypb.New(f)
 	if err != nil {
-		log.Println("Error marshalling the rule", f, err)
+		logger.BessLog.Errorln("error marshalling the rule", f, err)
 		return nil
 	}
 
@@ -219,7 +219,7 @@ func (b *bess) measureUpf(ifName string, f *pb.MeasureCommandGetSummaryArg) *pb.
 		Arg:  any,
 	})
 	if err != nil {
-		log.Println("Error calling get_summary on module", modName(), err)
+		logger.BessLog.Errorln("error calling get_summary on module", modName(), err)
 		return nil
 	}
 
@@ -227,7 +227,7 @@ func (b *bess) measureUpf(ifName string, f *pb.MeasureCommandGetSummaryArg) *pb.
 
 	err = modRes.GetData().UnmarshalTo(&res)
 	if err != nil {
-		log.Println("Error unmarshalling the response", modName(), err)
+		logger.BessLog.Errorln("error unmarshalling the response", modName(), err)
 		return nil
 	}
 
@@ -242,12 +242,12 @@ func (b *bess) getPortStats(ifname string) *pb.GetPortStatsResponse {
 
 	res, err := b.client.GetPortStats(ctx, req)
 	if err != nil {
-		log.Println("Error calling GetPortStats", ifname, err)
+		logger.BessLog.Errorln("error calling GetPortStats", ifname, err)
 		return nil
 	}
 
 	if res.GetError() != nil {
-		log.Println("Error calling GetPortStats", ifname, err, res.GetError().Errmsg)
+		logger.BessLog.Errorln("error calling GetPortStats", ifname, err, res.GetError().Errmsg)
 		return nil
 	}
 
@@ -349,7 +349,7 @@ func (b *bess) SummaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metri
 func (b *bess) SummaryGtpuLatency(uc *upfCollector, ch chan<- prometheus.Metric) {
 	gtpuPathStatsResp := b.readGtpuPathMonitoringStats(GtpuPathMonitoringMeasure, true)
 	if gtpuPathStatsResp == nil {
-		log.Errorln(GtpuPathMonitoringMeasure, " read failed!")
+		logger.BessLog.Errorln(GtpuPathMonitoringMeasure, "read failed")
 		return
 	}
 
@@ -389,7 +389,7 @@ func (b *bess) flipFlowMeasurementBufferFlag(ctx context.Context, module string)
 
 	any, err := anypb.New(req)
 	if err != nil {
-		log.Errorln("Error marshalling request", req, err)
+		logger.BessLog.Errorln("error marshalling request", req, err)
 		return
 	}
 
@@ -402,17 +402,17 @@ func (b *bess) flipFlowMeasurementBufferFlag(ctx context.Context, module string)
 	)
 
 	if err != nil {
-		log.Errorln(module, "read failed!:", err)
+		logger.BessLog.Errorln(module, "read failed:", err)
 		return
 	}
 
 	if resp.GetError() != nil {
-		log.Errorln(module, "error reading flow stats:", resp.GetError().Errmsg)
+		logger.BessLog.Errorln(module, "error reading flow stats:", resp.GetError().Errmsg)
 		return
 	}
 
 	if err = resp.Data.UnmarshalTo(&flip); err != nil {
-		log.Errorln(err)
+		logger.BessLog.Errorln(err)
 		return
 	}
 
@@ -431,7 +431,7 @@ func (b *bess) readFlowMeasurement(
 
 	any, err := anypb.New(req)
 	if err != nil {
-		log.Errorln("Error marshalling request", req, err)
+		logger.BessLog.Errorln("error marshalling request", req, err)
 		return
 	}
 
@@ -444,17 +444,17 @@ func (b *bess) readFlowMeasurement(
 	)
 
 	if err != nil {
-		log.Errorln(module, "read failed!:", err)
+		logger.BessLog.Errorln(module, "read failed:", err)
 		return
 	}
 
 	if resp.GetError() != nil {
-		log.Errorln(module, "error reading flow stats:", resp.GetError().Errmsg)
+		logger.BessLog.Errorln(module, "error reading flow stats:", resp.GetError().Errmsg)
 		return
 	}
 
 	if err = resp.Data.UnmarshalTo(&stats); err != nil {
-		log.Errorln(err, resp)
+		logger.BessLog.Errorln(err, resp)
 		return
 	}
 
@@ -469,7 +469,7 @@ func (b *bess) readGtpuPathMonitoringStats(
 
 	any, err := anypb.New(req)
 	if err != nil {
-		log.Errorln("Error marshalling request", req, err)
+		logger.BessLog.Errorln("error marshalling request", req, err)
 		return nil
 	}
 
@@ -484,12 +484,12 @@ func (b *bess) readGtpuPathMonitoringStats(
 	)
 
 	if err != nil {
-		log.Errorln(module, "read failed!:", err)
+		logger.BessLog.Errorln(module, "read failed:", err)
 		return nil
 	}
 
 	if resp.GetError() != nil {
-		log.Errorln(module, "error reading gptu path monitoring stats:", resp.GetError().Errmsg)
+		logger.BessLog.Errorln(module, "error reading gptu path monitoring stats:", resp.GetError().Errmsg)
 		return nil
 	}
 
@@ -497,7 +497,7 @@ func (b *bess) readGtpuPathMonitoringStats(
 	err = resp.Data.UnmarshalTo(&res)
 
 	if err != nil {
-		log.Errorln(err, resp)
+		logger.BessLog.Errorln(err, resp)
 		return nil
 	}
 
@@ -512,7 +512,7 @@ func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 	// Flips the buffer flag, automatically waits for in-flight packets to drain.
 	flip, err := b.flipFlowMeasurementBufferFlag(ctx, PreQosFlowMeasure)
 	if err != nil {
-		log.Errorln(PreQosFlowMeasure, " read failed!:", err)
+		logger.BessLog.Errorln(PreQosFlowMeasure, "read failed:", err)
 		return
 	}
 
@@ -521,19 +521,19 @@ func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 	// Read stats from the now inactive side, and clear if needed.
 	qosStatsInResp, err := b.readFlowMeasurement(ctx, PreQosFlowMeasure, flip.OldFlag, true, q)
 	if err != nil {
-		log.Errorln(PreQosFlowMeasure, " read failed!:", err)
+		logger.BessLog.Errorln(PreQosFlowMeasure, "read failed:", err)
 		return
 	}
 
 	postDlQosStatsResp, err := b.readFlowMeasurement(ctx, PostDlQosFlowMeasure, flip.OldFlag, true, q)
 	if err != nil {
-		log.Errorln(PostDlQosFlowMeasure, " read failed!:", err)
+		logger.BessLog.Errorln(PostDlQosFlowMeasure, "read failed:", err)
 		return
 	}
 
 	postUlQosStatsResp, err := b.readFlowMeasurement(ctx, PostUlQosFlowMeasure, flip.OldFlag, true, q)
 	if err != nil {
-		log.Errorln(PostUlQosFlowMeasure, " read failed!:", err)
+		logger.BessLog.Errorln(PostUlQosFlowMeasure, "read failed:", err)
 		return
 	}
 
@@ -551,7 +551,7 @@ func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 	})
 
 	if con == nil {
-		log.Warnln("No active PFCP connection, UE IP lookup disabled")
+		logger.BessLog.Warnln("no active PFCP connection, UE IP lookup disabled")
 	}
 
 	// Prepare session stats.
@@ -569,7 +569,7 @@ func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 			}
 
 			if pre == nil {
-				log.Infof("Found no pre QoS statistics for PDR %v FSEID %v", post.Pdr, post.Fseid)
+				logger.BessLog.Infof("found no pre QoS statistics for PDR %v FSEID %v", post.Pdr, post.Fseid)
 				continue
 			}
 
@@ -580,7 +580,7 @@ func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 			if con != nil {
 				session, ok := con.store.GetSession(pre.Fseid)
 				if !ok {
-					log.Errorln("Invalid or unknown FSEID", pre.Fseid)
+					logger.BessLog.Errorln("invalid or unknown FSEID", pre.Fseid)
 					continue
 				}
 
@@ -588,7 +588,7 @@ func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 				for _, p := range session.pdrs {
 					if p.IsUplink() && p.ueAddress > 0 {
 						ueIpString = int2ip(p.ueAddress).String()
-						log.Traceln(p.fseID, " -> ", ueIpString)
+						logger.BessLog.Debugln(p.fseID, " -> ", ueIpString)
 
 						break
 					}
@@ -658,7 +658,7 @@ func (b *bess) endMarkerSendLoop(endMarkerChan chan []byte) {
 	for outPacket := range endMarkerChan {
 		_, err := b.endMarkerSocket.Write(outPacket)
 		if err != nil {
-			log.Println("end marker write failed")
+			logger.BessLog.Errorln("end marker write failed")
 		}
 	}
 }
@@ -713,13 +713,13 @@ func (b *bess) clearState() {
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
 
-	log.Debug("Clearing all the state in BESS")
+	logger.BessLog.Debugln("clearing all the state in BESS")
 
 	clearWildcardCmd := &pb.WildcardMatchCommandClearArg{}
 
 	anyWildcardClear, err := anypb.New(clearWildcardCmd)
 	if err != nil {
-		log.Errorf("Error marshalling the rule %v: %v", clearWildcardCmd, err)
+		logger.BessLog.Errorf("error marshalling the rule %v: %v", clearWildcardCmd, err)
 		return
 	}
 
@@ -729,7 +729,7 @@ func (b *bess) clearState() {
 
 	anyExactClear, err := anypb.New(clearExactCmd)
 	if err != nil {
-		log.Errorf("Error marshalling the rule %v: %v", anyExactClear, err)
+		logger.BessLog.Errorf("error marshalling the rule %v: %v", anyExactClear, err)
 		return
 	}
 
@@ -741,7 +741,7 @@ func (b *bess) clearState() {
 		var anyGtpuPathMonitoringClear *anypb.Any
 		anyGtpuPathMonitoringClear, err = anypb.New(clearGtpuPathMonitoringCmd)
 		if err != nil {
-			log.Errorf("Error marshalling the rule %v: %v", anyGtpuPathMonitoringClear, err)
+			logger.BessLog.Errorf("error marshalling the rule %v: %v", anyGtpuPathMonitoringClear, err)
 			return
 		}
 
@@ -752,16 +752,16 @@ func (b *bess) clearState() {
 	var anyQoSClear *anypb.Any
 	anyQoSClear, err = anypb.New(clearQoSCmd)
 	if err != nil {
-		log.Errorf("Error marshalling the rule %v: %v", anyQoSClear, err)
+		logger.BessLog.Errorf("error marshalling the rule %v: %v", anyQoSClear, err)
 		return
 	}
 
 	if err = b.processQER(ctx, anyQoSClear, upfMsgTypeClear, AppQerLookup); err != nil {
-		log.Errorf("Failed to clear %v", AppQerLookup)
+		logger.BessLog.Errorf("failed to clear %v", AppQerLookup)
 	}
 
 	if err = b.processQER(ctx, anyQoSClear, upfMsgTypeClear, SessQerLookup); err != nil {
-		log.Errorf("Failed to clear %v", SessQerLookup)
+		logger.BessLog.Errorf("failed to clear %v", SessQerLookup)
 	}
 }
 
@@ -770,17 +770,17 @@ func (b *bess) clearState() {
 func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 	var err error
 
-	log.Println("SetUpfInfo bess")
+	logger.BessLog.Errorln("SetUpfInfo bess")
 
 	b.readQciQosMap(conf)
 	// get bess grpc client
-	log.Println("bessIP ", *bessIP)
+	logger.BessLog.Errorln("bessIP", *bessIP)
 
 	b.endMarkerChan = make(chan []byte, 1024)
 
-	b.conn, err = grpc.Dial(*bessIP, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	b.conn, err = grpc.NewClient(*bessIP, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalln("did not connect:", err)
+		logger.BessLog.Fatalln("did not connect:", err)
 	}
 
 	b.client = pb.NewBESSControlClient(b.conn)
@@ -795,7 +795,7 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 
 		b.notifyBessSocket, err = net.Dial("unixpacket", notifySockAddr)
 		if err != nil {
-			log.Println("dial error:", err)
+			logger.BessLog.Errorln("dial error:", err)
 			return
 		}
 
@@ -810,11 +810,11 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 
 		b.endMarkerSocket, err = net.Dial("unixpacket", pfcpCommAddr)
 		if err != nil {
-			log.Println("dial error:", err)
+			logger.BessLog.Errorln("dial error:", err)
 			return
 		}
 
-		log.Println("Starting end marker loop")
+		logger.BessLog.Infoln("Starting end marker loop")
 
 		go b.endMarkerSendLoop(b.endMarkerChan)
 	}
@@ -830,7 +830,7 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 
 		rc := b.GRPCJoin(1, Timeout, done)
 		if !rc {
-			log.Errorln("Unable to make GRPC calls")
+			logger.BessLog.Errorln("unable to make GRPC calls")
 		}
 	}
 
@@ -841,7 +841,7 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 
 func (b *bess) processPDR(ctx context.Context, any *anypb.Any, method upfMsgType) {
 	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
-		log.Println("Invalid method name: ", method)
+		logger.BessLog.Infoln("invalid method name:", method)
 		return
 	}
 
@@ -853,10 +853,10 @@ func (b *bess) processPDR(ctx context.Context, any *anypb.Any, method upfMsgType
 		Arg:  any,
 	})
 
-	log.Traceln("pdrlookup resp : ", resp)
+	logger.BessLog.Debugf("pdrlookup resp: %v", resp)
 
 	if err != nil || resp.GetError() != nil {
-		log.Errorf("pdrLookup method failed with resp: %v, err: %v\n", resp, err)
+		logger.BessLog.Errorf("pdrLookup method failed with resp: %v, err: %v", resp, err)
 	}
 }
 
@@ -877,11 +877,11 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 		// Translate port ranges into ternary rule(s) and insert them one-by-one.
 		portRules, err := CreatePortRangeCartesianProduct(p.appFilter.srcPortRange, p.appFilter.dstPortRange)
 		if err != nil {
-			log.Errorln(err)
+			logger.BessLog.Errorln(err)
 			return
 		}
 
-		log.Tracef("PDR rules %+v", portRules)
+		logger.BessLog.Debugf("PDR rules %+v", portRules)
 
 		for _, r := range portRules {
 			f := &pb.WildcardMatchCommandAddArg{
@@ -918,7 +918,7 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 			any, err = anypb.New(f)
 			if err != nil {
-				log.Println("Error marshalling the rule", f, err)
+				logger.BessLog.Infoln("error marshalling the rule", f, err)
 				return
 			}
 
@@ -938,7 +938,7 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 		// Translate port ranges into ternary rule(s) and insert them one-by-one.
 		portRules, err := CreatePortRangeCartesianProduct(p.appFilter.srcPortRange, p.appFilter.dstPortRange)
 		if err != nil {
-			log.Errorln(err)
+			logger.BessLog.Errorln(err)
 			return
 		}
 
@@ -968,7 +968,7 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 			any, err = anypb.New(f)
 			if err != nil {
-				log.Errorln("Error marshalling the rule", f, err)
+				logger.BessLog.Errorln("error marshalling the rule", f, err)
 				return
 			}
 
@@ -991,7 +991,7 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 		// Lookup QCI from QFI, else try default QCI.
 		qosVal, ok := b.qciQosMap[qer.qfi]
 		if !ok {
-			log.Debug("No config for qfi/qci : ", qer.qfi, ". Using default burst size.")
+			logger.BessLog.Debugf("number of config for qfi/qci: %v using default burst size", qer.qfi)
 
 			qosVal = b.qciQosMap[0]
 		}
@@ -1024,7 +1024,7 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 		// Lookup QCI from QFI, else try default QCI.
 		qosVal, ok = b.qciQosMap[qer.qfi]
 		if !ok {
-			log.Debug("No config for qfi/qci : ", qer.qfi, ". Using default burst size.")
+			logger.BessLog.Debugf("number of config for qfi/qci: %v using default burst size", qer.qfi)
 
 			qosVal = b.qciQosMap[0]
 		}
@@ -1082,7 +1082,7 @@ func (b *bess) addApplicationQER(ctx context.Context, gate uint64, srcIface uint
 
 	any, err = anypb.New(q)
 	if err != nil {
-		log.Errorln("Error marshalling the rule", q, err)
+		logger.BessLog.Errorln("error marshalling the rule", q, err)
 		return
 	}
 
@@ -1090,7 +1090,7 @@ func (b *bess) addApplicationQER(ctx context.Context, gate uint64, srcIface uint
 
 	err = b.processQER(ctx, any, upfMsgTypeAdd, qosTableName)
 	if err != nil {
-		log.Errorln("process QER failed for appQERLookup add operation")
+		logger.BessLog.Errorln("process QER failed for appQERLookup add operation")
 	}
 }
 
@@ -1137,7 +1137,7 @@ func (b *bess) delApplicationQER(
 
 	any, err = anypb.New(q)
 	if err != nil {
-		log.Println("Error marshalling the rule", q, err)
+		logger.BessLog.Infoln("error marshalling the rule", q, err)
 		return
 	}
 
@@ -1145,13 +1145,13 @@ func (b *bess) delApplicationQER(
 
 	err = b.processQER(ctx, any, upfMsgTypeDel, qosTableName)
 	if err != nil {
-		log.Errorln("process QER failed for appQERLookup del operation")
+		logger.BessLog.Errorln("process QER failed for appQERLookup del operation")
 	}
 }
 
 func (b *bess) processFAR(ctx context.Context, any *anypb.Any, method upfMsgType) {
 	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
-		log.Println("Invalid method name: ", method)
+		logger.BessLog.Errorln("invalid method name:", method)
 		return
 	}
 
@@ -1163,16 +1163,16 @@ func (b *bess) processFAR(ctx context.Context, any *anypb.Any, method upfMsgType
 		Arg:  any,
 	})
 
-	log.Traceln("farlookup resp : ", resp)
+	logger.BessLog.Debugf("farlookup resp: %v", resp)
 
 	if err != nil || resp.GetError() != nil {
-		log.Errorf("farLookup method failed with resp: %v, err: %v\n", resp, err)
+		logger.BessLog.Errorf("farLookup method failed with resp: %v, err: %v", resp, err)
 	}
 }
 
 func (b *bess) processGtpuPathMonitoring(ctx context.Context, any *anypb.Any, method upfMsgType) {
 	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
-		log.Println("Invalid method name: ", method)
+		logger.BessLog.Errorln("invalid method name:", method)
 		return
 	}
 
@@ -1184,10 +1184,10 @@ func (b *bess) processGtpuPathMonitoring(ctx context.Context, any *anypb.Any, me
 		Arg:  any,
 	})
 
-	log.Traceln("gtpuPathMonitoring resp: ", resp)
+	logger.BessLog.Debugf("gtpuPathMonitoring resp: %v", resp)
 
 	if err != nil || resp.GetError() != nil {
-		log.Errorf("gtpuPathMonitoring method failed with resp: %v, err: %v\n", resp, err)
+		logger.BessLog.Errorf("gtpuPathMonitoring method failed with resp: %v, err: %v", resp, err)
 	}
 }
 
@@ -1236,7 +1236,7 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 
 		any, err = anypb.New(f)
 		if err != nil {
-			log.Println("Error marshalling the rule", f, err)
+			logger.BessLog.Infoln("error marshalling the rule", f, err)
 			return
 		}
 
@@ -1249,7 +1249,7 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 
 			any, err = anypb.New(g)
 			if err != nil {
-				log.Println("Error marshalling data", g, err)
+				logger.BessLog.Infoln("error marshalling data", g, err)
 				return
 			}
 
@@ -1276,7 +1276,7 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 
 		any, err = anypb.New(f)
 		if err != nil {
-			log.Println("Error marshalling the rule", f, err)
+			logger.BessLog.Infoln("error marshalling the rule", f, err)
 			return
 		}
 
@@ -1289,12 +1289,12 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 
 			any, err = anypb.New(g)
 			if err != nil {
-				log.Println("Error marshalling data", g, err)
+				logger.BessLog.Infoln("error marshalling data", g, err)
 				return
 			}
-		}
 
-		b.processGtpuPathMonitoring(ctx, any, upfMsgTypeDel)
+			b.processGtpuPathMonitoring(ctx, any, upfMsgTypeDel)
+		}
 
 		done <- true
 	}()
@@ -1302,7 +1302,7 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 
 func (b *bess) processSliceMeter(ctx context.Context, any *anypb.Any, method upfMsgType) {
 	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
-		log.Errorln("Invalid method name: ", method)
+		logger.BessLog.Errorln("invalid method name:", method)
 		return
 	}
 
@@ -1316,7 +1316,7 @@ func (b *bess) processSliceMeter(ctx context.Context, any *anypb.Any, method upf
 		},
 	)
 	if err != nil {
-		log.Errorln("sliceMeter method failed!:", err)
+		logger.BessLog.Errorln("sliceMeter method failed:", err)
 	}
 }
 
@@ -1347,8 +1347,7 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 			ebs = 0 // Unused
 		}
 
-		log.Traceln("uplink slice : cir: ", cir, ", pir: ", pir,
-			", cbs: ", cbs, ", pbs: ", pbs)
+		logger.BessLog.Debugln("uplink slice: cir:", cir, ", pir:", pir, ", cbs:", cbs, ", pbs:", pbs)
 
 		q := &pb.QosCommandAddArg{
 			Gate:              gate,
@@ -1366,7 +1365,7 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 
 		any, err = anypb.New(q)
 		if err != nil {
-			log.Errorln("Error marshalling the rule", q, err)
+			logger.BessLog.Errorln("error marshalling the rule", q, err)
 			return
 		}
 
@@ -1391,8 +1390,7 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 			ebs = 0 // Unused
 		}
 
-		log.Traceln("downlink slice : cir: ", cir, ", pir: ", pir,
-			", cbs: ", cbs, ", pbs: ", pbs)
+		logger.BessLog.Debugln("downlink slice: cir:", cir, ", pir:", pir, ", cbs:", cbs, ", pbs:", pbs)
 		// TODO: packet deduction should take GTPU extension header into account
 		q = &pb.QosCommandAddArg{
 			Gate:              gate,
@@ -1410,7 +1408,7 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 
 		any, err = anypb.New(q)
 		if err != nil {
-			log.Errorln("Error marshalling the rule", q, err)
+			logger.BessLog.Errorln("error marshalling the rule", q, err)
 			return
 		}
 
@@ -1432,10 +1430,10 @@ func (b *bess) processQER(ctx context.Context, any *anypb.Any, method upfMsgType
 		Arg:  any,
 	})
 
-	log.Traceln("qerlookup resp : ", resp)
+	logger.BessLog.Debugf("qerlookup resp: %v", resp)
 
 	if err != nil || resp.GetError() != nil {
-		log.Errorf("%v for qer %v failed with resp: %v, error: %v", qosTableName, methods[method], resp, err)
+		logger.BessLog.Errorf("%v for qer %v failed with resp: %v, error: %v", qosTableName, methods[method], resp, err)
 		return err
 	}
 
@@ -1465,7 +1463,7 @@ func (b *bess) addSessionQER(ctx context.Context, gate uint64, srcIface uint8,
 
 	any, err = anypb.New(q)
 	if err != nil {
-		log.Errorln("Error marshalling the rule", q, err)
+		logger.BessLog.Errorln("error marshalling the rule", q, err)
 		return
 	}
 
@@ -1473,7 +1471,7 @@ func (b *bess) addSessionQER(ctx context.Context, gate uint64, srcIface uint8,
 
 	err = b.processQER(ctx, any, upfMsgTypeAdd, qosTableName)
 	if err != nil {
-		log.Errorln("process QER failed for sessionQERLookup add operation")
+		logger.BessLog.Errorln("process QER failed for sessionQERLookup add operation")
 	}
 }
 
@@ -1492,7 +1490,7 @@ func (b *bess) delSessionQER(ctx context.Context, srcIface uint8, qer qer) {
 
 	any, err = anypb.New(q)
 	if err != nil {
-		log.Println("Error marshalling the rule", q, err)
+		logger.BessLog.Errorln("error marshalling the rule", q, err)
 		return
 	}
 
@@ -1500,7 +1498,7 @@ func (b *bess) delSessionQER(ctx context.Context, srcIface uint8, qer qer) {
 
 	err = b.processQER(ctx, any, upfMsgTypeDel, qosTableName)
 	if err != nil {
-		log.Errorln("process QER failed for sessionQERLookup del operation")
+		logger.BessLog.Errorln("process QER failed for sessionQERLookup del operation")
 	}
 }
 
@@ -1511,7 +1509,7 @@ func (b *bess) GRPCJoin(calls int, timeout time.Duration, done chan bool) bool {
 		select {
 		case ok := <-done:
 			if !ok {
-				log.Println("Error making GRPC calls")
+				logger.BessLog.Errorln("error making GRPC calls")
 				return false
 			}
 
@@ -1520,7 +1518,7 @@ func (b *bess) GRPCJoin(calls int, timeout time.Duration, done chan bool) bool {
 				return true
 			}
 		case <-boom:
-			log.Println("Timed out adding entries")
+			logger.BessLog.Infoln("timed out adding entries")
 			return false
 		}
 	}

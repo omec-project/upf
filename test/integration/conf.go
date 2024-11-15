@@ -11,7 +11,7 @@ import (
 	"runtime"
 
 	"github.com/omec-project/upf-epc/pfcpiface"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
 const (
@@ -28,7 +28,7 @@ const (
 var baseConfig = pfcpiface.Conf{
 	ReadTimeout: 15,
 	RespTimeout: "2s",
-	LogLevel:    logrus.TraceLevel,
+	LogLevel:    zap.InfoLevel,
 }
 
 func BESSConfigDefault() pfcpiface.Conf {
@@ -128,7 +128,7 @@ func GetConfig(datapath string, configType uint32) pfcpiface.Conf {
 		}
 	}
 
-	panic("Wrong datapath or config type provided")
+	panic("wrong datapath or config type provided")
 }
 
 func PushSliceMeterConfig(sliceConfig pfcpiface.NetworkSlice) error {
@@ -137,7 +137,7 @@ func PushSliceMeterConfig(sliceConfig pfcpiface.NetworkSlice) error {
 		return err
 	}
 
-	_, err = http.Post("http://127.0.0.1:8080/v1/config/network-slices", "application/json", bytes.NewBuffer(rawSliceConfig))
+	_, err = http.Post("http://127.0.0.8:8080/v1/config/network-slices", "application/json", bytes.NewBuffer(rawSliceConfig))
 	if err != nil {
 		return err
 	}

@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/omec-project/upf-epc/logger"
 )
 
 const (
@@ -96,11 +96,8 @@ func (ipf *ipFilterRule) String() string {
 }
 
 func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
-	parseLog := log.WithFields(log.Fields{
-		"flow-description": flowDesc,
-		"ue-address":       ueIP,
-	})
-	parseLog.Debug("Parsing flow description")
+	parseLog := logger.PfcpLog.With("flow-description", flowDesc, "ue-address", ueIP)
+	parseLog.Debugln("parsing flow description")
 
 	ipf := newIpFilterRule()
 
@@ -146,7 +143,7 @@ func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
 
 			err := ipf.src.parseNet(fields[i])
 			if err != nil {
-				parseLog.Error(err)
+				parseLog.Errorln(err)
 				return nil, err
 			}
 
@@ -155,7 +152,7 @@ func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
 
 				err = ipf.src.parsePort(fields[i])
 				if err != nil {
-					parseLog.Error("src port parse failed ", err)
+					parseLog.Errorln("src port parse failed", err)
 					return nil, err
 				}
 			}
@@ -165,7 +162,7 @@ func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
 
 			err := ipf.dst.parseNet(fields[i])
 			if err != nil {
-				parseLog.Error(err)
+				parseLog.Errorln(err)
 				return nil, err
 			}
 
@@ -174,15 +171,15 @@ func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
 
 				err = ipf.dst.parsePort(fields[i])
 				if err != nil {
-					parseLog.Error("dst port parse failed ", err)
+					parseLog.Errorln("dst port parse failed", err)
 					return nil, err
 				}
 			}
 		}
 	}
 
-	parseLog = parseLog.WithField("ip-filter", ipf)
-	parseLog.Debug("Flow description parsed successfully")
+	parseLog = parseLog.With("ip-filter", ipf)
+	parseLog.Debugln("flow description parsed successfully")
 
 	return ipf, nil
 }

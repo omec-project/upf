@@ -4,7 +4,7 @@
 package pfcpiface
 
 import (
-	log "github.com/sirupsen/logrus"
+	"github.com/omec-project/upf-epc/logger"
 )
 
 type QosLevel uint8
@@ -75,7 +75,7 @@ func (s *PFCPSession) MarkSessionQer(qers []qer) {
 	// If PDRS have one QER and all PDRs point to same QER, then consider it as application qer.
 	// If number of QERS is 2 or more, then search for session QER
 	if (len(sessQerIDList) < 1) || (len(qers) < 2) {
-		log.Infoln("need atleast 1 QER in PDR or 2 QERs in session to mark session QER.")
+		logger.PfcpLog.Infoln("need atleast 1 QER in PDR or 2 QERs in session to mark session QER")
 		return
 	}
 
@@ -105,13 +105,13 @@ func (s *PFCPSession) MarkSessionQer(qers []qer) {
 	)
 
 	if len(sessQerIDList) > 3 {
-		log.Warnln("Qer ID list size above 3. Not supported.")
+		logger.PfcpLog.Warnln("qer id list size above 3 is not supported")
 	}
 
 	for idx, qer := range qers {
 		if contains(sessQerIDList, qer.qerID) {
 			if qer.ulGbr > 0 || qer.dlGbr > 0 {
-				log.Infoln("Do not consider qer with non zero gbr value for session qer")
+				logger.InitLog.Infoln("do not consider qer with non zero gbr value for session qer")
 				continue
 			}
 
@@ -123,7 +123,7 @@ func (s *PFCPSession) MarkSessionQer(qers []qer) {
 		}
 	}
 
-	log.Infoln("session QER found. QER ID : ", sessQerID)
+	logger.PfcpLog.Infoln("session QER found. QER ID:", sessQerID)
 
 	qers[sessionIdx].qosLevel = SessionQos
 

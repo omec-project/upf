@@ -7,9 +7,9 @@ import (
 	"errors"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-pfcp/message"
 
+	"github.com/omec-project/upf-epc/logger"
 	"github.com/omec-project/upf-epc/pfcpiface/metrics"
 )
 
@@ -63,7 +63,7 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 
 	msg, err := message.Parse(buf)
 	if err != nil {
-		log.Errorln("Ignoring undecodable message: ", buf, " error: ", err)
+		logger.PfcpLog.Errorf("ignoring undecodable message: %v, error: %v", buf, err)
 		return
 	}
 
@@ -104,7 +104,7 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 		pConn.handleIncomingResponse(msg)
 
 	default:
-		log.Errorln("Message type: ", msgType, " is currently not supported")
+		logger.PfcpLog.Errorf("message type: %s is not currently supported", msgType)
 		return
 	}
 
@@ -112,10 +112,10 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 	// Check for errors in handling the message
 	if err != nil {
 		m.Finish(nodeID, "Failure")
-		log.Errorln("Error handling PFCP message type", msgType, "from:", addr, "nodeID:", nodeID, err)
+		logger.PfcpLog.Errorf("error handling PFCP message type %s, from: %s, nodeID: %s, error: %v", msgType, addr, nodeID, err)
 	} else {
 		m.Finish(nodeID, "Success")
-		log.Traceln("Successfully processed", msgType, "from", addr, "nodeID:", nodeID)
+		logger.PfcpLog.Debugf("successfully processed %s, from %s, nodeID: %s", msgType, addr, nodeID)
 	}
 
 	pConn.SaveMessages(m)
@@ -137,20 +137,20 @@ func (pConn *PFCPConn) SendPFCPMsg(msg message.Message) {
 
 	if err := msg.MarshalTo(out); err != nil {
 		m.Finish(nodeID, "Failure")
-		log.Errorln("Failed to marshal", msgType, "for", addr, err)
+		logger.PfcpLog.Errorf("failed to marshal %s for %s, error: %v", msgType, addr, err)
 
 		return
 	}
 
 	if _, err := pConn.Write(out); err != nil {
 		m.Finish(nodeID, "Failure")
-		log.Errorln("Failed to transmit", msgType, "to", addr, err)
+		logger.PfcpLog.Errorf("failed to transmit %v to %s, error %v", msgType, addr, err)
 
 		return
 	}
 
 	m.Finish(nodeID, "Success")
-	log.Traceln("Sent", msgType, "to", addr)
+	logger.PfcpLog.Debugf("sent %v to %s", msgType, addr)
 }
 
 func (pConn *PFCPConn) sendPFCPRequestMessage(r *Request) (message.Message, bool) {
@@ -161,7 +161,7 @@ func (pConn *PFCPConn) sendPFCPRequestMessage(r *Request) (message.Message, bool
 
 	for {
 		if reply, rc := r.GetResponse(pConn.shutdown, pConn.upf.respTimeout); rc {
-			log.Traceln("Request Timeout, retriesLeft:", retriesLeft)
+			logger.PfcpLog.Debugln("request timeout, retries left:", retriesLeft)
 
 			if retriesLeft > 0 {
 				pConn.SendPFCPMsg(r.msg)

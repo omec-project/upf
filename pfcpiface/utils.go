@@ -11,8 +11,7 @@ import (
 	"strings"
 
 	"github.com/omec-project/upf-epc/internal/p4constants"
-
-	log "github.com/sirupsen/logrus"
+	"github.com/omec-project/upf-epc/logger"
 )
 
 // Bits type.
@@ -28,6 +27,13 @@ func Set(b, flag Bits) Bits { return b | flag }
 func setUeipFeature(features ...uint8) {
 	if len(features) >= 3 {
 		features[2] = features[2] | 0x04
+	}
+}
+
+// Set the 5th bit of the first octet to 1.
+func setFTUPFeature(features ...uint8) {
+	if len(features) >= 1 {
+		features[0] = features[0] | 0x10
 	}
 }
 
@@ -104,10 +110,10 @@ func calcBurstSizeFromRate(kbps uint64, ms uint64) uint64 {
 func MustParseStrIP(address string) *net.IPNet {
 	ip, ipNet, err := net.ParseCIDR(address)
 	if err != nil {
-		log.Fatalf("unable to parse IP %v that we should parse", address)
+		logger.PfcpLog.Fatalf("unable to parse IP %v that we should parse", address)
 	}
 
-	log.Info("Parsed IP: ", ip)
+	logger.PfcpLog.Infoln("parsed IP:", ip)
 
 	return ipNet
 }
