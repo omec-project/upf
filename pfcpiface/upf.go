@@ -131,7 +131,6 @@ func NewUPF(conf *Conf, fp datapath) *upf {
 		enableHBTimer:     conf.EnableHBTimer,
 		readTimeout:       time.Second * time.Duration(conf.ReadTimeout),
 		fteidGenerator:    NewFTEIDGenerator(),
-
 		n4addr:            conf.N4Addr,
 	}
 

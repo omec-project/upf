@@ -393,13 +393,12 @@ func (p *pdr) parseFTEID(teidIE *ie.IE) error {
 	teid := fteid.TEID
 	if fteid.HasCh() {
 		p.UPAllocateFteid = true
-	} else {
-		if teid != 0 {
-			p.tunnelTEID = teid
-			p.tunnelTEIDMask = 0xFFFFFFFF
-			p.tunnelIP4Dst = ip2int(fteid.IPv4Address)
-			p.tunnelIP4DstMask = 0xFFFFFFFF
-		}
+	} else if teid != 0 {
+		p.tunnelTEID = teid
+		p.tunnelTEIDMask = 0xFFFFFFFF
+		p.tunnelIP4Dst = ip2int(fteid.IPv4Address)
+		p.tunnelIP4DstMask = 0xFFFFFFFF
+
 	}
 
 	return nil
