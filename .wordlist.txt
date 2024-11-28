@@ -123,6 +123,7 @@ sudo
 tc
 TCP
 tcpdump
+TEID
 TRex
 UDP
 UE

@@ -5,6 +5,7 @@ package pfcpiface
 
 import (
 	"github.com/stretchr/testify/require"
+	"github.com/wmnsk/go-pfcp/ie"
 
 	"net"
 	"reflect"
@@ -89,5 +90,29 @@ func TestGetSliceTcMeterIndex(t *testing.T) {
 			require.Equal(t, tt.want, got)
 		},
 		)
+	}
+}
+
+func TestSetUeipFeature(t *testing.T) {
+	features := make([]uint8, 4)
+
+	setUeipFeature(features...)
+
+	ie := ie.NewUPFunctionFeatures(features...)
+	hasUeIPAlloc := ie.HasUEIP()
+	if !hasUeIPAlloc {
+		t.Errorf("Expected UEIPAlloc to be set")
+	}
+}
+
+func TestSetFTUPFeature(t *testing.T) {
+	features := make([]uint8, 4)
+
+	setFTUPFeature(features...)
+
+	ie := ie.NewUPFunctionFeatures(features...)
+	hasFTUP := ie.HasFTUP()
+	if !hasFTUP {
+		t.Errorf("Expected FTUP to be set")
 	}
 }

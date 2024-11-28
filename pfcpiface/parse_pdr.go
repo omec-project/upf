@@ -269,10 +269,11 @@ type applicationFilter struct {
 }
 
 type pdr struct {
-	srcIface     uint8
-	tunnelIP4Dst uint32
-	tunnelTEID   uint32
-	ueAddress    uint32
+	UPAllocateFteid bool
+	srcIface        uint8
+	tunnelIP4Dst    uint32
+	tunnelTEID      uint32
+	ueAddress       uint32
 
 	srcIfaceMask     uint8
 	tunnelIP4DstMask uint32
@@ -390,13 +391,14 @@ func (p *pdr) parseFTEID(teidIE *ie.IE) error {
 	}
 
 	teid := fteid.TEID
-	tunnelIPv4Address := fteid.IPv4Address
-
-	if teid != 0 {
+	if fteid.HasCh() {
+		p.UPAllocateFteid = true
+	} else if teid != 0 {
 		p.tunnelTEID = teid
 		p.tunnelTEIDMask = 0xFFFFFFFF
-		p.tunnelIP4Dst = ip2int(tunnelIPv4Address)
+		p.tunnelIP4Dst = ip2int(fteid.IPv4Address)
 		p.tunnelIP4DstMask = 0xFFFFFFFF
+
 	}
 
 	return nil

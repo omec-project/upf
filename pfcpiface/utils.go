@@ -30,6 +30,13 @@ func setUeipFeature(features ...uint8) {
 	}
 }
 
+// Set the 5th bit of the first octet to 1.
+func setFTUPFeature(features ...uint8) {
+	if len(features) >= 1 {
+		features[0] = features[0] | 0x10
+	}
+}
+
 func setEndMarkerFeature(features ...uint8) {
 	if len(features) >= 2 {
 		features[1] = features[1] | 0x01

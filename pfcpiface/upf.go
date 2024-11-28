@@ -51,6 +51,7 @@ type upf struct {
 	reportNotifyChan  chan uint64
 	sliceInfo         *SliceInfo
 	readTimeout       time.Duration
+	fteidGenerator    *FTEIDGenerator
 
 	datapath
 	maxReqRetries uint8
@@ -129,6 +130,7 @@ func NewUPF(conf *Conf, fp datapath) *upf {
 		maxReqRetries:     conf.MaxReqRetries,
 		enableHBTimer:     conf.EnableHBTimer,
 		readTimeout:       time.Second * time.Duration(conf.ReadTimeout),
+		fteidGenerator:    NewFTEIDGenerator(),
 		n4addr:            conf.N4Addr,
 	}
 
