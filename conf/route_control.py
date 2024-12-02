@@ -18,6 +18,7 @@ from pyroute2.netlink.rtnl.ndmsg import ndmsg
 from pybess.bess import *
 from pyroute2 import NDB, IPRoute
 from scapy.all import ICMP, IP, send
+from socket import AF_INET
 
 LOG_FORMAT = "%(asctime)s %(levelname)s %(message)s"
 logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
@@ -365,7 +366,7 @@ class RouteController:
 
     def bootstrap_routes(self) -> None:
         """Goes through all routes and handles new ones."""
-        routes = self._ipr.get_routes()
+        routes = self._ipr.get_routes(family=AF_INET)
         for route in routes:
             if route["event"] == KEY_NEW_ROUTE_ACTION:
                 if route_entry := self._parse_route_entry_msg(route):
