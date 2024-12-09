@@ -35,7 +35,7 @@ RUN pip3 install --no-cache-dir --root /python_output \
     unittest-xml-reporting==$UNITTEST_XML_REPORTING_VER
 
 # Install TRex traffic gen and library for TRex API
-FROM alpine:3.21.0 AS trex-builder
+FROM alpine:3.21 AS trex-builder
 ARG TREX_VER
 ARG TREX_EXT_LIBS
 ARG TREX_LIBS
