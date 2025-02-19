@@ -379,6 +379,8 @@ class RouteController:
         Args:
             route_entry (RouteEntry): The route entry.
         """
+        if not type(ipaddress.ip_address(route_entry.next_hop_ip)) is ipaddress.IPv4Address:
+            return
         if not (next_hop_mac := fetch_mac(self._ndb, route_entry.next_hop_ip)):
             logger.info(
                 "mac address of the next hop %s is not stored in ARP table. Probing...",
