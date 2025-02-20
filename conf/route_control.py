@@ -379,7 +379,7 @@ class RouteController:
         Args:
             route_entry (RouteEntry): The route entry.
         """
-        if not type(ipaddress.ip_address(route_entry.next_hop_ip)) is ipaddress.IPv4Address:
+        if not validate_ipv4(route_entry.next_hop_ip):
             return
         if not (next_hop_mac := fetch_mac(self._ndb, route_entry.next_hop_ip)):
             logger.info(
@@ -588,8 +588,6 @@ class RouteController:
         """
         self._unresolved_arp_queries_cache[route_entry.next_hop_ip] = route_entry
         logger.info("Adding entry %s in arp table by pinging", route_entry)
-        if not validate_ipv4(route_entry.next_hop_ip):
-            return
         send_ping(route_entry.next_hop_ip)
 
     def _get_gate_idx(self, route_entry: RouteEntry, module_name: str) -> int:
