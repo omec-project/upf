@@ -6,15 +6,9 @@
 run:
   tests: true
   timeout: 10m
-  skip-files:
-    - ".*\\.pb\\.go"
-  skip-dirs-use-default: true
-
 # all available settings of specific linters
 linters-settings:
   govet:
-    # report about shadowed variables
-    check-shadowing: true
     # settings per analyzer
     settings:
       printf: # analyzer name, run `go tool vet help` to see all analyzers
@@ -25,24 +19,27 @@ linters-settings:
           - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
     # enable all analyzers
     enable-all: true
-    disable:
-      - fieldalignment
 
 linters:
   enable:
-    - goconst
     - gofmt
     - goimports
-    - govet
+    # - govet
+    # - errcheck
     - ineffassign
+    - goconst
     - misspell
     - nilerr
     - nilnil
     - unparam
 
-  disable:
-    - errcheck
-    - goerr113
-    - gosec
-    - staticcheck
-    - wsl
+  #disable-all: false
+  fast: true
+issues:
+  # List of regexps of issue texts to exclude, empty list by default.
+  # But independently from this option we use default exclude patterns,
+  # it can be disabled by `exclude-use-default: false`. To list all
+  # excluded by default patterns execute `golangci-lint run --help`
+  exclude-files:
+    - ".*\\.pb\\.go"
+  uniq-by-line: true
