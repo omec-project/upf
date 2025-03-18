@@ -347,14 +347,16 @@ func (b *bess) SummaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metri
 }
 
 func (b *bess) SummaryGtpuLatency(uc *upfCollector, ch chan<- prometheus.Metric) {
+	if !uc.upf.enableGtpuMonitor {
+		return
+	}
 	gtpuPathStatsResp := b.readGtpuPathMonitoringStats(GtpuPathMonitoringMeasure, true)
 	if gtpuPathStatsResp == nil {
 		logger.BessLog.Errorln(GtpuPathMonitoringMeasure, "read failed")
 		return
 	}
 
-	for i := 0; i < len(gtpuPathStatsResp.Statistics); i++ {
-		post := gtpuPathStatsResp.Statistics[i]
+	for _, post := range gtpuPathStatsResp.Statistics {
 		gnbIpString := int2ip(post.GnbIp).String()
 
 		ch <- prometheus.MustNewConstMetric(
