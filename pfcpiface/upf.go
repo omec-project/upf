@@ -38,6 +38,7 @@ type upf struct {
 	enableUeIPAlloc   bool
 	enableEndMarker   bool
 	enableFlowMeasure bool
+	enableGtpuMonitor bool
 	accessIface       string
 	coreIface         string
 	ippoolCidr        string
@@ -119,6 +120,7 @@ func NewUPF(conf *Conf, fp datapath) *upf {
 		enableUeIPAlloc:   conf.CPIface.EnableUeIPAlloc,
 		enableEndMarker:   conf.EnableEndMarker,
 		enableFlowMeasure: conf.EnableFlowMeasure,
+		enableGtpuMonitor: conf.EnableGtpuPathMonitoring,
 		accessIface:       conf.AccessIface.IfName,
 		coreIface:         conf.CoreIface.IfName,
 		ippoolCidr:        conf.CPIface.UEIPPool,
