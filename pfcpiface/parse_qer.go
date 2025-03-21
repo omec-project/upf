@@ -76,12 +76,12 @@ func (q *qer) parseQER(ie1 *ie.IE, seid uint64) error {
 
 	gbrUL, err := ie1.GBRUL()
 	if err != nil {
-		logger.PfcpLog.Errorln("could not read GBRUL")
+		logger.PfcpLog.Warnln("could not read GBRUL. It might be because of non-GBR flow")
 	}
 
 	gbrDL, err := ie1.GBRDL()
 	if err != nil {
-		logger.PfcpLog.Errorln("could not read GBRDL")
+		logger.PfcpLog.Warnln("could not read GBRDL. It might be because of non-GBR flow")
 	}
 
 	q.qerID = qerID
