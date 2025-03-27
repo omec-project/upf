@@ -2,8 +2,6 @@
 # Copyright 2023 Canonical Ltd.
 # Copyright 2024 Intel Corporation
 
-name: Main workflow
-
 on:
   pull_request:
     branches:
@@ -14,23 +12,9 @@ on:
 
 jobs:
   build:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-
-      - name: Generate protobuf
-        run: make pb
-
-      - name: Build the BESS-UPF Docker image
-        run: DOCKER_TARGETS=bess make docker-build
-
-      - name: Build the PFCP Agent Docker image
-        run: DOCKER_TARGETS=pfcpiface make docker-build
+    uses: "dariofaccin/.github/.github/workflows/upf-build-upf.yml@add-upf-specific-workflows"
+    with:
+      branch_name: ${{ github.ref }}
 
   build-ptf:
     if: github.event_name == 'pull_request'
@@ -45,49 +29,20 @@ jobs:
         run: make build
 
   lint:
-    name: lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6.5.2
-        with:
-          version: latest
-          args: -v --config ./.golangci.yml
+    uses: omec-project/.github/.github/workflows/lint.yml@main
+    with:
+      branch_name: ${{ github.ref }}
 
   hadolint:
-    name: hadolint
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Dockerfile linter
-        uses: hadolint/hadolint-action@v3.1.0
-        # For now, ignoring:
-        # DL3007 warning: Pin the version explicitily to a release tag (no latest);
-        # DL3008 warning: Pin versions in apt get install (e.g., apt-get install <package>=<version>); and
-        # DL3018 warning: Pin versions in apk add (e.g., apk add <package>=<version>)
-        with:
-          dockerfile: Dockerfile
-          ignore: DL3007,DL3008,DL3018
+    uses: omec-project/.github/.github/workflows/hadolint.yml@main
+    with:
+      branch_name: ${{ github.ref }}
 
   check-spelling:
-    name: Markdown spellcheck
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    uses: dariofaccin/.github/.github/workflows/check-spelling.yml@add-upf-specific-workflows
+    with:
+      branch_name: ${{ github.ref }}
 
-      - name: Check Spelling
-        uses: rojopolis/spellcheck-github-actions@0.47.0
-        with:
-          config_path: .spellcheck.yml
-          task_name: Markdown
 
   route-control-tests:
     runs-on: ubuntu-latest
@@ -153,19 +108,11 @@ jobs:
         run: make test-bess-integration-native
 
   license-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    uses: omec-project/.github/.github/workflows/license-check.yml@main
+    with:
+      branch_name: ${{ github.ref }}
 
-      - name: reuse lint
-        uses: fsfe/reuse-action@v5
-
-  fossa-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: FOSSA scan
-        uses: fossa-contrib/fossa-action@v3
-        with:
-          fossa-api-key: 0c3bbcdf20e157bbd487dae173751b28
+  fossa-scan:
+    uses: omec-project/.github/.github/workflows/fossa-scan.yml@main
+    with:
+      branch_name: ${{ github.ref }}
