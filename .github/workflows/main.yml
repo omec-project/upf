@@ -2,8 +2,6 @@
 # Copyright 2023 Canonical Ltd.
 # Copyright 2024 Intel Corporation
 
-name: Main workflow
-
 on:
   pull_request:
     branches:
@@ -14,158 +12,56 @@ on:
 
 jobs:
   build:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-
-      - name: Generate protobuf
-        run: make pb
-
-      - name: Build the BESS-UPF Docker image
-        run: DOCKER_TARGETS=bess make docker-build
-
-      - name: Build the PFCP Agent Docker image
-        run: DOCKER_TARGETS=pfcpiface make docker-build
+    uses: "dariofaccin/.github/.github/workflows/upf-build-upf.yml@add-upf-specific-workflows"
+    with:
+      branch_name: ${{ github.ref }}
 
   build-ptf:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./ptf
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build PTF image
-        run: make build
+    uses: "dariofaccin/.github/.github/workflows/upf-build-ptf.yml@add-upf-specific-workflows"
+    with:
+      branch_name: ${{ github.ref }}
 
   lint:
-    name: lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6.5.2
-        with:
-          version: latest
-          args: -v --config ./.golangci.yml
+    uses: omec-project/.github/.github/workflows/lint.yml@main
+    with:
+      branch_name: ${{ github.ref }}
 
   hadolint:
-    name: hadolint
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Dockerfile linter
-        uses: hadolint/hadolint-action@v3.1.0
-        # For now, ignoring:
-        # DL3007 warning: Pin the version explicitily to a release tag (no latest);
-        # DL3008 warning: Pin versions in apt get install (e.g., apt-get install <package>=<version>); and
-        # DL3018 warning: Pin versions in apk add (e.g., apk add <package>=<version>)
-        with:
-          dockerfile: Dockerfile
-          ignore: DL3007,DL3008,DL3018
+    uses: omec-project/.github/.github/workflows/hadolint.yml@main
+    with:
+      branch_name: ${{ github.ref }}
 
   check-spelling:
-    name: Markdown spellcheck
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Check Spelling
-        uses: rojopolis/spellcheck-github-actions@0.47.0
-        with:
-          config_path: .spellcheck.yml
-          task_name: Markdown
+    uses: dariofaccin/.github/.github/workflows/check-spelling.yml@add-upf-specific-workflows
+    with:
+      branch_name: ${{ github.ref }}
 
   route-control-tests:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-
-    - name: Create virtual environment
-      run: python -m venv venv
-
-    - name: Install dependencies
-      run: |
-        source ./venv/bin/activate
-        pip install -r requirements.txt
-
-    - name: Run tests
-      run: |
-        source ./venv/bin/activate
-        python -m unittest ./conf/test_route_control.py
-
-    - name: Clean up virtual environment
-      run: rm -rf venv
+    uses: "dariofaccin/.github/.github/workflows/upf-route-control-tests.yml@add-upf-specific-workflows"
+    with:
+      branch_name: ${{ github.ref }}
 
   unit-tests-pfcp:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-
-      - name: Run unit tests for PFCP Agent
-        run: make test
+    uses: "dariofaccin/.github/.github/workflows/upf-unit-tests-pfcp.yml@add-upf-specific-workflows"
+    with:
+      branch_name: ${{ github.ref }}
 
   integration-tests-up4:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-
-      - name: Run integration tests for PFCP Agent & UP4
-        run: make test-up4-integration-docker || (docker logs pfcpiface; exit 1)
+    uses: "dariofaccin/.github/.github/workflows/upf-integration-tests-up4.yml@add-upf-specific-workflows"
+    with:
+      branch_name: ${{ github.ref }}
 
   integration-tests-bess:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-
-      - name: Run integration tests for PFCP Agent & UP4
-        run: make test-bess-integration-native
+    uses: "dariofaccin/.github/.github/workflows/upf-integration-tests-bess.yml@add-upf-specific-workflows"
+    with:
+      branch_name: ${{ github.ref }}
 
   license-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    uses: omec-project/.github/.github/workflows/license-check.yml@main
+    with:
+      branch_name: ${{ github.ref }}
 
-      - name: reuse lint
-        uses: fsfe/reuse-action@v5
-
-  fossa-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: FOSSA scan
-        uses: fossa-contrib/fossa-action@v3
-        with:
-          fossa-api-key: 0c3bbcdf20e157bbd487dae173751b28
+  fossa-scan:
+    uses: omec-project/.github/.github/workflows/fossa-scan.yml@main
+    with:
+      branch_name: ${{ github.ref }}
