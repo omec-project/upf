@@ -17,16 +17,9 @@ jobs:
       branch_name: ${{ github.ref }}
 
   build-ptf:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./ptf
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build PTF image
-        run: make build
+    uses: "dariofaccin/.github/.github/workflows/upf-build-ptf.yml@add-upf-specific-workflows"
+    with:
+      branch_name: ${{ github.ref }}
 
   lint:
     uses: omec-project/.github/.github/workflows/lint.yml@main
@@ -43,69 +36,25 @@ jobs:
     with:
       branch_name: ${{ github.ref }}
 
-
   route-control-tests:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-
-    - name: Create virtual environment
-      run: python -m venv venv
-
-    - name: Install dependencies
-      run: |
-        source ./venv/bin/activate
-        pip install -r requirements.txt
-
-    - name: Run tests
-      run: |
-        source ./venv/bin/activate
-        python -m unittest ./conf/test_route_control.py
-
-    - name: Clean up virtual environment
-      run: rm -rf venv
+    uses: "dariofaccin/.github/.github/workflows/upf-route-control-tests.yml@add-upf-specific-workflows"
+    with:
+      branch_name: ${{ github.ref }}
 
   unit-tests-pfcp:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-
-      - name: Run unit tests for PFCP Agent
-        run: make test
+    uses: "dariofaccin/.github/.github/workflows/upf-unit-tests-pfcp.yml@add-upf-specific-workflows"
+    with:
+      branch_name: ${{ github.ref }}
 
   integration-tests-up4:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-
-      - name: Run integration tests for PFCP Agent & UP4
-        run: make test-up4-integration-docker || (docker logs pfcpiface; exit 1)
+    uses: "dariofaccin/.github/.github/workflows/upf-integration-tests-up4.yml@add-upf-specific-workflows"
+    with:
+      branch_name: ${{ github.ref }}
 
   integration-tests-bess:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-
-      - name: Run integration tests for PFCP Agent & UP4
-        run: make test-bess-integration-native
+    uses: "dariofaccin/.github/.github/workflows/upf-integration-tests-bess.yml@add-upf-specific-workflows"
+    with:
+      branch_name: ${{ github.ref }}
 
   license-check:
     uses: omec-project/.github/.github/workflows/license-check.yml@main
