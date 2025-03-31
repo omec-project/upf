@@ -1,45 +1,53 @@
+# SPDX-FileCopyrightText: 2021 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2021 Intel Corporation
-# Copyright 2021 Open Networking Foundation
 
-# golangci-lint configuration used for CI
+version: "2"
 run:
   tests: true
-  timeout: 10m
-# all available settings of specific linters
-linters-settings:
-  govet:
-    # settings per analyzer
-    settings:
-      printf: # analyzer name, run `go tool vet help` to see all analyzers
-        funcs: # run `go tool vet help printf` to see available settings for `printf` analyzer
-          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Infof
-          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
-          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
-          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
-    # enable all analyzers
-    enable-all: true
-
 linters:
   enable:
-    - gofmt
-    - goimports
-    # - govet
-    # - errcheck
-    - ineffassign
     - goconst
     - misspell
     - nilerr
     - nilnil
     - unparam
-
-  #disable-all: false
-  fast: true
+  disable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+  settings:
+    govet:
+      enable-all: true
+      settings:
+        printf:
+          funcs:
+            - (github.com/golangci/golangci-lint/pkg/logutils.Log).Infof
+            - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
+            - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
+            - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - .*\.pb\.go
+      - third_party$
+      - builtin$
+      - examples$
 issues:
-  # List of regexps of issue texts to exclude, empty list by default.
-  # But independently from this option we use default exclude patterns,
-  # it can be disabled by `exclude-use-default: false`. To list all
-  # excluded by default patterns execute `golangci-lint run --help`
-  exclude-files:
-    - ".*\\.pb\\.go"
   uniq-by-line: true
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - .*\.pb\.go
+      - third_party$
+      - builtin$
+      - examples$
