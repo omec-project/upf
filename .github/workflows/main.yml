@@ -27,7 +27,7 @@ jobs:
       branch_name: ${{ github.ref }}
 
   hadolint:
-    uses: omec-project/.github/.github/workflows/hadolint.yml@main
+    uses: dariofaccin/.github/.github/workflows/hadolint.yml@add-upf-specific-workflows
     with:
       branch_name: ${{ github.ref }}
 
