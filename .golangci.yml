@@ -1,9 +1,5 @@
+# SPDX-FileCopyrightText: 2021 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2021 Intel Corporation
-# Copyright 2021 Open Networking Foundation
-# Copyright 2025 Canonical Ltd.
-
-# golangci-lint configuration used for CI
 
 version: "2"
 run:
@@ -16,17 +12,16 @@ linters:
     - nilnil
     - unparam
   disable:
-    - govet
     - errcheck
+    - govet
     - staticcheck
-  # all available settings of specific linters
+    - unused
   settings:
     govet:
-      # settings per analyzer
       enable-all: true
       settings:
-        printf: # analyzer name, run `go tool vet help` to see all analyzers
-          funcs: # run `go tool vet help printf` to see available settings for `printf` analyzer
+        printf:
+          funcs:
             - (github.com/golangci/golangci-lint/pkg/logutils.Log).Infof
             - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
             - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
@@ -44,10 +39,6 @@ linters:
       - builtin$
       - examples$
 issues:
-  # List of regexps of issue texts to exclude, empty list by default.
-  # But independently from this option we use default exclude patterns,
-  # it can be disabled by `exclude-use-default: false`. To list all
-  # excluded by default patterns execute `golangci-lint run --help`
   uniq-by-line: true
 formatters:
   enable:
