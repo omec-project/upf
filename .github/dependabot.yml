@@ -1,16 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2020-Present Intel Corporation
+# Copyright 2025 Canonical Ltd.
 
 version: 2
 updates:
-
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "sunday"
-      time: "21:00"
-      timezone: "America/Los_Angeles"
 
   - package-ecosystem: "docker"
     directory: "/"
