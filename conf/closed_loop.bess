@@ -1,0 +1,501 @@
+# vim: syntax=py
+# -*- mode: python -*-
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2019 Intel Corporation
+
+from conf.parser import *
+from conf.gtp_echo import *
+import conf.ports as port
+import conf.sim as sim
+import signal
+import os
+
+port.setup_globals()
+
+
+# ====================================================
+#	Read json config file (START HERE)
+# ====================================================
+
+Access = 1
+Core = 2
+noGTPUDecap = 0
+GTPUDecap = 1
+noGTPUEncap = 0
+GTPUEncap = 1
+farForwardDAction = 0
+farForwardUAction = 1
+farDropAction = 2
+farBufferAction = 3
+farNotifyCPAction = 4
+pdrFailGate = 2
+farFailGate = 2
+qerGreenGate = 1
+qerYellowGate = 2
+qerRedGate = 3
+qerFailGate = 4
+qerStatusDropGate = 5
+qerUnmeteredGate = 6
+interfaces = ["access", "core"]
+parser = Parser('conf/upf.jsonc')
+parser.parse(interfaces)
+
+# Catch core & access MAC/IPv4 addresses
+macstr_d = None
+macstr_u = None
+access_ip = ips_by_interface(parser.access_ifname)
+core_ip = ips_by_interface(parser.core_ifname)
+if parser.mode == 'sim':
+    macstr_d = '00:00:00:00:00:02'
+    macstr_u = '00:00:00:00:00:01'
+    n36_pkts = [sim.gen_gtpu_packet(parser.sim_pkt_size, macstr_d, macstr_u,
+                                    parser.sim_start_enb_ip, access_ip[0],
+                                    parser.sim_start_ue_ip, parser.sim_n6_app_ip,
+                                    parser.sim_start_n3_teid)]
+
+    n39_pkts = [sim.gen_gtpu_packet(parser.sim_pkt_size, macstr_d, macstr_u,
+                                    parser.sim_start_enb_ip, access_ip[0],
+                                    parser.sim_start_ue_ip, parser.sim_n9_app_ip,
+                                    parser.sim_start_n3_teid)]
+
+    n63_pkts = [sim.gen_inet_packet(parser.sim_pkt_size, macstr_u, macstr_d,
+                                    parser.sim_n6_app_ip, parser.sim_start_ue_ip)]
+
+    n93_pkts = [sim.gen_gtpu_packet(parser.sim_pkt_size, macstr_d, macstr_u,
+                                    parser.sim_start_aupf_ip, core_ip[0],
+                                    parser.sim_n9_app_ip, parser.sim_start_ue_ip,
+                                    parser.sim_start_n9_teid)]
+    if parser.enable_ntf:
+        # Every 30th packet will be a STUN packet.  With 5000 flows, this
+        # results in about 1000 flows with network tokens, and every 3rd packet
+        # is a STUN packet with a token.  This is not a good representation of
+        # a real world test, but it is enough to verify that NTF can match
+        # tokens and pass traffic through with mode="sim".
+        n36_pkts = n36_pkts * 29
+        n36_pkts.append(
+          sim.gen_ue_ntf_packet(parser.sim_pkt_size, macstr_d, macstr_u,
+                                parser.sim_start_enb_ip, access_ip[0],
+                                parser.sim_start_ue_ip, parser.sim_n6_app_ip,
+                                parser.sim_start_n3_teid))
+
+    n3_seq = sim.gen_gtpu_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip, 62, parser.sim_start_n3_teid)
+    n6_seq = sim.gen_inet_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip)
+    n9_seq = sim.gen_gtpu_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip, 66, parser.sim_start_n9_teid)
+
+    if parser.sim_core == "n6":
+        packet_generator = {'access': n36_pkts, 'core': n63_pkts}
+        seq_kwargs = {'access': n3_seq, 'core': n6_seq}
+    else:
+        packet_generator = {'access': n39_pkts, 'core': n93_pkts}
+        seq_kwargs = {'access': n3_seq, 'core': n9_seq}
+
+else:
+    macstr_d = mac_by_interface(parser.core_ifname)
+    macstr_u = mac_by_interface(parser.access_ifname)
+
+
+# ====================================================
+#       Core Setup
+# ====================================================
+
+
+# Initialize workers
+cores = get_process_affinity()
+workers = cores[:parser.workers]
+if len(cores) > parser.workers:
+    nonworkers = cores[parser.workers:]
+else:
+    nonworkers = cores
+
+set_process_affinity_all(nonworkers)
+for wid in range(parser.workers):
+    bess.add_worker(wid=wid, core=int(workers[wid % len(workers)]))
+
+
+# ====================================================
+#       Port Setup
+# ====================================================
+
+ports = {}
+
+for idx, iface in enumerate(interfaces):
+    # check if source natting for a given port is required
+    try:
+        ext_addrs = parser.interfaces[iface]["ip_masquerade"]
+    except KeyError:
+        ext_addrs = None
+    except TypeError:
+        ext_addrs = None
+
+    p = port.Port(parser.interfaces[iface]["ifname"], parser.hwcksum, ext_addrs)
+    if p.name in ports:
+        continue
+
+    if parser.ddp:
+        p.configure_flow_profiles(iface)
+
+    if parser.mode == 'cndp':
+        p.configure_cndp(parser.interfaces[iface]["cndp_jsonc_file"], iface, len(workers))
+
+    # initialize port with the configured driver
+    p.workers = [i for i in range(len(workers))]
+    p.init_port(idx, parser.mode)
+
+    # setup port module with auxiliary modules
+    if parser.mode == 'sim':
+        p.setup_port(parser.ip_frag_with_eth_mtu, parser.max_ip_defrag_flows, parser.measure_upf, packet_generator[iface], **seq_kwargs[iface])
+    else:
+        p.setup_port(parser.ip_frag_with_eth_mtu, parser.max_ip_defrag_flows, parser.measure_upf)
+
+    # Finally add entry to ports list
+    ports[p.name] = p
+
+
+# ====================================================
+#       Network Token Functions Setup
+# ====================================================
+
+ntf = None
+if parser.enable_ntf:
+    try:
+        ntf = NTF()
+        # TODO: Populate these tables by talking to the NTE
+        ntf.table_create(dpid=1, max_entries=5)
+        ntf.entry_create(dpid=1, entry_id=1, dscp=1, token={
+          'app_id': 0xB00F,
+          'encryption_key': '{"alg":"A128CBC-HS256","k":"Qr_XwDGctna3SlR88rEJYt6Zm100SASYeJWSJihDnsA","key_ops":["encrypt","decrypt"],"kty":"oct"}'
+        })
+    except NameError:
+        pass
+
+# ====================================================
+# 	Shared Pipeline (DL + UL)
+# ====================================================
+
+######################################################
+# The following atrributes are created by GtpuParser:
+#   - dst_ip
+#   - src_ip
+#   - dst_port
+#   - src_port
+#   - teid (fseid)
+#   - tunnel_ip4_dst
+#   - proto_id
+
+linkMerge::Merge() \
+    -> pktParse::GtpuParser():1 \
+    -> pdrLookup::WildcardMatch(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
+                                        {'attr_name':'tunnel_ipv4_dst', 'num_bytes':4}, \
+                                        {'attr_name':'teid', 'num_bytes':4}, \
+                                        {'attr_name':'src_ip', 'num_bytes':4}, \
+                                        {'attr_name':'dst_ip', 'num_bytes':4}, \
+                                        {'attr_name':'src_port', 'num_bytes':2}, \
+                                        {'attr_name':'dst_port', 'num_bytes':2}, \
+                                        {'attr_name':'ip_proto', 'num_bytes':1}], \
+                                values=[{'attr_name':'pdr_id', 'num_bytes':4}, \
+                                        {'attr_name':'fseid', 'num_bytes':8}, \
+                                        {'attr_name':'ctr_id', 'num_bytes':4}, \
+                                        {'attr_name':'qer_id', 'num_bytes':4}, \
+                                        {'attr_name':'far_id', 'num_bytes':4}],\
+                                entries=parser.table_size_pdr_lookup):noGTPUDecap
+
+appQERLookup::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
+                                 {'attr_name':'qer_id', 'num_bytes':4}, \
+                                 {'attr_name':'fseid', 'num_bytes':8}], \
+                         values=[{'attr_name':'qfi', 'num_bytes':1}],\
+                         entries = parser.table_size_app_qer_lookup)
+# Insert NTF module, if enabled
+_in = pdrLookup
+_out = appQERLookup
+
+if ntf:
+  _in -> ntf
+  _in = ntf
+  _out = ntf
+
+if parser.measure_flow:
+    preQosFlowMeasure::FlowMeasure(leader=True,
+                                   flag_attr_name="buffer_flag",
+                                   entries=parser.table_size_flow_measure)
+    _in -> preQosFlowMeasure
+    _in = preQosFlowMeasure
+    _out = preQosFlowMeasure
+
+_in -> appQERLookup
+
+# Add logical pipeline when gtpudecap is needed
+pdrLookup:GTPUDecap \
+    -> gtpuDecap::GtpuDecap() \
+    -> _out
+
+executeFAR::Split(size=1, attribute='action')
+_in = executeFAR
+if parser.enable_slice_metering:
+    # sliceMeter enforces a per slice, per direction meter rate limit
+    sliceMeter::Qos(fields=[{'attr_name':'action', 'num_bytes':1}, \
+                            {'attr_name':'tunnel_out_type', 'num_bytes':1}],\
+                            entries=8)
+    # Reserved gates, reject rule adds with gate=1/2/3
+    m_meter  = 0 # Placeholder gate not connected. Will meter if lookup result returns this gate
+    m_green  = 1 # For green traffic
+    m_yellow = 2 # For yellow traffic
+    m_red    = 3 # For red traffic
+    # User defined gates
+    m_fail   = 4 # For lookup failure traffic
+    m_unmeter = 5 # For unmetered traffic
+    # Admit green, yellow, unmetered and lookup failures, drop red.
+    sliceMeter:m_green -> executeFAR
+    sliceMeter:m_yellow -> executeFAR
+    sliceMeter:m_red -> sliceMeterRed::Sink()
+    sliceMeter:m_fail -> executeFAR
+    sliceMeter:m_unmeter -> executeFAR
+    sliceMeter.set_default_gate(gate=m_fail)
+    _in = sliceMeter
+
+farLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
+                              {'attr_name':'fseid', 'num_bytes':8}], \
+                      values=[{'attr_name':'action', 'num_bytes':1}, \
+                              {'attr_name':'tunnel_out_type', 'num_bytes':1}, \
+                              {'attr_name':'tunnel_out_src_ip4addr', 'num_bytes':4}, \
+                              {'attr_name':'tunnel_out_dst_ip4addr', 'num_bytes':4}, \
+                              {'attr_name':'tunnel_out_teid', 'num_bytes':4}, \
+                              {'attr_name':'tunnel_out_udp_port', 'num_bytes':2}],\
+                      entries=parser.table_size_far_lookup):noGTPUEncap \
+    -> farMerge::Merge() \
+    -> _in
+
+# sessionQERLookup enforces a per UE, per direction meter rate limit
+sessionQERLookup::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
+                              {'attr_name':'fseid', 'num_bytes':8}],\
+                      entries=parser.table_size_session_qer_lookup)
+# Admit green, yellow and misses, drop red
+sessionQERLookup:qerGreenGate -> farLookup
+sessionQERLookup:qerYellowGate -> farLookup
+sessionQERLookup:qerRedGate -> sessionQERMeterRed::Sink()
+sessionQERLookup:qerStatusDropGate -> sessionQERStatusDrop::Sink()
+sessionQERLookup:qerUnmeteredGate -> farLookup
+sessionQERLookup:qerFailGate -> farLookup
+sessionQERLookup.set_default_gate(gate=qerFailGate)
+
+# Add logical pipeline when gtpuencap is needed
+farLookup:GTPUEncap \
+    -> gtpuEncap::GtpuEncap(add_psc=parser.gtppsc):1 \
+    -> outerL4Cksum::L4Checksum() \
+    -> outerIPCksum::IPChecksum() \
+    -> farMerge
+
+notify = UnixSocketPort(name='notifyCP', path=parser.notify_sockaddr)
+pfcpPort = UnixSocketPort(name='pfcpPort', path=parser.endmarker_sockaddr)
+pfcpPI::PortInc(port='pfcpPort') -> pfcpPI_timestamp::Timestamp() -> ports[parser.access_ifname].rtr
+executeFAR:farNotifyCPAction -> pfcpDetails::GenericEncap(fields=[ {'size': 8, 'attribute': 'fseid'}]) \
+                             -> farNotifyCP::PortOut(port='notifyCP')
+# Drop unknown packets
+pktParse:0 -> badPkts::Sink()
+appQERLookup:qerGreenGate -> sessionQERLookup
+appQERLookup:qerYellowGate -> sessionQERLookup
+appQERLookup:qerRedGate -> appQERMeterRed::Sink()
+appQERLookup:qerStatusDropGate -> packetReplica::Replicate(gates=[0,1])
+appQERLookup:qerUnmeteredGate -> sessionQERLookup
+pdrLookup:pdrFailGate -> pdrLookupFail::Sink()
+farLookup:farFailGate -> farLookupFail::Sink()
+appQERLookup:qerFailGate -> appQERLookupFail::Sink()
+executeFAR:farDropAction -> farDrop::Sink()
+executeFAR:farBufferAction -> farBuffer::Sink()
+gtpuEncap:0 -> gtpuEncapFail::Sink()
+
+# Closed-loop
+closed_loop_path = os.getenv('CLOSED_LOOP_SOCKET_PATH', '/tmp/closedloop')
+closed = UnixSocketPort(name='closedLoop', path=closed_loop_path)
+packetReplica:0 -> sessionQERLookup
+packetReplica:1 -> closedLoop::PortOut(port='closedLoop')
+
+# Set default gates for relevant modules
+pdrLookup.set_default_gate(gate=pdrFailGate)
+farLookup.set_default_gate(gate=farFailGate)
+appQERLookup.set_default_gate(gate=qerFailGate)
+
+
+# ====================================================
+#       Downlink Pipeline
+# ====================================================
+
+# Pick fast-path gate for DL pipeline
+coreFastBPF = ports[parser.core_ifname].bpf
+UEGate = 0
+if ports[parser.core_ifname].ext_addrs is not None:
+    UEGate = ports[parser.core_ifname].bpf_gate()
+    ports[parser.core_ifname].bpf -> Sink()
+
+
+# 1. Build initial DL pipeline here
+coreFastBPF:UEGate \
+    -> coreRxIPCksum::IPChecksum(verify=True, hw=parser.hwcksum) \
+    -> coreRxL4Cksum::L4Checksum(verify=True, hw=parser.hwcksum)
+
+# Record last module to chain up optional modules
+_in = coreRxL4Cksum
+gate = 0
+
+# Append nat module (if enabled)
+if ports[parser.core_ifname].nat is not None:
+    _in:gate -> 1:ports[parser.core_ifname].nat
+    _in = ports[parser.core_ifname].nat
+    gate = 0
+
+# 2. Build the remaining first half of the DL pipeline before entering the shared pipeline
+#ports[parser.core_ifname].rewrite \
+_in:gate \
+    -> coreMetadata::SetMetadata(attrs=[{'name':'src_iface', 'size':1, 'value_int':Core}]) \
+    -> linkMerge # Start of the shared pipeline
+
+
+# 3. Complete the last part of the DL pipeline
+if not parser.measure_flow:
+    executeFAR:farForwardDAction \
+        -> ports[parser.access_ifname].rtr
+else:
+    executeFAR:farForwardDAction \
+        -> postDLQosFlowMeasure::FlowMeasure(leader=False,
+                                             flag_attr_name="buffer_flag",
+                                             entries=parser.table_size_flow_measure) \
+        -> ports[parser.access_ifname].rtr
+
+# Drop unknown packets
+coreRxIPCksum:1 -> coreRxIPCksumFail::Sink()
+coreRxL4Cksum:1 -> coreRxL4CksumFail::Sink()
+
+# Add Core filter rules, i.e.:
+# setting filter to detect ue_filter traffic
+# the filter can either be based on the NAT IP addr(s),
+# or ue IP addr subnet
+if ports[parser.core_ifname].nat is not None:
+    ue_filter = {"priority": -UEGate,
+                 "filter": "ip dst {}".format(ports[parser.core_ifname].ext_addrs), "gate": UEGate}
+    coreFastBPF.add(filters=[ue_filter])
+
+# Add Core filter rules, i.e.:
+# setting filter to detect gtpu traffic
+# and dst host x.x.x.x                         # check S/PGWU IP
+# and udp dst port 2152                         # check GTPU port
+check_ip = "ip"
+check_spgwu_ip = " and dst host " + \
+    " or ".join(str(x) for x in core_ip)
+check_gtpu_port = " and udp dst port 2152"
+GTPUGate = 0 #ports[parser.core_ifname].bpf_gate()
+downlink_filter = {"priority": -GTPUGate, "filter": check_ip +
+               check_spgwu_ip + check_gtpu_port, "gate": GTPUGate}
+coreFastBPF.add(filters=[downlink_filter])
+
+
+# ====================================================
+#       Uplink Pipeline
+# ====================================================
+
+
+# Pick fast-path and echo gates for UL pipeline
+accessFastBPF = ports[parser.access_ifname].bpf
+GTPUEchoGate = ports[parser.access_ifname].bpf_gate()
+GTPUEchoResGate = ports[parser.access_ifname].bpf_gate()
+GTPUGate = 0
+
+
+# 1. Build initial UL pipeline here
+accessFastBPF:GTPUGate \
+    -> accessRxIPCksum::IPChecksum(verify=True, hw=parser.hwcksum) \
+    -> accessRxL4Cksum::L4Checksum(verify=True, hw=parser.hwcksum)
+
+# Record last module to chain up option modules
+_in = accessRxL4Cksum
+gate = 0
+
+# 2. Build the remaining first half of the UL pipeline before entering the shared pipeline
+#ports[parser.access_ifname].rewrite \
+_in:gate \
+    -> accessMetadata::SetMetadata(attrs=[{'name':'src_iface', 'size':1, 'value_int':Access}]) \
+    -> linkMerge # Start of the shared pipeline
+
+# 3. Complete the last part of the UL pipeline
+if not parser.measure_flow:
+    executeFAR:farForwardUAction \
+        -> ports[parser.core_ifname].rtr
+else:
+    executeFAR:farForwardUAction \
+        -> postULQosFlowMeasure::FlowMeasure(leader=False,
+                                             flag_attr_name="buffer_flag",
+                                             entries=parser.table_size_flow_measure) \
+        -> ports[parser.core_ifname].rtr
+
+# 4. GTP Echo response pipeline
+accessFastBPF:GTPUEchoGate \
+    -> gtpuEcho::GtpuEcho(s1u_sgw_ip=ip2long(access_ip[0])):1 \
+    -> ethSwap::MACSwap() \
+    -> echoOuterL4Cksum::L4Checksum() \
+    -> echoOuterIPCksum::IPChecksum() \
+    -> ports[parser.access_ifname].rtr
+
+# Drop unknown packets
+gtpuEcho:0 -> badGtpuEchoPkt::Sink()
+accessRxIPCksum:1 -> accessRxIPCksumFail::Sink()
+accessRxL4Cksum:1 -> accessRxL4CksumFail::Sink()
+
+# Add Access filter rules, i.e.:
+# setting filter to detect gtpu traffic
+# and dst host 11.1.1.1                         # check S/PGWU IP
+# and udp dst port 2152                         # check GTPU port
+check_ip = "ip"
+check_spgwu_ip = " and dst host " + \
+    " or ".join(str(x) for x in access_ip)
+check_gtpu_port = " and udp dst port 2152"
+check_gtpu_msg_echo = " and udp[9] = 0x1"
+check_gtpu_msg_echo_res = " and udp[9] = 0x2"
+
+# Echo filter
+uplink_echo_filter = {"priority": GTPUEchoGate, "filter": check_ip +
+                      check_spgwu_ip + check_gtpu_port +
+                      check_gtpu_msg_echo, "gate": GTPUEchoGate}
+accessFastBPF.add(filters=[uplink_echo_filter])
+
+# Echo Response filter
+uplink_echo_res_filter = {"priority": GTPUEchoResGate, "filter": check_ip +
+                          check_spgwu_ip + check_gtpu_port +
+                          check_gtpu_msg_echo_res, "gate": GTPUEchoResGate}
+accessFastBPF.add(filters=[uplink_echo_res_filter])
+
+# PDU rule
+uplink_filter = {"priority": -GTPUGate, "filter": check_ip +
+               check_spgwu_ip + check_gtpu_port, "gate": GTPUGate}
+accessFastBPF.add(filters=[uplink_filter])
+
+
+# ====================================================
+#       GTP Echo Request for GTPU Path Monitoring
+# ====================================================
+
+# Create GTP Echo Request packets
+if parser.enable_gtpu_path_monitoring:
+    gtpuSrc::Source() -> gtpuEchoReq::Rewrite(templates=[gtp_echo_request(access_ip[0])]) \
+                      -> gtpuPathMonitoring::GtpuPathMonitoring() \
+                      -> gtpuL4Cksum::L4Checksum() -> gtpuIPCksum::IPChecksum() \
+                      -> ports[parser.access_ifname].rtr
+    gtpuSrc.set_burst(burst=1)
+
+    bess.add_tc('schedule_limit',
+                policy='rate_limit',
+                resource='count',
+                limit={'count': 1}, wid=0)
+    gtpuSrc.attach_task(parent='schedule_limit')
+
+    # Process GTP Echo Response packets
+    accessFastBPF:GTPUEchoResGate -> gtpuPathMonitoring
+else:
+    # Process GTP Echo Response packets
+    accessFastBPF:GTPUEchoResGate -> gtpuPathMonDisable::Sink()
+
+# ====================================================
+#       Route Control
+# ====================================================
+# Finally send SIGHUP to route_control daemon on reload
+# TODO: behavior is unspecified if route_control.py pid is not found
+route_control_pid = getpythonpid('route_control.py')
+if route_control_pid:
+    os.kill(route_control_pid, signal.SIGHUP)
