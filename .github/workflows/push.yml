@@ -1,30 +1,37 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2024 Intel Corporation
-name: GitHub release and Docker images
-
 on:
   push:
     branches:
       - main
-    tags:
-      - v*
+    paths:
+      - "VERSION"
 
 jobs:
   tag-github:
     uses: omec-project/.github/.github/workflows/tag-github.yml@main
 
   release-image:
+    needs: tag-github
     uses: dariofaccin/.github/.github/workflows/upf-release-image.yml@add-upf-specific-workflows
     with:
       branch_name: ${{ github.ref }}
+      changed: ${{ needs.tag-github.outputs.changed }}
+      version: ${{ needs.tag-github.outputs.version }}
     secrets: inherit
 
   update-version:
     needs: tag-github
     uses: omec-project/.github/.github/workflows/update-version.yml@main
+    with:
+       changed: ${{ needs.tag-github.outputs.changed }}
+       version: ${{ needs.tag-github.outputs.version }}
     secrets: inherit
 
   branch-release:
     needs: tag-github
     uses: omec-project/.github/.github/workflows/branch-release.yml@main
+    with:
+       release_branch: ${{ needs.tag-github.outputs.release_branch }}
+       version_branch: ${{ needs.tag-github.outputs.version_branch }}
     secrets: inherit
