@@ -42,9 +42,11 @@ jobs:
       branch_name: ${{ github.ref }}
 
   unit-tests-pfcp:
-    uses: "dariofaccin/.github/.github/workflows/upf-unit-tests-pfcp.yml@add-upf-specific-workflows"
+    uses: "dariofaccin/.github/.github/workflows/unit-test.yml@add-upf-specific-workflows"
     with:
       branch_name: ${{ github.ref }}
+      test_flags: "-race -failfast -v"
+      test_directory: "./pfcpiface ./cmd/..."
 
   integration-tests-up4:
     uses: "dariofaccin/.github/.github/workflows/upf-integration-tests-up4.yml@add-upf-specific-workflows"
@@ -52,9 +54,12 @@ jobs:
       branch_name: ${{ github.ref }}
 
   integration-tests-bess:
-    uses: "dariofaccin/.github/.github/workflows/upf-integration-tests-bess.yml@add-upf-specific-workflows"
+    uses: "dariofaccin/.github/.github/workflows/unit-test.yml@add-upf-specific-workflows"
     with:
       branch_name: ${{ github.ref }}
+      test_flags: "-race -failfast -v -count=1"
+      test_directory: "./test/integration/..."
+      env_vars: "MODE=native DATAPATH=bess"
 
   license-check:
     uses: omec-project/.github/.github/workflows/license-check.yml@main
