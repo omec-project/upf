@@ -48,9 +48,12 @@ jobs:
       test_directory: "./pfcpiface ./cmd/..."
 
   integration-tests-up4:
-    uses: "dariofaccin/.github/.github/workflows/upf-integration-tests-up4.yml@add-upf-specific-workflows"
+    uses: "dariofaccin/.github/.github/workflows/unit-test.yml@add-upf-specific-workflows"
     with:
       branch_name: ${{ github.ref }}
+      test_flags: "-v -count=1 -failfast -timeout 15m"
+      test_directory: "./test/integration/..."
+      env_vars: "DOCKER_TARGETS=pfcpiface DOCKER_TAG=integration make docker-build && MODE=docker DATAPATH=up4"
 
   integration-tests-bess:
     uses: "dariofaccin/.github/.github/workflows/unit-test.yml@add-upf-specific-workflows"
