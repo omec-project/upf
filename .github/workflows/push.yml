@@ -13,7 +13,7 @@ jobs:
 
   release-image:
     needs: tag-github
-    uses: dariofaccin/.github/.github/workflows/upf-release-image.yml@add-upf-specific-workflows
+    uses: omec-project/.github/.github/workflows/upf-release-image.yml@main
     with:
       branch_name: ${{ github.ref }}
       changed: ${{ needs.tag-github.outputs.changed }}
