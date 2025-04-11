@@ -78,7 +78,7 @@ func ipMask2int(ip net.IPMask) uint32 {
 
 func hex2int(hexStr string) uint32 {
 	// remove 0x suffix if found in the input string
-	cleaned := strings.Replace(hexStr, "0x", "", -1)
+	cleaned := strings.ReplaceAll(hexStr, "0x", "")
 
 	// base 16 for hexadecimal
 	result, _ := strconv.ParseUint(cleaned, 16, 32)

@@ -78,7 +78,7 @@ const (
 )
 
 func (u *upf) isConnected() bool {
-	return u.datapath.IsConnected(&u.accessIP)
+	return u.IsConnected(&u.accessIP)
 }
 
 func (u *upf) addSliceInfo(sliceInfo *SliceInfo) error {
@@ -88,7 +88,7 @@ func (u *upf) addSliceInfo(sliceInfo *SliceInfo) error {
 
 	u.sliceInfo = sliceInfo
 
-	return u.datapath.AddSliceInfo(sliceInfo)
+	return u.AddSliceInfo(sliceInfo)
 }
 
 func NewUPF(conf *Conf, fp datapath) *upf {
@@ -180,7 +180,7 @@ func NewUPF(conf *Conf, fp datapath) *upf {
 		}
 	}
 
-	u.datapath.SetUpfInfo(u, conf)
+	u.SetUpfInfo(u, conf)
 
 	return u
 }

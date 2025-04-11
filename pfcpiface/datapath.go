@@ -19,15 +19,16 @@ const (
 )
 
 func (u upfMsgType) String() string {
-	if u == upfMsgTypeAdd {
+	switch u {
+	case upfMsgTypeAdd:
 		return "add"
-	} else if u == upfMsgTypeMod {
+	case upfMsgTypeMod:
 		return "modify"
-	} else if u == upfMsgTypeDel {
+	case upfMsgTypeDel:
 		return "delete" //nolint
-	} else if u == upfMsgTypeClear {
+	case upfMsgTypeClear:
 		return "clear"
-	} else {
+	default:
 		return "unknown"
 	}
 }

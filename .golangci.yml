@@ -6,19 +6,36 @@ run:
   tests: true
 linters:
   enable:
+    - asciicheck
+    - dogsled
     - goconst
+    - gomodguard
+    - govet
     - misspell
     - nilerr
     - nilnil
+    - unconvert
     - unparam
+    - unused
+    - whitespace
   disable:
     - errcheck
-    - govet
+    - godox
+    - nakedret
+    - noctx
+    - predeclared
     - staticcheck
-    - unused
   settings:
+    errcheck:
+      check-type-assertions: false
+      check-blank: true
+    goconst:
+      min-len: 3
+      min-occurrences: 3
     govet:
       enable-all: true
+      disable:
+        - fieldalignment
       settings:
         printf:
           funcs:

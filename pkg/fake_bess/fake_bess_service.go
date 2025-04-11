@@ -163,27 +163,28 @@ func (b *fakeBessService) GetOrAddModule(name string) module {
 
 func (b *fakeBessService) unsafeGetOrAddModule(name string) module {
 	if _, ok := b.modules[name]; !ok {
-		if name == pdrLookupModuleName {
+		switch name {
+		case pdrLookupModuleName:
 			b.modules[name] = &wildcardModule{
 				baseModule{name: name},
 				nil,
 			}
-		} else if name == farLookupModuleName {
+		case farLookupModuleName:
 			b.modules[name] = &exactMatchModule{
 				baseModule{name: name},
 				nil,
 			}
-		} else if name == appQerModuleName || name == sessionQerModuleName {
+		case appQerModuleName, sessionQerModuleName:
 			b.modules[name] = &qosModule{
 				baseModule: baseModule{name: name},
 				entries:    nil,
 			}
-		} else if name == gtpuPathMonitoringModuleName {
+		case gtpuPathMonitoringModuleName:
 			b.modules[name] = &gtpuPathMonitoringModule{
 				baseModule{name: name},
 				nil,
 			}
-		} else {
+		default:
 			logger.BessLog.Fatalf("unknown module name: %v", name)
 		}
 	}
@@ -335,7 +336,8 @@ func (w *wildcardModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 
 	log := logger.BessLog.With("module", w.Name(), "cmd", cmd)
 
-	if cmd == addCmd {
+	switch cmd {
+	case addCmd:
 		wc := &bess_pb.WildcardMatchCommandAddArg{}
 		err = arg.UnmarshalTo(wc)
 		if err != nil {
@@ -356,7 +358,7 @@ func (w *wildcardModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 			log.Debugf("added new entry %v", wc)
 			w.entries = append(w.entries, wc)
 		}
-	} else if cmd == deleteCmd {
+	case deleteCmd:
 		wc := &bess_pb.WildcardMatchCommandDeleteArg{}
 		err = arg.UnmarshalTo(wc)
 		if err != nil {
@@ -375,7 +377,7 @@ func (w *wildcardModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 			log.Debugf("deleted existing entry %v", w.entries[idx])
 			w.entries = append(w.entries[:idx], w.entries[idx+1:]...)
 		}
-	} else if cmd == clearCmd {
+	case clearCmd:
 		wc := &bess_pb.WildcardMatchCommandClearArg{}
 		err = arg.UnmarshalTo(wc)
 		if err != nil {
@@ -383,7 +385,7 @@ func (w *wildcardModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 		}
 		// clear all rules
 		w.entries = nil
-	} else {
+	default:
 		panic("should not happen")
 	}
 
@@ -409,7 +411,8 @@ func (e *exactMatchModule) HandleRequest(cmd string, arg *anypb.Any) (err error)
 
 	log := logger.BessLog.With("module", e.Name(), "cmd", cmd)
 
-	if cmd == addCmd {
+	switch cmd {
+	case addCmd:
 		em := &bess_pb.ExactMatchCommandAddArg{}
 		err = arg.UnmarshalTo(em)
 		if err != nil {
@@ -429,7 +432,7 @@ func (e *exactMatchModule) HandleRequest(cmd string, arg *anypb.Any) (err error)
 			log.Debugf("added new entry %v", em)
 			e.entries = append(e.entries, em)
 		}
-	} else if cmd == deleteCmd {
+	case deleteCmd:
 		em := &bess_pb.ExactMatchCommandDeleteArg{}
 		err = arg.UnmarshalTo(em)
 		if err != nil {
@@ -447,7 +450,7 @@ func (e *exactMatchModule) HandleRequest(cmd string, arg *anypb.Any) (err error)
 			log.Debugf("deleted existing entry %v", e.entries[idx])
 			e.entries = append(e.entries[:idx], e.entries[idx+1:]...)
 		}
-	} else if cmd == clearCmd {
+	case clearCmd:
 		em := &bess_pb.ExactMatchCommandClearArg{}
 		err = arg.UnmarshalTo(em)
 		if err != nil {
@@ -455,7 +458,7 @@ func (e *exactMatchModule) HandleRequest(cmd string, arg *anypb.Any) (err error)
 		}
 		// clear all rules
 		e.entries = nil
-	} else {
+	default:
 		panic("should not happen")
 	}
 
@@ -486,7 +489,8 @@ func (q *qosModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 
 	log := logger.BessLog.With("module", q.Name(), "cmd", cmd)
 
-	if cmd == addCmd {
+	switch cmd {
+	case addCmd:
 		wc := &bess_pb.QosCommandAddArg{}
 		err = arg.UnmarshalTo(wc)
 		if err != nil {
@@ -506,7 +510,7 @@ func (q *qosModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 			log.Debugf("added new entry %v", wc)
 			q.entries = append(q.entries, wc)
 		}
-	} else if cmd == deleteCmd {
+	case deleteCmd:
 		qc := &bess_pb.QosCommandDeleteArg{}
 		err = arg.UnmarshalTo(qc)
 		if err != nil {
@@ -524,7 +528,7 @@ func (q *qosModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 			log.Debugf("deleted existing entry %v", q.entries[idx])
 			q.entries = append(q.entries[:idx], q.entries[idx+1:]...)
 		}
-	} else if cmd == clearCmd {
+	case clearCmd:
 		qc := &bess_pb.QosCommandClearArg{}
 		err = arg.UnmarshalTo(qc)
 		if err != nil {
@@ -532,7 +536,7 @@ func (q *qosModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 		}
 		// clear all rules
 		q.entries = nil
-	} else {
+	default:
 		panic("should not happen")
 	}
 
@@ -558,7 +562,8 @@ func (q *gtpuPathMonitoringModule) HandleRequest(cmd string, arg *anypb.Any) (er
 
 	log := logger.BessLog.With("module", q.Name(), "cmd", cmd)
 
-	if cmd == addCmd {
+	switch cmd {
+	case addCmd:
 		wc := &bess_pb.GtpuPathMonitoringCommandAddDeleteArg{}
 		err = arg.UnmarshalTo(wc)
 		if err != nil {
@@ -578,7 +583,7 @@ func (q *gtpuPathMonitoringModule) HandleRequest(cmd string, arg *anypb.Any) (er
 			log.Debugf("added new entry %v", wc)
 			q.entries = append(q.entries, wc)
 		}
-	} else if cmd == deleteCmd {
+	case deleteCmd:
 		qc := &bess_pb.GtpuPathMonitoringCommandAddDeleteArg{}
 		err = arg.UnmarshalTo(qc)
 		if err != nil {
@@ -596,7 +601,7 @@ func (q *gtpuPathMonitoringModule) HandleRequest(cmd string, arg *anypb.Any) (er
 			log.Debugf("deleted existing entry %v", q.entries[idx])
 			q.entries = append(q.entries[:idx], q.entries[idx+1:]...)
 		}
-	} else if cmd == clearCmd {
+	case clearCmd:
 		qc := &bess_pb.GtpuPathMonitoringCommandClearArg{}
 		err = arg.UnmarshalTo(qc)
 		if err != nil {
@@ -604,7 +609,7 @@ func (q *gtpuPathMonitoringModule) HandleRequest(cmd string, arg *anypb.Any) (er
 		}
 		// clear all rules
 		q.entries = nil
-	} else {
+	default:
 		panic("should not happen")
 	}
 

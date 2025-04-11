@@ -488,10 +488,11 @@ func (t *P4rtTranslator) BuildApplicationsTableEntry(pdr pdr, sliceID uint8, int
 		appPort          portRange
 	)
 
-	if pdr.srcIface == access {
+	switch pdr.srcIface {
+	case access:
 		appIP, appIPMask = pdr.appFilter.dstIP, pdr.appFilter.dstIPMask
 		appPort = pdr.appFilter.dstPortRange
-	} else if pdr.srcIface == core {
+	case core:
 		appIP, appIPMask = pdr.appFilter.srcIP, pdr.appFilter.srcIPMask
 		appPort = pdr.appFilter.srcPortRange
 	}
@@ -687,10 +688,7 @@ func (t *P4rtTranslator) buildDownlinkTerminationsEntry(pdr pdr, appMeterIdx uin
 		Priority: DefaultPriority,
 	}
 
-	shouldDrop := false
-	if relatedFAR.Drops() || relatedQER.dlStatus == ie.GateStatusClosed {
-		shouldDrop = true
-	}
+	shouldDrop := relatedFAR.Drops() || relatedQER.dlStatus == ie.GateStatusClosed
 
 	if err := t.withExactMatchField(entry, FieldUEAddress, pdr.ueAddress); err != nil {
 		return nil, err
