@@ -11,12 +11,14 @@ on:
 
 jobs:
   build:
-    uses: "omec-project/.github/.github/workflows/upf-build-upf.yml@main"
+    if: github.event_name == 'pull_request'
+    uses: omec-project/.github/.github/workflows/upf-build-upf.yml@main
     with:
       branch_name: ${{ github.ref }}
 
   build-ptf:
-    uses: "omec-project/.github/.github/workflows/upf-build-ptf.yml@main"
+    if: github.event_name == 'pull_request'
+    uses: omec-project/.github/.github/workflows/upf-build-ptf.yml@main
     with:
       branch_name: ${{ github.ref }}
 
@@ -36,19 +38,19 @@ jobs:
       branch_name: ${{ github.ref }}
 
   route-control-tests:
-    uses: "omec-project/.github/.github/workflows/upf-route-control-tests.yml@main"
+    uses: omec-project/.github/.github/workflows/upf-route-control-tests.yml@main
     with:
       branch_name: ${{ github.ref }}
 
   unit-tests-pfcp:
-    uses: "omec-project/.github/.github/workflows/unit-test.yml@main"
+    uses: omec-project/.github/.github/workflows/unit-test.yml@main
     with:
       branch_name: ${{ github.ref }}
       test_flags: "-race -failfast -v"
       test_directory: "./pfcpiface ./cmd/..."
 
   integration-tests-up4:
-    uses: "omec-project/.github/.github/workflows/unit-test.yml@main"
+    uses: omec-project/.github/.github/workflows/unit-test.yml@main
     with:
       branch_name: ${{ github.ref }}
       test_flags: "-v -count=1 -failfast -timeout 15m"
@@ -56,7 +58,7 @@ jobs:
       env_vars: "DOCKER_TARGETS=pfcpiface DOCKER_TAG=integration make docker-build && MODE=docker DATAPATH=up4"
 
   integration-tests-bess:
-    uses: "omec-project/.github/.github/workflows/unit-test.yml@main"
+    uses: omec-project/.github/.github/workflows/unit-test.yml@main
     with:
       branch_name: ${{ github.ref }}
       test_flags: "-race -failfast -v -count=1"
