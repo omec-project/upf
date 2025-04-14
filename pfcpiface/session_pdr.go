@@ -4,8 +4,6 @@
 package pfcpiface
 
 import (
-	"net"
-
 	"github.com/omec-project/upf-epc/logger"
 	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
@@ -18,7 +16,7 @@ func releaseAllocatedIPs(ippool *IPPool, session *PFCPSession) error {
 	// Check if we allocated an UE IP for this session and delete it.
 	for _, pdr := range session.pdrs {
 		if (pdr.allocIPFlag) && (pdr.srcIface == core) {
-			var ueIP net.IP = int2ip(pdr.ueAddress)
+			ueIP := int2ip(pdr.ueAddress)
 			logger.PfcpLog.Debugf("Releasing IP %s of session %d", ueIP.String(), session.localSEID)
 			return ippool.DeallocIP(session.localSEID)
 		}
@@ -41,10 +39,8 @@ func addPdrInfo(msg *message.SessionEstablishmentResponse, pdrs []pdr) {
 		}
 		if (pdr.allocIPFlag) && (pdr.srcIface == core) {
 			logger.PfcpLog.Debugln("pdrID:", pdr.pdrID)
-			var (
-				flags uint8  = 0x02
-				ueIP  net.IP = int2ip(pdr.ueAddress)
-			)
+			var flags uint8 = 0x02
+			ueIP := int2ip(pdr.ueAddress)
 			logger.PfcpLog.Debugln("ueIP:", ueIP.String())
 			msg.CreatedPDR = append(msg.CreatedPDR,
 				ie.NewCreatedPDR(

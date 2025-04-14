@@ -55,7 +55,7 @@ const (
 func emitEntityConstantUint32(prefix string, p4EntityName string, id uint32) string {
 	// see: https://go.dev/ref/spec#Identifiers
 	p4EntityName = prefix + "_" + p4EntityName
-	p4EntityName = strings.Replace(p4EntityName, ".", "_", -1)
+	p4EntityName = strings.ReplaceAll(p4EntityName, ".", "_")
 	p4EntityName = strcase.ToPascal(p4EntityName)
 	return fmt.Sprintf("%s \t %s = %v\n", p4EntityName, uint32TypeString, id)
 }
@@ -63,7 +63,7 @@ func emitEntityConstantUint32(prefix string, p4EntityName string, id uint32) str
 func emitEntityConstantInt32(prefix string, p4EntityName string, value int32) string {
 	// see: https://go.dev/ref/spec#Identifiers
 	p4EntityName = prefix + "_" + p4EntityName
-	p4EntityName = strings.Replace(p4EntityName, ".", "_", -1)
+	p4EntityName = strings.ReplaceAll(p4EntityName, ".", "_")
 	p4EntityName = strcase.ToPascal(p4EntityName)
 	return fmt.Sprintf("%s \t %s = %v\n", p4EntityName, int32TypeString, value)
 }
@@ -72,7 +72,7 @@ func emitEntityConstantInt32(prefix string, p4EntityName string, value int32) st
 func emitEntitySizeConstant(prefix string, p4EntityName string, id int64) string {
 	// see: https://go.dev/ref/spec#Identifiers
 	p4EntityName = prefix + "_" + p4EntityName
-	p4EntityName = strings.Replace(p4EntityName, ".", "_", -1)
+	p4EntityName = strings.ReplaceAll(p4EntityName, ".", "_")
 	p4EntityName = strcase.ToPascal(p4EntityName)
 	return fmt.Sprintf("%s \t %s = %v\n", p4EntityName, int64TypeString, id)
 }

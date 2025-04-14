@@ -1175,14 +1175,15 @@ func (up4 *UP4) resetMeters(qers []qer) {
 			continue
 		}
 
-		if p4Meter.meterType == meterTypeApplication {
+		switch p4Meter.meterType {
+		case meterTypeApplication:
 			up4.resetMeter(p4constants.MeterPreQosPipeAppMeter, p4Meter)
 			up4.releaseAppMeterCellID(p4Meter.uplinkCellID)
 
 			if p4Meter.downlinkCellID != p4Meter.uplinkCellID {
 				up4.releaseAppMeterCellID(p4Meter.downlinkCellID)
 			}
-		} else if p4Meter.meterType == meterTypeSession {
+		case meterTypeSession:
 			up4.resetMeter(p4constants.MeterPreQosPipeSessionMeter, p4Meter)
 			up4.releaseSessionMeterCellID(p4Meter.uplinkCellID)
 			up4.releaseSessionMeterCellID(p4Meter.downlinkCellID)

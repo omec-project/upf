@@ -334,11 +334,12 @@ func (c *P4rtClient) InsertTableEntry(entry *p4.TableEntry, funcType uint8) erro
 	logger.P4Log.Infoln("insert Table Entry for Table", entry.TableId)
 
 	var updateType p4.Update_Type
-	if funcType == FunctionTypeUpdate {
+	switch funcType {
+	case FunctionTypeUpdate:
 		updateType = p4.Update_MODIFY
-	} else if funcType == FunctionTypeInsert {
+	case FunctionTypeInsert:
 		updateType = p4.Update_INSERT
-	} else if funcType == FunctionTypeDelete {
+	case FunctionTypeDelete:
 		updateType = p4.Update_DELETE
 	}
 

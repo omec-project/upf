@@ -371,12 +371,13 @@ func (p *pdr) parseSourceInterfaceIE(srcIfaceIE *ie.IE) error {
 		return err
 	}
 
-	if srcIface == ie.SrcInterfaceCPFunction {
+	switch srcIface {
+	case ie.SrcInterfaceCPFunction:
 		return ErrUnsupported("Source Interface CP Function", srcIface)
-	} else if srcIface == ie.SrcInterfaceAccess {
+	case ie.SrcInterfaceAccess:
 		p.srcIface = access
 		p.srcIfaceMask = 0xFF
-	} else if srcIface == ie.SrcInterfaceCore {
+	case ie.SrcInterfaceCore:
 		p.srcIface = core
 		p.srcIfaceMask = 0xFF
 	}
@@ -398,7 +399,6 @@ func (p *pdr) parseFTEID(teidIE *ie.IE) error {
 		p.tunnelTEIDMask = 0xFFFFFFFF
 		p.tunnelIP4Dst = ip2int(fteid.IPv4Address)
 		p.tunnelIP4DstMask = 0xFFFFFFFF
-
 	}
 
 	return nil
@@ -474,7 +474,8 @@ func (p *pdr) parseSDFFilter(ie *ie.IE) error {
 		p.appFilter.protoMask = math.MaxUint8
 	}
 
-	if p.srcIface == core {
+	switch p.srcIface {
+	case core:
 		p.appFilter.dstIP = ip2int(ipf.dst.IPNet.IP)
 		p.appFilter.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
 		p.appFilter.srcIP = ip2int(ipf.src.IPNet.IP)
@@ -488,7 +489,7 @@ func (p *pdr) parseSDFFilter(ie *ie.IE) error {
 			p.appFilter.srcPortRange = p.appFilter.dstPortRange
 			p.appFilter.dstPortRange = newWildcardPortRange()
 		}
-	} else if p.srcIface == access {
+	case access:
 		p.appFilter.srcIP = ip2int(ipf.dst.IPNet.IP)
 		p.appFilter.srcIPMask = ipMask2int(ipf.dst.IPNet.Mask)
 		p.appFilter.dstIP = ip2int(ipf.src.IPNet.IP)

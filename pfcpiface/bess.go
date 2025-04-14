@@ -126,7 +126,7 @@ func (b *bess) AddSliceInfo(sliceInfo *SliceInfo) error {
 func (b *bess) SendMsgToUPF(
 	method upfMsgType, rules PacketForwardingRules, updated PacketForwardingRules) uint8 {
 	// create context
-	var cause uint8 = ie.CauseRequestAccepted
+	cause := ie.CauseRequestAccepted
 
 	pdrs := rules.pdrs
 	fars := rules.fars
@@ -1014,9 +1014,10 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 			gate = qerGateUnmeter
 		}
 
-		if qer.qosLevel == ApplicationQos {
+		switch qer.qosLevel {
+		case ApplicationQos:
 			b.addApplicationQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
-		} else if qer.qosLevel == SessionQos {
+		case SessionQos:
 			b.addSessionQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
 		}
 
@@ -1047,9 +1048,10 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 			gate = qerGateUnmeter
 		}
 
-		if qer.qosLevel == ApplicationQos {
+		switch qer.qosLevel {
+		case ApplicationQos:
 			b.addApplicationQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
-		} else if qer.qosLevel == SessionQos {
+		case SessionQos:
 			b.addSessionQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
 		}
 
@@ -1103,18 +1105,20 @@ func (b *bess) delQER(ctx context.Context, done chan<- bool, qer qer) {
 		// Uplink QER
 		srcIface = access
 
-		if qer.qosLevel == ApplicationQos {
+		switch qer.qosLevel {
+		case ApplicationQos:
 			b.delApplicationQER(ctx, srcIface, qer)
-		} else if qer.qosLevel == SessionQos {
+		case SessionQos:
 			b.delSessionQER(ctx, srcIface, qer)
 		}
 
 		// Downlink QER
 		srcIface = core
 
-		if qer.qosLevel == ApplicationQos {
+		switch qer.qosLevel {
+		case ApplicationQos:
 			b.delApplicationQER(ctx, srcIface, qer)
-		} else if qer.qosLevel == SessionQos {
+		case SessionQos:
 			b.delSessionQER(ctx, srcIface, qer)
 		}
 
@@ -1195,9 +1199,10 @@ func (b *bess) processGtpuPathMonitoring(ctx context.Context, any *anypb.Any, me
 
 func (b *bess) setActionValue(f far) uint8 {
 	if (f.applyAction & ActionForward) != 0 {
-		if f.dstIntf == ie.DstInterfaceAccess {
+		switch f.dstIntf {
+		case ie.DstInterfaceAccess:
 			return farForwardD
-		} else if (f.dstIntf == ie.DstInterfaceCore) || (f.dstIntf == ie.DstInterfaceSGiLANN6LAN) {
+		case ie.DstInterfaceCore, ie.DstInterfaceSGiLANN6LAN:
 			return farForwardU
 		}
 	} else if (f.applyAction & ActionDrop) != 0 {
