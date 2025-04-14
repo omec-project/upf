@@ -1,25 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2019-present Intel Corporation
-name: Stale issue/pr
-
+# Copyright 2025 Canonical Ltd.
 on:
   schedule:
-  - cron: "0 0 * * *"
-
-env:
-  DAYS_BEFORE_STALE: 120
-  DAYS_BEFORE_CLOSE: 15
+    - cron: "0 0 * * *"
 
 jobs:
   stale:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/stale@v9
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        stale-issue-message: 'This issue has been stale for ${{ env.DAYS_BEFORE_STALE }} days and will be closed in ${{ env.DAYS_BEFORE_CLOSE }} days. Comment to keep it open.'
-        stale-pr-message: 'This pull request has been stale for ${{ env.DAYS_BEFORE_STALE }} days and will be closed in ${{ env.DAYS_BEFORE_CLOSE }} days. Comment to keep it open.'
-        stale-issue-label: 'stale/issue'
-        stale-pr-label: 'stale/pr'
-        days-before-stale: ${{ env.DAYS_BEFORE_STALE }}
-        days-before-close: ${{ env.DAYS_BEFORE_CLOSE }}
+    uses: omec-project/.github/.github/workflows/stale-issue.yml@main
+    with:
+      days_before_stale: 120
+      days_before_close: 15
+    secrets: inherit
