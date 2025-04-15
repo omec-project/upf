@@ -14,6 +14,7 @@ linters:
     - misspell
     - nilerr
     - nilnil
+    - predeclared
     - unconvert
     - unparam
     - unused
@@ -23,7 +24,6 @@ linters:
     - godox
     - nakedret
     - noctx
-    - predeclared
     - staticcheck
   settings:
     errcheck:
