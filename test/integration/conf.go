@@ -5,10 +5,12 @@ package integration
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/omec-project/upf-epc/pfcpiface"
 	"go.uber.org/zap"
@@ -136,11 +138,18 @@ func PushSliceMeterConfig(sliceConfig pfcpiface.NetworkSlice) error {
 	if err != nil {
 		return err
 	}
-
-	_, err = http.Post("http://127.0.0.8:8080/v1/config/network-slices", "application/json", bytes.NewBuffer(rawSliceConfig))
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://127.0.0.8:8080/v1/config/network-slices", bytes.NewBuffer(rawSliceConfig))
 	if err != nil {
 		return err
 	}
+	resp, err := http.DefaultClient.Do(req)
+	req.Header.Set("Content-Type", "application/json")
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
 
 	return nil
 }
