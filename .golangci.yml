@@ -12,6 +12,7 @@ linters:
     - gomodguard
     - govet
     - misspell
+    - noctx
     - nilerr
     - nilnil
     - predeclared
@@ -23,7 +24,6 @@ linters:
     - errcheck
     - godox
     - nakedret
-    - noctx
     - staticcheck
   settings:
     errcheck:
