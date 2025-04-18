@@ -10,6 +10,7 @@ on:
 jobs:
   tag-github:
     uses: omec-project/.github/.github/workflows/tag-github.yml@main
+    secrets: inherit
 
   release-image:
     needs: tag-github
@@ -24,14 +25,14 @@ jobs:
     needs: tag-github
     uses: omec-project/.github/.github/workflows/update-version.yml@main
     with:
-       changed: ${{ needs.tag-github.outputs.changed }}
-       version: ${{ needs.tag-github.outputs.version }}
+      changed: ${{ needs.tag-github.outputs.changed }}
+      version: ${{ needs.tag-github.outputs.version }}
     secrets: inherit
 
   branch-release:
     needs: tag-github
     uses: omec-project/.github/.github/workflows/branch-release.yml@main
     with:
-       release_branch: ${{ needs.tag-github.outputs.release_branch }}
-       version_branch: ${{ needs.tag-github.outputs.version_branch }}
+      release_branch: ${{ needs.tag-github.outputs.release_branch }}
+      version_branch: ${{ needs.tag-github.outputs.version_branch }}
     secrets: inherit
