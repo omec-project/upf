@@ -19,6 +19,8 @@ from pybess.bess import *
 from pyroute2 import NDB, IPRoute
 from scapy.all import ICMP, IP, send
 from socket import AF_INET
+from pyroute2.netlink.rtnl.ifaddrmsg import ifaddrmsg
+
 
 LOG_FORMAT = "%(asctime)s %(levelname)s %(message)s"
 logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
@@ -68,6 +70,18 @@ class BessController:
             bess_port (str): The port of the BESS daemon.
         """
         self._bess = self._get_bess(ip=bess_ip, port=bess_port)
+
+    def pause_bess(self):
+        """Pause all BESS modules."""
+        self._bess.pause_all()
+
+    def resume_bess(self):
+        """Resume all BESS modules."""
+        self._bess.resume_all()
+
+    def run_module_command(self, module_name: str, command: str, arg_type: str, arg_params: dict):
+        """Run a command on a BESS module."""
+        return self._bess.run_module_command(module_name, command, arg_type, arg_params)
 
     def _get_bess(self, ip: str, port: str) -> "BESS":
         """Connects to the BESS daemon."""
@@ -345,6 +359,7 @@ class RouteController:
             target=self._ping_missing_entries, daemon=True
         )
         self._interfaces = interfaces
+        self._interface_ips = {}
 
     def register_handlers(self) -> None:
         """Register handler functions."""
@@ -356,7 +371,118 @@ class RouteController:
             ndmsg,
             self._netlink_neighbor_handler,
         )
+        self._ndb.task_manager.register_handler(
+            ifaddrmsg,
+            self._netlink_addr_handler,
+        )
         logger.info("Registered netlink event handlers...")
+
+    def _netlink_addr_handler(self, _, netlink_message: dict) -> None:
+        """Handle IP address change events."""
+        try:
+            event = netlink_message.get("event")
+            if not event or event != "RTM_NEWADDR":
+                return
+
+            if_idx = netlink_message.get("index")
+            if not if_idx:
+                return
+
+            attrs = dict(netlink_message.get("attrs", []))
+            interface = None
+            for attr_name, attr_value in attrs.items():
+                if attr_name == "IFLA_IFNAME":
+                    interface = attr_value
+                    break
+
+            if not interface or interface not in self._interfaces:
+                return
+
+            ip_addr = attrs.get("IFA_ADDRESS")
+            if not ip_addr:
+                return
+
+            self._interface_ips[interface] = ip_addr
+
+            if interface == "core":
+                logger.info(f"Core IP address change detected: {ip_addr}")
+                self._update_core_ip(ip_addr)
+
+        except Exception:
+            logger.exception("Error handling IP address change")
+
+
+    def _update_core_ip(self, new_ip: str) -> None:
+        """Update BESS modules when core IP changes."""
+        try:
+            self._bess_controller.pause_bess()
+
+            self._update_nat_module(new_ip)
+            self._update_bpf_filter(new_ip)
+
+            logger.info(f"Successfully updated core IP to {new_ip}")
+
+        except Exception as e:
+            logger.error(f"Failed to update core IP configuration: {e}")
+        finally:
+            self._bess_controller.resume_bess()
+
+    def _update_nat_module(self, new_ip: str) -> None:
+        """Update NAT module with new external IP."""
+        try:
+            self._bess_controller.run_module_command(
+                "coreNAT",
+                "update",
+                "IPAddressArg",
+                {"external_ip": new_ip}
+            )
+            logger.info(f"Updated NAT module with new IP: {new_ip}")
+        except Exception as e:
+            logger.error(f"Failed to update NAT module: {e}")
+            raise
+
+    def _update_bpf_filter(self, new_ip: str) -> None:
+        """Update core BPF filter with new IP."""
+        try:
+            # Get existing rules to get configuration values
+            existing_rules = self._bess_controller.run_module_command(
+                "coreFastBPF",
+                "get_initial_arg",
+                "EmptyArg",
+                {}
+            )
+
+            if not existing_rules or "rules" not in existing_rules or not existing_rules["rules"]:
+                logger.error("No existing BPF rules found to get configuration from")
+                raise ValueError("Cannot update BPF filter: No existing rules to get configuration from")
+
+            first_rule = existing_rules["rules"][0]
+            if "priority" not in first_rule or "gate" not in first_rule:
+                logger.error("Existing rule missing required priority or gate configuration")
+                raise ValueError("Cannot update BPF filter: Invalid rule configuration")
+
+            new_filter = {
+                "priority": first_rule["priority"],
+                "filter": f"ip dst {new_ip}",
+                "gate": first_rule["gate"]
+            }
+
+            self._bess_controller.run_module_command(
+                "coreFastBPF",
+                "clear",
+                "EmptyArg",
+                {}
+            )
+            self._bess_controller.run_module_command(
+                "coreFastBPF",
+                "add",
+                "FilterRule",
+                {"rule": new_filter}
+            )
+            logger.info(f"Updated BPF filter with new IP: {new_ip}, priority: {first_rule['priority']}, gate: {first_rule['gate']}")
+        except Exception as e:
+            logger.error(f"Failed to update BPF filter: {e}")
+            raise
 
     def start_pinging_missing_entries(self) -> None:
         """Starts a new thread for ping missing entries."""
