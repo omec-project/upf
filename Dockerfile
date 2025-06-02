@@ -134,7 +134,7 @@ COPY . /pfcpiface
 RUN CGO_ENABLED=0 go build $GOFLAGS -o /bin/pfcpiface ./cmd/pfcpiface
 
 # Stage pfcpiface: runtime image of pfcpiface toward SMF/SPGW-C
-FROM alpine:3.21 AS pfcpiface
+FROM alpine:3.22 AS pfcpiface
 COPY conf /opt/bess/bessctl/conf
 COPY --from=pfcpiface-build /bin/pfcpiface /bin
 ENTRYPOINT [ "/bin/pfcpiface" ]
