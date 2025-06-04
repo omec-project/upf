@@ -381,7 +381,7 @@ class RouteController:
         """Handle IP address change events."""
         try:
             event = netlink_message.get("event")
-            if not event or event != "RTM_NEWADDR":
+            if event not in {"RTM_NEWADDR", "RTM_DELADDR"}:
                 return
 
             if_idx = netlink_message.get("index")
@@ -389,28 +389,25 @@ class RouteController:
                 return
 
             attrs = dict(netlink_message.get("attrs", []))
-            interface = None
-            for attr_name, attr_value in attrs.items():
-                if attr_name == "IFLA_IFNAME":
-                    interface = attr_value
-                    break
+            interface = attrs.get("IFLA_IFNAME")
+            ip_addr = attrs.get("IFA_ADDRESS") or attrs.get("IFA_LOCAL")
 
             if not interface or interface not in self._interfaces:
                 return
 
-            ip_addr = attrs.get("IFA_ADDRESS")
-            if not ip_addr:
-                return
-
-            self._interface_ips[interface] = ip_addr
-
-            if interface == "core":
-                logger.info(f"Core IP address change detected: {ip_addr}")
-                self._update_core_ip(ip_addr)
+            if event == "RTM_NEWADDR":
+                if ip_addr:
+                    self._interface_ips[interface] = ip_addr
+                    if interface == "core":
+                        logger.info(f"Core IP address change detected: {ip_addr}")
+                        self._update_core_ip(ip_addr)
+            elif event == "RTM_DELADDR":
+                if ip_addr and self._interface_ips.get(interface) == ip_addr:
+                    logger.info(f"Core IP address removed: {ip_addr}")
+                    self._interface_ips.pop(interface, None)
 
         except Exception:
             logger.exception("Error handling IP address change")
-
 
     def _update_core_ip(self, new_ip: str) -> None:
         """Update BESS modules when core IP changes."""
