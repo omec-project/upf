@@ -45,7 +45,7 @@ type P4rtClient struct {
 	client     p4.P4RuntimeClient
 	conn       *grpc.ClientConn
 	stream     p4.P4Runtime_StreamChannelClient
-	electionID p4.Uint128
+	electionID *p4.Uint128
 	deviceID   uint64
 	digests    chan *p4.DigestList
 
@@ -107,10 +107,10 @@ func convertError(err error) error {
 // case, this election ID will be guaranteed to be higher than any previous
 // election ID. This is useful in tests where repeated connections need to
 // acquire mastership reliably.
-func TimeBasedElectionId() p4.Uint128 {
+func TimeBasedElectionId() *p4.Uint128 {
 	now := time.Now()
 
-	return p4.Uint128{
+	return &p4.Uint128{
 		High: uint64(now.Unix()),
 		Low:  uint64(now.UnixNano() % 1e9),
 	}
@@ -122,13 +122,13 @@ func (c *P4rtClient) CheckStatus() connectivity.State {
 }
 
 // SetMastership .. API.
-func (c *P4rtClient) SetMastership(electionID p4.Uint128) (err error) {
+func (c *P4rtClient) SetMastership(electionID *p4.Uint128) (err error) {
 	c.electionID = electionID
 	mastershipReq := &p4.StreamMessageRequest{
 		Update: &p4.StreamMessageRequest_Arbitration{
 			Arbitration: &p4.MasterArbitrationUpdate{
 				DeviceId:   1,
-				ElectionId: &electionID,
+				ElectionId: electionID,
 			},
 		},
 	}
@@ -394,7 +394,7 @@ func (c *P4rtClient) ApplyMeterEntries(methodType p4.Update_Type, entries ...*p4
 func (c *P4rtClient) WriteReq(update *p4.Update) error {
 	req := &p4.WriteRequest{
 		DeviceId:   c.deviceID,
-		ElectionId: &c.electionID,
+		ElectionId: c.electionID,
 		Updates:    []*p4.Update{update},
 	}
 
@@ -407,7 +407,7 @@ func (c *P4rtClient) WriteReq(update *p4.Update) error {
 func (c *P4rtClient) WriteBatchReq(updates []*p4.Update) error {
 	req := &p4.WriteRequest{
 		DeviceId:   c.deviceID,
-		ElectionId: &c.electionID,
+		ElectionId: c.electionID,
 	}
 
 	req.Updates = append(req.Updates, updates...)
@@ -490,7 +490,7 @@ func (c *P4rtClient) SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath st
 	pipeline.P4Info = p4Info
 	pipeline.P4DeviceConfig = deviceConfig
 
-	err = SetPipelineConfig(c.client, c.deviceID, &c.electionID, &pipeline)
+	err = SetPipelineConfig(c.client, c.deviceID, c.electionID, &pipeline)
 	if err != nil {
 		logger.P4Log.Errorln("set pipeline config error", err)
 		return

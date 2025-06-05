@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
@@ -102,7 +101,7 @@ func MustCreateNetworkIfNotExists(name string) {
 	}
 	defer cli.Close()
 
-	allNetworks, err := cli.NetworkList(ctx, types.NetworkListOptions{})
+	allNetworks, err := cli.NetworkList(ctx, network.ListOptions{})
 	if err != nil {
 		logger.DockerLog.Fatalf("failed to check if network exists: %v", err)
 	}
@@ -114,7 +113,7 @@ func MustCreateNetworkIfNotExists(name string) {
 		}
 	}
 
-	_, err = cli.NetworkCreate(ctx, name, types.NetworkCreate{})
+	_, err = cli.NetworkCreate(ctx, name, network.CreateOptions{})
 	if err != nil {
 		panic(err)
 	}
