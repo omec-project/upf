@@ -4,7 +4,7 @@
 
 import sys
 import unittest
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import call, MagicMock, Mock, patch
 
 sys.modules["pybess.bess"] = MagicMock()
 
@@ -88,6 +88,13 @@ class TestUtilityFunctions(unittest.TestCase):
 class TestRouteController(unittest.TestCase):
     def setUp(self):
         self.mock_bess_controller = Mock(BessControllerMock)
+        self.mock_bess_controller.pause_bess = Mock()
+        self.mock_bess_controller.resume_bess = Mock()
+        self.mock_bess_controller.run_module_command = Mock()
+        self.mock_bess_controller.add_route_to_module = Mock()
+        self.mock_bess_controller.delete_module_route_entry = Mock()
+        self.mock_bess_controller.create_module = Mock()
+
         self.ndb = Mock()
         self.ipr = Mock()
         interfaces = ["access", "core"]
@@ -487,3 +494,98 @@ class TestRouteController(unittest.TestCase):
             {"event": "RTM_NEWNEIGH"}
         )
         mock_add_unresolved_new_neighbor.assert_called()
+
+    def test_netlink_addr_handler_when_invalid_event_given_then_bess_is_not_paused(self):
+        netlink_message = {"event": "INVALID_EVENT"}
+        self.route_controller._netlink_addr_handler(None, netlink_message)
+        self.mock_bess_controller.pause_bess.assert_not_called()
+
+    def test_netlink_addr_handler_when_interface_attributes_missing_then_bess_is_not_paused(self):
+        netlink_message = {"event": "RTM_NEWADDR"}
+        self.route_controller._netlink_addr_handler(None, netlink_message)
+        self.mock_bess_controller.pause_bess.assert_not_called()
+
+    def test_netlink_addr_handler_when_ip_changes_then_bess_is_paused_to_update_modules(self):
+        netlink_message = {
+            "event": "RTM_NEWADDR",
+            "index": 1,
+            "attrs": [("IFLA_IFNAME", "core"), ("IFA_ADDRESS", "192.168.1.1")]
+        }
+        self.route_controller._netlink_addr_handler(None, netlink_message)
+        self.assertEqual(self.route_controller._interface_ips["core"], "192.168.1.1")
+        self.mock_bess_controller.pause_bess.assert_called_once()
+
+    def test_update_nat_module_when_ip_changes_then_nat_module_updated_with_new_ip(self):
+        new_ip = "192.168.1.1"
+        self.route_controller._update_nat_module(new_ip)
+        calls = [
+            call.run_module_command("coreNAT", "update", "IPAddressArg", {"external_ip": new_ip}),
+        ]
+        self.mock_bess_controller.assert_has_calls(calls, any_order=False)
+
+    def test_update_nat_module_when_ip_changes_and_pause_bess_raises_then_bess_is_resumed_with_existing_config(self):
+        new_ip = "192.168.1.1"
+        self.mock_bess_controller.pause_bess.side_effect = Exception("Test error")
+
+        self.route_controller._update_core_ip(new_ip)
+        self.mock_bess_controller.resume_bess.assert_called_once()
+
+    def test_update_nat_module_when_ip_changes_and_run_module_raises_then_operation_failed(self):
+        new_ip = "192.168.1.1"
+        self.mock_bess_controller.run_module_command.side_effect = Exception("NAT update failed")
+
+        with self.assertRaises(Exception):
+            self.route_controller._update_nat_module(new_ip)
+
+    def test_update_bpf_filter_when_ip_changes_then_module_updated_successfully(self):
+        """Test successful BPF filter update."""
+        new_ip = "192.168.1.1"
+        existing_rules = {
+            "rules": [{
+                "priority": 1,
+                "gate": 0
+            }]
+        }
+        self.mock_bess_controller.run_module_command.return_value = existing_rules
+        self.route_controller._update_bpf_filter(new_ip)
+
+        expected_calls = [
+            call("coreFastBPF", "get_initial_arg", "EmptyArg", {}),
+            call("coreFastBPF", "clear", "EmptyArg", {}),
+            call("coreFastBPF", "add", "FilterRule", {
+                "rule": {
+                    "priority": 1,
+                    "filter": f"ip dst {new_ip}",
+                    "gate": 0
+                }
+            })
+        ]
+        self.mock_bess_controller.run_module_command.assert_has_calls(expected_calls, any_order=False)
+
+    def test_update_bpf_filter_when_no_existing_rules_then_raise(self):
+        new_ip = "192.168.1.1"
+        self.mock_bess_controller.run_module_command.return_value = {"rules": []}
+
+        with self.assertRaises(ValueError) as context:
+            self.route_controller._update_bpf_filter(new_ip)
+        self.assertEqual(
+            str(context.exception),
+            "Cannot update BPF filter: No existing rules to get configuration from"
+        )
+
+    def test_update_bpf_filter_when_invalid_existing_rule_then_raise(self):
+        new_ip = "192.168.1.1"
+        existing_rules = {
+            "rules": [{
+                "priority": 1
+                # missing gate
+            }]
+        }
+        self.mock_bess_controller.run_module_command.return_value = existing_rules
+
+        with self.assertRaises(ValueError) as context:
+            self.route_controller._update_bpf_filter(new_ip)
+        self.assertEqual(
+            str(context.exception),
+            "Cannot update BPF filter: Invalid rule configuration"
+        )
