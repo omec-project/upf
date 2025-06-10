@@ -381,7 +381,7 @@ class RouteController:
         """Handle IP address change events."""
         try:
             event = netlink_message.get("event")
-            if event not in {"RTM_NEWADDR", "RTM_DELADDR"}:
+            if event not in {"RTM_NEWADDR", "RTM_DELADDR", "RTM_DELROUTE", " RTM_ADDROUTE"}:
                 return
 
             if_idx = netlink_message.get("index")
@@ -395,13 +395,13 @@ class RouteController:
             if not interface or interface not in self._interfaces:
                 return
 
-            if event == "RTM_NEWADDR":
+            if event == "RTM_NEWADDR" or event == "RTM_ADDROUTE":
                 if ip_addr:
                     self._interface_ips[interface] = ip_addr
                     if interface == "core":
                         logger.info(f"Core IP address change detected: {ip_addr}")
                         self._update_core_ip(ip_addr)
-            elif event == "RTM_DELADDR":
+            elif event == "RTM_DELADDR" or event == "RTM_DELROUTE":
                 if ip_addr and self._interface_ips.get(interface) == ip_addr:
                     logger.info(f"Core IP address removed: {ip_addr}")
                     self._interface_ips.pop(interface, None)
