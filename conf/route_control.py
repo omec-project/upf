@@ -410,7 +410,7 @@ class RouteController:
             logger.exception("Error handling IP address change")
 
     def _flush_arp_and_neighbor_cache(self):
-        """Flush neighbor and unresolved ARP caches and trigger refresh."""
+        """Flush neighbor and unresolved ARP caches"""
         with self._lock:
             self._unresolved_arp_queries_cache.clear()
             self._neighbor_cache.clear()
@@ -425,6 +425,7 @@ class RouteController:
             self._update_nat_module(new_ip)
             self._update_bpf_filter(new_ip)
             self._flush_arp_and_neighbor_cache()
+            self._bess_controller.run_module_command("coreRoutes", "clear", "EmptyArg", {})
 
             logger.info(f"Successfully updated core IP to {new_ip}")
 
