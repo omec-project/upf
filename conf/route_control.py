@@ -381,7 +381,7 @@ class RouteController:
         """Handle IP address change events."""
         try:
             event = netlink_message.get("event")
-            if event not in {"RTM_NEWADDR", "RTM_DELADDR", "RTM_DELROUTE", " RTM_ADDROUTE"}:
+            if event not in {"RTM_NEWADDR", "RTM_DELADDR", "RTM_DELROUTE", "RTM_ADDROUTE"}:
                 return
 
             if_idx = netlink_message.get("index")
@@ -409,6 +409,14 @@ class RouteController:
         except Exception:
             logger.exception("Error handling IP address change")
 
+    def _flush_arp_and_neighbor_cache(self):
+        """Flush neighbor and unresolved ARP caches and trigger refresh."""
+        with self._lock:
+            self._unresolved_arp_queries_cache.clear()
+            self._neighbor_cache.clear()
+        logger.info("Cleared ARP and neighbor caches due to core IP change")
+
+
     def _update_core_ip(self, new_ip: str) -> None:
         """Update BESS modules when core IP changes."""
         try:
@@ -416,6 +424,7 @@ class RouteController:
 
             self._update_nat_module(new_ip)
             self._update_bpf_filter(new_ip)
+            self._flush_arp_and_neighbor_cache()
 
             logger.info(f"Successfully updated core IP to {new_ip}")
 
@@ -448,7 +457,6 @@ class RouteController:
                 "EmptyArg",
                 {}
             )
-
             if not existing_rules or "rules" not in existing_rules or not existing_rules["rules"]:
                 logger.error("No existing BPF rules found to get configuration from")
                 raise ValueError("Cannot update BPF filter: No existing rules to get configuration from")
