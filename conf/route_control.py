@@ -315,9 +315,20 @@ class BessController:
 
     def recreate_module_link(self, upstream: str, ogate: int, downstream: str, igate: int, klass: str, config: dict):
         self.delete_module(downstream)
-        self._bess.create_module(klass, downstream, config)
+        self.create_module_with_config(downstream, klass, config)
         self.link_modules(upstream, downstream, ogate, igate)
 
+    def connect(self, m1: str, ogate: int, m2: str, igate: int):
+        """Connects two BESS modules."""
+        self._bess.connect_modules(m1, ogate, m2, igate)
+
+    def update_module_params(self, name: str, params: dict):
+        """Updates parameters of a BESS module using the 'command module' RPC."""
+        self._bess.run_module_command(name, "set_config", "Json", params)
+
+    def create_module_with_config(self, module_name: str, module_class: str, config: dict) -> None:
+        """Creates a generic BESS module with arbitrary config."""
+        self._bess.create_module(module_class, module_name, config)
 
 class RouteController:
     """Provides an interface to manage routes from netlink messages.
@@ -443,7 +454,15 @@ class RouteController:
                 downstream="coreDstMAC2A0DE2304A5E",
                 igate=0,
                 klass="Update",
-                config={"fields": [{"offset": 0, "size": 6, "value": self.core_mac}]}
+                config={
+                    "fields": [
+                        {
+                            "offset": 0,
+                            "size": 6,
+                            "value": self.get_core_interface_mac()
+                        }
+                    ]
+                }
             )
 
             self._bess_controller.recreate_module_link(
@@ -452,7 +471,7 @@ class RouteController:
                 downstream="coreNAT",
                 igate=0,
                 klass="NAT",
-                config={"entries": 15}
+                config={"entries": 8}
             )
 
             logger.info(f"Successfully updated core IP to {new_ip}")
