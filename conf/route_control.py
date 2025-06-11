@@ -444,8 +444,6 @@ class RouteController:
         """Update BESS modules when core IP changes."""
         try:
             self._bess_controller.pause_bess()
-
-            self._update_nat_module(new_ip)
             self._update_bpf_filter(new_ip)
             self._flush_arp_and_neighbor_cache()
             self._bess_controller.recreate_module_link(
@@ -464,14 +462,16 @@ class RouteController:
                     ]
                 }
             )
-
             self._bess_controller.recreate_module_link(
                 upstream="coreSrcEther",
                 ogate=0,
                 downstream="coreNAT",
                 igate=0,
                 klass="NAT",
-                config={"entries": 8}
+                config={
+                    "entries": 8,
+                    "external_ip": new_ip,
+                }
             )
 
             logger.info(f"Successfully updated core IP to {new_ip}")
@@ -480,20 +480,6 @@ class RouteController:
             logger.error(f"Failed to update core IP configuration: {e}")
         finally:
             self._bess_controller.resume_bess()
-
-    def _update_nat_module(self, new_ip: str) -> None:
-        """Update NAT module with new external IP."""
-        try:
-            self._bess_controller.run_module_command(
-                "coreNAT",
-                "update",
-                "IPAddressArg",
-                {"external_ip": new_ip}
-            )
-            logger.info(f"Updated NAT module with new IP: {new_ip}")
-        except Exception as e:
-            logger.error(f"Failed to update NAT module: {e}")
-            raise
 
     def _update_bpf_filter(self, new_ip: str) -> None:
         """Update core BPF filter with new IP."""
