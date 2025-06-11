@@ -6,7 +6,6 @@
 import argparse
 import ipaddress
 import logging
-import netifaces
 import signal
 import sys
 import time
@@ -369,12 +368,6 @@ class RouteController:
         )
         self._interfaces = interfaces
         self._interface_ips = {}
-        self.core_mac = self.get_core_interface_mac()
-
-    @staticmethod
-    def get_core_interface_mac():
-        core_mac = netifaces.ifaddresses("core")[netifaces.AF_LINK][0]["addr"]
-        return int(core_mac.replace(":", ""), 16)
 
     def register_handlers(self) -> None:
         """Register handler functions."""
@@ -438,22 +431,6 @@ class RouteController:
             self._bess_controller.pause_bess()
             self._update_bpf_filter(new_ip)
             self._flush_arp_and_neighbor_cache()
-            self._bess_controller.recreate_module_link(
-                upstream="coreRoutes",
-                ogate=0,
-                downstream="coreDstMAC2A0DE2304A5E",
-                igate=0,
-                klass="Update",
-                config={
-                    "fields": [
-                        {
-                            "offset": 0,
-                            "size": 6,
-                            "value": self.get_core_interface_mac()
-                        }
-                    ]
-                }
-            )
             self._bess_controller.recreate_module_link(
                 upstream="coreSrcEther",
                 ogate=0,
