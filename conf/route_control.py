@@ -20,6 +20,7 @@ from pyroute2 import NDB, IPRoute
 from scapy.all import ICMP, IP, send
 from socket import AF_INET
 from pyroute2.netlink.rtnl.ifaddrmsg import ifaddrmsg
+import netifaces
 
 
 LOG_FORMAT = "%(asctime)s %(levelname)s %(message)s"
@@ -312,6 +313,11 @@ class BessController:
         else:
             raise Exception("Module {} deletion failure.".format(module_name))
 
+    def recreate_module_link(self, upstream: str, ogate: int, downstream: str, igate: int, klass: str, config: dict):
+        self.delete_module(downstream)
+        self._bess.create_module(klass, downstream, config)
+        self.link_modules(upstream, downstream, ogate, igate)
+
 
 class RouteController:
     """Provides an interface to manage routes from netlink messages.
@@ -360,6 +366,12 @@ class RouteController:
         )
         self._interfaces = interfaces
         self._interface_ips = {}
+        self.core_mac = self.get_core_interface_mac()
+
+    @staticmethod
+    def get_core_interface_mac():
+        core_mac = netifaces.ifaddresses("core")[netifaces.AF_LINK][0]["addr"]
+        return int(core_mac.replace(":", ""), 16)
 
     def register_handlers(self) -> None:
         """Register handler functions."""
@@ -425,15 +437,22 @@ class RouteController:
             self._update_nat_module(new_ip)
             self._update_bpf_filter(new_ip)
             self._flush_arp_and_neighbor_cache()
-            self._bess_controller.run_module_command("coreRoutes", "clear", "EmptyArg", {})
-            self._bess_controller.run_module_command(
-                "coreRoutes",
-                "add",
-                "RouteArg",
-                {
-                    "prefix": "0.0.0.0/0",
-                    "gate": 0
-                }
+            self._bess_controller.recreate_module_link(
+                upstream="coreRoutes",
+                ogate=0,
+                downstream="coreDstMAC2A0DE2304A5E",
+                igate=0,
+                klass="Update",
+                config={"fields": [{"offset": 0, "size": 6, "value": self.core_mac}]}
+            )
+
+            self._bess_controller.recreate_module_link(
+                upstream="coreSrcEther",
+                ogate=0,
+                downstream="coreNAT",
+                igate=0,
+                klass="NAT",
+                config={"entries": 15}
             )
 
             logger.info(f"Successfully updated core IP to {new_ip}")
