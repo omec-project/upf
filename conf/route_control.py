@@ -6,6 +6,7 @@
 import argparse
 import ipaddress
 import logging
+import netifaces
 import signal
 import sys
 import time
@@ -20,7 +21,6 @@ from pyroute2 import NDB, IPRoute
 from scapy.all import ICMP, IP, send
 from socket import AF_INET
 from pyroute2.netlink.rtnl.ifaddrmsg import ifaddrmsg
-import netifaces
 
 
 LOG_FORMAT = "%(asctime)s %(levelname)s %(message)s"
@@ -317,14 +317,6 @@ class BessController:
         self.delete_module(downstream)
         self.create_module_with_config(downstream, klass, config)
         self.link_modules(upstream, downstream, ogate, igate)
-
-    def connect(self, m1: str, ogate: int, m2: str, igate: int):
-        """Connects two BESS modules."""
-        self._bess.connect_modules(m1, ogate, m2, igate)
-
-    def update_module_params(self, name: str, params: dict):
-        """Updates parameters of a BESS module using the 'command module' RPC."""
-        self._bess.run_module_command(name, "set_config", "Json", params)
 
     def create_module_with_config(self, module_name: str, module_class: str, config: dict) -> None:
         """Creates a generic BESS module with arbitrary config."""
