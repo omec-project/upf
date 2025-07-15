@@ -29,6 +29,9 @@ func NewFTEIDGenerator() *FTEIDGenerator {
 
 // Allocate and return an id in range [minValue, maxValue]
 func (idGenerator *FTEIDGenerator) Allocate() (uint32, error) {
+	if idGenerator == nil {
+		return 0, errors.New("FTEIDGenerator is not initialized")
+	}
 	idGenerator.lock.Lock()
 	defer idGenerator.lock.Unlock()
 

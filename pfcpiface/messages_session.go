@@ -94,6 +94,10 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 		if p.UPAllocateFteid {
 			var fteid uint32
+			if pConn.upf.fteidGenerator == nil {
+				logger.PfcpLog.Warnf("fteid is nill")
+				pConn.upf.fteidGenerator = NewFTEIDGenerator()
+			}
 			fteid, err = pConn.upf.fteidGenerator.Allocate()
 			if err != nil {
 				return errProcessReply(err, ie.CauseNoResourcesAvailable)

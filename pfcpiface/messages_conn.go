@@ -5,6 +5,7 @@ package pfcpiface
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/omec-project/upf-epc/logger"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -92,7 +93,7 @@ func (pConn *PFCPConn) handleIncomingResponse(msg message.Message) {
 
 func (pConn *PFCPConn) associationIEs() []*ie.IE {
 	upf := pConn.upf
-	networkInstance := string(ie.NewNetworkInstanceFQDN(upf.dnn).Payload)
+	networkInstance := string(ie.NewNetworkInstanceFQDN(strings.Join(upf.dnn, ",")).Payload)
 	flags := uint8(0x41)
 
 	if len(upf.dnn) != 0 {
