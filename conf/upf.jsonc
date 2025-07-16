@@ -155,7 +155,12 @@
     "cpiface": {
         "peers": ["148.162.12.214"],
         // [Optional] Below parameters
-        "dnn": "internet",
+        "dnn_list": [
+            {
+                "dnn": "internet",
+                "ue_ip_pool": "10.250.0.0/16"
+            }
+        ],
         "http_port": "8080",
         "enable_ue_ip_alloc": false,
         // "use_fqdn": "true",
