@@ -6,7 +6,7 @@ require (
 	github.com/Showmax/go-fqdn v1.0.0
 	github.com/antoninbas/p4runtime-go-client v0.0.0-20220204221603-49eba9f248c1
 	github.com/deckarep/golang-set v1.8.0
-	github.com/docker/docker v28.2.2+incompatible
+	github.com/docker/docker v28.3.3+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/ettle/strcase v0.2.0
 	github.com/golang/protobuf v1.5.4
