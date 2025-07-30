@@ -148,10 +148,13 @@ class TestRouteController(unittest.TestCase):
         }
         result = self.route_controller._parse_route_entry_msg(example_route_entry)
         self.assertIsInstance(result, RouteEntry)
-        self.assertEqual(result.dest_prefix, "192.168.1.0")
-        self.assertEqual(result.next_hop_ip, "172.31.48.1")
-        self.assertEqual(result.interface, self.ndb.interfaces[2].get("ifname"))
-        self.assertEqual(result.prefix_len, 24)
+        if result is not None:
+            self.assertEqual(result.dest_prefix, "192.168.1.0")
+            self.assertEqual(result.next_hop_ip, "172.31.48.1")
+            self.assertEqual(result.interface, self.ndb.interfaces[2].get("ifname"))
+            self.assertEqual(result.prefix_len, 24)
+        else:
+            self.fail("Result is None, expected an object with dest_prefix, next_hop_ip, interface, and prefix_len")
 
     def test_given_valid_route_message_and_dst_len_is_zero_when_parse_message_then_parses_message_as_default_route(
         self,
@@ -178,10 +181,13 @@ class TestRouteController(unittest.TestCase):
         }
         result = self.route_controller._parse_route_entry_msg(example_route_entry)
         self.assertIsInstance(result, RouteEntry)
-        self.assertEqual(result.dest_prefix, "0.0.0.0")
-        self.assertEqual(result.next_hop_ip, "172.31.48.1")
-        self.assertEqual(result.interface, self.ndb.interfaces[2].get("ifname"))
-        self.assertEqual(result.prefix_len, 0)
+        if result is not None:
+            self.assertEqual(result.dest_prefix, "0.0.0.0")
+            self.assertEqual(result.next_hop_ip, "172.31.48.1")
+            self.assertEqual(result.interface, self.ndb.interfaces[2].get("ifname"))
+            self.assertEqual(result.prefix_len, 0)
+        else:
+            self.fail("Result is None, expected an object with dest_prefix, next_hop_ip, interface, and prefix_len")
 
     def test_given_invalid_route_message_when_parse_message_then_returns_none(self):
         self.ndb.interfaces = {2: {"ifname": "not the needed interface"}}
@@ -342,7 +348,7 @@ class TestRouteController(unittest.TestCase):
         mock_add_new_route_entry.assert_not_called()
 
     @patch.object(RouteController, "add_new_route_entry")
-    def test_given_netlink_message_when_rtm_newroute_event_then_add_new_route_entry_is_called(
+    async def test_given_netlink_message_when_rtm_newroute_event_then_add_new_route_entry_is_called(
         self, mock_add_new_route_entry
     ):
         self.ndb.interfaces = {2: {"ifname": "core"}}
@@ -366,7 +372,7 @@ class TestRouteController(unittest.TestCase):
             },
             "event": "RTM_NEWROUTE",
         }
-        self.route_controller._netlink_route_handler(
+        await self.route_controller._netlink_route_handler(
             self.ndb,
             example_route_entry
         )
@@ -419,7 +425,7 @@ class TestRouteController(unittest.TestCase):
         self.mock_bess_controller.delete_module.assert_called_once()
 
     @patch.object(RouteController, "delete_route_entry")
-    def test_given_netlink_message_when_rtm_delroute_event_then_delete_route_entry_is_called(
+    async def test_given_netlink_message_when_rtm_delroute_event_then_delete_route_entry_is_called(
         self, mock_delete_route_entry
     ):
         self.ndb.interfaces = {2: {"ifname": "core"}}
@@ -443,7 +449,7 @@ class TestRouteController(unittest.TestCase):
             },
             "event": "RTM_DELROUTE",
         }
-        self.route_controller._netlink_route_handler(
+        await self.route_controller._netlink_route_handler(
             self.ndb,
             example_route_entry
         )
@@ -479,10 +485,10 @@ class TestRouteController(unittest.TestCase):
         self.mock_bess_controller.add_route_to_module.assert_called_once()
 
     @patch.object(RouteController, "add_unresolved_new_neighbor")
-    def test_given_netlink_message_when_rtm_newneigh_event_then_add_unresolved_new_neighbor_is_called(
+    async def test_given_netlink_message_when_rtm_newneigh_event_then_add_unresolved_new_neighbor_is_called(
         self, mock_add_unresolved_new_neighbor
     ):
-        self.route_controller._netlink_neighbor_handler(
+        await self.route_controller._netlink_neighbor_handler(
             self.ndb,
             {"event": "RTM_NEWNEIGH"}
         )
