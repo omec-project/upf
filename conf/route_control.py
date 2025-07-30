@@ -632,7 +632,7 @@ class RouteController:
 
     async def _netlink_neighbor_handler(self, *args, **kwargs) -> None:
         """Listens for netlink neighbor events and handles them (async for pyroute2 compatibility)."""
-        netlink_message = args[-1] if args else kwargs.get('netlink_message')
+        netlink_message = args[-1] if len(args) > 0 else kwargs.get('netlink_message')
         if netlink_message is None:
             logger.error("No netlink message received in neighbor handler.")
             return
@@ -650,7 +650,7 @@ class RouteController:
 
     async def _netlink_route_handler(self, *args, **kwargs) -> None:
         """Listens for netlink route events and handles them (async for pyroute2 compatibility)."""
-        netlink_message = args[-1] if args else kwargs.get('netlink_message')
+        netlink_message = args[-1] if len(args) > 0 else kwargs.get('netlink_message')
         if netlink_message is None:
             logger.error("No netlink message received in route handler.")
             return
@@ -717,7 +717,17 @@ class RouteController:
 
         if not attr_dict.get(KEY_INTERFACE):
             return None
-        interface_index = int(attr_dict.get(KEY_INTERFACE, 0))
+
+        interface_value = attr_dict.get(KEY_INTERFACE)
+        if interface_value is None:
+            return None
+
+        try:
+            interface_index = int(interface_value)
+        except ValueError:
+            logger.exception("Interface value is not convertible to int")
+            return None
+
         interface = self._ndb.interfaces[interface_index].get("ifname")
         if interface not in self._interfaces:
             return None
