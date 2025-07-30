@@ -39,9 +39,9 @@ KEY_DESTINATION_PREFIX_LENGTH = "dst_len"
 class RouteEntry:
     """A representation of a neighbor in route entry."""
 
-    next_hop_ip: str = field(default=None)
-    interface: str = field(default=None)
-    dest_prefix: str = field(default=None)
+    next_hop_ip: Optional[str] = field(default=None)
+    interface: Optional[str] = field(default=None)
+    dest_prefix: Optional[str] = field(default=None)
     prefix_len: int = field(default=0)
 
 
@@ -50,7 +50,7 @@ class NeighborEntry:
     """A representation of a neighbor in neighbor cache."""
 
     gate_idx: int = field(default=0)
-    mac_address: str = field(default=None)
+    mac_address: Optional[str] = field(default=None)
     route_count: int = field(default=0)
 
 
@@ -150,7 +150,7 @@ class BessController:
         Args:
             route_entry (RouteEntry): The neighbor entry.
         """
-        route_module = route_entry.interface + "Routes"
+        route_module = str(route_entry.interface) + "Routes"
         for _ in range(self.MAX_RETRIES):
             try:
                 self._bess.pause_all()
@@ -400,45 +400,51 @@ class RouteController:
             route_entry (RouteEntry)
             next_hop_mac (str): The MAC address of the next hop.
         """
-        route_module_name = get_route_module_name(route_entry.interface)
-        gate_idx = self._get_gate_idx(route_entry, route_module_name)
-        try:
-            self._bess_controller.add_route_to_module(
-                route_entry,
-                gate_idx=gate_idx,
-                module_name=route_module_name,
-            )
+        if route_entry.interface is not None:
+            route_module_name = get_route_module_name(route_entry.interface)
+            gate_idx = self._get_gate_idx(route_entry, route_module_name)
+            try:
+                self._bess_controller.add_route_to_module(
+                    route_entry,
+                    gate_idx=gate_idx,
+                    module_name=route_module_name,
+                )
 
-        except Exception:
-            logger.exception("Error adding route entry to BESS: %s", route_entry)
-            return
+            except Exception:
+                logger.exception("Error adding route entry to BESS: %s", route_entry)
+                return
 
-        if not self._neighbor_cache.get(route_entry.next_hop_ip):
-            logger.info("Neighbor entry does not exist, creating modules.")
-            update_module_name = get_update_module_name(
-                route_entry.interface,
-                next_hop_mac,
-            )
-            merge_module_name = get_merge_module_name(route_entry.interface)
-            self._create_update_module(
-                destination_mac=next_hop_mac,
-                update_module_name=update_module_name,
-            )
-            self._create_module_links(
-                gate_idx=gate_idx,
-                update_module_name=update_module_name,
-                route_module_name=route_module_name,
-                merge_module_name=merge_module_name,
-            )
-            self._neighbor_cache[route_entry.next_hop_ip] = NeighborEntry(
-                gate_idx=gate_idx,
-                mac_address=next_hop_mac,
-            )
-            self._module_gate_count_cache[route_module_name] += 1
+            if route_entry.next_hop_ip is not None:
+                if not self._neighbor_cache.get(route_entry.next_hop_ip):
+                    logger.info("Neighbor entry does not exist, creating modules.")
+                    update_module_name = get_update_module_name(
+                        route_entry.interface,
+                        next_hop_mac,
+                    )
+                    merge_module_name = get_merge_module_name(route_entry.interface)
+                    self._create_update_module(
+                        destination_mac=next_hop_mac,
+                        update_module_name=update_module_name,
+                    )
+                    self._create_module_links(
+                        gate_idx=gate_idx,
+                        update_module_name=update_module_name,
+                        route_module_name=route_module_name,
+                        merge_module_name=merge_module_name,
+                    )
+                    self._neighbor_cache[route_entry.next_hop_ip] = NeighborEntry(
+                        gate_idx=gate_idx,
+                        mac_address=next_hop_mac,
+                    )
+                    self._module_gate_count_cache[route_module_name] += 1
+                else:
+                    logger.info("Neighbor already exists")
+
+                self._neighbor_cache[route_entry.next_hop_ip].route_count += 1
+            else:
+                logger.warning("next_hop_ip is None, cannot add neighbor")
         else:
-            logger.info("Neighbor already exists")
-
-        self._neighbor_cache[route_entry.next_hop_ip].route_count += 1
+            logger.warning("interface is None, cannot get route module name")
 
     def _create_update_module(
         self,
@@ -477,7 +483,10 @@ class RouteController:
         gateway_mac = attr_dict[KEY_LINK_LAYER_ADDRESS]
         if route_entry:
             self._add_neighbor(route_entry, gateway_mac)
-            del self._unresolved_arp_queries_cache[route_entry.next_hop_ip]
+            if route_entry.next_hop_ip is not None:
+                del self._unresolved_arp_queries_cache[route_entry.next_hop_ip]
+            else:
+                logger.warning("next_hop_ip is None, cannot delete from cache")
 
     def _create_module_links(
         self,
@@ -520,46 +529,55 @@ class RouteController:
 
     def delete_route_entry(self, route_entry: RouteEntry) -> None:
         """Deletes a route entry from BESS and the neighbor cache."""
-        next_hop = self._neighbor_cache.get(route_entry.next_hop_ip)
+        if route_entry.next_hop_ip is not None:
+            next_hop = self._neighbor_cache.get(route_entry.next_hop_ip)
 
-        if next_hop:
-            try:
-                self._bess_controller.delete_module_route_entry(route_entry)
-            except Exception:
-                logger.exception("Error deleting route entry %s", route_entry)
-                return
-
-            next_hop.route_count -= 1
-
-            if next_hop.route_count == 0:
-                route_module = get_route_module_name(route_entry.interface)
-                update_module_name = get_update_module_name(
-                    route_module_name=route_module,
-                    mac_address=next_hop.mac_address,
-                )
-
+            if next_hop:
                 try:
-                    self._bess_controller.delete_module(update_module_name)
+                    self._bess_controller.delete_module_route_entry(route_entry)
                 except Exception:
-                    logger.exception(
-                        "Error deleting update module %s",
-                        update_module_name,
-                    )
+                    logger.exception("Error deleting route entry %s", route_entry)
                     return
 
-                logger.info("Module deleted %s", update_module_name)
+                next_hop.route_count -= 1
 
-                del self._neighbor_cache[route_entry.next_hop_ip]
-                logger.info("Deleted item from neighbor cache")
+                if next_hop.route_count == 0:
+                    if route_entry.interface is not None:
+                        route_module = get_route_module_name(route_entry.interface)
+                        if next_hop.mac_address is not None:
+                            update_module_name = get_update_module_name(
+                                route_module_name=route_module,
+                                mac_address=next_hop.mac_address,
+                            )
+
+                            try:
+                                self._bess_controller.delete_module(update_module_name)
+                            except Exception:
+                                logger.exception(
+                                    "Error deleting update module %s",
+                                    update_module_name,
+                                )
+                                return
+
+                            logger.info("Module deleted %s", update_module_name)
+
+                            del self._neighbor_cache[route_entry.next_hop_ip]
+                            logger.info("Deleted item from neighbor cache")
+                        else:
+                            logger.warning("MAC address is None, cannot get update module name")
+                    else:
+                        logger.warning("Interface is None, cannot get route module name")
+                else:
+                    logger.info(
+                        "Route count for %s decremented to %i",
+                        route_entry.next_hop_ip,
+                        next_hop.route_count,
+                    )
+                    self._neighbor_cache[route_entry.next_hop_ip] = next_hop
             else:
-                logger.info(
-                    "Route count for %s decremented to %i",
-                    route_entry.next_hop_ip,
-                    next_hop.route_count,
-                )
-                self._neighbor_cache[route_entry.next_hop_ip] = next_hop
+                logger.info("Neighbor %s does not exist", route_entry.next_hop_ip)
         else:
-            logger.info("Neighbor %s does not exist", route_entry.next_hop_ip)
+            logger.warning("next_hop_ip is None, cannot delete route entry")
 
     def _ping_missing_entries(self):
         """Pings missing entries every 10 seconds.
@@ -586,9 +604,12 @@ class RouteController:
         Args:
             route_entry (NeighborEntry): The neighbor entry.
         """
-        self._unresolved_arp_queries_cache[route_entry.next_hop_ip] = route_entry
-        logger.info("Adding entry %s in arp table by pinging", route_entry)
-        send_ping(route_entry.next_hop_ip)
+        if route_entry.next_hop_ip is not None:
+            self._unresolved_arp_queries_cache[route_entry.next_hop_ip] = route_entry
+            logger.info("Adding entry %s in arp table by pinging", route_entry)
+            send_ping(route_entry.next_hop_ip)
+        else:
+            logger.warning("next_hop_ip is None, cannot add to arp table")
 
     def _get_gate_idx(self, route_entry: RouteEntry, module_name: str) -> int:
         """Get gate index for a route module.
@@ -603,19 +624,18 @@ class RouteController:
         Returns:
             int: The gate index.
         """
-        if (
-            cached_entry := self._neighbor_cache.get(route_entry.next_hop_ip)
-        ) is not None:
-            return cached_entry.gate_idx
+        if route_entry.next_hop_ip is not None:
+            cached_entry = self._neighbor_cache.get(route_entry.next_hop_ip)
+            if cached_entry is not None:
+                return cached_entry.gate_idx
         return self._module_gate_count_cache[module_name]
 
-    def _netlink_neighbor_handler(self, _, netlink_message: dict) -> None:
-        """Listens for netlink neighbor events and handles them.
-
-        Args:
-            _: target
-            netlink_message (dict): The netlink message.
-        """
+    async def _netlink_neighbor_handler(self, *args, **kwargs) -> None:
+        """Listens for netlink neighbor events and handles them (async for pyroute2 compatibility)."""
+        netlink_message = args[-1] if args else kwargs.get('netlink_message')
+        if netlink_message is None:
+            logger.error("No netlink message received in neighbor handler.")
+            return
         try:
             event = netlink_message.get("event")
         except Exception:
@@ -628,15 +648,15 @@ class RouteController:
             with self._lock:
                 self.add_unresolved_new_neighbor(netlink_message)
 
-    def _netlink_route_handler(self, _, netlink_message: dict) -> None:
-        """Listens for netlink route events and handles them.
-
-        Args:
-            _: target
-            netlink_message (dict): The netlink message.
-        """
-        event = netlink_message.get("event")
-        if event is None:
+    async def _netlink_route_handler(self, *args, **kwargs) -> None:
+        """Listens for netlink route events and handles them (async for pyroute2 compatibility)."""
+        netlink_message = args[-1] if args else kwargs.get('netlink_message')
+        if netlink_message is None:
+            logger.error("No netlink message received in route handler.")
+            return
+        try:
+            event = netlink_message.get("event")
+        except Exception:
             logger.error("Netlink message does not include an event.")
             return
 
@@ -697,7 +717,7 @@ class RouteController:
 
         if not attr_dict.get(KEY_INTERFACE):
             return None
-        interface_index = int(attr_dict.get(KEY_INTERFACE))
+        interface_index = int(attr_dict.get(KEY_INTERFACE, 0))
         interface = self._ndb.interfaces[interface_index].get("ifname")
         if interface not in self._interfaces:
             return None
@@ -748,12 +768,14 @@ def get_merge_module_name(interface_name: str) -> str:
     return interface_name + "Merge"
 
 
-def validate_ipv4(ip: str) -> bool:
+def validate_ipv4(ip: Optional[str]) -> bool:
     """Validate the given IP address.
 
     Args:
         ip (str): The IP address to validate."""
     try:
+        if ip is None:
+            return False
         return isinstance(ipaddress.ip_address(ip), ipaddress.IPv4Address)
     except ValueError:
         logger.error("The IP address %s is invalid", ip)
@@ -770,7 +792,7 @@ def send_ping(neighbor_ip):
     logger.info("Sent ping to %s", neighbor_ip)
 
 
-def fetch_mac(ndb: NDB, target_ip: str) -> Optional[str]:
+def fetch_mac(ndb: NDB, target_ip: Optional[str]) -> Optional[str]:
     """Fetches the MAC address of the target IP from the ARP table using NDB.
 
     Args:
