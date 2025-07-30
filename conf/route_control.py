@@ -530,9 +530,7 @@ class RouteController:
     def delete_route_entry(self, route_entry: RouteEntry) -> None:
         """Deletes a route entry from BESS and the neighbor cache."""
         if route_entry.next_hop_ip is not None:
-            next_hop = self._neighbor_cache.get(route_entry.next_hop_ip)
-
-            if next_hop:
+            if next_hop := self._neighbor_cache.get(route_entry.next_hop_ip):
                 try:
                     self._bess_controller.delete_module_route_entry(route_entry)
                 except Exception:
