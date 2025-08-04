@@ -404,7 +404,11 @@ func (up4 *UP4) SetUpfInfo(u *upf, conf *Conf) {
 
 	logger.PfcpLog.Infof("AccessIP: %v", up4.accessIP)
 
-	up4.ueIPPool = MustParseStrIP(conf.CPIface.UEIPPool)
+	if len(conf.CPIface.DnnList) > 0 {
+		up4.ueIPPool = MustParseStrIP(conf.CPIface.DnnList[0].UEIPPool)
+	} else {
+		logger.PfcpLog.Fatalln("No UE IP pool configured in DnnList")
+	}
 
 	logger.PfcpLog.Infof("UE IP pool: %v", up4.ueIPPool)
 
