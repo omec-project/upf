@@ -66,6 +66,10 @@ func findItemIndex(slice []uint32, val uint32) int {
 
 // MarkSessionQer : identify and Mark session QER with flag.
 func (s *PFCPSession) MarkSessionQer(qers []qer) {
+	if len(s.pdrs) < 1 {
+		logger.PfcpLog.Infoln("need at least 1 PDR, it should not be empty")
+		return
+	}
 	sessQerIDList := make([]uint32, 0)
 	lastPdrIndex := len(s.pdrs) - 1
 	// create search list with first pdr's qerlist */
