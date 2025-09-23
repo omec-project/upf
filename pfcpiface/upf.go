@@ -106,6 +106,7 @@ func fqdnHostname() (string, error) {
 	// try to get FQDN via reverse DNS lookup
 	addrs, err := net.LookupIP(hostname)
 	if err != nil {
+		logger.PfcpLog.Warnf("failed to get fqdn for %s: %+v", hostname, err)
 		return hostname, nil // fallback to short hostname
 	}
 
