@@ -8,12 +8,15 @@ allocatable
 AMI
 bb
 bess
+bessctl
 busypoll
 BUIDKIT
 cndp
 CNDP
 CNI
 config
+cpus
+cpuset
 CPUs
 datagrams
 datapath
@@ -75,6 +78,7 @@ localhost
 lports
 MAKEFLAGS
 md
+memlock
 Microbenchmarks
 Natting
 natting
@@ -102,6 +106,7 @@ PFDs
 pktgen
 protobuf
 PTF
+PWD
 QERs
 qid
 QoS
@@ -123,8 +128,10 @@ sudo
 tc
 TCP
 tcpdump
+td
 TEID
 TRex
+ulimit
 UDP
 UE
 UEs
