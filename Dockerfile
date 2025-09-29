@@ -3,7 +3,7 @@
 # Copyright 2019-present Intel Corporation
 
 # Stage bess-build: fetch BESS dependencies & pre-reqs
-FROM registry.aetherproject.org/sdcore/bess_build:250619 AS bess-build
+FROM registry.aetherproject.org/sdcore/bess_build:250926 AS bess-build
 ARG CPU=native
 ARG BESS_COMMIT=main
 ENV PLUGINS_DIR=plugins
@@ -104,7 +104,7 @@ ENTRYPOINT ["bessd", "-f"]
 
 # Stage build bess golang pb
 FROM golang:1.25.1-bookworm AS protoc-gen
-RUN go install github.com/golang/protobuf/protoc-gen-go@latest
+RUN go install github.com/golang/protobuf/protoc-gen-go@v1.5.4
 
 FROM bess-build AS go-pb
 COPY --from=protoc-gen /go/bin/protoc-gen-go /bin
