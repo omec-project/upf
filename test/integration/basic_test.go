@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim/session"
+	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
 )
@@ -28,6 +29,7 @@ func TestUPFBasedUeIPAllocation(t *testing.T) {
 			dlTEID:       16,
 			QFI:          0x9,
 		},
+		expected: ueSessionConfig{
 		expected: ueSessionConfig{
 			// first IP address from pool configured in ue_ip_alloc.json
 			ueAddress: "10.250.0.1",
@@ -120,6 +122,7 @@ func TestUPFBasedUeIPAllocation(t *testing.T) {
 	}
 
 	verifyEntries(t, testcase.expected)
+	verifyEntries(t, testcase.expected)
 
 	// no need to send modification request, we can delete PFCP session
 
@@ -167,6 +170,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				QFI:          0x9,
 			},
 			expected: ueSessionConfig{
+			expected: ueSessionConfig{
 				appFilter: appFilter{
 					proto:        0x11,
 					appIP:        net.ParseIP("0.0.0.0"),
@@ -190,6 +194,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				dlTEID:       16,
 				QFI:          0x9,
 			},
+			expected: ueSessionConfig{
 			expected: ueSessionConfig{
 				appFilter: appFilter{
 					proto:        0x11,
@@ -215,6 +220,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				QFI:          0x9,
 			},
 			expected: ueSessionConfig{
+			expected: ueSessionConfig{
 				// no application filtering rule expected
 				tc: 3,
 			},
@@ -239,6 +245,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				appGBR:           30000,
 				appMBR:           50000,
 			},
+			expected: ueSessionConfig{
 			expected: ueSessionConfig{
 				appFilter: appFilter{
 					proto:        0x11,
@@ -272,6 +279,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				sessMBR:   500000,
 			},
 			expected: ueSessionConfig{
+			expected: ueSessionConfig{
 				appFilter: appFilter{
 					proto:        0x11,
 					appIP:        net.ParseIP("0.0.0.0"),
@@ -303,6 +311,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				appGBR:           30000,
 				appMBR:           50000,
 			},
+			expected: ueSessionConfig{
 			expected: ueSessionConfig{
 				appFilter: appFilter{
 					proto:        0x11,
@@ -337,6 +346,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				ulGateClosed:     true,
 			},
 			expected: ueSessionConfig{
+			expected: ueSessionConfig{
 				appFilter: appFilter{
 					proto:        0x11,
 					appIP:        net.ParseIP("0.0.0.0"),
@@ -369,6 +379,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				appMBR:           50000,
 				dlGateClosed:     true,
 			},
+			expected: ueSessionConfig{
 			expected: ueSessionConfig{
 				appFilter: appFilter{
 					proto:        0x11,
@@ -406,6 +417,7 @@ func TestUEBuffering(t *testing.T) {
 			dlTEID:       16,
 			QFI:          0x9,
 		},
+		expected: ueSessionConfig{
 		expected: ueSessionConfig{
 			appFilter: appFilter{
 				proto:        0x11,
@@ -518,6 +530,7 @@ func testUEAttach(t *testing.T, testcase *testCase) {
 	testcase.session = sess
 
 	verifyEntries(t, testcase.expected)
+	verifyEntries(t, testcase.expected)
 
 	pfcpClient.ModifySession(sess, nil, []*ie.IE{
 		session.NewFARBuilder().
@@ -526,6 +539,7 @@ func testUEAttach(t *testing.T, testcase *testCase) {
 			WithTEID(testcase.input.dlTEID).WithDownlinkIP(testcase.input.nbAddress).BuildFAR(),
 	}, nil, nil)
 
+	verifyEntries(t, testcase.expected)
 	verifyEntries(t, testcase.expected)
 }
 
@@ -545,6 +559,7 @@ func testUEBuffer(t *testing.T, testcase *testCase) {
 	}
 
 	verifyEntries(t, testcase.expected)
+	verifyEntries(t, testcase.expected)
 
 	// stop buffering
 	fars = []*ie.IE{
@@ -560,6 +575,7 @@ func testUEBuffer(t *testing.T, testcase *testCase) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	verifyEntries(t, testcase.expected)
 	verifyEntries(t, testcase.expected)
 }
 

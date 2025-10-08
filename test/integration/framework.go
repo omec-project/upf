@@ -22,6 +22,7 @@ import (
 
 const (
 	ConfigPath       = "/tmp/upf.jsonc"
+	ConfigPath       = "/tmp/upf.jsonc"
 	defaultSDFFilter = "permit out udp from any to assigned 80-80"
 
 	ueAddress    = "17.0.0.1"
@@ -95,8 +96,13 @@ type appFilter struct {
 }
 
 type ueSessionConfig struct {
+type ueSessionConfig struct {
 	tc        uint8
 	ueAddress string
+	appFilter appFilter
+	pdrs      []*ie.IE
+	fars      []*ie.IE
+	qers      []*ie.IE
 	appFilter appFilter
 	pdrs      []*ie.IE
 	fars      []*ie.IE
@@ -104,6 +110,8 @@ type ueSessionConfig struct {
 }
 
 type testCase struct {
+	input    *pfcpSessionData
+	expected ueSessionConfig
 	input    *pfcpSessionData
 	expected ueSessionConfig
 
@@ -199,9 +207,7 @@ func setup(t *testing.T, configType uint32) {
 		}
 	}()
 	err := waitForBESSFakeToStart()
-	if err != nil {
-		t.Fatalf("failed to start BESS fake: %v", err)
-	}
+	require.NoErrorf(t, err, "failed to start BESS fake: %v", err)
 
 	upfConf := GetConfig(configType)
 	upfConf.N4Addr = "127.0.0.8"
@@ -210,9 +216,7 @@ func setup(t *testing.T, configType uint32) {
 
 	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.1")
 	errConn := pfcpClient.ConnectN4("127.0.0.8")
-	if errConn != nil {
-		t.Fatalf("failed to connect to UPF: %v", errConn)
-	}
+	require.NoErrorf(t, errConn, "failed to connect to UPF")
 
 	// wait for PFCP Agent to initialize, blocking
 	err = waitForPFCPAssociationSetup(pfcpClient)
@@ -234,7 +238,10 @@ func teardown(t *testing.T) {
 	}
 
 	pfcpAgent.Stop()
+	pfcpAgent.Stop()
 
+	if bessFake != nil {
+		bessFake.Stop()
 	if bessFake != nil {
 		bessFake.Stop()
 	}
@@ -242,8 +249,11 @@ func teardown(t *testing.T) {
 
 func verifyEntries(t *testing.T, expectedValues ueSessionConfig) {
 	verifyBessEntries(t, bessFake, expectedValues)
+func verifyEntries(t *testing.T, expectedValues ueSessionConfig) {
+	verifyBessEntries(t, bessFake, expectedValues)
 }
 
 func verifyNoEntries(t *testing.T) {
+	verifyNoBessRuntimeEntries(t, bessFake)
 	verifyNoBessRuntimeEntries(t, bessFake)
 }
