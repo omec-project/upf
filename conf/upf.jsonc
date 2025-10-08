@@ -8,7 +8,6 @@
     // "cndp" to enable CNDP mode,
     // "dpdk" to enable DPDK mode,
     // "sim" to generate synthetic traffic from BESS's Source module,
-    // "" when running with UP4
     "mode": "dpdk",
 
     "table_sizes": {
@@ -101,8 +100,6 @@
     // [Optional] Whether to enable Notify BESS feature
     // "enable_notify_bess": false,
 
-    // Whether to enable P4Runtime feature
-    "enable_p4rt": false,
     // "conn_timeout": "1000",
     // "read_timeout": "25",
     // "notify_sockaddr": "/tmp/notifycp",
@@ -161,18 +158,5 @@
         // "use_fqdn": "true",
         // "hostname": "upf-0",
         "ue_ip_pool": "10.250.0.0/16"
-    },
-
-    // p4rtc interface settings,
-    "p4rtciface": {
-        "access_ip": "172.17.0.1/32",
-        "p4rtc_server": "onos",
-        "p4rtc_port": "51001",
-        // [Optional] Set the UP4 slice identifier that this PFCP Agent instance belongs to. Default: 0
-        "slice_id": 0,
-        // [Optional] Default TC is ELASTIC
-        "default_tc": 3,
-        // [Optional] Whether to wipe out PFCP state from UP4 datapath on UP4 restart. Default: false
-        "clear_state_on_restart": false
     }
 }

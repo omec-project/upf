@@ -14,7 +14,6 @@ var (
 	BessLog     *zap.SugaredLogger
 	DockerLog   *zap.SugaredLogger
 	InitLog     *zap.SugaredLogger
-	P4Log       *zap.SugaredLogger
 	PfcpLog     *zap.SugaredLogger
 	atomicLevel zap.AtomicLevel
 )
@@ -48,7 +47,6 @@ func init() {
 	BessLog = log.Sugar().With("component", "UPF", "category", "BESS")
 	DockerLog = log.Sugar().With("component", "UPF", "category", "Docker")
 	InitLog = log.Sugar().With("component", "UPF", "category", "Init")
-	P4Log = log.Sugar().With("component", "UPF", "category", "P4")
 	PfcpLog = log.Sugar().With("component", "UPF", "category", "Pfcp")
 }
 

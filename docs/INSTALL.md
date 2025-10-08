@@ -59,13 +59,13 @@ required:
 
     ```patch
     diff --git a/conf/upf.jsonc b/conf/upf.jsonc
-    index f8f4e4e..c82748a 100644
+    index fb34142..3bb68ec 100644
     --- a/conf/upf.jsonc
     +++ b/conf/upf.jsonc
-    @@ -9,7 +9,7 @@
-         // "dpdk" to enable DPDK mode,
+    @@ -8,7 +8,7 @@
          // "cndp" to enable CNDP mode,
-         // "" when running with UP4"
+         // "dpdk" to enable DPDK mode,
+         // "sim" to generate synthetic traffic from BESS's Source module,
     -    "mode": "dpdk",
     +    "mode": "sim",
 
@@ -103,19 +103,19 @@ To configure/install the UPF in AF_PACKET mode, the following changes are requir
 
     ```patch
     diff --git a/conf/upf.jsonc b/conf/upf.jsonc
-    index f332689..6787173 100644
+    index fb34142..b9d65a4 100644
     --- a/conf/upf.jsonc
     +++ b/conf/upf.jsonc
-    @@ -9,7 +9,7 @@
+    @@ -8,7 +8,7 @@
+         // "cndp" to enable CNDP mode,
          // "dpdk" to enable DPDK mode,
          // "sim" to generate synthetic traffic from BESS's Source module,
-         // "" when running with UP4
     -    "mode": "dpdk",
     +    "mode": "af_packet",
 
          "table_sizes": {
              // Example sizes based on sim mode and 50K sessions. Customize as per your control plane
-    @@ -74,7 +74,7 @@
+    @@ -73,7 +73,7 @@
          // N3 interface
          "access": {
              // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
@@ -124,7 +124,7 @@ To configure/install the UPF in AF_PACKET mode, the following changes are requir
          },
 
          // N6 or N9 interface (depending on the UPF's deployment [PSA-UPF or I-UPF])
-    @@ -82,7 +82,7 @@
+    @@ -81,7 +81,7 @@
              // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
              // Uncomment line below to enable UE IP natting. It could be a single IP or multiple IPs
              // "ip_masquerade": "18.0.0.1 or 18.0.0.2 or 18.0.0.3",
@@ -196,19 +196,19 @@ To configure/install the UPF in AF_XDP mode, the following changes are required:
 
     ```patch
     diff --git a/conf/upf.jsonc b/conf/upf.jsonc
-    index f332689..65d3932 100644
+    index fb34142..e4b6e78 100644
     --- a/conf/upf.jsonc
     +++ b/conf/upf.jsonc
-    @@ -9,7 +9,7 @@
+    @@ -8,7 +8,7 @@
+         // "cndp" to enable CNDP mode,
          // "dpdk" to enable DPDK mode,
          // "sim" to generate synthetic traffic from BESS's Source module,
-         // "" when running with UP4
     -    "mode": "dpdk",
     +    "mode": "af_xdp",
 
          "table_sizes": {
              // Example sizes based on sim mode and 50K sessions. Customize as per your control plane
-    @@ -74,7 +74,7 @@
+    @@ -73,7 +73,7 @@
          // N3 interface
          "access": {
              // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
@@ -217,7 +217,7 @@ To configure/install the UPF in AF_XDP mode, the following changes are required:
          },
 
          // N6 or N9 interface (depending on the UPF's deployment [PSA-UPF or I-UPF])
-    @@ -82,7 +82,7 @@
+    @@ -81,7 +81,7 @@
              // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
              // Uncomment line below to enable UE IP natting. It could be a single IP or multiple IPs
              // "ip_masquerade": "18.0.0.1 or 18.0.0.2 or 18.0.0.3",
