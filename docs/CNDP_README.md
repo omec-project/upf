@@ -66,21 +66,21 @@ For example, to setup 8GB of total huge pages (8 pages each of size 1GB in each 
 
 ```
 diff --git a/conf/upf.jsonc b/conf/upf.jsonc
-index f8f4e4e..f694197 100644
+index fb34142..09e8680 100644
 --- a/conf/upf.jsonc
 +++ b/conf/upf.jsonc
-@@ -9,7 +9,7 @@
-     // "dpdk" to enable DPDK mode,
+@@ -8,7 +8,7 @@
      // "cndp" to enable CNDP mode,
-     // "" when running with UP4"
+     // "dpdk" to enable DPDK mode,
+     // "sim" to generate synthetic traffic from BESS's Source module,
 -    "mode": "dpdk",
 +    "mode": "cndp",
 
      "table_sizes": {
          // Example sizes based on sim mode and 50K sessions. Customize as per your control plane
-@@ -67,15 +67,15 @@
+@@ -72,16 +72,16 @@
 
-     // Gateway interfaces
+     // N3 interface
      "access": {
 -        // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
 -        "ifname": "ens803f2"
@@ -88,10 +88,11 @@ index f8f4e4e..f694197 100644
 +        "ifname": "enp134s0"
      },
 
-     // UE IP Natting. Uncomment the line below to `\"ip_masquerade\": \"<ip> [or <ip>]\"` to enable
+     // N6 or N9 interface (depending on the UPF's deployment [PSA-UPF or I-UPF])
      "core": {
 -        // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
 +        "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
+         // Uncomment line below to enable UE IP natting. It could be a single IP or multiple IPs
          // "ip_masquerade": "18.0.0.1 or 18.0.0.2 or 18.0.0.3",
 -        "ifname": "ens803f3"
 +        "ifname": "enp136s0"
@@ -353,7 +354,6 @@ index f8f4e4e..3bd8b88 100644
 @@ -9,7 +9,7 @@
      // "dpdk" to enable DPDK mode,
      // "cndp" to enable CNDP mode,
-     // "" when running with UP4"
 -    "mode": "dpdk",
 +    "mode": "cndp",
 

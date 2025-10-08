@@ -76,13 +76,6 @@ output:
 		.;
 	rm -rf output && mkdir output && tar -xf output.tar -C output && rm -f output.tar
 
-test-up4-integration-docker: DOCKER_TARGETS=pfcpiface
-test-up4-integration-docker: DOCKER_TAG=integration
-test-up4-integration-docker: docker-build
-	docker rm -f mock-up4 pfcpiface
-	docker network prune -f
-	MODE=docker DATAPATH=up4 go test -v -count=1 -failfast -timeout 15m ./test/integration/...
-
 test-bess-integration-native:
 	MODE=native DATAPATH=bess go test \
        -v \
@@ -120,14 +113,6 @@ test: .coverage
 			-v \
 			./pfcpiface ./cmd/...
 
-p4-constants:
-	$(info *** Generating go constants...)
-	@docker run --rm -v $(CURDIR):/app -w /app \
-		golang:latest go run ./cmd/p4info_code_gen/p4info_code_gen.go \
-		-output internal/p4constants/p4constants.go -p4info conf/p4/bin/p4info.txt
-	@docker run --rm -v $(CURDIR):/app -w /app \
-		golang:latest gofmt -w internal/p4constants/p4constants.go
-
 fmt:
 	@go fmt ./...
 
@@ -137,4 +122,4 @@ golint:
 check-reuse:
 	@docker run --rm -v $(CURDIR):/upf-epc -w /upf-epc omecproject/reuse-verify:latest reuse lint
 
-.PHONY: docker-build docker-push output pb fmt golint check-reuse test-up4-integration .coverage test
+.PHONY: docker-build docker-push output pb fmt golint check-reuse .coverage test

@@ -4,7 +4,6 @@
 package pfcpiface
 
 import (
-	"github.com/omec-project/upf-epc/internal/p4constants"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
@@ -30,8 +29,6 @@ type Conf struct {
 	AccessIface              IfaceType        `json:"access"`
 	CoreIface                IfaceType        `json:"core"`
 	CPIface                  CPIfaceInfo      `json:"cpiface"`
-	P4rtcIface               P4rtcInfo        `json:"p4rtciface"`
-	EnableP4rt               bool             `json:"enable_p4rt"`
 	EnableGtpuPathMonitoring bool             `json:"enable_gtpu_path_monitoring"`
 	EnableFlowMeasure        bool             `json:"measure_flow"`
 	SimInfo                  SimModeInfo      `json:"sim"`
@@ -100,45 +97,18 @@ type IfaceType struct {
 	IfName string `json:"ifname"`
 }
 
-// P4rtcInfo : P4 runtime interface settings.
-type P4rtcInfo struct {
-	SliceID             uint8           `json:"slice_id"`
-	AccessIP            string          `json:"access_ip"`
-	P4rtcServer         string          `json:"p4rtc_server"`
-	P4rtcPort           string          `json:"p4rtc_port"`
-	QFIToTC             map[uint8]uint8 `json:"qfi_tc_mapping"`
-	DefaultTC           uint8           `json:"default_tc"`
-	ClearStateOnRestart bool            `json:"clear_state_on_restart"`
-}
-
 // validateConf checks that the given config reaches a baseline of correctness.
 func validateConf(conf Conf) error {
-	if conf.EnableP4rt {
-		_, _, err := net.ParseCIDR(conf.P4rtcIface.AccessIP)
-		if err != nil {
-			return ErrInvalidArgumentWithReason("conf.P4rtcIface.AccessIP", conf.P4rtcIface.AccessIP, err.Error())
-		}
-
-		_, _, err = net.ParseCIDR(conf.CPIface.UEIPPool)
-		if err != nil {
-			return ErrInvalidArgumentWithReason("conf.UEIPPool", conf.CPIface.UEIPPool, err.Error())
-		}
-
-		if conf.Mode != "" {
-			return ErrInvalidArgumentWithReason("conf.Mode", conf.Mode, "mode must not be set for UP4")
-		}
-	} else {
-		// Mode is only relevant in a BESS deployment.
-		validModes := map[string]struct{}{
-			"af_xdp":    {},
-			"af_packet": {},
-			"cndp":      {},
-			"dpdk":      {},
-			"sim":       {},
-		}
-		if _, ok := validModes[conf.Mode]; !ok {
-			return ErrInvalidArgumentWithReason("conf.Mode", conf.Mode, "invalid mode")
-		}
+	// Mode is only relevant in a BESS deployment.
+	validModes := map[string]struct{}{
+		"af_xdp":    {},
+		"af_packet": {},
+		"cndp":      {},
+		"dpdk":      {},
+		"sim":       {},
+	}
+	if _, ok := validModes[conf.Mode]; !ok {
+		return ErrInvalidArgumentWithReason("conf.Mode", conf.Mode, "invalid mode")
 	}
 
 	if conf.CPIface.EnableUeIPAlloc {
@@ -194,7 +164,6 @@ func LoadConfigFile(filepath string) (Conf, error) {
 
 	var conf Conf
 	conf.LogLevel = zap.InfoLevel
-	conf.P4rtcIface.DefaultTC = uint8(p4constants.EnumTrafficClassElastic)
 
 	err = json.Unmarshal([]byte(jsonData), &conf)
 	if err != nil {

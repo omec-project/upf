@@ -47,6 +47,7 @@ enp
 epc
 ethernet
 FARs
+fb
 github
 gNB
 gRPC
