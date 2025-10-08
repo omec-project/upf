@@ -5,7 +5,6 @@ package integration
 
 import (
 	"net"
-	"os"
 	"testing"
 	"time"
 

@@ -4,10 +4,8 @@
 package integration
 
 import (
-	"encoding/json"
 	"errors"
 	"net"
-	"os"
 	"testing"
 	"time"
 
@@ -230,8 +228,8 @@ func setup(t *testing.T, configType uint32) {
 	go pfcpAgent.Run()
 
 	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.1")
-	err := pfcpClient.ConnectN4("127.0.0.8")
-	require.NoErrorf(t, err, "failed to connect to UPF")
+	errConn := pfcpClient.ConnectN4("127.0.0.8")
+	require.NoErrorf(t, errConn, "failed to connect to UPF")
 
 	// wait for PFCP Agent to initialize, blocking
 	err = waitForPFCPAssociationSetup(pfcpClient)
