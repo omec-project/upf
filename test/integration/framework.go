@@ -22,8 +22,7 @@ import (
 // this file should contain all the struct defs/constants used among different test cases.
 
 const (
-	ConfigPath             = "/tmp/upf.jsonc"
-
+	ConfigPath       = "/tmp/upf.jsonc"
 	defaultSDFFilter = "permit out udp from any to assigned 80-80"
 
 	ueAddress    = "17.0.0.1"
@@ -34,12 +33,6 @@ const (
 	ActionDrop    uint8 = 0x1
 	ActionBuffer  uint8 = 0x4
 	ActionNotify  uint8 = 0x8
-
-	srcIfaceAccess = 0x1
-	srcIfaceCore   = 0x2
-
-	directionUplink   = 0x1
-	directionDownlink = 0x2
 )
 
 type UEState uint8
@@ -102,19 +95,11 @@ type appFilter struct {
 	appPort      portRange
 }
 
-type sliceMeter struct {
-	rate    int64
-	burst   int64
-	sliceID uint8
-	TC      uint8
-}
-
 type p4RtValues struct {
 	tc        uint8
 	ueAddress string
 
 	appFilter  appFilter
-	sliceMeter *sliceMeter
 
 	pdrs []*ie.IE
 	fars []*ie.IE
@@ -123,7 +108,6 @@ type p4RtValues struct {
 
 type testCase struct {
 	input       *pfcpSessionData
-	sliceConfig *pfcpiface.NetworkSlice
 	expected    p4RtValues
 
 	desc string
@@ -251,7 +235,7 @@ func teardown(t *testing.T) {
 	}
 }
 
-func verifyEntries(t *testing.T, testdata *pfcpSessionData, expectedValues p4RtValues, ueState UEState) {
+func verifyEntries(t *testing.T, expectedValues p4RtValues) {
 	verifyBessEntries(t, bessFake, expectedValues)
 }
 

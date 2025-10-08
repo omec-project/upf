@@ -104,7 +104,7 @@ func TestUPFBasedUeIPAllocation(t *testing.T) {
 
 	require.Equal(t, net.ParseIP(testcase.expected.ueAddress).To4(), ueIPs.IPv4Address.To4())
 
-	verifyEntries(t, testcase.input, testcase.expected, UEStateAttaching)
+	verifyEntries(t, testcase.expected)
 
 	// no need to send modification request, we can delete PFCP session
 
@@ -494,7 +494,7 @@ func testUEAttach(t *testing.T, testcase *testCase) {
 	require.NoErrorf(t, err, "failed to establish PFCP session")
 	testcase.session = sess
 
-	verifyEntries(t, testcase.input, testcase.expected, UEStateAttaching)
+	verifyEntries(t, testcase.expected)
 
 	pfcpClient.ModifySession(sess, nil, []*ie.IE{
 		session.NewFARBuilder().
@@ -503,7 +503,7 @@ func testUEAttach(t *testing.T, testcase *testCase) {
 			WithTEID(testcase.input.dlTEID).WithDownlinkIP(testcase.input.nbAddress).BuildFAR(),
 	}, nil, nil)
 
-	verifyEntries(t, testcase.input, testcase.expected, UEStateAttached)
+	verifyEntries(t, testcase.expected)
 }
 
 func testUEBuffer(t *testing.T, testcase *testCase) {
@@ -519,7 +519,7 @@ func testUEBuffer(t *testing.T, testcase *testCase) {
 	err := pfcpClient.ModifySession(testcase.session, nil, fars, nil, nil)
 	require.NoError(t, err)
 
-	verifyEntries(t, testcase.input, testcase.expected, UEStateBuffering)
+	verifyEntries(t, testcase.expected)
 
 	// stop buffering
 	fars = []*ie.IE{
@@ -533,7 +533,7 @@ func testUEBuffer(t *testing.T, testcase *testCase) {
 	err = pfcpClient.ModifySession(testcase.session, nil, fars, nil, nil)
 	require.NoError(t, err)
 
-	verifyEntries(t, testcase.input, testcase.expected, UEStateAttached)
+	verifyEntries(t, testcase.expected)
 }
 
 func testUEDetach(t *testing.T, testcase *testCase) {
