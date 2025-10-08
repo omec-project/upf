@@ -65,7 +65,7 @@ index 03b7d33..052456d 100644
 ## Testing local Go dependencies
 
 The `upf` repository relies on some external Go dependencies, which are not
-mature yet (e.g. pfcpsim or p4runtime-go-client).
+mature yet (e.g. pfcpsim).
 It's often needed to extend those dependencies first, before adding a new
 feature to the PFCP Agent. However, when using Go modules and containerized
 environment, it's hard to test work-in-progress (WIP) changes to local
@@ -75,7 +75,7 @@ vendoring, instead of Go modules, for development purposes.
 To use a local Go dependency add the `replace` directive to `go.mod`. An example:
 
 ```
-replace github.com/antoninbas/p4runtime-go-client v0.0.0-20211006214122-ea704d54a7d3 => ../p4runtime-go-client
+replace github.com/omec-project/pfcpsim v1.3.1 => ../pfcpsim
 ```
 
 Then, to build the Docker image using the local dependency:
@@ -87,5 +87,5 @@ DOCKER_BUILD_ARGS="--build-arg GOFLAGS=-mod=vendor" make docker-build
 To run E2E integration tests with the local dependency:
 
 ```
-DOCKER_BUILD_ARGS="--build-arg GOFLAGS=-mod=vendor" make test-up4-integration
+DOCKER_BUILD_ARGS="--build-arg GOFLAGS=-mod=vendor" make test-bess-integration-native
 ```
