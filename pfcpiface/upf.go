@@ -180,18 +180,16 @@ func NewUPF(conf *Conf, fp datapath) *upf {
 		}
 	}
 
-	if !conf.EnableP4rt {
-		u.accessIP, err = GetUnicastAddressFromInterface(conf.AccessIface.IfName)
-		if err != nil {
-			logger.PfcpLog.Errorln(err)
-			return nil
-		}
+	u.accessIP, err = GetUnicastAddressFromInterface(conf.AccessIface.IfName)
+	if err != nil {
+		logger.PfcpLog.Errorln(err)
+		return nil
+	}
 
-		u.coreIP, err = GetUnicastAddressFromInterface(conf.CoreIface.IfName)
-		if err != nil {
-			logger.PfcpLog.Errorln(err)
-			return nil
-		}
+	u.coreIP, err = GetUnicastAddressFromInterface(conf.CoreIface.IfName)
+	if err != nil {
+		logger.PfcpLog.Errorln(err)
+		return nil
 	}
 
 	u.respTimeout, err = time.ParseDuration(conf.RespTimeout)

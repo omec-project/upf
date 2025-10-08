@@ -353,7 +353,6 @@ index f8f4e4e..3bd8b88 100644
 @@ -9,7 +9,7 @@
      // "dpdk" to enable DPDK mode,
      // "cndp" to enable CNDP mode,
-     // "" when running with UP4"
 -    "mode": "dpdk",
 +    "mode": "cndp",
 

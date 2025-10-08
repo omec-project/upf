@@ -60,7 +60,7 @@ func (i *InMemoryStore) DeleteAllSessions() bool {
 		return true
 	})
 
-	logger.P4Log.Debugln("all PFCP sessions removed from local store")
+	logger.PfcpLog.Debugln("all PFCP sessions removed from local store")
 
 	return true
 }

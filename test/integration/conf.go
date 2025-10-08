@@ -19,7 +19,6 @@ import (
 const (
 	ConfigDefault = iota
 	ConfigUPFBasedIPAllocation
-	ConfigWipeOutOnUP4Restart
 )
 
 const (
@@ -63,71 +62,12 @@ func BESSConfigUPFBasedIPAllocation() pfcpiface.Conf {
 	return config
 }
 
-func UP4ConfigDefault() pfcpiface.Conf {
-	var up4Server string
-	switch os.Getenv(EnvMode) {
-	case ModeDocker:
-		up4Server = "mock-up4"
-	case ModeNative:
-		up4Server = "127.0.0.1"
-	}
-
-	config := baseConfig
-	config.EnableP4rt = true
-	config.EnableGtpuPathMonitoring = false
-	config.P4rtcIface = pfcpiface.P4rtcInfo{
-		SliceID:     1,
-		AccessIP:    upfN3Address + "/32",
-		P4rtcServer: up4Server,
-		P4rtcPort:   "50001",
-		QFIToTC: map[uint8]uint8{
-			8: 2,
-		},
-		DefaultTC: 3,
-	}
-
-	config.CPIface = pfcpiface.CPIfaceInfo{
-		UEIPPool: UEPoolCP,
-	}
-
-	return config
-}
-
-func UP4ConfigUPFBasedIPAllocation() pfcpiface.Conf {
-	config := UP4ConfigDefault()
-	config.CPIface = pfcpiface.CPIfaceInfo{
-		EnableUeIPAlloc: true,
-		UEIPPool:        UEPoolUPF,
-	}
-
-	return config
-}
-
-func UP4ConfigWipeOutOnUP4Restart() pfcpiface.Conf {
-	config := UP4ConfigDefault()
-	config.P4rtcIface.ClearStateOnRestart = true
-
-	return config
-}
-
-func GetConfig(datapath string, configType uint32) pfcpiface.Conf {
-	switch datapath {
-	case DatapathUP4:
-		switch configType {
-		case ConfigDefault:
-			return UP4ConfigDefault()
-		case ConfigUPFBasedIPAllocation:
-			return UP4ConfigUPFBasedIPAllocation()
-		case ConfigWipeOutOnUP4Restart:
-			return UP4ConfigWipeOutOnUP4Restart()
-		}
-	case DatapathBESS:
-		switch configType {
-		case ConfigDefault:
-			return BESSConfigDefault()
-		case ConfigUPFBasedIPAllocation:
-			return BESSConfigUPFBasedIPAllocation()
-		}
+func GetConfig(configType uint32) pfcpiface.Conf {
+	switch configType {
+	case ConfigDefault:
+		return BESSConfigDefault()
+	case ConfigUPFBasedIPAllocation:
+		return BESSConfigUPFBasedIPAllocation()
 	}
 
 	panic("wrong datapath or config type provided")

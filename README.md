@@ -35,7 +35,7 @@ The UPF implementation consists of two layers:
 - **Datapath:** responsible for the actual data plane packet processing.
 
 The PFCP Agent implements datapath plugins that translate
-  PFCP messages to datapath-specific configurations. We currently support two
+  PFCP messages to datapath-specific configurations. We currently support below
   datapath implementations:
   - [BESS](https://github.com/omec-project/bess): a software-based datapath
     built on top of the Berkeley Extensible Software Switch (BESS) framework.
@@ -43,11 +43,6 @@ The PFCP Agent implements datapath plugins that translate
     and demo videos [here](https://www.youtube.com/watch?v=KxK64jalKHw) and
     [here](https://youtu.be/rWnZuJeUWi4).
     > Note: The source code for the BESS-based datapath is in https://github.com/omec-project/bess
-  - [UP4](https://github.com/omec-project/up4): an implementation leveraging
-    ONOS and P4-programmable switches to realize a hardware-based datapath.
-
-The combination of PFCP Agent and UP4 is usually referred to as P4-UPF. While
-BESS-UPF denotes the combination of PFCP Agent and the BESS datapath.
 
 PFCP Agent internally abstracts different datapaths using a common API, while
 the different plug-ins can use specific southbound protocols to communicate with
@@ -122,22 +117,12 @@ registry: [upf-epc-bess](https://hub.docker.com/r/omecproject/upf-epc-bess),
 * Support for DPDK, CNDP, AF_PACKET and AF_XDP modes
   - BESS uses DPDK 22.11.4
 
-### P4-UPF
-P4-UPF implements a core set of features capable of supporting requirements for
-a broad range of enterprise use cases.
-
-See the [ONF's blog post](https://opennetworking.org/news-and-events/blog/using-p4-and-programmable-switches-to-implement-a-4g-5g-upf-in-aether/)
-for an overview of P4-UPF. Additionally, refer to the [SD-Fabric documentation](https://docs.sd-fabric.org/master/advanced/p4-upf.html)
-for the detailed feature set.
-
 ## Getting started
 
 ### Installation
 
 Please see installation document [here](docs/INSTALL.md) for details on how to
 set up the PFCP Agent with BESS-UPF.
-
-To install the PFCP Agent with UP4 please follow the [SD-Fabric documentation](https://docs.sd-fabric.org/master/index.html).
 
 ### Configuration
 
@@ -169,17 +154,6 @@ BESS-UPF in the `native` mode use:
 ```
 make test-bess-integration-native
 ```
-
-The `docker` mode uses fully containerized environment and runs all components
-(the PFCP Agent and a datapath mock) as Docker containers. It ensures the
-correct behavior of the package produced by the UPF project. To run E2E
-integration tests for UP4 in the `docker` mode use:
-
-```
-make test-up4-integration-docker
-```
-
-> NOTE: The `docker` mode for BESS-UPF and the `native` mode for UP4 are not implemented yet.
 
 **PTF tests for BESS-UPF** verify the BESS-based implementation of the UPF
 datapath (data plane). Details to run PTF tests for BESS-UPF can be found [here](./ptf/README.md).

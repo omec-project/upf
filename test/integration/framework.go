@@ -12,12 +12,9 @@ import (
 	"time"
 
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim"
-	"github.com/omec-project/upf-epc/internal/p4constants"
 	"github.com/omec-project/upf-epc/logger"
 	"github.com/omec-project/upf-epc/pfcpiface"
 	"github.com/omec-project/upf-epc/pkg/fake_bess"
-	"github.com/omec-project/upf-epc/test/integration/providers"
-	v1 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -28,20 +25,8 @@ import (
 
 const (
 	ConfigPath             = "/tmp/upf.jsonc"
-	ContainerNamePFCPAgent = "pfcpiface"
-	ContainerNameMockUP4   = "mock-up4"
-	ImageNamePFCPAgent     = "upf-epc-pfcpiface:integration"
-	ImageNameMockUP4       = "docker.io/opennetworking/mn-stratum:21.12"
-	DockerTestNetwork      = "testnet"
 
-	EnvMode     = "MODE"
-	EnvDatapath = "DATAPATH"
-
-	DatapathUP4  = "up4"
 	DatapathBESS = "bess"
-
-	ModeDocker = "docker"
-	ModeNative = "native"
 
 	defaultSDFFilter = "permit out udp from any to assigned 80-80"
 
@@ -59,9 +44,6 @@ const (
 
 	directionUplink   = 0x1
 	directionDownlink = 0x2
-
-	p4InfoPath       = "../../conf/p4/bin/p4info.txt"
-	deviceConfigPath = "../../conf/p4/bin/bmv2.json"
 )
 
 type UEState uint8
@@ -156,8 +138,6 @@ type testCase struct {
 
 func init() {
 	logger.SetLogLevel(zap.DebugLevel)
-	providers.MustPullDockerImage(ImageNameMockUP4)
-	providers.MustCreateNetworkIfNotExists(DockerTestNetwork)
 }
 
 func IsConnectionOpen(network string, host string, port string) bool {
@@ -226,81 +206,8 @@ func waitForPFCPAssociationSetup(pfcpClient *pfcpsim.PFCPClient) error {
 	}
 }
 
-func waitForMockUP4ToStart() error {
-	return waitForPortOpen("tcp", "127.0.0.1", "50001")
-}
-
 func waitForBESSFakeToStart() error {
 	return waitForPortOpen("tcp", "127.0.0.1", "10514")
-}
-
-func isDatapathUP4() bool {
-	return os.Getenv(EnvDatapath) == DatapathUP4
-}
-
-func initForwardingPipelineConfig() {
-	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", true)
-	if err != nil {
-		panic("Cannot init forwarding pipeline config: " + err.Error())
-	}
-	defer providers.DisconnectP4rt()
-
-	_, err = p4rtClient.SetFwdPipe(deviceConfigPath, p4InfoPath, 0)
-	if err != nil {
-		panic("Cannot init forwarding pipeline config: " + err.Error())
-	}
-}
-
-// initCounterValues is a helper function that initializes counters values to 1.
-// The initialization is required to check if counter cells are properly cleared
-// on session establishment by PFCP Agent.
-func mustInitCountersWithDummyValue() {
-	p4rtClient, err := providers.ConnectP4rt("127.0.0.1:50001", true)
-	if err != nil {
-		panic("Cannot init counter values: " + err.Error())
-	}
-	defer providers.DisconnectP4rt()
-
-	igCounterName := p4constants.GetCounterIDToNameMap()[p4constants.CounterPreQosPipePreQosCounter]
-	egCounterName := p4constants.GetCounterIDToNameMap()[p4constants.CounterPostQosPipePostQosCounter]
-
-	for i, maxSize := uint64(0), p4constants.CounterSizePreQosPipePreQosCounter; i < maxSize; i++ {
-		dummyValue := &v1.CounterData{
-			ByteCount:   1,
-			PacketCount: 1,
-		}
-
-		if err := p4rtClient.ModifyCounterEntry(igCounterName, int64(i), dummyValue); err != nil {
-			panic(err)
-		}
-
-		if err := p4rtClient.ModifyCounterEntry(egCounterName, int64(i), dummyValue); err != nil {
-			panic(err)
-		}
-	}
-}
-
-func MustStartMockUP4() {
-	providers.MustRunDockerContainer(ContainerNameMockUP4, ImageNameMockUP4, "--topo single", "127.0.0.1", []string{"50001/tcp"}, "", DockerTestNetwork)
-	err := waitForMockUP4ToStart()
-	if err != nil {
-		panic(err)
-	}
-	initForwardingPipelineConfig()
-	mustInitCountersWithDummyValue()
-}
-
-func MustStopMockUP4() {
-	providers.MustStopDockerContainer(ContainerNameMockUP4)
-}
-
-func MustStartPFCPAgent() {
-	providers.MustRunDockerContainer(ContainerNamePFCPAgent, ImageNamePFCPAgent, "-config /config/upf.jsonc",
-		"127.0.0.8", []string{"8805/udp", "8080/tcp"}, "/tmp:/config", DockerTestNetwork)
-}
-
-func MustStopPFCPAgent() {
-	providers.MustStopDockerContainer(ContainerNamePFCPAgent)
 }
 
 func setup(t *testing.T, configType uint32) {
@@ -308,35 +215,19 @@ func setup(t *testing.T, configType uint32) {
 	// 		 the registry in a bad state. Use custom registries to avoid global state.
 	prometheus.DefaultRegisterer = prometheus.NewRegistry()
 
-	switch os.Getenv(EnvDatapath) {
-	case DatapathBESS:
-		bessFake = fake_bess.NewFakeBESS()
-		go func() {
-			if err := bessFake.Run(":10514"); err != nil {
-				panic(err)
-			}
-		}()
+	bessFake = fake_bess.NewFakeBESS()
+	go func() {
+		if err := bessFake.Run(":10514"); err != nil {
+			panic(err)
+		}
+	}()
+	err := waitForBESSFakeToStart()
+	require.NoErrorf(t, err, "failed to start BESS fake: %v", err)
 
-		err := waitForBESSFakeToStart()
-		require.NoErrorf(t, err, "failed to start BESS fake: %v", err)
-	case DatapathUP4:
-		MustStartMockUP4()
-	}
-
-	switch os.Getenv(EnvMode) {
-	case ModeDocker:
-		jsonConf, _ := json.Marshal(GetConfig(os.Getenv(EnvDatapath), configType))
-		err := os.WriteFile(ConfigPath, jsonConf, os.ModePerm)
-		require.NoError(t, err)
-		MustStartPFCPAgent()
-	case ModeNative:
-		upfConf := GetConfig(os.Getenv(EnvDatapath), configType)
-		upfConf.N4Addr = "127.0.0.8"
-		pfcpAgent = pfcpiface.NewPFCPIface(upfConf)
-		go pfcpAgent.Run()
-	default:
-		t.Fatal("Unexpected test mode")
-	}
+	upfConf := GetConfig(configType)
+	upfConf.N4Addr = "127.0.0.8"
+	pfcpAgent = pfcpiface.NewPFCPIface(upfConf)
+	go pfcpAgent.Run()
 
 	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.1")
 	err := pfcpClient.ConnectN4("127.0.0.8")
@@ -357,53 +248,21 @@ func teardown(t *testing.T) {
 		pfcpClient.DisconnectN4()
 	}
 
-	switch os.Getenv(EnvMode) {
-	case ModeDocker:
-		err := os.Remove(ConfigPath)
-		require.NoError(t, err)
+	pfcpAgent.Stop()
 
-		// leave for troubleshooting
-		if !t.Failed() {
-			MustStopPFCPAgent()
-			MustStopMockUP4()
-		}
-	case ModeNative:
-		pfcpAgent.Stop()
-	default:
-		t.Fatal("Unexpected test mode")
-	}
-
-	switch os.Getenv(EnvDatapath) {
-	case DatapathBESS:
-		if bessFake != nil {
-			bessFake.Stop()
-		}
+	if bessFake != nil {
+		bessFake.Stop()
 	}
 }
 
 func verifyEntries(t *testing.T, testdata *pfcpSessionData, expectedValues p4RtValues, ueState UEState) {
-	switch os.Getenv(EnvDatapath) {
-	case DatapathUP4:
-		verifyP4RuntimeEntries(t, testdata, expectedValues, ueState)
-	case DatapathBESS:
-		verifyBessEntries(t, bessFake, expectedValues)
-	}
+	verifyBessEntries(t, bessFake, expectedValues)
 }
 
 func verifySliceMeter(t *testing.T, expectedValues p4RtValues) {
-	switch os.Getenv(EnvDatapath) {
-	case DatapathUP4:
-		verifyP4RuntimeSliceMeter(t, expectedValues)
-	case DatapathBESS:
-		t.Skip("Unimplemented")
-	}
+	t.Skip("Unimplemented")
 }
 
 func verifyNoEntries(t *testing.T) {
-	switch os.Getenv(EnvDatapath) {
-	case DatapathUP4:
-		verifyNoP4RuntimeEntries(t)
-	case DatapathBESS:
-		verifyNoBessRuntimeEntries(t, bessFake)
-	}
+	verifyNoBessRuntimeEntries(t, bessFake)
 }
