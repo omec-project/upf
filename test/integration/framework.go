@@ -24,8 +24,6 @@ import (
 const (
 	ConfigPath             = "/tmp/upf.jsonc"
 
-	DatapathBESS = "bess"
-
 	defaultSDFFilter = "permit out udp from any to assigned 80-80"
 
 	ueAddress    = "17.0.0.1"
@@ -255,10 +253,6 @@ func teardown(t *testing.T) {
 
 func verifyEntries(t *testing.T, testdata *pfcpSessionData, expectedValues p4RtValues, ueState UEState) {
 	verifyBessEntries(t, bessFake, expectedValues)
-}
-
-func verifySliceMeter(t *testing.T, expectedValues p4RtValues) {
-	t.Skip("Unimplemented")
 }
 
 func verifyNoEntries(t *testing.T) {

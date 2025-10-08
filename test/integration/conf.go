@@ -71,24 +71,3 @@ func GetConfig(configType uint32) pfcpiface.Conf {
 
 	panic("wrong datapath or config type provided")
 }
-
-func PushSliceMeterConfig(sliceConfig pfcpiface.NetworkSlice) error {
-	rawSliceConfig, err := json.Marshal(sliceConfig)
-	if err != nil {
-		return err
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://127.0.0.8:8080/v1/config/network-slices", bytes.NewBuffer(rawSliceConfig))
-	if err != nil {
-		return err
-	}
-	resp, err := http.DefaultClient.Do(req)
-	req.Header.Set("Content-Type", "application/json")
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	return nil
-}
