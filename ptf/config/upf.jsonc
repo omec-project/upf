@@ -8,7 +8,6 @@
     // "cndp" to enable CNDP mode,
     // "dpdk" to enable DPDK mode,
     // "sim" to generate synthetic traffic from BESS's Source module,
-    // "" when running with UP4
     "mode": "dpdk",
 
     "table_sizes": {
