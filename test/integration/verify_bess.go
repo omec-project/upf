@@ -12,7 +12,7 @@ import (
 
 // TODO: current assertions are limited to quantity verification only. We'd like to extend this
 // and check entry contents as well.
-func verifyBessEntries(t *testing.T, bess *fake_bess.FakeBESS, expectedValues p4RtValues) {
+func verifyBessEntries(t *testing.T, bess *fake_bess.FakeBESS, expectedValues ueSessionConfig) {
 	// Check we have all expected PDRs.
 	pdrs := bess.GetPdrTableEntries()
 	require.Equal(t, len(expectedValues.pdrs), len(pdrs), "found unexpected PDR entries %v", pdrs)

@@ -29,7 +29,7 @@ func TestUPFBasedUeIPAllocation(t *testing.T) {
 			dlTEID:       16,
 			QFI:          0x9,
 		},
-		expected: p4RtValues{
+		expected: ueSessionConfig{
 			// first IP address from pool configured in ue_ip_alloc.json
 			ueAddress: "10.250.0.1",
 			appFilter: appFilter{
@@ -145,7 +145,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				dlTEID:       16,
 				QFI:          0x9,
 			},
-			expected: p4RtValues{
+			expected: ueSessionConfig{
 				appFilter: appFilter{
 					proto:        0x11,
 					appIP:        net.ParseIP("0.0.0.0"),
@@ -169,7 +169,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				dlTEID:       16,
 				QFI:          0x9,
 			},
-			expected: p4RtValues{
+			expected: ueSessionConfig{
 				appFilter: appFilter{
 					proto:        0x11,
 					appIP:        net.ParseIP("192.168.1.1"),
@@ -193,7 +193,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				dlTEID:       16,
 				QFI:          0x9,
 			},
-			expected: p4RtValues{
+			expected: ueSessionConfig{
 				// no application filtering rule expected
 				tc: 3,
 			},
@@ -218,7 +218,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				appGBR:           30000,
 				appMBR:           50000,
 			},
-			expected: p4RtValues{
+			expected: ueSessionConfig{
 				appFilter: appFilter{
 					proto:        0x11,
 					appIP:        net.ParseIP("0.0.0.0"),
@@ -250,7 +250,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				sessGBR:   300000,
 				sessMBR:   500000,
 			},
-			expected: p4RtValues{
+			expected: ueSessionConfig{
 				appFilter: appFilter{
 					proto:        0x11,
 					appIP:        net.ParseIP("0.0.0.0"),
@@ -282,7 +282,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				appGBR:           30000,
 				appMBR:           50000,
 			},
-			expected: p4RtValues{
+			expected: ueSessionConfig{
 				appFilter: appFilter{
 					proto:        0x11,
 					appIP:        net.ParseIP("0.0.0.0"),
@@ -315,7 +315,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				appMBR:           50000,
 				ulGateClosed:     true,
 			},
-			expected: p4RtValues{
+			expected: ueSessionConfig{
 				appFilter: appFilter{
 					proto:        0x11,
 					appIP:        net.ParseIP("0.0.0.0"),
@@ -348,7 +348,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 				appMBR:           50000,
 				dlGateClosed:     true,
 			},
-			expected: p4RtValues{
+			expected: ueSessionConfig{
 				appFilter: appFilter{
 					proto:        0x11,
 					appIP:        net.ParseIP("0.0.0.0"),
@@ -385,7 +385,7 @@ func TestUEBuffering(t *testing.T) {
 			dlTEID:       16,
 			QFI:          0x9,
 		},
-		expected: p4RtValues{
+		expected: ueSessionConfig{
 			appFilter: appFilter{
 				proto:        0x11,
 				appIP:        net.ParseIP("0.0.0.0"),

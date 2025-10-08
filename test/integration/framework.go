@@ -95,7 +95,7 @@ type appFilter struct {
 	appPort      portRange
 }
 
-type p4RtValues struct {
+type ueSessionConfig struct {
 	tc        uint8
 	ueAddress string
 	appFilter appFilter
@@ -106,7 +106,7 @@ type p4RtValues struct {
 
 type testCase struct {
 	input    *pfcpSessionData
-	expected p4RtValues
+	expected ueSessionConfig
 
 	desc string
 
@@ -233,7 +233,7 @@ func teardown(t *testing.T) {
 	}
 }
 
-func verifyEntries(t *testing.T, expectedValues p4RtValues) {
+func verifyEntries(t *testing.T, expectedValues ueSessionConfig) {
 	verifyBessEntries(t, bessFake, expectedValues)
 }
 
