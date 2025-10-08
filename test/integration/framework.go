@@ -98,17 +98,15 @@ type appFilter struct {
 type p4RtValues struct {
 	tc        uint8
 	ueAddress string
-
-	appFilter  appFilter
-
-	pdrs []*ie.IE
-	fars []*ie.IE
-	qers []*ie.IE
+	appFilter appFilter
+	pdrs      []*ie.IE
+	fars      []*ie.IE
+	qers      []*ie.IE
 }
 
 type testCase struct {
-	input       *pfcpSessionData
-	expected    p4RtValues
+	input    *pfcpSessionData
+	expected p4RtValues
 
 	desc string
 
