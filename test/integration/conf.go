@@ -4,12 +4,7 @@
 package integration
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
-	"net/http"
 	"runtime"
-	"time"
 
 	"github.com/omec-project/upf-epc/pfcpiface"
 	"go.uber.org/zap"

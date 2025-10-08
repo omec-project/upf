@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim/session"
-	"github.com/omec-project/upf-epc/pfcpiface"
 	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
