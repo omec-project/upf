@@ -105,7 +105,7 @@ ENTRYPOINT ["bessd", "-f"]
 # Stage build bess golang pb
 FROM golang:1.25.1-bookworm AS protoc-gen
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10 && \
-    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.75.1
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
 
 FROM bess-build AS go-pb
 COPY --from=protoc-gen /go/bin/protoc-gen-go /bin
