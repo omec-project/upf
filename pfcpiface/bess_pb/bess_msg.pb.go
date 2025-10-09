@@ -46,7 +46,7 @@
 package bess_pb
 
 import (
-	any1 "github.com/golang/protobuf/ptypes/any"
+	any1 "google.golang.org/protobuf/types/known/anypb"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
