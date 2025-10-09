@@ -136,7 +136,8 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN if echo "$GOFLAGS" | grep -Eq "-mod=vendor"; then go mod download; fi
 
 COPY . /pfcpiface
-RUN CGO_ENABLED=0 go build $GOFLAGS -o /bin/pfcpiface ./cmd/pfcpiface
+RUN go mod tidy && \
+    CGO_ENABLED=0 go build $GOFLAGS -o /bin/pfcpiface ./cmd/pfcpiface
 
 # Stage pfcpiface: runtime image of pfcpiface toward SMF/SPGW-C
 FROM alpine:3.22 AS pfcpiface
