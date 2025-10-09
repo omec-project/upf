@@ -104,14 +104,18 @@ ENTRYPOINT ["bessd", "-f"]
 
 # Stage build bess golang pb
 FROM golang:1.25.1-bookworm AS protoc-gen
-RUN go install github.com/golang/protobuf/protoc-gen-go@v1.5.4
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10 && \
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
 
 FROM bess-build AS go-pb
 COPY --from=protoc-gen /go/bin/protoc-gen-go /bin
+COPY --from=protoc-gen /go/bin/protoc-gen-go-grpc /bin
+
 RUN mkdir /bess_pb && \
     protoc -I /usr/include -I /protobuf/ \
     /protobuf/*.proto /protobuf/ports/*.proto \
-    --go_opt=paths=source_relative --go_out=plugins=grpc:/bess_pb
+    --go_opt=paths=source_relative --go_out=/bess_pb \
+    --go-grpc_opt=paths=source_relative --go-grpc_out=/bess_pb
 
 FROM bess-build AS py-pb
 RUN pip install --no-cache-dir grpcio-tools==1.26
@@ -132,7 +136,8 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN if echo "$GOFLAGS" | grep -Eq "-mod=vendor"; then go mod download; fi
 
 COPY . /pfcpiface
-RUN CGO_ENABLED=0 go build $GOFLAGS -o /bin/pfcpiface ./cmd/pfcpiface
+RUN go mod tidy && \
+    CGO_ENABLED=0 go build $GOFLAGS -o /bin/pfcpiface ./cmd/pfcpiface
 
 # Stage pfcpiface: runtime image of pfcpiface toward SMF/SPGW-C
 FROM alpine:3.22 AS pfcpiface
