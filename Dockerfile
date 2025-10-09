@@ -105,13 +105,17 @@ ENTRYPOINT ["bessd", "-f"]
 # Stage build bess golang pb
 FROM golang:1.25.1-bookworm AS protoc-gen
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10
+RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.75.1
 
 FROM bess-build AS go-pb
 COPY --from=protoc-gen /go/bin/protoc-gen-go /bin
+COPY --from=protoc-gen /go/bin/protoc-gen-go-grpc /bin
+
 RUN mkdir /bess_pb && \
     protoc -I /usr/include -I /protobuf/ \
     /protobuf/*.proto /protobuf/ports/*.proto \
-    --go_opt=paths=source_relative --go_out=plugins=grpc:/bess_pb
+    --go_opt=paths=source_relative --go_out=/bess_pb \
+    --go-grpc_opt=paths=source_relative --go-grpc_out=/bess_pb
 
 FROM bess-build AS py-pb
 RUN pip install --no-cache-dir grpcio-tools==1.26
