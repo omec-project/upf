@@ -8,8 +8,6 @@ import (
 	"math"
 	"net"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 func TestInt2ip(t *testing.T) {
@@ -25,7 +23,9 @@ func TestInt2ip(t *testing.T) {
 		t.Run(
 			tt.name, func(t *testing.T) {
 				got := Uint32ToIp4(tt.args)
-				require.Equal(t, tt.want, got)
+				if !net.IP.Equal(got, tt.want) {
+					t.Errorf("Uint32ToIp4() mismatch. got = %v, want = %v", got, tt.want)
+				}
 			},
 		)
 	}
@@ -63,7 +63,10 @@ func TestIp2int2IpTransitive(t *testing.T) {
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			ip := Uint32ToIp4(i)
 			got := Ip4ToUint32(ip)
-			require.Equal(t, i, got, "value %v failed transitive conversion with intermediate ip %v", ip)
+			if got != i {
+				t.Errorf("Transitive conversion failed. value %v failed transitive conversion with intermediate ip %v. got = %v, want = %v",
+					i, ip, got, i)
+			}
 		},
 		)
 	}

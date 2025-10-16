@@ -6,8 +6,6 @@ package pfcpiface
 import (
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/require"
 )
 
 func Test_downlinkDataNotifier_Notify(t *testing.T) {
@@ -17,10 +15,14 @@ func Test_downlinkDataNotifier_Notify(t *testing.T) {
 	testFSEID := uint64(0x1)
 
 	n.Notify(testFSEID)
-	require.Len(t, n.notifyChan, 1)
+	if len(n.notifyChan) != 1 {
+		t.Fatalf("expected channel length 1, got %d", len(n.notifyChan))
+	}
 	n.Notify(testFSEID)
 	// we haven't picked any event from channel, so length should be the same.
-	require.Len(t, n.notifyChan, 1)
+	if len(n.notifyChan) != 1 {
+		t.Fatalf("expected channel length 1, got %d", len(n.notifyChan))
+	}
 }
 
 func Test_downlinkDataNotifier_shouldNotify(t *testing.T) {
@@ -30,23 +32,33 @@ func Test_downlinkDataNotifier_shouldNotify(t *testing.T) {
 		testFSEID := uint64(0x1)
 
 		got := n.shouldNotify(testFSEID)
-		require.True(t, got)
+		if !got {
+			t.Fatal("expected shouldNotify to return true")
+		}
 		<-time.After(3 * time.Second)
 
 		got = n.shouldNotify(testFSEID)
-		require.False(t, got)
+		if got {
+			t.Fatal("expected shouldNotify to return false")
+		}
 		<-time.After(1 * time.Second)
 
 		got = n.shouldNotify(testFSEID)
-		require.False(t, got)
+		if got {
+			t.Fatal("expected shouldNotify to return false")
+		}
 		<-time.After(2 * time.Second)
 
 		// after ~6 seconds
 		got = n.shouldNotify(testFSEID)
-		require.True(t, got)
+		if !got {
+			t.Fatal("expected shouldNotify to return true")
+		}
 
 		got = n.shouldNotify(testFSEID)
-		require.False(t, got)
+		if got {
+			t.Fatal("expected shouldNotify to return false")
+		}
 		<-time.After(1 * time.Second)
 	})
 
@@ -62,28 +74,36 @@ func Test_downlinkDataNotifier_shouldNotify(t *testing.T) {
 
 		for _, fseid := range testFSEIDs {
 			got := n.shouldNotify(fseid)
-			require.True(t, got)
+			if !got {
+				t.Fatalf("expected shouldNotify to return true for FSEID %d", fseid)
+			}
 		}
 
 		<-time.After(3 * time.Second)
 
 		for _, fseid := range testFSEIDs {
 			got := n.shouldNotify(fseid)
-			require.False(t, got)
+			if got {
+				t.Fatalf("expected shouldNotify to return false for FSEID %d", fseid)
+			}
 		}
 
 		<-time.After(3 * time.Second)
 
 		for _, fseid := range testFSEIDs {
 			got := n.shouldNotify(fseid)
-			require.True(t, got)
+			if !got {
+				t.Fatalf("expected shouldNotify to return true for FSEID %d", fseid)
+			}
 		}
 
 		<-time.After(1 * time.Second)
 
 		for _, fseid := range testFSEIDs {
 			got := n.shouldNotify(fseid)
-			require.False(t, got)
+			if got {
+				t.Fatalf("expected shouldNotify to return false for FSEID %d", fseid)
+			}
 		}
 	})
 }

@@ -4,11 +4,9 @@
 package pfcpiface
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"math"
 	"net"
+	"reflect"
 	"sync"
 	"testing"
 )
@@ -32,9 +30,13 @@ func TestNewIPPool(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				_, err := NewIPPool(tt.poolSubnet)
 				if !tt.wantErr {
-					require.NoError(t, err)
+					if err != nil {
+						t.Fatalf("unexpected error: %v", err)
+					}
 				} else {
-					require.Error(t, err)
+					if err == nil {
+						t.Fatal("expected an error, but got nil")
+					}
 				}
 			},
 		)
@@ -46,23 +48,39 @@ func TestIPPool_LookupOrAllocIP(t *testing.T) {
 		const poolSubnet = "2001::/124"
 		const seid = 1234
 		pool, err := NewIPPool(poolSubnet)
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		ip, err := pool.LookupOrAllocIP(seid)
-		require.NoError(t, err)
-		require.Len(t, ip, net.IPv6len)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(ip) != net.IPv6len {
+			t.Fatalf("expected IP length %d, got %d", net.IPv6len, len(ip))
+		}
 	})
 
 	t.Run("repeated SEID lookups return same IP", func(t *testing.T) {
 		const poolSubnet = "10.0.0.0/24"
 		const seid = 1234
 		pool, err := NewIPPool(poolSubnet)
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		ip1, err := pool.LookupOrAllocIP(seid)
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		ip2, err := pool.LookupOrAllocIP(seid)
-		require.NoError(t, err)
-		require.Equal(t, ip2, ip1)
-		require.Len(t, ip1, net.IPv4len)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !reflect.DeepEqual(ip2, ip1) {
+			t.Fatalf("expected %v, got %v", ip1, ip2)
+		}
+		if len(ip1) != net.IPv4len {
+			t.Fatalf("expected IP length %d, got %d", net.IPv4len, len(ip1))
+		}
 	})
 
 	t.Run("full subnet allocation", func(t *testing.T) {
@@ -70,28 +88,42 @@ func TestIPPool_LookupOrAllocIP(t *testing.T) {
 		const usableAddresses = 256 - 2 // Account for network and broadcast addresses
 		const baseSeid = 1000
 		_, ipnet, err := net.ParseCIDR(poolSubnet)
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		pool, err := NewIPPool(poolSubnet)
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		seidToIpMap := map[uint64]net.IP{}
 		var ip net.IP
 		for i := uint64(0); i < usableAddresses; i++ {
 			ip, err = pool.LookupOrAllocIP(baseSeid + i)
-			require.NoError(t, err)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 			seidToIpMap[baseSeid+i] = ip
 		}
 
 		for _, ip := range seidToIpMap {
-			require.True(t, ipnet.Contains(ip), "allocated ip %v not in subnet %v", ip, ipnet)
+			if !ipnet.Contains(ip) {
+				t.Fatalf("allocated ip %v not in subnet %v", ip, ipnet)
+			}
 		}
 
 		_, err = pool.LookupOrAllocIP(baseSeid + usableAddresses + 1)
-		require.Error(t, err, "ip alloc should fail after subnet has been exhausted")
+		if err == nil {
+			t.Fatal("ip alloc should fail after subnet has been exhausted")
+		}
 
 		for seid, ip := range seidToIpMap {
 			lookupIP, err := pool.LookupOrAllocIP(seid)
-			require.NoError(t, err, "already allocated IPs must be still be lookup-able")
-			require.Equal(t, ip, lookupIP, "looked up IP for SEID %v changed", seid)
+			if err != nil {
+				t.Fatalf("already allocated IPs must be still be lookup-able: %v", err)
+			}
+			if !reflect.DeepEqual(ip, lookupIP) {
+				t.Fatalf("looked up IP for SEID %v changed: expected %v, got %v", seid, ip, lookupIP)
+			}
 		}
 	})
 
@@ -99,12 +131,16 @@ func TestIPPool_LookupOrAllocIP(t *testing.T) {
 		const workers = 4
 		const seidsPerWorker = 5000
 		pool, err := NewIPPool("10.0.0.0/16")
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		wg := sync.WaitGroup{}
 		worker := func(startSeid uint64) {
 			for seid := startSeid; seid < startSeid+seidsPerWorker; seid++ {
 				_, err := pool.LookupOrAllocIP(seid)
-				require.NoError(t, err)
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
 			}
 			wg.Done()
 		}
@@ -121,21 +157,35 @@ func TestIPPool_DeallocIP(t *testing.T) {
 		const poolSubnet = "10.0.0.0/24"
 		const seid = 1234
 		pool, err := NewIPPool(poolSubnet)
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		_, err = pool.LookupOrAllocIP(seid)
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		err = pool.DeallocIP(seid)
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 	})
 
 	t.Run("dealloc non-existent SEIDs fails", func(t *testing.T) {
 		pool, err := NewIPPool("10.0.0.0/24")
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		err = pool.DeallocIP(1234)
-		assert.Error(t, err)
+		if err == nil {
+			t.Error("expected an error, but got nil")
+		}
 		err = pool.DeallocIP(0)
-		assert.Error(t, err)
+		if err == nil {
+			t.Error("expected an error, but got nil")
+		}
 		err = pool.DeallocIP(math.MaxUint64)
-		assert.Error(t, err)
+		if err == nil {
+			t.Error("expected an error, but got nil")
+		}
 	})
 }
