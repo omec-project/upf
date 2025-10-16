@@ -5,11 +5,10 @@ package pfcpiface
 
 import (
 	"net"
+	"reflect"
 	"testing"
 
 	pfcpsimLib "github.com/omec-project/pfcpsim/pkg/pfcpsim/session"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
@@ -80,9 +79,13 @@ func TestParseFAR(t *testing.T) {
 			}
 
 			err := mockFar.parseFAR(scenario.input, FSEID, mockUpf, scenario.op)
-			require.NoError(t, err)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
-			assert.Equal(t, scenario.expected, mockFar)
+			if !reflect.DeepEqual(scenario.expected, mockFar) {
+				t.Errorf("expected %+v, got %+v", scenario.expected, mockFar)
+			}
 		})
 	}
 }
@@ -147,9 +150,13 @@ func TestParseFARShouldError(t *testing.T) {
 			}
 
 			err := mockFar.parseFAR(scenario.input, 101, mockUpf, scenario.op)
-			require.Error(t, err)
+			if err == nil {
+				t.Fatal("expected an error, but got nil")
+			}
 
-			assert.Equal(t, scenario.expected, mockFar)
+			if !reflect.DeepEqual(scenario.expected, mockFar) {
+				t.Errorf("expected %+v, got %+v", scenario.expected, mockFar)
+			}
 		})
 	}
 }

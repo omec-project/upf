@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/omec-project/upf-epc/pkg/fake_bess"
-	"github.com/stretchr/testify/require"
 )
 
 // TODO: current assertions are limited to quantity verification only. We'd like to extend this
@@ -15,38 +14,69 @@ import (
 func verifyBessEntries(t *testing.T, bess *fake_bess.FakeBESS, expectedValues ueSessionConfig) {
 	// Check we have all expected PDRs.
 	pdrs := bess.GetPdrTableEntries()
-	require.Equal(t, len(expectedValues.pdrs), len(pdrs), "found unexpected PDR entries %v", pdrs)
+	if len(pdrs) != len(expectedValues.pdrs) {
+		t.Errorf("PDR entries count mismatch. got = %d, want = %d (found unexpected PDR entries %v)",
+			len(pdrs), len(expectedValues.pdrs), pdrs)
+	}
+
 	for _, expectedPdr := range expectedValues.pdrs {
 		id, err := expectedPdr.PDRID()
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatalf("Failed to get PDR ID: %v", err)
+		}
 
 		_, found := pdrs[uint32(id)]
-		require.True(t, found, "missing PDR", "expected PDR with ID %v: %+v, got %+v", id, expectedPdr, pdrs)
+		if !found {
+			t.Errorf("Missing PDR: expected PDR with ID %v: %+v, got %+v", id, expectedPdr, pdrs)
+		}
 	}
 
 	// Check we have all expected FARs.
 	fars := bess.GetFarTableEntries()
-	require.Equal(t, len(expectedValues.pdrs), len(fars), "found unexpected FAR entries %v", fars)
+	if len(fars) != len(expectedValues.pdrs) {
+		t.Errorf("FAR entries count mismatch. got = %d, want = %d (found unexpected FAR entries %v)",
+			len(fars), len(expectedValues.pdrs), fars)
+	}
+
 	for _, expectedFar := range expectedValues.fars {
 		id, err := expectedFar.FARID()
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatalf("Failed to get FAR ID: %v", err)
+		}
 
 		_, found := fars[id]
-		require.True(t, found, "missing FAR", "expected FAR with ID %v: %+v, got %+v", id, expectedFar, fars)
+		if !found {
+			t.Errorf("Missing FAR: expected FAR with ID %v: %+v, got %+v", id, expectedFar, fars)
+		}
 	}
 
 	// Check we have all expected session and app QERs.
 	qers := append(bess.GetSessionQerTableEntries(), bess.GetAppQerTableEntries()...)
-	require.Equal(t, len(expectedValues.qers)*2 /* up and down link */, len(qers), "found unexpected QER entries %v", qers)
+	expectedQerCount := len(expectedValues.qers) * 2 // up and down link
+	if len(qers) != expectedQerCount {
+		t.Errorf("QER entries count mismatch. got = %d, want = %d (found unexpected QER entries %v)",
+			len(qers), expectedQerCount, qers)
+	}
 }
 
 func verifyNoBessRuntimeEntries(t *testing.T, bess *fake_bess.FakeBESS) {
 	pdrs := bess.GetPdrTableEntries()
-	require.Equal(t, 0, len(pdrs), "found unexpected PDR entries: %v", pdrs)
+	if len(pdrs) != 0 {
+		t.Errorf("Expected no PDR entries, but found %d: %v", len(pdrs), pdrs)
+	}
+
 	fars := bess.GetFarTableEntries()
-	require.Equal(t, 0, len(fars), "found unexpected FAR entries: %v", fars)
+	if len(fars) != 0 {
+		t.Errorf("Expected no FAR entries, but found %d: %v", len(fars), fars)
+	}
+
 	sessionQers := bess.GetSessionQerTableEntries()
-	require.Equal(t, 0, len(sessionQers), "found unexpected session QER entries: %v", sessionQers)
+	if len(sessionQers) != 0 {
+		t.Errorf("Expected no session QER entries, but found %d: %v", len(sessionQers), sessionQers)
+	}
+
 	appQers := bess.GetAppQerTableEntries()
-	require.Equal(t, 0, len(appQers), "found unexpected app QER entries: %v", appQers)
+	if len(appQers) != 0 {
+		t.Errorf("Expected no app QER entries, but found %d: %v", len(appQers), appQers)
+	}
 }

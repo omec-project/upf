@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/omec-project/pfcpsim/pkg/pfcpsim/session"
-	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
 )
@@ -81,38 +80,58 @@ func TestUPFBasedUeIPAllocation(t *testing.T) {
 	}
 
 	err := pfcpClient.SendSessionEstablishmentRequest(pdrs, fars, nil, nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("SendSessionEstablishmentRequest failed: %v", err)
+	}
 
 	resp, err := pfcpClient.PeekNextResponse()
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("PeekNextResponse failed: %v", err)
+	}
 
 	estResp, ok := resp.(*message.SessionEstablishmentResponse)
-	require.True(t, ok)
+	if !ok {
+		t.Fatalf("Expected SessionEstablishmentResponse, got %T", resp)
+	}
 
 	testcase.expected.pdrs = pdrs
 	testcase.expected.fars = fars
 
 	remoteSEID, err := estResp.UPFSEID.FSEID()
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("Failed to get FSEID: %v", err)
+	}
 
 	// the PFCP response should contain exactly 1 Create PDR IE
-	require.Len(t, estResp.CreatedPDR, 1)
+	if len(estResp.CreatedPDR) != 1 {
+		t.Fatalf("Expected 1 CreatedPDR, got %d", len(estResp.CreatedPDR))
+	}
 
 	// verify if UE Address IE is provided and contains expected IP address
 	ueIPs, err := estResp.CreatedPDR[0].UEIPAddress()
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("Failed to get UE IP Address: %v", err)
+	}
 
-	require.Equal(t, net.ParseIP(testcase.expected.ueAddress).To4(), ueIPs.IPv4Address.To4())
+	expectedIP := net.ParseIP(testcase.expected.ueAddress).To4()
+	actualIP := ueIPs.IPv4Address.To4()
+	if !expectedIP.Equal(actualIP) {
+		t.Fatalf("Expected UE IP %v, got %v", expectedIP, actualIP)
+	}
 
 	verifyEntries(t, testcase.expected)
 
 	// no need to send modification request, we can delete PFCP session
 
 	err = pfcpClient.SendSessionDeletionRequest(0, remoteSEID.SEID)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("SendSessionDeletionRequest failed: %v", err)
+	}
 
 	_, err = pfcpClient.PeekNextResponse()
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("PeekNextResponse after deletion failed: %v", err)
+	}
 
 	verifyNoEntries(t)
 }
@@ -125,7 +144,9 @@ func TestPFCPHeartbeats(t *testing.T) {
 
 	// Heartbeats interval is 5 seconds by default.
 	// If the association is alive after 10 seconds it means that PFCP Agent handles heartbeats properly.
-	require.True(t, pfcpClient.IsAssociationAlive())
+	if !pfcpClient.IsAssociationAlive() {
+		t.Fatal("Expected PFCP association to be alive after 10 seconds")
+	}
 }
 
 func TestSingleUEAttachAndDetach(t *testing.T) {
@@ -491,7 +512,9 @@ func testUEAttach(t *testing.T, testcase *testCase) {
 	testcase.expected.pdrs = pdrs
 	testcase.expected.fars = fars
 	testcase.expected.qers = qers
-	require.NoErrorf(t, err, "failed to establish PFCP session")
+	if err != nil {
+		t.Fatalf("failed to establish PFCP session: %v", err)
+	}
 	testcase.session = sess
 
 	verifyEntries(t, testcase.expected)
@@ -517,7 +540,9 @@ func testUEBuffer(t *testing.T, testcase *testCase) {
 	}
 
 	err := pfcpClient.ModifySession(testcase.session, nil, fars, nil, nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	verifyEntries(t, testcase.expected)
 
@@ -531,14 +556,18 @@ func testUEBuffer(t *testing.T, testcase *testCase) {
 	}
 
 	err = pfcpClient.ModifySession(testcase.session, nil, fars, nil, nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	verifyEntries(t, testcase.expected)
 }
 
 func testUEDetach(t *testing.T, testcase *testCase) {
 	err := pfcpClient.DeleteSession(testcase.session)
-	require.NoErrorf(t, err, "failed to delete PFCP session")
+	if err != nil {
+		t.Fatalf("failed to delete PFCP session: %v", err)
+	}
 
 	verifyNoEntries(t)
 }
