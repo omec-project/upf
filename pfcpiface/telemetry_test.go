@@ -5,7 +5,6 @@ package pfcpiface
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/require"
 
 	"net/http"
 	"testing"
@@ -34,12 +33,16 @@ func Test_setupProm(t *testing.T) {
 		node := NewPFCPNode(upf)
 
 		uc, nc, err := setupProm(http.NewServeMux(), upf, node)
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 
 		clearProm(uc, nc)
 
 		_, _, err = setupProm(http.NewServeMux(), upf, node)
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 	})
 
 	t.Run("cannot setup prom multiple times without clearProm", func(t *testing.T) {
@@ -51,9 +54,13 @@ func Test_setupProm(t *testing.T) {
 		node := NewPFCPNode(upf)
 
 		_, _, err := setupProm(http.NewServeMux(), upf, node)
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 
 		_, _, err = setupProm(http.NewServeMux(), upf, node)
-		require.Error(t, err)
+		if err == nil {
+			t.Fatal("expected an error, but got nil")
+		}
 	})
 }

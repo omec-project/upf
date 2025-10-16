@@ -4,11 +4,11 @@
 package pfcpiface
 
 import (
-	"github.com/omec-project/upf-epc/logger"
-	"github.com/stretchr/testify/require"
-
 	"net"
+	"reflect"
 	"testing"
+
+	"github.com/omec-project/upf-epc/logger"
 )
 
 func mustParseCIDRNet(s string) *net.IPNet {
@@ -71,7 +71,9 @@ func Test_endpoint_parseNet(t *testing.T) {
 				if err := got.parseNet(tt.args); (err != nil) != tt.wantErr {
 					t.Errorf("parseNet() error = %v, wantErr %v", err, tt.wantErr)
 				}
-				require.Equal(t, got, tt.want)
+				if !reflect.DeepEqual(got, tt.want) {
+					t.Fatalf("expected %+v, got %+v", tt.want, got)
+				}
 			},
 		)
 	}
@@ -125,7 +127,9 @@ func Test_endpoint_parsePort(t *testing.T) {
 				if err := got.parsePort(tt.args); (err != nil) != tt.wantErr {
 					t.Errorf("parsePort() error = %v, wantErr %v", err, tt.wantErr)
 				}
-				require.Equal(t, got, tt.want)
+				if !reflect.DeepEqual(got, tt.want) {
+					t.Fatalf("expected %+v, got %+v", tt.want, got)
+				}
 			},
 		)
 	}
@@ -158,7 +162,9 @@ func Test_ipFilterRule_String(t *testing.T) {
 					src:       tt.fields.src,
 					dst:       tt.fields.dst,
 				}
-				require.Equal(t, ipf.String(), tt.want)
+				if ipf.String() != tt.want {
+					t.Fatalf("expected %q, got %q", tt.want, ipf.String())
+				}
 			},
 		)
 	}
@@ -433,7 +439,9 @@ func Test_parseFlowDesc(t *testing.T) {
 					t.Errorf("parseFlowDesc() error = %v, wantErr %v", err, tt.wantErr)
 					return
 				}
-				require.Equal(t, tt.want, got)
+				if !reflect.DeepEqual(got, tt.want) {
+					t.Fatalf("expected %+v, got %+v", tt.want, got)
+				}
 			},
 		)
 	}
@@ -460,7 +468,9 @@ func Test_parseL4Proto(t *testing.T) {
 					t.Errorf("parseL4Proto() error = %v, wantErr %v", err, tt.wantErr)
 					return
 				}
-				require.Equal(t, got, tt.want)
+				if got != tt.want {
+					t.Fatalf("expected %v, got %v", tt.want, got)
+				}
 			},
 		)
 	}

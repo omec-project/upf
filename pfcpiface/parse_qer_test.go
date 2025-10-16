@@ -4,12 +4,10 @@
 package pfcpiface
 
 import (
+	"reflect"
 	"testing"
 
 	pfcpsimLib "github.com/omec-project/pfcpsim/pkg/pfcpsim/session"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
@@ -52,9 +50,13 @@ func TestParseQER(t *testing.T) {
 			mockQER := &qer{}
 
 			err := mockQER.parseQER(scenario.input, FSEID)
-			require.NoError(t, err)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
-			assert.Equal(t, scenario.expected, mockQER)
+			if !reflect.DeepEqual(mockQER, scenario.expected) {
+				t.Errorf("expected %+v, got %+v", scenario.expected, mockQER)
+			}
 		})
 	}
 }
@@ -78,9 +80,13 @@ func TestParseQERShouldError(t *testing.T) {
 			mockQER := &qer{}
 
 			err := mockQER.parseQER(scenario.input, FSEID)
-			require.Error(t, err)
+			if err == nil {
+				t.Fatal("expected an error, but got nil")
+			}
 
-			assert.Equal(t, scenario.expected, mockQER)
+			if !reflect.DeepEqual(mockQER, scenario.expected) {
+				t.Errorf("expected %+v, got %+v", scenario.expected, mockQER)
+			}
 		})
 	}
 }
