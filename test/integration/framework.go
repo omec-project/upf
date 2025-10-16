@@ -207,7 +207,9 @@ func setup(t *testing.T, configType uint32) {
 		}
 	}()
 	err := waitForBESSFakeToStart()
-	require.NoErrorf(t, err, "failed to start BESS fake: %v", err)
+	if err != nil {
+		t.Fatalf("failed to start BESS fake: %v", err)
+	}
 
 	upfConf := GetConfig(configType)
 	upfConf.N4Addr = "127.0.0.8"
@@ -216,7 +218,9 @@ func setup(t *testing.T, configType uint32) {
 
 	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.1")
 	errConn := pfcpClient.ConnectN4("127.0.0.8")
-	require.NoErrorf(t, errConn, "failed to connect to UPF")
+	if errConn != nil {
+		t.Fatalf("failed to connect to UPF: %v", errConn)
+	}
 
 	// wait for PFCP Agent to initialize, blocking
 	err = waitForPFCPAssociationSetup(pfcpClient)
