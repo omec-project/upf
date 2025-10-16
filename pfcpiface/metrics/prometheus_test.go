@@ -4,8 +4,9 @@
 package metrics
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
 	"testing"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // TODO: we currently need to reset the DefaultRegisterer between tests, as some
