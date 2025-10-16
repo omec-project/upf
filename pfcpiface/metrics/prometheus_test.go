@@ -4,10 +4,9 @@
 package metrics
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/require"
-
 	"testing"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // TODO: we currently need to reset the DefaultRegisterer between tests, as some
@@ -29,10 +28,14 @@ func TestNewPrometheusService(t *testing.T) {
 		defer restoreReg()
 
 		_, err := NewPrometheusService()
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 
 		_, err = NewPrometheusService()
-		require.Error(t, err)
+		if err == nil {
+			t.Fatal("expected an error, but got nil")
+		}
 	})
 
 	t.Run("can register multiple times with stop", func(t *testing.T) {
@@ -41,12 +44,18 @@ func TestNewPrometheusService(t *testing.T) {
 
 		var s *Service
 		s, err := NewPrometheusService()
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 
 		err = s.Stop()
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 
 		_, err = NewPrometheusService()
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 	})
 }

@@ -9,8 +9,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
@@ -122,9 +120,13 @@ func Test_parsePDR(t *testing.T) {
 			mockIPPool, _ := NewIPPool("10.0.0.0")
 
 			err := mockPDR.parsePDR(scenario.input, FSEID, mockMapPFD, mockIPPool)
-			require.NoError(t, err)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
-			assert.Equal(t, mockPDR, scenario.expected)
+			if !reflect.DeepEqual(mockPDR, scenario.expected) {
+				t.Errorf("expected %+v, got %+v", scenario.expected, mockPDR)
+			}
 		})
 	}
 }
@@ -161,9 +163,13 @@ func TestParsePDRShouldError(t *testing.T) {
 			mockIPPool, _ := NewIPPool("10.0.0.0")
 
 			err := mockPDR.parsePDR(scenario.input, FSEID, mockMapPFD, mockIPPool)
-			require.Error(t, err)
+			if err == nil {
+				t.Fatal("expected an error, but got nil")
+			}
 
-			assert.Equal(t, scenario.expected, mockPDR)
+			if !reflect.DeepEqual(mockPDR, scenario.expected) {
+				t.Errorf("expected %+v, got %+v", scenario.expected, mockPDR)
+			}
 		})
 	}
 }
@@ -244,7 +250,9 @@ func TestCreatePortRangeCartesianProduct(t *testing.T) {
 
 func Test_defaultPortRange(t *testing.T) {
 	t.Run("default constructed is wildcard", func(t *testing.T) {
-		assert.True(t, portRange{}.isWildcardMatch(), "default portRange is wildcard")
+		if !(portRange{}.isWildcardMatch()) {
+			t.Error("default portRange is wildcard")
+		}
 	})
 }
 
@@ -645,7 +653,9 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 			}
 
 			if !tt.wantErr {
-				require.Equal(t, tt.wantAppFilter, p.appFilter)
+				if !reflect.DeepEqual(tt.wantAppFilter, p.appFilter) {
+					t.Fatalf("expected %+v, got %+v", tt.wantAppFilter, p.appFilter)
+				}
 			}
 		})
 	}
@@ -715,7 +725,9 @@ func Test_pdr_parsePDI(t *testing.T) {
 			}
 
 			if !tt.wantErr {
-				require.Equal(t, tt.wantPDR, p)
+				if !reflect.DeepEqual(tt.wantPDR, p) {
+					t.Fatalf("expected %+v, got %+v", tt.wantPDR, p)
+				}
 			}
 		})
 	}
