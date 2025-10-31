@@ -51,8 +51,8 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-/// The Field message represents one field in a packet -- either stored in
-/// metadata or in the packet body.
+// / The Field message represents one field in a packet -- either stored in
+// / metadata or in the packet body.
 type Field struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -141,8 +141,8 @@ func (*Field_AttrName) isField_Position() {}
 
 func (*Field_Offset) isField_Position() {}
 
-/// The FieldData message encodes a value to insert into a packet; the value can
-/// be supplied as either an int or a bytestring.
+// / The FieldData message encodes a value to insert into a packet; the value can
+// / be supplied as either an int or a bytestring.
 type FieldData struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
