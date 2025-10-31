@@ -90,7 +90,7 @@ func (*EmptyArg) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{0}
 }
 
-// *
+//*
 // The BPF module has a command `clear()` that takes no parameters.
 // This command removes all filters from the module.
 type BPFCommandClearArg struct {
@@ -131,7 +131,7 @@ func (*BPFCommandClearArg) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{1}
 }
 
-// *
+//*
 // The ExactMatch module has a command `add(...)` that takes two parameters.
 // The ExactMatch initializer specifies what fields in a packet to inspect;
 // add() specifies which values to check for over these fields. add() inserts a
@@ -201,7 +201,7 @@ func (x *ExactMatchCommandAddArg) GetValues() []*FieldData {
 	return nil
 }
 
-// *
+//*
 // The ExactMatch module has a command `delete(...)` which deletes an existing
 // rule. Example use: `delete(fields=[aton('12.3.4.5'), aton('5.4.3.2')])`
 type ExactMatchCommandDeleteArg struct {
@@ -251,7 +251,7 @@ func (x *ExactMatchCommandDeleteArg) GetFields() []*FieldData {
 	return nil
 }
 
-// *
+//*
 // The ExactMatch module has a command `clear()` which takes no parameters.
 // This command removes all rules from the ExactMatch module.
 type ExactMatchCommandClearArg struct {
@@ -292,7 +292,7 @@ func (*ExactMatchCommandClearArg) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{4}
 }
 
-// *
+//*
 // The ExactMatch module has a command `set_default_gate(...)` which takes one
 // parameter. This command routes all traffic which does _not_ match a rule to a
 // specified gate. Example use in bessctl: `setDefaultGate(gate=2)`
@@ -343,7 +343,7 @@ func (x *ExactMatchCommandSetDefaultGateArg) GetGate() uint64 {
 	return 0
 }
 
-// *
+//*
 // The FlowGen module has a command `set_burst(...)` that allows you to specify
 // the maximum number of packets to be stored in a single PacketBatch released
 // by the module.
@@ -394,7 +394,7 @@ func (x *FlowGenCommandSetBurstArg) GetBurst() uint64 {
 	return 0
 }
 
-// *
+//*
 // The HashLB module has a command `set_mode(...)` which takes two parameters.
 // The `mode` parameter specifies whether the load balancer will hash over the
 // src/dest ethernet header (`'l2'`), over the src/dest IP addresses (`'l3'`),
@@ -456,7 +456,7 @@ func (x *HashLBCommandSetModeArg) GetFields() []*Field {
 	return nil
 }
 
-// *
+//*
 // The HashLB module has a command `set_gates(...)` which takes one parameter.
 // This function takes in a list of gate numbers to send hashed traffic out
 // over. Example use in bessctl: `lb.setGates(gates=[0,1,2,3])`
@@ -507,7 +507,7 @@ func (x *HashLBCommandSetGatesArg) GetGates() []int64 {
 	return nil
 }
 
-// *
+//*
 // The IPLookup module has a command `add(...)` which takes three paramters.
 // This function accepts the routing rules -- CIDR prefix, CIDR prefix length,
 // and what gate to forward matching traffic out on.
@@ -575,7 +575,7 @@ func (x *IPLookupCommandAddArg) GetGate() uint64 {
 	return 0
 }
 
-// *
+//*
 // The IPLookup module has a command `delete(...)` which takes two paramters.
 // This function accepts the routing rules -- CIDR prefix, CIDR prefix length,
 // Example use in bessctl: `table.delete(prefix='10.0.0.0', prefix_len=8)`
@@ -634,7 +634,7 @@ func (x *IPLookupCommandDeleteArg) GetPrefixLen() uint64 {
 	return 0
 }
 
-// *
+//*
 // The IPLookup module has a command `clear()` which takes no parameters.
 // This function removes all rules in the IPLookup table.
 // Example use in bessctl: `myiplookuptable.clear()`
@@ -676,7 +676,7 @@ func (*IPLookupCommandClearArg) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{11}
 }
 
-// *
+//*
 // The L2Forward module forwards traffic via exact match over the Ethernet
 // destination address. The command `add(...)`  allows you to specifiy a
 // MAC address and which gate the L2Forward module should direct it out of.
@@ -727,7 +727,7 @@ func (x *L2ForwardCommandAddArg) GetEntries() []*L2ForwardCommandAddArg_Entry {
 	return nil
 }
 
-// *
+//*
 // The L2Forward module has a function `delete(...)` to remove a rule
 // from the MAC forwarding table.
 type L2ForwardCommandDeleteArg struct {
@@ -777,7 +777,7 @@ func (x *L2ForwardCommandDeleteArg) GetAddrs() []string {
 	return nil
 }
 
-// *
+//*
 // For traffic reaching the L2Forward module which does not match a MAC rule,
 // the function `set_default_gate(...)` allows you to specify a default gate
 // to direct unmatched traffic to.
@@ -828,7 +828,7 @@ func (x *L2ForwardCommandSetDefaultGateArg) GetGate() int64 {
 	return 0
 }
 
-// *
+//*
 // The L2Forward module has a function `lookup(...)` to query what output gate
 // a given MAC address will be forwared to; it returns the gate ID number.
 type L2ForwardCommandLookupArg struct {
@@ -878,7 +878,7 @@ func (x *L2ForwardCommandLookupArg) GetAddrs() []string {
 	return nil
 }
 
-// *
+//*
 // This message type provides the reponse to the L2Forward function
 // `lookup(..)`. It returns the gate that a requested MAC address is currently
 // assigned to.
@@ -929,7 +929,7 @@ func (x *L2ForwardCommandLookupResponse) GetGates() []uint64 {
 	return nil
 }
 
-// *
+//*
 // The L2Forward module has a command `populate(...)` which allows for fast
 // creation of the forwarding table given a range of MAC addresses. The function
 // takes in a 'base' MAC address, a count (number of MAC addresses), and a
@@ -1001,7 +1001,7 @@ func (x *L2ForwardCommandPopulateArg) GetGateCount() int64 {
 	return 0
 }
 
-// *
+//*
 // The Measure module measures and collects latency/jitter data for packets
 // annotated by a Timestamp module. Note that Timestamp and Measure module must
 // reside on the server for accurate measurement (as a result, the most typical
@@ -1072,7 +1072,7 @@ func (x *MeasureCommandGetSummaryArg) GetJitterPercentiles() []float64 {
 	return nil
 }
 
-// *
+//*
 // The Measure module function `get_summary()` returns the following values.
 // Note that the resolution value tells you how grainy the samples are,
 // e.g., 100 means that anything from 0-99 ns counts as "0",
@@ -1158,7 +1158,7 @@ func (x *MeasureCommandGetSummaryResponse) GetJitter() *MeasureCommandGetSummary
 	return nil
 }
 
-// *
+//*
 // The Module DRR provides fair scheduling of flows based on a quantum which is
 // number of bytes allocated to each flow on each round of going through all
 // flows. Examples can be found [./bessctl/conf/samples/drr.bess]
@@ -1228,7 +1228,7 @@ func (x *DRRArg) GetMaxFlowQueueSize() uint32 {
 	return 0
 }
 
-// *
+//*
 // the SetQuantumSize function sets a new quantum for DRR module to operate on.
 type DRRQuantumArg struct {
 	state         protoimpl.MessageState
@@ -1277,7 +1277,7 @@ func (x *DRRQuantumArg) GetQuantum() uint32 {
 	return 0
 }
 
-// *
+//*
 // The SetMaxQueueSize function sets a new maximum flow queue size for DRR
 // module. If the flow's queue gets to this size, the module starts dropping
 // packets to that flow until the queue is below this size.
@@ -1328,7 +1328,7 @@ func (x *DRRMaxFlowQueueSizeArg) GetMaxQueueSize() uint32 {
 	return 0
 }
 
-// *
+//*
 // The module PortInc has a function `set_burst(...)` that allows you to specify
 // the maximum number of packets to be stored in a single PacketBatch released
 // by the module.
@@ -1379,7 +1379,7 @@ func (x *PortIncCommandSetBurstArg) GetBurst() uint64 {
 	return 0
 }
 
-// *
+//*
 // The module QueueInc has a function `set_burst(...)` that allows you to
 // specify the maximum number of packets to be stored in a single PacketBatch
 // released by the module.
@@ -1430,7 +1430,7 @@ func (x *QueueIncCommandSetBurstArg) GetBurst() uint64 {
 	return 0
 }
 
-// *
+//*
 // The module Queue has a function `set_burst(...)` that allows you to specify
 // the maximum number of packets to be stored in a single PacketBatch released
 // by the module.
@@ -1481,7 +1481,7 @@ func (x *QueueCommandSetBurstArg) GetBurst() uint64 {
 	return 0
 }
 
-// *
+//*
 // The module Queue has a function `set_size(...)` that allows specifying the
 // size of the queue in total number of packets.
 type QueueCommandSetSizeArg struct {
@@ -1531,7 +1531,7 @@ func (x *QueueCommandSetSizeArg) GetSize() uint64 {
 	return 0
 }
 
-// *
+//*
 // Modules that are queues or contain queues may contain functions
 // `get_status()` that return QueueCommandGetStatusResponse.
 type QueueCommandGetStatusArg struct {
@@ -1572,7 +1572,7 @@ func (*QueueCommandGetStatusArg) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{27}
 }
 
-// *
+//*
 // Modules that are queues or contain queues may contain functions
 // `get_status()` that take no parameters and returns the queue occupancy and
 // size.
@@ -1655,7 +1655,7 @@ func (x *QueueCommandGetStatusResponse) GetDropped() uint64 {
 	return 0
 }
 
-// *
+//*
 // The function `clear()` for RandomUpdate takes no parameters and clears all
 // state in the module.
 type RandomUpdateCommandClearArg struct {
@@ -1696,7 +1696,7 @@ func (*RandomUpdateCommandClearArg) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{29}
 }
 
-// *
+//*
 // The function `clear()` for Rewrite takes no parameters and clears all state
 // in the module.
 type RewriteCommandClearArg struct {
@@ -1737,7 +1737,7 @@ func (*RewriteCommandClearArg) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{30}
 }
 
-// *
+//*
 // The function `clear()` for Update takes no parameters and clears all state in
 // the module.
 type UpdateCommandClearArg struct {
@@ -1778,7 +1778,7 @@ func (*UpdateCommandClearArg) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{31}
 }
 
-// *
+//*
 // The module WildcardMatch has a command `add(...)` which inserts a new rule
 // into the WildcardMatch module. For an example of code using WilcardMatch see
 // `bess/bessctl/conf/samples/wildcardmatch.bess`.
@@ -1861,7 +1861,7 @@ func (x *WildcardMatchCommandAddArg) GetValuesv() []*FieldData {
 	return nil
 }
 
-// *
+//*
 // The module WildcardMatch has a command `delete(...)` which removes a rule --
 // simply specify the values and masks from the previously inserted rule to
 // remove them.
@@ -1920,7 +1920,7 @@ func (x *WildcardMatchCommandDeleteArg) GetMasks() []*FieldData {
 	return nil
 }
 
-// *
+//*
 // The function `clear()` for WildcardMatch takes no parameters, it clears
 // all state in the WildcardMatch module (is equivalent to calling delete for
 // all rules)
@@ -1962,7 +1962,7 @@ func (*WildcardMatchCommandClearArg) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{34}
 }
 
-// *
+//*
 // For traffic which does not match any rule in the WildcardMatch module,
 // the `set_default_gate(...)` function specifies which gate to send this extra
 // traffic to.
@@ -2013,7 +2013,7 @@ func (x *WildcardMatchCommandSetDefaultGateArg) GetGate() uint64 {
 	return 0
 }
 
-// *
+//*
 // The module ACL creates an access control module which by default blocks all
 // traffic, unless it contains a rule which specifies otherwise. Examples of ACL
 // can be found in
@@ -2068,7 +2068,7 @@ func (x *ACLArg) GetRules() []*ACLArg_Rule {
 	return nil
 }
 
-// *
+//*
 // The BPF module is an access control module that sends packets out on a
 // particular gate based on whether they match a BPF filter.
 //
@@ -2121,7 +2121,7 @@ func (x *BPFArg) GetFilters() []*BPFArg_Filter {
 	return nil
 }
 
-// *
+//*
 // The Buffer module takes no parameters to initialize (ie, `Buffer()` is
 // sufficient to create one). Buffer accepts packets and stores them; it may
 // forward them to the next module only after it has received enough packets to
@@ -2167,7 +2167,7 @@ func (*BufferArg) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{38}
 }
 
-// *
+//*
 // The Bypass module forwards packets by emulating pre-defined packet processing
 // overhead. It burns cpu cycles per_batch, per_packet, and per-bytes. Bypass is
 // useful primarily for testing and performance evaluation.
@@ -2237,7 +2237,7 @@ func (x *BypassArg) GetCyclesPerByte() uint32 {
 	return 0
 }
 
-// *
+//*
 // The Dump module blindly forwards packets without modifying them. It
 // periodically samples a packet and prints out out to the BESS log (by default
 // stored in `/tmp/bessd.INFO`).
@@ -2291,7 +2291,7 @@ func (x *DumpArg) GetInterval() float64 {
 	return 0
 }
 
-// *
+//*
 // The EtherEncap module wraps packets in an Ethernet header, but it takes no
 // parameters. Instead, Ethernet source, destination, and type are pulled from a
 // packet's metadata attributes. For example: `SetMetadata('dst_mac',
@@ -2338,7 +2338,7 @@ func (*EtherEncapArg) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{41}
 }
 
-// *
+//*
 // The ExactMatch module splits packets along output gates according to exact
 // match values in arbitrary packet fields. To instantiate an ExactMatch module,
 // you must specify which fields in the packet to match over. You can add rules
@@ -2428,7 +2428,7 @@ func (x *ExactMatchArg) GetEntries() uint64 {
 	return 0
 }
 
-// *
+//*
 // ExactMatchConfig represents the current runtime configuration
 // of an ExactMatch module, as returned by get_runtime_config and
 // set by set_runtime_config.
@@ -2487,7 +2487,7 @@ func (x *ExactMatchConfig) GetRules() []*ExactMatchCommandAddArg {
 	return nil
 }
 
-// *
+//*
 // The FlowGen module generates simulated TCP flows of packets with correct
 // SYN/FIN flags and sequence numbers. This module is useful for testing, e.g.,
 // a NAT module or other flow-aware code. Packets are generated off a base,
@@ -2624,7 +2624,7 @@ func (x *FlowGenArg) GetPortDstRange() uint32 {
 	return 0
 }
 
-// *
+//*
 // The GenericDecap module strips off the first few bytes of data from a packet.
 //
 // __Input Gates__: 1
@@ -2676,7 +2676,7 @@ func (x *GenericDecapArg) GetBytes() uint64 {
 	return 0
 }
 
-// *
+//*
 // The GenericEncap module adds a header to packets passing through it.
 // Takes a list of fields. Each field is either:
 //
@@ -2684,10 +2684,8 @@ func (x *GenericDecapArg) GetBytes() uint64 {
 //  2. {'size': X, 'attribute': Y}      (for metadata attributes)
 //
 // e.g.: `GenericEncap([{'size': 4, 'value': 0xdeadbeef},
-//
-//	{'size': 2, 'attribute': 'foo'},
-//	{'size': 2, 'value': 0x1234}])`
-//
+//                      {'size': 2, 'attribute': 'foo'},
+//                      {'size': 2, 'value': 0x1234}])`
 // will prepend a 8-byte header:
 // `de ad be ef <xx> <xx> 12 34`
 //
@@ -2744,7 +2742,7 @@ func (x *GenericEncapArg) GetFields() []*GenericEncapArg_EncapField {
 	return nil
 }
 
-// *
+//*
 // The HashLB module partitions packets between output gates according to either
 // a hash over their MAC src/dst (`mode='l2'`), their IP src/dst (`mode='l3'`),
 // the full IP/TCP 5-tuple (`mode='l4'`), or the N-tuple defined by `fields`.
@@ -2814,7 +2812,7 @@ func (x *HashLBArg) GetFields() []*Field {
 	return nil
 }
 
-// *
+//*
 // Encapsulates a packet with an IP header, where IP src, dst, and proto are
 // filled in by metadata values carried with the packet. Metadata attributes
 // must include: ip_src, ip_dst, ip_proto, ip_nexthop, and ether_type.
@@ -2859,7 +2857,7 @@ func (*IPEncapArg) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{48}
 }
 
-// *
+//*
 // An IPLookup module perfroms LPM lookups over a packet destination.
 // IPLookup takes no parameters to instantiate.
 // To add rules to the IPLookup table, use `IPLookup.add()`
@@ -2921,7 +2919,7 @@ func (x *IPLookupArg) GetMaxTbl8S() uint32 {
 	return 0
 }
 
-// *
+//*
 // An L2Forward module forwards packets to an output gate according to
 // exact-match rules over an Ethernet destination. Note that this is _not_ a
 // learning switch -- forwards according to fixed routes specified by `add(..)`.
@@ -2983,7 +2981,7 @@ func (x *L2ForwardArg) GetBucket() int64 {
 	return 0
 }
 
-// *
+//*
 // The MACSwap module takes no arguments. It swaps the src/destination MAC
 // addresses within a packet.
 //
@@ -3027,7 +3025,7 @@ func (*MACSwapArg) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{51}
 }
 
-// *
+//*
 // The measure module tracks latencies, packets per second, and other
 // statistics. It should be paired with a Timestamp module, which attaches a
 // timestamp to packets. The measure module will log how long (in nanoseconds)
@@ -3144,7 +3142,7 @@ func (*MeasureArg_Offset) isMeasureArg_Type() {}
 
 func (*MeasureArg_AttrName) isMeasureArg_Type() {}
 
-// *
+//*
 // The merge module takes no parameters. It has multiple input gates,
 // and passes out all packets from a single output gate.
 //
@@ -3188,7 +3186,7 @@ func (*MergeArg) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{53}
 }
 
-// *
+//*
 // The MetadataTest module is used for internal testing purposes.
 type MetadataTestArg struct {
 	state         protoimpl.MessageState
@@ -3253,7 +3251,7 @@ func (x *MetadataTestArg) GetUpdate() map[string]int64 {
 	return nil
 }
 
-// *
+//*
 // The NAT module implements Dynamic IPv4 address/port translation,
 // rewriting packet source addresses with external addresses as specified,
 // and destination addresses for packets on the reverse direction.
@@ -3314,7 +3312,7 @@ func (x *NATArg) GetExtAddrs() []*NATArg_ExternalAddress {
 	return nil
 }
 
-// *
+//*
 // Static NAT module implements one-to-one translation of source/destination
 // IPv4 addresses. No port number is translated.
 // L3/L4 checksums are updated correspondingly.
@@ -3382,7 +3380,7 @@ func (x *StaticNATArg) GetPairs() []*StaticNATArg_AddressRangePair {
 	return nil
 }
 
-// *
+//*
 // This module is used for testing purposes.
 type NoOpArg struct {
 	state         protoimpl.MessageState
@@ -3422,7 +3420,7 @@ func (*NoOpArg) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{57}
 }
 
-// *
+//*
 // The PortInc module connects a physical or virtual port and releases
 // packets from it. PortInc does not support multiqueueing.
 // For details on how to configure PortInc using DPDK, virtual ports,
@@ -3485,7 +3483,7 @@ func (x *PortIncArg) GetPrefetch() bool {
 	return false
 }
 
-// *
+//*
 // The PortOut module connects to a physical or virtual port and pushes
 // packets to it. For details on how to configure PortOut with DPDK,
 // virtual ports, libpcap, etc, see the sidebar in the wiki.
@@ -3539,7 +3537,7 @@ func (x *PortOutArg) GetPort() string {
 	return ""
 }
 
-// *
+//*
 // The module QueueInc produces input packets from a physical or virtual port.
 // Unlike PortInc, it supports multiqueue ports.
 // For details on how to configure QueueInc with DPDK, virtualports,
@@ -3610,7 +3608,7 @@ func (x *QueueIncArg) GetPrefetch() bool {
 	return false
 }
 
-// *
+//*
 // The QueueOut module releases packets to a physical or virtual port.
 // Unlike PortOut, it supports multiqueue ports.
 // For details on how to configure QueueOut with DPDK, virtualports,
@@ -3673,7 +3671,7 @@ func (x *QueueOutArg) GetQid() uint64 {
 	return 0
 }
 
-// *
+//*
 // The Queue module implements a simple packet queue.
 //
 // __Input Gates__: 1
@@ -3741,7 +3739,7 @@ func (x *QueueArg) GetBackpressure() bool {
 	return false
 }
 
-// *
+//*
 // The RandomSplit module randomly split/drop packets
 //
 // __InputGates__: 1
@@ -3801,7 +3799,7 @@ func (x *RandomSplitArg) GetGates() []int64 {
 	return nil
 }
 
-// *
+//*
 // The RandomSplit module has a function `set_droprate(...)` which specifies
 // the probability of dropping packets
 type RandomSplitCommandSetDroprateArg struct {
@@ -3851,7 +3849,7 @@ func (x *RandomSplitCommandSetDroprateArg) GetDropRate() float64 {
 	return 0
 }
 
-// *
+//*
 // The RandomSplit module has a function `set_gates(...)` which changes
 // the total number of output gates in the module.
 type RandomSplitCommandSetGatesArg struct {
@@ -3901,7 +3899,7 @@ func (x *RandomSplitCommandSetGatesArg) GetGates() []int64 {
 	return nil
 }
 
-// *
+//*
 // The RandomUpdate module rewrites a specified field (`offset` and `size`) in a
 // packet with a random value between a specified min and max values.
 //
@@ -3954,7 +3952,7 @@ func (x *RandomUpdateArg) GetFields() []*RandomUpdateArg_Field {
 	return nil
 }
 
-// *
+//*
 // The Rewrite module replaces an entire packet body with a packet "template"
 // converting all packets that pass through to copies of the of one of
 // the templates.
@@ -4008,7 +4006,7 @@ func (x *RewriteArg) GetTemplates() [][]byte {
 	return nil
 }
 
-// *
+//*
 // The RoundRobin module has a function `set_gates(...)` which changes
 // the total number of output gates in the module.
 type RoundRobinCommandSetGatesArg struct {
@@ -4058,7 +4056,7 @@ func (x *RoundRobinCommandSetGatesArg) GetGates() []int64 {
 	return nil
 }
 
-// *
+//*
 // The RoundRobin module has a function `set_mode(...)` which specifies whether
 // to balance traffic across gates per-packet or per-batch.
 type RoundRobinCommandSetModeArg struct {
@@ -4108,7 +4106,7 @@ func (x *RoundRobinCommandSetModeArg) GetMode() string {
 	return ""
 }
 
-// *
+//*
 // The RoundRobin module splits packets from one input gate across multiple
 // output gates.
 //
@@ -4169,7 +4167,7 @@ func (x *RoundRobinArg) GetMode() string {
 	return ""
 }
 
-// *
+//*
 // The Replicate module makes copies of a packet sending one copy out over each
 // of n output gates.
 //
@@ -4222,7 +4220,7 @@ func (x *ReplicateArg) GetGates() []int64 {
 	return nil
 }
 
-// *
+//*
 // The Replicate module has a function `set_gates(...)` which changes
 // the total number of output gates in the module.
 type ReplicateCommandSetGatesArg struct {
@@ -4272,7 +4270,7 @@ func (x *ReplicateCommandSetGatesArg) GetGates() []int64 {
 	return nil
 }
 
-// *
+//*
 // The SetMetadata module adds metadata attributes to packets, which are not
 // stored or sent out with packet data. For examples of SetMetadata use, see
 // [`bess/bessctl/conf/attr_match.bess`](https://github.com/omec-project/bess/blob/master/bessctl/conf/metadata/attr_match.bess)
@@ -4326,7 +4324,7 @@ func (x *SetMetadataArg) GetAttrs() []*SetMetadataArg_Attribute {
 	return nil
 }
 
-// *
+//*
 // The sink module drops all packets that are sent to it.
 //
 // __Input Gates__: 1
@@ -4369,7 +4367,7 @@ func (*SinkArg) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{74}
 }
 
-// *
+//*
 // The Source module has a function `set_burst(...)` which
 // specifies the maximum number of packets to release in a single packetbatch
 // from the module.
@@ -4420,7 +4418,7 @@ func (x *SourceCommandSetBurstArg) GetBurst() uint64 {
 	return 0
 }
 
-// *
+//*
 // The Source module has a function `set_pkt_size(...)` which specifies the size
 // of packets to be produced by the Source module.
 type SourceCommandSetPktSizeArg struct {
@@ -4470,7 +4468,7 @@ func (x *SourceCommandSetPktSizeArg) GetPktSize() uint64 {
 	return 0
 }
 
-// *
+//*
 // The Source module generates packets with no payload contents.
 //
 // __Input Gates__: 0
@@ -4522,7 +4520,7 @@ func (x *SourceArg) GetPktSize() uint64 {
 	return 0
 }
 
-// *
+//*
 // The IPChecksum module calculates the IPv4 checksum of packets. If
 // verify is set to true, the module can be used to validate the checksum
 // of the IPv4 packet. All non-IPv4 packets are forwarded without
@@ -4585,7 +4583,7 @@ func (x *IPChecksumArg) GetHw() bool {
 	return false
 }
 
-// *
+//*
 // The L4Checksum module calculates the UDP/IPv4 checksum of packets. If
 // verify is set to true, the module can be used to validate the checksum
 // of the UDP/IPv4 packet. All non-IPv4 packets are forwarded without
@@ -4648,7 +4646,7 @@ func (x *L4ChecksumArg) GetHw() bool {
 	return false
 }
 
-// *
+//*
 // The GtpuEcho module processes the GTPv1 echo packet and prepares
 // corresponding IP packet containing GTP echo response. It assumes
 // Recovery IE is always zero.
@@ -4702,7 +4700,7 @@ func (x *GtpuEchoArg) GetS1USgwIp() uint32 {
 	return 0
 }
 
-// *
+//*
 // The IPDefrag module scans the IP datagram and checks whether
 // it is fragmented. It returns a fully reassembled datagram or
 // an unfragmented IP datagram
@@ -4764,7 +4762,7 @@ func (x *IPDefragArg) GetNuma() int32 {
 	return 0
 }
 
-// *
+//*
 // The IPDFrag module scans the IP datagram and checks whether
 // it needs to be fragmented.
 //
@@ -4817,7 +4815,7 @@ func (x *IPFragArg) GetMtu() int32 {
 	return 0
 }
 
-// *
+//*
 // The Counter module has a command `add(...)` which takes one
 // parameters.  This function accepts the counter id of a
 // session record.
@@ -4869,7 +4867,7 @@ func (x *CounterAddArg) GetCtrId() uint32 {
 	return 0
 }
 
-// *
+//*
 // The Counter module has a command `remove(...)` which takes one
 // parameter.  This function accepts ctr_id, and removes the
 // respective counter.
@@ -4921,7 +4919,7 @@ func (x *CounterRemoveArg) GetCtrId() uint32 {
 	return 0
 }
 
-// *
+//*
 // The Counter module counts the number of packets and bytes it passes
 //
 // __Input Gates__: 1
@@ -4989,7 +4987,7 @@ func (x *CounterArg) GetTotal() uint32 {
 	return 0
 }
 
-// *
+//*
 // The GtpuEncap module inserts GTP header in an ethernet frame
 //
 // __Input Gates__: 1
@@ -5041,7 +5039,7 @@ func (x *GtpuEncapArg) GetAddPsc() bool {
 	return false
 }
 
-// *
+//*
 // The Split module is a basic classifier which directs packets out a gate
 // based on data in the packet (e.g., if the read in value is 3, the packet
 // is directed out output gate 3).
@@ -5136,7 +5134,7 @@ func (*SplitArg_Attribute) isSplitArg_Type() {}
 
 func (*SplitArg_Offset) isSplitArg_Type() {}
 
-// *
+//*
 // The timestamp module takes an offset parameter. It inserts the current
 // time in nanoseconds into the packet, to be used for latency measurements
 // alongside the Measure module.  The default offset is after an IPv4 UDP
@@ -5224,7 +5222,7 @@ func (*TimestampArg_Offset) isTimestampArg_Type() {}
 
 func (*TimestampArg_AttrName) isTimestampArg_Type() {}
 
-// *
+//*
 // The Update module rewrites a field in a packet's data with a specific value.
 //
 // __Input Gates__: 1
@@ -5276,7 +5274,7 @@ func (x *UpdateArg) GetFields() []*UpdateArg_Field {
 	return nil
 }
 
-// *
+//*
 // The URLFilter performs TCP reconstruction over a flow and blocks
 // connections which mention a banned URL.
 //
@@ -5332,7 +5330,7 @@ func (x *UrlFilterArg) GetBlacklist() []*UrlFilterArg_Url {
 	return nil
 }
 
-// *
+//*
 // The runtime configuration of a URLFilter is the current
 // blacklist.  This means that getting the Arg gets an *empty*
 // list: we assume anyone using get_initial_arg is also using
@@ -5384,7 +5382,7 @@ func (x *UrlFilterConfig) GetBlacklist() []*UrlFilterArg_Url {
 	return nil
 }
 
-// *
+//*
 // VLANPop removes the VLAN tag.
 //
 // __Input Gates__: 1
@@ -5427,7 +5425,7 @@ func (*VLANPopArg) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{92}
 }
 
-// *
+//*
 // VLANPush appends a VLAN tag with a specified TCI value.
 //
 // __Input Gates__: 1
@@ -5479,7 +5477,7 @@ func (x *VLANPushArg) GetTci() uint64 {
 	return 0
 }
 
-// *
+//*
 // Splits packets across output gates according to VLAN id (e.g., id 3 goes out
 // gate 3).
 //
@@ -5523,7 +5521,7 @@ func (*VLANSplitArg) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{94}
 }
 
-// *
+//*
 // VXLANDecap module decapsulates a VXLAN header on a packet.
 //
 // __Input Gates__: 1
@@ -5566,7 +5564,7 @@ func (*VXLANDecapArg) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{95}
 }
 
-// *
+//*
 // VXLANEncap module wraps a packet in a VXLAN header with a specified
 // destination port.
 //
@@ -5619,7 +5617,7 @@ func (x *VXLANEncapArg) GetDstport() uint64 {
 	return 0
 }
 
-// *
+//*
 // The WildcardMatch module matches over multiple fields in a packet and
 // pushes packets that do match out a specified gate, and those that don't out a
 // default gate. WildcardMatch is initialized with the fields it should inspect
@@ -5692,7 +5690,7 @@ func (x *WildcardMatchArg) GetEntries() uint64 {
 	return 0
 }
 
-// *
+//*
 // WildcardMatchConfig represents the current runtime configuration
 // of a WildcardMatch module, as returned by get_runtime_config and
 // set by set_runtime_config.
@@ -5751,7 +5749,7 @@ func (x *WildcardMatchConfig) GetRules() []*WildcardMatchCommandAddArg {
 	return nil
 }
 
-// *
+//*
 // The ARP Responder module is responding to ARP requests.
 // It has a function `add(...)` which adds one IP-MAC mapping.
 //
@@ -5814,7 +5812,7 @@ func (x *ArpResponderArg) GetMacAddr() string {
 	return ""
 }
 
-// *
+//*
 // The MPLS pop module removes MPLS labels
 //
 // __Input Gates__: 1
@@ -5874,7 +5872,7 @@ func (x *MplsPopArg) GetNextEthType() uint32 {
 	return 0
 }
 
-// *
+//*
 // WorkerSplit splits packets based on the worker calling ProcessBatch(). It has
 // two modes.
 //  1. Packets from worker `x` are mapped to output gate `x`. This is the default
@@ -6175,7 +6173,7 @@ func (x *QosCommandDeleteArg) GetFields() []*FieldData {
 	return nil
 }
 
-// *
+//*
 // The function `clear()` for WildcardMatch takes no parameters, it clears
 // all state in the WildcardMatch module (is equivalent to calling delete for
 // all rules)
@@ -6217,7 +6215,7 @@ func (*QosCommandClearArg) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{105}
 }
 
-// *
+//*
 // For traffic which does not match any rule in the WildcardMatch module,
 // the `set_default_gate(...)` function specifies which gate to send this extra
 // traffic to.
@@ -6534,7 +6532,7 @@ func (x *FlowMeasureFlipResponse) GetOldFlag() uint64 {
 	return 0
 }
 
-// *
+//*
 // The GtpuPathMonitoring module has a command `add()` and `delete().
 // This command add or deletes an IP address from the GtpuPathMonitoring module.
 type GtpuPathMonitoringCommandAddDeleteArg struct {
@@ -6584,7 +6582,7 @@ func (x *GtpuPathMonitoringCommandAddDeleteArg) GetGnbIp() uint32 {
 	return 0
 }
 
-// *
+//*
 // The GtpuPathMonitoring module has a command `clear()` which takes no parameters.
 // This command removes all IP addresses from the GtpuPathMonitoring module.
 type GtpuPathMonitoringCommandClearArg struct {
@@ -6625,7 +6623,7 @@ func (*GtpuPathMonitoringCommandClearArg) Descriptor() ([]byte, []int) {
 	return file_module_msg_proto_rawDescGZIP(), []int{113}
 }
 
-// *
+//*
 // The GtpuPathMonitoring module has a command `read()`.
 // This command requests to read the stats from the GtpuPathMonitoring module.
 // It can also clear the stats
@@ -6676,7 +6674,7 @@ func (x *GtpuPathMonitoringCommandReadArg) GetClear() bool {
 	return false
 }
 
-// *
+//*
 // The GtpuPathMonitoring module has a command `readResponse()`.
 // This command reads the stats from the GtpuPathMonitoring module.
 type GtpuPathMonitoringCommandReadResponse struct {
@@ -6884,7 +6882,7 @@ func (x *MeasureCommandGetSummaryResponse_Histogram) GetPercentileValuesNs() []u
 	return nil
 }
 
-// *
+//*
 // One ACL rule is represented by the following 6-tuple.
 type ACLArg_Rule struct {
 	state         protoimpl.MessageState
@@ -6973,7 +6971,7 @@ func (x *ACLArg_Rule) GetDrop() bool {
 	return false
 }
 
-// *
+//*
 // One BPF filter is represented by the following 3-tuple.
 type BPFArg_Filter struct {
 	state         protoimpl.MessageState
@@ -7038,7 +7036,7 @@ func (x *BPFArg_Filter) GetGate() int64 {
 	return 0
 }
 
-// *
+//*
 // An EncapField represents one field in the new packet header.
 type GenericEncapArg_EncapField struct {
 	state         protoimpl.MessageState
@@ -7356,7 +7354,7 @@ func (x *StaticNATArg_AddressRangePair) GetExtRange() *StaticNATArg_AddressRange
 	return nil
 }
 
-// *
+//*
 // RandomUpdate's Field specifies where to rewrite, and what values to rewrite
 // in each packet processed.
 type RandomUpdateArg_Field struct {
@@ -7430,7 +7428,7 @@ func (x *RandomUpdateArg_Field) GetMax() uint64 {
 	return 0
 }
 
-// *
+//*
 // SetMetadata Attribute describes a metadata attribute and value to attach to
 // every packet. If copying data from a packet buffer, SetMetadata can also
 // logically shift then mask the value before storing it as metadata, i.e.,
@@ -7555,7 +7553,7 @@ func (*SetMetadataArg_Attribute_ValueInt) isSetMetadataArg_Attribute_Value() {}
 
 func (*SetMetadataArg_Attribute_ValueBin) isSetMetadataArg_Attribute_Value() {}
 
-// *
+//*
 // Update Field describes where in a packet's data to rewrite, and with what
 // value.
 type UpdateArg_Field struct {
@@ -7621,7 +7619,7 @@ func (x *UpdateArg_Field) GetValue() uint64 {
 	return 0
 }
 
-// *
+//*
 // A URL consists of a host and a path.
 type UrlFilterArg_Url struct {
 	state         protoimpl.MessageState
