@@ -8,7 +8,9 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/wmnsk/go-pfcp/message"
 
@@ -197,7 +199,23 @@ func (pConn *PFCPConn) sendPFCPRequestMessage(r *Request) (message.Message, bool
 
 // dumpRawPFCP writes the raw PFCP packet bytes to a file under dumpDir.
 func dumpRawPFCP(dumpDir, addr string, buf []byte) error {
-	safeAddr := filepath.Base(addr)
+	// Use the last path element if addr looks like a path, then sanitize any
+	// characters that could be problematic in filenames (for example ':' in
+	// IPv6 addresses or '%' in scoped addresses). We allow letters, digits,
+	// dot, dash and underscore; everything else becomes an underscore.
+	safe := filepath.Base(addr)
+	var b strings.Builder
+	for _, r := range safe {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '.' || r == '-' || r == '_' {
+			b.WriteRune(r)
+		} else {
+			b.WriteRune('_')
+		}
+	}
+	safeAddr := b.String()
+	if safeAddr == "" {
+		safeAddr = UnknownString
+	}
 
 	if err := os.MkdirAll(dumpDir, 0o755); err != nil {
 		return err
