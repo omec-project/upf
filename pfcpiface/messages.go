@@ -63,7 +63,7 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 		reply message.Message
 		err   error
 	)
-	addr := "unknown"
+	addr := UnknownString
 	if pConn != nil && pConn.RemoteAddr() != nil {
 		addr = pConn.RemoteAddr().String()
 	}
