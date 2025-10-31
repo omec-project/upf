@@ -4,7 +4,10 @@
 package pfcpiface
 
 import (
+	"encoding/base64"
 	"errors"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/wmnsk/go-pfcp/message"
@@ -60,14 +63,31 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 		reply message.Message
 		err   error
 	)
+	addr := "unknown"
+	if pConn != nil && pConn.RemoteAddr() != nil {
+		addr = pConn.RemoteAddr().String()
+	}
 
 	msg, err := message.Parse(buf)
 	if err != nil {
-		logger.PfcpLog.Errorf("ignoring undecodable message: %v, error: %v", buf, err)
+		logger.PfcpLog.Errorf("ignoring undecodable message from %s: len=%d, hex=%x, error=%v", addr, len(buf), buf, err)
+
+		if dumpDir := os.Getenv("PFCP_DUMP_DIR"); dumpDir != "" {
+			if err2 := dumpRawPFCP(dumpDir, addr, buf); err2 != nil {
+				logger.PfcpLog.Errorf("failed to dump raw PFCP from %s: %v", addr, err2)
+			} else {
+				logger.PfcpLog.Debugf("dumped raw PFCP from %s to %s", addr, dumpDir)
+			}
+		}
+
+		if os.Getenv("PFCP_DUMP_TO_LOG") == "1" {
+			b64 := base64.StdEncoding.EncodeToString(buf)
+			logger.PfcpLog.Infof("PFCP_RAW_DUMP addr=%s len=%d b64=%s", addr, len(buf), b64)
+		}
+
 		return
 	}
 
-	addr := pConn.RemoteAddr().String()
 	msgType := msg.MessageTypeName()
 	m := metrics.NewMessage(msgType, "Incoming")
 
@@ -173,4 +193,17 @@ func (pConn *PFCPConn) sendPFCPRequestMessage(r *Request) (message.Message, bool
 			return reply, false
 		}
 	}
+}
+
+// dumpRawPFCP writes the raw PFCP packet bytes to a file under dumpDir.
+func dumpRawPFCP(dumpDir, addr string, buf []byte) error {
+	safeAddr := filepath.Base(addr)
+
+	if err := os.MkdirAll(dumpDir, 0o755); err != nil {
+		return err
+	}
+
+	fname := filepath.Join(dumpDir, "pfcp_"+safeAddr+"_"+time.Now().Format("20060102T150405")+".bin")
+
+	return os.WriteFile(fname, buf, 0o644)
 }

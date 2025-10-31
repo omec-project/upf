@@ -46,9 +46,9 @@
 package bess_pb
 
 import (
-	any1 "google.golang.org/protobuf/types/known/anypb"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	any1 "google.golang.org/protobuf/types/known/anypb"
 	reflect "reflect"
 	sync "sync"
 )
@@ -1478,7 +1478,7 @@ func (x *CreatePortRequest) GetArg() *any1.Any {
 	return nil
 }
 
-/// All configuration parameters updatable at runtime
+// / All configuration parameters updatable at runtime
 type PortConf struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -3279,13 +3279,13 @@ func (x *GetGateHookClassInfoResponse) GetCmdArgs() []string {
 	return nil
 }
 
-/// Enable/Disable the "Track" hook on a gate (or all gates)
-///
-/// "Track" hook accumulates the number of total packets, batches and bits
-///  passing through a gate. This incurs some amount of CPU overheads. While
-///  the cost is very small, remember that the delay adds up at every gate.
-///
-/// NOTE: There should be no running worker to run this command.
+// / Enable/Disable the "Track" hook on a gate (or all gates)
+// /
+// / "Track" hook accumulates the number of total packets, batches and bits
+// /  passing through a gate. This incurs some amount of CPU overheads. While
+// /  the cost is very small, remember that the delay adds up at every gate.
+// /
+// / NOTE: There should be no running worker to run this command.
 type TrackArg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -3333,14 +3333,14 @@ func (x *TrackArg) GetBits() bool {
 	return false
 }
 
-/// Enable/Disable tcpdump tapping at an input/output gate.
-///
-/// Once the tap is installed, all packets going through the gate will be
-/// captured and sent in PCAP format to the specified named pipe (FIFO).
-/// Thus you can run `tcpdump -r <path to FIFO>` or save the stream in a file.
-/// This feature may affect performance.
-///
-/// NOTE: There should be no running worker to run this command.
+// / Enable/Disable tcpdump tapping at an input/output gate.
+// /
+// / Once the tap is installed, all packets going through the gate will be
+// / captured and sent in PCAP format to the specified named pipe (FIFO).
+// / Thus you can run `tcpdump -r <path to FIFO>` or save the stream in a file.
+// / This feature may affect performance.
+// /
+// / NOTE: There should be no running worker to run this command.
 type TcpdumpArg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -3404,16 +3404,16 @@ func (x *TcpdumpArg) GetReconnect() bool {
 	return false
 }
 
-/// Enable/Disable pcapng tapping at an input/output gate.
-///
-/// Once the tap is installed, all packets going through the gate will be
-/// captured and sent in pcapng format to the specified named pipe (FIFO).
-/// Unlike the Tcpdump hook, this also dumps a textual metadata representation,
-/// in the form of a comment to the Enhanced Packet Block. Thus you can run
-/// `tcpdump -r <path to FIFO>` or save the stream in a file.
-/// This feature may affect performance.
-///
-/// NOTE: There should be no running worker to run this command.
+// / Enable/Disable pcapng tapping at an input/output gate.
+// /
+// / Once the tap is installed, all packets going through the gate will be
+// / captured and sent in pcapng format to the specified named pipe (FIFO).
+// / Unlike the Tcpdump hook, this also dumps a textual metadata representation,
+// / in the form of a comment to the Enhanced Packet Block. Thus you can run
+// / `tcpdump -r <path to FIFO>` or save the stream in a file.
+// / This feature may affect performance.
+// /
+// / NOTE: There should be no running worker to run this command.
 type PcapngArg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
