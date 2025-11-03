@@ -257,11 +257,20 @@ func dumpRawPFCP(dumpDir, addr string, buf []byte) error {
 	// Use O_EXCL to avoid overwriting an existing file with the same name.
 	f, err := os.OpenFile(fname, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
-		return os.WriteFile(fname, buf, 0o600)
+		// fallback to WriteFile; if successful, kick off pruning asynchronously.
+		if err2 := os.WriteFile(fname, buf, 0o600); err2 == nil {
+			go pruneDumpDir(outDir)
+			return nil
+		} else {
+			return err2
+		}
 	}
 	defer f.Close()
 
 	_, err = f.Write(buf)
+	if err == nil {
+		go pruneDumpDir(outDir)
+	}
 	return err
 }
 
