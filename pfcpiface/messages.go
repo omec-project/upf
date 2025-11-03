@@ -213,7 +213,7 @@ func dumpRawPFCP(dumpDir, addr string, buf []byte) error {
 		}
 	}
 	safeAddr := b.String()
-	if safeAddr == "" {
+	if safeAddr == "" || safeAddr == "." || safeAddr == ".." {
 		safeAddr = UnknownString
 	}
 
