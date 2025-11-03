@@ -4,10 +4,15 @@
 package pfcpiface
 
 import (
+	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -199,10 +204,6 @@ func (pConn *PFCPConn) sendPFCPRequestMessage(r *Request) (message.Message, bool
 
 // dumpRawPFCP writes the raw PFCP packet bytes to a file under dumpDir.
 func dumpRawPFCP(dumpDir, addr string, buf []byte) error {
-	// Use the last path element if addr looks like a path, then sanitize any
-	// characters that could be problematic in filenames (for example ':' in
-	// IPv6 addresses or '%' in scoped addresses). We allow letters, digits,
-	// dot, dash and underscore; everything else becomes an underscore.
 	safe := filepath.Base(addr)
 	var b strings.Builder
 	for _, r := range safe {
@@ -217,11 +218,125 @@ func dumpRawPFCP(dumpDir, addr string, buf []byte) error {
 		safeAddr = UnknownString
 	}
 
-	if err := os.MkdirAll(dumpDir, 0o700); err != nil {
+	// Allow per-instance dump directory when UPF_NAME is set.
+	outDir := dumpDir
+	if upfName := os.Getenv("UPF_NAME"); upfName != "" {
+		var sb strings.Builder
+		for _, r := range upfName {
+			if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '.' || r == '-' || r == '_' {
+				sb.WriteRune(r)
+			} else {
+				sb.WriteRune('_')
+			}
+		}
+		safeUPF := sb.String()
+		if safeUPF == "" {
+			safeUPF = UnknownString
+		}
+		outDir = filepath.Join(dumpDir, safeUPF)
+	}
+
+	if err := os.MkdirAll(outDir, 0o700); err != nil {
 		return err
 	}
 
-	fname := filepath.Join(dumpDir, "pfcp_"+safeAddr+"_"+time.Now().Format("20060102T150405.000000")+".bin")
+	pid := os.Getpid()
 
-	return os.WriteFile(fname, buf, 0o600)
+	randb := make([]byte, 4)
+	if _, err := rand.Read(randb); err != nil {
+		// fallback to time-based low-entropy suffix if crypto/rand fails
+		randb = []byte(time.Now().Format("150405"))
+	}
+	suffix := hex.EncodeToString(randb)
+
+	// Include UPF name in filename when available (use basename of outDir)
+	upfPart := filepath.Base(outDir)
+
+	fname := filepath.Join(outDir, fmt.Sprintf("pfcp_%s_%s_pid%d_%s_%s.bin", upfPart, safeAddr, pid, time.Now().Format("20060102T150405.000000"), suffix))
+
+	// Use O_EXCL to avoid overwriting an existing file with the same name.
+	f, err := os.OpenFile(fname, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return os.WriteFile(fname, buf, 0o600)
+	}
+	defer f.Close()
+
+	_, err = f.Write(buf)
+	return err
+}
+
+// pruneDumpDir enforces max total bytes and max file count for the given
+// directory. It removes oldest files first until the directory is within
+// limits. Defaults: maxBytes=100MB, maxFiles=1000.
+func pruneDumpDir(dir string) {
+	const (
+		defaultMaxBytes = int64(100 * 1024 * 1024) // 100 MB
+		defaultMaxFiles = 1000
+	)
+
+	maxBytes := defaultMaxBytes
+	maxFiles := defaultMaxFiles
+
+	if v := os.Getenv("PFCP_DUMP_MAX_BYTES"); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+			maxBytes = n
+		}
+	}
+	if v := os.Getenv("PFCP_DUMP_MAX_FILES"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			maxFiles = n
+		}
+	}
+
+	// If both limits are disabled, nothing to do.
+	if maxBytes == 0 && maxFiles == 0 {
+		return
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		logger.PfcpLog.Errorf("pruneDumpDir: unable to read dir %s: %v", dir, err)
+		return
+	}
+
+	type fileEntry struct {
+		name string
+		info os.FileInfo
+		size int64
+	}
+
+	var files []fileEntry
+	var total int64
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		fi, err := e.Info()
+		if err != nil {
+			continue
+		}
+		files = append(files, fileEntry{name: e.Name(), info: fi, size: fi.Size()})
+		total += fi.Size()
+	}
+
+	// Apply file count limit and byte limit. Sort files by ModTime ascending
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].info.ModTime().Before(files[j].info.ModTime())
+	})
+
+	for len(files) > 0 {
+		if (maxFiles == 0 || len(files) <= maxFiles) && (maxBytes == 0 || total <= maxBytes) {
+			break
+		}
+
+		oldest := files[0]
+		p := filepath.Join(dir, oldest.name)
+		if err := os.Remove(p); err != nil {
+			logger.PfcpLog.Errorf("pruneDumpDir: failed to remove %s: %v", p, err)
+			break
+		}
+		logger.PfcpLog.Infof("pruneDumpDir: removed dump %s to enforce limits", p)
+		total -= oldest.size
+		files = files[1:]
+	}
 }
