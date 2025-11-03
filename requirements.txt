@@ -8,5 +8,5 @@ jsoncomment
 mitogen
 protobuf==3.20.3
 psutil
-pyroute2==0.9.4
+pyroute2==0.9.5
 scapy
