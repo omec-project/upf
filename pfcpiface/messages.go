@@ -217,11 +217,11 @@ func dumpRawPFCP(dumpDir, addr string, buf []byte) error {
 		safeAddr = UnknownString
 	}
 
-	if err := os.MkdirAll(dumpDir, 0o755); err != nil {
+	if err := os.MkdirAll(dumpDir, 0o700); err != nil {
 		return err
 	}
 
 	fname := filepath.Join(dumpDir, "pfcp_"+safeAddr+"_"+time.Now().Format("20060102T150405.000000")+".bin")
 
-	return os.WriteFile(fname, buf, 0o644)
+	return os.WriteFile(fname, buf, 0o600)
 }
