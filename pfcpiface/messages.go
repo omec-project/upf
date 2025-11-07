@@ -87,7 +87,7 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 			}
 		}
 
-		if os.Getenv("PFCP_DUMP_TO_LOG") == "1" {
+		if os.Getenv("PFCP_DUMP_TO_LOG") == "true" {
 			b64 := base64.StdEncoding.EncodeToString(buf)
 			logger.PfcpLog.Infof("PFCP_RAW_DUMP addr=%s len=%d b64=%s", addr, len(buf), b64)
 		}
