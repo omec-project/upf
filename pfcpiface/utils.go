@@ -19,6 +19,11 @@ type Bits uint8
 // Set Bits.
 func Set(b, flag Bits) Bits { return b | flag }
 
+// UnknownString is the canonical string used to represent unknown values in
+// the pfcpiface package. Using a single constant avoids repeated string
+// literals and satisfies goconst lint checks.
+const UnknownString = "unknown"
+
 // func Clear(b, flag Bits) Bits  { return b &^ flag }
 // func Toggle(b, flag Bits) Bits { return b ^ flag }
 // func Has(b, flag Bits) bool { return b&flag != 0 }

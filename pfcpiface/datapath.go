@@ -29,7 +29,7 @@ func (u upfMsgType) String() string {
 	case upfMsgTypeClear:
 		return "clear"
 	default:
-		return "unknown"
+		return UnknownString
 	}
 }
 

@@ -577,7 +577,7 @@ func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 
 			fseidString := strconv.FormatUint(pre.Fseid, 10)
 			pdrString := strconv.FormatUint(pre.Pdr, 10)
-			ueIpString := "unknown"
+			ueIpString := UnknownString
 
 			if con != nil {
 				session, ok := con.store.GetSession(pre.Fseid)
