@@ -252,10 +252,10 @@ type BESSControlClient interface {
 	// /
 	// / NOTE: There should be no running worker to run this command.
 	CreateModule(ctx context.Context, in *CreateModuleRequest, opts ...grpc.CallOption) (*CreateModuleResponse, error)
-	// / Destroy an exsting module
+	// / Destroy an existing module
 	// /
 	// / If the module is connected to other modules' input/output gate, they are
-	// / disconnected first. All tasks created by the module will also be destoyed.
+	// / disconnected first. All tasks created by the module will also be destroyed.
 	// /
 	// / NOTE: There should be no running worker to run this command.
 	DestroyModule(ctx context.Context, in *DestroyModuleRequest, opts ...grpc.CallOption) (*EmptyResponse, error)
@@ -263,8 +263,8 @@ type BESSControlClient interface {
 	GetModuleInfo(ctx context.Context, in *GetModuleInfoRequest, opts ...grpc.CallOption) (*GetModuleInfoResponse, error)
 	// / Connect two modules.
 	// /
-	// / Connect between m1's ogate and n2's igate (i.e., ackets sent to m1's ogate
-	// / will be fed to m2's igate). The oate can be connected to only one igate,
+	// / Connect between m1's ogate and n2's igate (i.e., packets sent to m1's ogate
+	// / will be fed to m2's igate). The ogate can be connected to only one igate,
 	// / while the igate can be connected to multiple output gates.
 	// /
 	// / NOTE: There should be no running worker to run this command.
@@ -282,7 +282,7 @@ type BESSControlClient interface {
 	DumpMempool(ctx context.Context, in *DumpMempoolRequest, opts ...grpc.CallOption) (*DumpMempoolResponse, error)
 	// / Send a command to the specified module instance.
 	// /
-	// / Each module type defines a list of modyle-specific commands, which
+	// / Each module type defines a list of module-specific commands, which
 	// / allow external programs to communicate with the module at runtime.
 	// / See module_msg.proto for details.
 	// /
@@ -943,10 +943,10 @@ type BESSControlServer interface {
 	// /
 	// / NOTE: There should be no running worker to run this command.
 	CreateModule(context.Context, *CreateModuleRequest) (*CreateModuleResponse, error)
-	// / Destroy an exsting module
+	// / Destroy an existing module
 	// /
 	// / If the module is connected to other modules' input/output gate, they are
-	// / disconnected first. All tasks created by the module will also be destoyed.
+	// / disconnected first. All tasks created by the module will also be destroyed.
 	// /
 	// / NOTE: There should be no running worker to run this command.
 	DestroyModule(context.Context, *DestroyModuleRequest) (*EmptyResponse, error)
@@ -954,8 +954,8 @@ type BESSControlServer interface {
 	GetModuleInfo(context.Context, *GetModuleInfoRequest) (*GetModuleInfoResponse, error)
 	// / Connect two modules.
 	// /
-	// / Connect between m1's ogate and n2's igate (i.e., ackets sent to m1's ogate
-	// / will be fed to m2's igate). The oate can be connected to only one igate,
+	// / Connect between m1's ogate and n2's igate (i.e., packets sent to m1's ogate
+	// / will be fed to m2's igate). The ogate can be connected to only one igate,
 	// / while the igate can be connected to multiple output gates.
 	// /
 	// / NOTE: There should be no running worker to run this command.
@@ -973,7 +973,7 @@ type BESSControlServer interface {
 	DumpMempool(context.Context, *DumpMempoolRequest) (*DumpMempoolResponse, error)
 	// / Send a command to the specified module instance.
 	// /
-	// / Each module type defines a list of modyle-specific commands, which
+	// / Each module type defines a list of module-specific commands, which
 	// / allow external programs to communicate with the module at runtime.
 	// / See module_msg.proto for details.
 	// /
@@ -1157,7 +1157,7 @@ type UnsafeBESSControlServer interface {
 }
 
 func RegisterBESSControlServer(s grpc.ServiceRegistrar, srv BESSControlServer) {
-	// If the following call pancis, it indicates UnimplementedBESSControlServer was
+	// If the following call panics, it indicates UnimplementedBESSControlServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
