@@ -14,6 +14,7 @@ import (
 var errFlowDescAbsent = errors.New("flow description not present")
 var errDatapathDown = errors.New("datapath down")
 var errReqRejected = errors.New("request rejected")
+var errRecoveryTimeStampMissing = errors.New("mandatory Recovery Time Stamp IE missing")
 
 func (pConn *PFCPConn) sendAssociationRequest() {
 	// Build request message
@@ -140,6 +141,15 @@ func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (messa
 		return nil, errUnmarshal(err)
 	}
 
+	if asreq.RecoveryTimeStamp == nil {
+		// Reject requests missing Recovery Time Stamp to avoid nil deref on malformed PFCP messages.
+		asres := message.NewAssociationSetupResponse(asreq.SequenceNumber,
+			pConn.associationIEs()...)
+		asres.Cause = ie.NewCause(ie.CauseMandatoryIEMissing)
+		logger.PfcpLog.Warnln("association Setup Request without Recovery Time Stamp from", addr)
+		return asres, errProcess(errRecoveryTimeStampMissing)
+	}
+
 	ts, err := asreq.RecoveryTimeStamp.RecoveryTimeStamp()
 	if err != nil {
 		return nil, errUnmarshal(err)
@@ -148,7 +158,6 @@ func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (messa
 	// Build response message
 	asres := message.NewAssociationSetupResponse(asreq.SequenceNumber,
 		pConn.associationIEs()...)
-
 	if !upf.isConnected() {
 		asres.Cause = ie.NewCause(ie.CauseRequestRejected)
 		return asres, errProcess(errDatapathDown)
@@ -196,6 +205,11 @@ func (pConn *PFCPConn) handleAssociationSetupResponse(msg message.Message) error
 	nodeID, err := asres.NodeID.NodeID()
 	if err != nil {
 		return errUnmarshal(err)
+	}
+
+	if asres.RecoveryTimeStamp == nil {
+		// Abort association if peer omits Recovery Time Stamp to keep state consistent with request handling.
+		return errUnmarshal(errRecoveryTimeStampMissing)
 	}
 
 	ts, err := asres.RecoveryTimeStamp.RecoveryTimeStamp()
