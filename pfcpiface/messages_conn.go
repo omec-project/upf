@@ -14,6 +14,7 @@ import (
 var errFlowDescAbsent = errors.New("flow description not present")
 var errDatapathDown = errors.New("datapath down")
 var errReqRejected = errors.New("request rejected")
+var errNodeIDMissing = errors.New("mandatory NodeID IE missing")
 
 func (pConn *PFCPConn) sendAssociationRequest() {
 	// Build request message
@@ -135,20 +136,27 @@ func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (messa
 		return nil, errUnmarshal(errMsgUnexpectedType)
 	}
 
+	// Build response message
+	asres := message.NewAssociationSetupResponse(asreq.SequenceNumber,
+		pConn.associationIEs()...)
+
+	if asreq.NodeID == nil {
+		// Reject requests that omit the mandatory Node ID to avoid nil deref on malformed PFCP messages.
+		asres.Cause = ie.NewCause(ie.CauseMandatoryIEMissing)
+		logger.PfcpLog.Warnln("association Setup Request without NodeID from", addr)
+		return asres, errProcess(errNodeIDMissing)
+	}
+
 	nodeID, err := asreq.NodeID.NodeID()
 	if err != nil {
-		return nil, errUnmarshal(err)
+		asres.Cause = ie.NewCause(ie.CauseMandatoryIEIncorrect)
+		return asres, errUnmarshal(err)
 	}
 
 	ts, err := asreq.RecoveryTimeStamp.RecoveryTimeStamp()
 	if err != nil {
 		return nil, errUnmarshal(err)
 	}
-
-	// Build response message
-	asres := message.NewAssociationSetupResponse(asreq.SequenceNumber,
-		pConn.associationIEs()...)
-
 	if !upf.isConnected() {
 		asres.Cause = ie.NewCause(ie.CauseRequestRejected)
 		return asres, errProcess(errDatapathDown)
@@ -191,6 +199,11 @@ func (pConn *PFCPConn) handleAssociationSetupResponse(msg message.Message) error
 		logger.PfcpLog.Errorln("association Setup Response from", addr,
 			"with Cause:", cause)
 		return errReqRejected
+	}
+
+	if asres.NodeID == nil {
+		// Abort association if peer omits Node ID, matching request-side validation.
+		return errUnmarshal(errNodeIDMissing)
 	}
 
 	nodeID, err := asres.NodeID.NodeID()
