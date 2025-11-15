@@ -60,6 +60,8 @@ type PFCPConn struct {
 	// channel to signal PFCPNode on exit
 	done     chan<- string
 	shutdown chan struct{}
+	// ensure shutdown is only performed once
+	shutdownOnce sync.Once
 
 	metrics.InstrumentPFCP
 
@@ -231,7 +233,7 @@ func (pConn *PFCPConn) Serve() {
 
 // Shutdown stops connection backing PFCPConn.
 func (pConn *PFCPConn) Shutdown() {
-	close(pConn.shutdown)
+	pConn.shutdownOnce.Do(func() { close(pConn.shutdown) })
 
 	if pConn.hbCtxCancel != nil {
 		pConn.hbCtxCancel()
