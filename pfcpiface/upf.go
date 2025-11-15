@@ -145,10 +145,10 @@ func NewUPF(conf *Conf, fp datapath) *upf {
 	if nodeID != "" {
 		hosts, err = net.LookupHost(nodeID)
 		if err != nil {
-			logger.PfcpLog.Fatalln("unable to resolve hostname", nodeID, err)
+			logger.PfcpLog.Warnf("unable to resolve hostname %s: %+v; continuing with %s", nodeID, err, nodeID)
+		} else if len(hosts) > 0 {
+			nodeID = hosts[0]
 		}
-
-		nodeID = hosts[0]
 	}
 
 	u := &upf{

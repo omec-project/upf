@@ -1,0 +1,333 @@
+{{/*
+# Copyright 2020-present Open Networking Foundation
+
+# SPDX-License-Identifier: Apache-2.0
+*/}}
+
+{{- $upfConfig := index .Values.config.upf.cfgFiles "upf.jsonc" }}
+{{- $accessConfig := index $upfConfig "access" }}
+{{- $coreConfig := index $upfConfig "core" }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: upf
+  labels:
+    app: upf
+    release: {{ .Release.Name | default "" }}
+spec:
+  replicas: 1
+  serviceName: upf-headless
+  selector:
+    matchLabels:
+      app: upf
+      release: {{ .Release.Name | default "" }}
+  template:
+    metadata:
+      labels:
+        app: upf
+        release: {{ .Release.Name | default "" }}
+      annotations:
+        k8s.v1.cni.cncf.io/networks: '[
+          {
+            "name": "access-net",
+            "interface": {{ index $accessConfig "ifname" | quote }},
+          {{- if hasKey .Values.config.upf.access "mac" }}
+            "mac": {{ .Values.config.upf.access.mac | quote }},
+          {{- end }}
+            "ips": [{{ .Values.config.upf.access.ip | quote }}]
+          },
+          {
+            "name": "core-net",
+            "interface": {{ index $coreConfig "ifname" | quote }},
+          {{- if hasKey .Values.config.upf.core "mac" }}
+            "mac": {{ .Values.config.upf.core.mac | quote }},
+          {{- end }}
+            "ips": [{{ .Values.config.upf.core.ip | quote }}]
+          }
+        ]'
+    spec:
+      shareProcessNamespace: true
+    {{- if .Values.nodeSelectors.enabled }}
+      nodeSelector:
+        {{ .Values.nodeSelectors.upf.label }}: {{ .Values.nodeSelectors.upf.value }}
+    {{- end }}
+    {{- if hasKey .Values.images "pullSecrets" }}
+      imagePullSecrets:
+{{ toYaml .Values.images.pullSecrets | indent 8 }}
+    {{- end }}
+      initContainers:
+      - name: bess-init
+        image: {{ .Values.images.repository }}{{ .Values.images.tags.bess }}
+        imagePullPolicy: {{ .Values.images.pullPolicy }}
+        command: ["sh", "-xc"]
+        args:
+        - ip route replace {{ .Values.config.upf.enb.subnet }} via {{ .Values.config.upf.access.gateway }};
+          ip route replace default via {{ .Values.config.upf.core.gateway }} metric 110;
+          {{- range .Values.config.upf.routes }}
+          ip route replace {{ .to }} via {{ .via }};
+          {{- end }}
+          iptables -I OUTPUT -p icmp --icmp-type port-unreachable -j DROP;
+        securityContext:
+          capabilities:
+            add:
+            - NET_ADMIN
+        resources:
+          limits:
+            cpu: 128m
+            memory: 64Mi
+          requests:
+            cpu: 128m
+            memory: 64Mi
+    {{- if .Values.config.coreDump.enabled }}
+{{ tuple "upf" . | include "omec-user-plane.coredump_init" | indent 6 }}
+    {{- end }}
+      containers:
+      - name: bessd
+        image: {{ .Values.images.repository }}{{ .Values.images.tags.bess }}
+        imagePullPolicy: {{ .Values.images.pullPolicy }}
+        securityContext:
+        {{- if .Values.config.upf.privileged }}
+          privileged: true
+        {{- end }}
+          capabilities:
+            add:
+            - IPC_LOCK
+            - CAP_SYS_NICE
+        stdin: true
+        tty: true
+        command: ["/bin/bash", "-xc"]
+        args:
+        {{- if .Values.config.upf.devMode }}
+          # In devMode assume kernel-mode execution (no DPDK/SR-IOV flags)
+          # Disable DPDK, avoid hugepages, reduce packet pool and skip root check
+          - bessd -f -m 0 -buffers=16384 -dpdk=false -skip_root_check --grpc_url=0.0.0.0:10514
+        {{- else }}
+          {{- if .Values.config.upf.hugepage.enabled }}
+            - bessd -f --allow="$PCIDEVICE_INTEL_COM_INTEL_SRIOV_DPDK" --grpc_url=0.0.0.0:10514
+          {{- else }}
+            - bessd -m 0 -f --allow="$PCIDEVICE_INTEL_COM_INTEL_SRIOV_DPDK" --grpc_url=0.0.0.0:10514
+          {{- end }}
+        {{- end }}
+        {{- if not .Values.config.upf.devMode }}
+        lifecycle:
+          postStart:
+            exec:
+              command: ["/etc/bess/conf/bessd-poststart.sh"]
+        {{- end }}
+        {{- if not .Values.config.upf.devMode }}
+        livenessProbe:
+          tcpSocket:
+            port: 10514
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        {{- end }}
+        resources:
+          requests:
+          {{- if .Values.resources.enabled }}
+{{ toYaml .Values.resources.bess.requests | indent 12 }}
+          {{- end }}
+          {{- if .Values.config.upf.hugepage.enabled }}
+            hugepages-1Gi: 2Gi
+          {{- end }}
+          {{- if .Values.config.upf.sriov.enabled }}
+          {{- if eq .Values.config.upf.access.resourceName .Values.config.upf.core.resourceName }}
+            {{ .Values.config.upf.access.resourceName }}: 2
+          {{- else }}
+            {{ .Values.config.upf.access.resourceName }}: 1
+            {{ .Values.config.upf.core.resourceName }}: 1
+          {{- end }}
+          {{- end }}
+          limits:
+          {{- if .Values.resources.enabled }}
+{{ toYaml .Values.resources.bess.limits | indent 12 }}
+          {{- end }}
+          {{- if .Values.config.upf.hugepage.enabled }}
+            hugepages-1Gi: 2Gi
+          {{- end }}
+          {{- if .Values.config.upf.sriov.enabled }}
+          {{- if eq .Values.config.upf.access.resourceName .Values.config.upf.core.resourceName }}
+            {{ .Values.config.upf.access.resourceName }}: 2
+          {{- else }}
+            {{ .Values.config.upf.access.resourceName }}: 1
+            {{ .Values.config.upf.core.resourceName }}: 1
+          {{- end }}
+          {{- end }}
+        env:
+          - name: CONF_FILE
+            value: /etc/bess/conf/upf.jsonc
+        {{- if .Values.config.upf.closedLoop }}
+          - name: CLOSED_LOOP_SOCKET_PATH
+            value: /pod-share/closedloop
+        {{- end }}
+        volumeMounts:
+          - name: shared-app
+            mountPath: /pod-share
+        {{- if .Values.config.upf.hugepage.enabled }}
+          - name: hugepages
+            mountPath: /dev/hugepages
+        {{- end }}
+          - name: configs
+            mountPath: /etc/bess/conf
+        {{- if .Values.config.coreDump.enabled }}
+          - name: coredump
+            mountPath: /tmp/coredump
+        {{- end }}
+      - name: routectl
+        image: {{ .Values.images.repository }}{{ .Values.images.tags.bess }}
+        imagePullPolicy: {{ .Values.images.pullPolicy }}
+        env:
+          - name: PYTHONUNBUFFERED
+            value: "1"
+        command: ["/opt/bess/bessctl/conf/route_control.py"]
+        args:
+          - -i
+          - {{ index $accessConfig "ifname" }}
+          - {{ index $coreConfig "ifname" }}
+      {{- if .Values.resources.enabled }}
+        resources:
+{{ toYaml .Values.resources.routectl | indent 10 }}
+      {{- end }}
+      - name: web
+        image: {{ .Values.images.repository }}{{ .Values.images.tags.bess }}
+        imagePullPolicy: {{ .Values.images.pullPolicy }}
+        command: ["/bin/bash", "-xc", "bessctl http 0.0.0.0 8000"]
+      {{- if .Values.resources.enabled }}
+        resources:
+{{ toYaml .Values.resources.web | indent 10 }}
+      {{- end }}
+      - name: pfcp-agent
+        image: {{ .Values.images.repository }}{{ .Values.images.tags.pfcpiface }}
+        imagePullPolicy: {{ .Values.images.pullPolicy }}
+        command: ["pfcpiface"]
+        args:
+          - -config
+          - /tmp/conf/upf.jsonc
+        {{- if .Values.config.upfDump.enabled }}
+        env:
+        - name: PFCP_DUMP_DIR
+          value: {{ .Values.config.upfDump.dir | quote }}
+        - name: UPF_NAME
+          value: {{ .Values.config.upfDump.upfName | quote }}
+        - name: PFCP_DUMP_MAX_BYTES
+          value: {{ .Values.config.upfDump.maxBytes | quote }}
+        - name: PFCP_DUMP_MAX_FILES
+          value: {{ .Values.config.upfDump.maxFiles | quote }}
+        - name: PFCP_DUMP_TO_LOG
+          value: {{ .Values.config.upfDump.toLog | quote }}
+        {{- end }}
+      {{- if .Values.resources.enabled }}
+        resources:
+{{ toYaml .Values.resources.cpiface | indent 10 }}
+      {{- end }}
+        volumeMounts:
+          - name: shared-app
+            mountPath: /pod-share
+          - name: configs
+            mountPath: /tmp/conf
+          {{- if .Values.config.upfDump.enabled }}
+          - name: pfcp-dump
+            mountPath: "{{ .Values.config.upfDump.dir }}"
+          {{- end }}
+    {{- if .Values.config.gratuitousArp.enabled }}
+      - name: arping
+        image: {{ .Values.images.repository }}{{ .Values.images.tags.tools }}
+        imagePullPolicy: {{ .Values.images.pullPolicy }}
+        command: ["sh", "-xc"]
+        args:
+          - |
+            while true; do
+              # arping does not work - BESS graph is still disconnected
+              #arping -c 2 -I {{ index $accessConfig "ifname" }} {{ .Values.config.upf.access.gateway }}
+              #arping -c 2 -I {{ index $coreConfig "ifname" }} {{ .Values.config.upf.core.gateway }}
+              ping -c 2 {{ .Values.config.upf.access.gateway }}
+              ping -c 2 {{ .Values.config.upf.core.gateway }}
+              sleep {{ .Values.config.gratuitousArp.interval }}
+            done
+        resources:
+          limits:
+            cpu: 128m
+            memory: 64Mi
+          requests:
+            cpu: 128m
+            memory: 64Mi
+    {{- end }}
+    {{- if .Values.config.upf.closedLoop }}
+      - name: closed-loop
+        image: {{ .Values.images.repository }}{{ .Values.images.tags.bess }}
+        imagePullPolicy: {{ .Values.images.pullPolicy }}
+        env:
+          - name: CLOSED_LOOP_PORT
+            value: {{ .Values.config.upf.closedLoopPort | quote }}
+          - name: CLOSED_LOOP_SOCKET_PATH
+            value: /pod-share/closedloop
+        command: ["/opt/bess/bessctl/conf/closed_loop_svr.py"]
+        resources:
+          limits:
+            cpu: 128m
+            memory: 256Mi
+          requests:
+            cpu: 128m
+            memory: 256Mi
+        volumeMounts:
+          - name: shared-app
+            mountPath: /pod-share
+    {{- end }}
+      volumes:
+      - name: configs
+        configMap:
+          name: upf
+          defaultMode: 493
+      - name: shared-app
+        emptyDir: {}
+    {{- if .Values.config.upf.hugepage.enabled }}
+      - name: hugepages
+        emptyDir:
+          medium: HugePages
+    {{- end }}
+    {{- if .Values.config.coreDump.enabled }}
+      - name: host-rootfs
+        hostPath:
+          path: /
+      - name: coredump
+        hostPath:
+          path: {{ .Values.config.coreDump.path }}
+    {{- end }}
+    {{- if .Values.config.upfDump.enabled }}
+      - name: pfcp-dump
+        {{- if .Values.config.upfDump.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: "{{ printf "%s-pfcp-dump-pvc" (default .Release.Name .Values.config.upfDump.upfName) }}"
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
+    {{- end }}
+
+        command: ["/opt/bess/bessctl/conf/route_control.py"]
+        args:
+          - -i
+          - {{ index $accessConfig "ifname" }}
+          - {{ index $coreConfig "ifname" }}
+      - name: web
+        image: {{ .Values.images.repository }}{{ .Values.images.tags.bess }}
+        imagePullPolicy: {{ .Values.images.pullPolicy }}
+        command: ["/bin/bash", "-xc", "bessctl http 0.0.0.0 8000"]
+      - name: pfcp-agent
+        image: {{ .Values.images.repository }}{{ .Values.images.tags.pfcpiface }}
+        imagePullPolicy: {{ .Values.images.pullPolicy }}
+        command: ["pfcpiface"]
+        args:
+          - -config
+          - /tmp/conf/upf.jsonc
+        volumeMounts:
+          - name: shared-app
+            mountPath: /pod-share
+          - name: configs
+            mountPath: /tmp/conf
+      volumes:
+      - name: configs
+        configMap:
+          name: upf
+          defaultMode: 493
+      - name: shared-app
+        emptyDir: {}
