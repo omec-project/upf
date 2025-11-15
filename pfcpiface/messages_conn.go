@@ -156,8 +156,6 @@ func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (messa
 
 	if asreq.RecoveryTimeStamp == nil {
 		// Reject requests missing Recovery Time Stamp to avoid nil deref on malformed PFCP messages.
-		asres := message.NewAssociationSetupResponse(asreq.SequenceNumber,
-			pConn.associationIEs()...)
 		asres.Cause = ie.NewCause(ie.CauseMandatoryIEMissing)
 		logger.PfcpLog.Warnln("association Setup Request without Recovery Time Stamp from", addr)
 		return asres, errProcess(errRecoveryTimeStampMissing)
@@ -165,7 +163,8 @@ func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (messa
 
 	ts, err := asreq.RecoveryTimeStamp.RecoveryTimeStamp()
 	if err != nil {
-		return nil, errUnmarshal(err)
+		asres.Cause = ie.NewCause(ie.CauseMandatoryIEIncorrect)
+		return asres, errUnmarshal(err)
 	}
 
 	if !upf.isConnected() {
