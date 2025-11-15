@@ -92,21 +92,6 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 			logger.PfcpLog.Infof("PFCP_RAW_DUMP addr=%s len=%d b64=%s", addr, len(buf), b64)
 		}
 
-		logger.PfcpLog.Errorf("ignoring undecodable message from %s: len=%d, hex=%x, error=%v", addr, len(buf), buf, err)
-
-		if dumpDir := os.Getenv("PFCP_DUMP_DIR"); dumpDir != "" {
-			if err2 := dumpRawPFCP(dumpDir, addr, buf); err2 != nil {
-				logger.PfcpLog.Errorf("failed to dump raw PFCP from %s: %v", addr, err2)
-			} else {
-				logger.PfcpLog.Debugf("dumped raw PFCP from %s to %s", addr, dumpDir)
-			}
-		}
-
-		if os.Getenv("PFCP_DUMP_TO_LOG") == "true" {
-			b64 := base64.StdEncoding.EncodeToString(buf)
-			logger.PfcpLog.Infof("PFCP_RAW_DUMP addr=%s len=%d b64=%s", addr, len(buf), b64)
-		}
-
 		return
 	}
 
