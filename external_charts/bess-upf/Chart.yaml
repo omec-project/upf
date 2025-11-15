@@ -1,0 +1,30 @@
+{{/*
+# Copyright 2020-present Open Networking Foundation
+
+# SPDX-License-Identifier: Apache-2.0
+*/}}
+
+apiVersion: v2
+name: bess-upf
+description: BESS UPF chart (dev-friendly)
+type: application
+version: 0.1.0
+appVersion: "rel-2.1.2"
+apiVersion: v2
+name: bess-upf
+description: BESS UPF chart (dev-friendly)
+type: application
+version: 0.1.0
+appVersion: "rel-2.1.2"
+apiVersion: v2
+name: bess-upf
+description: BESS UPF Helm chart (local copy restored)
+type: application
+version: 0.1.0
+appVersion: "rel-2.1.2"
+apiVersion: v2
+name: bess-upf
+description: BESS UPF chart (dev-friendly)
+type: application
+version: 0.1.0
+appVersion: "rel-2.1.2"
