@@ -15,6 +15,7 @@ var errFlowDescAbsent = errors.New("flow description not present")
 var errDatapathDown = errors.New("datapath down")
 var errReqRejected = errors.New("request rejected")
 var errNodeIDMissing = errors.New("mandatory NodeID IE missing")
+var errRecoveryTimeStampMissing = errors.New("mandatory Recovery Time Stamp IE missing")
 
 func (pConn *PFCPConn) sendAssociationRequest() {
 	// Build request message
@@ -164,11 +165,19 @@ func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (messa
 		return asres, errUnmarshal(err)
 	}
 
+	if asreq.RecoveryTimeStamp == nil {
+		// Reject requests missing Recovery Time Stamp to avoid nil deref on malformed PFCP messages.
+		asres.Cause = ie.NewCause(ie.CauseMandatoryIEMissing)
+		logger.PfcpLog.Warnln("association Setup Request without Recovery Time Stamp from", addr)
+		return asres, errProcess(errRecoveryTimeStampMissing)
+	}
+
 	ts, err := asreq.RecoveryTimeStamp.RecoveryTimeStamp()
 	if err != nil {
 		asres.Cause = ie.NewCause(ie.CauseMandatoryIEIncorrect)
 		return asres, errUnmarshal(err)
 	}
+
 	if !upf.isConnected() {
 		asres.Cause = ie.NewCause(ie.CauseRequestRejected)
 		return asres, errProcess(errDatapathDown)
