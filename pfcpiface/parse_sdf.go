@@ -139,6 +139,9 @@ func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
 		switch fields[i] {
 		case "from":
 			i++
+			if i >= len(fields) {
+				return nil, errBadFilterDesc
+			}
 			xform(i)
 
 			err := ipf.src.parseNet(fields[i])
@@ -147,8 +150,12 @@ func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
 				return nil, err
 			}
 
-			if fields[i+1] != "to" {
+			if i+1 < len(fields) && fields[i+1] != "to" {
 				i++
+
+				if i >= len(fields) {
+					return nil, errBadFilterDesc
+				}
 
 				err = ipf.src.parsePort(fields[i])
 				if err != nil {
@@ -158,6 +165,9 @@ func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
 			}
 		case "to":
 			i++
+			if i >= len(fields) {
+				return nil, errBadFilterDesc
+			}
 			xform(i)
 
 			err := ipf.dst.parseNet(fields[i])
