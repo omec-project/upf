@@ -137,35 +137,18 @@ func (node *PFCPNode) Serve() {
 				logger.PfcpLog.Errorln("error closing PFCPNode conn", err)
 			}
 
-			// Clear out the remaining pconn completions
-		clearLoop:
+			// Drain remaining pconn completions without closing the channel.
+		drainLoop:
 			for {
 				select {
-				case rAddr, ok := <-node.pConnDone:
-					{
-						if !ok {
-							// channel is closed, break
-							break clearLoop
-						}
-						node.pConns.Delete(rAddr)
-						logger.PfcpLog.Infoln("removed connection to", rAddr)
-					}
-				default:
-					// nothing to read from channel
-					break clearLoop
-				}
-			}
-
-			if len(node.pConnDone) > 0 {
-				for rAddr := range node.pConnDone {
+				case rAddr := <-node.pConnDone:
 					node.pConns.Delete(rAddr)
 					logger.PfcpLog.Infoln("removed connection to", rAddr)
+				default:
+					// nothing left to read
+					break drainLoop
 				}
 			}
-
-			close(node.pConnDone)
-			logger.PfcpLog.Infoln("done waiting for PFCPConn completions")
-
 			node.upf.Exit()
 		}
 	}
