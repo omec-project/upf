@@ -19,6 +19,7 @@ var (
 	ErrAssocNotFound   = errors.New("no association found for NodeID")
 	ErrAllocateSession = errors.New("unable to allocate new PFCP session")
 	ErrCPFSEIDMissing  = errors.New("mandatory CPF-SEID IE missing")
+	ErrCauseMissing    = errors.New("mandatory Cause IE missing")
 )
 
 func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (message.Message, error) {
