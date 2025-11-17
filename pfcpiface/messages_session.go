@@ -18,6 +18,7 @@ var (
 	ErrWriteToDatapath = errors.New("write to datapath failed")
 	ErrAssocNotFound   = errors.New("no association found for NodeID")
 	ErrAllocateSession = errors.New("unable to allocate new PFCP session")
+	ErrCPFSEIDMissing  = errors.New("mandatory CPF-SEID IE missing")
 )
 
 func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (message.Message, error) {
@@ -48,6 +49,19 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 	}
 
 	/* Read fseid from the IE */
+	if sereq.CPFSEID == nil {
+		// Reject requests that omit the mandatory CPF-SEID to avoid nil deref on malformed PFCP messages.
+		logger.PfcpLog.Warnln("Session Establishment Request without CPF-SEID from nodeID:", nodeID)
+		pfdres := message.NewSessionEstablishmentResponse(0,
+			0,
+			0,
+			sereq.SequenceNumber,
+			0,
+			ie.NewCause(ie.CauseMandatoryIEMissing),
+		)
+		return pfdres, errUnmarshal(ErrCPFSEIDMissing)
+	}
+
 	fseid, err := sereq.CPFSEID.FSEID()
 	if err != nil {
 		return errUnmarshalReply(err, sereq.CPFSEID)
