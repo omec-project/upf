@@ -153,10 +153,6 @@ func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
 			if i+1 < len(fields) && fields[i+1] != "to" {
 				i++
 
-				if i >= len(fields) {
-					return nil, errBadFilterDesc
-				}
-
 				err = ipf.src.parsePort(fields[i])
 				if err != nil {
 					parseLog.Errorln("src port parse failed", err)
@@ -176,7 +172,7 @@ func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
 				return nil, err
 			}
 
-			if i < len(fields)-1 {
+			if i+1 < len(fields) {
 				i++
 
 				err = ipf.dst.parsePort(fields[i])
