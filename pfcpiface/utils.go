@@ -66,7 +66,7 @@ func inc(ip net.IP) {
 
 func ip2int(ip net.IP) uint32 {
 	// Guard against nil or empty IP to prevent out-of-bounds access
-	if ip == nil || len(ip) == 0 {
+	if len(ip) == 0 {
 		return 0
 	}
 	if len(ip) == 16 {

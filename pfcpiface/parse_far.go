@@ -121,7 +121,7 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 
 			f.tunnelTEID = ohcFields.TEID
 			// Guard against nil or empty IPv4Address to avoid out-of-bounds access in ip2int
-			if ohcFields.IPv4Address != nil && len(ohcFields.IPv4Address) > 0 {
+			if len(ohcFields.IPv4Address) > 0 {
 				f.tunnelIP4Dst = ip2int(ohcFields.IPv4Address)
 			}
 			f.tunnelType = uint8(1)
