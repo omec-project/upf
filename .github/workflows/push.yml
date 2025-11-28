@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2024 Intel Corporation
+name: Release Pipeline
+
 on:
   push:
     branches:
@@ -7,14 +9,27 @@ on:
     paths:
       - "VERSION"
 
+permissions:
+  contents: read
+
 jobs:
   tag-github:
-    uses: omec-project/.github/.github/workflows/tag-github.yml@main
+    permissions:
+      contents: write
+      actions: read
+      id-token: write
+    uses: omec-project/.github/.github/workflows/tag-github.yml@453e42d23f0366133ec7c053ee92a97f374f3ac5 # v0.0.1
     secrets: inherit
 
   release-image:
     needs: tag-github
-    uses: omec-project/.github/.github/workflows/upf-release-image.yml@main
+    permissions:
+      contents: read
+      packages: write
+      actions: read
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/upf-release-image.yml@453e42d23f0366133ec7c053ee92a97f374f3ac5 # v0.0.1
     with:
       branch_name: ${{ github.ref }}
       changed: ${{ needs.tag-github.outputs.changed }}
@@ -23,7 +38,12 @@ jobs:
 
   update-version:
     needs: tag-github
-    uses: omec-project/.github/.github/workflows/update-version.yml@main
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: read
+      id-token: write
+    uses: omec-project/.github/.github/workflows/update-version.yml@453e42d23f0366133ec7c053ee92a97f374f3ac5 # v0.0.1
     with:
       changed: ${{ needs.tag-github.outputs.changed }}
       version: ${{ needs.tag-github.outputs.version }}
@@ -31,7 +51,11 @@ jobs:
 
   branch-release:
     needs: tag-github
-    uses: omec-project/.github/.github/workflows/branch-release.yml@main
+    permissions:
+      contents: write
+      actions: read
+      id-token: write
+    uses: omec-project/.github/.github/workflows/branch-release.yml@453e42d23f0366133ec7c053ee92a97f374f3ac5 # v0.0.1
     with:
       release_branch: ${{ needs.tag-github.outputs.release_branch }}
       version_branch: ${{ needs.tag-github.outputs.version_branch }}

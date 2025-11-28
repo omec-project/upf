@@ -165,17 +165,16 @@ integrate a new UPF datapath or fix bugs!
 
 Before contributing, please follow these guidelines:
 
-* Check out [open issues](https://github.com/omec-project/upf/issues).
 * Check out [the developer guide](./docs/developer-guide.md).
 * We follow the best practices described in https://google.github.io/eng-practices/review/developer/.
   Get familiar with them before submitting a PR.
 * Both unit and E2E integration tests must pass on CI. Please make sure that
   tests are passing with your change (see [Testing](#testing) section).
 
-## Support
+## Reach out to us through
 
-To report any other kind of problem, feel free to open a GitHub Issue or reach
-out to the project maintainers on the ONF Community Slack ([aether-dev](https://app.slack.com/client/T095Z193Q/C01E4HMLBNV)).
+1. #sdcore-dev channel in [Aether Community Slack](https://aether5g-project.slack.com)
+2. Raise Github [issues](https://github.com/omec-project/upf/issues/new)
 
 ## License
 
