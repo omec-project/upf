@@ -118,7 +118,7 @@ RUN mkdir /bess_pb && \
     --go-grpc_opt=paths=source_relative --go-grpc_out=/bess_pb
 
 FROM bess-build AS py-pb
-RUN pip install --no-cache-dir grpcio-tools protobuf==4.25.8
+RUN pip install --no-cache-dir grpcio-tools==1.56.2 protobuf==4.25.8
 RUN mkdir /bess_pb && \
     python3 -m grpc_tools.protoc -I /usr/include -I /protobuf/ \
     /protobuf/*.proto /protobuf/ports/*.proto \
