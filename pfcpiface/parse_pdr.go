@@ -397,7 +397,10 @@ func (p *pdr) parseFTEID(teidIE *ie.IE) error {
 	} else if teid != 0 {
 		p.tunnelTEID = teid
 		p.tunnelTEIDMask = 0xFFFFFFFF
-		p.tunnelIP4Dst = ip2int(fteid.IPv4Address)
+		// Guard against nil or empty IPv4Address to avoid out-of-bounds access in ip2int
+		if len(fteid.IPv4Address) > 0 {
+			p.tunnelIP4Dst = ip2int(fteid.IPv4Address)
+		}
 		p.tunnelIP4DstMask = 0xFFFFFFFF
 	}
 
