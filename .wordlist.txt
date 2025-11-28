@@ -3,6 +3,7 @@
 adaptor
 ADQ
 aether
+aetherproject
 Aether
 allocatable
 AMI
@@ -185,6 +186,7 @@ nhmacaddrs
 Personalization
 PRIVS
 rf
+sdcore
 sgi
 vdev
 zc

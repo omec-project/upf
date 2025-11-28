@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2023 Canonical Ltd.
 # Copyright 2024 Intel Corporation
+name: CI Pipeline
+
 on:
   pull_request:
     branches:
@@ -9,48 +11,93 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   build:
     if: github.event_name == 'pull_request'
-    uses: omec-project/.github/.github/workflows/upf-build-upf.yml@main
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/upf-build-upf.yml@453e42d23f0366133ec7c053ee92a97f374f3ac5 # v0.0.1
     with:
       branch_name: ${{ github.ref }}
 
   build-ptf:
     if: github.event_name == 'pull_request'
-    uses: omec-project/.github/.github/workflows/upf-build-ptf.yml@main
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/upf-build-ptf.yml@453e42d23f0366133ec7c053ee92a97f374f3ac5 # v0.0.1
     with:
       branch_name: ${{ github.ref }}
 
   lint:
-    uses: omec-project/.github/.github/workflows/lint.yml@main
+    permissions:
+      contents: read
+      checks: write
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/lint.yml@453e42d23f0366133ec7c053ee92a97f374f3ac5 # v0.0.1
     with:
       branch_name: ${{ github.ref }}
 
   hadolint:
-    uses: omec-project/.github/.github/workflows/hadolint.yml@main
+    permissions:
+      contents: read
+      security-events: write
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/hadolint.yml@453e42d23f0366133ec7c053ee92a97f374f3ac5 # v0.0.1
     with:
       branch_name: ${{ github.ref }}
 
   check-spelling:
-    uses: omec-project/.github/.github/workflows/check-spelling.yml@main
+    permissions:
+      contents: read
+      checks: write
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/check-spelling.yml@453e42d23f0366133ec7c053ee92a97f374f3ac5 # v0.0.1
     with:
       branch_name: ${{ github.ref }}
 
   route-control-tests:
-    uses: omec-project/.github/.github/workflows/upf-route-control-tests.yml@main
+    permissions:
+      contents: read
+      checks: write
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/upf-route-control-tests.yml@453e42d23f0366133ec7c053ee92a97f374f3ac5 # v0.0.1
     with:
       branch_name: ${{ github.ref }}
 
   unit-tests-pfcp:
-    uses: omec-project/.github/.github/workflows/unit-test.yml@main
+    permissions:
+      contents: read
+      checks: write
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/unit-test.yml@453e42d23f0366133ec7c053ee92a97f374f3ac5 # v0.0.1
     with:
       branch_name: ${{ github.ref }}
       test_flags: "-race -failfast -v"
       test_directory: "./pfcpiface ./cmd/..."
 
   integration-tests-bess:
-    uses: omec-project/.github/.github/workflows/unit-test.yml@main
+    permissions:
+      contents: read
+      checks: write
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/unit-test.yml@453e42d23f0366133ec7c053ee92a97f374f3ac5 # v0.0.1
     with:
       branch_name: ${{ github.ref }}
       test_flags: "-race -failfast -v -count=1"
@@ -58,11 +105,43 @@ jobs:
       env_vars: "MODE=native DATAPATH=bess"
 
   license-check:
-    uses: omec-project/.github/.github/workflows/license-check.yml@main
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/license-check.yml@453e42d23f0366133ec7c053ee92a97f374f3ac5 # v0.0.1
     with:
       branch_name: ${{ github.ref }}
 
   fossa-scan:
-    uses: omec-project/.github/.github/workflows/fossa-scan.yml@main
+    permissions:
+      contents: read
+      security-events: write
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/fossa-scan.yml@453e42d23f0366133ec7c053ee92a97f374f3ac5 # v0.0.1
+    with:
+      branch_name: ${{ github.ref }}
+
+  analysis:
+    if: github.repository_owner == 'omec-project'
+    permissions:
+      actions: read
+      artifact-metadata: read
+      attestations: read
+      checks: read
+      contents: read
+      deployments: read
+      discussions: read
+      id-token: write
+      issues: read
+      models: read
+      packages: read
+      pages: read
+      pull-requests: read
+      repository-projects: read
+      security-events: write
+      statuses: read
+    uses: omec-project/.github/.github/workflows/scorecard-analysis.yml@453e42d23f0366133ec7c053ee92a97f374f3ac5 # v0.0.1
     with:
       branch_name: ${{ github.ref }}
