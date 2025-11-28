@@ -96,6 +96,7 @@ ONF
 ONF's
 ONFConnect
 ONOS
+OpenSSF
 pci
 PCI
 PCIe
