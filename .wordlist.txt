@@ -10,7 +10,9 @@ allocatable
 AMI
 bb
 bess
+BESSControl
 bessctl
+bessd
 busypoll
 BUIDKIT
 cndp
@@ -50,6 +52,7 @@ epc
 ethernet
 FARs
 fb
+GetVersion
 github
 gNB
 gRPC
@@ -83,6 +86,7 @@ MAKEFLAGS
 md
 memlock
 Microbenchmarks
+ModuleCommand
 Natting
 natting
 netdev
