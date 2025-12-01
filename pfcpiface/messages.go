@@ -207,7 +207,7 @@ func (pConn *PFCPConn) sendPFCPRequestMessage(r *Request) (message.Message, bool
 }
 
 // dumpRawPFCP writes the raw PFCP packet bytes to a file under dumpDir.
-func dumpRawPFCP(dumpDir, addr string, buf []byte) error {
+func dumpRawPFCP(dumpDir, addr string, buf []byte) (err error) {
 	safe := filepath.Base(addr)
 	var b strings.Builder
 	for _, r := range safe {
@@ -240,14 +240,14 @@ func dumpRawPFCP(dumpDir, addr string, buf []byte) error {
 		outDir = filepath.Join(dumpDir, safeUPF)
 	}
 
-	if err := os.MkdirAll(outDir, 0o700); err != nil {
+	if err = os.MkdirAll(outDir, 0o700); err != nil {
 		return err
 	}
 
 	pid := os.Getpid()
 
 	randb := make([]byte, 4)
-	if _, err := rand.Read(randb); err != nil {
+	if _, err = rand.Read(randb); err != nil {
 		// fallback to time-based low-entropy suffix if crypto/rand fails
 		randb = []byte(time.Now().Format("150405"))
 	}
@@ -259,7 +259,8 @@ func dumpRawPFCP(dumpDir, addr string, buf []byte) error {
 	fname := filepath.Join(outDir, fmt.Sprintf("pfcp_%s_%s_pid%d_%s_%s.bin", upfPart, safeAddr, pid, time.Now().Format("20060102T150405.000000"), suffix))
 
 	// Use O_EXCL to avoid overwriting an existing file with the same name.
-	f, err := os.OpenFile(fname, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	var f *os.File
+	f, err = os.OpenFile(fname, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
 		// fallback to WriteFile; if successful, kick off pruning asynchronously.
 		if err2 := os.WriteFile(fname, buf, 0o600); err2 == nil {
@@ -269,7 +270,11 @@ func dumpRawPFCP(dumpDir, addr string, buf []byte) error {
 			return err2
 		}
 	}
-	defer f.Close()
+	defer func() {
+		if cerr := f.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
 	_, err = f.Write(buf)
 	if err == nil {
