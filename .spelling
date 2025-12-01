@@ -1,0 +1,6 @@
+# Technical terms and API names to accept in spell checks
+BESSControl
+GetVersion
+ModuleCommand
+pfcpiface
+bessd

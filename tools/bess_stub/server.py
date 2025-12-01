@@ -1,10 +1,14 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2019-present Intel Corporation
+# Copyright (c) 2024-present The UPF contributors
+
 """Minimal BESS gRPC stub for testing UPF startup.
 
-This stub implements a tiny subset of the BESSControl API used by UPF:
-- GetVersion
-- ModuleCommand
+This stub implements a tiny subset of the `BESSControl` API used by UPF:
+- `GetVersion`
+- `ModuleCommand`
 
-It intentionally returns success for ModuleCommand and a fixed version string.
+It intentionally returns success for `ModuleCommand` and a fixed version string.
 """
 import logging
 from concurrent import futures

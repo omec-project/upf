@@ -1,3 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2019-present Intel Corporation
+# Copyright (c) 2024-present The UPF contributors
+
 FROM python:3.11-slim
 WORKDIR /app
 
