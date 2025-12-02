@@ -11,7 +11,7 @@ ARG TREX_LIBS=/trex_python
 ARG UNITTEST_XML_REPORTING_VER=3.0.4
 ARG PROTOBUF_VER=3.20
 # Install dependencies for general PTF test definitions
-FROM ubuntu:22.04 AS ptf-deps
+FROM ubuntu:22.04@sha256:104ae83764a5119017b8e8d6218fa0832b09df65aae7d5a6de29a85d813da2fb AS ptf-deps
 
 ARG SCAPY_VER
 ARG PTF_VER
@@ -35,7 +35,7 @@ RUN pip3 install --no-cache-dir --root /python_output \
     unittest-xml-reporting==$UNITTEST_XML_REPORTING_VER
 
 # Install TRex traffic gen and library for TRex API
-FROM alpine:3.22 AS trex-builder
+FROM alpine:3.22@sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412 AS trex-builder
 ARG TREX_VER
 ARG TREX_EXT_LIBS
 ARG TREX_LIBS
@@ -52,7 +52,7 @@ RUN apk update && apk add --no-cache -U wget && \
     cp -r ${TREX_SCRIPT_DIR}/automation/trex_control_plane/stf/trex_stf_lib /output/${TREX_LIBS}
 
 # Synthesize all dependencies for runtime
-FROM ubuntu:22.04
+FROM ubuntu:22.04@sha256:104ae83764a5119017b8e8d6218fa0832b09df65aae7d5a6de29a85d813da2fb
 
 ARG TREX_EXT_LIBS
 ARG TREX_LIBS
