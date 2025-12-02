@@ -3,7 +3,7 @@
 # Copyright 2019-present Intel Corporation
 
 # Stage bess-build: fetch BESS dependencies & pre-reqs
-FROM registry.aetherproject.org/sdcore/bess_build:251001 AS bess-build
+FROM registry.aetherproject.org/sdcore/bess_build:251001@sha256:b7d5a28a18bb51bbfcf4c36c52382797425fc94d8541af5d0690f17f6e9140f8 AS bess-build
 ARG CPU=native
 ARG BESS_COMMIT=main
 ENV PLUGINS_DIR=plugins
@@ -53,7 +53,7 @@ RUN PLUGINS=$(find "$PLUGINS_DIR" -mindepth 1 -maxdepth 1 -type d) && \
     cp -r core/pb /pb
 
 # Stage bess: creates the runtime image of BESS
-FROM ubuntu:22.04 AS bess
+FROM ubuntu:22.04@sha256:104ae83764a5119017b8e8d6218fa0832b09df65aae7d5a6de29a85d813da2fb AS bess
 WORKDIR /
 COPY requirements.txt .
 RUN apt-get update && apt-get install -y \
