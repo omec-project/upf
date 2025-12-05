@@ -65,10 +65,13 @@ func inc(ip net.IP) {
 }
 
 func ip2int(ip net.IP) uint32 {
+	// Guard against IP with insufficient length (need at least 4 bytes for uint32)
+	if len(ip) < 4 {
+		return 0
+	}
 	if len(ip) == 16 {
 		return binary.BigEndian.Uint32(ip[12:16])
 	}
-
 	return binary.BigEndian.Uint32(ip)
 }
 
