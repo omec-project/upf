@@ -1,5 +1,8 @@
 """pfcpiface.bess_pb package marker.
 
+SPDX-FileCopyrightText: 2025 Arnav Kapoor
+SPDX-License-Identifier: Apache-2.0
+
 Ensures the generated Python protobufs in this directory are importable
 as `pfcpiface.bess_pb.<module>`.
 """
