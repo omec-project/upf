@@ -70,7 +70,7 @@ type PFCPConn struct {
 	pendingReqs sync.Map
 
 	shutdownOnce sync.Once
-	isShutdown   atomic.Int32
+	isShutdown   atomic.Bool
 }
 
 func (pConn *PFCPConn) startHeartBeatMonitor() {
@@ -260,13 +260,13 @@ func (pConn *PFCPConn) Serve() {
 // Shutdown stops connection backing PFCPConn.
 func (pConn *PFCPConn) Shutdown() {
 	pConn.shutdownOnce.Do(func() {
-		pConn.doShutdown()
+		pConn.executeShutdown()
 	})
 }
 
-func (pConn *PFCPConn) doShutdown() {
+func (pConn *PFCPConn) executeShutdown() {
 	// Mark as shutdown atomically
-	pConn.isShutdown.Store(1)
+	pConn.isShutdown.Store(true)
 
 	close(pConn.shutdown)
 
@@ -302,7 +302,7 @@ func (pConn *PFCPConn) doShutdown() {
 
 // IsShutdown returns true if the connection has been shutdown
 func (pConn *PFCPConn) IsShutdown() bool {
-	return pConn.isShutdown.Load() == 1
+	return pConn.isShutdown.Load()
 }
 
 func (pConn *PFCPConn) getSeqNum() uint32 {
