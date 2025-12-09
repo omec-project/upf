@@ -7,7 +7,6 @@ Copyright 2019 Intel Corporation
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/omec-project/upf)](https://goreportcard.com/report/github.com/omec-project/upf)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/omec-project/upf/badge)](https://scorecard.dev/viewer/?uri=github.com/omec-project/upf)
-[![Build Status](https://jenkins.onosproject.org/buildStatus/icon?job=bess-upf-linerate-tests&subject=Linerate+Tests)](https://jenkins.onosproject.org/job/bess-upf-linerate-tests/)
 
 This project implements a 4G/5G User Plane Function (UPF) compliant with 3GPP
 TS23.501. It follows the 3GPP Control and User Plane Separation (CUPS)
