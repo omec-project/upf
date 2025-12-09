@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	reuse "github.com/libp2p/go-reuseport"
@@ -67,9 +68,17 @@ type PFCPConn struct {
 	hbCtxCancel context.CancelFunc
 
 	pendingReqs sync.Map
+
+	shutdownOnce sync.Once
+	isShutdown   atomic.Bool
 }
 
 func (pConn *PFCPConn) startHeartBeatMonitor() {
+	// Check if already shutdown
+	if pConn.IsShutdown() {
+		return
+	}
+
 	// Stop HeartBeat routine if already running
 	if pConn.hbCtxCancel != nil {
 		pConn.hbCtxCancel()
@@ -88,11 +97,21 @@ func (pConn *PFCPConn) startHeartBeatMonitor() {
 		case <-hbCtx.Done():
 			logger.PfcpLog.Infoln("cancel HeartBeat Timer", pConn.RemoteAddr().String())
 			heartBeatExpiryTimer.Stop()
-
 			return
 		case <-pConn.hbReset:
+			// Check if shutdown before resetting timer
+			if pConn.IsShutdown() {
+				heartBeatExpiryTimer.Stop()
+				return
+			}
 			heartBeatExpiryTimer.Reset(pConn.upf.hbInterval)
 		case <-heartBeatExpiryTimer.C:
+			// Check if shutdown before sending heartbeat
+			if pConn.IsShutdown() {
+				heartBeatExpiryTimer.Stop()
+				return
+			}
+
 			logger.PfcpLog.Debugln("HeartBeat Interval Timer Expired", pConn.RemoteAddr().String())
 
 			r := pConn.getHeartBeatRequest()
@@ -185,6 +204,11 @@ func (pConn *PFCPConn) Serve() {
 		recvBuf := make([]byte, 65507) // Maximum UDP payload size
 
 		for {
+			// Check if shutdown before attempting to read
+			if pConn.IsShutdown() {
+				return
+			}
+
 			err := pConn.SetReadDeadline(time.Now().Add(pConn.upf.readTimeout))
 			if err != nil {
 				logger.PfcpLog.Errorf("failed to set read timeout: %v", err)
@@ -196,7 +220,6 @@ func (pConn *PFCPConn) Serve() {
 					logger.PfcpLog.Infof("read timeout for connection %v<->%v, is the SMF still alive?",
 						pConn.LocalAddr(), pConn.RemoteAddr())
 					connTimeout <- struct{}{}
-
 					return
 				}
 
@@ -205,6 +228,11 @@ func (pConn *PFCPConn) Serve() {
 				}
 
 				continue
+			}
+
+			// Check again before processing the message
+			if pConn.IsShutdown() {
+				return
 			}
 
 			buf := append([]byte{}, recvBuf[:n]...)
@@ -231,6 +259,15 @@ func (pConn *PFCPConn) Serve() {
 
 // Shutdown stops connection backing PFCPConn.
 func (pConn *PFCPConn) Shutdown() {
+	pConn.shutdownOnce.Do(func() {
+		pConn.executeShutdown()
+	})
+}
+
+func (pConn *PFCPConn) executeShutdown() {
+	// Mark as shutdown atomically
+	pConn.isShutdown.Store(true)
+
 	close(pConn.shutdown)
 
 	if pConn.hbCtxCancel != nil {
@@ -245,7 +282,14 @@ func (pConn *PFCPConn) Shutdown() {
 	}
 
 	rAddr := pConn.RemoteAddr().String()
-	pConn.done <- rAddr
+
+	// Safely send to done channel (non-blocking)
+	select {
+	case pConn.done <- rAddr:
+	default:
+		// Channel might be full or closed, do not block
+		logger.PfcpLog.Warnln("could not send shutdown notification for", rAddr)
+	}
 
 	err := pConn.Close()
 	if err != nil {
@@ -254,6 +298,11 @@ func (pConn *PFCPConn) Shutdown() {
 	}
 
 	logger.PfcpLog.Infoln("shutdown complete for", rAddr)
+}
+
+// IsShutdown returns true if the connection has been shutdown
+func (pConn *PFCPConn) IsShutdown() bool {
+	return pConn.isShutdown.Load()
 }
 
 func (pConn *PFCPConn) getSeqNum() uint32 {
