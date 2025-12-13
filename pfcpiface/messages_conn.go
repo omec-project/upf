@@ -216,11 +216,6 @@ func (pConn *PFCPConn) handleAssociationSetupResponse(msg message.Message) error
 		return errUnmarshal(errNodeIDMissing)
 	}
 
-	if asres.NodeID == nil {
-		// Abort association if peer omits Node ID, matching request-side validation.
-		return errUnmarshal(errNodeIDMissing)
-	}
-
 	nodeID, err := asres.NodeID.NodeID()
 	if err != nil {
 		return errUnmarshal(err)

@@ -110,6 +110,7 @@ RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10 && \
 FROM bess-build AS go-pb
 COPY --from=protoc-gen /go/bin/protoc-gen-go /bin
 COPY --from=protoc-gen /go/bin/protoc-gen-go-grpc /bin
+
 RUN mkdir /bess_pb && \
     protoc -I /usr/include -I /protobuf/ \
     /protobuf/*.proto /protobuf/ports/*.proto \
@@ -117,7 +118,8 @@ RUN mkdir /bess_pb && \
     --go-grpc_opt=paths=source_relative --go-grpc_out=/bess_pb
 
 FROM bess-build AS py-pb
-RUN pip install --no-cache-dir grpcio-tools==1.56.2 protobuf==4.25.8
+COPY requirements_pb.txt .
+RUN pip install --no-cache-dir --require-hashes -r requirements_pb.txt
 RUN mkdir /bess_pb && \
     python3 -m grpc_tools.protoc -I /usr/include -I /protobuf/ \
     /protobuf/*.proto /protobuf/ports/*.proto \
@@ -135,8 +137,6 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN if echo "$GOFLAGS" | grep -Eq "-mod=vendor"; then go mod download; fi
 
 COPY . /pfcpiface
-RUN go mod tidy && \
-    CGO_ENABLED=0 go build $GOFLAGS -o /bin/pfcpiface ./cmd/pfcpiface
 RUN go mod tidy && \
     CGO_ENABLED=0 go build $GOFLAGS -o /bin/pfcpiface ./cmd/pfcpiface
 

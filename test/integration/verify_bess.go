@@ -80,10 +80,3 @@ func verifyNoBessRuntimeEntries(t *testing.T, bess *fake_bess.FakeBESS) {
 		t.Errorf("Expected no app QER entries, but found %d: %v", len(appQers), appQers)
 	}
 }
-
-// verifyEntries performs all runtime entry checks for a UE session that
-// is expected to be present in the fake BESS instance. It is a thin
-// wrapper used by tests to avoid repeating the global `bessFake` value.
-func verifyEntries(t *testing.T, expected ueSessionConfig) {
-	verifyBessEntries(t, bessFake, expected)
-}

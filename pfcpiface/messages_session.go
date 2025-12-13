@@ -63,19 +63,6 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 		return pfdres, errUnmarshal(ErrCPFSEIDMissing)
 	}
 
-	if sereq.CPFSEID == nil {
-		// Reject requests that omit the mandatory CPF-SEID to avoid nil deref on malformed PFCP messages.
-		logger.PfcpLog.Warnln("Session Establishment Request without CPF-SEID from nodeID:", nodeID)
-		pfdres := message.NewSessionEstablishmentResponse(0,
-			0,
-			0,
-			sereq.SequenceNumber,
-			0,
-			ie.NewCause(ie.CauseMandatoryIEMissing),
-		)
-		return pfdres, errUnmarshal(ErrCPFSEIDMissing)
-	}
-
 	fseid, err := sereq.CPFSEID.FSEID()
 	if err != nil {
 		return errUnmarshalReply(err, sereq.CPFSEID)

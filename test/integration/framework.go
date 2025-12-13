@@ -22,7 +22,6 @@ import (
 
 const (
 	ConfigPath       = "/tmp/upf.jsonc"
-	ConfigPath       = "/tmp/upf.jsonc"
 	defaultSDFFilter = "permit out udp from any to assigned 80-80"
 
 	ueAddress    = "17.0.0.1"
@@ -96,13 +95,8 @@ type appFilter struct {
 }
 
 type ueSessionConfig struct {
-type ueSessionConfig struct {
 	tc        uint8
 	ueAddress string
-	appFilter appFilter
-	pdrs      []*ie.IE
-	fars      []*ie.IE
-	qers      []*ie.IE
 	appFilter appFilter
 	pdrs      []*ie.IE
 	fars      []*ie.IE
@@ -110,8 +104,6 @@ type ueSessionConfig struct {
 }
 
 type testCase struct {
-	input    *pfcpSessionData
-	expected ueSessionConfig
 	input    *pfcpSessionData
 	expected ueSessionConfig
 
@@ -242,10 +234,7 @@ func teardown(t *testing.T) {
 	}
 
 	pfcpAgent.Stop()
-	pfcpAgent.Stop()
 
-	if bessFake != nil {
-		bessFake.Stop()
 	if bessFake != nil {
 		bessFake.Stop()
 	}
@@ -253,11 +242,8 @@ func teardown(t *testing.T) {
 
 func verifyEntries(t *testing.T, expectedValues ueSessionConfig) {
 	verifyBessEntries(t, bessFake, expectedValues)
-func verifyEntries(t *testing.T, expectedValues ueSessionConfig) {
-	verifyBessEntries(t, bessFake, expectedValues)
 }
 
 func verifyNoEntries(t *testing.T) {
-	verifyNoBessRuntimeEntries(t, bessFake)
 	verifyNoBessRuntimeEntries(t, bessFake)
 }

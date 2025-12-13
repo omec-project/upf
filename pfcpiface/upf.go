@@ -99,23 +99,20 @@ func fqdnHostname() (string, error) {
 		return "", err
 	}
 
-	resolver := net.Resolver{}
-	ctx := context.Background()
-
 	// if hostname is already FQDN, return it
 	if strings.Contains(hostname, ".") {
 		return hostname, nil
 	}
 
 	// try to get FQDN via reverse DNS lookup
-	addrs, err := resolver.LookupIPAddr(ctx, hostname)
+	addrs, err := net.LookupIP(hostname)
 	if err != nil {
 		logger.PfcpLog.Warnf("failed to get fqdn for %s: %+v", hostname, err)
 		return hostname, nil // fallback to short hostname
 	}
 
 	for _, addr := range addrs {
-		names, err := resolver.LookupAddr(ctx, addr.IP.String())
+		names, err := net.LookupAddr(addr.String())
 		if err != nil || len(names) == 0 {
 			continue
 		}
