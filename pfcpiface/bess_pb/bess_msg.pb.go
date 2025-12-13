@@ -46,13 +46,13 @@
 package bess_pb
 
 import (
-	any1 "github.com/golang/protobuf/ptypes/any"
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	any1 "google.golang.org/protobuf/types/known/anypb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	anypb "google.golang.org/protobuf/types/known/anypb"
 )
 
 const (
@@ -1334,7 +1334,7 @@ type CreatePortRequest struct {
 	// / If not set (0), a driver-specific default value will be used.
 	SizeOutQ uint64 `protobuf:"varint,6,opt,name=size_out_q,json=sizeOutQ,proto3" json:"size_out_q,omitempty"`
 	// / Driver specific argument for port initialization. See port_msg.proto
-	Arg           *any1.Any `protobuf:"bytes,7,opt,name=arg,proto3" json:"arg,omitempty"`
+	Arg           *anypb.Any `protobuf:"bytes,7,opt,name=arg,proto3" json:"arg,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1411,7 +1411,7 @@ func (x *CreatePortRequest) GetSizeOutQ() uint64 {
 	return 0
 }
 
-func (x *CreatePortRequest) GetArg() *any1.Any {
+func (x *CreatePortRequest) GetArg() *anypb.Any {
 	if x != nil {
 		return x.Arg
 	}
@@ -2202,7 +2202,7 @@ type CreateModuleRequest struct {
 	Mclass string `protobuf:"bytes,2,opt,name=mclass,proto3" json:"mclass,omitempty"`
 	// / Protobuf message to be used for module initialization.
 	// / See module_msg.proto for the argument message types.
-	Arg           *any1.Any `protobuf:"bytes,3,opt,name=arg,proto3" json:"arg,omitempty"`
+	Arg           *anypb.Any `protobuf:"bytes,3,opt,name=arg,proto3" json:"arg,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2251,7 +2251,7 @@ func (x *CreateModuleRequest) GetMclass() string {
 	return ""
 }
 
-func (x *CreateModuleRequest) GetArg() *any1.Any {
+func (x *CreateModuleRequest) GetArg() *anypb.Any {
 	if x != nil {
 		return x.Arg
 	}
@@ -2852,7 +2852,7 @@ type CommandRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"` /// Name of module/port/driver
 	Cmd           string                 `protobuf:"bytes,2,opt,name=cmd,proto3" json:"cmd,omitempty"`   /// Name of command
-	Arg           *any1.Any              `protobuf:"bytes,3,opt,name=arg,proto3" json:"arg,omitempty"`   /// Command argument
+	Arg           *anypb.Any             `protobuf:"bytes,3,opt,name=arg,proto3" json:"arg,omitempty"`   /// Command argument
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2901,7 +2901,7 @@ func (x *CommandRequest) GetCmd() string {
 	return ""
 }
 
-func (x *CommandRequest) GetArg() *any1.Any {
+func (x *CommandRequest) GetArg() *anypb.Any {
 	if x != nil {
 		return x.Arg
 	}
@@ -2911,7 +2911,7 @@ func (x *CommandRequest) GetArg() *any1.Any {
 type CommandResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Error         *Error                 `protobuf:"bytes,1,opt,name=error,proto3" json:"error,omitempty"`
-	Data          *any1.Any              `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"` /// Command response (see *_msg.proto)
+	Data          *anypb.Any             `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"` /// Command response (see *_msg.proto)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2953,7 +2953,7 @@ func (x *CommandResponse) GetError() *Error {
 	return nil
 }
 
-func (x *CommandResponse) GetData() *any1.Any {
+func (x *CommandResponse) GetData() *anypb.Any {
 	if x != nil {
 		return x.Data
 	}
@@ -3331,7 +3331,7 @@ type GateHookInfo struct {
 	//	*GateHookInfo_Igate
 	//	*GateHookInfo_Ogate
 	Gate          isGateHookInfo_Gate `protobuf_oneof:"gate"`
-	Arg           *any1.Any           `protobuf:"bytes,6,opt,name=arg,proto3" json:"arg,omitempty"` /// Hook-specific arguments
+	Arg           *anypb.Any          `protobuf:"bytes,6,opt,name=arg,proto3" json:"arg,omitempty"` /// Hook-specific arguments
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3412,7 +3412,7 @@ func (x *GateHookInfo) GetOgate() int64 {
 	return 0
 }
 
-func (x *GateHookInfo) GetArg() *any1.Any {
+func (x *GateHookInfo) GetArg() *anypb.Any {
 	if x != nil {
 		return x.Arg
 	}
@@ -3648,7 +3648,7 @@ type ConfigureResumeHookRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	HookName      string                 `protobuf:"bytes,1,opt,name=hook_name,json=hookName,proto3" json:"hook_name,omitempty"` /// Name of the hook
 	Enable        bool                   `protobuf:"varint,2,opt,name=enable,proto3" json:"enable,omitempty"`                    /// Installs the hook if True, else uninstalls
-	Arg           *any1.Any              `protobuf:"bytes,3,opt,name=arg,proto3" json:"arg,omitempty"`                           /// Hook-specific arguments
+	Arg           *anypb.Any             `protobuf:"bytes,3,opt,name=arg,proto3" json:"arg,omitempty"`                           /// Hook-specific arguments
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3697,7 +3697,7 @@ func (x *ConfigureResumeHookRequest) GetEnable() bool {
 	return false
 }
 
-func (x *ConfigureResumeHookRequest) GetArg() *any1.Any {
+func (x *ConfigureResumeHookRequest) GetArg() *anypb.Any {
 	if x != nil {
 		return x.Arg
 	}
@@ -4051,7 +4051,7 @@ type ListPortsResponse_Port struct {
 	SizeOutQ uint64 `protobuf:"varint,7,opt,name=size_out_q,json=sizeOutQ,proto3" json:"size_out_q,omitempty"`
 	// / Driver specific argument that was used for port initialization. See
 	// / port_msg.proto
-	DriverArg     *any1.Any `protobuf:"bytes,8,opt,name=driver_arg,json=driverArg,proto3" json:"driver_arg,omitempty"`
+	DriverArg     *anypb.Any `protobuf:"bytes,8,opt,name=driver_arg,json=driverArg,proto3" json:"driver_arg,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4135,7 +4135,7 @@ func (x *ListPortsResponse_Port) GetSizeOutQ() uint64 {
 	return 0
 }
 
-func (x *ListPortsResponse_Port) GetDriverArg() *any1.Any {
+func (x *ListPortsResponse_Port) GetDriverArg() *anypb.Any {
 	if x != nil {
 		return x.DriverArg
 	}
@@ -5084,7 +5084,7 @@ var file_bess_msg_proto_goTypes = []any{
 	(*GetModuleInfoResponse_Attribute)(nil),                    // 75: bess.pb.GetModuleInfoResponse.Attribute
 	(*GetModuleInfoResponse_IGate_OGate)(nil),                  // 76: bess.pb.GetModuleInfoResponse.IGate.OGate
 	(*Error)(nil),                                              // 77: bess.pb.Error
-	(*any1.Any)(nil),                                           // 78: google.protobuf.Any
+	(*anypb.Any)(nil),                                          // 78: google.protobuf.Any
 }
 var file_bess_msg_proto_depIdxs = []int32{
 	77, // 0: bess.pb.EmptyResponse.error:type_name -> bess.pb.Error

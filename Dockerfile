@@ -110,15 +110,10 @@ RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10 && \
 FROM bess-build AS go-pb
 COPY --from=protoc-gen /go/bin/protoc-gen-go /bin
 COPY --from=protoc-gen /go/bin/protoc-gen-go-grpc /bin
-
-COPY --from=protoc-gen /go/bin/protoc-gen-go-grpc /bin
-
 RUN mkdir /bess_pb && \
     protoc -I /usr/include -I /protobuf/ \
     /protobuf/*.proto /protobuf/ports/*.proto \
     --go_opt=paths=source_relative --go_out=/bess_pb \
-    --go-grpc_opt=paths=source_relative --go-grpc_out=/bess_pb
---go_opt=paths=source_relative --go_out=/bess_pb \
     --go-grpc_opt=paths=source_relative --go-grpc_out=/bess_pb
 
 FROM bess-build AS py-pb

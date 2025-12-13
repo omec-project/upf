@@ -148,17 +148,6 @@ func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (messa
 		return asres, errProcess(errNodeIDMissing)
 	}
 
-	// Build response message
-	asres := message.NewAssociationSetupResponse(asreq.SequenceNumber,
-		pConn.associationIEs()...)
-
-	if asreq.NodeID == nil {
-		// Reject requests that omit the mandatory Node ID to avoid nil deref on malformed PFCP messages.
-		asres.Cause = ie.NewCause(ie.CauseMandatoryIEMissing)
-		logger.PfcpLog.Warnln("association Setup Request without NodeID from", addr)
-		return asres, errProcess(errNodeIDMissing)
-	}
-
 	nodeID, err := asreq.NodeID.NodeID()
 	if err != nil {
 		asres.Cause = ie.NewCause(ie.CauseMandatoryIEIncorrect)
