@@ -104,15 +104,19 @@ func fqdnHostname() (string, error) {
 		return hostname, nil
 	}
 
+	resolver := net.Resolver{}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	// try to get FQDN via reverse DNS lookup
-	addrs, err := net.LookupIP(hostname)
+	addrs, err := resolver.LookupIPAddr(ctx, hostname)
 	if err != nil {
 		logger.PfcpLog.Warnf("failed to get fqdn for %s: %+v", hostname, err)
 		return hostname, nil // fallback to short hostname
 	}
 
 	for _, addr := range addrs {
-		names, err := net.LookupAddr(addr.String())
+		names, err := resolver.LookupAddr(ctx, addr.IP.String())
 		if err != nil || len(names) == 0 {
 			continue
 		}
