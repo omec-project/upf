@@ -1,0 +1,31 @@
+
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2019-present Intel Corporation
+# Copyright (c) 2024-present The UPF contributors
+
+version: '3.8'
+
+networks:
+  upf-net:
+    driver: bridge
+
+services:
+  bess_stub:
+    build:
+      context: .
+      dockerfile: tools/bess_stub/Dockerfile
+    image: upf-bess-stub:local
+    ports:
+      - "10514:10514"
+    networks:
+      - upf-net
+
+  pfcpiface:
+    image: upf-pfcpiface:local
+    depends_on:
+      - bess_stub
+    command: ["/bin/pfcpiface", "-config", "/opt/bess/bessctl/conf/upf_test_local_lo.jsonc"]
+    volumes:
+      - ./dev:/opt/bess/bessctl/conf:ro
+    networks:
+      - upf-net

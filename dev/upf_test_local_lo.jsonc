@@ -1,0 +1,35 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2019-present Intel Corporation
+// Copyright (c) 2024-present The UPF contributors
+{
+  "mode": "sim",
+  "log_level": "info",
+  "sim": {
+    "core": "n6",
+    "max_sessions": 10,
+    "start_ue_ip": "16.0.0.1",
+    "start_enb_ip": "11.1.1.129",
+    "start_aupf_ip": "13.1.1.199",
+    "n6_app_ip": "6.6.6.6",
+    "n9_app_ip": "9.9.9.9",
+    "start_n3_teid": "0x30000000",
+    "start_n9_teid": "0x90000000",
+    "uplink_mbr": 500000,
+    "uplink_gbr": 50000,
+    "downlink_mbr": 1000000,
+    "downlink_gbr": 100000,
+    "pkt_size": 128,
+    "total_flows": 100
+  },
+  "access": { "ifname": "lo" },
+  "core": { "ifname": "lo" },
+  "workers": 1,
+  "max_req_retries": 5,
+  "resp_timeout": "2s",
+  "cpiface": {
+    "peers": [],
+    "dnn": "internet",
+    "http_port": "8080",
+    "enable_ue_ip_alloc": false
+  }
+}

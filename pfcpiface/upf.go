@@ -4,6 +4,7 @@
 package pfcpiface
 
 import (
+	"context"
 	"net"
 	"os"
 	"strings"
@@ -103,15 +104,19 @@ func fqdnHostname() (string, error) {
 		return hostname, nil
 	}
 
+	resolver := net.Resolver{}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	// try to get FQDN via reverse DNS lookup
-	addrs, err := net.LookupIP(hostname)
+	addrs, err := resolver.LookupIPAddr(ctx, hostname)
 	if err != nil {
 		logger.PfcpLog.Warnf("failed to get fqdn for %s: %+v", hostname, err)
 		return hostname, nil // fallback to short hostname
 	}
 
 	for _, addr := range addrs {
-		names, err := net.LookupAddr(addr.String())
+		names, err := resolver.LookupAddr(ctx, addr.IP.String())
 		if err != nil || len(names) == 0 {
 			continue
 		}
@@ -133,6 +138,9 @@ func NewUPF(conf *Conf, fp datapath) *upf {
 		hosts  []string
 	)
 
+	resolver := net.Resolver{}
+	ctx := context.Background()
+
 	nodeID = conf.CPIface.NodeID
 	if conf.CPIface.UseFQDN && nodeID == "" {
 		nodeID, err = fqdnHostname()
@@ -143,12 +151,12 @@ func NewUPF(conf *Conf, fp datapath) *upf {
 
 	// TODO: Delete this once CI config is fixed
 	if nodeID != "" {
-		hosts, err = net.LookupHost(nodeID)
+		hosts, err = resolver.LookupHost(ctx, nodeID)
 		if err != nil {
-			logger.PfcpLog.Fatalln("unable to resolve hostname", nodeID, err)
+			logger.PfcpLog.Warnf("unable to resolve hostname %s: %+v; continuing with %s", nodeID, err, nodeID)
+		} else if len(hosts) > 0 {
+			nodeID = hosts[0]
 		}
-
-		nodeID = hosts[0]
 	}
 
 	u := &upf{

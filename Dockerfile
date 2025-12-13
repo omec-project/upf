@@ -42,7 +42,7 @@ RUN ./install_ntf.sh
 RUN PLUGINS=$(find "$PLUGINS_DIR" -mindepth 1 -maxdepth 1 -type d) && \
     CMD="./build.py bess" && \
     for PLUGIN in $PLUGINS; do \
-        CMD="$CMD --plugin \"$PLUGIN\""; \
+    CMD="$CMD --plugin \"$PLUGIN\""; \
     done && \
     eval "$CMD" && \
     cp bin/bessd /bin && \
