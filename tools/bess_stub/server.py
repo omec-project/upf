@@ -39,6 +39,7 @@ if _os_mod.path.isdir(_app_bess_dir):
         if _app_bess_dir not in _sys_mod.path:
             _sys_mod.path.insert(0, _app_bess_dir)
     except Exception:
+        # Ignore errors if sys.path insertion fails; fallback to other import mechanisms
         pass
 
 _loaded_via_files = False
@@ -54,6 +55,7 @@ try:
             if _pb_dir not in _sys.path:
                 _sys.path.insert(0, _pb_dir)
         except Exception:
+            # Ignore errors if sys.path insertion fails; fallback to other import mechanisms
             pass
         def _load(name, fname):
             path = _os_mod.path.join(_pb_dir, fname)
@@ -71,6 +73,7 @@ try:
                     short = _os_mod.path.splitext(_os_mod.path.basename(fname))[0]
                     _reg_sys.modules[short] = mod
                 except Exception:
+                    # Ignore errors if sys.path insertion fails; fallback to other import mechanisms
                     pass
                 return mod
             return None
@@ -78,8 +81,9 @@ try:
         # Ensure well-known protos are present in the descriptor pool first.
         try:
             # import any_pb2 / other well-known protos so descriptor deps resolve
-            import google.protobuf.any_pb2 as _any_pb2  # noqa: F401
+            import google.protobuf.any_pb2  # noqa: F401
         except Exception:
+            # Ignore errors if sys.path insertion fails; fallback to other import mechanisms
             pass
 
         # Load in dependency order to populate descriptor pool correctly.
@@ -87,9 +91,7 @@ try:
         # depends on messages defined in bess_msg.proto.
         _load("pfcpiface.bess_pb.error_pb2", "error_pb2.py")
         _load("pfcpiface.bess_pb.util_msg_pb2", "util_msg_pb2.py")
-        _load("pfcpiface.bess_pb.module_msg_pb2", "module_msg_pb2.py")
         _load("pfcpiface.bess_pb.bess_msg_pb2", "bess_msg_pb2.py")
-        _load("pfcpiface.bess_pb.service_pb2", "service_pb2.py")
         _load("pfcpiface.bess_pb.service_pb2_grpc", "service_pb2_grpc.py")
         _loaded_via_files = True
 except Exception:
@@ -98,17 +100,11 @@ except Exception:
 if _loaded_via_files:
     import sys as _sys
     error_pb2 = _sys.modules.get("pfcpiface.bess_pb.error_pb2")
-    util_msg_pb2 = _sys.modules.get("pfcpiface.bess_pb.util_msg_pb2")
-    module_msg_pb2 = _sys.modules.get("pfcpiface.bess_pb.module_msg_pb2")
     bess_msg_pb2 = _sys.modules.get("pfcpiface.bess_pb.bess_msg_pb2")
-    service_pb2 = _sys.modules.get("pfcpiface.bess_pb.service_pb2")
     service_pb2_grpc = _sys.modules.get("pfcpiface.bess_pb.service_pb2_grpc")
 else:
     from pfcpiface.bess_pb import error_pb2
-    from pfcpiface.bess_pb import util_msg_pb2
-    from pfcpiface.bess_pb import module_msg_pb2
     from pfcpiface.bess_pb import bess_msg_pb2
-    from pfcpiface.bess_pb import service_pb2
     from pfcpiface.bess_pb import service_pb2_grpc
 
 LOG = logging.getLogger("bess_stub")

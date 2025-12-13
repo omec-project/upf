@@ -71,8 +71,7 @@ type PFCPConn struct {
 
 	pendingReqs sync.Map
 
-	shutdownOnce sync.Once
-	isShutdown   atomic.Bool
+	isShutdown atomic.Bool
 }
 
 func (pConn *PFCPConn) startHeartBeatMonitor() {

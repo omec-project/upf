@@ -27,10 +27,7 @@ for _m in __all__:
     full = f"pfcpiface.bess_pb.{_m}"
     try:
         mod = import_module(full)
-        try:
-            _sys.modules[_m] = mod
-        except Exception:
-            pass
+        _sys.modules[_m] = mod
     except Exception:
         # Defer errors until module is actually imported; keep import lightweight.
         pass
