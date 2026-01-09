@@ -3,6 +3,7 @@ module github.com/omec-project/upf-epc
 go 1.24.0
 
 require (
+	github.com/golang/protobuf v1.5.4
 	github.com/google/gopacket v1.1.19
 	github.com/libp2p/go-reuseport v0.4.0
 	github.com/omec-project/pfcpsim v1.3.1

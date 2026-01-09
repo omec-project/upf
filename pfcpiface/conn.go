@@ -61,6 +61,8 @@ type PFCPConn struct {
 	// channel to signal PFCPNode on exit
 	done     chan<- string
 	shutdown chan struct{}
+	// ensure shutdown is only performed once
+	shutdownOnce sync.Once
 
 	metrics.InstrumentPFCP
 
@@ -69,8 +71,7 @@ type PFCPConn struct {
 
 	pendingReqs sync.Map
 
-	shutdownOnce sync.Once
-	isShutdown   atomic.Bool
+	isShutdown atomic.Bool
 }
 
 func (pConn *PFCPConn) startHeartBeatMonitor() {
@@ -259,16 +260,7 @@ func (pConn *PFCPConn) Serve() {
 
 // Shutdown stops connection backing PFCPConn.
 func (pConn *PFCPConn) Shutdown() {
-	pConn.shutdownOnce.Do(func() {
-		pConn.executeShutdown()
-	})
-}
-
-func (pConn *PFCPConn) executeShutdown() {
-	// Mark as shutdown atomically
-	pConn.isShutdown.Store(true)
-
-	close(pConn.shutdown)
+	pConn.shutdownOnce.Do(func() { close(pConn.shutdown) })
 
 	if pConn.hbCtxCancel != nil {
 		pConn.hbCtxCancel()

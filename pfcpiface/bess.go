@@ -771,6 +771,7 @@ func (b *bess) clearState() {
 // it clears all the state in BESS
 func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 	var err error
+	dialer := &net.Dialer{}
 
 	logger.BessLog.Errorln("SetUpfInfo bess")
 
@@ -795,7 +796,10 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 			notifySockAddr = SockAddr
 		}
 
-		b.notifyBessSocket, err = net.Dial("unixpacket", notifySockAddr)
+		ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+		defer cancel()
+
+		b.notifyBessSocket, err = dialer.DialContext(ctx, "unixpacket", notifySockAddr)
 		if err != nil {
 			logger.BessLog.Errorln("dial error:", err)
 			return
@@ -810,7 +814,10 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 			pfcpCommAddr = PfcpAddr
 		}
 
-		b.endMarkerSocket, err = net.Dial("unixpacket", pfcpCommAddr)
+		ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+		defer cancel()
+
+		b.endMarkerSocket, err = dialer.DialContext(ctx, "unixpacket", pfcpCommAddr)
 		if err != nil {
 			logger.BessLog.Errorln("dial error:", err)
 			return
