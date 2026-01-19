@@ -3,7 +3,7 @@
 # Copyright 2019-present Intel Corporation
 
 # Stage bess-build: fetch BESS dependencies & pre-reqs
-FROM registry.aetherproject.org/sdcore/bess_build:251212@sha256:054cbc60635319f545165fe173c47df86f4a82448c3bf5bece3063065c5d70d5 AS bess-build
+FROM registry.aetherproject.org/sdcore/bess_build:260112@sha256:78c7cdc3526bb637b804ab0195a6ad4ffe9dae4f06f1e06439e1e280810a08f2 AS bess-build
 ARG CPU=native
 ARG BESS_COMMIT=main
 ENV PLUGINS_DIR=plugins
