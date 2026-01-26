@@ -56,10 +56,9 @@ type PFCPConn struct {
 
 	store SessionsStore
 
-	nodeID nodeID
-	upf    *upf
-	// channel to signal PFCPNode on exit
-	done     chan<- string
+	nodeID   nodeID
+	upf      *upf
+	node     *PFCPNode // Reference to parent node for WaitGroup management
 	shutdown chan struct{}
 
 	metrics.InstrumentPFCP
@@ -149,7 +148,7 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 		maxRetries:     100,
 		store:          NewInMemoryStore(),
 		upf:            node.upf,
-		done:           node.pConnDone,
+		node:           node,
 		shutdown:       make(chan struct{}),
 		InstrumentPFCP: node.metrics,
 		hbReset:        make(chan struct{}, 100),
@@ -163,10 +162,24 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 		p.HandlePFCPMsg(buf)
 	}
 
+	// Register this connection with the WaitGroup
+	node.connWg.Add(1)
+
 	// Update map of connections
 	node.pConns.Store(rAddr, p)
 
-	go p.Serve()
+	// Start the connection with proper cleanup
+	go func() {
+		defer func() {
+			// Signal completion to WaitGroup
+			node.connWg.Done()
+			// Remove from map when done
+			node.pConns.Delete(rAddr)
+			logger.PfcpLog.Infoln("removed connection to", rAddr)
+		}()
+
+		p.Serve()
+	}()
 
 	return p
 }
@@ -282,14 +295,6 @@ func (pConn *PFCPConn) executeShutdown() {
 	}
 
 	rAddr := pConn.RemoteAddr().String()
-
-	// Safely send to done channel (non-blocking)
-	select {
-	case pConn.done <- rAddr:
-	default:
-		// Channel might be full or closed, do not block
-		logger.PfcpLog.Warnln("could not send shutdown notification for", rAddr)
-	}
 
 	err := pConn.Close()
 	if err != nil {
