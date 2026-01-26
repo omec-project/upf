@@ -171,11 +171,11 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 	// Start the connection with proper cleanup
 	go func() {
 		defer func() {
+			// Signal completion to WaitGroup
+			node.connWg.Done()
 			// Remove from map when done
 			node.pConns.Delete(rAddr)
 			logger.PfcpLog.Infoln("removed connection to", rAddr)
-			// Signal completion to WaitGroup
-			node.connWg.Done()
 		}()
 
 		p.Serve()
