@@ -35,12 +35,14 @@ const (
 	gtpEndMarkerType = 254
 )
 
+// Placeholder MAC addresses for end marker packets.
+// These are immutable values that will be replaced by the dataplane (BESS)
+// with actual MAC addresses based on the routing/forwarding table.
+// Note: Defined as variables (not constants) because Go doesn't support
+// byte slice/array constants, but these should be treated as read-only.
 var (
-	// Placeholder MAC addresses for end marker packets
-	// These are temporary values that will be replaced by the dataplane (BESS)
-	// with actual MAC addresses based on the routing/forwarding table.
-	endMarkerDstMAC = []byte{0xBD, 0xBD, 0xBD, 0xBD, 0xBD, 0xBD} // Placeholder for next-hop MAC
-	endMarkerSrcMAC = []byte{0xFF, 0xAA, 0xFA, 0xAA, 0xFF, 0xAA} // Placeholder for local interface MAC
+	endMarkerDstMAC = [6]byte{0xBD, 0xBD, 0xBD, 0xBD, 0xBD, 0xBD} // Placeholder for next-hop MAC
+	endMarkerSrcMAC = [6]byte{0xFF, 0xAA, 0xFA, 0xAA, 0xFF, 0xAA} // Placeholder for local interface MAC
 )
 
 func addEndMarker(farItem far, endMarkerList *[][]byte) {
@@ -49,8 +51,8 @@ func addEndMarker(farItem far, endMarkerList *[][]byte) {
 	packet := make([]byte, endMarkerSize)
 
 	// Ethernet header - placeholder MAC addresses will be replaced by dataplane
-	copy(packet[0:6], endMarkerDstMAC)
-	copy(packet[6:12], endMarkerSrcMAC)
+	copy(packet[0:6], endMarkerDstMAC[:])
+	copy(packet[6:12], endMarkerSrcMAC[:])
 	binary.BigEndian.PutUint16(packet[ethTypeOffset:], 0x0800) // IPv4
 
 	// IPv4 header
