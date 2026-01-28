@@ -78,17 +78,17 @@ func addEndMarker(farItem far, endMarkerList *[][]byte) {
 // calculateIPv4Checksum calculates Internet Checksum for IPv4 header (RFC 1071)
 // Optimized for fixed 20-byte IPv4 header by unrolling the loop
 func calculateIPv4Checksum(header []byte) uint16 {
-	// Unroll loop for 10 16-bit words (20 bytes)
-	sum := uint32(header[0])<<8 | uint32(header[1]) |
-		uint32(header[2])<<8 | uint32(header[3]) |
-		uint32(header[4])<<8 | uint32(header[5]) |
-		uint32(header[6])<<8 | uint32(header[7]) |
-		uint32(header[8])<<8 | uint32(header[9]) |
-		uint32(header[10])<<8 | uint32(header[11]) |
-		uint32(header[12])<<8 | uint32(header[13]) |
-		uint32(header[14])<<8 | uint32(header[15]) |
-		uint32(header[16])<<8 | uint32(header[17]) |
-		uint32(header[18])<<8 | uint32(header[19])
+	// Sum all 10 16-bit words (20 bytes)
+	sum := uint32(binary.BigEndian.Uint16(header[0:])) +
+		uint32(binary.BigEndian.Uint16(header[2:])) +
+		uint32(binary.BigEndian.Uint16(header[4:])) +
+		uint32(binary.BigEndian.Uint16(header[6:])) +
+		uint32(binary.BigEndian.Uint16(header[8:])) +
+		uint32(binary.BigEndian.Uint16(header[10:])) +
+		uint32(binary.BigEndian.Uint16(header[12:])) +
+		uint32(binary.BigEndian.Uint16(header[14:])) +
+		uint32(binary.BigEndian.Uint16(header[16:])) +
+		uint32(binary.BigEndian.Uint16(header[18:]))
 
 	// Fold 32-bit sum to 16 bits
 	sum = (sum >> 16) + (sum & 0xffff)
