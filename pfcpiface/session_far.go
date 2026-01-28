@@ -65,7 +65,7 @@ func addEndMarker(farItem far, endMarkerList *[][]byte) {
 	binary.BigEndian.PutUint32(packet[ipSrcOffset:], farItem.tunnelIP4Src)
 	binary.BigEndian.PutUint32(packet[ipDstOffset:], farItem.tunnelIP4Dst)
 
-	// Calculate and set IPv4 checksum (optimized for 20-byte header)
+	// Calculate and set IPv4 checksum
 	binary.BigEndian.PutUint16(packet[ipChecksumOffset:], calculateIPv4Checksum(packet[ipOffset:ipOffset+ipv4HeaderSize]))
 
 	// UDP header
@@ -83,8 +83,9 @@ func addEndMarker(farItem far, endMarkerList *[][]byte) {
 	*endMarkerList = append(*endMarkerList, packet)
 }
 
-// calculateIPv4Checksum calculates Internet Checksum for IPv4 header (RFC 1071)
-// Optimized for fixed 20-byte IPv4 header by unrolling the loop
+// calculateIPv4Checksum calculates Internet Checksum for IPv4 header (RFC 1071).
+// This function is optimized for fixed 20-byte IPv4 headers (no options) by
+// unrolling the loop to sum all 10 16-bit words directly, avoiding iteration overhead.
 func calculateIPv4Checksum(header []byte) uint16 {
 	if len(header) < ipv4HeaderSize {
 		logger.PfcpLog.Errorln("invalid IPv4 header length for checksum calculation:", len(header))
