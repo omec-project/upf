@@ -92,17 +92,11 @@ func calculateIPv4Checksum(header []byte) uint16 {
 		return 0
 	}
 
-	// Sum all 10 16-bit words (20 bytes)
-	sum := uint32(binary.BigEndian.Uint16(header[0:])) +
-		uint32(binary.BigEndian.Uint16(header[2:])) +
-		uint32(binary.BigEndian.Uint16(header[4:])) +
-		uint32(binary.BigEndian.Uint16(header[6:])) +
-		uint32(binary.BigEndian.Uint16(header[8:])) +
-		uint32(binary.BigEndian.Uint16(header[10:])) +
-		uint32(binary.BigEndian.Uint16(header[12:])) +
-		uint32(binary.BigEndian.Uint16(header[14:])) +
-		uint32(binary.BigEndian.Uint16(header[16:])) +
-		uint32(binary.BigEndian.Uint16(header[18:]))
+	// Sum all 16-bit words (20 bytes = 10 words)
+	var sum uint32
+	for i := 0; i < ipv4HeaderSize; i += 2 {
+		sum += uint32(binary.BigEndian.Uint16(header[i:]))
+	}
 
 	// Fold 32-bit sum to 16 bits
 	sum = (sum >> 16) + (sum & 0xffff)
