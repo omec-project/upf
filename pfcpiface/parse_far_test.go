@@ -19,10 +19,6 @@ type farTestCase struct {
 	description string
 }
 
-const (
-	defaultGTPProtocolPort = 2152
-)
-
 func TestParseFAR(t *testing.T) {
 	createOp, updateOp := create, update
 
@@ -66,7 +62,7 @@ func TestParseFAR(t *testing.T) {
 				tunnelType:   access,
 				tunnelIP4Src: ip2int(coreIP),
 				tunnelIP4Dst: ip2int(UEAddressForDownlink),
-				tunnelPort:   uint16(defaultGTPProtocolPort),
+				tunnelPort:   tunnelGTPUPort,
 			},
 			description: "Valid Downlink FAR input with update operation",
 		},
