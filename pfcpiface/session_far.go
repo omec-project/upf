@@ -33,24 +33,14 @@ const (
 
 	// Protocol constants
 	gtpEndMarkerType = 254
+)
 
+var (
 	// Placeholder MAC addresses for end marker packets
 	// These are temporary values that will be replaced by the dataplane (BESS)
 	// with actual MAC addresses based on the routing/forwarding table.
-	// Destination MAC: BD:BD:BD:BD:BD:BD - placeholder for next-hop MAC
-	endMarkerDstMAC0 = 0xBD
-	endMarkerDstMAC1 = 0xBD
-	endMarkerDstMAC2 = 0xBD
-	endMarkerDstMAC3 = 0xBD
-	endMarkerDstMAC4 = 0xBD
-	endMarkerDstMAC5 = 0xBD
-	// Source MAC: FF:AA:FA:AA:FF:AA - placeholder for local interface MAC
-	endMarkerSrcMAC0 = 0xFF
-	endMarkerSrcMAC1 = 0xAA
-	endMarkerSrcMAC2 = 0xFA
-	endMarkerSrcMAC3 = 0xAA
-	endMarkerSrcMAC4 = 0xFF
-	endMarkerSrcMAC5 = 0xAA
+	endMarkerDstMAC = []byte{0xBD, 0xBD, 0xBD, 0xBD, 0xBD, 0xBD} // Placeholder for next-hop MAC
+	endMarkerSrcMAC = []byte{0xFF, 0xAA, 0xFA, 0xAA, 0xFF, 0xAA} // Placeholder for local interface MAC
 )
 
 func addEndMarker(farItem far, endMarkerList *[][]byte) {
@@ -59,8 +49,8 @@ func addEndMarker(farItem far, endMarkerList *[][]byte) {
 	packet := make([]byte, endMarkerSize)
 
 	// Ethernet header - placeholder MAC addresses will be replaced by dataplane
-	packet[0], packet[1], packet[2], packet[3], packet[4], packet[5] = endMarkerDstMAC0, endMarkerDstMAC1, endMarkerDstMAC2, endMarkerDstMAC3, endMarkerDstMAC4, endMarkerDstMAC5
-	packet[6], packet[7], packet[8], packet[9], packet[10], packet[11] = endMarkerSrcMAC0, endMarkerSrcMAC1, endMarkerSrcMAC2, endMarkerSrcMAC3, endMarkerSrcMAC4, endMarkerSrcMAC5
+	copy(packet[0:6], endMarkerDstMAC)
+	copy(packet[6:12], endMarkerSrcMAC)
 	binary.BigEndian.PutUint16(packet[ethTypeOffset:], 0x0800) // IPv4
 
 	// IPv4 header
