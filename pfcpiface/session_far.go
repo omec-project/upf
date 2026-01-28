@@ -84,8 +84,7 @@ func addEndMarker(farItem far, endMarkerList *[][]byte) {
 }
 
 // calculateIPv4Checksum calculates Internet Checksum for IPv4 header (RFC 1071).
-// This function is optimized for fixed 20-byte IPv4 headers (no options) by
-// unrolling the loop to sum all 10 16-bit words directly, avoiding iteration overhead.
+// This function handles fixed 20-byte IPv4 headers (no options) by summing all 10 16-bit words directly.
 func calculateIPv4Checksum(header []byte) uint16 {
 	if len(header) < ipv4HeaderSize {
 		logger.PfcpLog.Errorln("invalid IPv4 header length for checksum calculation:", len(header))
