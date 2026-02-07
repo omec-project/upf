@@ -3,21 +3,11 @@
 # Copyright 2019-present Intel Corporation
 
 # Stage bess-build: fetch BESS dependencies & pre-reqs
-FROM ghcr.io/omec-project/bess_build:260128@sha256:013f8b8dab6b2f822624ec9b9c0861ad4f1c1061adf44937b5c008169a83d8c2 AS bess-build
+FROM ghcr.io/omec-project/bess_build:260206@sha256:3355d990fde583ad8d7eed5ae0c9200328d20dd91f7e6ecdf110a9beab48ffa7 AS bess-build
 ARG CPU=native
 ARG BESS_COMMIT=main
 ENV PLUGINS_DIR=plugins
 ARG MAKEFLAGS
-ENV PKG_CONFIG_PATH=/usr/lib64/pkgconfig
-
-RUN apt-get update && apt-get install -y \
-    --no-install-recommends \
-    git \
-    ca-certificates \
-    libbpf0 \
-    libelf-dev && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
 
 # BESS pre-reqs
 WORKDIR /bess
@@ -60,7 +50,6 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends \
     python3-pip \
     libgraph-easy-perl \
-    libgrpc++1 \
     iproute2 \
     iptables \
     iputils-ping \
@@ -80,7 +69,9 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends \
     build-essential \
     ethtool \
+    libbpf0 \
     libbsd0 \
+    libc-ares2 \
     libelf1 \
     libgflags2.2 \
     libjson-c[45] \
@@ -88,6 +79,7 @@ RUN apt-get update && apt-get install -y \
     libnl-cli-3-200 \
     libnuma1 \
     libpcap0.8 \
+    libssl3 \
     pkg-config && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -96,7 +88,14 @@ COPY --from=bess-build /usr/local/lib/x86_64-linux-gnu/*.so /usr/local/lib/x86_6
 COPY --from=bess-build /usr/local/lib/x86_64-linux-gnu/*.a /usr/local/lib/x86_64-linux-gnu/
 COPY --from=bess-build /usr/lib/libxdp* /usr/lib/
 COPY --from=bess-build /usr/lib/x86_64-linux-gnu/libjson-c.so* /lib/x86_64-linux-gnu/
-COPY --from=bess-build /usr/lib/x86_64-linux-gnu/libbpf.so* /usr/lib/x86_64-linux-gnu/
+COPY --from=bess-build /usr/local/lib/libgrpc*.so* /usr/local/lib/
+COPY --from=bess-build /usr/local/lib/libgpr*.so* /usr/local/lib/
+COPY --from=bess-build /usr/local/lib/libre2*.so* /usr/local/lib/
+COPY --from=bess-build /usr/local/lib/libaddress_sorting*.so* /usr/local/lib/
+COPY --from=bess-build /usr/local/lib/libupb*.so* /usr/local/lib/
+COPY --from=bess-build /usr/local/lib/libutf8_range*.so* /usr/local/lib/
+COPY --from=bess-build /usr/local/lib/libz.so* /usr/local/lib/
+RUN ldconfig
 
 ENV PYTHONPATH="/opt/bess"
 WORKDIR /opt/bess/bessctl
@@ -119,6 +118,7 @@ RUN mkdir /bess_pb && \
 
 FROM bess-build AS py-pb
 COPY requirements_pb.txt .
+RUN apt-get update && apt-get install -y --no-install-recommends python3-dev && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir --require-hashes -r requirements_pb.txt
 RUN mkdir /bess_pb && \
     python3 -m grpc_tools.protoc -I /usr/include -I /protobuf/ \
