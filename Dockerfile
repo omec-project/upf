@@ -69,7 +69,9 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends \
     build-essential \
     ethtool \
+    libbpf0 \
     libbsd0 \
+    libc-ares2 \
     libelf1 \
     libgflags2.2 \
     libjson-c[45] \
@@ -77,6 +79,7 @@ RUN apt-get update && apt-get install -y \
     libnl-cli-3-200 \
     libnuma1 \
     libpcap0.8 \
+    libssl3 \
     pkg-config && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -85,10 +88,6 @@ COPY --from=bess-build /usr/local/lib/x86_64-linux-gnu/*.so /usr/local/lib/x86_6
 COPY --from=bess-build /usr/local/lib/x86_64-linux-gnu/*.a /usr/local/lib/x86_64-linux-gnu/
 COPY --from=bess-build /usr/lib/libxdp* /usr/lib/
 COPY --from=bess-build /usr/lib/x86_64-linux-gnu/libjson-c.so* /lib/x86_64-linux-gnu/
-COPY --from=bess-build /usr/lib/x86_64-linux-gnu/libbpf.so* /usr/lib/x86_64-linux-gnu/
-COPY --from=bess-build /usr/lib/x86_64-linux-gnu/libcares*.so* /usr/lib/x86_64-linux-gnu/
-COPY --from=bess-build /usr/lib/x86_64-linux-gnu/libssl.so* /usr/lib/x86_64-linux-gnu/
-COPY --from=bess-build /usr/lib/x86_64-linux-gnu/libcrypto.so* /usr/lib/x86_64-linux-gnu/
 COPY --from=bess-build /usr/local/lib/libgrpc*.so* /usr/local/lib/
 COPY --from=bess-build /usr/local/lib/libgpr*.so* /usr/local/lib/
 COPY --from=bess-build /usr/local/lib/libre2*.so* /usr/local/lib/
@@ -119,6 +118,7 @@ RUN mkdir /bess_pb && \
 
 FROM bess-build AS py-pb
 COPY requirements_pb.txt .
+RUN apt-get update && apt-get install -y --no-install-recommends python3-dev && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir --require-hashes -r requirements_pb.txt
 RUN mkdir /bess_pb && \
     python3 -m grpc_tools.protoc -I /usr/include -I /protobuf/ \
