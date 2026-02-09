@@ -90,7 +90,6 @@ NICs
 NodeID
 NUMA
 nproc
-NTF
 omec
 ONF
 ONF's
@@ -166,7 +165,6 @@ xlarge
 conf
 hostip
 io
-networktokens
 ubench
 # Words inside code blocks
 BESS's

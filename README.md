@@ -112,7 +112,6 @@ registry: [upf-epc-bess](https://hub.docker.com/r/omecproject/upf-epc-bess),
 * Per-flow latency and throughput metrics
 * DSCP marking of GTPu packets by copying the DSCP value from the inner IP packet
 * GTPu path monitoring
-* Network Token Functions (_**experimental**_)
 * Support for DPDK, CNDP, AF_PACKET and AF_XDP modes
   - BESS uses DPDK 22.11.4
 

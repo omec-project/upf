@@ -17,7 +17,6 @@ Copyright 2019 Intel Corporation
   * [General Execution Commands](#general-execution-commands)
   * [Testing (Microbenchmarks)](#testing-microbenchmarks)
   * [Troubleshooting](#troubleshooting)
-  * [Network Token Functions](#network-token-functions)
 
 ## Prerequisites
 
@@ -477,34 +476,4 @@ reading from file /tmp/tmpUBTGau, link-type EN10MB (Ethernet)
 00:03:08.130884 IP 0.0.0.0.bootpc > 255.255.255.255.bootps: BOOTP/DHCP, Request from 68:05:ca:37:e1:38 (oui Unknown), length 300
 00:03:08.294573 STP 802.1s, Rapid STP, CIST Flags [Learn, Forward], length 102
 00:03:10.247193 STP 802.1s, Rapid STP, CIST Flags [Learn, Forward], length 102
-```
-
-## Network Token Functions
-
-OMEC includes a Network Token Function (NTF) which provides preliminary support
-for Network Tokens, a new protocol to expose datapath services to end users and
-application providers. More details are available at [networktokens.org](https://networktokens.org)
-
-In order to compile NTF support, update [`conf/upf.jsonc`](conf/upf.jsonc) as follows:
-
-```patch
-diff --git a/conf/upf.jsonc b/conf/upf.jsonc
-index f8f4e4e..c052755 100644
---- a/conf/upf.jsonc
-+++ b/conf/upf.jsonc
-@@ -86,7 +86,7 @@
-     "resp_timeout": "2s",
-
-     // Whether to enable Network Token Functions
--    "enable_ntf": false,
-+    "enable_ntf": true,
-
-     // [Optional] Whether to enable End Marker Support
-     // "enable_end_marker": false,
-```
-
-And run the [scripts/docker_setup.sh](scripts/docker_setup.sh) as follows:
-
-```bash
-ENABLE_NTF=1 ./scripts/docker_setup.sh
 ```

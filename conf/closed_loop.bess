@@ -65,18 +65,6 @@ if parser.mode == 'sim':
                                     parser.sim_start_aupf_ip, core_ip[0],
                                     parser.sim_n9_app_ip, parser.sim_start_ue_ip,
                                     parser.sim_start_n9_teid)]
-    if parser.enable_ntf:
-        # Every 30th packet will be a STUN packet.  With 5000 flows, this
-        # results in about 1000 flows with network tokens, and every 3rd packet
-        # is a STUN packet with a token.  This is not a good representation of
-        # a real world test, but it is enough to verify that NTF can match
-        # tokens and pass traffic through with mode="sim".
-        n36_pkts = n36_pkts * 29
-        n36_pkts.append(
-          sim.gen_ue_ntf_packet(parser.sim_pkt_size, macstr_d, macstr_u,
-                                parser.sim_start_enb_ip, access_ip[0],
-                                parser.sim_start_ue_ip, parser.sim_n6_app_ip,
-                                parser.sim_start_n3_teid))
 
     n3_seq = sim.gen_gtpu_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip, 62, parser.sim_start_n3_teid)
     n6_seq = sim.gen_inet_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip)
@@ -152,22 +140,6 @@ for idx, iface in enumerate(interfaces):
 
 
 # ====================================================
-#       Network Token Functions Setup
-# ====================================================
-
-ntf = None
-if parser.enable_ntf:
-    try:
-        ntf = NTF()
-        # TODO: Populate these tables by talking to the NTE
-        ntf.table_create(dpid=1, max_entries=5)
-        ntf.entry_create(dpid=1, entry_id=1, dscp=1, token={
-          'app_id': 0xB00F,
-          'encryption_key': '{"alg":"A128CBC-HS256","k":"Qr_XwDGctna3SlR88rEJYt6Zm100SASYeJWSJihDnsA","key_ops":["encrypt","decrypt"],"kty":"oct"}'
-        })
-    except NameError:
-        pass
-
 # ====================================================
 # 	Shared Pipeline (DL + UL)
 # ====================================================
@@ -204,29 +176,21 @@ appQERLookup::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
                                  {'attr_name':'fseid', 'num_bytes':8}], \
                          values=[{'attr_name':'qfi', 'num_bytes':1}],\
                          entries = parser.table_size_app_qer_lookup)
-# Insert NTF module, if enabled
-_in = pdrLookup
-_out = appQERLookup
 
-if ntf:
-  _in -> ntf
-  _in = ntf
-  _out = ntf
 
 if parser.measure_flow:
-    preQosFlowMeasure::FlowMeasure(leader=True,
-                                   flag_attr_name="buffer_flag",
-                                   entries=parser.table_size_flow_measure)
-    _in -> preQosFlowMeasure
-    _in = preQosFlowMeasure
-    _out = preQosFlowMeasure
-
-_in -> appQERLookup
+    pdrLookup \
+        -> preQosFlowMeasure::FlowMeasure(leader=True,
+                                          flag_attr_name="buffer_flag",
+                                          entries=parser.table_size_flow_measure) \
+        -> appQERLookup
+else:
+    pdrLookup -> appQERLookup
 
 # Add logical pipeline when gtpudecap is needed
 pdrLookup:GTPUDecap \
     -> gtpuDecap::GtpuDecap() \
-    -> _out
+    -> appQERLookup
 
 executeFAR::Split(size=1, attribute='action')
 _in = executeFAR
