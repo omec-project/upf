@@ -123,7 +123,7 @@ RUN pip install --no-cache-dir --require-hashes -r requirements_pb.txt
 RUN mkdir /bess_pb && \
     python3 -m grpc_tools.protoc -I /usr/include -I /protobuf/ \
     /protobuf/*.proto /protobuf/ports/*.proto \
-    --python_out=plugins=grpc:/bess_pb \
+    --python_out=/bess_pb \
     --grpc_python_out=/bess_pb
 
 FROM golang:1.25.7-bookworm@sha256:38342f3e7a504bf1efad858c18e771f84b66dc0b363add7a57c9a0bbb6cf7b12 AS pfcpiface-build
