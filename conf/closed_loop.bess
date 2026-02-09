@@ -184,13 +184,14 @@ if parser.measure_flow:
                                           flag_attr_name="buffer_flag",
                                           entries=parser.table_size_flow_measure) \
         -> appQERLookup
+    pdrLookup:GTPUDecap \
+        -> gtpuDecap::GtpuDecap() \
+        -> preQosFlowMeasure
 else:
     pdrLookup -> appQERLookup
-
-# Add logical pipeline when gtpudecap is needed
-pdrLookup:GTPUDecap \
-    -> gtpuDecap::GtpuDecap() \
-    -> appQERLookup
+    pdrLookup:GTPUDecap \
+        -> gtpuDecap::GtpuDecap() \
+        -> appQERLookup
 
 executeFAR::Split(size=1, attribute='action')
 _in = executeFAR
