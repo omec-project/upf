@@ -16,10 +16,6 @@ endif
 # For a more portable image set CPU=haswell
 CPU                      ?= native
 
-# Enable Network Token Function support (see https://networktokens.org for more
-# information)
-ENABLE_NTF               ?= 0
-
 ## Docker related
 DOCKER_REGISTRY          ?=
 DOCKER_REPOSITORY        ?=
@@ -27,7 +23,6 @@ DOCKER_TAG               ?= ${VERSION}
 DOCKER_IMAGENAME         := ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}${PROJECT_NAME}:${DOCKER_TAG}
 DOCKER_BUILDKIT          ?= 1
 DOCKER_BUILD_ARGS        ?= --build-arg MAKEFLAGS=-j${NPROCS} --build-arg CPU
-DOCKER_BUILD_ARGS        += --build-arg ENABLE_NTF=$(ENABLE_NTF)
 DOCKER_PULL              ?= --pull
 
 ## Docker labels. Only set ref and commit date if committed

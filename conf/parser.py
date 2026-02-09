@@ -44,7 +44,6 @@ class Parser:
         self.access_ifname = None
         self.core_ifname = None
         self.interfaces = dict()
-        self.enable_ntf = False
         self.notify_sockaddr = "/tmp/notifycp"
         self.endmarker_sockaddr = "/tmp/pfcpport"
         self.enable_slice_metering = False
@@ -189,12 +188,6 @@ class Parser:
                     "/tmp/pfcpport"
                 )
             )
-        # Network Token Function
-        try:
-            self.enable_ntf = bool(self.conf["enable_ntf"])
-        except KeyError:
-            print("Network Token Function disabled")
-
         # Flow measurements
         try:
             self.measure_flow = bool(self.conf["measure_flow"])

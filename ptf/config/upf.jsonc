@@ -91,9 +91,6 @@
     "max_req_retries": 5,
     "resp_timeout": "2s",
 
-    // Whether to enable Network Token Functions
-    "enable_ntf": false,
-
     // [Optional] Whether to enable End Marker Support
     // "enable_end_marker": false,
 

@@ -22,12 +22,6 @@ RUN ./build.py dpdk
 RUN mkdir -p plugins && \
     mv sample_plugin plugins
 
-## Network Token
-ARG ENABLE_NTF
-ARG NTF_COMMIT=master
-COPY scripts/install_ntf.sh .
-RUN ./install_ntf.sh
-
 # Build and copy artifacts
 RUN PLUGINS=$(find "$PLUGINS_DIR" -mindepth 1 -maxdepth 1 -type d) && \
     CMD="./build.py bess" && \
