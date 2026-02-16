@@ -96,7 +96,7 @@ WORKDIR /opt/bess/bessctl
 ENTRYPOINT ["bessd", "-f"]
 
 # Stage build bess golang pb
-FROM golang:1.25.7-bookworm@sha256:38342f3e7a504bf1efad858c18e771f84b66dc0b363add7a57c9a0bbb6cf7b12 AS protoc-gen
+FROM golang:1.26.0-bookworm@sha256:eae3cdfa040d0786510a5959d36a836978724d03b34a166ba2e0e198baac9196 AS protoc-gen
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10 && \
     go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
 
@@ -120,7 +120,7 @@ RUN mkdir /bess_pb && \
     --python_out=/bess_pb \
     --grpc_python_out=/bess_pb
 
-FROM golang:1.25.7-bookworm@sha256:38342f3e7a504bf1efad858c18e771f84b66dc0b363add7a57c9a0bbb6cf7b12 AS pfcpiface-build
+FROM golang:1.26.0-bookworm@sha256:eae3cdfa040d0786510a5959d36a836978724d03b34a166ba2e0e198baac9196 AS pfcpiface-build
 ARG GOFLAGS
 WORKDIR /pfcpiface
 
