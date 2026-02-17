@@ -22,7 +22,7 @@ updates:
       timezone: "America/Los_Angeles"
 
   - package-ecosystem: "gomod"
-    directory: "/pfcpiface"
+    directory: "/"
     schedule:
       interval: "weekly"
       day: "sunday"
