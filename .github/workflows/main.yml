@@ -23,7 +23,7 @@ jobs:
       security-events: write
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/upf-build-upf.yml@4c4b1670edc14f7f8f95b6be5e1cb779b86b2716 # v0.0.16
+    uses: omec-project/.github/.github/workflows/upf-build-upf.yml@40ff5b9cd1d59e64caae6f30ed9ccbece3951ea6 # v0.0.17
     with:
       branch_name: ${{ github.ref }}
 
@@ -35,7 +35,7 @@ jobs:
       security-events: write
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/upf-build-ptf.yml@4c4b1670edc14f7f8f95b6be5e1cb779b86b2716 # v0.0.16
+    uses: omec-project/.github/.github/workflows/upf-build-ptf.yml@40ff5b9cd1d59e64caae6f30ed9ccbece3951ea6 # v0.0.17
     with:
       branch_name: ${{ github.ref }}
 
@@ -45,7 +45,7 @@ jobs:
       checks: write
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/lint.yml@4c4b1670edc14f7f8f95b6be5e1cb779b86b2716 # v0.0.16
+    uses: omec-project/.github/.github/workflows/lint.yml@40ff5b9cd1d59e64caae6f30ed9ccbece3951ea6 # v0.0.17
     with:
       branch_name: ${{ github.ref }}
 
@@ -55,7 +55,7 @@ jobs:
       security-events: write
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/hadolint.yml@4c4b1670edc14f7f8f95b6be5e1cb779b86b2716 # v0.0.16
+    uses: omec-project/.github/.github/workflows/hadolint.yml@40ff5b9cd1d59e64caae6f30ed9ccbece3951ea6 # v0.0.17
     with:
       branch_name: ${{ github.ref }}
 
@@ -65,7 +65,7 @@ jobs:
       checks: write
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/check-spelling.yml@4c4b1670edc14f7f8f95b6be5e1cb779b86b2716 # v0.0.16
+    uses: omec-project/.github/.github/workflows/check-spelling.yml@40ff5b9cd1d59e64caae6f30ed9ccbece3951ea6 # v0.0.17
     with:
       branch_name: ${{ github.ref }}
 
@@ -75,7 +75,7 @@ jobs:
       checks: write
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/upf-route-control-tests.yml@4c4b1670edc14f7f8f95b6be5e1cb779b86b2716 # v0.0.16
+    uses: omec-project/.github/.github/workflows/upf-route-control-tests.yml@40ff5b9cd1d59e64caae6f30ed9ccbece3951ea6 # v0.0.17
     with:
       branch_name: ${{ github.ref }}
 
@@ -85,7 +85,7 @@ jobs:
       checks: write
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/unit-test.yml@4c4b1670edc14f7f8f95b6be5e1cb779b86b2716 # v0.0.16
+    uses: omec-project/.github/.github/workflows/unit-test.yml@40ff5b9cd1d59e64caae6f30ed9ccbece3951ea6 # v0.0.17
     with:
       branch_name: ${{ github.ref }}
       test_flags: "-race -failfast -v"
@@ -97,7 +97,7 @@ jobs:
       checks: write
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/unit-test.yml@4c4b1670edc14f7f8f95b6be5e1cb779b86b2716 # v0.0.16
+    uses: omec-project/.github/.github/workflows/unit-test.yml@40ff5b9cd1d59e64caae6f30ed9ccbece3951ea6 # v0.0.17
     with:
       branch_name: ${{ github.ref }}
       test_flags: "-race -failfast -v -count=1"
@@ -109,7 +109,7 @@ jobs:
       contents: read
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/license-check.yml@4c4b1670edc14f7f8f95b6be5e1cb779b86b2716 # v0.0.16
+    uses: omec-project/.github/.github/workflows/license-check.yml@40ff5b9cd1d59e64caae6f30ed9ccbece3951ea6 # v0.0.17
     with:
       branch_name: ${{ github.ref }}
 
@@ -119,7 +119,7 @@ jobs:
       security-events: write
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/fossa-scan.yml@4c4b1670edc14f7f8f95b6be5e1cb779b86b2716 # v0.0.16
+    uses: omec-project/.github/.github/workflows/fossa-scan.yml@40ff5b9cd1d59e64caae6f30ed9ccbece3951ea6 # v0.0.17
     with:
       branch_name: ${{ github.ref }}
 
@@ -142,6 +142,6 @@ jobs:
       repository-projects: read
       security-events: write
       statuses: read
-    uses: omec-project/.github/.github/workflows/scorecard-analysis.yml@4c4b1670edc14f7f8f95b6be5e1cb779b86b2716 # v0.0.16
+    uses: omec-project/.github/.github/workflows/scorecard-analysis.yml@40ff5b9cd1d59e64caae6f30ed9ccbece3951ea6 # v0.0.17
     with:
       branch_name: ${{ github.ref }}
