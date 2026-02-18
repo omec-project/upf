@@ -27,5 +27,5 @@ data plane component to verify forwarding state configuration.
 To run all E2E integration tests invoke the command below from the root directory:
 
 ```bash
-make test-bess-integration-native
+make test-integration
 ```

@@ -150,7 +150,7 @@ it makes the test cases easier to debug. To run E2E integration tests for
 BESS-UPF in the `native` mode use:
 
 ```
-make test-bess-integration-native
+make test-integration
 ```
 
 **PTF tests for BESS-UPF** verify the BESS-based implementation of the UPF

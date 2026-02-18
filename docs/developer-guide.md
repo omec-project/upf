@@ -87,5 +87,5 @@ DOCKER_BUILD_ARGS="--build-arg GOFLAGS=-mod=vendor" make docker-build
 To run E2E integration tests with the local dependency:
 
 ```
-DOCKER_BUILD_ARGS="--build-arg GOFLAGS=-mod=vendor" make test-bess-integration-native
+DOCKER_BUILD_ARGS="--build-arg GOFLAGS=-mod=vendor" make test-integration
 ```
