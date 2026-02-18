@@ -7,7 +7,7 @@ docker run --name pktgen -td --restart unless-stopped \
            -v /dev/hugepages:/dev/hugepages -v "$PWD/conf":/opt/bess/bessctl/conf \
            -v /lib/firmware/intel:/lib/firmware/intel \
            --device=/dev/vfio/vfio --device=/dev/vfio/119 --device=/dev/vfio/120 \
-           upf-epc-bess:"$(<VERSION)" -grpc-url=0.0.0.0:10514
+           upf-bess:"$(<VERSION)" -grpc-url=0.0.0.0:10514
 """
 
 import conf.sim as sim

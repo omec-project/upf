@@ -439,7 +439,7 @@ This can be done either using a single machine or two machines.
             --cpuset-cpus=2-5 --ulimit memlock=-1 --cap-add IPC_LOCK \
             -v /dev/hugepages:/dev/hugepages -v "$PWD/conf":/opt/bess/bessctl/conf \
             --device=/dev/vfio/vfio --device=/dev/vfio/176 \
-            upf-epc-bess:"$(<VERSION)" -grpc-url=0.0.0.0:10514
+            upf-bess:"$(<VERSION)" -grpc-url=0.0.0.0:10514
     ```
 
 2. Customize [conf/pktgen.bess](../conf/pktgen.bess) to match [conf/upf](../conf/upf.jsonc)
