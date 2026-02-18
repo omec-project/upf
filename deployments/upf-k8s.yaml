@@ -80,7 +80,7 @@ spec:
   initContainers:
   # Currently CNI doesn't allow metric we're doing it here instead of net-attach-def
   - name: routes
-    image: omecproject/upf-epc-bess:master-latest
+    image: omecproject/upf-bess:master-latest
     env:
     - name: ENB_GNB_SUBNET
       value: '11.1.1.128/25'
@@ -99,7 +99,7 @@ spec:
 
   # Reqd. if working with AF_PACKET so that kernel does not reply to GTP-U packets
   #- name: iptables
-  #  image: omecproject/upf-epc-bess:master-latest
+  #  image: omecproject/upf-bess:master-latest
   #  command: [ "sh", "-xec"]
   #  args:
   #  - iptables -I OUTPUT -p icmp --icmp-type port-unreachable -j DROP;
@@ -109,7 +109,7 @@ spec:
   #        - NET_ADMIN
   containers:
   - name: routectl
-    image: omecproject/upf-epc-bess:master-latest
+    image: omecproject/upf-bess:master-latest
     command: ["/opt/bess/bessctl/conf/route_control.py"]
     args:
     - -i
@@ -123,7 +123,7 @@ spec:
         cpu: 256m
         memory: 128Mi
   - name: bessd
-    image: omecproject/upf-epc-bess:master-latest
+    image: omecproject/upf-bess:master-latest
     stdin: true
     tty: true
     args:
@@ -157,7 +157,7 @@ spec:
     - name: hugepages
       mountPath: /dev/hugepages
   - name: web
-    image: omecproject/upf-epc-bess:master-latest
+    image: omecproject/upf-bess:master-latest
     command: ["bessctl"]
     args:
     - http
@@ -168,7 +168,7 @@ spec:
         cpu: 256m
         memory: 128Mi
   - name: pfcpiface
-    image: omecproject/upf-epc-pfcpiface:master-latest
+    image: omecproject/upf-pfcpiface:master-latest
     command: ["pfcpiface"]
     args:
     - -config

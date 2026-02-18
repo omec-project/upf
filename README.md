@@ -66,8 +66,8 @@ DOCKER_TARGETS=pfcpiface make docker-build
 ```
 
 The latest Docker images are also published in the OMEC project's DockerHub
-registry: [upf-epc-bess](https://hub.docker.com/r/omecproject/upf-epc-bess),
-[upf-epc-pfcpiface](https://hub.docker.com/r/omecproject/upf-epc-pfcpiface).
+registry: [upf-bess](https://hub.docker.com/r/omecproject/upf-bess),
+[upf-pfcpiface](https://hub.docker.com/r/omecproject/upf-pfcpiface).
 
 ### BESS-UPF Components
 
