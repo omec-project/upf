@@ -4,19 +4,12 @@
 
 PROJECT_NAME             := upf
 VERSION                  ?= $(shell cat ./VERSION 2>/dev/null || echo "dev")
-OSTYPE                   := $(shell uname -s)
 
-# Extract Go version from go.mod file
-GOLANG_VERSION           ?= $(shell awk '/^go / {print $$2}' go.mod 2>/dev/null || echo "1.21")
+# Extract minimum Go version from go.mod file
+GOLANG_MINIMUM_VERSION   ?= $(shell awk '/^go / {print $$2}' go.mod 2>/dev/null || echo "1.25")
 
-# Determine number of processors for parallel builds
-ifeq ($(OSTYPE),Linux)
+# Number of processors for parallel builds (Linux only)
 NPROCS                   := $(shell nproc)
-else ifeq ($(OSTYPE),Darwin) # Assume Mac OS X
-NPROCS                   := $(shell sysctl -n hw.physicalcpu)
-else
-NPROCS                   := 1
-endif
 
 # Build configuration
 CPU                      ?= native
@@ -25,19 +18,25 @@ CPU                      ?= native
 DOCKER_REGISTRY          ?=
 DOCKER_REPOSITORY        ?=
 DOCKER_TAG               ?= $(VERSION)
+DOCKER_IMAGE_PREFIX      ?=
 DOCKER_IMAGENAME         := $(DOCKER_REGISTRY)$(DOCKER_REPOSITORY)$(PROJECT_NAME)
 DOCKER_BUILDKIT          ?= 1
 DOCKER_BUILD_ARGS        ?= --build-arg MAKEFLAGS=-j$(NPROCS) --build-arg CPU=$(CPU)
-DOCKER_BUILD_ARGS        += --build-arg ENABLE_NTF=$(ENABLE_NTF)
 DOCKER_PULL              ?= --pull
 
 ## Docker labels with better error handling
 DOCKER_LABEL_VCS_URL     ?= $(shell git remote get-url origin 2>/dev/null || echo "unknown")
-DOCKER_LABEL_VCS_REF     ?= $(shell git diff-index --quiet HEAD -- 2>/dev/null && git rev-parse HEAD 2>/dev/null || echo "unknown")
-DOCKER_LABEL_COMMIT_DATE ?= $(shell git diff-index --quiet HEAD -- 2>/dev/null && git show -s --format=%cd --date=iso-strict HEAD 2>/dev/null || echo "unknown")
+DOCKER_LABEL_VCS_REF     ?= $(shell \
+	echo "$${GIT_COMMIT:-$${GITHUB_SHA:-$${CI_COMMIT_SHA:-$(shell \
+		if git rev-parse --git-dir > /dev/null 2>&1; then \
+			git rev-parse HEAD 2>/dev/null; \
+		else \
+			echo "unknown"; \
+		fi \
+	)}}}")
 DOCKER_LABEL_BUILD_DATE  ?= $(shell date -u "+%Y-%m-%dT%H:%M:%SZ")
 
-## Build targets
+## Build configuration
 DOCKER_TARGETS           ?= bess pfcpiface
 GO_PACKAGES              ?= ./pfcpiface ./cmd/...
 
@@ -70,17 +69,11 @@ docker-build: ## Build Docker images for all targets
 		DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) \
 			--target $$target \
 			$$DOCKER_CACHE_ARG \
+			--build-arg VERSION="$(VERSION)" \
+			--build-arg VCS_URL="$(DOCKER_LABEL_VCS_URL)" \
+			--build-arg VCS_REF="$(DOCKER_LABEL_VCS_REF)" \
+			--build-arg BUILD_DATE="$(DOCKER_LABEL_BUILD_DATE)" \
 			--tag $(DOCKER_IMAGENAME)-$$target:$(DOCKER_TAG) \
-			--label org.opencontainers.image.source="https://github.com/omec-project/$(PROJECT_NAME)" \
-			--label org.opencontainers.image.version="$(VERSION)" \
-			--label org.opencontainers.image.created="$(DOCKER_LABEL_BUILD_DATE)" \
-			--label org.opencontainers.image.revision="$(DOCKER_LABEL_VCS_REF)" \
-			--label org.opencontainers.image.url="$(DOCKER_LABEL_VCS_URL)" \
-			--label org.label.schema.version="$(VERSION)" \
-			--label org.label.schema.vcs.url="$(DOCKER_LABEL_VCS_URL)" \
-			--label org.label.schema.vcs.ref="$(DOCKER_LABEL_VCS_REF)" \
-			--label org.label.schema.build.date="$(DOCKER_LABEL_BUILD_DATE)" \
-			--label org.opencord.vcs.commit.date="$(DOCKER_LABEL_COMMIT_DATE)" \
 			. \
 			|| exit 1; \
 	done
@@ -127,7 +120,7 @@ py-pb: $(BUILD_OUTPUT_DIR) ## Generate Python protobuf files
 	@cp -a $(BUILD_OUTPUT_DIR)/bess_pb/. $(PTF_PB_DIR)
 
 ## Testing targets
-$(COVERAGE_DIR):
+$(COVERAGE_DIR): ## Create coverage directory
 	@mkdir -p $(COVERAGE_DIR)
 
 test: $(COVERAGE_DIR) ## Run unit tests with coverage
@@ -135,7 +128,7 @@ test: $(COVERAGE_DIR) ## Run unit tests with coverage
 	@docker run --rm \
 		-v $(CURDIR):/$(PROJECT_NAME) \
 		-w /$(PROJECT_NAME) \
-		golang:$(GOLANG_VERSION) \
+		golang:$(GOLANG_MINIMUM_VERSION) \
 		go test \
 			-race \
 			-failfast \
@@ -193,10 +186,14 @@ print-version: ## Print current version
 env: ## Print environment variables
 	@echo "PROJECT_NAME=$(PROJECT_NAME)"
 	@echo "VERSION=$(VERSION)"
+	@echo "GOLANG_MINIMUM_VERSION=$(GOLANG_MINIMUM_VERSION)"
 	@echo "DOCKER_REGISTRY=$(DOCKER_REGISTRY)"
 	@echo "DOCKER_REPOSITORY=$(DOCKER_REPOSITORY)"
+	@echo "DOCKER_IMAGE_PREFIX=$(DOCKER_IMAGE_PREFIX)"
 	@echo "DOCKER_TAG=$(DOCKER_TAG)"
 	@echo "DOCKER_TARGETS=$(DOCKER_TARGETS)"
+	@echo "DOCKER_LABEL_VCS_URL=$(DOCKER_LABEL_VCS_URL)"
+	@echo "DOCKER_LABEL_VCS_REF=$(DOCKER_LABEL_VCS_REF)"
 	@echo "NPROCS=$(NPROCS)"
 
 ## Phony targets
