@@ -3,7 +3,7 @@
 # Copyright 2019-present Intel Corporation
 
 # Stage bess-build: fetch BESS dependencies & pre-reqs
-FROM ghcr.io/omec-project/bess_build:260206@sha256:3355d990fde583ad8d7eed5ae0c9200328d20dd91f7e6ecdf110a9beab48ffa7 AS bess-build
+FROM ghcr.io/omec-project/bess_build:260218@sha256:3a3d1772698ed5e34259d28a8cc54791dd8b94998a26cfd343f9727cabf6de19 AS bess-build
 ARG CPU=native
 ARG BESS_COMMIT=main
 ENV PLUGINS_DIR=plugins
