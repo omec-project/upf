@@ -25,7 +25,7 @@ CPU                      ?= native
 DOCKER_REGISTRY          ?=
 DOCKER_REPOSITORY        ?=
 DOCKER_TAG               ?= $(VERSION)
-DOCKER_IMAGENAME         := $(DOCKER_REGISTRY)$(DOCKER_REPOSITORY)$(PROJECT_NAME):$(DOCKER_TAG)
+DOCKER_IMAGENAME         := $(DOCKER_REGISTRY)$(DOCKER_REPOSITORY)$(PROJECT_NAME)
 DOCKER_BUILDKIT          ?= 1
 DOCKER_BUILD_ARGS        ?= --build-arg MAKEFLAGS=-j$(NPROCS) --build-arg CPU=$(CPU)
 DOCKER_BUILD_ARGS        += --build-arg ENABLE_NTF=$(ENABLE_NTF)
@@ -47,7 +47,7 @@ PTF_PB_DIR               ?= ptf/lib
 COVERAGE_DIR             := .coverage
 BUILD_OUTPUT_DIR         := build-output
 
-## Tool versions (for reproducible builds)
+## Tool versions (for linting and CI tools)
 GOLANGCI_LINT_VERSION    ?= latest
 
 # Default target
@@ -65,12 +65,12 @@ docker-build: ## Build Docker images for all targets
 		echo "Building $$target..."; \
 		DOCKER_CACHE_ARG=""; \
 		if [ "$(DOCKER_BUILDKIT)" = "1" ]; then \
-			DOCKER_CACHE_ARG="--cache-from $(DOCKER_REGISTRY)$(DOCKER_REPOSITORY)$(PROJECT_NAME)-$$target:$(DOCKER_TAG)"; \
+			DOCKER_CACHE_ARG="--cache-from $(DOCKER_IMAGENAME)-$$target:$(DOCKER_TAG)"; \
 		fi; \
 		DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) \
 			--target $$target \
 			$$DOCKER_CACHE_ARG \
-			--tag $(DOCKER_REGISTRY)$(DOCKER_REPOSITORY)$(PROJECT_NAME)-$$target:$(DOCKER_TAG) \
+			--tag $(DOCKER_IMAGENAME)-$$target:$(DOCKER_TAG) \
 			--label org.opencontainers.image.source="https://github.com/omec-project/$(PROJECT_NAME)" \
 			--label org.opencontainers.image.version="$(VERSION)" \
 			--label org.opencontainers.image.created="$(DOCKER_LABEL_BUILD_DATE)" \
@@ -89,13 +89,13 @@ docker-push: ## Push Docker images to registry
 	@echo "Pushing Docker images for targets: $(DOCKER_TARGETS)"
 	@for target in $(DOCKER_TARGETS); do \
 		echo "Pushing $$target..."; \
-		docker push $(DOCKER_REGISTRY)$(DOCKER_REPOSITORY)$(PROJECT_NAME)-$$target:$(DOCKER_TAG) || exit 1; \
+		docker push $(DOCKER_IMAGENAME)-$$target:$(DOCKER_TAG) || exit 1; \
 	done
 
 docker-clean: ## Remove local Docker images
 	@echo "Cleaning local Docker images..."
 	@for target in $(DOCKER_TARGETS); do \
-		docker rmi $(DOCKER_REGISTRY)$(DOCKER_REPOSITORY)$(PROJECT_NAME)-$$target:$(DOCKER_TAG) 2>/dev/null || true; \
+		docker rmi $(DOCKER_IMAGENAME)-$$target:$(DOCKER_TAG) 2>/dev/null || true; \
 	done
 
 ## Development targets
