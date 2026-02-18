@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/libp2p/go-reuseport v0.4.0
-	github.com/omec-project/pfcpsim v1.3.1
+	github.com/omec-project/pfcpsim v1.4.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/wmnsk/go-pfcp v0.0.24
 	go.uber.org/zap v1.27.1
