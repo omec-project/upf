@@ -787,7 +787,11 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 
 	b.client = pb.NewBESSControlClient(b.conn)
 
-	b.clearState()
+	// Skip clearing state when in `simulate delete` mode, so previously
+	// created rules remain in BESS and can be individually deleted.
+	if !simulate.delete() {
+		b.clearState()
+	}
 
 	if conf.EnableNotifyBess {
 		notifySockAddr := conf.NotifySockAddr
