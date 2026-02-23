@@ -9,54 +9,27 @@ Copyright 2022 Open Networking Foundation
 When implementing new features or making improvements to the `BESS` pipeline,
 the easiest way to do so is by:
 
-- Clone the `bess` repository inside the UPF repository
+- Clone the `bess` repository and make your changes
+```bash
+$ cd <path/to/upf>/..
+$ git clone https://github.com/<your-user>/bess.git
+$ cd bess
+# make your modifications
+```
+
+- Rebuild the `bess_build` image locally from the `bess` repository
+```bash
+$ cd <path/to/bess>
+$ yes N | ./env/rebuild_images.py jammy64
+```
+
+- Build the UPF Docker image using the locally-built `bess_build` image
 ```bash
 $ cd <path/to/upf>
-$ git clone https://github.com/<your-user>/bess.git
+$ BESS_BUILD_IMAGE=ghcr.io/omec-project/bess_build:latest DOCKER_PULL="" make docker-build
 ```
-
-- **Temporarily** modify Dockerfile to use the `bess` cloned in the previous
-step
-```diff
-diff --git a/Dockerfile b/Dockerfile
-index 052456d..03b7d33 100644
---- a/Dockerfile
-+++ b/Dockerfile
-@@ -11,9 +11,7 @@ RUN apt-get update && \
-
- # BESS pre-reqs
- WORKDIR /bess
--ARG BESS_COMMIT=master
--RUN git clone https://github.com/omec-project/bess.git .
--RUN git checkout ${BESS_COMMIT}
-+COPY bess/ .
- RUN cp -a protobuf /protobuf
-
- # Stage bess-build: builds bess with its dependencies
-```
-
-- Implement a feature or make modifications
 
 - Test the modifications
-
-- Revert change in Dockerfile
-```diff
-diff --git a/Dockerfile b/Dockerfile
-index 03b7d33..052456d 100644
---- a/Dockerfile
-+++ b/Dockerfile
-@@ -11,7 +11,9 @@ RUN apt-get update && \
-
- # BESS pre-reqs
- WORKDIR /bess
--COPY bess/ .
-+ARG BESS_COMMIT=master
-+RUN git clone https://github.com/omec-project/bess.git .
-+RUN git checkout ${BESS_COMMIT}
- RUN cp -a protobuf /protobuf
-
- # Stage bess-build: builds bess with its dependencies
-```
 
 - Commit your changes to `bess` repository and, if needed, `upf` repository
 - Open pull request in `bess` repository and, if needed, `upf` repository
