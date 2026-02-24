@@ -10,24 +10,30 @@ When implementing new features or making improvements to the `BESS` pipeline,
 the easiest way to do so is by:
 
 - Clone the `bess` repository and make your changes
-```bash
-$ cd <path/to/upf>/..
-$ git clone https://github.com/<your-user>/bess.git
-$ cd bess
-# make your modifications
-```
+  ```bash
+  $ cd <path/to/upf>/..
+  $ git clone https://github.com/<your-user>/bess.git
+  $ cd bess
+  # make your modifications
+  ```
 
 - Rebuild the `bess_build` image locally from the `bess` repository
-```bash
-$ cd <path/to/bess>
-$ yes N | ./env/rebuild_images.py jammy64
-```
+  ```bash
+  $ cd <path/to/bess>
+  $ yes N | ./env/rebuild_images.py jammy64
+  ```
 
-- Build the UPF Docker image using the locally-built `bess_build` image
-```bash
-$ cd <path/to/upf>
-$ BESS_BUILD_IMAGE=ghcr.io/omec-project/bess_build:latest DOCKER_PULL="" make docker-build
-```
+- Update the `FROM` line in `Dockerfile` to use the locally-built image
+  ```diff
+  -FROM ghcr.io/omec-project/bess_build:260223@sha256:... AS bess-build
+  +FROM ghcr.io/omec-project/bess_build:latest AS bess-build
+  ```
+
+- Build the UPF Docker image
+  ```bash
+  $ cd <path/to/upf>
+  $ DOCKER_PULL="" make docker-build
+  ```
 
 - Test the modifications
 
