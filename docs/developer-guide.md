@@ -9,54 +9,33 @@ Copyright 2022 Open Networking Foundation
 When implementing new features or making improvements to the `BESS` pipeline,
 the easiest way to do so is by:
 
-- Clone the `bess` repository inside the UPF repository
-```bash
-$ cd <path/to/upf>
-$ git clone https://github.com/<your-user>/bess.git
-```
+- Clone the `bess` repository and make your changes
+  ```bash
+  $ cd <path/to/upf>/..
+  $ git clone https://github.com/<your-user>/bess.git
+  $ cd bess
+  # make your modifications
+  ```
 
-- **Temporarily** modify Dockerfile to use the `bess` cloned in the previous
-step
-```diff
-diff --git a/Dockerfile b/Dockerfile
-index 052456d..03b7d33 100644
---- a/Dockerfile
-+++ b/Dockerfile
-@@ -11,9 +11,7 @@ RUN apt-get update && \
+- Rebuild the `bess_build` image locally from the `bess` repository
+  ```bash
+  $ cd <path/to/bess>
+  $ yes N | ./env/rebuild_images.py jammy64
+  ```
 
- # BESS pre-reqs
- WORKDIR /bess
--ARG BESS_COMMIT=master
--RUN git clone https://github.com/omec-project/bess.git .
--RUN git checkout ${BESS_COMMIT}
-+COPY bess/ .
- RUN cp -a protobuf /protobuf
+- Update the `FROM` line in `Dockerfile` to use the locally-built image
+  ```diff
+  -FROM ghcr.io/omec-project/bess_build:260223@sha256:... AS bess-build
+  +FROM ghcr.io/omec-project/bess_build:latest AS bess-build
+  ```
 
- # Stage bess-build: builds bess with its dependencies
-```
-
-- Implement a feature or make modifications
+- Build the UPF Docker image
+  ```bash
+  $ cd <path/to/upf>
+  $ DOCKER_PULL="" make docker-build
+  ```
 
 - Test the modifications
-
-- Revert change in Dockerfile
-```diff
-diff --git a/Dockerfile b/Dockerfile
-index 03b7d33..052456d 100644
---- a/Dockerfile
-+++ b/Dockerfile
-@@ -11,7 +11,9 @@ RUN apt-get update && \
-
- # BESS pre-reqs
- WORKDIR /bess
--COPY bess/ .
-+ARG BESS_COMMIT=master
-+RUN git clone https://github.com/omec-project/bess.git .
-+RUN git checkout ${BESS_COMMIT}
- RUN cp -a protobuf /protobuf
-
- # Stage bess-build: builds bess with its dependencies
-```
 
 - Commit your changes to `bess` repository and, if needed, `upf` repository
 - Open pull request in `bess` repository and, if needed, `upf` repository

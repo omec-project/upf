@@ -2,39 +2,8 @@
 # Copyright 2020-present Open Networking Foundation
 # Copyright 2019-present Intel Corporation
 
-# Stage bess-build: fetch BESS dependencies & pre-reqs
-FROM ghcr.io/omec-project/bess_build:260218@sha256:3a3d1772698ed5e34259d28a8cc54791dd8b94998a26cfd343f9727cabf6de19 AS bess-build
-ARG CPU=native
-ARG BESS_COMMIT=main
-ENV PLUGINS_DIR=plugins
-ARG MAKEFLAGS
-
-# BESS pre-reqs
-WORKDIR /bess
-RUN git clone https://github.com/omec-project/bess.git . && \
-    git checkout ${BESS_COMMIT} && \
-    cp -a protobuf /protobuf
-
-# Build DPDK
-RUN ./build.py dpdk
-
-# Plugins: SequentialUpdate
-RUN mkdir -p plugins && \
-    mv sample_plugin plugins
-
-# Build and copy artifacts
-RUN PLUGINS=$(find "$PLUGINS_DIR" -mindepth 1 -maxdepth 1 -type d) && \
-    CMD="./build.py bess" && \
-    for PLUGIN in $PLUGINS; do \
-        CMD="$CMD --plugin \"$PLUGIN\""; \
-    done && \
-    eval "$CMD" && \
-    cp bin/bessd /bin && \
-    mkdir -p /bin/modules && \
-    cp core/modules/*.so /bin/modules && \
-    mkdir -p /opt/bess && \
-    cp -r bessctl pybess /opt/bess && \
-    cp -r core/pb /pb
+# Stage bess-build: pre-built BESS image (built from bess/env/Dockerfile)
+FROM ghcr.io/omec-project/bess_build:260223@sha256:010f996492f443faa0f240b6b26a291d141df0db566b4834cdc05729f0049f13 AS bess-build
 
 # Stage bess: creates the runtime image of BESS
 FROM ubuntu:22.04@sha256:104ae83764a5119017b8e8d6218fa0832b09df65aae7d5a6de29a85d813da2fb AS bess
@@ -98,7 +67,6 @@ RUN apt-get update && apt-get install -y \
     rm -rf /var/lib/apt/lists/*
 COPY --from=bess-build /usr/bin/cndpfwd /usr/bin/
 COPY --from=bess-build /usr/local/lib/x86_64-linux-gnu/*.so /usr/local/lib/x86_64-linux-gnu/
-COPY --from=bess-build /usr/local/lib/x86_64-linux-gnu/*.a /usr/local/lib/x86_64-linux-gnu/
 COPY --from=bess-build /usr/lib/libxdp* /usr/lib/
 COPY --from=bess-build /usr/lib/x86_64-linux-gnu/libjson-c.so* /lib/x86_64-linux-gnu/
 COPY --from=bess-build /usr/local/lib/libgrpc*.so* /usr/local/lib/
@@ -130,6 +98,7 @@ RUN mkdir /bess_pb && \
     --go-grpc_opt=paths=source_relative --go-grpc_out=/bess_pb
 
 FROM bess-build AS py-pb
+WORKDIR /
 COPY requirements_pb.txt .
 RUN apt-get update && apt-get install -y --no-install-recommends python3-dev && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir --require-hashes -r requirements_pb.txt
@@ -192,4 +161,5 @@ COPY --from=py-pb /bess_pb /bess_pb
 FROM scratch AS artifacts
 COPY --from=bess /bin/bessd /
 COPY --from=pfcpiface /bin/pfcpiface /
-COPY --from=bess-build /bess /bess
+COPY --from=bess-build /bess/protobuf /bess/protobuf
+COPY --from=bess-build /pb /bess/pb
