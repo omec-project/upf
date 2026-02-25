@@ -73,6 +73,11 @@ RUN apt-get update && apt-get install -y \
     rm -rf /var/lib/apt/lists/*
 # Copy CNDP binary and libraries
 COPY --from=bess-build /usr/bin/cndpfwd /usr/bin/
+# NOTE: Copy the entire directory rather than individual library files because:
+# - CNDP and DPDK install their runtime libraries into /usr/local/lib/x86_64-linux-gnu/
+# - The exact set of required shared objects may change between CNDP/DPDK/BESS releases
+# - Maintaining a fragile, version-specific list of libraries is error-prone
+# - Image size impact has been evaluated and is acceptable for this component
 COPY --from=bess-build /usr/local/lib/x86_64-linux-gnu/ /usr/local/lib/x86_64-linux-gnu/
 RUN ldconfig
 
