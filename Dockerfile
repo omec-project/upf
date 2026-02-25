@@ -99,7 +99,7 @@ FROM bess-build AS py-pb
 WORKDIR /
 COPY requirements_pb.txt .
 RUN apt-get update && apt-get install -y --no-install-recommends python3-dev && rm -rf /var/lib/apt/lists/*
-RUN pip install --no-cache-dir --break-system-packages --require-hashes -r requirements_pb.txt
+RUN pip install --no-cache-dir --break-system-packages --ignore-installed --require-hashes -r requirements_pb.txt
 RUN mkdir /bess_pb && \
     python3 -m grpc_tools.protoc -I /usr/include -I /protobuf/ \
     /protobuf/*.proto /protobuf/ports/*.proto \
