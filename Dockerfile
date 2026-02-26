@@ -3,10 +3,12 @@
 # Copyright 2019-present Intel Corporation
 
 # Stage bess-build: pre-built BESS image (built from bess/env/Dockerfile)
-FROM ghcr.io/omec-project/bess_build:260223@sha256:010f996492f443faa0f240b6b26a291d141df0db566b4834cdc05729f0049f13 AS bess-build
+FROM ghcr.io/omec-project/bess_build:260225@sha256:cd1cfb19f59988e82e7515d06551edbf170b33a7b7407aa6b19fe11071ce7abd AS bess-build
 
 # Stage bess: creates the runtime image of BESS
-FROM ubuntu:22.04@sha256:104ae83764a5119017b8e8d6218fa0832b09df65aae7d5a6de29a85d813da2fb AS bess
+FROM ubuntu:24.04@sha256:d1e2e92c075e5ca139d51a140fff46f84315c0fdce203eab2807c7e495eff4f9 AS bess
+
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Build arguments for dynamic labels
 ARG VERSION=dev
@@ -38,44 +40,45 @@ RUN apt-get update && apt-get install -y \
     tcpdump && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
-    pip install --no-cache-dir --require-hashes -r requirements.txt
+    pip install --no-cache-dir --break-system-packages --ignore-installed --require-hashes -r requirements.txt
 COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin/bessd
 COPY --from=bess-build /bin/modules /bin/modules
 COPY conf /opt/bess/bessctl/conf
 RUN ln -s /opt/bess/bessctl/bessctl /bin
 
-# CNDP: Install dependencies
-ENV DEBIAN_FRONTEND=noninteractive
+# CNDP and runtime: Install dependencies
 RUN apt-get update && apt-get install -y \
     --no-install-recommends \
     build-essential \
     ethtool \
-    libbpf0 \
+    libbpf1 \
     libbsd0 \
     libc-ares2 \
     libelf1 \
+    libfdt1 \
     libgflags2.2 \
-    libjson-c[45] \
+    libgoogle-glog0v6 \
+    libgrpc++1.51t64 \
+    libjson-c5 \
     libnl-3-200 \
     libnl-cli-3-200 \
     libnuma1 \
     libpcap0.8 \
+    libprotobuf32t64 \
     libssl3 \
+    libxdp1 \
     pkg-config && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+# Copy CNDP binary and libraries
 COPY --from=bess-build /usr/bin/cndpfwd /usr/bin/
-COPY --from=bess-build /usr/local/lib/x86_64-linux-gnu/*.so /usr/local/lib/x86_64-linux-gnu/
-COPY --from=bess-build /usr/lib/libxdp* /usr/lib/
-COPY --from=bess-build /usr/lib/x86_64-linux-gnu/libjson-c.so* /lib/x86_64-linux-gnu/
-COPY --from=bess-build /usr/local/lib/libgrpc*.so* /usr/local/lib/
-COPY --from=bess-build /usr/local/lib/libgpr*.so* /usr/local/lib/
-COPY --from=bess-build /usr/local/lib/libre2*.so* /usr/local/lib/
-COPY --from=bess-build /usr/local/lib/libaddress_sorting*.so* /usr/local/lib/
-COPY --from=bess-build /usr/local/lib/libupb*.so* /usr/local/lib/
-COPY --from=bess-build /usr/local/lib/libutf8_range*.so* /usr/local/lib/
-COPY --from=bess-build /usr/local/lib/libz.so* /usr/local/lib/
+# NOTE: Copy the entire directory rather than individual library files because:
+# - CNDP and DPDK install their runtime libraries into /usr/local/lib/x86_64-linux-gnu/
+# - The exact set of required shared objects may change between CNDP/DPDK/BESS releases
+# - Maintaining a fragile, version-specific list of libraries is error-prone
+# - Image size impact has been evaluated and is acceptable for this component
+COPY --from=bess-build /usr/local/lib/x86_64-linux-gnu/ /usr/local/lib/x86_64-linux-gnu/
 RUN ldconfig
 
 ENV PYTHONPATH="/opt/bess"
@@ -101,7 +104,7 @@ FROM bess-build AS py-pb
 WORKDIR /
 COPY requirements_pb.txt .
 RUN apt-get update && apt-get install -y --no-install-recommends python3-dev && rm -rf /var/lib/apt/lists/*
-RUN pip install --no-cache-dir --require-hashes -r requirements_pb.txt
+RUN pip install --no-cache-dir --break-system-packages --ignore-installed --require-hashes -r requirements_pb.txt
 RUN mkdir /bess_pb && \
     python3 -m grpc_tools.protoc -I /usr/include -I /protobuf/ \
     /protobuf/*.proto /protobuf/ports/*.proto \
