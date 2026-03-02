@@ -3,7 +3,7 @@
 # Copyright 2019-present Intel Corporation
 
 # Stage bess-build: pre-built BESS image (built from bess/env/Dockerfile)
-FROM ghcr.io/omec-project/bess_build:260225@sha256:cd1cfb19f59988e82e7515d06551edbf170b33a7b7407aa6b19fe11071ce7abd AS bess-build
+FROM ghcr.io/omec-project/bess_build:260302@sha256:33698a09fbb0ff1b512d74838313f14aea1e8bc3afe90b25e3d3c7ce62ca6fac AS bess-build
 
 # Stage bess: creates the runtime image of BESS
 FROM ubuntu:24.04@sha256:d1e2e92c075e5ca139d51a140fff46f84315c0fdce203eab2807c7e495eff4f9 AS bess
@@ -79,7 +79,39 @@ COPY --from=bess-build /usr/bin/cndpfwd /usr/bin/
 # - Maintaining a fragile, version-specific list of libraries is error-prone
 # - Image size impact has been evaluated and is acceptable for this component
 COPY --from=bess-build /usr/local/lib/x86_64-linux-gnu/ /usr/local/lib/x86_64-linux-gnu/
-RUN ldconfig
+# Create DPDK plugin directory so that EAL can dlopen bus/mempool/net drivers
+# at runtime.  bessd passes "-d /opt/bess/lib/dpdk-pmds" to rte_eal_init()
+# when this directory exists.
+# Needed plugins:
+#   librte_bus_vdev      – vdev bus (required to create AF_PACKET/AF_XDP ports)
+#   librte_bus_pci       – PCI bus (required for DPDK-bound NICs)
+#   librte_mempool_ring  – default "ring_mp_mc" mempool ops
+#   librte_net_af_packet – AF_PACKET net driver (kernel datapath fallback)
+#   librte_net_af_xdp    – AF_XDP net driver (kernel datapath)
+RUN set -e; \
+    mkdir -p /opt/bess/lib/dpdk-pmds; \
+    missing_pats=""; \
+    for pat in librte_mempool_ring librte_bus_vdev librte_bus_pci \
+               librte_net_af_packet librte_net_af_xdp; do \
+      found=0; \
+      for f in /usr/local/lib/x86_64-linux-gnu/"${pat}".so*; do \
+        if [ -f "$f" ]; then \
+          ln -sf "$f" /opt/bess/lib/dpdk-pmds/; \
+          found=1; \
+        fi; \
+      done; \
+      if [ "$found" -eq 0 ]; then \
+        echo "Required DPDK plugin not found: ${pat}" >&2; \
+        missing_pats="yes"; \
+      fi; \
+    done; \
+    if [ -n "$missing_pats" ]; then \
+      echo "One or more required DPDK plugins are missing; failing build." >&2; \
+      exit 1; \
+    fi; \
+    echo "DPDK PMD directory contents:"; \
+    ls -la /opt/bess/lib/dpdk-pmds/; \
+    ldconfig
 
 ENV PYTHONPATH="/opt/bess"
 WORKDIR /opt/bess/bessctl
