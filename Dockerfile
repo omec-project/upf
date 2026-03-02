@@ -91,7 +91,7 @@ COPY --from=bess-build /usr/local/lib/x86_64-linux-gnu/ /usr/local/lib/x86_64-li
 RUN mkdir -p /opt/bess/lib/dpdk-pmds && \
     for pat in librte_mempool_ring librte_bus_vdev librte_bus_pci \
                librte_net_af_packet librte_net_af_xdp; do \
-      for f in /usr/local/lib/x86_64-linux-gnu/${pat}.so*; do \
+      for f in /usr/local/lib/x86_64-linux-gnu/"${pat}".so*; do \
         [ -f "$f" ] && ln -sf "$f" /opt/bess/lib/dpdk-pmds/; \
       done; \
     done && \
