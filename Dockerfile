@@ -88,15 +88,29 @@ COPY --from=bess-build /usr/local/lib/x86_64-linux-gnu/ /usr/local/lib/x86_64-li
 #   librte_mempool_ring  – default "ring_mp_mc" mempool ops
 #   librte_net_af_packet – AF_PACKET net driver (kernel datapath fallback)
 #   librte_net_af_xdp    – AF_XDP net driver (kernel datapath)
-RUN mkdir -p /opt/bess/lib/dpdk-pmds && \
+RUN set -e; \
+    mkdir -p /opt/bess/lib/dpdk-pmds; \
+    missing_pats=""; \
     for pat in librte_mempool_ring librte_bus_vdev librte_bus_pci \
                librte_net_af_packet librte_net_af_xdp; do \
+      found=0; \
       for f in /usr/local/lib/x86_64-linux-gnu/"${pat}".so*; do \
-        [ -f "$f" ] && ln -sf "$f" /opt/bess/lib/dpdk-pmds/; \
+        if [ -f "$f" ]; then \
+          ln -sf "$f" /opt/bess/lib/dpdk-pmds/; \
+          found=1; \
+        fi; \
       done; \
-    done && \
-    echo "DPDK PMD directory contents:" && \
-    ls -la /opt/bess/lib/dpdk-pmds/ && \
+      if [ "$found" -eq 0 ]; then \
+        echo "Required DPDK plugin not found: ${pat}" >&2; \
+        missing_pats="yes"; \
+      fi; \
+    done; \
+    if [ -n "$missing_pats" ]; then \
+      echo "One or more required DPDK plugins are missing; failing build." >&2; \
+      exit 1; \
+    fi; \
+    echo "DPDK PMD directory contents:"; \
+    ls -la /opt/bess/lib/dpdk-pmds/; \
     ldconfig
 
 ENV PYTHONPATH="/opt/bess"
