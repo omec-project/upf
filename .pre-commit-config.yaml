@@ -3,11 +3,11 @@
 
 repos:
 - repo: https://github.com/gitleaks/gitleaks
-  rev: v8.29.0
+  rev: v8.30.0
   hooks:
   - id: gitleaks
 - repo: https://github.com/golangci/golangci-lint
-  rev: v2.6.1
+  rev: v2.10.1
   hooks:
   - id: golangci-lint
 - repo: https://github.com/pre-commit/pre-commit-hooks

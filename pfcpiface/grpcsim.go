@@ -20,6 +20,8 @@ const (
 	simModeCreateAndContinue
 )
 
+const stringDelete = "delete"
+
 func (s *simMode) String() string {
 	switch *s {
 	case simModeDisable:
@@ -27,7 +29,7 @@ func (s *simMode) String() string {
 	case simModeCreate:
 		return "create"
 	case simModeDelete:
-		return "delete"
+		return stringDelete
 	case simModeCreateAndContinue:
 		return "create_continue"
 	default:
@@ -41,7 +43,7 @@ func (s *simMode) Set(value string) error {
 		*s = simModeDisable
 	case "create":
 		*s = simModeCreate
-	case "delete":
+	case stringDelete:
 		*s = simModeDelete
 	case "create_continue":
 		*s = simModeCreateAndContinue

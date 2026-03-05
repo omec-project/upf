@@ -4,6 +4,7 @@
 package integration
 
 import (
+	"context"
 	"errors"
 	"net"
 	"testing"
@@ -122,13 +123,15 @@ func IsConnectionOpen(network string, host string, port string) bool {
 
 	switch network {
 	case "udp":
-		ln, err := net.Listen(network, target)
+		var lc net.ListenConfig
+		ln, err := lc.Listen(context.Background(), network, target)
 		if err != nil {
 			return true
 		}
 		ln.Close()
 	case "tcp":
-		conn, err := net.DialTimeout(network, target, time.Second*3)
+		d := net.Dialer{Timeout: time.Second * 3}
+		conn, err := d.DialContext(context.Background(), network, target)
 		if err != nil {
 			return false
 		}
