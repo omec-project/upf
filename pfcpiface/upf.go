@@ -4,6 +4,7 @@
 package pfcpiface
 
 import (
+	"context"
 	"net"
 	"os"
 	"strings"
@@ -104,14 +105,14 @@ func fqdnHostname() (string, error) {
 	}
 
 	// try to get FQDN via reverse DNS lookup
-	addrs, err := net.LookupIP(hostname)
+	addrs, err := net.DefaultResolver.LookupIPAddr(context.Background(), hostname)
 	if err != nil {
 		logger.PfcpLog.Warnf("failed to get fqdn for %s: %+v", hostname, err)
 		return hostname, nil // fallback to short hostname
 	}
 
 	for _, addr := range addrs {
-		names, err := net.LookupAddr(addr.String())
+		names, err := net.DefaultResolver.LookupAddr(context.Background(), addr.String())
 		if err != nil || len(names) == 0 {
 			continue
 		}
@@ -143,7 +144,7 @@ func NewUPF(conf *Conf, fp datapath) *upf {
 
 	// TODO: Delete this once CI config is fixed
 	if nodeID != "" {
-		hosts, err = net.LookupHost(nodeID)
+		hosts, err = net.DefaultResolver.LookupHost(context.Background(), nodeID)
 		if err != nil {
 			logger.PfcpLog.Fatalln("unable to resolve hostname", nodeID, err)
 		}

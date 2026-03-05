@@ -799,7 +799,8 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 			notifySockAddr = SockAddr
 		}
 
-		b.notifyBessSocket, err = net.Dial("unixpacket", notifySockAddr)
+		var d net.Dialer
+		b.notifyBessSocket, err = d.DialContext(context.Background(), "unixpacket", notifySockAddr)
 		if err != nil {
 			logger.BessLog.Errorln("dial error:", err)
 			return
@@ -814,7 +815,8 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 			pfcpCommAddr = PfcpAddr
 		}
 
-		b.endMarkerSocket, err = net.Dial("unixpacket", pfcpCommAddr)
+		var d net.Dialer
+		b.endMarkerSocket, err = d.DialContext(context.Background(), "unixpacket", pfcpCommAddr)
 		if err != nil {
 			logger.BessLog.Errorln("dial error:", err)
 			return

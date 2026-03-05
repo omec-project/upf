@@ -60,13 +60,15 @@ func NewPFCPNode(upf *upf) *PFCPNode {
 
 func (node *PFCPNode) tryConnectToN4Peers(lAddrStr string) {
 	for _, peer := range node.upf.peers {
-		conn, err := net.Dial("udp", peer+":"+PFCPPort)
+		var d net.Dialer
+		conn, err := d.DialContext(node.ctx, "udp", peer+":"+PFCPPort)
 		if err != nil {
 			logger.PfcpLog.Warnln("failed to establish PFCP connection to peer", peer)
 			continue
 		}
 
 		remoteAddr := conn.RemoteAddr().(*net.UDPAddr)
+		conn.Close()
 		n4DstIP := remoteAddr.IP
 
 		logger.PfcpLog.Infof("Establishing PFCP Conn with CP node. SPGWC/SMF host: %s, CP node: %s", peer, n4DstIP.String())
