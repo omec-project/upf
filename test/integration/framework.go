@@ -124,11 +124,11 @@ func IsConnectionOpen(network string, host string, port string) bool {
 	switch network {
 	case "udp":
 		var lc net.ListenConfig
-		ln, err := lc.Listen(context.Background(), network, target)
+		pc, err := lc.ListenPacket(context.Background(), network, target)
 		if err != nil {
 			return true
 		}
-		ln.Close()
+		pc.Close()
 	case "tcp":
 		d := net.Dialer{Timeout: time.Second * 3}
 		conn, err := d.DialContext(context.Background(), network, target)
