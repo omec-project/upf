@@ -20,22 +20,6 @@ func Ip4ToUint32(ip net.IP) uint32 {
 	return binary.BigEndian.Uint32(ip.To4())
 }
 
-func MaxUint16(x, y uint16) uint16 {
-	if x < y {
-		return y
-	}
-
-	return x
-}
-
-func MinUint16(x, y uint16) uint16 {
-	if MaxUint16(x, y) == x {
-		return y
-	}
-
-	return x
-}
-
 func Uint8Has3rdBit(f uint8) bool {
 	return (f&0x04)>>2 == 1
 }

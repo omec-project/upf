@@ -50,10 +50,6 @@ func init() {
 	PfcpLog = log.Sugar().With("component", "UPF", "category", "Pfcp")
 }
 
-func GetLogger() *zap.Logger {
-	return log
-}
-
 // SetLogLevel: set the log level (panic|fatal|error|warn|info|debug)
 func SetLogLevel(level zapcore.Level) {
 	InitLog.Infoln("set log level:", level)
