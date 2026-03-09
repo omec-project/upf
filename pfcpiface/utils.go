@@ -9,8 +9,6 @@ import (
 	"net"
 	"strconv"
 	"strings"
-
-	"github.com/omec-project/upf-epc/logger"
 )
 
 // Bits type.
@@ -111,18 +109,6 @@ func maxUint64(x, y uint64) uint64 {
 // Returns the bandwidth delay product for a given rate in kbps and duration in ms.
 func calcBurstSizeFromRate(kbps uint64, ms uint64) uint64 {
 	return uint64((float64(kbps) * 1000 / 8) * (float64(ms) / 1000))
-}
-
-// MustParseStrIP : parse IP address from config and fail on error.
-func MustParseStrIP(address string) *net.IPNet {
-	ip, ipNet, err := net.ParseCIDR(address)
-	if err != nil {
-		logger.PfcpLog.Fatalf("unable to parse IP %v that we should parse", address)
-	}
-
-	logger.PfcpLog.Infoln("parsed IP:", ip)
-
-	return ipNet
 }
 
 // GetUnicastAddressFromInterface returns a unicast IP address configured on the interface.
