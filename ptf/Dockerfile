@@ -80,7 +80,8 @@ COPY --from=ptf-deps /python_output /
 # TODO: Move to a newer Scapy version compatible with latest Ubuntu versions
 WORKDIR ${TREX_EXT_LIBS}/scapy-${SCAPY_VER}
 RUN printf '%s\n' "${SCAPY_VER}" > scapy/VERSION && \
-    python3 -m pip install --no-cache-dir --break-system-packages --no-build-isolation . && \
+    python3 -m pip wheel --no-cache-dir --no-build-isolation --no-deps --wheel-dir /tmp/wheels . && \
+    python3 -m pip install --no-cache-dir --break-system-packages /tmp/wheels/scapy-*.whl && \
     ldconfig
 
 ENTRYPOINT []
