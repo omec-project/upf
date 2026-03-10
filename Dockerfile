@@ -143,7 +143,7 @@ RUN mkdir /bess_pb && \
     --python_out=/bess_pb \
     --grpc_python_out=/bess_pb
 
-FROM golang:1.26.1-bookworm@sha256:c7a82e9e2df2fea5d8cb62a16aa6f796d2b2ed81ccad4ddd2bc9f0d22936c3f2 AS pfcpiface-build
+FROM golang:1.26.1-bookworm@sha256:c7a82e9e2df2fea5d8cb62a16aa6f796d2b2ed81ccad4ddd2bc9f0d22936c3f2 AS pfcp-build
 ARG GOFLAGS
 WORKDIR /pfcpiface
 
@@ -157,8 +157,8 @@ COPY . /pfcpiface
 RUN go mod tidy && \
     CGO_ENABLED=0 go build $GOFLAGS -o /bin/pfcpiface ./cmd/pfcpiface
 
-# Stage pfcpiface: runtime image of pfcpiface toward SMF/SPGW-C
-FROM alpine:3.23@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659 AS pfcpiface
+# Stage pfcp: runtime image of pfcp agent towards SMF
+FROM alpine:3.23@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659 AS pfcp
 
 # Build arguments for dynamic labels
 ARG VERSION=dev
@@ -171,7 +171,7 @@ LABEL org.opencontainers.image.source="${VCS_URL}" \
     org.opencontainers.image.created="${BUILD_DATE}" \
     org.opencontainers.image.revision="${VCS_REF}" \
     org.opencontainers.image.url="${VCS_URL}" \
-    org.opencontainers.image.title="pfcpiface" \
+    org.opencontainers.image.title="pfcp" \
     org.opencontainers.image.description="Aether 5G Core PFCPIFACE Network Function" \
     org.opencontainers.image.authors="Aether SD-Core <dev@lists.aetherproject.org>" \
     org.opencontainers.image.vendor="Aether Project" \
@@ -179,7 +179,7 @@ LABEL org.opencontainers.image.source="${VCS_URL}" \
     org.opencontainers.image.documentation="https://docs.sd-core.aetherproject.org/"
 
 COPY conf /opt/bess/bessctl/conf
-COPY --from=pfcpiface-build /bin/pfcpiface /bin
+COPY --from=pfcp-build /bin/pfcpiface /bin
 ENTRYPOINT [ "/bin/pfcpiface" ]
 
 # Stage pb: dummy stage for collecting protobufs
@@ -195,6 +195,6 @@ COPY --from=py-pb /bess_pb /bess_pb
 # Stage binaries: dummy stage for collecting artifacts
 FROM scratch AS artifacts
 COPY --from=bess /bin/bessd /
-COPY --from=pfcpiface /bin/pfcpiface /
+COPY --from=pfcp /bin/pfcpiface /
 COPY --from=bess-build /bess/protobuf /bess/protobuf
 COPY --from=bess-build /pb /bess/pb

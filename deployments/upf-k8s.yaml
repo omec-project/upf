@@ -157,7 +157,7 @@ spec:
     - name: hugepages
       mountPath: /dev/hugepages
   - name: web
-    image: omecproject/upf-bess:master-latest
+    image: omecproject/upf-bess:rel-2.4.0
     command: ["bessctl"]
     args:
     - http
@@ -168,7 +168,7 @@ spec:
         cpu: 256m
         memory: 128Mi
   - name: pfcpiface
-    image: omecproject/upf-pfcpiface:master-latest
+    image: omec-project/upf-pfcp:rel-2.4.0
     command: ["pfcpiface"]
     args:
     - -config
