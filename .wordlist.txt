@@ -74,7 +74,6 @@ json
 jsonc
 kubernetes
 linerate
-Linerate
 linux
 localhost
 lports
@@ -92,9 +91,7 @@ NUMA
 nproc
 omec
 ONF
-ONF's
 ONFConnect
-ONOS
 OpenSSF
 pci
 PCI
@@ -103,6 +100,7 @@ PDR
 PDRs
 pfcpiface
 PFCP
+pfcp
 pfcpsim
 PFDs
 pktgen
@@ -121,7 +119,6 @@ setenv
 SMF
 SPGW
 smac
-sourceforge
 SR-IOV
 subnet
 subnet's
@@ -154,7 +151,6 @@ WIP
 YAML
 # Words with numbers or symbols
 af
-BMv
 Gi
 GPP
 IPv

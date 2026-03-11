@@ -30,7 +30,7 @@ SD-Core mobile core control plane.
 
 The UPF implementation consists of two layers:
 
-- **PFCP Agent (_pfcpiface_)**: a Go-based implementation of the PFCP northbound API used to interact with the mobile core control plane.
+- **PFCP Agent (`pfcp` image, _pfcpiface_ binary/module)**: a Go-based implementation of the PFCP northbound API used to interact with the mobile core control plane.
 - **Datapath:** responsible for the actual data plane packet processing.
 
 The PFCP Agent implements datapath plugins that translate
@@ -50,8 +50,8 @@ implementing new plugins.
 
 ![UPF overview](./docs/images/upf-overview.jpg)
 
-This repository provides code to build two Docker images: `pfcpiface` (the PFCP
-Agent) and `bess` (the BESS-based datapath).
+This repository provides code to build two Docker images: `pfcp` (packaging the
+`pfcpiface` PFCP Agent binary) and `bess` (the BESS-based datapath).
 
 To build all Docker images run:
 
@@ -62,12 +62,12 @@ make docker-build
 To build a selected image use `DOCKER_TARGETS`:
 
 ```
-DOCKER_TARGETS=pfcpiface make docker-build
+DOCKER_TARGETS=pfcp make docker-build
 ```
 
 The latest Docker images are also published in the OMEC project's DockerHub
 registry: [upf-bess](https://hub.docker.com/r/omecproject/upf-bess),
-[upf-pfcpiface](https://hub.docker.com/r/omecproject/upf-pfcpiface).
+[upf-pfcp](https://hub.docker.com/r/omecproject/upf-pfcp).
 
 ### BESS-UPF Components
 
@@ -113,7 +113,6 @@ registry: [upf-bess](https://hub.docker.com/r/omecproject/upf-bess),
 * DSCP marking of GTPu packets by copying the DSCP value from the inner IP packet
 * GTPu path monitoring
 * Support for DPDK, CNDP, AF_PACKET and AF_XDP modes
-  - BESS uses DPDK 22.11.4
 
 ## Getting started
 
