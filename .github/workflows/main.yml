@@ -27,7 +27,7 @@ jobs:
     with:
       branch_name: ${{ github.ref }}
       run_pre_build: true
-      docker_targets: "bess pfcpiface"
+      docker_targets: "bess pfcp"
 
   build-ptf:
     if: github.event_name == 'pull_request'
