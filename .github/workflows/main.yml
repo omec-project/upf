@@ -23,9 +23,11 @@ jobs:
       security-events: write
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/upf-build-upf.yml@ead90c247b15898cf138fa31300ee71de83905bd # v0.0.21
+    uses: omec-project/.github/.github/workflows/docker-build.yml@ead90c247b15898cf138fa31300ee71de83905bd # v0.0.21
     with:
       branch_name: ${{ github.ref }}
+      run_pre_build: true
+      docker_targets: "bess pfcpiface"
 
   build-ptf:
     if: github.event_name == 'pull_request'
@@ -35,9 +37,11 @@ jobs:
       security-events: write
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/upf-build-ptf.yml@ead90c247b15898cf138fa31300ee71de83905bd # v0.0.21
+    uses: omec-project/.github/.github/workflows/docker-build.yml@ead90c247b15898cf138fa31300ee71de83905bd # v0.0.21
     with:
       branch_name: ${{ github.ref }}
+      build_directory: "./ptf"
+      build_command: "make build"
 
   lint:
     permissions:
