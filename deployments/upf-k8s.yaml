@@ -80,7 +80,7 @@ spec:
   initContainers:
   # Currently CNI doesn't allow metric we're doing it here instead of net-attach-def
   - name: routes
-    image: omecproject/upf-bess:master-latest
+    image: omecproject/upf-bess:rel-2.4.0
     env:
     - name: ENB_GNB_SUBNET
       value: '11.1.1.128/25'
@@ -99,7 +99,7 @@ spec:
 
   # Reqd. if working with AF_PACKET so that kernel does not reply to GTP-U packets
   #- name: iptables
-  #  image: omecproject/upf-bess:master-latest
+  #  image: omecproject/upf-bess:rel-2.4.0
   #  command: [ "sh", "-xec"]
   #  args:
   #  - iptables -I OUTPUT -p icmp --icmp-type port-unreachable -j DROP;
@@ -109,7 +109,7 @@ spec:
   #        - NET_ADMIN
   containers:
   - name: routectl
-    image: omecproject/upf-bess:master-latest
+    image: omecproject/upf-bess:rel-2.4.0
     command: ["/opt/bess/bessctl/conf/route_control.py"]
     args:
     - -i
@@ -123,7 +123,7 @@ spec:
         cpu: 256m
         memory: 128Mi
   - name: bessd
-    image: omecproject/upf-bess:master-latest
+    image: omecproject/upf-bess:rel-2.4.0
     stdin: true
     tty: true
     args:
@@ -168,7 +168,7 @@ spec:
         cpu: 256m
         memory: 128Mi
   - name: pfcpiface
-    image: omec-project/upf-pfcp:rel-2.4.0
+    image: omecproject/upf-pfcp:rel-2.4.0
     command: ["pfcpiface"]
     args:
     - -config
