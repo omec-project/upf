@@ -17,7 +17,7 @@ jobs:
       pull-requests: write
       contents: read
       actions: read
-    uses: omec-project/.github/.github/workflows/stale-issue.yml@ead90c247b15898cf138fa31300ee71de83905bd # v0.0.21
+    uses: omec-project/.github/.github/workflows/stale-issue.yml@13844841ff9ff9944647b65f59ed015c6797f9d6 # v0.0.22
     with:
       days_before_stale: 120
       days_before_close: 15
