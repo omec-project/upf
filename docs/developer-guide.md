@@ -20,7 +20,7 @@ the easiest way to do so is by:
 - Rebuild the `bess_build` image locally from the `bess` repository
   ```bash
   $ cd <path/to/bess>
-  $ yes N | ./env/rebuild_images.py jammy64
+  $ yes N | ./env/rebuild_images.py noble64
   ```
 
 - Update the `FROM` line in `Dockerfile` to use the locally-built image
@@ -32,7 +32,7 @@ the easiest way to do so is by:
 - Build the UPF Docker image
   ```bash
   $ cd <path/to/upf>
-  $ DOCKER_PULL="" make docker-build
+  $ make docker-build
   ```
 
 - Test the modifications
