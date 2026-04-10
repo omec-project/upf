@@ -230,12 +230,12 @@ class Port:
                 }
                 try:
                     self.init_datapath(**kwargs)
-                except:
+                except Exception as err:
                     kwargs = None
                     print(
-                        "Unable to initialize {} datapath using alias {},\
-                        falling back to scan".format(
-                            name, pci
+                        "Unable to initialize {} datapath using alias {}: {}. \
+                        Falling back to port_id/scan".format(
+                            name, pci, err
                         )
                     )
             if kwargs is None:
@@ -248,8 +248,12 @@ class Port:
                         "flow_profiles": self.flow_profiles,
                     }
                     self.init_datapath(**kwargs)
-                except:
+                except Exception as err:
                     kwargs = None
+                    print(
+                        "Unable to initialize {} datapath using port_id {}: {}. \
+                        Falling back to scan".format(name, idx, err)
+                    )
 
             if kwargs is None:
                 # Fallback to scanning ports

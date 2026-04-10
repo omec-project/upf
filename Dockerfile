@@ -108,22 +108,28 @@ RUN set -e; \
         missing_pats="yes"; \
       fi; \
     done; \
-    found_net_pmd=0; \
-    for pat in librte_net_af_packet librte_net_af_xdp librte_net_bond \
-               librte_net_e1000 librte_net_i40e librte_net_iavf \
-               librte_net_ice librte_net_igc librte_net_ixgbe \
-               librte_net_idpf librte_net_cpfl; do \
+    for pat in librte_net_af_packet librte_net_af_xdp; do \
+      found=0; \
       for f in /usr/local/lib/x86_64-linux-gnu/"${pat}".so*; do \
         if [ -f "$f" ]; then \
           ln -sf "$f" /opt/bess/lib/dpdk-pmds/; \
-          found_net_pmd=1; \
+          found=1; \
+        fi; \
+      done; \
+      if [ "$found" -eq 0 ]; then \
+        echo "Required DPDK net PMD not found: ${pat}" >&2; \
+        missing_pats="yes"; \
+      fi; \
+    done; \
+    for pat in librte_net_bond librte_net_e1000 librte_net_i40e \
+               librte_net_iavf librte_net_ice librte_net_igc \
+               librte_net_ixgbe librte_net_idpf librte_net_cpfl; do \
+      for f in /usr/local/lib/x86_64-linux-gnu/"${pat}".so*; do \
+        if [ -f "$f" ]; then \
+          ln -sf "$f" /opt/bess/lib/dpdk-pmds/; \
         fi; \
       done; \
     done; \
-    if [ "$found_net_pmd" -eq 0 ]; then \
-      echo "No supported DPDK net PMDs were found; failing build." >&2; \
-      exit 1; \
-    fi; \
     if [ -n "$missing_pats" ]; then \
       echo "One or more required DPDK plugins are missing; failing build." >&2; \
       exit 1; \
