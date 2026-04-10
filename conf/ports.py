@@ -25,7 +25,12 @@ def scan_dpdk_ports():
     idx = 0
     while True:
         try:
-            intf = PMDPort(name="Port {}".format(idx), port_id=idx)
+            intf = PMDPort(
+                name="Port {}".format(idx),
+                port_id=idx,
+                num_inc_q=1,
+                num_out_q=1,
+            )
             if intf:
                 # Need to declare mac so that we don't lose key during destroy_port
                 mac = intf.mac_addr
@@ -225,14 +230,31 @@ class Port:
                 }
                 try:
                     self.init_datapath(**kwargs)
-                except:
+                except Exception as err:
                     kwargs = None
                     print(
-                        "Unable to initialize {} datapath using alias {},\
-                        falling back to scan".format(
-                            name, pci
+                        "Unable to initialize {} datapath using alias {}: {}. \
+                        Falling back to port_id/scan".format(
+                            name, pci, err
                         )
                     )
+            if kwargs is None:
+                try:
+                    kwargs = {
+                        "port_id": idx,
+                        "num_out_q": num_q,
+                        "num_inc_q": num_q,
+                        "hwcksum": self.hwcksum,
+                        "flow_profiles": self.flow_profiles,
+                    }
+                    self.init_datapath(**kwargs)
+                except Exception as err:
+                    kwargs = None
+                    print(
+                        "Unable to initialize {} datapath using port_id {}: {}. \
+                        Falling back to scan".format(name, idx, err)
+                    )
+
             if kwargs is None:
                 # Fallback to scanning ports
                 # if port list is empty, scan for dpdk_ports first
