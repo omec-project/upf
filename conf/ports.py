@@ -25,7 +25,12 @@ def scan_dpdk_ports():
     idx = 0
     while True:
         try:
-            intf = PMDPort(name="Port {}".format(idx), port_id=idx)
+            intf = PMDPort(
+                name="Port {}".format(idx),
+                port_id=idx,
+                num_inc_q=1,
+                num_out_q=1,
+            )
             if intf:
                 # Need to declare mac so that we don't lose key during destroy_port
                 mac = intf.mac_addr
@@ -233,6 +238,19 @@ class Port:
                             name, pci
                         )
                     )
+            if kwargs is None:
+                try:
+                    kwargs = {
+                        "port_id": idx,
+                        "num_out_q": num_q,
+                        "num_inc_q": num_q,
+                        "hwcksum": self.hwcksum,
+                        "flow_profiles": self.flow_profiles,
+                    }
+                    self.init_datapath(**kwargs)
+                except:
+                    kwargs = None
+
             if kwargs is None:
                 # Fallback to scanning ports
                 # if port list is empty, scan for dpdk_ports first
