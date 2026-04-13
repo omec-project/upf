@@ -158,8 +158,8 @@ function add_tc_rules() {
 }
 
 # Stop previous instances of bess* before restarting
-docker stop pause bess bess-routectl bess-web bess-pfcpiface || true
-docker rm -f pause bess bess-routectl bess-web bess-pfcpiface || true
+docker stop pause bess bess-routectl bess-web bess-pfcp || true
+docker rm -f pause bess bess-routectl bess-web bess-pfcp || true
 sudo rm -rf /var/run/netns/pause
 
 # Build
@@ -224,7 +224,7 @@ docker run --name bess -td --restart unless-stopped \
 	--net container:pause \
 	$PRIVS \
 	$DEVICES \
-	upf-epc-bess:"$(<VERSION)" -grpc-url=0.0.0.0:$bessd_port $HUGEPAGES
+	upf-bess:"$(<VERSION)" -grpc-url=0.0.0.0:$bessd_port $HUGEPAGES
 
 docker logs bess
 
@@ -237,13 +237,13 @@ sleep 10
 docker run --name bess-web -d --restart unless-stopped \
 	--net container:bess \
 	--entrypoint bessctl \
-	upf-epc-bess:"$(<VERSION)" http 0.0.0.0 $gui_port
+	upf-bess:"$(<VERSION)" http 0.0.0.0 $gui_port
 
-# Run bess-pfcpiface depending on mode type
-docker run --name bess-pfcpiface -td --restart on-failure \
+# Run bess-pfcp depending on mode type
+docker run --name bess-pfcp -td --restart on-failure \
 	--net container:pause \
 	-v "$PWD/conf/upf.jsonc":/conf/upf.jsonc \
-	upf-epc-pfcpiface:"$(<VERSION)" \
+	upf-pfcp:"$(<VERSION)" \
 	-config /conf/upf.jsonc
 
 # Don't run any other container if mode is "sim"
@@ -256,4 +256,4 @@ docker run --name bess-routectl -td --restart unless-stopped \
 	-v "$PWD/conf/route_control.py":/route_control.py \
 	--net container:pause --pid container:bess \
 	--entrypoint /route_control.py \
-	upf-epc-bess:"$(<VERSION)" -i "${ifaces[@]}"
+	upf-bess:"$(<VERSION)" -i "${ifaces[@]}"

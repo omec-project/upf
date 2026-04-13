@@ -37,7 +37,7 @@ DOCKER_LABEL_VCS_REF     ?= $(shell \
 DOCKER_LABEL_BUILD_DATE  ?= $(shell date -u "+%Y-%m-%dT%H:%M:%SZ")
 
 ## Build configuration
-DOCKER_TARGETS           ?= bess pfcpiface
+DOCKER_TARGETS           ?= bess pfcp
 GO_PACKAGES              ?= ./pfcpiface ./cmd/...
 
 ## Directory configuration
