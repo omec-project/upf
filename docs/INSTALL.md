@@ -360,7 +360,7 @@ To configure/install the UPF in CNDP mode, please refer [CNDP_README.md](./CNDP_
     (works only for BESS)
 
     ```bash
-    docker exec bess-pfcpiface pfcpiface -config conf/upf.jsonc -simulate create
+    docker exec bess-pfcp pfcpiface -config conf/upf.jsonc -simulate create
     ```
 
     OR

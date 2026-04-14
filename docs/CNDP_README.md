@@ -285,7 +285,7 @@ $ chmod +x dpdk-devbind.py
 Insert rules into relevant PDR and FAR tables
 
 ```
-$ docker exec bess-pfcpiface pfcpiface -config /conf/upf.jsonc -simulate create
+$ docker exec bess-pfcp pfcpiface -config /conf/upf.jsonc -simulate create
 ```
 9) From browser, use localhost:8000 to view the UPF pipeline in GUI. If you are remotely connecting to system via ssh, you need to setup a tunnel with local port forwarding.
 
@@ -427,6 +427,6 @@ $ ./scripts/docker_setup.sh
 ```
 Insert rules into relevant PDR and FAR tables
 ```
-$ docker exec bess-pfcpiface pfcpiface -config /conf/upf.jsonc -simulate create
+$ docker exec bess-pfcp pfcpiface -config /conf/upf.jsonc -simulate create
 ```
 4) From browser, use localhost:8000 to view the UPF pipeline in GUI. If you are remotely connecting to system via ssh, you need to setup a tunnel with local port forwarding.

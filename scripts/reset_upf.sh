@@ -22,8 +22,8 @@ sudo dpdk-devbind.py -u $CORE_PCIE --force
 
 sleep 2
 echo "Stop UPF docker containers"
-docker stop pause bess bess-routectl bess-web bess-pfcpiface || true
-docker rm -f pause bess bess-routectl bess-web bess-pfcpiface || true
+docker stop pause bess bess-routectl bess-web bess-pfcp || true
+docker rm -f pause bess bess-routectl bess-web bess-pfcp || true
 
 if [ "$MODE" == 'cndp' ]; then
 	echo "Bind access/core interface to ICE driver"
