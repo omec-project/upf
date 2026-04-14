@@ -18,7 +18,7 @@ jobs:
       contents: write
       actions: read
       id-token: write
-    uses: omec-project/.github/.github/workflows/tag-github.yml@13844841ff9ff9944647b65f59ed015c6797f9d6 # v0.0.22
+    uses: omec-project/.github/.github/workflows/tag-github.yml@0bce626c84023cadf638ceff2af19c73a7201bf8 # v0.0.26
     secrets: inherit
 
   release-image:
@@ -29,7 +29,7 @@ jobs:
       actions: read
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/upf-release-image.yml@13844841ff9ff9944647b65f59ed015c6797f9d6 # v0.0.22
+    uses: omec-project/.github/.github/workflows/upf-release-image.yml@0bce626c84023cadf638ceff2af19c73a7201bf8 # v0.0.26
     with:
       branch_name: ${{ github.ref }}
       changed: ${{ needs.tag-github.outputs.changed }}
@@ -43,7 +43,7 @@ jobs:
       pull-requests: write
       actions: read
       id-token: write
-    uses: omec-project/.github/.github/workflows/update-version.yml@13844841ff9ff9944647b65f59ed015c6797f9d6 # v0.0.22
+    uses: omec-project/.github/.github/workflows/update-version.yml@0bce626c84023cadf638ceff2af19c73a7201bf8 # v0.0.26
     with:
       changed: ${{ needs.tag-github.outputs.changed }}
       version: ${{ needs.tag-github.outputs.version }}
@@ -55,7 +55,7 @@ jobs:
       contents: write
       actions: read
       id-token: write
-    uses: omec-project/.github/.github/workflows/branch-release.yml@13844841ff9ff9944647b65f59ed015c6797f9d6 # v0.0.22
+    uses: omec-project/.github/.github/workflows/branch-release.yml@0bce626c84023cadf638ceff2af19c73a7201bf8 # v0.0.26
     with:
       release_branch: ${{ needs.tag-github.outputs.release_branch }}
       version_branch: ${{ needs.tag-github.outputs.version_branch }}
@@ -66,7 +66,7 @@ jobs:
     permissions:
       contents: read
       actions: read
-    uses: omec-project/.github/.github/workflows/sbom-source.yml@13844841ff9ff9944647b65f59ed015c6797f9d6 # v0.0.22
+    uses: omec-project/.github/.github/workflows/sbom-source.yml@0bce626c84023cadf638ceff2af19c73a7201bf8 # v0.0.26
     with:
       changed: ${{ needs.tag-github.outputs.changed }}
       branch_name: ${{ github.ref }}
@@ -80,7 +80,7 @@ jobs:
       contents: read
       actions: read
       security-events: write # Required for SARIF upload to Code Scanning
-    uses: omec-project/.github/.github/workflows/grype-scan.yml@13844841ff9ff9944647b65f59ed015c6797f9d6 # v0.0.22
+    uses: omec-project/.github/.github/workflows/grype-scan.yml@0bce626c84023cadf638ceff2af19c73a7201bf8 # v0.0.26
     with:
       changed: ${{ needs.tag-github.outputs.changed }}
       artifact_name: ${{ github.event.repository.name }}-${{ needs.tag-github.outputs.version }}.spdx.json
