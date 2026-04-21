@@ -146,6 +146,7 @@ jobs:
       repository-projects: read
       security-events: write
       statuses: read
+      vulnerability-alerts: read
     uses: omec-project/.github/.github/workflows/scorecard-analysis.yml@0bce626c84023cadf638ceff2af19c73a7201bf8 # v0.0.26
     with:
       branch_name: ${{ github.ref }}
