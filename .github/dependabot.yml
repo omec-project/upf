@@ -47,18 +47,6 @@ updates:
         patterns:
           - "*"
 
-  - package-ecosystem: "pip"
-    directory: "/ptf"
-    schedule:
-      interval: "weekly"
-      day: "thursday"
-      time: "21:00"
-      timezone: "America/Los_Angeles"
-    groups:
-      python-deps:
-        patterns:
-          - "*"
-
   - package-ecosystem: github-actions
     directory: /
     schedule:
