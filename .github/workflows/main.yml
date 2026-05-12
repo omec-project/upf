@@ -134,6 +134,7 @@ jobs:
       artifact-metadata: read
       attestations: read
       checks: read
+      code-quality: read
       contents: read
       deployments: read
       discussions: read
