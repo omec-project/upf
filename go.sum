@@ -22,8 +22,8 @@ github.com/libp2p/go-reuseport v0.4.0 h1:nR5KU7hD0WxXCJbmw7r2rhRYruNRl2koHw8fQsc
 github.com/libp2p/go-reuseport v0.4.0/go.mod h1:ZtI03j/wO5hZVDFo2jKywN6bYKWLOy8Se6DrI2E1cLU=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
-github.com/omec-project/pfcpsim v1.4.3 h1:4nMuSuHq/w2RPDTwU8Rsnzn7WT/oAURV+1Ii7/D5qnE=
-github.com/omec-project/pfcpsim v1.4.3/go.mod h1:/RUGkiYrYiSDwRUtFUpuLHtyXj9dj9/y3XyGgyHoWjc=
+github.com/omec-project/pfcpsim v1.4.4 h1:KAayiIklpPfQdK1xoZFFkjDveHjW/QCe29LC0AQEhlk=
+github.com/omec-project/pfcpsim v1.4.4/go.mod h1:ZDWIv1lJNJ8x7IQutbEgHtS75lwgn1oHUv+D1EV4hoY=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/prometheus/client_golang v1.23.2 h1:Je96obch5RDVy3FDMndoUsjAhG5Edi49h0RJWRi/o0o=
