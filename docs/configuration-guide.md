@@ -37,4 +37,3 @@ These are configurations commonly shared between P4-UPF and BESS-UPF.
 | `access.ifname` | - | Yes | Access-facing network interface name |
 | `core.ifname` | - | Yes | Core-facing network interface name |
 | `enable_notify_bess` | false | No | Whether to enable Notify feature for DDNs |
-

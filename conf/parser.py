@@ -211,4 +211,3 @@ class Parser:
             self.enable_gtpu_path_monitoring = bool(self.conf["enable_gtpu_path_monitoring"])
         except KeyError:
             print("GTPu Path monitoring disabled")
-
