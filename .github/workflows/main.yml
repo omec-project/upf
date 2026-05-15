@@ -51,6 +51,7 @@ jobs:
       attestations: write
     uses: omec-project/.github/.github/workflows/lint.yml@e05a6a6c35278d4b7f9f03da4474e49d869edf2f # v0.0.27
     with:
+      golangci_lint_version: 'v2.11.3'
       branch_name: ${{ github.ref }}
 
   hadolint:

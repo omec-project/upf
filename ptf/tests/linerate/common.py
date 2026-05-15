@@ -26,4 +26,3 @@ UE_IP_START = IPv4Address("16.0.0.1")
 GNB_IP = IPv4Address("11.1.1.129")
 N3_IP = IPv4Address("198.18.0.1")
 PDN_IP = IPv4Address("6.6.6.6") # Must be routable by route_control
-

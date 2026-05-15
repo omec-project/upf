@@ -49,18 +49,6 @@ jobs:
       version: ${{ needs.tag-github.outputs.version }}
     secrets: inherit
 
-  branch-release:
-    needs: tag-github
-    permissions:
-      contents: write
-      actions: read
-      id-token: write
-    uses: omec-project/.github/.github/workflows/branch-release.yml@e05a6a6c35278d4b7f9f03da4474e49d869edf2f # v0.0.27
-    with:
-      release_branch: ${{ needs.tag-github.outputs.release_branch }}
-      version_branch: ${{ needs.tag-github.outputs.version_branch }}
-    secrets: inherit
-
   sbom-source:
     needs: tag-github
     permissions:

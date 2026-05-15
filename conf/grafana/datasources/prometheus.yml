@@ -13,4 +13,4 @@ datasources:
   orgId: 1
   url: http://localhost:9090
   version: 1
-  editable: true 
+  editable: true
