@@ -5,7 +5,6 @@
     // UPF support various configuration modes:
     // "af_packet"` to enable AF_PACKET mode,
     // "af_xdp" to enable AF_XDP mode,
-    // "cndp" to enable CNDP mode,
     // "dpdk" to enable DPDK mode,
     // "sim" to generate synthetic traffic from BESS's Source module,
     "mode": "dpdk",
@@ -72,13 +71,11 @@
 
     // N3 interface
     "access": {
-        // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
         "ifname": "access"
     },
 
     // N6 or N9 interface (depending on the UPF's deployment [PSA-UPF or I-UPF])
     "core": {
-        // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
         // Uncomment line below to enable UE IP natting. It could be a single IP or multiple IPs
         // "ip_masquerade": "18.0.0.1 or 18.0.0.2 or 18.0.0.3",
         "ifname": "core"

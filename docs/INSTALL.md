@@ -12,7 +12,6 @@ Copyright 2019 Intel Corporation
     * [AF_PACKET mode](#configuration-af_packet-mode)
     * [AF_XDP mode](#configuration-af_xdp-mode)
     * [DPDK mode](#configuration-dpdk-mode)
-    * [CNDP mode](#configuration-cndp-mode)
   * [Installation](#installation)
   * [General Execution Commands](#general-execution-commands)
   * [Testing (Microbenchmarks)](#testing-microbenchmarks)
@@ -61,8 +60,7 @@ required:
     index fb34142..3bb68ec 100644
     --- a/conf/upf.jsonc
     +++ b/conf/upf.jsonc
-    @@ -8,7 +8,7 @@
-         // "cndp" to enable CNDP mode,
+    @@ -7,6 +7,6 @@
          // "dpdk" to enable DPDK mode,
          // "sim" to generate synthetic traffic from BESS's Source module,
     -    "mode": "dpdk",
@@ -105,8 +103,7 @@ To configure/install the UPF in AF_PACKET mode, the following changes are requir
     index fb34142..b9d65a4 100644
     --- a/conf/upf.jsonc
     +++ b/conf/upf.jsonc
-    @@ -8,7 +8,7 @@
-         // "cndp" to enable CNDP mode,
+    @@ -7,6 +7,6 @@
          // "dpdk" to enable DPDK mode,
          // "sim" to generate synthetic traffic from BESS's Source module,
     -    "mode": "dpdk",
@@ -114,17 +111,15 @@ To configure/install the UPF in AF_PACKET mode, the following changes are requir
 
          "table_sizes": {
              // Example sizes based on sim mode and 50K sessions. Customize as per your control plane
-    @@ -73,7 +73,7 @@
+    @@ -74,6 +74,6 @@
          // N3 interface
          "access": {
-             // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
     -        "ifname": "ens803f2"
     +        "ifname": "ens801f0"
          },
 
          // N6 or N9 interface (depending on the UPF's deployment [PSA-UPF or I-UPF])
-    @@ -81,7 +81,7 @@
-             // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
+    @@ -81,6 +81,6 @@
              // Uncomment line below to enable UE IP natting. It could be a single IP or multiple IPs
              // "ip_masquerade": "18.0.0.1 or 18.0.0.2 or 18.0.0.3",
     -        "ifname": "ens803f3"
@@ -141,13 +136,11 @@ To configure/install the UPF in AF_PACKET mode, the following changes are requir
     index e3ad773..7f1d71a 100755
     --- a/scripts/docker_setup.sh
     +++ b/scripts/docker_setup.sh
-    @@ -15,36 +15,36 @@ metrics_port=8080
+    @@ -15,34 +15,34 @@ metrics_port=8080
      # "af_packet" uses AF_PACKET sockets via DPDK's vdev for pkt I/O.
      # "sim" uses Source() modules to simulate traffic generation
-     # "cndp" uses kernel AF-XDP. It supports ZC and XDP offload if driver and NIC supports it. It's tested on Intel 800 series n/w adapter.
     -mode="dpdk"
     +#mode="dpdk"
-     #mode="cndp"
      #mode="af_xdp"
     -#mode="af_packet"
     +mode="af_packet"
@@ -198,8 +191,7 @@ To configure/install the UPF in AF_XDP mode, the following changes are required:
     index fb34142..e4b6e78 100644
     --- a/conf/upf.jsonc
     +++ b/conf/upf.jsonc
-    @@ -8,7 +8,7 @@
-         // "cndp" to enable CNDP mode,
+    @@ -7,6 +7,6 @@
          // "dpdk" to enable DPDK mode,
          // "sim" to generate synthetic traffic from BESS's Source module,
     -    "mode": "dpdk",
@@ -207,17 +199,15 @@ To configure/install the UPF in AF_XDP mode, the following changes are required:
 
          "table_sizes": {
              // Example sizes based on sim mode and 50K sessions. Customize as per your control plane
-    @@ -73,7 +73,7 @@
+    @@ -74,6 +74,6 @@
          // N3 interface
          "access": {
-             // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
     -        "ifname": "ens803f2"
     +        "ifname": "enp134s0"
          },
 
          // N6 or N9 interface (depending on the UPF's deployment [PSA-UPF or I-UPF])
-    @@ -81,7 +81,7 @@
-             // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
+    @@ -81,6 +81,6 @@
              // Uncomment line below to enable UE IP natting. It could be a single IP or multiple IPs
              // "ip_masquerade": "18.0.0.1 or 18.0.0.2 or 18.0.0.3",
     -        "ifname": "ens803f3"
@@ -234,13 +224,11 @@ To configure/install the UPF in AF_XDP mode, the following changes are required:
     index e6bb65c..f589991 100755
     --- a/scripts/docker_setup.sh
     +++ b/scripts/docker_setup.sh
-    @@ -15,16 +15,16 @@ metrics_port=8080
+    @@ -15,14 +15,14 @@ metrics_port=8080
      # "af_packet" uses AF_PACKET sockets via DPDK's vdev for pkt I/O.
      # "sim" uses Source() modules to simulate traffic generation
-     # "cndp" uses kernel AF-XDP. It supports ZC and XDP offload if driver and NIC supports it. It's tested on Intel 800 series n/w adapter.
     -mode="dpdk"
     +#mode="dpdk"
-     #mode="cndp"
     -#mode="af_xdp"
     +mode="af_xdp"
      #mode="af_packet"
@@ -335,12 +323,6 @@ To configure/install the UPF in DPDK mode, the following changes are required:
            --net container:pause \
            $PRIVS \
    ```
-
-## Configuration: CNDP mode
-
-To configure/install the UPF in CNDP mode, please refer [CNDP_README.md](./CNDP_README.md)
-
-
 
 ## Installation
 
