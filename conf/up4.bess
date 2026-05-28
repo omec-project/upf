@@ -134,6 +134,9 @@ for idx, iface in enumerate(interfaces):
     # Finally add entry to ports list
     ports[p.name] = p
 
+core_rx_l4_verify = ports[parser.core_ifname].mode == 'dpdk'
+access_rx_l4_verify = ports[parser.access_ifname].mode == 'dpdk'
+
 
 # ====================================================
 # 	Shared Pipeline (DL + UL)
@@ -283,7 +286,7 @@ if ports[parser.core_ifname].ext_addrs is not None:
 # 1. Build initial DL pipeline here
 coreFastBPF:UEGate \
     -> coreRxIPCksum::IPChecksum(verify=True, hw=parser.hwcksum) \
-    -> coreRxL4Cksum::L4Checksum(verify=True, hw=parser.hwcksum)
+    -> coreRxL4Cksum::L4Checksum(verify=core_rx_l4_verify, hw=parser.hwcksum)
 
 # Record last module to chain up optional modules
 _in = coreRxL4Cksum
@@ -355,7 +358,7 @@ GTPUGate = 0
 # 1. Build initial UL pipeline here
 accessFastBPF:GTPUGate \
     -> accessRxIPCksum::IPChecksum(verify=True, hw=parser.hwcksum) \
-    -> accessRxL4Cksum::L4Checksum(verify=True, hw=parser.hwcksum)
+    -> accessRxL4Cksum::L4Checksum(verify=access_rx_l4_verify, hw=parser.hwcksum)
 
 # Record last module to chain up option modules
 _in = accessRxL4Cksum
