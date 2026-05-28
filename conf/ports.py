@@ -64,8 +64,6 @@ class Port:
         self.ext_addrs = ext_addrs
         self.mode = None
         self.hwcksum = hwcksum
-        self.cndp_jsonc_file = ""
-        self.cndp_lport_start_index = 0
 
     def bpf_gate(self):
         if self.bpfgate < MAX_GATES - 2:
@@ -89,42 +87,24 @@ class Port:
         if iface == "core":
             self.flow_profiles = [6, 9]
 
-    def configure_cndp(self, jsonc_file, iface, num_workers):
-        self.cndp_jsonc_file = jsonc_file
-        if iface == "access":
-            self.cndp_lport_start_index = 0
-        elif iface == "core":
-            self.cndp_lport_start_index = num_workers
-        else:
-            raise Exception("Unknown interface {}: ".format(iface))
-
-    def init_datapath(self, cndp=False, **kwargs):
+    def init_datapath(self, **kwargs):
         # Initialize PMDPort and RX/TX modules
         name = self.name
-        if not cndp:
-            fast = PMDPort(name="{}Fast".format(name), **kwargs)
+        fast = PMDPort(name="{}Fast".format(name), **kwargs)
 
         self.fpi = Merge(name="{}PortMerge".format(name))
         self.fpo = WorkerSplit(name="{}QSplit".format(name))
 
         for qid in range(self.num_q):
-            qid_val = qid
-            if cndp:
-                lport_index = self.cndp_lport_start_index + qid
-                fast = CndpPort(
-                    jsonc_file=self.cndp_jsonc_file, lport_index=lport_index
-                )
-                qid_val = 0
-
             fpi = QueueInc(
-                name="{}Q{}FastPI".format(name, qid), port=fast.name, qid=qid_val
+                name="{}Q{}FastPI".format(name, qid), port=fast.name, qid=qid
             )
             fpi.connect(next_mod=self.fpi)
             # Attach datapath to worker's root TC
             fpi.attach_task(wid=qid)
 
             fpo = QueueOut(
-                name="{}Q{}FastPO".format(name, qid), port=fast.name, qid=qid_val
+                name="{}Q{}FastPO".format(name, qid), port=fast.name, qid=qid
             )
             self.fpo.connect(next_mod=fpo, ogate=qid)
 
@@ -150,7 +130,7 @@ class Port:
         if conf_mode is None:
             conf_mode = self.detect_mode()
 
-        if conf_mode not in ["af_xdp", "linux", "dpdk", "af_packet", "sim", "cndp"]:
+        if conf_mode not in ["af_xdp", "linux", "dpdk", "af_packet", "sim"]:
             raise Exception("Invalid mode: {} selected.".format(conf_mode))
 
         if conf_mode in ["af_xdp", "linux"]:
@@ -178,18 +158,6 @@ class Port:
                         "Failed to create AF_XDP socket for {}. Exiting...".format(name)
                     )
                     sys.exit()
-
-        if conf_mode == "cndp":
-            try:
-                # Initialize kernel fastpath.
-                self.init_datapath(cndp=True)
-            except:
-                print(
-                    "Failed to create CNDP/AF_XDP socket for {}. Exiting...".format(
-                        name
-                    )
-                )
-                sys.exit()
 
         if conf_mode == "af_packet":
             try:

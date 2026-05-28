@@ -12,8 +12,6 @@ bess
 bessctl
 busypoll
 BUIDKIT
-cndp
-CNDP
 CNI
 config
 cpus

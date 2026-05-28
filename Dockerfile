@@ -47,7 +47,7 @@ COPY --from=bess-build /bin/modules /bin/modules
 COPY conf /opt/bess/bessctl/conf
 RUN ln -s /opt/bess/bessctl/bessctl /bin
 
-# CNDP and runtime: Install dependencies
+# Runtime dependencies
 RUN apt-get update && apt-get install -y \
     --no-install-recommends \
     build-essential \
@@ -71,11 +71,9 @@ RUN apt-get update && apt-get install -y \
     pkg-config && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
-# Copy CNDP binary and libraries
-COPY --from=bess-build /usr/bin/cndpfwd /usr/bin/
 # NOTE: Copy the entire directory rather than individual library files because:
-# - CNDP and DPDK install their runtime libraries into /usr/local/lib/x86_64-linux-gnu/
-# - The exact set of required shared objects may change between CNDP/DPDK/BESS releases
+# - BESS and DPDK install their runtime libraries into /usr/local/lib/x86_64-linux-gnu/
+# - The exact set of required shared objects may change between DPDK/BESS releases
 # - Maintaining a fragile, version-specific list of libraries is error-prone
 # - Image size impact has been evaluated and is acceptable for this component
 COPY --from=bess-build /usr/local/lib/x86_64-linux-gnu/ /usr/local/lib/x86_64-linux-gnu/

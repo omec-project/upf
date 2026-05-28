@@ -112,7 +112,7 @@ registry: [upf-bess](https://hub.docker.com/r/omecproject/upf-bess),
 * Per-flow latency and throughput metrics
 * DSCP marking of GTPu packets by copying the DSCP value from the inner IP packet
 * GTPu path monitoring
-* Support for DPDK, CNDP, AF_PACKET and AF_XDP modes
+* Support for DPDK, AF_PACKET and AF_XDP modes
 
 ## Getting started
 
