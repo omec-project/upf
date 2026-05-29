@@ -13,10 +13,9 @@ import (
 	"time"
 
 	reuse "github.com/libp2p/go-reuseport"
-	"github.com/wmnsk/go-pfcp/ie"
-
 	"github.com/omec-project/upf-epc/logger"
 	"github.com/omec-project/upf-epc/pfcpiface/metrics"
+	"github.com/wmnsk/go-pfcp/ie"
 )
 
 const (

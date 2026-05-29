@@ -4,15 +4,14 @@
 package pfcpiface
 
 import (
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-
-	"net"
-	"time"
-
 	"encoding/json"
+	"net"
 	"os"
 	"regexp"
+	"time"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 const (

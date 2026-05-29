@@ -10,7 +10,6 @@ import (
 	"sync"
 
 	reuse "github.com/libp2p/go-reuseport"
-
 	"github.com/omec-project/upf-epc/logger"
 	"github.com/omec-project/upf-epc/pfcpiface/metrics"
 )

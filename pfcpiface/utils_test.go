@@ -4,11 +4,11 @@
 package pfcpiface
 
 import (
-	"github.com/wmnsk/go-pfcp/ie"
-
 	"net"
 	"reflect"
 	"testing"
+
+	"github.com/wmnsk/go-pfcp/ie"
 )
 
 func GetLoopbackInterface() (net.Interface, error) {

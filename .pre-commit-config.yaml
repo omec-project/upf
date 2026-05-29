@@ -6,10 +6,33 @@ repos:
   rev: v8.30.1
   hooks:
   - id: gitleaks
+- repo: local
+  hooks:
+  - id: gci
+    name: gci
+    entry: gci write
+    language: golang
+    types: [go]
+    additional_dependencies:
+    - github.com/daixiang0/gci@v0.14.0
+  - id: staticcheck
+    name: staticcheck
+    entry: staticcheck ./...
+    language: golang
+    types: [go]
+    additional_dependencies:
+    - honnef.co/go/tools/cmd/staticcheck@v0.7.0
+    pass_filenames: false
+  - id: go-test-race
+    name: go test -race
+    entry: go test -race ./... -count=1
+    language: system
+    types: [go]
+    pass_filenames: false
 - repo: https://github.com/golangci/golangci-lint
   rev: v2.11.3
   hooks:
-  - id: golangci-lint
+  - id: golangci-lint-full
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v6.0.0
   hooks:
@@ -21,17 +44,3 @@ repos:
   rev: v6.2.0
   hooks:
   - id: reuse
-- repo: local
-  hooks:
-  - id: go-test
-    name: go test
-    entry: go test ./... -count=1
-    language: system
-    pass_filenames: false
-  # - id: staticcheck
-  #   name: staticcheck
-  #   entry: staticcheck ./...
-  #   language: golang
-  #   additional_dependencies:
-  #   - honnef.co/go/tools/cmd/staticcheck@v0.7.0
-  #   pass_filenames: false
