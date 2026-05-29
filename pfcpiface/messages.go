@@ -17,10 +17,9 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/wmnsk/go-pfcp/message"
-
 	"github.com/omec-project/upf-epc/logger"
 	"github.com/omec-project/upf-epc/pfcpiface/metrics"
+	"github.com/wmnsk/go-pfcp/message"
 )
 
 var errMsgUnexpectedType = errors.New("unable to parse message as type specified")

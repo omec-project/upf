@@ -3,35 +3,63 @@
 
 version: "2"
 run:
+  concurrency: 4
+  issues-exit-code: 1
   tests: true
+  allow-parallel-runners: true
+output:
+  formats:
+    text:
+      path: stdout
+      print-linter-name: true
+      print-issued-lines: true
 linters:
   enable:
     - asciicheck
     - dogsled
     - goconst
     - gomodguard
-    - govet
     - misspell
+    - nakedret
     - noctx
-    - nilerr
-    - nilnil
-    - predeclared
     - unconvert
     - unparam
-    - unused
     - whitespace
-  disable:
-    - errcheck
-    - godox
-    - nakedret
     - staticcheck
+  disable:
+    - govet
+    - godox
   settings:
     errcheck:
       check-type-assertions: false
       check-blank: true
+    funlen:
+      lines: 60
+      statements: 40
+    gocognit:
+      min-complexity: 10
     goconst:
       min-len: 3
       min-occurrences: 3
+    gocritic:
+      disabled-checks:
+        - regexpMust
+      enabled-tags:
+        - performance
+      disabled-tags:
+        - experimental
+      settings:
+        captLocal:
+          paramsOnly: true
+        rangeValCopy:
+          sizeThreshold: 32
+    gocyclo:
+      min-complexity: 10
+    godox:
+      keywords:
+        - FIXME
+        - BUG
+        - XXX
     govet:
       enable-all: true
       disable:
@@ -43,6 +71,27 @@ linters:
             - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
             - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
             - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
+    lll:
+      line-length: 120
+      tab-width: 1
+    nakedret:
+      max-func-lines: 30
+    nestif:
+      min-complexity: 4
+    testpackage:
+      skip-regexp: (export|internal)_test\.go
+    whitespace:
+      multi-if: false
+      multi-func: false
+    wsl:
+      strict-append: true
+      allow-assign-and-call: true
+      allow-multiline-assign: true
+      force-case-trailing-whitespace: 0
+      allow-trailing-comment: true
+      allow-separated-leading-comment: false
+      allow-cuddle-declarations: false
+      force-err-cuddling: false
   exclusions:
     generated: lax
     presets:
@@ -57,10 +106,25 @@ linters:
       - examples$
 issues:
   uniq-by-line: true
+  new-from-rev: ""
+  new: false
+severity:
+  default: error
+  rules:
+    - linters:
+        - mnd
+      severity: ignore
 formatters:
   enable:
+    - gci
     - gofmt
-    - goimports
+    - gofumpt
+  settings:
+    gofmt:
+      simplify: true
+    goimports:
+      local-prefixes:
+        - github.com/omec-project
   exclusions:
     generated: lax
     paths:

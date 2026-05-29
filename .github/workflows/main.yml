@@ -43,6 +43,17 @@ jobs:
       build_directory: "./ptf"
       build_command: "make build"
 
+  static-analysis:
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/static-analysis.yml@e05a6a6c35278d4b7f9f03da4474e49d869edf2f # v0.0.27
+    with:
+      branch_name: ${{ github.ref }}
+
   lint:
     permissions:
       contents: read

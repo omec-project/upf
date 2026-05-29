@@ -13,10 +13,9 @@ import (
 	"time"
 
 	reuse "github.com/libp2p/go-reuseport"
-	"github.com/wmnsk/go-pfcp/ie"
-
 	"github.com/omec-project/upf-epc/logger"
 	"github.com/omec-project/upf-epc/pfcpiface/metrics"
+	"github.com/wmnsk/go-pfcp/ie"
 )
 
 const (
@@ -140,7 +139,7 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano())) // #nosec G404
 
-	var p = &PFCPConn{
+	p := &PFCPConn{
 		ctx:            node.ctx,
 		Conn:           conn,
 		ts:             ts,

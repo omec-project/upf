@@ -11,11 +11,13 @@ import (
 	"github.com/wmnsk/go-pfcp/message"
 )
 
-var errFlowDescAbsent = errors.New("flow description not present")
-var errDatapathDown = errors.New("datapath down")
-var errReqRejected = errors.New("request rejected")
-var errNodeIDMissing = errors.New("mandatory NodeID IE missing")
-var errRecoveryTimeStampMissing = errors.New("mandatory Recovery Time Stamp IE missing")
+var (
+	errFlowDescAbsent           = errors.New("flow description not present")
+	errDatapathDown             = errors.New("datapath down")
+	errReqRejected              = errors.New("request rejected")
+	errNodeIDMissing            = errors.New("mandatory NodeID IE missing")
+	errRecoveryTimeStampMissing = errors.New("mandatory Recovery Time Stamp IE missing")
+)
 
 func (pConn *PFCPConn) sendAssociationRequest() {
 	// Build request message

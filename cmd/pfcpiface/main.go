@@ -12,9 +12,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-var (
-	configPath = flag.String("config", "upf.jsonc", "path to upf config")
-)
+var configPath = flag.String("config", "upf.jsonc", "path to upf config")
 
 func main() {
 	// cmdline args

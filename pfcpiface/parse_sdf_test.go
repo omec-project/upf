@@ -35,34 +35,50 @@ func Test_endpoint_parseNet(t *testing.T) {
 		want    endpoint
 		wantErr bool
 	}{
-		{name: "single IP",
+		{
+			name:    "single IP",
 			args:    "10.0.0.1",
 			want:    endpoint{IPNet: mustParseCIDRNet("10.0.0.1/32")},
-			wantErr: false},
-		{name: "single IP with /32 net",
+			wantErr: false,
+		},
+		{
+			name:    "single IP with /32 net",
 			args:    "10.0.0.1/32",
 			want:    endpoint{IPNet: mustParseCIDRNet("10.0.0.1/32")},
-			wantErr: false},
-		{name: "single IP with net",
+			wantErr: false,
+		},
+		{
+			name:    "single IP with net",
 			args:    "10.0.0.1/24",
 			want:    endpoint{IPNet: mustParseCIDRNet("10.0.0.1/24")},
-			wantErr: false},
-		{name: "single IPv6",
+			wantErr: false,
+		},
+		{
+			name:    "single IPv6",
 			args:    "2001:db8:a0b:12f0::1/32",
 			want:    endpoint{IPNet: mustParseCIDRNet("2001:db8:a0b:12f0::1/32")},
-			wantErr: false},
-		{name: "invalid empty arg",
+			wantErr: false,
+		},
+		{
+			name:    "invalid empty arg",
 			args:    "",
-			wantErr: true},
-		{name: "malformed IP missing octet",
+			wantErr: true,
+		},
+		{
+			name:    "malformed IP missing octet",
 			args:    "10.0.1/24",
-			wantErr: true},
-		{name: "malformed IP",
+			wantErr: true,
+		},
+		{
+			name:    "malformed IP",
 			args:    "100",
-			wantErr: true},
-		{name: "malformed IP double slash",
+			wantErr: true,
+		},
+		{
+			name:    "malformed IP double slash",
 			args:    "10.0.0.1/32/24",
-			wantErr: true},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(
@@ -86,39 +102,59 @@ func Test_endpoint_parsePort(t *testing.T) {
 		want    endpoint
 		wantErr bool
 	}{
-		{name: "single port",
+		{
+			name:    "single port",
 			args:    "8080",
 			want:    endpoint{ports: newExactMatchPortRange(8080)},
-			wantErr: false},
-		{name: "single port range",
+			wantErr: false,
+		},
+		{
+			name:    "single port range",
 			args:    "8080-8080",
 			want:    endpoint{ports: newExactMatchPortRange(8080)},
-			wantErr: false},
-		{name: "normal port range",
+			wantErr: false,
+		},
+		{
+			name:    "normal port range",
 			args:    "8080-8084",
 			want:    endpoint{ports: newRangeMatchPortRange(8080, 8084)},
-			wantErr: false},
-		{name: "invalid empty port range",
+			wantErr: false,
+		},
+		{
+			name:    "invalid empty port range",
 			args:    "",
-			wantErr: true},
-		{name: "invalid inverted port range",
+			wantErr: true,
+		},
+		{
+			name:    "invalid inverted port range",
 			args:    "100-90",
-			wantErr: true},
-		{name: "malformed double dash port range",
+			wantErr: true,
+		},
+		{
+			name:    "malformed double dash port range",
 			args:    "100-200-300",
-			wantErr: true},
-		{name: "missing high port range",
+			wantErr: true,
+		},
+		{
+			name:    "missing high port range",
 			args:    "100-",
-			wantErr: true},
-		{name: "missing low port range",
+			wantErr: true,
+		},
+		{
+			name:    "missing low port range",
 			args:    "-100",
-			wantErr: true},
-		{name: "wrong separator",
+			wantErr: true,
+		},
+		{
+			name:    "wrong separator",
 			args:    "200,300",
-			wantErr: true},
-		{name: "malformed non-decimal number format",
+			wantErr: true,
+		},
+		{
+			name:    "malformed non-decimal number format",
 			args:    "0x0000-0xffff",
-			wantErr: true},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(
@@ -246,12 +282,16 @@ func Test_parseFlowDesc(t *testing.T) {
 		want    *ipFilterRule
 		wantErr bool
 	}{
-		{name: "empty",
+		{
+			name: "empty",
 			args: args{
 				flowDesc: "",
-				ueIP:     ""},
-			wantErr: true},
-		{name: "catch-all",
+				ueIP:     "",
+			},
+			wantErr: true,
+		},
+		{
+			name: "catch-all",
 			args: args{
 				flowDesc: "permit out ip from any to assigned",
 				ueIP:     ueIpString,
@@ -268,8 +308,10 @@ func Test_parseFlowDesc(t *testing.T) {
 					IPNet: newIpv4AddrAsNet(ueIpString),
 					ports: newWildcardPortRange(),
 				},
-			}, wantErr: false},
-		{name: "from IPv4 host TCP to don't care",
+			}, wantErr: false,
+		},
+		{
+			name: "from IPv4 host TCP to don't care",
 			args: args{
 				flowDesc: "permit out tcp from 60.60.0.102/32 to assigned",
 				ueIP:     ueIpString,
@@ -286,8 +328,10 @@ func Test_parseFlowDesc(t *testing.T) {
 					IPNet: newIpv4AddrAsNet(ueIpString),
 					ports: newWildcardPortRange(),
 				},
-			}, wantErr: false},
-		{name: "from don't care UDP to IPv4 host",
+			}, wantErr: false,
+		},
+		{
+			name: "from don't care UDP to IPv4 host",
 			args: args{
 				flowDesc: "permit out udp from any to 60.60.0.102",
 				ueIP:     ueIpString,
@@ -304,8 +348,10 @@ func Test_parseFlowDesc(t *testing.T) {
 					IPNet: newIpv4AddrAsNet("60.60.0.102"),
 					ports: newWildcardPortRange(),
 				},
-			}, wantErr: false},
-		{name: "from IPv4 net to IPv4 host",
+			}, wantErr: false,
+		},
+		{
+			name: "from IPv4 net to IPv4 host",
 			args: args{
 				flowDesc: "permit out ip from 60.60.0.1/26 to 60.60.0.102",
 				ueIP:     ueIpString,
@@ -322,8 +368,10 @@ func Test_parseFlowDesc(t *testing.T) {
 					IPNet: newIpv4AddrAsNet("60.60.0.102"),
 					ports: newWildcardPortRange(),
 				},
-			}, wantErr: false},
-		{name: "from single port",
+			}, wantErr: false,
+		},
+		{
+			name: "from single port",
 			args: args{
 				flowDesc: "permit out ip from 60.60.0.1 8888 to 60.60.0.102/26",
 				ueIP:     ueIpString,
@@ -340,8 +388,10 @@ func Test_parseFlowDesc(t *testing.T) {
 					IPNet: mustParseCIDRNet("60.60.0.102/26"),
 					ports: newWildcardPortRange(),
 				},
-			}, wantErr: false},
-		{name: "from single port range",
+			}, wantErr: false,
+		},
+		{
+			name: "from single port range",
 			args: args{
 				flowDesc: "permit out ip from 60.60.0.1 8888-8888 to 60.60.0.102/26",
 				ueIP:     ueIpString,
@@ -358,8 +408,10 @@ func Test_parseFlowDesc(t *testing.T) {
 					IPNet: mustParseCIDRNet("60.60.0.102/26"),
 					ports: newWildcardPortRange(),
 				},
-			}, wantErr: false},
-		{name: "to single port",
+			}, wantErr: false,
+		},
+		{
+			name: "to single port",
 			args: args{
 				flowDesc: "permit out ip from 60.60.0.1 to 60.60.0.102 9999",
 				ueIP:     ueIpString,
@@ -376,8 +428,10 @@ func Test_parseFlowDesc(t *testing.T) {
 					IPNet: newIpv4AddrAsNet("60.60.0.102"),
 					ports: newExactMatchPortRange(9999),
 				},
-			}, wantErr: false},
-		{name: "from single port to single port",
+			}, wantErr: false,
+		},
+		{
+			name: "from single port to single port",
 			args: args{
 				flowDesc: "permit out ip from 60.60.0.1 8888 to 60.60.0.102 9999",
 				ueIP:     ueIpString,
@@ -394,8 +448,10 @@ func Test_parseFlowDesc(t *testing.T) {
 					IPNet: newIpv4AddrAsNet("60.60.0.102"),
 					ports: newExactMatchPortRange(9999),
 				},
-			}, wantErr: false},
-		{name: "from single port range to single port range",
+			}, wantErr: false,
+		},
+		{
+			name: "from single port range to single port range",
 			args: args{
 				flowDesc: "permit out ip from 60.60.0.1 8888-8888 to 60.60.0.102 9999-9999",
 				ueIP:     ueIpString,
@@ -412,11 +468,14 @@ func Test_parseFlowDesc(t *testing.T) {
 					IPNet: newIpv4AddrAsNet("60.60.0.102"),
 					ports: newExactMatchPortRange(9999),
 				},
-			}, wantErr: false},
-		{name: "to unknown assigned UE IP (uplink)",
+			}, wantErr: false,
+		},
+		{
+			name: "to unknown assigned UE IP (uplink)",
 			args: args{
 				flowDesc: "permit out udp from 60.60.0.1/32 to assigned",
-				ueIP:     "0.0.0.0"},
+				ueIP:     "0.0.0.0",
+			},
 			want: &ipFilterRule{
 				action:    "permit",
 				direction: "out",
@@ -429,7 +488,8 @@ func Test_parseFlowDesc(t *testing.T) {
 					IPNet: newIpv4WildcardNet(),
 					ports: newWildcardPortRange(),
 				},
-			}, wantErr: false},
+			}, wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(

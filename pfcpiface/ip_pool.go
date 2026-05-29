@@ -99,10 +99,10 @@ func (i *IPPool) String() string {
 	sb.WriteString("inventory: ")
 
 	for s, e := range i.inventory {
-		sb.WriteString(fmt.Sprintf("{F-SEID %v -> %+v} ", s, e))
+		fmt.Fprintf(&sb, "{F-SEID %v -> %+v} ", s, e)
 	}
 
-	sb.WriteString(fmt.Sprintf("Number of free IP addresses left: %d", len(i.freePool)))
+	fmt.Fprintf(&sb, "Number of free IP addresses left: %d", len(i.freePool))
 
 	return sb.String()
 }
