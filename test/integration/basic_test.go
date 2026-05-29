@@ -519,12 +519,15 @@ func testUEAttach(t *testing.T, testcase *testCase) {
 
 	verifyEntries(t, testcase.expected)
 
-	pfcpClient.ModifySession(sess, nil, []*ie.IE{
+	err = pfcpClient.ModifySession(sess, nil, []*ie.IE{
 		session.NewFARBuilder().
 			WithMethod(session.Update).WithID(2).
 			WithAction(ActionForward).WithDstInterface(ie.DstInterfaceAccess).
 			WithTEID(testcase.input.dlTEID).WithDownlinkIP(testcase.input.nbAddress).BuildFAR(),
 	}, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to modify PFCP session: %v", err)
+	}
 
 	verifyEntries(t, testcase.expected)
 }

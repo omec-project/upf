@@ -17,9 +17,7 @@ import (
 	"github.com/omec-project/upf-epc/logger"
 )
 
-var (
-	simulate = simModeDisable
-)
+var simulate = simModeDisable
 
 func init() {
 	flag.Var(&simulate, "simulate", "create|delete|create_continue simulated sessions")
@@ -72,7 +70,6 @@ func (p *PFCPIface) mustInit() {
 	var err error
 
 	p.uc, p.nc, err = setupProm(httpMux, p.upf, p.node)
-
 	if err != nil {
 		logger.PfcpLog.Fatalln("setupProm failed", err)
 	}

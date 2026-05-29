@@ -50,7 +50,6 @@ func TestUpdateFAR_WithEndMarkerEnabled(t *testing.T) {
 
 	// Execute: Update the FAR
 	err := session.UpdateFAR(updatedFAR, &endMarkerList)
-
 	// Assert: No error should occur
 	if err != nil {
 		t.Fatalf("UpdateFAR failed: %v", err)
@@ -126,7 +125,6 @@ func TestUpdateFAR_WithEndMarkerDisabled(t *testing.T) {
 
 	// Execute: Update the FAR
 	err := session.UpdateFAR(updatedFAR, &endMarkerList)
-
 	// Assert: No error should occur
 	if err != nil {
 		t.Fatalf("UpdateFAR failed: %v", err)
@@ -235,7 +233,6 @@ func TestUpdateFAR_MultipleFARs(t *testing.T) {
 
 	// Execute
 	err := session.UpdateFAR(updatedFAR, &endMarkerList)
-
 	// Assert
 	if err != nil {
 		t.Fatalf("UpdateFAR failed: %v", err)

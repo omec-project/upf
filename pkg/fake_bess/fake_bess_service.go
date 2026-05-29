@@ -255,7 +255,7 @@ func UnmarshalPdr(wc *bess_pb.WildcardMatchCommandAddArg) (p FakePdr) {
 	p.qerID = uint32(wc.Valuesv[3].GetValueInt())
 	p.farID = uint32(wc.Valuesv[4].GetValueInt())
 
-	return
+	return p
 }
 
 func UnmarshalFar(em *bess_pb.ExactMatchCommandAddArg) (f FakeFar) {
@@ -331,7 +331,7 @@ func (w *wildcardModule) GetState() (msgs []proto.Message) {
 
 func (w *wildcardModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 	if err = w.baseModule.HandleRequest(cmd, arg); err != nil {
-		return
+		return err
 	}
 
 	log := logger.BessLog.With("module", w.Name(), "cmd", cmd)
@@ -406,7 +406,7 @@ func (e *exactMatchModule) GetState() (msgs []proto.Message) {
 
 func (e *exactMatchModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 	if err = e.baseModule.HandleRequest(cmd, arg); err != nil {
-		return
+		return err
 	}
 
 	log := logger.BessLog.With("module", e.Name(), "cmd", cmd)
@@ -484,7 +484,7 @@ func (q *qosModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
 	if err = q.baseModule.HandleRequest(cmd, arg); err != nil {
-		return
+		return err
 	}
 
 	log := logger.BessLog.With("module", q.Name(), "cmd", cmd)
@@ -557,7 +557,7 @@ func (q *gtpuPathMonitoringModule) GetState() (msgs []proto.Message) {
 
 func (q *gtpuPathMonitoringModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 	if err = q.baseModule.HandleRequest(cmd, arg); err != nil {
-		return
+		return err
 	}
 
 	log := logger.BessLog.With("module", q.Name(), "cmd", cmd)

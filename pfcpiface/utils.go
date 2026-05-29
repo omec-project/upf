@@ -86,7 +86,10 @@ func hex2int(hexStr string) uint32 {
 	cleaned := strings.ReplaceAll(hexStr, "0x", "")
 
 	// base 16 for hexadecimal
-	result, _ := strconv.ParseUint(cleaned, 16, 32)
+	result, err := strconv.ParseUint(cleaned, 16, 32)
+	if err != nil {
+		return 0
+	}
 
 	return uint32(result)
 }
