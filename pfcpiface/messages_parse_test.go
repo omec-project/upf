@@ -92,6 +92,9 @@ func TestDumpRawPFCP_DoesNotOverwriteExistingFile(t *testing.T) {
 		copy(b, []byte{0xaa, 0xbb, 0xcc, 0xdd})
 		return len(b), nil
 	}
+	t.Setenv("UPF_NAME", "")
+	t.Setenv("PFCP_DUMP_MAX_BYTES", "")
+	t.Setenv("PFCP_DUMP_MAX_FILES", "")
 
 	dumpDir := t.TempDir()
 	addr := "127.0.0.1:8805"
@@ -111,8 +114,8 @@ func TestDumpRawPFCP_DoesNotOverwriteExistingFile(t *testing.T) {
 	}
 
 	dumpPath := filepath.Join(dumpDir, entries[0].Name())
-	if err := dumpRawPFCP(dumpDir, addr, secondPayload); err == nil {
-		t.Fatal("expected second dumpRawPFCP call to fail on existing file")
+	if err := dumpRawPFCP(dumpDir, addr, secondPayload); err != nil {
+		t.Fatalf("second dumpRawPFCP failed: %v", err)
 	}
 
 	got, err := os.ReadFile(dumpPath)
@@ -127,7 +130,25 @@ func TestDumpRawPFCP_DoesNotOverwriteExistingFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to reread dump dir: %v", err)
 	}
-	if len(entries) != 1 {
-		t.Fatalf("expected dump dir to still contain 1 file, got %d", len(entries))
+	if len(entries) != 2 {
+		t.Fatalf("expected dump dir to contain 2 files after retry, got %d", len(entries))
+	}
+
+	secondFound := false
+	for _, entry := range entries {
+		if entry.Name() == filepath.Base(dumpPath) {
+			continue
+		}
+		otherPath := filepath.Join(dumpDir, entry.Name())
+		other, err := os.ReadFile(otherPath)
+		if err != nil {
+			t.Fatalf("failed to read retried dump file: %v", err)
+		}
+		if bytes.Equal(other, secondPayload) {
+			secondFound = true
+		}
+	}
+	if !secondFound {
+		t.Fatal("expected a retried dump file containing the second payload")
 	}
 }
