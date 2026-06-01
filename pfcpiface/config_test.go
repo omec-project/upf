@@ -4,7 +4,6 @@
 package pfcpiface
 
 import (
-	"io/fs"
 	"os"
 	"testing"
 
@@ -12,7 +11,7 @@ import (
 )
 
 func mustWriteStringToDisk(s string, path string) {
-	err := os.WriteFile(path, []byte(s), fs.ModePerm)
+	err := os.WriteFile(path, []byte(s), 0o600)
 	if err != nil {
 		panic(err)
 	}

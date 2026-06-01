@@ -4,7 +4,10 @@
 package pfcpiface
 
 import (
+	"bytes"
 	"net"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -73,4 +76,58 @@ func TestHandlePFCPMsg_TruncatedAssociationRequest_NoPanic(t *testing.T) {
 	}()
 
 	p.HandlePFCPMsg(trunc)
+}
+
+func TestDumpRawPFCP_DoesNotOverwriteExistingFile(t *testing.T) {
+	oldRandRead := dumpRawPFCPRandRead
+	oldNow := dumpRawPFCPNow
+	t.Cleanup(func() {
+		dumpRawPFCPRandRead = oldRandRead
+		dumpRawPFCPNow = oldNow
+	})
+
+	fixedTime := time.Date(2026, time.May, 29, 12, 34, 56, 0, time.UTC)
+	dumpRawPFCPNow = func() time.Time { return fixedTime }
+	dumpRawPFCPRandRead = func(b []byte) (int, error) {
+		copy(b, []byte{0xaa, 0xbb, 0xcc, 0xdd})
+		return len(b), nil
+	}
+
+	dumpDir := t.TempDir()
+	addr := "127.0.0.1:8805"
+	firstPayload := []byte("first payload")
+	secondPayload := []byte("second payload")
+
+	if err := dumpRawPFCP(dumpDir, addr, firstPayload); err != nil {
+		t.Fatalf("first dumpRawPFCP failed: %v", err)
+	}
+
+	entries, err := os.ReadDir(dumpDir)
+	if err != nil {
+		t.Fatalf("failed to read dump dir: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 dump file, got %d", len(entries))
+	}
+
+	dumpPath := filepath.Join(dumpDir, entries[0].Name())
+	if err := dumpRawPFCP(dumpDir, addr, secondPayload); err == nil {
+		t.Fatal("expected second dumpRawPFCP call to fail on existing file")
+	}
+
+	got, err := os.ReadFile(dumpPath)
+	if err != nil {
+		t.Fatalf("failed to read dump file: %v", err)
+	}
+	if !bytes.Equal(got, firstPayload) {
+		t.Fatalf("dump file was overwritten: got %q want %q", string(got), string(firstPayload))
+	}
+
+	entries, err = os.ReadDir(dumpDir)
+	if err != nil {
+		t.Fatalf("failed to reread dump dir: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected dump dir to still contain 1 file, got %d", len(entries))
+	}
 }
