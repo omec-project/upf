@@ -24,6 +24,13 @@ import (
 
 var errMsgUnexpectedType = errors.New("unable to parse message as type specified")
 
+var (
+	dumpRawPFCPRandRead = rand.Read
+	dumpRawPFCPNow      = time.Now
+)
+
+const dumpRawPFCPCreateAttempts = 4
+
 type HandlePFCPMsgError struct {
 	Op  string
 	Err error
@@ -241,28 +248,38 @@ func dumpRawPFCP(dumpDir, addr string, buf []byte) error {
 
 	pid := os.Getpid()
 
-	randb := make([]byte, 4)
-	if _, err := rand.Read(randb); err != nil {
-		// fallback to time-based low-entropy suffix if crypto/rand fails
-		randb = []byte(time.Now().Format("150405"))
-	}
-	suffix := hex.EncodeToString(randb)
-
 	// Include UPF name in filename when available (use basename of outDir)
 	upfPart := filepath.Base(outDir)
 
-	fname := filepath.Join(outDir, fmt.Sprintf("pfcp_%s_%s_pid%d_%s_%s.bin", upfPart, safeAddr, pid, time.Now().Format("20060102T150405.000000"), suffix))
+	var (
+		f   *os.File
+		err error
+	)
 
-	// Use O_EXCL to avoid overwriting an existing file with the same name.
-	f, err := os.OpenFile(fname, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
-	if err != nil {
-		// fallback to WriteFile; if successful, kick off pruning asynchronously.
-		if err2 := os.WriteFile(fname, buf, 0o600); err2 == nil {
-			go pruneDumpDir(outDir)
-			return nil
-		} else {
-			return err2
+	for attempt := range dumpRawPFCPCreateAttempts {
+		randb := make([]byte, 4)
+		if _, err = dumpRawPFCPRandRead(randb); err != nil {
+			// fallback to time-based low-entropy suffix if crypto/rand fails
+			randb = []byte(dumpRawPFCPNow().Format("150405"))
 		}
+		suffix := hex.EncodeToString(randb)
+		if attempt > 0 {
+			suffix = fmt.Sprintf("%s_retry%d", suffix, attempt)
+		}
+
+		fname := filepath.Join(outDir, fmt.Sprintf("pfcp_%s_%s_pid%d_%s_%s.bin", upfPart, safeAddr, pid, dumpRawPFCPNow().Format("20060102T150405.000000"), suffix))
+
+		// Use O_EXCL to avoid overwriting an existing file with the same name.
+		f, err = os.OpenFile(fname, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+		if err == nil {
+			break
+		}
+		if !errors.Is(err, os.ErrExist) {
+			return err
+		}
+	}
+	if err != nil {
+		return err
 	}
 	defer f.Close()
 
