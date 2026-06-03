@@ -70,7 +70,7 @@ RUN apt-get update && \
 
 COPY requirements-trex.txt /tmp/requirements-trex.txt
 
-RUN pip3 install --no-cache-dir --break-system-packages --require-hashes -r /tmp/requirements-trex.txt
+RUN pip3 install --no-cache-dir --break-system-packages --ignore-installed --require-hashes -r /tmp/requirements-trex.txt
 
 ENV TREX_EXT_LIBS=${TREX_EXT_LIBS}
 ENV PYTHONPATH=${TREX_EXT_LIBS}:${TREX_LIBS}
