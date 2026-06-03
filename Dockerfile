@@ -3,7 +3,7 @@
 # Copyright 2019-present Intel Corporation
 
 # Stage bess-build: pre-built BESS image (built from bess/env/Dockerfile)
-FROM ghcr.io/omec-project/bess_build:260602@sha256:282c70d3c5a0814b1aa16d071dc61946feca24d92845450551ac7564cbc28aa4 AS bess-build
+FROM ghcr.io/omec-project/bess_build:260603@sha256:0ba137488a33cf1fdf0c1ef444f84cd2691e122f98de0e32007e2e9902a6af39 AS bess-build
 
 # Stage bess: creates the runtime image of BESS
 FROM ubuntu:24.04@sha256:d1e2e92c075e5ca139d51a140fff46f84315c0fdce203eab2807c7e495eff4f9 AS bess
