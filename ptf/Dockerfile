@@ -8,7 +8,7 @@ ARG TREX_VER=2.92-scapy-2.4.5
 ARG TREX_EXT_LIBS=/external_libs
 ARG TREX_LIBS=/trex_python
 # Install dependencies for general PTF test definitions
-FROM ubuntu:24.04@sha256:c4a8d5503dfb2a3eb8ab5f807da5bc69a85730fb49b5cfca2330194ebcc41c7b AS ptf-deps
+FROM ubuntu:26.04@sha256:f3d28607ddd78734bb7f71f117f3c6706c666b8b76cbff7c9ff6e5718d46ff64 AS ptf-deps
 
 ARG SCAPY_VER
 
@@ -45,7 +45,7 @@ RUN apk add --no-cache wget unzip && \
     cp -r ${TREX_SCRIPT_DIR}/automation/trex_control_plane/stf/trex_stf_lib /output/${TREX_LIBS}
 
 # Synthesize all dependencies for runtime
-FROM ubuntu:24.04@sha256:c4a8d5503dfb2a3eb8ab5f807da5bc69a85730fb49b5cfca2330194ebcc41c7b
+FROM ubuntu:26.04@sha256:f3d28607ddd78734bb7f71f117f3c6706c666b8b76cbff7c9ff6e5718d46ff64
 
 ARG TREX_EXT_LIBS
 ARG TREX_LIBS
@@ -70,7 +70,7 @@ RUN apt-get update && \
 
 COPY requirements-trex.txt /tmp/requirements-trex.txt
 
-RUN pip3 install --no-cache-dir --break-system-packages --require-hashes -r /tmp/requirements-trex.txt
+RUN pip3 install --no-cache-dir --break-system-packages --ignore-installed --require-hashes -r /tmp/requirements-trex.txt
 
 ENV TREX_EXT_LIBS=${TREX_EXT_LIBS}
 ENV PYTHONPATH=${TREX_EXT_LIBS}:${TREX_LIBS}
