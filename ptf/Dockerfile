@@ -28,7 +28,7 @@ COPY requirements-ptf.txt /tmp/requirements-ptf.txt
 RUN pip3 install --no-cache-dir --break-system-packages --require-hashes --root /python_output -r /tmp/requirements-ptf.txt
 
 # Install TRex traffic gen and library for TRex API
-FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS trex-builder
+FROM alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS trex-builder
 ARG TREX_VER
 ARG TREX_EXT_LIBS
 ARG TREX_LIBS
