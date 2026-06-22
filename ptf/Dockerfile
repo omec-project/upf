@@ -8,7 +8,7 @@ ARG TREX_VER=2.92-scapy-2.4.5
 ARG TREX_EXT_LIBS=/external_libs
 ARG TREX_LIBS=/trex_python
 # Install dependencies for general PTF test definitions
-FROM ubuntu:26.04@sha256:f3d28607ddd78734bb7f71f117f3c6706c666b8b76cbff7c9ff6e5718d46ff64 AS ptf-deps
+FROM ubuntu:26.04@sha256:53958ec7b67c2c9355df922dd08dbf0360611f8c3cdb656875e81873db9ffdba AS ptf-deps
 
 ARG SCAPY_VER
 
@@ -45,7 +45,7 @@ RUN apk add --no-cache wget unzip && \
     cp -r ${TREX_SCRIPT_DIR}/automation/trex_control_plane/stf/trex_stf_lib /output/${TREX_LIBS}
 
 # Synthesize all dependencies for runtime
-FROM ubuntu:26.04@sha256:f3d28607ddd78734bb7f71f117f3c6706c666b8b76cbff7c9ff6e5718d46ff64
+FROM ubuntu:26.04@sha256:53958ec7b67c2c9355df922dd08dbf0360611f8c3cdb656875e81873db9ffdba
 
 ARG TREX_EXT_LIBS
 ARG TREX_LIBS
