@@ -10,24 +10,6 @@ FROM ubuntu:26.04@sha256:f3d28607ddd78734bb7f71f117f3c6706c666b8b76cbff7c9ff6e57
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Build arguments for dynamic labels
-ARG VERSION=dev
-ARG VCS_URL=unknown
-ARG VCS_REF=unknown
-ARG BUILD_DATE=unknown
-
-LABEL org.opencontainers.image.source="${VCS_URL}" \
-    org.opencontainers.image.version="${VERSION}" \
-    org.opencontainers.image.created="${BUILD_DATE}" \
-    org.opencontainers.image.revision="${VCS_REF}" \
-    org.opencontainers.image.url="${VCS_URL}" \
-    org.opencontainers.image.title="upf-bess" \
-    org.opencontainers.image.description="Aether 5G Core UPF-BESS Network Function" \
-    org.opencontainers.image.authors="Aether SD-Core <dev@lists.aetherproject.org>" \
-    org.opencontainers.image.vendor="Aether Project" \
-    org.opencontainers.image.licenses="Apache-2.0" \
-    org.opencontainers.image.documentation="https://docs.sd-core.aetherproject.org/"
-
 WORKDIR /
 COPY requirements.txt .
 RUN apt-get update && apt-get install -y \
@@ -136,6 +118,24 @@ RUN set -e; \
     ls -la /opt/bess/lib/dpdk-pmds/; \
     ldconfig
 
+# Build arguments for dynamic labels
+ARG VERSION=dev
+ARG VCS_URL=unknown
+ARG VCS_REF=unknown
+ARG BUILD_DATE=unknown
+
+LABEL org.opencontainers.image.source="${VCS_URL}" \
+    org.opencontainers.image.version="${VERSION}" \
+    org.opencontainers.image.created="${BUILD_DATE}" \
+    org.opencontainers.image.revision="${VCS_REF}" \
+    org.opencontainers.image.url="${VCS_URL}" \
+    org.opencontainers.image.title="upf-bess" \
+    org.opencontainers.image.description="Aether 5G Core UPF-BESS Network Function" \
+    org.opencontainers.image.authors="Aether SD-Core <dev@lists.aetherproject.org>" \
+    org.opencontainers.image.vendor="Aether Project" \
+    org.opencontainers.image.licenses="Apache-2.0" \
+    org.opencontainers.image.documentation="https://docs.sd-core.aetherproject.org/"
+
 ENV PYTHONPATH="/opt/bess"
 WORKDIR /opt/bess/bessctl
 ENTRYPOINT ["bessd", "-f"]
@@ -183,6 +183,9 @@ RUN go mod tidy && \
 # Stage pfcp: runtime image of pfcp agent towards SMF
 FROM alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS pfcp
 
+COPY conf /opt/bess/bessctl/conf
+COPY --from=pfcp-build /bin/pfcpiface /bin
+
 # Build arguments for dynamic labels
 ARG VERSION=dev
 ARG VCS_URL=unknown
@@ -201,8 +204,6 @@ LABEL org.opencontainers.image.source="${VCS_URL}" \
     org.opencontainers.image.licenses="Apache-2.0" \
     org.opencontainers.image.documentation="https://docs.sd-core.aetherproject.org/"
 
-COPY conf /opt/bess/bessctl/conf
-COPY --from=pfcp-build /bin/pfcpiface /bin
 ENTRYPOINT [ "/bin/pfcpiface" ]
 
 # Stage pb: dummy stage for collecting protobufs
