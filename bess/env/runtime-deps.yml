@@ -41,7 +41,10 @@
           - libxdp1
           - ethtool
         update_cache: yes
+        install_recommends: no
       become: true
+      tags:
+        - runtime-apt
 
     - name: Install list of Python packages
       pip:

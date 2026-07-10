@@ -111,16 +111,20 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /
 COPY requirements.txt .
+COPY bess/env/ansible.cfg /tmp/
+COPY bess/env/runtime-deps.yml /tmp/
 RUN apt-get update && apt-get install -y \
     --no-install-recommends \
-    python3-pip \
-    libgraph-easy-perl \
+    ansible \
     iproute2 \
     iptables \
-    iputils-ping \
-    tcpdump && \
+    iputils-ping && \
+    ANSIBLE_CONFIG=/tmp/ansible.cfg ansible-playbook /tmp/runtime-deps.yml \
+        -i "localhost," -c local --tags runtime-apt && \
+    apt-get purge -y ansible && \
+    apt-get autoremove -y && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /var/lib/apt/lists/* /tmp/ansible.cfg /tmp/runtime-deps.yml && \
     pip install --no-cache-dir --break-system-packages --ignore-installed --require-hashes -r requirements.txt
 COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin/bessd
@@ -132,27 +136,11 @@ COPY --from=bess-build /usr/include/google/protobuf /usr/local/include/google/pr
 COPY conf /opt/bess/bessctl/conf
 RUN ln -s /opt/bess/bessctl/bessctl /bin
 
-# Runtime dependencies
+# UPF-specific runtime dependencies. BESS runtime packages are installed from
+# bess/env/runtime-deps.yml above, which is also used by BESS host installs.
 RUN apt-get update && apt-get install -y \
     --no-install-recommends \
     build-essential \
-    ethtool \
-    libbpf1 \
-    libbsd0 \
-    libc-ares2 \
-    libelf1 \
-    libfdt1 \
-    libgflags2.2 \
-    libgoogle-glog0v6 \
-    libgrpc++1.51t64 \
-    libjson-c5 \
-    libnl-3-200 \
-    libnl-cli-3-200 \
-    libnuma1 \
-    libpcap0.8 \
-    libprotobuf32t64 \
-    libssl3 \
-    libxdp1 \
     pkg-config && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
