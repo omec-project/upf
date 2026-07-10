@@ -3,10 +3,11 @@
 ## Summary
 
 Absorb `omec-project/bess` into `omec-project/upf` and make UPF the canonical
-source for BESS-UPF datapath development. The migration should preserve BESS
-Git history, remove the external `bess_build` image dependency, keep the
-existing UPF build interface, and prepare the separate BESS repository for
-retirement after UPF CI and releases are proven.
+source for BESS-UPF datapath development. The migration should import BESS as a
+squashed subtree with explicit source-SHA provenance, remove the external
+`bess_build` image dependency, keep the existing UPF build interface, and
+prepare the separate BESS repository for retirement after UPF CI and releases
+are proven.
 
 ## Current Build Context
 
@@ -43,13 +44,18 @@ retirement after UPF CI and releases are proven.
 
 ## Key Changes
 
-- Import BESS into UPF under `bess/` using a history-preserving subtree:
+- Import BESS into UPF under `bess/` using a squashed subtree:
 
   ```bash
   git remote add bess https://github.com/omec-project/bess.git
   git fetch bess
-  git subtree add --prefix=bess bess main
+  git subtree add --prefix=bess bess main --squash
   ```
+
+  Record the exact imported BESS source commit in the import commit and plan.
+  The initial import snapshot is
+  `ac3763d659c5e63ed52c08c1f6311f63b31ac776`. The old BESS repository remains
+  the historical reference for pre-integration BESS development.
 
 - Refactor the root UPF `Dockerfile` so the `bess-build` stage builds from the
   in-repo `bess/` source instead of
@@ -140,12 +146,14 @@ retirement after UPF CI and releases are proven.
 
 ### Milestone 1: Source Import and Build Context Hygiene
 
-- Import BESS under `bess/` with history preserved.
+- Import BESS under `bess/` as a squashed subtree.
+- Record the exact imported BESS source commit SHA so maintainers can trace the
+  initial source snapshot back to the old BESS repository.
 - Update `.dockerignore` to exclude local reference checkouts such as `repos/`
   without excluding the canonical imported `bess/` directory.
-- Exit criteria: `git log -- bess/core` shows imported BESS history, UPF status
-  is clean except intended changes, and Docker build context no longer includes
-  local reference repositories.
+- Exit criteria: `git log -- bess/core` shows the squashed BESS import, UPF
+  status is clean except intended changes, and Docker build context no longer
+  includes local reference repositories.
 
 ### Milestone 2: In-Repo BESS Docker Build Prototype
 
