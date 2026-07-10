@@ -126,7 +126,7 @@ COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin/bessd
 COPY --from=bess-build /bin/modules /bin/modules
 COPY --from=bess-build /protobuf /protobuf
-COPY --from=bess-build /bess/protobuf /bess/protobuf
+COPY --from=bess-build /protobuf /bess/protobuf
 COPY --from=bess-build /usr/bin/protoc /usr/local/bin/
 COPY --from=bess-build /usr/include/google/protobuf /usr/local/include/google/protobuf
 COPY conf /opt/bess/bessctl/conf
@@ -259,17 +259,17 @@ ENTRYPOINT [ "/bin/pfcpiface" ]
 
 # Stage pb: dummy stage for collecting protobufs
 FROM scratch AS pb
-COPY --from=bess-build /bess/protobuf /protobuf
+COPY --from=bess-build /protobuf /protobuf
 COPY --from=go-pb /bess_pb /bess_pb
 
 # Stage ptf-pb: dummy stage for collecting python protobufs
 FROM scratch AS ptf-pb
-COPY --from=bess-build /bess/protobuf /protobuf
+COPY --from=bess-build /protobuf /protobuf
 COPY --from=py-pb /bess_pb /bess_pb
 
 # Stage binaries: dummy stage for collecting artifacts
 FROM scratch AS artifacts
 COPY --from=bess /bin/bessd /
 COPY --from=pfcp /bin/pfcpiface /
-COPY --from=bess-build /bess/protobuf /bess/protobuf
+COPY --from=bess-build /protobuf /bess/protobuf
 COPY --from=bess-build /pb /bess/pb
