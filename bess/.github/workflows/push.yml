@@ -1,0 +1,48 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-Present Intel Corporation
+# Copyright 2025 Canonical Ltd.
+name: Release Pipeline
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "core/**"
+      - "bessctl/**"
+      - "protobuf/**"
+      - "pybess/**"
+      - "deps/**"
+      - "env/Dockerfile"
+      - "env/*.yml"
+      - "env/requirements*.txt"
+      - "build.py"
+
+permissions:
+  contents: read
+
+jobs:
+  bess-release-image:
+    permissions:
+      contents: read
+      packages: write
+      actions: read
+      id-token: write
+      attestations: write
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'omec-project'
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: "ghcr.io"
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push to GitHub Container Registry
+        env:
+          DOCKER_REGISTRY: "ghcr.io/"
+          DOCKER_REPOSITORY: ${{ github.repository_owner }}/
+        run: yes y | ./env/rebuild_images.py

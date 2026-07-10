@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2023 Intel Corporation
+
+# Timeline for each ecosystem is intentionally staggered to spread
+# Dependabot PRs over the week.
+version: 2
+updates:
+
+  - package-ecosystem: "docker"
+    directory: "/env/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "21:00"
+      timezone: "America/Los_Angeles"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "21:00"
+      timezone: "America/Los_Angeles"
+    groups:
+      actions-deps:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "pip"
+    directory: "/env/"
+    schedule:
+      interval: "weekly"
+      day: "thursday"
+      time: "21:00"
+      timezone: "America/Los_Angeles"
+    groups:
+      python-deps:
+        patterns:
+          - "*"
