@@ -58,13 +58,49 @@ RUN mkdir -p /staging/lib && \
     done && \
     cp -aL /usr/lib/x86_64-linux-gnu/librte_*.so* /staging/lib/ 2>/dev/null || true && \
     mkdir -p /staging/opt/bess/lib/dpdk-pmds && \
-    for pat in librte_mempool_ring librte_bus_vdev librte_bus_pci \
-               librte_net_af_packet librte_net_af_xdp; do \
+    missing_pats="" && \
+    for pat in librte_mempool_ring librte_bus_vdev librte_bus_pci; do \
+      found=0; \
       for f in /staging/lib/"${pat}".so*; do \
-        [ -f "$f" ] && ln -sf "/usr/local/lib/x86_64-linux-gnu/$(basename "$f")" \
-          /staging/opt/bess/lib/dpdk-pmds/; \
+        if [ -f "$f" ]; then \
+          ln -sf "/usr/local/lib/x86_64-linux-gnu/$(basename "$f")" \
+            /staging/opt/bess/lib/dpdk-pmds/; \
+          found=1; \
+        fi; \
+      done; \
+      if [ "$found" -eq 0 ]; then \
+        echo "Required DPDK plugin not found: ${pat}" >&2; \
+        missing_pats="yes"; \
+      fi; \
+    done && \
+    for pat in librte_net_af_packet librte_net_af_xdp; do \
+      found=0; \
+      for f in /staging/lib/"${pat}".so*; do \
+        if [ -f "$f" ]; then \
+          ln -sf "/usr/local/lib/x86_64-linux-gnu/$(basename "$f")" \
+            /staging/opt/bess/lib/dpdk-pmds/; \
+          found=1; \
+        fi; \
+      done; \
+      if [ "$found" -eq 0 ]; then \
+        echo "Required DPDK net PMD not found: ${pat}" >&2; \
+        missing_pats="yes"; \
+      fi; \
+    done && \
+    for pat in librte_net_bond librte_net_e1000 librte_net_i40e \
+               librte_net_iavf librte_net_ice librte_net_igc \
+               librte_net_ixgbe librte_net_idpf librte_net_cpfl; do \
+      for f in /staging/lib/"${pat}".so*; do \
+        if [ -f "$f" ]; then \
+          ln -sf "/usr/local/lib/x86_64-linux-gnu/$(basename "$f")" \
+            /staging/opt/bess/lib/dpdk-pmds/; \
+        fi; \
       done; \
     done && \
+    if [ -n "$missing_pats" ]; then \
+      echo "One or more required DPDK plugins are missing; failing build." >&2; \
+      exit 1; \
+    fi && \
     echo "DPDK PMD staging directory contents:" && \
     ls -la /staging/opt/bess/lib/dpdk-pmds/
 
@@ -127,62 +163,9 @@ RUN apt-get update && apt-get install -y \
 # - Image size impact has been evaluated and is acceptable for this component
 COPY --from=bess-build /staging/lib/ /usr/local/lib/x86_64-linux-gnu/
 COPY --from=bess-build /staging/opt/bess/lib/dpdk-pmds/ /opt/bess/lib/dpdk-pmds/
-# Create DPDK plugin directory so that EAL can dlopen bus/mempool/net drivers
-# at runtime.  bessd passes "-d /opt/bess/lib/dpdk-pmds" to rte_eal_init()
-# when this directory exists.
-# Needed plugins:
-#   librte_bus_vdev      – vdev bus (required to create AF_PACKET/AF_XDP ports)
-#   librte_bus_pci       – PCI bus (required for DPDK-bound NICs)
-#   librte_mempool_ring  – default "ring_mp_mc" mempool ops
-#   Selected librte_net_* PMDs for the datapaths we support here.
-#
-# Do not symlink every net PMD into the plugin directory. Some vendor drivers
-# (for example mlx5) require extra shared libraries that are not part of this
-# image, and EAL aborts plugin initialization when one of those dlopen() calls
-# fails. Keep the PMD set intentionally narrow.
-RUN set -e; \
-    mkdir -p /opt/bess/lib/dpdk-pmds; \
-    missing_pats=""; \
-    for pat in librte_mempool_ring librte_bus_vdev librte_bus_pci; do \
-      found=0; \
-      for f in /usr/local/lib/x86_64-linux-gnu/"${pat}".so*; do \
-        if [ -f "$f" ]; then \
-          ln -sf "$f" /opt/bess/lib/dpdk-pmds/; \
-          found=1; \
-        fi; \
-      done; \
-      if [ "$found" -eq 0 ]; then \
-        echo "Required DPDK plugin not found: ${pat}" >&2; \
-        missing_pats="yes"; \
-      fi; \
-    done; \
-    for pat in librte_net_af_packet librte_net_af_xdp; do \
-      found=0; \
-      for f in /usr/local/lib/x86_64-linux-gnu/"${pat}".so*; do \
-        if [ -f "$f" ]; then \
-          ln -sf "$f" /opt/bess/lib/dpdk-pmds/; \
-          found=1; \
-        fi; \
-      done; \
-      if [ "$found" -eq 0 ]; then \
-        echo "Required DPDK net PMD not found: ${pat}" >&2; \
-        missing_pats="yes"; \
-      fi; \
-    done; \
-    for pat in librte_net_bond librte_net_e1000 librte_net_i40e \
-               librte_net_iavf librte_net_ice librte_net_igc \
-               librte_net_ixgbe librte_net_idpf librte_net_cpfl; do \
-      for f in /usr/local/lib/x86_64-linux-gnu/"${pat}".so*; do \
-        if [ -f "$f" ]; then \
-          ln -sf "$f" /opt/bess/lib/dpdk-pmds/; \
-        fi; \
-      done; \
-    done; \
-    if [ -n "$missing_pats" ]; then \
-      echo "One or more required DPDK plugins are missing; failing build." >&2; \
-      exit 1; \
-    fi; \
-    echo "DPDK PMD directory contents:"; \
+# BESS owns the staged PMD selection.  The final image only copies the selected
+# directory and refreshes the dynamic linker cache.
+RUN echo "DPDK PMD directory contents:"; \
     ls -la /opt/bess/lib/dpdk-pmds/; \
     ldconfig
 
