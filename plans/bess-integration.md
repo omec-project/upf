@@ -141,6 +141,8 @@ are proven.
   separately.
 - Treat BESS code as normal UPF source under `bess/`; BESS changes go through
   UPF PRs and UPF CI.
+- Sign all integration commits with `git commit -s` so the branch satisfies
+  UPF's DCO/sign-off requirements.
 
 ## Implementation Milestones
 
