@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2023 Intel Corporation
+
+matrix:
+- name: Markdown
+  # expect_match: false
+  apsell:
+    lang: en
+    # ignore-case: true
+  dictionary:
+    wordlists:
+    - .wordlist.txt
+    # output: wordlist.dic
+    encoding: utf-8
+  pipeline:
+    - pyspelling.filters.markdown:
+        markdown_extensions:
+        - markdown.extensions.extra:
+    - pyspelling.filters.html:
+        comments: false
+        attributes:
+        - title
+        - alt
+        ignores:
+        - ':matches(code, pre)'
+        - 'code'
+        - 'pre'
+        - 'blockquote'
+  sources:
+  - '**/*.md'
+  default_encoding: utf-8

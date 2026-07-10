@@ -1,0 +1,9 @@
+# vim: syntax=py
+# -*- mode: python -*-
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2019 Intel Corporation
+
+p = PMDPort(name='ipv4frags', vdev='eth_pcap0,rx_pcap=ipv4frags.pcap,tx_pcap=reassembled.pcap')
+reassemb = IPDefrag(num_flows=10)
+PortInc(port=p.name) -> reassemb:1 -> PortOut(port=p.name)
+reassemb:0 -> Sink()
