@@ -2,8 +2,71 @@
 # Copyright 2020-present Open Networking Foundation
 # Copyright 2019-present Intel Corporation
 
-# Stage bess-build: pre-built BESS image (built from bess/env/Dockerfile)
-FROM ghcr.io/omec-project/bess_build:260703@sha256:116e9c752a414a3fa0020e2f82b091302e196392f71f355fc37445a1d608eff0 AS bess-build
+# Stage builder: install BESS build dependencies from the imported source tree
+FROM ubuntu:26.04@sha256:f3d28607ddd78734bb7f71f117f3c6706c666b8b76cbff7c9ff6e5718d46ff64 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+COPY bess/env/ansible.cfg /tmp/
+COPY bess/env/build-dep.yml /tmp/
+COPY bess/env/kmod.yml /tmp/
+COPY bess/env/ci.yml /tmp/
+COPY bess/env/requirements-dev.txt /tmp/
+
+RUN apt-get update && \
+    apt-get install -y \
+    --no-install-recommends \
+    ansible \
+    curl && \
+    ANSIBLE_CONFIG=/tmp/ansible.cfg ansible-playbook /tmp/ci.yml -i "localhost," -c local && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Stage bess-build: build BESS from the imported source tree
+FROM builder AS bess-build
+
+ARG CPU=haswell
+ARG MAKEFLAGS
+ENV CPU=${CPU} MAKEFLAGS=${MAKEFLAGS} PLUGINS_DIR=plugins
+ENV PKG_CONFIG_PATH=/usr/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/local/lib/pkgconfig:/usr/local/lib/x86_64-linux-gnu/pkgconfig
+ENV BESS_LINK_DYNAMIC=1
+
+WORKDIR /bess
+COPY bess .
+RUN cp -a protobuf /protobuf && \
+    mkdir -p plugins && \
+    mv sample_plugin plugins
+
+RUN PLUGINS=$(find "$PLUGINS_DIR" -mindepth 1 -maxdepth 1 -type d) && \
+    CMD="./build.py bess" && \
+    for PLUGIN in $PLUGINS; do \
+        CMD="$CMD --plugin \"$PLUGIN\""; \
+    done && \
+    eval "$CMD" && \
+    cp bin/bessd /bin && \
+    strip /bin/bessd && \
+    mkdir -p /bin/modules && \
+    cp core/modules/*.so /bin/modules && \
+    mkdir -p /opt/bess && \
+    cp -r bessctl pybess /opt/bess && \
+    cp -a core/pb /pb
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN mkdir -p /staging/lib && \
+    for lib in $(ldd /bin/bessd 2>/dev/null | grep -E '/usr/(local/)?lib' | awk '{print $3}'); do \
+      cp -aL "${lib}"* /staging/lib/ 2>/dev/null || true; \
+    done && \
+    cp -aL /usr/lib/x86_64-linux-gnu/librte_*.so* /staging/lib/ 2>/dev/null || true && \
+    mkdir -p /staging/opt/bess/lib/dpdk-pmds && \
+    for pat in librte_mempool_ring librte_bus_vdev librte_bus_pci \
+               librte_net_af_packet librte_net_af_xdp; do \
+      for f in /staging/lib/"${pat}".so*; do \
+        [ -f "$f" ] && ln -sf "/usr/local/lib/x86_64-linux-gnu/$(basename "$f")" \
+          /staging/opt/bess/lib/dpdk-pmds/; \
+      done; \
+    done && \
+    echo "DPDK PMD staging directory contents:" && \
+    ls -la /staging/opt/bess/lib/dpdk-pmds/
 
 # Stage bess: creates the runtime image of BESS
 FROM ubuntu:26.04@sha256:f3d28607ddd78734bb7f71f117f3c6706c666b8b76cbff7c9ff6e5718d46ff64 AS bess
@@ -26,6 +89,10 @@ RUN apt-get update && apt-get install -y \
 COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin/bessd
 COPY --from=bess-build /bin/modules /bin/modules
+COPY --from=bess-build /protobuf /protobuf
+COPY --from=bess-build /bess/protobuf /bess/protobuf
+COPY --from=bess-build /usr/bin/protoc /usr/local/bin/
+COPY --from=bess-build /usr/include/google/protobuf /usr/local/include/google/protobuf
 COPY conf /opt/bess/bessctl/conf
 RUN ln -s /opt/bess/bessctl/bessctl /bin
 
@@ -58,7 +125,8 @@ RUN apt-get update && apt-get install -y \
 # - The exact set of required shared objects may change between DPDK/BESS releases
 # - Maintaining a fragile, version-specific list of libraries is error-prone
 # - Image size impact has been evaluated and is acceptable for this component
-COPY --from=bess-build /usr/local/lib/x86_64-linux-gnu/ /usr/local/lib/x86_64-linux-gnu/
+COPY --from=bess-build /staging/lib/ /usr/local/lib/x86_64-linux-gnu/
+COPY --from=bess-build /staging/opt/bess/lib/dpdk-pmds/ /opt/bess/lib/dpdk-pmds/
 # Create DPDK plugin directory so that EAL can dlopen bus/mempool/net drivers
 # at runtime.  bessd passes "-d /opt/bess/lib/dpdk-pmds" to rte_eal_init()
 # when this directory exists.
