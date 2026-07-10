@@ -136,6 +136,63 @@ retirement after UPF CI and releases are proven.
 - Treat BESS code as normal UPF source under `bess/`; BESS changes go through
   UPF PRs and UPF CI.
 
+## Implementation Milestones
+
+### Milestone 1: Source Import and Build Context Hygiene
+
+- Import BESS under `bess/` with history preserved.
+- Update `.dockerignore` to exclude local reference checkouts such as `repos/`
+  without excluding the canonical imported `bess/` directory.
+- Exit criteria: `git log -- bess/core` shows imported BESS history, UPF status
+  is clean except intended changes, and Docker build context no longer includes
+  local reference repositories.
+
+### Milestone 2: In-Repo BESS Docker Build Prototype
+
+- Adapt BESS's `env/Dockerfile` builder and `bess-build` stages into the root
+  UPF `Dockerfile`.
+- Change BESS-relative `COPY` paths to use `bess/` while preserving UPF as the
+  top-level Docker build context.
+- Keep the existing BESS artifact contract: `/bin/bessd`, `/bin/modules`,
+  `/opt/bess`, `/protobuf`, `/bess/protobuf`, protobuf includes, DPDK runtime
+  libraries, and `/opt/bess/lib/dpdk-pmds`.
+- Exit criteria: `DOCKER_TARGETS=bess CPU=haswell make docker-build` reaches
+  the in-repo BESS build path and either succeeds or leaves a documented,
+  isolated blocker.
+
+### Milestone 3: Protobuf and Dependency Consolidation
+
+- Align BESS protobuf ownership around imported `bess/protobuf/`.
+- Preserve generated outputs for Go `pfcpiface`, PTF Python tests, and BESS
+  `pybess`.
+- Consolidate overlapping Python requirement files and runtime apt package
+  ownership where compatible.
+- Consolidate DPDK runtime library and PMD staging into the BESS-owned build
+  stage, with UPF packaging copying staged artifacts.
+- Exit criteria: `make pb`, `make py-pb`, PTF image build, and `upf-bess` image
+  Python imports work with the selected dependency set.
+
+### Milestone 4: CI and Validation Integration
+
+- Bring BESS source-build checks into UPF CI: BESS C++ build, `core/all_test`,
+  Python unittest discovery, module tests, clang-format, and Dockerfile linting.
+- Gate expensive BESS checks and image builds with path filters where practical.
+- Keep unsupported checks such as kernel-module build gated to suitable Linux
+  runners.
+- Exit criteria: PR CI validates both existing UPF behavior and imported BESS
+  source behavior without unnecessary full rebuilds for unrelated changes.
+
+### Milestone 5: Documentation and Repository Retirement
+
+- Replace old BESS development docs that require cloning BESS separately,
+  building `bess_build`, and editing UPF's Dockerfile.
+- Document the single-checkout workflow, supported `CPU` values, and how to
+  run tests using the new layout.
+- Prepare retirement guidance for the old BESS repository and standalone
+  `bess_build` publishing path.
+- Exit criteria: developers can follow UPF docs to build and test the integrated
+  source tree without external BESS repo steps.
+
 ## Test Plan
 
 - Verify source import:
