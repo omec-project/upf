@@ -3,30 +3,12 @@
 # Copyright 2019-present Intel Corporation
 
 # Stage bess-build: pre-built BESS image (built from bess/env/Dockerfile)
-FROM ghcr.io/omec-project/bess_build:260603@sha256:0ba137488a33cf1fdf0c1ef444f84cd2691e122f98de0e32007e2e9902a6af39 AS bess-build
+FROM ghcr.io/omec-project/bess_build:260703@sha256:116e9c752a414a3fa0020e2f82b091302e196392f71f355fc37445a1d608eff0 AS bess-build
 
 # Stage bess: creates the runtime image of BESS
 FROM ubuntu:26.04@sha256:f3d28607ddd78734bb7f71f117f3c6706c666b8b76cbff7c9ff6e5718d46ff64 AS bess
 
 ENV DEBIAN_FRONTEND=noninteractive
-
-# Build arguments for dynamic labels
-ARG VERSION=dev
-ARG VCS_URL=unknown
-ARG VCS_REF=unknown
-ARG BUILD_DATE=unknown
-
-LABEL org.opencontainers.image.source="${VCS_URL}" \
-    org.opencontainers.image.version="${VERSION}" \
-    org.opencontainers.image.created="${BUILD_DATE}" \
-    org.opencontainers.image.revision="${VCS_REF}" \
-    org.opencontainers.image.url="${VCS_URL}" \
-    org.opencontainers.image.title="upf-bess" \
-    org.opencontainers.image.description="Aether 5G Core UPF-BESS Network Function" \
-    org.opencontainers.image.authors="Aether SD-Core <dev@lists.aetherproject.org>" \
-    org.opencontainers.image.vendor="Aether Project" \
-    org.opencontainers.image.licenses="Apache-2.0" \
-    org.opencontainers.image.documentation="https://docs.sd-core.aetherproject.org/"
 
 WORKDIR /
 COPY requirements.txt .
@@ -136,6 +118,24 @@ RUN set -e; \
     ls -la /opt/bess/lib/dpdk-pmds/; \
     ldconfig
 
+# Build arguments for dynamic labels
+ARG VERSION=dev
+ARG VCS_URL=unknown
+ARG VCS_REF=unknown
+ARG BUILD_DATE=unknown
+
+LABEL org.opencontainers.image.source="${VCS_URL}" \
+    org.opencontainers.image.version="${VERSION}" \
+    org.opencontainers.image.created="${BUILD_DATE}" \
+    org.opencontainers.image.revision="${VCS_REF}" \
+    org.opencontainers.image.url="${VCS_URL}" \
+    org.opencontainers.image.title="upf-bess" \
+    org.opencontainers.image.description="Aether 5G Core UPF-BESS Network Function" \
+    org.opencontainers.image.authors="Aether SD-Core <dev@lists.aetherproject.org>" \
+    org.opencontainers.image.vendor="Aether Project" \
+    org.opencontainers.image.licenses="Apache-2.0" \
+    org.opencontainers.image.documentation="https://docs.sd-core.aetherproject.org/"
+
 ENV PYTHONPATH="/opt/bess"
 WORKDIR /opt/bess/bessctl
 ENTRYPOINT ["bessd", "-f"]
@@ -183,6 +183,9 @@ RUN go mod tidy && \
 # Stage pfcp: runtime image of pfcp agent towards SMF
 FROM alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS pfcp
 
+COPY conf /opt/bess/bessctl/conf
+COPY --from=pfcp-build /bin/pfcpiface /bin
+
 # Build arguments for dynamic labels
 ARG VERSION=dev
 ARG VCS_URL=unknown
@@ -201,8 +204,6 @@ LABEL org.opencontainers.image.source="${VCS_URL}" \
     org.opencontainers.image.licenses="Apache-2.0" \
     org.opencontainers.image.documentation="https://docs.sd-core.aetherproject.org/"
 
-COPY conf /opt/bess/bessctl/conf
-COPY --from=pfcp-build /bin/pfcpiface /bin
 ENTRYPOINT [ "/bin/pfcpiface" ]
 
 # Stage pb: dummy stage for collecting protobufs
