@@ -9,13 +9,15 @@ squashed subtree with explicit source-SHA provenance, remove the external
 prepare the separate BESS repository for retirement after UPF CI and releases
 are proven.
 
-## Current Build Context
+## Build Context and Progress
 
-- UPF's root `Dockerfile` currently treats BESS as a prebuilt supplier stage:
-  `FROM ghcr.io/omec-project/bess_build:260603@sha256:... AS bess-build`.
-  UPF does not compile BESS source today.
-- UPF's `bess` image copies BESS artifacts from that supplier stage, then adds
-  UPF-specific BESS pipeline configuration from `conf/`.
+- Before this branch, UPF's root `Dockerfile` treated BESS as a prebuilt
+  supplier stage: `FROM ghcr.io/omec-project/bess_build:... AS bess-build`.
+- On the integration branch, the root `Dockerfile` now builds BESS from the
+  imported `bess/` source using the builder and `bess-build` stages adapted
+  from BESS's `env/Dockerfile`.
+- UPF's `bess` image copies artifacts from the in-repo BESS build stage, then
+  adds UPF-specific BESS pipeline configuration from `conf/`.
 - UPF's `Makefile` drives Docker builds through `DOCKER_TARGETS`, defaulting to
   `bess pfcp`, and already passes `MAKEFLAGS` and `CPU` as Docker build args.
 - UPF's `pb` and `ptf-pb` Docker targets generate Go and Python protobuf
@@ -30,17 +32,16 @@ are proven.
 - BESS CI currently includes source-level validation that UPF does not run:
   BESS C++ build, kmod build, `core/all_test`, Python unittest discovery, module
   tests, clang-format checks, and BESS Dockerfile linting.
-- Python dependency maintenance is currently split across both repos and several
-  Docker stages. UPF pins `grpcio==1.80.0` and `protobuf==6.33.6` in
-  `requirements.txt` and `requirements_pb.txt`, PTF pins `protobuf==7.34.1`,
-  while BESS pins `grpcio==1.81.1` and `protobuf==7.35.1` in its runtime and
-  development requirement files.
-- Runtime apt package ownership is also split. UPF manually installs BESS
-  runtime packages in the root `Dockerfile`, while BESS maintains
-  `env/runtime-deps.yml` for the runtime image it publishes today.
-- DPDK runtime library and PMD plugin setup is duplicated. BESS stages runtime
-  libraries and `/opt/bess/lib/dpdk-pmds`; UPF then has additional PMD symlink
-  logic in its final `bess` stage.
+- The final `upf-bess` image now pins its overlapping Python runtime packages
+  to BESS's tested versions: `grpcio==1.81.1`, `protobuf==7.35.1`, and
+  `typing-extensions==4.16.0`. Python protobuf generation remains a separate
+  toolchain (`grpcio-tools==1.80.0` and `protobuf==6.33.6`), and PTF retains
+  its independent test-runtime lock.
+- BESS's imported `env/runtime-deps.yml` is now the source of truth for BESS
+  runtime apt packages in the final image. UPF-only packages remain explicit
+  in the root `Dockerfile`.
+- The BESS build stage now stages DPDK runtime libraries and PMD plugins; the
+  final image copies those staged artifacts without recreating PMD symlinks.
 
 ## Key Changes
 
@@ -71,12 +72,13 @@ are proven.
   so `make pb`, `make py-pb`, and `ptf/Makefile` keep producing the same
   generated bindings.
 - Consolidate Python dependency ownership after BESS is imported:
-  - Use one shared runtime requirements file for the final `upf-bess` image
-    instead of maintaining separate UPF and BESS runtime pins for overlapping
-    packages.
-  - Use one shared protobuf-generation requirements file for Python protobuf
-    generation, aligned with the runtime `grpcio`/`protobuf` versions unless a
-    documented tooling constraint requires a different version.
+  - Keep root `requirements.txt` as the single requirements file installed in
+    the final `upf-bess` image, and align overlapping BESS runtime pins and
+    hashes with `bess/env/requirements-run.txt`.
+  - Keep `requirements_pb.txt` as a separate, locked Python protobuf-generation
+    toolchain because `grpcio-tools` has its own protobuf compatibility
+    constraints. Upgrade its `grpcio`, `grpcio-tools`, and `protobuf` pins as
+    a tested set rather than forcing them to match the runtime image.
   - Keep PTF-only traffic-generator dependencies separate, but align overlapping
     `grpcio`, `protobuf`, `scapy`, `psutil`, and `typing-extensions` pins where
     compatible.
@@ -106,6 +108,9 @@ are proven.
     policy and document any required exception.
 - Keep UPF's existing `CPU ?= native` and `--build-arg CPU=$(CPU)` interface as
   the architecture-selection mechanism for BESS builds.
+- Add `DOCKER_EXTRA_BUILD_ARGS` for optional Docker flags such as `--no-cache`
+  without replacing the default `DOCKER_BUILD_ARGS` values that pass `CPU` and
+  parallel `MAKEFLAGS`.
 - Define and document the supported `CPU` values for project-built images,
   including `native`, `haswell`, and `ivybridge`, while still allowing advanced
   users to pass any compiler-supported `-march` value for local experiments.
@@ -135,8 +140,8 @@ are proven.
 
 ## Public Interfaces
 
-- Keep `make docker-build`, `DOCKER_TARGETS`, `DOCKER_BUILD_ARGS`, and `CPU` as
-  the public build interface.
+- Keep `make docker-build`, `DOCKER_TARGETS`, `DOCKER_BUILD_ARGS`,
+  `DOCKER_EXTRA_BUILD_ARGS`, and `CPU` as the public build interface.
 - Do not require developers to run `git submodule` commands or clone BESS
   separately.
 - Treat BESS code as normal UPF source under `bess/`; BESS changes go through
@@ -148,6 +153,10 @@ are proven.
 
 ### Milestone 1: Source Import and Build Context Hygiene
 
+Status: complete. BESS was imported as a squashed subtree from
+`ac3763d659c5e63ed52c08c1f6311f63b31ac776`; `.dockerignore` excludes the
+local `repos/` reference checkout and preserves the canonical `bess/` tree.
+
 - Import BESS under `bess/` as a squashed subtree.
 - Record the exact imported BESS source commit SHA so maintainers can trace the
   initial source snapshot back to the old BESS repository.
@@ -158,6 +167,10 @@ are proven.
   includes local reference repositories.
 
 ### Milestone 2: In-Repo BESS Docker Build Prototype
+
+Status: complete. The root Dockerfile builds BESS from `bess/`; x86_64 builds
+validated `CPU=haswell` and `CPU=ivybridge`, along with the expected runtime
+artifact paths.
 
 - Adapt BESS's `env/Dockerfile` builder and `bess-build` stages into the root
   UPF `Dockerfile`.
@@ -171,6 +184,20 @@ are proven.
   isolated blocker.
 
 ### Milestone 3: Protobuf and Dependency Consolidation
+
+Status: in progress. Completed substeps:
+
+- BESS protobuf exports are staged at `/protobuf` and copied to legacy
+  destinations only where consumers require them.
+- DPDK library and PMD staging is owned by `bess-build`; the final image copies
+  the prepared library and PMD directories.
+- BESS runtime apt packages are installed from `bess/env/runtime-deps.yml`,
+  while UPF-only packages remain explicit in the root Dockerfile.
+- Final-image Python runtime pins for `grpcio`, `protobuf`, and
+  `typing-extensions` match BESS's runtime lockfile. The resulting image was
+  validated with gRPC 1.81.1 and protobuf 7.35.1.
+- The Python protobuf generator remains intentionally separate pending a
+  dedicated generator-toolchain upgrade and validation.
 
 - Align BESS protobuf ownership around imported `bess/protobuf/`.
 - Preserve generated outputs for Go `pfcpiface`, PTF Python tests, and BESS
@@ -235,7 +262,9 @@ are proven.
   ```
 
 - Verify consolidated Python dependency installs in all Docker stages that use
-  Python requirements: `bess`, `py-pb`, and PTF image build.
+  Python requirements: `bess`, `py-pb`, and PTF image build. The final `bess`
+  image has been validated with BESS's aligned `grpcio` and `protobuf` pins;
+  `py-pb` and PTF validation remain.
 - Verify consolidated runtime apt dependencies by checking the final `upf-bess`
   image still contains required runtime libraries and tools without reinstalling
   duplicate BESS package lists in multiple stages.
@@ -276,8 +305,8 @@ are proven.
 
 ## Assumptions
 
-- Use a history-preserving `git subtree` import, not a squash import or
-  submodule.
+- Use a squashed `git subtree` import with the source commit SHA recorded in
+  the import history, not a full-history import or submodule.
 - Import BESS under `bess/`.
 - Preserve current UPF image names and targets: `upf-bess` and `upf-pfcp`.
 - Keep the current root `Dockerfile` as the primary image build entrypoint.
