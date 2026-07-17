@@ -46,6 +46,8 @@ updates:
       python-deps:
         patterns:
           - "*"
+    ignore:
+      - dependency-name: "pyperclip"
 
   - package-ecosystem: github-actions
     directory: /
