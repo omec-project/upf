@@ -426,6 +426,10 @@ scapy==2.7.0 \
 scapy-helper==0.14.8 \
     --hash=sha256:ebb277bd84170ce7091eaa82eef677ea726f483b2d7c2c816d2c8659ecf8ba4e \
     --hash=sha256:e9d3b57451142f42032c42a0bb6fca4683360d18bb7a3effe28e87b56275e160
+# Required to build TRex's custom Scapy wheel without using Ubuntu's packages.
+setuptools==82.0.1 \
+    --hash=sha256:7d872682c5d01cfde07da7bccc7b65469d3dca203318515ada1de5eda35efbf9 \
+    --hash=sha256:a59e362652f08dcd477c78bb6e7bd9d80a7995bc73ce773050228a348ce2e5bb
 six==1.17.0 \
     --hash=sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274 \
     --hash=sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81
@@ -441,3 +445,6 @@ typing-extensions==4.15.0 \
 unittest-xml-reporting==4.0.0 \
     --hash=sha256:e3e24bac8ea27c454d8be1d718851b2c5c8f712d75281920b6af81bdfef2f9bc \
     --hash=sha256:bfa1ed65e9e6f33c161d04470d89050458cfb65a5a5d0358834ef7ce037d9136
+wheel==0.47.0 \
+    --hash=sha256:212281cab4dff978f6cedd499cd893e1f620791ca6ff7107cf270781e587eced \
+    --hash=sha256:cc72bd1009ba0cf63922e28f94d9d83b920aa2bb28f798a31d0691b02fa3c9b3
