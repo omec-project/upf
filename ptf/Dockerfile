@@ -90,7 +90,7 @@ WORKDIR ${TREX_EXT_LIBS}/scapy-${SCAPY_VER}
 RUN printf '%s\n' "${SCAPY_VER}" > scapy/VERSION && \
     /opt/ptf-venv/bin/python -m pip wheel --no-cache-dir --no-build-isolation --no-deps --wheel-dir /tmp/wheels . && \
     /opt/ptf-venv/bin/python -m pip install --no-cache-dir --no-deps /tmp/wheels/scapy-*.whl && \
-    /opt/ptf-venv/bin/python -c "import ptf, scapy; assert scapy.__version__ == '${SCAPY_VER}'" && \
+    /opt/ptf-venv/bin/python -c "from importlib.metadata import version; import ptf, scapy; assert version('scapy') == '${SCAPY_VER}'" && \
     ldconfig
 
 ENTRYPOINT []
