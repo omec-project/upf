@@ -207,7 +207,8 @@ Status: in progress. Completed substeps:
   build of the original image confirms the same Scapy 2.4.5 and failing
   `pip check`; this is pre-existing behavior, not a result of the integration.
   The Dockerfile documents the exception and validates the PTF and Scapy
-  imports plus the installed Scapy distribution version. Full two-host
+  imports plus the installed Scapy distribution version. The built image's
+  runtime smoke test passed with PTF 0.12.0 and Scapy 2.4.5. Full two-host
   PTF/TRex validation remains pending.
 - Audit and remove `--ignore-installed` from final-image and generated-artifact
   Python installs. Use isolated Python environments or explicit staging paths
