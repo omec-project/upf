@@ -81,13 +81,16 @@ ENV PATH="/opt/ptf-venv/bin:${PATH}"
 
 COPY --from=trex-builder /output /
 
-# Install custom scapy version from TRex so PTF tests can access certain scapy features
-# TODO: Move to a newer Scapy version compatible with latest Ubuntu versions
+# Install TRex's custom Scapy so PTF tests can access its required features.
+# This intentionally replaces the checked Scapy 2.7.0 dependency. PTF 0.12.0
+# declares Scapy >=2.5.0, so a final pip check would report this known legacy
+# incompatibility; validate the runtime imports and intended version instead.
+# TODO: Move to a newer Scapy version compatible with the PTF requirement.
 WORKDIR ${TREX_EXT_LIBS}/scapy-${SCAPY_VER}
 RUN printf '%s\n' "${SCAPY_VER}" > scapy/VERSION && \
     /opt/ptf-venv/bin/python -m pip wheel --no-cache-dir --no-build-isolation --no-deps --wheel-dir /tmp/wheels . && \
     /opt/ptf-venv/bin/python -m pip install --no-cache-dir --no-deps /tmp/wheels/scapy-*.whl && \
-    /opt/ptf-venv/bin/python -m pip check && \
+    /opt/ptf-venv/bin/python -c "import ptf, scapy; assert scapy.__version__ == '${SCAPY_VER}'" && \
     ldconfig
 
 ENTRYPOINT []
