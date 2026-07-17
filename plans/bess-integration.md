@@ -198,6 +198,12 @@ Status: in progress. Completed substeps:
   validated with gRPC 1.81.1 and protobuf 7.35.1.
 - The Python protobuf generator remains intentionally separate pending a
   dedicated generator-toolchain upgrade and validation.
+- Audit and remove `--ignore-installed` from final-image and generated-artifact
+  Python installs. Use isolated Python environments or explicit staging paths
+  so Ubuntu, BESS build, runtime, protobuf-generation, and PTF dependencies do
+  not silently override one another. Any unavoidable exception must document
+  the conflicting distribution, why isolation is impractical, and its
+  validation coverage.
 
 - Align BESS protobuf ownership around imported `bess/protobuf/`.
 - Preserve generated outputs for Go `pfcpiface`, PTF Python tests, and BESS
@@ -265,6 +271,9 @@ Status: in progress. Completed substeps:
   Python requirements: `bess`, `py-pb`, and PTF image build. The final `bess`
   image has been validated with BESS's aligned `grpcio` and `protobuf` pins;
   `py-pb` and PTF validation remain.
+- Verify each isolated Python environment with `pip check`, its expected
+  package versions, and the imports used by that stage. Do not rely on
+  `--ignore-installed` to hide an Ubuntu package-version discrepancy.
 - Verify consolidated runtime apt dependencies by checking the final `upf-bess`
   image still contains required runtime libraries and tools without reinstalling
   duplicate BESS package lists in multiple stages.
