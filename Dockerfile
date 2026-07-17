@@ -118,14 +118,14 @@ RUN apt-get update && apt-get install -y \
     ansible \
     iproute2 \
     iptables \
-    iputils-ping && \
+    iputils-ping \
+    python3-venv && \
     ANSIBLE_CONFIG=/tmp/ansible.cfg ansible-playbook /tmp/runtime-deps.yml \
         -i "localhost," -c local --tags runtime-apt && \
     apt-get purge -y ansible && \
     apt-get autoremove -y && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/ansible.cfg /tmp/runtime-deps.yml && \
-    pip install --no-cache-dir --break-system-packages --ignore-installed --require-hashes -r requirements.txt
+    rm -rf /var/lib/apt/lists/* /tmp/ansible.cfg /tmp/runtime-deps.yml
 COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin/bessd
 COPY --from=bess-build /bin/modules /bin/modules
@@ -134,6 +134,9 @@ COPY --from=bess-build /protobuf /bess/protobuf
 COPY --from=bess-build /usr/bin/protoc /usr/local/bin/
 COPY --from=bess-build /usr/include/google/protobuf /usr/local/include/google/protobuf
 COPY conf /opt/bess/bessctl/conf
+RUN python3 -m venv /opt/bess/venv && \
+    /opt/bess/venv/bin/pip install --no-cache-dir --require-hashes -r requirements.txt && \
+    /opt/bess/venv/bin/pip check
 RUN ln -s /opt/bess/bessctl/bessctl /bin
 
 # UPF-specific runtime dependencies. BESS runtime packages are installed from
@@ -175,6 +178,7 @@ LABEL org.opencontainers.image.source="${VCS_URL}" \
     org.opencontainers.image.licenses="Apache-2.0" \
     org.opencontainers.image.documentation="https://docs.sd-core.aetherproject.org/"
 
+ENV PATH="/opt/bess/venv/bin:${PATH}"
 ENV PYTHONPATH="/opt/bess"
 WORKDIR /opt/bess/bessctl
 ENTRYPOINT ["bessd", "-f"]
