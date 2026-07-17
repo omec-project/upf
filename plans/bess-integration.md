@@ -198,6 +198,17 @@ Status: in progress. Completed substeps:
   validated with gRPC 1.81.1 and protobuf 7.35.1.
 - The Python protobuf generator remains intentionally separate pending a
   dedicated generator-toolchain upgrade and validation.
+- PTF dependencies now use `/opt/ptf-venv`, removing global Python installs
+  and `--ignore-installed`; its x86_64 Docker image build passes.
+- The normal locked PTF and TRex dependency installs pass `pip check` before
+  TRex's custom Scapy is installed. TRex then intentionally replaces Scapy
+  2.7.0 with its bundled 2.4.5 distribution. PTF 0.12.0 declares
+  `scapy>=2.5.0`, so a final `pip check` reports a known conflict. A baseline
+  build of the original image confirms the same Scapy 2.4.5 and failing
+  `pip check`; this is pre-existing behavior, not a result of the integration.
+  The Dockerfile documents the exception and validates the PTF and Scapy
+  imports plus the installed Scapy distribution version. Full two-host
+  PTF/TRex validation remains pending.
 - Audit and remove `--ignore-installed` from final-image and generated-artifact
   Python installs. Use isolated Python environments or explicit staging paths
   so Ubuntu, BESS build, runtime, protobuf-generation, and PTF dependencies do
@@ -270,7 +281,8 @@ Status: in progress. Completed substeps:
 - Verify consolidated Python dependency installs in all Docker stages that use
   Python requirements: `bess`, `py-pb`, and PTF image build. The final `bess`
   image has been validated with BESS's aligned `grpcio` and `protobuf` pins;
-  `py-pb` and PTF validation remain.
+  `py-pb` generated no binding diffs and the PTF image build passes. Complete
+  the PTF/TRex functional testbed run before closing this validation item.
 - Verify each isolated Python environment with `pip check`, its expected
   package versions, and the imports used by that stage. Do not rely on
   `--ignore-installed` to hide an Ubuntu package-version discrepancy.
