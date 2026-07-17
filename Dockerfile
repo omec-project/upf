@@ -201,10 +201,15 @@ RUN mkdir /bess_pb && \
 FROM bess-build AS py-pb
 WORKDIR /
 COPY requirements_pb.txt .
-RUN apt-get update && apt-get install -y --no-install-recommends python3-dev && rm -rf /var/lib/apt/lists/*
-RUN pip install --no-cache-dir --break-system-packages --ignore-installed --require-hashes -r requirements_pb.txt
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3-dev \
+    python3-venv && \
+    rm -rf /var/lib/apt/lists/*
+RUN python3 -m venv /opt/py-pb-venv && \
+    /opt/py-pb-venv/bin/pip install --no-cache-dir --require-hashes -r requirements_pb.txt && \
+    /opt/py-pb-venv/bin/pip check
 RUN mkdir /bess_pb && \
-    python3 -m grpc_tools.protoc -I /usr/include -I /protobuf/ \
+    /opt/py-pb-venv/bin/python -m grpc_tools.protoc -I /usr/include -I /protobuf/ \
     /protobuf/*.proto /protobuf/ports/*.proto \
     --python_out=/bess_pb \
     --grpc_python_out=/bess_pb
