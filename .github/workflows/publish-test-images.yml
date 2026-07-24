@@ -1,0 +1,70 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Intel Corporation
+name: Publish Test Images
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Test image tag to publish
+        required: true
+        default: bess-integration
+        type: string
+      cpu:
+        description: BESS CPU architecture
+        required: true
+        default: haswell
+        type: choice
+        options:
+          - haswell
+          - ivybridge
+          - native
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: Publish ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: bess
+            image: upf-bess
+          - target: pfcp
+            image: upf-pfcp
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: ${{ matrix.target }}
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ inputs.tag }}
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:sha-${{ github.sha }}
+          build-args: |
+            CPU=${{ inputs.cpu }}
+            MAKEFLAGS=-j2
+            VERSION=${{ inputs.tag }}
+            VCS_URL=https://github.com/${{ github.repository }}
+            VCS_REF=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
