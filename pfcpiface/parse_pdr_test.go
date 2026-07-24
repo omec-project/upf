@@ -676,6 +676,11 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 			sdfIE:   newFilter(""),
 			wantErr: true,
 		},
+		{
+			name:    "truncated flow description",
+			sdfIE:   ie.New(ie.SDFFilter, []byte{0x01, 0x00, 0x00, 0x24, 'a'}),
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

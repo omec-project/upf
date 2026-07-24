@@ -5,6 +5,7 @@ package pfcpiface
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/omec-project/upf-epc/logger"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -267,6 +268,19 @@ func (pConn *PFCPConn) handleAssociationReleaseRequest(msg message.Message) (mes
 	return arres, nil
 }
 
+// parsePFDContents wraps pfdContent.PFDContents() to convert the go-pfcp ≤ v0.0.24
+// slice-bounds panic into an ordinary error. PFDContentsFields.UnmarshalBinary checks
+// bounds before reading the length fields, so the check always uses the zero value and
+// fails to catch FDLength/URLLength/etc. values that exceed the remaining payload bytes.
+func parsePFDContents(pfdContent *ie.IE) (fields *ie.PFDContentsFields, retErr error) {
+	defer func() {
+		if r := recover(); r != nil {
+			retErr = fmt.Errorf("PFD Contents IE malformed (panic while parsing): %v", r)
+		}
+	}()
+	return pfdContent.PFDContents()
+}
+
 func (pConn *PFCPConn) handlePFDMgmtRequest(msg message.Message) (message.Message, error) {
 	pfdmreq, ok := msg.(*message.PFDManagementRequest)
 	if !ok {
@@ -307,7 +321,7 @@ func (pConn *PFCPConn) handlePFDMgmtRequest(msg message.Message) (message.Messag
 		}
 
 		for _, pfdContent := range pfdCtx {
-			fields, err := pfdContent.PFDContents()
+			fields, err := parsePFDContents(pfdContent)
 			if err != nil {
 				pConn.RemoveAppPFD(id)
 				return errUnmarshalReply(err, appIDPFD)

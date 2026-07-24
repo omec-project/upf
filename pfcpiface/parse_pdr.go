@@ -451,8 +451,20 @@ func (p *pdr) parseApplicationID(ie *ie.IE, appPFDs map[string]appPFD) error {
 	return nil
 }
 
+// safeSDFFilter wraps i.SDFFilter() to convert the go-pfcp ≤ v0.0.24
+// slice-bounds panic into an ordinary error. SDFFilterFields.UnmarshalBinary
+// fails to validate FDLength against the remaining payload bytes.
+func safeSDFFilter(i *ie.IE) (fields *ie.SDFFilterFields, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("SDF Filter IE malformed (panic while parsing): %v", r)
+		}
+	}()
+	return i.SDFFilter()
+}
+
 func (p *pdr) parseSDFFilter(ie *ie.IE) error {
-	sdfFields, err := ie.SDFFilter()
+	sdfFields, err := safeSDFFilter(ie)
 	if err != nil {
 		return err
 	}

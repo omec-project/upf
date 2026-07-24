@@ -152,3 +152,12 @@ func TestDumpRawPFCP_DoesNotOverwriteExistingFile(t *testing.T) {
 		t.Fatal("expected a retried dump file containing the second payload")
 	}
 }
+
+func TestParsePFDContents_MalformedPayload_ReturnsError(t *testing.T) {
+	malformedPFD := ie.New(ie.PFDContents, []byte{0x01, 0x00, 0x00, 0x20, 0x70, 0x65})
+
+	_, err := parsePFDContents(malformedPFD)
+	if err == nil {
+		t.Fatal("expected an error for a malformed PFD Contents IE, got nil")
+	}
+}
