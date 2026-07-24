@@ -33,10 +33,10 @@ are proven.
   BESS C++ build, kmod build, `core/all_test`, Python unittest discovery, module
   tests, clang-format checks, and BESS Dockerfile linting.
 - The final `upf-bess` image now pins its overlapping Python runtime packages
-  to BESS's tested versions: `grpcio==1.81.1`, `protobuf==7.35.1`, and
+  to BESS's tested versions: `grpcio==1.83.0`, `protobuf==7.35.1`, and
   `typing-extensions==4.16.0`. Python protobuf generation remains a separate
-  toolchain (`grpcio-tools==1.80.0` and `protobuf==6.33.6`), and PTF retains
-  its independent test-runtime lock.
+  toolchain (`grpcio-tools==1.82.1`, `grpcio==1.82.1`, and
+  `protobuf==7.35.1`), and PTF retains its independent test-runtime lock.
 - BESS's imported `env/runtime-deps.yml` is now the source of truth for BESS
   runtime apt packages in the final image. UPF-only packages remain explicit
   in the root `Dockerfile`.
@@ -195,7 +195,9 @@ Status: in progress. Completed substeps:
   while UPF-only packages remain explicit in the root Dockerfile.
 - Final-image Python runtime pins for `grpcio`, `protobuf`, and
   `typing-extensions` match BESS's runtime lockfile. The resulting image was
-  validated with gRPC 1.81.1 and protobuf 7.35.1.
+  previously validated with gRPC 1.81.1 and protobuf 7.35.1. The refreshed
+  BESS snapshot updates gRPC to 1.83.0, so this image validation must be
+  repeated.
 - The Python protobuf generator remains intentionally separate pending a
   dedicated generator-toolchain upgrade and validation.
 - PTF dependencies now use `/opt/ptf-venv`, removing global Python installs
