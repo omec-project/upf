@@ -188,6 +188,8 @@ ZC
 Alireza
 Amin
 Ansible
+arg
+args
 Asim
 Aurojit
 Barath
@@ -214,6 +216,7 @@ initializer
 Jamshed
 Jang
 Keon
+kmod
 kvm
 LaTeX
 Lan
@@ -232,6 +235,7 @@ Peng
 PMD
 PMDs
 pre
+prebuilt
 PRs
 programmability
 Proietto
@@ -252,6 +256,7 @@ Saikrishna
 Sanaee
 Sagie
 Sangjin
+SBOM
 SHA
 Shinae
 Situ
@@ -260,6 +265,7 @@ Standt
 submodule
 substeps
 subtree
+symlinks
 testbed
 testpmd
 toolchain
@@ -273,6 +279,7 @@ utils
 vagrantup
 vhost
 virtio
+vm
 VPort
 vSwitch
 VMs
