@@ -183,17 +183,34 @@ ENV PYTHONPATH="/opt/bess"
 WORKDIR /opt/bess/bessctl
 ENTRYPOINT ["bessd", "-f"]
 
-# Stage build bess golang pb
+# Stage protoc-go: pinned Protocol Buffers compiler for Go binding generation.
+# BESS itself continues to build with Ubuntu's system protoc from bess-build.
+FROM ubuntu:26.04@sha256:f3d28607ddd78734bb7f71f117f3c6706c666b8b76cbff7c9ff6e5718d46ff64 AS protoc-go
+ARG PROTOC_RELEASE=33.0
+ARG PROTOC_CLI_VERSION=33.0
+ARG PROTOC_SHA256=d99c011b799e9e412064244f0be417e5d76c9b6ace13a2ac735330fa7d57ad8f
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates curl unzip && \
+    curl --fail --location --silent --show-error \
+        --output /tmp/protoc.zip \
+        "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_RELEASE}/protoc-${PROTOC_RELEASE}-linux-x86_64.zip" && \
+    echo "${PROTOC_SHA256}  /tmp/protoc.zip" | sha256sum --check --strict - && \
+    unzip -q /tmp/protoc.zip -d /opt/protoc && \
+    /opt/protoc/bin/protoc --version | grep -Fx "libprotoc ${PROTOC_CLI_VERSION}" && \
+    rm -rf /var/lib/apt/lists/* /tmp/protoc.zip
+
+# Stage protoc-gen: Go protobuf plugins
 FROM golang:1.26.4-bookworm@sha256:b305420a68d0f229d91eb3b3ed9e519fcf2cf5461da4bef997bf927e8c0bfd2b AS protoc-gen
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10 && \
     go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
 
 FROM bess-build AS go-pb
+COPY --from=protoc-go /opt/protoc /opt/protoc
 COPY --from=protoc-gen /go/bin/protoc-gen-go /bin
 COPY --from=protoc-gen /go/bin/protoc-gen-go-grpc /bin
 
 RUN mkdir /bess_pb && \
-    protoc -I /usr/include -I /protobuf/ \
+    /opt/protoc/bin/protoc -I /opt/protoc/include -I /protobuf/ \
     /protobuf/*.proto /protobuf/ports/*.proto \
     --go_opt=paths=source_relative --go_out=/bess_pb \
     --go-grpc_opt=paths=source_relative --go-grpc_out=/bess_pb
