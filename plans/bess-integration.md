@@ -249,10 +249,30 @@ Status: in progress. Completed substeps:
   building `bess_build`, and editing UPF's Dockerfile.
 - Document the single-checkout workflow, supported `CPU` values, and how to
   run tests using the new layout.
-- Prepare retirement guidance for the old BESS repository and standalone
-  `bess_build` publishing path.
+- Retire the duplicate standalone BESS image pipeline after the root Dockerfile
+  source build and UPF CI have proven its replacement:
+  - Remove `bess/env/Dockerfile` and `bess/env/rebuild_images.py`; the root
+    `Dockerfile` is the only supported BESS image build path.
+  - Remove the standalone BESS image publication workflow
+    `bess/.github/workflows/push.yml`, plus any now-inert nested BESS workflow
+    configuration that is not migrated to a root UPF workflow.
+  - Update documentation and test helpers that name `bess_build`, including
+    `docs/developer-guide.md` and
+    `bess/bessctl/conf/port/vhost/launch_container.py`, to use or configure
+    the canonical `upf-bess` image instead.
+  - Retain `bess/env/ci.yml`, BESS dependency playbooks and requirements, and
+    BESS source tests because the UPF direct-source CI job uses them.
+- Before deletion, verify that `make docker-build`, BESS direct-source CI,
+  `make pb`, `make py-pb`, and the UPF runtime image validation pass without
+  the standalone pipeline. Search the repository for remaining `bess_build`
+  references and either remove each one or document its temporary purpose.
+- After UPF releases no longer consume or publish `bess_build`, archive/freeze
+  the external BESS repository, update its README with the UPF contribution
+  location, redirect issue and PR guidance, and stop standalone image releases.
 - Exit criteria: developers can follow UPF docs to build and test the integrated
-  source tree without external BESS repo steps.
+  source tree without external BESS repo steps or a standalone `bess_build`
+  image. No live UPF build, CI workflow, documentation, or test helper depends
+  on the retired pipeline.
 
 ## Test Plan
 
