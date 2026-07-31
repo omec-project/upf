@@ -194,10 +194,11 @@ RUN apt-get update && \
     curl --fail --location --silent --show-error \
         --output /tmp/protoc.zip \
         "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_RELEASE}/protoc-${PROTOC_RELEASE}-linux-x86_64.zip" && \
-    echo "${PROTOC_SHA256}  /tmp/protoc.zip" | sha256sum --check --strict - && \
+    printf '%s  %s\n' "${PROTOC_SHA256}" /tmp/protoc.zip > /tmp/protoc.sha256 && \
+    sha256sum --check --strict /tmp/protoc.sha256 && \
     unzip -q /tmp/protoc.zip -d /opt/protoc && \
-    /opt/protoc/bin/protoc --version | grep -Fx "libprotoc ${PROTOC_CLI_VERSION}" && \
-    rm -rf /var/lib/apt/lists/* /tmp/protoc.zip
+    test "$(/opt/protoc/bin/protoc --version)" = "libprotoc ${PROTOC_CLI_VERSION}" && \
+    rm -rf /var/lib/apt/lists/* /tmp/protoc.zip /tmp/protoc.sha256
 
 # Stage protoc-gen: Go protobuf plugins
 FROM golang:1.26.4-bookworm@sha256:b305420a68d0f229d91eb3b3ed9e519fcf2cf5461da4bef997bf927e8c0bfd2b AS protoc-gen
