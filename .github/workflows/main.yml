@@ -82,6 +82,32 @@ jobs:
           ccache -s
           bessctl/bessctl daemon stop || true
 
+  bess-clang-format:
+    needs: bess-changes
+    if: needs.bess-changes.outputs.source == 'true'
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+      attestations: write
+    strategy:
+      matrix:
+        path:
+          - check: bess/core
+            exclude: '(kmod)'
+          - check: bess/protobuf
+            exclude: ''
+          - check: bess/sample_plugin/modules
+            exclude: ''
+          - check: bess/sample_plugin/protobuf
+            exclude: ''
+    uses: omec-project/.github/.github/workflows/check-clang-format.yml@c6f69e74f8ee9034dcc237ccbd719de59526aee5 # v0.0.30
+    with:
+      branch_name: ${{ github.ref }}
+      clang_format_version: '14'
+      check_path: ${{ matrix.path.check }}
+      exclude_regex: ${{ matrix.path.exclude }}
+
   build:
     if: github.event_name == 'pull_request'
     permissions:
