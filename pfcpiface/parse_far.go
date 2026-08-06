@@ -94,7 +94,9 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 			fwdIEs, err = farIE.ForwardingParameters()
 		}
 	case update:
-		fwdIEs, err = farIE.UpdateForwardingParameters()
+		if (f.applyAction & ActionForward) != 0 {
+			fwdIEs, err = farIE.UpdateForwardingParameters()
+		}
 	default:
 		return ErrInvalidOperation(op)
 	}
