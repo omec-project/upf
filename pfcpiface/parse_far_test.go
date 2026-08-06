@@ -85,7 +85,7 @@ func TestParseFAR(t *testing.T) {
 			op: updateOp,
 			input: ie.NewUpdateFAR(
 				ie.NewFARID(3),
-				ie.NewApplyAction(ActionBuffer | ActionNotify),
+				ie.NewApplyAction(ActionBuffer|ActionNotify),
 			),
 			expected: &far{
 				farID:       3,
