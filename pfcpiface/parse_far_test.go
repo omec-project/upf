@@ -66,6 +66,34 @@ func TestParseFAR(t *testing.T) {
 			},
 			description: "Valid Downlink FAR input with update operation",
 		},
+		{
+			// Regression: update FAR with ActionDrop must not require UpdateForwardingParameters.
+			op: updateOp,
+			input: ie.NewUpdateFAR(
+				ie.NewFARID(2),
+				ie.NewApplyAction(ActionDrop),
+			),
+			expected: &far{
+				farID:       2,
+				fseID:       FSEID,
+				applyAction: ActionDrop,
+			},
+			description: "Valid FAR update with ActionDrop, no forwarding parameters required",
+		},
+		{
+			// Regression: update FAR with ActionBuffer must not require UpdateForwardingParameters.
+			op: updateOp,
+			input: ie.NewUpdateFAR(
+				ie.NewFARID(3),
+				ie.NewApplyAction(ActionBuffer | ActionNotify),
+			),
+			expected: &far{
+				farID:       3,
+				fseID:       FSEID,
+				applyAction: ActionBuffer | ActionNotify,
+			},
+			description: "Valid FAR update with ActionBuffer, no forwarding parameters required",
+		},
 	} {
 		t.Run(scenario.description, func(t *testing.T) {
 			mockFar := &far{}
