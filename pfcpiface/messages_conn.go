@@ -12,6 +12,8 @@ import (
 	"github.com/wmnsk/go-pfcp/message"
 )
 
+const msgAssociationSetupResponseFrom = "association Setup Response from"
+
 var (
 	errFlowDescAbsent           = errors.New("flow description not present")
 	errDatapathDown             = errors.New("datapath down")
@@ -209,7 +211,7 @@ func (pConn *PFCPConn) handleAssociationSetupResponse(msg message.Message) error
 	}
 
 	if cause != ie.CauseRequestAccepted {
-		logger.PfcpLog.Errorln("association Setup Response from", addr,
+		logger.PfcpLog.Errorln(msgAssociationSetupResponseFrom, addr,
 			"with Cause:", cause)
 		return errReqRejected
 	}
@@ -236,12 +238,12 @@ func (pConn *PFCPConn) handleAssociationSetupResponse(msg message.Message) error
 
 	if pConn.ts.remote.IsZero() {
 		pConn.ts.remote = ts
-		logger.PfcpLog.Infoln("association Setup Response from", addr,
+		logger.PfcpLog.Infoln(msgAssociationSetupResponseFrom, addr,
 			"with recovery timestamp:", ts)
 	} else if ts.After(pConn.ts.remote) {
 		old := pConn.ts.remote
 		pConn.ts.remote = ts
-		logger.PfcpLog.Warnln("association Setup Response from", addr,
+		logger.PfcpLog.Warnln(msgAssociationSetupResponseFrom, addr,
 			"with newer recovery timestamp:", ts, "older:", old)
 	}
 
