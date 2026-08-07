@@ -12,12 +12,15 @@ from conf.route_control import (RouteController, RouteEntry,
                                 fetch_mac, mac_to_hex, mac_to_int,
                                 validate_ipv4)
 
-
+DEFAULT_MAC_ADDRESS  = "00:1a:2b:3c:4d:5e"
 class BessControllerMock(object):
     """Mock of BessController to avoid using BESS from pybess.bess"""
 
     def __init__(self):
         pass
+
+
+
 
     def _get_bess(self, *args, **kwargs) -> None:
         pass
@@ -53,7 +56,7 @@ class TestUtilityFunctions(unittest.TestCase):
         self.assertFalse(validate_ipv4(""))
 
     def test_given_valid_mac_when_mac_to_int_then_returns_int_representation(self):
-        self.assertEqual(mac_to_int("00:1a:2b:3c:4d:5e"), 112394521950)
+        self.assertEqual(mac_to_int(DEFAULT_MAC_ADDRESS), 112394521950)
 
     def test_given_invalid_mac_when_mac_to_int_then_raises_exception(self):
         with self.assertRaises(ValueError):
@@ -62,17 +65,17 @@ class TestUtilityFunctions(unittest.TestCase):
     def test_given_valid_mac_when_mac_to_hex_then_return_hex_string_representation(
         self,
     ):
-        self.assertEqual(mac_to_hex("00:1a:2b:3c:4d:5e"), "001A2B3C4D5E")
+        self.assertEqual(mac_to_hex(DEFAULT_MAC_ADDRESS), "001A2B3C4D5E")
 
     def test_given_known_destination_when_fetch_mac_then_returns_mac(self):
         ndb = Mock()
         kwargs = {
             "ifindex": 1,
             "dst": "192.168.1.1",
-            "lladdr": "00:1a:2b:3c:4d:5e"
+            "lladdr": DEFAULT_MAC_ADDRESS
         }
         ndb.neighbours.dump.return_value = [kwargs]
-        self.assertEqual(fetch_mac(ndb, "192.168.1.1"), "00:1a:2b:3c:4d:5e")
+        self.assertEqual(fetch_mac(ndb, "192.168.1.1"), DEFAULT_MAC_ADDRESS)
 
     def test_given_unknown_destination_when_fetch_mac_then_returns_none(self):
         ndb = Mock()
@@ -114,13 +117,13 @@ class TestRouteController(unittest.TestCase):
         kwargs = {
             "ifindex": 1,
             "dst": "192.168.1.1",
-            "lladdr": "00:1a:2b:3c:4d:5e"
+            "lladdr": DEFAULT_MAC_ADDRESS
         }
         self.ndb.neighbours.dump.return_value = [kwargs]
         mock_get_update_module_name.return_value = "merge_module"
         mock_get_route_module_name.return_value = "route_module"
         mock_get_merge_module_name.return_value = "update_module"
-        mock_fetch_mac.return_value = "00:1a:2b:3c:4d:5e"
+        mock_fetch_mac.return_value = DEFAULT_MAC_ADDRESS
         self.route_controller.add_new_route_entry(route_entry)
         return route_entry
 
@@ -239,7 +242,7 @@ class TestRouteController(unittest.TestCase):
         kwargs = {
             "ifindex": 1,
             "dst": "192.168.1.1",
-            "lladdr": "00:1a:2b:3c:4d:5e"
+            "lladdr": DEFAULT_MAC_ADDRESS
         }
         self.ndb.neighbours.dump.return_value = [kwargs]
         mock_routes = [{"event": "RTM_NEWROUTE"}, {"event": "OTHER_ACTION"}]
@@ -261,7 +264,7 @@ class TestRouteController(unittest.TestCase):
         kwargs = {
             "ifindex": 1,
             "dst": "1.2.3.4",
-            "lladdr": "00:1a:2b:3c:4d:5e"
+            "lladdr": DEFAULT_MAC_ADDRESS
         }
         self.ndb.neighbours.dump.return_value = [kwargs]
         mock_routes = [{"event": "RTM_NEWROUTE"}, {"event": "OTHER_ACTION"}]
@@ -463,13 +466,13 @@ class TestRouteController(unittest.TestCase):
         kwargs = {
             "ifindex": 1,
             "dst": "192.168.1.1",
-            "lladdr": "00:1a:2b:3c:4d:5e"
+            "lladdr": DEFAULT_MAC_ADDRESS
         }
         self.ndb.neighbours.dump.return_value = [kwargs]
         mock_netlink_msg = {
             "attrs": {
                 "NDA_DST": "1.2.3.4",
-                "NDA_LLADDR": "00:1a:2b:3c:4d:5e",
+                "NDA_LLADDR": DEFAULT_MAC_ADDRESS,
             }
         }
         mock_routes = [{"event": "RTM_NEWROUTE"}, {"event": "OTHER_ACTION"}]
