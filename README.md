@@ -40,8 +40,7 @@ The PFCP Agent implements datapath plugins that translate
     For more details, please see the ONFConnect 2019 [talk](https://www.youtube.com/watch?v=fqJGWcwcOxE)
     and demo videos [here](https://www.youtube.com/watch?v=KxK64jalKHw) and
     [here](https://youtu.be/rWnZuJeUWi4).
-    > Note: BESS source is included in this repository under `bess/` and is
-    > built into the `upf-bess` image by the root `Dockerfile`.
+    > Note: BESS source is included in this repository under `bess/`.
 
 PFCP Agent internally abstracts different datapaths using a common API, while
 the different plug-ins can use specific southbound protocols to communicate with
