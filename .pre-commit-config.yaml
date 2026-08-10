@@ -37,6 +37,8 @@ repos:
   rev: v6.0.0
   hooks:
   - id: end-of-file-fixer
+    # Packet fixtures intentionally preserve protocol-specific line endings.
+    exclude: ^bess/core/testdata/test-pktcaptures/
   - id: trailing-whitespace
     args:
     - --markdown-linebreak-ext=md
