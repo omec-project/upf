@@ -33,6 +33,9 @@ const (
 	ActionDrop    uint8 = 0x1
 	ActionBuffer  uint8 = 0x4
 	ActionNotify  uint8 = 0x8
+
+	localLoopbackAltIP = "127.0.0.8"
+	localhostIPIn      = "127.0.0.1"
 )
 
 type UEState uint8
@@ -187,7 +190,7 @@ func waitForPFCPAssociationSetup(pfcpClient *pfcpsim.PFCPClient) error {
 }
 
 func waitForBESSFakeToStart() error {
-	return waitForPortOpen("tcp", "127.0.0.1", "10514")
+	return waitForPortOpen("tcp", localhostIPIn, "10514")
 }
 
 func setup(t *testing.T, configType uint32) {
@@ -207,12 +210,12 @@ func setup(t *testing.T, configType uint32) {
 	}
 
 	upfConf := GetConfig(configType)
-	upfConf.N4Addr = "127.0.0.8"
+	upfConf.N4Addr = localLoopbackAltIP
 	pfcpAgent = pfcpiface.NewPFCPIface(upfConf)
 	go pfcpAgent.Run()
 
-	pfcpClient = pfcpsim.NewPFCPClient("127.0.0.1")
-	errConn := pfcpClient.ConnectN4("127.0.0.8")
+	pfcpClient = pfcpsim.NewPFCPClient(localhostIPIn)
+	errConn := pfcpClient.ConnectN4(localLoopbackAltIP)
 	if errConn != nil {
 		t.Fatalf("failed to connect to UPF: %v", errConn)
 	}
