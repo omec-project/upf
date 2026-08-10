@@ -8,12 +8,11 @@ Copyright 2022 Open Networking Foundation
 
 The BESS source used by UPF is part of this repository under `bess/`. Make BESS
 pipeline changes in that directory and submit them through the UPF review and
-CI process; do not clone BESS separately or build a standalone `bess_build`
-image.
+CI process.
 
-The root `Dockerfile` is the canonical BESS image build. It compiles the source
-in `bess/` and produces the `upf-bess` image; no local image substitution or
-`FROM` line change is required.
+The root `Dockerfile` compiles the source in `bess/` and produces the `upf-bess`
+image. It is no longer necessary to clone BESS separately and build a standalone
+`bess_build` image.
 
 Build both UPF images with the default architecture selection:
 
