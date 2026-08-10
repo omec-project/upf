@@ -189,7 +189,10 @@ artifact paths.
 
 ### Milestone 3: Protobuf and Dependency Consolidation
 
-Status: in progress. Completed substeps:
+Status: complete. Closeout validation passed `make pb`, `make py-pb`, the PTF
+image build, and the `upf-bess` Python/runtime smoke checks with the selected
+dependency set. The full two-host PTF/TRex traffic run remains deferred
+validation, not a milestone blocker. Completed substeps:
 
 - BESS protobuf exports are staged at `/protobuf` and copied to legacy
   destinations only where consumers require them.
@@ -198,10 +201,9 @@ Status: in progress. Completed substeps:
 - BESS runtime apt packages are installed from `bess/env/runtime-deps.yml`,
   while UPF-only packages remain explicit in the root Dockerfile.
 - Final-image Python runtime pins for `grpcio`, `protobuf`, and
-  `typing-extensions` match BESS's runtime lockfile. The resulting image was
-  previously validated with gRPC 1.81.1 and protobuf 7.35.1. The refreshed
-  BESS snapshot updates gRPC to 1.83.0, so this image validation must be
-  repeated.
+  `typing-extensions` match BESS's runtime lockfile. The refreshed BESS
+  snapshot's gRPC 1.83.0 and protobuf 7.35.1 runtime was validated during
+  milestone closeout.
 - The Python protobuf generator remains intentionally separate pending a
   dedicated generator-toolchain upgrade and validation.
 - PTF dependencies now use `/opt/ptf-venv`, removing global Python installs
@@ -234,6 +236,12 @@ Status: in progress. Completed substeps:
   Python imports work with the selected dependency set.
 
 ### Milestone 4: CI and Validation Integration
+
+Status: complete. PR #1 CI run `30931083624` passed the UPF and PTF image
+builds, existing UPF tests, the path-filtered BESS source build and tests, and
+all four BESS clang-format scopes. The root Dockerfile remains covered by
+Hadolint; the duplicate standalone BESS Dockerfile is intentionally deferred
+to the Milestone 5 retirement work.
 
 - Bring BESS source-build checks into UPF CI: BESS C++ build, `core/all_test`,
   Python unittest discovery, module tests, clang-format, and Dockerfile linting.
