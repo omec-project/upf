@@ -57,6 +57,7 @@ http
 https
 hugepages
 HugePages
+Hadolint
 HW
 HVM
 ifaces
