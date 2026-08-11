@@ -151,13 +151,20 @@ func (f *far) parseFARBasicFields(farIE *ie.IE, op operation) ([]*ie.IE, error) 
 	case create:
 		if (f.applyAction & ActionForward) != 0 {
 			fwdIEs, err = farIE.ForwardingParameters()
+			if err != nil {
+				return nil, err
+			}
 		}
 	case update:
 		if (f.applyAction & ActionForward) != 0 {
 			fwdIEs, err = farIE.UpdateForwardingParameters()
+			if err != nil {
+				return nil, err
+			}
 		}
 	default:
 		return nil, ErrInvalidOperation(op)
 	}
+
 	return fwdIEs, nil
 }
