@@ -253,7 +253,10 @@ func (pConn *PFCPConn) Serve() {
 	}(connTimeout)
 
 	// TODO: Sender goroutine
+	pConn.waitForShutdown(connTimeout)
+}
 
+func (pConn *PFCPConn) waitForShutdown(connTimeout chan struct{}) {
 	for {
 		select {
 		case <-connTimeout:
