@@ -119,7 +119,8 @@ func (pr portRange) asComplexTernaryMatches(strategy RangeConversionStrategy) ([
 		return rules, nil
 	}
 
-	if strategy == Exact {
+	switch strategy {
+	case Exact:
 		if pr.Width() > 100 {
 			return nil, ErrInvalidArgumentWithReason("asComplexTernaryMatches", pr,
 				"port range too wide for exact match strategy")
@@ -128,10 +129,10 @@ func (pr portRange) asComplexTernaryMatches(strategy RangeConversionStrategy) ([
 		for port := int(pr.low); port <= int(pr.high); port++ {
 			rules = append(rules, portRangeTernaryRule{uint16(port), math.MaxUint16})
 		}
-	} else if strategy == Ternary {
+	case Ternary:
 		// Adapted from https://stackoverflow.com/a/66959276
 		return pr.buildTernaryRules(), nil
-	} else {
+	default:
 		return nil, ErrInvalidArgument("asComplexTernaryMatches", strategy)
 	}
 
