@@ -11,6 +11,8 @@ import (
 	"google.golang.org/grpc"
 )
 
+const msgUnexpectedMessageType = "unexpected message type"
+
 type FakeBESS struct {
 	grpcServer *grpc.Server
 	service    *fakeBessService
@@ -55,7 +57,7 @@ func (b *FakeBESS) GetPdrTableEntries() (entries map[uint32][]FakePdr) {
 	for _, m := range msgs {
 		e, ok := m.(*bess_pb.WildcardMatchCommandAddArg)
 		if !ok {
-			panic("unexpected message type")
+			panic(msgUnexpectedMessageType)
 		}
 		pdr := UnmarshalPdr(e)
 		entries[pdr.PdrID] = append(entries[pdr.PdrID], pdr)
@@ -70,7 +72,7 @@ func (b *FakeBESS) GetFarTableEntries() (entries map[uint32]FakeFar) {
 	for _, m := range msgs {
 		e, ok := m.(*bess_pb.ExactMatchCommandAddArg)
 		if !ok {
-			panic("unexpected message type")
+			panic(msgUnexpectedMessageType)
 		}
 		far := UnmarshalFar(e)
 		entries[far.FarID] = far
@@ -84,7 +86,7 @@ func (b *FakeBESS) GetSessionQerTableEntries() (entries []FakeQer) {
 	for _, m := range msgs {
 		e, ok := m.(*bess_pb.QosCommandAddArg)
 		if !ok {
-			panic("unexpected message type")
+			panic(msgUnexpectedMessageType)
 		}
 		entries = append(entries, UnmarshalSessionQer(e))
 	}
@@ -96,7 +98,7 @@ func (b *FakeBESS) GetAppQerTableEntries() (entries []FakeQer) {
 	for _, m := range msgs {
 		e, ok := m.(*bess_pb.QosCommandAddArg)
 		if !ok {
-			panic("unexpected message type")
+			panic(msgUnexpectedMessageType)
 		}
 		entries = append(entries, UnmarshalAppQer(e))
 	}
