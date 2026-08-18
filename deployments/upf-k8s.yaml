@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2019 Intel Corporation
 # Copyright 2020 Open Networking Foundation
----
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
@@ -9,18 +8,7 @@ metadata:
   annotations:
     k8s.v1.cni.cncf.io/resourceName: intel.com/sriov_vfio_access_net
 spec:
-  config: '{
-    "cniVersion": "0.3.1",
-    "type": "vfioveth",
-    "name": "access-net",
-    "ipam": {
-        "type": "host-local",
-        "subnet": "198.18.0.0/24",
-        "rangeStart": "198.18.0.2",
-        "rangeEnd": "198.18.0.250",
-        "gateway": "198.18.0.1"
-    }
-}'
+  config: '{ "cniVersion": "0.3.1", "type": "vfioveth", "name": "access-net", "ipam": { "type": "host-local", "subnet": "198.18.0.0/24", "rangeStart": "198.18.0.2", "rangeEnd": "198.18.0.250", "gateway": "198.18.0.1" } }'
 ---
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
@@ -29,18 +17,7 @@ metadata:
   annotations:
     k8s.v1.cni.cncf.io/resourceName: intel.com/sriov_vfio_core_net
 spec:
-  config: '{
-    "cniVersion": "0.3.1",
-    "type": "vfioveth",
-    "name": "core-net",
-    "ipam": {
-        "type": "host-local",
-        "subnet": "198.19.0.0/24",
-        "rangeStart": "198.19.0.2",
-        "rangeEnd": "198.19.0.250",
-        "gateway": "198.19.0.1"
-    }
-}'
+  config: '{ "cniVersion": "0.3.1", "type": "vfioveth", "name": "core-net", "ipam": { "type": "host-local", "subnet": "198.19.0.0/24", "rangeStart": "198.19.0.2", "rangeEnd": "198.19.0.250", "gateway": "198.19.0.1" } }'
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -69,34 +46,29 @@ metadata:
   labels:
     app: upf
   annotations:
-      prometheus.io/scrape: "true"
-      prometheus.io/port: "8080"
-      k8s.v1.cni.cncf.io/networks: '[
-            { "name": "access-net", "interface": "access" },
-            { "name": "core-net", "interface": "core" }
-    ]'
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    k8s.v1.cni.cncf.io/networks: '[ { "name": "access-net", "interface": "access" }, { "name": "core-net", "interface": "core" } ]'
 spec:
   shareProcessNamespace: true
   initContainers:
-  # Currently CNI doesn't allow metric we're doing it here instead of net-attach-def
-  - name: routes
-    image: omecproject/upf-bess:rel-2.4.0
-    env:
-    - name: ENB_GNB_SUBNET
-      value: '11.1.1.128/25'
-    - name: S1U_N3_GATEWAY
-      value: '198.18.0.1'
-    - name: SGI_N6_GATEWAY
-      value: '198.19.0.1'
-    command: ["sh", "-xec"]
-    args:
-    - ip route add $ENB_GNB_SUBNET via $S1U_N3_GATEWAY;
-      ip route add default via $SGI_N6_GATEWAY metric 110;
-    securityContext:
-      capabilities:
-        add:
-          - NET_ADMIN
-
+    # Currently CNI doesn't allow metric we're doing it here instead of net-attach-def
+    - name: routes
+      image: omecproject/upf-bess:rel-2.4.0
+      env:
+        - name: ENB_GNB_SUBNET
+          value: '11.1.1.128/25'
+        - name: S1U_N3_GATEWAY
+          value: '198.18.0.1'
+        - name: SGI_N6_GATEWAY
+          value: '198.19.0.1'
+      command: ["sh", "-xec"]
+      args:
+        - ip route add $ENB_GNB_SUBNET via $S1U_N3_GATEWAY; ip route add default via $SGI_N6_GATEWAY metric 110;
+      securityContext:
+        capabilities:
+          add:
+            - NET_ADMIN
   # Reqd. if working with AF_PACKET so that kernel does not reply to GTP-U packets
   #- name: iptables
   #  image: omecproject/upf-bess:rel-2.4.0
@@ -108,86 +80,86 @@ spec:
   #      add:
   #        - NET_ADMIN
   containers:
-  - name: routectl
-    image: omecproject/upf-bess:rel-2.4.0
-    command: ["/opt/bess/bessctl/conf/route_control.py"]
-    args:
-    - -i
-    - access
-    - core
-    env:
-    - name: PYTHONUNBUFFERED
-      value: "1"
-    resources:
-      limits:
-        cpu: 256m
-        memory: 128Mi
-  - name: bessd
-    image: omecproject/upf-bess:rel-2.4.0
-    stdin: true
-    tty: true
-    args:
-    - -grpc-url=0.0.0.0:10514
-    env:
-    - name: CONF_FILE
-      value: /conf/upf.jsonc
-    livenessProbe:
-      tcpSocket:
-        port: 10514
-      initialDelaySeconds: 30
-      periodSeconds: 20
-    lifecycle:
-      postStart:
-        exec:
-          command: ["sh", "-c", "until ss | grep -q 10514; do sleep 5; echo waiting for bessd; done; ./bessctl run up4;"]
-    securityContext:
-      capabilities:
-        add:
-        - IPC_LOCK # AF_PACKET vdev (and 4K pages) uses mmap
-    resources:
-      limits:
-        hugepages-1Gi: 2Gi
-        cpu: 2
-        memory: 256Mi
-        intel.com/sriov_vfio_access_net: '1'
-        intel.com/sriov_vfio_core_net: '1'
-    volumeMounts:
-    - name: upf-conf
-      mountPath: /conf
-    - name: hugepages
-      mountPath: /dev/hugepages
-  - name: web
-    image: omecproject/upf-bess:rel-2.4.0
-    command: ["bessctl"]
-    args:
-    - http
-    - 0.0.0.0
-    - '8000'
-    resources:
-      limits:
-        cpu: 256m
-        memory: 128Mi
-  - name: pfcpiface
-    image: omecproject/upf-pfcp:rel-2.4.0
-    command: ["pfcpiface"]
-    args:
-    - -config
-    - /conf/upf.jsonc
-    volumeMounts:
-    - name: upf-conf
-      mountPath: /conf
-    ports:
-    - name: http
-      containerPort: 8080
-      protocol: TCP
-    resources:
-      limits:
-        cpu: 256m
-        memory: 128Mi
+    - name: routectl
+      image: omecproject/upf-bess:rel-2.4.0
+      command: ["/opt/bess/bessctl/conf/route_control.py"]
+      args:
+        - -i
+        - access
+        - core
+      env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+      resources:
+        limits:
+          cpu: 256m
+          memory: 128Mi
+    - name: bessd
+      image: omecproject/upf-bess:rel-2.4.0
+      stdin: true
+      tty: true
+      args:
+        - -grpc-url=0.0.0.0:10514
+      env:
+        - name: CONF_FILE
+          value: /conf/upf.jsonc
+      livenessProbe:
+        tcpSocket:
+          port: 10514
+        initialDelaySeconds: 30
+        periodSeconds: 20
+      lifecycle:
+        postStart:
+          exec:
+            command: ["sh", "-c", "until ss | grep -q 10514; do sleep 5; echo waiting for bessd; done; ./bessctl run up4;"]
+      securityContext:
+        capabilities:
+          add:
+            - IPC_LOCK # AF_PACKET vdev (and 4K pages) uses mmap
+      resources:
+        limits:
+          hugepages-1Gi: 2Gi
+          cpu: 2
+          memory: 256Mi
+          intel.com/sriov_vfio_access_net: '1'
+          intel.com/sriov_vfio_core_net: '1'
+      volumeMounts:
+        - name: upf-conf
+          mountPath: /conf
+        - name: hugepages
+          mountPath: /dev/hugepages
+    - name: web
+      image: omecproject/upf-bess:rel-2.4.0
+      command: ["bessctl"]
+      args:
+        - http
+        - 0.0.0.0
+        - '8000'
+      resources:
+        limits:
+          cpu: 256m
+          memory: 128Mi
+    - name: pfcpiface
+      image: omecproject/upf-pfcp:rel-2.4.0
+      command: ["pfcpiface"]
+      args:
+        - -config
+        - /conf/upf.jsonc
+      volumeMounts:
+        - name: upf-conf
+          mountPath: /conf
+      ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+      resources:
+        limits:
+          cpu: 256m
+          memory: 128Mi
   volumes:
-  - name: upf-conf
-    configMap:
-      name: upf-conf
-  - name: hugepages
-    emptyDir:
-      medium: HugePages
+    - name: upf-conf
+      configMap:
+        name: upf-conf
+    - name: hugepages
+      emptyDir:
+        medium: HugePages

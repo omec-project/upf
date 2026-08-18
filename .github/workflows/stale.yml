@@ -4,12 +4,10 @@
 on:
   schedule:
     - cron: "0 0 * * *"
-
 permissions:
   issues: write
   pull-requests: write
   contents: read
-
 jobs:
   stale:
     permissions:
