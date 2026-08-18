@@ -158,7 +158,7 @@ func (node *PFCPNode) Stop() {
 
 	if err := node.metrics.Stop(); err != nil {
 		// TODO: propagate error upwards
-		logger.PfcpLog.Errorln(err)
+		logger.PfcpLog.Errorf("failed to stop metrics: %v", err)
 	}
 }
 

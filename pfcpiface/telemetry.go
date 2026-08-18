@@ -167,7 +167,7 @@ func (col PfcpNodeCollector) Collect(ch chan<- prometheus.Metric) {
 	if col.node.upf.enableFlowMeasure {
 		err := col.node.upf.SessionStats(&col, ch)
 		if err != nil {
-			logger.PfcpLog.Errorln(err)
+			logger.PfcpLog.Errorf("failed to collect session stats: %v", err)
 			return
 		}
 	}
