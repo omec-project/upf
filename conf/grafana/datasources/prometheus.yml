@@ -1,16 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2020 Intel Corporation
----
 apiVersion: 1
-
 deleteDatasources:
   - name: Prometheus
     orgId: 1
-
 datasources:
-- name: Prometheus
-  type: prometheus
-  orgId: 1
-  url: http://localhost:9090
-  version: 1
-  editable: true
+  - name: Prometheus
+    type: prometheus
+    orgId: 1
+    url: http://localhost:9090
+    version: 1
+    editable: true
