@@ -196,13 +196,13 @@ func setupPeersAndInterfaces(u *upf, conf *Conf) bool {
 
 	u.accessIP, err = GetUnicastAddressFromInterface(conf.AccessIface.IfName)
 	if err != nil {
-		logger.PfcpLog.Errorln(err)
+		logger.PfcpLog.Errorf("failed to get unicast address for access interface %q: %v", conf.AccessIface.IfName, err)
 		return false
 	}
 
 	u.coreIP, err = GetUnicastAddressFromInterface(conf.CoreIface.IfName)
 	if err != nil {
-		logger.PfcpLog.Errorln(err)
+		logger.PfcpLog.Errorf("failed to get unicast address for core interface %q: %v", conf.CoreIface.IfName, err)
 		return false
 	}
 	return true
@@ -212,14 +212,14 @@ func initTimersAndIPPool(u *upf, conf *Conf) {
 	var err error
 	u.respTimeout, err = time.ParseDuration(conf.RespTimeout)
 	if err != nil {
-		logger.PfcpLog.Fatalln("unable to parse resp_timeout")
+		logger.PfcpLog.Fatalf("unable to parse resp_timeout %q: %v", conf.RespTimeout, err)
 	}
 
 	if u.enableHBTimer {
 		if conf.HeartBeatInterval != "" {
 			u.hbInterval, err = time.ParseDuration(conf.HeartBeatInterval)
 			if err != nil {
-				logger.PfcpLog.Fatalln("unable to parse heart_beat_interval")
+				logger.PfcpLog.Fatalf("unable to parse heart_beat_interval %q: %v", conf.HeartBeatInterval, err)
 			}
 		}
 	}
@@ -227,7 +227,7 @@ func initTimersAndIPPool(u *upf, conf *Conf) {
 	if u.enableUeIPAlloc {
 		u.ippool, err = NewIPPool(u.ippoolCidr)
 		if err != nil {
-			logger.PfcpLog.Fatalln("ip pool init failed", err)
+			logger.PfcpLog.Fatalf("ip pool init failed for CIDR %q: %v", u.ippoolCidr, err)
 		}
 	}
 }
