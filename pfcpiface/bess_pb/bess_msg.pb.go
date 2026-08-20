@@ -79,6 +79,7 @@ func (x *EmptyRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*EmptyRequest) ProtoMessage() {}
 
 func (x *EmptyRequest) ProtoReflect() protoreflect.Message {
@@ -118,6 +119,7 @@ func (x *EmptyResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*EmptyResponse) ProtoMessage() {}
 
 func (x *EmptyResponse) ProtoReflect() protoreflect.Message {
@@ -163,6 +165,7 @@ func (x *VersionResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*VersionResponse) ProtoMessage() {}
 
 func (x *VersionResponse) ProtoReflect() protoreflect.Message {
@@ -214,6 +217,7 @@ func (x *ImportPluginRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*ImportPluginRequest) ProtoMessage() {}
 
 func (x *ImportPluginRequest) ProtoReflect() protoreflect.Message {
@@ -258,6 +262,7 @@ func (x *UnloadPluginRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*UnloadPluginRequest) ProtoMessage() {}
 
 func (x *UnloadPluginRequest) ProtoReflect() protoreflect.Message {
@@ -303,6 +308,7 @@ func (x *ListPluginsResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*ListPluginsResponse) ProtoMessage() {}
 
 func (x *ListPluginsResponse) ProtoReflect() protoreflect.Message {
@@ -355,6 +361,7 @@ func (x *ListWorkersResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*ListWorkersResponse) ProtoMessage() {}
 
 func (x *ListWorkersResponse) ProtoReflect() protoreflect.Message {
@@ -408,6 +415,7 @@ func (x *AddWorkerRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*AddWorkerRequest) ProtoMessage() {}
 
 func (x *AddWorkerRequest) ProtoReflect() protoreflect.Message {
@@ -466,6 +474,7 @@ func (x *DestroyWorkerRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*DestroyWorkerRequest) ProtoMessage() {}
 
 func (x *DestroyWorkerRequest) ProtoReflect() protoreflect.Message {
@@ -534,6 +543,7 @@ func (x *TrafficClass) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*TrafficClass) ProtoMessage() {}
 
 func (x *TrafficClass) ProtoReflect() protoreflect.Message {
@@ -667,8 +677,10 @@ type TrafficClass_Share struct {
 	Share int64 `protobuf:"varint,7,opt,name=share,proto3,oneof"`
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*TrafficClass_Priority) isTrafficClass_Arg() {}
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*TrafficClass_Share) isTrafficClass_Arg() {}
 
 type ListTcsRequest struct {
@@ -691,6 +703,7 @@ func (x *ListTcsRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*ListTcsRequest) ProtoMessage() {}
 
 func (x *ListTcsRequest) ProtoReflect() protoreflect.Message {
@@ -736,6 +749,7 @@ func (x *ListTcsResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*ListTcsResponse) ProtoMessage() {}
 
 func (x *ListTcsResponse) ProtoReflect() protoreflect.Message {
@@ -790,6 +804,7 @@ func (x *CheckSchedulingConstraintsResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*CheckSchedulingConstraintsResponse) ProtoMessage() {}
 
 func (x *CheckSchedulingConstraintsResponse) ProtoReflect() protoreflect.Message {
@@ -855,6 +870,7 @@ func (x *AddTcRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*AddTcRequest) ProtoMessage() {}
 
 func (x *AddTcRequest) ProtoReflect() protoreflect.Message {
@@ -899,6 +915,7 @@ func (x *UpdateTcParamsRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*UpdateTcParamsRequest) ProtoMessage() {}
 
 func (x *UpdateTcParamsRequest) ProtoReflect() protoreflect.Message {
@@ -943,6 +960,7 @@ func (x *UpdateTcParentRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*UpdateTcParentRequest) ProtoMessage() {}
 
 func (x *UpdateTcParentRequest) ProtoReflect() protoreflect.Message {
@@ -987,6 +1005,7 @@ func (x *GetTcStatsRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GetTcStatsRequest) ProtoMessage() {}
 
 func (x *GetTcStatsRequest) ProtoReflect() protoreflect.Message {
@@ -1038,6 +1057,7 @@ func (x *GetTcStatsResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GetTcStatsResponse) ProtoMessage() {}
 
 func (x *GetTcStatsResponse) ProtoReflect() protoreflect.Message {
@@ -1118,6 +1138,7 @@ func (x *ListDriversResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*ListDriversResponse) ProtoMessage() {}
 
 func (x *ListDriversResponse) ProtoReflect() protoreflect.Message {
@@ -1169,6 +1190,7 @@ func (x *GetDriverInfoRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GetDriverInfoRequest) ProtoMessage() {}
 
 func (x *GetDriverInfoRequest) ProtoReflect() protoreflect.Message {
@@ -1216,6 +1238,7 @@ func (x *GetDriverInfoResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GetDriverInfoResponse) ProtoMessage() {}
 
 func (x *GetDriverInfoResponse) ProtoReflect() protoreflect.Message {
@@ -1282,6 +1305,7 @@ func (x *ListPortsResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*ListPortsResponse) ProtoMessage() {}
 
 func (x *ListPortsResponse) ProtoReflect() protoreflect.Message {
@@ -1350,6 +1374,7 @@ func (x *CreatePortRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*CreatePortRequest) ProtoMessage() {}
 
 func (x *CreatePortRequest) ProtoReflect() protoreflect.Message {
@@ -1444,6 +1469,7 @@ func (x *PortConf) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*PortConf) ProtoMessage() {}
 
 func (x *PortConf) ProtoReflect() protoreflect.Message {
@@ -1503,6 +1529,7 @@ func (x *SetPortConfRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*SetPortConfRequest) ProtoMessage() {}
 
 func (x *SetPortConfRequest) ProtoReflect() protoreflect.Message {
@@ -1554,6 +1581,7 @@ func (x *GetPortConfRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GetPortConfRequest) ProtoMessage() {}
 
 func (x *GetPortConfRequest) ProtoReflect() protoreflect.Message {
@@ -1599,6 +1627,7 @@ func (x *GetPortConfResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GetPortConfResponse) ProtoMessage() {}
 
 func (x *GetPortConfResponse) ProtoReflect() protoreflect.Message {
@@ -1652,6 +1681,7 @@ func (x *CreatePortResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*CreatePortResponse) ProtoMessage() {}
 
 func (x *CreatePortResponse) ProtoReflect() protoreflect.Message {
@@ -1710,6 +1740,7 @@ func (x *DestroyPortRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*DestroyPortRequest) ProtoMessage() {}
 
 func (x *DestroyPortRequest) ProtoReflect() protoreflect.Message {
@@ -1754,6 +1785,7 @@ func (x *GetPortStatsRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GetPortStatsRequest) ProtoMessage() {}
 
 func (x *GetPortStatsRequest) ProtoReflect() protoreflect.Message {
@@ -1801,6 +1833,7 @@ func (x *GetPortStatsResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GetPortStatsResponse) ProtoMessage() {}
 
 func (x *GetPortStatsResponse) ProtoReflect() protoreflect.Message {
@@ -1866,6 +1899,7 @@ func (x *GetLinkStatusRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GetLinkStatusRequest) ProtoMessage() {}
 
 func (x *GetLinkStatusRequest) ProtoReflect() protoreflect.Message {
@@ -1914,6 +1948,7 @@ func (x *GetLinkStatusResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GetLinkStatusResponse) ProtoMessage() {}
 
 func (x *GetLinkStatusResponse) ProtoReflect() protoreflect.Message {
@@ -1987,6 +2022,7 @@ func (x *ListMclassResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*ListMclassResponse) ProtoMessage() {}
 
 func (x *ListMclassResponse) ProtoReflect() protoreflect.Message {
@@ -2038,6 +2074,7 @@ func (x *GetMclassInfoRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GetMclassInfoRequest) ProtoMessage() {}
 
 func (x *GetMclassInfoRequest) ProtoReflect() protoreflect.Message {
@@ -2086,6 +2123,7 @@ func (x *GetMclassInfoResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GetMclassInfoResponse) ProtoMessage() {}
 
 func (x *GetMclassInfoResponse) ProtoReflect() protoreflect.Message {
@@ -2159,6 +2197,7 @@ func (x *ListModulesResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*ListModulesResponse) ProtoMessage() {}
 
 func (x *ListModulesResponse) ProtoReflect() protoreflect.Message {
@@ -2218,6 +2257,7 @@ func (x *CreateModuleRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*CreateModuleRequest) ProtoMessage() {}
 
 func (x *CreateModuleRequest) ProtoReflect() protoreflect.Message {
@@ -2277,6 +2317,7 @@ func (x *CreateModuleResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*CreateModuleResponse) ProtoMessage() {}
 
 func (x *CreateModuleResponse) ProtoReflect() protoreflect.Message {
@@ -2328,6 +2369,7 @@ func (x *DestroyModuleRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*DestroyModuleRequest) ProtoMessage() {}
 
 func (x *DestroyModuleRequest) ProtoReflect() protoreflect.Message {
@@ -2372,6 +2414,7 @@ func (x *GetModuleInfoRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GetModuleInfoRequest) ProtoMessage() {}
 
 func (x *GetModuleInfoRequest) ProtoReflect() protoreflect.Message {
@@ -2423,6 +2466,7 @@ func (x *GetModuleInfoResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GetModuleInfoResponse) ProtoMessage() {}
 
 func (x *GetModuleInfoResponse) ProtoReflect() protoreflect.Message {
@@ -2522,6 +2566,7 @@ func (x *ConnectModulesRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*ConnectModulesRequest) ProtoMessage() {}
 
 func (x *ConnectModulesRequest) ProtoReflect() protoreflect.Message {
@@ -2595,6 +2640,7 @@ func (x *DisconnectModulesRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*DisconnectModulesRequest) ProtoMessage() {}
 
 func (x *DisconnectModulesRequest) ProtoReflect() protoreflect.Message {
@@ -2656,6 +2702,7 @@ func (x *MempoolDump) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*MempoolDump) ProtoMessage() {}
 
 func (x *MempoolDump) ProtoReflect() protoreflect.Message {
@@ -2770,6 +2817,7 @@ func (x *DumpMempoolRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*DumpMempoolRequest) ProtoMessage() {}
 
 func (x *DumpMempoolRequest) ProtoReflect() protoreflect.Message {
@@ -2815,6 +2863,7 @@ func (x *DumpMempoolResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*DumpMempoolResponse) ProtoMessage() {}
 
 func (x *DumpMempoolResponse) ProtoReflect() protoreflect.Message {
@@ -2868,6 +2917,7 @@ func (x *CommandRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*CommandRequest) ProtoMessage() {}
 
 func (x *CommandRequest) ProtoReflect() protoreflect.Message {
@@ -2927,6 +2977,7 @@ func (x *CommandResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*CommandResponse) ProtoMessage() {}
 
 func (x *CommandResponse) ProtoReflect() protoreflect.Message {
@@ -2979,6 +3030,7 @@ func (x *ListGateHookClassResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*ListGateHookClassResponse) ProtoMessage() {}
 
 func (x *ListGateHookClassResponse) ProtoReflect() protoreflect.Message {
@@ -3030,6 +3082,7 @@ func (x *GetGateHookClassInfoRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GetGateHookClassInfoRequest) ProtoMessage() {}
 
 func (x *GetGateHookClassInfoRequest) ProtoReflect() protoreflect.Message {
@@ -3078,6 +3131,7 @@ func (x *GetGateHookClassInfoResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GetGateHookClassInfoResponse) ProtoMessage() {}
 
 func (x *GetGateHookClassInfoResponse) ProtoReflect() protoreflect.Message {
@@ -3157,6 +3211,7 @@ func (x *TrackArg) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*TrackArg) ProtoMessage() {}
 
 func (x *TrackArg) ProtoReflect() protoreflect.Message {
@@ -3211,6 +3266,7 @@ func (x *TcpdumpArg) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*TcpdumpArg) ProtoMessage() {}
 
 func (x *TcpdumpArg) ProtoReflect() protoreflect.Message {
@@ -3281,6 +3337,7 @@ func (x *PcapngArg) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*PcapngArg) ProtoMessage() {}
 
 func (x *PcapngArg) ProtoReflect() protoreflect.Message {
@@ -3347,6 +3404,7 @@ func (x *GateHookInfo) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GateHookInfo) ProtoMessage() {}
 
 func (x *GateHookInfo) ProtoReflect() protoreflect.Message {
@@ -3431,8 +3489,10 @@ type GateHookInfo_Ogate struct {
 	Ogate int64 `protobuf:"varint,5,opt,name=ogate,proto3,oneof"` /// Output gate index. All output gates if -1
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GateHookInfo_Igate) isGateHookInfo_Gate() {}
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GateHookInfo_Ogate) isGateHookInfo_Gate() {}
 
 type ConfigureGateHookRequest struct {
@@ -3454,6 +3514,7 @@ func (x *ConfigureGateHookRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*ConfigureGateHookRequest) ProtoMessage() {}
 
 func (x *ConfigureGateHookRequest) ProtoReflect() protoreflect.Message {
@@ -3506,6 +3567,7 @@ func (x *ConfigureGateHookResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*ConfigureGateHookResponse) ProtoMessage() {}
 
 func (x *ConfigureGateHookResponse) ProtoReflect() protoreflect.Message {
@@ -3558,6 +3620,7 @@ func (x *ListGateHooksResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*ListGateHooksResponse) ProtoMessage() {}
 
 func (x *ListGateHooksResponse) ProtoReflect() protoreflect.Message {
@@ -3610,6 +3673,7 @@ func (x *GateHookCommandRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GateHookCommandRequest) ProtoMessage() {}
 
 func (x *GateHookCommandRequest) ProtoReflect() protoreflect.Message {
@@ -3664,6 +3728,7 @@ func (x *ConfigureResumeHookRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*ConfigureResumeHookRequest) ProtoMessage() {}
 
 func (x *ConfigureResumeHookRequest) ProtoReflect() protoreflect.Message {
@@ -3722,6 +3787,7 @@ func (x *PauseWorkerRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*PauseWorkerRequest) ProtoMessage() {}
 
 func (x *PauseWorkerRequest) ProtoReflect() protoreflect.Message {
@@ -3766,6 +3832,7 @@ func (x *ResumeWorkerRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*ResumeWorkerRequest) ProtoMessage() {}
 
 func (x *ResumeWorkerRequest) ProtoReflect() protoreflect.Message {
@@ -3818,6 +3885,7 @@ func (x *ListWorkersResponse_WorkerStatus) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*ListWorkersResponse_WorkerStatus) ProtoMessage() {}
 
 func (x *ListWorkersResponse_WorkerStatus) ProtoReflect() protoreflect.Message {
@@ -3891,6 +3959,7 @@ func (x *ListTcsResponse_TrafficClassStatus) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*ListTcsResponse_TrafficClassStatus) ProtoMessage() {}
 
 func (x *ListTcsResponse_TrafficClassStatus) ProtoReflect() protoreflect.Message {
@@ -3945,6 +4014,7 @@ func (x *CheckSchedulingConstraintsResponse_ViolatingClass) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*CheckSchedulingConstraintsResponse_ViolatingClass) ProtoMessage() {}
 
 func (x *CheckSchedulingConstraintsResponse_ViolatingClass) ProtoReflect() protoreflect.Message {
@@ -4010,6 +4080,7 @@ func (x *CheckSchedulingConstraintsResponse_ViolatingModule) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*CheckSchedulingConstraintsResponse_ViolatingModule) ProtoMessage() {}
 
 func (x *CheckSchedulingConstraintsResponse_ViolatingModule) ProtoReflect() protoreflect.Message {
@@ -4067,6 +4138,7 @@ func (x *ListPortsResponse_Port) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*ListPortsResponse_Port) ProtoMessage() {}
 
 func (x *ListPortsResponse_Port) ProtoReflect() protoreflect.Message {
@@ -4179,6 +4251,7 @@ func (x *GetPortStatsResponse_Stat) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GetPortStatsResponse_Stat) ProtoMessage() {}
 
 func (x *GetPortStatsResponse_Stat) ProtoReflect() protoreflect.Message {
@@ -4260,6 +4333,7 @@ func (x *ListModulesResponse_Module) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*ListModulesResponse_Module) ProtoMessage() {}
 
 func (x *ListModulesResponse_Module) ProtoReflect() protoreflect.Message {
@@ -4319,6 +4393,7 @@ func (x *GetModuleInfoResponse_GateHook) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GetModuleInfoResponse_GateHook) ProtoMessage() {}
 
 func (x *GetModuleInfoResponse_GateHook) ProtoReflect() protoreflect.Message {
@@ -4376,6 +4451,7 @@ func (x *GetModuleInfoResponse_IGate) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GetModuleInfoResponse_IGate) ProtoMessage() {}
 
 func (x *GetModuleInfoResponse_IGate) ProtoReflect() protoreflect.Message {
@@ -4469,6 +4545,7 @@ func (x *GetModuleInfoResponse_OGate) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GetModuleInfoResponse_OGate) ProtoMessage() {}
 
 func (x *GetModuleInfoResponse_OGate) ProtoReflect() protoreflect.Message {
@@ -4565,6 +4642,7 @@ func (x *GetModuleInfoResponse_Attribute) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GetModuleInfoResponse_Attribute) ProtoMessage() {}
 
 func (x *GetModuleInfoResponse_Attribute) ProtoReflect() protoreflect.Message {
@@ -4631,6 +4709,7 @@ func (x *GetModuleInfoResponse_IGate_OGate) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*GetModuleInfoResponse_IGate_OGate) ProtoMessage() {}
 
 func (x *GetModuleInfoResponse_IGate_OGate) ProtoReflect() protoreflect.Message {
@@ -5004,88 +5083,90 @@ func file_bess_msg_proto_rawDescGZIP() []byte {
 	return file_bess_msg_proto_rawDescData
 }
 
-var file_bess_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 77)
-var file_bess_msg_proto_goTypes = []any{
-	(*EmptyRequest)(nil),                                       // 0: bess.pb.EmptyRequest
-	(*EmptyResponse)(nil),                                      // 1: bess.pb.EmptyResponse
-	(*VersionResponse)(nil),                                    // 2: bess.pb.VersionResponse
-	(*ImportPluginRequest)(nil),                                // 3: bess.pb.ImportPluginRequest
-	(*UnloadPluginRequest)(nil),                                // 4: bess.pb.UnloadPluginRequest
-	(*ListPluginsResponse)(nil),                                // 5: bess.pb.ListPluginsResponse
-	(*ListWorkersResponse)(nil),                                // 6: bess.pb.ListWorkersResponse
-	(*AddWorkerRequest)(nil),                                   // 7: bess.pb.AddWorkerRequest
-	(*DestroyWorkerRequest)(nil),                               // 8: bess.pb.DestroyWorkerRequest
-	(*TrafficClass)(nil),                                       // 9: bess.pb.TrafficClass
-	(*ListTcsRequest)(nil),                                     // 10: bess.pb.ListTcsRequest
-	(*ListTcsResponse)(nil),                                    // 11: bess.pb.ListTcsResponse
-	(*CheckSchedulingConstraintsResponse)(nil),                 // 12: bess.pb.CheckSchedulingConstraintsResponse
-	(*AddTcRequest)(nil),                                       // 13: bess.pb.AddTcRequest
-	(*UpdateTcParamsRequest)(nil),                              // 14: bess.pb.UpdateTcParamsRequest
-	(*UpdateTcParentRequest)(nil),                              // 15: bess.pb.UpdateTcParentRequest
-	(*GetTcStatsRequest)(nil),                                  // 16: bess.pb.GetTcStatsRequest
-	(*GetTcStatsResponse)(nil),                                 // 17: bess.pb.GetTcStatsResponse
-	(*ListDriversResponse)(nil),                                // 18: bess.pb.ListDriversResponse
-	(*GetDriverInfoRequest)(nil),                               // 19: bess.pb.GetDriverInfoRequest
-	(*GetDriverInfoResponse)(nil),                              // 20: bess.pb.GetDriverInfoResponse
-	(*ListPortsResponse)(nil),                                  // 21: bess.pb.ListPortsResponse
-	(*CreatePortRequest)(nil),                                  // 22: bess.pb.CreatePortRequest
-	(*PortConf)(nil),                                           // 23: bess.pb.PortConf
-	(*SetPortConfRequest)(nil),                                 // 24: bess.pb.SetPortConfRequest
-	(*GetPortConfRequest)(nil),                                 // 25: bess.pb.GetPortConfRequest
-	(*GetPortConfResponse)(nil),                                // 26: bess.pb.GetPortConfResponse
-	(*CreatePortResponse)(nil),                                 // 27: bess.pb.CreatePortResponse
-	(*DestroyPortRequest)(nil),                                 // 28: bess.pb.DestroyPortRequest
-	(*GetPortStatsRequest)(nil),                                // 29: bess.pb.GetPortStatsRequest
-	(*GetPortStatsResponse)(nil),                               // 30: bess.pb.GetPortStatsResponse
-	(*GetLinkStatusRequest)(nil),                               // 31: bess.pb.GetLinkStatusRequest
-	(*GetLinkStatusResponse)(nil),                              // 32: bess.pb.GetLinkStatusResponse
-	(*ListMclassResponse)(nil),                                 // 33: bess.pb.ListMclassResponse
-	(*GetMclassInfoRequest)(nil),                               // 34: bess.pb.GetMclassInfoRequest
-	(*GetMclassInfoResponse)(nil),                              // 35: bess.pb.GetMclassInfoResponse
-	(*ListModulesResponse)(nil),                                // 36: bess.pb.ListModulesResponse
-	(*CreateModuleRequest)(nil),                                // 37: bess.pb.CreateModuleRequest
-	(*CreateModuleResponse)(nil),                               // 38: bess.pb.CreateModuleResponse
-	(*DestroyModuleRequest)(nil),                               // 39: bess.pb.DestroyModuleRequest
-	(*GetModuleInfoRequest)(nil),                               // 40: bess.pb.GetModuleInfoRequest
-	(*GetModuleInfoResponse)(nil),                              // 41: bess.pb.GetModuleInfoResponse
-	(*ConnectModulesRequest)(nil),                              // 42: bess.pb.ConnectModulesRequest
-	(*DisconnectModulesRequest)(nil),                           // 43: bess.pb.DisconnectModulesRequest
-	(*MempoolDump)(nil),                                        // 44: bess.pb.MempoolDump
-	(*DumpMempoolRequest)(nil),                                 // 45: bess.pb.DumpMempoolRequest
-	(*DumpMempoolResponse)(nil),                                // 46: bess.pb.DumpMempoolResponse
-	(*CommandRequest)(nil),                                     // 47: bess.pb.CommandRequest
-	(*CommandResponse)(nil),                                    // 48: bess.pb.CommandResponse
-	(*ListGateHookClassResponse)(nil),                          // 49: bess.pb.ListGateHookClassResponse
-	(*GetGateHookClassInfoRequest)(nil),                        // 50: bess.pb.GetGateHookClassInfoRequest
-	(*GetGateHookClassInfoResponse)(nil),                       // 51: bess.pb.GetGateHookClassInfoResponse
-	(*TrackArg)(nil),                                           // 52: bess.pb.TrackArg
-	(*TcpdumpArg)(nil),                                         // 53: bess.pb.TcpdumpArg
-	(*PcapngArg)(nil),                                          // 54: bess.pb.PcapngArg
-	(*GateHookInfo)(nil),                                       // 55: bess.pb.GateHookInfo
-	(*ConfigureGateHookRequest)(nil),                           // 56: bess.pb.ConfigureGateHookRequest
-	(*ConfigureGateHookResponse)(nil),                          // 57: bess.pb.ConfigureGateHookResponse
-	(*ListGateHooksResponse)(nil),                              // 58: bess.pb.ListGateHooksResponse
-	(*GateHookCommandRequest)(nil),                             // 59: bess.pb.GateHookCommandRequest
-	(*ConfigureResumeHookRequest)(nil),                         // 60: bess.pb.ConfigureResumeHookRequest
-	(*PauseWorkerRequest)(nil),                                 // 61: bess.pb.PauseWorkerRequest
-	(*ResumeWorkerRequest)(nil),                                // 62: bess.pb.ResumeWorkerRequest
-	(*ListWorkersResponse_WorkerStatus)(nil),                   // 63: bess.pb.ListWorkersResponse.WorkerStatus
-	nil,                                                        // 64: bess.pb.TrafficClass.LimitEntry
-	nil,                                                        // 65: bess.pb.TrafficClass.MaxBurstEntry
-	(*ListTcsResponse_TrafficClassStatus)(nil),                 // 66: bess.pb.ListTcsResponse.TrafficClassStatus
-	(*CheckSchedulingConstraintsResponse_ViolatingClass)(nil),  // 67: bess.pb.CheckSchedulingConstraintsResponse.ViolatingClass
-	(*CheckSchedulingConstraintsResponse_ViolatingModule)(nil), // 68: bess.pb.CheckSchedulingConstraintsResponse.ViolatingModule
-	(*ListPortsResponse_Port)(nil),                             // 69: bess.pb.ListPortsResponse.Port
-	(*GetPortStatsResponse_Stat)(nil),                          // 70: bess.pb.GetPortStatsResponse.Stat
-	(*ListModulesResponse_Module)(nil),                         // 71: bess.pb.ListModulesResponse.Module
-	(*GetModuleInfoResponse_GateHook)(nil),                     // 72: bess.pb.GetModuleInfoResponse.GateHook
-	(*GetModuleInfoResponse_IGate)(nil),                        // 73: bess.pb.GetModuleInfoResponse.IGate
-	(*GetModuleInfoResponse_OGate)(nil),                        // 74: bess.pb.GetModuleInfoResponse.OGate
-	(*GetModuleInfoResponse_Attribute)(nil),                    // 75: bess.pb.GetModuleInfoResponse.Attribute
-	(*GetModuleInfoResponse_IGate_OGate)(nil),                  // 76: bess.pb.GetModuleInfoResponse.IGate.OGate
-	(*Error)(nil),                                              // 77: bess.pb.Error
-	(*anypb.Any)(nil),                                          // 78: google.protobuf.Any
-}
+var (
+	file_bess_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 77)
+	file_bess_msg_proto_goTypes  = []any{
+		(*EmptyRequest)(nil),                                       // 0: bess.pb.EmptyRequest
+		(*EmptyResponse)(nil),                                      // 1: bess.pb.EmptyResponse
+		(*VersionResponse)(nil),                                    // 2: bess.pb.VersionResponse
+		(*ImportPluginRequest)(nil),                                // 3: bess.pb.ImportPluginRequest
+		(*UnloadPluginRequest)(nil),                                // 4: bess.pb.UnloadPluginRequest
+		(*ListPluginsResponse)(nil),                                // 5: bess.pb.ListPluginsResponse
+		(*ListWorkersResponse)(nil),                                // 6: bess.pb.ListWorkersResponse
+		(*AddWorkerRequest)(nil),                                   // 7: bess.pb.AddWorkerRequest
+		(*DestroyWorkerRequest)(nil),                               // 8: bess.pb.DestroyWorkerRequest
+		(*TrafficClass)(nil),                                       // 9: bess.pb.TrafficClass
+		(*ListTcsRequest)(nil),                                     // 10: bess.pb.ListTcsRequest
+		(*ListTcsResponse)(nil),                                    // 11: bess.pb.ListTcsResponse
+		(*CheckSchedulingConstraintsResponse)(nil),                 // 12: bess.pb.CheckSchedulingConstraintsResponse
+		(*AddTcRequest)(nil),                                       // 13: bess.pb.AddTcRequest
+		(*UpdateTcParamsRequest)(nil),                              // 14: bess.pb.UpdateTcParamsRequest
+		(*UpdateTcParentRequest)(nil),                              // 15: bess.pb.UpdateTcParentRequest
+		(*GetTcStatsRequest)(nil),                                  // 16: bess.pb.GetTcStatsRequest
+		(*GetTcStatsResponse)(nil),                                 // 17: bess.pb.GetTcStatsResponse
+		(*ListDriversResponse)(nil),                                // 18: bess.pb.ListDriversResponse
+		(*GetDriverInfoRequest)(nil),                               // 19: bess.pb.GetDriverInfoRequest
+		(*GetDriverInfoResponse)(nil),                              // 20: bess.pb.GetDriverInfoResponse
+		(*ListPortsResponse)(nil),                                  // 21: bess.pb.ListPortsResponse
+		(*CreatePortRequest)(nil),                                  // 22: bess.pb.CreatePortRequest
+		(*PortConf)(nil),                                           // 23: bess.pb.PortConf
+		(*SetPortConfRequest)(nil),                                 // 24: bess.pb.SetPortConfRequest
+		(*GetPortConfRequest)(nil),                                 // 25: bess.pb.GetPortConfRequest
+		(*GetPortConfResponse)(nil),                                // 26: bess.pb.GetPortConfResponse
+		(*CreatePortResponse)(nil),                                 // 27: bess.pb.CreatePortResponse
+		(*DestroyPortRequest)(nil),                                 // 28: bess.pb.DestroyPortRequest
+		(*GetPortStatsRequest)(nil),                                // 29: bess.pb.GetPortStatsRequest
+		(*GetPortStatsResponse)(nil),                               // 30: bess.pb.GetPortStatsResponse
+		(*GetLinkStatusRequest)(nil),                               // 31: bess.pb.GetLinkStatusRequest
+		(*GetLinkStatusResponse)(nil),                              // 32: bess.pb.GetLinkStatusResponse
+		(*ListMclassResponse)(nil),                                 // 33: bess.pb.ListMclassResponse
+		(*GetMclassInfoRequest)(nil),                               // 34: bess.pb.GetMclassInfoRequest
+		(*GetMclassInfoResponse)(nil),                              // 35: bess.pb.GetMclassInfoResponse
+		(*ListModulesResponse)(nil),                                // 36: bess.pb.ListModulesResponse
+		(*CreateModuleRequest)(nil),                                // 37: bess.pb.CreateModuleRequest
+		(*CreateModuleResponse)(nil),                               // 38: bess.pb.CreateModuleResponse
+		(*DestroyModuleRequest)(nil),                               // 39: bess.pb.DestroyModuleRequest
+		(*GetModuleInfoRequest)(nil),                               // 40: bess.pb.GetModuleInfoRequest
+		(*GetModuleInfoResponse)(nil),                              // 41: bess.pb.GetModuleInfoResponse
+		(*ConnectModulesRequest)(nil),                              // 42: bess.pb.ConnectModulesRequest
+		(*DisconnectModulesRequest)(nil),                           // 43: bess.pb.DisconnectModulesRequest
+		(*MempoolDump)(nil),                                        // 44: bess.pb.MempoolDump
+		(*DumpMempoolRequest)(nil),                                 // 45: bess.pb.DumpMempoolRequest
+		(*DumpMempoolResponse)(nil),                                // 46: bess.pb.DumpMempoolResponse
+		(*CommandRequest)(nil),                                     // 47: bess.pb.CommandRequest
+		(*CommandResponse)(nil),                                    // 48: bess.pb.CommandResponse
+		(*ListGateHookClassResponse)(nil),                          // 49: bess.pb.ListGateHookClassResponse
+		(*GetGateHookClassInfoRequest)(nil),                        // 50: bess.pb.GetGateHookClassInfoRequest
+		(*GetGateHookClassInfoResponse)(nil),                       // 51: bess.pb.GetGateHookClassInfoResponse
+		(*TrackArg)(nil),                                           // 52: bess.pb.TrackArg
+		(*TcpdumpArg)(nil),                                         // 53: bess.pb.TcpdumpArg
+		(*PcapngArg)(nil),                                          // 54: bess.pb.PcapngArg
+		(*GateHookInfo)(nil),                                       // 55: bess.pb.GateHookInfo
+		(*ConfigureGateHookRequest)(nil),                           // 56: bess.pb.ConfigureGateHookRequest
+		(*ConfigureGateHookResponse)(nil),                          // 57: bess.pb.ConfigureGateHookResponse
+		(*ListGateHooksResponse)(nil),                              // 58: bess.pb.ListGateHooksResponse
+		(*GateHookCommandRequest)(nil),                             // 59: bess.pb.GateHookCommandRequest
+		(*ConfigureResumeHookRequest)(nil),                         // 60: bess.pb.ConfigureResumeHookRequest
+		(*PauseWorkerRequest)(nil),                                 // 61: bess.pb.PauseWorkerRequest
+		(*ResumeWorkerRequest)(nil),                                // 62: bess.pb.ResumeWorkerRequest
+		(*ListWorkersResponse_WorkerStatus)(nil),                   // 63: bess.pb.ListWorkersResponse.WorkerStatus
+		nil,                                                        // 64: bess.pb.TrafficClass.LimitEntry
+		nil,                                                        // 65: bess.pb.TrafficClass.MaxBurstEntry
+		(*ListTcsResponse_TrafficClassStatus)(nil),                 // 66: bess.pb.ListTcsResponse.TrafficClassStatus
+		(*CheckSchedulingConstraintsResponse_ViolatingClass)(nil),  // 67: bess.pb.CheckSchedulingConstraintsResponse.ViolatingClass
+		(*CheckSchedulingConstraintsResponse_ViolatingModule)(nil), // 68: bess.pb.CheckSchedulingConstraintsResponse.ViolatingModule
+		(*ListPortsResponse_Port)(nil),                             // 69: bess.pb.ListPortsResponse.Port
+		(*GetPortStatsResponse_Stat)(nil),                          // 70: bess.pb.GetPortStatsResponse.Stat
+		(*ListModulesResponse_Module)(nil),                         // 71: bess.pb.ListModulesResponse.Module
+		(*GetModuleInfoResponse_GateHook)(nil),                     // 72: bess.pb.GetModuleInfoResponse.GateHook
+		(*GetModuleInfoResponse_IGate)(nil),                        // 73: bess.pb.GetModuleInfoResponse.IGate
+		(*GetModuleInfoResponse_OGate)(nil),                        // 74: bess.pb.GetModuleInfoResponse.OGate
+		(*GetModuleInfoResponse_Attribute)(nil),                    // 75: bess.pb.GetModuleInfoResponse.Attribute
+		(*GetModuleInfoResponse_IGate_OGate)(nil),                  // 76: bess.pb.GetModuleInfoResponse.IGate.OGate
+		(*Error)(nil),                                              // 77: bess.pb.Error
+		(*anypb.Any)(nil),                                          // 78: google.protobuf.Any
+	}
+)
 var file_bess_msg_proto_depIdxs = []int32{
 	77, // 0: bess.pb.EmptyResponse.error:type_name -> bess.pb.Error
 	77, // 1: bess.pb.VersionResponse.error:type_name -> bess.pb.Error
