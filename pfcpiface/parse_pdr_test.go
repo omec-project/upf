@@ -12,6 +12,11 @@ import (
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
+const (
+	ipAddrPrimary   = "17.0.0.1"
+	ipAddrSecondary = "192.168.1.1"
+)
+
 type pdrTestCase struct {
 	input       *ie.IE
 	expected    *pdr
@@ -589,7 +594,7 @@ func Test_portRange_Width(t *testing.T) {
 }
 
 func Test_pdr_parseSDFFilter(t *testing.T) {
-	ueAddress := "17.0.0.1"
+	ueAddress := ipAddrPrimary
 
 	newFilter := func(flowDesc string) *ie.IE {
 		return ie.NewSDFFilter(flowDesc, "", "", "", 1)
@@ -607,7 +612,7 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 			sdfIE:     newFilter("permit out udp from 192.168.1.1/32 to assigned 80-400"),
 			direction: core,
 			wantAppFilter: applicationFilter{
-				srcIP:        ip2int(net.ParseIP("192.168.1.1")),
+				srcIP:        ip2int(net.ParseIP(ipAddrSecondary)),
 				dstIP:        ip2int(net.ParseIP(ueAddress)),
 				srcPortRange: newRangeMatchPortRange(80, 400),
 				dstPortRange: newWildcardPortRange(),
@@ -624,7 +629,7 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 			direction: access,
 			wantAppFilter: applicationFilter{
 				srcIP:        ip2int(net.ParseIP(ueAddress)),
-				dstIP:        ip2int(net.ParseIP("192.168.1.1")),
+				dstIP:        ip2int(net.ParseIP(ipAddrSecondary)),
 				srcPortRange: newWildcardPortRange(),
 				dstPortRange: newRangeMatchPortRange(80, 400),
 				proto:        17,
@@ -639,7 +644,7 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 			sdfIE:     newFilter("permit out udp from 192.168.1.1/32 80-400 to assigned"),
 			direction: core,
 			wantAppFilter: applicationFilter{
-				srcIP:        ip2int(net.ParseIP("192.168.1.1")),
+				srcIP:        ip2int(net.ParseIP(ipAddrSecondary)),
 				dstIP:        ip2int(net.ParseIP(ueAddress)),
 				srcPortRange: newRangeMatchPortRange(80, 400),
 				dstPortRange: newWildcardPortRange(),
@@ -656,7 +661,7 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 			direction: access,
 			wantAppFilter: applicationFilter{
 				srcIP:        ip2int(net.ParseIP(ueAddress)),
-				dstIP:        ip2int(net.ParseIP("192.168.1.1")),
+				dstIP:        ip2int(net.ParseIP(ipAddrSecondary)),
 				srcPortRange: newWildcardPortRange(),
 				dstPortRange: newRangeMatchPortRange(80, 400),
 				proto:        17,
@@ -685,7 +690,7 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := &pdr{
-				ueAddress: ip2int(net.ParseIP("17.0.0.1")),
+				ueAddress: ip2int(net.ParseIP(ipAddrPrimary)),
 				srcIface:  tt.direction,
 			}
 			if err := p.parseSDFFilter(tt.sdfIE); (err != nil) != tt.wantErr {
@@ -702,7 +707,7 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 }
 
 func Test_pdr_parsePDI(t *testing.T) {
-	ueAddress := "17.0.0.1"
+	ueAddress := ipAddrPrimary
 
 	type args struct {
 		pdiIEs  []*ie.IE
