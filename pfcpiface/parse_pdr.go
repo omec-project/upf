@@ -119,7 +119,8 @@ func (pr portRange) asComplexTernaryMatches(strategy RangeConversionStrategy) ([
 		return rules, nil
 	}
 
-	if strategy == Exact {
+	switch strategy {
+	case Exact:
 		if pr.Width() > 100 {
 			return nil, ErrInvalidArgumentWithReason("asComplexTernaryMatches", pr,
 				"port range too wide for exact match strategy")
@@ -128,48 +129,54 @@ func (pr portRange) asComplexTernaryMatches(strategy RangeConversionStrategy) ([
 		for port := int(pr.low); port <= int(pr.high); port++ {
 			rules = append(rules, portRangeTernaryRule{uint16(port), math.MaxUint16})
 		}
-	} else if strategy == Ternary {
+	case Ternary:
 		// Adapted from https://stackoverflow.com/a/66959276
-		const limit = math.MaxUint16
-		maxPort := func(port, mask uint16) uint16 {
-			xid := limit - mask
-			nid := port & mask
-			return nid + xid
-		}
-
-		portMask := func(port, end uint16) uint16 {
-			bit := uint16(1)
-			mask := uint16(limit)
-			testMask := uint16(limit)
-			netPort := port & limit
-			maximumPort := maxPort(netPort, limit)
-
-			for netPort > 0 && maximumPort < end {
-				netPort = port & testMask
-				if netPort < port {
-					break
-				}
-				maximumPort = maxPort(netPort, testMask)
-				if maximumPort <= end {
-					mask = testMask
-				}
-				testMask -= bit
-				bit <<= 1
-			}
-			return mask
-		}
-
-		port := uint32(pr.low) // Promote to higher bit width for greater-equals check.
-		for port <= uint32(pr.high) {
-			mask := portMask(uint16(port), pr.high)
-			rules = append(rules, portRangeTernaryRule{uint16(port), mask})
-			port = uint32(maxPort(uint16(port), mask)) + 1
-		}
-	} else {
+		return pr.buildTernaryRules(), nil
+	default:
 		return nil, ErrInvalidArgument("asComplexTernaryMatches", strategy)
 	}
 
 	return rules, nil
+}
+
+func (pr portRange) buildTernaryRules() []portRangeTernaryRule {
+	const limit = math.MaxUint16
+	maxPort := func(port, mask uint16) uint16 {
+		xid := limit - mask
+		nid := port & mask
+		return nid + xid
+	}
+
+	portMask := func(port, end uint16) uint16 {
+		bit := uint16(1)
+		mask := uint16(limit)
+		testMask := uint16(limit)
+		netPort := port & limit
+		maximumPort := maxPort(netPort, limit)
+
+		for netPort > 0 && maximumPort < end {
+			netPort = port & testMask
+			if netPort < port {
+				break
+			}
+			maximumPort = maxPort(netPort, testMask)
+			if maximumPort <= end {
+				mask = testMask
+			}
+			testMask -= bit
+			bit <<= 1
+		}
+		return mask
+	}
+
+	rules := make([]portRangeTernaryRule, 0)
+	port := uint32(pr.low) // Promote to higher bit width for greater-equals check.
+	for port <= uint32(pr.high) {
+		mask := portMask(uint16(port), pr.high)
+		rules = append(rules, portRangeTernaryRule{uint16(port), mask})
+		port = uint32(maxPort(uint16(port), mask)) + 1
+	}
+	return rules
 }
 
 type portRangeTernaryRule struct {
@@ -208,14 +215,7 @@ func CreatePortRangeCartesianProduct(src, dst portRange) ([]portRangeTernaryCart
 		if err != nil {
 			return nil, err
 		}
-
-		for _, r := range srcTernaryRules {
-			p := portRangeTernaryCartesianProduct{
-				srcPort: r.port, srcMask: r.mask,
-				dstPort: dstTernary.port, dstMask: dstTernary.mask,
-			}
-			rules = append(rules, p)
-		}
+		rules = buildRulesFromRange(srcTernaryRules, dstTernary, true)
 	} else if dst.isRangeMatch() {
 		dstTernaryRules, err := dst.asComplexTernaryMatches(Exact)
 		if err != nil {
@@ -227,13 +227,7 @@ func CreatePortRangeCartesianProduct(src, dst portRange) ([]portRangeTernaryCart
 			return nil, err
 		}
 
-		for _, r := range dstTernaryRules {
-			p := portRangeTernaryCartesianProduct{
-				srcPort: srcTernary.port, srcMask: srcTernary.mask,
-				dstPort: r.port, dstMask: r.mask,
-			}
-			rules = append(rules, p)
-		}
+		rules = buildRulesFromRange(dstTernaryRules, srcTernary, false)
 	} else {
 		// Neither is range. Only one rule needed.
 		srcTernary, err := src.asTrivialTernaryMatch()
@@ -254,6 +248,29 @@ func CreatePortRangeCartesianProduct(src, dst portRange) ([]portRangeTernaryCart
 	}
 
 	return rules, nil
+}
+
+func buildRulesFromRange(
+	rangeRules []portRangeTernaryRule,
+	fixedRule portRangeTernaryRule,
+	isSrcRange bool,
+) []portRangeTernaryCartesianProduct {
+	rules := make([]portRangeTernaryCartesianProduct, 0, len(rangeRules))
+	for _, r := range rangeRules {
+		if isSrcRange {
+			rules = append(rules, portRangeTernaryCartesianProduct{
+				srcPort: r.port, srcMask: r.mask,
+				dstPort: fixedRule.port, dstMask: fixedRule.mask,
+			})
+		} else {
+			rules = append(rules, portRangeTernaryCartesianProduct{
+				srcPort: fixedRule.port, srcMask: fixedRule.mask,
+				dstPort: r.port, dstMask: r.mask,
+			})
+		}
+	}
+
+	return rules
 }
 
 type applicationFilter struct {
@@ -522,26 +539,9 @@ func (p *pdr) parseSDFFilter(ie *ie.IE) error {
 }
 
 func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, ippool *IPPool) error {
-	for _, pdiIE := range pdiIEs {
-		switch pdiIE.Type {
-		case ie.UEIPAddress:
-			if err := p.parseUEAddressIE(pdiIE, ippool); err != nil {
-				logger.PfcpLog.Errorf("failed to parse UE Address IE: %v", err)
-				return err
-			}
-		case ie.SourceInterface:
-			if err := p.parseSourceInterfaceIE(pdiIE); err != nil {
-				logger.PfcpLog.Errorf("failed to parse Source Interface IE: %v", err)
-				return err
-			}
-		case ie.FTEID:
-			if err := p.parseFTEID(pdiIE); err != nil {
-				logger.PfcpLog.Errorf("failed to parse F-TEID IE: %v", err)
-				return err
-			}
-		}
+	if err := p.processBasicPDI(pdiIEs, ippool); err != nil {
+		return err
 	}
-
 	// initialize application filter with UE address;
 	// it can be overwritten by parseSDFFilter() later.
 	if p.IsDownlink() && p.ueAddress != 0 {
@@ -571,41 +571,36 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, ippool *IPPoo
 	return nil
 }
 
+func (p *pdr) processBasicPDI(pdiIEs []*ie.IE, ippool *IPPool) error {
+	for _, pdiIE := range pdiIEs {
+		switch pdiIE.Type {
+		case ie.UEIPAddress:
+			if err := p.parseUEAddressIE(pdiIE, ippool); err != nil {
+				logger.PfcpLog.Errorf("failed to parse UE Address IE: %v", err)
+				return err
+			}
+		case ie.SourceInterface:
+			if err := p.parseSourceInterfaceIE(pdiIE); err != nil {
+				logger.PfcpLog.Errorf("failed to parse Source Interface IE: %v", err)
+				return err
+			}
+		case ie.FTEID:
+			if err := p.parseFTEID(pdiIE); err != nil {
+				logger.PfcpLog.Errorf("failed to parse F-TEID IE: %v", err)
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, ippool *IPPool) error {
 	/* reset outerHeaderRemoval to begin with */
 	outerHeaderRemoval := uint8(0)
 	p.qerIDList = make([]uint32, 0)
 	p.fseID = seid
 
-	pdrID, err := ie1.PDRID()
-	if err != nil {
-		logger.PfcpLog.Errorln("could not read PDR ID!")
-		return err
-	}
-
-	precedence, err := ie1.Precedence()
-	if err != nil {
-		logger.PfcpLog.Errorln("could not read Precedence!")
-		return err
-	}
-
-	pdi, err := ie1.PDI()
-	if err != nil {
-		logger.PfcpLog.Errorln("could not read PDI!")
-		return err
-	}
-
-	res, err := ie1.OuterHeaderRemovalDescription()
-	if res == 0 && err == nil { // 0 == GTP-U/UDP/IPv4
-		outerHeaderRemoval = 1
-	}
-
-	err = p.parsePDI(pdi, appPFDs, ippool)
-	if err != nil && !errors.Is(err, errBadFilterDesc) {
-		return err
-	}
-
-	farID, err := ie1.FARID()
+	pdrID, precedence, farID, outerHeaderRemoval, err := p.parseCorePDRFields(ie1, appPFDs, ippool)
 	if err != nil {
 		logger.PfcpLog.Errorln("could not read FAR ID!")
 		return err
@@ -654,4 +649,46 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, ippoo
 	p.needDecap = outerHeaderRemoval
 
 	return nil
+}
+
+func (p *pdr) parseCorePDRFields(
+	ie1 *ie.IE,
+	appPFDs map[string]appPFD,
+	ippool *IPPool,
+) (uint16, uint32, uint32, uint8, error) {
+	var outerHeaderRemoval uint8
+	pdrID, err := ie1.PDRID()
+	if err != nil {
+		logger.PfcpLog.Errorln("could not read PDR ID!")
+		return 0, 0, 0, 0, err
+	}
+
+	precedence, err := ie1.Precedence()
+	if err != nil {
+		logger.PfcpLog.Errorln("could not read Precedence!")
+		return 0, 0, 0, 0, err
+	}
+
+	pdi, err := ie1.PDI()
+	if err != nil {
+		logger.PfcpLog.Errorln("could not read PDI!")
+		return 0, 0, 0, 0, err
+	}
+
+	res, err := ie1.OuterHeaderRemovalDescription()
+	if res == 0 && err == nil { // 0 == GTP-U/UDP/IPv4
+		outerHeaderRemoval = 1
+	}
+
+	err = p.parsePDI(pdi, appPFDs, ippool)
+	if err != nil && !errors.Is(err, errBadFilterDesc) {
+		return 0, 0, 0, 0, err
+	}
+
+	farID, err := ie1.FARID()
+	if err != nil {
+		logger.PfcpLog.Errorln("could not read FAR ID!")
+		return 0, 0, 0, 0, err
+	}
+	return pdrID, precedence, farID, outerHeaderRemoval, nil
 }
