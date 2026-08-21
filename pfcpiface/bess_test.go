@@ -23,7 +23,7 @@ func TestGRPCJoinWaitsForEveryCallBeforeReturning(t *testing.T) {
 	var reported atomic.Int32
 
 	// The failure is reported first and the successes arrive later. A join that returns
-	// on the first failure leaves the remaining senders blocked for ever on a channel
+	// on the first failure leaves the remaining senders blocked forever on a channel
 	// nobody will read again, and returns while their writes are still in flight.
 	go func() {
 		reported.Add(1)

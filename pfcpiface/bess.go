@@ -1550,8 +1550,8 @@ func (b *bess) delSessionQER(ctx context.Context, srcIface uint8, qer qer) {
 	}
 }
 
-// GRPCJoin waits for calls asynchronous operations, each of which reports exactly one
-// result on done, and reports whether all of them succeeded.
+// GRPCJoin waits for the given number of asynchronous operations, each of which reports
+// exactly one result on done, and reports whether all of them succeeded.
 //
 // It waits for every operation to report rather than returning as soon as one fails.
 // The callers use the result to decide what the datapath now holds, and an operation
