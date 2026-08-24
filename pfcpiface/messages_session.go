@@ -510,11 +510,14 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 	return smres, nil
 }
 
-func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
+// handleDigestReport reports a downlink data notification to the control plane, and
+// returns whether this association is the one holding the session. A notification
+// carries only an F-SEID, so the caller cannot know which association owns it and has
+// to offer it around.
+func (pConn *PFCPConn) handleDigestReport(fseid uint64) bool {
 	session, ok := pConn.store.GetSession(fseid)
 	if !ok {
-		logger.PfcpLog.Warnln("no session found for fseid:", fseid)
-		return
+		return false
 	}
 
 	seq := pConn.getSeqNum()
@@ -544,8 +547,12 @@ func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
 	for _, far := range session.fars {
 		if far.farID == farID {
 			if far.applyAction&ActionNotify == 0 {
+				// This association holds the session, so the notification is answered
+				// here whatever the outcome: offering it on would only find peers that
+				// do not know the F-SEID at all.
 				logger.PfcpLog.Errorln("packet received for forwarding far. discard")
-				return
+
+				return true
 			}
 		}
 	}
@@ -553,7 +560,7 @@ func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
 	if pdrID == 0 {
 		logger.PfcpLog.Errorln("no Pdr found for downlink")
 
-		return
+		return true
 	}
 
 	srreq.DownlinkDataReport = ie.NewDownlinkDataReport(
@@ -562,6 +569,35 @@ func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
 	logger.PfcpLog.With("F-SEID", fseid, "PDR ID", pdrID).Infoln("sending Downlink Data Report")
 
 	pConn.SendPFCPMsg(srreq)
+
+	return true
+}
+
+// pfcpSRRspFlagDROBU is the DROBU bit of the PFCPSRRsp-Flags IE, TS 29.244 8.2.62. It asks
+// the user plane to discard the packets it buffered for the session. go-pfcp offers a
+// HasDROBU helper for PFCPSMReq-Flags but not for these, so the bit is tested here.
+const pfcpSRRspFlagDROBU = 0x01
+
+// reportDropBufferedRequest says when the control plane has asked for buffered packets to
+// be discarded and this element cannot honour it. The BUFF apply action reaches this
+// datapath as notify-only, so there is no store to discard -- honouring DROBU is part of
+// downlink buffering, which is not implemented here. Without this the control plane's log
+// reads as though buffering had been stopped while nothing acted on the request.
+func reportDropBufferedRequest(srres *message.SessionReportResponse) {
+	if srres.PFCPSRRspFlags == nil {
+		return
+	}
+
+	flags, err := srres.PFCPSRRspFlags.PFCPSRRspFlags()
+	if err != nil {
+		logger.PfcpLog.Warnln("could not read PFCPSRRsp-Flags:", err)
+		return
+	}
+
+	if flags&pfcpSRRspFlagDROBU != 0 {
+		logger.PfcpLog.Warnln("DROBU requested for seq, but this datapath notifies rather than buffers, "+
+			"so there is nothing to discard:", srres.SequenceNumber)
+	}
 }
 
 func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) error {
@@ -583,6 +619,8 @@ func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) error {
 	if err != nil {
 		return errUnmarshal(err)
 	}
+
+	reportDropBufferedRequest(srres)
 
 	if cause == ie.CauseRequestAccepted {
 		return nil
