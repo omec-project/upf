@@ -70,38 +70,46 @@ class CLI(object):
         pass
 
     def __init__(self, cmdlist, fin=sys.stdin, fout=sys.stdout, ferr=None,
-                 interactive=None, history_file=None):
+                interactive=None, history_file=None):
         self.cmdlist = cmdlist
-
         self.fin = fin
         self.fout = fout
         self.last_cmd = ''
         self.rl = None
 
-        if history_file is None:
-            try:
-                self.history_file = os.path.expanduser('~/.bess_history')
-            except:
-                self.history_file = None
-        else:
-            self.history_file = history_file
-
-        # Colorize output to standard error
-        if ferr is None:
-            if os.environ.get('TERM') != 'dumb' and sys.stderr.isatty():
-                self.ferr = ColorizedOutput(sys.stderr, '\033[31m')  # dark red
-            else:
-                self.ferr = sys.stderr
-        else:
-            self.ferr = ferr
-
-        if interactive is None:
-            self.interactive = fin.isatty() and fout.isatty()
-        else:
-            self.interactive = interactive
+        self.history_file = self._setup_history_file(history_file)
+        self.ferr = self._setup_error_output(ferr)
+        self.interactive = self._setup_interactive_mode(interactive, fin, fout)
 
         if self.interactive:
             self.go_interactive()
+
+    def _setup_history_file(self, history_file):
+        """Setup history file path with fallback to default."""
+        if history_file is not None:
+            return history_file
+
+        try:
+            return os.path.expanduser('~/.bess_history')
+        except Exception:
+            return None
+
+    def _setup_error_output(self, ferr):
+        """Setup error output with colorization support."""
+        if ferr is not None:
+            return ferr
+
+        if os.environ.get('TERM') != 'dumb' and sys.stderr.isatty():
+            return ColorizedOutput(sys.stderr, '\033[31m')  # dark red
+
+        return sys.stderr
+
+    def _setup_interactive_mode(self, interactive, fin, fout):
+        """Determine if CLI should run in interactive mode."""
+        if interactive is not None:
+            return interactive
+
+        return fin.isatty() and fout.isatty()
 
     def err(self, msg):
         self.ferr.write('*** Error: %s\n' % msg)
@@ -149,77 +157,140 @@ class CLI(object):
     # score is the number of matched keywords
     # exact_score is the number of "exactly" matched keywords
     def match(self, syntax, line):
+        """
+        Match command syntax against user input line.
+
+        Returns:
+            tuple: (match_type, candidates, syntax_token, score, exact_score)
+            match_type: 'full', 'partial', or 'nonmatch'
+        """
+        # Initialize matching state
         candidates = []
         remainder = line
         score = 0
         exact_score = 0
-
         new_token = (line != '' and line[-1] == ' ')
-
         syntax_tokens = syntax.split()
 
+        # Process each syntax token
         for i, syntax_token in enumerate(syntax_tokens):
-            if remainder.split():
-                line_word = remainder.split()[0]
-            else:
-                line_word = ''
+            # Get current word and variable attributes
+            line_word = self._get_line_word(remainder)
+            var_type, var_desc, var_candidates = self._get_var_attrs(syntax_token, line_word)
 
-            attrs = self.get_var_attrs(syntax_token, line_word)
-            if attrs:
-                var_type, var_desc, var_candidates = attrs
-            else:
-                var_type, var_desc, var_candidates = 'keyword', '', []
-
+            # Handle empty remainder (end of input)
             if remainder.strip() == '':
-                if new_token:
-                    if i == 0 or '...' not in syntax_tokens[i - 1]:
-                        candidates = []
+                return self._handle_empty_remainder(
+                    i, syntax_token, syntax_tokens, var_type, var_candidates,
+                    new_token, candidates, score, exact_score
+                )
 
-                    candidates.extend(var_candidates)
-
-                    if var_type == 'keyword':
-                        candidates.append(syntax_token)
-
-                    if syntax_token[0] == '[':  # skippable?
-                        return 'full', candidates, syntax_token, score, \
-                            exact_score
-                    return 'partial', candidates, syntax_token, score, \
-                        exact_score
-
-                return 'partial', candidates, \
-                    syntax_tokens[max(0, i - 1)], score, exact_score
-
+            # Process current token
             token, remainder = self.split_var(var_type, remainder)
             remainder = remainder.lstrip()
 
+            # Update matching state based on variable type
             if var_type == 'keyword':
-                if syntax_token == token:
-                    if new_token:
-                        candidates = []
-                    else:
-                        candidates = [syntax_token]
-                else:
-                    if not syntax_token.startswith(token):
-                        return 'nonmatch', [], '', score, exact_score
-                    candidates = [syntax_token]
-                score += 1
-                if syntax_token.strip() == token:
-                    exact_score += 1
+                result = self._process_keyword_match(
+                    syntax_token, token, new_token, score, exact_score
+                )
+                if result['match_type'] == 'nonmatch':
+                    return 'nonmatch', [], '', score, exact_score
+                candidates = result['candidates']
+                score = result['score']
+                exact_score = result['exact_score']
             else:
-                if new_token:
-                    candidates = var_candidates
-                else:
-                    candidates = []
-                    for var in var_candidates:
-                        if var.startswith(token.split()[-1]):
-                            candidates.append(var)
+                candidates = self._process_variable_match(
+                    var_candidates, token, new_token
+                )
 
+        # Final validation after processing all tokens
+        return self._finalize_match(
+            remainder, syntax_token, new_token, candidates, score, exact_score
+        )
+
+    def _get_line_word(self, remainder):
+        """Extract the first word from remainder or return empty string."""
+        if remainder.split():
+            return remainder.split()[0]
+        return ''
+
+    def _get_var_attrs(self, syntax_token, line_word):
+        """Get variable attributes for a syntax token."""
+        attrs = self.get_var_attrs(syntax_token, line_word)
+        if attrs:
+            return attrs
+        return 'keyword', '', []
+
+    def _handle_empty_remainder(self, i, syntax_token, syntax_tokens, var_type,
+                            var_candidates, new_token, candidates, score, exact_score):
+        """Handle case when user input is exhausted."""
+        if new_token:
+            # Clear candidates unless previous token allows continuation
+            if i == 0 or '...' not in syntax_tokens[i - 1]:
+                candidates = []
+
+            candidates.extend(var_candidates)
+
+            if var_type == 'keyword':
+                candidates.append(syntax_token)
+
+            # Check if current token is skippable (optional)
+            if syntax_token[0] == '[':
+                return 'full', candidates, syntax_token, score, exact_score
+
+            return 'partial', candidates, syntax_token, score, exact_score
+
+        return 'partial', candidates, syntax_tokens[max(0, i - 1)], score, exact_score
+
+    def _process_keyword_match(self, syntax_token, token, new_token, score, exact_score):
+        """Process matching for keyword tokens."""
+        if syntax_token == token:
+            # Exact match
+            candidates = [] if new_token else [syntax_token]
+            score += 1
+            if syntax_token.strip() == token:
+                exact_score += 1
+        else:
+            # Partial match
+            if not syntax_token.startswith(token):
+                return {'match_type': 'nonmatch', 'candidates': [], 'score': score, 'exact_score': exact_score}
+            candidates = [syntax_token]
+            score += 1
+            if syntax_token.strip() == token:
+                exact_score += 1
+
+        return {'match_type': 'continue', 'candidates': candidates, 'score': score, 'exact_score': exact_score}
+
+    def _process_variable_match(self, var_candidates, token, new_token):
+        """Process matching for variable tokens."""
+        if new_token:
+            return var_candidates
+
+        # Filter candidates that match the partial token
+        candidates = []
+        token_parts = token.split()
+        if token_parts:
+            last_part = token_parts[-1]
+            for var in var_candidates:
+                if var.startswith(last_part):
+                    candidates.append(var)
+
+        return candidates
+
+    def _finalize_match(self, remainder, syntax_token, new_token, candidates, score, exact_score):
+        """Final validation and result determination."""
         if remainder.strip() == '':
+            # Check for ellipsis (variable length argument)
             if '...' in syntax_token:
                 return 'full', candidates, syntax_token, score, exact_score
+
+            # Handle new token case
             if new_token:
                 return 'full', ['\n'], '', score, exact_score
+
             return 'full', candidates, syntax_token, score, exact_score
+
         return 'nonmatch', [], '', score, exact_score
 
     # filter is one of 'full', 'partial', 'nonmatch'
@@ -252,76 +323,124 @@ class CLI(object):
         return ret, ret_low
 
     def _do_complete(self, line, partial_word):
+        """
+        Handle command completion for the CLI.
+
+        Returns:
+            list: Completion candidates or empty list if help should be displayed
+        """
+        # Find matching commands and collect candidates
+        possible_cmds, candidates = self._find_matching_commands(line, partial_word)
+
+        # Try to find common prefix for auto-completion
+        completion_candidates = self._try_common_prefix_completion(candidates, partial_word)
+        if completion_candidates:
+            return completion_candidates
+
+        # Build and display help information
+        help_buffer = self._build_help_buffer(possible_cmds, partial_word)
+        self._write_help_output(help_buffer, line)
+
+        return []
+
+    def _find_matching_commands(self, line, partial_word):
+        """Find commands that match the current input and collect completion candidates."""
         possible_cmds = []
         candidates = []
-        num_full_matches = 0
 
         for cmd in self.cmdlist:
             syntax = cmd[0]
-            match_type, sub_candidates, \
-                syntax_token, _, _ = self.match(syntax, line)
+            match_type, sub_candidates, syntax_token, _, _ = self.match(syntax, line)
 
             if match_type in ['full', 'partial']:
                 possible_cmds.append((cmd, match_type, syntax_token))
 
-                if match_type == 'full':
-                    num_full_matches += 1
-
+                # Collect candidates that match the partial word
                 for candidate in sub_candidates:
                     if candidate.startswith(partial_word):
-                        if not candidate.endswith('/') and candidate != '\n':
-                            candidate += ' '
-                        candidates.append(candidate)
+                        formatted_candidate = self._format_candidate(candidate)
+                        candidates.append(formatted_candidate)
 
-        candidates = sorted(list(set(candidates)))
+        return possible_cmds, sorted(list(set(candidates)))
 
-        if candidates:
-            # find the longest common prefix of all candidates
-            s_min = candidates[0]
-            s_max = candidates[-1]
+    def _format_candidate(self, candidate):
+        """Format a completion candidate by adding space if needed."""
+        if not candidate.endswith('/') and candidate != '\n':
+            return candidate + ' '
+        return candidate
 
-            for i, c in enumerate(s_min):
-                if i >= len(s_max) or c != s_max[i]:
-                    common_prefix = s_min[:i]
-                    break
-            else:
-                common_prefix = s_min
+    def _try_common_prefix_completion(self, candidates, partial_word):
+        """Try to complete using common prefix if available."""
+        if not candidates:
+            return None
 
-            if (common_prefix and len(partial_word) < len(common_prefix) and
-                    partial_word == common_prefix[:len(partial_word)]):
-                candidates = [c for c in candidates if c.strip() != '']
-                if candidates:
-                    return candidates
+        common_prefix = self._find_common_prefix(candidates)
 
+        if (common_prefix and len(partial_word) < len(common_prefix) and
+                partial_word == common_prefix[:len(partial_word)]):
+            filtered_candidates = [c for c in candidates if c.strip() != '']
+            return filtered_candidates if filtered_candidates else None
+
+        return None
+
+    def _find_common_prefix(self, candidates):
+        """Find the longest common prefix among all candidates."""
+        if not candidates:
+            return ''
+
+        s_min = candidates[0]
+        s_max = candidates[-1]
+
+        for i, c in enumerate(s_min):
+            if i >= len(s_max) or c != s_max[i]:
+                return s_min[:i]
+
+        return s_min
+
+    def _build_help_buffer(self, possible_cmds, partial_word):
+        """Build help buffer showing available commands and their descriptions."""
         buf = []
+        num_full_matches = sum(1 for _, match_type, _ in possible_cmds if match_type == 'full')
 
         for cmd, match_type, syntax_token in possible_cmds:
             syntax, desc, _ = cmd
 
+            # Add command description
             if match_type == 'full' and num_full_matches == 1:
                 buf.append('  %-50s %s\n' % (syntax + ' <enter>', desc))
             else:
                 buf.append('  %-50s %s\n' % (syntax, desc))
 
+            # Add variable information if available
             if syntax_token:
-                attrs = self.get_var_attrs(syntax_token, partial_word)
-                if attrs:
-                    var_type, var_desc, var_candidates = attrs
-                    buf.append('    %s (%s): %s\n' %
-                               (syntax_token, var_type, var_desc))
+                var_info = self._get_variable_info(syntax_token, partial_word)
+                buf.extend(var_info)
 
-                    eligible = []
-                    for var in var_candidates:
-                        if var.startswith(partial_word):
-                            buf.append('      %s\n' % var)
+        return buf
 
-        if buf:
+    def _get_variable_info(self, syntax_token, partial_word):
+        """Get formatted information about variables for a syntax token."""
+        attrs = self.get_var_attrs(syntax_token, partial_word)
+        if not attrs:
+            return []
+
+        var_type, var_desc, var_candidates = attrs
+        buf = ['    %s (%s): %s\n' % (syntax_token, var_type, var_desc)]
+
+        # Add eligible variable candidates
+        for var in var_candidates:
+            if var.startswith(partial_word):
+                buf.append('      %s\n' % var)
+
+        return buf
+
+    def _write_help_output(self, help_buffer, line):
+        """Write help output to the terminal."""
+        if help_buffer:
             self.fout.write('\n')
-            self.fout.write(''.join(buf))
+            self.fout.write(''.join(help_buffer))
             self.fout.write('%s%s' % (self.get_prompt(), line))
             self.fout.flush()
-
-        return []
 
     def complete(self, partial_word, state):
         if state == 0:
@@ -413,57 +532,88 @@ class CLI(object):
         func(*args)
 
     def print_banner(self):
+        # The method is intentionally left empty
+        # because not all subclasses require a banner.
+        # Subclasses can override this method if needed.
         pass
 
     def process_one_line(self):
-        if self.interactive:
-            try:
-                try:
-                    prompt = raw_input  # Python 2
-                except NameError:
-                    prompt = input      # Python 3
-                line = prompt(self.get_prompt())
-            except KeyboardInterrupt:
-                self.fout.write('\n')
-                return
-        else:
-            line = self.fin.readline()
-            if len(line) == 0:
-                raise EOFError()
+        """
+        Process a single line of input from the CLI.
+
+        Handles both interactive and non-interactive modes, with proper
+        exception handling and command execution.
+        """
+        # Read input line
+        line = self._read_input_line()
+        if line is None:
+            return
 
         line = line.strip()
 
         if line:
             self.last_cmd = line
+            self._execute_command(line)
+
+    def _read_input_line(self):
+        """Read input line from appropriate source (interactive or file)."""
+        if self.interactive:
+            return self._read_interactive_input()
+        else:
+            return self._read_file_input()
+
+    def _read_interactive_input(self):
+        """Read input from interactive prompt with Python 2/3 compatibility."""
+        try:
             try:
-                try:
-                    cmd = self.find_cmd(line + ' ')
-                    func, args = self.bind_args(cmd, line)
-                    self.call_func(func, args)
-                except:
-                    if not self.interactive:
-                        self.stop_loop = True
-                    raise
+                prompt = raw_input  # Python 2
+            except NameError:
+                prompt = input      # Python 3
+            return prompt(self.get_prompt())
+        except KeyboardInterrupt:
+            self.fout.write('\n')
+            return None
 
-            except self.HandledError:
-                pass
+    def _read_file_input(self):
+        """Read input from file with EOF handling."""
+        line = self.fin.readline()
+        if len(line) == 0:
+            raise EOFError()
+        return line
 
-            except self.InvalidCommandError:
-                pass
+    def _execute_command(self, line):
+        """Execute a command line with proper exception handling."""
+        try:
+            # We use a nested try to ensure the 'stop_loop' logic runs
+            # for EVERY type of exception before we decide to handle/ignore it.
+            try:
+                cmd = self.find_cmd(line + ' ')
+                func, args = self.bind_args(cmd, line)
+                self.call_func(func, args)
+            except:
+                if not self.interactive:
+                    self.stop_loop = True
+                raise # Re-raise to be caught by the outer block
 
-            except self.BindError as e:
-                self.err(e)
-
-            except self.CommandError as e:
-                self.err(e)
+        except self.HandledError:
+            pass
+        except self.InvalidCommandError:
+            pass
+        except self.BindError as e:
+            self.err(e)
+        except self.CommandError as e:
+            self.err(e)
 
     def save_history(self):
         if self.interactive and self.rl and self.history_file:
             try:
                 self.rl.write_history_file(self.history_file)
-            except:
+            except OSError:
                 self.err('Cannot write to history file "%s"' %
                          self.history_file)
+            except Exception as e:
+                self.err('Unexpected error saving history file "%s": %s' %
+                        (self.history_file, e))
 
     def disable_echoctl(self):
         try:
@@ -474,11 +624,18 @@ class CLI(object):
             new_flags = self.old_flags
             new_flags[3] &= ~termios.ECHOCTL
             termios.tcsetattr(sys.stdin, termios.TCSADRAIN, new_flags)
-        except:
+        except ImportError:
+            pass
+        except Exception:
             pass
 
     def restore_echoctl(self):
         try:
+            import termios
+
+            if not hasattr(self, 'old_flags'):
+                 return
+
             cur_flags = termios.tcgetattr(sys.stdin)
             new_flags = cur_flags
             if self.old_flags[3] & termios.ECHOCTL:
@@ -486,7 +643,9 @@ class CLI(object):
             else:
                 new_flags[3] &= ~termios.ECHOCTL
             termios.tcsetattr(sys.stdin, termios.TCSADRAIN, new_flags)
-        except:
+        except ImportError:
+            pass
+        except Exception:
             pass
 
     def go_interactive(self):
@@ -512,9 +671,12 @@ class CLI(object):
         try:
             if self.history_file and os.path.exists(self.history_file):
                 self.rl.read_history_file(self.history_file)
-        except:
+        except OSError:
             self.err('Cannot read from history file "%s"' %
                      self.history_file)
+        except Exception as e:
+            self.err('Unexpected error reading history file "%s": %s' %
+                    (self.history_file, e))
 
         self.print_banner()
         self.fout.flush()

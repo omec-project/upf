@@ -31,6 +31,8 @@
 
 from test_utils import *
 
+# constants for duplicate literals
+TEST_MAC_ADDRESS = 'A0:22:33:44:55:66'
 
 class BessArpTest(BessModuleTestCase):
 
@@ -42,15 +44,15 @@ class BessArpTest(BessModuleTestCase):
         arp_header = scapy.ARP(op=1, pdst='1.2.3.4')
         arp_req = eth_header / arp_header
 
-        arp.add(ip='1.2.3.4', mac_addr='A0:22:33:44:55:66')
+        arp.add(ip='1.2.3.4', mac_addr=TEST_MAC_ADDRESS)
 
         arp_reply = arp_req.copy()
-        arp_reply[scapy.Ether].src = 'A0:22:33:44:55:66'
+        arp_reply[scapy.Ether].src = TEST_MAC_ADDRESS
         arp_reply[scapy.Ether].dst = '02:1e:67:9f:4d:ae'
         arp_reply[scapy.ARP].op = 2
 
         arp_reply[scapy.ARP].hwdst = arp_req[scapy.ARP].hwsrc
-        arp_reply[scapy.ARP].hwsrc = 'A0:22:33:44:55:66'
+        arp_reply[scapy.ARP].hwsrc = TEST_MAC_ADDRESS
 
         arp_reply[scapy.ARP].pdst = arp_req[scapy.ARP].psrc
         arp_reply[scapy.ARP].psrc = '1.2.3.4'

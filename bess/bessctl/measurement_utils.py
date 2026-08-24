@@ -128,7 +128,7 @@ class PortStats(object):
 
 class PortStatsGenerator(object):
 
-    def __init__(self, bess, tx_port, rx_port, measure=None, rtt_percentiles=list(), rate=False):
+    def __init__(self, bess, tx_port, rx_port, measure=None, rtt_percentiles=None, rate=False):
         """
         Creates a generator that produces PortStats. When `tx_port` and
         `rx_port` are configured differently, the generated PortStats objects
@@ -141,6 +141,9 @@ class PortStatsGenerator(object):
         will have RTT stats reported as the average of those seen between
         subsequent calls to `next()`.
         """
+        if rtt_percentiles is None:
+            rtt_percentiles = []
+
         self.bess = bess
         self.tx_port = tx_port
         self.rx_port = rx_port

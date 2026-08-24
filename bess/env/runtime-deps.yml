@@ -3,7 +3,6 @@
 #
 # Runtime dependencies for BESS. Used by both the Docker export image
 # and host-based installations (via runtime.yml).
-
 - hosts: all
   tags:
     - runtime

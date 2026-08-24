@@ -120,6 +120,8 @@ STRING_SHORT = r'\'.*?\'|\".*?\"'
 STRING_LONG = r'\'\'\'.*?\'\'\'|""".*?"""'
 STRING_ALL = STRING_LONG + '|' + STRING_SHORT
 
+# constants for duplicate literals
+BESS_ENV_PREFIX = "__bess_env__('"
 
 def replace_envvar(s):
     environment = r'\$(' + NAME + ')'\
@@ -146,12 +148,12 @@ def replace_envvar(s):
             # if match.group(3) is not None, match.group(4) is not None
             # if match.group(5) is not None, then there is a parameter
             if match.group(5) is None and match.group(7) is None:
-                return "__bess_env__('" + match.group(4) + "')"
+                return BESS_ENV_PREFIX + match.group(4) + "')"
             elif match.group(5) is not None:
-                return "__bess_env__('" + match.group(4) + "', " + \
+                return BESS_ENV_PREFIX + match.group(4) + "', " + \
                     match.group(6) + ")"
             else:
-                return "__bess_env__('" + match.group(4) + "', "
+                return BESS_ENV_PREFIX + match.group(4) + "', "
 
         else:
             return match.group()

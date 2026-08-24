@@ -34,6 +34,9 @@ import sys
 from test_utils import *
 from pybess import protobuf_to_dict as pb_conv
 
+# constants for duplicate literals
+BLACKLISTED_HOST = 'www.blacklisted.com'
+BLUELISTED_HOST = 'www.bluelisted.com'
 
 class BessUrlFilterTest(BessModuleTestCase):
 
@@ -49,7 +52,7 @@ class BessUrlFilterTest(BessModuleTestCase):
     # Output test -- make sure packets go out right ports
     def test_urlfilter(self):
         uf = UrlFilter()
-        uf.add(blacklist=[{'host': 'www.blacklisted.com', 'path': '/'}])
+        uf.add(blacklist=[{'host': BLACKLISTED_HOST, 'path': '/'}])
 
         # Eth: us to them; eth_swapped: them to us
         eth = scapy.Ether(src='02:1e:67:9f:4d:ae', dst='06:16:3e:1b:72:32')
@@ -105,16 +108,16 @@ class BessUrlFilterTest(BessModuleTestCase):
         iconf = {}
         uf = UrlFilter(**iconf)
         uf.add(blacklist=[
-            {'host': 'www.bluelisted.com', 'path': '/b'},
-            {'host': 'www.bluelisted.com', 'path': '/a'},
-            {'host': 'www.blacklisted.com', 'path': '/'},
+            {'host': BLUELISTED_HOST, 'path': '/b'},
+            {'host': BLUELISTED_HOST, 'path': '/a'},
+            {'host': BLACKLISTED_HOST, 'path': '/'},
         ])
         # Delivered config is sorted by host, then path within host.
         # Blue sorts after black ('u' > 'a').
         expect_config = {'blacklist': [
-            {'host': 'www.blacklisted.com', 'path': '/'},
-            {'host': 'www.bluelisted.com', 'path': '/a'},
-            {'host': 'www.bluelisted.com', 'path': '/b'},
+            {'host': BLACKLISTED_HOST, 'path': '/'},
+            {'host': BLUELISTED_HOST, 'path': '/a'},
+            {'host': BLUELISTED_HOST, 'path': '/b'},
         ]}
         arg = pb_conv.protobuf_to_dict(uf.get_initial_arg())
         cur_config = pb_conv.protobuf_to_dict(uf.get_runtime_config())
