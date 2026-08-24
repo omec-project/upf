@@ -19,6 +19,8 @@ type farTestCase struct {
 	description string
 }
 
+const ipAddressIn = "10.0.0.1"
+
 func TestParseFAR(t *testing.T) {
 	createOp, updateOp := create, update
 
@@ -65,6 +67,34 @@ func TestParseFAR(t *testing.T) {
 				tunnelPort:   tunnelGTPUPort,
 			},
 			description: "Valid Downlink FAR input with update operation",
+		},
+		{
+			// Regression: update FAR with ActionDrop must not require UpdateForwardingParameters.
+			op: updateOp,
+			input: ie.NewUpdateFAR(
+				ie.NewFARID(2),
+				ie.NewApplyAction(ActionDrop),
+			),
+			expected: &far{
+				farID:       2,
+				fseID:       FSEID,
+				applyAction: ActionDrop,
+			},
+			description: "Valid FAR update with ActionDrop, no forwarding parameters required",
+		},
+		{
+			// Regression: update FAR with ActionBuffer must not require UpdateForwardingParameters.
+			op: updateOp,
+			input: ie.NewUpdateFAR(
+				ie.NewFARID(3),
+				ie.NewApplyAction(ActionBuffer|ActionNotify),
+			),
+			expected: &far{
+				farID:       3,
+				fseID:       FSEID,
+				applyAction: ActionBuffer | ActionNotify,
+			},
+			description: "Valid FAR update with ActionBuffer, no forwarding parameters required",
 		},
 	} {
 		t.Run(scenario.description, func(t *testing.T) {
@@ -114,7 +144,7 @@ func TestParseFARShouldError(t *testing.T) {
 				ie.NewApplyAction(0),
 				ie.NewUpdateForwardingParameters(
 					ie.NewDestinationInterface(ie.DstInterfaceAccess),
-					ie.NewOuterHeaderCreation(0x100, 100, "10.0.0.1", "", 0, 0, 0),
+					ie.NewOuterHeaderCreation(0x100, 100, ipAddressIn, "", 0, 0, 0),
 				),
 			),
 			expected: &far{
@@ -129,7 +159,7 @@ func TestParseFARShouldError(t *testing.T) {
 				ie.NewApplyAction(ActionDrop),
 				ie.NewUpdateForwardingParameters(
 					ie.NewDestinationInterface(ie.DstInterfaceAccess),
-					ie.NewOuterHeaderCreation(0x100, 100, "10.0.0.1", "", 0, 0, 0),
+					ie.NewOuterHeaderCreation(0x100, 100, ipAddressIn, "", 0, 0, 0),
 				),
 			),
 			expected: &far{
@@ -142,7 +172,7 @@ func TestParseFARShouldError(t *testing.T) {
 			mockFar := &far{}
 			mockUpf := &upf{
 				accessIP: net.ParseIP("192.168.0.1"),
-				coreIP:   net.ParseIP("10.0.0.1"),
+				coreIP:   net.ParseIP(ipAddressIn),
 			}
 
 			err := mockFar.parseFAR(scenario.input, 101, mockUpf, scenario.op)

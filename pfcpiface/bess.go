@@ -66,6 +66,16 @@ const (
 	sliceMeterGateUnmeter uint64 = 6
 )
 
+const (
+	// SOnarQube define constants.
+	errGRPCCallFailed    = "unable to make GRPC calls"
+	errMarshalRule       = "error marshalling the rule"
+	errMarshalRequest    = "error marshalling request"
+	errReadFailed        = "read failed:"
+	errInvalidMethodName = "invalid method name:"
+	errMarshalRuleVbl    = "error marshalling the rule %v: %v"
+)
+
 var intEnc = func(u uint64) *pb.FieldData {
 	return &pb.FieldData{Encoding: &pb.FieldData_ValueInt{ValueInt: u}}
 }
@@ -116,7 +126,7 @@ func (b *bess) AddSliceInfo(sliceInfo *SliceInfo) error {
 	rc := b.GRPCJoin(1, Timeout, done)
 
 	if !rc {
-		logger.BessLog.Errorln("unable to make GRPC calls")
+		logger.BessLog.Errorln(errGRPCCallFailed)
 	}
 
 	return nil
@@ -189,7 +199,7 @@ func (b *bess) SendMsgToUPF(
 
 	rc := b.GRPCJoin(calls, Timeout, done)
 	if !rc {
-		logger.BessLog.Errorln("unable to make GRPC calls")
+		logger.BessLog.Errorln(errGRPCCallFailed)
 	}
 
 	return cause
@@ -207,7 +217,7 @@ func (b *bess) measureUpf(ifName string, f *pb.MeasureCommandGetSummaryArg) *pb.
 
 	arg, err := anypb.New(f)
 	if err != nil {
-		logger.BessLog.Errorln("error marshalling the rule", f, err)
+		logger.BessLog.Errorln(errMarshalRule, f, err)
 		return nil
 	}
 
@@ -391,7 +401,7 @@ func (b *bess) flipFlowMeasurementBufferFlag(ctx context.Context, module string)
 
 	arg, err := anypb.New(req)
 	if err != nil {
-		logger.BessLog.Errorln("error marshalling request", req, err)
+		logger.BessLog.Errorln(errMarshalRequest, req, err)
 		return nil, err
 	}
 
@@ -403,7 +413,7 @@ func (b *bess) flipFlowMeasurementBufferFlag(ctx context.Context, module string)
 		},
 	)
 	if err != nil {
-		logger.BessLog.Errorln(module, "read failed:", err)
+		logger.BessLog.Errorln(module, errReadFailed, err)
 		return nil, err
 	}
 
@@ -434,7 +444,7 @@ func (b *bess) readFlowMeasurement(
 
 	arg, err := anypb.New(req)
 	if err != nil {
-		logger.BessLog.Errorln("error marshalling request", req, err)
+		logger.BessLog.Errorln(errMarshalRequest, req, err)
 		return nil, err
 	}
 
@@ -446,7 +456,7 @@ func (b *bess) readFlowMeasurement(
 		},
 	)
 	if err != nil {
-		logger.BessLog.Errorln(module, "read failed:", err)
+		logger.BessLog.Errorln(module, errReadFailed, err)
 		return nil, err
 	}
 
@@ -474,7 +484,7 @@ func (b *bess) readGtpuPathMonitoringStats(
 
 	arg, err := anypb.New(req)
 	if err != nil {
-		logger.BessLog.Errorln("error marshalling request", req, err)
+		logger.BessLog.Errorln(errMarshalRequest, req, err)
 		return nil
 	}
 
@@ -488,7 +498,7 @@ func (b *bess) readGtpuPathMonitoringStats(
 		},
 	)
 	if err != nil {
-		logger.BessLog.Errorln(module, "read failed:", err)
+		logger.BessLog.Errorln(module, errReadFailed, err)
 		return nil
 	}
 
@@ -515,7 +525,7 @@ func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 	// Flips the buffer flag, automatically waits for in-flight packets to drain.
 	flip, err := b.flipFlowMeasurementBufferFlag(ctx, PreQosFlowMeasure)
 	if err != nil {
-		logger.BessLog.Errorln(PreQosFlowMeasure, "read failed:", err)
+		logger.BessLog.Errorln(PreQosFlowMeasure, errReadFailed, err)
 		return err
 	}
 
@@ -524,19 +534,19 @@ func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 	// Read stats from the now inactive side, and clear if needed.
 	qosStatsInResp, err := b.readFlowMeasurement(ctx, PreQosFlowMeasure, flip.OldFlag, true, q)
 	if err != nil {
-		logger.BessLog.Errorln(PreQosFlowMeasure, "read failed:", err)
+		logger.BessLog.Errorln(PreQosFlowMeasure, errReadFailed, err)
 		return err
 	}
 
 	postDlQosStatsResp, err := b.readFlowMeasurement(ctx, PostDlQosFlowMeasure, flip.OldFlag, true, q)
 	if err != nil {
-		logger.BessLog.Errorln(PostDlQosFlowMeasure, "read failed:", err)
+		logger.BessLog.Errorln(PostDlQosFlowMeasure, errReadFailed, err)
 		return err
 	}
 
 	postUlQosStatsResp, err := b.readFlowMeasurement(ctx, PostUlQosFlowMeasure, flip.OldFlag, true, q)
 	if err != nil {
-		logger.BessLog.Errorln(PostUlQosFlowMeasure, "read failed:", err)
+		logger.BessLog.Errorln(PostUlQosFlowMeasure, errReadFailed, err)
 		return err
 	}
 
@@ -722,7 +732,7 @@ func (b *bess) clearState() {
 
 	anyWildcardClear, err := anypb.New(clearWildcardCmd)
 	if err != nil {
-		logger.BessLog.Errorf("error marshalling the rule %v: %v", clearWildcardCmd, err)
+		logger.BessLog.Errorf(errMarshalRuleVbl, clearWildcardCmd, err)
 		return
 	}
 
@@ -732,7 +742,7 @@ func (b *bess) clearState() {
 
 	anyExactClear, err := anypb.New(clearExactCmd)
 	if err != nil {
-		logger.BessLog.Errorf("error marshalling the rule %v: %v", anyExactClear, err)
+		logger.BessLog.Errorf(errMarshalRuleVbl, anyExactClear, err)
 		return
 	}
 
@@ -744,7 +754,7 @@ func (b *bess) clearState() {
 		var anyGtpuPathMonitoringClear *anypb.Any
 		anyGtpuPathMonitoringClear, err = anypb.New(clearGtpuPathMonitoringCmd)
 		if err != nil {
-			logger.BessLog.Errorf("error marshalling the rule %v: %v", anyGtpuPathMonitoringClear, err)
+			logger.BessLog.Errorf(errMarshalRuleVbl, anyGtpuPathMonitoringClear, err)
 			return
 		}
 
@@ -755,7 +765,7 @@ func (b *bess) clearState() {
 	var anyQoSClear *anypb.Any
 	anyQoSClear, err = anypb.New(clearQoSCmd)
 	if err != nil {
-		logger.BessLog.Errorf("error marshalling the rule %v: %v", anyQoSClear, err)
+		logger.BessLog.Errorf(errMarshalRuleVbl, anyQoSClear, err)
 		return
 	}
 
@@ -839,7 +849,7 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 
 		rc := b.GRPCJoin(1, Timeout, done)
 		if !rc {
-			logger.BessLog.Errorln("unable to make GRPC calls")
+			logger.BessLog.Errorln(errGRPCCallFailed)
 		}
 	}
 
@@ -850,7 +860,7 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 
 func (b *bess) processPDR(ctx context.Context, arg *anypb.Any, method upfMsgType) {
 	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
-		logger.BessLog.Infoln("invalid method name:", method)
+		logger.BessLog.Infoln(errInvalidMethodName, method)
 		return
 	}
 
@@ -927,7 +937,7 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 			arg, err = anypb.New(f)
 			if err != nil {
-				logger.BessLog.Infoln("error marshalling the rule", f, err)
+				logger.BessLog.Infoln(errMarshalRule, f, err)
 				return
 			}
 
@@ -977,7 +987,7 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 			arg, err = anypb.New(f)
 			if err != nil {
-				logger.BessLog.Errorln("error marshalling the rule", f, err)
+				logger.BessLog.Errorln(errMarshalRule, f, err)
 				return
 			}
 
@@ -1094,7 +1104,7 @@ func (b *bess) addApplicationQER(ctx context.Context, gate uint64, srcIface uint
 
 	arg, err = anypb.New(q)
 	if err != nil {
-		logger.BessLog.Errorln("error marshalling the rule", q, err)
+		logger.BessLog.Errorln(errMarshalRule, q, err)
 		return
 	}
 
@@ -1152,7 +1162,7 @@ func (b *bess) delApplicationQER(
 
 	arg, err = anypb.New(q)
 	if err != nil {
-		logger.BessLog.Infoln("error marshalling the rule", q, err)
+		logger.BessLog.Infoln(errMarshalRule, q, err)
 		return
 	}
 
@@ -1166,7 +1176,7 @@ func (b *bess) delApplicationQER(
 
 func (b *bess) processFAR(ctx context.Context, arg *anypb.Any, method upfMsgType) {
 	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
-		logger.BessLog.Errorln("invalid method name:", method)
+		logger.BessLog.Errorln(errInvalidMethodName, method)
 		return
 	}
 
@@ -1187,7 +1197,7 @@ func (b *bess) processFAR(ctx context.Context, arg *anypb.Any, method upfMsgType
 
 func (b *bess) processGtpuPathMonitoring(ctx context.Context, arg *anypb.Any, method upfMsgType) {
 	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
-		logger.BessLog.Errorln("invalid method name:", method)
+		logger.BessLog.Errorln(errInvalidMethodName, method)
 		return
 	}
 
@@ -1252,7 +1262,7 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 
 		arg, err = anypb.New(f)
 		if err != nil {
-			logger.BessLog.Infoln("error marshalling the rule", f, err)
+			logger.BessLog.Infoln(errMarshalRule, f, err)
 			return
 		}
 
@@ -1292,7 +1302,7 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 
 		arg, err = anypb.New(f)
 		if err != nil {
-			logger.BessLog.Infoln("error marshalling the rule", f, err)
+			logger.BessLog.Infoln(errMarshalRule, f, err)
 			return
 		}
 
@@ -1318,7 +1328,7 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 
 func (b *bess) processSliceMeter(ctx context.Context, arg *anypb.Any, method upfMsgType) {
 	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
-		logger.BessLog.Errorln("invalid method name:", method)
+		logger.BessLog.Errorln(errInvalidMethodName, method)
 		return
 	}
 
@@ -1381,7 +1391,7 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 
 		arg, err = anypb.New(q)
 		if err != nil {
-			logger.BessLog.Errorln("error marshalling the rule", q, err)
+			logger.BessLog.Errorln(errMarshalRule, q, err)
 			return
 		}
 
@@ -1424,7 +1434,7 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 
 		arg, err = anypb.New(q)
 		if err != nil {
-			logger.BessLog.Errorln("error marshalling the rule", q, err)
+			logger.BessLog.Errorln(errMarshalRule, q, err)
 			return
 		}
 
@@ -1480,7 +1490,7 @@ func (b *bess) addSessionQER(ctx context.Context, gate uint64, srcIface uint8,
 
 	arg, err = anypb.New(q)
 	if err != nil {
-		logger.BessLog.Errorln("error marshalling the rule", q, err)
+		logger.BessLog.Errorln(errMarshalRule, q, err)
 		return
 	}
 
@@ -1507,7 +1517,7 @@ func (b *bess) delSessionQER(ctx context.Context, srcIface uint8, qer qer) {
 
 	arg, err = anypb.New(q)
 	if err != nil {
-		logger.BessLog.Errorln("error marshalling the rule", q, err)
+		logger.BessLog.Errorln(errMarshalRule, q, err)
 		return
 	}
 
