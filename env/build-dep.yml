@@ -2,7 +2,6 @@
 # SPDX-FileCopyrightText: 2017, The Regents of the University of California.
 # SPDX-FileCopyrightText: 2024, Intel Corporation
 # SPDX-License-Identifier: BSD-3-Clause
-
 - hosts: all
   tags: build-dep
   tasks:
@@ -45,30 +44,25 @@
           - zlib1g-dev
         update_cache: yes
       become: true
-
     - name: Install Python development and build dependencies
       become: true
       pip:
         requirements: "{{ playbook_dir }}/requirements-dev.txt"
         executable: pip3
         extra_args: --require-hashes --break-system-packages --ignore-installed
-
     - name: Configure dynamic linker for /usr/local/lib
       become: true
       shell: |
         echo "/usr/local/lib" > /etc/ld.so.conf.d/usr-local.conf
         echo "/usr/local/lib/x86_64-linux-gnu" >> /etc/ld.so.conf.d/usr-local.conf
         ldconfig
-
     - name: Verify protoc installation
       command: protoc --version
       register: protoc_version
       changed_when: false
-
     - name: Display protoc version
       debug:
         msg: "Installed {{ protoc_version.stdout }}"
-
     - name: BESS build dependencies installed
       debug:
         msg: "You are now ready to build BESS using build.py"

@@ -45,6 +45,8 @@ import subprocess
 import textwrap
 import argparse
 
+# constants for duplicate literals
+BUILTIN_PB_DIR = 'pybess/builtin_pb'
 
 def cmd(cmd, quiet=False, shell=False):
     """
@@ -308,8 +310,8 @@ def generate_protobuf_files():
 
     print('Generating protobuf codes for pybess...')
     sys.stdout.flush()
-    gen_one_set_of_files('protobuf', 'pybess/builtin_pb')
-    gen_one_set_of_files('protobuf/tests', 'pybess/builtin_pb')
+    gen_one_set_of_files('protobuf', BUILTIN_PB_DIR)
+    gen_one_set_of_files('protobuf/tests', BUILTIN_PB_DIR)
     for path in plugins:
         gen_one_set_of_files(os.path.join(path, 'protobuf'),
                              'pybess/plugin_pb')
@@ -359,7 +361,7 @@ def do_clean():
     print('Cleaning up...')
     cmd('make -C core clean')
     cmd('make -C core/kmod clean')
-    for path in ('pybess/builtin_pb', 'pybess/plugin_pb'):
+    for path in (BUILTIN_PB_DIR, 'pybess/plugin_pb'):
         cmd('rm -rf '
             '{path}/*_pb2.py* {path}/ports/*_pb2.py* '
             '{path}/__init__.pyc {path}/ports/__init__.pyc '

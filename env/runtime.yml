@@ -2,10 +2,8 @@
 # SPDX-FileCopyrightText: 2017, The Regents of the University of California.
 # SPDX-FileCopyrightText: 2024, Intel Corporation
 # SPDX-License-Identifier: BSD-3-Clause
-
 # Install runtime dependencies (shared with Docker export image)
 - import_playbook: runtime-deps.yml
-
 # Host-specific setup (hugepages, mounts)
 - hosts: all
   tags: runtime
@@ -13,13 +11,10 @@
     - name: Note about C++ runtime libraries
       debug:
         msg: "Note: For runtime environments, ensure protobuf 28.3 and gRPC 1.68 C++ libraries are installed (from Docker image or built separately)"
-
     - shell: ls -d /sys/devices/system/node/node* | wc -l
       register: num_nodes
-
     - shell: cat /proc/meminfo | grep Hugepagesize
       register: def_hugepage_size
-
     - name: Enable huge pages
       ansible.posix.sysctl:
         name: vm.nr_hugepages
@@ -27,11 +22,9 @@
         sysctl_set: yes
       when: "{{ def_hugepage_size.stdout.find('2048 kB') != -1 }}"
       become: true
-
     - shell: mount | grep 'type hugetlbfs'
       register: hugetlbfs_mounted
       failed_when: hugetlbfs_mounted.rc == 2
-
     - name: Mount up /mnt/huge
       mount:
         name: /mnt/huge

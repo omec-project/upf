@@ -1,11 +1,9 @@
 # SPDX-FileCopyrightText: 2016-2017, Nefeli Networks, Inc.
 # SPDX-FileCopyrightText: 2017, The Regents of the University of California.
 # SPDX-License-Identifier: BSD-3-Clause
-
 codecov:
-  branch: master  # base branch for delta computation
-
-ignore:           # files and folders to be ignored
+  branch: master # base branch for delta computation
+ignore: # files and folders to be ignored
   - "*_test.cc$"
   - "*_bench.cc$"
   - "test_*.py"

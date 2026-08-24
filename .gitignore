@@ -4,6 +4,7 @@
 
 # Temporary/hidden files
 .*
+!.pre-commit-config.yaml
 *.dump
 cscope.*
 *.vim

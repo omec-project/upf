@@ -3,7 +3,6 @@
 #
 # Runtime dependencies for BESS. Used by both the Docker export image
 # and host-based installations (via runtime.yml).
-
 - hosts: all
   tags:
     - runtime
@@ -42,7 +41,6 @@
           - ethtool
         update_cache: yes
       become: true
-
     - name: Install list of Python packages
       pip:
         requirements: "{{ playbook_dir }}/requirements-run.txt"

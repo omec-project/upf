@@ -2,9 +2,7 @@
 # SPDX-FileCopyrightText: 2017, The Regents of the University of California.
 # SPDX-FileCopyrightText: 2024, Intel Corporation
 # SPDX-License-Identifier: BSD-3-Clause
-
 - import_playbook: dev.yml
-
 - hosts: all
   tags: vagrant
   tasks:
@@ -14,20 +12,17 @@
         value: 20
         sysctl_set: yes
       become: true
-
     - name: Panic on oops
       ansible.posix.sysctl:
         name: kernel.panic_on_oops
         value: 1
         sysctl_set: yes
       become: true
-
     - user:
         name: vagrant
         groups: adm,docker
         append: yes
       become: true
-
     - name: Bind /opt/bess as ~/bess
       mount:
         name: /home/vagrant/bess
@@ -36,7 +31,6 @@
         src: /opt/bess
         state: mounted
       become: true
-
     - name: Set PATH
       lineinfile:
         dest: /etc/environment

@@ -40,6 +40,10 @@ import getopt
 import subprocess
 from os.path import exists, abspath, dirname, basename
 
+# constants for duplicate literals
+UNBIND_OPEN_ERROR = "Error: unbind failed for %s - Cannot open %s"
+USAGE_INFO = "Run '%s --usage' for further information"
+
 # The PCI base class for all devices
 network_class = {'Class': '02', 'Vendor': None, 'Device': None,
                     'SVendor': None, 'SDevice': None}
@@ -400,8 +404,7 @@ def unbind_one(dev_id, force):
     try:
         f = open(filename, "a")
     except:
-        print("Error: unbind failed for %s - Cannot open %s"
-              % (dev_id, filename))
+        print(UNBIND_OPEN_ERROR % (dev_id, filename))
         sys.exit(1)
     f.write(dev_id)
     f.close()
@@ -505,15 +508,13 @@ def bind_one(dev_id, driver, force):
         try:
             f = open(filename, "w")
         except:
-            print("Error: unbind failed for %s - Cannot open %s"
-                  % (dev_id, filename))
+            print(UNBIND_OPEN_ERROR % (dev_id, filename))
             sys.exit(1)
         try:
             f.write("\00")
             f.close()
         except:
-            print("Error: unbind failed for %s - Cannot open %s"
-                  % (dev_id, filename))
+            print(UNBIND_OPEN_ERROR % (dev_id, filename))
             sys.exit(1)
 
 
@@ -645,7 +646,7 @@ def parse_args():
                                     "force", "bind=", "unbind", ])
     except getopt.GetoptError as error:
         print(str(error))
-        print("Run '%s --usage' for further information" % sys.argv[0])
+        print(USAGE_INFO % sys.argv[0])
         sys.exit(1)
 
     for opt, arg in opts:
@@ -680,12 +681,12 @@ def do_arg_actions():
     if b_flag is None and not status_flag:
         print("Error: No action specified for devices."
               "Please give a -b or -u option")
-        print("Run '%s --usage' for further information" % sys.argv[0])
+        print(USAGE_INFO % sys.argv[0])
         sys.exit(1)
 
     if b_flag is not None and len(args) == 0:
         print("Error: No devices specified.")
-        print("Run '%s --usage' for further information" % sys.argv[0])
+        print(USAGE_INFO % sys.argv[0])
         sys.exit(1)
 
     if b_flag == "none" or b_flag == "None":

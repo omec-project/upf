@@ -45,6 +45,8 @@ this_dir = os.path.dirname(os.path.realpath(__file__))
 bessctl = os.path.join(this_dir, 'bessctl')
 sample_dir = os.path.join(this_dir, 'conf/samples')
 
+# constants for duplicate literals
+DAEMON_START_CMD = '%s daemon start'
 
 class CommandError(subprocess.CalledProcessError):
 
@@ -74,7 +76,7 @@ class TestSamples(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        run_cmd('%s daemon start' % bessctl)
+        run_cmd(DAEMON_START_CMD % bessctl)
 
     @classmethod
     def tearDownClass(cls):
@@ -87,7 +89,7 @@ def generate_test_method(path):
             run_cmd('%s run file %s' % (bessctl, path))
         except CommandError:
             # bessd may have crashed. Relaunch for next tests.
-            run_cmd('%s daemon start' % bessctl)
+            run_cmd(DAEMON_START_CMD % bessctl)
             raise
 
         # 0.5 seconds should be enough to detect packet leaks in the datapath.
@@ -99,7 +101,7 @@ def generate_test_method(path):
             run_cmd('%s daemon reset' % bessctl)
         except CommandError:
             # bessd may have crashed. Relaunch for next tests.
-            run_cmd('%s daemon start' % bessctl)
+            run_cmd(DAEMON_START_CMD % bessctl)
             raise
 
     return template
