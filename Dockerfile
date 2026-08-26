@@ -200,8 +200,9 @@ RUN apt-get update && \
     test "$(/opt/protoc/bin/protoc --version)" = "libprotoc ${PROTOC_CLI_VERSION}" && \
     rm -rf /var/lib/apt/lists/* /tmp/protoc.zip /tmp/protoc.sha256
 
-# Stage protoc-gen: Go protobuf plugins
-FROM golang:1.27.0-bookworm@sha256:484ef6066fa69acb059fdfeda7ba2b8f7391f2ef6abc6f9b8411e669ebd56466 AS protoc-gen
+# Stage protoc-gen: Go protobuf plugins. Keep this image byte-stable until
+# generated bindings are refreshed in #1227.
+FROM golang:1.26.4-bookworm@sha256:b305420a68d0f229d91eb3b3ed9e519fcf2cf5461da4bef997bf927e8c0bfd2b AS protoc-gen
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10 && \
     go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
 
