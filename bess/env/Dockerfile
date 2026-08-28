@@ -4,7 +4,7 @@
 # vim: syntax=dockerfile
 
 # Build stage: Install all build dependencies and compile from source
-FROM ubuntu:26.04@sha256:f3d28607ddd78734bb7f71f117f3c6706c666b8b76cbff7c9ff6e5718d46ff64 AS builder
+FROM ubuntu:26.04@sha256:2260313b31c8c011cd2eebe728008efac1b3982be73eb71348ea2648d2c0e09b AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -84,7 +84,7 @@ RUN mkdir -p /staging/lib && \
     ls -la /staging/opt/bess/lib/dpdk-pmds/
 
 # Default target: pre-built BESS image with runtime deps and compiled artifacts.
-FROM ubuntu:26.04@sha256:f3d28607ddd78734bb7f71f117f3c6706c666b8b76cbff7c9ff6e5718d46ff64
+FROM ubuntu:26.04@sha256:2260313b31c8c011cd2eebe728008efac1b3982be73eb71348ea2648d2c0e09b
 
 ENV DEBIAN_FRONTEND=noninteractive
 
