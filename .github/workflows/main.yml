@@ -12,6 +12,110 @@ on:
 permissions:
   contents: read
 jobs:
+  whitespace:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
+        with:
+          extra_args: trailing-whitespace --all-files
+      - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
+        with:
+          extra_args: end-of-file-fixer --all-files
+
+  bess-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      source: ${{ steps.filter.outputs.source }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        id: filter
+        with:
+          filters: |
+            source:
+              - 'bess/**'
+              - '.github/workflows/main.yml'
+
+  bess-source-tests:
+    needs: bess-changes
+    if: needs.bess-changes.outputs.source == 'true'
+    runs-on: ubuntu-latest
+    env:
+      CXX: "ccache g++"
+      DEBIAN_FRONTEND: noninteractive
+      NEEDRESTART_MODE: a
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Restore ccache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ccache
+          key: bess-ccache-${{ runner.os }}-${{ github.sha }}
+          restore-keys: bess-ccache-${{ runner.os }}-
+
+      - name: Set up hugepages
+        run: |
+          sudo sysctl -w vm.nr_hugepages=1024
+          sudo mkdir -p /mnt/huge
+          sudo mount -t hugetlbfs nodev /mnt/huge
+
+      - name: Install BESS dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ansible
+          sudo ansible-playbook bess/env/ci.yml -i "localhost," -c local
+          ccache -s
+
+      - name: Build BESS and kernel module
+        env:
+          BESS_LINK_DYNAMIC: "1"
+        run: |
+          cd bess
+          export PKG_CONFIG_PATH="/usr/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig"
+          export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:/usr/local/lib/pkgconfig"
+          export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:/usr/local/lib/x86_64-linux-gnu/pkgconfig"
+          sudo --preserve-env=CXX,PKG_CONFIG_PATH,BESS_LINK_DYNAMIC \
+            ./build.py bess
+          sudo ./build.py kmod
+          sudo ldconfig
+
+      - name: Test BESS
+        run: |
+          cd bess
+          (cd core && ./all_test)
+          coverage run -m unittest discover -v
+          python3 bessctl/run_module_tests.py
+          ccache -s
+          bessctl/bessctl daemon stop || true
+
+  bess-clang-format:
+    needs: bess-changes
+    if: needs.bess-changes.outputs.source == 'true'
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+      attestations: write
+    strategy:
+      matrix:
+        path:
+          - check: bess/core
+            exclude: '(kmod)'
+          - check: bess/protobuf
+            exclude: ''
+          - check: bess/sample_plugin/modules
+            exclude: ''
+          - check: bess/sample_plugin/protobuf
+            exclude: ''
+    uses: omec-project/.github/.github/workflows/check-clang-format.yml@c6f69e74f8ee9034dcc237ccbd719de59526aee5 # v0.0.30
+    with:
+      branch_name: ${{ github.ref }}
+      clang_format_version: '14'
+      check_path: ${{ matrix.path.check }}
+      exclude_regex: ${{ matrix.path.exclude }}
+
   build:
     if: github.event_name == 'pull_request'
     permissions:

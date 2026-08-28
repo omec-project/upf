@@ -19,6 +19,13 @@ updates:
       day: "sunday"
       time: "21:00"
       timezone: "America/Los_Angeles"
+  - package-ecosystem: "docker"
+    directory: "/bess/env"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "21:00"
+      timezone: "America/Los_Angeles"
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
@@ -39,6 +46,17 @@ updates:
       timezone: "America/Los_Angeles"
     groups:
       python-deps:
+        patterns:
+          - "*"
+  - package-ecosystem: "pip"
+    directory: "/bess/env"
+    schedule:
+      interval: "weekly"
+      day: "thursday"
+      time: "21:00"
+      timezone: "America/Los_Angeles"
+    groups:
+      bess-python-deps:
         patterns:
           - "*"
   - package-ecosystem: github-actions

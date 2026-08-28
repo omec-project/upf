@@ -35,12 +35,12 @@ The UPF implementation consists of two layers:
 The PFCP Agent implements datapath plugins that translate
   PFCP messages to datapath-specific configurations. We currently support below
   datapath implementation:
-  - [BESS](https://github.com/omec-project/bess): a software-based datapath
+  - [BESS](./bess): a software-based datapath
     built on top of the Berkeley Extensible Software Switch (BESS) framework.
     For more details, please see the ONFConnect 2019 [talk](https://www.youtube.com/watch?v=fqJGWcwcOxE)
     and demo videos [here](https://www.youtube.com/watch?v=KxK64jalKHw) and
     [here](https://youtu.be/rWnZuJeUWi4).
-    > Note: The source code for the BESS-based datapath is in https://github.com/omec-project/bess
+    > Note: BESS source is included in this repository under `bess/`.
 
 PFCP Agent internally abstracts different datapaths using a common API, while
 the different plug-ins can use specific southbound protocols to communicate with

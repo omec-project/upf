@@ -1,0 +1,101 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2022 Open Networking Foundation
+# Copyright 2019 Intel Corporation
+# Copyright 2014-2016, The Regents of the University of California.
+# Copyright 2016-2017, Nefeli Networks, Inc.
+
+# This pipeline showcases the effect of increasing the number of distinct
+# entries in the WildcardMatch module on throughput.
+
+import scapy.all as scapy
+import socket
+import struct
+import ipaddress
+import time
+
+nh_mac='00:00:00:00:00:01'
+
+def atoh(ip):
+    return socket.inet_aton(ip)
+
+def mac2hex(mac):
+    return int(mac.replace(':', ''), 16)
+
+# Craft a packet with the specified IP address and port number
+def gen_packet(dst_ip, dst_port):
+    eth = scapy.Ether(src='02:1e:67:9f:4d:ae', dst='06:16:3e:1b:72:32')
+    ip = scapy.IP(src='10.0.0.1', dst=dst_ip)
+    udp = scapy.UDP(sport=1234, dport=dst_port)
+    payload = 'helloworld'
+    pkt = eth/ip/udp/payload
+    return bytes(pkt)
+
+pkts = [
+    gen_packet('20.0.0.1', 80),
+]
+
+# destination IP address + destination port number + metadata 'in_port'
+wm::WildcardMatch(fields=[{'offset':30, 'num_bytes':4},
+                          {'offset':36, 'num_bytes':2},
+                          {'attr_name':'in_port', 'num_bytes':2}],
+                  values=[{'offset':6, 'num_bytes':6},
+                          {'attr_name':'out_port1', 'num_bytes':2},
+                          {'attr_name':'out_port2', 'num_bytes':2}
+                  ])
+
+# locally emulate two input ports
+Source() -> SetMetadata(attrs=[{'name': 'in_port', 'size': 2, 'value_int': 1}, {'name': 'in_port2', 'size':2, 'value_int':5}]) -> Rewrite(templates=pkts) -> wm
+Source() -> SetMetadata(attrs=[{'name': 'in_port', 'size': 2, 'value_int': 2}]) -> Rewrite(templates=pkts) -> wm
+
+wm:0 -> m0::Merge() -> offsetCmp::Split(size=6, offset=6)
+wm:1 -> m0
+wm:10 -> BackgroundTraffic::Sink()   # used as default gate
+
+wm.set_default_gate(gate=10)
+
+# setting failure gates
+offsetCmp -> wm0Failure::Sink()
+
+# setting success gates
+offsetCmp:1 -> m1::Merge() -> attr1Cmp::Split(size=2, attribute='out_port1')
+offsetCmp:2 -> m1
+offsetCmp:3 -> m1
+offsetCmp:4 -> m1
+offsetCmp:5 -> m1
+
+
+# setting failure gates
+attr1Cmp -> wm1Failure::Sink()
+
+# setting success gates
+attr1Cmp:17 -> attr2Cmp::Split(size=2, attribute='out_port2')
+
+# setting failure gates
+attr2Cmp -> wm2Failure::Sink()
+
+attr2Cmp:4352 -> Success::Sink()
+
+
+# Matching rule
+# 20.0.0.1/32, in_port any
+wm.add(values=[{'value_bin': atoh('20.0.0.1')}, {'value_int': 0}, {'value_int':0} ], gate=1,
+       masks=[{'value_bin': atoh('255.255.255.255')}, {'value_int':0x0000}, {'value_int': 0x0000}],
+       valuesv=[{'value_int': mac2hex(nh_mac)}, {'value_int':0x1100}, {'value_int':0x0011}],
+       priority=1)
+
+bess.resume_all()
+time.sleep(10)
+
+# Dummy rules
+for i in range(16, 16+16):
+    bess.pause_all()
+    prefix = 32 - i
+    subnet = ipaddress.ip_address(((2**32 - 1) >> prefix) << prefix)
+    print(i, prefix, subnet, subnet.packed)
+    # 10.0.0.0/i, in_port any
+    wm.add(values=[{'value_bin': atoh('10.0.0.0')}, {'value_int': 0}, {'value_int': 0} ], gate=0,
+           masks=[{'value_bin': subnet.packed}, {'value_int': 0x0000}, {'value_int': 0x0000}],
+           valuesv=[{'value_int': mac2hex(nh_mac)}, {'value_int': 0x1100}, {'value_int': 0x0011}],
+           priority=40+i)
+    bess.resume_all()
+    time.sleep(10)

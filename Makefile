@@ -21,7 +21,10 @@ DOCKER_TAG               ?= $(VERSION)
 DOCKER_IMAGE_PREFIX      ?=
 DOCKER_IMAGENAME         := $(DOCKER_REGISTRY)$(DOCKER_REPOSITORY)$(DOCKER_IMAGE_PREFIX)$(PROJECT_NAME)
 DOCKER_BUILDKIT          ?= 1
+# Keep optional Docker flags separate so callers do not replace the default
+# CPU and parallel-build arguments in DOCKER_BUILD_ARGS.
 DOCKER_BUILD_ARGS        ?= --build-arg MAKEFLAGS=-j$(NPROCS) --build-arg CPU=$(CPU)
+DOCKER_EXTRA_BUILD_ARGS  ?=
 DOCKER_PULL              ?=
 
 ## Docker labels with better error handling
@@ -66,7 +69,7 @@ docker-build: ## Build Docker images for all targets
 		if [ "$(DOCKER_BUILDKIT)" = "1" ]; then \
 			DOCKER_CACHE_ARG="--cache-from $(DOCKER_IMAGENAME)-$$target:$(DOCKER_TAG)"; \
 		fi; \
-		DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) \
+		DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) $(DOCKER_EXTRA_BUILD_ARGS) \
 			--target $$target \
 			$$DOCKER_CACHE_ARG \
 			--build-arg VERSION="$(VERSION)" \
@@ -97,7 +100,7 @@ $(BUILD_OUTPUT_DIR):
 
 output: $(BUILD_OUTPUT_DIR) ## Extract build artifacts
 	@echo "Extracting build artifacts..."
-	@DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) \
+	@DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) $(DOCKER_EXTRA_BUILD_ARGS) \
 		--target artifacts \
 		--output type=tar,dest=$(BUILD_OUTPUT_DIR)/output.tar \
 		.
@@ -105,7 +108,7 @@ output: $(BUILD_OUTPUT_DIR) ## Extract build artifacts
 
 pb: $(BUILD_OUTPUT_DIR) ## Generate Go protobuf files
 	@echo "Generating Go protobuf files..."
-	@DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) \
+	@DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) $(DOCKER_EXTRA_BUILD_ARGS) \
 		--target pb \
 		--output $(BUILD_OUTPUT_DIR) \
 		.
@@ -113,7 +116,7 @@ pb: $(BUILD_OUTPUT_DIR) ## Generate Go protobuf files
 
 py-pb: $(BUILD_OUTPUT_DIR) ## Generate Python protobuf files
 	@echo "Generating Python protobuf files..."
-	@DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) \
+	@DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) $(DOCKER_EXTRA_BUILD_ARGS) \
 		--target ptf-pb \
 		--output $(BUILD_OUTPUT_DIR) \
 		.

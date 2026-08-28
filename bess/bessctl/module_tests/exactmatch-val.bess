@@ -1,0 +1,111 @@
+# vim: syntax=py
+# -*- mode: python -*-
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2019 Intel Corporation
+#
+# Copyright 2014-2016, The Regents of the University of California.
+# Copyright 2016-2017, Nefeli Networks, Inc.
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+# list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+#
+# * Neither the names of the copyright holders nor the names of their
+# contributors may be used to endorse or promote products derived from this
+# software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+import scapy.all as scapy
+import socket
+
+src_mac='02:1e:67:9f:4d:ae'
+dst_mac='06:16:3e:1b:72:32'
+nh_mac1='00:00:00:00:00:01'
+nh_mac2='00:00:00:00:00:02'
+nh_mac3='00:00:00:00:00:03'
+nh_mac4='60:61:62:63:64:65'
+
+def aton(ip):
+    return socket.inet_aton(ip)
+
+def mac2hex(mac):
+    return int(mac.replace(':', ''), 16)
+
+# Craft a packet with the specified IP addresses
+def gen_packet(proto, src_ip, dst_ip):
+    eth = scapy.Ether(src=src_mac, dst=dst_mac)
+    ip = scapy.IP(src=src_ip, dst=dst_ip)
+    udp = proto(sport=10001, dport=10002)
+    payload = 'helloworld'
+    pkt = eth/ip/udp/payload
+    return bytes(pkt)
+
+packets = [gen_packet(scapy.UDP, '172.16.100.1', '10.0.0.1'),
+           gen_packet(scapy.UDP, '172.12.55.99', '12.34.56.78'),
+           gen_packet(scapy.UDP, '172.12.55.99', '10.0.0.1'),
+           gen_packet(scapy.UDP, '172.16.100.1', '12.34.56.78'),
+           gen_packet(scapy.UDP, '192.168.1.123', '12.34.56.78'),
+          ]
+
+# L4 protocol and source/destination IP addresses
+em::ExactMatch(fields=[{'offset':0, 'num_bytes':6},
+                       {'offset':23, 'num_bytes':1},
+                       {'offset':26, 'num_bytes':4},
+                       {'offset':30, 'num_bytes':4},
+                       {'attr_name':'foo', 'num_bytes':2}],
+               values=[{'offset':0, 'num_bytes':6},
+                       {'attr_name':'bar', 'num_bytes':1}])
+
+Source() -> Rewrite(templates=packets) -> SetMetadata(attrs=[{'name': 'foo', 'size': 2, 'value_int':0x3344}]) -> em
+
+em:0 -> m0::Merge() -> attrCmp::Split(size=1, attribute='bar')
+em:1 -> m0
+em:2 -> m0
+
+em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_int':17}, {'value_bin':aton('172.16.100.1')}, {'value_bin':aton('10.0.0.1')}, {'value_int': 0x4433}], gate=0, values=[{'value_int': mac2hex(nh_mac1)}, {'value_int': 30}])
+em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_int':17}, {'value_bin':aton('172.12.55.99')}, {'value_bin':aton('12.34.56.78')}, {'value_int': 0x4433}], gate=1, values=[{'value_int': mac2hex(nh_mac2)}, {'value_int': 29}])
+em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_int':17}, {'value_bin':aton('172.12.55.99')}, {'value_bin':aton('10.0.0.1')}, {'value_int': 0x4433}], gate=2, values=[{'value_int': mac2hex(nh_mac3)}, {'value_int': 28}])
+
+
+# delete test
+em.add(fields=[{'value_int': mac2hex(dst_mac)}, {'value_bin':chr(17)}, {'value_bin':aton('192.168.1.123')}, {'value_bin':aton('12.34.56.78')}, {'value_int': 0x4433}], gate=3, values=[{'value_int': mac2hex(nh_mac4)}, {'value_int': 27}])
+em.delete(fields=[{'value_int': mac2hex(dst_mac)}, {'value_bin':chr(17)}, {'value_bin':aton('192.168.1.123')}, {'value_bin':aton('12.34.56.78')}, {'value_int': 0x4433}])
+
+# Setting out gates
+em:3 -> BackgroundTraffic::Sink()   # used as default gate
+em.set_default_gate(gate=3)
+
+# setting failure gates
+attrCmp -> em0Failure::Sink()
+
+# setting success gates
+attrCmp:30 -> m1::Merge() -> offsetCmp::Split(size=6, offset=0)
+attrCmp:29 -> m1
+attrCmp:28 -> m1
+
+
+# setting failure gates
+offsetCmp -> em1Failure::Sink()
+
+# setting success gates
+offsetCmp:1 -> m2::Merge() -> Success::Sink()
+offsetCmp:2 -> m2
+offsetCmp:3 -> m2
