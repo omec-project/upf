@@ -194,17 +194,24 @@ class Parser:
         except KeyError:
             print("Flow measurement function disabled")
 
-        # Table sizes
-        try:
-            self.table_size_pdr_lookup = self.conf["table_sizes"]["pdrLookup"]
-            self.table_size_flow_measure = self.conf["table_sizes"]["flowMeasure"]
-            self.table_size_app_qer_lookup = self.conf["table_sizes"]["appQERLookup"]
-            self.table_size_session_qer_lookup = self.conf["table_sizes"][
-                "sessionQERLookup"
-            ]
-            self.table_size_far_lookup = self.conf["table_sizes"]["farLookup"]
-        except KeyError:
+        # Table sizes. Read each key on its own: sharing one try/except meant a single
+        # absent key raised part-way and silently discarded every size after it, leaving
+        # those tables on the module default while the configured values were ignored.
+        table_sizes = self.conf.get("table_sizes", {})
+        if not table_sizes:
             print("No explicit table sizes")
+
+        for key, attr in (
+            ("pdrLookup", "table_size_pdr_lookup"),
+            ("flowMeasure", "table_size_flow_measure"),
+            ("appQERLookup", "table_size_app_qer_lookup"),
+            ("sessionQERLookup", "table_size_session_qer_lookup"),
+            ("farLookup", "table_size_far_lookup"),
+        ):
+            if key in table_sizes:
+                setattr(self, attr, table_sizes[key])
+            elif table_sizes:
+                print("No explicit table size for {}, using default".format(key))
 
         # GTPu Path Monitoring
         try:
