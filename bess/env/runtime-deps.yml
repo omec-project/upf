@@ -44,7 +44,6 @@
       become: true
       tags:
         - runtime-apt
-
     - name: Install list of Python packages
       pip:
         requirements: "{{ playbook_dir }}/requirements-run.txt"
