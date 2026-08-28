@@ -726,9 +726,11 @@ func (b *bess) notifyListen(reportNotifyChan chan<- uint64, notifySockAddr strin
 		}
 
 		// Exit may have run while this dial was in flight, and it can only close a
-		// connection it can see. Without this the listener parks on a read nobody
-		// will interrupt, holding the socket open past shutdown.
-		if b.stopping() {
+		// connection it can see. Registering and checking for shutdown have to happen
+		// together, or the two orders differ: with the check first, Exit can look at an
+		// empty slot and close nothing, and this goroutine then registers a connection
+		// nobody will ever close and parks on a read nobody will interrupt.
+		if !b.adoptNotifyConn(conn) {
 			conn.Close()
 			logger.BessLog.Infoln("downlink data notification listener stopped")
 
@@ -736,8 +738,6 @@ func (b *bess) notifyListen(reportNotifyChan chan<- uint64, notifySockAddr strin
 		}
 
 		logger.BessLog.Infoln("connected to downlink data notification socket:", notifySockAddr)
-
-		b.setNotifyConn(conn)
 		b.readNotifications(conn, notifier)
 		b.closeNotifyConn()
 
@@ -774,11 +774,25 @@ func (b *bess) readNotifications(conn net.Conn, notifier *downlinkDataNotifier) 
 	}
 }
 
-func (b *bess) setNotifyConn(conn net.Conn) {
+// adoptNotifyConn registers conn as the live notification connection and reports whether
+// it was adopted. It refuses once shutdown has begun.
+//
+// The stop check belongs inside notifyMu, which closeNotifyConn also takes, because Exit
+// closes notifyStop before taking that lock. That ordering leaves exactly two possible
+// interleavings and both are safe: adopt runs first and Exit finds the connection to
+// close, or Exit runs first and adopt sees the closed channel and refuses. Checking the
+// channel outside the lock admits a third, where neither closes the connection.
+func (b *bess) adoptNotifyConn(conn net.Conn) bool {
 	b.notifyMu.Lock()
 	defer b.notifyMu.Unlock()
 
+	if b.stopping() {
+		return false
+	}
+
 	b.notifyConn = conn
+
+	return true
 }
 
 // closeNotifyConn closes the live notification connection if there is one. It is
