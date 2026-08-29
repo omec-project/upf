@@ -855,100 +855,100 @@ def _get_bess_module_and_port_creators(cli, rsvd):
 
     return creators
 
-def _process_config_file(cli, conf_file):  
-    """Process and compile the configuration file."""  
-    try:  
-        xformed = sugar.xform_file(conf_file)  
-    except (IOError, OSError):  
-        cli.err('Cannot open file %s' % conf_file)  
-        raise cli.HandledError()  
-      
-    try:  
-        code = compile(xformed, conf_file, 'exec')  
-    except SyntaxError as e:  
-        _handle_syntax_error(cli, conf_file, e)  
-        raise cli.HandledError()  
-    except Exception as e:  
-        cli.err('Fail to compile bess config file (%s): %s ' % (conf_file, e))  
-        raise cli.HandledError()  
-      
-    return code
-
-def _handle_syntax_error(cli, conf_file, e):  
-    """Handle syntax errors in configuration files."""  
-    cli.err('\n  File "%s", line %d\n    %s\n    %s\nSyntaxError: %s' %  
-            (conf_file, e.lineno, e.text, ' ' * (e.offset - 1) + '^', e.msg))
-    
-def _prepare_pipeline_state(cli):  
-    """Prepare pipeline state for configuration execution."""  
-    if is_pipeline_empty(cli):  
-        cli.bess.pause_all()  
-        return True  
-    else:  
-        ret = warn(cli, 'The current pipeline will be reset.', _clear_pipeline)  
-        return ret is not False
-    
-def _handle_execution_exception(cli, e):  
-    """Handle exceptions during configuration execution."""  
-    cur_frame = inspect.currentframe()  
-    cur_func = inspect.getframeinfo(cur_frame).function  
-    t, v, tb = sys.exc_info()  
-    stack = traceback.extract_tb(tb)  
-  
-    while len(stack) > 0 and stack.pop(0)[2] != cur_func:  
-        pass  
-  
-    errmsg = 'Unhandled exception in the configuration script'  
-    cli.err('%s (most recent call last)' % errmsg)  
-    cli.ferr.write(''.join(traceback.format_list(stack)))  
-  
-    if isinstance(v, (cli.bess.Error, cli.bess.RPCError)):  
-        raise  
-    else:  
-        cli.ferr.write(''.join(traceback.format_exception_only(t, v)))  
+def _process_config_file(cli, conf_file):
+    """Process and compile the configuration file."""
+    try:
+        xformed = sugar.xform_file(conf_file)
+    except (IOError, OSError):
+        cli.err('Cannot open file %s' % conf_file)
         raise cli.HandledError()
 
-# NOTE: the name of this function is used below    
-def _do_run_file(cli, conf_file):  
-    """Execute a BESS configuration file."""  
-    # Process and compile the configuration file  
-    code = _process_config_file(cli, conf_file)  
-      
-    # Prepare pipeline state  
-    if not _prepare_pipeline_state(cli):  
-        return  
-      
-    # Set up execution environment  
-    new_globals = _setup_execution_globals(cli, conf_file)  
-      
-    # Execute the configuration  
-    try:  
-        exec(code, new_globals)  
-        if cli.interactive:  
-            cli.fout.write('Done.\n')  
-    except:  
-        _handle_execution_exception(cli, sys.exc_info()[1])  
-    finally:  
-        if cli.bess.is_connected():  
+    try:
+        code = compile(xformed, conf_file, 'exec')
+    except SyntaxError as e:
+        _handle_syntax_error(cli, conf_file, e)
+        raise cli.HandledError()
+    except Exception as e:
+        cli.err('Fail to compile bess config file (%s): %s ' % (conf_file, e))
+        raise cli.HandledError()
+
+    return code
+
+def _handle_syntax_error(cli, conf_file, e):
+    """Handle syntax errors in configuration files."""
+    cli.err('\n  File "%s", line %d\n    %s\n    %s\nSyntaxError: %s' %
+            (conf_file, e.lineno, e.text, ' ' * (e.offset - 1) + '^', e.msg))
+
+def _prepare_pipeline_state(cli):
+    """Prepare pipeline state for configuration execution."""
+    if is_pipeline_empty(cli):
+        cli.bess.pause_all()
+        return True
+    else:
+        ret = warn(cli, 'The current pipeline will be reset.', _clear_pipeline)
+        return ret is not False
+
+def _handle_execution_exception(cli, e):
+    """Handle exceptions during configuration execution."""
+    cur_frame = inspect.currentframe()
+    cur_func = inspect.getframeinfo(cur_frame).function
+    t, v, tb = sys.exc_info()
+    stack = traceback.extract_tb(tb)
+
+    while len(stack) > 0 and stack.pop(0)[2] != cur_func:
+        pass
+
+    errmsg = 'Unhandled exception in the configuration script'
+    cli.err('%s (most recent call last)' % errmsg)
+    cli.ferr.write(''.join(traceback.format_list(stack)))
+
+    if isinstance(v, (cli.bess.Error, cli.bess.RPCError)):
+        raise
+    else:
+        cli.ferr.write(''.join(traceback.format_exception_only(t, v)))
+        raise cli.HandledError()
+
+# NOTE: the name of this function is used below
+def _do_run_file(cli, conf_file):
+    """Execute a BESS configuration file."""
+    # Process and compile the configuration file
+    code = _process_config_file(cli, conf_file)
+
+    # Prepare pipeline state
+    if not _prepare_pipeline_state(cli):
+        return
+
+    # Set up execution environment
+    new_globals = _setup_execution_globals(cli, conf_file)
+
+    # Execute the configuration
+    try:
+        exec(code, new_globals)
+        if cli.interactive:
+            cli.fout.write('Done.\n')
+    except:
+        _handle_execution_exception(cli, sys.exc_info()[1])
+    finally:
+        if cli.bess.is_connected():
             cli.bess.resume_all()
 
-def _setup_execution_globals(cli, conf_file):  
-    """Set up the global execution environment."""  
-    new_globals = {  
-        '__builtins__': __builtins__,  
-        '__file__': conf_file,  
-        'bess': cli.bess,  
-        'ConfError': ConfError,  
-        '__bess_env__': __bess_env__,  
-        '__bess_module__': __bess_module__,  
-        '__bess_creators__': None,  
-    }  
-      
-    creators = _get_bess_module_and_port_creators(cli, new_globals)  
-    new_globals['__bess_creators__'] = creators  
-    for name in creators:  
-        new_globals[name] = creators[name]  
-      
+def _setup_execution_globals(cli, conf_file):
+    """Set up the global execution environment."""
+    new_globals = {
+        '__builtins__': __builtins__,
+        '__file__': conf_file,
+        'bess': cli.bess,
+        'ConfError': ConfError,
+        '__bess_env__': __bess_env__,
+        '__bess_module__': __bess_module__,
+        '__bess_creators__': None,
+    }
+
+    creators = _get_bess_module_and_port_creators(cli, new_globals)
+    new_globals['__bess_creators__'] = creators
+    for name in creators:
+        new_globals[name] = creators[name]
+
     return new_globals
 
 
