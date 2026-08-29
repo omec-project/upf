@@ -300,7 +300,7 @@ def _parse_lspci_output(devices_type):
         current_dev[key] = value_list[-1].strip("[]")
         if len(value_list) > 1:
             current_dev[key + '_str'] = value_list[0]
-            
+
     return found_devices
 
 def _update_module_strings(dev_id):
@@ -320,7 +320,7 @@ def _update_module_strings(dev_id):
 def get_device_details(devices_type):
     '''Populates the "devices" dictionary with PCI and interface details.'''
     global devices
-    
+
     # 1. Parse basic PCI info
     devices = _parse_lspci_output(devices_type)
 
