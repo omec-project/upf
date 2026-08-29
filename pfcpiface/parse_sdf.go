@@ -122,7 +122,11 @@ func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
 	}
 
 	ipf.direction = fields[1]
-	ipf.proto, _ = parseL4Proto(fields[2])
+	proto, err := parseL4Proto(fields[2])
+	if err != nil {
+		return nil, err
+	}
+	ipf.proto = proto
 
 	// bring to common intermediate representation
 	xform := func(i int) {
@@ -155,6 +159,9 @@ func processFlowFields(fields []string, ipf *ipFilterRule, parseLog interface{ E
 		switch fields[i] {
 		case "from":
 			i++
+			if i >= len(fields) {
+				return errBadFilterDesc
+			}
 			xform(i)
 
 			err := ipf.src.parseNet(fields[i])
@@ -163,17 +170,23 @@ func processFlowFields(fields []string, ipf *ipFilterRule, parseLog interface{ E
 				return err
 			}
 
-			if fields[i+1] != "to" {
+			if i+1 < len(fields) && fields[i+1] != "to" {
 				i++
-
-				err = ipf.src.parsePort(fields[i])
+				if i >= len(fields) {
+					return errBadFilterDesc
+				}
+				xform(i)
+				ports, err := parsePorts(fields[i])
 				if err != nil {
-					parseLog.Errorln("src port parse failed", err)
 					return err
 				}
+				ipf.srcPorts = ports
 			}
 		case "to":
 			i++
+			if i >= len(fields) {
+				return errBadFilterDesc
+			}
 			xform(i)
 
 			err := ipf.dst.parseNet(fields[i])
@@ -182,14 +195,17 @@ func processFlowFields(fields []string, ipf *ipFilterRule, parseLog interface{ E
 				return err
 			}
 
-			if i < len(fields)-1 {
+			if i+1 < len(fields) {
 				i++
-
-				err = ipf.dst.parsePort(fields[i])
+				if i >= len(fields) {
+					return errBadFilterDesc
+				}
+				xform(i)
+				ports, err := parsePorts(fields[i])
 				if err != nil {
-					parseLog.Errorln("dst port parse failed", err)
 					return err
 				}
+				ipf.dstPorts = ports
 			}
 		}
 	}
