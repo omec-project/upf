@@ -234,7 +234,7 @@ def _get_base_string_type():
 
 def _handle_repeated_field(field, input_value, pb_value, type_callable_map, strict, basestr):
     """Handle repeated fields including map entries."""
-    if field.label != FieldDescriptor.LABEL_REPEATED:
+    if not field.is_repeated:
         return False
 
     if _is_map_field(field):
