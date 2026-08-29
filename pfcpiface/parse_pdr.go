@@ -602,7 +602,6 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, ippoo
 
 	pdrID, precedence, farID, outerHeaderRemoval, err := p.parseCorePDRFields(ie1, appPFDs, ippool)
 	if err != nil {
-		logger.PfcpLog.Errorln("could not read FAR ID!")
 		return err
 	}
 
