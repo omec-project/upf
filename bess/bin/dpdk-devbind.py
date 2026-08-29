@@ -266,101 +266,105 @@ def clear_data():
     '''This function clears any old data'''
     devices = {}
 
-def get_device_details(devices_type):
-    '''This function populates the "devices" dictionary. The keys used are
-    the pci addresses (domain:bus:slot.func). The values are themselves
-    dictionaries - one for each NIC.'''
-    global devices
-    global dpdk_drivers
+def _get_active_ssh_interfaces():
+    '''Identify interfaces used for active routes (e.g., SSH) to prevent disconnects.'''
+    ssh_if = []
+    route = check_output(["ip", "-o", "route"]).decode().splitlines()
+    for line in route:
+        if line.startswith("169.254"):
+            continue
+        rt_info = line.split()
+        if "dev" in rt_info:
+            ssh_if.append(rt_info[rt_info.index("dev") + 1])
+    return ssh_if
 
-    # first loop through and read details for all devices
-    # request machine readable format, with numeric IDs and String
-    dev = {}
-    dev_lines = check_output(["lspci", "-Dvmmnnk"]).splitlines()
-    for dev_line in dev_lines:
-        if len(dev_line) == 0:
-            if device_type_match(dev, devices_type):
-                # Replace "Driver" with "Driver_str" to have consistency of
-                # of dictionary key names
-                if "Driver" in dev.keys():
-                    dev["Driver_str"] = dev.pop("Driver")
-                # use dict to make copy of dev
-                devices[dev["Slot"]] = dict(dev)
-            # Clear previous device's data
-            dev = {}
-        else:
-            name, value = dev_line.decode().split("\t", 1)
-            value_list = value.rsplit(' ', 1)
-            if len(value_list) > 1:
-                # String stored in <name>_str
-                dev[name.rstrip(":") + '_str'] = value_list[0]
-            # Numeric IDs
-            dev[name.rstrip(":")] = value_list[len(value_list) - 1] \
-                .rstrip("]").lstrip("[")
+def _parse_lspci_output(devices_type):
+    '''Parse lspci -Dvmmnnk output into a dictionary of matching devices.'''
+    found_devices = {}
+    current_dev = {}
+    lines = check_output(["lspci", "-Dvmmnnk"]).splitlines()
 
-    if devices_type == network_devices:
-        # check what is the interface if any for an ssh connection if
-        # any to this host, so we can mark it later.
-        ssh_if = []
-        route = check_output(["ip", "-o", "route"])
-        # filter out all lines for 169.254 routes
-        route = "\n".join(filter(lambda ln: not ln.startswith("169.254"),
-                             route.decode().splitlines()))
-        rt_info = route.split()
-        for i in range(len(rt_info) - 1):
-            if rt_info[i] == "dev":
-                ssh_if.append(rt_info[i+1])
-
-    # based on the basic info, get extended text details
-    for d in devices.keys():
-        if not device_type_match(devices[d], devices_type):
+    for line in lines:
+        if not line:
+            if device_type_match(current_dev, devices_type):
+                if "Driver" in current_dev:
+                    current_dev["Driver_str"] = current_dev.pop("Driver")
+                found_devices[current_dev["Slot"]] = dict(current_dev)
+            current_dev = {}
             continue
 
-        # get additional info and add it to existing data
-        devices[d] = devices[d].copy()
-        # No need to probe lspci
-        devices[d].update(get_pci_device_details(d, False).items())
+        name, value = line.decode().split("\t", 1)
+        value_list = value.rsplit(' ', 1)
+        key = name.rstrip(":")
+        # Store IDs and Strings
+        current_dev[key] = value_list[-1].strip("[]")
+        if len(value_list) > 1:
+            current_dev[key + '_str'] = value_list[0]
+            
+    return found_devices
 
+def _update_module_strings(dev_id):
+    '''Add DPDK drivers to Module_str and remove current active driver from unused list.'''
+    dev = devices[dev_id]
+    # Initialize/Merge Module_str with dpdk_drivers
+    existing_mods = dev.get("Module_str", "").split(",")
+    modules = set(filter(None, existing_mods))
+    modules.update(dpdk_drivers)
+
+    # If already bound, remove that driver from the "unused modules" list
+    if has_driver(dev_id) and dev["Driver_str"] in modules:
+        modules.remove(dev["Driver_str"])
+
+    dev["Module_str"] = ",".join(modules)
+
+def get_device_details(devices_type):
+    '''Populates the "devices" dictionary with PCI and interface details.'''
+    global devices
+    
+    # 1. Parse basic PCI info
+    devices = _parse_lspci_output(devices_type)
+
+    # 2. Get active interfaces for SSH protection
+    ssh_if = _get_active_ssh_interfaces() if devices_type == network_devices else []
+
+    # 3. Enrich with extended details
+    for d_id in list(devices.keys()):
+        # Basic update from sysfs
+        devices[d_id].update(get_pci_device_details(d_id, False))
+
+        # Check for active SSH connection
         if devices_type == network_devices:
-            for _if in ssh_if:
-                if _if in devices[d]["Interface"].split(","):
-                    devices[d]["Ssh_if"] = True
-                    devices[d]["Active"] = "*Active*"
-                    break
+            dev_ifs = devices[d_id].get("Interface", "").split(",")
+            if any(i in dev_ifs for i in ssh_if):
+                devices[d_id].update({"Ssh_if": True, "Active": "*Active*"})
 
-        # add igb_uio to list of supporting modules if needed
-        if "Module_str" in devices[d]:
-            for driver in dpdk_drivers:
-                if driver not in devices[d]["Module_str"]:
-                    devices[d]["Module_str"] = \
-                        devices[d]["Module_str"] + ",%s" % driver
-        else:
-            devices[d]["Module_str"] = ",".join(dpdk_drivers)
+        # Finalize driver/module info
+        _update_module_strings(d_id)
 
-        # make sure the driver and module strings do not have any duplicates
-        if has_driver(d):
-            modules = devices[d]["Module_str"].split(",")
-            if devices[d]["Driver_str"] in modules:
-                modules.remove(devices[d]["Driver_str"])
-                devices[d]["Module_str"] = ",".join(modules)
+def _matches_single_type(dev, template):
+    '''Check if a device matches a specific device type template.'''
+    # 1. Check Class match (first 2 characters are mandatory)
+    if dev["Class"][0:2] != template["Class"]:
+        return False
 
+    # 2. Check all other non-None fields (Vendor, Device, etc.)
+    # All specified criteria in the template must be met (logical AND)
+    for key, val in template.items():
+        if key == 'Class' or val is None:
+            continue
+
+        # template[key] can be a comma-separated list of allowed values
+        allowed_values = [v.strip() for v in val.split(',')]
+        if dev.get(key) not in allowed_values:
+            return False
+
+    return True
 
 def device_type_match(dev, devices_type):
-    for i in range(len(devices_type)):
-        param_count = len(
-            [x for x in devices_type[i].values() if x is not None])
-        match_count = 0
-        if dev["Class"][0:2] == devices_type[i]["Class"]:
-            match_count = match_count + 1
-            for key in devices_type[i].keys():
-                if key != 'Class' and devices_type[i][key]:
-                    value_list = devices_type[i][key].split(',')
-                    for value in value_list:
-                        if value.strip(' ') == dev[key]:
-                            match_count = match_count + 1
-            # count must be the number of non None parameters to match
-            if match_count == param_count:
-                return True
+    '''Check if a device matches any of the provided device types.'''
+    for template in devices_type:
+        if _matches_single_type(dev, template):
+            return True
     return False
 
 def dev_id_from_dev_name(dev_name):
