@@ -1,0 +1,136 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2021 Intel Corporation
+
+# Update assignments to hit different QoS entries
+iface, qer, fseid = 1, 2, 4
+ip_pkt_size = 46
+sleep_seconds_before_delete = 30
+
+import struct
+def convert(format, val, bigendian=True):
+    end = '>' if [bigendian] else '<'
+    return struct.pack(end + format, val, )
+
+
+Meta::SetMetadata(attrs=[{'name': 'src_iface', 'size': 1, 'value_int': iface},
+                         {'name': 'qer_id', 'size':4, 'value_int': qer},
+                         {'name': 'fseid', 'size':8, 'value_int': fseid}])
+
+Metering::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1},
+                      {'attr_name':'qer_id', 'num_bytes':4},
+                      {'attr_name':'fseid', 'num_bytes':8}],
+              values=[{'attr_name':'qfi', 'num_bytes':1}])
+
+M::Merge()
+S::Split(size=1, attribute='qfi')
+
+# Reserved gates, reject rule adds with gate=1/2/3
+m_meter  = 0 # Placeholder gate not connected. Will meter if lookup result returns this gate
+m_green  = 1 # For green traffic
+m_yellow = 2 # For yellow traffic
+m_red    = 3 # For red traffic
+
+# Rules with gate number above 3 are directly sent out w/o metering
+m_fail   = 4 # Default gate for lookup failure
+m_drop   = 5 # Explicitly asked to drop
+m_unmeter= 6 # Unmetered
+
+Metering:m_green -> M
+Metering:m_yellow -> M
+Metering:m_red -> red::Sink()
+Metering:m_drop -> drop::Sink()
+Metering:m_unmeter -> S
+
+Metering:m_fail -> fail::Sink()
+Metering.set_default_gate(gate=m_fail)
+
+# Pipeline
+Source() -> Meta -> Metering
+M -> S
+
+S:0 -> bad::Sink() # If traffic is going to this gate, meta update in QoS is not working
+S:1 -> gbr1::Sink()
+S:2 -> gbr5::Sink()
+S:3 -> gmbr6::Sink()
+S:4 -> mbr6::Sink()
+S:5 -> unmeter::Sink()
+
+# Resume workers to test concurrent read-write
+bess.resume_all()
+
+MPPS = pow(10,6) * ip_pkt_size
+
+# Add QoS entries
+# GBR only
+Metering.add(fields=[{'value_int': 1},
+                     {'value_bin': convert('L', 2)},
+                     {'value_bin': convert('Q', 4)}],
+             values=[{'value_int': 1}], # S:1
+             gate=m_meter, cir=1 * MPPS , pir=1 * MPPS, cbs=2048, pbs=2048)
+
+Metering.add(fields=[{'value_int': 1},
+                     {'value_bin': convert('L', 3)},
+                     {'value_bin': convert('Q', 6)}],
+             values=[{'value_int': 2}], # S:2
+             gate=m_meter, cir=5 * MPPS, pir=5 * MPPS, cbs=2048, pbs=2048)
+
+# GBR/MBR
+Metering.add(fields=[{'value_int': 1},
+                     {'value_bin': convert('L', 4)},
+                     {'value_bin': convert('Q', 8)}],
+             values=[{'value_int': 3}], # S:3
+             gate=m_meter, cir=3 * MPPS, pir=6 * MPPS, cbs=2048, pbs=2048)
+
+# MBR only
+Metering.add(fields=[{'value_int': 1},
+                     {'value_bin': convert('L', 5)},
+                     {'value_bin': convert('Q', 10)}],
+             values=[{'value_int': 4}], # S:4
+             gate=m_meter, cir=1, pir=6 * MPPS, cbs=2048, pbs=2048)
+
+# Unmeter
+Metering.add(fields=[{'value_int': 1},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}],
+             values=[{'value_int': 5}], # S:5
+             gate=m_unmeter)
+
+# Gate closed
+Metering.add(fields=[{'value_int': 1},
+                     {'value_bin': convert('L', 2)},
+                     {'value_bin': convert('Q', 3)}],
+             values=[{'value_int': 5}],
+             gate=m_drop)
+
+# Delete QoS entries after sleep
+import time
+time.sleep(sleep_seconds_before_delete)
+
+# GBR only
+Metering.delete(fields=[{'value_int': 1},
+                     {'value_bin': convert('L', 2)},
+                     {'value_bin': convert('Q', 4)}])
+
+Metering.delete(fields=[{'value_int': 1},
+                     {'value_bin': convert('L', 3)},
+                     {'value_bin': convert('Q', 6)}])
+
+# GBR/MBR
+Metering.delete(fields=[{'value_int': 1},
+                     {'value_bin': convert('L', 4)},
+                     {'value_bin': convert('Q', 8)}])
+
+# MBR only
+Metering.delete(fields=[{'value_int': 1},
+                     {'value_bin': convert('L', 5)},
+                     {'value_bin': convert('Q', 10)}])
+
+# Unmeter
+Metering.delete(fields=[{'value_int': 1},
+                     {'value_bin': convert('L', 6)},
+                     {'value_bin': convert('Q', 12)}])
+
+# Gate closed
+Metering.delete(fields=[{'value_int': 1},
+                     {'value_bin': convert('L', 2)},
+                     {'value_bin': convert('Q', 3)}])

@@ -68,39 +68,7 @@ func (f *far) Forwards() bool {
 func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error {
 	f.fseID = (fseid)
 
-	farID, err := farIE.FARID()
-	if err != nil {
-		return err
-	}
-
-	f.farID = farID
-
-	action, err := farIE.ApplyAction()
-	if err != nil {
-		return err
-	}
-
-	if action[0] == 0 {
-		return ErrInvalidArgument("FAR Action", action)
-	}
-
-	f.applyAction = action[0]
-
-	var fwdIEs []*ie.IE
-
-	switch op {
-	case create:
-		if (f.applyAction & ActionForward) != 0 {
-			fwdIEs, err = farIE.ForwardingParameters()
-		}
-	case update:
-		if (f.applyAction & ActionForward) != 0 {
-			fwdIEs, err = farIE.UpdateForwardingParameters()
-		}
-	default:
-		return ErrInvalidOperation(op)
-	}
-
+	fwdIEs, err := f.parseFARBasicFields(farIE, op)
 	if err != nil {
 		return err
 	}
@@ -156,4 +124,47 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 	}
 
 	return nil
+}
+
+func (f *far) parseFARBasicFields(farIE *ie.IE, op operation) ([]*ie.IE, error) {
+	farID, err := farIE.FARID()
+	if err != nil {
+		return nil, err
+	}
+
+	f.farID = farID
+
+	action, err := farIE.ApplyAction()
+	if err != nil {
+		return nil, err
+	}
+
+	if action[0] == 0 {
+		return nil, ErrInvalidArgument("FAR Action", action)
+	}
+
+	f.applyAction = action[0]
+
+	var fwdIEs []*ie.IE
+
+	switch op {
+	case create:
+		if (f.applyAction & ActionForward) != 0 {
+			fwdIEs, err = farIE.ForwardingParameters()
+			if err != nil {
+				return nil, err
+			}
+		}
+	case update:
+		if (f.applyAction & ActionForward) != 0 {
+			fwdIEs, err = farIE.UpdateForwardingParameters()
+			if err != nil {
+				return nil, err
+			}
+		}
+	default:
+		return nil, ErrInvalidOperation(op)
+	}
+
+	return fwdIEs, nil
 }

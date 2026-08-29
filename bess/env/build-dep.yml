@@ -1,0 +1,68 @@
+# SPDX-FileCopyrightText: 2016-2017, Nefeli Networks, Inc.
+# SPDX-FileCopyrightText: 2017, The Regents of the University of California.
+# SPDX-FileCopyrightText: 2024, Intel Corporation
+# SPDX-License-Identifier: BSD-3-Clause
+- hosts: all
+  tags: build-dep
+  tasks:
+    - name: Install APT build dependencies
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - cmake
+          - curl
+          - g++
+          - git
+          - libbenchmark-dev
+          - libbsd-dev
+          - libc-ares-dev
+          - libfdt-dev
+          - libgflags-dev
+          - libgoogle-glog-dev
+          - libgrpc++-dev
+          - libdpdk-dev
+          - libgtest-dev
+          - libipsec-mb-dev
+          - liblzma-dev
+          - libnuma-dev
+          - libpcap-dev
+          - libprotobuf-dev
+          - libssl-dev
+          - libunwind-dev
+          - make
+          - meson
+          - ninja-build
+          - pkg-config
+          - protobuf-compiler
+          - protobuf-compiler-grpc
+          - python3
+          - python3-apt
+          - python3-pip
+          - python3-pyelftools
+          - sudo
+          - zlib1g-dev
+        update_cache: yes
+      become: true
+    - name: Install Python development and build dependencies
+      become: true
+      pip:
+        requirements: "{{ playbook_dir }}/requirements-dev.txt"
+        executable: pip3
+        extra_args: --require-hashes --break-system-packages --ignore-installed
+    - name: Configure dynamic linker for /usr/local/lib
+      become: true
+      shell: |
+        echo "/usr/local/lib" > /etc/ld.so.conf.d/usr-local.conf
+        echo "/usr/local/lib/x86_64-linux-gnu" >> /etc/ld.so.conf.d/usr-local.conf
+        ldconfig
+    - name: Verify protoc installation
+      command: protoc --version
+      register: protoc_version
+      changed_when: false
+    - name: Display protoc version
+      debug:
+        msg: "Installed {{ protoc_version.stdout }}"
+    - name: BESS build dependencies installed
+      debug:
+        msg: "You are now ready to build BESS using build.py"

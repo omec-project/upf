@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2021 Intel Corporation
+
+num_q = 4
+kwargs = {'flow_profiles' : [3],
+          'num_inc_q': num_q,
+          'num_out_q': num_q}
+p0 = PMDPort(port_id=0, **kwargs)
+qinc_0_0::QueueInc(port=p0.name, qid=0) -> Sink()
+qinc_0_1::QueueInc(port=p0.name, qid=1) -> Sink()
+qinc_0_2::QueueInc(port=p0.name, qid=2) -> Sink()
+qinc_0_3::QueueInc(port=p0.name, qid=3) -> Sink()
+
+kwargs = {'flow_profiles' : [6, 9],
+          'num_inc_q': num_q,
+          'num_out_q': num_q}
+p1 = PMDPort(port_id=1, **kwargs)
+qinc_1_0::QueueInc(port=p1.name, qid=0) -> Sink()
+qinc_1_1::QueueInc(port=p1.name, qid=1) -> Sink()
+qinc_1_2::QueueInc(port=p1.name, qid=2) -> Sink()
+qinc_1_3::QueueInc(port=p1.name, qid=3) -> Sink()

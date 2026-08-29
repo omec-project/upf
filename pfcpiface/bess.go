@@ -119,7 +119,7 @@ func (b *bess) AddSliceInfo(sliceInfo *SliceInfo) error {
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
 
-	done := make(chan bool)
+	done := make(chan bool, 1)
 
 	b.addSliceMeter(ctx, done, sliceMeterConfig)
 
@@ -156,7 +156,7 @@ func (b *bess) SendMsgToUPF(
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
 
-	done := make(chan bool)
+	done := make(chan bool, calls)
 
 	for _, pdr := range pdrs {
 		logger.BessLog.Debugln(method, pdr)
@@ -843,7 +843,7 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 		ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 		defer cancel()
 
-		done := make(chan bool)
+		done := make(chan bool, 1)
 
 		b.addSliceMeter(ctx, done, conf.SliceMeterConfig)
 
@@ -881,6 +881,9 @@ func (b *bess) processPDR(ctx context.Context, arg *anypb.Any, method upfMsgType
 
 func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 	go func() {
+		completed := false
+		defer func() { done <- completed }()
+
 		var (
 			arg *anypb.Any
 			err error
@@ -943,12 +946,15 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 			b.processPDR(ctx, arg, upfMsgTypeAdd)
 		}
-		done <- true
+		completed = true
 	}()
 }
 
 func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 	go func() {
+		completed := false
+		defer func() { done <- completed }()
+
 		var (
 			arg *anypb.Any
 			err error
@@ -993,12 +999,15 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 			b.processPDR(ctx, arg, upfMsgTypeDel)
 		}
-		done <- true
+		completed = true
 	}()
 }
 
 func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 	go func() {
+		completed := false
+		defer func() { done <- completed }()
+
 		var (
 			cir, pir, cbs, ebs, pbs, gate uint64
 			srcIface                      uint8
@@ -1072,7 +1081,7 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 			b.addSessionQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
 		}
 
-		done <- true
+		completed = true
 	}()
 }
 
@@ -1118,6 +1127,9 @@ func (b *bess) addApplicationQER(ctx context.Context, gate uint64, srcIface uint
 
 func (b *bess) delQER(ctx context.Context, done chan<- bool, qer qer) {
 	go func() {
+		completed := false
+		defer func() { done <- completed }()
+
 		var srcIface uint8
 
 		// Uplink QER
@@ -1140,7 +1152,7 @@ func (b *bess) delQER(ctx context.Context, done chan<- bool, qer qer) {
 			b.delSessionQER(ctx, srcIface, qer)
 		}
 
-		done <- true
+		completed = true
 	}()
 }
 
@@ -1238,6 +1250,9 @@ func (b *bess) setActionValue(f far) uint8 {
 
 func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 	go func() {
+		completed := false
+		defer func() { done <- completed }()
+
 		var (
 			arg *anypb.Any
 			err error
@@ -1282,12 +1297,15 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 			b.processGtpuPathMonitoring(ctx, arg, upfMsgTypeAdd)
 		}
 
-		done <- true
+		completed = true
 	}()
 }
 
 func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 	go func() {
+		completed := false
+		defer func() { done <- completed }()
+
 		var (
 			arg *anypb.Any
 			err error
@@ -1322,7 +1340,7 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 			b.processGtpuPathMonitoring(ctx, arg, upfMsgTypeDel)
 		}
 
-		done <- true
+		completed = true
 	}()
 }
 
@@ -1348,6 +1366,9 @@ func (b *bess) processSliceMeter(ctx context.Context, arg *anypb.Any, method upf
 
 func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig SliceMeterConfig) {
 	go func() {
+		completed := false
+		defer func() { done <- completed }()
+
 		var (
 			arg                           *anypb.Any
 			err                           error
@@ -1439,7 +1460,7 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 		}
 
 		b.processSliceMeter(ctx, arg, upfMsgTypeAdd)
-		done <- true
+		completed = true
 	}()
 }
 
@@ -1529,24 +1550,34 @@ func (b *bess) delSessionQER(ctx context.Context, srcIface uint8, qer qer) {
 	}
 }
 
+// GRPCJoin waits for the given number of asynchronous operations, each of which reports
+// exactly one result on done, and reports whether all of them succeeded.
+//
+// It waits for every operation to report rather than returning as soon as one fails.
+// The callers use the result to decide what the datapath now holds, and an operation
+// still in flight when the caller has moved on can be overtaken by a later one that
+// touches the same rule — leaving the datapath holding a rule the caller believes it
+// has already replaced. A failing batch therefore costs up to the full timeout instead
+// of returning at the first failure, which the timeout already bounds.
 func (b *bess) GRPCJoin(calls int, timeout time.Duration, done chan bool) bool {
 	boom := time.After(timeout)
+	succeeded := true
 
-	for {
+	for calls > 0 {
 		select {
 		case ok := <-done:
 			if !ok {
 				logger.BessLog.Errorln("error making GRPC calls")
-				return false
+
+				succeeded = false
 			}
 
 			calls--
-			if calls == 0 {
-				return true
-			}
 		case <-boom:
 			logger.BessLog.Infoln("timed out adding entries")
 			return false
 		}
 	}
+
+	return succeeded
 }
