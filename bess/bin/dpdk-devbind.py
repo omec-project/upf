@@ -41,10 +41,10 @@ import subprocess
 from os.path import exists, abspath, dirname, basename
 
 # constants for duplicate literals
-UNBIND_OPEN_ERROR = "Error: unbind failed for %s - Cannot open %s"  
-BIND_OPEN_ERROR = "Error: bind failed for %s - Cannot open %s"  
-DRIVER_OVERRIDE_PATH = "/sys/bus/pci/devices/%s/driver_override" 
-USAGE_INFO = "Run '%s --usage' for further information" 
+UNBIND_OPEN_ERROR = "Error: unbind failed for %s - Cannot open %s"
+BIND_OPEN_ERROR = "Error: bind failed for %s - Cannot open %s"
+DRIVER_OVERRIDE_PATH = "/sys/bus/pci/devices/%s/driver_override"
+USAGE_INFO = "Run '%s --usage' for further information"
 
 # The PCI base class for all devices
 network_class = {'Class': '02', 'Vendor': None, 'Device': None,
@@ -443,7 +443,7 @@ def _finalize_bind(dev_id, driver, saved_driver, force):
         tmp = get_pci_device_details(dev_id, True)
         if "Driver_str" in tmp and tmp["Driver_str"] == driver:
             return True
-        
+
         print("Error: bind failed for %s - Cannot bind to driver %s" % (dev_id, driver))
         if saved_driver is not None:
             bind_one(dev_id, saved_driver, force)
