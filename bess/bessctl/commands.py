@@ -208,272 +208,127 @@ def complete_filename(partial_word, start_dir='', suffix='', skip_suffix=False):
     except OSError:
         return []
 
+# --- Helper Fetchers for Dynamic Data ---
+def _fetch_candidates(cli, func, processor):
+    """Generic wrapper to handle BESS RPC errors during auto-completion."""
+    try:
+        return processor(func())
+    except Exception:
+        # We ignore errors here as this is only for CLI auto-completion
+        return []
+
+def _get_workers(cli):
+    return _fetch_candidates(cli, cli.bess.list_workers,
+                             lambda r: [str(m.wid) for m in r.workers_status])
+
+def _get_drivers(cli):
+    return _fetch_candidates(cli, cli.bess.list_drivers, lambda r: r.driver_names)
+
+def _get_mclasses(cli):
+    return _fetch_candidates(cli, cli.bess.list_mclasses, lambda r: r.names)
+
+def _get_modules(cli, include_star=False):
+    names = _fetch_candidates(cli, cli.bess.list_modules,
+                              lambda r: [m.name for m in r.modules])
+    return (['*'] + names) if include_star else names
+
+def _get_ports(cli):
+    return _fetch_candidates(cli, cli.bess.list_ports,
+                             lambda r: [p.name for p in r.ports])
+
+def _get_tcs(cli):
+    return _fetch_candidates(cli, cli.bess.list_tcs,
+                             lambda r: [getattr(c, 'class').name for c in r.classes_status])
+
+def _get_gatehook_classes(cli):
+    return _fetch_candidates(cli, cli.bess.list_gatehook_classes, lambda r: r.names)
+
+# --- Token Registry ---
+# Map: var_token -> (var_type, var_desc, candidate_provider_or_list)
+TOKEN_REGISTRY = {
+    'ENABLE_DISABLE': ('endis', '', ['enable', 'disable']),
+    'CORE': ('int', '', []),
+    '[SOCKET]': ('socket', '', []),
+    'WORKER_ID': ('int', '', _get_workers),
+    'WORKER_ID...': ('wid+', 'one or more worker IDs', _get_workers),
+    'DRIVER': ('name', 'name of a port driver', _get_drivers),
+    'DRIVER...': ('name+', 'one or more port driver names', _get_drivers),
+    'MCLASS': ('name', 'name of a module class', _get_mclasses),
+    'MCLASS...': ('name+', 'one or more module class names', _get_mclasses),
+    '[NEW_MODULE]': ('name', 'specify a name of the new module instance', []),
+    'MODULE': ('name', 'name of an existing module instance',
+               lambda cli, word: _get_modules(cli)),
+    '[MODULE]': ('name', 'name of an existing module instance (* means all)',
+                 lambda cli, word: _get_modules(cli, True)),
+    'MODULE...': ('name+', 'one or more module names',
+                  lambda cli, word: _get_modules(cli)),
+    'MODULE_CMD': ('name', 'module command to run (see "show mclass")', []),
+    'ARG_TYPE': ('name', 'type of argument (see "show mclass")', []),
+    '[NEW_PORT]': ('name', 'specify a name of the new port', []),
+    '[SCHEDULER]': ('name', 'specify the type of scheduler (none for default)',
+                    ['', 'experimental']),
+    'PORT': ('name', 'name of a port', _get_ports),
+    'PORT...': ('name+', 'one or more port names', _get_ports),
+    'TC...': ('name+', 'one or more traffic class names', _get_tcs),
+    'PLUGIN_FILE': ('filename', 'plugin filename (*.so)',
+                    lambda cli, word: complete_filename(word, suffix='.so', skip_suffix=True)),
+    'CONF': ('confname', 'configuration name in "conf/" directory',
+             lambda cli, word: complete_filename(word, '%s/conf' % cli.this_dir, '.' + CONF_EXT)),
+    'CONF_FILE': ('filename', 'configuration filename',
+                  lambda cli, word: complete_filename(word)),
+    '[DIRECTION]': ('dir', 'gate direction discriminator (default "out")', ['in', 'out']),
+    'DIRECTION': ('dir', 'gate direction discriminator (default "out")', ['in', 'out']),
+    '[GATE]': ('gate', 'gate index of a module', []),
+    'GATE': ('gate', 'gate index of a module', []),
+    '[OGATE]': ('gate', 'output gate of a module (default 0)', []),
+    '[IGATE]': ('gate', 'input gate of a module (default 0)', []),
+    'GATEHOOKCLASS': ('name', 'name of a gatehook class', _get_gatehook_classes),
+    'GATEHOOKCLASS...': ('name+', 'one or more gatehook class names', _get_gatehook_classes),
+    'GATEHOOK': ('name', 'name of an existing gatehook instance', []),
+    'GATEHOOK_CMD': ('name', 'module command to run (see "show gatehookclass")', []),
+    '[ENV_VARS...]': ('map', 'Environmental variables for configuration', []),
+    '[PORT_ARGS...]': ('map', 'initial configuration for port', []),
+    '[MODULE_ARGS...]': ('pyobj', 'initial configuration for module', []),
+    '[CMD_ARGS...]': ('pyobj', 'arguments for module/gatehook command', []),
+    '[TCPDUMP_OPTS...]': ('opts', 'tcpdump(1) command-line options (e.g., "-ne tcp port 22")', []),
+    '[TSHARK_OPTS...]': ('opts', 'tshark(1) command-line options (default "-z proto,colinfo,frame.comment,frame.comment")', []),
+    '[GRAPHEASY_OPTS...]': ('opts', 'graph-easy(1p) command-line options (e.g. --as dot | dot -Tsvg -o graph.svg)', []),
+    '[BESSD_OPTS...]': ('opts', 'bess daemon command-line options (see "bessd -h")', []),
+    '[GRPC_URL]': ('filename', 'gRPC url', []),
+    '[PAUSE_WORKERS]': ('pause_workers', 'determines whether to pause workers', ['pause', 'no_pause']),
+    '[HOST]': ('host', 'HTTP server address to listen on (default: "localhost")', []),
+    '[PORT_NUMBER]': ('int', 'HTTP server address to listen on (default: 5000)', []),
+}
+
+# --- Main Dispatcher ---
 def get_var_attrs(cli, var_token, partial_word):
-    var_type = None
-    var_desc = ''
+    """Refactored get_var_attrs with Cognitive Complexity < 15."""
+    if var_token not in TOKEN_REGISTRY:
+        return None
+
+    var_type, var_desc, provider = TOKEN_REGISTRY[var_token]
     var_candidates = []
 
     try:
-        if var_token == 'ENABLE_DISABLE':
-            var_type = 'endis'
-            var_candidates = ['enable', 'disable']
-
-        elif var_token == 'CORE':
-            var_type = 'int'
-
-        elif var_token == '[SOCKET]':
-            var_type = 'socket'
-
-        elif var_token == 'WORKER_ID':
-            var_type = 'int'
-            try:
-                var_candidates = [str(m.wid) for m in
-                                  cli.bess.list_workers().workers_status]
-            except:
-                pass
-
-        elif var_token == 'WORKER_ID...':
-            var_type = 'wid+'
-            var_desc = 'one or more worker IDs'
-            try:
-                var_candidates = [str(m.wid) for m in
-                                  cli.bess.list_workers().workers_status]
-            except:
-                pass
-
-        elif var_token == 'DRIVER':
-            var_type = 'name'
-            var_desc = 'name of a port driver'
-            try:
-                var_candidates = cli.bess.list_drivers().driver_names
-            except:
-                pass
-
-        elif var_token == 'DRIVER...':
-            var_type = 'name+'
-            var_desc = 'one or more port driver names'
-            try:
-                var_candidates = cli.bess.list_drivers().driver_names
-            except:
-                pass
-
-        elif var_token == 'MCLASS':
-            var_type = 'name'
-            var_desc = 'name of a module class'
-            try:
-                var_candidates = cli.bess.list_mclasses().names
-            except:
-                pass
-
-        elif var_token == 'MCLASS...':
-            var_type = 'name+'
-            var_desc = 'one or more module class names'
-            try:
-                var_candidates = cli.bess.list_mclasses().names
-            except:
-                pass
-
-        elif var_token == '[NEW_MODULE]':
-            var_type = 'name'
-            var_desc = 'specify a name of the new module instance'
-
-        elif var_token == 'MODULE':
-            var_type = 'name'
-            var_desc = 'name of an existing module instance'
-            try:
-                var_candidates = [m.name for m in
-                                  cli.bess.list_modules().modules]
-            except:
-                pass
-
-        elif var_token == '[MODULE]':
-            var_type = 'name'
-            var_desc = 'name of an existing module instance (* means all)'
-            var_candidates = ['*']
-            try:
-                var_candidates += [m.name for m in
-                                   cli.bess.list_modules().modules]
-            except:
-                pass
-
-        elif var_token == 'MODULE...':
-            var_type = 'name+'
-            var_desc = 'one or more module names'
-            try:
-                var_candidates = [m.name for m in
-                                  cli.bess.list_modules().modules]
-            except:
-                pass
-
-        elif var_token == 'MODULE_CMD':
-            var_type = 'name'
-            var_desc = 'module command to run (see "show mclass")'
-
-        elif var_token == 'ARG_TYPE':
-            var_type = 'name'
-            var_desc = 'type of argument (see "show mclass")'
-
-        elif var_token == '[NEW_PORT]':
-            var_type = 'name'
-            var_desc = 'specify a name of the new port'
-
-        elif var_token == '[SCHEDULER]':
-            var_type = 'name'
-            var_desc = 'specify the type of scheduler (none for default)'
-            var_candidates = ['', 'experimental']
-
-        elif var_token == 'PORT':
-            var_type = 'name'
-            var_desc = 'name of a port'
-            try:
-                var_candidates = [p.name for p in cli.bess.list_ports().ports]
-            except:
-                pass
-
-        elif var_token == 'PORT...':
-            var_type = 'name+'
-            var_desc = 'one or more port names'
-            try:
-                var_candidates = [p.name for p in cli.bess.list_ports().ports]
-            except:
-                pass
-
-        elif var_token == 'TC...':
-            var_type = 'name+'
-            var_desc = 'one or more traffic class names'
-            try:
-                var_candidates = [getattr(c, 'class').name
-                                  for c in cli.bess.list_tcs().classes_status]
-            except:
-                pass
-
-        elif var_token == 'CONF':
-            var_type = 'confname'
-            var_desc = 'configuration name in "conf/" directory'
-            var_candidates = complete_filename(partial_word,
-                                               '%s/conf' % cli.this_dir,
-                                               '.' + CONF_EXT)
-
-        elif var_token == 'CONF_FILE':
-            var_type = 'filename'
-            var_desc = 'configuration filename'
-            var_candidates = complete_filename(partial_word)
-
-        elif var_token == 'PLUGIN_FILE':
-            var_type = 'filename'
-            var_desc = 'plugin filename (*.so)'
-            var_candidates = complete_filename(partial_word, suffix='.so',
-                                               skip_suffix=True)
-
-        elif var_token in ('[DIRECTION]', 'DIRECTION'):
-            var_type = 'dir'
-            var_desc = 'gate direction discriminator (default "out")'
-            var_candidates = ['in', 'out']
-
-        elif var_token in ('[GATE]', 'GATE'):
-            var_type = 'gate'
-            var_desc = 'gate index of a module'
-
-        elif var_token == '[OGATE]':
-            var_type = 'gate'
-            var_desc = 'output gate of a module (default 0)'
-
-        elif var_token == '[IGATE]':
-            var_type = 'gate'
-            var_desc = 'input gate of a module (default 0)'
-
-        elif var_token == 'GATEHOOKCLASS':
-            var_type = 'name'
-            var_desc = 'name of a gatehook class'
-            try:
-                var_candidates = cli.bess.list_gatehook_classes().names
-            except:
-                pass
-
-        elif var_token == 'GATEHOOKCLASS...':
-            var_type = 'name+'
-            var_desc = 'one or more gatehook class names'
-            try:
-                var_candidates = cli.bess.list_gatehook_classes().names
-            except:
-                pass
-
-        elif var_token == 'GATEHOOK':
-            var_type = 'name'
-            var_desc = 'name of an existing gatehook instance'
-
-        elif var_token == 'GATEHOOK_CMD':
-            var_type = 'name'
-            var_desc = 'module command to run (see "show gatehookclass")'
-
-        elif var_token == '[ENV_VARS...]':
-            var_type = 'map'
-            var_desc = 'Environmental variables for configuration'
-
-        elif var_token == '[PORT_ARGS...]':
-            var_type = 'map'
-            var_desc = 'initial configuration for port'
-
-        elif var_token == '[MODULE_ARGS...]':
-            var_type = 'pyobj'
-            var_desc = 'initial configuration for module'
-
-        elif var_token == '[CMD_ARGS...]':
-            var_type = 'pyobj'
-            var_desc = 'arguments for module/gatehook command'
-
-        elif var_token == '[TCPDUMP_OPTS...]':
-            var_type = 'opts'
-            var_desc = 'tcpdump(1) command-line options ' \
-                '(e.g., "-ne tcp port 22")'
-
-        elif var_token == '[TSHARK_OPTS...]':
-            var_type = 'opts'
-            var_desc = 'tshark(1) command-line options ' \
-                '(default "-z proto,colinfo,frame.comment,frame.comment")'
-
-        elif var_token == '[GRAPHEASY_OPTS...]':
-            var_type = 'opts'
-            var_desc = 'graph-easy(1p) command-line options ' \
-                '(e.g. --as dot | dot -Tsvg -o graph.svg)'
-
-        elif var_token == '[BESSD_OPTS...]':
-            var_type = 'opts'
-            var_desc = 'bess daemon command-line options (see "bessd -h")'
-
-        elif var_token == '[GRPC_URL]':
-            var_type = 'filename'
-            var_desc = 'gRPC url'
-
-        elif var_token == '[PAUSE_WORKERS]':
-            var_type = 'pause_workers'
-            var_desc = 'determines whether to pause workers for the operation (default: "pause")'
-            var_candidates = ['pause', 'no_pause']
-
-        elif var_token == '[HOST]':
-            var_type = 'host'
-            var_desc = 'HTTP server address to listen on (default: "localhost")'
-
-        elif var_token == '[PORT_NUMBER]':
-            var_type = 'int'
-            var_desc = 'HTTP server address to listen on (default: 5000)'
-
+        if callable(provider):
+            # Check if provider needs partial_word (for filenames) or just cli
+            sig = inspect.signature(provider)
+            if len(sig.parameters) == 2:
+                var_candidates = provider(cli, partial_word)
+            else:
+                var_candidates = provider(cli)
+        else:
+            var_candidates = provider
 
     except socket.error as e:
         if e.errno in [errno.ECONNRESET, errno.EPIPE]:
             cli.bess.disconnect()
         else:
             raise
-
     except (cli.bess.Error, cli.bess.APIError, cli.bess.RPCError):
-        # ignore errors, this is just auto completion
         pass
 
-    if var_type is None:
-        return None
-    else:
-        return var_type, var_desc, var_candidates
-
+    return var_type, var_desc, var_candidates
 
 # Return (head, tail)
 #   head: consumed string portion
