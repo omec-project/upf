@@ -508,96 +508,96 @@ def _parse_map(**kwargs):
 # Return (mapped_value, tail)
 #   mapped_value: Python value/object from the consumed token(s)
 #   tail: the rest of input line
-def bind_var(cli, var_type, line):
-    head, remainder = split_var(cli, var_type, line)
-
-    # default behavior
-    val = head
-
+def _handle_endis_dir(cli, val, var_type):
     if var_type == 'endis':
-        if 'enable'.startswith(val):
-            val = 'enable'
-        elif 'disable'.startswith(val):
-            val = 'disable'
-        else:
-            raise cli.BindError('"endis" must be either "enable" or "disable"')
+        if 'enable'.startswith(val): return 'enable'
+        if 'disable'.startswith(val): return 'disable'
+        raise cli.BindError('"endis" must be either "enable" or "disable"')
+    if var_type == 'dir':
+        if 'in'.startswith(val): return 'in'
+        if 'out'.startswith(val): return 'out'
+        raise cli.BindError('"dir" must be either "in" or "out"')
 
-    elif var_type == 'dir':
-        if 'in'.startswith(val):
-            val = 'in'
-        elif 'out'.startswith(val):
-            val = 'out'
-        else:
-            raise cli.BindError('"dir" must be either "in" or "out"')
+def _handle_numeric(cli, val, var_type):
+    if var_type in ['gate', 'socket']:
+        if val.isdigit(): return int(val)
+        raise cli.BindError(f'"{var_type}" must be a positive number')
+    try:
+        return int(val)
+    except Exception:
+        raise cli.BindError('Expected an integer')
 
-    elif var_type == 'wid+':
-        val = []
-        for wid_str in head.split():
-            if wid_str.isdigit():
-                val.append(int(wid_str))
-            else:
-                raise cli.BindError('"wid" must be a positive number')
-        val = sorted(list(set(val)))
+def _handle_collections(cli, val, var_type):
+    if var_type == 'wid+':
+        res = []
+        for x in val.split():
+            if not x.isdigit(): raise cli.BindError('"wid" must be a positive number')
+            res.append(int(x))
+        return sorted(list(set(res)))
+    if var_type == 'name+':
+        return sorted(list(set(val.split())))
+    if var_type == 'opts':
+        return val.split()
 
-    elif var_type == 'host':
+def _handle_validation(cli, val, var_type):
+    if var_type == 'host':
         dns = re.match(r'^[a-zA-Z0-9][a-zA-Z0-9\-.]*$', val)
         ip = re.match(r'^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$', val)
         if dns is None and ip is None:
-            raise cli.BindError(
-                '"host" must be a valid DNS name or IPv4 address')
+            raise cli.BindError('"host" must be a valid DNS name or IPv4 address')
+    elif var_type == 'name' and re.match(r'^[\S]*$', val) is None:
+        raise cli.BindError('"name" must not contain whitespaces')
+    elif var_type in ['confname', 'filename'] and '\0' in val:
+        raise cli.BindError(f'Invalid {var_type}')
+    return val
 
-    elif var_type == 'name':
-        if re.match(r'^[\S]*$', val) is None:
-            raise cli.BindError('"name" must not contain whitespaces')
-
-    elif var_type == 'gate':
-        if head.isdigit():
-            val = int(head)
-        else:
-            raise cli.BindError('"gate" must be a positive number')
-
-    elif var_type == 'socket':
-        if head.isdigit():
-            val = int(head)
-        else:
-            raise cli.BindError('"socket" must be a positive number')
-
-    elif var_type == 'name+':
-        val = sorted(list(set(head.split())))  # collect unique items
-
-    elif var_type == 'confname':
-        if val.find('\0') >= 0:
-            raise cli.BindError('Invalid configuration name')
-
-    elif var_type == 'filename':
-        if val.find('\0') >= 0:
-            raise cli.BindError('Invalid filename')
-
-    elif var_type == 'map':
-        try:
-            val = eval('_parse_map(%s)' % head)
-        except:
+def _handle_eval(cli, val, var_type):
+    try:
+        if var_type == 'map':
+            return eval('_parse_map(%s)' % val)
+        # pyobj case
+        return eval(val) if val.strip() != '' else None
+    except Exception:
+        if var_type == 'map':
             raise cli.BindError('"map" should be "key=val, key=val, ..."')
-
-    elif var_type == 'pyobj':
-        try:
-            if head.strip() == '':
-                val = None
-            else:
-                val = eval(head)
-        except:
+        else:
             raise cli.BindError(
                 '"pyobj" should be an object in python syntax'
                 ' (e.g., 42, "foo", ["hello", "world"], {"bar": "baz"})')
 
-    elif var_type == 'opts':
-        val = val.split()
+def _handle_pause_workers(cli, val, var_type):
+    if 'pause'.startswith(val):
+        return 'pause'
+    elif 'no_pause'.startswith(val):
+        return 'no_pause'
+    else:
+        raise cli.BindError('"pause_workers" must be either "pause" or "no_pause"')
 
-    elif var_type == 'int':
-        try:
-            val = int(val)
-        except Exception:
-            raise cli.BindError('Expected an integer')
+def bind_var(cli, var_type, line):
+    """Refactored bind_var with Cognitive Complexity < 15."""
+    head, remainder = split_var(cli, var_type, line)
+
+    # Map types to their respective handler functions
+    handler_map = {
+        'endis': _handle_endis_dir,
+        'dir': _handle_endis_dir,
+        'gate': _handle_numeric,
+        'socket': _handle_numeric,
+        'int': _handle_numeric,
+        'wid+': _handle_collections,
+        'name+': _handle_collections,
+        'opts': _handle_collections,
+        'host': _handle_validation,
+        'name': _handle_validation,
+        'confname': _handle_validation,
+        'filename': _handle_validation,
+        'map': _handle_eval,
+        'pyobj': _handle_eval,
+        'pause_workers': _handle_pause_workers,
+    }
+
+    handler = handler_map.get(var_type)
+    val = handler(cli, head, var_type) if handler else head
 
     return val, remainder
 
