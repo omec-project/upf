@@ -17,6 +17,11 @@ import (
 const (
 	reservedProto         = uint8(0xff)
 	Ipv4WildcardNetString = "0.0.0.0/0"
+
+	filterActionPermit = "permit"
+	filterActionDeny   = "deny"
+	filterDirectionIn  = "in"
+	filterDirectionOut = "out"
 )
 
 var errBadFilterDesc = errors.New("unsupported Filter Description format")
@@ -196,8 +201,8 @@ func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
 
 func parseAction(action string) error {
 	switch action {
-	case "permit":
-	case "deny":
+	case filterActionPermit:
+	case filterActionDeny:
 	default:
 		return errBadFilterDesc
 	}
@@ -207,8 +212,8 @@ func parseAction(action string) error {
 
 func parseDirection(dir string) error {
 	switch dir {
-	case "in":
-	case "out":
+	case filterDirectionIn:
+	case filterDirectionOut:
 	default:
 		return errBadFilterDesc
 	}
