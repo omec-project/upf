@@ -114,7 +114,7 @@ func TestDumpRawPFCP_DoesNotOverwriteExistingFile(t *testing.T) {
 	}
 
 	dumpPath := filepath.Join(dumpDir, entries[0].Name())
-	if err := dumpRawPFCP(dumpDir, addr, secondPayload); err != nil {
+	if err = dumpRawPFCP(dumpDir, addr, secondPayload); err != nil {
 		t.Fatalf("second dumpRawPFCP failed: %v", err)
 	}
 

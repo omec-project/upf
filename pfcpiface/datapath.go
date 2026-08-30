@@ -18,16 +18,23 @@ const (
 	upfMsgTypeClear
 )
 
+const (
+	upfMethodAdd    = "add"
+	upfMethodModify = "modify"
+	upfMethodDelete = "delete"
+	upfMethodClear  = "clear"
+)
+
 func (u upfMsgType) String() string {
 	switch u {
 	case upfMsgTypeAdd:
-		return "add"
+		return upfMethodAdd
 	case upfMsgTypeMod:
-		return "modify"
+		return upfMethodModify
 	case upfMsgTypeDel:
-		return "delete" //nolint
+		return upfMethodDelete //nolint
 	case upfMsgTypeClear:
-		return "clear"
+		return upfMethodClear
 	default:
 		return UnknownString
 	}

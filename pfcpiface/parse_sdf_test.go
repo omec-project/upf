@@ -230,7 +230,7 @@ func Test_parseAction(t *testing.T) {
 		args    string
 		wantErr bool
 	}{
-		{name: "permit action", args: "permit", wantErr: false},
+		{name: "permit action", args: filterActionPermit, wantErr: false},
 		{name: "deny action", args: "deny", wantErr: false},
 		{name: "empty action", args: "", wantErr: true},
 		{name: "invalid action", args: "allow", wantErr: true},
@@ -254,7 +254,7 @@ func Test_parseDirection(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "in direction", args: "in", wantErr: false},
-		{name: "out direction", args: "out", wantErr: false},
+		{name: "out direction", args: filterDirectionOut, wantErr: false},
 		{name: "empty direction", args: "", wantErr: true},
 		{name: "invalid direction", args: "both", wantErr: true},
 	}
@@ -303,8 +303,8 @@ func Test_parseFlowDesc(t *testing.T) {
 				ueIP:     ueIpString,
 			},
 			want: &ipFilterRule{
-				action:    "permit",
-				direction: "out",
+				action:    filterActionPermit,
+				direction: filterDirectionOut,
 				proto:     reservedProto,
 				src: endpoint{
 					IPNet: newIpv4WildcardNet(),
@@ -323,8 +323,8 @@ func Test_parseFlowDesc(t *testing.T) {
 				ueIP:     ueIpString,
 			},
 			want: &ipFilterRule{
-				action:    "permit",
-				direction: "out",
+				action:    filterActionPermit,
+				direction: filterDirectionOut,
 				proto:     tcpProto,
 				src: endpoint{
 					IPNet: mustParseCIDRNet("60.60.0.102/32"),
@@ -343,8 +343,8 @@ func Test_parseFlowDesc(t *testing.T) {
 				ueIP:     ueIpString,
 			},
 			want: &ipFilterRule{
-				action:    "permit",
-				direction: "out",
+				action:    filterActionPermit,
+				direction: filterDirectionOut,
 				proto:     udpProto,
 				src: endpoint{
 					IPNet: newIpv4WildcardNet(),
@@ -363,8 +363,8 @@ func Test_parseFlowDesc(t *testing.T) {
 				ueIP:     ueIpString,
 			},
 			want: &ipFilterRule{
-				action:    "permit",
-				direction: "out",
+				action:    filterActionPermit,
+				direction: filterDirectionOut,
 				proto:     reservedProto,
 				src: endpoint{
 					IPNet: mustParseCIDRNet("60.60.0.1/26"),
@@ -383,8 +383,8 @@ func Test_parseFlowDesc(t *testing.T) {
 				ueIP:     ueIpString,
 			},
 			want: &ipFilterRule{
-				action:    "permit",
-				direction: "out",
+				action:    filterActionPermit,
+				direction: filterDirectionOut,
 				proto:     reservedProto,
 				src: endpoint{
 					IPNet: newIpv4AddrAsNet(ipGateway),
@@ -403,8 +403,8 @@ func Test_parseFlowDesc(t *testing.T) {
 				ueIP:     ueIpString,
 			},
 			want: &ipFilterRule{
-				action:    "permit",
-				direction: "out",
+				action:    filterActionPermit,
+				direction: filterDirectionOut,
 				proto:     reservedProto,
 				src: endpoint{
 					IPNet: newIpv4AddrAsNet(ipGateway),
@@ -423,8 +423,8 @@ func Test_parseFlowDesc(t *testing.T) {
 				ueIP:     ueIpString,
 			},
 			want: &ipFilterRule{
-				action:    "permit",
-				direction: "out",
+				action:    filterActionPermit,
+				direction: filterDirectionOut,
 				proto:     reservedProto,
 				src: endpoint{
 					IPNet: newIpv4AddrAsNet(ipGateway),
@@ -443,8 +443,8 @@ func Test_parseFlowDesc(t *testing.T) {
 				ueIP:     ueIpString,
 			},
 			want: &ipFilterRule{
-				action:    "permit",
-				direction: "out",
+				action:    filterActionPermit,
+				direction: filterDirectionOut,
 				proto:     reservedProto,
 				src: endpoint{
 					IPNet: newIpv4AddrAsNet(ipGateway),
@@ -463,8 +463,8 @@ func Test_parseFlowDesc(t *testing.T) {
 				ueIP:     ueIpString,
 			},
 			want: &ipFilterRule{
-				action:    "permit",
-				direction: "out",
+				action:    filterActionPermit,
+				direction: filterDirectionOut,
 				proto:     reservedProto,
 				src: endpoint{
 					IPNet: newIpv4AddrAsNet(ipGateway),
@@ -483,8 +483,8 @@ func Test_parseFlowDesc(t *testing.T) {
 				ueIP:     "0.0.0.0",
 			},
 			want: &ipFilterRule{
-				action:    "permit",
-				direction: "out",
+				action:    filterActionPermit,
+				direction: filterDirectionOut,
 				proto:     udpProto,
 				src: endpoint{
 					IPNet: mustParseCIDRNet("60.60.0.1/32"),
