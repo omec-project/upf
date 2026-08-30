@@ -17,11 +17,13 @@ type Service struct {
 	sessionDuration *prometheus.HistogramVec
 }
 
+const labelNodeID = "node_id"
+
 func NewPrometheusService() (*Service, error) {
 	msgCount := prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "pfcp_messages_total",
 		Help: "Counter for incoming and outgoing PFCP messages",
-	}, []string{"node_id", "message_type", "direction", "result"})
+	}, []string{labelNodeID, "message_type", "direction", "result"})
 
 	if err := prometheus.Register(msgCount); err != nil {
 		return nil, err
@@ -31,7 +33,7 @@ func NewPrometheusService() (*Service, error) {
 		Name:    "pfcp_messages_duration_seconds",
 		Help:    "The latency of the PFCP request",
 		Buckets: []float64{1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 1e1},
-	}, []string{"node_id", "message_type", "direction"})
+	}, []string{labelNodeID, "message_type", "direction"})
 
 	if err := prometheus.Register(msgDuration); err != nil {
 		return nil, err
@@ -40,7 +42,7 @@ func NewPrometheusService() (*Service, error) {
 	sessions := prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "pfcp_sessions",
 		Help: "Number of PFCP sessions currently in the UPF",
-	}, []string{"node_id"})
+	}, []string{labelNodeID})
 
 	if err := prometheus.Register(sessions); err != nil {
 		return nil, err
@@ -62,7 +64,7 @@ func NewPrometheusService() (*Service, error) {
 			7 * 24 * time.Hour.Seconds(),
 			4 * 7 * 24 * time.Hour.Seconds(),
 		},
-	}, []string{"node_id"})
+	}, []string{labelNodeID})
 
 	if err := prometheus.Register(sessionDuration); err != nil {
 		return nil, err

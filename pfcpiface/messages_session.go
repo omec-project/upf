@@ -161,7 +161,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 	}
 
 	session.MarkSessionQer(session.qers)
-	// FIXME: since PacketForwardingRules doesn't store pointers,
+	// TODO: since PacketForwardingRules doesn't store pointers,
 	//  we must also mark session QERs in addQERs.
 	//  We need a kind of refactoring to clean it up.
 	session.MarkSessionQer(addQERs)
@@ -361,7 +361,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 	}
 
 	session.MarkSessionQer(session.qers)
-	// FIXME: since PacketForwardingRules doesn't store pointers,
+	// TODO: since PacketForwardingRules doesn't store pointers,
 	//  we must also mark session QERs in addQERs.
 	//  We need a kind of refactoring to clean it up.
 	session.MarkSessionQer(addQERs)
