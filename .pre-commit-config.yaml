@@ -29,9 +29,13 @@ repos:
         types: [go]
         pass_filenames: false
   - repo: https://github.com/golangci/golangci-lint
-    rev: v2.11.3
+    rev: v2.12.2
     hooks:
       - id: golangci-lint-full
+  - repo: https://github.com/google/yamlfmt
+    rev: v0.21.0
+    hooks:
+      - id: yamlfmt
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -41,10 +45,6 @@ repos:
       - id: trailing-whitespace
         args:
           - --markdown-linebreak-ext=md
-  - repo: https://github.com/google/yamlfmt
-    rev: v0.21.0
-    hooks:
-      - id: yamlfmt
   - repo: https://codeberg.org/fsfe/reuse-tool
     rev: v6.2.0
     hooks:

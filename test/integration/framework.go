@@ -24,6 +24,7 @@ import (
 const (
 	ConfigPath       = "/tmp/upf.jsonc"
 	defaultSDFFilter = "permit out udp from any to assigned 80-80"
+	sdfFilterUDP80   = "permit out udp from any 80-80 to assigned"
 
 	ueAddress    = "17.0.0.1"
 	upfN3Address = "198.18.0.1"

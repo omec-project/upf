@@ -41,43 +41,52 @@ type upfCollector struct {
 	upf *upf
 }
 
+const (
+	labelDir       = "dir"
+	labelIPAddress = "ipAddress"
+	labelFSEID     = "fseid"
+	labelIface     = "iface"
+	labelPDR       = "pdr"
+	labelUeIP      = "ue_ip"
+)
+
 func newUpfCollector(upf *upf) *upfCollector {
 	return &upfCollector{
 		packets: prometheus.NewDesc(prometheus.BuildFQName("upf", "packets", "count"),
 			"Shows the number of packets received by the UPF port",
-			[]string{"iface", "dir"}, nil,
+			[]string{labelIface, labelDir}, nil,
 		),
 		bytes: prometheus.NewDesc(prometheus.BuildFQName("upf", "bytes", "count"),
 			"Shows the number of bytes received by the UPF port",
-			[]string{"iface", "dir"}, nil,
+			[]string{labelIface, labelDir}, nil,
 		),
 		dropped: prometheus.NewDesc(prometheus.BuildFQName("upf", "dropped", "count"),
 			"Shows the number of packets dropped on receive by the UPF port",
-			[]string{"iface", "dir"}, nil,
+			[]string{labelIface, labelDir}, nil,
 		),
 		latency: prometheus.NewDesc(prometheus.BuildFQName("upf", "latency", "ns"),
 			"Shows the packet processing latency percentiles in UPF",
-			[]string{"iface"}, nil,
+			[]string{labelIface}, nil,
 		),
 		jitter: prometheus.NewDesc(prometheus.BuildFQName("upf", "jitter", "ns"),
 			"Shows the packet processing jitter percentiles in UPF",
-			[]string{"iface"}, nil,
+			[]string{labelIface}, nil,
 		),
 		gtpupackets: prometheus.NewDesc(prometheus.BuildFQName("upf", "gtpupackets", "count"),
 			"Shows the number of gtpu packets (replies) received by the UPF for a given gNB",
-			[]string{"ipAddress"}, nil,
+			[]string{labelIPAddress}, nil,
 		),
 		gtpulatencymin: prometheus.NewDesc(prometheus.BuildFQName("upf", "gtpulatencymin", "ns"),
 			"Shows the minimum latency for a gtpu path monitoring packet in UPF",
-			[]string{"ipAddress"}, nil,
+			[]string{labelIPAddress}, nil,
 		),
 		gtpulatencymean: prometheus.NewDesc(prometheus.BuildFQName("upf", "gtpulatencymean", "ns"),
 			"Shows the mean latency for a gtpu path monitoring packet in UPF",
-			[]string{"ipAddress"}, nil,
+			[]string{labelIPAddress}, nil,
 		),
 		gtpulatencymax: prometheus.NewDesc(prometheus.BuildFQName("upf", "gtpulatencymax", "ns"),
 			"Shows the maximum latency for a gtpu path monitoring packet in UPF",
-			[]string{"ipAddress"}, nil,
+			[]string{labelIPAddress}, nil,
 		),
 		upf: upf,
 	}
@@ -134,27 +143,27 @@ func NewPFCPNodeCollector(node *PFCPNode) *PfcpNodeCollector {
 		node: node,
 		sessionLatency: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "latency_ns"),
 			"Shows the latency of a session in UPF",
-			[]string{"fseid", "pdr", "ue_ip"}, nil,
+			[]string{labelFSEID, labelPDR, labelUeIP}, nil,
 		),
 		sessionJitter: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "jitter_ns"),
 			"Shows the jitter of a session in UPF",
-			[]string{"fseid", "pdr", "ue_ip"}, nil,
+			[]string{labelFSEID, labelPDR, labelUeIP}, nil,
 		),
 		sessionTxPackets: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "tx_packets"),
 			"Shows the total number of packets sent for a given session in UPF",
-			[]string{"fseid", "pdr", "ue_ip"}, nil,
+			[]string{labelFSEID, labelPDR, labelUeIP}, nil,
 		),
 		sessionRxPackets: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "rx_packets"),
 			"Shows the total number of packets received for a given session in UPF",
-			[]string{"fseid", "pdr", "ue_ip"}, nil,
+			[]string{labelFSEID, labelPDR, labelUeIP}, nil,
 		),
 		sessionDroppedPackets: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "dropped_packets"),
 			"Shows the number of packets dropped for a given session in UPF",
-			[]string{"fseid", "pdr", "ue_ip"}, nil,
+			[]string{labelFSEID, labelPDR, labelUeIP}, nil,
 		),
 		sessionTxBytes: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "tx_bytes"),
 			"Shows the total number of bytes for a given session in UPF",
-			[]string{"fseid", "pdr", "ue_ip"}, nil,
+			[]string{labelFSEID, labelPDR, labelUeIP}, nil,
 		),
 	}
 }

@@ -445,8 +445,8 @@ func (p *pdr) parseApplicationID(ie *ie.IE, appPFDs map[string]appPFD) error {
 			return errBadFilterDesc
 		}
 
-		if (p.srcIface == access && ipf.direction == "out") ||
-			(p.srcIface == core && ipf.direction == "in") {
+		if (p.srcIface == access && ipf.direction == filterDirectionOut) ||
+			(p.srcIface == core && ipf.direction == filterDirectionIn) {
 			logger.Debug("Found a matching flow description")
 
 			if ipf.proto != reservedProto {
@@ -512,7 +512,7 @@ func (p *pdr) parseSDFFilter(ie *ie.IE) error {
 		p.appFilter.dstPortRange = ipf.dst.ports
 		p.appFilter.srcPortRange = ipf.src.ports
 
-		// FIXME: temporary workaround for SDF Filter,
+		// TODO: temporary workaround for SDF Filter,
 		//  remove once we meet spec compliance
 		if !p.appFilter.dstPortRange.isWildcardMatch() {
 			p.appFilter.srcPortRange = p.appFilter.dstPortRange
@@ -527,7 +527,7 @@ func (p *pdr) parseSDFFilter(ie *ie.IE) error {
 		p.appFilter.dstPortRange = ipf.src.ports
 		p.appFilter.srcPortRange = ipf.dst.ports
 
-		// FIXME: temporary workaround for SDF Filter,
+		// TODO: temporary workaround for SDF Filter,
 		//  remove once we meet spec compliance
 		if !p.appFilter.srcPortRange.isWildcardMatch() {
 			p.appFilter.dstPortRange = p.appFilter.srcPortRange
