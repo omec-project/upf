@@ -176,11 +176,10 @@ func processFlowFields(fields []string, ipf *ipFilterRule, parseLog interface{ E
 					return errBadFilterDesc
 				}
 				xform(i)
-				ports, err := parsePorts(fields[i])
+				err := ipf.src.parsePort(fields[i])
 				if err != nil {
 					return err
 				}
-				ipf.srcPorts = ports
 			}
 		case "to":
 			i++
@@ -201,11 +200,10 @@ func processFlowFields(fields []string, ipf *ipFilterRule, parseLog interface{ E
 					return errBadFilterDesc
 				}
 				xform(i)
-				ports, err := parsePorts(fields[i])
+				err := ipf.dst.parsePort(fields[i])
 				if err != nil {
 					return err
 				}
-				ipf.dstPorts = ports
 			}
 		}
 	}
