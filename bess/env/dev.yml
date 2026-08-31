@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2016-2017, Nefeli Networks, Inc.
+# SPDX-FileCopyrightText: 2017, The Regents of the University of California.
+# SPDX-FileCopyrightText: 2024, Intel Corporation
+# SPDX-License-Identifier: BSD-3-Clause
+- import_playbook: ci.yml
+- import_playbook: docker.yml
+- import_playbook: runtime.yml
+- hosts: all
+  tags: dev
+  tasks:
+    - name: Install recommended packages for developers
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - git
+          - gdb
+          - linux-tools-common
+          - vim
+          - nano
+          - lcov
+          - python-autopep8
+          - graphviz
+        update_cache: yes
+      become: true

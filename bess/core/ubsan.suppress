@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2016-2017, Nefeli Networks, Inc.
+# SPDX-FileCopyrightText: 2017, The Regents of the University of California.
+# SPDX-License-Identifier: BSD-3-Clause
+
+# This file contains a list of functions/files that should be ignored by
+# clang's UndefinedBehaviorSanitizer. For more details, see:
+# https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
+
+# ignore all misaligned store/load issues, since we are on x86
+alignment:*

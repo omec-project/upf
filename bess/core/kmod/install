@@ -1,0 +1,15 @@
+#!/bin/sh
+
+# SPDX-FileCopyrightText: 2016-2017, Nefeli Networks, Inc.
+# SPDX-FileCopyrightText: 2017, The Regents of the University of California.
+# SPDX-License-Identifier: BSD-3-Clause
+
+sudo killall -q bessd
+sleep 1
+if lsmod | grep -q bess; then
+	sudo rmmod bess || exit 0
+fi
+
+make && sudo insmod bess.ko && echo "Module successfully installed!"
+sudo chmod 0444 /dev/bess
+sudo perf buildid-cache -a bess.ko

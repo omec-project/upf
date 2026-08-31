@@ -1,17 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2024-present Intel Corporation
 name: Release Pipeline
-
 on:
   push:
     branches:
       - main
     paths:
       - "VERSION"
-
 permissions:
   contents: read
-
 jobs:
   tag-github:
     permissions:
@@ -20,7 +17,6 @@ jobs:
       id-token: write
     uses: omec-project/.github/.github/workflows/tag-github.yml@c6f69e74f8ee9034dcc237ccbd719de59526aee5 # v0.0.30
     secrets: inherit
-
   release-image:
     needs: tag-github
     permissions:
@@ -35,7 +31,6 @@ jobs:
       changed: ${{ needs.tag-github.outputs.changed }}
       version: ${{ needs.tag-github.outputs.version }}
     secrets: inherit
-
   update-version:
     needs: tag-github
     permissions:
@@ -48,7 +43,6 @@ jobs:
       changed: ${{ needs.tag-github.outputs.changed }}
       version: ${{ needs.tag-github.outputs.version }}
     secrets: inherit
-
   sbom-source:
     needs: tag-github
     permissions:
@@ -61,7 +55,6 @@ jobs:
       artifact_name: ${{ github.event.repository.name }}-${{ needs.tag-github.outputs.version }}.spdx.json
       sbom_format: spdx-json
       path: .
-
   grype-scan:
     needs: [tag-github, sbom-source]
     permissions:

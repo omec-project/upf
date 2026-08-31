@@ -3,3 +3,4 @@
 *       text    eol=lf
 *.bess  text    diff=python
 *.jpg   binary
+bess/core/testdata/test-pktcaptures/* -text
