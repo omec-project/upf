@@ -1419,7 +1419,7 @@ func (b *bess) handleUplinkSliceMeter(
 		*ebs = 0 // Unused
 	}
 
-	logger.BessLog.Debugln("uplink slice: cir:", cir, ", pir:", pir, ", cbs:", cbs, ", pbs:", pbs)
+	logger.BessLog.Debugln("uplink slice: cir:", *cir, ", pir:", *pir, ", cbs:", *cbs, ", pbs:", *pbs)
 
 	q := &pb.QosCommandAddArg{
 		Gate:              *gate,
@@ -1465,7 +1465,7 @@ func (b *bess) handleDownlinkSliceMeter(
 		*ebs = 0 // Unused
 	}
 
-	logger.BessLog.Debugln("downlink slice: cir:", cir, ", pir:", pir, ", cbs:", cbs, ", pbs:", pbs)
+	logger.BessLog.Debugf("uplink slice: cir: %d, pir: %d, cbs: %d, pbs: %d", *cir, *pir, *cbs, *pbs)
 	// TODO: packet deduction should take GTPU extension header into account
 	q := &pb.QosCommandAddArg{
 		Gate:              *gate,
