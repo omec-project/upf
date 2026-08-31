@@ -66,7 +66,7 @@ func (f *far) Forwards() bool {
 }
 
 func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error {
-	f.fseID = (fseid)
+	f.fseID = fseid
 
 	fwdIEs, err := f.parseFARBasicFields(farIE, op)
 	if err != nil {
