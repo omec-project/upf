@@ -1419,7 +1419,7 @@ func (b *bess) handleUplinkSliceMeter(
 		*ebs = 0 // Unused
 	}
 
-	logger.BessLog.Debugln("uplink slice: cir:", cir, ", pir:", pir, ", cbs:", cbs, ", pbs:", pbs)
+	logger.BessLog.Debugln("uplink slice: cir:", *cir, ", pir:", *pir, ", cbs:", *cbs, ", pbs:", *pbs)
 
 	q := &pb.QosCommandAddArg{
 		Gate:              *gate,
