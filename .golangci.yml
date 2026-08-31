@@ -1,6 +1,5 @@
 # SPDX-FileCopyrightText: 2021 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
-
 version: "2"
 run:
   concurrency: 4
@@ -16,19 +15,20 @@ output:
 linters:
   enable:
     - asciicheck
+    - bodyclose
     - dogsled
+    - govet
     - goconst
-    - gomodguard
+    - godox
+    - gomodguard_v2
     - misspell
     - nakedret
     - noctx
+    - predeclared
+    - staticcheck
     - unconvert
     - unparam
     - whitespace
-    - staticcheck
-  disable:
-    - govet
-    - godox
   settings:
     errcheck:
       check-type-assertions: false

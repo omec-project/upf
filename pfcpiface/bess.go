@@ -119,7 +119,7 @@ func (b *bess) AddSliceInfo(sliceInfo *SliceInfo) error {
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
 
-	done := make(chan bool)
+	done := make(chan bool, 1)
 
 	b.addSliceMeter(ctx, done, sliceMeterConfig)
 
@@ -156,7 +156,7 @@ func (b *bess) SendMsgToUPF(
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
 
-	done := make(chan bool)
+	done := make(chan bool, calls)
 
 	for _, pdr := range pdrs {
 		logger.BessLog.Debugln(method, pdr)
@@ -861,7 +861,7 @@ func (b *bess) setupSliceMeter(conf *Conf) {
 		ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 		defer cancel()
 
-		done := make(chan bool)
+		done := make(chan bool, 1)
 
 		b.addSliceMeter(ctx, done, conf.SliceMeterConfig)
 
@@ -878,7 +878,7 @@ func (b *bess) processPDR(ctx context.Context, arg *anypb.Any, method upfMsgType
 		return
 	}
 
-	methods := [...]string{"add", "add", "delete", "clear"}
+	methods := [...]string{upfMethodAdd, upfMethodAdd, upfMethodDelete, upfMethodClear}
 
 	resp, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "pdrLookup",
@@ -895,6 +895,9 @@ func (b *bess) processPDR(ctx context.Context, arg *anypb.Any, method upfMsgType
 
 func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 	go func() {
+		completed := false
+		defer func() { done <- completed }()
+
 		var (
 			arg *anypb.Any
 			err error
@@ -957,12 +960,15 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 			b.processPDR(ctx, arg, upfMsgTypeAdd)
 		}
-		done <- true
+		completed = true
 	}()
 }
 
 func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 	go func() {
+		completed := false
+		defer func() { done <- completed }()
+
 		var (
 			arg *anypb.Any
 			err error
@@ -1007,19 +1013,19 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 			b.processPDR(ctx, arg, upfMsgTypeDel)
 		}
-		done <- true
+		completed = true
 	}()
 }
 
 func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 	go func() {
-		// Uplink
-		b.handleUplinkQER(ctx, qer)
-		// Downlink
-		b.handleDownlinkQER(ctx, qer)
-		done <- true
-	}()
-}
+		completed := false
+		defer func() { done <- completed }()
+
+		var (
+			cir, pir, cbs, ebs, pbs, gate uint64
+			srcIface                      uint8
+		)
 
 func (b *bess) handleUplinkQER(ctx context.Context, qer qer) {
 	var (
@@ -1076,28 +1082,8 @@ func (b *bess) handleDownlinkQER(ctx context.Context, qer qer) {
 		qosVal = b.qciQosMap[0]
 	}
 
-	cbs = maxUint64(calcBurstSizeFromRate(qer.dlGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
-	ebs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
-	pbs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
-
-	if qer.dlStatus != ie.GateStatusOpen {
-		gate = qerGateStatusDrop
-	} else if qer.dlMbr != 0 || qer.dlGbr != 0 {
-		/* MBR/GBR is received in Kilobits/sec.
-		CIR/PIR is sent in bytes */
-		cir = maxUint64(((qer.dlGbr * 1000) / 8), 1)
-		pir = maxUint64(((qer.dlMbr * 1000) / 8), cir)
-		gate = qerGateMeter
-	} else {
-		gate = qerGateUnmeter
-	}
-
-	switch qer.qosLevel {
-	case ApplicationQos:
-		b.addApplicationQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
-	case SessionQos:
-		b.addSessionQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
-	}
+		completed = true
+	}()
 }
 
 func (b *bess) addApplicationQER(ctx context.Context, gate uint64, srcIface uint8,
@@ -1142,6 +1128,9 @@ func (b *bess) addApplicationQER(ctx context.Context, gate uint64, srcIface uint
 
 func (b *bess) delQER(ctx context.Context, done chan<- bool, qer qer) {
 	go func() {
+		completed := false
+		defer func() { done <- completed }()
+
 		var srcIface uint8
 
 		// Uplink QER
@@ -1164,7 +1153,7 @@ func (b *bess) delQER(ctx context.Context, done chan<- bool, qer qer) {
 			b.delSessionQER(ctx, srcIface, qer)
 		}
 
-		done <- true
+		completed = true
 	}()
 }
 
@@ -1204,7 +1193,7 @@ func (b *bess) processFAR(ctx context.Context, arg *anypb.Any, method upfMsgType
 		return
 	}
 
-	methods := [...]string{"add", "add", "delete", "clear"}
+	methods := [...]string{upfMethodAdd, upfMethodAdd, upfMethodDelete, upfMethodClear}
 
 	resp, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "farLookup",
@@ -1225,7 +1214,7 @@ func (b *bess) processGtpuPathMonitoring(ctx context.Context, arg *anypb.Any, me
 		return
 	}
 
-	methods := [...]string{"add", "add", "delete", "clear"}
+	methods := [...]string{upfMethodAdd, upfMethodAdd, upfMethodDelete, upfMethodClear}
 
 	resp, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: "gtpuPathMonitoring",
@@ -1262,6 +1251,9 @@ func (b *bess) setActionValue(f far) uint8 {
 
 func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 	go func() {
+		completed := false
+		defer func() { done <- completed }()
+
 		var (
 			arg *anypb.Any
 			err error
@@ -1306,12 +1298,15 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 			b.processGtpuPathMonitoring(ctx, arg, upfMsgTypeAdd)
 		}
 
-		done <- true
+		completed = true
 	}()
 }
 
 func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 	go func() {
+		completed := false
+		defer func() { done <- completed }()
+
 		var (
 			arg *anypb.Any
 			err error
@@ -1346,7 +1341,7 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 			b.processGtpuPathMonitoring(ctx, arg, upfMsgTypeDel)
 		}
 
-		done <- true
+		completed = true
 	}()
 }
 
@@ -1356,7 +1351,7 @@ func (b *bess) processSliceMeter(ctx context.Context, arg *anypb.Any, method upf
 		return
 	}
 
-	methods := [...]string{"add", "add", "delete", "clear"}
+	methods := [...]string{upfMethodAdd, upfMethodAdd, upfMethodDelete, upfMethodClear}
 
 	_, err := b.client.ModuleCommand(
 		ctx, &pb.CommandRequest{
@@ -1372,6 +1367,9 @@ func (b *bess) processSliceMeter(ctx context.Context, arg *anypb.Any, method upf
 
 func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig SliceMeterConfig) {
 	go func() {
+		completed := false
+		defer func() { done <- completed }()
+
 		var (
 			arg                           *anypb.Any
 			err                           error
@@ -1392,7 +1390,7 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 			return
 		}
 		b.processSliceMeter(ctx, arg, upfMsgTypeAdd)
-		done <- true
+		completed = true
 	}()
 }
 
@@ -1493,7 +1491,7 @@ func (b *bess) processQER(ctx context.Context, arg *anypb.Any, method upfMsgType
 		return ErrInvalidArgument("method name", method)
 	}
 
-	methods := [...]string{"add", "add", "delete", "clear"}
+	methods := [...]string{upfMethodAdd, upfMethodAdd, upfMethodDelete, upfMethodClear}
 
 	resp, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
 		Name: qosTableName,
@@ -1574,24 +1572,34 @@ func (b *bess) delSessionQER(ctx context.Context, srcIface uint8, qer qer) {
 	}
 }
 
+// GRPCJoin waits for the given number of asynchronous operations, each of which reports
+// exactly one result on done, and reports whether all of them succeeded.
+//
+// It waits for every operation to report rather than returning as soon as one fails.
+// The callers use the result to decide what the datapath now holds, and an operation
+// still in flight when the caller has moved on can be overtaken by a later one that
+// touches the same rule — leaving the datapath holding a rule the caller believes it
+// has already replaced. A failing batch therefore costs up to the full timeout instead
+// of returning at the first failure, which the timeout already bounds.
 func (b *bess) GRPCJoin(calls int, timeout time.Duration, done chan bool) bool {
 	boom := time.After(timeout)
+	succeeded := true
 
-	for {
+	for calls > 0 {
 		select {
 		case ok := <-done:
 			if !ok {
 				logger.BessLog.Errorln("error making GRPC calls")
-				return false
+
+				succeeded = false
 			}
 
 			calls--
-			if calls == 0 {
-				return true
-			}
 		case <-boom:
 			logger.BessLog.Infoln("timed out adding entries")
 			return false
 		}
 	}
+
+	return succeeded
 }

@@ -1,3 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2019-present Intel Corporation
 output
+build-output
+.coverage
+.DS_Store
+repos

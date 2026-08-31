@@ -6,39 +6,47 @@ Copyright 2022 Open Networking Foundation
 
 ## New Features or Improvements to the BESS pipeline
 
-When implementing new features or making improvements to the `BESS` pipeline,
-the easiest way to do so is by:
+The BESS source used by UPF is part of this repository under `bess/`. Make BESS
+pipeline changes in that directory and submit them through the UPF review and
+CI process.
 
-- Clone the `bess` repository and make your changes
-  ```bash
-  $ cd <path/to/upf>/..
-  $ git clone https://github.com/<your-user>/bess.git
-  $ cd bess
-  # make your modifications
-  ```
+The root `Dockerfile` compiles the source in `bess/` and produces the `upf-bess`
+image. It is no longer necessary to clone BESS separately and build a standalone
+`bess_build` image.
 
-- Rebuild the `bess_build` image locally from the `bess` repository
-  ```bash
-  $ cd <path/to/bess>
-  $ yes N | ./env/rebuild_images.py noble64
-  ```
+Build both UPF images with the default architecture selection:
 
-- Update the `FROM` line in `Dockerfile` to use the locally-built image
-  ```diff
-  -FROM ghcr.io/omec-project/bess_build:260223@sha256:... AS bess-build
-  +FROM ghcr.io/omec-project/bess_build:latest AS bess-build
-  ```
+```bash
+CPU=native make docker-build
+```
 
-- Build the UPF Docker image
-  ```bash
-  $ cd <path/to/upf>
-  $ make docker-build
-  ```
+To build only the BESS-based datapath image, or to select a deployment CPU
+architecture, use `DOCKER_TARGETS` and `CPU`:
 
-- Test the modifications
+```bash
+DOCKER_TARGETS=bess CPU=haswell make docker-build
+DOCKER_TARGETS=bess CPU=ivybridge make docker-build
+```
 
-- Commit your changes to `bess` repository and, if needed, `upf` repository
-- Open pull request in `bess` repository and, if needed, `upf` repository
+The default `CPU=native` is intended for development. Select a named CPU only
+when the target deployment requires it.
+
+For changes that affect BESS protobuf definitions, regenerate both consumers:
+
+```bash
+make pb
+make py-pb
+```
+
+Run the UPF test suites as appropriate:
+
+```bash
+make test
+make test-integration
+```
+
+UPF CI runs the BESS source build, BESS tests, and BESS formatting checks when
+files under `bess/` change.
 
 
 ## Testing local Go dependencies
