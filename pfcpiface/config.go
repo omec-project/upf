@@ -109,6 +109,17 @@ func validateConf(conf Conf) error {
 		return ErrInvalidArgumentWithReason("conf.Mode", conf.Mode, "invalid mode")
 	}
 
+	if err := validateUEIPPoolAndPeers(conf); err != nil {
+		return err
+	}
+	if err := validateTimeouts(conf); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func validateUEIPPoolAndPeers(conf Conf) error {
 	if conf.CPIface.EnableUeIPAlloc {
 		_, _, err := net.ParseCIDR(conf.CPIface.UEIPPool)
 		if err != nil {
@@ -122,7 +133,10 @@ func validateConf(conf Conf) error {
 			return ErrInvalidArgumentWithReason("conf.CPIface.Peers", peer, "invalid IP")
 		}
 	}
+	return nil
+}
 
+func validateTimeouts(conf Conf) error {
 	if _, err := time.ParseDuration(conf.RespTimeout); err != nil {
 		return ErrInvalidArgumentWithReason("conf.RespTimeout", conf.RespTimeout, "invalid duration")
 	}
@@ -140,7 +154,6 @@ func validateConf(conf Conf) error {
 			return err
 		}
 	}
-
 	return nil
 }
 

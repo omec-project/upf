@@ -1029,6 +1029,8 @@ func (b *bess) handleUplinkQER(ctx context.Context, qer qer) {
 
 	// Uplink QER
 	srcIface = access
+	// Uplink QER
+	srcIface = access
 
 	// Lookup QCI from QFI, else try default QCI.
 	qosVal, ok := b.qciQosMap[qer.qfi]
