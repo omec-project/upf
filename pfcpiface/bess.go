@@ -1026,9 +1026,6 @@ func (b *bess) handleUplinkQER(ctx context.Context, qer qer) {
 		cir, pir, cbs, ebs, pbs, gate uint64
 		srcIface                      uint8
 	)
-
-	// Uplink QER
-	srcIface = access
 	// Uplink QER
 	srcIface = access
 
