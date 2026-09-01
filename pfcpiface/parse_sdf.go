@@ -144,59 +144,70 @@ func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
 		}
 	}
 
-	for i := 3; i < len(fields); i++ {
-		switch fields[i] {
-		case "from":
-			i++
-			if i >= len(fields) {
-				return nil, errBadFilterDesc
-			}
-			xform(i)
-
-			err := ipf.src.parseNet(fields[i])
-			if err != nil {
-				parseLog.Errorln(err)
-				return nil, err
-			}
-
-			if i+1 < len(fields) && fields[i+1] != "to" {
-				i++
-
-				err = ipf.src.parsePort(fields[i])
-				if err != nil {
-					parseLog.Errorln("src port parse failed", err)
-					return nil, err
-				}
-			}
-		case "to":
-			i++
-			if i >= len(fields) {
-				return nil, errBadFilterDesc
-			}
-			xform(i)
-
-			err := ipf.dst.parseNet(fields[i])
-			if err != nil {
-				parseLog.Errorln(err)
-				return nil, err
-			}
-
-			if i+1 < len(fields) {
-				i++
-
-				err = ipf.dst.parsePort(fields[i])
-				if err != nil {
-					parseLog.Errorln("dst port parse failed", err)
-					return nil, err
-				}
-			}
-		}
+	if err := processFlowFields(fields, ipf, parseLog, xform); err != nil {
+		return nil, err
 	}
 
 	parseLog = parseLog.With("ip-filter", ipf)
 	parseLog.Debugln("flow description parsed successfully")
 
 	return ipf, nil
+}
+
+func processFlowFields(fields []string, ipf *ipFilterRule, parseLog interface{ Errorln(...interface{}) }, xform func(int)) error {
+	for i := 3; i < len(fields); i++ {
+		switch fields[i] {
+		case "from":
+			i++
+			if i >= len(fields) {
+				return errBadFilterDesc
+			}
+			xform(i)
+
+			err := ipf.src.parseNet(fields[i])
+			if err != nil {
+				parseLog.Errorln(err)
+				return err
+			}
+
+			if i+1 < len(fields) && fields[i+1] != "to" {
+				i++
+				if i >= len(fields) {
+					return errBadFilterDesc
+				}
+				xform(i)
+				err := ipf.src.parsePort(fields[i])
+				if err != nil {
+					return err
+				}
+			}
+		case "to":
+			i++
+			if i >= len(fields) {
+				return errBadFilterDesc
+			}
+			xform(i)
+
+			err := ipf.dst.parseNet(fields[i])
+			if err != nil {
+				parseLog.Errorln(err)
+				return err
+			}
+
+			if i+1 < len(fields) {
+				i++
+				if i >= len(fields) {
+					return errBadFilterDesc
+				}
+				xform(i)
+				err := ipf.dst.parsePort(fields[i])
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func parseAction(action string) error {
