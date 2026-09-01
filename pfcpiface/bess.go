@@ -1019,19 +1019,20 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 	go func() {
-		completed := false
-		defer func() { done <- completed }()
-
-		var (
-			cir, pir, cbs, ebs, pbs, gate uint64
-			srcIface                      uint8
-		)
+		// Uplink
+		b.handleUplinkQER(ctx, qer)
+		// Downlink
+		b.handleDownlinkQER(ctx, qer)
+		done <- true
+	}()
+}
 
 func (b *bess) handleUplinkQER(ctx context.Context, qer qer) {
 	var (
 		cir, pir, cbs, ebs, pbs, gate uint64
 		srcIface                      uint8
 	)
+
 	// Uplink QER
 	srcIface = access
 
@@ -1051,7 +1052,7 @@ func (b *bess) handleUplinkQER(ctx context.Context, qer qer) {
 		gate = qerGateStatusDrop
 	} else if qer.ulMbr != 0 || qer.ulGbr != 0 {
 		/* MBR/GBR is received in Kilobits/sec.
-		CIR/PIR is sent in bytes */
+		   CIR/PIR is sent in bytes */
 		cir = maxUint64(((qer.ulGbr * 1000) / 8), 1)
 		pir = maxUint64(((qer.ulMbr * 1000) / 8), cir)
 		gate = qerGateMeter
@@ -1082,8 +1083,28 @@ func (b *bess) handleDownlinkQER(ctx context.Context, qer qer) {
 		qosVal = b.qciQosMap[0]
 	}
 
-		completed = true
-	}()
+	cbs = maxUint64(calcBurstSizeFromRate(qer.dlGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
+	ebs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
+	pbs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
+
+	if qer.dlStatus != ie.GateStatusOpen {
+		gate = qerGateStatusDrop
+	} else if qer.dlMbr != 0 || qer.dlGbr != 0 {
+		/* MBR/GBR is received in Kilobits/sec.
+		   CIR/PIR is sent in bytes */
+		cir = maxUint64(((qer.dlGbr * 1000) / 8), 1)
+		pir = maxUint64(((qer.dlMbr * 1000) / 8), cir)
+		gate = qerGateMeter
+	} else {
+		gate = qerGateUnmeter
+	}
+
+	switch qer.qosLevel {
+	case ApplicationQos:
+		b.addApplicationQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
+	case SessionQos:
+		b.addSessionQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
+	}
 }
 
 func (b *bess) addApplicationQER(ctx context.Context, gate uint64, srcIface uint8,
@@ -1390,7 +1411,7 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 			return
 		}
 		b.processSliceMeter(ctx, arg, upfMsgTypeAdd)
-		completed = true
+		done <- true
 	}()
 }
 
@@ -1416,7 +1437,7 @@ func (b *bess) handleUplinkSliceMeter(
 		*ebs = 0 // Unused
 	}
 
-	logger.BessLog.Debugln("uplink slice: cir:", *cir, ", pir:", *pir, ", cbs:", *cbs, ", pbs:", *pbs)
+	logger.BessLog.Debugf("uplink slice: cir: %d, pir: %d, cbs: %d, pbs: %d", *cir, *pir, *cbs, *pbs)
 
 	q := &pb.QosCommandAddArg{
 		Gate:              *gate,
@@ -1462,7 +1483,7 @@ func (b *bess) handleDownlinkSliceMeter(
 		*ebs = 0 // Unused
 	}
 
-	logger.BessLog.Debugf("uplink slice: cir: %d, pir: %d, cbs: %d, pbs: %d", *cir, *pir, *cbs, *pbs)
+	logger.BessLog.Debugf("downlink slice: cir: %d, pir: %d, cbs: %d, pbs: %d", *cir, *pir, *cbs, *pbs)
 	// TODO: packet deduction should take GTPU extension header into account
 	q := &pb.QosCommandAddArg{
 		Gate:              *gate,
