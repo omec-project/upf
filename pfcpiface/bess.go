@@ -1481,7 +1481,14 @@ func (b *bess) processQER(ctx context.Context, arg *anypb.Any, method upfMsgType
 
 	if err != nil || resp.GetError() != nil {
 		logger.BessLog.Errorf("%v for qer %v failed with resp: %v, error: %v", qosTableName, methods[method], resp, err)
-		return err
+
+		if err != nil {
+			return err
+		}
+
+		// The RPC itself succeeded and the module refused the rule, so err is nil.
+		// Returning it would report the refusal to the caller as success.
+		return ErrOperationFailedWithReason(qosTableName+" "+methods[method], resp.GetError().String())
 	}
 
 	return nil
