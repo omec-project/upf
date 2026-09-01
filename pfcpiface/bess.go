@@ -11,6 +11,7 @@ import (
 	"math"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/omec-project/upf-epc/logger"
@@ -28,6 +29,9 @@ const (
 	DefaultBurstSize = 32 * 1514
 	// SockAddr : Unix Socket path to read bess notification from.
 	SockAddr = "/tmp/notifycp"
+	// notifyRedialInterval is how long to wait before reconnecting to the
+	// datapath's notification socket after a dial or read failure.
+	notifyRedialInterval = 2 * time.Second
 	// PfcpAddr : Unix Socket path to send end marker packet.
 	PfcpAddr = "/tmp/pfcpport"
 	// AppQerLookup: Application Qos table Name.
@@ -85,12 +89,14 @@ var bessIP = flag.String("bess", "localhost:10514", "BESS IP/port combo")
 var enableGtpuPathMonitoring = false
 
 type bess struct {
-	client           pb.BESSControlClient
-	conn             *grpc.ClientConn
-	endMarkerSocket  net.Conn
-	notifyBessSocket net.Conn
-	endMarkerChan    chan []byte
-	qciQosMap        map[uint8]*QosConfigVal
+	client          pb.BESSControlClient
+	conn            *grpc.ClientConn
+	endMarkerSocket net.Conn
+	notifyStop      chan struct{}
+	notifyMu        sync.Mutex
+	notifyConn      net.Conn
+	endMarkerChan   chan []byte
+	qciQosMap       map[uint8]*QosConfigVal
 }
 
 func (b *bess) IsConnected(accessIP *net.IP) bool {
@@ -207,6 +213,15 @@ func (b *bess) SendMsgToUPF(
 
 func (b *bess) Exit() {
 	logger.BessLog.Infoln("exit function Bess")
+
+	if b.notifyStop != nil {
+		close(b.notifyStop)
+		// Closing the channel alone cannot end a read that is already blocked, so
+		// close the socket too: without this the listener stays parked until the
+		// datapath happens to disconnect.
+		b.closeNotifyConn()
+	}
+
 	b.conn.Close()
 }
 
@@ -676,21 +691,137 @@ func (b *bess) endMarkerSendLoop(endMarkerChan chan []byte) {
 	}
 }
 
-func (b *bess) notifyListen(reportNotifyChan chan<- uint64) {
+// notifyListen owns the connection to the datapath's control-plane notification
+// socket for the life of the process. Every downlink-data notification for a
+// buffering session arrives here, so losing this loop means no Session Report
+// reaches the SMF, no paging is triggered, and an idle UE becomes unreachable.
+//
+// It used to return on the first read error -- no log line, no reconnect -- so a
+// single transient failure disabled mobile-terminated reachability until the pod
+// was restarted, and nothing said so: the datapath kept writing notifications
+// into a socket with no reader, reporting successful transmits.
+func (b *bess) notifyListen(reportNotifyChan chan<- uint64, notifySockAddr string) {
+	// The rate limiter outlives reconnects on purpose: reconnecting is not a
+	// reason to re-notify for a session reported moments ago.
 	notifier := NewDownlinkDataNotifier(reportNotifyChan, 20*time.Second)
 
-	for {
-		buf := make([]byte, 512)
+	logger.BessLog.Infoln("downlink data notification listener started, socket:", notifySockAddr)
 
-		_, err := b.notifyBessSocket.Read(buf)
+	for {
+		select {
+		case <-b.notifyStop:
+			logger.BessLog.Infoln("downlink data notification listener stopped")
+			return
+		default:
+		}
+
+		var d net.Dialer
+
+		conn, err := d.DialContext(context.Background(), "unixpacket", notifySockAddr)
 		if err != nil {
+			logger.BessLog.Errorf("dial %v failed, retrying in %v: %v", notifySockAddr, notifyRedialInterval, err)
+			b.waitBeforeRedial()
+
+			continue
+		}
+
+		// Exit may have run while this dial was in flight, and it can only close a
+		// connection it can see. Registering and checking for shutdown have to happen
+		// together, or the two orders differ: with the check first, Exit can look at an
+		// empty slot and close nothing, and this goroutine then registers a connection
+		// nobody will ever close and parks on a read nobody will interrupt.
+		if !b.adoptNotifyConn(conn) {
+			conn.Close()
+			logger.BessLog.Infoln("downlink data notification listener stopped")
+
 			return
 		}
 
-		d := buf[0:8]
-		fseid := binary.LittleEndian.Uint64(d)
+		logger.BessLog.Infoln("connected to downlink data notification socket:", notifySockAddr)
+		b.readNotifications(conn, notifier)
+		b.closeNotifyConn()
+
+		b.waitBeforeRedial()
+	}
+}
+
+// readNotifications consumes notifications until the connection fails, and
+// reports why it stopped -- silence here is indistinguishable from an idle
+// network, which is what made this failure invisible.
+func (b *bess) readNotifications(conn net.Conn, notifier *downlinkDataNotifier) {
+	for {
+		buf := make([]byte, 512)
+
+		n, err := conn.Read(buf)
+		if err != nil {
+			if b.stopping() {
+				return
+			}
+
+			logger.BessLog.Errorln("downlink data notification socket read failed, reconnecting:", err)
+
+			return
+		}
+
+		if n < 8 {
+			logger.BessLog.Warnln("short downlink data notification, want at least 8 bytes, got:", n)
+			continue
+		}
+
+		fseid := binary.LittleEndian.Uint64(buf[0:8])
 
 		notifier.Notify(fseid)
+	}
+}
+
+// adoptNotifyConn registers conn as the live notification connection and reports whether
+// it was adopted. It refuses once shutdown has begun.
+//
+// The stop check belongs inside notifyMu, which closeNotifyConn also takes, because Exit
+// closes notifyStop before taking that lock. That ordering leaves exactly two possible
+// interleavings and both are safe: adopt runs first and Exit finds the connection to
+// close, or Exit runs first and adopt sees the closed channel and refuses. Checking the
+// channel outside the lock admits a third, where neither closes the connection.
+func (b *bess) adoptNotifyConn(conn net.Conn) bool {
+	b.notifyMu.Lock()
+	defer b.notifyMu.Unlock()
+
+	if b.stopping() {
+		return false
+	}
+
+	b.notifyConn = conn
+
+	return true
+}
+
+// closeNotifyConn closes the live notification connection if there is one. It is
+// safe to call from the listener and from Exit concurrently, and twice.
+func (b *bess) closeNotifyConn() {
+	b.notifyMu.Lock()
+	defer b.notifyMu.Unlock()
+
+	if b.notifyConn == nil {
+		return
+	}
+
+	b.notifyConn.Close()
+	b.notifyConn = nil
+}
+
+func (b *bess) stopping() bool {
+	select {
+	case <-b.notifyStop:
+		return true
+	default:
+		return false
+	}
+}
+
+func (b *bess) waitBeforeRedial() {
+	select {
+	case <-b.notifyStop:
+	case <-time.After(notifyRedialInterval):
 	}
 }
 
@@ -810,14 +941,13 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 			notifySockAddr = SockAddr
 		}
 
-		var d net.Dialer
-		b.notifyBessSocket, err = d.DialContext(context.Background(), "unixpacket", notifySockAddr)
-		if err != nil {
-			logger.BessLog.Errorln("dial error:", err)
-			return
-		}
+		// The listener dials for itself and keeps redialing. Dialing here instead
+		// meant a datapath that was not yet accepting connections cost this
+		// process its notification path permanently, and took the end-marker
+		// setup below down with it by returning early.
+		b.notifyStop = make(chan struct{})
 
-		go b.notifyListen(u.reportNotifyChan)
+		go b.notifyListen(u.reportNotifyChan, notifySockAddr)
 	}
 
 	if conf.EnableEndMarker {
