@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2023 Canonical Ltd.
-# Copyright 2024 Intel Corporation
+# Copyright (c) 2024-Present Intel Corporation
 name: CI Pipeline
 on:
   pull_request:
@@ -151,7 +151,7 @@ jobs:
       attestations: write
     uses: omec-project/.github/.github/workflows/lint.yml@c6f69e74f8ee9034dcc237ccbd719de59526aee5 # v0.0.30
     with:
-      golangci_lint_version: 'v2.12.2'
+      golangci_lint_version: 'v2.13.2'
       branch_name: ${{ github.ref }}
   hadolint:
     permissions:

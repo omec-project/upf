@@ -15,7 +15,7 @@ func releaseAllocatedIPs(ippool *IPPool, session *PFCPSession) error {
 
 	// Check if we allocated an UE IP for this session and delete it.
 	for _, pdr := range session.pdrs {
-		if (pdr.allocIPFlag) && (pdr.srcIface == core) {
+		if pdr.allocIPFlag && (pdr.srcIface == core) {
 			ueIP := int2ip(pdr.ueAddress)
 			logger.PfcpLog.Debugf("Releasing IP %s of session %d", ueIP.String(), session.localSEID)
 			return ippool.DeallocIP(session.localSEID)
@@ -37,7 +37,7 @@ func addPdrInfo(msg *message.SessionEstablishmentResponse, pdrs []pdr) {
 					ie.NewFTEID(0x01, pdr.tunnelTEID, int2ip(pdr.tunnelIP4Dst), nil, 0),
 				))
 		}
-		if (pdr.allocIPFlag) && (pdr.srcIface == core) {
+		if pdr.allocIPFlag && (pdr.srcIface == core) {
 			logger.PfcpLog.Debugln("pdrID:", pdr.pdrID)
 			var flags uint8 = 0x02
 			ueIP := int2ip(pdr.ueAddress)
