@@ -559,9 +559,6 @@ func (pConn *PFCPConn) handleDigestReport(fseid uint64) {
 	srreq.DownlinkDataReport = ie.NewDownlinkDataReport(
 		ie.NewPDRID(uint16(pdrID)))
 
-	// Info, not Debug: this is the only evidence that a downlink notification
-	// became a Session Report. At debug level a silent break in this path looks
-	// exactly like a network with no downlink traffic.
 	logger.PfcpLog.With("F-SEID", fseid, "PDR ID", pdrID).Infoln("sending Downlink Data Report")
 
 	pConn.SendPFCPMsg(srreq)
