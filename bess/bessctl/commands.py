@@ -1391,73 +1391,66 @@ def show_status(cli):
         cli.fout.write(NONE_MESSAGE)
 
 
-# last_stats: a map of (node name, gateid) -> (timestamp, counter value)
-def _draw_pipeline(cli, field, units, last_stats=None, graph_args=[]):
-    if graph_args is None:
-        graph_args = []
-
-    modules = sorted(cli.bess.list_modules().modules, key=lambda x: x.name)
-    names = []
+def _get_node_labels(modules):
+    """Pre-calculate display labels for all modules."""
     node_labels = {}
-
     for m in modules:
-        name = m.name
-        mclass = m.mclass
-        names.append(name)
-        node_labels[name] = '%s\\n%s' % (name, mclass)
-        node_labels[name] += '\\n%s' % m.desc
+        label = f"{m.name}\\n{m.mclass}\\n{m.desc}"
+        node_labels[m.name] = label
+    return node_labels
+
+def _get_gate_label(gate, field, name, last_stats):
+    """Determine the value/label to show on a graph edge."""
+    if gate.timestamp == 0.0:
+        return '?'
+
+    # Case A: Static Pipeline View
+    if last_stats is None:
+        val = getattr(gate, field)
+    # Case B: Monitoring View (calculate rate)
+    else:
+        last_time, last_val = last_stats[(name, gate.ogate)]
+        new_time, new_val = gate.timestamp, getattr(gate, field)
+        last_stats[(name, gate.ogate)] = (new_time, new_val)
+        val = (new_val - last_val) / (new_time - last_time)
+
+    return '%.1f' % (val * 8 / 1e6) if field == 'bytes' else '%d' % val
+
+def _draw_pipeline(cli, field, units, last_stats=None, graph_args=None):
+    """Draw pipeline visualization with reduced complexity."""
+    graph_args = graph_args or []
+    modules = sorted(cli.bess.list_modules().modules, key=lambda x: x.name)
+    node_labels = _get_node_labels(modules)
 
     try:
-        f = subprocess.Popen('graph-easy ' + ' '.join(graph_args), shell=True,
-                             stdin=subprocess.PIPE,
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE,
-                             universal_newlines=True)
+        proc = subprocess.Popen(['graph-easy'] + graph_args,
+                                stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                universal_newlines=True)
 
+        # 1. Define Nodes
         for m in modules:
-            print('[%s]' % node_labels[m.name], file=f.stdin)
+            proc.stdin.write(f'[{node_labels[m.name]}]\n')
 
-        for name in names:
-            gates = cli.bess.get_module_info(name).ogates
-
+        # 2. Define Edges (Connections)
+        for m in modules:
+            gates = cli.bess.get_module_info(m.name).ogates
             for gate in gates:
-                if gate.timestamp == 0.0:  # stats disabled?
-                    label = '?'
-                else:
-                    if last_stats is None:  # show pipeline
-                        val = getattr(gate, field)
-                    else:  # monitor pipeline
-                        last_time, last_val = last_stats[(name, gate.ogate)]
-                        new_time, new_val = gate.timestamp, getattr(
-                            gate, field)
-                        last_stats[(name, gate.ogate)] = (new_time, new_val)
+                label = _get_gate_label(gate, field, m.name, last_stats)
+                edge_attr = f'{{label::{gate.ogate}  {label} {units} {gate.igate}:;}}'
 
-                        val = (new_val - last_val) / (new_time - last_time)
+                line = f'[{node_labels[m.name]}] ->{edge_attr} [{node_labels[gate.name]}]\n'
+                proc.stdin.write(line)
 
-                    if field == 'bytes':
-                        label = '%.1f' % (val * 8 / 1e6)
-                    else:
-                        label = '%d' % val
-
-                edge_attr = '{label::%d  %s %s %d:;}' % (
-                    gate.ogate, label, units, gate.igate)
-
-                print('[%s] ->%s [%s]' % (
-                    node_labels[name],
-                    edge_attr,
-                    node_labels[gate.name]), file=f.stdin)
-        output, error = f.communicate()
-        f.wait()
+        output, _ = proc.communicate()
         return output
 
     except IOError as e:
         if e.errno == errno.EPIPE:
-            raise cli.CommandError('"graph-easy" program is not available? '
-                                   'Check if the package "libgraph-easy-perl" '
-                                   'is installed.')
-        else:
-            raise
-
+            raise cli.CommandError('"graph-easy" program not available. '
+                                   'Install "libgraph-easy-perl".')
+        raise
 
 @cmd('show pipeline [GRAPHEASY_OPTS...]', 'Show the current datapath pipeline')
 def show_pipeline(cli, opts):
