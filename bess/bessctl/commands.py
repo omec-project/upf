@@ -1910,6 +1910,8 @@ TcCounterRate = collections.namedtuple('TcCounterRate',
 def _calculate_tc_delta(old, new):
     """Calculate rate-based statistics for traffic class."""
     sec_diff = new.timestamp - old.timestamp
+    if sec_diff <= 0:
+        return TcCounterRate(count=0.0, cycles=0.0, bits=0.0, packets=0.0)
     return TcCounterRate(
         count=(new.count - old.count) / sec_diff,
         cycles=(new.cycles - old.cycles) / sec_diff,
@@ -1977,7 +1979,7 @@ def _monitor_tcs(cli, *tcs):
 
     # Determine which TCs to monitor
     if not tcs:
-        tcs =[getattr(tc, 'class').name for tc in all_tcs]
+        tcs = [getattr(tc, 'class').name for tc in all_tcs]
         if not tcs:
             raise cli.CommandError('No traffic class to monitor')
 

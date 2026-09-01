@@ -275,7 +275,7 @@ def parenthesize(exp):
                 l = len(exp) - len(exp.lstrip())
                 r = len(exp) - len(exp.rstrip())
                 return '%s(%s)%s' % (exp[:l], exp.strip(), exp[len(exp) - r:])
-    except Exception:
+    except (tokenize.TokenError, IndentationError):
         pass
     return exp
 

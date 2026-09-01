@@ -482,7 +482,7 @@ func (e *exactMatchModule) handleAddEntry(arg *anypb.Any) error {
 	}
 
 	if existing != nil {
-		log.Debugf(msgUpdatedEntry, em)
+		log.Debugf(msgUpdatedEntry, existing)
 		existing.Reset()
 		proto.Merge(existing, em)
 	} else {

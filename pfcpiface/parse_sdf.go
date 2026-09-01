@@ -178,6 +178,7 @@ func processFlowFields(fields []string, ipf *ipFilterRule, parseLog interface{ E
 				xform(i)
 				err := ipf.src.parsePort(fields[i])
 				if err != nil {
+					parseLog.Errorln("src port parse failed", err)
 					return err
 				}
 			}
@@ -202,6 +203,7 @@ func processFlowFields(fields []string, ipf *ipFilterRule, parseLog interface{ E
 				xform(i)
 				err := ipf.dst.parsePort(fields[i])
 				if err != nil {
+					parseLog.Errorln("dst port parse failed", err)
 					return err
 				}
 			}
