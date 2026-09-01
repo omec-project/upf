@@ -1219,18 +1219,19 @@ def _show_tcs_tree(cli, root):
         stack.extend(reversed(ret))
 
 
-def _build_tcs_tree(tcs):
-    nodes = {}
-    root = {"children": []}
-    for tc in tcs:
-        c_ = getattr(tc, 'class')
-        node = {}
-        node["children"] = []
-        node["name"] = c_.name
-        node["policy"] = c_.policy
-        node["show_list"] = []
-        nodes[c_.name] = node
+def _create_tc_node(tc):
+    """Create a node for a traffic class."""
+    c_ = getattr(tc, 'class')
+    node = {
+        "children": [],
+        "name": c_.name,
+        "policy": c_.policy,
+        "show_list": []
+    }
+    return node, c_
 
+def _build_parent_child_relationships(tcs, nodes, root):
+    """Build parent-child relationships between traffic classes."""
     for tc in tcs:
         c_ = getattr(tc, 'class')
 
@@ -1239,23 +1240,44 @@ def _build_tcs_tree(tcs):
         else:
             root["children"].append(nodes[c_.name])
 
-        nodes[c_.name]["show_list"].append(c_.policy)
+def _populate_show_list(tc, nodes):
+    """Populate the show list for a traffic class based on its policy."""
+    c_ = getattr(tc, 'class')
 
-        if tc.parent and tc.parent in nodes:
-            if (nodes[tc.parent]["policy"] == "weighted_fair" and
-                    c_.HasField("share")):
-                nodes[c_.name]["show_list"].append("share: %d" % c_.share)
-            elif (nodes[tc.parent]["policy"] == "priority" and
-                    c_.HasField("priority")):
-                nodes[c_.name]["show_list"].append(
-                    "priority: %d" % c_.priority)
+    # Always add the policy
+    nodes[c_.name]["show_list"].append(c_.policy)
 
-        if c_.policy == "rate_limit":
-            nodes[c_.name]["show_list"].append(_limit_to_str(c_.limit))
-            nodes[c_.name]["show_list"].append(_burst_to_str(c_.max_burst))
+    # Handle parent-specific attributes
+    if tc.parent and tc.parent in nodes:
+        parent_policy = nodes[tc.parent]["policy"]
+        if parent_policy == "weighted_fair" and c_.HasField("share"):
+            nodes[c_.name]["show_list"].append("share: %d" % c_.share)
+        elif parent_policy == "priority" and c_.HasField("priority"):
+            nodes[c_.name]["show_list"].append("priority: %d" % c_.priority)
+
+    # Handle rate limiting policy
+    if c_.policy == "rate_limit":
+        nodes[c_.name]["show_list"].append(_limit_to_str(c_.limit))
+        nodes[c_.name]["show_list"].append(_burst_to_str(c_.max_burst))
+
+def _build_tcs_tree(tcs):
+    """Build a tree structure from traffic classes."""
+    nodes = {}
+    root = {"children": []}
+
+    # Create all nodes
+    for tc in tcs:
+        node, c_ = _create_tc_node(tc)
+        nodes[c_.name] = node
+
+    # Build parent-child relationships
+    _build_parent_child_relationships(tcs, nodes, root)
+
+    # Populate show lists
+    for tc in tcs:
+        _populate_show_list(tc, nodes)
 
     return root
-
 
 @cmd('check constraints', 'Check constraints')
 def check_constraints(cli):
