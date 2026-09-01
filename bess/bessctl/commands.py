@@ -792,6 +792,55 @@ def _clear_pipeline(cli):
     cli.bess.reset_all()
 
 
+def _collect_module_and_driver_names(cli):
+    """Collect module class names and port driver names from BESS."""
+    class_names = [str(i) for i in cli.bess.list_mclasses().names]
+    driver_names = [str(i) for i in cli.bess.list_drivers().driver_names]
+    return class_names, driver_names
+
+def _find_duplicate_names(rsvd, class_names, driver_names):
+    """Find duplicate names between reserved names, modules, and drivers."""
+    counts = collections.Counter(rsvd.keys())
+    counts.update(class_names)
+    counts.update(driver_names)
+    return [k for k in counts if counts[k] > 1]
+
+def _generate_duplicate_error_message(dups, rsvd, class_names, driver_names):
+    """Generate detailed error message for duplicate names."""
+    errors = []
+    for name in dups:
+        if name in rsvd:
+            why = 'reserved name {} is used as '.format(name)
+        else:
+            why = 'name {} is used as '.format(name)
+
+        if name in class_names:
+            if name in driver_names:
+                why += 'both a module class and a port driver'
+            else:
+                why += 'a module class'
+        else:
+            why += 'a port driver'
+        errors.append(why)
+
+    return 'duplicate names found: {}'.format('; '.join(errors))
+
+def _create_module_creators(cli, class_names):
+    """Create module class creators."""
+    creators = {}
+    for name in class_names:
+        creators[name] = type(str(name), (Module,),
+                              {'bess': cli.bess, 'choose_arg': _choose_arg})
+    return creators
+
+def _create_port_creators(cli, driver_names):
+    """Create port driver creators."""
+    creators = {}
+    for name in driver_names:
+        creators[name] = type(str(name), (Port,),
+                              {'bess': cli.bess, 'choose_arg': _choose_arg})
+    return creators
+
 def _get_bess_module_and_port_creators(cli, rsvd):
     """
     Return module instance creators and port instance creators.
@@ -807,54 +856,23 @@ def _get_bess_module_and_port_creators(cli, rsvd):
 
     The rsvd argument is a dictionary of reserved names (see below).
     """
-    creators = {}
-
     # TODO(torek) cache these for performance, rebuild when needed
 
-    class_names = [str(i) for i in cli.bess.list_mclasses().names]
-    driver_names = [str(i) for i in cli.bess.list_drivers().driver_names]
+    # Collect names from BESS
+    class_names, driver_names = _collect_module_and_driver_names(cli)
 
-    # Duplicates, if they exist, represent a fault in what's been
-    # loaded into BESS.  In particular, at least for the moment,
-    # we cannot have the same name as both a module *and* a port,
-    # nor may they use any of the reserved names.
-    #
-    # We can assume that the C++ code has already forbidden
-    # using the same name twice as-module class or port-driver.
-    # But the C++ code does not have the restriction on using
-    # Foo() as *both* module *and* port-driver.
-    counts = collections.Counter(rsvd.keys())
-    counts.update(class_names)
-    counts.update(driver_names)
-    dups = [k for k in counts if counts[k] > 1]
-
+    # Check for duplicates
+    dups = _find_duplicate_names(rsvd, class_names, driver_names)
     if dups:
-        errors = []
-        for name in dups:
-            if name in rsvd:
-                why = 'reserved name {} is used as '.format(name)
-            else:
-                why = 'name {} is used as '.format(name)
-            if name in class_names:
-                if name in driver_names:
-                    why += 'both a module class and a port driver'
-                else:
-                    why += 'a module class'
-            else:
-                why += 'a port driver'
-            errors.append(why)
-        errors = 'duplicate names found: {}'.format('; '.join(errors))
-        raise cli.InternalError(errors)
+        error_msg = _generate_duplicate_error_message(dups, rsvd, class_names, driver_names)
+        raise cli.InternalError(error_msg)
 
-    for name in class_names:
-        creators[name] = type(str(name), (Module,),
-                              {'bess': cli.bess, 'choose_arg': _choose_arg})
-    for name in driver_names:
-        creators[name] = type(str(name), (Port,),
-                              {'bess': cli.bess, 'choose_arg': _choose_arg})
+    # Create creators
+    creators = {}
+    creators.update(_create_module_creators(cli, class_names))
+    creators.update(_create_port_creators(cli, driver_names))
 
     return creators
-
 
 # NOTE: the name of this function is used below
 def _do_run_file(cli, conf_file):
