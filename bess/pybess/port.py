@@ -30,24 +30,23 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-class Port(object):
 
+class Port:
     def __init__(self, **kwargs):
-        self.name = '<uninitialized>'
+        self.name = "<uninitialized>"
         self.driver = self.__class__.__name__
 
-        assert self.driver != 'Port', "Do not instantiate 'Port' directly"
+        assert self.driver != "Port", "Do not instantiate 'Port' directly"
 
-        name = kwargs.pop('name', None)
+        name = kwargs.pop("name", None)
 
-        ret = self.bess.create_port(self.driver, name,
-                                    self.choose_arg(None, kwargs))
+        ret = self.bess.create_port(self.driver, name, self.choose_arg(None, kwargs))
 
         self.name = ret.name
         self.mac_addr = ret.mac_addr
 
     def __str__(self):
-        return '%s/%s' % (self.name, self.driver)
+        return "%s/%s" % (self.name, self.driver)
 
     def get_port_stats(self):
         return self.bess.get_port_stats(self.name)
@@ -56,8 +55,7 @@ class Port(object):
         return self.bess.get_link_status(self.name)
 
     def set_port_config(self, **kwargs):
-        return self.bess.set_port_config(self.name,
-                                         self.choose_arg(None, kwargs))
+        return self.bess.set_port_config(self.name, self.choose_arg(None, kwargs))
 
     def get_port_config(self):
         return self.bess.get_port_config(self.name)

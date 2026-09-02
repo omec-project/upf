@@ -30,7 +30,6 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from __future__ import print_function
 
 """
 Pseduo-module multi-import.
@@ -49,14 +48,13 @@ import importlib
 import sys
 import types
 
-__std_skip = set(n for n in sys.modules[__name__].__dict__.keys()
-                 if n.startswith('__'))
+__std_skip = set(n for n in sys.modules[__name__].__dict__.keys() if n.startswith("__"))
 
 
 class Collisions(Exception):
     def __init__(self, *args, **kwargs):
-        self.collisions = kwargs.pop('collisions')
-        super(Collisions, self).__init__(*args, **kwargs)
+        self.collisions = kwargs.pop("collisions")
+        super().__init__(*args, **kwargs)
 
 
 def pm_import(mname, iterator, name_filter=None, package=None, override=False):
@@ -105,7 +103,7 @@ def pm_import(mname, iterator, name_filter=None, package=None, override=False):
     for submodule in iterator:
         tmp = importlib.import_module(submodule, package)
         try:
-            names = tmp.__dict__['__all__']
+            names = tmp.__dict__["__all__"]
         except KeyError:
             # standard names like __name__ will always conflict,
             # so always skip them.
@@ -117,13 +115,13 @@ def pm_import(mname, iterator, name_filter=None, package=None, override=False):
 
         # Update return value, assuming lack of collisions
         # or desire to keep last-recorded name.
-        module.__dict__.update({ k: tmp.__dict__[k] for k in names })
+        module.__dict__.update({k: tmp.__dict__[k] for k in names})
 
         if override:
             continue
 
         # convert names to set for fast collision detection
-        #names = set(names) -- done above
+        # names = set(names) -- done above
         collisions |= names & allnames
         allnames |= names
         for k in names:
@@ -134,9 +132,10 @@ def pm_import(mname, iterator, name_filter=None, package=None, override=False):
     # If not, it's the set of name/value pairs we want to
     # *keep* from sources.
     if collisions:
-        collisions = { k: sources[k] for k in collisions }
-        raise Collisions('non-unique names in pm_import({!r})'.format(mname),
-                         collisions=collisions)
+        collisions = {k: sources[k] for k in collisions}
+        raise Collisions(
+            f"non-unique names in pm_import({mname!r})", collisions=collisions
+        )
 
     sys.modules[mname] = module
     return module

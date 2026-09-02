@@ -10,103 +10,268 @@ import platform
 import pwd
 import subprocess
 import sys
-
 from glob import glob
-from os.path import exists, basename
+from os.path import basename, exists
 from os.path import join as path_join
 
-is_linux = sys.platform.startswith('linux')
-is_bsd = sys.platform.startswith('freebsd')
+is_linux = sys.platform.startswith("linux")
+is_bsd = sys.platform.startswith("freebsd")
 freebsd_err_unsupported_string = """Error: This operation is unsupported on FreeBSD.
 See FreeBSD Getting Started Guide for details on binding and unbinding devices.
 """
 
 # The PCI base class for all devices
-network_class = {'Class': '02', 'Vendor': None, 'Device': None,
-                 'SVendor': None, 'SDevice': None}
-acceleration_class = {'Class': '12', 'Vendor': None, 'Device': None,
-                      'SVendor': None, 'SDevice': None}
-ifpga_class = {'Class': '12', 'Vendor': '8086', 'Device': '0b30',
-               'SVendor': None, 'SDevice': None}
-encryption_class = {'Class': '10', 'Vendor': None, 'Device': None,
-                    'SVendor': None, 'SDevice': None}
-intel_processor_class = {'Class': '0b', 'Vendor': '8086', 'Device': None,
-                         'SVendor': None, 'SDevice': None}
-cavium_sso = {'Class': '08', 'Vendor': '177d', 'Device': 'a04b,a04d',
-              'SVendor': None, 'SDevice': None}
-cavium_fpa = {'Class': '08', 'Vendor': '177d', 'Device': 'a053',
-              'SVendor': None, 'SDevice': None}
-cavium_pkx = {'Class': '08', 'Vendor': '177d', 'Device': 'a0dd,a049',
-              'SVendor': None, 'SDevice': None}
-cavium_tim = {'Class': '08', 'Vendor': '177d', 'Device': 'a051',
-              'SVendor': None, 'SDevice': None}
-cavium_zip = {'Class': '12', 'Vendor': '177d', 'Device': 'a037',
-              'SVendor': None, 'SDevice': None}
-avp_vnic = {'Class': '05', 'Vendor': '1af4', 'Device': '1110',
-            'SVendor': None, 'SDevice': None}
+network_class = {
+    "Class": "02",
+    "Vendor": None,
+    "Device": None,
+    "SVendor": None,
+    "SDevice": None,
+}
+acceleration_class = {
+    "Class": "12",
+    "Vendor": None,
+    "Device": None,
+    "SVendor": None,
+    "SDevice": None,
+}
+ifpga_class = {
+    "Class": "12",
+    "Vendor": "8086",
+    "Device": "0b30",
+    "SVendor": None,
+    "SDevice": None,
+}
+encryption_class = {
+    "Class": "10",
+    "Vendor": None,
+    "Device": None,
+    "SVendor": None,
+    "SDevice": None,
+}
+intel_processor_class = {
+    "Class": "0b",
+    "Vendor": "8086",
+    "Device": None,
+    "SVendor": None,
+    "SDevice": None,
+}
+cavium_sso = {
+    "Class": "08",
+    "Vendor": "177d",
+    "Device": "a04b,a04d",
+    "SVendor": None,
+    "SDevice": None,
+}
+cavium_fpa = {
+    "Class": "08",
+    "Vendor": "177d",
+    "Device": "a053",
+    "SVendor": None,
+    "SDevice": None,
+}
+cavium_pkx = {
+    "Class": "08",
+    "Vendor": "177d",
+    "Device": "a0dd,a049",
+    "SVendor": None,
+    "SDevice": None,
+}
+cavium_tim = {
+    "Class": "08",
+    "Vendor": "177d",
+    "Device": "a051",
+    "SVendor": None,
+    "SDevice": None,
+}
+cavium_zip = {
+    "Class": "12",
+    "Vendor": "177d",
+    "Device": "a037",
+    "SVendor": None,
+    "SDevice": None,
+}
+avp_vnic = {
+    "Class": "05",
+    "Vendor": "1af4",
+    "Device": "1110",
+    "SVendor": None,
+    "SDevice": None,
+}
 
-cnxk_bphy = {'Class': '08', 'Vendor': '177d', 'Device': 'a089',
-             'SVendor': None, 'SDevice': None}
-cnxk_bphy_cgx = {'Class': '08', 'Vendor': '177d', 'Device': 'a059,a060',
-                 'SVendor': None, 'SDevice': None}
-cnxk_dma = {'Class': '08', 'Vendor': '177d', 'Device': 'a081',
-            'SVendor': None, 'SDevice': None}
-cnxk_inl_dev = {'Class': '08', 'Vendor': '177d', 'Device': 'a0f0,a0f1',
-                'SVendor': None, 'SDevice': None}
+cnxk_bphy = {
+    "Class": "08",
+    "Vendor": "177d",
+    "Device": "a089",
+    "SVendor": None,
+    "SDevice": None,
+}
+cnxk_bphy_cgx = {
+    "Class": "08",
+    "Vendor": "177d",
+    "Device": "a059,a060",
+    "SVendor": None,
+    "SDevice": None,
+}
+cnxk_dma = {
+    "Class": "08",
+    "Vendor": "177d",
+    "Device": "a081",
+    "SVendor": None,
+    "SDevice": None,
+}
+cnxk_inl_dev = {
+    "Class": "08",
+    "Vendor": "177d",
+    "Device": "a0f0,a0f1",
+    "SVendor": None,
+    "SDevice": None,
+}
 
-hisilicon_dma = {'Class': '08', 'Vendor': '19e5', 'Device': 'a122',
-                 'SVendor': None, 'SDevice': None}
-odm_dma = {'Class': '08', 'Vendor': '177d', 'Device': 'a08c',
-           'SVendor': None, 'SDevice': None}
+hisilicon_dma = {
+    "Class": "08",
+    "Vendor": "19e5",
+    "Device": "a122",
+    "SVendor": None,
+    "SDevice": None,
+}
+odm_dma = {
+    "Class": "08",
+    "Vendor": "177d",
+    "Device": "a08c",
+    "SVendor": None,
+    "SDevice": None,
+}
 
-intel_dlb = {'Class': '0b', 'Vendor': '8086', 'Device': '270b,2710,2714',
-             'SVendor': None, 'SDevice': None}
-intel_ioat_bdw = {'Class': '08', 'Vendor': '8086',
-                  'Device': '6f20,6f21,6f22,6f23,6f24,6f25,6f26,6f27,6f2e,6f2f',
-                  'SVendor': None, 'SDevice': None}
-intel_ioat_skx = {'Class': '08', 'Vendor': '8086', 'Device': '2021',
-                  'SVendor': None, 'SDevice': None}
-intel_ioat_icx = {'Class': '08', 'Vendor': '8086', 'Device': '0b00',
-                  'SVendor': None, 'SDevice': None}
-intel_idxd_spr = {'Class': '08', 'Vendor': '8086', 'Device': '0b25',
-                  'SVendor': None, 'SDevice': None}
-intel_idxd_gnrd = {'Class': '08', 'Vendor': '8086', 'Device': '11fb',
-                  'SVendor': None, 'SDevice': None}
-intel_idxd_dmr = {'Class': '08', 'Vendor': '8086', 'Device': '1212',
-                  'SVendor': None, 'SDevice': None}
-intel_ntb_skx = {'Class': '06', 'Vendor': '8086', 'Device': '201c',
-                 'SVendor': None, 'SDevice': None}
-intel_ntb_icx = {'Class': '06', 'Vendor': '8086', 'Device': '347e',
-                 'SVendor': None, 'SDevice': None}
+intel_dlb = {
+    "Class": "0b",
+    "Vendor": "8086",
+    "Device": "270b,2710,2714",
+    "SVendor": None,
+    "SDevice": None,
+}
+intel_ioat_bdw = {
+    "Class": "08",
+    "Vendor": "8086",
+    "Device": "6f20,6f21,6f22,6f23,6f24,6f25,6f26,6f27,6f2e,6f2f",
+    "SVendor": None,
+    "SDevice": None,
+}
+intel_ioat_skx = {
+    "Class": "08",
+    "Vendor": "8086",
+    "Device": "2021",
+    "SVendor": None,
+    "SDevice": None,
+}
+intel_ioat_icx = {
+    "Class": "08",
+    "Vendor": "8086",
+    "Device": "0b00",
+    "SVendor": None,
+    "SDevice": None,
+}
+intel_idxd_spr = {
+    "Class": "08",
+    "Vendor": "8086",
+    "Device": "0b25",
+    "SVendor": None,
+    "SDevice": None,
+}
+intel_idxd_gnrd = {
+    "Class": "08",
+    "Vendor": "8086",
+    "Device": "11fb",
+    "SVendor": None,
+    "SDevice": None,
+}
+intel_idxd_dmr = {
+    "Class": "08",
+    "Vendor": "8086",
+    "Device": "1212",
+    "SVendor": None,
+    "SDevice": None,
+}
+intel_ntb_skx = {
+    "Class": "06",
+    "Vendor": "8086",
+    "Device": "201c",
+    "SVendor": None,
+    "SDevice": None,
+}
+intel_ntb_icx = {
+    "Class": "06",
+    "Vendor": "8086",
+    "Device": "347e",
+    "SVendor": None,
+    "SDevice": None,
+}
 
-cnxk_sso = {'Class': '08', 'Vendor': '177d', 'Device': 'a0f9,a0fa',
-            'SVendor': None, 'SDevice': None}
-cnxk_npa = {'Class': '08', 'Vendor': '177d', 'Device': 'a0fb,a0fc',
-            'SVendor': None, 'SDevice': None}
-cn9k_ree = {'Class': '08', 'Vendor': '177d', 'Device': 'a0f4',
-            'SVendor': None, 'SDevice': None}
+cnxk_sso = {
+    "Class": "08",
+    "Vendor": "177d",
+    "Device": "a0f9,a0fa",
+    "SVendor": None,
+    "SDevice": None,
+}
+cnxk_npa = {
+    "Class": "08",
+    "Vendor": "177d",
+    "Device": "a0fb,a0fc",
+    "SVendor": None,
+    "SDevice": None,
+}
+cn9k_ree = {
+    "Class": "08",
+    "Vendor": "177d",
+    "Device": "a0f4",
+    "SVendor": None,
+    "SDevice": None,
+}
 
-virtio_blk = {'Class': '01', 'Vendor': "1af4", 'Device': '1001,1042',
-              'SVendor': None, 'SDevice': None}
+virtio_blk = {
+    "Class": "01",
+    "Vendor": "1af4",
+    "Device": "1001,1042",
+    "SVendor": None,
+    "SDevice": None,
+}
 
-cnxk_ml = {'Class': '08', 'Vendor': '177d', 'Device': 'a092',
-           'SVendor': None, 'SDevice': None}
+cnxk_ml = {
+    "Class": "08",
+    "Vendor": "177d",
+    "Device": "a092",
+    "SVendor": None,
+    "SDevice": None,
+}
 
 network_devices = [network_class, cavium_pkx, avp_vnic, ifpga_class]
 baseband_devices = [acceleration_class]
 crypto_devices = [encryption_class, intel_processor_class]
-dma_devices = [cnxk_dma, hisilicon_dma,
-               intel_idxd_gnrd, intel_idxd_dmr, intel_idxd_spr,
-               intel_ioat_bdw, intel_ioat_icx, intel_ioat_skx,
-               odm_dma]
+dma_devices = [
+    cnxk_dma,
+    hisilicon_dma,
+    intel_idxd_gnrd,
+    intel_idxd_dmr,
+    intel_idxd_spr,
+    intel_ioat_bdw,
+    intel_ioat_icx,
+    intel_ioat_skx,
+    odm_dma,
+]
 eventdev_devices = [cavium_sso, cavium_tim, intel_dlb, cnxk_sso]
 mempool_devices = [cavium_fpa, cnxk_npa]
 compress_devices = [cavium_zip]
 regex_devices = [cn9k_ree]
 ml_devices = [cnxk_ml]
-misc_devices = [cnxk_bphy, cnxk_bphy_cgx, cnxk_inl_dev,
-                intel_ntb_skx, intel_ntb_icx,
-                virtio_blk]
+misc_devices = [
+    cnxk_bphy,
+    cnxk_bphy_cgx,
+    cnxk_inl_dev,
+    intel_ntb_skx,
+    intel_ntb_icx,
+    virtio_blk,
+]
 
 # global dict ethernet devices present. Dictionary indexed by PCI address.
 # Each device within this is itself a dictionary of device properties
@@ -136,22 +301,23 @@ def module_is_loaded(module):
     if is_bsd:
         return subprocess.run(["kldstat", "-qn", module]).returncode == 0
 
-    if module == 'vfio_pci':
-        module = 'vfio-pci'
+    if module == "vfio_pci":
+        module = "vfio-pci"
 
     if loaded_modules:
         return module in loaded_modules
 
     # Get list of sysfs modules (both built-in and dynamically loaded)
-    sysfs_path = '/sys/module/'
+    sysfs_path = "/sys/module/"
 
     # Get the list of directories in sysfs_path
-    sysfs_mods = [m for m in os.listdir(sysfs_path)
-                  if os.path.isdir(os.path.join(sysfs_path, m))]
+    sysfs_mods = [
+        m for m in os.listdir(sysfs_path) if os.path.isdir(os.path.join(sysfs_path, m))
+    ]
 
     # special case for vfio_pci (module is named vfio-pci,
     # but its .ko is named vfio_pci)
-    sysfs_mods = [a if a != 'vfio_pci' else 'vfio-pci' for a in sysfs_mods]
+    sysfs_mods = [a if a != "vfio_pci" else "vfio-pci" for a in sysfs_mods]
 
     loaded_modules = sysfs_mods
 
@@ -161,15 +327,17 @@ def module_is_loaded(module):
     if os.path.exists(filename):
         try:
             with open(filename) as f:
-                loaded_modules += [os.path.splitext(os.path.basename(mod))[0] for mod in f]
-        except IOError:
+                loaded_modules += [
+                    os.path.splitext(os.path.basename(mod))[0] for mod in f
+                ]
+        except OSError:
             print("Warning: cannot read list of built-in kernel modules")
 
     return module in loaded_modules
 
 
 def check_modules():
-    '''Checks that igb_uio is loaded'''
+    """Checks that igb_uio is loaded"""
     global dpdk_drivers
 
     # list of supported modules
@@ -189,12 +357,12 @@ def check_modules():
 
 
 def has_driver(dev_id):
-    '''return true if a device is assigned to a driver. False otherwise'''
+    """return true if a device is assigned to a driver. False otherwise"""
     return "Driver_str" in devices[dev_id]
 
 
 def get_pci_device_details(dev_id, probe_lspci):
-    '''This function gets additional details for a PCI device'''
+    """This function gets additional details for a PCI device"""
     device = {}
 
     if probe_lspci:
@@ -210,8 +378,7 @@ def get_pci_device_details(dev_id, probe_lspci):
     device["Interface"] = ""
     for base, dirs, _ in os.walk("/sys/bus/pci/devices/%s/" % dev_id):
         if "net" in dirs:
-            device["Interface"] = \
-                ",".join(os.listdir(os.path.join(base, "net")))
+            device["Interface"] = ",".join(os.listdir(os.path.join(base, "net")))
             break
     # check if a port is used for ssh connection
     device["Ssh_if"] = False
@@ -221,7 +388,7 @@ def get_pci_device_details(dev_id, probe_lspci):
 
 
 def clear_data():
-    '''This function clears any old data'''
+    """This function clears any old data"""
     global devices
     global devices_cache
     devices = {}
@@ -241,9 +408,9 @@ def get_basic_devinfo_linux(devices_type):
             if device_type_match(dev, devices_type):
                 # Replace "Driver" with "Driver_str" to have consistency of
                 # of dictionary key names
-                if "Driver" in dev.keys():
+                if "Driver" in dev:
                     dev["Driver_str"] = dev.pop("Driver")
-                if "Module" in dev.keys():
+                if "Module" in dev:
                     dev["Module_str"] = dev.pop("Module")
                 # use dict to make copy of dev
                 devices[dev["Slot"]] = dict(dev)
@@ -251,17 +418,19 @@ def get_basic_devinfo_linux(devices_type):
             dev = {}
         else:
             name, value = dev_line.decode("utf8").split("\t", 1)
-            value_list = value.rsplit(' ', 1)
+            value_list = value.rsplit(" ", 1)
             if value_list:
                 # String stored in <name>_str
-                dev[name.rstrip(":") + '_str'] = value_list[0]
+                dev[name.rstrip(":") + "_str"] = value_list[0]
             # Numeric IDs
-            dev[name.rstrip(":")] = value_list[len(value_list) - 1] \
-                .rstrip("]").lstrip("[")
+            dev[name.rstrip(":")] = (
+                value_list[len(value_list) - 1].rstrip("]").lstrip("[")
+            )
+
 
 def init_devices_cache_bsd():
-    '''Initialize the devices cache by parsing pciconf -lv and ifconfig -a once.
-    Returns a list of device dictionaries with ifconfig data merged in.'''
+    """Initialize the devices cache by parsing pciconf -lv and ifconfig -a once.
+    Returns a list of device dictionaries with ifconfig data merged in."""
     global devices_cache
 
     if devices_cache is not None:
@@ -270,7 +439,9 @@ def init_devices_cache_bsd():
     # Get all PCI device info in one call
     pciconf_output = subprocess.check_output(["pciconf", "-lv"]).decode("utf8")
     # Get all network interface info in one call
-    ifconfig_output = subprocess.check_output(["ifconfig", "-a"]).decode("utf8").splitlines()
+    ifconfig_output = (
+        subprocess.check_output(["ifconfig", "-a"]).decode("utf8").splitlines()
+    )
 
     devices_cache = []
     current_dev = None
@@ -278,16 +449,16 @@ def init_devices_cache_bsd():
     # Parse pciconf -lv output
     for line in pciconf_output.splitlines():
         # Main device line: none0@pci0:0:0:0: class=0x088000 rev=0x04 hdr=0x00 vendor=0x8086 device=0x09a2
-        if line and '@pci' in line:
+        if line and "@pci" in line:
             # Save previous device if any
             if current_dev:
                 devices_cache.append(current_dev)
 
             # Parse slot/address from first part
             name_addr, fields = line.split(maxsplit=1)
-            devname, addr = name_addr.split('@')
+            devname, addr = name_addr.split("@")
             # Remove trailing colon from address
-            addr = addr.rstrip(':')
+            addr = addr.rstrip(":")
 
             current_dev = {}
             current_dev["Slot"] = addr
@@ -295,12 +466,12 @@ def init_devices_cache_bsd():
 
             # Extract driver base name from device name (e.g., "nic_uio2" -> "nic_uio", "ixl0" -> "ixl")
             # Device name format is like: "nic_uio2", "ioat0", "em0", "ixl1", "none0", etc.
-            current_dev["Driver_str"] = devname.rstrip('0123456789')
+            current_dev["Driver_str"] = devname.rstrip("0123456789")
 
             # Parse class/vendor/device from rest of line
             fields_list = fields.split()
             for field in fields_list:
-                if '=' in field:
+                if "=" in field:
                     name, value = field.split("=")
                     name = name.title()
                     if name.startswith("Sub"):
@@ -308,16 +479,20 @@ def init_devices_cache_bsd():
                     # For class code, extract only first 2 hex digits (class part)
                     if name == "Class" and value.startswith("0x") and len(value) > 4:
                         current_dev[name + "_str"] = value
-                        current_dev[name] = value[2:4]  # Extract just class code (e.g., "02" from "0x020000")
+                        current_dev[name] = value[
+                            2:4
+                        ]  # Extract just class code (e.g., "02" from "0x020000")
                     else:
                         current_dev[name + "_str"] = value
-                        current_dev[name] = value[2:] if value.startswith("0x") else value
+                        current_dev[name] = value.removeprefix("0x")
 
             # Check if this is a network device and attach interface info
             if "Class" in current_dev:
                 class_code = current_dev.get("Class", "")
                 if class_code == "02":  # Network controller
-                    iflines = [ln for ln in ifconfig_output if ln.startswith(f"{devname}:")]
+                    iflines = [
+                        ln for ln in ifconfig_output if ln.startswith(f"{devname}:")
+                    ]
                     if iflines:
                         current_dev["Interface"] = devname
 
@@ -331,8 +506,9 @@ def init_devices_cache_bsd():
 
     return devices_cache
 
+
 def get_basic_devinfo_bsd(devices_type):
-    '''Filter the pre-cached device list by device type and populate devices dict.'''
+    """Filter the pre-cached device list by device type and populate devices dict."""
     global devices
 
     # Initialize cache on first call (subsequent calls return cached data)
@@ -345,9 +521,9 @@ def get_basic_devinfo_bsd(devices_type):
 
 
 def get_device_details(devices_type):
-    '''This function populates the "devices" dictionary. The keys used are
+    """This function populates the "devices" dictionary. The keys used are
     the pci addresses (domain:bus:slot.func). The values are themselves
-    dictionaries - one for each NIC.'''
+    dictionaries - one for each NIC."""
     global devices
     global dpdk_drivers
 
@@ -362,15 +538,16 @@ def get_device_details(devices_type):
         ssh_if = []
         route = subprocess.check_output(["ip", "-o", "route"])
         # filter out all lines for 169.254 routes
-        route = "\n".join(filter(lambda ln: not ln.startswith("169.254"),
-                                 route.decode().splitlines()))
+        route = "\n".join(
+            filter(lambda ln: not ln.startswith("169.254"), route.decode().splitlines())
+        )
         rt_info = route.split()
         for i in range(len(rt_info) - 1):
             if rt_info[i] == "dev":
                 ssh_if.append(rt_info[i + 1])
 
     # based on the basic info, get extended text details
-    for d in devices.keys():
+    for d in devices:
         if not device_type_match(devices[d], devices_type):
             continue
 
@@ -390,8 +567,7 @@ def get_device_details(devices_type):
         if "Module_str" in devices[d]:
             for driver in dpdk_drivers:
                 if driver not in devices[d]["Module_str"]:
-                    devices[d]["Module_str"] = \
-                        devices[d]["Module_str"] + ",%s" % driver
+                    devices[d]["Module_str"] = devices[d]["Module_str"] + ",%s" % driver
         else:
             devices[d]["Module_str"] = ",".join(dpdk_drivers)
 
@@ -405,16 +581,15 @@ def get_device_details(devices_type):
 
 def device_type_match(dev, devices_type):
     for i in range(len(devices_type)):
-        param_count = len(
-            [x for x in devices_type[i].values() if x is not None])
+        param_count = len([x for x in devices_type[i].values() if x is not None])
         match_count = 0
         if dev["Class"][0:2] == devices_type[i]["Class"]:
             match_count = match_count + 1
             for key in devices_type[i].keys():
-                if key != 'Class' and devices_type[i][key]:
-                    value_list = devices_type[i][key].split(',')
+                if key != "Class" and devices_type[i][key]:
+                    value_list = devices_type[i][key].split(",")
                     for value in value_list:
-                        if value.strip(' ') == dev[key]:
+                        if value.strip(" ") == dev[key]:
                             match_count = match_count + 1
             # count must be the number of non None parameters to match
             if match_count == param_count:
@@ -423,9 +598,9 @@ def device_type_match(dev, devices_type):
 
 
 def dev_id_from_dev_name(dev_name):
-    '''Take a device "name" - a string passed in by user to identify a NIC
+    """Take a device "name" - a string passed in by user to identify a NIC
     device, and determine the device id - i.e. the domain:bus:slot.func - for
-    it, which can then be used to index into the devices array'''
+    it, which can then be used to index into the devices array"""
 
     # check if it's already a suitable index
     if dev_name in devices:
@@ -435,26 +610,33 @@ def dev_id_from_dev_name(dev_name):
         return "0000:" + dev_name
 
     # check if it's an interface name, e.g. eth1
-    for d in devices.keys():
+    for d in devices:
         if dev_name in devices[d]["Interface"].split(","):
             return devices[d]["Slot"]
     # if nothing else matches - error
-    raise ValueError("Unknown device: %s. "
-                     "Please specify device in \"bus:slot.func\" format" % dev_name)
+    raise ValueError(
+        'Unknown device: %s. Please specify device in "bus:slot.func" format' % dev_name
+    )
 
 
 def unbind_one(dev_id, force):
-    '''Unbind the device identified by "dev_id" from its current driver'''
+    """Unbind the device identified by "dev_id" from its current driver"""
     dev = devices[dev_id]
     if not has_driver(dev_id):
-        print("Notice: %s %s %s is not currently managed by any driver" %
-              (dev["Slot"], dev["Device_str"], dev["Interface"]), file=sys.stderr)
+        print(
+            "Notice: %s %s %s is not currently managed by any driver"
+            % (dev["Slot"], dev["Device_str"], dev["Interface"]),
+            file=sys.stderr,
+        )
         return
 
     # prevent us disconnecting ourselves
     if dev["Ssh_if"] and not force:
-        print("Warning: routing table indicates that interface %s is active. "
-              "Skipping unbind" % dev_id, file=sys.stderr)
+        print(
+            "Warning: routing table indicates that interface %s is active. "
+            "Skipping unbind" % dev_id,
+            file=sys.stderr,
+        )
         return
 
     # write to /sys to unbind
@@ -462,29 +644,35 @@ def unbind_one(dev_id, force):
     try:
         f = open(filename, "a")
     except OSError as err:
-        sys.exit("Error: unbind failed for %s - Cannot open %s: %s" %
-                 (dev_id, filename, err))
+        sys.exit(
+            "Error: unbind failed for %s - Cannot open %s: %s" % (dev_id, filename, err)
+        )
     f.write(dev_id)
     f.close()
 
 
 def bind_one(dev_id, driver, force):
-    '''Bind the device given by "dev_id" to the driver "driver". If the device
-    is already bound to a different driver, it will be unbound first'''
+    """Bind the device given by "dev_id" to the driver "driver". If the device
+    is already bound to a different driver, it will be unbound first"""
     dev = devices[dev_id]
     saved_driver = None  # used to rollback any unbind in case of failure
 
     # prevent disconnection of our ssh session
     if dev["Ssh_if"] and not force:
-        print("Warning: routing table indicates that interface %s is active. "
-              "Not modifying" % dev_id, file=sys.stderr)
+        print(
+            "Warning: routing table indicates that interface %s is active. "
+            "Not modifying" % dev_id,
+            file=sys.stderr,
+        )
         return
 
     # unbind any existing drivers we don't want
     if has_driver(dev_id):
         if dev["Driver_str"] == driver:
-            print("Notice: %s already bound to driver %s, skipping" %
-                  (dev_id, driver), file=sys.stderr)
+            print(
+                "Notice: %s already bound to driver %s, skipping" % (dev_id, driver),
+                file=sys.stderr,
+            )
             return
         saved_driver = dev["Driver_str"]
         unbind_one(dev_id, force)
@@ -502,15 +690,21 @@ def bind_one(dev_id, driver, force):
             try:
                 f = open(filename, "w")
             except OSError as err:
-                print("Error: bind failed for %s - Cannot open %s: %s"
-                      % (dev_id, filename, err), file=sys.stderr)
+                print(
+                    "Error: bind failed for %s - Cannot open %s: %s"
+                    % (dev_id, filename, err),
+                    file=sys.stderr,
+                )
                 return
             try:
                 f.write("%s" % driver)
                 f.close()
             except OSError as err:
-                print("Error: bind failed for %s - Cannot write driver %s to "
-                      "PCI ID: %s" % (dev_id, driver, err), file=sys.stderr)
+                print(
+                    "Error: bind failed for %s - Cannot write driver %s to "
+                    "PCI ID: %s" % (dev_id, driver, err),
+                    file=sys.stderr,
+                )
                 return
         # For kernels < 3.15 use new_id to add PCI id's to the driver
         else:
@@ -518,17 +712,22 @@ def bind_one(dev_id, driver, force):
             try:
                 f = open(filename, "w")
             except OSError as err:
-                print("Error: bind failed for %s - Cannot open %s: %s"
-                      % (dev_id, filename, err), file=sys.stderr)
+                print(
+                    "Error: bind failed for %s - Cannot open %s: %s"
+                    % (dev_id, filename, err),
+                    file=sys.stderr,
+                )
                 return
             try:
                 # Convert Device and Vendor Id to int to write to new_id
-                f.write("%04x %04x" % (int(dev["Vendor"], 16),
-                                       int(dev["Device"], 16)))
+                f.write("%04x %04x" % (int(dev["Vendor"], 16), int(dev["Device"], 16)))
                 f.close()
             except OSError as err:
-                print("Error: bind failed for %s - Cannot write new PCI ID to "
-                      "driver %s: %s" % (dev_id, driver, err), file=sys.stderr)
+                print(
+                    "Error: bind failed for %s - Cannot write new PCI ID to "
+                    "driver %s: %s" % (dev_id, driver, err),
+                    file=sys.stderr,
+                )
                 return
 
     # do the bind by writing to /sys
@@ -536,8 +735,10 @@ def bind_one(dev_id, driver, force):
     try:
         f = open(filename, "a")
     except OSError as err:
-        print("Error: bind failed for %s - Cannot open %s: %s"
-              % (dev_id, filename, err), file=sys.stderr)
+        print(
+            "Error: bind failed for %s - Cannot open %s: %s" % (dev_id, filename, err),
+            file=sys.stderr,
+        )
         if saved_driver is not None:  # restore any previous driver
             bind_one(dev_id, saved_driver, force)
         return
@@ -551,8 +752,11 @@ def bind_one(dev_id, driver, force):
         tmp = get_pci_device_details(dev_id, True)
         if "Driver_str" in tmp and tmp["Driver_str"] == driver:
             return
-        print("Error: bind failed for %s - Cannot bind to driver %s: %s"
-              % (dev_id, driver, err), file=sys.stderr)
+        print(
+            "Error: bind failed for %s - Cannot bind to driver %s: %s"
+            % (dev_id, driver, err),
+            file=sys.stderr,
+        )
         if saved_driver is not None:  # restore any previous driver
             bind_one(dev_id, saved_driver, force)
         return
@@ -565,14 +769,18 @@ def bind_one(dev_id, driver, force):
         try:
             f = open(filename, "w")
         except OSError as err:
-            sys.exit("Error: unbind failed for %s - Cannot open %s: %s"
-                     % (dev_id, filename, err))
+            sys.exit(
+                "Error: unbind failed for %s - Cannot open %s: %s"
+                % (dev_id, filename, err)
+            )
         try:
             f.write("\00")
             f.close()
         except OSError as err:
-            sys.exit("Error: unbind failed for %s - Cannot write %s: %s"
-                     % (dev_id, filename, err))
+            sys.exit(
+                "Error: unbind failed for %s - Cannot write %s: %s"
+                % (dev_id, filename, err)
+            )
 
 
 def unbind_all(dev_list, force=False):
@@ -582,7 +790,7 @@ def unbind_all(dev_list, force=False):
         sys.exit(freebsd_err_unsupported_string)
 
     if dev_list[0] == "dpdk":
-        for d in devices.keys():
+        for d in devices:
             if "Driver_str" in devices[d]:
                 if devices[d]["Driver_str"] in dpdk_drivers:
                     unbind_one(devices[d]["Slot"], force)
@@ -611,19 +819,25 @@ def check_noiommu_mode():
     try:
         with open(filename, "r") as f:
             value = f.read(1)
-            if value in ("1", "y" ,"Y"):
+            if value in ("1", "y", "Y"):
                 return
     except OSError as err:
-        sys.exit(f"Error: failed to check unsafe noiommu mode - Cannot open {filename}: {err}")
+        sys.exit(
+            f"Error: failed to check unsafe noiommu mode - Cannot open {filename}: {err}"
+        )
 
     if not noiommu_flag:
-        sys.exit("Error: IOMMU support is disabled, use --noiommu-mode for binding in noiommu mode")
+        sys.exit(
+            "Error: IOMMU support is disabled, use --noiommu-mode for binding in noiommu mode"
+        )
 
     try:
         with open(filename, "w") as f:
             f.write("1")
     except OSError as err:
-        sys.exit(f"Error: failed to enable unsafe noiommu mode - Cannot open {filename}: {err}")
+        sys.exit(
+            f"Error: failed to enable unsafe noiommu mode - Cannot open {filename}: {err}"
+        )
     print("Warning: enabling unsafe no IOMMU mode for VFIO drivers")
 
 
@@ -641,14 +855,16 @@ def bind_all(dev_list, driver, force=False):
         dev_id_from_dev_name(driver)
         # if we've made it this far, this means that the "driver" was a valid
         # device string, so it's probably not a valid driver name.
-        sys.exit("Error: Driver '%s' does not look like a valid driver. "
-                 "Did you forget to specify the driver to bind devices to?" % driver)
+        sys.exit(
+            "Error: Driver '%s' does not look like a valid driver. "
+            "Did you forget to specify the driver to bind devices to?" % driver
+        )
     except ValueError:
         # driver generated error - it's not a valid device ID, so all is well
         pass
 
     # check if we're attempting to bind to a driver that isn't loaded
-    if not module_is_loaded(driver.replace('-', '_')):
+    if not module_is_loaded(driver.replace("-", "_")):
         sys.exit("Error: Driver '%s' is not loaded." % driver)
 
     try:
@@ -682,14 +898,15 @@ def bind_all(dev_list, driver, force=False):
     # asked them to. hence, we check the list of drivers again, and see if
     # some of the previously-unbound devices were erroneously bound.
     if not exists("/sys/bus/pci/devices/%s/driver_override" % d):
-        for d in devices.keys():
+        for d in devices:
             # skip devices that were already bound or that we know should be bound
             if "Driver_str" in devices[d] or d in dev_list:
                 continue
 
             # update information about this device
-            devices[d] = dict(devices[d].items()
-                              + get_pci_device_details(d, True).items())
+            devices[d] = dict(
+                devices[d].items() + get_pci_device_details(d, True).items()
+            )
 
             # check if updated information indicates that the device was bound
             if "Driver_str" in devices[d]:
@@ -697,10 +914,10 @@ def bind_all(dev_list, driver, force=False):
 
 
 def display_devices(title, dev_list, extra_params=None):
-    '''Displays to the user the details of a list of devices given in
+    """Displays to the user the details of a list of devices given in
     "dev_list". The "extra_params" parameter, if given, should contain a string
      with %()s fields in it for replacement by the named fields in each
-     device's dictionary.'''
+     device's dictionary."""
     strings = []  # this holds the strings to print. We sort before printing
     print("\n%s" % title)
     print("=" * len(title))
@@ -709,10 +926,15 @@ def display_devices(title, dev_list, extra_params=None):
     else:
         for dev in dev_list:
             if extra_params is not None:
-                strings.append("%s '%s %s' %s" % (dev["Slot"],
-                                                  dev["Device_str"],
-                                                  dev["Device"],
-                                                  extra_params % dev))
+                strings.append(
+                    "%s '%s %s' %s"
+                    % (
+                        dev["Slot"],
+                        dev["Device_str"],
+                        dev["Device"],
+                        extra_params % dev,
+                    )
+                )
             else:
                 strings.append("%s '%s'" % (dev["Slot"], dev["Device_str"]))
     # sort before printing, so that the entries appear in PCI order
@@ -729,7 +951,7 @@ def show_device_status(devices_type, device_name, if_field=False):
     print_numa = True  # by default, assume we can print NUMA information
 
     # split our list of network devices into the three categories above
-    for d in devices.keys():
+    for d in devices:
         if device_type_match(devices[d], devices_type):
             print_numa &= "NUMANode" in devices[d]
             if not has_driver(d):
@@ -745,9 +967,9 @@ def show_device_status(devices_type, device_name, if_field=False):
     # don't bother displaying anything if there are no devices
     if n_devs == 0:
         msg = "No '%s' devices detected" % device_name
-        print("")
+        print()
         print(msg)
-        print("".join('=' * len(msg)))
+        print("".join("=" * len(msg)))
         return
 
     # print each category separately, so we can clearly see what's used by DPDK
@@ -755,8 +977,11 @@ def show_device_status(devices_type, device_name, if_field=False):
         extra_param = "drv=%(Driver_str)s unused=%(Module_str)s"
         if print_numa:
             extra_param = "numa_node=%(NUMANode)s " + extra_param
-        display_devices("%s devices using DPDK-compatible driver" % device_name,
-                        dpdk_drv, extra_param)
+        display_devices(
+            "%s devices using DPDK-compatible driver" % device_name,
+            dpdk_drv,
+            extra_param,
+        )
     if kernel_drv:
         extra_param = "drv=%(Driver_str)s unused=%(Module_str)s"
         if if_field:
@@ -764,8 +989,9 @@ def show_device_status(devices_type, device_name, if_field=False):
         if print_numa:
             extra_param = "numa_node=%(NUMANode)s " + extra_param
         extra_param += " %(Active)s"
-        display_devices("%s devices using kernel driver" % device_name,
-                        kernel_drv, extra_param)
+        display_devices(
+            "%s devices using kernel driver" % device_name, kernel_drv, extra_param
+        )
     if no_drv:
         extra_param = "unused=%(Module_str)s"
         if print_numa:
@@ -774,9 +1000,9 @@ def show_device_status(devices_type, device_name, if_field=False):
 
 
 def show_status():
-    '''Function called when the script is passed the "--status" option.
+    """Function called when the script is passed the "--status" option.
     Displays to the user what devices are bound to the igb_uio driver, the
-    kernel driver or to no driver'''
+    kernel driver or to no driver"""
 
     if status_dev in ["net", "all"]:
         show_device_status(network_devices, "Network", if_field=True)
@@ -810,11 +1036,11 @@ def show_status():
 
 
 def pci_glob(arg):
-    '''Returns a list containing either:
+    """Returns a list containing either:
     * List of PCI B:D:F matching arg, using shell wildcards e.g. 80:04.*
-    * Only the passed arg if matching list is empty'''
+    * Only the passed arg if matching list is empty"""
     sysfs_path = "/sys/bus/pci/devices"
-    for _glob in [arg, '0000:' + arg]:
+    for _glob in [arg, "0000:" + arg]:
         paths = [basename(path) for path in glob(path_join(sysfs_path, _glob))]
         if paths:
             return paths
@@ -822,8 +1048,8 @@ def pci_glob(arg):
 
 
 def parse_args():
-    '''Parses the command-line arguments given by the user and takes the
-    appropriate action for each'''
+    """Parses the command-line arguments given by the user and takes the
+    appropriate action for each"""
     global b_flag
     global status_flag
     global status_dev
@@ -858,35 +1084,51 @@ NOTE: Only query options, -s/--status and --status-dev, are supported on FreeBSD
 
     epilog = epilog_linux if is_linux else epilog_bsd
     parser = argparse.ArgumentParser(
-        description='Utility to bind and unbind devices from OS kernel',
+        description="Utility to bind and unbind devices from OS kernel",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=epilog)
+        epilog=epilog,
+    )
 
     parser.add_argument(
-        '-s',
-        '--status',
-        action='store_true',
-        help="Print the current status of all known devices.")
+        "-s",
+        "--status",
+        action="store_true",
+        help="Print the current status of all known devices.",
+    )
     parser.add_argument(
-        '--status-dev',
+        "--status-dev",
         help="Print the status of given device group.",
-        choices=['baseband', 'compress', 'crypto', 'dma', 'event',
-                 'mempool', 'misc', 'net', 'regex', 'ml'])
+        choices=[
+            "baseband",
+            "compress",
+            "crypto",
+            "dma",
+            "event",
+            "mempool",
+            "misc",
+            "net",
+            "regex",
+            "ml",
+        ],
+    )
     bind_group = parser.add_mutually_exclusive_group()
     bind_group.add_argument(
-        '-b',
-        '--bind',
-        metavar='DRIVER',
-        help="Select the driver to use or \"none\" to unbind the device")
+        "-b",
+        "--bind",
+        metavar="DRIVER",
+        help='Select the driver to use or "none" to unbind the device',
+    )
     bind_group.add_argument(
-        '-u',
-        '--unbind',
-        action='store_true',
-        help="Unbind a device (equivalent to \"-b none\")")
+        "-u",
+        "--unbind",
+        action="store_true",
+        help='Unbind a device (equivalent to "-b none")',
+    )
     parser.add_argument(
-        '--noiommu-mode',
-        action='store_true',
-        help="If IOMMU is not available, enable no IOMMU mode for VFIO drivers")
+        "--noiommu-mode",
+        action="store_true",
+        help="If IOMMU is not available, enable no IOMMU mode for VFIO drivers",
+    )
     parser.add_argument(
         "-U",
         "--uid",
@@ -902,20 +1144,22 @@ NOTE: Only query options, -s/--status and --status-dev, are supported on FreeBSD
         default=-1,
     )
     parser.add_argument(
-        '--force',
-        action='store_true',
+        "--force",
+        action="store_true",
         help="""
 Override restriction on binding devices in use by Linux"
 WARNING: This can lead to loss of network connection and should be used with caution.
-""")
+""",
+    )
     parser.add_argument(
-        'devices',
-        metavar='DEVICE',
-        nargs='*',
+        "devices",
+        metavar="DEVICE",
+        nargs="*",
         help="""
 Device specified as PCI "domain:bus:slot.func" syntax or "bus:slot.func" syntax.
 For devices bound to Linux kernel drivers, they may be referred to by interface name.
-""")
+""",
+    )
 
     opt = parser.parse_args()
 
@@ -938,9 +1182,11 @@ For devices bound to Linux kernel drivers, they may be referred to by interface 
     args = opt.devices
 
     if not b_flag and not status_flag:
-        print("Error: No action specified for devices. "
-              "Please give a --bind, --ubind or --status option",
-              file=sys.stderr)
+        print(
+            "Error: No action specified for devices. "
+            "Please give a --bind, --ubind or --status option",
+            file=sys.stderr,
+        )
         parser.print_usage()
         sys.exit(1)
 
@@ -957,7 +1203,7 @@ For devices bound to Linux kernel drivers, they may be referred to by interface 
 
 
 def do_arg_actions():
-    '''do the actual action requested by the user'''
+    """do the actual action requested by the user"""
     global b_flag
     global status_flag
     global force_flag
@@ -985,14 +1231,15 @@ def do_arg_actions():
 
 
 def main():
-    '''program main function'''
+    """program main function"""
     # check if lspci/pciconf is installed, suppress any output
-    pcitool = 'lspci' if is_linux else 'pciconf'
-    with open(os.devnull, 'w') as devnull:
-        ret = subprocess.call(['which', pcitool],
-                              stdout=devnull, stderr=devnull)
+    pcitool = "lspci" if is_linux else "pciconf"
+    with open(os.devnull, "w") as devnull:
+        ret = subprocess.call(["which", pcitool], stdout=devnull, stderr=devnull)
         if ret != 0:
-            sys.exit(f"'{pcitool}' not found - please install relevant package, e.g. 'pciutils'")
+            sys.exit(
+                f"'{pcitool}' not found - please install relevant package, e.g. 'pciutils'"
+            )
     parse_args()
     check_modules()
     clear_data()

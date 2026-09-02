@@ -33,15 +33,14 @@ from test_utils import *
 
 filters = [
     "tcp src port 92",
-        "len <= 1000",
-        "ether proto 0x800",
-        "ip proto 47 or ip6 proto 47",
-        "ip host 22.22.22.22"
+    "len <= 1000",
+    "ether proto 0x800",
+    "ip proto 47 or ip6 proto 47",
+    "ip host 22.22.22.22",
 ]
 
 
 class BessBpfTest(BessModuleTestCase):
-
     def test_run_bpf_simple(self):
         bpf = BPF()
         filter0 = {"priority": 0, "filter": filters[0], "gate": 1}
@@ -62,9 +61,8 @@ class BessBpfTest(BessModuleTestCase):
         filter0 = {"priority": 0, "filter": filters[0], "gate": 1}
         bpf.add(filters=[filter0])
 
-        pkt1 = get_udp_packet(sip='12.34.56.78', dip='12.34.56.78')
-        pkt2 = get_tcp_packet(sip='12.34.56.78', dip='12.34.56.78',
-                              sport=92)
+        pkt1 = get_udp_packet(sip="12.34.56.78", dip="12.34.56.78")
+        pkt2 = get_tcp_packet(sip="12.34.56.78", dip="12.34.56.78", sport=92)
 
         pkt_outs = self.run_module(bpf, 0, [pkt1], [0])
         self.assertEqual(len(pkt_outs[0]), 1)
@@ -80,14 +78,11 @@ class BessBpfTest(BessModuleTestCase):
         bpf.add(filters=[{"priority": 2, "filter": filters[0], "gate": 1}])
         bpf.add(filters=[{"priority": 1, "filter": filters[4], "gate": 2}])
 
-        pkt1 = get_udp_packet(sip='22.22.22.22', dip='12.34.56.78',
-                              sport=700)
+        pkt1 = get_udp_packet(sip="22.22.22.22", dip="12.34.56.78", sport=700)
 
-        pkt2 = get_tcp_packet(sip='12.34.56.78', dip='22.22.22.22',
-                              sport=92)
+        pkt2 = get_tcp_packet(sip="12.34.56.78", dip="22.22.22.22", sport=92)
 
-        pkt3 = get_tcp_packet(sip='12.34.56.78', dip='12.34.56.78',
-                              sport=700)
+        pkt3 = get_tcp_packet(sip="12.34.56.78", dip="12.34.56.78", sport=700)
 
         pkt_outs = self.run_module(bpf, 0, [pkt3], [0])
         self.assertEqual(len(pkt_outs[0]), 1)
@@ -100,6 +95,7 @@ class BessBpfTest(BessModuleTestCase):
         pkt_outs = self.run_module(bpf, 0, [pkt1], [2])
         self.assertEqual(len(pkt_outs[2]), 1)
         self.assertSamePackets(pkt_outs[2][0], pkt1)
+
 
 suite = unittest.TestLoader().loadTestsFromTestCase(BessBpfTest)
 results = unittest.TextTestRunner(verbosity=2).run(suite)

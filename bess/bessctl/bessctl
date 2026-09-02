@@ -32,38 +32,37 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from __future__ import print_function
-from __future__ import absolute_import
-import sys
-import os
-import os.path
 import io
-import tempfile
-import time
-import cli
-import commands
 
 # Suppress scapy IPv6 warning (must be done before importing scapy module)
 import logging
+import os
+import os.path
+import sys
+import tempfile
+import time
+
+import cli
+import commands
+
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 
 try:
     this_dir = os.path.dirname(os.path.realpath(__file__))
-    sys.path.insert(1, os.path.join(this_dir, '..'))
+    sys.path.insert(1, os.path.join(this_dir, ".."))
     from pybess.bess import *
 except ImportError:
-    print('Cannot import the API module (pybess)', file=sys.stderr)
+    print("Cannot import the API module (pybess)", file=sys.stderr)
     raise
 
 
 class BESSCLI(cli.CLI):
-
     def __init__(self, bess, cmd_db, **kwargs):
         self.bess = bess
         self.cmd_db = cmd_db
         self.this_dir = this_dir
 
-        super(BESSCLI, self).__init__(self.cmd_db.cmdlist, **kwargs)
+        super().__init__(self.cmd_db.cmdlist, **kwargs)
 
     def get_var_attrs(self, var_token, partial_word):
         return self.cmd_db.get_var_attrs(self, var_token, partial_word)
@@ -72,13 +71,13 @@ class BESSCLI(cli.CLI):
         try:
             return self.cmd_db.split_var(self, var_type, line)
         except self.InternalError:
-            return super(BESSCLI, self).split_var(var_type, line)
+            return super().split_var(var_type, line)
 
     def bind_var(self, var_type, line):
         try:
             return self.cmd_db.bind_var(self, var_type, line)
         except self.InternalError:
-            return super(BESSCLI, self).bind_var(var_type, line)
+            return super().bind_var(var_type, line)
 
     def print_banner(self):
         self.fout.write('Type "help" for more information.\n')
@@ -88,21 +87,20 @@ class BESSCLI(cli.CLI):
 
     def _handle_broken_connection(self):
         peer = self.bess.peer
-        if peer.startswith('localhost') or peer.startswith('127.'):
+        if peer.startswith(("localhost", "127.")):
             self._print_crashlog()
         self.bess.disconnect()
 
     def call_func(self, func, args):
         try:
-            super(BESSCLI, self).call_func(func, args)
+            super().call_func(func, args)
 
         except self.bess.APIError as e:
             self.err(e)
             raise self.HandledError()
 
-        except self.bess.RPCError as e:
-            self.err('RPC failed to  - {}'.format(
-                self.bess.peer, str(e)))
+        except self.bess.RPCError:
+            self.err(f"RPC failed to  - {self.bess.peer}")
 
             self._handle_broken_connection()
             raise self.HandledError()
@@ -113,37 +111,40 @@ class BESSCLI(cli.CLI):
             if e.code in errno.errorcode:
                 err_code = errno.errorcode[e.code]
             else:
-                err_code = '<unknown>'
+                err_code = "<unknown>"
 
-            self.ferr.write('  BESS daemon response - errno=%d (%s: %s)\n' %
-                            (e.code, err_code, os.strerror(e.code)))
+            self.ferr.write(
+                f"  BESS daemon response - errno={e.code} ({err_code}: {os.strerror(e.code)})\n"
+            )
             for k, v in sorted(e.info.items()):
-                self.ferr.write('%12s: %s\n' % (str(k), str(v)))
+                self.ferr.write("%12s: %s\n" % (str(k), str(v)))
 
             raise self.HandledError()
 
     def _print_crashlog(self):
         try:
-            log_path = tempfile.gettempdir() + '/bessd_crash.log'
+            log_path = tempfile.gettempdir() + "/bessd_crash.log"
             log = open(log_path).read()
             ctime = time.ctime(os.path.getmtime(log_path))
-            self.ferr.write('From {} ({}):\n{}'.format(log_path, ctime, log))
+            self.ferr.write(f"From {log_path} ({ctime}):\n{log}")
         except Exception as e:
-            self.ferr.write('Abruptly disconnected from bessd, but crashlog is '
-                            'not available:\n%s\n' % (str(e)))
+            self.ferr.write(
+                "Abruptly disconnected from bessd, but crashlog is "
+                "not available:\n%s\n" % (str(e))
+            )
 
     def loop(self):
-        super(BESSCLI, self).loop()
+        super().loop()
         self.bess.disconnect()
 
     def get_prompt(self):
         if self.bess.is_connected():
-            return '{} $ '.format(self.bess.peer)
+            return f"{self.bess.peer} $ "
 
         if self.bess.is_connection_broken():
             self._handle_broken_connection()
 
-        return '<disconnected> $ '
+        return "<disconnected> $ "
 
 
 def run_cli(instream=sys.stdin):
@@ -154,16 +155,17 @@ def run_cli(instream=sys.stdin):
         s.connect()
     except BESS.RPCError as e:
         if cli.interactive:
-            cli.ferr.write(str(e) + '\n')
-            cli.ferr.write('Perhaps bessd daemon is not running locally? '
-                           'Try "daemon start".\n')
+            cli.ferr.write(str(e) + "\n")
+            cli.ferr.write(
+                'Perhaps bessd daemon is not running locally? Try "daemon start".\n'
+            )
 
     cli.loop()
 
     # end of loop due to error? let them know which command failed.
     if cli.stop_loop:
         if cli.last_cmd:
-            cli.ferr.write('  Command failed: %s\n' % cli.last_cmd)
+            cli.ferr.write("  Command failed: %s\n" % cli.last_cmd)
         os._exit(1)
 
 
@@ -175,14 +177,15 @@ def main():
         line_buf = []
 
         for arg in sys.argv[1:]:
-            if arg == '--':
-                cmds.append(' '.join(line_buf))
+            if arg == "--":
+                cmds.append(" ".join(line_buf))
                 line_buf = []
             else:
                 line_buf.append(arg)
 
-        cmds.append(u' '.join(line_buf))
-        run_cli(io.StringIO('\n'.join(cmds)))
+        cmds.append(" ".join(line_buf))
+        run_cli(io.StringIO("\n".join(cmds)))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

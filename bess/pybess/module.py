@@ -35,36 +35,40 @@ import types
 
 
 def _callback_factory(self, cmd, arg_type):
-    return lambda mod, **kwargs: \
-        self.bess.run_module_command(self.name, cmd, arg_type, kwargs)
+    return lambda mod, **kwargs: self.bess.run_module_command(
+        self.name, cmd, arg_type, kwargs
+    )
 
 
-class Module(object):
-
+class Module:
     def __init__(self, _do_not_create=False, **kwargs):
-        self.name = '<uninitialized>'
+        self.name = "<uninitialized>"
         self.mclass = self.__class__.__name__
 
-        assert self.__class__.__name__ != 'Module', \
+        assert self.__class__.__name__ != "Module", (
             "Should not instantiate 'Module' directly"
+        )
 
-        if 'name' in kwargs:
-            name = kwargs['name']
-            del kwargs['name']
+        if "name" in kwargs:
+            name = kwargs["name"]
+            del kwargs["name"]
         else:
             name = None
 
         if not _do_not_create:
             # create an object
-            ret = self.bess.create_module(self.__class__.__name__, name,
-                                          self.choose_arg(None, kwargs))
+            ret = self.bess.create_module(
+                self.__class__.__name__, name, self.choose_arg(None, kwargs)
+            )
             self.name = ret.name
         else:
             # bind to a pre-existing object, check if it's real
             assert name is not None, "Module should not be None"
             info = self.bess.get_module_info(name)
             assert self.mclass == info.mclass, "Module %s is not of % type" % (
-                name, self.mclass)
+                name,
+                self.mclass,
+            )
             self.name = name
 
         # add mclass-specific methods
@@ -78,14 +82,14 @@ class Module(object):
         self.igate = None
 
     def __str__(self):
-        return '%s::%s' % (self.name, str(self.__class__.__name__))
+        return "%s::%s" % (self.name, str(self.__class__.__name__))
 
     def __mul__(self, ogate):
         if not isinstance(ogate, int):
-            assert False, 'Gate ID must be an integer'
+            assert False, "Gate ID must be an integer"
 
         if self.ogate is not None:
-            assert False, 'Output gate is already bound'
+            assert False, "Output gate is already bound"
 
         ret = copy.copy(self)
         ret.ogate = ogate
@@ -93,10 +97,10 @@ class Module(object):
 
     def __rmul__(self, igate):
         if not isinstance(igate, int):
-            assert False, 'Gate ID must be an integer'
+            assert False, "Gate ID must be an integer"
 
         if self.igate is not None:
-            assert False, 'Input gate is already bound'
+            assert False, "Input gate is already bound"
 
         ret = copy.copy(self)
         ret.igate = igate
@@ -104,7 +108,7 @@ class Module(object):
 
     def __add__(self, next_mod):
         if not isinstance(next_mod, Module):
-            assert False, '%s is not a module' % next_mod
+            assert False, "%s is not a module" % next_mod
 
         ogate = 0
         igate = 0
@@ -121,7 +125,7 @@ class Module(object):
 
     def connect(self, next_mod, ogate=0, igate=0):
         if not isinstance(next_mod, Module):
-            assert False, '%s is not a module' % next_mod
+            assert False, "%s is not a module" % next_mod
 
         self.bess.connect_modules(self.name, next_mod.name, ogate, igate)
 
@@ -140,7 +144,9 @@ class Module(object):
     #   If `parent` is a priority or weighted_fair TC, `priority` or `share`
     #   can be used to customize the child parameter.
     #
-    def attach_task(self, parent='', wid=-1, module_taskid=0,
-                    priority=None, share=None):
-        return self.bess.attach_task(self.name, parent, wid, module_taskid,
-                                     priority, share)
+    def attach_task(
+        self, parent="", wid=-1, module_taskid=0, priority=None, share=None
+    ):
+        return self.bess.attach_task(
+            self.name, parent, wid, module_taskid, priority, share
+        )

@@ -55,12 +55,12 @@ class BessNatTest(BessModuleTestCase):
         # |    |<--------------|       |<----------------|    |
         # +----+  pkt_unnatted +-------+    pkt_repl     +----+
 
-        eth = scapy.Ether(src='02:1e:67:9f:4d:ae', dst='06:16:3e:1b:72:32')
-        ip_orig = scapy.IP(src='172.16.0.2', dst='8.8.8.8')
-        ip_natted = scapy.IP(src=ruleaddr, dst='8.8.8.8')
-        ip_reply = scapy.IP(src='8.8.8.8', dst=ruleaddr)
-        ip_unnatted = scapy.IP(src='8.8.8.8', dst='172.16.0.2')
-        l7 = 'helloworld'
+        eth = scapy.Ether(src="02:1e:67:9f:4d:ae", dst="06:16:3e:1b:72:32")
+        ip_orig = scapy.IP(src="172.16.0.2", dst="8.8.8.8")
+        ip_natted = scapy.IP(src=ruleaddr, dst="8.8.8.8")
+        ip_reply = scapy.IP(src="8.8.8.8", dst=ruleaddr)
+        ip_unnatted = scapy.IP(src="8.8.8.8", dst="172.16.0.2")
+        l7 = "helloworld"
 
         pkt_orig = eth / ip_orig / l4_orig / l7
 
@@ -84,37 +84,45 @@ class BessNatTest(BessModuleTestCase):
 
         pkt_outs = self.run_module(module, 1, [pkt_reply], [0, 1])
         self.assertEqual(len(pkt_outs[0]), 1)
-        self.assertSamePackets(eth / ip_unnatted / _swap_l4(l4_orig) / l7,
-                               pkt_outs[0][0])
+        self.assertSamePackets(
+            eth / ip_unnatted / _swap_l4(l4_orig) / l7, pkt_outs[0][0]
+        )
 
     def test_nat_udp(self):
-        nat_config = [{'ext_addr': '192.168.1.1'}]
+        nat_config = [{"ext_addr": "192.168.1.1"}]
         nat = NAT(ext_addrs=nat_config)
-        self._test_l4(nat, scapy.UDP(sport=56797, dport=53), '192.168.1.1')
+        self._test_l4(nat, scapy.UDP(sport=56797, dport=53), "192.168.1.1")
 
     def test_nat_udp_with_zero_cksum(self):
-        nat_config = [{'ext_addr': '192.168.1.1'}]
+        nat_config = [{"ext_addr": "192.168.1.1"}]
         nat = NAT(ext_addrs=nat_config)
-        self._test_l4(
-            nat, scapy.UDP(sport=56797, dport=53, chksum=0), '192.168.1.1')
+        self._test_l4(nat, scapy.UDP(sport=56797, dport=53, chksum=0), "192.168.1.1")
 
     def test_nat_tcp(self):
-        nat_config = [{'ext_addr': '192.168.1.1'}]
+        nat_config = [{"ext_addr": "192.168.1.1"}]
         nat = NAT(ext_addrs=nat_config)
-        self._test_l4(nat, scapy.TCP(sport=52428, dport=80), '192.168.1.1')
+        self._test_l4(nat, scapy.TCP(sport=52428, dport=80), "192.168.1.1")
 
     def test_nat_icmp(self):
-        nat_config = [{'ext_addr': '192.168.1.1'}]
+        nat_config = [{"ext_addr": "192.168.1.1"}]
         nat = NAT(ext_addrs=nat_config)
-        self._test_l4(nat, scapy.ICMP(), '192.168.1.1')
+        self._test_l4(nat, scapy.ICMP(), "192.168.1.1")
 
     def test_nat_selfconfig(self):
         # Send initial conf unsorted, see that it comes back sorted
         # (note that this is a bit different from other modules
         # where argument order often matters).
-        iconf = {'ext_addrs': [{'ext_addr': '192.168.1.1',
-                                'port_ranges': [{'begin': 1, 'end': 1024},
-                                                {'begin': 1025, 'end': 65535}]}]}
+        iconf = {
+            "ext_addrs": [
+                {
+                    "ext_addr": "192.168.1.1",
+                    "port_ranges": [
+                        {"begin": 1, "end": 1024},
+                        {"begin": 1025, "end": 65535},
+                    ],
+                }
+            ]
+        }
         nat = NAT(**iconf)
         arg = pb_conv.protobuf_to_dict(nat.get_initial_arg())
         expect_config = {}

@@ -33,7 +33,6 @@ from test_utils import *
 
 
 class BessBypassTest(BessModuleTestCase):
-
     def test_bypass(self):
         bp0 = Bypass()
         pkt_in = get_udp_packet()
@@ -43,6 +42,7 @@ class BessBypassTest(BessModuleTestCase):
 
         pkt_outs = self.run_module(bp0, 0, [], [0])
         self.assertEqual(len(pkt_outs[0]), 0)
+
 
 suite = unittest.TestLoader().loadTestsFromTestCase(BessBypassTest)
 results = unittest.TextTestRunner(verbosity=2).run(suite)
