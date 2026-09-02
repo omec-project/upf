@@ -73,45 +73,65 @@ def _import_modules(name, subdir):
     We detect any name collisions, e.g., if foo_msg_pb2.py defines
     QuuxArg and bar_msg_pb2.py also defines QuuxArg, we catch that
     error here."""
-    def protobufs(subdir):
-        "Yield modules (subdir=None) or port drivers (subdir='ports')."
-        for path in sys.path:
-            if not os.path.exists(os.path.join(path, 'builtin_pb')) or \
-               not os.path.exists(os.path.join(path, 'plugin_pb')):
-                continue
-            for directory in ('builtin_pb', 'plugin_pb'):
-                if subdir:
-                    dirpath = os.path.join(path, directory, subdir)
-                    prefix = '{}.{}'.format(directory, subdir)
-                else:
-                    dirpath = os.path.join(path, directory)
-                    prefix = '{}'.format(directory)
-                for filename in os.listdir(dirpath):
-                    if not filename.endswith('_msg_pb2.py'):
-                        continue
-                    import_name = '{}.{}'.format(prefix, filename[:-3])
-                    if import_name != 'builtin_pb.bess_msg_pb2':
-                        yield import_name
-
-    def keep_name(name):
-        """
-        This defines the set of protobuf names to keep.  Those ending
-        with Arg, Response, or Config are kept: Arg for arguments to
-        a command, Response for a reply to a command, and Config for
-        get_config / set_config state.
-        """
-        return re.search(r'(?:Arg|Config|Response)$', name) is not None
-
     try:
-        mod = _pm.pm_import(name, protobufs(subdir),
-                            name_filter=keep_name,
+        protobuf_modules = _discover_protobuf_modules(subdir)
+        mod = _pm.pm_import(name, protobuf_modules,
+                            name_filter=_keep_protobuf_name,
                             package=__name__)
     except _pm.Collisions as err:
-        print('internal error:')
-        for key in err.collisions:
-            print('', key, 'is defined in', ' and '.join(err.collisions[key]))
+        _handle_collision_error(err)
         raise SystemExit(1)
     return mod
+
+
+def _discover_protobuf_modules(subdir):
+    """Discover and yield protobuf module names from builtin_pb and plugin_pb directories."""
+    for path in sys.path:
+        if not _has_protobuf_directories(path):
+            continue
+
+        for directory in ('builtin_pb', 'plugin_pb'):
+            for module_name in _get_modules_from_directory(path, directory, subdir):
+                yield module_name
+
+
+def _has_protobuf_directories(path):
+    """Check if path contains both builtin_pb and plugin_pb directories."""
+    return (os.path.isdir(os.path.join(path, 'builtin_pb')) and
+            os.path.isdir(os.path.join(path, 'plugin_pb')))
+
+
+def _get_modules_from_directory(path, directory, subdir):
+    """Get protobuf module names from a specific directory."""
+    if subdir:
+        dirpath = os.path.join(path, directory, subdir)
+        prefix = '{}.{}'.format(directory, subdir)
+    else:
+        dirpath = os.path.join(path, directory)
+        prefix = directory  # Simplified from .format()
+
+    # Safety check: subdir might not exist in both builtin and plugin folders
+    if not os.path.isdir(dirpath):
+        return
+
+    for filename in os.listdir(dirpath):
+        if not filename.endswith('_msg_pb2.py'):
+            continue
+
+        import_name = '{}.{}'.format(prefix, filename[:-3])
+        if import_name != 'builtin_pb.bess_msg_pb2':
+            yield import_name
+
+def _keep_protobuf_name(name):
+    """Filter to keep only protobuf names ending with Arg, Config, or Response."""
+    return re.search(r'(?:Arg|Config|Response)$', name) is not None
+
+
+def _handle_collision_error(err):
+    """Handle and report name collision errors."""
+    print('internal error:')
+    for key in err.collisions:
+        print('', key, 'is defined in', ' and '.join(err.collisions[key]))
 
 
 module_pb = _import_modules('module_pb', None)

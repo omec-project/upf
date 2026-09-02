@@ -792,6 +792,55 @@ def _clear_pipeline(cli):
     cli.bess.reset_all()
 
 
+def _collect_module_and_driver_names(cli):
+    """Collect module class names and port driver names from BESS."""
+    class_names = [str(i) for i in cli.bess.list_mclasses().names]
+    driver_names = [str(i) for i in cli.bess.list_drivers().driver_names]
+    return class_names, driver_names
+
+def _find_duplicate_names(rsvd, class_names, driver_names):
+    """Find duplicate names between reserved names, modules, and drivers."""
+    counts = collections.Counter(rsvd.keys())
+    counts.update(class_names)
+    counts.update(driver_names)
+    return [k for k in counts if counts[k] > 1]
+
+def _generate_duplicate_error_message(dups, rsvd, class_names, driver_names):
+    """Generate detailed error message for duplicate names."""
+    errors = []
+    for name in dups:
+        if name in rsvd:
+            why = 'reserved name {} is used as '.format(name)
+        else:
+            why = 'name {} is used as '.format(name)
+
+        if name in class_names:
+            if name in driver_names:
+                why += 'both a module class and a port driver'
+            else:
+                why += 'a module class'
+        else:
+            why += 'a port driver'
+        errors.append(why)
+
+    return 'duplicate names found: {}'.format('; '.join(errors))
+
+def _create_module_creators(cli, class_names):
+    """Create module class creators."""
+    creators = {}
+    for name in class_names:
+        creators[name] = type(str(name), (Module,),
+                              {'bess': cli.bess, 'choose_arg': _choose_arg})
+    return creators
+
+def _create_port_creators(cli, driver_names):
+    """Create port driver creators."""
+    creators = {}
+    for name in driver_names:
+        creators[name] = type(str(name), (Port,),
+                              {'bess': cli.bess, 'choose_arg': _choose_arg})
+    return creators
+
 def _get_bess_module_and_port_creators(cli, rsvd):
     """
     Return module instance creators and port instance creators.
@@ -807,54 +856,23 @@ def _get_bess_module_and_port_creators(cli, rsvd):
 
     The rsvd argument is a dictionary of reserved names (see below).
     """
-    creators = {}
-
     # TODO(torek) cache these for performance, rebuild when needed
 
-    class_names = [str(i) for i in cli.bess.list_mclasses().names]
-    driver_names = [str(i) for i in cli.bess.list_drivers().driver_names]
+    # Collect names from BESS
+    class_names, driver_names = _collect_module_and_driver_names(cli)
 
-    # Duplicates, if they exist, represent a fault in what's been
-    # loaded into BESS.  In particular, at least for the moment,
-    # we cannot have the same name as both a module *and* a port,
-    # nor may they use any of the reserved names.
-    #
-    # We can assume that the C++ code has already forbidden
-    # using the same name twice as-module class or port-driver.
-    # But the C++ code does not have the restriction on using
-    # Foo() as *both* module *and* port-driver.
-    counts = collections.Counter(rsvd.keys())
-    counts.update(class_names)
-    counts.update(driver_names)
-    dups = [k for k in counts if counts[k] > 1]
-
+    # Check for duplicates
+    dups = _find_duplicate_names(rsvd, class_names, driver_names)
     if dups:
-        errors = []
-        for name in dups:
-            if name in rsvd:
-                why = 'reserved name {} is used as '.format(name)
-            else:
-                why = 'name {} is used as '.format(name)
-            if name in class_names:
-                if name in driver_names:
-                    why += 'both a module class and a port driver'
-                else:
-                    why += 'a module class'
-            else:
-                why += 'a port driver'
-            errors.append(why)
-        errors = 'duplicate names found: {}'.format('; '.join(errors))
-        raise cli.InternalError(errors)
+        error_msg = _generate_duplicate_error_message(dups, rsvd, class_names, driver_names)
+        raise cli.InternalError(error_msg)
 
-    for name in class_names:
-        creators[name] = type(str(name), (Module,),
-                              {'bess': cli.bess, 'choose_arg': _choose_arg})
-    for name in driver_names:
-        creators[name] = type(str(name), (Port,),
-                              {'bess': cli.bess, 'choose_arg': _choose_arg})
+    # Create creators
+    creators = {}
+    creators.update(_create_module_creators(cli, class_names))
+    creators.update(_create_port_creators(cli, driver_names))
 
     return creators
-
 
 # NOTE: the name of this function is used below
 def _do_run_file(cli, conf_file):
@@ -1889,72 +1907,77 @@ TcCounterRate = collections.namedtuple('TcCounterRate',
                                        ['count', 'cycles', 'bits', 'packets'])
 
 
+def _calculate_tc_delta(old, new):
+    """Calculate rate-based statistics for traffic class."""
+    sec_diff = new.timestamp - old.timestamp
+    if sec_diff <= 0:
+        return TcCounterRate(count=0.0, cycles=0.0, bits=0.0, packets=0.0)
+    return TcCounterRate(
+        count=(new.count - old.count) / sec_diff,
+        cycles=(new.cycles - old.cycles) / sec_diff,
+        bits=(new.bits - old.bits) / sec_diff,
+        packets=(new.packets - old.packets) / sec_diff
+    )
+
+def _format_tc_data(delta):
+    """Calculate ratios and format traffic class data for display."""
+    ppb = delta.packets / delta.count if delta.count >= 1 else 0.0
+    cpp = delta.cycles / delta.packets if delta.packets >= 1 else 0.0
+    return (delta.cycles / 1e6, int(delta.count), delta.packets / 1e6, delta.bits / 1e6, ppb, cpp)
+
+def _monitor_tc_loop(cli, tcs, wids, max_len, fields, csv_f=None):
+    """Main monitoring loop for traffic classes."""
+    last_stats = {tc: cli.bess.get_tc_stats(tc) for tc in tcs}
+
+    while True:
+        time.sleep(1)
+        current_stats = {tc: cli.bess.get_tc_stats(tc) for tc in tcs}
+
+        # 1. Write Header
+        timestamp = current_stats[tcs[-1]].timestamp
+        cli.fout.write('\n')
+        fmt_head = '{:<%d}{:>12}{:>12}{:>12}{:>12}{:>12}{:>12}\n' % (max_len,)
+        cli.fout.write(fmt_head.format(time.strftime('%X') + str(timestamp % 1)[1:8], *fields))
+        cli.fout.write('{}\n'.format('-' * (72 + max_len)))
+
+        # 2. Write Data for each TC
+        for tc in tcs:
+            delta = _calculate_tc_delta(last_stats[tc], current_stats[tc])
+            data = _format_tc_data(delta)
+            tc_display_name = 'W{} {}'.format(wids[tc], tc)
+
+            fmt_data = '{:<%d}{:>12.3f}{:>12d}{:>12.3f}{:>12.3f}{:>12.3f}{:>12.3f}\n' % (max_len,)
+            cli.fout.write(fmt_data.format(tc_display_name, *data))
+
+            if csv_f is not None:
+                csv_line = '{},{},{}\n'.format(
+                    time.strftime('%X'),
+                    tc_display_name,
+                    ','.join('{:.3f}'.format(x) for x in data)
+                )
+                csv_f.write(csv_line)
+
+        # 3. Write Footer and update stats
+        cli.fout.write('{}\n'.format('-' * (72 + max_len)))
+        last_stats = current_stats
+
 def _monitor_tcs(cli, *tcs):
+    """Monitor traffic class statistics."""
     GUTTER_WIDTH = 5
     FIELDS = ('CPU MHz', 'scheduled', 'Mpps', 'Mbps', 'pkts/sched', 'cycles/p')
 
-    def get_delta(old, new):
-        sec_diff = new.timestamp - old.timestamp
-        delta = TcCounterRate(count=(new.count - old.count) / sec_diff,
-                              cycles=(new.cycles - old.cycles) / sec_diff,
-                              bits=(new.bits - old.bits) / sec_diff,
-                              packets=(new.packets - old.packets) / sec_diff)
-        return delta
-
-    def print_header(timestamp, name_len):
-        cli.fout.write('\n')
-        fmt = '{:<%d}{:>12}{:>12}{:>12}{:>12}{:>12}{:>12}\n' % (name_len,)
-        cli.fout.write(fmt.format(time.strftime('%X') + str(timestamp % 1)[1:8], *FIELDS))
-
-        cli.fout.write('{}\n'.format(('-' * (72 + name_len))))
-
-    def print_footer(name_len):
-        cli.fout.write('{}\n'.format('-' * (72 + name_len)))
-
-    def print_delta(timestamp, tc, delta, name_len, csv_f=None):
-        if delta.count >= 1:
-            ppb = delta.packets / delta.count
-        else:
-            ppb = 0.
-
-        if delta.packets >= 1:
-            cpp = delta.cycles / delta.packets
-        else:
-            cpp = 0.
-
-        data = (delta.cycles / 1e6, int(delta.count), delta.packets / 1e6, delta.bits / 1e6, ppb, cpp)
-        fmt = '{:<%d}{:>12.3f}{:>12d}{:>12.3f}{:>12.3f}{:>12.3f}{:>12.3f}\n' % (name_len,)
-        cli.fout.write(fmt.format(tc, *data))
-        if csv_f is not None:
-            csv_f.write('{},{},{}\n'.format(time.strftime('%X'), tc, ','.join(map(lambda x: '{:.3f}'.format(x), data))))
-
-    def print_loop(csv=None):
-        while True:
-            time.sleep(1)
-
-            for tc in tcs:
-                now[tc] = cli.bess.get_tc_stats(tc)
-
-            print_header(now[tc].timestamp, max_len)
-
-            for tc in tcs:
-                print_delta(now[tc].timestamp, 'W{} {}'.format(wids[tc], tc),
-                            get_delta(last[tc], now[tc]), max_len, csv)
-
-            print_footer(max_len)
-
-            for tc in tcs:
-                last[tc] = now[tc]
-
+    # Get TC information
     all_tcs = cli.bess.list_tcs().classes_status
     wids = {}
     max_len = 0
+
     for tc in all_tcs:
         class_ = getattr(tc, 'class')
         max_len = max(len(class_.name), max_len)
         wids[class_.name] = class_.wid
     max_len += GUTTER_WIDTH
 
+    # Determine which TCs to monitor
     if not tcs:
         tcs = [getattr(tc, 'class').name for tc in all_tcs]
         if not tcs:
@@ -1962,18 +1985,12 @@ def _monitor_tcs(cli, *tcs):
 
     cli.fout.write('Monitoring traffic classes: {}\n'.format(', '.join(tcs)))
 
-    last = {}
-    now = {}
-
-    for tc in tcs:
-        last[tc] = cli.bess.get_tc_stats(tc)
-
     try:
         csv_path = os.getenv('CSV', None)
         with open(csv_path, 'w') if csv_path is not None else noop() as csv_f:
             if csv_f is not None:
-                csv_f.write('{}\n'.format(','.join(('Timestamp','traffic class',) + FIELDS)))
-            print_loop(csv_f)
+                csv_f.write('{}\n'.format(','.join(('Timestamp', 'traffic class') + FIELDS)))
+            _monitor_tc_loop(cli, tcs, wids, max_len, FIELDS, csv_f)
     except KeyboardInterrupt:
         pass
 
