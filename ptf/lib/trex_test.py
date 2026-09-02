@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2021 Open Networking Foundation
 
-import ptf.testutils as testutils
 from ptf.base_tests import BaseTest
 from trex.stl.api import STLClient
+
+from ptf import testutils
 
 
 class TrexTest(BaseTest):
@@ -13,7 +14,7 @@ class TrexTest(BaseTest):
     """
 
     def setUp(self):
-        super(TrexTest, self).setUp()
+        super().setUp()
         trex_server_addr = testutils.test_param_get("trex_server_addr")
         self.trex_client = STLClient(server=trex_server_addr)
         self.trex_client.connect()
@@ -34,4 +35,4 @@ class TrexTest(BaseTest):
         self.trex_client.stop()
         self.trex_client.release()
         self.trex_client.disconnect()
-        super(TrexTest, self).tearDown()
+        super().tearDown()

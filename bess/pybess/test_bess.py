@@ -30,11 +30,11 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from __future__ import absolute_import
-import unittest
-import grpc
 import time
+import unittest
 from concurrent import futures
+
+import grpc
 
 from . import bess
 from .builtin_pb import bess_msg_pb2 as bess_msg
@@ -42,7 +42,6 @@ from .builtin_pb import service_pb2_grpc
 
 
 class DummyServiceImpl(service_pb2_grpc.BESSControlServicer):
-
     def __init__(self):
         pass
 
@@ -67,15 +66,13 @@ class TestBESS(unittest.TestCase):
     # Do not use BESS.DEF_PORT (== 10514), as it might be being used by
     # a real bessd process.
     PORT = 19876
-    GRPC_URL = 'localhost:' + str(PORT)
+    GRPC_URL = "localhost:" + str(PORT)
 
     @classmethod
     def setUpClass(cls):
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=2))
-        service_pb2_grpc.add_BESSControlServicer_to_server(
-            DummyServiceImpl(),
-            server)
-        server.add_insecure_port('[::]:%d' % cls.PORT)
+        service_pb2_grpc.add_BESSControlServicer_to_server(DummyServiceImpl(), server)
+        server.add_insecure_port("[::]:%d" % cls.PORT)
         server.start()
         cls.server = server
 
@@ -112,41 +109,44 @@ class TestBESS(unittest.TestCase):
         client = bess.BESS()
         client.connect(grpc_url=self.GRPC_URL)
 
-        response = client.create_port('PCAPPort', 'p0', {'dev': 'rnd'})
+        response = client.create_port("PCAPPort", "p0", {"dev": "rnd"})
         self.assertEqual(0, response.error.code)
-        self.assertEqual('p0', response.name)
+        self.assertEqual("p0", response.name)
 
-        response = client.create_port('PMDPort', 'p0', {
-            'loopback': True,
-            'port_id': 14325,
-            'pci': 'akshdkashf'})
+        response = client.create_port(
+            "PMDPort", "p0", {"loopback": True, "port_id": 14325, "pci": "akshdkashf"}
+        )
         self.assertEqual(0, response.error.code)
-        self.assertEqual('p0', response.name)
+        self.assertEqual("p0", response.name)
 
-        response = client.create_port('UnixSocketPort', 'p0',
-                                      {'path': '/ajksd/dd'})
+        response = client.create_port("UnixSocketPort", "p0", {"path": "/ajksd/dd"})
         self.assertEqual(0, response.error.code)
-        self.assertEqual('p0', response.name)
+        self.assertEqual("p0", response.name)
 
-        response = client.create_port('VPort', 'p0', {
-            'ifname': 'veth0',
-            'container_pid': 23124,
-            'rxq_cpus': [1, 2, 3],
-            'tx_tci': 123,
-            'tx_outer_tci': 123,
-            'loopback': False,
-            'ip_addrs': ['1.2.3.4', '255.254.253.252']
-        })
+        response = client.create_port(
+            "VPort",
+            "p0",
+            {
+                "ifname": "veth0",
+                "container_pid": 23124,
+                "rxq_cpus": [1, 2, 3],
+                "tx_tci": 123,
+                "tx_outer_tci": 123,
+                "loopback": False,
+                "ip_addrs": ["1.2.3.4", "255.254.253.252"],
+            },
+        )
         self.assertEqual(0, response.error.code)
-        self.assertEqual('p0', response.name)
+        self.assertEqual("p0", response.name)
 
     def test_run_module_command(self):
         client = bess.BESS()
         client.connect(grpc_url=self.GRPC_URL)
 
-        response = client.run_module_command('m1',
-                                             'add',
-                                             'ExactMatchCommandAddArg',
-                                             {'gate': 0,
-                                                 'fields': [{'value_bin': b'\x11'}, {'value_bin': b'\x22'}]})
+        response = client.run_module_command(
+            "m1",
+            "add",
+            "ExactMatchCommandAddArg",
+            {"gate": 0, "fields": [{"value_bin": b"\x11"}, {"value_bin": b"\x22"}]},
+        )
         self.assertEqual(0, response.error.code)

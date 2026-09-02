@@ -30,30 +30,26 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from __future__ import print_function
 import fnmatch
-import glob
 import os
 import shlex
 import subprocess
-import sys
 import time
 import unittest
 
-
 this_dir = os.path.dirname(os.path.realpath(__file__))
-bessctl = os.path.join(this_dir, 'bessctl')
-sample_dir = os.path.join(this_dir, 'conf/samples')
+bessctl = os.path.join(this_dir, "bessctl")
+sample_dir = os.path.join(this_dir, "conf/samples")
 
 # constants for duplicate literals
-DAEMON_START_CMD = '%s daemon start'
+DAEMON_START_CMD = "%s daemon start"
+
 
 class CommandError(subprocess.CalledProcessError):
-
-    '''Identical to CalledProcessError, except it also shows the output'''
+    """Identical to CalledProcessError, except it also shows the output"""
 
     def __str__(self):
-        return '%s\n%s' % (super(CommandError, self).__str__(), self.output)
+        return "%s\n%s" % (super().__str__(), self.output)
 
 
 def run_cmd(cmd):
@@ -65,7 +61,6 @@ def run_cmd(cmd):
 
 
 class TestSamples(unittest.TestCase):
-
     """
     All scripts in conf/samples will be dynamically added here as individual
     tests (e.g., test_path_to_conf_samples_exactmatch_bess) in this class.
@@ -80,13 +75,13 @@ class TestSamples(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        run_cmd('%s daemon stop' % bessctl)
+        run_cmd("%s daemon stop" % bessctl)
 
 
 def generate_test_method(path):
     def template(self):
         try:
-            run_cmd('%s run file %s' % (bessctl, path))
+            run_cmd("%s run file %s" % (bessctl, path))
         except CommandError:
             # bessd may have crashed. Relaunch for next tests.
             run_cmd(DAEMON_START_CMD % bessctl)
@@ -97,8 +92,8 @@ def generate_test_method(path):
 
         # Check if bessd crushed.
         try:
-            run_cmd('%s show version' % bessctl)
-            run_cmd('%s daemon reset' % bessctl)
+            run_cmd("%s show version" % bessctl)
+            run_cmd("%s daemon reset" % bessctl)
         except CommandError:
             # bessd may have crashed. Relaunch for next tests.
             run_cmd(DAEMON_START_CMD % bessctl)
@@ -110,9 +105,9 @@ def generate_test_method(path):
 for root, _, file_names in os.walk(sample_dir):
     for file_name in fnmatch.filter(file_names, "*.bess"):
         path = os.path.join(root, file_name)
-        name = 'test' + path.replace('/', '_').replace('.', '_')
+        name = "test" + path.replace("/", "_").replace(".", "_")
         method = generate_test_method(path)
         setattr(TestSamples, name, method)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

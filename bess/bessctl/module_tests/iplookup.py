@@ -33,21 +33,22 @@ from test_utils import *
 
 
 class BessIPLookupTest(BessModuleTestCase):
-
     def test_iplookup(self):
         ipl = IPLookup()
 
-        pkts = [get_tcp_packet(sip='12.22.22.22', dip='22.22.22.22'),
-                get_tcp_packet(sip='12.22.22.22', dip='32.22.22.22'),
-                get_tcp_packet(sip='12.22.22.22', dip='42.22.22.22')]
+        pkts = [
+            get_tcp_packet(sip="12.22.22.22", dip="22.22.22.22"),
+            get_tcp_packet(sip="12.22.22.22", dip="32.22.22.22"),
+            get_tcp_packet(sip="12.22.22.22", dip="42.22.22.22"),
+        ]
 
-        ipl.add(prefix='22.22.22.0', prefix_len=24, gate=0)
-        ipl.add(prefix='32.22.22.0', prefix_len=24, gate=1)
-        ipl.add(prefix='42.22.22.0', prefix_len=24, gate=1)
+        ipl.add(prefix="22.22.22.0", prefix_len=24, gate=0)
+        ipl.add(prefix="32.22.22.0", prefix_len=24, gate=1)
+        ipl.add(prefix="42.22.22.0", prefix_len=24, gate=1)
 
-        ipl.delete(prefix='42.22.22.0', prefix_len=24)
+        ipl.delete(prefix="42.22.22.0", prefix_len=24)
         with self.assertRaises(bess.Error):
-            ipl.delete(prefix='52.22.22.0', prefix_len=24)
+            ipl.delete(prefix="52.22.22.0", prefix_len=24)
 
         pkt_outs = self.run_module(ipl, 0, pkts, [0, 1])
         self.assertEqual(len(pkt_outs[0]), 1)
@@ -58,7 +59,7 @@ class BessIPLookupTest(BessModuleTestCase):
     def test_prefix(self):
         ipl = IPLookup()
         with self.assertRaises(bess.Error):
-            ipl.add(prefix='22.22.22.0', prefix_len=16, gate=0)
+            ipl.add(prefix="22.22.22.0", prefix_len=16, gate=0)
 
 
 suite = unittest.TestLoader().loadTestsFromTestCase(BessIPLookupTest)

@@ -8,15 +8,16 @@ from pprint import pprint
 import bess_msg_pb2 as bess_msg
 import grpc
 import module_msg_pb2 as module_msg
-import ptf.testutils as testutils
 import service_pb2_grpc as pb
 import util_msg_pb2 as util_msg
-from google.protobuf import text_format
 from google.protobuf.any_pb2 import Any
 from google.protobuf.json_format import MessageToDict
 from ptf.base_tests import BaseTest
+
 # initialize useful variables
 from trex_test import TrexTest
+
+from ptf import testutils
 
 ACCESS = 0x1
 CORE = 0x2
@@ -42,6 +43,11 @@ QFI_DEFAULT = 9
 # (see FlowMeasure module).
 FLAG_VALUE_A = 0x1
 FLAG_VALUE_B = 0x2
+
+
+class ModuleCommandError(Exception):
+    """Raised when a BESS ModuleCommand response reports a non-zero error code."""
+
 
 class GrpcTest(BaseTest):
     """Define a base test for communicating with BESS over gRPC messages
@@ -73,7 +79,7 @@ class GrpcTest(BaseTest):
             timeout=timeout,
         )
         if raise_error and response.error.code != 0:
-            raise Exception(
+            raise ModuleCommandError(
                 f"{request.name} {request.cmd}: {response.error.errmsg} (code {response.error.code})"
             )
         return response
@@ -119,11 +125,13 @@ class GrpcTest(BaseTest):
 
         return msg
 
-    def getSessionStats(self, q=[50, 90, 99], flag=FLAG_VALUE_A, quiet=False):
+    def getSessionStats(self, q=None, flag=FLAG_VALUE_A, quiet=False):
         """
         Get QoS metrics from 3 different modules directly from BESS-UPF
         and return back in Python dictionary format
         """
+        if q is None:
+            q = [50, 90, 99]
 
         # Pre-Qos Measurement Module
         qosStatsInResp = self._readFlowMeasurement(
@@ -193,10 +201,12 @@ class GrpcTest(BaseTest):
         fseidIP=0,
         ctrID=0,
         farID=0,
-        qerIDList=[],
+        qerIDList=None,
         needDecap=0,
         allocIPFlag=False,
     ):
+        if qerIDList is None:
+            qerIDList = []
         fields = (
             "srcIface",
             "tunnelIP4Dst",
@@ -347,7 +357,6 @@ class GrpcTest(BaseTest):
 
     def addPDR(self, pdr, debug=False):
         for qerID in pdr.qerIDList:
-            qerID = qerID
             break
 
         # parse params of PDR tuple into a wildcard match message to send to BESS
@@ -445,9 +454,9 @@ class GrpcTest(BaseTest):
                 return farForwardU
         elif (far.applyAction & ACTION_DROP) != 0:
             return farDrop
-        elif (far.applyAction & ACTION_BUFFER) != 0:
-            return farNotify
-        elif (far.applyAction & ACTION_NOTIFY) != 0:
+        elif (far.applyAction & ACTION_BUFFER) != 0 or (
+            far.applyAction & ACTION_NOTIFY
+        ) != 0:
             return farNotify
 
     def addFAR(self, far, debug=False):
@@ -694,8 +703,6 @@ def _cleanupRules(test):
 
     for sQer in test.sessionQers:
         test.delSessionQER(sQer)
-
-    return
 
 
 def autocleanup(f):

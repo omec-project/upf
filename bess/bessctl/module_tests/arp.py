@@ -32,34 +32,34 @@
 from test_utils import *
 
 # constants for duplicate literals
-TEST_MAC_ADDRESS = 'A0:22:33:44:55:66'
+TEST_MAC_ADDRESS = "A0:22:33:44:55:66"
+
 
 class BessArpTest(BessModuleTestCase):
-
     def test_arp(self):
         arp = ArpResponder()
 
-        eth_header = scapy.Ether(
-            src='02:1e:67:9f:4d:ae', dst='ff:ff:ff:ff:ff:ff')
-        arp_header = scapy.ARP(op=1, pdst='1.2.3.4')
+        eth_header = scapy.Ether(src="02:1e:67:9f:4d:ae", dst="ff:ff:ff:ff:ff:ff")
+        arp_header = scapy.ARP(op=1, pdst="1.2.3.4")
         arp_req = eth_header / arp_header
 
-        arp.add(ip='1.2.3.4', mac_addr=TEST_MAC_ADDRESS)
+        arp.add(ip="1.2.3.4", mac_addr=TEST_MAC_ADDRESS)
 
         arp_reply = arp_req.copy()
         arp_reply[scapy.Ether].src = TEST_MAC_ADDRESS
-        arp_reply[scapy.Ether].dst = '02:1e:67:9f:4d:ae'
+        arp_reply[scapy.Ether].dst = "02:1e:67:9f:4d:ae"
         arp_reply[scapy.ARP].op = 2
 
         arp_reply[scapy.ARP].hwdst = arp_req[scapy.ARP].hwsrc
         arp_reply[scapy.ARP].hwsrc = TEST_MAC_ADDRESS
 
         arp_reply[scapy.ARP].pdst = arp_req[scapy.ARP].psrc
-        arp_reply[scapy.ARP].psrc = '1.2.3.4'
+        arp_reply[scapy.ARP].psrc = "1.2.3.4"
 
         pkt_outs = self.run_module(arp, 0, [arp_req], [0])
         self.assertEqual(len(pkt_outs[0]), 1)
         self.assertSamePackets(pkt_outs[0][0], arp_reply)
+
 
 suite = unittest.TestLoader().loadTestsFromTestCase(BessArpTest)
 results = unittest.TextTestRunner(verbosity=2).run(suite)

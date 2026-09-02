@@ -29,7 +29,6 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from __future__ import print_function
 
 import copy
 import os
@@ -38,11 +37,11 @@ import time
 
 try:
     this_dir = os.path.dirname(os.path.realpath(__file__))
-    bessctl = os.path.join(this_dir, 'bessctl')
-    sys.path.insert(1, os.path.join(this_dir, '../../../'))
+    bessctl = os.path.join(this_dir, "bessctl")
+    sys.path.insert(1, os.path.join(this_dir, "../../../"))
     from pybess.bess import *
 except ImportError:
-    print('Cannot import the API module (pybess)', file=sys.stderr)
+    print("Cannot import the API module (pybess)", file=sys.stderr)
     raise
 
 
@@ -51,12 +50,11 @@ def get_local_bess_handle():
     try:
         bess.connect()
     except BESS.RPCError:
-        raise Exception('BESS is not running')
+        raise Exception("BESS is not running")
     return bess
 
 
-class PortStats(object):
-
+class PortStats:
     """
     Stores PMDPort stats and optional Measure module output and exports some
     acceessors for convenience.
@@ -108,27 +106,32 @@ class PortStats(object):
             keys = sorted(data.keys())
             for k in keys:
                 dst.append(data[k] / 1e3)
-            return ', '.join(['{}{}: {{:.3f}} us'.format(prefix, k) for k in keys])
+            return ", ".join([f"{prefix}{k}: {{:.3f}} us" for k in keys])
 
-        fmt = '[in / out] pkts: {:.3f}M / {:.3f}M, drops: {:.3f}M / {:.3f}M, bytes: {} / {}'
+        fmt = "[in / out] pkts: {:.3f}M / {:.3f}M, drops: {:.3f}M / {:.3f}M, bytes: {} / {}"
         rtt_data = []
         if self.rtt is not None:
-            fmt += '\n' + format_data('rtt', self.rtt, rtt_data)
-            fmt += '\n' + format_data('jitter', self.jitter, rtt_data)
+            fmt += "\n" + format_data("rtt", self.rtt, rtt_data)
+            fmt += "\n" + format_data("jitter", self.jitter, rtt_data)
 
         return fmt.format(
-            self.pkts_in() / 1e6, self.pkts_out() / 1e6,
-            self.drops_in() / 1e6, self.drops_out() / 1e6,
-            self.bytes_in(), self.bytes_out(),
-            *rtt_data)
+            self.pkts_in() / 1e6,
+            self.pkts_out() / 1e6,
+            self.drops_in() / 1e6,
+            self.drops_out() / 1e6,
+            self.bytes_in(),
+            self.bytes_out(),
+            *rtt_data,
+        )
 
     def __repr__(self):
         return self.__str__()
 
 
-class PortStatsGenerator(object):
-
-    def __init__(self, bess, tx_port, rx_port, measure=None, rtt_percentiles=None, rate=False):
+class PortStatsGenerator:
+    def __init__(
+        self, bess, tx_port, rx_port, measure=None, rtt_percentiles=None, rate=False
+    ):
         """
         Creates a generator that produces PortStats. When `tx_port` and
         `rx_port` are configured differently, the generated PortStats objects
@@ -190,12 +193,14 @@ class PortStatsGenerator(object):
 
         rtt, jitter = None, None
         if self.measure:
-            arg = {'clear': True,
-                   'latency_percentiles': self.rtt_percentiles,
-                   'jitter_percentiles': self.rtt_percentiles}
-            mstats = self.bess.run_module_command(self.measure, 'get_summary',
-                                                  'MeasureCommandGetSummaryArg',
-                                                  arg)
+            arg = {
+                "clear": True,
+                "latency_percentiles": self.rtt_percentiles,
+                "jitter_percentiles": self.rtt_percentiles,
+            }
+            mstats = self.bess.run_module_command(
+                self.measure, "get_summary", "MeasureCommandGetSummaryArg", arg
+            )
             rtt = dict()
             jitter = dict()
             for i, p in enumerate(self.rtt_percentiles):
@@ -215,15 +220,15 @@ class PortStatsGenerator(object):
                 self.old_throughput.out.bytes = 0
 
             delta_throughput = PortStatsGenerator.throughput_delta(
-                self.old_throughput, throughput, delta_t)
+                self.old_throughput, throughput, delta_t
+            )
             self.old_throughput = throughput
             self.last_check = now
 
             agg_rtt, agg_jitter = None, None
             if self.measure:
                 agg_rtt = PortStatsGenerator.aggregate_rtt(self.old_rtt, rtt)
-                agg_jitter = PortStatsGenerator.aggregate_rtt(
-                    self.old_jitter, jitter)
+                agg_jitter = PortStatsGenerator.aggregate_rtt(self.old_jitter, jitter)
                 self.old_rtt = rtt
                 self.old_jitter = jitter
 
@@ -232,10 +237,17 @@ class PortStatsGenerator(object):
         return PortStats(throughput, rtt, jitter)
 
 
-class PortConfig(object):
-
-    def __init__(self, name, num_queues=1, pci=None, port_id=None, vdev=None,
-                 no_tx=False, no_rx=False):
+class PortConfig:
+    def __init__(
+        self,
+        name,
+        num_queues=1,
+        pci=None,
+        port_id=None,
+        vdev=None,
+        no_tx=False,
+        no_rx=False,
+    ):
         """
         Creates a configuraiton for a Port named `name` and configures it with `num_queues` tx and
         rx queues. If `no_tx` is set, no PortOut will be created. If `no_rx` is
@@ -244,7 +256,8 @@ class PortConfig(object):
         """
         if [pci, port_id, vdev].count(None) != 2:
             raise TypeError(
-                'exactly one of `pci`, `port_id` or `vdev` must be specified')
+                "exactly one of `pci`, `port_id` or `vdev` must be specified"
+            )
 
         self.name = name
         self.pci = pci
@@ -255,8 +268,7 @@ class PortConfig(object):
         self.num_queues = num_queues
 
 
-class Port(object):
-
+class Port:
     """
     A thin wrapper around PMDPort for use in MeasurablePort. Keeps track of a
     PMDPort along with a PortInc and a PortOut.
@@ -270,39 +282,60 @@ class Port(object):
         self.port_out = None
 
         if conf.pci is not None:
-            self.pmd = bess.create_port('PMDPort', conf.name,
-                                        {'pci': conf.pci, 'num_inc_q':
-                                            conf.num_queues, 'num_out_q': conf.num_queues})
+            self.pmd = bess.create_port(
+                "PMDPort",
+                conf.name,
+                {
+                    "pci": conf.pci,
+                    "num_inc_q": conf.num_queues,
+                    "num_out_q": conf.num_queues,
+                },
+            )
         elif conf.port_id is not None:
-            self.pmd = bess.create_port('PMDPort', conf.name,
-                                        {'port_id': conf.port_id, 'num_inc_q':
-                                            conf.num_queues, 'num_out_q': conf.num_queues})
+            self.pmd = bess.create_port(
+                "PMDPort",
+                conf.name,
+                {
+                    "port_id": conf.port_id,
+                    "num_inc_q": conf.num_queues,
+                    "num_out_q": conf.num_queues,
+                },
+            )
         elif conf.vdev is not None:
-            self.pmd = bess.create_port('PMDPort', conf.name,
-                                        {'vdev': conf.vdev, 'num_inc_q':
-                                         conf.num_queues, 'num_out_q': conf.num_queues})
+            self.pmd = bess.create_port(
+                "PMDPort",
+                conf.name,
+                {
+                    "vdev": conf.vdev,
+                    "num_inc_q": conf.num_queues,
+                    "num_out_q": conf.num_queues,
+                },
+            )
 
         self.mac_addr = self.pmd.mac_addr
 
         if not conf.no_rx:
-            inc_name = 'port_inc_{}'.format(self.name)
+            inc_name = f"port_inc_{self.name}"
             self.port_inc = bess.create_module(
-                'PortInc', inc_name, {'port': self.pmd.name}).name
+                "PortInc", inc_name, {"port": self.pmd.name}
+            ).name
 
         if not conf.no_tx:
-            out_name = 'port_out_{}'.format(self.name)
+            out_name = f"port_out_{self.name}"
             self.port_out = bess.create_module(
-                'PortOut', out_name, {'port': self.pmd.name}).name
+                "PortOut", out_name, {"port": self.pmd.name}
+            ).name
 
 
-class MeasureablePort():
-
+class MeasureablePort:
     """
     A with optional Timestamp and Measures modules attached
     respectively.
     """
 
-    def __init__(self, tx_port, rx_port, tx_ts_offset=None, rx_ts_offset=None, bess=None):
+    def __init__(
+        self, tx_port, rx_port, tx_ts_offset=None, rx_ts_offset=None, bess=None
+    ):
         """
         Creates a MeasurablePort form two PortConfigs `tx_port` and `rx_port`,
         which may be the same. `tx_port` must be configured with `no_tx=False`
@@ -329,17 +362,17 @@ class MeasureablePort():
         self.measure = None
 
         if self.measure_rtt:
-            ts_name = 'timestamp_{}'.format(self.tx_port.name)
+            ts_name = f"timestamp_{self.tx_port.name}"
             self.timestamp = self.bess.create_module(
-                'Timestamp', ts_name, {'offset': tx_ts_offset}).name
-            self.bess.connect_modules(
-                self.timestamp, self.tx_port.port_out, 0, 0)
+                "Timestamp", ts_name, {"offset": tx_ts_offset}
+            ).name
+            self.bess.connect_modules(self.timestamp, self.tx_port.port_out, 0, 0)
 
-            measure_name = 'measure_{}'.format(self.rx_port.name)
+            measure_name = f"measure_{self.rx_port.name}"
             self.measure = self.bess.create_module(
-                'Measure', measure_name, {'offset': rx_ts_offset}).name
-            self.bess.connect_modules(
-                self.rx_port.port_inc, self.measure, 0, 0)
+                "Measure", measure_name, {"offset": rx_ts_offset}
+            ).name
+            self.bess.connect_modules(self.rx_port.port_inc, self.measure, 0, 0)
 
     def connect_rx(self, dst, igate):
         """
@@ -349,8 +382,7 @@ class MeasureablePort():
         if self.measure_rtt:
             self.bess.connect_modules(self.measure, dst.name, 0, igate)
         else:
-            self.bess.connect_modules(
-                self.rx_port.port_inc, dst.name, 0, igate)
+            self.bess.connect_modules(self.rx_port.port_inc, dst.name, 0, igate)
 
     def connect_tx(self, src, ogate):
         """
@@ -360,29 +392,32 @@ class MeasureablePort():
         if self.measure_rtt:
             self.bess.connect_modules(src.name, self.timestamp, ogate, 0)
         else:
-            self.bess.connect_modules(
-                src.name, self.tx_port.port_out, ogate, 0)
+            self.bess.connect_modules(src.name, self.tx_port.port_out, ogate, 0)
 
     def cumulative_stats(self, rtt_percentiles=[0, 25, 50, 99, 100]):
         """
         Returns a PortsStatsGenerator configured to report cummulative PMDPort
         statistics.
         """
-        return PortStatsGenerator(self.bess,
-                                  self.tx_port.name,
-                                  self.rx_port.name,
-                                  measure=self.measure,
-                                  rtt_percentiles=rtt_percentiles,
-                                  rate=False)
+        return PortStatsGenerator(
+            self.bess,
+            self.tx_port.name,
+            self.rx_port.name,
+            measure=self.measure,
+            rtt_percentiles=rtt_percentiles,
+            rate=False,
+        )
 
     def rate_stats(self, rtt_percentiles=[0, 25, 50, 99, 100]):
         """
         Returns a PortsStatsGenerator configured to report PMDPort statistics as
         rates.
         """
-        return PortStatsGenerator(self.bess,
-                                  self.tx_port.name,
-                                  self.rx_port.name,
-                                  measure=self.measure,
-                                  rtt_percentiles=rtt_percentiles,
-                                  rate=True)
+        return PortStatsGenerator(
+            self.bess,
+            self.tx_port.name,
+            self.rx_port.name,
+            measure=self.measure,
+            rtt_percentiles=rtt_percentiles,
+            rate=True,
+        )

@@ -8,15 +8,15 @@ from flask import Flask, jsonify
 from google.protobuf.json_format import MessageToJson
 
 app = Flask(__name__)
-app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
 
-@app.route('/')
+@app.route("/")
 def get_html():
-    return app.send_static_file('graph.html')
+    return app.send_static_file("graph.html")
 
 
-@app.route('/pipeline')
+@app.route("/pipeline")
 def get_pipeline():
     if not app.bess.is_connected():
         app.bess.disconnect()
@@ -26,5 +26,6 @@ def get_pipeline():
         # NOTE: MessageToJson will convert 64-bit integers to strings!
         info_pb = app.bess.get_module_info(m_pb.name)
         modules[m_pb.name] = json.loads(
-            MessageToJson(info_pb, always_print_fields_with_no_presence=True))
+            MessageToJson(info_pb, always_print_fields_with_no_presence=True)
+        )
     return jsonify(modules)

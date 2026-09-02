@@ -35,15 +35,18 @@
 
 import sys
 
-from google.protobuf.message import Message
 from google.protobuf.descriptor import FieldDescriptor
+from google.protobuf.message import Message
+
+__all__ = [
+    "REVERSE_TYPE_CALLABLE_MAP",
+    "TYPE_CALLABLE_MAP",
+    "dict_to_protobuf",
+    "protobuf_to_dict",
+]
 
 
-__all__ = ["protobuf_to_dict", "TYPE_CALLABLE_MAP",
-           "dict_to_protobuf", "REVERSE_TYPE_CALLABLE_MAP"]
-
-
-EXTENSION_CONTAINER = '___X'
+EXTENSION_CONTAINER = "___X"
 
 
 TYPE_CALLABLE_MAP = {
@@ -67,8 +70,9 @@ TYPE_CALLABLE_MAP = {
 
 
 def repeated_map(type_k_callable, type_v_callable):
-    return lambda values: {type_k_callable(k): type_v_callable(v)
-                           for k, v in values.items()}
+    return lambda values: {
+        type_k_callable(k): type_v_callable(v) for k, v in values.items()
+    }
 
 
 def repeated(type_callable):
@@ -83,22 +87,23 @@ def protobuf_to_dict(pb, type_callable_map=TYPE_CALLABLE_MAP, use_enum_labels=Fa
     result_dict = {}
     extensions = {}
     for field, value in pb.ListFields():
-        if field.type == FieldDescriptor.TYPE_MESSAGE and \
-                field.message_type.GetOptions().map_entry:
-            field_k = field.message_type.fields_by_name['key']
-            type_k_callable = _get_field_value_adaptor(pb,
-                                                       field_k,
-                                                       type_callable_map,
-                                                       use_enum_labels)
-            field_v = field.message_type.fields_by_name['value']
-            type_v_callable = _get_field_value_adaptor(pb,
-                                                       field_v,
-                                                       type_callable_map,
-                                                       use_enum_labels)
+        if (
+            field.type == FieldDescriptor.TYPE_MESSAGE
+            and field.message_type.GetOptions().map_entry
+        ):
+            field_k = field.message_type.fields_by_name["key"]
+            type_k_callable = _get_field_value_adaptor(
+                pb, field_k, type_callable_map, use_enum_labels
+            )
+            field_v = field.message_type.fields_by_name["value"]
+            type_v_callable = _get_field_value_adaptor(
+                pb, field_v, type_callable_map, use_enum_labels
+            )
             type_callable = repeated_map(type_k_callable, type_v_callable)
         else:
             type_callable = _get_field_value_adaptor(
-                pb, field, type_callable_map, use_enum_labels)
+                pb, field, type_callable_map, use_enum_labels
+            )
             if field.is_repeated:
                 type_callable = repeated(type_callable)
 
@@ -113,12 +118,14 @@ def protobuf_to_dict(pb, type_callable_map=TYPE_CALLABLE_MAP, use_enum_labels=Fa
     return result_dict
 
 
-def _get_field_value_adaptor(pb, field, type_callable_map=TYPE_CALLABLE_MAP, use_enum_labels=False):
+def _get_field_value_adaptor(
+    pb, field, type_callable_map=TYPE_CALLABLE_MAP, use_enum_labels=False
+):
     if field.type == FieldDescriptor.TYPE_MESSAGE:
         # recursively encode protobuf sub-message
-        return lambda pb: protobuf_to_dict(pb,
-                                           type_callable_map=type_callable_map,
-                                           use_enum_labels=use_enum_labels)
+        return lambda pb: protobuf_to_dict(
+            pb, type_callable_map=type_callable_map, use_enum_labels=use_enum_labels
+        )
 
     if use_enum_labels and field.type == FieldDescriptor.TYPE_ENUM:
         return lambda value: enum_label_name(field, value)
@@ -126,8 +133,10 @@ def _get_field_value_adaptor(pb, field, type_callable_map=TYPE_CALLABLE_MAP, use
     if field.type in type_callable_map:
         return type_callable_map[field.type]
 
-    raise TypeError("Field %s.%s has unrecognised type id %d" % (
-        pb.__class__.__name__, field.name, field.type))
+    raise TypeError(
+        "Field %s.%s has unrecognised type id %d"
+        % (pb.__class__.__name__, field.name, field.type)
+    )
 
 
 REVERSE_TYPE_CALLABLE_MAP = {
@@ -135,7 +144,12 @@ REVERSE_TYPE_CALLABLE_MAP = {
 }
 
 
-def dict_to_protobuf(pb_klass_or_instance, values, type_callable_map=REVERSE_TYPE_CALLABLE_MAP, strict=True):
+def dict_to_protobuf(
+    pb_klass_or_instance,
+    values,
+    type_callable_map=REVERSE_TYPE_CALLABLE_MAP,
+    strict=True,
+):
     """Populates a protobuf model from a dictionary.
 
     :param pb_klass_or_instance: a protobuf message class, or an protobuf instance
@@ -160,11 +174,13 @@ def _process_regular_fields(pb, dict_value, strict, field_mapping):
             continue
         if key not in pb.DESCRIPTOR.fields_by_name:
             if strict:
-                raise KeyError("%s does not have a field called %s" %
-                               (pb.__class__.__name__, key))
+                raise KeyError(
+                    "%s does not have a field called %s" % (pb.__class__.__name__, key)
+                )
             continue
-        field_mapping.append((pb.DESCRIPTOR.fields_by_name[
-                             key], value, getattr(pb, key, None)))
+        field_mapping.append(
+            (pb.DESCRIPTOR.fields_by_name[key], value, getattr(pb, key, None))
+        )
 
 
 def _process_extension_fields(pb, dict_value, strict, field_mapping):
@@ -177,14 +193,17 @@ def _process_extension_fields(pb, dict_value, strict, field_mapping):
 
         if ext_num not in pb._extensions_by_number:
             if strict:
-                raise KeyError("%s does not have an extension with number %s. "
-                               "Perhaps you forgot to import it?" %
-                               (pb.__class__.__name__, ext_num))
+                raise KeyError(
+                    "%s does not have an extension with number %s. "
+                    "Perhaps you forgot to import it?"
+                    % (pb.__class__.__name__, ext_num)
+                )
             continue
 
         ext_field = pb._extensions_by_number[ext_num]
         pb_val = pb.Extensions[ext_field]
         field_mapping.append((ext_field, ext_val, pb_val))
+
 
 def _get_field_mapping(pb, dict_value, strict):
     """Get field mapping for dictionary to protobuf conversion."""
@@ -198,6 +217,7 @@ def _get_field_mapping(pb, dict_value, strict):
 
     return field_mapping
 
+
 def _dict_to_protobuf(pb, value, type_callable_map, strict):
     """Populates a protobuf message from a dictionary."""
     fields = _get_field_mapping(pb, value, strict)
@@ -205,11 +225,15 @@ def _dict_to_protobuf(pb, value, type_callable_map, strict):
 
     for field, input_value, pb_value in fields:
         # 1. Handle repeated fields (exits loop on match)
-        if _handle_repeated_field(field, input_value, pb_value, type_callable_map, strict, basestr):
+        if _handle_repeated_field(
+            field, input_value, pb_value, type_callable_map, strict, basestr
+        ):
             continue
 
         # 2. Handle nested message fields (exits loop on match)
-        if _handle_message_field(field, input_value, pb_value, type_callable_map, strict):
+        if _handle_message_field(
+            field, input_value, pb_value, type_callable_map, strict
+        ):
             continue
 
         # 3. Apply type callable mapping (must run before extension checks)
@@ -229,11 +253,15 @@ def _dict_to_protobuf(pb, value, type_callable_map, strict):
 
     return pb
 
+
 def _get_base_string_type():
     """Get the appropriate string type for the Python version."""
     return basestring if sys.version_info[0] == 2 else str
 
-def _handle_repeated_field(field, input_value, pb_value, type_callable_map, strict, basestr):
+
+def _handle_repeated_field(
+    field, input_value, pb_value, type_callable_map, strict, basestr
+):
     """Handle repeated fields including map entries."""
     if not field.is_repeated:
         return False
@@ -241,25 +269,36 @@ def _handle_repeated_field(field, input_value, pb_value, type_callable_map, stri
     if _is_map_field(field):
         _handle_map_field(field, input_value, pb_value, type_callable_map, strict)
     else:
-        _handle_regular_repeated_field(field, input_value, pb_value, type_callable_map, strict, basestr)
+        _handle_regular_repeated_field(
+            field, input_value, pb_value, type_callable_map, strict, basestr
+        )
 
     return True
 
+
 def _is_map_field(field):
     """Check if field is a map entry."""
-    return (field.message_type and
-            field.message_type.has_options and
-            field.message_type.GetOptions().map_entry)
+    return (
+        field.message_type
+        and field.message_type.has_options
+        and field.message_type.GetOptions().map_entry
+    )
+
 
 def _handle_map_field(field, input_value, pb_value, type_callable_map, strict):
     """Handle map field processing."""
-    if isinstance(input_value, dict) and all(isinstance(x, dict) for x in input_value.values()):
+    if isinstance(input_value, dict) and all(
+        isinstance(x, dict) for x in input_value.values()
+    ):
         for k, v in input_value.items():
             _dict_to_protobuf(pb_value[k], v, type_callable_map, strict)
     else:
         pb_value.update(input_value)
 
-def _handle_regular_repeated_field(field, input_value, pb_value, type_callable_map, strict, basestr):
+
+def _handle_regular_repeated_field(
+    field, input_value, pb_value, type_callable_map, strict, basestr
+):
     """Handle regular repeated field processing."""
     for item in input_value:
         if field.type == FieldDescriptor.TYPE_MESSAGE:
@@ -270,6 +309,7 @@ def _handle_regular_repeated_field(field, input_value, pb_value, type_callable_m
         else:
             pb_value.append(item)
 
+
 def _handle_message_field(field, input_value, pb_value, type_callable_map, strict):
     """Handle message field processing."""
     if field.type != FieldDescriptor.TYPE_MESSAGE:
@@ -277,6 +317,7 @@ def _handle_message_field(field, input_value, pb_value, type_callable_map, stric
 
     _dict_to_protobuf(pb_value, input_value, type_callable_map, strict)
     return True
+
 
 def _handle_extension_field(field, input_value, pb):
     """Handle extension field processing."""
@@ -286,11 +327,13 @@ def _handle_extension_field(field, input_value, pb):
     pb.Extensions[field] = input_value
     return True
 
+
 def _string_to_enum(field, input_value):
     enum_dict = field.enum_type.values_by_name
     try:
         input_value = enum_dict[input_value].number
     except KeyError:
-        raise KeyError("`%s` is not a valid value for field `%s`" %
-                       (input_value, field.name))
+        raise KeyError(
+            "`%s` is not a valid value for field `%s`" % (input_value, field.name)
+        )
     return input_value
