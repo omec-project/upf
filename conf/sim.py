@@ -18,9 +18,12 @@ def gen_inet_packet(size, src_mac, dst_mac, src_ip, dst_ip):
     ip = IP(src=src_ip, dst=dst_ip)
     udp = UDP(sport=10001, dport=10002)
     header = eth / ip / udp
-    if size < len(header):
-        raise ValueError(f"size {size} is smaller than header length {len(header)}")
-    payload = ("hello" + "0123456789" * 200)[: size - len(header)]
+    header_len = len(header)
+    if size < header_len:
+        raise ValueError(f"size {size} is smaller than header length {header_len}")
+    payload_len = size - header_len
+    pattern = "hello" + "0123456789" * 200
+    payload = (pattern * (payload_len // len(pattern) + 1))[:payload_len]
     pkt = header / payload
     return bytes(pkt)
 
@@ -61,12 +64,15 @@ def gen_gtpu_packet(
         header = eth / ip / udp / gtp / psc / inet_p
     else:
         header = eth / ip / udp / gtp / inet_p
-    # Size the payload against the actual header (GTP-U + optional PDU
-    # session container), not just the outer eth/ip/udp, so the final
+    # Size the payload against the full packet header (outer eth/ip/udp +
+    # GTP-U + optional PDU session container + inner IP/UDP), so the final
     # packet matches the requested `size`.
-    if size < len(header):
-        raise ValueError(f"size {size} is smaller than header length {len(header)}")
-    payload = ("hello" + "0123456789" * 200)[: size - len(header)]
+    header_len = len(header)
+    if size < header_len:
+        raise ValueError(f"size {size} is smaller than header length {header_len}")
+    payload_len = size - header_len
+    pattern = "hello" + "0123456789" * 200
+    payload = (pattern * (payload_len // len(pattern) + 1))[:payload_len]
     pkt = header / payload
     return bytes(pkt)
 
