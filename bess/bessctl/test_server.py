@@ -17,11 +17,13 @@ import unittest
 this_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(1, os.path.join(this_dir, ".."))
 
-# Import for side effects: pybess.bess configures protobuf import paths.
+# isort: skip_file
+# Order matters: pybess.bess must be imported first since, as a side effect, it
+# appends builtin_pb to sys.path, which the next import depends on.
 try:
-    from builtin_pb import bess_msg_pb2 as bess_msg
-    from google.protobuf.json_format import MessageToJson
     from pybess import bess as _bess
+    from google.protobuf.json_format import MessageToJson
+    from builtin_pb import bess_msg_pb2 as bess_msg
 except ImportError as e:
     print(f"Cannot import required modules: {e}", file=sys.stderr)
     raise

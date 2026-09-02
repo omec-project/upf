@@ -99,8 +99,8 @@ class BESSCLI(cli.CLI):
             self.err(e)
             raise self.HandledError()
 
-        except self.bess.RPCError:
-            self.err(f"RPC failed to  - {self.bess.peer}")
+        except self.bess.RPCError as e:
+            self.err(f"RPC failed to {self.bess.peer} - {e}")
 
             self._handle_broken_connection()
             raise self.HandledError()

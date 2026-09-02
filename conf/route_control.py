@@ -88,7 +88,7 @@ class BessController:
                 time.sleep(self.SLEEP_S)
             except Exception as e:
                 logger.exception("Error connecting to BESS daemon")
-                raise BessControllerError("BESS connection failure.", e)
+                raise BessControllerError("BESS connection failure.") from e
             else:
                 logger.info("Connected to BESS daemon")
                 return bess

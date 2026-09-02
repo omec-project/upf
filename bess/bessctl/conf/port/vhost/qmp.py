@@ -120,8 +120,8 @@ class QEMUMonitorProtocol:
                 ret = self.__json_read(only_event=True)
             except TimeoutError:
                 raise QMPTimeoutError("Timeout waiting for event")
-            except:
-                raise QMPConnectError("Error while reading from socket")
+            except (OSError, ValueError) as err:
+                raise QMPConnectError("Error while reading from socket") from err
             if ret is None:
                 raise QMPConnectError("Error while reading from socket")
             self.__sock.settimeout(None)
