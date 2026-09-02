@@ -48,7 +48,7 @@ import importlib
 import sys
 import types
 
-__std_skip = set(n for n in sys.modules[__name__].__dict__.keys() if n.startswith("__"))
+__std_skip = {n for n in sys.modules[__name__].__dict__ if n.startswith("__")}
 
 
 class Collisions(Exception):

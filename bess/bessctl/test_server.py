@@ -21,7 +21,7 @@ sys.path.insert(1, os.path.join(this_dir, ".."))
 # Order matters: pybess.bess must be imported first since, as a side effect, it
 # appends builtin_pb to sys.path, which the next import depends on.
 try:
-    from pybess import bess as _bess
+    from pybess import bess as _bess  # noqa: F401 -- side effect: adds builtin_pb to sys.path
     from google.protobuf.json_format import MessageToJson
     from builtin_pb import bess_msg_pb2 as bess_msg
 except ImportError as e:

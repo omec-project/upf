@@ -33,8 +33,6 @@
 # Copied from https://github.com/benhodgson/protobuf-to-dict (cd98280)
 # written by Ben Hodgson, with additional fixes
 
-import sys
-
 from google.protobuf.descriptor import FieldDescriptor
 from google.protobuf.message import Message
 
@@ -256,7 +254,7 @@ def _dict_to_protobuf(pb, value, type_callable_map, strict):
 
 def _get_base_string_type():
     """Get the appropriate string type for the Python version."""
-    return basestring if sys.version_info[0] == 2 else str
+    return str
 
 
 def _handle_repeated_field(

@@ -89,8 +89,7 @@ def _discover_protobuf_modules(subdir):
             continue
 
         for directory in ("builtin_pb", "plugin_pb"):
-            for module_name in _get_modules_from_directory(path, directory, subdir):
-                yield module_name
+            yield from _get_modules_from_directory(path, directory, subdir)
 
 
 def _has_protobuf_directories(path):

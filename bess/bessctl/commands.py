@@ -957,7 +957,7 @@ def _do_run_file(cli, conf_file):
             return
 
     try:
-        exec(code, new_globals)
+        exec(code, new_globals)  # noqa: S102 -- required to run user *.bess config scripts
         if cli.interactive:
             cli.fout.write(DONE_MESSAGE)
     except:
@@ -987,7 +987,7 @@ def _do_run_file(cli, conf_file):
 def _run_file(cli, conf_file, env_map):
     if env_map:
         try:
-            original_env = copy.copy(os.environ)
+            original_env = os.environ.copy()
 
             for k, v in env_map.items():
                 os.environ[k] = str(v)
@@ -1218,7 +1218,7 @@ def _limit_to_str(limit):
 
 def _burst_to_str(burst):
     # no output if max_burst is not set
-    if len(burst) == 0 or list(burst.values())[0] == 0:
+    if len(burst) == 0 or next(iter(burst.values())) == 0:
         return ""
 
     if "count" in burst:
@@ -1353,7 +1353,7 @@ def check_constraints(cli):
 
 
 def _show_tc_list(cli, tcs):
-    wids = sorted(list(set([getattr(tc, "class").wid for tc in tcs])))
+    wids = sorted({getattr(tc, "class").wid for tc in tcs})
 
     for wid in wids:
         matched = [tc for tc in tcs if getattr(tc, "class").wid == wid]
@@ -2022,20 +2022,8 @@ def _monitor_ports(cli, *ports):
         with open(csv_path, "w") if csv_path is not None else noop() as csv_f:
             if csv_f is not None:
                 csv_f.write(
-                    "{}\n".format(
-                        ",".join(
-                            (
-                                "Timestamp",
-                                "Port",
-                                "Mbps In",
-                                "Mpps In",
-                                "Dropped In",
-                                "Mbps Out",
-                                "Mpps Out",
-                                "Dropped Out",
-                            )
-                        )
-                    )
+                    "Timestamp,Port,Mbps In,Mpps In,Dropped In,"
+                    "Mbps Out,Mpps Out,Dropped Out\n"
                 )
             _monitor_ports_loop(cli, ports, drivers, csv_f)
     except KeyboardInterrupt:
@@ -2193,7 +2181,7 @@ def _capture_gate(cli, module_name, direction, gate, opts, program, hook_fn):
     capture_cmd = " ".join(capture_cmd)
 
     cli.fout.write("  Running: %s\n" % capture_cmd)
-    proc = subprocess.Popen(capture_cmd, shell=True, preexec_fn=os.setsid)
+    proc = subprocess.Popen(capture_cmd, shell=True, start_new_session=True)
 
     unhook = True
     try:
