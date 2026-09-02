@@ -1530,6 +1530,7 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 		// Uplink N6 slice meter config
 		arg, err = b.handleUplinkSliceMeter(meterConfig, &cir, &pir, &cbs, &ebs, &pbs, &gate)
 		if err != nil {
+			done <- false
 			return
 		}
 
