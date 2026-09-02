@@ -253,7 +253,7 @@ def _dict_to_protobuf(pb, value, type_callable_map, strict):
 
 
 def _get_base_string_type():
-    """Get the appropriate string type for the Python version."""
+    """Get the base string type used for isinstance checks (str, Python 3 only)."""
     return str
 
 
