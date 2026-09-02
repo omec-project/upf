@@ -97,8 +97,8 @@ def _discover_protobuf_modules(subdir):
 
 def _has_protobuf_directories(path):
     """Check if path contains both builtin_pb and plugin_pb directories."""
-    return (os.path.exists(os.path.join(path, 'builtin_pb')) and
-            os.path.exists(os.path.join(path, 'plugin_pb')))
+    return (os.path.isdir(os.path.join(path, 'builtin_pb')) and
+            os.path.isdir(os.path.join(path, 'plugin_pb')))
 
 
 def _get_modules_from_directory(path, directory, subdir):

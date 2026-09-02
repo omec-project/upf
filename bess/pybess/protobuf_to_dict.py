@@ -166,6 +166,7 @@ def _process_regular_fields(pb, dict_value, strict, field_mapping):
         field_mapping.append((pb.DESCRIPTOR.fields_by_name[
                              key], value, getattr(pb, key, None)))
 
+
 def _process_extension_fields(pb, dict_value, strict, field_mapping):
     """Process extension fields from the dictionary."""
     for ext_num, ext_val in dict_value.get(EXTENSION_CONTAINER, {}).items():
@@ -176,7 +177,7 @@ def _process_extension_fields(pb, dict_value, strict, field_mapping):
 
         if ext_num not in pb._extensions_by_number:
             if strict:
-                raise KeyError("%s does not have a extension with number %s. "
+                raise KeyError("%s does not have an extension with number %s. "
                                "Perhaps you forgot to import it?" %
                                (pb.__class__.__name__, ext_num))
             continue
@@ -240,7 +241,6 @@ def _handle_repeated_field(field, input_value, pb_value, type_callable_map, stri
     if _is_map_field(field):
         _handle_map_field(field, input_value, pb_value, type_callable_map, strict)
     else:
-        # Added 'strict' to this call
         _handle_regular_repeated_field(field, input_value, pb_value, type_callable_map, strict, basestr)
 
     return True
