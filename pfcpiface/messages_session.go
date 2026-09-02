@@ -573,7 +573,7 @@ func (pConn *PFCPConn) handleDigestReport(fseid uint64) bool {
 	return true
 }
 
-// pfcpSRRspFlagDROBU is the DROBU bit of the PFCPSRRsp-Flags IE, TS 29.244 8.2.62. It asks
+// pfcpSRRspFlagDROBU is the DROBU bit of the PFCPSRRsp-Flags IE, TS 29.244 8.2.32. It asks
 // the user plane to discard the packets it buffered for the session. go-pfcp offers a
 // HasDROBU helper for PFCPSMReq-Flags but not for these, so the bit is tested here.
 const pfcpSRRspFlagDROBU = 0x01
