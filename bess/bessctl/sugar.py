@@ -30,12 +30,11 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from __future__ import print_function
+import io
 import re
 import tokenize
-import io
 
-'''
+"""
 <BESS script language>
 - Providing a Click-like module connection semantics
 - All these syntactic sugars must be able to coexist with original Python
@@ -111,22 +110,23 @@ Python:
 5.
 a::Foo():1 -> 2:b::Foo()
 - Connecting output gate 1 of a to input gate 2 of b
-'''
+"""
 
 # common python tokens
-NAME = r'[a-zA-Z_]\w*'
-COMMENT = r'#[^\r\n]*'
-STRING_SHORT = r'\'.*?\'|\".*?\"'
+NAME = r"[a-zA-Z_]\w*"
+COMMENT = r"#[^\r\n]*"
+STRING_SHORT = r"\'.*?\'|\".*?\""
 STRING_LONG = r'\'\'\'.*?\'\'\'|""".*?"""'
-STRING_ALL = STRING_LONG + '|' + STRING_SHORT
+STRING_ALL = STRING_LONG + "|" + STRING_SHORT
 
 # constants for duplicate literals
 BESS_ENV_PREFIX = "__bess_env__('"
 
+
 def replace_envvar(s):
-    environment = r'\$(' + NAME + ')'\
-        r'(!(' + STRING_SHORT + '|' + NAME + '))?' \
-        r'(!\()?'
+    environment = (
+        r"\$(" + NAME + ")" r"(!(" + STRING_SHORT + "|" + NAME + "))?" r"(!\()?"
+    )
 
     # first group: # leading COMMENT -> skip
     # second group: single / double /triple quoted strings -> skip
@@ -139,7 +139,7 @@ def replace_envvar(s):
     #       fourth group 'ENV'
     #       fifth group '!' or not
 
-    pattern = '(' + COMMENT + ')|(' + STRING_ALL + ')|(' + environment + ')'
+    pattern = "(" + COMMENT + ")|(" + STRING_ALL + ")|(" + environment + ")"
     regex = re.compile(pattern, re.MULTILINE | re.DOTALL)
 
     def _replacer(match):
@@ -150,8 +150,7 @@ def replace_envvar(s):
             if match.group(5) is None and match.group(7) is None:
                 return BESS_ENV_PREFIX + match.group(4) + "')"
             elif match.group(5) is not None:
-                return BESS_ENV_PREFIX + match.group(4) + "', " + \
-                    match.group(6) + ")"
+                return BESS_ENV_PREFIX + match.group(4) + "', " + match.group(6) + ")"
             else:
                 return BESS_ENV_PREFIX + match.group(4) + "', "
 
@@ -165,17 +164,17 @@ def replace_envvar(s):
 def is_gate_expr(exp, is_ogate):
     # check if the leading/trailing whitespace characters contains '\n'
     if is_ogate:
-        prefix, postfix = '1*', '+1'
+        prefix, postfix = "1*", "+1"
     else:
-        prefix, postfix = '1+', '*1'
+        prefix, postfix = "1+", "*1"
 
     exp_stripped = exp.strip()
-    while len(exp_stripped) > 0 and exp_stripped[-1] == '\\':
+    while len(exp_stripped) > 0 and exp_stripped[-1] == "\\":
         exp_stripped = exp_stripped[:-1].strip()
 
     try:
-        compile('(%s)' % exp_stripped, '', mode='eval')
-        compile('%s%s%s' % (prefix, exp, postfix), '', mode='eval')
+        compile("(%s)" % exp_stripped, "", mode="eval")
+        compile("%s%s%s" % (prefix, exp, postfix), "", mode="eval")
     except SyntaxError:
         return False
     else:
@@ -187,7 +186,8 @@ def replace_rarrows(s):
     arrows = find_arrow_positions(s)
     segments = split_string_by_arrows(s, arrows)
     transform_gate_expressions(segments)
-    return '+'.join(segments)
+    return "+".join(segments)
+
 
 def find_arrow_positions(s):
     """Find all arrow positions in the string using tokenization."""
@@ -198,14 +198,15 @@ def find_arrow_positions(s):
             token = t[1]
             row, col = t[2]
             # Handle Python 2.x (separate tokens) and Python 3 (single token)
-            if last_token == '-' and token == '>':
+            if last_token == "-" and token == ">":
                 arrows.append((row - 1, col - 1))
-            elif token == '->':
+            elif token == "->":
                 arrows.append((row - 1, col))
             last_token = token
     except (tokenize.TokenError, IndentationError):
         pass
     return arrows
+
 
 def split_string_by_arrows(s, arrows):
     """Split string into segments at '->' positions."""
@@ -226,16 +227,17 @@ def split_string_by_arrows(s, arrows):
             col_offset = 0
         elif line_idx == row:
             curr_seg.append(line[col_offset:col])
-            segments.append(''.join(curr_seg))
+            segments.append("".join(curr_seg))
             curr_seg = []
-            col_offset = col + 2 # Skip the '->' characters
+            col_offset = col + 2  # Skip the '->' characters
             arrow_idx += 1
         else:
             # This should be unreachable given the logic above
             raise RuntimeError("Splitting logic encountered an invalid state")
 
-    segments.append(''.join(curr_seg))
+    segments.append("".join(curr_seg))
     return segments
+
 
 def transform_gate_expressions(segments):
     """Transform output and input gate expressions in segments."""
@@ -243,29 +245,32 @@ def transform_gate_expressions(segments):
         process_output_gate(segments, i)
         process_input_gate(segments, i)
 
+
 def process_output_gate(segments, i):
     seg = segments[i]
-    colon_pos = seg.rfind(':')
+    colon_pos = seg.rfind(":")
     while colon_pos != -1:
-        ogate = seg[colon_pos + 1:]
+        ogate = seg[colon_pos + 1 :]
         if not ogate.strip():  # Break immediately if empty
             break
         if is_gate_expr(ogate, True):
-            segments[i] = seg[:colon_pos] + '*' + parenthesize(ogate)
+            segments[i] = seg[:colon_pos] + "*" + parenthesize(ogate)
             break
-        colon_pos = seg.rfind(':', 0, colon_pos)
+        colon_pos = seg.rfind(":", 0, colon_pos)
+
 
 def process_input_gate(segments, i):
     seg = segments[i + 1]
-    colon_pos = seg.find(':')
+    colon_pos = seg.find(":")
     while colon_pos != -1:
         igate = seg[:colon_pos]
         if not igate.strip():  # Break immediately if empty
             break
         if is_gate_expr(igate, False):
-            segments[i + 1] = parenthesize(igate) + '*' + seg[colon_pos + 1:]
+            segments[i + 1] = parenthesize(igate) + "*" + seg[colon_pos + 1 :]
             break
-        colon_pos = seg.find(':', colon_pos + 1)
+        colon_pos = seg.find(":", colon_pos + 1)
+
 
 def parenthesize(exp):
     """Add parentheses around expression if it contains operators."""
@@ -274,7 +279,7 @@ def parenthesize(exp):
             if t[0] == tokenize.OP:
                 l = len(exp) - len(exp.lstrip())
                 r = len(exp) - len(exp.rstrip())
-                return '%s(%s)%s' % (exp[:l], exp.strip(), exp[len(exp) - r:])
+                return "%s(%s)%s" % (exp[:l], exp.strip(), exp[len(exp) - r :])
     except (tokenize.TokenError, IndentationError):
         pass
     return exp
@@ -283,24 +288,24 @@ def parenthesize(exp):
 def create_module_string(s):
 
     # single module -> return a module name string
-    if s.find(',') < 0:
+    if s.find(",") < 0:
         return "'" + s + "'"
 
     # multiple module -> return a tuple of module name string
-    mstr = '('
-    for module in s.split(','):
+    mstr = "("
+    for module in s.split(","):
         mstr += "'" + module.strip() + "', "
-    mstr += ')'
+    mstr += ")"
     return mstr
 
 
 def replace_module_assignment(s):
-    target = '(' + NAME + r'(,[ \t]*' + NAME + ')*' + ')::(' + NAME + r')[ \t]*\('
+    target = "(" + NAME + r"(,[ \t]*" + NAME + ")*" + ")::(" + NAME + r")[ \t]*\("
 
     # first group: # leading COMMENT -> skip
     # second group: single / double / triple quoted strings -> skip
     # third group: replace target  'NAME::NAME'
-    pattern = '(' + COMMENT + ')|(' + STRING_ALL + ')|(' + target + ')'
+    pattern = "(" + COMMENT + ")|(" + STRING_ALL + ")|(" + target + ")"
     regex = re.compile(pattern, re.MULTILINE | re.DOTALL)
 
     def _replacer(match):
@@ -310,8 +315,7 @@ def replace_module_assignment(s):
             # match.group(4) -> module NAMEs
             # match.group(6) -> module class NAME
             modules = create_module_string(match.group(4))
-            f_str = "__bess_module__(" + modules + ", '" + \
-                    match.group(6) + "', "
+            f_str = "__bess_module__(" + modules + ", '" + match.group(6) + "', "
             return f_str
 
         else:
@@ -328,5 +332,5 @@ def xform_str(s):
 
 
 def xform_file(filename):
-    with io.open(filename) as f:
+    with open(filename) as f:
         return xform_str(f.read())

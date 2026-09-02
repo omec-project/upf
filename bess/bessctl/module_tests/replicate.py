@@ -33,7 +33,6 @@ from test_utils import *
 
 
 class BessReplicateTest(BessModuleTestCase):
-
     def test_run_replicate4(self):
         rep4 = Replicate(gates=[0, 1, 2, 3])
         self.run_for(rep4, [0], 3)
@@ -48,7 +47,7 @@ class BessReplicateTest(BessModuleTestCase):
 
     def test_replicate(self):
         rep3 = Replicate(gates=[0, 1, 2])
-        pkt_in = get_tcp_packet(sip='22.22.22.22', dip='22.22.22.22')
+        pkt_in = get_tcp_packet(sip="22.22.22.22", dip="22.22.22.22")
 
         pkt_outs = self.run_module(rep3, 0, [pkt_in], [0, 1, 2])
 
@@ -60,6 +59,7 @@ class BessReplicateTest(BessModuleTestCase):
 
         self.assertEqual(len(pkt_outs[2]), 1)
         self.assertSamePackets(pkt_outs[2][0], pkt_in)
+
 
 suite = unittest.TestLoader().loadTestsFromTestCase(BessReplicateTest)
 results = unittest.TextTestRunner(verbosity=2).run(suite)

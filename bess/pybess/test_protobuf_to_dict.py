@@ -30,13 +30,12 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from __future__ import absolute_import
 import os
 import sys
 import unittest
 
 # See bess.py for why this is here.
-bipath = os.path.abspath(os.path.join(__file__, '..', 'builtin_pb'))
+bipath = os.path.abspath(os.path.join(__file__, "..", "builtin_pb"))
 if bipath not in sys.path:
     sys.path.insert(1, bipath)
 del bipath
@@ -47,19 +46,18 @@ from .builtin_pb import test_msg_pb2 as test_msg
 
 
 class TestProtobufConvert(unittest.TestCase):
-
     def test_protobuf_to_dict(self):
         pb = bess_msg.CreatePortResponse()
         pb.error.code = 1
-        pb.error.errmsg = 'bar'
-        pb.name = 'foo'
+        pb.error.errmsg = "bar"
+        pb.name = "foo"
 
         true_result = {
-            'error': {
-                'code': 1,
-                'errmsg': 'bar',
+            "error": {
+                "code": 1,
+                "errmsg": "bar",
             },
-            'name': 'foo'
+            "name": "foo",
         }
         result = pb_conv.protobuf_to_dict(pb)
         self.assertEqual(true_result, result)
@@ -67,27 +65,27 @@ class TestProtobufConvert(unittest.TestCase):
     def test_dict_to_protobuf(self):
         pb = bess_msg.CreatePortResponse()
         pb.error.code = 1
-        pb.error.errmsg = 'bar'
-        pb.name = 'foo'
+        pb.error.errmsg = "bar"
+        pb.name = "foo"
 
         msg_dict = {
-            'error': {
-                'code': 1,
-                'errmsg': 'bar',
+            "error": {
+                "code": 1,
+                "errmsg": "bar",
             },
-            'name': 'foo'
+            "name": "foo",
         }
 
         msg = pb_conv.dict_to_protobuf(bess_msg.CreatePortResponse, msg_dict)
         self.assertEqual(msg, pb)
 
         pb = bess_msg.CreateModuleRequest()
-        pb.name = 'm1'
-        pb.mclass = 'bpf'
+        pb.name = "m1"
+        pb.mclass = "bpf"
 
         kv = {
-            'name': 'm1',
-            'mclass': 'bpf',
+            "name": "m1",
+            "mclass": "bpf",
         }
         msg = pb_conv.dict_to_protobuf(bess_msg.CreateModuleRequest, kv)
         self.assertEqual(msg, pb)
@@ -106,9 +104,9 @@ class TestProtobufConvert(unittest.TestCase):
         init_from_dict(pb.c.dict, c_dict)
 
         msg_dict = {
-            'a': {'dict': a_dict},
-            'b': {'dict': b_dict},
-            'c': {'dict': c_dict},
+            "a": {"dict": a_dict},
+            "b": {"dict": b_dict},
+            "c": {"dict": c_dict},
         }
 
         msg = pb_conv.dict_to_protobuf(test_msg.NestedDictMsg, msg_dict)
@@ -118,9 +116,7 @@ class TestProtobufConvert(unittest.TestCase):
         pb = test_msg.UnnestedDictMsg()
         init_from_dict(pb.dict, {0: 10, 1: 5, 6: 7})
 
-        msg_dict = {
-            'dict': {0: 10, 1: 5, 6: 7}
-        }
+        msg_dict = {"dict": {0: 10, 1: 5, 6: 7}}
 
         msg = pb_conv.dict_to_protobuf(test_msg.UnnestedDictMsg, msg_dict)
         self.assertEqual(msg, pb)

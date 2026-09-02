@@ -30,28 +30,26 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import sys
 import os
+import sys
 from operator import itemgetter
 
 
-class ColorizedOutput(object):  # for pretty printing
-
+class ColorizedOutput:  # for pretty printing
     def __init__(self, orig_out, color):
         self.orig_out = orig_out
         self.color = color
 
     def __getattr__(self, attr):
-        def_color = '\033[0;0m'  # resets all terminal attributes
+        def_color = "\033[0;0m"  # resets all terminal attributes
 
-        if attr == 'write':
+        if attr == "write":
             return lambda x: self.orig_out.write(self.color + x + def_color)
         else:
             return getattr(self.orig_out, attr)
 
 
-class CLI(object):
-
+class CLI:
     class CommandError(Exception):  # general command errors
         pass
 
@@ -69,12 +67,19 @@ class CLI(object):
     class InternalError(Exception):
         pass
 
-    def __init__(self, cmdlist, fin=sys.stdin, fout=sys.stdout, ferr=None,
-                interactive=None, history_file=None):
+    def __init__(
+        self,
+        cmdlist,
+        fin=sys.stdin,
+        fout=sys.stdout,
+        ferr=None,
+        interactive=None,
+        history_file=None,
+    ):
         self.cmdlist = cmdlist
         self.fin = fin
         self.fout = fout
-        self.last_cmd = ''
+        self.last_cmd = ""
         self.rl = None
 
         self.history_file = self._setup_history_file(history_file)
@@ -90,7 +95,7 @@ class CLI(object):
             return history_file
 
         try:
-            return os.path.expanduser('~/.bess_history')
+            return os.path.expanduser("~/.bess_history")
         except Exception:
             return None
 
@@ -99,8 +104,8 @@ class CLI(object):
         if ferr is not None:
             return ferr
 
-        if os.environ.get('TERM') != 'dumb' and sys.stderr.isatty():
-            return ColorizedOutput(sys.stderr, '\033[31m')  # dark red
+        if os.environ.get("TERM") != "dumb" and sys.stderr.isatty():
+            return ColorizedOutput(sys.stderr, "\033[31m")  # dark red
 
         return sys.stderr
 
@@ -112,7 +117,7 @@ class CLI(object):
         return fin.isatty() and fout.isatty()
 
     def err(self, msg):
-        self.ferr.write('*** Error: %s\n' % msg)
+        self.ferr.write("*** Error: %s\n" % msg)
         if not self.interactive:
             self.stop_loop = True
 
@@ -128,10 +133,10 @@ class CLI(object):
     #   tail: the rest of input line
     # You can assume that 'line == head + tail'
     def split_var(self, var_type, line):
-        if var_type == 'keyword':
-            pos = line.find(' ')
+        if var_type == "keyword":
+            pos = line.find(" ")
             if pos == -1:
-                return line, ''
+                return line, ""
             else:
                 return line[:pos], line[pos:]
 
@@ -141,7 +146,7 @@ class CLI(object):
     #   mapped_value: Python value/object from the consumed token(s)
     #   tail: the rest of input line
     def bind_var(self, var_type, line):
-        if var_type == 'keyword':
+        if var_type == "keyword":
             return None, self.split_var(var_type, line)[1]
 
         raise self.InternalError('type "%s" is undefined' % var_type)
@@ -169,20 +174,29 @@ class CLI(object):
         remainder = line
         score = 0
         exact_score = 0
-        new_token = (line != '' and line[-1] == ' ')
+        new_token = line != "" and line[-1] == " "
         syntax_tokens = syntax.split()
 
         # Process each syntax token
         for i, syntax_token in enumerate(syntax_tokens):
             # Get current word and variable attributes
             line_word = self._get_line_word(remainder)
-            var_type, var_desc, var_candidates = self._get_var_attrs(syntax_token, line_word)
+            var_type, var_desc, var_candidates = self._get_var_attrs(
+                syntax_token, line_word
+            )
 
             # Handle empty remainder (end of input)
-            if remainder.strip() == '':
+            if remainder.strip() == "":
                 return self._handle_empty_remainder(
-                    i, syntax_token, syntax_tokens, var_type, var_candidates,
-                    new_token, candidates, score, exact_score
+                    i,
+                    syntax_token,
+                    syntax_tokens,
+                    var_type,
+                    var_candidates,
+                    new_token,
+                    candidates,
+                    score,
+                    exact_score,
                 )
 
             # Process current token
@@ -190,15 +204,15 @@ class CLI(object):
             remainder = remainder.lstrip()
 
             # Update matching state based on variable type
-            if var_type == 'keyword':
+            if var_type == "keyword":
                 result = self._process_keyword_match(
                     syntax_token, token, new_token, score, exact_score
                 )
-                if result['match_type'] == 'nonmatch':
-                    return 'nonmatch', [], '', score, exact_score
-                candidates = result['candidates']
-                score = result['score']
-                exact_score = result['exact_score']
+                if result["match_type"] == "nonmatch":
+                    return "nonmatch", [], "", score, exact_score
+                candidates = result["candidates"]
+                score = result["score"]
+                exact_score = result["exact_score"]
             else:
                 candidates = self._process_variable_match(
                     var_candidates, token, new_token
@@ -213,37 +227,49 @@ class CLI(object):
         """Extract the first word from remainder or return empty string."""
         if remainder.split():
             return remainder.split()[0]
-        return ''
+        return ""
 
     def _get_var_attrs(self, syntax_token, line_word):
         """Get variable attributes for a syntax token."""
         attrs = self.get_var_attrs(syntax_token, line_word)
         if attrs:
             return attrs
-        return 'keyword', '', []
+        return "keyword", "", []
 
-    def _handle_empty_remainder(self, i, syntax_token, syntax_tokens, var_type,
-                            var_candidates, new_token, candidates, score, exact_score):
+    def _handle_empty_remainder(
+        self,
+        i,
+        syntax_token,
+        syntax_tokens,
+        var_type,
+        var_candidates,
+        new_token,
+        candidates,
+        score,
+        exact_score,
+    ):
         """Handle case when user input is exhausted."""
         if new_token:
             # Clear candidates unless previous token allows continuation
-            if i == 0 or '...' not in syntax_tokens[i - 1]:
+            if i == 0 or "..." not in syntax_tokens[i - 1]:
                 candidates = []
 
             candidates.extend(var_candidates)
 
-            if var_type == 'keyword':
+            if var_type == "keyword":
                 candidates.append(syntax_token)
 
             # Check if current token is skippable (optional)
-            if syntax_token[0] == '[':
-                return 'full', candidates, syntax_token, score, exact_score
+            if syntax_token[0] == "[":
+                return "full", candidates, syntax_token, score, exact_score
 
-            return 'partial', candidates, syntax_token, score, exact_score
+            return "partial", candidates, syntax_token, score, exact_score
 
-        return 'partial', candidates, syntax_tokens[max(0, i - 1)], score, exact_score
+        return "partial", candidates, syntax_tokens[max(0, i - 1)], score, exact_score
 
-    def _process_keyword_match(self, syntax_token, token, new_token, score, exact_score):
+    def _process_keyword_match(
+        self, syntax_token, token, new_token, score, exact_score
+    ):
         """Process matching for keyword tokens."""
         if syntax_token == token:
             # Exact match
@@ -254,13 +280,23 @@ class CLI(object):
         else:
             # Partial match
             if not syntax_token.startswith(token):
-                return {'match_type': 'nonmatch', 'candidates': [], 'score': score, 'exact_score': exact_score}
+                return {
+                    "match_type": "nonmatch",
+                    "candidates": [],
+                    "score": score,
+                    "exact_score": exact_score,
+                }
             candidates = [syntax_token]
             score += 1
             if syntax_token.strip() == token:
                 exact_score += 1
 
-        return {'match_type': 'continue', 'candidates': candidates, 'score': score, 'exact_score': exact_score}
+        return {
+            "match_type": "continue",
+            "candidates": candidates,
+            "score": score,
+            "exact_score": exact_score,
+        }
 
     def _process_variable_match(self, var_candidates, token, new_token):
         """Process matching for variable tokens."""
@@ -278,20 +314,22 @@ class CLI(object):
 
         return candidates
 
-    def _finalize_match(self, remainder, syntax_token, new_token, candidates, score, exact_score):
+    def _finalize_match(
+        self, remainder, syntax_token, new_token, candidates, score, exact_score
+    ):
         """Final validation and result determination."""
-        if remainder.strip() == '':
+        if remainder.strip() == "":
             # Check for ellipsis (variable length argument)
-            if '...' in syntax_token:
-                return 'full', candidates, syntax_token, score, exact_score
+            if "..." in syntax_token:
+                return "full", candidates, syntax_token, score, exact_score
 
             # Handle new token case
             if new_token:
-                return 'full', ['\n'], '', score, exact_score
+                return "full", ["\n"], "", score, exact_score
 
-            return 'full', candidates, syntax_token, score, exact_score
+            return "full", candidates, syntax_token, score, exact_score
 
-        return 'nonmatch', [], '', score, exact_score
+        return "nonmatch", [], "", score, exact_score
 
     # filter is one of 'full', 'partial', 'nonmatch'
     def list_matched(self, line, filter):
@@ -313,7 +351,7 @@ class CLI(object):
         ret_low = [m[0] for m in matched_list if m[1] != max_score]
 
         # Find exact matches without ambiguity
-        if filter == 'full' and len(ret) > 1:
+        if filter == "full" and len(ret) > 1:
             full_matches = [m for m in matched_list if m[1] == max_score]
             # sorted by exact score
             full_matches.sort(key=itemgetter(2), reverse=True)
@@ -333,7 +371,9 @@ class CLI(object):
         possible_cmds, candidates = self._find_matching_commands(line, partial_word)
 
         # Try to find common prefix for auto-completion
-        completion_candidates = self._try_common_prefix_completion(candidates, partial_word)
+        completion_candidates = self._try_common_prefix_completion(
+            candidates, partial_word
+        )
         if completion_candidates:
             return completion_candidates
 
@@ -352,7 +392,7 @@ class CLI(object):
             syntax = cmd[0]
             match_type, sub_candidates, syntax_token, _, _ = self.match(syntax, line)
 
-            if match_type in ['full', 'partial']:
+            if match_type in ["full", "partial"]:
                 possible_cmds.append((cmd, match_type, syntax_token))
 
                 # Collect candidates that match the partial word
@@ -365,8 +405,8 @@ class CLI(object):
 
     def _format_candidate(self, candidate):
         """Format a completion candidate by adding space if needed."""
-        if not candidate.endswith('/') and candidate != '\n':
-            return candidate + ' '
+        if not candidate.endswith("/") and candidate != "\n":
+            return candidate + " "
         return candidate
 
     def _try_common_prefix_completion(self, candidates, partial_word):
@@ -376,9 +416,12 @@ class CLI(object):
 
         common_prefix = self._find_common_prefix(candidates)
 
-        if (common_prefix and len(partial_word) < len(common_prefix) and
-                partial_word == common_prefix[:len(partial_word)]):
-            filtered_candidates = [c for c in candidates if c.strip() != '']
+        if (
+            common_prefix
+            and len(partial_word) < len(common_prefix)
+            and partial_word == common_prefix[: len(partial_word)]
+        ):
+            filtered_candidates = [c for c in candidates if c.strip() != ""]
             return filtered_candidates if filtered_candidates else None
 
         return None
@@ -386,7 +429,7 @@ class CLI(object):
     def _find_common_prefix(self, candidates):
         """Find the longest common prefix among all candidates."""
         if not candidates:
-            return ''
+            return ""
 
         s_min = candidates[0]
         s_max = candidates[-1]
@@ -400,16 +443,18 @@ class CLI(object):
     def _build_help_buffer(self, possible_cmds, partial_word):
         """Build help buffer showing available commands and their descriptions."""
         buf = []
-        num_full_matches = sum(1 for _, match_type, _ in possible_cmds if match_type == 'full')
+        num_full_matches = sum(
+            1 for _, match_type, _ in possible_cmds if match_type == "full"
+        )
 
         for cmd, match_type, syntax_token in possible_cmds:
             syntax, desc, _ = cmd
 
             # Add command description
-            if match_type == 'full' and num_full_matches == 1:
-                buf.append('  %-50s %s\n' % (syntax + ' <enter>', desc))
+            if match_type == "full" and num_full_matches == 1:
+                buf.append("  %-50s %s\n" % (syntax + " <enter>", desc))
             else:
-                buf.append('  %-50s %s\n' % (syntax, desc))
+                buf.append("  %-50s %s\n" % (syntax, desc))
 
             # Add variable information if available
             if syntax_token:
@@ -425,21 +470,21 @@ class CLI(object):
             return []
 
         var_type, var_desc, var_candidates = attrs
-        buf = ['    %s (%s): %s\n' % (syntax_token, var_type, var_desc)]
+        buf = ["    %s (%s): %s\n" % (syntax_token, var_type, var_desc)]
 
         # Add eligible variable candidates
         for var in var_candidates:
             if var.startswith(partial_word):
-                buf.append('      %s\n' % var)
+                buf.append("      %s\n" % var)
 
         return buf
 
     def _write_help_output(self, help_buffer, line):
         """Write help output to the terminal."""
         if help_buffer:
-            self.fout.write('\n')
-            self.fout.write(''.join(help_buffer))
-            self.fout.write('%s%s' % (self.get_prompt(), line))
+            self.fout.write("\n")
+            self.fout.write("".join(help_buffer))
+            self.fout.write("%s%s" % (self.get_prompt(), line))
             self.fout.flush()
 
     def complete(self, partial_word, state):
@@ -454,8 +499,9 @@ class CLI(object):
             # so we add our exception handler for debugging
             try:
                 self.candidates = self._do_complete(line, partial_word)
-            except BaseException as e:
+            except BaseException:
                 import traceback
+
                 traceback.print_exc()
                 sys.exit(1)
 
@@ -468,11 +514,11 @@ class CLI(object):
         return None
 
     def get_prompt(self):
-        return '> '
+        return "> "
 
     def find_cmd(self, line):
         # return commands being matched with every token
-        matched, matched_low = self.list_matched(line, 'full')
+        matched, matched_low = self.list_matched(line, "full")
         line_stripped = line.strip()
 
         if len(matched) == 1:
@@ -481,15 +527,14 @@ class CLI(object):
         elif len(matched) >= 2:
             self.err('Ambiguous command "%s". Candidates:' % line_stripped)
             for cmd, desc, _ in matched + matched_low:
-                self.ferr.write('  %-50s%s\n' % (cmd, desc))
+                self.ferr.write("  %-50s%s\n" % (cmd, desc))
 
         elif len(matched) == 0:
-            matched, matched_low = self.list_matched(line, 'partial')
+            matched, matched_low = self.list_matched(line, "partial")
             if len(matched) > 0:
-                self.err('Incomplete command "%s". Candidates:' %
-                         line_stripped)
+                self.err('Incomplete command "%s". Candidates:' % line_stripped)
                 for cmd, desc, _ in matched + matched_low:
-                    self.ferr.write('  %-50s%s\n' % (cmd, desc))
+                    self.ferr.write("  %-50s%s\n" % (cmd, desc))
             else:
                 self.err('Unknown command "%s".' % line_stripped)
 
@@ -504,23 +549,24 @@ class CLI(object):
         args = []
 
         for i, syntax_token in enumerate(syntax.split()):
-            if remainder.strip() == '':
-                if syntax_token[0] == '[':
+            if remainder.strip() == "":
+                if syntax_token[0] == "[":
                     args.append(None)
                     continue
 
-                raise self.InternalError('Partial match on "%s"? line: "%s"' %
-                                         (syntax, line))
+                raise self.InternalError(
+                    'Partial match on "%s"? line: "%s"' % (syntax, line)
+                )
 
             attrs = self.get_var_attrs(syntax_token, remainder.split()[0])
             if attrs:
                 var_type = attrs[0]
             else:
-                var_type = 'keyword'
+                var_type = "keyword"
 
             val, remainder = self.bind_var(var_type, remainder)
 
-            if var_type != 'keyword':
+            if var_type != "keyword":
                 args.append(val)
 
             remainder = remainder.lstrip()
@@ -568,10 +614,10 @@ class CLI(object):
             try:
                 prompt = raw_input  # Python 2
             except NameError:
-                prompt = input      # Python 3
+                prompt = input  # Python 3
             return prompt(self.get_prompt())
         except KeyboardInterrupt:
-            self.fout.write('\n')
+            self.fout.write("\n")
             return None
 
     def _read_file_input(self):
@@ -587,13 +633,13 @@ class CLI(object):
             # We use a nested try to ensure the 'stop_loop' logic runs
             # for EVERY type of exception before we decide to handle/ignore it.
             try:
-                cmd = self.find_cmd(line + ' ')
+                cmd = self.find_cmd(line + " ")
                 func, args = self.bind_args(cmd, line)
                 self.call_func(func, args)
             except:
                 if not self.interactive:
                     self.stop_loop = True
-                raise # Re-raise to be caught by the outer block
+                raise  # Re-raise to be caught by the outer block
 
         except self.HandledError:
             pass
@@ -609,11 +655,12 @@ class CLI(object):
             try:
                 self.rl.write_history_file(self.history_file)
             except OSError:
-                self.err('Cannot write to history file "%s"' %
-                         self.history_file)
+                self.err('Cannot write to history file "%s"' % self.history_file)
             except Exception as e:
-                self.err('Unexpected error saving history file "%s": %s' %
-                        (self.history_file, e))
+                self.err(
+                    'Unexpected error saving history file "%s": %s'
+                    % (self.history_file, e)
+                )
 
     def disable_echoctl(self):
         try:
@@ -633,8 +680,8 @@ class CLI(object):
         try:
             import termios
 
-            if not hasattr(self, 'old_flags'):
-                 return
+            if not hasattr(self, "old_flags"):
+                return
 
             cur_flags = termios.tcgetattr(sys.stdin)
             new_flags = cur_flags
@@ -651,32 +698,34 @@ class CLI(object):
     def go_interactive(self):
         try:
             import readline
+
             self.rl = readline
         except ImportError:
             self.err('"readline" not available. No auto completion.\n')
             return
 
-        if 'libedit' in self.rl.__doc__:
-            self.rl.parse_and_bind('bind -e')
+        if "libedit" in self.rl.__doc__:
+            self.rl.parse_and_bind("bind -e")
             self.rl.parse_and_bind("bind '\t' rl_complete")
         else:
-            self.rl.parse_and_bind('tab: complete')
+            self.rl.parse_and_bind("tab: complete")
 
         self.rl.set_completer(self.complete)
 
         # Remove `~!@#$%^&*()-=+[{]}\|;:'",<>?/ from readline delimiters
         # leaving only space, tab, LF
-        self.rl.set_completer_delims(' \x09\x0a')
+        self.rl.set_completer_delims(" \x09\x0a")
 
         try:
             if self.history_file and os.path.exists(self.history_file):
                 self.rl.read_history_file(self.history_file)
         except OSError:
-            self.err('Cannot read from history file "%s"' %
-                     self.history_file)
+            self.err('Cannot read from history file "%s"' % self.history_file)
         except Exception as e:
-            self.err('Unexpected error reading history file "%s": %s' %
-                    (self.history_file, e))
+            self.err(
+                'Unexpected error reading history file "%s": %s'
+                % (self.history_file, e)
+            )
 
         self.print_banner()
         self.fout.flush()
@@ -692,7 +741,7 @@ class CLI(object):
                 self.process_one_line()
         except EOFError:
             if self.interactive:
-                self.fout.write('\n')
+                self.fout.write("\n")
         finally:
             self.save_history()
             self.restore_echoctl()

@@ -31,28 +31,24 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from __future__ import print_function
 
 import argparse
-import fnmatch
 import glob
 import os
 import shlex
 import subprocess
 import sys
-import unittest
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
-bessctl = os.path.join(this_dir, 'bessctl')
-default_test_dir = os.path.join(this_dir, 'module_tests')
+bessctl = os.path.join(this_dir, "bessctl")
+default_test_dir = os.path.join(this_dir, "module_tests")
 
 
 class CommandError(subprocess.CalledProcessError):
-
-    '''Identical to CalledProcessError, except it also shows the output'''
+    """Identical to CalledProcessError, except it also shows the output"""
 
     def __str__(self):
-        return '%s\n%s' % (super(CommandError, self).__str__(), self.output)
+        return "%s\n%s" % (super().__str__(), self.output)
 
 
 def run_cmd(cmd):
@@ -65,28 +61,32 @@ def run_cmd(cmd):
 
 def main():
 
-    arg_parser = argparse.ArgumentParser(
-        description='Run per-module unit tests')
-    arg_parser.add_argument('--test_name', type=str, default='*',
-                            help='Name of a specific test to run.')
-    arg_parser.add_argument('--test_dir', type=str, default=default_test_dir,
-                            help='Path to the directory to serach for tests.')
+    arg_parser = argparse.ArgumentParser(description="Run per-module unit tests")
+    arg_parser.add_argument(
+        "--test_name", type=str, default="*", help="Name of a specific test to run."
+    )
+    arg_parser.add_argument(
+        "--test_dir",
+        type=str,
+        default=default_test_dir,
+        help="Path to the directory to serach for tests.",
+    )
     args = arg_parser.parse_args()
 
     any_failure = 0
 
-    daemon_start_cmd = '%s daemon start' % bessctl
+    daemon_start_cmd = "%s daemon start" % bessctl
 
     try:
         run_cmd(daemon_start_cmd)
     except CommandError:
-        raise Exception('bess daemon could not start')
+        raise Exception("bess daemon could not start")
 
-    for file_name in glob.glob(os.path.join(args.test_dir, "{}.py".format(args.test_name))):
-        print('Running test %s' % file_name)
+    for file_name in glob.glob(os.path.join(args.test_dir, f"{args.test_name}.py")):
+        print("Running test %s" % file_name)
 
         try:
-            run_cmd('%s daemon reset -- run file %s' % (bessctl, file_name))
+            run_cmd("%s daemon reset -- run file %s" % (bessctl, file_name))
         except CommandError:
             any_failure = 1
             run_cmd(daemon_start_cmd)
@@ -94,5 +94,5 @@ def main():
     sys.exit(any_failure)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

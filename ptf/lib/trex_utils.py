@@ -1,8 +1,6 @@
 # SPDX-FileCopyrightText: Copyright 2020-present Open Networking Foundation.
 # SPDX-License-Identifier: Apache-2.0
-import argparse
 import collections
-import logging
 import time
 
 import numpy as np
@@ -16,6 +14,10 @@ G = 1000 * M
 """
 Library of useful functions for parsing and reading TRex statistics.
 """
+
+
+class RampUpTimeoutError(Exception):
+    """Raised when TX rate fails to reach or sustain the minimum sending rate."""
 
 
 def to_readable(src: int, unit: str = "bps") -> str:
@@ -32,13 +34,13 @@ def to_readable(src: int, unit: str = "bps") -> str:
         A human readable string
     """
     if src < 1000:
-        return "{:.1f} {}".format(src, unit)
+        return f"{src:.1f} {unit}"
     elif src < 1000_000:
-        return "{:.1f} K{}".format(src / 1000, unit)
+        return f"{src / 1000:.1f} K{unit}"
     elif src < 1000_000_000:
-        return "{:.1f} M{}".format(src / 1000_000, unit)
+        return f"{src / 1000_000:.1f} M{unit}"
     else:
-        return "{:.1f} G{}".format(src / 1000_000_000, unit)
+        return f"{src / 1000_000_000:.1f} G{unit}"
 
 
 def get_readable_port_stats(port_stats: dict) -> str:
@@ -106,7 +108,7 @@ def list_port_status(port_status: dict) -> None:
     """
     for port in [0, 1]:
         readable_stats = get_readable_port_stats(port_status[port])
-        print("States from port {}: \n{}".format(port, readable_stats))
+        print(f"States from port {port}: \n{readable_stats}")
 
 
 LatencyStats = collections.namedtuple(
@@ -271,7 +273,7 @@ def start_and_monitor_port_stats(
         if bad_sample:
             if elapsed > ramp_up_timeout:
                 client.stop(ports=[tx_port])
-                raise Exception(
+                raise RampUpTimeoutError(
                     f"TX port ({tx_port}) did not reach or sustain "
                     f"min sending rate ({to_readable(min_tx_bps)})"
                 )
@@ -370,9 +372,7 @@ def get_readable_latency_stats(stats: LatencyStats) -> str:
         val = stats.histogram[sample]
         histogram = (
             histogram
-            + "\n        Packets with latency between {0:>5} us and {1:>5} us: {2:>10}".format(
-                range_start, range_end, val
-            )
+            + f"\n        Packets with latency between {range_start:>5} us and {range_end:>5} us: {val:>10}"
         )
 
     return f"""

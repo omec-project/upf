@@ -33,7 +33,6 @@ from test_utils import *
 
 
 class BessUpdateTTLTest(BessModuleTestCase):
-
     def test_run_update_ttl(self):
         uttl = UpdateTTL()
         self.run_for(uttl, [0], 3)
@@ -73,6 +72,7 @@ class BessUpdateTTLTest(BessModuleTestCase):
 
         pkt_outs = self.run_module(uttl, 0, [drop_pkt1], [0])
         self.assertEqual(len(pkt_outs[0]), 0)
+
 
 suite = unittest.TestLoader().loadTestsFromTestCase(BessUpdateTTLTest)
 results = unittest.TextTestRunner(verbosity=2).run(suite)

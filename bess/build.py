@@ -33,20 +33,20 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from __future__ import print_function
 
+import argparse
 import glob
-import sys
 import os
 import os.path
 import re
 import shlex
 import subprocess
+import sys
 import textwrap
-import argparse
 
 # constants for duplicate literals
-BUILTIN_PB_DIR = 'pybess/builtin_pb'
+BUILTIN_PB_DIR = "pybess/builtin_pb"
+
 
 def cmd(cmd, quiet=False, shell=False):
     """
@@ -62,14 +62,16 @@ def cmd(cmd, quiet=False, shell=False):
     the tests themselves use use cmd_success() to check for failures.)
     """
     if not quiet:
-        quiet = os.getenv('V') is None
+        quiet = os.getenv("V") is None
 
-    kwargs = {'universal_newlines': True,
-              'close_fds': False}  # For Python >3.2, default is True
+    kwargs = {
+        "universal_newlines": True,
+        "close_fds": False,
+    }  # For Python >3.2, default is True
 
     if quiet:
-        kwargs['stdout'] = subprocess.PIPE
-        kwargs['stderr'] = subprocess.STDOUT
+        kwargs["stdout"] = subprocess.PIPE
+        kwargs["stderr"] = subprocess.STDOUT
     if shell:
         proc = subprocess.Popen(cmd, shell=True, **kwargs)
     else:
@@ -82,8 +84,8 @@ def cmd(cmd, quiet=False, shell=False):
     if proc.returncode:
         # We only have output if we ran in quiet mode.
         if quiet:
-            print('Log:\n', out, file=sys.stderr)
-        print('Error has occured running command: %s' % cmd, file=sys.stderr)
+            print("Log:\n", out, file=sys.stderr)
+        print("Error has occured running command: %s" % cmd, file=sys.stderr)
         sys.exit(proc.returncode)
 
     return out
@@ -91,9 +93,9 @@ def cmd(cmd, quiet=False, shell=False):
 
 BESS_DIR = os.path.dirname(os.path.abspath(__file__))
 
-DEPS_DIR = '%s/deps' % BESS_DIR
+DEPS_DIR = "%s/deps" % BESS_DIR
 
-kernel_release = cmd('uname -r', quiet=True).strip()
+kernel_release = cmd("uname -r", quiet=True).strip()
 
 extra_libs = set()
 cxx_flags = []
@@ -107,40 +109,45 @@ def cmd_success(cmd):
         # but if the output exceeds PIPE_MAX, the pipes will
         # constipate and check_call may never return.
         subprocess.check_call(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True
+        )
         return True
     except subprocess.CalledProcessError:
         return False
 
 
 def check_header(header_file, compiler):
-    test_c_file = '%s/test.c' % DEPS_DIR
-    test_o_file = '%s/test.o' % DEPS_DIR
+    test_c_file = "%s/test.c" % DEPS_DIR
+    test_o_file = "%s/test.o" % DEPS_DIR
 
-    src = """
+    src = (
+        """
         #include <%s>
 
         int main()
         {
             return 0;
         }
-        """ % header_file
+        """
+        % header_file
+    )
 
     try:
-        with open(test_c_file, 'w') as fp:
+        with open(test_c_file, "w") as fp:
             fp.write(textwrap.dedent(src))
 
-        return cmd_success('%s %s -c %s -o %s' %
-                           (compiler, ' '.join(cxx_flags), test_c_file,
-                            test_o_file))
+        return cmd_success(
+            "%s %s -c %s -o %s"
+            % (compiler, " ".join(cxx_flags), test_c_file, test_o_file)
+        )
 
     finally:
-        cmd('rm -f %s %s' % (test_c_file, test_o_file), quiet=True)
+        cmd("rm -f %s %s" % (test_c_file, test_o_file), quiet=True)
 
 
 def check_c_lib(lib):
-    test_c_file = '%s/test.c' % DEPS_DIR
-    test_e_file = '%s/test' % DEPS_DIR
+    test_c_file = "%s/test.c" % DEPS_DIR
+    test_e_file = "%s/test" % DEPS_DIR
 
     src = """
         int main()
@@ -150,43 +157,47 @@ def check_c_lib(lib):
         """
 
     try:
-        with open(test_c_file, 'w') as fp:
+        with open(test_c_file, "w") as fp:
             fp.write(textwrap.dedent(src))
 
-        return cmd_success('gcc %s -l%s %s %s -o %s' %
-                           (test_c_file, lib, ' '.join(cxx_flags),
-                            ' '.join(ld_flags), test_e_file))
+        return cmd_success(
+            "gcc %s -l%s %s %s -o %s"
+            % (test_c_file, lib, " ".join(cxx_flags), " ".join(ld_flags), test_e_file)
+        )
     finally:
-        cmd('rm -f %s %s' % (test_c_file, test_e_file), quiet=True)
+        cmd("rm -f %s %s" % (test_c_file, test_e_file), quiet=True)
 
 
 def required(header_file, lib_name, compiler):
     if not check_header(header_file, compiler):
-        print('Error - #include <%s> failed. Did you install "%s" package?'
-              % (header_file, lib_name), file=sys.stderr)
+        print(
+            'Error - #include <%s> failed. Did you install "%s" package?'
+            % (header_file, lib_name),
+            file=sys.stderr,
+        )
         sys.exit(1)
 
 
 def check_essential():
-    if not cmd_success('gcc -v'):
+    if not cmd_success("gcc -v"):
         print('Error - "gcc" is not available', file=sys.stderr)
         sys.exit(1)
 
-    if not cmd_success('g++ -v'):
+    if not cmd_success("g++ -v"):
         print('Error - "g++" is not available', file=sys.stderr)
         sys.exit(1)
 
-    if not cmd_success('make -v'):
+    if not cmd_success("make -v"):
         print('Error - "make" is not available', file=sys.stderr)
         sys.exit(1)
 
-    required('numa.h', 'libnuma-dev', 'gcc')
-    required('pcap/pcap.h', 'libpcap-dev', 'gcc')
-    required('zlib.h', 'zlib1g-dev', 'gcc')
-    required('glog/logging.h', 'libgoogle-glog-dev', 'g++')
-    required('gflags/gflags.h', 'libgflags-dev', 'g++')
-    required('gtest/gtest.h', 'libgtest-dev', 'g++')
-    required('benchmark/benchmark.h', 'libbenchmark-dev', 'g++')
+    required("numa.h", "libnuma-dev", "gcc")
+    required("pcap/pcap.h", "libpcap-dev", "gcc")
+    required("zlib.h", "zlib1g-dev", "gcc")
+    required("glog/logging.h", "libgoogle-glog-dev", "g++")
+    required("gflags/gflags.h", "libgflags-dev", "g++")
+    required("gtest/gtest.h", "libgtest-dev", "g++")
+    required("benchmark/benchmark.h", "libbenchmark-dev", "g++")
 
 
 def set_config(filename, config, new_value):
@@ -194,15 +205,15 @@ def set_config(filename, config, new_value):
         lines = fp.readlines()
 
     found = False
-    with open(filename, 'w') as fp:
+    with open(filename, "w") as fp:
         for line in lines:
-            if line.startswith(config + '='):
+            if line.startswith(config + "="):
                 found = True
-                line = '%s=%s\n' % (config, new_value)
+                line = "%s=%s\n" % (config, new_value)
             fp.write(line)
 
     assert found, '"%s" is not found in %s' % (config, filename)
-    print('  %s: %s=%s' % (filename, config, new_value))
+    print("  %s: %s=%s" % (filename, config, new_value))
 
 
 def is_kernel_header_installed():
@@ -213,38 +224,40 @@ def find_current_plugins():
     "return list of existing plugins"
     result = []
     try:
-        for line in open('core/extra.mk').readlines():
-            match = re.match(r'PLUGINS \+= (.*)', line)
+        for line in open("core/extra.mk"):
+            match = re.match(r"PLUGINS \+= (.*)", line)
             if match:
                 result.append(match.group(1))
-    except (OSError, IOError):
+    except OSError:
         pass
     return result
 
 
 def generate_extra_mk():
     "set up core/extra.mk to hold flags and plugin paths"
-    with open('core/extra.mk', 'w') as fp:
-        fp.write('CXXFLAGS += %s\n' % ' '.join(cxx_flags))
-        fp.write('LDFLAGS += %s\n' % ' '.join(ld_flags))
-        for path in plugins:
-            fp.write('PLUGINS += {}\n'.format(path))
+    with open("core/extra.mk", "w") as fp:
+        fp.write("CXXFLAGS += %s\n" % " ".join(cxx_flags))
+        fp.write("LDFLAGS += %s\n" % " ".join(ld_flags))
+        fp.writelines(f"PLUGINS += {path}\n" for path in plugins)
 
 
 def check_dpdk():
     """Verify that DPDK is available via pkg-config (system packages)."""
-    if not cmd_success('which pkg-config'):
-        print('Error - pkg-config not found. '
-              'Install it with: sudo apt-get install pkg-config',
-              file=sys.stderr)
+    if not cmd_success("which pkg-config"):
+        print(
+            "Error - pkg-config not found. "
+            "Install it with: sudo apt-get install pkg-config",
+            file=sys.stderr,
+        )
         sys.exit(1)
-    if not cmd_success('pkg-config --exists libdpdk'):
-        print('Error - DPDK not found. '
-              'Install it with: sudo apt-get install libdpdk-dev',
-              file=sys.stderr)
+    if not cmd_success("pkg-config --exists libdpdk"):
+        print(
+            "Error - DPDK not found. Install it with: sudo apt-get install libdpdk-dev",
+            file=sys.stderr,
+        )
         sys.exit(1)
-    ver = cmd('pkg-config --modversion libdpdk', quiet=True).strip()
-    print('Using system DPDK %s' % ver)
+    ver = cmd("pkg-config --modversion libdpdk", quiet=True).strip()
+    print("Using system DPDK %s" % ver)
 
 
 def makeflags():
@@ -258,38 +271,37 @@ def makeflags():
     cpus printed by nproc.
     """
     # reuse cached value if we have one
-    result = getattr(makeflags, 'result', None)
+    result = getattr(makeflags, "result", None)
     if result is not None:
         return result
     # figure out correct value, then cache it
-    result = os.getenv('MAKEFLAGS')
+    result = os.getenv("MAKEFLAGS")
     if result is None:
-        result = '-j%d' % int(cmd('nproc', quiet=True))
-    elif result != "" and not result.startswith('-'):
-        result = '-%s' % result
+        result = "-j%d" % int(cmd("nproc", quiet=True))
+    elif result != "" and not result.startswith("-"):
+        result = "-%s" % result
     makeflags.result = result
     return result
 
 
-
-
-
 def generate_protobuf_files():
-    grpc = cmd('which grpc_python_plugin', quiet=True).strip()
+    grpc = cmd("which grpc_python_plugin", quiet=True).strip()
 
     def gen_one_set_of_files(srcdir, outdir):
         "run protoc on *.proto in srcdir, with python output to outdir"
-        cmd_template = ('protoc {name} --proto_path={srcdir} '
-                        '--proto_path={stddir} '
-                        '--python_out={outdir} --grpc_out={outdir} '
-                        '--plugin=protoc-gen-grpc={grpc}')
+        cmd_template = (
+            "protoc {name} --proto_path={srcdir} "
+            "--proto_path={stddir} "
+            "--python_out={outdir} --grpc_out={outdir} "
+            "--plugin=protoc-gen-grpc={grpc}"
+        )
         cmd_args = {
-            'grpc': grpc,
-            'stddir': 'protobuf',
-            'srcdir': srcdir,
-            'outdir': outdir,
+            "grpc": grpc,
+            "stddir": "protobuf",
+            "srcdir": srcdir,
+            "outdir": outdir,
         }
-        files = glob.glob(os.path.join(srcdir, '*.proto'))
+        files = glob.glob(os.path.join(srcdir, "*.proto"))
         for name in files:
             cmd(cmd_template.format(name=name, **cmd_args))
         # Note: when run as, e.g.
@@ -304,17 +316,16 @@ def generate_protobuf_files():
         # so that the generated file does not have a ports/ prefix.
         # This is documented!  See, e.g.,
         # developers.google.com/protocol-buffers/docs/reference/cpp-generated
-        files = glob.glob(os.path.join(srcdir, 'ports', '*.proto'))
+        files = glob.glob(os.path.join(srcdir, "ports", "*.proto"))
         for name in files:
             cmd(cmd_template.format(name=name, **cmd_args))
 
-    print('Generating protobuf codes for pybess...')
+    print("Generating protobuf codes for pybess...")
     sys.stdout.flush()
-    gen_one_set_of_files('protobuf', BUILTIN_PB_DIR)
-    gen_one_set_of_files('protobuf/tests', BUILTIN_PB_DIR)
+    gen_one_set_of_files("protobuf", BUILTIN_PB_DIR)
+    gen_one_set_of_files("protobuf/tests", BUILTIN_PB_DIR)
     for path in plugins:
-        gen_one_set_of_files(os.path.join(path, 'protobuf'),
-                             'pybess/plugin_pb')
+        gen_one_set_of_files(os.path.join(path, "protobuf"), "pybess/plugin_pb")
 
 
 def build_bess():
@@ -323,50 +334,51 @@ def build_bess():
 
     generate_protobuf_files()
 
-    print('Building BESS daemon...')
+    print("Building BESS daemon...")
     sys.stdout.flush()
-    cmd('bin/bessctl daemon stop 2> /dev/null || true', shell=True)
-    cmd('rm -f core/bessd')  # force relink
-    cmd('make -C core bessd modules all_test %s' % makeflags())
+    cmd("bin/bessctl daemon stop 2> /dev/null || true", shell=True)
+    cmd("rm -f core/bessd")  # force relink
+    cmd("make -C core bessd modules all_test %s" % makeflags())
 
 
 def build_kmod():
     check_essential()
 
-    if os.getenv('KERNELDIR'):
-        print('Building BESS kernel module (%s) ...' %
-              os.getenv('KERNELDIR'))
+    if os.getenv("KERNELDIR"):
+        print("Building BESS kernel module (%s) ..." % os.getenv("KERNELDIR"))
     else:
-        print('Building BESS kernel module (%s - running kernel) ...' %
-              kernel_release)
+        print("Building BESS kernel module (%s - running kernel) ..." % kernel_release)
         if not is_kernel_header_installed():
-            print('"kernel-headers-%s" is not available. Build may fail.' %
-                  kernel_release)
+            print(
+                '"kernel-headers-%s" is not available. Build may fail.' % kernel_release
+            )
     sys.stdout.flush()
-    cmd('sudo -n rmmod bess 2> /dev/null || true', shell=True)
+    cmd("sudo -n rmmod bess 2> /dev/null || true", shell=True)
     try:
-        cmd('make -C core/kmod')
+        cmd("make -C core/kmod")
     except SystemExit:
-        print('*** module build has failed.', file=sys.stderr)
+        print("*** module build has failed.", file=sys.stderr)
         sys.exit(1)
 
 
 def build_all():
     build_bess()
     build_kmod()
-    print('Done.')
+    print("Done.")
 
 
 def do_clean():
-    print('Cleaning up...')
-    cmd('make -C core clean')
-    cmd('make -C core/kmod clean')
-    for path in (BUILTIN_PB_DIR, 'pybess/plugin_pb'):
-        cmd('rm -rf '
-            '{path}/*_pb2.py* {path}/ports/*_pb2.py* '
-            '{path}/__init__.pyc {path}/ports/__init__.pyc '
-            '{path}/*_pb2_grpc.py* {path}/ports/*_pb2_grpc.py* '
-            '{path}/__pycache__ {path}/ports/__pycache__'.format(path=path))
+    print("Cleaning up...")
+    cmd("make -C core clean")
+    cmd("make -C core/kmod clean")
+    for path in (BUILTIN_PB_DIR, "pybess/plugin_pb"):
+        cmd(
+            "rm -rf "
+            f"{path}/*_pb2.py* {path}/ports/*_pb2.py* "
+            f"{path}/__init__.pyc {path}/ports/__init__.pyc "
+            f"{path}/*_pb2_grpc.py* {path}/ports/*_pb2_grpc.py* "
+            f"{path}/__pycache__ {path}/ports/__pycache__"
+        )
 
 
 def do_dist_clean():
@@ -379,9 +391,9 @@ def print_usage(parser):
 
 
 def update_benchmark_path(path):
-    print('Specified benchmark path %s' % path)
-    cxx_flags.extend(['-I%s/include' % (path)])
-    ld_flags.extend(['-L%s/lib' % (path)])
+    print("Specified benchmark path %s" % path)
+    cxx_flags.extend(["-I%s/include" % (path)])
+    ld_flags.extend(["-L%s/lib" % (path)])
 
 
 def dedup(lst):
@@ -403,46 +415,52 @@ def show_plugins():
 
 def main():
     os.chdir(BESS_DIR)
-    parser = argparse.ArgumentParser(description='Build BESS')
+    parser = argparse.ArgumentParser(description="Build BESS")
     cmds = {
-        'all': build_all,
-        'bess': build_bess,
-        'kmod': build_kmod,
-        'clean': do_clean,
-        'dist_clean': do_dist_clean,
-        'help': lambda: print_usage(parser),
-        'protobuf': generate_protobuf_files,
-        'show_plugins': show_plugins,
+        "all": build_all,
+        "bess": build_bess,
+        "kmod": build_kmod,
+        "clean": do_clean,
+        "dist_clean": do_dist_clean,
+        "help": lambda: print_usage(parser),
+        "protobuf": generate_protobuf_files,
+        "show_plugins": show_plugins,
     }
     # if foo_bar is a command allow foo-bar too
     for name in list(cmds.keys()):
-        if '_' in name:
-            cmds[name.replace('_', '-')] = cmds[name]
+        if "_" in name:
+            cmds[name.replace("_", "-")] = cmds[name]
     cmdlist = sorted(cmds.keys())
     parser.add_argument(
-        'action',
-        metavar='action',
-        nargs='?',
-        default='all',
+        "action",
+        metavar="action",
+        nargs="?",
+        default="all",
         choices=cmdlist,
-        help='Action is one of ' + ', '.join(cmdlist))
+        help="Action is one of " + ", ".join(cmdlist),
+    )
     parser.add_argument(
-        '--plugin',
-        action='append',
-        help='add a plugin source directory')
+        "--plugin", action="append", help="add a plugin source directory"
+    )
     parser.add_argument(
-        '--reset-plugins',
-        action='store_true',
-        help='clear out existing plugin settings')
+        "--reset-plugins",
+        action="store_true",
+        help="clear out existing plugin settings",
+    )
     # Note: unlike plugins, --with-benchmark must be specified each time
     # you build bess.
     parser.add_argument(
-        '--with-benchmark',
-        dest='benchmark_path',
+        "--with-benchmark",
+        dest="benchmark_path",
         nargs=1,
-        help='Location of benchmark library')
-    parser.add_argument('-v', '--verbose', action='store_true',
-                        help='enable verbose builds (same as env V=1)')
+        help="Location of benchmark library",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="enable verbose builds (same as env V=1)",
+    )
     args = parser.parse_args()
 
     newplugins = [] if args.reset_plugins else find_current_plugins()
@@ -452,7 +470,7 @@ def main():
     plugins.extend(dedup(os.path.abspath(i) for i in newplugins))
 
     if args.verbose:
-        os.environ['V'] = '1'
+        os.environ["V"] = "1"
 
     if args.benchmark_path:
         update_benchmark_path(args.benchmark_path[0])
@@ -465,8 +483,8 @@ def main():
     cmds[args.action]()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     try:
         sys.exit(main())
     except KeyboardInterrupt:
-        sys.exit('\nInterrupted')
+        sys.exit("\nInterrupted")
