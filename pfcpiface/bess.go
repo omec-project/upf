@@ -1539,6 +1539,7 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 		// Downlink N3 slice meter config
 		arg, err = b.handleDownlinkSliceMeter(meterConfig, &cir, &pir, &cbs, &ebs, &pbs, &gate)
 		if err != nil {
+			done <- false
 			return
 		}
 		b.processSliceMeter(ctx, arg, upfMsgTypeAdd)
