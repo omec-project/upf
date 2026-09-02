@@ -201,8 +201,8 @@ class PortStatsGenerator:
             mstats = self.bess.run_module_command(
                 self.measure, "get_summary", "MeasureCommandGetSummaryArg", arg
             )
-            rtt = dict()
-            jitter = dict()
+            rtt = {}
+            jitter = {}
             for i, p in enumerate(self.rtt_percentiles):
                 rtt[p] = mstats.latency.percentile_values_ns[i]
                 jitter[p] = mstats.jitter.percentile_values_ns[i]

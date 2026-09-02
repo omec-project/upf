@@ -224,10 +224,11 @@ def find_current_plugins():
     "return list of existing plugins"
     result = []
     try:
-        for line in open("core/extra.mk"):
-            match = re.match(r"PLUGINS \+= (.*)", line)
-            if match:
-                result.append(match.group(1))
+        with open("core/extra.mk") as f:
+            for line in f:
+                match = re.match(r"PLUGINS \+= (.*)", line)
+                if match:
+                    result.append(match.group(1))
     except OSError:
         pass
     return result

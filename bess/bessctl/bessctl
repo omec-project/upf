@@ -124,7 +124,8 @@ class BESSCLI(cli.CLI):
     def _print_crashlog(self):
         try:
             log_path = tempfile.gettempdir() + "/bessd_crash.log"
-            log = open(log_path).read()
+            with open(log_path) as f:
+                log = f.read()
             ctime = time.ctime(os.path.getmtime(log_path))
             self.ferr.write(f"From {log_path} ({ctime}):\n{log}")
         except Exception as e:
