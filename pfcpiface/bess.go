@@ -605,22 +605,9 @@ func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 			pdrString := strconv.FormatUint(pre.Pdr, 10)
 			ueIpString := UnknownString
 
-			if con != nil {
-				session, ok := con.store.GetSession(pre.Fseid)
-				if !ok {
-					logger.BessLog.Errorln("invalid or unknown FSEID", pre.Fseid)
-					continue
-				}
-
-				// Try to find the N6 uplink PDR with the UE IP.
-				for _, p := range session.pdrs {
-					if p.IsUplink() && p.ueAddress > 0 {
-						ueIpString = int2ip(p.ueAddress).String()
-						logger.BessLog.Debugln(p.fseID, " -> ", ueIpString)
-
-						break
-					}
-				}
+			ueIpString, ok := resolveUEIP(con, pre, ueIpString)
+			if !ok {
+				continue
 			}
 
 			ch <- prometheus.MustNewConstMetric(
@@ -680,6 +667,30 @@ func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 	createStats(qosStatsInResp, postDlQosStatsResp)
 
 	return err
+}
+
+func resolveUEIP(
+	con *PFCPConn,
+	pre *pb.FlowMeasureReadResponse_Statistic,
+	ueIpString string,
+) (string, bool) {
+	if con != nil {
+		session, ok := con.store.GetSession(pre.Fseid)
+		if !ok {
+			logger.BessLog.Errorln("invalid or unknown FSEID", pre.Fseid)
+			return ueIpString, false
+		}
+
+		// Try to find the N6 uplink PDR with the UE IP.
+		for _, p := range session.pdrs {
+			if p.IsUplink() && p.ueAddress > 0 {
+				ueIpString = int2ip(p.ueAddress).String()
+				logger.BessLog.Debugln(p.fseID, " -> ", ueIpString)
+				break
+			}
+		}
+	}
+	return ueIpString, true
 }
 
 func (b *bess) endMarkerSendLoop(endMarkerChan chan []byte) {
@@ -967,7 +978,14 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 
 		go b.endMarkerSendLoop(b.endMarkerChan)
 	}
+	b.setupSliceMeter(conf)
 
+	if conf.EnableGtpuPathMonitoring {
+		enableGtpuPathMonitoring = true
+	}
+}
+
+func (b *bess) setupSliceMeter(conf *Conf) {
 	if (conf.SliceMeterConfig.N6RateBps > 0) ||
 		(conf.SliceMeterConfig.N3RateBps > 0) {
 		ctx, cancel := context.WithTimeout(context.Background(), Timeout)
@@ -981,10 +999,6 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 		if !rc {
 			logger.BessLog.Errorln(errGRPCCallFailed)
 		}
-	}
-
-	if conf.EnableGtpuPathMonitoring {
-		enableGtpuPathMonitoring = true
 	}
 }
 
@@ -1135,84 +1149,92 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 	go func() {
-		completed := false
-		defer func() { done <- completed }()
-
-		var (
-			cir, pir, cbs, ebs, pbs, gate uint64
-			srcIface                      uint8
-		)
-
-		// Uplink QER
-		srcIface = access
-
-		// Lookup QCI from QFI, else try default QCI.
-		qosVal, ok := b.qciQosMap[qer.qfi]
-		if !ok {
-			logger.BessLog.Debugf("number of config for qfi/qci: %v using default burst size", qer.qfi)
-
-			qosVal = b.qciQosMap[0]
-		}
-
-		cbs = maxUint64(calcBurstSizeFromRate(qer.ulGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
-		ebs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
-		pbs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
-
-		if qer.ulStatus != ie.GateStatusOpen {
-			gate = qerGateStatusDrop
-		} else if qer.ulMbr != 0 || qer.ulGbr != 0 {
-			/* MBR/GBR is received in Kilobits/sec.
-			   CIR/PIR is sent in bytes */
-			cir = maxUint64(((qer.ulGbr * 1000) / 8), 1)
-			pir = maxUint64(((qer.ulMbr * 1000) / 8), cir)
-			gate = qerGateMeter
-		} else {
-			gate = qerGateUnmeter
-		}
-
-		switch qer.qosLevel {
-		case ApplicationQos:
-			b.addApplicationQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
-		case SessionQos:
-			b.addSessionQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
-		}
-
-		// Downlink QER
-		srcIface = core
-
-		// Lookup QCI from QFI, else try default QCI.
-		qosVal, ok = b.qciQosMap[qer.qfi]
-		if !ok {
-			logger.BessLog.Debugf("number of config for qfi/qci: %v using default burst size", qer.qfi)
-
-			qosVal = b.qciQosMap[0]
-		}
-
-		cbs = maxUint64(calcBurstSizeFromRate(qer.dlGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
-		ebs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
-		pbs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
-
-		if qer.dlStatus != ie.GateStatusOpen {
-			gate = qerGateStatusDrop
-		} else if qer.dlMbr != 0 || qer.dlGbr != 0 {
-			/* MBR/GBR is received in Kilobits/sec.
-			   CIR/PIR is sent in bytes */
-			cir = maxUint64(((qer.dlGbr * 1000) / 8), 1)
-			pir = maxUint64(((qer.dlMbr * 1000) / 8), cir)
-			gate = qerGateMeter
-		} else {
-			gate = qerGateUnmeter
-		}
-
-		switch qer.qosLevel {
-		case ApplicationQos:
-			b.addApplicationQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
-		case SessionQos:
-			b.addSessionQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
-		}
-
-		completed = true
+		// Uplink
+		b.handleUplinkQER(ctx, qer)
+		// Downlink
+		b.handleDownlinkQER(ctx, qer)
+		done <- true
 	}()
+}
+
+func (b *bess) handleUplinkQER(ctx context.Context, qer qer) {
+	var (
+		cir, pir, cbs, ebs, pbs, gate uint64
+		srcIface                      uint8
+	)
+
+	// Uplink QER
+	srcIface = access
+
+	// Lookup QCI from QFI, else try default QCI.
+	qosVal, ok := b.qciQosMap[qer.qfi]
+	if !ok {
+		logger.BessLog.Debugf("number of config for qfi/qci: %v using default burst size", qer.qfi)
+
+		qosVal = b.qciQosMap[0]
+	}
+
+	cbs = maxUint64(calcBurstSizeFromRate(qer.ulGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
+	ebs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
+	pbs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
+
+	if qer.ulStatus != ie.GateStatusOpen {
+		gate = qerGateStatusDrop
+	} else if qer.ulMbr != 0 || qer.ulGbr != 0 {
+		/* MBR/GBR is received in Kilobits/sec.
+		   CIR/PIR is sent in bytes */
+		cir = maxUint64(((qer.ulGbr * 1000) / 8), 1)
+		pir = maxUint64(((qer.ulMbr * 1000) / 8), cir)
+		gate = qerGateMeter
+	} else {
+		gate = qerGateUnmeter
+	}
+
+	switch qer.qosLevel {
+	case ApplicationQos:
+		b.addApplicationQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
+	case SessionQos:
+		b.addSessionQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
+	}
+}
+
+func (b *bess) handleDownlinkQER(ctx context.Context, qer qer) {
+	var (
+		cir, pir, cbs, ebs, pbs, gate uint64
+		srcIface                      uint8
+	)
+	srcIface = core
+
+	// Lookup QCI from QFI, else try default QCI.
+	qosVal, ok := b.qciQosMap[qer.qfi]
+	if !ok {
+		logger.BessLog.Debugf("number of config for qfi/qci: %v using default burst size", qer.qfi)
+
+		qosVal = b.qciQosMap[0]
+	}
+
+	cbs = maxUint64(calcBurstSizeFromRate(qer.dlGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
+	ebs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
+	pbs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
+
+	if qer.dlStatus != ie.GateStatusOpen {
+		gate = qerGateStatusDrop
+	} else if qer.dlMbr != 0 || qer.dlGbr != 0 {
+		/* MBR/GBR is received in Kilobits/sec.
+		   CIR/PIR is sent in bytes */
+		cir = maxUint64(((qer.dlGbr * 1000) / 8), 1)
+		pir = maxUint64(((qer.dlMbr * 1000) / 8), cir)
+		gate = qerGateMeter
+	} else {
+		gate = qerGateUnmeter
+	}
+
+	switch qer.qosLevel {
+	case ApplicationQos:
+		b.addApplicationQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
+	case SessionQos:
+		b.addSessionQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
+	}
 }
 
 func (b *bess) addApplicationQER(ctx context.Context, gate uint64, srcIface uint8,
@@ -1380,9 +1402,6 @@ func (b *bess) setActionValue(f far) uint8 {
 
 func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 	go func() {
-		completed := false
-		defer func() { done <- completed }()
-
 		var (
 			arg *anypb.Any
 			err error
@@ -1408,6 +1427,7 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 		arg, err = anypb.New(f)
 		if err != nil {
 			logger.BessLog.Infoln(errMarshalRule, f, err)
+			done <- false
 			return
 		}
 
@@ -1415,27 +1435,25 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 
 		if enableGtpuPathMonitoring {
 			g := &pb.GtpuPathMonitoringCommandAddDeleteArg{
-				GnbIp: far.tunnelIP4Dst, /* gnb ip */
+				GnbIp: far.tunnelIP4Dst,
 			}
 
 			arg, err = anypb.New(g)
 			if err != nil {
 				logger.BessLog.Infoln("error marshalling data", g, err)
+				done <- false
 				return
 			}
 
 			b.processGtpuPathMonitoring(ctx, arg, upfMsgTypeAdd)
 		}
 
-		completed = true
+		done <- true
 	}()
 }
 
 func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 	go func() {
-		completed := false
-		defer func() { done <- completed }()
-
 		var (
 			arg *anypb.Any
 			err error
@@ -1451,6 +1469,7 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 		arg, err = anypb.New(f)
 		if err != nil {
 			logger.BessLog.Infoln(errMarshalRule, f, err)
+			done <- false
 			return
 		}
 
@@ -1458,19 +1477,20 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 
 		if enableGtpuPathMonitoring {
 			g := &pb.GtpuPathMonitoringCommandAddDeleteArg{
-				GnbIp: far.tunnelIP4Dst, /* gnb ip */
+				GnbIp: far.tunnelIP4Dst,
 			}
 
 			arg, err = anypb.New(g)
 			if err != nil {
 				logger.BessLog.Infoln("error marshalling data", g, err)
+				done <- false
 				return
 			}
 
 			b.processGtpuPathMonitoring(ctx, arg, upfMsgTypeDel)
 		}
 
-		completed = true
+		done <- true
 	}()
 }
 
@@ -1496,9 +1516,6 @@ func (b *bess) processSliceMeter(ctx context.Context, arg *anypb.Any, method upf
 
 func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig SliceMeterConfig) {
 	go func() {
-		completed := false
-		defer func() { done <- completed }()
-
 		var (
 			arg                           *anypb.Any
 			err                           error
@@ -1506,92 +1523,115 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 		)
 
 		// Uplink N6 slice meter config
-		if meterConfig.N6RateBps != 0 {
-			gate = sliceMeterGateMeter
-			cir = 1                         // Mark all traffic as yellow
-			pir = meterConfig.N6RateBps / 8 // bit/s to byte/s
-		} else {
-			gate = sliceMeterGateUnmeter
-		}
-
-		if meterConfig.N6BurstBytes != 0 {
-			cbs = 1 // Mark all traffic as yellow
-			pbs = meterConfig.N6BurstBytes
-			ebs = 0 // Unused
-		} else {
-			cbs = 1 // Mark all traffic as yellow
-			pbs = DefaultBurstSize
-			ebs = 0 // Unused
-		}
-
-		logger.BessLog.Debugln("uplink slice: cir:", cir, ", pir:", pir, ", cbs:", cbs, ", pbs:", pbs)
-
-		q := &pb.QosCommandAddArg{
-			Gate:              gate,
-			Cir:               cir,                                          /* committed info rate */
-			Pir:               pir,                                          /* peak info rate */
-			Cbs:               cbs,                                          /* committed burst size */
-			Pbs:               pbs,                                          /* Peak burst size */
-			Ebs:               ebs,                                          /* Excess burst size */
-			OptionalDeductLen: &pb.QosCommandAddArg_DeductLen{DeductLen: 0}, /* Include all headers */
-			Fields: []*pb.FieldData{
-				intEnc(uint64(farForwardU)), /* Action */
-				intEnc(uint64(0)),           /* tunnel_out_type */
-			},
-		}
-
-		arg, err = anypb.New(q)
+		arg, err = b.handleUplinkSliceMeter(meterConfig, &cir, &pir, &cbs, &ebs, &pbs, &gate)
 		if err != nil {
-			logger.BessLog.Errorln(errMarshalRule, q, err)
+			done <- false
 			return
 		}
 
 		b.processSliceMeter(ctx, arg, upfMsgTypeAdd)
 
 		// Downlink N3 slice meter config
-		if meterConfig.N3RateBps != 0 {
-			gate = sliceMeterGateMeter
-			cir = 1                         // Mark all traffic as yellow
-			pir = meterConfig.N3RateBps / 8 // bit/s to byte/s
-		} else {
-			gate = sliceMeterGateUnmeter
-		}
-
-		if meterConfig.N3BurstBytes != 0 {
-			cbs = 1 // Mark all traffic as yellow
-			pbs = meterConfig.N3BurstBytes
-			ebs = 0 // Unused
-		} else {
-			cbs = 1 // Mark all traffic as yellow
-			pbs = DefaultBurstSize
-			ebs = 0 // Unused
-		}
-
-		logger.BessLog.Debugln("downlink slice: cir:", cir, ", pir:", pir, ", cbs:", cbs, ", pbs:", pbs)
-		// TODO: packet deduction should take GTPU extension header into account
-		q = &pb.QosCommandAddArg{
-			Gate:              gate,
-			Cir:               cir,                                           /* committed info rate */
-			Pir:               pir,                                           /* peak info rate */
-			Cbs:               cbs,                                           /* committed burst size */
-			Pbs:               pbs,                                           /* Peak burst size */
-			Ebs:               ebs,                                           /* Excess burst size */
-			OptionalDeductLen: &pb.QosCommandAddArg_DeductLen{DeductLen: 50}, /* Exclude Ethernet,IP,UDP,GTP header */
-			Fields: []*pb.FieldData{
-				intEnc(uint64(farForwardD)), /* Action */
-				intEnc(uint64(1)),           /* tunnel_out_type */
-			},
-		}
-
-		arg, err = anypb.New(q)
+		arg, err = b.handleDownlinkSliceMeter(meterConfig, &cir, &pir, &cbs, &ebs, &pbs, &gate)
 		if err != nil {
-			logger.BessLog.Errorln(errMarshalRule, q, err)
+			done <- false
 			return
 		}
-
 		b.processSliceMeter(ctx, arg, upfMsgTypeAdd)
-		completed = true
+		done <- true
 	}()
+}
+
+func (b *bess) handleUplinkSliceMeter(
+	meterConfig SliceMeterConfig,
+	cir, pir, cbs, ebs, pbs, gate *uint64,
+) (*anypb.Any, error) {
+	if meterConfig.N6RateBps != 0 {
+		*gate = sliceMeterGateMeter
+		*cir = 1                         // Mark all traffic as yellow
+		*pir = meterConfig.N6RateBps / 8 // bit/s to byte/s
+	} else {
+		*gate = sliceMeterGateUnmeter
+	}
+
+	if meterConfig.N6BurstBytes != 0 {
+		*cbs = 1 // Mark all traffic as yellow
+		*pbs = meterConfig.N6BurstBytes
+		*ebs = 0 // Unused
+	} else {
+		*cbs = 1 // Mark all traffic as yellow
+		*pbs = DefaultBurstSize
+		*ebs = 0 // Unused
+	}
+
+	logger.BessLog.Debugf("uplink slice: cir: %d, pir: %d, cbs: %d, pbs: %d", *cir, *pir, *cbs, *pbs)
+
+	q := &pb.QosCommandAddArg{
+		Gate:              *gate,
+		Cir:               *cir,                                         /* committed info rate */
+		Pir:               *pir,                                         /* peak info rate */
+		Cbs:               *cbs,                                         /* committed burst size */
+		Pbs:               *pbs,                                         /* Peak burst size */
+		Ebs:               *ebs,                                         /* Excess burst size */
+		OptionalDeductLen: &pb.QosCommandAddArg_DeductLen{DeductLen: 0}, /* Include all headers */
+		Fields: []*pb.FieldData{
+			intEnc(uint64(farForwardU)), /* Action */
+			intEnc(uint64(0)),           /* tunnel_out_type */
+		},
+	}
+
+	arg, err := anypb.New(q)
+	if err != nil {
+		logger.BessLog.Errorln(errMarshalRule, q, err)
+		return nil, err
+	}
+	return arg, nil
+}
+
+func (b *bess) handleDownlinkSliceMeter(
+	meterConfig SliceMeterConfig,
+	cir, pir, cbs, ebs, pbs, gate *uint64,
+) (*anypb.Any, error) {
+	if meterConfig.N3RateBps != 0 {
+		*gate = sliceMeterGateMeter
+		*cir = 1                         // Mark all traffic as yellow
+		*pir = meterConfig.N3RateBps / 8 // bit/s to byte/s
+	} else {
+		*gate = sliceMeterGateUnmeter
+	}
+
+	if meterConfig.N3BurstBytes != 0 {
+		*cbs = 1 // Mark all traffic as yellow
+		*pbs = meterConfig.N3BurstBytes
+		*ebs = 0 // Unused
+	} else {
+		*cbs = 1 // Mark all traffic as yellow
+		*pbs = DefaultBurstSize
+		*ebs = 0 // Unused
+	}
+
+	logger.BessLog.Debugf("downlink slice: cir: %d, pir: %d, cbs: %d, pbs: %d", *cir, *pir, *cbs, *pbs)
+	// TODO: packet deduction should take GTPU extension header into account
+	q := &pb.QosCommandAddArg{
+		Gate:              *gate,
+		Cir:               *cir,                                          /* committed info rate */
+		Pir:               *pir,                                          /* peak info rate */
+		Cbs:               *cbs,                                          /* committed burst size */
+		Pbs:               *pbs,                                          /* Peak burst size */
+		Ebs:               *ebs,                                          /* Excess burst size */
+		OptionalDeductLen: &pb.QosCommandAddArg_DeductLen{DeductLen: 50}, /* Exclude Ethernet,IP,UDP,GTP header */
+		Fields: []*pb.FieldData{
+			intEnc(uint64(farForwardD)), /* Action */
+			intEnc(uint64(1)),           /* tunnel_out_type */
+		},
+	}
+
+	arg, err := anypb.New(q)
+	if err != nil {
+		logger.BessLog.Errorln(errMarshalRule, q, err)
+		return nil, err
+	}
+	return arg, nil
 }
 
 func (b *bess) processQER(ctx context.Context, arg *anypb.Any, method upfMsgType, qosTableName string) error {
