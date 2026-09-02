@@ -1402,9 +1402,6 @@ func (b *bess) setActionValue(f far) uint8 {
 
 func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 	go func() {
-		completed := false
-		defer func() { done <- completed }()
-
 		var (
 			arg *anypb.Any
 			err error
@@ -1430,6 +1427,7 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 		arg, err = anypb.New(f)
 		if err != nil {
 			logger.BessLog.Infoln(errMarshalRule, f, err)
+			done <- false
 			return
 		}
 
@@ -1437,27 +1435,25 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 
 		if enableGtpuPathMonitoring {
 			g := &pb.GtpuPathMonitoringCommandAddDeleteArg{
-				GnbIp: far.tunnelIP4Dst, /* gnb ip */
+				GnbIp: far.tunnelIP4Dst,
 			}
 
 			arg, err = anypb.New(g)
 			if err != nil {
 				logger.BessLog.Infoln("error marshalling data", g, err)
+				done <- false
 				return
 			}
 
 			b.processGtpuPathMonitoring(ctx, arg, upfMsgTypeAdd)
 		}
 
-		completed = true
+		done <- true
 	}()
 }
 
 func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 	go func() {
-		completed := false
-		defer func() { done <- completed }()
-
 		var (
 			arg *anypb.Any
 			err error
@@ -1473,6 +1469,7 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 		arg, err = anypb.New(f)
 		if err != nil {
 			logger.BessLog.Infoln(errMarshalRule, f, err)
+			done <- false
 			return
 		}
 
@@ -1480,19 +1477,20 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 
 		if enableGtpuPathMonitoring {
 			g := &pb.GtpuPathMonitoringCommandAddDeleteArg{
-				GnbIp: far.tunnelIP4Dst, /* gnb ip */
+				GnbIp: far.tunnelIP4Dst,
 			}
 
 			arg, err = anypb.New(g)
 			if err != nil {
 				logger.BessLog.Infoln("error marshalling data", g, err)
+				done <- false
 				return
 			}
 
 			b.processGtpuPathMonitoring(ctx, arg, upfMsgTypeDel)
 		}
 
-		completed = true
+		done <- true
 	}()
 }
 
@@ -1518,9 +1516,6 @@ func (b *bess) processSliceMeter(ctx context.Context, arg *anypb.Any, method upf
 
 func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig SliceMeterConfig) {
 	go func() {
-		completed := false
-		defer func() { done <- completed }()
-
 		var (
 			arg                           *anypb.Any
 			err                           error
