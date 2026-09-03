@@ -51,6 +51,10 @@ class CommandError(subprocess.CalledProcessError):
         return f"{super().__str__()}\n{self.output}"
 
 
+class DaemonStartError(Exception):
+    pass
+
+
 def run_cmd(cmd):
     args = shlex.split(cmd)
     try:
@@ -80,7 +84,7 @@ def main():
     try:
         run_cmd(daemon_start_cmd)
     except CommandError:
-        raise Exception("bess daemon could not start")
+        raise DaemonStartError("bess daemon could not start")
 
     for file_name in glob.glob(os.path.join(args.test_dir, f"{args.test_name}.py")):
         print(f"Running test {file_name}")

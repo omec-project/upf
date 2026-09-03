@@ -564,7 +564,7 @@ def bind_var(cli, var_type, line):
                 val.append(int(wid_str))
             else:
                 raise cli.BindError('"wid" must be a positive number')
-        val = sorted(list(set(val)))
+        val = sorted(set(val))
 
     elif var_type == "host":
         dns = re.match(r"^[a-zA-Z0-9][a-zA-Z0-9\-.]*$", val)
@@ -589,7 +589,7 @@ def bind_var(cli, var_type, line):
             raise cli.BindError('"socket" must be a positive number')
 
     elif var_type == "name+":
-        val = sorted(list(set(head.split())))  # collect unique items
+        val = sorted(set(head.split()))  # collect unique items
 
     elif var_type == "confname":
         if val.find("\0") >= 0:
@@ -602,7 +602,7 @@ def bind_var(cli, var_type, line):
     elif var_type == "map":
         try:
             val = eval(f"_parse_map({head})")
-        except Exception:
+        except Exception:  # noqa: BLE001 -- eval() of arbitrary user input can raise any exception type
             raise cli.BindError('"map" should be "key=val, key=val, ..."')
 
     elif var_type == "pyobj":
@@ -611,7 +611,7 @@ def bind_var(cli, var_type, line):
                 val = None
             else:
                 val = eval(head)
-        except Exception:
+        except Exception:  # noqa: BLE001 -- eval() of arbitrary user input can raise any exception type
             raise cli.BindError(
                 '"pyobj" should be an object in python syntax'
                 ' (e.g., 42, "foo", ["hello", "world"], {"bar": "baz"})'
@@ -623,7 +623,7 @@ def bind_var(cli, var_type, line):
     elif var_type == "int":
         try:
             val = int(val)
-        except Exception:
+        except (ValueError, TypeError):
             raise cli.BindError("Expected an integer")
 
     return val, remainder
@@ -957,7 +957,7 @@ def _do_run_file(cli, conf_file):
             )
         )
         raise cli.HandledError()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- compiling an arbitrary user config script can raise any exception type
         cli.err(f"Failed to compile BESS config file ({conf_file}): {e}")
         raise cli.HandledError()
 
@@ -1123,7 +1123,7 @@ def conigure_port(cli, name, args):
 
 @cmd("delete worker WORKER_ID...", "Delete a worker")
 def delete_worker(cli, wids):
-    wids = sorted(list(set(wids)))
+    wids = sorted(set(wids))
     for wid in wids:
         cli.bess.destroy_worker(wid)
 
@@ -1360,7 +1360,7 @@ def _build_tcs_tree(tcs):
 def check_constraints(cli):
     try:
         cli.bess.check_constraints()
-    except Exception as e:
+    except (cli.bess.Error, cli.bess.RPCError, cli.bess.ConstraintError) as e:
         cli.fout.write(f"Constraint check failed {e!r}\n")
 
 
@@ -1391,7 +1391,7 @@ def show_tc_all(cli):
 
 @cmd("show tc worker WORKER_ID...", "Show the list of traffic classes")
 def show_tc_workers(cli, wids):
-    wids = sorted(list(set(wids)))
+    wids = sorted(set(wids))
     for wid in wids:
         _show_tc_list(cli, cli.bess.list_tcs(wid).classes_status)
 
@@ -1449,7 +1449,7 @@ def show_status(cli):
 
 
 # last_stats: a map of (node name, gateid) -> (timestamp, counter value)
-def _draw_pipeline(cli, field, units, last_stats=None, graph_args=[]):
+def _draw_pipeline(cli, field, units, last_stats=None, graph_args=None):
     if graph_args is None:
         graph_args = []
 
@@ -1841,7 +1841,10 @@ def show_version(cli):
     cli.fout.write(f"{version.version}\n")
 
 
-def _monitor_pipeline(cli, field, units, graph_args=[]):
+def _monitor_pipeline(cli, field, units, graph_args=None):
+    if graph_args is None:
+        graph_args = []
+
     modules = sorted(cli.bess.list_modules().modules, key=lambda x: x.name)
 
     last_stats = {}

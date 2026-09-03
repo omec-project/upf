@@ -56,6 +56,14 @@ SOCKET_PATH = "/tmp/bess_unix_"
 SCRIPT_STARTTIME = strftime("%Y-%m-%d-%H-%M-%S", gmtime())
 
 
+class BessNotRunningError(Exception):
+    pass
+
+
+class RootTcNotFoundError(Exception):
+    pass
+
+
 def get_root_tc(bess):
     # get tc information
     tcs = bess.list_tcs().classes_status
@@ -71,7 +79,7 @@ def get_root_tc(bess):
 def measure_tc_perf(bess, duration):
     root_tc = get_root_tc(bess)
     if not root_tc:
-        raise Exception("Fail to find root tc")
+        raise RootTcNotFoundError("Fail to find root tc")
 
     old = bess.get_tc_stats(root_tc.name)
     time.sleep(duration)
@@ -207,7 +215,7 @@ class BessModuleTestCase(unittest.TestCase):
         try:
             self.bess.connect()
         except BESS.APIError:
-            raise Exception("BESS is not running")
+            raise BessNotRunningError("BESS is not running")
 
         self.bess.pause_all()
         self.bess.reset_all()
@@ -223,8 +231,11 @@ class BessModuleTestCase(unittest.TestCase):
         self.bess.pause_all()
         self.bess.reset_all()
 
-    def run_for(self, module, igates, duration, pkt_update_fields=[]):
+    def run_for(self, module, igates, duration, pkt_update_fields=None):
         self.bess.pause_all()
+
+        if pkt_update_fields is None:
+            pkt_update_fields = []
 
         fields = pkt_update_fields
         if len(fields) == 0:
@@ -307,7 +318,7 @@ class BessModuleTestCase(unittest.TestCase):
 
         root_tc = get_root_tc(self.bess)
         if not root_tc:
-            raise Exception("Fail to find root tc")
+            raise RootTcNotFoundError("Fail to find root tc")
 
         # Get number of packets processed inside bess.
         # Send our packets in, then wait for them to also

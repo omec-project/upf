@@ -45,12 +45,16 @@ except ImportError:
     raise
 
 
+class BessNotRunningError(Exception):
+    pass
+
+
 def get_local_bess_handle():
     bess = BESS()
     try:
         bess.connect()
     except BESS.RPCError:
-        raise Exception("BESS is not running")
+        raise BessNotRunningError("BESS is not running")
     return bess
 
 
@@ -394,11 +398,14 @@ class MeasureablePort:
         else:
             self.bess.connect_modules(src.name, self.tx_port.port_out, ogate, 0)
 
-    def cumulative_stats(self, rtt_percentiles=[0, 25, 50, 99, 100]):
+    def cumulative_stats(self, rtt_percentiles=None):
         """
         Returns a PortsStatsGenerator configured to report cummulative PMDPort
         statistics.
         """
+        if rtt_percentiles is None:
+            rtt_percentiles = [0, 25, 50, 99, 100]
+
         return PortStatsGenerator(
             self.bess,
             self.tx_port.name,
@@ -408,11 +415,14 @@ class MeasureablePort:
             rate=False,
         )
 
-    def rate_stats(self, rtt_percentiles=[0, 25, 50, 99, 100]):
+    def rate_stats(self, rtt_percentiles=None):
         """
         Returns a PortsStatsGenerator configured to report PMDPort statistics as
         rates.
         """
+        if rtt_percentiles is None:
+            rtt_percentiles = [0, 25, 50, 99, 100]
+
         return PortStatsGenerator(
             self.bess,
             self.tx_port.name,

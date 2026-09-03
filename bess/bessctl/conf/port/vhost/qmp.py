@@ -33,6 +33,10 @@ class QMPTimeoutError(QMPError):
     pass
 
 
+class QMPCommandError(QMPError):
+    pass
+
+
 class QEMUMonitorProtocol:
     def __init__(self, address, server=False, debug=False):
         """
@@ -193,7 +197,7 @@ class QEMUMonitorProtocol:
     def command(self, cmd, **kwds):
         ret = self.cmd(cmd, kwds)
         if "error" in ret:
-            raise Exception(ret["error"]["desc"])
+            raise QMPCommandError(ret["error"]["desc"])
         return ret["return"]
 
     def pull_event(self, wait=False):
