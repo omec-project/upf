@@ -1360,7 +1360,12 @@ def _build_tcs_tree(tcs):
 def check_constraints(cli):
     try:
         cli.bess.check_constraints()
-    except (cli.bess.Error, cli.bess.RPCError, cli.bess.ConstraintError) as e:
+    except (
+        cli.bess.Error,
+        cli.bess.RPCError,
+        cli.bess.APIError,
+        cli.bess.ConstraintError,
+    ) as e:
         cli.fout.write(f"Constraint check failed {e!r}\n")
 
 
@@ -1464,15 +1469,58 @@ def _draw_pipeline(cli, field, units, last_stats=None, graph_args=None):
         node_labels[name] = f"{name}\\n{mclass}"
         node_labels[name] += f"\\n{m.desc}"
 
+    # graph_args may chain further commands with a literal "|" token
+    # (e.g., "--as dot | dot -Tsvg -o graph.svg"). Build each stage as its
+    # own argv list and connect them without invoking a shell, to avoid
+    # command injection via shell metacharacters in user-supplied input.
+    commands = [["graph-easy"]]
+    for arg in graph_args:
+        if arg == "|":
+            if not commands[-1]:
+                raise cli.CommandError(
+                    'Invalid pipeline syntax: empty command before "|"'
+                )
+            commands.append([])
+        else:
+            commands[-1].append(arg)
+    if not commands[-1]:
+        raise cli.CommandError('Invalid pipeline syntax: empty command after "|"')
+
     try:
-        f = subprocess.Popen(
-            "graph-easy " + " ".join(graph_args),
-            shell=True,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            universal_newlines=True,
-        )
+        procs = []
+        next_stdin = subprocess.PIPE
+        last_idx = len(commands) - 1
+
+        try:
+            for i, command in enumerate(commands):
+                proc = subprocess.Popen(
+                    command,
+                    shell=False,
+                    stdin=next_stdin,
+                    stdout=subprocess.PIPE,
+                    # Only the last stage's stderr is drained (via communicate()
+                    # below); piping stderr for earlier stages without reading it
+                    # could fill the pipe buffer and hang the whole pipeline.
+                    stderr=(subprocess.PIPE if i == last_idx else None),
+                    universal_newlines=True,
+                )
+                if procs:
+                    # Let the upstream process get SIGPIPE if this one exits early.
+                    procs[-1].stdout.close()
+                procs.append(proc)
+                next_stdin = proc.stdout
+        except OSError:
+            # A later stage failed to start; reap the ones already spawned.
+            for proc in procs:
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass
+                proc.wait()
+            raise
+
+        f = procs[0]
+        last_proc = procs[-1]
 
         for m in modules:
             print(f"[{node_labels[m.name]}]", file=f.stdin)
@@ -1504,19 +1552,33 @@ def _draw_pipeline(cli, field, units, last_stats=None, graph_args=None):
                     f"[{node_labels[name]}] ->{edge_attr} [{node_labels[gate.name]}]",
                     file=f.stdin,
                 )
-        output, error = f.communicate()
-        f.wait()
+        f.stdin.close()
+        output, _ = last_proc.communicate()
+        for proc in procs:
+            proc.wait()
         return output
 
-    except OSError as e:
-        if e.errno == errno.EPIPE:
+    except FileNotFoundError as e:
+        if e.filename == "graph-easy":
             raise cli.CommandError(
                 '"graph-easy" program is not available? '
                 'Check if the package "libgraph-easy-perl" '
                 "is installed."
-            )
-        else:
-            raise
+            ) from e
+        raise cli.CommandError(f'"{e.filename}" program is not available.') from e
+    except BrokenPipeError:
+        # A downstream stage exited early; reap the still-running processes
+        # so we don't leave them running (or as zombies).
+        for proc in procs:
+            try:
+                proc.kill()
+            except ProcessLookupError:
+                pass
+        for proc in procs:
+            proc.wait()
+        raise cli.CommandError(
+            "One of the piped commands in the pipeline exited early (broken pipe)."
+        )
 
 
 @cmd("show pipeline [GRAPHEASY_OPTS...]", "Show the current datapath pipeline")

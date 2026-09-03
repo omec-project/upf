@@ -44,17 +44,20 @@ except ImportError:
     print("Cannot import the API module (pybess)", file=sys.stderr)
     raise
 
-
-class BessNotRunningError(Exception):
-    pass
+try:
+    from .errors import BessNotRunningError
+except ImportError:  # executed as a script / imported as a top-level module
+    if __package__:
+        raise
+    from errors import BessNotRunningError
 
 
 def get_local_bess_handle():
     bess = BESS()
     try:
         bess.connect()
-    except BESS.RPCError:
-        raise BessNotRunningError("BESS is not running")
+    except BESS.RPCError as e:
+        raise BessNotRunningError("BESS is not running") from e
     return bess
 
 

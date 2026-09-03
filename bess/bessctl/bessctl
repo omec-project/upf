@@ -128,7 +128,7 @@ class BESSCLI(cli.CLI):
                 log = f.read()
             ctime = time.ctime(os.path.getmtime(log_path))
             self.ferr.write(f"From {log_path} ({ctime}):\n{log}")
-        except (OSError, UnicodeDecodeError) as e:
+        except (OSError, UnicodeDecodeError, OverflowError, ValueError) as e:
             self.ferr.write(
                 "Abruptly disconnected from bessd, but crashlog is "
                 f"not available:\n{e!s}\n"
