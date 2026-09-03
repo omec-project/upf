@@ -30,9 +30,12 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import logging
 import os
 import sys
 from operator import itemgetter
+
+logger = logging.getLogger(__name__)
 
 
 class ColorizedOutput:  # for pretty printing
@@ -671,7 +674,7 @@ class CLI:
         except ImportError:
             pass
         except Exception:
-            pass
+            logger.debug("Failed to disable echoctl", exc_info=True)
 
     def restore_echoctl(self):
         try:
@@ -690,7 +693,7 @@ class CLI:
         except ImportError:
             pass
         except Exception:
-            pass
+            logger.debug("Failed to restore echoctl", exc_info=True)
 
     def go_interactive(self):
         try:
