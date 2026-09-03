@@ -32,17 +32,14 @@ func main() {
 	if len(os.Args) > 1 {
 		root = os.Args[1]
 	}
-
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-
 		if strings.HasSuffix(path, ".pb.go") {
 			fmt.Println("Processing:", path)
 			return processFile(path)
 		}
-
 		return nil
 	})
 	if err != nil {
@@ -56,21 +53,17 @@ func processFile(path string) error {
 	if err != nil {
 		return err
 	}
-
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
-
 	original := string(data)
 	lines := strings.Split(original, "\n")
 	output := make([]string, 0, len(lines)+8)
 	modified := false
-
 	for i := 0; i < len(lines); i++ {
 		line := lines[i]
 		trim := strings.TrimSpace(line)
-
 		// Match any empty function: func (...) methodName() {}
 		if strings.HasPrefix(trim, "func (") && strings.HasSuffix(trim, "{}") {
 			methodName := extractMethodName(trim)
@@ -86,14 +79,11 @@ func processFile(path string) error {
 				modified = true
 			}
 		}
-
 		output = append(output, line)
 	}
-
 	if !modified {
 		return nil
 	}
-
 	return os.WriteFile(path, []byte(strings.Join(output, "\n")), fi.Mode().Perm())
 }
 
@@ -102,7 +92,6 @@ func extractMethodName(line string) string {
 	// Example:
 	// func (*Type) ProtoMessage() {}
 	// func (*Type) isSomething() {}
-
 	parts := strings.Split(line, ")")
 	if len(parts) < 2 {
 		return ""
