@@ -38,6 +38,7 @@ import errno
 import fcntl
 import fnmatch
 import inspect
+import logging
 import os
 import os.path
 import pprint
@@ -60,6 +61,7 @@ except ImportError:
     print("Cannot import the API module (pybess)", file=sys.stderr)
     raise
 
+logger = logging.getLogger(__name__)
 
 # extention for configuration files.
 CONF_EXT = "bess"
@@ -106,10 +108,10 @@ def __bess_env__(key, default=None):
         return os.environ[key]
     except KeyError:
         if default is None:
-            raise ConfError('Environment variable "%s" must be set.')
+            raise ConfError(f"Environment variable {key} must be set.")
 
         print(
-            f'Environment variable "{key}" is not set. Using default value "{default}"',
+            f"Environment variable {key} is not set. Using default value {default}",
             file=sys.stderr,
         )
         return default
@@ -233,8 +235,8 @@ def get_var_attrs(cli, var_token, partial_word):
                 var_candidates = [
                     str(m.wid) for m in cli.bess.list_workers().workers_status
                 ]
-            except:
-                pass
+            except Exception:
+                logger.debug("Failed to list workers for tab completion", exc_info=True)
 
         elif var_token == "WORKER_ID...":
             var_type = "wid+"
@@ -243,40 +245,44 @@ def get_var_attrs(cli, var_token, partial_word):
                 var_candidates = [
                     str(m.wid) for m in cli.bess.list_workers().workers_status
                 ]
-            except:
-                pass
+            except Exception:
+                logger.debug("Failed to list workers for tab completion", exc_info=True)
 
         elif var_token == "DRIVER":
             var_type = "name"
             var_desc = "name of a port driver"
             try:
                 var_candidates = cli.bess.list_drivers().driver_names
-            except:
-                pass
+            except Exception:
+                logger.debug("Failed to list drivers for tab completion", exc_info=True)
 
         elif var_token == "DRIVER...":
             var_type = "name+"
             var_desc = "one or more port driver names"
             try:
                 var_candidates = cli.bess.list_drivers().driver_names
-            except:
-                pass
+            except Exception:
+                logger.debug("Failed to list drivers for tab completion", exc_info=True)
 
         elif var_token == "MCLASS":
             var_type = "name"
             var_desc = "name of a module class"
             try:
                 var_candidates = cli.bess.list_mclasses().names
-            except:
-                pass
+            except Exception:
+                logger.debug(
+                    "Failed to list mclasses for tab completion", exc_info=True
+                )
 
         elif var_token == "MCLASS...":
             var_type = "name+"
             var_desc = "one or more module class names"
             try:
                 var_candidates = cli.bess.list_mclasses().names
-            except:
-                pass
+            except Exception:
+                logger.debug(
+                    "Failed to list mclasses for tab completion", exc_info=True
+                )
 
         elif var_token == "[NEW_MODULE]":
             var_type = "name"
@@ -287,8 +293,8 @@ def get_var_attrs(cli, var_token, partial_word):
             var_desc = "name of an existing module instance"
             try:
                 var_candidates = [m.name for m in cli.bess.list_modules().modules]
-            except:
-                pass
+            except Exception:
+                logger.debug("Failed to list modules for tab completion", exc_info=True)
 
         elif var_token == "[MODULE]":
             var_type = "name"
@@ -296,16 +302,16 @@ def get_var_attrs(cli, var_token, partial_word):
             var_candidates = ["*"]
             try:
                 var_candidates += [m.name for m in cli.bess.list_modules().modules]
-            except:
-                pass
+            except Exception:
+                logger.debug("Failed to list modules for tab completion", exc_info=True)
 
         elif var_token == "MODULE...":
             var_type = "name+"
             var_desc = "one or more module names"
             try:
                 var_candidates = [m.name for m in cli.bess.list_modules().modules]
-            except:
-                pass
+            except Exception:
+                logger.debug("Failed to list modules for tab completion", exc_info=True)
 
         elif var_token == "MODULE_CMD":
             var_type = "name"
@@ -329,16 +335,16 @@ def get_var_attrs(cli, var_token, partial_word):
             var_desc = "name of a port"
             try:
                 var_candidates = [p.name for p in cli.bess.list_ports().ports]
-            except:
-                pass
+            except Exception:
+                logger.debug("Failed to list ports for tab completion", exc_info=True)
 
         elif var_token == "PORT...":
             var_type = "name+"
             var_desc = "one or more port names"
             try:
                 var_candidates = [p.name for p in cli.bess.list_ports().ports]
-            except:
-                pass
+            except Exception:
+                logger.debug("Failed to list ports for tab completion", exc_info=True)
 
         elif var_token == "TC...":
             var_type = "name+"
@@ -347,8 +353,10 @@ def get_var_attrs(cli, var_token, partial_word):
                 var_candidates = [
                     getattr(c, "class").name for c in cli.bess.list_tcs().classes_status
                 ]
-            except:
-                pass
+            except Exception:
+                logger.debug(
+                    "Failed to list traffic classes for tab completion", exc_info=True
+                )
 
         elif var_token == "CONF":
             var_type = "confname"
@@ -391,16 +399,20 @@ def get_var_attrs(cli, var_token, partial_word):
             var_desc = "name of a gatehook class"
             try:
                 var_candidates = cli.bess.list_gatehook_classes().names
-            except:
-                pass
+            except Exception:
+                logger.debug(
+                    "Failed to list gatehook classes for tab completion", exc_info=True
+                )
 
         elif var_token == "GATEHOOKCLASS...":
             var_type = "name+"
             var_desc = "one or more gatehook class names"
             try:
                 var_candidates = cli.bess.list_gatehook_classes().names
-            except:
-                pass
+            except Exception:
+                logger.debug(
+                    "Failed to list gatehook classes for tab completion", exc_info=True
+                )
 
         elif var_token == "GATEHOOK":
             var_type = "name"
@@ -590,7 +602,7 @@ def bind_var(cli, var_type, line):
     elif var_type == "map":
         try:
             val = eval(f"_parse_map({head})")
-        except:
+        except Exception:
             raise cli.BindError('"map" should be "key=val, key=val, ..."')
 
     elif var_type == "pyobj":
@@ -599,7 +611,7 @@ def bind_var(cli, var_type, line):
                 val = None
             else:
                 val = eval(head)
-        except:
+        except Exception:
             raise cli.BindError(
                 '"pyobj" should be an object in python syntax'
                 ' (e.g., 42, "foo", ["hello", "world"], {"bar": "baz"})'
@@ -960,7 +972,7 @@ def _do_run_file(cli, conf_file):
         exec(code, new_globals)  # noqa: S102 -- required to run user *.bess config scripts
         if cli.interactive:
             cli.fout.write(DONE_MESSAGE)
-    except:
+    except Exception:
         cur_frame = inspect.currentframe()
         cur_func = inspect.getframeinfo(cur_frame).function
         t, v, tb = sys.exc_info()
@@ -1630,8 +1642,8 @@ def _show_module(cli, module_name):
             track_str = "batches N/A packets N/A"
             try:
                 track_str = f"batches {gate.cnt:<11d} packets {gate.pkts:<12d}"
-            except:
-                pass
+            except Exception:
+                logger.debug("Failed to format igate stats", exc_info=True)
             cli.fout.write(
                 "      {:3d}: {} {}\t{}\n".format(
                     gate.igate,
@@ -1647,8 +1659,8 @@ def _show_module(cli, module_name):
             track_str = "batches N/A packets N/A"
             try:
                 track_str = f"batches {gate.cnt:<11d} packets {gate.pkts:<12d}"
-            except:
-                pass
+            except Exception:
+                logger.debug("Failed to format ogate stats", exc_info=True)
             cli.fout.write(
                 "      {:3d}: {} -> {}:{}\t{}\n".format(
                     gate.ogate,
@@ -2190,8 +2202,8 @@ def _capture_gate(cli, module_name, direction, gate, opts, program, hook_fn):
                 os.close(fd)
                 os.unlink(fifo)
                 os.system("stty sane")  # more/less may screw the terminal
-            except:
-                pass
+            except Exception:
+                logger.debug("Failed to clean up capture fifo", exc_info=True)
 
 
 # tcpdump can write pcap files, so we don't need to support it separately
