@@ -329,7 +329,5 @@ def _string_to_enum(field, input_value):
     try:
         input_value = enum_dict[input_value].number
     except KeyError:
-        raise KeyError(
-            f"`{input_value}` is not a valid value for field `{field.name}`"
-        )
+        raise KeyError(f"`{input_value}` is not a valid value for field `{field.name}`")
     return input_value

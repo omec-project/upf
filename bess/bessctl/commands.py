@@ -109,8 +109,7 @@ def __bess_env__(key, default=None):
             raise ConfError('Environment variable "%s" must be set.')
 
         print(
-            f'Environment variable "{key}" is not set. '
-            f'Using default value "{default}"',
+            f'Environment variable "{key}" is not set. Using default value "{default}"',
             file=sys.stderr,
         )
         return default
@@ -947,7 +946,7 @@ def _do_run_file(cli, conf_file):
         )
         raise cli.HandledError()
     except Exception as e:
-        cli.err(f"Fail to compile bess config file ({conf_file}): {e} ")
+        cli.err(f"Failed to compile BESS config file ({conf_file}): {e}")
         raise cli.HandledError()
 
     if is_pipeline_empty(cli):
@@ -1196,23 +1195,23 @@ def show_worker_list(cli, worker_ids):
 
 def _limit_to_str(limit):
     if "count" in limit:
-        return "{} times/s".format(limit["count"])
+        return f"{limit['count']} times/s"
     elif "cycle" in limit:
-        return "{:.3f} MHz".format(limit["cycle"] / 1e6)
+        return f"{limit['cycle'] / 1e6:.3f} MHz"
     elif "packet" in limit:
         if limit["packet"] < 1e3:
-            return "{:.0f} pps".format(limit["packet"])
+            return f"{limit['packet']:.0f} pps"
         elif limit["packet"] < 1e6:
-            return "{:.3f} kpps".format(limit["packet"] / 1e3)
+            return f"{limit['packet'] / 1e3:.3f} kpps"
         else:
-            return "%.3f Mpps" % (limit["packet"] / 1e6)
+            return f"{limit['packet'] / 1e6:.3f} Mpps"
     elif "bit" in limit:
         if limit["bit"] < 1e3:
-            return "{:.0f} bps".format(limit["bit"])
+            return f"{limit['bit']:.0f} bps"
         elif limit["bit"] < 1e6:
-            return "{:.3f} kbps".format(limit["bit"] / 1e3)
+            return f"{limit['bit'] / 1e3:.3f} kbps"
         else:
-            return "%.3f Mbps" % (limit["bit"] / 1e6)
+            return f"{limit['bit'] / 1e6:.3f} Mbps"
     else:
         return "unlimited"
 
@@ -1223,23 +1222,23 @@ def _burst_to_str(burst):
         return ""
 
     if "count" in burst:
-        return "burst: {} times".format(burst["count"])
+        return f"burst: {burst['count']} times"
     elif "cycle" in burst:
-        return "burst: {} cycles".format(burst["cycle"])
+        return f"burst: {burst['cycle']} cycles"
     elif "packet" in burst:
         if burst["packet"] < 1e3:
-            return "burst: {:.0f} pkts".format(burst["packet"])
+            return f"burst: {burst['packet']:.0f} pkts"
         elif burst["packet"] < 1e6:
-            return "burst: {:.3f} kpkts".format(burst["packet"] / 1e3)
+            return f"burst: {burst['packet'] / 1e3:.3f} kpkts"
         else:
-            return "burst: %.3f Mpkts" % (burst["packet"] / 1e6)
+            return f"burst: {burst['packet'] / 1e6:.3f} Mpkts"
     elif "bit" in burst:
         if burst["bit"] < 1e3:
-            return "burst: {:.0f} bits".format(burst["bit"])
+            return f"burst: {burst['bit']:.0f} bits"
         elif burst["bit"] < 1e6:
-            return "burst: {:.3f} kbits".format(burst["bit"] / 1e3)
+            return f"burst: {burst['bit'] / 1e3:.3f} kbits"
         else:
-            return "burst: %.3f Mbits" % (burst["bit"] / 1e6)
+            return f"burst: {burst['bit'] / 1e6:.3f} Mbits"
     else:
         return ""
 
@@ -1396,9 +1395,7 @@ def show_status(cli):
 
     cli.fout.write("  Active worker threads: ")
     if workers:
-        worker_list = [
-            f"worker{worker.wid} (cpu {worker.core})" for worker in workers
-        ]
+        worker_list = [f"worker{worker.wid} (cpu {worker.core})" for worker in workers]
         cli.fout.write("{}\n".format(", ".join(worker_list)))
     else:
         cli.fout.write(NONE_MESSAGE)
@@ -1487,7 +1484,7 @@ def _draw_pipeline(cli, field, units, last_stats=None, graph_args=[]):
                     if field == "bytes":
                         label = f"{val * 8 / 1e6:.1f}"
                     else:
-                        label = f"{val}"
+                        label = f"{val:.0f}"
 
                 edge_attr = f"{{label::{gate.ogate}  {label} {units} {gate.igate}:;}}"
 
@@ -1601,7 +1598,7 @@ def show_port_list(cli, port_names):
                 _show_port(cli, port)
                 break
         else:
-            raise cli.CommandError(f'Port "{port_name}" doest not exist')
+            raise cli.CommandError(f'Port "{port_name}" does not exist')
 
 
 def _show_module(cli, module_name):
@@ -1613,7 +1610,9 @@ def _show_module(cli, module_name):
         cli.fout.write("    Per-packet metadata fields:\n")
         for field in info.metadata:
             cli.fout.write(
-                "{:16} {:<6}{:2} bytes ".format(field.name + ":", field.mode, field.size)
+                "{:16} {:<6}{:2} bytes ".format(
+                    field.name + ":", field.mode, field.size
+                )
             )
 
             if field.offset >= 0:
@@ -1638,9 +1637,7 @@ def _show_module(cli, module_name):
                     gate.igate,
                     track_str,
                     ", ".join(f"{g.name}:{g.ogate} ->" for g in gate.ogates),
-                    ", ".join(
-                        f"{h.class_name}::{h.hook_name}" for h in gate.gatehooks
-                    ),
+                    ", ".join(f"{h.class_name}::{h.hook_name}" for h in gate.gatehooks),
                 )
             )
 
@@ -1658,9 +1655,7 @@ def _show_module(cli, module_name):
                     track_str,
                     gate.igate,
                     gate.name,
-                    ", ".join(
-                        f"{h.class_name}::{h.hook_name}" for h in gate.gatehooks
-                    ),
+                    ", ".join(f"{h.class_name}::{h.hook_name}" for h in gate.gatehooks),
                 )
             )
     cli.fout.write(f"    Deadends: {info.deadends:<12d}\n")
@@ -2088,9 +2083,7 @@ def _monitor_tc_loop(cli, tcs, wids, max_len, fields, csv_f=None):
             data = _format_tc_data(delta)
             tc_display_name = f"W{wids[tc]} {tc}"
 
-            fmt_data = (
-                f"{{:<{max_len}}}{{:>12.3f}}{{:>12d}}{{:>12.3f}}{{:>12.3f}}{{:>12.3f}}{{:>12.3f}}\n"
-            )
+            fmt_data = f"{{:<{max_len}}}{{:>12.3f}}{{:>12d}}{{:>12.3f}}{{:>12.3f}}{{:>12.3f}}{{:>12.3f}}\n"
             cli.fout.write(fmt_data.format(tc_display_name, *data))
 
             if csv_f is not None:

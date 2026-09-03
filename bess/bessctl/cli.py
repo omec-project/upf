@@ -554,9 +554,7 @@ class CLI:
                     args.append(None)
                     continue
 
-                raise self.InternalError(
-                    f'Partial match on "{syntax}"? line: "{line}"'
-                )
+                raise self.InternalError(f'Partial match on "{syntax}"? line: "{line}"')
 
             attrs = self.get_var_attrs(syntax_token, remainder.split()[0])
             if attrs:

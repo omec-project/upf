@@ -85,7 +85,7 @@ def cmd(cmd, quiet=False, shell=False):
         # We only have output if we ran in quiet mode.
         if quiet:
             print("Log:\n", out, file=sys.stderr)
-        print(f"Error has occured running command: {cmd}", file=sys.stderr)
+        print(f"Error has occurred running command: {cmd}", file=sys.stderr)
         sys.exit(proc.returncode)
 
     return out
@@ -120,8 +120,7 @@ def check_header(header_file, compiler):
     test_c_file = f"{DEPS_DIR}/test.c"
     test_o_file = f"{DEPS_DIR}/test.o"
 
-    src = (
-        f"""
+    src = f"""
         #include <{header_file}>
 
         int main()
@@ -129,14 +128,15 @@ def check_header(header_file, compiler):
             return 0;
         }}
         """
-    )
 
     try:
         with open(test_c_file, "w") as fp:
             fp.write(textwrap.dedent(src))
 
         return cmd_success(
-            "{} {} -c {} -o {}".format(compiler, " ".join(cxx_flags), test_c_file, test_o_file)
+            "{} {} -c {} -o {}".format(
+                compiler, " ".join(cxx_flags), test_c_file, test_o_file
+            )
         )
 
     finally:
@@ -159,7 +159,9 @@ def check_c_lib(lib):
             fp.write(textwrap.dedent(src))
 
         return cmd_success(
-            "gcc {} -l{} {} {} -o {}".format(test_c_file, lib, " ".join(cxx_flags), " ".join(ld_flags), test_e_file)
+            "gcc {} -l{} {} {} -o {}".format(
+                test_c_file, lib, " ".join(cxx_flags), " ".join(ld_flags), test_e_file
+            )
         )
     finally:
         cmd(f"rm -f {test_c_file} {test_e_file}", quiet=True)

@@ -65,7 +65,9 @@ class Module:
             # bind to a pre-existing object, check if it's real
             assert name is not None, "Module should not be None"
             info = self.bess.get_module_info(name)
-            assert self.mclass == info.mclass, f"Module {name} is not of {self.mclass} type"
+            assert self.mclass == info.mclass, (
+                f"Module {name} is not of {self.mclass} type"
+            )
             self.name = name
 
         # add mclass-specific methods
