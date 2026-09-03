@@ -49,7 +49,7 @@ class CommandError(subprocess.CalledProcessError):
     """Identical to CalledProcessError, except it also shows the output"""
 
     def __str__(self):
-        return "%s\n%s" % (super().__str__(), self.output)
+        return f"{super().__str__()}\n{self.output}"
 
 
 def run_cmd(cmd):
@@ -75,13 +75,13 @@ class TestSamples(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        run_cmd("%s daemon stop" % bessctl)
+        run_cmd(f"{bessctl} daemon stop")
 
 
 def generate_test_method(path):
     def template(self):
         try:
-            run_cmd("%s run file %s" % (bessctl, path))
+            run_cmd(f"{bessctl} run file {path}")
         except CommandError:
             # bessd may have crashed. Relaunch for next tests.
             run_cmd(DAEMON_START_CMD % bessctl)
@@ -92,8 +92,8 @@ def generate_test_method(path):
 
         # Check if bessd crushed.
         try:
-            run_cmd("%s show version" % bessctl)
-            run_cmd("%s daemon reset" % bessctl)
+            run_cmd(f"{bessctl} show version")
+            run_cmd(f"{bessctl} daemon reset")
         except CommandError:
             # bessd may have crashed. Relaunch for next tests.
             run_cmd(DAEMON_START_CMD % bessctl)

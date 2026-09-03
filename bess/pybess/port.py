@@ -46,7 +46,7 @@ class Port:
         self.mac_addr = ret.mac_addr
 
     def __str__(self):
-        return "%s/%s" % (self.name, self.driver)
+        return f"{self.name}/{self.driver}"
 
     def get_port_stats(self):
         return self.bess.get_port_stats(self.name)

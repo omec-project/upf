@@ -117,7 +117,7 @@ class CLI:
         return fin.isatty() and fout.isatty()
 
     def err(self, msg):
-        self.ferr.write("*** Error: %s\n" % msg)
+        self.ferr.write(f"*** Error: {msg}\n")
         if not self.interactive:
             self.stop_loop = True
 
@@ -140,7 +140,7 @@ class CLI:
             else:
                 return line[:pos], line[pos:]
 
-        raise self.InternalError('type "%s" is undefined' % var_type)
+        raise self.InternalError(f'type "{var_type}" is undefined')
 
     # Return (mapped_value, tail)
     #   mapped_value: Python value/object from the consumed token(s)
@@ -149,7 +149,7 @@ class CLI:
         if var_type == "keyword":
             return None, self.split_var(var_type, line)[1]
 
-        raise self.InternalError('type "%s" is undefined' % var_type)
+        raise self.InternalError(f'type "{var_type}" is undefined')
 
     # Compare a command with a user-typed line.
     # It returns (match_type, candidates, syntax_token, score).
@@ -452,9 +452,9 @@ class CLI:
 
             # Add command description
             if match_type == "full" and num_full_matches == 1:
-                buf.append("  %-50s %s\n" % (syntax + " <enter>", desc))
+                buf.append("  {:<50} {}\n".format(syntax + " <enter>", desc))
             else:
-                buf.append("  %-50s %s\n" % (syntax, desc))
+                buf.append(f"  {syntax:<50} {desc}\n")
 
             # Add variable information if available
             if syntax_token:
@@ -470,12 +470,12 @@ class CLI:
             return []
 
         var_type, var_desc, var_candidates = attrs
-        buf = ["    %s (%s): %s\n" % (syntax_token, var_type, var_desc)]
+        buf = [f"    {syntax_token} ({var_type}): {var_desc}\n"]
 
         # Add eligible variable candidates
         for var in var_candidates:
             if var.startswith(partial_word):
-                buf.append("      %s\n" % var)
+                buf.append(f"      {var}\n")
 
         return buf
 
@@ -484,7 +484,7 @@ class CLI:
         if help_buffer:
             self.fout.write("\n")
             self.fout.write("".join(help_buffer))
-            self.fout.write("%s%s" % (self.get_prompt(), line))
+            self.fout.write(f"{self.get_prompt()}{line}")
             self.fout.flush()
 
     def complete(self, partial_word, state):
@@ -525,18 +525,18 @@ class CLI:
             return matched[0]
 
         elif len(matched) >= 2:
-            self.err('Ambiguous command "%s". Candidates:' % line_stripped)
+            self.err(f'Ambiguous command "{line_stripped}". Candidates:')
             for cmd, desc, _ in matched + matched_low:
-                self.ferr.write("  %-50s%s\n" % (cmd, desc))
+                self.ferr.write(f"  {cmd:<50}{desc}\n")
 
         elif len(matched) == 0:
             matched, matched_low = self.list_matched(line, "partial")
             if len(matched) > 0:
-                self.err('Incomplete command "%s". Candidates:' % line_stripped)
+                self.err(f'Incomplete command "{line_stripped}". Candidates:')
                 for cmd, desc, _ in matched + matched_low:
-                    self.ferr.write("  %-50s%s\n" % (cmd, desc))
+                    self.ferr.write(f"  {cmd:<50}{desc}\n")
             else:
-                self.err('Unknown command "%s".' % line_stripped)
+                self.err(f'Unknown command "{line_stripped}".')
 
         raise self.InvalidCommandError()
 
@@ -554,9 +554,7 @@ class CLI:
                     args.append(None)
                     continue
 
-                raise self.InternalError(
-                    'Partial match on "%s"? line: "%s"' % (syntax, line)
-                )
+                raise self.InternalError(f'Partial match on "{syntax}"? line: "{line}"')
 
             attrs = self.get_var_attrs(syntax_token, remainder.split()[0])
             if attrs:
@@ -655,11 +653,10 @@ class CLI:
             try:
                 self.rl.write_history_file(self.history_file)
             except OSError:
-                self.err('Cannot write to history file "%s"' % self.history_file)
+                self.err(f'Cannot write to history file "{self.history_file}"')
             except Exception as e:
                 self.err(
-                    'Unexpected error saving history file "%s": %s'
-                    % (self.history_file, e)
+                    f'Unexpected error saving history file "{self.history_file}": {e}'
                 )
 
     def disable_echoctl(self):
@@ -720,11 +717,10 @@ class CLI:
             if self.history_file and os.path.exists(self.history_file):
                 self.rl.read_history_file(self.history_file)
         except OSError:
-            self.err('Cannot read from history file "%s"' % self.history_file)
+            self.err(f'Cannot read from history file "{self.history_file}"')
         except Exception as e:
             self.err(
-                'Unexpected error reading history file "%s": %s'
-                % (self.history_file, e)
+                f'Unexpected error reading history file "{self.history_file}": {e}'
             )
 
         self.print_banner()

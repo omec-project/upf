@@ -88,7 +88,7 @@ def launch(cid):
     ):
         cmd = ""
     else:
-        cmd = "numactl -m %d " % VM_MEM_SOCKET
+        cmd = f"numactl -m {VM_MEM_SOCKET} "
 
     cmd += (
         "docker run --privileged -i --rm --name {name} -v {huge}:{huge} "
@@ -139,7 +139,7 @@ def kill(cid):
 
 def main(argv):
     if len(argv) != 2:
-        print("Usage: %s <# of containers to launch>" % argv[0], file=sys.stderr)
+        print(f"Usage: {argv[0]} <# of containers to launch>", file=sys.stderr)
         return 2
 
     num_containers = int(argv[1])

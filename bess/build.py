@@ -85,7 +85,7 @@ def cmd(cmd, quiet=False, shell=False):
         # We only have output if we ran in quiet mode.
         if quiet:
             print("Log:\n", out, file=sys.stderr)
-        print("Error has occured running command: %s" % cmd, file=sys.stderr)
+        print(f"Error has occurred running command: {cmd}", file=sys.stderr)
         sys.exit(proc.returncode)
 
     return out
@@ -93,7 +93,7 @@ def cmd(cmd, quiet=False, shell=False):
 
 BESS_DIR = os.path.dirname(os.path.abspath(__file__))
 
-DEPS_DIR = "%s/deps" % BESS_DIR
+DEPS_DIR = f"{BESS_DIR}/deps"
 
 kernel_release = cmd("uname -r", quiet=True).strip()
 
@@ -117,37 +117,35 @@ def cmd_success(cmd):
 
 
 def check_header(header_file, compiler):
-    test_c_file = "%s/test.c" % DEPS_DIR
-    test_o_file = "%s/test.o" % DEPS_DIR
+    test_c_file = f"{DEPS_DIR}/test.c"
+    test_o_file = f"{DEPS_DIR}/test.o"
 
-    src = (
-        """
-        #include <%s>
+    src = f"""
+        #include <{header_file}>
 
         int main()
-        {
+        {{
             return 0;
-        }
+        }}
         """
-        % header_file
-    )
 
     try:
         with open(test_c_file, "w") as fp:
             fp.write(textwrap.dedent(src))
 
         return cmd_success(
-            "%s %s -c %s -o %s"
-            % (compiler, " ".join(cxx_flags), test_c_file, test_o_file)
+            "{} {} -c {} -o {}".format(
+                compiler, " ".join(cxx_flags), test_c_file, test_o_file
+            )
         )
 
     finally:
-        cmd("rm -f %s %s" % (test_c_file, test_o_file), quiet=True)
+        cmd(f"rm -f {test_c_file} {test_o_file}", quiet=True)
 
 
 def check_c_lib(lib):
-    test_c_file = "%s/test.c" % DEPS_DIR
-    test_e_file = "%s/test" % DEPS_DIR
+    test_c_file = f"{DEPS_DIR}/test.c"
+    test_e_file = f"{DEPS_DIR}/test"
 
     src = """
         int main()
@@ -161,18 +159,18 @@ def check_c_lib(lib):
             fp.write(textwrap.dedent(src))
 
         return cmd_success(
-            "gcc %s -l%s %s %s -o %s"
-            % (test_c_file, lib, " ".join(cxx_flags), " ".join(ld_flags), test_e_file)
+            "gcc {} -l{} {} {} -o {}".format(
+                test_c_file, lib, " ".join(cxx_flags), " ".join(ld_flags), test_e_file
+            )
         )
     finally:
-        cmd("rm -f %s %s" % (test_c_file, test_e_file), quiet=True)
+        cmd(f"rm -f {test_c_file} {test_e_file}", quiet=True)
 
 
 def required(header_file, lib_name, compiler):
     if not check_header(header_file, compiler):
         print(
-            'Error - #include <%s> failed. Did you install "%s" package?'
-            % (header_file, lib_name),
+            f'Error - #include <{header_file}> failed. Did you install "{lib_name}" package?',
             file=sys.stderr,
         )
         sys.exit(1)
@@ -209,15 +207,15 @@ def set_config(filename, config, new_value):
         for line in lines:
             if line.startswith(config + "="):
                 found = True
-                line = "%s=%s\n" % (config, new_value)
+                line = f"{config}={new_value}\n"
             fp.write(line)
 
-    assert found, '"%s" is not found in %s' % (config, filename)
-    print("  %s: %s=%s" % (filename, config, new_value))
+    assert found, f'"{config}" is not found in {filename}'
+    print(f"  {filename}: {config}={new_value}")
 
 
 def is_kernel_header_installed():
-    return os.path.isdir("/lib/modules/%s/build" % kernel_release)
+    return os.path.isdir(f"/lib/modules/{kernel_release}/build")
 
 
 def find_current_plugins():
@@ -237,8 +235,8 @@ def find_current_plugins():
 def generate_extra_mk():
     "set up core/extra.mk to hold flags and plugin paths"
     with open("core/extra.mk", "w") as fp:
-        fp.write("CXXFLAGS += %s\n" % " ".join(cxx_flags))
-        fp.write("LDFLAGS += %s\n" % " ".join(ld_flags))
+        fp.write("CXXFLAGS += {}\n".format(" ".join(cxx_flags)))
+        fp.write("LDFLAGS += {}\n".format(" ".join(ld_flags)))
         fp.writelines(f"PLUGINS += {path}\n" for path in plugins)
 
 
@@ -258,7 +256,7 @@ def check_dpdk():
         )
         sys.exit(1)
     ver = cmd("pkg-config --modversion libdpdk", quiet=True).strip()
-    print("Using system DPDK %s" % ver)
+    print(f"Using system DPDK {ver}")
 
 
 def makeflags():
@@ -278,9 +276,9 @@ def makeflags():
     # figure out correct value, then cache it
     result = os.getenv("MAKEFLAGS")
     if result is None:
-        result = "-j%d" % int(cmd("nproc", quiet=True))
+        result = "-j{}".format(int(cmd("nproc", quiet=True)))
     elif result != "" and not result.startswith("-"):
-        result = "-%s" % result
+        result = f"-{result}"
     makeflags.result = result
     return result
 
@@ -339,19 +337,19 @@ def build_bess():
     sys.stdout.flush()
     cmd("bin/bessctl daemon stop 2> /dev/null || true", shell=True)
     cmd("rm -f core/bessd")  # force relink
-    cmd("make -C core bessd modules all_test %s" % makeflags())
+    cmd(f"make -C core bessd modules all_test {makeflags()}")
 
 
 def build_kmod():
     check_essential()
 
     if os.getenv("KERNELDIR"):
-        print("Building BESS kernel module (%s) ..." % os.getenv("KERNELDIR"))
+        print("Building BESS kernel module ({}) ...".format(os.getenv("KERNELDIR")))
     else:
-        print("Building BESS kernel module (%s - running kernel) ..." % kernel_release)
+        print(f"Building BESS kernel module ({kernel_release} - running kernel) ...")
         if not is_kernel_header_installed():
             print(
-                '"kernel-headers-%s" is not available. Build may fail.' % kernel_release
+                f'"kernel-headers-{kernel_release}" is not available. Build may fail.'
             )
     sys.stdout.flush()
     cmd("sudo -n rmmod bess 2> /dev/null || true", shell=True)
@@ -392,9 +390,9 @@ def print_usage(parser):
 
 
 def update_benchmark_path(path):
-    print("Specified benchmark path %s" % path)
-    cxx_flags.extend(["-I%s/include" % (path)])
-    ld_flags.extend(["-L%s/lib" % (path)])
+    print(f"Specified benchmark path {path}")
+    cxx_flags.extend([f"-I{path}/include"])
+    ld_flags.extend([f"-L{path}/lib"])
 
 
 def dedup(lst):
