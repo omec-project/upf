@@ -72,7 +72,7 @@ class TestBESS(unittest.TestCase):
     def setUpClass(cls):
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=2))
         service_pb2_grpc.add_BESSControlServicer_to_server(DummyServiceImpl(), server)
-        server.add_insecure_port("[::]:%d" % cls.PORT)
+        server.add_insecure_port(f"[::]:{cls.PORT}")
         server.start()
         cls.server = server
 

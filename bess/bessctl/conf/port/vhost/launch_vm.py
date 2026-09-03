@@ -64,13 +64,13 @@ VERBOSE = int(os.getenv("VERBOSE", "0"))
 
 qemu_cmd_template = (
     "kvm -snapshot -enable-kvm -cpu host -smp {cpus} -m 1024 "
-    "-object memory-backend-file,id=ram,size=1024M,mem-path=%s,share=on "
+    f"-object memory-backend-file,id=ram,size=1024M,mem-path={HUGEPAGES_PATH},share=on "
     "-numa node,memdev=ram -mem-prealloc "
     "-qmp unix:/tmp/qmp{vm}.sock,server,nowait "
     "-device virtio-net-pci,netdev=mgmt,mac=52:54:00:12:34:56 "
     "-netdev user,id=mgmt,hostfwd=tcp:127.0.0.1:2200{vm}-:22 "
     "-vnc 127.0.0.1:{vm} -k en-us "
-    "vm.qcow2" % HUGEPAGES_PATH
+    "vm.qcow2"
 )
 
 vhost_opt_template = (
@@ -131,7 +131,7 @@ def launch(vm_id, num_nics, vhost_opts):
     ):
         cmd = ""
     else:
-        cmd = "numactl -m %d " % VM_MEM_SOCKET
+        cmd = f"numactl -m {VM_MEM_SOCKET} "
 
     cmd += qemu_cmd_template.format(vm=vm_id, cpus=NUM_VCPUS)
     for i in range(num_nics):
@@ -186,7 +186,7 @@ def run_forward(vm_id, num_nics):
     scp(vm_id, os.path.join(bess_dir, "deps/dpdk-22.11.4/build/app/dpdk-testpmd"), "")
 
     # virtio-pci devices should not be bound to any driver
-    cmd = ssh_cmd(vm_id, "sudo ./dpdk-devbind.py -u %s" % nics)
+    cmd = ssh_cmd(vm_id, f"sudo ./dpdk-devbind.py -u {nics}")
     if VERBOSE:
         print(cmd)
     subprocess.check_call(shlex.split(cmd))
@@ -200,8 +200,7 @@ def run_forward(vm_id, num_nics):
     testpmd_cmd = f"sudo ./testpmd {eal_opt} -- {testpmd_opt}"
     cmd = ssh_cmd(
         vm_id,
-        '(echo -e "set fwd %s\nset txpkts %d\nstart tx_first %d" && cat) | %s'
-        % (FWD_MODE, PKT_SIZE, QSIZE, testpmd_cmd),
+        f'(echo -e "set fwd {FWD_MODE}\nset txpkts {PKT_SIZE}\nstart tx_first {QSIZE}" && cat) | {testpmd_cmd}',
     )
     if VERBOSE:
         print(cmd)
@@ -214,7 +213,7 @@ def main(argv):
         return 1
 
     if len(argv) != 2:
-        print("Usage: %s <# of VMs to launch>" % argv[0], file=sys.stderr)
+        print(f"Usage: {argv[0]} <# of VMs to launch>", file=sys.stderr)
         return 2
 
     os.system("pkill -f qemu-system-x86_64 > /dev/null 2>&1")
@@ -236,7 +235,7 @@ def main(argv):
         pass
     finally:
         for proc in procs:
-            print("Terminating VM (pid=%d)" % proc.pid)
+            print(f"Terminating VM (pid={proc.pid})")
             proc.terminate()
             proc.wait()
 

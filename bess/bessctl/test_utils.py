@@ -80,7 +80,7 @@ def measure_tc_perf(bess, duration):
     sec_diff = new.timestamp - old.timestamp
     pps = (new.packets - old.packets) / sec_diff
     cps = (new.count - old.count) / sec_diff
-    sys.stdout.write("pps: %12.f\tcounts/s: %12.f\n" % (pps, cps))
+    sys.stdout.write(f"pps: {pps:12.0f}\tcounts/s: {cps:12.0f}\n")
 
 
 def run_cmd(cmd):
@@ -188,12 +188,12 @@ class BessModuleTestCase(unittest.TestCase):
     @staticmethod
     def assertSamePackets(pkt1, pkt2):
         if pkt_str(pkt1) != pkt_str(pkt2):
-            raise AssertionError('"%s" != "%s"' % (pkt_str(pkt1), pkt_str(pkt2)))
+            raise AssertionError(f'"{pkt_str(pkt1)}" != "{pkt_str(pkt2)}"')
 
     @staticmethod
     def assertNotSamePackets(pkt1, pkt2):
         if pkt_str(pkt1) == pkt_str(pkt2):
-            raise AssertionError('"%s" == "%s"' % (pkt_str(pkt1), pkt_str(pkt2)))
+            raise AssertionError(f'"{pkt_str(pkt1)}" == "{pkt_str(pkt2)}"')
 
     def assertBessAlive(self):
         try:
@@ -279,7 +279,7 @@ class BessModuleTestCase(unittest.TestCase):
                     self.sockets[ogate] = sock
 
                 po = self.bess.create_module(
-                    "PortOut", "po%d" % ogate, {"port": sock_name}
+                    "PortOut", f"po{ogate}", {"port": sock_name}
                 )
                 self.output_ports[ogate] = po
 
@@ -295,7 +295,7 @@ class BessModuleTestCase(unittest.TestCase):
                 sock = gen_unix_socket(self.bess, sock_name)
                 self.sockets[igate] = sock
 
-            pi = self.bess.create_module("PortInc", "pi%d" % igate, {"port": sock_name})
+            pi = self.bess.create_module("PortInc", f"pi{igate}", {"port": sock_name})
             self.input_ports[igate] = pi
 
         pi = self.input_ports[igate]

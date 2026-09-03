@@ -173,8 +173,8 @@ def is_gate_expr(exp, is_ogate):
         exp_stripped = exp_stripped[:-1].strip()
 
     try:
-        compile("(%s)" % exp_stripped, "", mode="eval")
-        compile("%s%s%s" % (prefix, exp, postfix), "", mode="eval")
+        compile(f"({exp_stripped})", "", mode="eval")
+        compile(f"{prefix}{exp}{postfix}", "", mode="eval")
     except SyntaxError:
         return False
     else:
@@ -279,7 +279,7 @@ def parenthesize(exp):
             if t[0] == tokenize.OP:
                 l = len(exp) - len(exp.lstrip())
                 r = len(exp) - len(exp.rstrip())
-                return "%s(%s)%s" % (exp[:l], exp.strip(), exp[len(exp) - r :])
+                return f"{exp[:l]}({exp.strip()}){exp[len(exp) - r :]}"
     except (tokenize.TokenError, IndentationError):
         pass
     return exp

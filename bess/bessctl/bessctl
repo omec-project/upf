@@ -117,7 +117,7 @@ class BESSCLI(cli.CLI):
                 f"  BESS daemon response - errno={e.code} ({err_code}: {os.strerror(e.code)})\n"
             )
             for k, v in sorted(e.info.items()):
-                self.ferr.write("%12s: %s\n" % (str(k), str(v)))
+                self.ferr.write(f"{k!s:12}: {v!s}\n")
 
             raise self.HandledError()
 
@@ -131,7 +131,7 @@ class BESSCLI(cli.CLI):
         except Exception as e:
             self.ferr.write(
                 "Abruptly disconnected from bessd, but crashlog is "
-                "not available:\n%s\n" % (str(e))
+                f"not available:\n{e!s}\n"
             )
 
     def loop(self):
@@ -166,7 +166,7 @@ def run_cli(instream=sys.stdin):
     # end of loop due to error? let them know which command failed.
     if cli.stop_loop:
         if cli.last_cmd:
-            cli.ferr.write("  Command failed: %s\n" % cli.last_cmd)
+            cli.ferr.write(f"  Command failed: {cli.last_cmd}\n")
         os._exit(1)
 
 

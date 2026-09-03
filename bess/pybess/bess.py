@@ -164,12 +164,7 @@ class BESS:
                 err_code = errno.errorcode[self.code]
             else:
                 err_code = "<unknown>"
-            return "errno=%d (%s: %s), %s" % (
-                self.code,
-                err_code,
-                os.strerror(self.code),
-                self.errmsg,
-            )
+            return f"errno={self.code} ({err_code}: {os.strerror(self.code)}), {self.errmsg}"
 
     # abnormal RPC failure
     class RPCError(Exception):
@@ -344,30 +339,19 @@ class BESS:
                         map(str, _constraints_to_list(violation.constraint))
                     )
                     print(
-                        "name %s allowed_sockets [%s] worker_socket %d "
-                        "worker_core %d"
-                        % (
-                            violation.name,
-                            valid,
-                            violation.assigned_node,
-                            violation.assigned_core,
-                        )
+                        f"name {violation.name} allowed_sockets [{valid}] worker_socket {violation.assigned_node} "
+                        f"worker_core {violation.assigned_core}"
                     )
                 else:
                     print(
-                        "name %s has no valid "
-                        "placements worker_socket %d "
-                        "worker_core %d"
-                        % (
-                            violation.name,
-                            violation.assigned_node,
-                            violation.assigned_core,
-                        )
+                        f"name {violation.name} has no valid "
+                        f"placements worker_socket {violation.assigned_node} "
+                        f"worker_core {violation.assigned_core}"
                     )
             for module in response.modules:
                 print(
-                    "constraints violated for module %s --"
-                    " please check bessd log" % module.name
+                    f"constraints violated for module {module.name} --"
+                    " please check bessd log"
                 )
             error = True
         if response.fatal:
@@ -539,7 +523,7 @@ class BESS:
         try:
             message_type = getattr(module_pb, arg_type)
         except AttributeError:
-            raise self.APIError('Unknown arg "%s"' % arg_type)
+            raise self.APIError(f'Unknown arg "{arg_type}"')
 
         try:
             arg_msg = pb_conv.dict_to_protobuf(message_type, arg)
@@ -580,7 +564,7 @@ class BESS:
         try:
             message_type = getattr(module_pb, arg_type)
         except AttributeError:
-            raise self.APIError('Unknown arg "%s"' % arg_type)
+            raise self.APIError(f'Unknown arg "{arg_type}"')
 
         try:
             arg_msg = pb_conv.dict_to_protobuf(message_type, arg)

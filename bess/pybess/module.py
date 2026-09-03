@@ -65,10 +65,7 @@ class Module:
             # bind to a pre-existing object, check if it's real
             assert name is not None, "Module should not be None"
             info = self.bess.get_module_info(name)
-            assert self.mclass == info.mclass, "Module %s is not of %s type" % (
-                name,
-                self.mclass,
-            )
+            assert self.mclass == info.mclass, f"Module {name} is not of {self.mclass} type"
             self.name = name
 
         # add mclass-specific methods
@@ -82,7 +79,7 @@ class Module:
         self.igate = None
 
     def __str__(self):
-        return "%s::%s" % (self.name, str(self.__class__.__name__))
+        return f"{self.name}::{self.__class__.__name__!s}"
 
     def __mul__(self, ogate):
         if not isinstance(ogate, int):
@@ -108,7 +105,7 @@ class Module:
 
     def __add__(self, next_mod):
         if not isinstance(next_mod, Module):
-            assert False, "%s is not a module" % next_mod
+            assert False, f"{next_mod} is not a module"
 
         ogate = 0
         igate = 0
@@ -125,7 +122,7 @@ class Module:
 
     def connect(self, next_mod, ogate=0, igate=0):
         if not isinstance(next_mod, Module):
-            assert False, "%s is not a module" % next_mod
+            assert False, f"{next_mod} is not a module"
 
         self.bess.connect_modules(self.name, next_mod.name, ogate, igate)
 

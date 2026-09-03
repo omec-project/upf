@@ -48,7 +48,7 @@ class CommandError(subprocess.CalledProcessError):
     """Identical to CalledProcessError, except it also shows the output"""
 
     def __str__(self):
-        return "%s\n%s" % (super().__str__(), self.output)
+        return f"{super().__str__()}\n{self.output}"
 
 
 def run_cmd(cmd):
@@ -75,7 +75,7 @@ def main():
 
     any_failure = 0
 
-    daemon_start_cmd = "%s daemon start" % bessctl
+    daemon_start_cmd = f"{bessctl} daemon start"
 
     try:
         run_cmd(daemon_start_cmd)
@@ -83,10 +83,10 @@ def main():
         raise Exception("bess daemon could not start")
 
     for file_name in glob.glob(os.path.join(args.test_dir, f"{args.test_name}.py")):
-        print("Running test %s" % file_name)
+        print(f"Running test {file_name}")
 
         try:
-            run_cmd("%s daemon reset -- run file %s" % (bessctl, file_name))
+            run_cmd(f"{bessctl} daemon reset -- run file {file_name}")
         except CommandError:
             any_failure = 1
             run_cmd(daemon_start_cmd)

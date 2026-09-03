@@ -109,8 +109,8 @@ def __bess_env__(key, default=None):
             raise ConfError('Environment variable "%s" must be set.')
 
         print(
-            'Environment variable "%s" is not set. '
-            'Using default value "%s"' % (key, default),
+            f'Environment variable "{key}" is not set. '
+            f'Using default value "{default}"',
             file=sys.stderr,
         )
         return default
@@ -121,9 +121,9 @@ def __bess_module__(module_names, mclass_name, *args, **kwargs):
         result = []
         for module in names:
             if module in caller_globals:
-                raise ConfError("Module name %s already exists" % module)
+                raise ConfError(f"Module name {module} already exists")
             if module in caller_locals:
-                raise ConfError("Module name %s shadowed by local variable" % module)
+                raise ConfError(f"Module name {module} shadowed by local variable")
         for module in names:
             obj = mclass_obj(*args, name=module, **kwargs)
             caller_globals[module] = obj
@@ -140,7 +140,7 @@ def __bess_module__(module_names, mclass_name, *args, **kwargs):
         caller_locals = {}
 
     if mclass_name not in caller_globals:
-        raise ConfError("Module class %s does not exist" % mclass_name)
+        raise ConfError(f"Module class {mclass_name} does not exist")
     mclass_obj = caller_globals[mclass_name]
 
     # a::SomeMod()
@@ -151,7 +151,7 @@ def __bess_module__(module_names, mclass_name, *args, **kwargs):
     if isinstance(module_names, tuple):
         return make_modules(module_names)
 
-    assert False, "Invalid argument %s" % type(module_names)
+    assert False, f"Invalid argument {type(module_names)}"
 
 
 def is_allowed_filename(basename):
@@ -355,7 +355,7 @@ def get_var_attrs(cli, var_token, partial_word):
             var_type = "confname"
             var_desc = 'configuration name in "conf/" directory'
             var_candidates = complete_filename(
-                partial_word, "%s/conf" % cli.this_dir, "." + CONF_EXT
+                partial_word, f"{cli.this_dir}/conf", "." + CONF_EXT
             )
 
         elif var_token == "CONF_FILE":
@@ -590,7 +590,7 @@ def bind_var(cli, var_type, line):
 
     elif var_type == "map":
         try:
-            val = eval("_parse_map(%s)" % head)
+            val = eval(f"_parse_map({head})")
         except:
             raise cli.BindError('"map" should be "key=val, key=val, ..."')
 
@@ -631,7 +631,7 @@ def cmd(syntax, desc=""):
 @cmd("help", "List available commands")
 def help(cli):
     for syntax, desc, _ in cmdlist:
-        cli.fout.write("  %-50s%s\n" % (syntax, desc))
+        cli.fout.write(f"  {syntax:<50}{desc}\n")
     cli.fout.flush()
 
 
@@ -646,7 +646,7 @@ def history(cli):
         len_history = cli.rl.get_current_history_length()
         begin_index = max(1, len_history - 100)  # max 100 items
         for i in range(begin_index, len_history):  # skip the last one
-            cli.fout.write("%5d  %s\n" % (i, cli.rl.get_history_item(i)))
+            cli.fout.write(f"{i:5d}  {cli.rl.get_history_item(i)}\n")
     else:
         cli.err('"readline" not available')
 
@@ -683,7 +683,7 @@ def warn(cli, msg, func, *args):
             except NameError:
                 prompt = input  # Python 3
 
-            resp = prompt('WARNING: %s Are you sure? (type "yes") ' % msg)
+            resp = prompt(f'WARNING: {msg} Are you sure? (type "yes") ')
 
             if resp.strip() == "yes":
                 func(cli, *args)
@@ -713,7 +713,7 @@ def _do_start(cli, opts):
         opts = []
 
     # need -E to pass GCOV_* env variables through
-    cmd = "sudo -E %s/core/bessd -k %s" % (
+    cmd = "sudo -E {}/core/bessd -k {}".format(
         os.path.dirname(cli.this_dir),
         " ".join(opts),
     )
@@ -910,7 +910,7 @@ def _do_run_file(cli, conf_file):
     try:
         xformed = sugar.xform_file(conf_file)
     except OSError:
-        cli.err("Cannot open file %s" % conf_file)
+        cli.err(f"Cannot open file {conf_file}")
         raise cli.HandledError()
 
     new_globals = {
@@ -941,12 +941,13 @@ def _do_run_file(cli, conf_file):
 
         # Mimic python's error reporting style
         cli.err(
-            '\n  File "%s", line %d\n    %s\n    %s\nSyntaxError: %s'
-            % (conf_file, e.lineno, e.text, " " * (e.offset - 1) + "^", e.msg)
+            '\n  File "{}", line {}\n    {}\n    {}\nSyntaxError: {}'.format(
+                conf_file, e.lineno, e.text, " " * (e.offset - 1) + "^", e.msg
+            )
         )
         raise cli.HandledError()
     except Exception as e:
-        cli.err("Fail to compile bess config file (%s): %s " % (conf_file, e))
+        cli.err(f"Fail to compile bess config file ({conf_file}): {e} ")
         raise cli.HandledError()
 
     if is_pipeline_empty(cli):
@@ -971,7 +972,7 @@ def _do_run_file(cli, conf_file):
 
         errmsg = "Unhandled exception in the configuration script"
 
-        cli.err("%s (most recent call last)" % errmsg)
+        cli.err(f"{errmsg} (most recent call last)")
         cli.ferr.write("".join(traceback.format_list(stack)))
 
         if isinstance(v, (cli.bess.Error, cli.bess.RPCError)):
@@ -1003,8 +1004,8 @@ def _run_file(cli, conf_file, env_map):
 
 @cmd("run CONF [ENV_VARS...]", 'Run a *.bess configuration in "conf/"')
 def run_conf(cli, conf, env_map):
-    target_dir = "%s/conf" % cli.this_dir
-    basename = os.path.expanduser("%s.%s" % (conf, CONF_EXT))
+    target_dir = f"{cli.this_dir}/conf"
+    basename = os.path.expanduser(f"{conf}.{CONF_EXT}")
     conf_file = os.path.join(target_dir, basename)
     _run_file(cli, conf_file, env_map)
 
@@ -1024,7 +1025,7 @@ def add_port(cli, driver, port, args):
     ret = cli.bess.create_port(driver, port, args)
 
     if port is None:
-        cli.fout.write('  The new port "%s" has been created\n' % ret.name)
+        cli.fout.write(f'  The new port "{ret.name}" has been created\n')
 
 
 @cmd(
@@ -1041,7 +1042,7 @@ def add_module(cli, mclass, module, pause_workers, args):
             cli.bess.resume_all()
 
     if module is None:
-        cli.fout.write('  The new module "%s" has been created\n' % ret.name)
+        cli.fout.write(f'  The new module "{ret.name}" has been created\n')
 
 
 @cmd(
@@ -1075,7 +1076,7 @@ def command_module(cli, module, cmd, arg_type, args):
     cli.bess.pause_all()
     try:
         ret = cli.bess.run_module_command(module, cmd, arg_type, args)
-        cli.fout.write("response: %s\n" % repr(ret))
+        cli.fout.write(f"response: {ret!r}\n")
     finally:
         cli.bess.resume_all()
 
@@ -1093,7 +1094,7 @@ def command_gatehook(cli, name, module, direction, gate, cmd, arg_type, args):
         ret = cli.bess.run_gatehook_command(
             name, module, direction, gate, cmd, arg_type, args
         )
-        cli.fout.write("response: %s\n" % repr(ret))
+        cli.fout.write(f"response: {ret!r}\n")
     finally:
         cli.bess.resume_all()
 
@@ -1146,15 +1147,15 @@ def delete_connection(cli, module, ogate):
 
 def _show_worker_header(cli):
     cli.fout.write(
-        "  %10s%10s%10s%10s%16s\n"
-        % ("Worker ID", "Status", "CPU core", "# of TCs", "Deadend pkts")
+        "  {:10}{:10}{:10}{:10}{:16}\n".format(
+            "Worker ID", "Status", "CPU core", "# of TCs", "Deadend pkts"
+        )
     )
 
 
 def _show_worker(cli, w):
     cli.fout.write(
-        "  %10d%10s%10d%10d%16d\n"
-        % (
+        "  {:10d}{:10}{:10d}{:10d}{:16d}\n".format(
             w.wid,
             "RUNNING" if w.running else "PAUSED",
             w.core,
@@ -1185,7 +1186,7 @@ def show_worker_list(cli, worker_ids):
             if worker.wid == wid:
                 break
         else:
-            raise cli.CommandError("Worker ID %d does not exist" % wid)
+            raise cli.CommandError(f"Worker ID {wid} does not exist")
 
     _show_worker_header(cli)
     for worker in workers:
@@ -1195,21 +1196,21 @@ def show_worker_list(cli, worker_ids):
 
 def _limit_to_str(limit):
     if "count" in limit:
-        return "%d times/s" % limit["count"]
+        return "{} times/s".format(limit["count"])
     elif "cycle" in limit:
-        return "%.3f MHz" % (limit["cycle"] / 1e6)
+        return "{:.3f} MHz".format(limit["cycle"] / 1e6)
     elif "packet" in limit:
         if limit["packet"] < 1e3:
-            return "%.d pps" % limit["packet"]
+            return "{:.0f} pps".format(limit["packet"])
         elif limit["packet"] < 1e6:
-            return "%.3f kpps" % (limit["packet"] / 1e3)
+            return "{:.3f} kpps".format(limit["packet"] / 1e3)
         else:
             return "%.3f Mpps" % (limit["packet"] / 1e6)
     elif "bit" in limit:
         if limit["bit"] < 1e3:
-            return "%.d bps" % limit["bit"]
+            return "{:.0f} bps".format(limit["bit"])
         elif limit["bit"] < 1e6:
-            return "%.3f kbps" % (limit["bit"] / 1e3)
+            return "{:.3f} kbps".format(limit["bit"] / 1e3)
         else:
             return "%.3f Mbps" % (limit["bit"] / 1e6)
     else:
@@ -1222,21 +1223,21 @@ def _burst_to_str(burst):
         return ""
 
     if "count" in burst:
-        return "burst: %d times" % burst["count"]
+        return "burst: {} times".format(burst["count"])
     elif "cycle" in burst:
-        return "burst: %d cycles" % burst["cycle"]
+        return "burst: {} cycles".format(burst["cycle"])
     elif "packet" in burst:
         if burst["packet"] < 1e3:
-            return "burst: %.d pkts" % burst["packet"]
+            return "burst: {:.0f} pkts".format(burst["packet"])
         elif burst["packet"] < 1e6:
-            return "burst: %.3f kpkts" % (burst["packet"] / 1e3)
+            return "burst: {:.3f} kpkts".format(burst["packet"] / 1e3)
         else:
             return "burst: %.3f Mpkts" % (burst["packet"] / 1e6)
     elif "bit" in burst:
         if burst["bit"] < 1e3:
-            return "burst: %.d bits" % burst["bit"]
+            return "burst: {:.0f} bits".format(burst["bit"])
         elif burst["bit"] < 1e6:
-            return "burst: %.3f kbits" % (burst["bit"] / 1e3)
+            return "burst: {:.3f} kbits".format(burst["bit"] / 1e3)
         else:
             return "burst: %.3f Mbits" % (burst["bit"] / 1e6)
     else:
@@ -1253,7 +1254,7 @@ def _show_tcs_node(cli, node, indent, prefix, lastsibling):
     if "show_list" in node:
         attrs = node["show_list"]
         for v in attrs:
-            line += " %-19s" % v
+            line += f" {v:<19}"
 
     cli.fout.write(line.rstrip(" ") + "\n")
 
@@ -1314,9 +1315,9 @@ def _populate_show_list(tc, nodes):
     if tc.parent and tc.parent in nodes:
         parent_policy = nodes[tc.parent]["policy"]
         if parent_policy == "weighted_fair" and c_.HasField("share"):
-            nodes[c_.name]["show_list"].append("share: %d" % c_.share)
+            nodes[c_.name]["show_list"].append(f"share: {c_.share}")
         elif parent_policy == "priority" and c_.HasField("priority"):
-            nodes[c_.name]["show_list"].append("priority: %d" % c_.priority)
+            nodes[c_.name]["show_list"].append(f"priority: {c_.priority}")
 
     # Handle rate limiting policy
     if c_.policy == "rate_limit":
@@ -1349,7 +1350,7 @@ def check_constraints(cli):
     try:
         cli.bess.check_constraints()
     except Exception as e:
-        cli.fout.write("Constraint check failed %s\n" % repr(e))
+        cli.fout.write(f"Constraint check failed {e!r}\n")
 
 
 def _show_tc_list(cli, tcs):
@@ -1362,7 +1363,7 @@ def _show_tc_list(cli, tcs):
         if wid == -1:
             root["name"] = "<unattached>"
         else:
-            root["name"] = "<worker %d>" % wid
+            root["name"] = f"<worker {wid}>"
 
         _show_tcs_tree(cli, root)
 
@@ -1396,34 +1397,34 @@ def show_status(cli):
     cli.fout.write("  Active worker threads: ")
     if workers:
         worker_list = [
-            "worker%d (cpu %d)" % (worker.wid, worker.core) for worker in workers
+            f"worker{worker.wid} (cpu {worker.core})" for worker in workers
         ]
-        cli.fout.write("%s\n" % ", ".join(worker_list))
+        cli.fout.write("{}\n".format(", ".join(worker_list)))
     else:
         cli.fout.write(NONE_MESSAGE)
 
     cli.fout.write("  Available drivers: ")
     if drivers:
-        cli.fout.write("%s\n" % ", ".join(drivers))
+        cli.fout.write("{}\n".format(", ".join(drivers)))
     else:
         cli.fout.write(NONE_MESSAGE)
 
     cli.fout.write("  Available plugins: ")
     if plugins:
-        cli.fout.write("%s\n" % ", ".join(plugins))
+        cli.fout.write("{}\n".format(", ".join(plugins)))
     else:
         cli.fout.write(NONE_MESSAGE)
 
     cli.fout.write("  Available module classes: ")
     if mclasses:
-        cli.fout.write("%s\n" % ", ".join(mclasses))
+        cli.fout.write("{}\n".format(", ".join(mclasses)))
     else:
         cli.fout.write(NONE_MESSAGE)
 
     cli.fout.write("  Active ports: ")
     if ports:
-        port_list = ["%s/%s" % (p.name, p.driver) for p in ports]
-        cli.fout.write("%s\n" % ", ".join(port_list))
+        port_list = [f"{p.name}/{p.driver}" for p in ports]
+        cli.fout.write("{}\n".format(", ".join(port_list)))
     else:
         cli.fout.write(NONE_MESSAGE)
 
@@ -1431,9 +1432,9 @@ def show_status(cli):
     if modules:
         module_list = []
         for m in modules:
-            module_list.append("%s::%s(%s)" % (m.name, m.mclass, m.desc))
+            module_list.append(f"{m.name}::{m.mclass}({m.desc})")
 
-        cli.fout.write("%s\n" % ", ".join(module_list))
+        cli.fout.write("{}\n".format(", ".join(module_list)))
     else:
         cli.fout.write(NONE_MESSAGE)
 
@@ -1451,8 +1452,8 @@ def _draw_pipeline(cli, field, units, last_stats=None, graph_args=[]):
         name = m.name
         mclass = m.mclass
         names.append(name)
-        node_labels[name] = "%s\\n%s" % (name, mclass)
-        node_labels[name] += "\\n%s" % m.desc
+        node_labels[name] = f"{name}\\n{mclass}"
+        node_labels[name] += f"\\n{m.desc}"
 
     try:
         f = subprocess.Popen(
@@ -1465,7 +1466,7 @@ def _draw_pipeline(cli, field, units, last_stats=None, graph_args=[]):
         )
 
         for m in modules:
-            print("[%s]" % node_labels[m.name], file=f.stdin)
+            print(f"[{node_labels[m.name]}]", file=f.stdin)
 
         for name in names:
             gates = cli.bess.get_module_info(name).ogates
@@ -1484,20 +1485,14 @@ def _draw_pipeline(cli, field, units, last_stats=None, graph_args=[]):
                         val = (new_val - last_val) / (new_time - last_time)
 
                     if field == "bytes":
-                        label = "%.1f" % (val * 8 / 1e6)
+                        label = f"{val * 8 / 1e6:.1f}"
                     else:
-                        label = "%d" % val
+                        label = f"{val}"
 
-                edge_attr = "{label::%d  %s %s %d:;}" % (
-                    gate.ogate,
-                    label,
-                    units,
-                    gate.igate,
-                )
+                edge_attr = f"{{label::{gate.ogate}  {label} {units} {gate.igate}:;}}"
 
                 print(
-                    "[%s] ->%s [%s]"
-                    % (node_labels[name], edge_attr, node_labels[gate.name]),
+                    f"[{node_labels[name]}] ->{edge_attr} [{node_labels[gate.name]}]",
                     file=f.stdin,
                 )
         output, error = f.communicate()
@@ -1562,12 +1557,12 @@ def _show_port(cli, port):
     port_config = cli.bess.get_port_config(port.name)
 
     cli.fout.write(
-        "  %-12s Driver %-10s HWaddr %-18s MTU %-6d\n"
-        % (port.name, port.driver, port.mac_addr, port_config.conf.mtu)
+        f"  {port.name:<12} Driver {port.driver:<10} HWaddr {port.mac_addr:<18} MTU {port_config.conf.mtu:<6}\n"
     )
     cli.fout.write(
-        "  %-12s Speed %-11s Link %-5s Duplex %-5s Autoneg %-5s\n"
-        % ("", speed, link, duplex, autoneg)
+        "  {:<12} Speed {:<11} Link {:<5} Duplex {:<5} Autoneg {:<5}\n".format(
+            "", speed, link, duplex, autoneg
+        )
     )
     stats = cli.bess.get_port_stats(port.name)
 
@@ -1606,23 +1601,23 @@ def show_port_list(cli, port_names):
                 _show_port(cli, port)
                 break
         else:
-            raise cli.CommandError('Port "%s" doest not exist' % port_name)
+            raise cli.CommandError(f'Port "{port_name}" doest not exist')
 
 
 def _show_module(cli, module_name):
     info = cli.bess.get_module_info(module_name)
 
-    cli.fout.write("  %s::%s(%s)\n" % (info.name, info.mclass, info.desc))
+    cli.fout.write(f"  {info.name}::{info.mclass}({info.desc})\n")
 
     if len(info.metadata) > 0:
         cli.fout.write("    Per-packet metadata fields:\n")
         for field in info.metadata:
             cli.fout.write(
-                "%16s %-6s%2d bytes " % (field.name + ":", field.mode, field.size)
+                "{:16} {:<6}{:2} bytes ".format(field.name + ":", field.mode, field.size)
             )
 
             if field.offset >= 0:
-                cli.fout.write("at offset %d\n" % field.offset)
+                cli.fout.write(f"at offset {field.offset}\n")
             elif field.offset == -1:
                 cli.fout.write("(no downstream reader)\n")
             elif field.offset == -2:
@@ -1635,17 +1630,16 @@ def _show_module(cli, module_name):
         for gate in info.igates:
             track_str = "batches N/A packets N/A"
             try:
-                track_str = "batches %-11d packets %-12d" % (gate.cnt, gate.pkts)
+                track_str = f"batches {gate.cnt:<11d} packets {gate.pkts:<12d}"
             except:
                 pass
             cli.fout.write(
-                "      %3d: %s %s\t%s\n"
-                % (
+                "      {:3d}: {} {}\t{}\n".format(
                     gate.igate,
                     track_str,
-                    ", ".join("%s:%d ->" % (g.name, g.ogate) for g in gate.ogates),
+                    ", ".join(f"{g.name}:{g.ogate} ->" for g in gate.ogates),
                     ", ".join(
-                        "%s::%s" % (h.class_name, h.hook_name) for h in gate.gatehooks
+                        f"{h.class_name}::{h.hook_name}" for h in gate.gatehooks
                     ),
                 )
             )
@@ -1655,28 +1649,27 @@ def _show_module(cli, module_name):
         for gate in info.ogates:
             track_str = "batches N/A packets N/A"
             try:
-                track_str = "batches %-11d packets %-12d" % (gate.cnt, gate.pkts)
+                track_str = f"batches {gate.cnt:<11d} packets {gate.pkts:<12d}"
             except:
                 pass
             cli.fout.write(
-                "      %3d: %s -> %d:%s\t%s\n"
-                % (
+                "      {:3d}: {} -> {}:{}\t{}\n".format(
                     gate.ogate,
                     track_str,
                     gate.igate,
                     gate.name,
                     ", ".join(
-                        "%s::%s" % (h.class_name, h.hook_name) for h in gate.gatehooks
+                        f"{h.class_name}::{h.hook_name}" for h in gate.gatehooks
                     ),
                 )
             )
-    cli.fout.write("    Deadends: %-12d\n" % (info.deadends,))
+    cli.fout.write(f"    Deadends: {info.deadends:<12d}\n")
 
     if hasattr(info, "dump"):
         dump_str = pprint.pformat(info.dump, width=74)
         dump_str = "\n      ".join(dump_str.split("\n"))
         cli.fout.write("    Dump:\n")
-        cli.fout.write("      %s\n" % dump_str)
+        cli.fout.write(f"      {dump_str}\n")
 
 
 @cmd("show module", "Show the status of all modules")
@@ -1807,7 +1800,7 @@ def unload_plugin(cli, plugin):
 def show_plugin_all(cli):
     plugins = cli.bess.list_plugins().paths
     for plugin_name in plugins:
-        cli.fout.write("%-16s\n" % (plugin_name))
+        cli.fout.write(f"{plugin_name:<16}\n")
 
 
 def _show_driver(cli, drv_name, detail):
@@ -1838,7 +1831,7 @@ def show_driver_list(cli, drv_names):
 @cmd("show version", "Show the version of BESS daemon")
 def show_version(cli):
     version = cli.bess.get_version()
-    cli.fout.write("%s\n" % version.version)
+    cli.fout.write(f"{version.version}\n")
 
 
 def _monitor_pipeline(cli, field, units, graph_args=[]):
@@ -2083,7 +2076,7 @@ def _monitor_tc_loop(cli, tcs, wids, max_len, fields, csv_f=None):
         # 1. Write Header
         timestamp = current_stats[tcs[-1]].timestamp
         cli.fout.write("\n")
-        fmt_head = "{:<%d}{:>12}{:>12}{:>12}{:>12}{:>12}{:>12}\n" % (max_len,)
+        fmt_head = f"{{:<{max_len}}}{{:>12}}{{:>12}}{{:>12}}{{:>12}}{{:>12}}{{:>12}}\n"
         cli.fout.write(
             fmt_head.format(time.strftime("%X") + str(timestamp % 1)[1:8], *fields)
         )
@@ -2096,8 +2089,7 @@ def _monitor_tc_loop(cli, tcs, wids, max_len, fields, csv_f=None):
             tc_display_name = f"W{wids[tc]} {tc}"
 
             fmt_data = (
-                "{:<%d}{:>12.3f}{:>12d}{:>12.3f}{:>12.3f}{:>12.3f}{:>12.3f}\n"
-                % (max_len,)
+                f"{{:<{max_len}}}{{:>12.3f}}{{:>12d}}{{:>12.3f}}{{:>12.3f}}{{:>12.3f}}{{:>12.3f}}\n"
             )
             cli.fout.write(fmt_data.format(tc_display_name, *data))
 
@@ -2180,7 +2172,7 @@ def _capture_gate(cli, module_name, direction, gate, opts, program, hook_fn):
     capture_cmd.extend(opts)
     capture_cmd = " ".join(capture_cmd)
 
-    cli.fout.write("  Running: %s\n" % capture_cmd)
+    cli.fout.write(f"  Running: {capture_cmd}\n")
     proc = subprocess.Popen(capture_cmd, shell=True, start_new_session=True)
 
     unhook = True
