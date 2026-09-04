@@ -113,6 +113,8 @@ pb: $(BUILD_OUTPUT_DIR) ## Generate Go protobuf files
 		--output $(BUILD_OUTPUT_DIR) \
 		.
 	@cp -a $(BUILD_OUTPUT_DIR)/bess_pb $(BESS_PB_DIR)
+	@echo "Fixing SonarQube issues in generated protobuf files..."
+	@go run pfcpiface/tools/fix_sonar_pb.go $(BESS_PB_DIR)/bess_pb
 
 py-pb: $(BUILD_OUTPUT_DIR) ## Generate Python protobuf files
 	@echo "Generating Python protobuf files..."
