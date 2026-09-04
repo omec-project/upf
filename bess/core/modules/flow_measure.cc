@@ -99,8 +99,7 @@ void FlowMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
         uint64_t flag =
             get_attr<uint64_t>(this, buffer_flag_attr_id_, batch->pkts()[i]);
         if (!Flag_IsValid(flag)) {
-          LOG_EVERY_N(WARNING, 100'001)
-              << "Encountered invalid flag: " << flag;
+          LOG_EVERY_N(WARNING, 100'001) << "Encountered invalid flag: " << flag;
           continue;
         } else {
           current_flag_value_ = static_cast<Flag>(flag);
@@ -172,10 +171,10 @@ void FlowMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 /*----------------------------------------------------------------------------------*/
 CommandResponse FlowMeasure::CommandReadStats(
     const bess::pb::FlowMeasureCommandReadArg &arg) {
+  // Note: FLAG_VALUE_INVALID is a valid request here (see switch below); it
+  // means "no traffic seen yet" and returns empty stats. Out-of-range values
+  // are rejected by the switch's default case.
   Flag flag_to_read = static_cast<Flag>(arg.flag_to_read());
-  if (!Flag_IsValid(flag_to_read)) {
-    return CommandFailure(EINVAL, "invalid flag value");
-  }
   Flag cached_current_flag;
   {
     // Cache current flag so we do not block the dataplane while reading the
