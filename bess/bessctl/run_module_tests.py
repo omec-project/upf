@@ -43,20 +43,26 @@ this_dir = os.path.dirname(os.path.abspath(__file__))
 bessctl = os.path.join(this_dir, "bessctl")
 default_test_dir = os.path.join(this_dir, "module_tests")
 
+try:
+    from .errors import CommandError
+except ImportError:  # executed as a script / imported as a top-level module
+    if __package__:
+        raise
+    from errors import CommandError
 
-class CommandError(subprocess.CalledProcessError):
-    """Identical to CalledProcessError, except it also shows the output"""
 
-    def __str__(self):
-        return f"{super().__str__()}\n{self.output}"
+class DaemonStartError(Exception):
+    pass
 
 
 def run_cmd(cmd):
     args = shlex.split(cmd)
     try:
-        ret = subprocess.check_call(args, stderr=subprocess.STDOUT)
+        output = subprocess.check_output(args, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
-        raise CommandError(e.returncode, e.cmd, e.output)
+        raise CommandError(e.returncode, e.cmd, e.output) from e
+    if output:
+        print(output.decode(errors="replace"), end="")
 
 
 def main():
@@ -79,15 +85,16 @@ def main():
 
     try:
         run_cmd(daemon_start_cmd)
-    except CommandError:
-        raise Exception("bess daemon could not start")
+    except CommandError as e:
+        raise DaemonStartError("bess daemon could not start") from e
 
     for file_name in glob.glob(os.path.join(args.test_dir, f"{args.test_name}.py")):
         print(f"Running test {file_name}")
 
         try:
             run_cmd(f"{bessctl} daemon reset -- run file {file_name}")
-        except CommandError:
+        except CommandError as e:
+            print(e)
             any_failure = 1
             run_cmd(daemon_start_cmd)
 

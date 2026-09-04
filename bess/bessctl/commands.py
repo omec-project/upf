@@ -564,7 +564,7 @@ def bind_var(cli, var_type, line):
                 val.append(int(wid_str))
             else:
                 raise cli.BindError('"wid" must be a positive number')
-        val = sorted(list(set(val)))
+        val = sorted(set(val))
 
     elif var_type == "host":
         dns = re.match(r"^[a-zA-Z0-9][a-zA-Z0-9\-.]*$", val)
@@ -589,7 +589,7 @@ def bind_var(cli, var_type, line):
             raise cli.BindError('"socket" must be a positive number')
 
     elif var_type == "name+":
-        val = sorted(list(set(head.split())))  # collect unique items
+        val = sorted(set(head.split()))  # collect unique items
 
     elif var_type == "confname":
         if val.find("\0") >= 0:
@@ -602,7 +602,7 @@ def bind_var(cli, var_type, line):
     elif var_type == "map":
         try:
             val = eval(f"_parse_map({head})")
-        except Exception:
+        except Exception:  # noqa: BLE001 -- eval() of arbitrary user input can raise any exception type
             raise cli.BindError('"map" should be "key=val, key=val, ..."')
 
     elif var_type == "pyobj":
@@ -611,7 +611,7 @@ def bind_var(cli, var_type, line):
                 val = None
             else:
                 val = eval(head)
-        except Exception:
+        except Exception:  # noqa: BLE001 -- eval() of arbitrary user input can raise any exception type
             raise cli.BindError(
                 '"pyobj" should be an object in python syntax'
                 ' (e.g., 42, "foo", ["hello", "world"], {"bar": "baz"})'
@@ -623,7 +623,7 @@ def bind_var(cli, var_type, line):
     elif var_type == "int":
         try:
             val = int(val)
-        except Exception:
+        except (ValueError, TypeError):
             raise cli.BindError("Expected an integer")
 
     return val, remainder
@@ -957,7 +957,7 @@ def _do_run_file(cli, conf_file):
             )
         )
         raise cli.HandledError()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- compiling an arbitrary user config script can raise any exception type
         cli.err(f"Failed to compile BESS config file ({conf_file}): {e}")
         raise cli.HandledError()
 
@@ -1123,7 +1123,7 @@ def conigure_port(cli, name, args):
 
 @cmd("delete worker WORKER_ID...", "Delete a worker")
 def delete_worker(cli, wids):
-    wids = sorted(list(set(wids)))
+    wids = sorted(set(wids))
     for wid in wids:
         cli.bess.destroy_worker(wid)
 
@@ -1360,7 +1360,12 @@ def _build_tcs_tree(tcs):
 def check_constraints(cli):
     try:
         cli.bess.check_constraints()
-    except Exception as e:
+    except (
+        cli.bess.Error,
+        cli.bess.RPCError,
+        cli.bess.APIError,
+        cli.bess.ConstraintError,
+    ) as e:
         cli.fout.write(f"Constraint check failed {e!r}\n")
 
 
@@ -1391,7 +1396,7 @@ def show_tc_all(cli):
 
 @cmd("show tc worker WORKER_ID...", "Show the list of traffic classes")
 def show_tc_workers(cli, wids):
-    wids = sorted(list(set(wids)))
+    wids = sorted(set(wids))
     for wid in wids:
         _show_tc_list(cli, cli.bess.list_tcs(wid).classes_status)
 
@@ -1449,7 +1454,7 @@ def show_status(cli):
 
 
 # last_stats: a map of (node name, gateid) -> (timestamp, counter value)
-def _draw_pipeline(cli, field, units, last_stats=None, graph_args=[]):
+def _draw_pipeline(cli, field, units, last_stats=None, graph_args=None):
     if graph_args is None:
         graph_args = []
 
@@ -1464,15 +1469,58 @@ def _draw_pipeline(cli, field, units, last_stats=None, graph_args=[]):
         node_labels[name] = f"{name}\\n{mclass}"
         node_labels[name] += f"\\n{m.desc}"
 
+    # graph_args may chain further commands with a literal "|" token
+    # (e.g., "--as dot | dot -Tsvg -o graph.svg"). Build each stage as its
+    # own argv list and connect them without invoking a shell, to avoid
+    # command injection via shell metacharacters in user-supplied input.
+    commands = [["graph-easy"]]
+    for arg in graph_args:
+        if arg == "|":
+            if not commands[-1]:
+                raise cli.CommandError(
+                    'Invalid pipeline syntax: empty command before "|"'
+                )
+            commands.append([])
+        else:
+            commands[-1].append(arg)
+    if not commands[-1]:
+        raise cli.CommandError('Invalid pipeline syntax: empty command after "|"')
+
     try:
-        f = subprocess.Popen(
-            "graph-easy " + " ".join(graph_args),
-            shell=True,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            universal_newlines=True,
-        )
+        procs = []
+        next_stdin = subprocess.PIPE
+        last_idx = len(commands) - 1
+
+        try:
+            for i, command in enumerate(commands):
+                proc = subprocess.Popen(
+                    command,
+                    shell=False,
+                    stdin=next_stdin,
+                    stdout=subprocess.PIPE,
+                    # Only the last stage's stderr is drained (via communicate()
+                    # below); piping stderr for earlier stages without reading it
+                    # could fill the pipe buffer and hang the whole pipeline.
+                    stderr=(subprocess.PIPE if i == last_idx else None),
+                    universal_newlines=True,
+                )
+                if procs:
+                    # Let the upstream process get SIGPIPE if this one exits early.
+                    procs[-1].stdout.close()
+                procs.append(proc)
+                next_stdin = proc.stdout
+        except OSError:
+            # A later stage failed to start; reap the ones already spawned.
+            for proc in procs:
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass
+                proc.wait()
+            raise
+
+        f = procs[0]
+        last_proc = procs[-1]
 
         for m in modules:
             print(f"[{node_labels[m.name]}]", file=f.stdin)
@@ -1504,19 +1552,33 @@ def _draw_pipeline(cli, field, units, last_stats=None, graph_args=[]):
                     f"[{node_labels[name]}] ->{edge_attr} [{node_labels[gate.name]}]",
                     file=f.stdin,
                 )
-        output, error = f.communicate()
-        f.wait()
+        f.stdin.close()
+        output, _ = last_proc.communicate()
+        for proc in procs:
+            proc.wait()
         return output
 
-    except OSError as e:
-        if e.errno == errno.EPIPE:
+    except FileNotFoundError as e:
+        if e.filename == "graph-easy":
             raise cli.CommandError(
                 '"graph-easy" program is not available? '
                 'Check if the package "libgraph-easy-perl" '
                 "is installed."
-            )
-        else:
-            raise
+            ) from e
+        raise cli.CommandError(f'"{e.filename}" program is not available.') from e
+    except BrokenPipeError:
+        # A downstream stage exited early; reap the still-running processes
+        # so we don't leave them running (or as zombies).
+        for proc in procs:
+            try:
+                proc.kill()
+            except ProcessLookupError:
+                pass
+        for proc in procs:
+            proc.wait()
+        raise cli.CommandError(
+            "One of the piped commands in the pipeline exited early (broken pipe)."
+        )
 
 
 @cmd("show pipeline [GRAPHEASY_OPTS...]", "Show the current datapath pipeline")
@@ -1841,7 +1903,10 @@ def show_version(cli):
     cli.fout.write(f"{version.version}\n")
 
 
-def _monitor_pipeline(cli, field, units, graph_args=[]):
+def _monitor_pipeline(cli, field, units, graph_args=None):
+    if graph_args is None:
+        graph_args = []
+
     modules = sorted(cli.bess.list_modules().modules, key=lambda x: x.name)
 
     last_stats = {}

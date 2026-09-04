@@ -99,7 +99,7 @@ class CLI:
 
         try:
             return os.path.expanduser("~/.bess_history")
-        except Exception:
+        except (KeyError, OSError, RuntimeError):
             return None
 
     def _setup_error_output(self, ferr):
@@ -404,7 +404,7 @@ class CLI:
                         formatted_candidate = self._format_candidate(candidate)
                         candidates.append(formatted_candidate)
 
-        return possible_cmds, sorted(list(set(candidates)))
+        return possible_cmds, sorted(set(candidates))
 
     def _format_candidate(self, candidate):
         """Format a completion candidate by adding space if needed."""
@@ -502,7 +502,7 @@ class CLI:
             # so we add our exception handler for debugging
             try:
                 self.candidates = self._do_complete(line, partial_word)
-            except BaseException:
+            except BaseException:  # noqa: BLE001 -- surface any completer bug instead of readline silently swallowing it
                 import traceback
 
                 traceback.print_exc()
@@ -657,7 +657,7 @@ class CLI:
                 self.rl.write_history_file(self.history_file)
             except OSError:
                 self.err(f'Cannot write to history file "{self.history_file}"')
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- readline internals can raise arbitrary errors; report and continue
                 self.err(
                     f'Unexpected error saving history file "{self.history_file}": {e}'
                 )
@@ -721,7 +721,7 @@ class CLI:
                 self.rl.read_history_file(self.history_file)
         except OSError:
             self.err(f'Cannot read from history file "{self.history_file}"')
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- readline internals can raise arbitrary errors; report and continue
             self.err(
                 f'Unexpected error reading history file "{self.history_file}": {e}'
             )

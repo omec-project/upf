@@ -44,13 +44,20 @@ except ImportError:
     print("Cannot import the API module (pybess)", file=sys.stderr)
     raise
 
+try:
+    from .errors import BessNotRunningError
+except ImportError:  # executed as a script / imported as a top-level module
+    if __package__:
+        raise
+    from errors import BessNotRunningError
+
 
 def get_local_bess_handle():
     bess = BESS()
     try:
         bess.connect()
-    except BESS.RPCError:
-        raise Exception("BESS is not running")
+    except BESS.RPCError as e:
+        raise BessNotRunningError("BESS is not running") from e
     return bess
 
 
@@ -394,11 +401,14 @@ class MeasureablePort:
         else:
             self.bess.connect_modules(src.name, self.tx_port.port_out, ogate, 0)
 
-    def cumulative_stats(self, rtt_percentiles=[0, 25, 50, 99, 100]):
+    def cumulative_stats(self, rtt_percentiles=None):
         """
         Returns a PortsStatsGenerator configured to report cummulative PMDPort
         statistics.
         """
+        if rtt_percentiles is None:
+            rtt_percentiles = [0, 25, 50, 99, 100]
+
         return PortStatsGenerator(
             self.bess,
             self.tx_port.name,
@@ -408,11 +418,14 @@ class MeasureablePort:
             rate=False,
         )
 
-    def rate_stats(self, rtt_percentiles=[0, 25, 50, 99, 100]):
+    def rate_stats(self, rtt_percentiles=None):
         """
         Returns a PortsStatsGenerator configured to report PMDPort statistics as
         rates.
         """
+        if rtt_percentiles is None:
+            rtt_percentiles = [0, 25, 50, 99, 100]
+
         return PortStatsGenerator(
             self.bess,
             self.tx_port.name,
