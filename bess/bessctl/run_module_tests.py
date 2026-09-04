@@ -62,12 +62,25 @@ def run_cmd(cmd):
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         universal_newlines=True,
+        errors="replace",
+        bufsize=1,
     )
     lines = []
-    for line in proc.stdout or ():
-        print(line, end="")
-        lines.append(line)
-    proc.wait()
+    try:
+        for line in proc.stdout or ():
+            print(line, end="", flush=True)
+            lines.append(line)
+    except (BrokenPipeError, KeyboardInterrupt):
+        # Unblock a child possibly stuck writing to the now-unread pipe.
+        try:
+            proc.kill()
+        except ProcessLookupError:
+            pass
+        raise
+    finally:
+        if proc.stdout is not None:
+            proc.stdout.close()
+        proc.wait()
     if proc.returncode != 0:
         raise CommandError(proc.returncode, args, "".join(lines))
 
@@ -101,7 +114,8 @@ def main():
         try:
             run_cmd(f"{bessctl} daemon reset -- run file {file_name}")
         except CommandError as e:
-            print(f"Test {file_name} failed (exit code {e.returncode})")
+            cmd_str = " ".join(shlex.quote(str(a)) for a in e.cmd)
+            print(f"Test {file_name} failed (exit code {e.returncode}): {cmd_str}")
             any_failure = 1
             run_cmd(daemon_start_cmd)
 
