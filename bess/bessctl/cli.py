@@ -184,9 +184,7 @@ class CLI:
         for i, syntax_token in enumerate(syntax_tokens):
             # Get current word and variable attributes
             line_word = self._get_line_word(remainder)
-            var_type, _, var_candidates = self._get_var_attrs(
-                syntax_token, line_word
-            )
+            var_type, _, var_candidates = self._get_var_attrs(syntax_token, line_word)
 
             # Handle empty remainder (end of input)
             if remainder.strip() == "":
