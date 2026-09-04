@@ -647,7 +647,7 @@ def help(cli):
 
 
 @cmd("quit", "Quit CLI")
-def help(cli):
+def quit(cli):
     raise EOFError()
 
 
@@ -2101,7 +2101,7 @@ def monitor_port_all(cli):
 
 
 @cmd("monitor port PORT...", "Monitor the current traffic of specified ports")
-def monitor_port_all(cli, ports):
+def monitor_port_selected(cli, ports):
     _monitor_ports(cli, *ports)
 
 
@@ -2218,7 +2218,7 @@ def monitor_tc_all(cli):
 
 
 @cmd("monitor tc TC...", "Monitor the statistics of specified traffic classes")
-def monitor_tc_all(cli, tcs):
+def monitor_tc_selected(cli, tcs):
     _monitor_tcs(cli, *tcs)
 
 
