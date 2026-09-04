@@ -184,7 +184,7 @@ class CLI:
         for i, syntax_token in enumerate(syntax_tokens):
             # Get current word and variable attributes
             line_word = self._get_line_word(remainder)
-            var_type, _var_desc, var_candidates = self._get_var_attrs(
+            var_type, _, var_candidates = self._get_var_attrs(
                 syntax_token, line_word
             )
 
@@ -547,7 +547,7 @@ class CLI:
         return []
 
     def bind_args(self, cmd, line):
-        syntax, _desc, func = cmd
+        syntax, _, func = cmd
         remainder = line
         args = []
 
