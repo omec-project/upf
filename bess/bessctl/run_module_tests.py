@@ -57,12 +57,19 @@ class DaemonStartError(Exception):
 
 def run_cmd(cmd):
     args = shlex.split(cmd)
-    try:
-        output = subprocess.check_output(args, stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as e:
-        raise CommandError(e.returncode, e.cmd, e.output) from e
-    if output:
-        print(output.decode(errors="replace"), end="")
+    proc = subprocess.Popen(
+        args,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        universal_newlines=True,
+    )
+    lines = []
+    for line in proc.stdout or ():
+        print(line, end="")
+        lines.append(line)
+    proc.wait()
+    if proc.returncode != 0:
+        raise CommandError(proc.returncode, args, "".join(lines))
 
 
 def main():
@@ -94,7 +101,7 @@ def main():
         try:
             run_cmd(f"{bessctl} daemon reset -- run file {file_name}")
         except CommandError as e:
-            print(e)
+            print(f"Test {file_name} failed (exit code {e.returncode})")
             any_failure = 1
             run_cmd(daemon_start_cmd)
 
