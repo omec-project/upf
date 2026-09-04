@@ -113,7 +113,7 @@ def gen_unix_socket(bess, sockname, timeout_sec=3):
     # listen()ing on the abstract path '\0' + SOCKET_PATH + sockname.
     # When we connect() to it below, the thread eventually wakes up
     # and creates the in-BESS listener.
-    socket_port = bess.create_port(
+    bess.create_port(
         "UnixSocketPort",
         sockname,
         {

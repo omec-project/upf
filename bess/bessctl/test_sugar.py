@@ -137,7 +137,7 @@ class TestSugar(unittest.TestCase):
 def generate_test_method(path):
     def template(self):
         xformed = sugar.xform_file(path)
-        code = compile(xformed, path, "exec")
+        compile(xformed, path, "exec")
 
     return template
 

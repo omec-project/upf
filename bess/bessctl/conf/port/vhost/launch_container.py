@@ -132,7 +132,7 @@ def kill(cid):
         print(cmd)
 
     try:
-        proc = subprocess.check_call(shlex.split(cmd), stdout=subprocess.PIPE)
+        subprocess.check_call(shlex.split(cmd), stdout=subprocess.PIPE)
     except subprocess.CalledProcessError:
         pass
 
@@ -145,7 +145,7 @@ def main(argv):
     num_containers = int(argv[1])
 
     try:
-        procs = [launch(i) for i in range(num_containers)]
+        [launch(i) for i in range(num_containers)]
 
         print("Press Ctrl+C to terminate all containers")
         while True:
