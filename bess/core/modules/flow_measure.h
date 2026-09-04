@@ -115,6 +115,12 @@ class FlowMeasure final : public Module {
   bool leader_;
   Flag current_flag_value_;  // protected by flag_mutex_
   mutable std::mutex flag_mutex_;
+  // Each guards all rte_hash_* calls (lookup/add/iterate/reset) on the
+  // correspondingly-lettered table, so ProcessBatch() and CommandReadStats()
+  // never touch the same table concurrently while still letting them run
+  // unimpeded on opposite sides of the double buffer.
+  mutable std::mutex table_a_mutex_;
+  mutable std::mutex table_b_mutex_;
   rte_hash *table_a_;
   rte_hash *table_b_;
   std::vector<SessionStats> table_data_a_;

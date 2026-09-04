@@ -89,21 +89,23 @@ void FlowMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   uint64_t now_ns = tsc_to_ns(rdtsc());
   for (int i = 0; i < batch->cnt(); ++i) {
     Flag cached_current_flag;
-    if (leader_) {
+    {
       const std::lock_guard<std::mutex> lock(flag_mutex_);
-      set_attr<uint64_t>(this, buffer_flag_attr_id_, batch->pkts()[i],
-                         static_cast<uint64_t>(current_flag_value_));
-      cached_current_flag = current_flag_value_;
-    } else {
-      const std::lock_guard<std::mutex> lock(flag_mutex_);
-      uint64_t flag =
-          get_attr<uint64_t>(this, buffer_flag_attr_id_, batch->pkts()[i]);
-      if (!Flag_IsValid(flag)) {
-        LOG_EVERY_N(WARNING, 100'001) << "Encountered invalid flag: " << flag;
-        continue;
-      } else {
-        current_flag_value_ = static_cast<Flag>(flag);
+      if (leader_) {
+        set_attr<uint64_t>(this, buffer_flag_attr_id_, batch->pkts()[i],
+                           static_cast<uint64_t>(current_flag_value_));
         cached_current_flag = current_flag_value_;
+      } else {
+        uint64_t flag =
+            get_attr<uint64_t>(this, buffer_flag_attr_id_, batch->pkts()[i]);
+        if (!Flag_IsValid(flag)) {
+          LOG_EVERY_N(WARNING, 100'001)
+              << "Encountered invalid flag: " << flag;
+          continue;
+        } else {
+          current_flag_value_ = static_cast<Flag>(flag);
+          cached_current_flag = current_flag_value_;
+        }
       }
     }
 
@@ -117,20 +119,28 @@ void FlowMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     // Pick current side.
     rte_hash *current_hash = nullptr;
     std::vector<SessionStats> *current_data = nullptr;
+    std::mutex *table_mutex = nullptr;
     switch (cached_current_flag) {
       case Flag::FLAG_VALUE_A:
         current_hash = table_a_;
         current_data = &table_data_a_;
+        table_mutex = &table_a_mutex_;
         break;
       case Flag::FLAG_VALUE_B:
         current_hash = table_b_;
         current_data = &table_data_b_;
+        table_mutex = &table_b_mutex_;
         break;
       default:
         LOG_EVERY_N(ERROR, 100'001)
             << "Unknown flag value: " << Flag_Name(cached_current_flag) << ".";
         continue;
     }
+    // Held for the rest of the iteration: rte_hash forbids calling
+    // rte_hash_lookup()/rte_hash_add_key() (below) concurrently with
+    // rte_hash_iterate()/rte_hash_reset(), which CommandReadStats() performs
+    // on this same table while holding this same per-table lock.
+    const std::lock_guard<std::mutex> table_lock(*table_mutex);
     // Find or create session.
     TableKey key(fseid, pdr);
     int32_t ret = rte_hash_lookup(current_hash, &key);
@@ -144,7 +154,7 @@ void FlowMeasure::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     }
     // Update stats.
     SessionStats &stat = current_data->at(ret);
-    const std::lock_guard<std::mutex> lock(stat.mutex);
+    const std::lock_guard<std::mutex> stat_lock(stat.mutex);
     uint64_t diff_ns = now_ns - ts_ns;
     if (stat.last_latency == 0) {
       stat.last_latency = diff_ns;
@@ -166,9 +176,10 @@ CommandResponse FlowMeasure::CommandReadStats(
   if (!Flag_IsValid(flag_to_read)) {
     return CommandFailure(EINVAL, "invalid flag value");
   }
-  // Cache current flag so we don't block the dataplane while reading the stats.
   Flag cached_current_flag;
   {
+    // Cache current flag so we do not block the dataplane while reading the
+    // stats: current_flag_value_ itself is only ever touched briefly.
     const std::lock_guard<std::mutex> lock(flag_mutex_);
     cached_current_flag = current_flag_value_;
   }
@@ -184,20 +195,31 @@ CommandResponse FlowMeasure::CommandReadStats(
   auto t_start = std::chrono::high_resolution_clock::now();
   rte_hash *current_hash = nullptr;
   std::vector<SessionStats> *current_data = nullptr;
+  std::mutex *table_mutex = nullptr;
   switch (flag_to_read) {
     case Flag::FLAG_VALUE_INVALID:
       return CommandSuccess(resp);  // return empty stats when no traffic
     case Flag::FLAG_VALUE_A:
       current_hash = table_a_;
       current_data = &table_data_a_;
+      table_mutex = &table_a_mutex_;
       break;
     case Flag::FLAG_VALUE_B:
       current_hash = table_b_;
       current_data = &table_data_b_;
+      table_mutex = &table_b_mutex_;
       break;
     default:
       return CommandFailure(EINVAL, "invalid flag value");
   }
+  // Held until this function returns: rte_hash_iterate() below (and
+  // rte_hash_reset(), if arg.clear()) must not run concurrently with
+  // ProcessBatch()'s rte_hash_lookup()/rte_hash_add_key() on this same
+  // table, and ProcessBatch() takes this same per-table lock for the whole
+  // time it touches this table. Using a lock per table (rather than one
+  // shared with the other side) avoids blocking the dataplane while it is
+  // processing the other, still-active buffer.
+  const std::lock_guard<std::mutex> table_lock(*table_mutex);
   const void *key = nullptr;
   void *data = nullptr;
   uint32_t next = 0;
@@ -211,7 +233,7 @@ CommandResponse FlowMeasure::CommandReadStats(
     }
     const TableKey *table_key = reinterpret_cast<const TableKey *>(key);
     const SessionStats &session_stat = current_data->at(ret);
-    const std::lock_guard<std::mutex> lock(session_stat.mutex);
+    const std::lock_guard<std::mutex> stat_lock(session_stat.mutex);
     const std::vector<double> lat_percs(arg.latency_percentiles().begin(),
                                         arg.latency_percentiles().end());
     const std::vector<double> jitter_percs(arg.jitter_percentiles().begin(),
@@ -240,7 +262,7 @@ CommandResponse FlowMeasure::CommandReadStats(
     // TODO: this is quite slow
     VLOG(1) << name() << ": hash table clear done, clearing table data...";
     for (auto &stat : *current_data) {
-      const std::lock_guard<std::mutex> lock(stat.mutex);
+      const std::lock_guard<std::mutex> stat_lock(stat.mutex);
       stat.reset();
     }
     VLOG(1) << name() << ": table data clear done.";
