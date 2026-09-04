@@ -108,7 +108,7 @@ def launch(cid):
         out = None  # to screen
         print(cmd)
     else:
-        out = subprocess.PIPE
+        out = subprocess.DEVNULL
 
     proc = subprocess.Popen(
         shlex.split(cmd),
@@ -132,7 +132,9 @@ def kill(cid):
         print(cmd)
 
     try:
-        proc = subprocess.check_call(shlex.split(cmd), stdout=subprocess.PIPE)
+        out = None if VERBOSE else subprocess.DEVNULL
+        err = None if VERBOSE else subprocess.DEVNULL
+        subprocess.check_call(shlex.split(cmd), stdout=out, stderr=err)
     except subprocess.CalledProcessError:
         pass
 
@@ -144,8 +146,11 @@ def main(argv):
 
     num_containers = int(argv[1])
 
+    procs = []
+
     try:
-        procs = [launch(i) for i in range(num_containers)]
+        for i in range(num_containers):
+            procs.append(launch(i))
 
         print("Press Ctrl+C to terminate all containers")
         while True:
@@ -155,6 +160,12 @@ def main(argv):
     finally:
         for cid in range(num_containers):
             kill(cid)
+        for proc in procs:
+            try:
+                proc.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.communicate()
 
     return 0
 
