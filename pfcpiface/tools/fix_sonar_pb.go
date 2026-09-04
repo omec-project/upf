@@ -61,7 +61,7 @@ func processFile(path string) error {
 	lines := strings.Split(original, "\n")
 	output := make([]string, 0, len(lines)+8)
 	modified := false
-	for i := 0; i < len(lines); i++ {
+	for i := range lines {
 		line := lines[i]
 		trim := strings.TrimSpace(line)
 		// Match any empty function: func (...) methodName() {}
