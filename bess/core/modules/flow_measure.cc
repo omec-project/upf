@@ -218,7 +218,30 @@ CommandResponse FlowMeasure::CommandReadStats(
   // time it touches this table. Using a lock per table (rather than one
   // shared with the other side) avoids blocking the dataplane while it is
   // processing the other, still-active buffer.
-  const std::lock_guard<std::mutex> table_lock(*table_mutex);
+  if (cached_current_flag == flag_to_read) {
+    // Reading the still-active buffer would hold the table lock across
+    // rte_hash_iterate() (and rte_hash_reset(), if arg.clear()) while
+    // ProcessBatch() is still writing to this same table: fail fast instead
+    // of stalling the dataplane for an invalid controller request.
+    return CommandFailure(EINVAL, "refusing to read active buffer");
+  }
+  // current_flag_value_ can still change (concurrent CommandFlipFlag(), or a
+  // follower catching up to new packets) between the check above and here,
+  // so try_lock instead of blocking: contention on a table that is supposed
+  // to be inactive means it may have just become active, and we would rather
+  // fail fast than stall the dataplane waiting for/holding that lock.
+  std::unique_lock<std::mutex> table_lock(*table_mutex, std::try_to_lock);
+  if (!table_lock.owns_lock()) {
+    return CommandFailure(EBUSY, "table busy (possible concurrent flip/read)");
+  }
+  {
+    // Re-check under flag_mutex_: now that we hold table_lock, confirm the
+    // table we are about to iterate/reset still is not the active one.
+    const std::lock_guard<std::mutex> lock(flag_mutex_);
+    if (current_flag_value_ == flag_to_read) {
+      return CommandFailure(EINVAL, "refusing to read active buffer");
+    }
+  }
   const void *key = nullptr;
   void *data = nullptr;
   uint32_t next = 0;
