@@ -5,6 +5,30 @@ repos:
     rev: v8.30.1
     hooks:
       - id: gitleaks
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.5
+    hooks:
+      # Run the linter
+      - id: ruff-check
+        args: [--fix, --output-format=concise]
+        exclude: |
+          (?x)^(
+            bess/bessctl/module_tests/|
+            bess/bin/dpdk-devbind\.py
+          )
+      # Run the formatter
+      - id: ruff-format
+        exclude: |
+          (?x)^(
+            bess/bessctl/module_tests/|
+            bess/bin/dpdk-devbind\.py
+          )
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v14.0.0
+    hooks:
+      - id: clang-format
+        types_or: [c, c++, proto]
+        exclude: ^bess/core/kmod/
   - repo: local
     hooks:
       - id: gci

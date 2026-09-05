@@ -118,12 +118,25 @@ func (node *PFCPNode) Serve() {
 	for !shutdown {
 		select {
 		case fseid := <-node.upf.reportNotifyChan:
-			// TODO: Logic to distinguish PFCPConn based on SEID
+			// Offer the notification to every association until one recognises the
+			// F-SEID. This used to stop at the first, whichever the map happened to
+			// yield: if that association did not hold the session the notification was
+			// dropped with a warning and no Session Report was sent, so an idle UE
+			// stayed unreachable. More than one association is ordinary -- an SMF
+			// talking to this element directly while an adapter is also associated is
+			// enough -- and which one answered was a coin toss.
+			reported := false
+
 			node.pConns.Range(func(key, value interface{}) bool {
 				pConn := value.(*PFCPConn)
-				pConn.handleDigestReport(fseid)
-				return false
+				reported = pConn.handleDigestReport(fseid)
+
+				return !reported
 			})
+
+			if !reported {
+				logger.PfcpLog.Warnln("no association holds a session for fseid, downlink data notification dropped:", fseid)
+			}
 		case <-node.ctx.Done():
 			shutdown = true
 
