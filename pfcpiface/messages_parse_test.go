@@ -26,6 +26,7 @@ func (f *fakeDP) SendEndMarkers(endMarkerList *[][]byte) error { return nil }
 func (f *fakeDP) SendMsgToUPF(method upfMsgType, all PacketForwardingRules, newRules PacketForwardingRules) uint8 {
 	return 1
 }
+
 func (f *fakeDP) IsConnected(accessIP *net.IP) bool                                     { return true }
 func (f *fakeDP) SummaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric)    {}
 func (f *fakeDP) PortStats(uc *upfCollector, ch chan<- prometheus.Metric)               {}
