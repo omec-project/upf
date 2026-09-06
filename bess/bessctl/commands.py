@@ -571,12 +571,12 @@ def _handle_eval(cli, val, var_type):
             call = tree.body
             if not isinstance(call, ast.Call) or call.func.id != "_parse_map":
                 raise ValueError()
-            
+
             res = {}
             for kw in call.keywords:
                 res[kw.arg] = ast.literal_eval(kw.value)
             return res
-            
+
         # pyobj case: safely evaluate standard python literal representations
         return ast.literal_eval(val) if val.strip() != "" else None
     except Exception:
@@ -599,7 +599,7 @@ def _handle_pause_workers(cli, val, var_type):
 def bind_var(cli, var_type, line):
     """Bind and validate a CLI argument based on var_type."""
     head, remainder = split_var(cli, var_type, line)
-    
+
     # Map types to their respective handler functions
     handler_map = {
         'endis': _handle_endis_dir,
@@ -621,7 +621,7 @@ def bind_var(cli, var_type, line):
 
     handler = handler_map.get(var_type)
     val = handler(cli, head, var_type) if handler else head
-    
+
     return val, remainder
 
 
