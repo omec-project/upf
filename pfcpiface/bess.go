@@ -11,6 +11,7 @@ import (
 	"math"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/omec-project/upf-epc/logger"
@@ -28,6 +29,9 @@ const (
 	DefaultBurstSize = 32 * 1514
 	// SockAddr : Unix Socket path to read bess notification from.
 	SockAddr = "/tmp/notifycp"
+	// notifyRedialInterval is how long to wait before reconnecting to the
+	// datapath's notification socket after a dial or read failure.
+	notifyRedialInterval = 2 * time.Second
 	// PfcpAddr : Unix Socket path to send end marker packet.
 	PfcpAddr = "/tmp/pfcpport"
 	// AppQerLookup: Application Qos table Name.
@@ -85,12 +89,14 @@ var bessIP = flag.String("bess", "localhost:10514", "BESS IP/port combo")
 var enableGtpuPathMonitoring = false
 
 type bess struct {
-	client           pb.BESSControlClient
-	conn             *grpc.ClientConn
-	endMarkerSocket  net.Conn
-	notifyBessSocket net.Conn
-	endMarkerChan    chan []byte
-	qciQosMap        map[uint8]*QosConfigVal
+	client          pb.BESSControlClient
+	conn            *grpc.ClientConn
+	endMarkerSocket net.Conn
+	notifyStop      chan struct{}
+	notifyMu        sync.Mutex
+	notifyConn      net.Conn
+	endMarkerChan   chan []byte
+	qciQosMap       map[uint8]*QosConfigVal
 }
 
 func (b *bess) IsConnected(accessIP *net.IP) bool {
@@ -207,6 +213,15 @@ func (b *bess) SendMsgToUPF(
 
 func (b *bess) Exit() {
 	logger.BessLog.Infoln("exit function Bess")
+
+	if b.notifyStop != nil {
+		close(b.notifyStop)
+		// Closing the channel alone cannot end a read that is already blocked, so
+		// close the socket too: without this the listener stays parked until the
+		// datapath happens to disconnect.
+		b.closeNotifyConn()
+	}
+
 	b.conn.Close()
 }
 
@@ -590,22 +605,9 @@ func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 			pdrString := strconv.FormatUint(pre.Pdr, 10)
 			ueIpString := UnknownString
 
-			if con != nil {
-				session, ok := con.store.GetSession(pre.Fseid)
-				if !ok {
-					logger.BessLog.Errorln("invalid or unknown FSEID", pre.Fseid)
-					continue
-				}
-
-				// Try to find the N6 uplink PDR with the UE IP.
-				for _, p := range session.pdrs {
-					if p.IsUplink() && p.ueAddress > 0 {
-						ueIpString = int2ip(p.ueAddress).String()
-						logger.BessLog.Debugln(p.fseID, " -> ", ueIpString)
-
-						break
-					}
-				}
+			ueIpString, ok := resolveUEIP(con, pre, ueIpString)
+			if !ok {
+				continue
 			}
 
 			ch <- prometheus.MustNewConstMetric(
@@ -667,6 +669,30 @@ func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 	return err
 }
 
+func resolveUEIP(
+	con *PFCPConn,
+	pre *pb.FlowMeasureReadResponse_Statistic,
+	ueIpString string,
+) (string, bool) {
+	if con != nil {
+		session, ok := con.store.GetSession(pre.Fseid)
+		if !ok {
+			logger.BessLog.Errorln("invalid or unknown FSEID", pre.Fseid)
+			return ueIpString, false
+		}
+
+		// Try to find the N6 uplink PDR with the UE IP.
+		for _, p := range session.pdrs {
+			if p.IsUplink() && p.ueAddress > 0 {
+				ueIpString = int2ip(p.ueAddress).String()
+				logger.BessLog.Debugln(p.fseID, " -> ", ueIpString)
+				break
+			}
+		}
+	}
+	return ueIpString, true
+}
+
 func (b *bess) endMarkerSendLoop(endMarkerChan chan []byte) {
 	for outPacket := range endMarkerChan {
 		_, err := b.endMarkerSocket.Write(outPacket)
@@ -676,21 +702,137 @@ func (b *bess) endMarkerSendLoop(endMarkerChan chan []byte) {
 	}
 }
 
-func (b *bess) notifyListen(reportNotifyChan chan<- uint64) {
+// notifyListen owns the connection to the datapath's control-plane notification
+// socket for the life of the process. Every downlink-data notification for a
+// buffering session arrives here, so losing this loop means no Session Report
+// reaches the SMF, no paging is triggered, and an idle UE becomes unreachable.
+//
+// It used to return on the first read error -- no log line, no reconnect -- so a
+// single transient failure disabled mobile-terminated reachability until the pod
+// was restarted, and nothing said so: the datapath kept writing notifications
+// into a socket with no reader, reporting successful transmits.
+func (b *bess) notifyListen(reportNotifyChan chan<- uint64, notifySockAddr string) {
+	// The rate limiter outlives reconnects on purpose: reconnecting is not a
+	// reason to re-notify for a session reported moments ago.
 	notifier := NewDownlinkDataNotifier(reportNotifyChan, 20*time.Second)
 
-	for {
-		buf := make([]byte, 512)
+	logger.BessLog.Infoln("downlink data notification listener started, socket:", notifySockAddr)
 
-		_, err := b.notifyBessSocket.Read(buf)
+	for {
+		select {
+		case <-b.notifyStop:
+			logger.BessLog.Infoln("downlink data notification listener stopped")
+			return
+		default:
+		}
+
+		var d net.Dialer
+
+		conn, err := d.DialContext(context.Background(), "unixpacket", notifySockAddr)
 		if err != nil {
+			logger.BessLog.Errorf("dial %v failed, retrying in %v: %v", notifySockAddr, notifyRedialInterval, err)
+			b.waitBeforeRedial()
+
+			continue
+		}
+
+		// Exit may have run while this dial was in flight, and it can only close a
+		// connection it can see. Registering and checking for shutdown have to happen
+		// together, or the two orders differ: with the check first, Exit can look at an
+		// empty slot and close nothing, and this goroutine then registers a connection
+		// nobody will ever close and parks on a read nobody will interrupt.
+		if !b.adoptNotifyConn(conn) {
+			conn.Close()
+			logger.BessLog.Infoln("downlink data notification listener stopped")
+
 			return
 		}
 
-		d := buf[0:8]
-		fseid := binary.LittleEndian.Uint64(d)
+		logger.BessLog.Infoln("connected to downlink data notification socket:", notifySockAddr)
+		b.readNotifications(conn, notifier)
+		b.closeNotifyConn()
+
+		b.waitBeforeRedial()
+	}
+}
+
+// readNotifications consumes notifications until the connection fails, and
+// reports why it stopped -- silence here is indistinguishable from an idle
+// network, which is what made this failure invisible.
+func (b *bess) readNotifications(conn net.Conn, notifier *downlinkDataNotifier) {
+	for {
+		buf := make([]byte, 512)
+
+		n, err := conn.Read(buf)
+		if err != nil {
+			if b.stopping() {
+				return
+			}
+
+			logger.BessLog.Errorln("downlink data notification socket read failed, reconnecting:", err)
+
+			return
+		}
+
+		if n < 8 {
+			logger.BessLog.Warnln("short downlink data notification, want at least 8 bytes, got:", n)
+			continue
+		}
+
+		fseid := binary.LittleEndian.Uint64(buf[0:8])
 
 		notifier.Notify(fseid)
+	}
+}
+
+// adoptNotifyConn registers conn as the live notification connection and reports whether
+// it was adopted. It refuses once shutdown has begun.
+//
+// The stop check belongs inside notifyMu, which closeNotifyConn also takes, because Exit
+// closes notifyStop before taking that lock. That ordering leaves exactly two possible
+// interleavings and both are safe: adopt runs first and Exit finds the connection to
+// close, or Exit runs first and adopt sees the closed channel and refuses. Checking the
+// channel outside the lock admits a third, where neither closes the connection.
+func (b *bess) adoptNotifyConn(conn net.Conn) bool {
+	b.notifyMu.Lock()
+	defer b.notifyMu.Unlock()
+
+	if b.stopping() {
+		return false
+	}
+
+	b.notifyConn = conn
+
+	return true
+}
+
+// closeNotifyConn closes the live notification connection if there is one. It is
+// safe to call from the listener and from Exit concurrently, and twice.
+func (b *bess) closeNotifyConn() {
+	b.notifyMu.Lock()
+	defer b.notifyMu.Unlock()
+
+	if b.notifyConn == nil {
+		return
+	}
+
+	b.notifyConn.Close()
+	b.notifyConn = nil
+}
+
+func (b *bess) stopping() bool {
+	select {
+	case <-b.notifyStop:
+		return true
+	default:
+		return false
+	}
+}
+
+func (b *bess) waitBeforeRedial() {
+	select {
+	case <-b.notifyStop:
+	case <-time.After(notifyRedialInterval):
 	}
 }
 
@@ -810,14 +952,13 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 			notifySockAddr = SockAddr
 		}
 
-		var d net.Dialer
-		b.notifyBessSocket, err = d.DialContext(context.Background(), "unixpacket", notifySockAddr)
-		if err != nil {
-			logger.BessLog.Errorln("dial error:", err)
-			return
-		}
+		// The listener dials for itself and keeps redialing. Dialing here instead
+		// meant a datapath that was not yet accepting connections cost this
+		// process its notification path permanently, and took the end-marker
+		// setup below down with it by returning early.
+		b.notifyStop = make(chan struct{})
 
-		go b.notifyListen(u.reportNotifyChan)
+		go b.notifyListen(u.reportNotifyChan, notifySockAddr)
 	}
 
 	if conf.EnableEndMarker {
@@ -837,7 +978,14 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 
 		go b.endMarkerSendLoop(b.endMarkerChan)
 	}
+	b.setupSliceMeter(conf)
 
+	if conf.EnableGtpuPathMonitoring {
+		enableGtpuPathMonitoring = true
+	}
+}
+
+func (b *bess) setupSliceMeter(conf *Conf) {
 	if (conf.SliceMeterConfig.N6RateBps > 0) ||
 		(conf.SliceMeterConfig.N3RateBps > 0) {
 		ctx, cancel := context.WithTimeout(context.Background(), Timeout)
@@ -851,10 +999,6 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 		if !rc {
 			logger.BessLog.Errorln(errGRPCCallFailed)
 		}
-	}
-
-	if conf.EnableGtpuPathMonitoring {
-		enableGtpuPathMonitoring = true
 	}
 }
 
@@ -1005,84 +1149,92 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 	go func() {
-		completed := false
-		defer func() { done <- completed }()
-
-		var (
-			cir, pir, cbs, ebs, pbs, gate uint64
-			srcIface                      uint8
-		)
-
-		// Uplink QER
-		srcIface = access
-
-		// Lookup QCI from QFI, else try default QCI.
-		qosVal, ok := b.qciQosMap[qer.qfi]
-		if !ok {
-			logger.BessLog.Debugf("number of config for qfi/qci: %v using default burst size", qer.qfi)
-
-			qosVal = b.qciQosMap[0]
-		}
-
-		cbs = maxUint64(calcBurstSizeFromRate(qer.ulGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
-		ebs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
-		pbs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
-
-		if qer.ulStatus != ie.GateStatusOpen {
-			gate = qerGateStatusDrop
-		} else if qer.ulMbr != 0 || qer.ulGbr != 0 {
-			/* MBR/GBR is received in Kilobits/sec.
-			   CIR/PIR is sent in bytes */
-			cir = maxUint64(((qer.ulGbr * 1000) / 8), 1)
-			pir = maxUint64(((qer.ulMbr * 1000) / 8), cir)
-			gate = qerGateMeter
-		} else {
-			gate = qerGateUnmeter
-		}
-
-		switch qer.qosLevel {
-		case ApplicationQos:
-			b.addApplicationQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
-		case SessionQos:
-			b.addSessionQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
-		}
-
-		// Downlink QER
-		srcIface = core
-
-		// Lookup QCI from QFI, else try default QCI.
-		qosVal, ok = b.qciQosMap[qer.qfi]
-		if !ok {
-			logger.BessLog.Debugf("number of config for qfi/qci: %v using default burst size", qer.qfi)
-
-			qosVal = b.qciQosMap[0]
-		}
-
-		cbs = maxUint64(calcBurstSizeFromRate(qer.dlGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
-		ebs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
-		pbs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
-
-		if qer.dlStatus != ie.GateStatusOpen {
-			gate = qerGateStatusDrop
-		} else if qer.dlMbr != 0 || qer.dlGbr != 0 {
-			/* MBR/GBR is received in Kilobits/sec.
-			   CIR/PIR is sent in bytes */
-			cir = maxUint64(((qer.dlGbr * 1000) / 8), 1)
-			pir = maxUint64(((qer.dlMbr * 1000) / 8), cir)
-			gate = qerGateMeter
-		} else {
-			gate = qerGateUnmeter
-		}
-
-		switch qer.qosLevel {
-		case ApplicationQos:
-			b.addApplicationQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
-		case SessionQos:
-			b.addSessionQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
-		}
-
-		completed = true
+		// Uplink
+		b.handleUplinkQER(ctx, qer)
+		// Downlink
+		b.handleDownlinkQER(ctx, qer)
+		done <- true
 	}()
+}
+
+func (b *bess) handleUplinkQER(ctx context.Context, qer qer) {
+	var (
+		cir, pir, cbs, ebs, pbs, gate uint64
+		srcIface                      uint8
+	)
+
+	// Uplink QER
+	srcIface = access
+
+	// Lookup QCI from QFI, else try default QCI.
+	qosVal, ok := b.qciQosMap[qer.qfi]
+	if !ok {
+		logger.BessLog.Debugf("number of config for qfi/qci: %v using default burst size", qer.qfi)
+
+		qosVal = b.qciQosMap[0]
+	}
+
+	cbs = maxUint64(calcBurstSizeFromRate(qer.ulGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
+	ebs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
+	pbs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
+
+	if qer.ulStatus != ie.GateStatusOpen {
+		gate = qerGateStatusDrop
+	} else if qer.ulMbr != 0 || qer.ulGbr != 0 {
+		/* MBR/GBR is received in Kilobits/sec.
+		   CIR/PIR is sent in bytes */
+		cir = maxUint64(((qer.ulGbr * 1000) / 8), 1)
+		pir = maxUint64(((qer.ulMbr * 1000) / 8), cir)
+		gate = qerGateMeter
+	} else {
+		gate = qerGateUnmeter
+	}
+
+	switch qer.qosLevel {
+	case ApplicationQos:
+		b.addApplicationQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
+	case SessionQos:
+		b.addSessionQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
+	}
+}
+
+func (b *bess) handleDownlinkQER(ctx context.Context, qer qer) {
+	var (
+		cir, pir, cbs, ebs, pbs, gate uint64
+		srcIface                      uint8
+	)
+	srcIface = core
+
+	// Lookup QCI from QFI, else try default QCI.
+	qosVal, ok := b.qciQosMap[qer.qfi]
+	if !ok {
+		logger.BessLog.Debugf("number of config for qfi/qci: %v using default burst size", qer.qfi)
+
+		qosVal = b.qciQosMap[0]
+	}
+
+	cbs = maxUint64(calcBurstSizeFromRate(qer.dlGbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.cbs))
+	ebs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
+	pbs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
+
+	if qer.dlStatus != ie.GateStatusOpen {
+		gate = qerGateStatusDrop
+	} else if qer.dlMbr != 0 || qer.dlGbr != 0 {
+		/* MBR/GBR is received in Kilobits/sec.
+		   CIR/PIR is sent in bytes */
+		cir = maxUint64(((qer.dlGbr * 1000) / 8), 1)
+		pir = maxUint64(((qer.dlMbr * 1000) / 8), cir)
+		gate = qerGateMeter
+	} else {
+		gate = qerGateUnmeter
+	}
+
+	switch qer.qosLevel {
+	case ApplicationQos:
+		b.addApplicationQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
+	case SessionQos:
+		b.addSessionQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
+	}
 }
 
 func (b *bess) addApplicationQER(ctx context.Context, gate uint64, srcIface uint8,
@@ -1250,9 +1402,6 @@ func (b *bess) setActionValue(f far) uint8 {
 
 func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 	go func() {
-		completed := false
-		defer func() { done <- completed }()
-
 		var (
 			arg *anypb.Any
 			err error
@@ -1278,6 +1427,7 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 		arg, err = anypb.New(f)
 		if err != nil {
 			logger.BessLog.Infoln(errMarshalRule, f, err)
+			done <- false
 			return
 		}
 
@@ -1285,27 +1435,25 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 
 		if enableGtpuPathMonitoring {
 			g := &pb.GtpuPathMonitoringCommandAddDeleteArg{
-				GnbIp: far.tunnelIP4Dst, /* gnb ip */
+				GnbIp: far.tunnelIP4Dst,
 			}
 
 			arg, err = anypb.New(g)
 			if err != nil {
 				logger.BessLog.Infoln("error marshalling data", g, err)
+				done <- false
 				return
 			}
 
 			b.processGtpuPathMonitoring(ctx, arg, upfMsgTypeAdd)
 		}
 
-		completed = true
+		done <- true
 	}()
 }
 
 func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 	go func() {
-		completed := false
-		defer func() { done <- completed }()
-
 		var (
 			arg *anypb.Any
 			err error
@@ -1321,6 +1469,7 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 		arg, err = anypb.New(f)
 		if err != nil {
 			logger.BessLog.Infoln(errMarshalRule, f, err)
+			done <- false
 			return
 		}
 
@@ -1328,19 +1477,20 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 
 		if enableGtpuPathMonitoring {
 			g := &pb.GtpuPathMonitoringCommandAddDeleteArg{
-				GnbIp: far.tunnelIP4Dst, /* gnb ip */
+				GnbIp: far.tunnelIP4Dst,
 			}
 
 			arg, err = anypb.New(g)
 			if err != nil {
 				logger.BessLog.Infoln("error marshalling data", g, err)
+				done <- false
 				return
 			}
 
 			b.processGtpuPathMonitoring(ctx, arg, upfMsgTypeDel)
 		}
 
-		completed = true
+		done <- true
 	}()
 }
 
@@ -1366,9 +1516,6 @@ func (b *bess) processSliceMeter(ctx context.Context, arg *anypb.Any, method upf
 
 func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig SliceMeterConfig) {
 	go func() {
-		completed := false
-		defer func() { done <- completed }()
-
 		var (
 			arg                           *anypb.Any
 			err                           error
@@ -1376,92 +1523,115 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 		)
 
 		// Uplink N6 slice meter config
-		if meterConfig.N6RateBps != 0 {
-			gate = sliceMeterGateMeter
-			cir = 1                         // Mark all traffic as yellow
-			pir = meterConfig.N6RateBps / 8 // bit/s to byte/s
-		} else {
-			gate = sliceMeterGateUnmeter
-		}
-
-		if meterConfig.N6BurstBytes != 0 {
-			cbs = 1 // Mark all traffic as yellow
-			pbs = meterConfig.N6BurstBytes
-			ebs = 0 // Unused
-		} else {
-			cbs = 1 // Mark all traffic as yellow
-			pbs = DefaultBurstSize
-			ebs = 0 // Unused
-		}
-
-		logger.BessLog.Debugln("uplink slice: cir:", cir, ", pir:", pir, ", cbs:", cbs, ", pbs:", pbs)
-
-		q := &pb.QosCommandAddArg{
-			Gate:              gate,
-			Cir:               cir,                                          /* committed info rate */
-			Pir:               pir,                                          /* peak info rate */
-			Cbs:               cbs,                                          /* committed burst size */
-			Pbs:               pbs,                                          /* Peak burst size */
-			Ebs:               ebs,                                          /* Excess burst size */
-			OptionalDeductLen: &pb.QosCommandAddArg_DeductLen{DeductLen: 0}, /* Include all headers */
-			Fields: []*pb.FieldData{
-				intEnc(uint64(farForwardU)), /* Action */
-				intEnc(uint64(0)),           /* tunnel_out_type */
-			},
-		}
-
-		arg, err = anypb.New(q)
+		arg, err = b.handleUplinkSliceMeter(meterConfig, &cir, &pir, &cbs, &ebs, &pbs, &gate)
 		if err != nil {
-			logger.BessLog.Errorln(errMarshalRule, q, err)
+			done <- false
 			return
 		}
 
 		b.processSliceMeter(ctx, arg, upfMsgTypeAdd)
 
 		// Downlink N3 slice meter config
-		if meterConfig.N3RateBps != 0 {
-			gate = sliceMeterGateMeter
-			cir = 1                         // Mark all traffic as yellow
-			pir = meterConfig.N3RateBps / 8 // bit/s to byte/s
-		} else {
-			gate = sliceMeterGateUnmeter
-		}
-
-		if meterConfig.N3BurstBytes != 0 {
-			cbs = 1 // Mark all traffic as yellow
-			pbs = meterConfig.N3BurstBytes
-			ebs = 0 // Unused
-		} else {
-			cbs = 1 // Mark all traffic as yellow
-			pbs = DefaultBurstSize
-			ebs = 0 // Unused
-		}
-
-		logger.BessLog.Debugln("downlink slice: cir:", cir, ", pir:", pir, ", cbs:", cbs, ", pbs:", pbs)
-		// TODO: packet deduction should take GTPU extension header into account
-		q = &pb.QosCommandAddArg{
-			Gate:              gate,
-			Cir:               cir,                                           /* committed info rate */
-			Pir:               pir,                                           /* peak info rate */
-			Cbs:               cbs,                                           /* committed burst size */
-			Pbs:               pbs,                                           /* Peak burst size */
-			Ebs:               ebs,                                           /* Excess burst size */
-			OptionalDeductLen: &pb.QosCommandAddArg_DeductLen{DeductLen: 50}, /* Exclude Ethernet,IP,UDP,GTP header */
-			Fields: []*pb.FieldData{
-				intEnc(uint64(farForwardD)), /* Action */
-				intEnc(uint64(1)),           /* tunnel_out_type */
-			},
-		}
-
-		arg, err = anypb.New(q)
+		arg, err = b.handleDownlinkSliceMeter(meterConfig, &cir, &pir, &cbs, &ebs, &pbs, &gate)
 		if err != nil {
-			logger.BessLog.Errorln(errMarshalRule, q, err)
+			done <- false
 			return
 		}
-
 		b.processSliceMeter(ctx, arg, upfMsgTypeAdd)
-		completed = true
+		done <- true
 	}()
+}
+
+func (b *bess) handleUplinkSliceMeter(
+	meterConfig SliceMeterConfig,
+	cir, pir, cbs, ebs, pbs, gate *uint64,
+) (*anypb.Any, error) {
+	if meterConfig.N6RateBps != 0 {
+		*gate = sliceMeterGateMeter
+		*cir = 1                         // Mark all traffic as yellow
+		*pir = meterConfig.N6RateBps / 8 // bit/s to byte/s
+	} else {
+		*gate = sliceMeterGateUnmeter
+	}
+
+	if meterConfig.N6BurstBytes != 0 {
+		*cbs = 1 // Mark all traffic as yellow
+		*pbs = meterConfig.N6BurstBytes
+		*ebs = 0 // Unused
+	} else {
+		*cbs = 1 // Mark all traffic as yellow
+		*pbs = DefaultBurstSize
+		*ebs = 0 // Unused
+	}
+
+	logger.BessLog.Debugf("uplink slice: cir: %d, pir: %d, cbs: %d, pbs: %d", *cir, *pir, *cbs, *pbs)
+
+	q := &pb.QosCommandAddArg{
+		Gate:              *gate,
+		Cir:               *cir,                                         /* committed info rate */
+		Pir:               *pir,                                         /* peak info rate */
+		Cbs:               *cbs,                                         /* committed burst size */
+		Pbs:               *pbs,                                         /* Peak burst size */
+		Ebs:               *ebs,                                         /* Excess burst size */
+		OptionalDeductLen: &pb.QosCommandAddArg_DeductLen{DeductLen: 0}, /* Include all headers */
+		Fields: []*pb.FieldData{
+			intEnc(uint64(farForwardU)), /* Action */
+			intEnc(uint64(0)),           /* tunnel_out_type */
+		},
+	}
+
+	arg, err := anypb.New(q)
+	if err != nil {
+		logger.BessLog.Errorln(errMarshalRule, q, err)
+		return nil, err
+	}
+	return arg, nil
+}
+
+func (b *bess) handleDownlinkSliceMeter(
+	meterConfig SliceMeterConfig,
+	cir, pir, cbs, ebs, pbs, gate *uint64,
+) (*anypb.Any, error) {
+	if meterConfig.N3RateBps != 0 {
+		*gate = sliceMeterGateMeter
+		*cir = 1                         // Mark all traffic as yellow
+		*pir = meterConfig.N3RateBps / 8 // bit/s to byte/s
+	} else {
+		*gate = sliceMeterGateUnmeter
+	}
+
+	if meterConfig.N3BurstBytes != 0 {
+		*cbs = 1 // Mark all traffic as yellow
+		*pbs = meterConfig.N3BurstBytes
+		*ebs = 0 // Unused
+	} else {
+		*cbs = 1 // Mark all traffic as yellow
+		*pbs = DefaultBurstSize
+		*ebs = 0 // Unused
+	}
+
+	logger.BessLog.Debugf("downlink slice: cir: %d, pir: %d, cbs: %d, pbs: %d", *cir, *pir, *cbs, *pbs)
+	// TODO: packet deduction should take GTPU extension header into account
+	q := &pb.QosCommandAddArg{
+		Gate:              *gate,
+		Cir:               *cir,                                          /* committed info rate */
+		Pir:               *pir,                                          /* peak info rate */
+		Cbs:               *cbs,                                          /* committed burst size */
+		Pbs:               *pbs,                                          /* Peak burst size */
+		Ebs:               *ebs,                                          /* Excess burst size */
+		OptionalDeductLen: &pb.QosCommandAddArg_DeductLen{DeductLen: 50}, /* Exclude Ethernet,IP,UDP,GTP header */
+		Fields: []*pb.FieldData{
+			intEnc(uint64(farForwardD)), /* Action */
+			intEnc(uint64(1)),           /* tunnel_out_type */
+		},
+	}
+
+	arg, err := anypb.New(q)
+	if err != nil {
+		logger.BessLog.Errorln(errMarshalRule, q, err)
+		return nil, err
+	}
+	return arg, nil
 }
 
 func (b *bess) processQER(ctx context.Context, arg *anypb.Any, method upfMsgType, qosTableName string) error {
@@ -1481,7 +1651,14 @@ func (b *bess) processQER(ctx context.Context, arg *anypb.Any, method upfMsgType
 
 	if err != nil || resp.GetError() != nil {
 		logger.BessLog.Errorf("%v for qer %v failed with resp: %v, error: %v", qosTableName, methods[method], resp, err)
-		return err
+
+		if err != nil {
+			return err
+		}
+
+		// The RPC itself succeeded and the module refused the rule, so err is nil.
+		// Returning it would report the refusal to the caller as success.
+		return ErrOperationFailedWithReason(qosTableName+" "+methods[method], resp.GetError().String())
 	}
 
 	return nil

@@ -17,19 +17,20 @@ TREX_FILES_DIR = "/tmp/trex_files/"
 DEFAULT_KILL_TIMEOUT = 10
 LOG_FORMAT = "%(asctime)s %(levelname)s %(message)s"
 logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
-logging.getLogger().setLevel(logging.INFO)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 def error(msg, *args, **kwargs):
-    logging.error(msg, *args, **kwargs)
+    logger.error(msg, *args, **kwargs)
 
 
 def warn(msg, *args, **kwargs):
-    logging.warning(msg, *args, **kwargs)
+    logger.warning(msg, *args, **kwargs)
 
 
 def info(msg, *args, **kwargs):
-    logging.info(msg, *args, **kwargs)
+    logger.info(msg, *args, **kwargs)
 
 
 def check_ifaces(ifaces):
@@ -37,7 +38,7 @@ def check_ifaces(ifaces):
     Checks that required interfaces exist.
     """
     ifconfig_out = subprocess.check_output(["ifconfig"]).decode("utf-8")
-    iface_list = re.findall(r"^([a-zA-Z0-9]+)", ifconfig_out, re.S | re.M)
+    iface_list = re.findall(r"^([a-zA-Z0-9]+)", ifconfig_out, re.DOTALL | re.MULTILINE)
     present_ifaces = set(iface_list)
     ifaces = set(ifaces)
     return ifaces <= present_ifaces
@@ -59,7 +60,7 @@ def create_dummy_interface():
     try:
         subprocess.check_output(["ip", "link", "show", DUMMY_IFACE_NAME])
         return True  # device already exists, skip
-    except:
+    except subprocess.CalledProcessError:
         # interface does not exists
         pass
     try:
@@ -85,7 +86,7 @@ def remove_dummy_interface():
             )
             return False
         return True
-    except:
+    except subprocess.CalledProcessError:
         # interface does not exists
         return True
 
@@ -143,10 +144,10 @@ def run_test(
     cmd.extend(["--test-dir", ptfdir])
     cmd.extend(["--pypath", pypath])
     cmd.extend(["-i", f"296@{DUMMY_IFACE_NAME}"])
-    test_params = "bess_upf_addr='{}'".format(bess_addr)
+    test_params = f"bess_upf_addr='{bess_addr}'"
     if trex_server_addr is not None:
-        test_params += ";trex_server_addr='{}'".format(trex_server_addr)
-    cmd.append("--test-params={}".format(test_params))
+        test_params += f";trex_server_addr='{trex_server_addr}'"
+    cmd.append(f"--test-params={test_params}")
     cmd.extend(extra_args)
     info("Executing PTF command: {}".format(" ".join(cmd)))
 
@@ -154,7 +155,7 @@ def run_test(
         # run ptf and send output to stdout
         p = subprocess.Popen(cmd)
         p.wait()
-    except Exception:
+    except OSError:
         error("Error when running PTF tests")
         return False
     finally:

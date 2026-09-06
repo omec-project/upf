@@ -29,29 +29,37 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from __future__ import print_function
 
 import codecs
 import os
 import random
-import scapy.all as scapy
 import shlex
 import socket
 import subprocess
 import sys
+import time
 import unittest
-from time import gmtime, sleep, strftime
+from time import gmtime, strftime
+
+import scapy.all as scapy
 
 try:
     this_dir = os.path.dirname(os.path.realpath(__file__))
-    bessctl = os.path.join(this_dir, 'bessctl')
-    sys.path.insert(1, os.path.join(this_dir, '../../../'))
+    bessctl = os.path.join(this_dir, "bessctl")
+    sys.path.insert(1, os.path.join(this_dir, "../../../"))
     from pybess.bess import *
 except ImportError:
-    print('Cannot import the API module (pybess)', file=sys.stderr)
+    print("Cannot import the API module (pybess)", file=sys.stderr)
     raise
 
-SOCKET_PATH = '/tmp/bess_unix_'
+try:
+    from .errors import BessNotRunningError, CommandError, RootTcNotFoundError
+except ImportError:  # executed as a script / imported as a top-level module
+    if __package__:
+        raise
+    from errors import BessNotRunningError, CommandError, RootTcNotFoundError
+
+SOCKET_PATH = "/tmp/bess_unix_"
 SCRIPT_STARTTIME = strftime("%Y-%m-%d-%H-%M-%S", gmtime())
 
 
@@ -60,8 +68,8 @@ def get_root_tc(bess):
     tcs = bess.list_tcs().classes_status
     root_tc = None
     for tc in tcs:
-        if not getattr(tc, 'parent'):
-            root_tc = getattr(tc, 'class')
+        if not tc.parent:
+            root_tc = getattr(tc, "class")
             break
 
     return root_tc
@@ -70,7 +78,7 @@ def get_root_tc(bess):
 def measure_tc_perf(bess, duration):
     root_tc = get_root_tc(bess)
     if not root_tc:
-        raise Exception('Fail to find root tc')
+        raise RootTcNotFoundError("Failed to find root tc")
 
     old = bess.get_tc_stats(root_tc.name)
     time.sleep(duration)
@@ -79,7 +87,7 @@ def measure_tc_perf(bess, duration):
     sec_diff = new.timestamp - old.timestamp
     pps = (new.packets - old.packets) / sec_diff
     cps = (new.count - old.count) / sec_diff
-    sys.stdout.write("pps: %12.f\tcounts/s: %12.f\n" % (pps, cps))
+    sys.stdout.write(f"pps: {pps:12.0f}\tcounts/s: {cps:12.0f}\n")
 
 
 def run_cmd(cmd):
@@ -105,16 +113,19 @@ def gen_unix_socket(bess, sockname, timeout_sec=3):
     # listen()ing on the abstract path '\0' + SOCKET_PATH + sockname.
     # When we connect() to it below, the thread eventually wakes up
     # and creates the in-BESS listener.
-    socket_port = bess.create_port('UnixSocketPort', sockname,
-                                   {
-                                       'path': '@' + SOCKET_PATH + sockname,
-                                       # 'min_rx_interval_ns': 50000,
-                                       'confirm_connect': True,
-                                   })
+    bess.create_port(
+        "UnixSocketPort",
+        sockname,
+        {
+            "path": "@" + SOCKET_PATH + sockname,
+            # 'min_rx_interval_ns': 50000,
+            "confirm_connect": True,
+        },
+    )
     s = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
     s.settimeout(timeout_sec)
 
-    s.connect('\0' + SOCKET_PATH + sockname)
+    s.connect("\0" + SOCKET_PATH + sockname)
     # This connect() is in the middle of the race.  If we return
     # now, the in-BESS listener may not have actually set up the
     # connection.  We can make more bess.* calls, e.g., to create
@@ -134,72 +145,76 @@ def gen_unix_socket(bess, sockname, timeout_sec=3):
     # us once the connection finishes.  We read this here to guarantee
     # that the connection is live and it's OK to run the test.
     confirmed = s.recv(2048)
-    if confirmed != b'yes\0':
-        raise AssertionError('port not connected '
-                             '({!r} != {!r})'.format(confirmed, b'yes\0'))
+    if confirmed != b"yes\0":
+        raise AssertionError(
+            "port not connected ({!r} != {!r})".format(confirmed, b"yes\0")
+        )
 
     return s
 
 
 # generate random packet
 def get_udp_packet(sip=None, dip=None, sport=None, dport=None, pkt_len=60):
-    eth = scapy.Ether(src=scapy.RandMAC()._fix(),
-                      dst=scapy.RandMAC()._fix())
-    ip = scapy.IP(src=sip if sip else scapy.RandIP()._fix(),
-                  dst=dip if dip else scapy.RandIP()._fix())
-    udp = scapy.UDP(sport=sport if sport else random.randrange(pow(2, 16)),
-                    dport=dport if dport else random.randrange(pow(2, 16)))
+    eth = scapy.Ether(src=scapy.RandMAC()._fix(), dst=scapy.RandMAC()._fix())
+    ip = scapy.IP(
+        src=sip if sip else scapy.RandIP()._fix(),
+        dst=dip if dip else scapy.RandIP()._fix(),
+    )
+    udp = scapy.UDP(
+        sport=sport if sport else random.randrange(pow(2, 16)),
+        dport=dport if dport else random.randrange(pow(2, 16)),
+    )
     header = eth / ip / udp
-    payload = '0' * (pkt_len - len(header))
+    payload = "0" * (pkt_len - len(header))
     return header / payload
 
 
 def get_tcp_packet(sip=None, dip=None, sport=None, dport=None, pkt_len=60):
-    eth = scapy.Ether(src=scapy.RandMAC()._fix(),
-                      dst=scapy.RandMAC()._fix())
-    ip = scapy.IP(src=sip if sip else scapy.RandIP()._fix(),
-                  dst=dip if dip else scapy.RandIP()._fix())
-    tcp = scapy.TCP(sport=sport if sport else random.randrange(pow(2, 16)),
-                    dport=dport if dport else random.randrange(pow(2, 16)))
+    eth = scapy.Ether(src=scapy.RandMAC()._fix(), dst=scapy.RandMAC()._fix())
+    ip = scapy.IP(
+        src=sip if sip else scapy.RandIP()._fix(),
+        dst=dip if dip else scapy.RandIP()._fix(),
+    )
+    tcp = scapy.TCP(
+        sport=sport if sport else random.randrange(pow(2, 16)),
+        dport=dport if dport else random.randrange(pow(2, 16)),
+    )
     header = eth / ip / tcp
-    payload = '0' * (pkt_len - len(header))
+    payload = "0" * (pkt_len - len(header))
     return header / payload
 
 
 def pkt_str(pkt):
     if not pkt:
-        return ''
+        return ""
     else:
-        return codecs.encode(bytes(pkt), 'hex')
+        return codecs.encode(bytes(pkt), "hex")
 
 
 class BessModuleTestCase(unittest.TestCase):
-
     @staticmethod
     def assertSamePackets(pkt1, pkt2):
         if pkt_str(pkt1) != pkt_str(pkt2):
-            raise AssertionError(
-                '"%s" != "%s"' % (pkt_str(pkt1), pkt_str(pkt2)))
+            raise AssertionError(f'"{pkt_str(pkt1)}" != "{pkt_str(pkt2)}"')
 
     @staticmethod
     def assertNotSamePackets(pkt1, pkt2):
         if pkt_str(pkt1) == pkt_str(pkt2):
-            raise AssertionError(
-                '"%s" == "%s"' % (pkt_str(pkt1), pkt_str(pkt2)))
+            raise AssertionError(f'"{pkt_str(pkt1)}" == "{pkt_str(pkt2)}"')
 
     def assertBessAlive(self):
         try:
             self.bess.get_version()
-        except BESS.APIError:
-            raise AssertionError('Bess is not alive')
+        except (BESS.APIError, BESS.RPCError, BESS.Error) as e:
+            raise AssertionError("Bess is not alive") from e
 
     def setUp(self):
         self.bess = BESS()
 
         try:
             self.bess.connect()
-        except BESS.APIError:
-            raise Exception('BESS is not running')
+        except BESS.RPCError as e:
+            raise BessNotRunningError("BESS is not running") from e
 
         self.bess.pause_all()
         self.bess.reset_all()
@@ -215,21 +230,23 @@ class BessModuleTestCase(unittest.TestCase):
         self.bess.pause_all()
         self.bess.reset_all()
 
-    def run_for(self, module, igates, duration, pkt_update_fields=[]):
+    def run_for(self, module, igates, duration, pkt_update_fields=None):
         self.bess.pause_all()
+
+        if pkt_update_fields is None:
+            pkt_update_fields = []
 
         fields = pkt_update_fields
         if len(fields) == 0:
-            fields.append({'offset': 26, 'size': 4,
-                           'min': 1, 'max': pow(2, 32) - 1})
-            fields.append({'offset': 30, 'size': 4,
-                           'min': 1, 'max': pow(2, 32) - 1})
+            fields.append({"offset": 26, "size": 4, "min": 1, "max": pow(2, 32) - 1})
+            fields.append({"offset": 30, "size": 4, "min": 1, "max": pow(2, 32) - 1})
 
         # source and associate sockets
         for igate in igates:
-            src = self.bess.create_module('Source')
-            random = self.bess.create_module('RandomUpdate', 'RandomUpdateArg',
-                                             {'fields': fields})
+            src = self.bess.create_module("Source")
+            random = self.bess.create_module(
+                "RandomUpdate", "RandomUpdateArg", {"fields": fields}
+            )
             self.bess.connect_modules(src.name, random.name)
             self.bess.connect_modules(random.name, module.name, 0, igate)
 
@@ -238,8 +255,16 @@ class BessModuleTestCase(unittest.TestCase):
         time.sleep(duration)
         self.bess.pause_all()
 
-    def run_pipeline(self, src_module, dst_module, igate, input_pkts,
-                     ogates, time_out=3, proto=scapy.Ether):
+    def run_pipeline(
+        self,
+        src_module,
+        dst_module,
+        igate,
+        input_pkts,
+        ogates,
+        time_out=3,
+        proto=scapy.Ether,
+    ):
         """
         Runs a pipeline that injects data (input_pkts) at module
         src_module on input gate igate and collects it at module
@@ -257,15 +282,15 @@ class BessModuleTestCase(unittest.TestCase):
         # output ports and associate sockets
         for ogate in ogates:
             if ogate not in self.output_ports:
-                sock_name = "soc_{}_{}".format(ogate,
-                                               SCRIPT_STARTTIME)
+                sock_name = f"soc_{ogate}_{SCRIPT_STARTTIME}"
 
                 if ogate not in self.sockets:
                     sock = gen_unix_socket(self.bess, sock_name)
                     self.sockets[ogate] = sock
 
-                po = self.bess.create_module('PortOut', 'po%d' % ogate,
-                                             {'port': sock_name})
+                po = self.bess.create_module(
+                    "PortOut", f"po{ogate}", {"port": sock_name}
+                )
                 self.output_ports[ogate] = po
 
             po = self.output_ports[ogate]
@@ -274,15 +299,13 @@ class BessModuleTestCase(unittest.TestCase):
 
         # input ports and associate sockets
         if igate not in self.input_ports:
-            sock_name = "soc_{}_{}".format(igate,
-                                           SCRIPT_STARTTIME)
+            sock_name = f"soc_{igate}_{SCRIPT_STARTTIME}"
 
             if igate not in self.sockets:
                 sock = gen_unix_socket(self.bess, sock_name)
                 self.sockets[igate] = sock
 
-            pi = self.bess.create_module('PortInc', 'pi%d' % igate,
-                                         {'port': sock_name})
+            pi = self.bess.create_module("PortInc", f"pi{igate}", {"port": sock_name})
             self.input_ports[igate] = pi
 
         pi = self.input_ports[igate]
@@ -294,7 +317,7 @@ class BessModuleTestCase(unittest.TestCase):
 
         root_tc = get_root_tc(self.bess)
         if not root_tc:
-            raise Exception('Fail to find root tc')
+            raise RootTcNotFoundError("Failed to find root tc")
 
         # Get number of packets processed inside bess.
         # Send our packets in, then wait for them to also
@@ -326,6 +349,7 @@ class BessModuleTestCase(unittest.TestCase):
         dictionary indexed by ogate with a list of each packet
         wrapped by scapy.Ether.
         """
+
         def get_all_pkts(sock):
             """
             Reads all immediately-available packets.  Wrecks
@@ -340,11 +364,11 @@ class BessModuleTestCase(unittest.TestCase):
                 # NB: sock.settimeout(0.0) logically should
                 # produce a socket.timeout, not a socket.error
                 # with EAGAIN, but in fact we get the latter.
-                except socket.error as e:
+                except OSError as e:
                     if e.errno in (errno.EAGAIN, errno.EWOULDBLOCK):
                         return ret
                     raise
-                except socket.timeout:
+                except TimeoutError:
                     return ret
 
         timeout = {}
@@ -359,7 +383,9 @@ class BessModuleTestCase(unittest.TestCase):
             for ogate in ogates:
                 self.sockets[ogate].settimeout(timeout[ogate])
 
-    def run_module(self, module, igate, input_pkts, ogates=range(16),
-                   time_out=3, proto=scapy.Ether):
-        return self.run_pipeline(module, module, igate, input_pkts, ogates,
-                                 time_out=time_out, proto=proto)
+    def run_module(
+        self, module, igate, input_pkts, ogates=range(16), time_out=3, proto=scapy.Ether
+    ):
+        return self.run_pipeline(
+            module, module, igate, input_pkts, ogates, time_out=time_out, proto=proto
+        )

@@ -6,13 +6,12 @@ import os
 import socket
 import struct
 import sys
-from typing import Optional
+from socket import AF_INET
 
 import iptools
-from jsoncomment import JsonComment
 import psutil
+from jsoncomment import JsonComment
 from pyroute2 import NDB
-from socket import AF_INET
 
 
 def exit(code, msg):
@@ -40,14 +39,14 @@ def getpythonpid(process_name):
 
 def get_json_conf(path, dump):
     try:
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             jsonc_data = f.read()
         jc = JsonComment()
         conf = jc.loads(jsonc_data)
         if dump:
             print(jc.dumps(conf, indent=4, sort_keys=True))
         return conf
-    except Exception as e:
+    except (OSError, ValueError) as e:
         print("An unexpected error occurred:", str(e))
         return None
 
@@ -58,9 +57,9 @@ def get_env(varname, default=None):
         return var
     except KeyError:
         if default is not None:
-            return "{}".format(default)
+            return f"{default}"
         else:
-            exit(1, "Empty env var {}".format(varname))
+            exit(1, f"Empty env var {varname}")
 
 
 def ips_by_interface(name: str) -> list[str]:
@@ -77,13 +76,13 @@ def atoh(ip):
     return socket.inet_aton(ip)
 
 
-def alias_by_interface(name: str) -> Optional[str]:
+def alias_by_interface(name: str) -> str | None:
     ndb = NDB()
     if iface_record := ndb.interfaces.get(name):
         return iface_record["ifalias"]
 
 
-def mac_by_interface(name: str) -> Optional[str]:
+def mac_by_interface(name: str) -> str | None:
     ndb = NDB()
     if iface_record := ndb.interfaces.get(name):
         return iface_record["address"]
@@ -98,8 +97,8 @@ def peer_by_interface(name: str) -> str:
     try:
         peer_idx = ndb.interfaces[name]["link"]
         peer_name = ndb.interfaces[peer_idx]["ifname"]
-    except:
-        raise Exception("veth interface {} does not exist".format(name))
+    except KeyError:
+        raise LookupError(f"veth interface {name} does not exist") from None
     else:
         return peer_name
 
@@ -148,7 +147,7 @@ def set_process_affinity(pid, cpus):
         if e.errno == 22:
             print(f"Failed to set affinity on process {pid} {psutil.Process(pid).name}")
         else:
-            raise e
+            raise
 
 
 def set_process_affinity_all(cpus):

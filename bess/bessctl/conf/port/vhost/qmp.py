@@ -10,10 +10,9 @@
 # This work is licensed under the terms of the GNU GPL, version 2.  See
 # the COPYING file in the top-level directory.
 
-from __future__ import print_function
 
-import json
 import errno
+import json
 import socket
 import sys
 
@@ -34,8 +33,11 @@ class QMPTimeoutError(QMPError):
     pass
 
 
-class QEMUMonitorProtocol:
+class QMPCommandError(QMPError):
+    pass
 
+
+class QEMUMonitorProtocol:
     def __init__(self, address, server=False, debug=False):
         """
         Create a QEMUMonitorProtocol class.
@@ -66,10 +68,10 @@ class QEMUMonitorProtocol:
 
     def __negotiate_capabilities(self):
         greeting = self.__json_read()
-        if greeting is None or 'QMP' not in greeting:
+        if greeting is None or "QMP" not in greeting:
             raise QMPConnectError
         # Greeting seems ok, negotiate capabilities
-        resp = self.cmd('qmp_capabilities')
+        resp = self.cmd("qmp_capabilities")
         if "return" in resp:
             return greeting
         raise QMPCapabilitiesError
@@ -80,9 +82,9 @@ class QEMUMonitorProtocol:
             if not data:
                 return
             resp = json.loads(data)
-            if 'event' in resp:
+            if "event" in resp:
                 if self._debug:
-                    print("QMP:<<< %s" % resp, file=sys.stderr)
+                    print(f"QMP:<<< {resp}", file=sys.stderr)
                 self.__events.append(resp)
                 if not only_event:
                     continue
@@ -107,7 +109,7 @@ class QEMUMonitorProtocol:
         self.__sock.setblocking(0)
         try:
             self.__json_read()
-        except socket.error as err:
+        except OSError as err:
             if err[0] == errno.EAGAIN:
                 # No data available
                 pass
@@ -120,10 +122,10 @@ class QEMUMonitorProtocol:
                 self.__sock.settimeout(wait)
             try:
                 ret = self.__json_read(only_event=True)
-            except socket.timeout:
+            except TimeoutError:
                 raise QMPTimeoutError("Timeout waiting for event")
-            except:
-                raise QMPConnectError("Error while reading from socket")
+            except (OSError, ValueError) as err:
+                raise QMPConnectError("Error while reading from socket") from err
             if ret is None:
                 raise QMPConnectError("Error while reading from socket")
             self.__sock.settimeout(None)
@@ -165,16 +167,16 @@ class QEMUMonitorProtocol:
                 been closed
         """
         if self._debug:
-            print("QMP:>>> %s" % qmp_cmd, file=sys.stderr)
+            print(f"QMP:>>> {qmp_cmd}", file=sys.stderr)
         try:
             self.__sock.sendall(json.dumps(qmp_cmd))
-        except socket.error as err:
+        except OSError as err:
             if err[0] == errno.EPIPE:
                 return
-            raise socket.error(err)
+            raise OSError(err)
         resp = self.__json_read()
         if self._debug:
-            print("QMP:<<< %s" % resp, file=sys.stderr)
+            print(f"QMP:<<< {resp}", file=sys.stderr)
         return resp
 
     def cmd(self, name, args=None, id=None):
@@ -185,18 +187,18 @@ class QEMUMonitorProtocol:
         @param args: command arguments (dict)
         @param id: command id (dict, list, string or int)
         """
-        qmp_cmd = {'execute': name}
+        qmp_cmd = {"execute": name}
         if args:
-            qmp_cmd['arguments'] = args
+            qmp_cmd["arguments"] = args
         if id:
-            qmp_cmd['id'] = id
+            qmp_cmd["id"] = id
         return self.cmd_obj(qmp_cmd)
 
     def command(self, cmd, **kwds):
         ret = self.cmd(cmd, kwds)
-        if 'error' in ret:
-            raise Exception(ret['error']['desc'])
-        return ret['return']
+        if "error" in ret:
+            raise QMPCommandError(ret["error"]["desc"])
+        return ret["return"]
 
     def pull_event(self, wait=False):
         """
