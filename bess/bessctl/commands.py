@@ -1374,7 +1374,7 @@ def _get_gate_label(gate, field, name, last_stats):
         last_stats[(name, gate.ogate)] = (new_time, new_val)
         val = (new_val - last_val) / (new_time - last_time)
 
-    return '%.1f' % (val * 8 / 1e6) if field == 'bytes' else '%d' % val
+    return f'{val * 8 / 1e6:.1f}' if field == 'bytes' else f'{int(val)}'
 
 def _draw_pipeline(cli, field, units, last_stats=None, graph_args=None):
     """Draw pipeline visualization with reduced complexity."""
@@ -1406,7 +1406,10 @@ def _draw_pipeline(cli, field, units, last_stats=None, graph_args=None):
         output, _ = proc.communicate()
         return output
 
-    except IOError as e:
+    except FileNotFoundError:
+        raise cli.CommandError('"graph-easy" program not available. '
+                               'Install "libgraph-easy-perl".')
+    except OSError as e:
         if e.errno == errno.EPIPE:
             raise cli.CommandError('"graph-easy" program not available. '
                                    'Install "libgraph-easy-perl".')
