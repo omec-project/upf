@@ -52,6 +52,7 @@ import signal
 import collections
 import contextlib
 import sugar
+import ast
 
 try:
     this_dir = os.path.dirname(os.path.realpath(__file__))
@@ -509,23 +510,30 @@ def _parse_map(**kwargs):
 #   mapped_value: Python value/object from the consumed token(s)
 #   tail: the rest of input line
 def _handle_endis_dir(cli, val, var_type):
-    if var_type == 'endis':
-        if 'enable'.startswith(val): return 'enable'
-        if 'disable'.startswith(val): return 'disable'
-        raise cli.BindError('"endis" must be either "enable" or "disable"')
-    if var_type == 'dir':
-        if 'in'.startswith(val): return 'in'
-        if 'out'.startswith(val): return 'out'
-        raise cli.BindError('"dir" must be either "in" or "out"')
+    if var_type == "endis":
+        if "enable".startswith(val):
+            return "enable"
+        elif "disable".startswith(val):
+            return "disable"
+        else:
+            raise cli.BindError('"endis" must be either "enable" or "disable"')
+    elif var_type == "dir":
+        if "in".startswith(val):
+            return "in"
+        elif "out".startswith(val):
+            return "out"
+        else:
+            raise cli.BindError('"dir" must be either "in" or "out"')
 
 def _handle_numeric(cli, val, var_type):
-    if var_type in ['gate', 'socket']:
-        if val.isdigit(): return int(val)
+    if var_type in ["gate", "socket"]:
+        if val.isdigit():
+            return int(val)
         raise cli.BindError(f'"{var_type}" must be a positive number')
     try:
         return int(val)
-    except Exception:
-        raise cli.BindError('Expected an integer')
+    except (ValueError, TypeError):
+        raise cli.BindError("Expected an integer")
 
 def _handle_collections(cli, val, var_type):
     if var_type == 'wid+':
@@ -540,30 +548,45 @@ def _handle_collections(cli, val, var_type):
         return val.split()
 
 def _handle_validation(cli, val, var_type):
-    if var_type == 'host':
-        dns = re.match(r'^[a-zA-Z0-9][a-zA-Z0-9\-.]*$', val)
-        ip = re.match(r'^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$', val)
+    if var_type == "host":
+        dns = re.match(r"^[a-zA-Z0-9][a-zA-Z0-9\-.]*$", val)
+        ip = re.match(r"^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$", val)
         if dns is None and ip is None:
             raise cli.BindError('"host" must be a valid DNS name or IPv4 address')
-    elif var_type == 'name' and re.match(r'^[\S]*$', val) is None:
+    elif var_type == "name" and re.match(r"^[\S]*$", val) is None:
         raise cli.BindError('"name" must not contain whitespaces')
-    elif var_type in ['confname', 'filename'] and '\0' in val:
-        raise cli.BindError(f'Invalid {var_type}')
+    elif var_type == "confname" and "\0" in val:
+        raise cli.BindError("Invalid configuration name")
+    elif var_type == "filename" and "\0" in val:
+        raise cli.BindError("Invalid filename")
     return val
 
 def _handle_eval(cli, val, var_type):
     try:
-        if var_type == 'map':
-            return eval('_parse_map(%s)' % val)
-        # pyobj case
-        return eval(val) if val.strip() != '' else None
+        if var_type == "map":
+            # Safely parse key=val arguments by building and validating an AST Call node
+            tree = ast.parse(f"_parse_map({val})", mode="eval")
+            if not isinstance(tree, ast.Expression):
+                raise ValueError()
+            call = tree.body
+            if not isinstance(call, ast.Call) or call.func.id != "_parse_map":
+                raise ValueError()
+            
+            res = {}
+            for kw in call.keywords:
+                res[kw.arg] = ast.literal_eval(kw.value)
+            return res
+            
+        # pyobj case: safely evaluate standard python literal representations
+        return ast.literal_eval(val) if val.strip() != "" else None
     except Exception:
-        if var_type == 'map':
+        if var_type == "map":
             raise cli.BindError('"map" should be "key=val, key=val, ..."')
         else:
             raise cli.BindError(
                 '"pyobj" should be an object in python syntax'
-                ' (e.g., 42, "foo", ["hello", "world"], {"bar": "baz"})')
+                ' (e.g., 42, "foo", ["hello", "world"], {"bar": "baz"})'
+            )
 
 def _handle_pause_workers(cli, val, var_type):
     if 'pause'.startswith(val):
@@ -574,9 +597,9 @@ def _handle_pause_workers(cli, val, var_type):
         raise cli.BindError('"pause_workers" must be either "pause" or "no_pause"')
 
 def bind_var(cli, var_type, line):
-    """Refactored bind_var with Cognitive Complexity < 15."""
+    """Bind and validate a CLI argument based on var_type."""
     head, remainder = split_var(cli, var_type, line)
-
+    
     # Map types to their respective handler functions
     handler_map = {
         'endis': _handle_endis_dir,
@@ -598,7 +621,7 @@ def bind_var(cli, var_type, line):
 
     handler = handler_map.get(var_type)
     val = handler(cli, head, var_type) if handler else head
-
+    
     return val, remainder
 
 
