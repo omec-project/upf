@@ -17,8 +17,14 @@ def gen_inet_packet(size, src_mac, dst_mac, src_ip, dst_ip):
     eth = Ether(src=src_mac, dst=dst_mac)
     ip = IP(src=src_ip, dst=dst_ip)
     udp = UDP(sport=10001, dport=10002)
-    payload = ("hello" + "0123456789" * 200)[: size - len(eth / ip / udp)]
-    pkt = eth / ip / udp / payload
+    header = eth / ip / udp
+    header_len = len(header)
+    if size < header_len:
+        raise ValueError(f"size {size} is smaller than header length {header_len}")
+    payload_len = size - header_len
+    pattern = "hello" + "0123456789" * 200
+    payload = (pattern * (payload_len // len(pattern) + 1))[:payload_len]
+    pkt = header / payload
     return bytes(pkt)
 
 
@@ -51,13 +57,23 @@ def gen_gtpu_packet(
     eth = Ether(src=src_mac, dst=dst_mac)
     ip = IP(src=src_ip, dst=dst_ip)
     udp = UDP(sport=2152, dport=2152)
+    gtp = GTP_U_Header(teid=teid)
     inet_p = IP(src=inner_src_ip, dst=inner_dst_ip) / UDP(sport=10001, dport=10002)
-    payload = ("hello" + "0123456789" * 200)[: size - len(eth / ip / udp / inet_p)]
     if pdutype is not None or qfi is not None:
         psc = GTPPDUSessionContainer(type=pdutype, QFI=qfi)
-        pkt = eth / ip / udp / GTP_U_Header(teid=teid) / psc / inet_p / payload
+        header = eth / ip / udp / gtp / psc / inet_p
     else:
-        pkt = eth / ip / udp / GTP_U_Header(teid=teid) / inet_p / payload
+        header = eth / ip / udp / gtp / inet_p
+    # Size the payload against the full packet header (outer eth/ip/udp +
+    # GTP-U + optional PDU session container + inner IP/UDP), so the final
+    # packet matches the requested `size`.
+    header_len = len(header)
+    if size < header_len:
+        raise ValueError(f"size {size} is smaller than header length {header_len}")
+    payload_len = size - header_len
+    pattern = "hello" + "0123456789" * 200
+    payload = (pattern * (payload_len // len(pattern) + 1))[:payload_len]
+    pkt = header / payload
     return bytes(pkt)
 
 

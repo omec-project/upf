@@ -2,16 +2,14 @@
 # Copyright 2021 Open Networking Foundation
 
 import time
-from ipaddress import IPv4Address
-from pprint import pprint
 
-import ptf.testutils as testutils
+from common import *
 from grpc_test import *
 from pkt_utils import GTPU_PORT
 from trex_stl_lib.api import STLVM, STLPktBuilder, STLStream, STLTXCont
 from trex_test import TrexTest
 
-from common import *
+from ptf import testutils
 
 
 class PerFlowQosMetricsTest(TrexTest, GrpcTest):
@@ -105,9 +103,7 @@ class PerFlowQosMetricsTest(TrexTest, GrpcTest):
         if self.trex_client.is_traffic_active():
             stats = self.getSessionStats(q=[90, 99, 99.9], quiet=True)
 
-            preQos = stats["preQos"]
             postDlQos = stats["postDlQos"]
-            postUlQos = stats["postUlQos"]
 
         self.trex_client.wait_on_traffic(ports=[UPF_ACCESS_PORT])
         print(f"Duration was {time.time() - s_time}")
@@ -147,5 +143,3 @@ class PerFlowQosMetricsTest(TrexTest, GrpcTest):
                 100,
                 f"99th %ile jitter was higher than 100 us! Was {int(jitter[1]) / 1000} us",
             )
-
-        return

@@ -29,37 +29,39 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import socket
 import sys
-from test_utils import *
+
 from pybess import protobuf_to_dict as pb_conv
+from test_utils import *
 
 # constants for duplicate literals
-BLACKLISTED_HOST = 'www.blacklisted.com'
-BLUELISTED_HOST = 'www.bluelisted.com'
+BLACKLISTED_HOST = "www.blacklisted.com"
+BLUELISTED_HOST = "www.bluelisted.com"
+
 
 class BessUrlFilterTest(BessModuleTestCase):
-
     def test_run_urlfilter(self):
         uf = UrlFilter()
-        uf.add(blacklist=[
-            {'host': 'www.foo.com', 'path': '/foo'},
-            {'host': 'www.bar.com', 'path': '/bar'}
-        ])
+        uf.add(
+            blacklist=[
+                {"host": "www.foo.com", "path": "/foo"},
+                {"host": "www.bar.com", "path": "/bar"},
+            ]
+        )
         self.run_for(uf, [0], 3)
         self.assertBessAlive()
 
     # Output test -- make sure packets go out right ports
     def test_urlfilter(self):
         uf = UrlFilter()
-        uf.add(blacklist=[{'host': BLACKLISTED_HOST, 'path': '/'}])
+        uf.add(blacklist=[{"host": BLACKLISTED_HOST, "path": "/"}])
 
         # Eth: us to them; eth_swapped: them to us
-        eth = scapy.Ether(src='02:1e:67:9f:4d:ae', dst='06:16:3e:1b:72:32')
+        eth = scapy.Ether(src="02:1e:67:9f:4d:ae", dst="06:16:3e:1b:72:32")
         eth_swapped = scapy.Ether(src=eth.dst, dst=eth.src)
         # ip1 for "OK" request, ip2 for bad (gets 403) request
-        ip1 = scapy.IP(src='192.168.0.1', dst='10.0.0.1')
-        ip2 = scapy.IP(src='192.168.0.2', dst='10.0.0.2')
+        ip1 = scapy.IP(src="192.168.0.1", dst="10.0.0.1")
+        ip2 = scapy.IP(src="192.168.0.2", dst="10.0.0.2")
         # tcp for SYNs, tplus for packet following SYN
         tcp = scapy.TCP(sport=10001, dport=80, seq=12345)  # has syn
         tplus = tcp.copy()
@@ -71,24 +73,27 @@ class BessUrlFilterTest(BessModuleTestCase):
         t403 = tplus.copy()
         t403.sport, t403.dport = t403.dport, t403.sport
         t403.seq, t403.ack = tplus.ack, tplus.seq
-        t403.flags = 'A'
+        t403.flags = "A"
         t403.window = 0
         # and of course, a "good" request vs a 403 "bad" request
-        good_payload = 'GET / HTTP/1.1\r\nHost: www.google.com\r\n\r\n'
-        bad_payload = 'GET / HTTP/1.1\r\nHost: www.blacklisted.com\r\n\r\n'
-        error_403 = 'HTTP/1.1 403 Bad Forbidden\r\nConnection: Closed\r\n\r\n'
+        good_payload = "GET / HTTP/1.1\r\nHost: www.google.com\r\n\r\n"
+        bad_payload = "GET / HTTP/1.1\r\nHost: www.blacklisted.com\r\n\r\n"
+        error_403 = "HTTP/1.1 403 Bad Forbidden\r\nConnection: Closed\r\n\r\n"
         syn_pkt1 = bytes(eth / ip1 / tcp)
         syn_pkt2 = bytes(eth / ip2 / tcp)
         good_pkt = bytes(eth / ip1 / tplus / good_payload)
         bad_pkt = bytes(eth / ip2 / tplus / bad_payload)
-        err_pkt = bytes(eth_swapped / scapy.IP(src=ip2.dst, dst=ip2.src) /
-                        t403 / error_403)
+        err_pkt = bytes(
+            eth_swapped / scapy.IP(src=ip2.dst, dst=ip2.src) / t403 / error_403
+        )
 
-        pkt_outs = self.run_pipeline(src_module=uf, dst_module=uf,
-                                     igate=0,
-                                     input_pkts=[syn_pkt1, good_pkt,
-                                                 syn_pkt2, bad_pkt],
-                                     ogates=[0, 1])
+        pkt_outs = self.run_pipeline(
+            src_module=uf,
+            dst_module=uf,
+            igate=0,
+            input_pkts=[syn_pkt1, good_pkt, syn_pkt2, bad_pkt],
+            ogates=[0, 1],
+        )
 
         # We should receive 4 packets on gate 0:
         #  1) SYN to google.com
@@ -107,18 +112,22 @@ class BessUrlFilterTest(BessModuleTestCase):
     def test_urlfilter_selfconfig(self):
         iconf = {}
         uf = UrlFilter(**iconf)
-        uf.add(blacklist=[
-            {'host': BLUELISTED_HOST, 'path': '/b'},
-            {'host': BLUELISTED_HOST, 'path': '/a'},
-            {'host': BLACKLISTED_HOST, 'path': '/'},
-        ])
+        uf.add(
+            blacklist=[
+                {"host": BLUELISTED_HOST, "path": "/b"},
+                {"host": BLUELISTED_HOST, "path": "/a"},
+                {"host": BLACKLISTED_HOST, "path": "/"},
+            ]
+        )
         # Delivered config is sorted by host, then path within host.
         # Blue sorts after black ('u' > 'a').
-        expect_config = {'blacklist': [
-            {'host': BLACKLISTED_HOST, 'path': '/'},
-            {'host': BLUELISTED_HOST, 'path': '/a'},
-            {'host': BLUELISTED_HOST, 'path': '/b'},
-        ]}
+        expect_config = {
+            "blacklist": [
+                {"host": BLACKLISTED_HOST, "path": "/"},
+                {"host": BLUELISTED_HOST, "path": "/a"},
+                {"host": BLUELISTED_HOST, "path": "/b"},
+            ]
+        }
         arg = pb_conv.protobuf_to_dict(uf.get_initial_arg())
         cur_config = pb_conv.protobuf_to_dict(uf.get_runtime_config())
         # import pprint
@@ -129,6 +138,7 @@ class BessUrlFilterTest(BessModuleTestCase):
         # pp2('iconf:', iconf, 'arg:', arg,
         #    '\nmut state:', cur_config, 'expecting:', expect_config)
         assert arg == iconf and cur_config == expect_config
+
 
 suite = unittest.TestLoader().loadTestsFromTestCase(BessUrlFilterTest)
 results = unittest.TextTestRunner(verbosity=2).run(suite)

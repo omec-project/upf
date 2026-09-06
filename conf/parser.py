@@ -43,7 +43,7 @@ class Parser:
         self.workers = 1
         self.access_ifname = None
         self.core_ifname = None
-        self.interfaces = dict()
+        self.interfaces = {}
         self.notify_sockaddr = "/tmp/notifycp"
         self.endmarker_sockaddr = "/tmp/pfcpport"
         self.enable_slice_metering = False
@@ -113,11 +113,7 @@ class Parser:
                 self.interfaces[iface] = self.conf[iface]
             except KeyError:
                 self.interfaces[iface] = {"ifname": iface}
-                print(
-                    "Can't read {} interface. Setting it to default ({}).".format(
-                        iface, iface
-                    )
-                )
+                print(f"Can't read {iface} interface. Setting it to default ({iface}).")
 
         # Detect mode. Default is dpdk
         try:
@@ -211,10 +207,12 @@ class Parser:
             if key in table_sizes:
                 setattr(self, attr, table_sizes[key])
             elif table_sizes:
-                print("No explicit table size for {}, using default".format(key))
+                print(f"No explicit table size for {key}, using default")
 
         # GTPu Path Monitoring
         try:
-            self.enable_gtpu_path_monitoring = bool(self.conf["enable_gtpu_path_monitoring"])
+            self.enable_gtpu_path_monitoring = bool(
+                self.conf["enable_gtpu_path_monitoring"]
+            )
         except KeyError:
             print("GTPu Path monitoring disabled")

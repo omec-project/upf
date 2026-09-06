@@ -33,22 +33,26 @@ from test_utils import *
 
 
 class BessL2ForwardTest(BessModuleTestCase):
-
     def test_l2forward(self):
         l2fib = L2Forward()
 
-        l2fib.add(entries=[{'addr': '00:01:02:03:04:05', 'gate': 64},
-                           {'addr': 'aa:bb:cc:dd:ee:ff', 'gate': 1},
-                           {'addr': '11:11:11:11:11:22', 'gate': 2}])
+        l2fib.add(
+            entries=[
+                {"addr": "00:01:02:03:04:05", "gate": 64},
+                {"addr": "aa:bb:cc:dd:ee:ff", "gate": 1},
+                {"addr": "11:11:11:11:11:22", "gate": 2},
+            ]
+        )
         with self.assertRaises(bess.Error):
-            l2fib.add(entries=[{'addr': '00:01:02:03:04:05', 'gate': 0}])
+            l2fib.add(entries=[{"addr": "00:01:02:03:04:05", "gate": 0}])
 
-        ret = l2fib.lookup(addrs=['aa:bb:cc:dd:ee:ff', '00:01:02:03:04:05'])
+        ret = l2fib.lookup(addrs=["aa:bb:cc:dd:ee:ff", "00:01:02:03:04:05"])
         self.assertEqual(ret.gates, [1, 64])
 
-        l2fib.delete(addrs=['00:01:02:03:04:05'])
+        l2fib.delete(addrs=["00:01:02:03:04:05"])
         with self.assertRaises(bess.Error):
-            l2fib.delete(addrs=['00:01:02:03:04:05'])
+            l2fib.delete(addrs=["00:01:02:03:04:05"])
+
 
 suite = unittest.TestLoader().loadTestsFromTestCase(BessL2ForwardTest)
 results = unittest.TextTestRunner(verbosity=2).run(suite)
