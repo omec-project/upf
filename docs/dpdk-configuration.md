@@ -26,18 +26,15 @@ $ ip a
 ...
 ```
 
-- Download a copy of dpdk-devbind script
+- Use the bundled dpdk-devbind script
 
-The dpdk-devbind script from DPDK is used for this purpose. To get a copy of it,
-execute the following command from the UPF's root directory:
-```bash
-$ wget https://raw.githubusercontent.com/DPDK/dpdk/main/usertools/dpdk-devbind.py -O dpdk-devbind.py
-$ chmod +x dpdk-devbind.py
-```
+A copy of the dpdk-devbind script is bundled at `bess/bin/dpdk-devbind.py` in the
+UPF's root directory. The commands below assume they are run from the UPF's
+root directory.
 
 - Get the PCI addresses of interest
 ```bash
-$ ./dpdk-devbind.py -s
+$ ./bess/bin/dpdk-devbind.py -s
 Network devices using kernel driver
 ===================================
 0000:17:00.0 'Ethernet Controller X710 for 10GBASE-T 15ff' if=ens260f0 drv=i40e unused=vfio-pci *Active*
@@ -56,13 +53,13 @@ No 'Baseband' devices detected
 - Bind devices to `DPDK-compatible driver`
 
 ```bash
-$ sudo ./dpdk-devbind.py -b vfio-pci 0000:b1:00.0
-$ sudo ./dpdk-devbind.py -b vfio-pci 0000:b1:00.1
+$ sudo ./bess/bin/dpdk-devbind.py -b vfio-pci 0000:b1:00.0
+$ sudo ./bess/bin/dpdk-devbind.py -b vfio-pci 0000:b1:00.1
 ```
 
 - Verify that the binding was successful
 ```bash
-$ ./dpdk-devbind.py -s
+$ ./bess/bin/dpdk-devbind.py -s
 
 Network devices using DPDK-compatible driver
 ============================================

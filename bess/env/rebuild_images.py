@@ -33,7 +33,6 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from __future__ import print_function
 import os
 import shlex
 import subprocess
@@ -47,7 +46,7 @@ FULL_TARGET = TARGET_REGISTRY + TARGET_REPOSITORY + TARGET
 
 
 def print_usage(prog):
-    print('Usage - {}'.format(prog))
+    print(f"Usage - {prog}")
 
 
 def run_cmd(cmd, shell=False):
@@ -58,23 +57,24 @@ def run_cmd(cmd, shell=False):
 
 
 def build():
-    tag_suffix = ''
-    version = time.strftime('%y%m%d')
+    tag_suffix = ""
+    version = time.strftime("%y%m%d")
 
-    run_cmd('docker build -f env/Dockerfile '
-            '-t {target}:latest{suffix} -t {target}:{version}{suffix} '
-            '.'.format(target=FULL_TARGET,
-                       version=version, suffix=tag_suffix))
+    run_cmd(
+        "docker build -f env/Dockerfile "
+        f"-t {FULL_TARGET}:latest{tag_suffix} -t {FULL_TARGET}:{version}{tag_suffix} "
+        "."
+    )
 
-    print('Build succeeded: {}:{}{}'.format(FULL_TARGET, version, tag_suffix))
-    print('Build succeeded: {}:latest{}'.format(FULL_TARGET, tag_suffix))
+    print(f"Build succeeded: {FULL_TARGET}:{version}{tag_suffix}")
+    print(f"Build succeeded: {FULL_TARGET}:latest{tag_suffix}")
 
     return version, tag_suffix
 
 
 def push(version, tag_suffix):
-    run_cmd('docker push {}:latest{}'.format(FULL_TARGET, tag_suffix))
-    run_cmd('docker push {}:{}{}'.format(FULL_TARGET, version, tag_suffix))
+    run_cmd(f"docker push {FULL_TARGET}:latest{tag_suffix}")
+    run_cmd(f"docker push {FULL_TARGET}:{version}{tag_suffix}")
 
 
 def main(argv):
@@ -86,13 +86,13 @@ def main(argv):
 
     prompt = input  # Python 3
 
-    if prompt('Do you wish to push the image? [y/N] ').lower() in ['y', 'yes']:
+    if prompt("Do you wish to push the image? [y/N] ").lower() in ["y", "yes"]:
         push(version, tag_suffix)
     else:
-        print('The image was not pushed')
+        print("The image was not pushed")
 
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main(sys.argv))
