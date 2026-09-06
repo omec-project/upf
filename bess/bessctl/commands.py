@@ -213,8 +213,12 @@ def _fetch_candidates(cli, func, processor):
     """Generic wrapper to handle BESS RPC errors during auto-completion."""
     try:
         return processor(func())
+    except OSError:
+        # Let socket and network errors bubble up to get_var_attrs
+        # so it can cleanly disconnect stale RPC sessions
+        raise
     except Exception:
-        # We ignore errors here as this is only for CLI auto-completion
+        # We ignore other internal errors here as this is only for CLI auto-completion
         return []
 
 def _get_workers(cli):
@@ -297,7 +301,7 @@ TOKEN_REGISTRY = {
     '[GRPC_URL]': ('filename', 'gRPC url', []),
     '[PAUSE_WORKERS]': ('pause_workers', 'determines whether to pause workers', ['pause', 'no_pause']),
     '[HOST]': ('host', 'HTTP server address to listen on (default: "localhost")', []),
-    '[PORT_NUMBER]': ('int', 'HTTP server address to listen on (default: 5000)', []),
+    '[PORT_NUMBER]': ('int', 'HTTP server port number to listen on (default: 5000)', []),
 }
 
 # --- Main Dispatcher ---
@@ -311,21 +315,26 @@ def get_var_attrs(cli, var_token, partial_word):
 
     try:
         if callable(provider):
-            # Check if provider needs partial_word (for filenames) or just cli
-            sig = inspect.signature(provider)
-            if len(sig.parameters) == 2:
-                var_candidates = provider(cli, partial_word)
-            else:
+            # Only pass partial_word when the provider's 2nd parameter
+            # is explicitly meant for it (named 'word' or 'partial_word').
+            try:
+                params = list(inspect.signature(provider).parameters.values())
+                if len(params) >= 2 and params[1].name in ('partial_word', 'word'):
+                    var_candidates = provider(cli, partial_word)
+                else:
+                    var_candidates = provider(cli)
+            except (TypeError, ValueError):
                 var_candidates = provider(cli)
         else:
             var_candidates = provider
 
-    except socket.error as e:
+    except OSError as e:
         if e.errno in [errno.ECONNRESET, errno.EPIPE]:
             cli.bess.disconnect()
         else:
             raise
     except (cli.bess.Error, cli.bess.APIError, cli.bess.RPCError):
+        # ignore errors, this is just auto completion
         pass
 
     return var_type, var_desc, var_candidates
