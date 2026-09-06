@@ -876,8 +876,11 @@ def _process_config_file(cli, conf_file):
 
 def _handle_syntax_error(cli, conf_file, e):
     """Handle syntax errors in configuration files."""
+    text = (e.text or '').rstrip('\n')
+    offset = max((e.offset or 1) - 1, 0)
+    caret = (' ' * offset) + '^'
     cli.err('\n  File "%s", line %d\n    %s\n    %s\nSyntaxError: %s' %
-            (conf_file, e.lineno, e.text, ' ' * (e.offset - 1) + '^', e.msg))
+            (conf_file, e.lineno or 0, text, caret, e.msg))
 
 def _prepare_pipeline_state(cli):
     """Prepare pipeline state for configuration execution."""
@@ -890,22 +893,22 @@ def _prepare_pipeline_state(cli):
 
 def _handle_execution_exception(cli, e):
     """Handle exceptions during configuration execution."""
-    cur_frame = inspect.currentframe()
-    cur_func = inspect.getframeinfo(cur_frame).function
-    t, v, tb = sys.exc_info()
+    tb = e.__traceback__
     stack = traceback.extract_tb(tb)
 
-    while len(stack) > 0 and stack.pop(0)[2] != cur_func:
+    # Filter out the frames up to '_do_run_file' where exec() occurred.
+    # We match against the exact caller function name.
+    while len(stack) > 0 and stack.pop(0)[2] != "_do_run_file":
         pass
 
     errmsg = 'Unhandled exception in the configuration script'
     cli.err('%s (most recent call last)' % errmsg)
     cli.ferr.write(''.join(traceback.format_list(stack)))
 
-    if isinstance(v, (cli.bess.Error, cli.bess.RPCError)):
-        raise
+    if isinstance(e, (cli.bess.Error, cli.bess.RPCError)):
+        raise e
     else:
-        cli.ferr.write(''.join(traceback.format_exception_only(t, v)))
+        cli.ferr.write(''.join(traceback.format_exception_only(type(e), e)))
         raise cli.HandledError()
 
 # NOTE: the name of this function is used below
@@ -925,9 +928,9 @@ def _do_run_file(cli, conf_file):
     try:
         exec(code, new_globals)
         if cli.interactive:
-            cli.fout.write('Done.\n')
-    except:
-        _handle_execution_exception(cli, sys.exc_info()[1])
+            cli.fout.write(DONE_MESSAGE)
+    except Exception as e:
+        _handle_execution_exception(cli, e)
     finally:
         if cli.bess.is_connected():
             cli.bess.resume_all()
