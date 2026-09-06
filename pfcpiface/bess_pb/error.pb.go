@@ -72,6 +72,7 @@ func (x *Error) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// SONARQB: Empty protobuf generated method is safe to ignore
 func (*Error) ProtoMessage() {}
 
 func (x *Error) ProtoReflect() protoreflect.Message {
@@ -126,10 +127,12 @@ func file_error_proto_rawDescGZIP() []byte {
 	return file_error_proto_rawDescData
 }
 
-var file_error_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
-var file_error_proto_goTypes = []any{
-	(*Error)(nil), // 0: bess.pb.Error
-}
+var (
+	file_error_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+	file_error_proto_goTypes  = []any{
+		(*Error)(nil), // 0: bess.pb.Error
+	}
+)
 var file_error_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
 	0, // [0:0] is the sub-list for method input_type

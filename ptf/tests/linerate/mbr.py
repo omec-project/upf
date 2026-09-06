@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2022-present Open Networking Foundation
 
+from common import *
 from grpc_test import *
 from pkt_utils import GTPU_PORT, pkt_add_gtpu
 from scapy.layers.l2 import Ether
@@ -9,7 +10,6 @@ from trex_stl_lib.api import STLPktBuilder, STLStream, STLTXCont
 from trex_test import TrexTest
 from trex_utils import *
 
-from common import *
 
 class AppMbrTest(TrexTest, GrpcTest):
     """Base class for app MBR testing"""

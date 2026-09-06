@@ -2,17 +2,14 @@
 # Copyright 2021 Open Networking Foundation
 
 import time
-from ipaddress import IPv4Address
-from pprint import pprint
 
-import ptf.testutils as testutils
+from common import *
 from grpc_test import *
 from pkt_utils import GTPU_PORT
 from trex_stl_lib.api import *
 from trex_test import TrexTest
 from trex_utils import *
 
-from common import *
 
 class DownlinkPerformanceBaselineTest(TrexTest, GrpcTest):
     """
@@ -88,7 +85,7 @@ class DownlinkPerformanceBaselineTest(TrexTest, GrpcTest):
         eth = Ether(dst=UPF_CORE_MAC, src=TREX_SRC_MAC)
         ip = IP(src=PDN_IP, id=0)
         udp = UDP(sport=10002, dport=10001, chksum=0)
-        pkt = eth/ip/udp
+        pkt = eth / ip / udp
 
         stream = STLStream(
             packet=STLPktBuilder(pkt=pkt, vm=vm),
@@ -139,5 +136,3 @@ class DownlinkPerformanceBaselineTest(TrexTest, GrpcTest):
             20,
             f"Jitter was higher than 20 us! Was {lat_stats.jitter}",
         )
-
-        return
