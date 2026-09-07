@@ -391,7 +391,12 @@ CommandResponse Qos::CommandAdd(const bess::pb::QosCommandAddArg &arg) {
     }
   }
 
-  table_.Add(v, key);
+  const bess::utils::Error err_add = table_.Add(v, key);
+  if (err_add.first != 0) {
+    return CommandFailure(err_add.first, "Insert Failed - %s",
+                          err_add.second.c_str());
+  }
+
   return CommandSuccess();
 }
 

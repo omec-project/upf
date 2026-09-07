@@ -111,13 +111,18 @@ class Metering {
   Metering() : total_key_size_(0), num_fields_(0) {}
 
   Error Add(const T &val, const MeteringKey &key) {
-    Error err;
     const void *Key_t = (const void *)&key;
     T *val_t = new T(val);
+    // insert_dpdk() forwards rte_hash_add_key_data(), which returns 0 on
+    // success and a negative errno on failure (-ENOSPC for a full table).
+    // Negative rather than non-zero: its no-data path returns a non-negative
+    // index on success.
     int ret = table_->insert_dpdk(Key_t, val_t);
-    if (!ret) {
-      return MakeError(ENOENT, "Dpdk Insert Failed");
+    if (ret < 0) {
+      delete val_t;
+      return MakeError(-ret, "Dpdk Insert Failed");
     }
+
     return MakeError(0);
   }
 
