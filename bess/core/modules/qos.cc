@@ -403,6 +403,11 @@ CommandResponse Qos::CommandAdd(const bess::pb::QosCommandAddArg &arg) {
 CommandResponse Qos::CommandDelete(const bess::pb::QosCommandDeleteArg &arg) {
   MeteringKey key;
   CommandResponse err = ExtractKey(arg, &key);
+
+  if (err.error().code() != 0) {
+    return err;
+  }
+
   table_.Delete(key);
   return CommandSuccess();
 }
