@@ -202,7 +202,7 @@ RUN apt-get update && \
 
 # Stage protoc-gen: Go protobuf plugins. See #1227 for generated binding
 # refresh and drift-check coverage.
-FROM golang:1.27.0-bookworm@sha256:ded31c68586d2e49e760acc2e65a884b23d032e9bbbed0ae0c55abd3fcaf4452 AS protoc-gen
+FROM golang:1.27.1-bookworm@sha256:648f440f42a0958804efb24df176f806f9d353b41f1c0627f666428e40310f6b AS protoc-gen
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10 && \
     go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
 
@@ -233,7 +233,7 @@ RUN mkdir /bess_pb && \
     --python_out=/bess_pb \
     --grpc_python_out=/bess_pb
 
-FROM golang:1.27.0-bookworm@sha256:ded31c68586d2e49e760acc2e65a884b23d032e9bbbed0ae0c55abd3fcaf4452 AS pfcp-build
+FROM golang:1.27.1-bookworm@sha256:648f440f42a0958804efb24df176f806f9d353b41f1c0627f666428e40310f6b AS pfcp-build
 ARG GOFLAGS
 WORKDIR /pfcpiface
 
