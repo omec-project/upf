@@ -35,6 +35,7 @@
 
 #include <gtest/gtest.h>
 
+#include "../dpdk.h"
 #include "../packet_pool.h"
 #include "endian.h"
 
@@ -45,7 +46,21 @@ using bess::utils::ExactMatchRuleFields;
 using bess::utils::ExactMatchTable;
 using google::protobuf::RepeatedPtrField;
 
-TEST(EmTableTest, AddField) {
+// An ExactMatchTable stores its rules in a DPDK rte_hash, so no table can be
+// created before EAL is up: rte_hash_create() fails, CuckooMap stays in its
+// non-DPDK mode without reporting that, and every lookup then misses. Bringing
+// DPDK up here is what makes these tests independent of the order they run in.
+// Without it, four of them passed only because FindMakeKeysPktBatch runs
+// before them and initialises EAL as a side effect of constructing a
+// PacketPool; run on their own they failed.
+class EmTableTest : public ::testing::Test {
+ protected:
+  // InitDpdk() is idempotent and aborts the process if EAL cannot be brought
+  // up, so there is nothing here worth asserting afterwards.
+  void SetUp() override { bess::InitDpdk(); }
+};
+
+TEST_F(EmTableTest, AddField) {
   ExactMatchTable<uint8_t> em;
   Error err = em.AddField(0, 4, 0, 0);
   ASSERT_EQ(0, err.first);
@@ -58,9 +73,9 @@ TEST(EmTableTest, AddField) {
   ASSERT_EQ(EINVAL, err.first);
 }
 
-TEST(EmTableTest, AddRule) {
+TEST_F(EmTableTest, AddRule) {
   ExactMatchTable<uint16_t> em;
-  em.AddField(0, 4, 0, 0);
+  ASSERT_EQ(0, em.AddField(0, 4, 0, 0).first);
   em.Init(1 << 4);
   ExactMatchRuleFields rule = {
       {0x01, 0x02, 0x03, 0x04},
@@ -71,10 +86,53 @@ TEST(EmTableTest, AddRule) {
   em.DeInit();
 }
 
-TEST(EmTableTest, FindMakeKeysPktBatch) {
+// A table with no room left must say so, and say which failure it was. Nothing
+// above this layer knows the table's capacity, so a rule dropped here would
+// otherwise be reported to the caller as installed.
+TEST_F(EmTableTest, AddRuleReportsAFullTable) {
+  const uint32_t entries = 1 << 6;
+
+  ExactMatchTable<uint16_t> em;
+  ASSERT_EQ(0, em.AddField(0, 4, 0, 0).first);
+  em.Init(entries);
+
+  Error err = std::make_pair(0, std::string());
+  uint32_t accepted = 0;
+
+  for (uint32_t i = 1; i <= entries * 8; i++) {
+    const ExactMatchRuleFields rule = {
+        {static_cast<uint8_t>(i), static_cast<uint8_t>(i >> 8),
+         static_cast<uint8_t>(i >> 16), static_cast<uint8_t>(i >> 24)},
+    };
+
+    err = em.AddRule(static_cast<uint16_t>(i), rule);
+    if (err.first != 0) {
+      break;
+    }
+    accepted++;
+  }
+
+  // EXPECT rather than ASSERT: an ASSERT returns from the test immediately, so
+  // the table below would never be released. Init() names its rte_hash after
+  // the address of its own member, which is a stack address, so a leaked table
+  // collides by name with the next test's and breaks it -- one failure here
+  // would be reported as several.
+  EXPECT_NE(0, err.first) << "the table accepted " << accepted
+                          << " rules into a " << entries
+                          << "-entry table without reporting a failure";
+  EXPECT_EQ(ENOSPC, err.first)
+      << "a full table must report ENOSPC and not some other errno, so that a "
+         "refusal stays distinguishable from a table that was never created; "
+         "reported: "
+      << err.second;
+
+  em.ClearRules();
+  em.DeInit();
+}
+
+TEST_F(EmTableTest, FindMakeKeysPktBatch) {
   const size_t n = 2;
   ExactMatchTable<uint16_t> em;
-  em.Init(1 << 6);
   ExactMatchRuleFields rule = {{0x04, 0x03, 0x02, 0x01}};
   ExactMatchKey keys[n];
   bess::PacketBatch batch;
@@ -83,7 +141,12 @@ TEST(EmTableTest, FindMakeKeysPktBatch) {
   pool.AllocBulk(pkts, n, 0);
   char databuf[32] = {0};
 
+  // Init() sizes the table's key from the fields added so far, so it has to
+  // come after AddField(); called before, it built a table with a key length
+  // of zero, which rte_hash_create() refuses. The assertion below then held
+  // for the wrong reason -- a table that does not exist misses every key.
   ASSERT_EQ(0, em.AddField(0, 4, 0, 0).first);
+  em.Init(1 << 6);
   ASSERT_EQ(0, em.AddRule(0xF00, rule).first);
 
   batch.clear();
@@ -105,7 +168,7 @@ TEST(EmTableTest, FindMakeKeysPktBatch) {
   em.DeInit();
 }
 
-TEST(EmTableTest, LookupOneFieldOneRule) {
+TEST_F(EmTableTest, LookupOneFieldOneRule) {
   ExactMatchTable<uint16_t> em;
   em.AddField(0, 4, 0, 0);
   ExactMatchRuleFields rule = {
@@ -123,7 +186,7 @@ TEST(EmTableTest, LookupOneFieldOneRule) {
   em.DeInit();
 }
 
-TEST(EmTableTest, LookupTwoFieldsOneRule) {
+TEST_F(EmTableTest, LookupTwoFieldsOneRule) {
   ExactMatchTable<uint16_t> em;
   ASSERT_EQ(0, em.AddField(0, 4, 0, 0).first);
   ASSERT_EQ(0, em.AddField(6, 2, 0, 1).first);
@@ -139,7 +202,7 @@ TEST(EmTableTest, LookupTwoFieldsOneRule) {
   em.DeInit();
 }
 
-TEST(EmTableTest, LookupTwoFieldsTwoRules) {
+TEST_F(EmTableTest, LookupTwoFieldsTwoRules) {
   ExactMatchTable<uint16_t> em;
   ASSERT_EQ(0, em.AddField(0, 4, 0, 0).first);
   ASSERT_EQ(0, em.AddField(6, 2, 0, 1).first);
@@ -165,7 +228,7 @@ TEST(EmTableTest, LookupTwoFieldsTwoRules) {
 // This test is for a specific bug introduced at one point
 // where the MakeKeys function didn't clear out any random
 // crud that might be on the stack.
-TEST(EmTableTest, IgnoreBytesPastEnd) {
+TEST_F(EmTableTest, IgnoreBytesPastEnd) {
   ExactMatchTable<uint16_t> em;
   ASSERT_EQ(0, em.AddField(6, 1, 0, 0).first);
   ASSERT_EQ(0, em.AddField(7, 8, 0, 1).first);
