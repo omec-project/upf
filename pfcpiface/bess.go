@@ -1518,15 +1518,18 @@ func (b *bess) processSliceMeter(ctx context.Context, arg *anypb.Any, method upf
 
 	methods := [...]string{upfMethodAdd, upfMethodAdd, upfMethodDelete, upfMethodClear}
 
-	_, err := b.client.ModuleCommand(
+	resp, err := b.client.ModuleCommand(
 		ctx, &pb.CommandRequest{
 			Name: "sliceMeter",
 			Cmd:  methods[method],
 			Arg:  arg,
 		},
 	)
-	if err != nil {
-		logger.BessLog.Errorln("sliceMeter method failed:", err)
+
+	logger.BessLog.Debugf("sliceMeter resp: %v", resp)
+
+	if err != nil || resp.GetError() != nil {
+		logger.BessLog.Errorf("sliceMeter method failed with resp: %v, err: %v", resp, err)
 	}
 }
 
