@@ -234,6 +234,13 @@ Error ExactMatch::AddRule(const bess::pb::ExactMatchCommandAddArg &arg) {
   memset(&t.action, 0, sizeof(t.action));
   /* set gate */
   t.gate = gate;
+  /* check whether the fields match the table's, before reading per-field
+   * metadata indexed by the request's own count */
+  if (arg.fields_size() != (ssize_t)table_.num_fields())
+    return std::make_pair(
+        EINVAL, bess::utils::Format(
+                    "rule has incorrect number of fields. Need %d, has %d",
+                    (int)table_.num_fields(), arg.fields_size()));
   RuleFieldsFromPb(arg.fields(), &rule, FIELD_TYPE);
   /* check whether values match with the the table's */
   if (arg.values_size() != (ssize_t)num_values())
@@ -409,6 +416,12 @@ CommandResponse ExactMatch::CommandDelete(
 
   if (arg.fields_size() == 0) {
     return CommandFailure(EINVAL, "argument must be a list");
+  }
+
+  if (arg.fields_size() != (ssize_t)table_.num_fields()) {
+    return CommandFailure(
+        EINVAL, "rule has incorrect number of fields. Need %d, has %d",
+        (int)table_.num_fields(), arg.fields_size());
   }
 
   ExactMatchRuleFields rule;
