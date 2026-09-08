@@ -190,7 +190,16 @@ class ExactMatchTable {
     }
     const void *Key_t = (const void *)&key;
     T *val_t = new T(val);
-    table_->insert_dpdk(Key_t, val_t);
+    // insert_dpdk() forwards rte_hash_add_key_data(), which returns 0 on
+    // success and a negative errno on failure (-ENOSPC for a full table).
+    // Negative rather than non-zero: its no-data path returns a non-negative
+    // index on success.
+    int ret = table_->insert_dpdk(Key_t, val_t);
+    if (ret < 0) {
+      delete val_t;
+      return MakeError(-ret, "dpdk insert failed");
+    }
+
     return MakeError(0);
   }
 
