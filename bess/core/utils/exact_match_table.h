@@ -341,7 +341,8 @@ class ExactMatchTable {
 
   typename EmTable::iterator end() { return table_->end(); }
 
-  void Init(uint32_t entries) {
+  // Returns 0 on success, non-zero errno if no table could be created.
+  Error Init(uint32_t entries) {
     std::ostringstream address;
     address << &table_;
     std::string name = "Exactmatch" + address.str();
@@ -353,6 +354,12 @@ class ExactMatchTable {
     table_.reset(
         new CuckooMap<ExactMatchKey, T, ExactMatchKeyHash, ExactMatchKeyEq>(
             0, 0, &dpdk_params));
+
+    if (table_->dpdk_init_failed()) {
+      return MakeError(ENOMEM, "rte_hash_create() failed");
+    }
+
+    return MakeError(0);
   }
 
  private:

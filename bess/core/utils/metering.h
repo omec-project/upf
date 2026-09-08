@@ -169,7 +169,8 @@ class Metering {
 
   uint32_t Total_key_size() const { return total_key_size_; }
 
-  void Init(int size, int entries) {
+  // Returns 0 on success, non-zero errno if no table could be created.
+  Error Init(int size, int entries) {
     std::ostringstream address;
     total_key_size_ = size;
     address << &table_;
@@ -181,6 +182,12 @@ class Metering {
     dpdk_params.key_len = size;
     table_.reset(new CuckooMap<MeteringKey, T, MeteringKeyHash, MeteringKeyEq>(
         0, 0, &dpdk_params));
+
+    if (table_->dpdk_init_failed()) {
+      return MakeError(ENOMEM, "rte_hash_create() failed");
+    }
+
+    return MakeError(0);
   }
 
  private:

@@ -101,7 +101,12 @@ CommandResponse Qos::Init(const bess::pb::QosArg &arg) {
     cs[i] = 0xff;
   }
 
-  table_.Init(total_key_size_, arg.entries());
+  if (const bess::utils::Error err =
+          table_.Init(total_key_size_, arg.entries());
+      err.first != 0) {
+    return CommandFailure(err.first, "%s", err.second.c_str());
+  }
+
   return CommandSuccess();
 }
 

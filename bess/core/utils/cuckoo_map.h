@@ -80,12 +80,18 @@ template <typename K, typename V, typename H = std::hash<K>,
 class CuckooMap {
  private:
   bool IsDpdk = false;
+  bool dpdk_init_failed_ = false;
   uint32_t key_len = 0;
   rte_hash_parameters rt;
 
  public:
   struct rte_hash* hash = nullptr;
   typedef std::pair<K, V> Entry;
+
+  // True when a DPDK-backed table was asked for and rte_hash_create() refused
+  // it. Such a map holds no table: every insert reports a failure and every
+  // lookup misses.
+  bool dpdk_init_failed() const { return dpdk_init_failed_; }
 
   class iterator {
    public:
@@ -169,8 +175,13 @@ class CuckooMap {
       if (hash == NULL) {
         rt = *((rte_hash_parameters*)dpdk_params);
         hash = rte_hash_create(&rt);
-        if (hash == NULL)
+        if (hash == NULL) {
+          // No table was created, so this map cannot serve the mode it was
+          // asked for. IsDpdk stays false, which is indistinguishable from a
+          // deliberately non-DPDK map, so record the failure separately.
+          dpdk_init_failed_ = true;
           return;
+        }
       }
       IsDpdk = true;
     } else {
