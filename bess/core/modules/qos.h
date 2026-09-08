@@ -43,11 +43,6 @@ struct value {
   MeteringKey Data;
 };
 
-struct MKey {
-  uint8_t key1;
-  uint8_t key2;
-};
-
 class Qos final : public Module {
  public:
   static const gate_idx_t kNumOGates = MAX_GATES;
@@ -70,7 +65,7 @@ class Qos final : public Module {
       const bess::pb::QosCommandSetDefaultGateArg &arg);
   template <typename T>
   CommandResponse ExtractKeyMask(const T &arg, MeteringKey *key,
-                                 MeteringKey *val, MKey *l);
+                                 MeteringKey *val);
   template <typename T>
   CommandResponse ExtractKey(const T &arg, MeteringKey *key);
   CommandResponse AddFieldOne(const bess::pb::Field &field,
