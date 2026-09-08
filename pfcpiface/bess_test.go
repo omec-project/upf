@@ -38,7 +38,12 @@ func TestGRPCJoinWaitsForEveryCallBeforeReturning(t *testing.T) {
 		}()
 	}
 
-	if b.GRPCJoin(calls, time.Second, done) {
+	completed, succeeded := b.GRPCJoin(calls, time.Second, done)
+	if !completed {
+		t.Error("GRPCJoin reported a batch as incomplete when every call reported")
+	}
+
+	if succeeded {
 		t.Error("GRPCJoin reported success for a batch containing a failed call")
 	}
 
@@ -59,8 +64,9 @@ func TestGRPCJoinReportsSuccessWhenEveryCallSucceeds(t *testing.T) {
 		go func() { done <- true }()
 	}
 
-	if !b.GRPCJoin(calls, time.Second, done) {
-		t.Error("GRPCJoin reported failure for a batch in which every call succeeded")
+	if completed, succeeded := b.GRPCJoin(calls, time.Second, done); !completed || !succeeded {
+		t.Errorf("GRPCJoin() = (%t, %t) for a batch in which every call succeeded, want (true, true)",
+			completed, succeeded)
 	}
 }
 
@@ -81,8 +87,9 @@ func TestGRPCJoinReportsFailureWhenAnyCallFails(t *testing.T) {
 		done <- false
 	}()
 
-	if b.GRPCJoin(calls, time.Second, done) {
-		t.Error("GRPCJoin reported success for a batch whose last call failed")
+	if completed, succeeded := b.GRPCJoin(calls, time.Second, done); !completed || succeeded {
+		t.Errorf("GRPCJoin() = (%t, %t) for a batch whose last call failed, want (true, false)",
+			completed, succeeded)
 	}
 }
 
@@ -95,8 +102,9 @@ func TestGRPCJoinReturnsWhenACallNeverReports(t *testing.T) {
 
 	start := time.Now()
 
-	if b.GRPCJoin(2, 50*time.Millisecond, done) {
-		t.Error("GRPCJoin reported success for a batch one of whose calls never reported")
+	if completed, succeeded := b.GRPCJoin(2, 50*time.Millisecond, done); completed || succeeded {
+		t.Errorf("GRPCJoin() = (%t, %t) for a batch one of whose calls never reported, want (false, false)",
+			completed, succeeded)
 	}
 
 	if elapsed := time.Since(start); elapsed > time.Second {

@@ -129,15 +129,23 @@ func (b *bess) AddSliceInfo(sliceInfo *SliceInfo) error {
 
 	b.addSliceMeter(ctx, done, sliceMeterConfig)
 
-	rc := b.GRPCJoin(1, Timeout, done)
+	completed, succeeded := b.GRPCJoin(1, Timeout, done)
 
-	if !rc {
+	if !completed || !succeeded {
 		logger.BessLog.Errorln(errGRPCCallFailed)
 	}
 
 	return nil
 }
 
+// SendMsgToUPF programs a session's rules as one batch and reports the PFCP cause the
+// batch earned: rejected when the batch completed and any rule in it reported a failure,
+// accepted otherwise. The callers use the cause to decide whether the session exists.
+//
+// A batch that did not complete within Timeout is answered as accepted, which is not a
+// claim that its rules were programmed: nothing here knows what a timed-out batch left in
+// the datapath, and answering it as rejected would have the caller forget a session whose
+// rules may still be installed. That case is unchanged from before this cause existed.
 func (b *bess) SendMsgToUPF(
 	method upfMsgType, rules PacketForwardingRules, updated PacketForwardingRules,
 ) uint8 {
@@ -203,9 +211,17 @@ func (b *bess) SendMsgToUPF(
 		}
 	}
 
-	rc := b.GRPCJoin(calls, Timeout, done)
-	if !rc {
+	completed, succeeded := b.GRPCJoin(calls, Timeout, done)
+	if !completed || !succeeded {
 		logger.BessLog.Errorln(errGRPCCallFailed)
+	}
+
+	// Reject only a batch that completed and reported a failure. A batch that timed out
+	// has an unknown subset of its rules programmed and still in flight, so answering it
+	// as rejected would have the caller forget a session the datapath may still be
+	// forwarding for -- which is worse than the accepted answer it gets today.
+	if completed && !succeeded {
+		cause = ie.CauseRequestRejected
 	}
 
 	return cause
@@ -995,8 +1011,8 @@ func (b *bess) setupSliceMeter(conf *Conf) {
 
 		b.addSliceMeter(ctx, done, conf.SliceMeterConfig)
 
-		rc := b.GRPCJoin(1, Timeout, done)
-		if !rc {
+		completed, succeeded := b.GRPCJoin(1, Timeout, done)
+		if !completed || !succeeded {
 			logger.BessLog.Errorln(errGRPCCallFailed)
 		}
 	}
@@ -1728,7 +1744,14 @@ func (b *bess) delSessionQER(ctx context.Context, srcIface uint8, qer qer) {
 }
 
 // GRPCJoin waits for the given number of asynchronous operations, each of which reports
-// exactly one result on done, and reports whether all of them succeeded.
+// exactly one result on done. It reports two separate things: whether the batch
+// completed within the timeout, and whether every operation in it succeeded.
+//
+// They are separate because they tell a caller different things about the datapath. A
+// batch that completed and failed leaves it in a state the caller knows: every operation
+// has finished and reported. A batch that timed out leaves an unknown subset programmed
+// and still in flight, so a caller cannot conclude anything about what the datapath now
+// holds.
 //
 // It waits for every operation to report rather than returning as soon as one fails.
 // The callers use the result to decide what the datapath now holds, and an operation
@@ -1736,7 +1759,7 @@ func (b *bess) delSessionQER(ctx context.Context, srcIface uint8, qer qer) {
 // touches the same rule — leaving the datapath holding a rule the caller believes it
 // has already replaced. A failing batch therefore costs up to the full timeout instead
 // of returning at the first failure, which the timeout already bounds.
-func (b *bess) GRPCJoin(calls int, timeout time.Duration, done chan bool) bool {
+func (b *bess) GRPCJoin(calls int, timeout time.Duration, done chan bool) (bool, bool) {
 	boom := time.After(timeout)
 	succeeded := true
 
@@ -1752,9 +1775,9 @@ func (b *bess) GRPCJoin(calls int, timeout time.Duration, done chan bool) bool {
 			calls--
 		case <-boom:
 			logger.BessLog.Infoln("timed out adding entries")
-			return false
+			return false, false
 		}
 	}
 
-	return succeeded
+	return true, succeeded
 }
