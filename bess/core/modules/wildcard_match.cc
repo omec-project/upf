@@ -436,6 +436,12 @@ CommandResponse WildcardMatch::ExtractKeyMask(const T &arg, wm_hkey_t *key,
                               field_size);
       }
     } else if (valuedata.encoding_case() == bess::pb::FieldData::kValueBin) {
+      if (valuedata.value_bin().size() > sizeof(v)) {
+        return CommandFailure(EINVAL,
+                              "idx %zu: binary value is %zu bytes, at most %zu",
+                              i, valuedata.value_bin().size(), sizeof(v));
+      }
+
       bess::utils::Copy(reinterpret_cast<uint8_t *>(&v),
                         valuedata.value_bin().c_str(),
                         valuedata.value_bin().size());
@@ -449,6 +455,12 @@ CommandResponse WildcardMatch::ExtractKeyMask(const T &arg, wm_hkey_t *key,
                               field_size);
       }
     } else if (maskdata.encoding_case() == bess::pb::FieldData::kValueBin) {
+      if (maskdata.value_bin().size() > sizeof(m)) {
+        return CommandFailure(EINVAL,
+                              "idx %zu: binary value is %zu bytes, at most %zu",
+                              i, maskdata.value_bin().size(), sizeof(m));
+      }
+
       bess::utils::Copy(reinterpret_cast<uint8_t *>(&m),
                         maskdata.value_bin().c_str(),
                         maskdata.value_bin().size());
@@ -494,6 +506,12 @@ CommandResponse WildcardMatch::ExtractValue(const T &arg, wm_hkey_t *keyv) {
                               value_size);
       }
     } else if (valuedata.encoding_case() == bess::pb::FieldData::kValueBin) {
+      if (valuedata.value_bin().size() > sizeof(v)) {
+        return CommandFailure(EINVAL,
+                              "idx %zu: binary value is %zu bytes, at most %zu",
+                              i, valuedata.value_bin().size(), sizeof(v));
+      }
+
       bess::utils::Copy(reinterpret_cast<uint8_t *>(&v),
                         valuedata.value_bin().c_str(),
                         valuedata.value_bin().size());

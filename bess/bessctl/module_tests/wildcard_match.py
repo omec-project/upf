@@ -176,6 +176,32 @@ class BessWildcardMatchTest(BessModuleTestCase):
         #    '\nmut state:', cur_config, 'expecting:', expect_config)
     #    assert arg == iconf and cur_config == expect_config
 
+    # Each field of a rule is assembled by copying its value_bin into a
+    # uint64_t. A value longer than that must be refused rather than written
+    # past it: Copy() is length-driven and the length comes from the request.
+    def test_wildcardmatch_refuses_an_oversized_binary_value(self):
+        wm = WildcardMatch(fields=[{'offset': 26, 'num_bytes': 4}])
+
+        # Nine bytes into eight.
+        with self.assertRaises(bess.Error):
+            wm.add(gate=0, priority=0,
+                   masks=vstring([0xff, 0xff, 0xff, 0xff]),
+                   values=vstring([0x01] * 9))
+
+        # The mask is assembled the same way and is checked the same way.
+        with self.assertRaises(bess.Error):
+            wm.add(gate=0, priority=0,
+                   masks=vstring([0xff] * 9),
+                   values=vstring([0x01, 0x02, 0x03, 0x04]))
+
+        # A value that fits is still accepted, and still zero-extended.
+        wm.add(gate=0, priority=0,
+               masks=vstring([0xff, 0xff, 0xff, 0xff]),
+               values=vstring([0x01, 0x02]))
+
+        self.assertBessAlive()
+
+
 suite = unittest.TestLoader().loadTestsFromTestCase(BessWildcardMatchTest)
 results = unittest.TextTestRunner(verbosity=2).run(suite)
 
