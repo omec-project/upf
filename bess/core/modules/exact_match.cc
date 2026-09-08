@@ -70,6 +70,11 @@ CommandResponse ExactMatch::AddFieldOne(const bess::pb::Field &field,
   if (mask.encoding_case() == bess::pb::FieldData::kValueInt) {
     mask64 = mask.value_int();
   } else if (mask.encoding_case() == bess::pb::FieldData::kValueBin) {
+    if (mask.value_bin().size() > sizeof(mask64)) {
+      return CommandFailure(EINVAL, "idx %d: mask is %zu bytes, at most %zu",
+                            idx, mask.value_bin().size(), sizeof(mask64));
+    }
+
     bess::utils::Copy(reinterpret_cast<uint8_t *>(&mask64),
                       mask.value_bin().c_str(), mask.value_bin().size());
   }

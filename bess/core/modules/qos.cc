@@ -254,6 +254,12 @@ CommandResponse Qos::ExtractKey(const T &arg, MeteringKey *key) {
                               field_size);
       }
     } else if (fieldsdata.encoding_case() == bess::pb::FieldData::kValueBin) {
+      if (fieldsdata.value_bin().size() > sizeof(k)) {
+        return CommandFailure(EINVAL,
+                              "idx %zu: binary value is %zu bytes, at most %zu",
+                              i, fieldsdata.value_bin().size(), sizeof(k));
+      }
+
       bess::utils::Copy(reinterpret_cast<uint8_t *>(&k),
                         fieldsdata.value_bin().c_str(),
                         fieldsdata.value_bin().size());
@@ -288,6 +294,12 @@ CommandResponse Qos::ExtractKeyMask(const T &arg, MeteringKey *key,
                               field_size);
       }
     } else if (fieldsdata.encoding_case() == bess::pb::FieldData::kValueBin) {
+      if (fieldsdata.value_bin().size() > sizeof(k)) {
+        return CommandFailure(EINVAL,
+                              "idx %zu: binary value is %zu bytes, at most %zu",
+                              i, fieldsdata.value_bin().size(), sizeof(k));
+      }
+
       bess::utils::Copy(reinterpret_cast<uint8_t *>(&k),
                         fieldsdata.value_bin().c_str(),
                         fieldsdata.value_bin().size());
@@ -309,6 +321,12 @@ CommandResponse Qos::ExtractKeyMask(const T &arg, MeteringKey *key,
                               val_size);
       }
     } else if (valuedata.encoding_case() == bess::pb::FieldData::kValueBin) {
+      if (valuedata.value_bin().size() > sizeof(v)) {
+        return CommandFailure(EINVAL,
+                              "idx %zu: binary value is %zu bytes, at most %zu",
+                              i, valuedata.value_bin().size(), sizeof(v));
+      }
+
       bess::utils::Copy(reinterpret_cast<uint8_t *>(&v),
                         valuedata.value_bin().c_str(),
                         valuedata.value_bin().size());
