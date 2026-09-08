@@ -266,7 +266,7 @@ CommandResponse Qos::ExtractKey(const T &arg, MeteringKey *key) {
 
 template <typename T>
 CommandResponse Qos::ExtractKeyMask(const T &arg, MeteringKey *key,
-                                    MeteringKey *val, MKey *l) {
+                                    MeteringKey *val) {
   if ((size_t)arg.fields_size() != fields_.size()) {
     return CommandFailure(EINVAL, "must specify %zu masks", fields_.size());
   }
@@ -294,28 +294,6 @@ CommandResponse Qos::ExtractKeyMask(const T &arg, MeteringKey *key,
     }
 
     memcpy(reinterpret_cast<uint8_t *>(key) + field_pos, &k, field_size);
-  }
-
-  for (size_t i = 0; i < fields_.size(); i++) {
-    int field_size = fields_[i].size;
-    int field_pos = fields_[i].pos;
-
-    uint64_t k = 0;
-
-    bess::pb::FieldData fieldsdata = arg.fields(i);
-    if (fieldsdata.encoding_case() == bess::pb::FieldData::kValueInt) {
-      if (!bess::utils::uint64_to_bin(&k, fieldsdata.value_int(), field_size,
-                                      false)) {
-        return CommandFailure(EINVAL, "idx %zu: not a correct %d-byte mask", i,
-                              field_size);
-      }
-    } else if (fieldsdata.encoding_case() == bess::pb::FieldData::kValueBin) {
-      bess::utils::Copy(reinterpret_cast<uint8_t *>(&k),
-                        fieldsdata.value_bin().c_str(),
-                        fieldsdata.value_bin().size());
-    }
-
-    memcpy(reinterpret_cast<uint8_t *>(l) + field_pos, &k, field_size);
   }
 
   for (size_t i = 0; i < values_.size(); i++) {
@@ -349,10 +327,9 @@ CommandResponse Qos::CommandAdd(const bess::pb::QosCommandAddArg &arg) {
   }
   MeteringKey key = {{0}};
 
-  MKey l;
   value v;
   v.ogate = gate;
-  CommandResponse err = ExtractKeyMask(arg, &key, &v.Data, &l);
+  CommandResponse err = ExtractKeyMask(arg, &key, &v.Data);
 
   if (err.error().code() != 0) {
     return err;
