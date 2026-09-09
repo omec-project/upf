@@ -141,7 +141,10 @@ CommandResponse ExactMatch::Init(const bess::pb::ExactMatchArg &arg) {
   }
 
   default_gate_ = DROP_GATE;
-  table_.Init(arg.entries());
+  if (const Error err = table_.Init(arg.entries()); err.first != 0) {
+    return CommandFailure(err.first, "%s", err.second.c_str());
+  }
+
   return CommandSuccess();
 }
 
