@@ -608,8 +608,15 @@ CommandResponse WildcardMatch::CommandAdd(
   }
   struct WmData *data_t = new WmData(data);
   int ret = tuples_[idx].ht->insert_dpdk(&key, data_t);
-  if (ret < 0)
+  if (ret < 0) {
+    // The insert failed, so no lookup can return this pointer. Values the
+    // table did take are a different matter and are left alone: commands here
+    // are THREAD_SAFE and run while ProcessBatch dereferences what a lookup
+    // returned.
+    delete data_t;
     return CommandFailure(EINVAL, "failed to add a rule");
+  }
+
   return CommandSuccess();
 }
 
