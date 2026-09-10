@@ -8,6 +8,8 @@
 #include <rte_errno.h>
 #include <rte_jhash.h>
 
+#include <cstring>
+
 #include "../core/utils/common.h"
 
 /*----------------------------------------------------------------------------------*/
@@ -253,7 +255,13 @@ CommandResponse FlowMeasure::CommandReadStats(
           << ", next=" << next << ")";
       continue;
     }
-    const TableKey *table_key = reinterpret_cast<const TableKey *>(key);
+    // key points into DPDK's own key storage, which is not guaranteed to be
+    // aligned for TableKey; reinterpret_cast'ing and dereferencing it
+    // directly lets the compiler assume that alignment and emit aligned SIMD
+    // loads, which fault on unaligned storage. memcpy() into a local
+    // (compiler-aligned) TableKey avoids that undefined behavior.
+    TableKey table_key;
+    std::memcpy(&table_key, key, sizeof(table_key));
     const SessionStats &session_stat = current_data->at(ret);
     const std::lock_guard<std::mutex> stat_lock(session_stat.mutex);
     const std::vector<double> lat_percs(arg.latency_percentiles().begin(),
@@ -265,8 +273,8 @@ CommandResponse FlowMeasure::CommandReadStats(
     const auto jitter_summary =
         session_stat.jitter_histogram.Summarize(jitter_percs);
     bess::pb::FlowMeasureReadResponse::Statistic stat;
-    stat.set_fseid(table_key->fseid);
-    stat.set_pdr(table_key->pdr);
+    stat.set_fseid(table_key.fseid);
+    stat.set_pdr(table_key.pdr);
     for (const auto &lat_perc : lat_summary.percentile_values) {
       stat.mutable_latency()->add_percentile_values_ns(lat_perc);
     }
