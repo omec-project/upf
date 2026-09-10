@@ -67,9 +67,16 @@ class FlowMeasure final : public Module {
   }
 
   // TableKey encapsulates all information used to identify a flow and is used
-  // as the lookup key in the hash tables. It is packed and aligned to
-  // calculating a hash over the raw bytes of the struct is ok.
-  struct __attribute__((packed, aligned(16))) TableKey {
+  // as the lookup key in the hash tables. It is packed so calculating a hash
+  // over the raw bytes of the struct is ok. Deliberately NOT over-aligned
+  // (e.g. via alignas/aligned(16)): rte_hash_iterate()/rte_hash_lookup()
+  // return pointers into DPDK's own key storage, which is not guaranteed to
+  // satisfy any alignment beyond the natural alignment of its bytes. An
+  // over-aligned TableKey previously let the compiler emit aligned SIMD
+  // loads (e.g. movdqa) when reading through a `const TableKey *` obtained
+  // from that storage, which faults (SIGSEGV, si_code SI_KERNEL) whenever
+  // the DPDK-owned memory isn't 16-byte aligned.
+  struct __attribute__((packed)) TableKey {
     uint64_t fseid;
     uint64_t pdr;
     TableKey(uint64_t fseid, uint64_t pdr) : fseid(fseid), pdr(pdr) {}
