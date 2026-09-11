@@ -210,6 +210,17 @@ jobs:
       test_flags: "-race -failfast -v -count=1"
       test_directory: "./test/integration/..."
       env_vars: "MODE=native DATAPATH=bess"
+  e2e-tests:
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/e2e-test.yml@f977114a69e50ecb3ac7c334c630136c218f814e # test shared E2E workflow PR #204
+    with:
+      branch_name: ${{ github.ref }}
   license-check:
     permissions:
       contents: read
