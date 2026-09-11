@@ -579,3 +579,149 @@ func testUEAttachDetach(t *testing.T, testcase *testCase) {
 	testUEAttach(t, testcase)
 	testUEDetach(t, testcase)
 }
+
+// A session whose rule the datapath refuses must not leave its UE address allocated.
+//
+// Parsing allocates the address (parse_pdr.go's LookupOrAllocIP) before any rule is
+// programmed, and only the deletion path releases it -- so a rejected establishment
+// used to lose one address for good, against a local SEID nobody presents again.
+//
+// The assertion is capacity, which is the only thing that distinguishes released from
+// leaked here. DeallocIP returns an address to the *back* of the free queue while
+// LookupOrAllocIP takes from the front, so "the next session gets the address the
+// refused one held" is false either way. With a pool of exactly two addresses, a
+// refusal that releases leaves room for two more sessions; one that leaks leaves room
+// for one.
+//
+// The refusal is arranged with an SDF filter carrying a port range 101 wide.
+// CreatePortRangeCartesianProduct declines it, because asComplexTernaryMatches(Exact)
+// covers a range with one ternary rule per port and refuses anything wider than 100 --
+// so addPDR reports a failure before it makes an RPC, the batch completes having
+// refused, and SendMsgToUPF answers rejected. That is what makes it the refusal to test
+// with: it is decided client-side, so it needs no datapath fault.
+//
+// Both ports carry a range because parseSDFFilter's SDF workaround keeps only one of
+// them, and the filter does not get to choose which. The workaround tests one fixed side
+// per source interface -- the destination for core, the source for access, which that
+// case has already swapped -- and when the tested side holds a range it copies that
+// range onto the other side and becomes a wildcard itself, discarding whatever range the
+// other side held. So the pair never reaches the datapath as a pair, and a wide range on
+// each side leaves the survivor wide either way.
+func TestUeIPIsReleasedWhenTheDatapathRefusesTheSession(t *testing.T) {
+	setup(t, ConfigUPFBasedIPAllocationTinyPool)
+	defer teardown(t)
+
+	const aPortRangeTooWideToProgram = "permit out udp from any 100-200 to assigned 300-400"
+
+	// The uplink PDR carries the filter the datapath will refuse; the downlink one
+	// carries the CHOOSE flag that makes the UPF allocate an address.
+	allocatingDownlinkPDR := func() *ie.IE {
+		return ie.NewCreatePDR(
+			ie.NewPDRID(2),
+			ie.NewPrecedence(0),
+			ie.NewPDI(
+				ie.NewSourceInterface(ie.SrcInterfaceCore),
+				ie.NewUEIPAddress(0x10, "", "", 0, 0),
+				ie.NewSDFFilter(sdfFilterUDP80, "", "", "", 1),
+			),
+			ie.NewFARID(2),
+			ie.NewQERID(2),
+		)
+	}
+
+	fars := []*ie.IE{
+		session.NewFARBuilder().
+			WithMethod(session.Create).WithID(1).WithDstInterface(ie.DstInterfaceCore).
+			WithAction(ActionForward).BuildFAR(),
+		session.NewFARBuilder().
+			WithMethod(session.Create).WithID(2).
+			WithDstInterface(ie.DstInterfaceAccess).
+			WithAction(ActionDrop).WithTEID(16).
+			WithDownlinkIP(nodeBAddress).BuildFAR(),
+	}
+
+	uplinkPDR := func(filter string) *ie.IE {
+		return session.NewPDRBuilder().MarkAsUplink().
+			WithMethod(session.Create).WithID(1).WithTEID(15).
+			WithN3Address(upfN3Address).
+			WithSDFFilter(filter).
+			WithFARID(1).
+			AddQERID(1).BuildPDR()
+	}
+
+	establish := func(t *testing.T, filter string) (uint8, uint64) {
+		t.Helper()
+
+		pdrs := []*ie.IE{uplinkPDR(filter), allocatingDownlinkPDR()}
+		if err := pfcpClient.SendSessionEstablishmentRequest(pdrs, fars, nil, nil); err != nil {
+			t.Fatalf("establishment request failed to send: %v", err)
+		}
+
+		resp, err := pfcpClient.PeekNextResponse()
+		if err != nil {
+			t.Fatalf("no response to the establishment: %v", err)
+		}
+
+		estResp, ok := resp.(*message.SessionEstablishmentResponse)
+		if !ok {
+			t.Fatalf("expected a SessionEstablishmentResponse, got %T", resp)
+		}
+
+		cause, err := estResp.Cause.Cause()
+		if err != nil {
+			t.Fatalf("the establishment carried no readable cause: %v", err)
+		}
+
+		// A rejected establishment carries no UP F-SEID.
+		var upfSEID uint64
+
+		if estResp.UPFSEID != nil {
+			fseid, err := estResp.UPFSEID.FSEID()
+			if err != nil {
+				t.Fatalf("the establishment carried an unreadable UP F-SEID: %v", err)
+			}
+
+			upfSEID = fseid.SEID
+		}
+
+		return cause, upfSEID
+	}
+
+	// The refused session takes one of the two addresses and must give it back.
+	if cause, _ := establish(t, aPortRangeTooWideToProgram); cause != ie.CauseRequestRejected {
+		t.Fatalf("a session whose rule the datapath refused was answered with cause %d, want CauseRequestRejected (%d)",
+			cause, ie.CauseRequestRejected)
+	}
+
+	// It must also leave nothing of itself behind. The refused session is the only
+	// one so far, so an empty datapath means the rollback removed every rule the
+	// batch had programmed before it was refused.
+	verifyNoEntries(t)
+
+	// Both remaining establishments must find an address. Without the release the
+	// second has none, because the refused session is still holding one of the two.
+	seids := make([]uint64, 0, 2)
+
+	for i := 1; i <= 2; i++ {
+		cause, seid := establish(t, sdfFilterUDP80)
+		if cause != ie.CauseRequestAccepted {
+			t.Fatalf("session %d of 2 after a refused one was answered with cause %d, want CauseRequestAccepted (%d); "+
+				"the refused session did not release its address",
+				i, cause, ie.CauseRequestAccepted)
+		}
+
+		seids = append(seids, seid)
+	}
+
+	for _, seid := range seids {
+		if err := pfcpClient.SendSessionDeletionRequest(0, seid); err != nil {
+			t.Fatalf("deletion request failed to send: %v", err)
+		}
+
+		if _, err := pfcpClient.PeekNextResponse(); err != nil {
+			t.Fatalf("no response to the deletion: %v", err)
+		}
+	}
+
+	verifyNoEntries(t)
+}

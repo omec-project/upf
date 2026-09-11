@@ -176,7 +176,34 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 	cause := upf.SendMsgToUPF(upfMsgTypeAdd, session.PacketForwardingRules, updated)
 	if cause == ie.CauseRequestRejected {
+		// The batch reported a failure, which means it completed and some of its rules
+		// may be programmed. Take them out before forgetting the session: nothing else
+		// will, because the session is never stored on this path and the SMF has no
+		// F-SEID to release. Best effort -- a datapath that just refused a write may
+		// refuse this one too, and there is nothing further to report it to.
+		if delCause := upf.SendMsgToUPF(
+			upfMsgTypeDel, session.PacketForwardingRules, PacketForwardingRules{},
+		); delCause == ie.CauseRequestRejected {
+			// Not yet evidence of a stranded rule, so this is not an error. The only
+			// things that can fail a BESS delete worker today are translating the rule
+			// (`CreatePortRangeCartesianProduct`) and marshalling it: `processPDR` and
+			// `processFAR` are void and `delQER` drops `processQER`'s error, so a module's
+			// refusal to delete cannot reach here. A rule that could not be translated
+			// was never programmed either -- which is exactly what happens when the add
+			// was refused for that same reason.
+			logger.PfcpLog.Warnln("the rollback of a rejected session reported a failure; " +
+				"no rule is known to be stranded")
+		}
+
+		// Parsing allocated the UE address (parse_pdr.go), and only the deletion path
+		// releases it. Without this, every rejected establishment leaks one address
+		// against a local SEID nobody will present again.
+		if relErr := releaseAllocatedIPs(upf.ippool, &session); relErr != nil {
+			logger.PfcpLog.Errorln("failed to release the IP of a rejected session:", relErr)
+		}
+
 		pConn.RemoveSession(session)
+
 		return errProcessReply(ErrWriteToDatapath,
 			ie.CauseRequestRejected)
 	}
