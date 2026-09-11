@@ -638,6 +638,15 @@ func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) error {
 
 		logger.PfcpLog.Warnln("context not found, deleting session locally")
 
+		// The address goes back to the pool before the session is forgotten, because
+		// nothing can return it afterwards. This site already forgets the session before
+		// deleting its rules, so unlike the deletion path the release precedes the
+		// delete; the free queue is FIFO, so the address is not handed out again while
+		// the delete runs unless every other free address is already taken.
+		if err := releaseAllocatedIPs(upf.ippool, &sessItem); err != nil {
+			logger.PfcpLog.Errorln("failed to release the IP of a session deleted locally:", err)
+		}
+
 		pConn.RemoveSession(sessItem)
 
 		cause := upf.SendMsgToUPF(
