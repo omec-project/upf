@@ -223,8 +223,8 @@ def _fetch_candidates(cli, func, processor):
         # Let socket and network errors bubble up to get_var_attrs
         # so it can cleanly disconnect stale RPC sessions
         raise
-    except (cli.bess.Error, cli.bess.APIError, cli.bess.RPCError):
-        # We ignore other internal errors here as this is only for CLI auto-completion
+    except Exception:
+        logger.debug("Failed to fetch candidates for tab completion", exc_info=True)
         return []
 
 
