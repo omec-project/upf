@@ -523,11 +523,21 @@ def _handle_eval(cli, val, var_type):
             if not isinstance(tree, ast.Expression):
                 raise ValueError()
             call = tree.body
-            if not isinstance(call, ast.Call) or call.func.id != "_parse_map":
+            if (
+                not isinstance(call, ast.Call)
+                or not isinstance(call.func, ast.Name)
+                or call.func.id != "_parse_map"
+                or call.args
+                or any(kw.arg is None for kw in call.keywords)
+            ):
                 raise ValueError()
 
             res = {}
+            seen = set()
             for kw in call.keywords:
+                if kw.arg in seen:
+                    raise ValueError()
+                seen.add(kw.arg)
                 res[kw.arg] = ast.literal_eval(kw.value)
             return res
 
@@ -935,12 +945,12 @@ def _do_run_file(cli, conf_file):
     # Process and compile the configuration file
     code = _process_config_file(cli, conf_file)
 
+    # Set up execution environment before changing pipeline state
+    new_globals = _setup_execution_globals(cli, conf_file)
+
     # Prepare pipeline state
     if not _prepare_pipeline_state(cli):
         return
-
-    # Set up execution environment
-    new_globals = _setup_execution_globals(cli, conf_file)
 
     # Execute the configuration
     try:
