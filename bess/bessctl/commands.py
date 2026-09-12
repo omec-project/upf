@@ -1454,7 +1454,7 @@ def _get_gate_label(gate, field, name, last_stats):
         last_stats[(name, gate.ogate)] = (new_time, new_val)
         val = (new_val - last_val) / (new_time - last_time)
 
-    return f"{val * 8 / 1e6:.1f}" if field == "bytes" else f"{int(val)}"
+    return f"{val * 8 / 1e6:.1f}" if field == "bytes" else f"{val:.0f}"
 
 
 # last_stats: a map of (node name, gateid) -> (timestamp, counter value)
