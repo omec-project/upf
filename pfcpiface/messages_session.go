@@ -184,15 +184,16 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 		if delCause := upf.SendMsgToUPF(
 			upfMsgTypeDel, session.PacketForwardingRules, PacketForwardingRules{},
 		); delCause == ie.CauseRequestRejected {
-			// Not yet evidence of a stranded rule, so this is not an error. The only
-			// things that can fail a BESS delete worker today are translating the rule
-			// (`CreatePortRangeCartesianProduct`) and marshalling it: `processPDR` and
-			// `processFAR` are void and `delQER` drops `processQER`'s error, so a module's
-			// refusal to delete cannot reach here. A rule that could not be translated
-			// was never programmed either -- which is exactly what happens when the add
-			// was refused for that same reason.
+			// Two different things reach here and the cause does not tell them apart.
+			// A rule that could not be translated (`CreatePortRangeCartesianProduct`) or
+			// marshalled was never programmed either, so there is nothing to strand --
+			// and that is exactly what happens when the add was refused for the same
+			// reason. But now that the workers report what the datapath answered, a
+			// module that refused to remove a rule it does hold also reaches here, and
+			// that one leaves the rule behind. Not an error, because the common case is
+			// the first; not silence, because the second is real.
 			logger.PfcpLog.Warnln("the rollback of a rejected session reported a failure; " +
-				"no rule is known to be stranded")
+				"a rule the datapath refused to remove may still be programmed")
 		}
 
 		// Parsing allocated the UE address (parse_pdr.go), and only the deletion path
