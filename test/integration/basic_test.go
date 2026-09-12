@@ -33,7 +33,7 @@ func TestUPFBasedUeIPAllocation(t *testing.T) {
 			ueAddress: "10.250.0.1",
 			appFilter: appFilter{
 				proto:        0x11,
-				appIP:        net.ParseIP("0.0.0.0"),
+				appIP:        net.ParseIP(anyIPv4Address),
 				appPrefixLen: 0,
 				appPort: portRange{
 					80, 80,
@@ -169,7 +169,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 			expected: ueSessionConfig{
 				appFilter: appFilter{
 					proto:        0x11,
-					appIP:        net.ParseIP("0.0.0.0"),
+					appIP:        net.ParseIP(anyIPv4Address),
 					appPrefixLen: 0,
 					appPort: portRange{
 						80, 80,
@@ -242,7 +242,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 			expected: ueSessionConfig{
 				appFilter: appFilter{
 					proto:        0x11,
-					appIP:        net.ParseIP("0.0.0.0"),
+					appIP:        net.ParseIP(anyIPv4Address),
 					appPrefixLen: 0,
 					appPort: portRange{
 						80, 80,
@@ -274,7 +274,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 			expected: ueSessionConfig{
 				appFilter: appFilter{
 					proto:        0x11,
-					appIP:        net.ParseIP("0.0.0.0"),
+					appIP:        net.ParseIP(anyIPv4Address),
 					appPrefixLen: 0,
 					appPort: portRange{
 						80, 80,
@@ -306,7 +306,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 			expected: ueSessionConfig{
 				appFilter: appFilter{
 					proto:        0x11,
-					appIP:        net.ParseIP("0.0.0.0"),
+					appIP:        net.ParseIP(anyIPv4Address),
 					appPrefixLen: 0,
 					appPort: portRange{
 						80, 80,
@@ -339,7 +339,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 			expected: ueSessionConfig{
 				appFilter: appFilter{
 					proto:        0x11,
-					appIP:        net.ParseIP("0.0.0.0"),
+					appIP:        net.ParseIP(anyIPv4Address),
 					appPrefixLen: 0,
 					appPort: portRange{
 						80, 80,
@@ -372,7 +372,7 @@ func TestSingleUEAttachAndDetach(t *testing.T) {
 			expected: ueSessionConfig{
 				appFilter: appFilter{
 					proto:        0x11,
-					appIP:        net.ParseIP("0.0.0.0"),
+					appIP:        net.ParseIP(anyIPv4Address),
 					appPrefixLen: 0,
 					appPort: portRange{
 						80, 80,
@@ -409,7 +409,7 @@ func TestUEBuffering(t *testing.T) {
 		expected: ueSessionConfig{
 			appFilter: appFilter{
 				proto:        0x11,
-				appIP:        net.ParseIP("0.0.0.0"),
+				appIP:        net.ParseIP(anyIPv4Address),
 				appPrefixLen: 0,
 				appPort: portRange{
 					80, 80,
