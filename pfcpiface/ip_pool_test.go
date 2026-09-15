@@ -154,8 +154,8 @@ func TestIPPool_LookupOrAllocIP(t *testing.T) {
 	})
 }
 
-func TestIPPool_DeallocIP(t *testing.T) {
-	t.Run("plain alloc into dealloc", func(t *testing.T) {
+func TestIPPool_Release(t *testing.T) {
+	t.Run("plain alloc into release", func(t *testing.T) {
 		const poolSubnet = ipSubnetCIDR
 		const seid = 1234
 		pool, err := NewIPPool(poolSubnet)
@@ -166,28 +166,53 @@ func TestIPPool_DeallocIP(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		err = pool.DeallocIP(seid)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		if !pool.Release(seid) {
+			t.Fatal("expected the allocated address to be released")
 		}
 	})
 
-	t.Run("dealloc non-existent SEIDs fails", func(t *testing.T) {
+	t.Run("releasing a SEID that holds nothing is not a failure", func(t *testing.T) {
 		pool, err := NewIPPool(ipSubnetCIDR)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		err = pool.DeallocIP(1234)
-		if err == nil {
-			t.Error("expected an error, but got nil")
+		for _, seid := range []uint64{1234, 0, math.MaxUint64} {
+			if pool.Release(seid) {
+				t.Errorf("SEID %d held no address, but Release reported one", seid)
+			}
 		}
-		err = pool.DeallocIP(0)
-		if err == nil {
-			t.Error("expected an error, but got nil")
+	})
+
+	t.Run("a deployment with no pool has nothing to release", func(t *testing.T) {
+		// enable_ue_ip_alloc is off, so initTimersAndIPPool never built a pool and
+		// upf.ippool is nil. The teardown paths call Release regardless.
+		var pool *IPPool
+		if pool.Release(1234) {
+			t.Error("a nil pool reported that it released an address")
 		}
-		err = pool.DeallocIP(math.MaxUint64)
-		if err == nil {
-			t.Error("expected an error, but got nil")
+	})
+
+	t.Run("a released address is handed out again", func(t *testing.T) {
+		// A pool of exactly two addresses: capacity is what distinguishes a released
+		// address from a leaked one, because Release enqueues at the back of the free
+		// pool while LookupOrAllocIP takes from the front.
+		pool, err := NewIPPool("10.251.0.0/30")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		for seid := uint64(1); seid <= 2; seid++ {
+			if _, err := pool.LookupOrAllocIP(seid); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		}
+		if _, err := pool.LookupOrAllocIP(3); err == nil {
+			t.Fatal("expected the pool to be exhausted")
+		}
+		if !pool.Release(1) {
+			t.Fatal("expected the allocated address to be released")
+		}
+		if _, err := pool.LookupOrAllocIP(3); err != nil {
+			t.Fatalf("the released address was not handed out again: %v", err)
 		}
 	})
 }

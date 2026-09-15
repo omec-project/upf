@@ -74,21 +74,34 @@ func (i *IPPool) LookupOrAllocIP(seid uint64) (net.IP, error) {
 	return ipVal, nil
 }
 
-func (i *IPPool) DeallocIP(seid uint64) error {
+// Release returns the address held for seid to the pool and reports whether there was
+// one to return. The inventory is the only record of an allocation that every session
+// carries for as long as it exists, which is why the release is keyed by SEID: a
+// session's rules are not. A session for which the UPF allocated nothing -- the control
+// plane supplied the UE address -- has nothing to release, and that is the ordinary
+// case rather than a failure.
+func (i *IPPool) Release(seid uint64) bool {
+	// UE IP allocation is optional: initTimersAndIPPool builds a pool only when
+	// enable_ue_ip_alloc is set, so a deployment whose control plane assigns the
+	// addresses has no pool at all. Every caller is on a teardown path that runs
+	// either way, so the absent pool is answered here rather than at each of them.
+	if i == nil {
+		return false
+	}
+
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
 	ip, ok := i.inventory[seid]
 	if !ok {
-		logger.PfcpLog.Warnln("attempt to dealloc non-existent session", seid)
-		return ErrInvalidArgumentWithReason("seid", seid, "can't dealloc non-existent session")
+		return false
 	}
 
 	delete(i.inventory, seid)
 	i.freePool = append(i.freePool, ip) // Simply append to enqueue.
-	logger.PfcpLog.Debugln("deallocated session", seid, "IP", ip)
+	logger.PfcpLog.Debugln("released session", seid, "IP", ip)
 
-	return nil
+	return true
 }
 
 func (i *IPPool) String() string {

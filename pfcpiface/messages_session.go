@@ -198,9 +198,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 		// Parsing allocated the UE address (parse_pdr.go), and only the deletion path
 		// releases it. Without this, every rejected establishment leaks one address
 		// against a local SEID nobody will present again.
-		if relErr := releaseAllocatedIPs(upf.ippool, &session); relErr != nil {
-			logger.PfcpLog.Errorln("failed to release the IP of a rejected session:", relErr)
-		}
+		upf.ippool.Release(session.localSEID)
 
 		pConn.RemoveSession(session)
 
@@ -518,9 +516,7 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 		return sendError(ErrWriteToDatapath)
 	}
 
-	if err := releaseAllocatedIPs(upf.ippool, &session); err != nil {
-		return sendError(ErrOperationFailedWithReason("session IP dealloc", err.Error()))
-	}
+	upf.ippool.Release(session.localSEID)
 
 	/* delete sessionRecord */
 	pConn.RemoveSession(session)
@@ -670,9 +666,7 @@ func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) error {
 		// deleting its rules, so unlike the deletion path the release precedes the
 		// delete; the free queue is FIFO, so the address is not handed out again while
 		// the delete runs unless every other free address is already taken.
-		if err := releaseAllocatedIPs(upf.ippool, &sessItem); err != nil {
-			logger.PfcpLog.Errorln("failed to release the IP of a session deleted locally:", err)
-		}
+		upf.ippool.Release(seid)
 
 		pConn.RemoveSession(sessItem)
 
