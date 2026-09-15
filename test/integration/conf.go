@@ -15,7 +15,7 @@ const (
 	ConfigUPFBasedIPAllocation
 	// A pool holding exactly two usable addresses, so that whether a rejected
 	// session released its address is observable as capacity. With the /16 pool
-	// it is not: DeallocIP returns an address to the back of the free queue while
+	// it is not: a release returns an address to the back of the free queue while
 	// allocation takes from the front, so the next session gets the next address
 	// either way.
 	ConfigUPFBasedIPAllocationTinyPool

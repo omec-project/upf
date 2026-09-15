@@ -25,7 +25,7 @@ func (noopMetrics) SaveSessions(*metrics.Session) {}
 func (noopMetrics) Stop() error                   { return nil }
 
 // allocatingSession is what a UPF-allocated address looks like once parsed: a core PDR
-// carrying allocIPFlag, which is the pair releaseAllocatedIPs looks for.
+// carrying allocIPFlag, plus the pool inventory entry the release is keyed by.
 func allocatingSession(t *testing.T, pool *IPPool, seid uint64) PFCPSession {
 	t.Helper()
 
@@ -48,7 +48,7 @@ func allocatingSession(t *testing.T, pool *IPPool, seid uint64) PFCPSession {
 }
 
 // teardownConn is an association holding one session, with a pool of exactly two
-// addresses -- capacity is what distinguishes released from leaked, because DeallocIP
+// addresses -- capacity is what distinguishes released from leaked, because a release
 // appends to the back of the free queue while LookupOrAllocIP takes from the front.
 func teardownConn(t *testing.T, pool *IPPool, sessions ...PFCPSession) *PFCPConn {
 	t.Helper()

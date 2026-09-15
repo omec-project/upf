@@ -587,7 +587,7 @@ func testUEAttachDetach(t *testing.T, testcase *testCase) {
 // used to lose one address for good, against a local SEID nobody presents again.
 //
 // The assertion is capacity, which is the only thing that distinguishes released from
-// leaked here. DeallocIP returns an address to the *back* of the free queue while
+// leaked here. A release returns an address to the *back* of the free queue while
 // LookupOrAllocIP takes from the front, so "the next session gets the address the
 // refused one held" is false either way. With a pool of exactly two addresses, a
 // refusal that releases leaves room for two more sessions; one that leaks leaves room
