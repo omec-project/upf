@@ -32,7 +32,7 @@ func (s moduleCommandStub) ModuleCommand(
 // the datapath holds a rule it has in fact rejected.
 func TestProcessQERReportsAModuleRefusal(t *testing.T) {
 	b := &bess{client: moduleCommandStub{
-		resp: &pb.CommandResponse{Error: &pb.Error{Code: 1, Errmsg: "table is full"}},
+		resp: &pb.CommandResponse{Error: &pb.Error{Code: 1, Errmsg: msgTableFull}},
 	}}
 
 	err := b.processQER(context.Background(), nil, upfMsgTypeAdd, "appQERLookup")

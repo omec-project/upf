@@ -6,6 +6,7 @@ package pfcpiface
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"flag"
 	"fmt"
 	"math"
@@ -133,6 +134,14 @@ func (b *bess) AddSliceInfo(sliceInfo *SliceInfo) error {
 
 	if !completed || !succeeded {
 		logger.BessLog.Errorln(errGRPCCallFailed)
+	}
+
+	// Reject only a batch that completed and reported a failure: a timeout leaves an
+	// unknown state and has never been reported here. Without this the handler that
+	// serves the slice configuration was told the meter had been applied whatever the
+	// datapath answered, which is the same defect this change fixes one layer down.
+	if completed && !succeeded {
+		return ErrOperationFailedWithReason("slice meter", "the datapath refused the meter")
 	}
 
 	return nil
@@ -894,7 +903,9 @@ func (b *bess) clearState() {
 		return
 	}
 
-	b.processPDR(ctx, anyWildcardClear, upfMsgTypeClear)
+	if err = b.processPDR(ctx, anyWildcardClear, upfMsgTypeClear); err != nil {
+		logger.BessLog.Errorln("failed to clear pdrLookup:", err)
+	}
 
 	clearExactCmd := &pb.ExactMatchCommandClearArg{}
 
@@ -904,7 +915,9 @@ func (b *bess) clearState() {
 		return
 	}
 
-	b.processFAR(ctx, anyExactClear, upfMsgTypeClear)
+	if err = b.processFAR(ctx, anyExactClear, upfMsgTypeClear); err != nil {
+		logger.BessLog.Errorln("failed to clear farLookup:", err)
+	}
 
 	clearGtpuPathMonitoringCmd := &pb.GtpuPathMonitoringCommandClearArg{}
 
@@ -1018,10 +1031,72 @@ func (b *bess) setupSliceMeter(conf *Conf) {
 	}
 }
 
-func (b *bess) processPDR(ctx context.Context, arg *anypb.Any, method upfMsgType) {
+// errnoNoEntry is ENOENT in a module's answer. ExactMatch reports it for a rule it does
+// not hold and WildcardMatch for a mask it has no rule under -- and bessctl reports it
+// for a module that is not in the graph at all, which is why the exception below is
+// confined to deletes: every add still reports it as the refusal it is.
+const errnoNoEntry = 2
+
+// errDatapathRefused marks the one outcome that must stop a worker reporting its rule as
+// programmed: the module considered the request over a healthy RPC and declined it.
+//
+// **A failed RPC is a different thing and is deliberately not marked.** It says nothing
+// about what the datapath did, and SendMsgToUPF answers a batch that did not complete as
+// accepted precisely so an uncertain result does not have the caller tear down a session
+// the datapath may still be holding -- a rule reported as refused reaches the opposite
+// answer. It is also the common shape rather than a corner: the context these calls carry
+// is created before GRPCJoin's timer starts, so a slow datapath expires the context first
+// and every worker sees DeadlineExceeded while the join itself never times out. The
+// process* functions still return such errors, because their callers log them.
+var errDatapathRefused = errors.New("the datapath refused the rule")
+
+// refused reports whether the datapath answered and declined.
+func refused(err error) bool {
+	return errors.Is(err, errDatapathRefused)
+}
+
+// commandOutcome reports what the datapath did with a module command: nil if it took it,
+// the transport error if the RPC did not complete, and otherwise a refusal carrying the
+// module's own words.
+//
+// A delete has one exception. "The rule is not there" is the state a delete asks for, not
+// a failure to reach it, and deletes legitimately name rules that were never programmed:
+// a batch that timed out is answered accepted with an unknown subset of its rules in
+// place, and the session's later deletion names all of them. Reporting that as a refusal
+// would reject deletions that did exactly what they were asked to do.
+func commandOutcome(module string, method upfMsgType, methodName string,
+	resp *pb.CommandResponse, err error,
+) error {
+	if err != nil {
+		logger.BessLog.Errorf("%v %v did not complete: %v", module, methodName, err)
+
+		return err
+	}
+
+	if resp.GetError() == nil {
+		return nil
+	}
+
+	if method == upfMsgTypeDel && resp.GetError().GetCode() == errnoNoEntry {
+		logger.BessLog.Debugf("%v %v: the datapath did not hold the rule", module, methodName)
+
+		return nil
+	}
+
+	logger.BessLog.Errorf("%v %v was refused: %v", module, methodName, resp.GetError())
+
+	return fmt.Errorf("%v %v: %v: %w", module, methodName, resp.GetError(), errDatapathRefused)
+}
+
+// processPDR programs one PDR into the datapath's match table and reports whether the
+// datapath took it.
+//
+// The return value is the point. This used to log the failure and return nothing, so
+// addPDR and delPDR told GRPCJoin the rule was programmed whatever the module answered,
+// and the cause SendMsgToUPF derives from that join could not be anything but accepted.
+func (b *bess) processPDR(ctx context.Context, arg *anypb.Any, method upfMsgType) error {
 	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
-		logger.BessLog.Infoln(errInvalidMethodName, method)
-		return
+		return ErrInvalidArgument("method name", method)
 	}
 
 	methods := [...]string{upfMethodAdd, upfMethodAdd, upfMethodDelete, upfMethodClear}
@@ -1034,9 +1109,7 @@ func (b *bess) processPDR(ctx context.Context, arg *anypb.Any, method upfMsgType
 
 	logger.BessLog.Debugf("pdrlookup resp: %v", resp)
 
-	if err != nil || resp.GetError() != nil {
-		logger.BessLog.Errorf("pdrLookup method failed with resp: %v, err: %v", resp, err)
-	}
+	return commandOutcome("pdrLookup", method, methods[method], resp, err)
 }
 
 func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
@@ -1104,7 +1177,9 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 				return
 			}
 
-			b.processPDR(ctx, arg, upfMsgTypeAdd)
+			if refused(b.processPDR(ctx, arg, upfMsgTypeAdd)) {
+				return
+			}
 		}
 		completed = true
 	}()
@@ -1157,7 +1232,9 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 				return
 			}
 
-			b.processPDR(ctx, arg, upfMsgTypeDel)
+			if refused(b.processPDR(ctx, arg, upfMsgTypeDel)) {
+				return
+			}
 		}
 		completed = true
 	}()
@@ -1165,15 +1242,23 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 	go func() {
+		completed := false
+		defer func() { done <- completed }()
+
 		// Uplink
-		b.handleUplinkQER(ctx, qer)
+		if refused(b.handleUplinkQER(ctx, qer)) {
+			return
+		}
 		// Downlink
-		b.handleDownlinkQER(ctx, qer)
-		done <- true
+		if refused(b.handleDownlinkQER(ctx, qer)) {
+			return
+		}
+
+		completed = true
 	}()
 }
 
-func (b *bess) handleUplinkQER(ctx context.Context, qer qer) {
+func (b *bess) handleUplinkQER(ctx context.Context, qer qer) error {
 	var (
 		cir, pir, cbs, ebs, pbs, gate uint64
 		srcIface                      uint8
@@ -1208,13 +1293,15 @@ func (b *bess) handleUplinkQER(ctx context.Context, qer qer) {
 
 	switch qer.qosLevel {
 	case ApplicationQos:
-		b.addApplicationQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
+		return b.addApplicationQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
 	case SessionQos:
-		b.addSessionQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
+		return b.addSessionQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
 	}
+
+	return nil
 }
 
-func (b *bess) handleDownlinkQER(ctx context.Context, qer qer) {
+func (b *bess) handleDownlinkQER(ctx context.Context, qer qer) error {
 	var (
 		cir, pir, cbs, ebs, pbs, gate uint64
 		srcIface                      uint8
@@ -1247,16 +1334,18 @@ func (b *bess) handleDownlinkQER(ctx context.Context, qer qer) {
 
 	switch qer.qosLevel {
 	case ApplicationQos:
-		b.addApplicationQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
+		return b.addApplicationQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
 	case SessionQos:
-		b.addSessionQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
+		return b.addSessionQER(ctx, gate, srcIface, cir, pir, cbs, pbs, ebs, qer)
 	}
+
+	return nil
 }
 
 func (b *bess) addApplicationQER(ctx context.Context, gate uint64, srcIface uint8,
 	cir uint64, pir uint64, cbs uint64, pbs uint64,
 	ebs uint64, qer qer,
-) {
+) error {
 	var (
 		arg *anypb.Any
 		err error
@@ -1282,15 +1371,10 @@ func (b *bess) addApplicationQER(ctx context.Context, gate uint64, srcIface uint
 	arg, err = anypb.New(q)
 	if err != nil {
 		logger.BessLog.Errorln(errMarshalRule, q, err)
-		return
+		return err
 	}
 
-	qosTableName := AppQerLookup
-
-	err = b.processQER(ctx, arg, upfMsgTypeAdd, qosTableName)
-	if err != nil {
-		logger.BessLog.Errorln("process QER failed for appQERLookup add operation")
-	}
+	return b.processQER(ctx, arg, upfMsgTypeAdd, AppQerLookup)
 }
 
 func (b *bess) delQER(ctx context.Context, done chan<- bool, qer qer) {
@@ -1305,9 +1389,13 @@ func (b *bess) delQER(ctx context.Context, done chan<- bool, qer qer) {
 
 		switch qer.qosLevel {
 		case ApplicationQos:
-			b.delApplicationQER(ctx, srcIface, qer)
+			if refused(b.delApplicationQER(ctx, srcIface, qer)) {
+				return
+			}
 		case SessionQos:
-			b.delSessionQER(ctx, srcIface, qer)
+			if refused(b.delSessionQER(ctx, srcIface, qer)) {
+				return
+			}
 		}
 
 		// Downlink QER
@@ -1315,9 +1403,13 @@ func (b *bess) delQER(ctx context.Context, done chan<- bool, qer qer) {
 
 		switch qer.qosLevel {
 		case ApplicationQos:
-			b.delApplicationQER(ctx, srcIface, qer)
+			if refused(b.delApplicationQER(ctx, srcIface, qer)) {
+				return
+			}
 		case SessionQos:
-			b.delSessionQER(ctx, srcIface, qer)
+			if refused(b.delSessionQER(ctx, srcIface, qer)) {
+				return
+			}
 		}
 
 		completed = true
@@ -1326,7 +1418,7 @@ func (b *bess) delQER(ctx context.Context, done chan<- bool, qer qer) {
 
 func (b *bess) delApplicationQER(
 	ctx context.Context, srcIface uint8, qer qer,
-) {
+) error {
 	var (
 		arg *anypb.Any
 		err error
@@ -1343,21 +1435,17 @@ func (b *bess) delApplicationQER(
 	arg, err = anypb.New(q)
 	if err != nil {
 		logger.BessLog.Infoln(errMarshalRule, q, err)
-		return
+		return err
 	}
 
-	qosTableName := AppQerLookup
-
-	err = b.processQER(ctx, arg, upfMsgTypeDel, qosTableName)
-	if err != nil {
-		logger.BessLog.Errorln("process QER failed for appQERLookup del operation")
-	}
+	return b.processQER(ctx, arg, upfMsgTypeDel, AppQerLookup)
 }
 
-func (b *bess) processFAR(ctx context.Context, arg *anypb.Any, method upfMsgType) {
+// processFAR programs one FAR into the datapath's forwarding table and reports whether
+// the datapath took it. See processPDR for why the return value matters.
+func (b *bess) processFAR(ctx context.Context, arg *anypb.Any, method upfMsgType) error {
 	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
-		logger.BessLog.Errorln(errInvalidMethodName, method)
-		return
+		return ErrInvalidArgument("method name", method)
 	}
 
 	methods := [...]string{upfMethodAdd, upfMethodAdd, upfMethodDelete, upfMethodClear}
@@ -1370,9 +1458,7 @@ func (b *bess) processFAR(ctx context.Context, arg *anypb.Any, method upfMsgType
 
 	logger.BessLog.Debugf("farlookup resp: %v", resp)
 
-	if err != nil || resp.GetError() != nil {
-		logger.BessLog.Errorf("farLookup method failed with resp: %v, err: %v", resp, err)
-	}
+	return commandOutcome("farLookup", method, methods[method], resp, err)
 }
 
 func (b *bess) processGtpuPathMonitoring(ctx context.Context, arg *anypb.Any, method upfMsgType) {
@@ -1418,6 +1504,9 @@ func (b *bess) setActionValue(f far) uint8 {
 
 func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 	go func() {
+		completed := false
+		defer func() { done <- completed }()
+
 		var (
 			arg *anypb.Any
 			err error
@@ -1443,11 +1532,12 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 		arg, err = anypb.New(f)
 		if err != nil {
 			logger.BessLog.Infoln(errMarshalRule, f, err)
-			done <- false
 			return
 		}
 
-		b.processFAR(ctx, arg, upfMsgTypeAdd)
+		if refused(b.processFAR(ctx, arg, upfMsgTypeAdd)) {
+			return
+		}
 
 		if enableGtpuPathMonitoring {
 			g := &pb.GtpuPathMonitoringCommandAddDeleteArg{
@@ -1457,19 +1547,24 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 			arg, err = anypb.New(g)
 			if err != nil {
 				logger.BessLog.Infoln("error marshalling data", g, err)
-				done <- false
 				return
 			}
 
+			// Path monitoring is not a forwarding rule: a session is programmed
+			// whether or not monitoring was set up for its gNB, so its result does
+			// not decide the batch.
 			b.processGtpuPathMonitoring(ctx, arg, upfMsgTypeAdd)
 		}
 
-		done <- true
+		completed = true
 	}()
 }
 
 func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 	go func() {
+		completed := false
+		defer func() { done <- completed }()
+
 		var (
 			arg *anypb.Any
 			err error
@@ -1485,11 +1580,12 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 		arg, err = anypb.New(f)
 		if err != nil {
 			logger.BessLog.Infoln(errMarshalRule, f, err)
-			done <- false
 			return
 		}
 
-		b.processFAR(ctx, arg, upfMsgTypeDel)
+		if refused(b.processFAR(ctx, arg, upfMsgTypeDel)) {
+			return
+		}
 
 		if enableGtpuPathMonitoring {
 			g := &pb.GtpuPathMonitoringCommandAddDeleteArg{
@@ -1499,21 +1595,21 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 			arg, err = anypb.New(g)
 			if err != nil {
 				logger.BessLog.Infoln("error marshalling data", g, err)
-				done <- false
 				return
 			}
 
 			b.processGtpuPathMonitoring(ctx, arg, upfMsgTypeDel)
 		}
 
-		done <- true
+		completed = true
 	}()
 }
 
-func (b *bess) processSliceMeter(ctx context.Context, arg *anypb.Any, method upfMsgType) {
+// processSliceMeter programs one slice meter and reports whether the datapath took it.
+// See processPDR for why the return value matters.
+func (b *bess) processSliceMeter(ctx context.Context, arg *anypb.Any, method upfMsgType) error {
 	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
-		logger.BessLog.Errorln(errInvalidMethodName, method)
-		return
+		return ErrInvalidArgument("method name", method)
 	}
 
 	methods := [...]string{upfMethodAdd, upfMethodAdd, upfMethodDelete, upfMethodClear}
@@ -1528,13 +1624,14 @@ func (b *bess) processSliceMeter(ctx context.Context, arg *anypb.Any, method upf
 
 	logger.BessLog.Debugf("sliceMeter resp: %v", resp)
 
-	if err != nil || resp.GetError() != nil {
-		logger.BessLog.Errorf("sliceMeter method failed with resp: %v, err: %v", resp, err)
-	}
+	return commandOutcome("sliceMeter", method, methods[method], resp, err)
 }
 
 func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig SliceMeterConfig) {
 	go func() {
+		completed := false
+		defer func() { done <- completed }()
+
 		var (
 			arg                           *anypb.Any
 			err                           error
@@ -1544,20 +1641,24 @@ func (b *bess) addSliceMeter(ctx context.Context, done chan<- bool, meterConfig 
 		// Uplink N6 slice meter config
 		arg, err = b.handleUplinkSliceMeter(meterConfig, &cir, &pir, &cbs, &ebs, &pbs, &gate)
 		if err != nil {
-			done <- false
 			return
 		}
 
-		b.processSliceMeter(ctx, arg, upfMsgTypeAdd)
+		if refused(b.processSliceMeter(ctx, arg, upfMsgTypeAdd)) {
+			return
+		}
 
 		// Downlink N3 slice meter config
 		arg, err = b.handleDownlinkSliceMeter(meterConfig, &cir, &pir, &cbs, &ebs, &pbs, &gate)
 		if err != nil {
-			done <- false
 			return
 		}
-		b.processSliceMeter(ctx, arg, upfMsgTypeAdd)
-		done <- true
+
+		if refused(b.processSliceMeter(ctx, arg, upfMsgTypeAdd)) {
+			return
+		}
+
+		completed = true
 	}()
 }
 
@@ -1668,25 +1769,13 @@ func (b *bess) processQER(ctx context.Context, arg *anypb.Any, method upfMsgType
 
 	logger.BessLog.Debugf("qerlookup resp: %v", resp)
 
-	if err != nil || resp.GetError() != nil {
-		logger.BessLog.Errorf("%v for qer %v failed with resp: %v, error: %v", qosTableName, methods[method], resp, err)
-
-		if err != nil {
-			return err
-		}
-
-		// The RPC itself succeeded and the module refused the rule, so err is nil.
-		// Returning it would report the refusal to the caller as success.
-		return ErrOperationFailedWithReason(qosTableName+" "+methods[method], resp.GetError().String())
-	}
-
-	return nil
+	return commandOutcome(qosTableName, method, methods[method], resp, err)
 }
 
 func (b *bess) addSessionQER(ctx context.Context, gate uint64, srcIface uint8,
 	cir uint64, pir uint64, cbs uint64,
 	pbs uint64, ebs uint64, qer qer,
-) {
+) error {
 	var (
 		arg *anypb.Any
 		err error
@@ -1708,18 +1797,13 @@ func (b *bess) addSessionQER(ctx context.Context, gate uint64, srcIface uint8,
 	arg, err = anypb.New(q)
 	if err != nil {
 		logger.BessLog.Errorln(errMarshalRule, q, err)
-		return
+		return err
 	}
 
-	qosTableName := SessQerLookup
-
-	err = b.processQER(ctx, arg, upfMsgTypeAdd, qosTableName)
-	if err != nil {
-		logger.BessLog.Errorln("process QER failed for sessionQERLookup add operation")
-	}
+	return b.processQER(ctx, arg, upfMsgTypeAdd, SessQerLookup)
 }
 
-func (b *bess) delSessionQER(ctx context.Context, srcIface uint8, qer qer) {
+func (b *bess) delSessionQER(ctx context.Context, srcIface uint8, qer qer) error {
 	var (
 		arg *anypb.Any
 		err error
@@ -1735,15 +1819,10 @@ func (b *bess) delSessionQER(ctx context.Context, srcIface uint8, qer qer) {
 	arg, err = anypb.New(q)
 	if err != nil {
 		logger.BessLog.Errorln(errMarshalRule, q, err)
-		return
+		return err
 	}
 
-	qosTableName := SessQerLookup
-
-	err = b.processQER(ctx, arg, upfMsgTypeDel, qosTableName)
-	if err != nil {
-		logger.BessLog.Errorln("process QER failed for sessionQERLookup del operation")
-	}
+	return b.processQER(ctx, arg, upfMsgTypeDel, SessQerLookup)
 }
 
 // GRPCJoin waits for the given number of asynchronous operations, each of which reports

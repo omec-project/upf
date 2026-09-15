@@ -184,15 +184,23 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 		if delCause := upf.SendMsgToUPF(
 			upfMsgTypeDel, session.PacketForwardingRules, PacketForwardingRules{},
 		); delCause == ie.CauseRequestRejected {
-			// Not yet evidence of a stranded rule, so this is not an error. The only
-			// things that can fail a BESS delete worker today are translating the rule
-			// (`CreatePortRangeCartesianProduct`) and marshalling it: `processPDR` and
-			// `processFAR` are void and `delQER` drops `processQER`'s error, so a module's
-			// refusal to delete cannot reach here. A rule that could not be translated
-			// was never programmed either -- which is exactly what happens when the add
-			// was refused for that same reason.
+			// A rule that could not be translated (`CreatePortRangeCartesianProduct`)
+			// or marshalled was never programmed either, so there is nothing to strand,
+			// and that is exactly what happens when the add was refused for the same
+			// reason. Still the only thing that reaches here after this change: every
+			// non-ENOENT answer the three CommandDelete implementations can give is an
+			// EINVAL about argument shape, which is static and would have failed the
+			// matching add long before, and none of them can refuse to remove a rule
+			// they do hold -- WildcardMatch's DelEntry cannot report failure at all and
+			// Qos discards its table's result.
+			//
+			// If one ever can, the release and RemoveSession below stop being safe to
+			// run unconditionally: the address would go back to the pool while a PDR
+			// still matched it, and no stored session would be left to delete that PDR.
+			// Fixing either module to report a refused delete has to come with a way to
+			// hold the allocation back here.
 			logger.PfcpLog.Warnln("the rollback of a rejected session reported a failure; " +
-				"no rule is known to be stranded")
+				"no rule the datapath holds is known to be stranded")
 		}
 
 		// Parsing allocated the UE address (parse_pdr.go), and only the deletion path
