@@ -111,6 +111,25 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 			ie.CauseNoResourcesAvailable)
 	}
 
+	// From here the session holds resources before it is known whether it will exist:
+	// NewPFCPSession has counted it, and parsing a CHOOSE PDR allocates the UE address
+	// (parse_pdr.go) as a side effect of reading it. A rejected establishment is never
+	// stored and the control plane is handed no F-SEID for it, so nothing else will
+	// give either back -- not a deletion request, not the association teardown. Every
+	// way out of this function short of an accepted batch is a return, and several of
+	// them are inside the parse loops below, so the cleanup is deferred rather than
+	// repeated.
+	accepted := false
+
+	defer func() {
+		if accepted {
+			return
+		}
+
+		upf.ippool.Release(session.localSEID)
+		pConn.RemoveSession(session)
+	}()
+
 	addPDRs := make([]pdr, 0, MaxItems)
 	addFARs := make([]far, 0, MaxItems)
 	addQERs := make([]qer, 0, MaxItems)
@@ -194,25 +213,22 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 			// they do hold -- WildcardMatch's DelEntry cannot report failure at all and
 			// Qos discards its table's result.
 			//
-			// If one ever can, the release and RemoveSession below stop being safe to
-			// run unconditionally: the address would go back to the pool while a PDR
-			// still matched it, and no stored session would be left to delete that PDR.
+			// If one ever can, the deferred cleanup above stops being safe to run
+			// unconditionally on this return: the address would go back to the pool
+			// while a PDR still matched it, and no stored session would be left to
+			// delete that PDR. The returns before the datapath is reached are not
+			// exposed to it -- nothing was programmed for them to strand.
 			// Fixing either module to report a refused delete has to come with a way to
 			// hold the allocation back here.
 			logger.PfcpLog.Warnln("the rollback of a rejected session reported a failure; " +
 				"no rule the datapath holds is known to be stranded")
 		}
 
-		// Parsing allocated the UE address (parse_pdr.go), and only the deletion path
-		// releases it. Without this, every rejected establishment leaks one address
-		// against a local SEID nobody will present again.
-		upf.ippool.Release(session.localSEID)
-
-		pConn.RemoveSession(session)
-
 		return errProcessReply(ErrWriteToDatapath,
 			ie.CauseRequestRejected)
 	}
+
+	accepted = true
 
 	err = pConn.store.PutSession(session)
 	if err != nil {
