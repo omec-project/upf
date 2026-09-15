@@ -293,6 +293,15 @@ func (pConn *PFCPConn) executeShutdown() {
 	// Cleanup all sessions in this conn
 	for _, sess := range pConn.store.GetAllSessions() {
 		pConn.upf.SendMsgToUPF(upfMsgTypeDel, sess.PacketForwardingRules, PacketForwardingRules{})
+
+		// The pool is built in NewUPF and belongs to the upf, which every connection
+		// shares, so an address not returned here is lost for the life of the process:
+		// the session is about to be forgotten and its local SEID will never be
+		// presented again. RemoveSession only drops the metrics and the store entry.
+		if err := releaseAllocatedIPs(pConn.upf.ippool, &sess); err != nil {
+			logger.PfcpLog.Errorln("failed to release the IP of a session being shut down:", err)
+		}
+
 		pConn.RemoveSession(sess)
 	}
 
