@@ -290,6 +290,12 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		return sendError(ErrNotFoundWithParam("PFCP session", "localSEID", localSEID))
 	}
 
+	// Parse into rules of our own. Every loop below can still refuse the message, and a
+	// refusal tells the control plane the session is unchanged -- which it is not if
+	// the rules that did parse have already been written through the slices this copy
+	// shares with the store. The PutSession at the end is what publishes them.
+	session.PacketForwardingRules = session.Clone()
+
 	var fseidIP uint32
 
 	if smreq.CPFSEID != nil {

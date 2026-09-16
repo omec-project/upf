@@ -28,6 +28,30 @@ func (p PacketForwardingRules) String() string {
 	return fmt.Sprintf("PDRs=%v, FARs=%v, QERs=%v", p.pdrs, p.fars, p.qers)
 }
 
+// Clone returns rules that share no storage with these ones.
+//
+// A PFCPSession read from the store is a struct copy, but its three slices still point
+// at the arrays the store holds: assigning into one of them -- which is what UpdatePDR,
+// UpdateFAR and UpdateQER do -- is a write the store sees at once, and removing a rule
+// shifts every rule after it through the same array. A handler that can still refuse
+// the message it is parsing therefore has to work on a copy of its own, and publish it
+// with PutSession only once the message has succeeded.
+func (p PacketForwardingRules) Clone() PacketForwardingRules {
+	c := PacketForwardingRules{
+		pdrs: append(make([]pdr, 0, cap(p.pdrs)), p.pdrs...),
+		fars: append(make([]far, 0, cap(p.fars)), p.fars...),
+		qers: append(make([]qer, 0, cap(p.qers)), p.qers...),
+	}
+
+	// qerIDList is the one field of a rule that is a slice of its own, and
+	// MarkSessionQer rewrites it in place.
+	for i := range c.pdrs {
+		c.pdrs[i].qerIDList = append(make([]uint32, 0, cap(p.pdrs[i].qerIDList)), p.pdrs[i].qerIDList...)
+	}
+
+	return c
+}
+
 // NewPFCPSession allocates an session with ID.
 func (pConn *PFCPConn) NewPFCPSession(rseid uint64) (PFCPSession, bool) {
 	for i := 0; i < pConn.maxRetries; i++ {
