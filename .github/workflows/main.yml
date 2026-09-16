@@ -228,7 +228,7 @@ jobs:
       checks: write
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/e2e-test.yml@778fad7dab60577c7ae9420dd1619aca22afd283 # test shared workflow PR #209
+    uses: omec-project/.github/.github/workflows/e2e-test.yml@d57b6360a2cc92237c201f2bb9ad58b924ef7082 # v0.0.32
     with:
       branch_name: ${{ github.ref }}
       image_list: ${{ needs.bess-changes.outputs.e2e_image_list }}
