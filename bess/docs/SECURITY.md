@@ -2,6 +2,7 @@
 SPDX-FileCopyrightText: 2025 Intel Corporation
 SPDX-License-Identifier: Apache-2.0
 -->
+<!-- TEST ONLY: triggers the BESS-image E2E selection path. DO NOT MERGE. -->
 # Security Policy
 
 ## Reporting a Vulnerability
