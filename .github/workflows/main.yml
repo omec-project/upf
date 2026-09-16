@@ -27,6 +27,7 @@ jobs:
     outputs:
       source: ${{ steps.filter.outputs.source }}
       clang_format: ${{ steps.filter.outputs.clang_format }}
+      e2e_image_list: ${{ steps.filter.outputs.e2e_bess == 'true' && 'bess pfcp' || 'pfcp' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -42,6 +43,14 @@ jobs:
               - 'bess/sample_plugin/modules/**'
               - 'bess/sample_plugin/protobuf/**'
               - '.github/workflows/main.yml'
+            e2e_bess:
+              # The PFCP Docker target does not depend on bess-build, so only
+              # select BESS when an input to the BESS runtime image changes.
+              - 'bess/**'
+              - 'conf/**'
+              - 'Dockerfile'
+              - '.dockerignore'
+              - 'requirements.txt'
   bess-source-tests:
     needs: bess-changes
     if: needs.bess-changes.outputs.source == 'true'
@@ -212,15 +221,17 @@ jobs:
       env_vars: "MODE=native DATAPATH=bess"
   e2e-tests:
     if: github.event_name == 'pull_request'
+    needs: bess-changes
     permissions:
       contents: read
       pull-requests: write
       checks: write
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/e2e-test.yml@c1ddc83eed14046b21fe05de3dfe30054fea746e # v0.0.31
+    uses: omec-project/.github/.github/workflows/e2e-test.yml@778fad7dab60577c7ae9420dd1619aca22afd283 # test shared workflow PR #209
     with:
       branch_name: ${{ github.ref }}
+      image_list: ${{ needs.bess-changes.outputs.e2e_image_list }}
   license-check:
     permissions:
       contents: read
