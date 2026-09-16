@@ -269,7 +269,16 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 
 	var remoteSEID uint64
 
+	// Set just before the modification is written to the datapath, and consulted by
+	// every refusal after it. Nil until then, because a message refused while it is
+	// still being parsed has changed nothing to put back.
+	var rollBack func()
+
 	sendError := func(err error) (message.Message, error) {
+		if rollBack != nil {
+			rollBack()
+		}
+
 		logger.PfcpLog.Errorln(err)
 
 		smres := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */
@@ -293,8 +302,10 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 	// Parse into rules of our own. Every loop below can still refuse the message, and a
 	// refusal tells the control plane the session is unchanged -- which it is not if
 	// the rules that did parse have already been written through the slices this copy
-	// shares with the store. The PutSession at the end is what publishes them.
-	session.PacketForwardingRules = session.Clone()
+	// shares with the store. The PutSession at the end is what publishes them, and
+	// before keeps what the session had for the rollback.
+	before := session.PacketForwardingRules
+	session.PacketForwardingRules = before.Clone()
 
 	var fseidIP uint32
 
@@ -351,6 +362,10 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		session.CreateQER(q)
 		addQERs = append(addQERs, q)
 	}
+
+	// Everything appended so far was created by this message and did not exist before
+	// it; everything the update loops append replaces a rule that did.
+	createdPDRs, createdFARs, createdQERs := len(addPDRs), len(addFARs), len(addQERs)
 
 	for _, uPDR := range smreq.UpdatePDR {
 		var (
@@ -425,6 +440,47 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		pdrs: addPDRs,
 		fars: addFARs,
 		qers: addQERs,
+	}
+
+	// From here the datapath has been asked to change, so every refusal below has to put
+	// it back. A batch that was rejected programmed an unknown subset of its rules
+	// before it was, and the deletion batch further down an unknown subset of the
+	// removals.
+	//
+	// Remove what this message created, then write the rules the session had. The order
+	// is what makes this safe against a Create naming a rule the session already holds:
+	// nothing rejects one, so the created rule can share a datapath key with a rule in
+	// before, and removing it after the restore would take the restored rule with it.
+	// Restoring second cannot go wrong that way, because it re-writes every rule the
+	// session had -- an overwrite for the ones this message never touched, and the way
+	// back for anything the removal above or a rejected deletion batch took out.
+	//
+	// The cost is a window rather than a wrong state: an updated rule that points at a
+	// rule this message created is left pointing at nothing until the restore lands one
+	// batch later, and a packet reaching it is dropped for that moment.
+	rollBack = func() {
+		created := PacketForwardingRules{
+			pdrs: addPDRs[:createdPDRs],
+			fars: addFARs[:createdFARs],
+			qers: addQERs[:createdQERs],
+		}
+
+		// A refused removal of a created rule does not mean the datapath kept it. The
+		// only thing that can refuse one today is the same translation or marshal step
+		// that would already have failed the rule's add, and a rule that cannot be
+		// translated was never programmed -- the reasoning the establishment rollback
+		// records. A module that learns to refuse a delete of a rule it holds changes
+		// that, and this line with it.
+		if upf.SendMsgToUPF(upfMsgTypeDel, created, PacketForwardingRules{}) == ie.CauseRequestRejected {
+			logger.PfcpLog.Warnln("could not translate a rule a refused modification created "+
+				"in order to remove it; it was not programmed either, F-SEID:", localSEID)
+		}
+
+		if upf.SendMsgToUPF(upfMsgTypeMod, before, before) == ie.CauseRequestRejected {
+			logger.PfcpLog.Warnln("datapath refused to restore the rules of a refused "+
+				"modification; it may be missing rules this session describes, or holding "+
+				"the refused modification's version of them, F-SEID:", localSEID)
+		}
 	}
 
 	cause := upf.SendMsgToUPF(upfMsgTypeMod, session.PacketForwardingRules, updated)
