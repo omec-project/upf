@@ -725,3 +725,88 @@ func TestUeIPIsReleasedWhenTheDatapathRefusesTheSession(t *testing.T) {
 
 	verifyNoEntries(t)
 }
+
+// A modification is written to the datapath in the middle of the handler, and the
+// handler can still refuse the message afterwards -- the write itself can be rejected,
+// and so can a Remove naming a rule the session does not hold. The control plane is then
+// told the session is unchanged, so the datapath has to be put back to what it held.
+//
+// The refusal is the one TestUeIPIsReleasedWhenTheDatapathRefusesTheSession already
+// relies on: a port range wider than the exact-match strategy can cover is declined while
+// the rule is translated, so it needs no datapath fault. It is carried by an Update PDR,
+// while the Create PDR beside it in the same batch is the rule this test reads back --
+// the batch programs the created rule and is then rejected by the updated one.
+func TestARefusedModificationRemovesTheRuleItCreated(t *testing.T) {
+	setup(t, ConfigDefault)
+	defer teardown(t)
+
+	const (
+		aPortRangeTooWideToProgram = "permit out udp from any 100-200 to assigned 300-400"
+		createdPDRID               = 3
+	)
+
+	uplinkPDR := func(method session.IEMethod, id uint16, teid uint32, filter string) *ie.IE {
+		return session.NewPDRBuilder().MarkAsUplink().
+			WithMethod(method).WithID(id).WithTEID(teid).
+			WithN3Address(upfN3Address).
+			WithSDFFilter(filter).
+			WithFARID(1).
+			AddQERID(1).BuildPDR()
+	}
+
+	pdrs := []*ie.IE{
+		uplinkPDR(session.Create, 1, 15, sdfFilterUDP80),
+		session.NewPDRBuilder().MarkAsDownlink().
+			WithMethod(session.Create).WithID(2).
+			WithUEAddress(ueAddress).
+			WithSDFFilter(sdfFilterUDP80).
+			WithFARID(2).
+			AddQERID(2).BuildPDR(),
+	}
+
+	fars := []*ie.IE{
+		session.NewFARBuilder().
+			WithMethod(session.Create).WithID(1).
+			WithDstInterface(ie.DstInterfaceCore).
+			WithAction(ActionForward).BuildFAR(),
+		session.NewFARBuilder().
+			WithMethod(session.Create).WithID(2).
+			WithDstInterface(ie.DstInterfaceAccess).
+			WithAction(ActionForward).WithTEID(16).
+			WithDownlinkIP(nodeBAddress).BuildFAR(),
+	}
+
+	qers := []*ie.IE{
+		session.NewQERBuilder().WithMethod(session.Create).WithID(1).
+			WithQFI(0x9).WithUplinkMBR(50000).WithDownlinkMBR(50000).Build(),
+		session.NewQERBuilder().WithMethod(session.Create).WithID(2).
+			WithQFI(0x9).WithUplinkMBR(50000).WithDownlinkMBR(50000).Build(),
+	}
+
+	sess, err := pfcpClient.EstablishSession(pdrs, fars, qers, nil)
+	if err != nil {
+		t.Fatalf("failed to establish PFCP session: %v", err)
+	}
+
+	// A Create the datapath accepts, beside an Update it refuses. Both are carried in
+	// the Update PDR argument because that is all the simulator offers; each IE names
+	// its own type on the wire, so the UPF reads them as what they are.
+	err = pfcpClient.ModifySession(sess, []*ie.IE{
+		uplinkPDR(session.Create, createdPDRID, 17, sdfFilterUDP80),
+		uplinkPDR(session.Update, 1, 15, aPortRangeTooWideToProgram),
+	}, nil, nil, nil)
+	if err == nil {
+		t.Fatal("the modification was accepted, so this test proves nothing")
+	}
+
+	if _, created := bessFake.GetPdrTableEntries()[createdPDRID]; created {
+		t.Fatalf("PDR %d is in the datapath after the modification that created it was "+
+			"refused; the session does not describe it, so nothing will ever remove it",
+			createdPDRID)
+	}
+
+	if got := len(bessFake.GetPdrTableEntries()); got != len(pdrs) {
+		t.Fatalf("the datapath holds %d PDRs after a refused modification, expected the "+
+			"%d the session had", got, len(pdrs))
+	}
+}
