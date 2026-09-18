@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/omec-project/upf-epc/pfcpiface/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -31,7 +30,8 @@ func restoreReg() {
 // reads node.upf, so the node needs no real PFCP listener -- and binding the real port
 // makes the test collide with any other PFCP endpoint already running on the host (and
 // NewPFCPNode calls log.Fatalln on a bind failure, which kills the whole test binary
-// rather than just this test).
+// rather than just this test). node.metrics is left nil since setupProm never reads it,
+// avoiding the extra global Prometheus registrations a real metrics service would add.
 func newTestPFCPNode(t *testing.T, u *upf) *PFCPNode {
 	t.Helper()
 
@@ -42,12 +42,6 @@ func newTestPFCPNode(t *testing.T, u *upf) *PFCPNode {
 		t.Fatalf("failed to open test PFCP socket: %v", err)
 	}
 
-	m, err := metrics.NewPrometheusService()
-	if err != nil {
-		_ = conn.Close()
-		t.Fatalf("failed to init metrics service: %v", err)
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 
 	node := &PFCPNode{
@@ -56,7 +50,6 @@ func newTestPFCPNode(t *testing.T, u *upf) *PFCPNode {
 		PacketConn: conn,
 		done:       make(chan struct{}),
 		upf:        u,
-		metrics:    m,
 	}
 
 	t.Cleanup(func() {
@@ -64,8 +57,10 @@ func newTestPFCPNode(t *testing.T, u *upf) *PFCPNode {
 			t.Errorf("failed to close node: %v", err)
 		}
 
-		if err := node.metrics.Stop(); err != nil {
-			t.Errorf("failed to stop metrics: %v", err)
+		if node.metrics != nil {
+			if err := node.metrics.Stop(); err != nil {
+				t.Errorf("failed to stop metrics: %v", err)
+			}
 		}
 	})
 
