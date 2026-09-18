@@ -4,9 +4,12 @@
 package pfcpiface
 
 import (
+	"context"
+	"net"
 	"net/http"
 	"testing"
 
+	"github.com/omec-project/upf-epc/pfcpiface/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -23,6 +26,39 @@ func restoreReg() {
 	prometheus.DefaultRegisterer = backupGlobalRegistry
 }
 
+// newTestPFCPNode builds a *PFCPNode the way NewPFCPNode does, but on an ephemeral
+// local port instead of the hardcoded production PFCPPort (":8805"). setupProm only
+// reads node.upf, so the node needs no real PFCP listener -- and binding the real port
+// makes the test collide with any other PFCP endpoint already running on the host (and
+// NewPFCPNode calls log.Fatalln on a bind failure, which kills the whole test binary
+// rather than just this test).
+func newTestPFCPNode(t *testing.T, u *upf) *PFCPNode {
+	t.Helper()
+
+	var lc net.ListenConfig
+
+	conn, err := lc.ListenPacket(context.Background(), "udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to open test PFCP socket: %v", err)
+	}
+
+	m, err := metrics.NewPrometheusService()
+	if err != nil {
+		t.Fatalf("failed to init metrics service: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	return &PFCPNode{
+		ctx:        ctx,
+		cancel:     cancel,
+		PacketConn: conn,
+		done:       make(chan struct{}),
+		upf:        u,
+		metrics:    m,
+	}
+}
+
 func Test_setupProm(t *testing.T) {
 	t.Run("can setup prom multiple times with clearProm", func(t *testing.T) {
 		saveReg()
@@ -30,7 +66,16 @@ func Test_setupProm(t *testing.T) {
 
 		// TODO: use actual mocks
 		upf := &upf{}
-		node := NewPFCPNode(upf)
+		node := newTestPFCPNode(t, upf)
+		t.Cleanup(func() {
+			if err := node.Close(); err != nil {
+				t.Errorf("failed to close node: %v", err)
+			}
+
+			if err := node.metrics.Stop(); err != nil {
+				t.Errorf("failed to stop metrics: %v", err)
+			}
+		})
 
 		uc, nc, err := setupProm(http.NewServeMux(), upf, node)
 		if err != nil {
@@ -51,7 +96,16 @@ func Test_setupProm(t *testing.T) {
 
 		// TODO: use actual mocks
 		upf := &upf{}
-		node := NewPFCPNode(upf)
+		node := newTestPFCPNode(t, upf)
+		t.Cleanup(func() {
+			if err := node.Close(); err != nil {
+				t.Errorf("failed to close node: %v", err)
+			}
+
+			if err := node.metrics.Stop(); err != nil {
+				t.Errorf("failed to stop metrics: %v", err)
+			}
+		})
 
 		_, _, err := setupProm(http.NewServeMux(), upf, node)
 		if err != nil {
