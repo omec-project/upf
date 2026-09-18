@@ -44,12 +44,13 @@ func newTestPFCPNode(t *testing.T, u *upf) *PFCPNode {
 
 	m, err := metrics.NewPrometheusService()
 	if err != nil {
+		_ = conn.Close()
 		t.Fatalf("failed to init metrics service: %v", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	return &PFCPNode{
+	node := &PFCPNode{
 		ctx:        ctx,
 		cancel:     cancel,
 		PacketConn: conn,
@@ -57,6 +58,18 @@ func newTestPFCPNode(t *testing.T, u *upf) *PFCPNode {
 		upf:        u,
 		metrics:    m,
 	}
+
+	t.Cleanup(func() {
+		if err := node.Close(); err != nil {
+			t.Errorf("failed to close node: %v", err)
+		}
+
+		if err := node.metrics.Stop(); err != nil {
+			t.Errorf("failed to stop metrics: %v", err)
+		}
+	})
+
+	return node
 }
 
 func Test_setupProm(t *testing.T) {
@@ -67,15 +80,6 @@ func Test_setupProm(t *testing.T) {
 		// TODO: use actual mocks
 		upf := &upf{}
 		node := newTestPFCPNode(t, upf)
-		t.Cleanup(func() {
-			if err := node.Close(); err != nil {
-				t.Errorf("failed to close node: %v", err)
-			}
-
-			if err := node.metrics.Stop(); err != nil {
-				t.Errorf("failed to stop metrics: %v", err)
-			}
-		})
 
 		uc, nc, err := setupProm(http.NewServeMux(), upf, node)
 		if err != nil {
@@ -97,15 +101,6 @@ func Test_setupProm(t *testing.T) {
 		// TODO: use actual mocks
 		upf := &upf{}
 		node := newTestPFCPNode(t, upf)
-		t.Cleanup(func() {
-			if err := node.Close(); err != nil {
-				t.Errorf("failed to close node: %v", err)
-			}
-
-			if err := node.metrics.Stop(); err != nil {
-				t.Errorf("failed to stop metrics: %v", err)
-			}
-		})
 
 		_, _, err := setupProm(http.NewServeMux(), upf, node)
 		if err != nil {
