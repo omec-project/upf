@@ -48,7 +48,7 @@ repos:
         pass_filenames: false
       - id: go-test-race
         name: go test -race
-        entry: go test -race ./... -count=1
+        entry: go test -race ./... -count=20
         language: system
         types: [go]
         pass_filenames: false
