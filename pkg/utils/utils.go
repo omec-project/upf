@@ -19,15 +19,3 @@ func Uint32ToIp4(nn uint32) net.IP {
 func Ip4ToUint32(ip net.IP) uint32 {
 	return binary.BigEndian.Uint32(ip.To4())
 }
-
-func Uint8Has3rdBit(f uint8) bool {
-	return (f&0x04)>>2 == 1
-}
-
-func Uint8Has2ndBit(f uint8) bool {
-	return (f&0x02)>>1 == 1
-}
-
-func Uint8Has1stBit(f uint8) bool {
-	return (f & 0x01) == 1
-}
