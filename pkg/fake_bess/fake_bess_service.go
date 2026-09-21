@@ -101,7 +101,7 @@ type FakeFar struct {
 
 	dstIntf       uint8
 	sendEndMarker bool
-	applyAction   uint8
+	action        uint8
 	tunnelType    uint8
 	tunnelIP4Src  uint32
 	tunnelIP4Dst  uint32
@@ -117,16 +117,26 @@ func (f FakeFar) String() string {
 		f.Drops(), f.Forwards(), f.Buffers())
 }
 
+// The action a FAR carries into the table is not the PFCP Apply Action: addFAR passes it
+// through setActionValue first, which turns it into the gate farLookup switches on. These
+// mirror the values there, and they are what UnmarshalFar reads back.
+const (
+	farForwardD uint8 = 0
+	farForwardU uint8 = 1
+	farDrop     uint8 = 2
+	farNotify   uint8 = 4
+)
+
 func (f *FakeFar) Drops() bool {
-	return utils.Uint8Has1stBit(f.applyAction)
+	return f.action == farDrop
 }
 
 func (f *FakeFar) Forwards() bool {
-	return utils.Uint8Has2ndBit(f.applyAction)
+	return f.action == farForwardD || f.action == farForwardU
 }
 
 func (f *FakeFar) Buffers() bool {
-	return utils.Uint8Has3rdBit(f.applyAction)
+	return f.action == farNotify
 }
 
 type FakeQer struct {
@@ -290,7 +300,7 @@ func UnmarshalFar(em *bess_pb.ExactMatchCommandAddArg) (f FakeFar) {
 	f.fseID = em.Fields[1].GetValueInt()
 
 	// Values.
-	f.applyAction = uint8(em.Values[0].GetValueInt())
+	f.action = uint8(em.Values[0].GetValueInt())
 	f.tunnelType = uint8(em.Values[1].GetValueInt())
 	f.tunnelIP4Src = uint32(em.Values[2].GetValueInt())
 	f.tunnelIP4Dst = uint32(em.Values[3].GetValueInt())

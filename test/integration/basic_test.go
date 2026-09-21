@@ -810,3 +810,108 @@ func TestARefusedModificationRemovesTheRuleItCreated(t *testing.T) {
 			"%d the session had", got, len(pdrs))
 	}
 }
+
+// The FAR table does not hold the PFCP Apply Action. addFAR passes it through
+// setActionValue first, which turns it into the gate farLookup switches on, so anything
+// reading a FAR back out of the datapath has to decode that and not the PFCP bits. This
+// pins the two against each other: the session names the actions, the datapath is asked
+// for them by the real agent, and what comes back has to agree.
+func TestAFarReadsBackWithTheActionTheSessionGaveIt(t *testing.T) {
+	setup(t, ConfigDefault)
+	defer teardown(t)
+
+	const (
+		forwardingFARID = 1
+		droppingFARID   = 2
+		downlinkFARID   = 3
+		bufferingFARID  = 4
+	)
+
+	pdrs := []*ie.IE{
+		session.NewPDRBuilder().MarkAsUplink().
+			WithMethod(session.Create).WithID(1).WithTEID(15).
+			WithN3Address(upfN3Address).
+			WithSDFFilter(sdfFilterUDP80).
+			WithFARID(forwardingFARID).
+			AddQERID(1).BuildPDR(),
+		session.NewPDRBuilder().MarkAsDownlink().
+			WithMethod(session.Create).WithID(2).
+			WithUEAddress(ueAddress).
+			WithSDFFilter(sdfFilterUDP80).
+			WithFARID(droppingFARID).
+			AddQERID(2).BuildPDR(),
+	}
+
+	fars := []*ie.IE{
+		session.NewFARBuilder().
+			WithMethod(session.Create).WithID(forwardingFARID).
+			WithDstInterface(ie.DstInterfaceCore).
+			WithAction(ActionForward).BuildFAR(),
+		session.NewFARBuilder().
+			WithMethod(session.Create).WithID(droppingFARID).
+			WithDstInterface(ie.DstInterfaceAccess).
+			WithAction(ActionDrop).WithTEID(16).
+			WithDownlinkIP(nodeBAddress).BuildFAR(),
+		// The other two gate values. Forwarding to the access side is a different gate
+		// from forwarding to the core, and buffering shares its gate with notifying.
+		session.NewFARBuilder().
+			WithMethod(session.Create).WithID(downlinkFARID).
+			WithDstInterface(ie.DstInterfaceAccess).
+			WithAction(ActionForward).WithTEID(17).
+			WithDownlinkIP(nodeBAddress).BuildFAR(),
+		session.NewFARBuilder().
+			WithMethod(session.Create).WithID(bufferingFARID).
+			WithDstInterface(ie.DstInterfaceAccess).
+			WithAction(ActionBuffer | ActionNotify).BuildFAR(),
+	}
+
+	qers := []*ie.IE{
+		session.NewQERBuilder().WithMethod(session.Create).WithID(1).
+			WithQFI(0x9).WithUplinkMBR(50000).WithDownlinkMBR(50000).Build(),
+		session.NewQERBuilder().WithMethod(session.Create).WithID(2).
+			WithQFI(0x9).WithUplinkMBR(50000).WithDownlinkMBR(50000).Build(),
+	}
+
+	if _, err := pfcpClient.EstablishSession(pdrs, fars, qers, nil); err != nil {
+		t.Fatalf("failed to establish PFCP session: %v", err)
+	}
+
+	entries := bessFake.GetFarTableEntries()
+
+	forwarding, ok := entries[forwardingFARID]
+	if !ok {
+		t.Fatalf("FAR %d is not in the datapath", forwardingFARID)
+	}
+
+	if !forwarding.Forwards() || forwarding.Drops() || forwarding.Buffers() {
+		t.Errorf("the FAR the session told to forward reads back as %v", forwarding)
+	}
+
+	dropping, ok := entries[droppingFARID]
+	if !ok {
+		t.Fatalf("FAR %d is not in the datapath", droppingFARID)
+	}
+
+	if !dropping.Drops() || dropping.Forwards() || dropping.Buffers() {
+		t.Errorf("the FAR the session told to drop reads back as %v", dropping)
+	}
+
+	downlink, ok := entries[downlinkFARID]
+	if !ok {
+		t.Fatalf("FAR %d is not in the datapath", downlinkFARID)
+	}
+
+	if !downlink.Forwards() || downlink.Drops() || downlink.Buffers() {
+		t.Errorf("the FAR the session told to forward to the access side reads back as %v",
+			downlink)
+	}
+
+	buffering, ok := entries[bufferingFARID]
+	if !ok {
+		t.Fatalf("FAR %d is not in the datapath", bufferingFARID)
+	}
+
+	if !buffering.Buffers() || buffering.Forwards() || buffering.Drops() {
+		t.Errorf("the FAR the session told to buffer reads back as %v", buffering)
+	}
+}

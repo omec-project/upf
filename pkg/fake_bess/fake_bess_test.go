@@ -15,6 +15,51 @@ func intField(v uint64) *bess_pb.FieldData {
 	return &bess_pb.FieldData{Encoding: &bess_pb.FieldData_ValueInt{ValueInt: v}}
 }
 
+// The value a FAR carries into the datapath is not the PFCP Apply Action. The agent
+// translates the action into the gate the farLookup module switches on, and that is what
+// lands in the table and what comes back out of it.
+
+// farAddArg is the shape addFAR writes: two key fields, then the action followed by the
+// tunnel values.
+func farAddArg(action uint64) *bess_pb.ExactMatchCommandAddArg {
+	return &bess_pb.ExactMatchCommandAddArg{
+		Fields: []*bess_pb.FieldData{intField(1), intField(0xC0FFEE)},
+		Values: []*bess_pb.FieldData{
+			intField(action),
+			intField(0), intField(0), intField(0), intField(0), intField(0),
+		},
+	}
+}
+
+func TestAFarReportsTheActionTheDatapathWasGiven(t *testing.T) {
+	for _, tc := range []struct {
+		name                     string
+		action                   uint64
+		drops, forwards, buffers bool
+	}{
+		{name: "forwards downlink", action: 0, forwards: true},
+		{name: "forwards uplink", action: 1, forwards: true},
+		{name: "drops", action: 2, drops: true},
+		{name: "notifies", action: 4, buffers: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			far := UnmarshalFar(farAddArg(tc.action))
+
+			if got := far.Drops(); got != tc.drops {
+				t.Errorf("Drops() = %v for action %d, expected %v", got, tc.action, tc.drops)
+			}
+
+			if got := far.Forwards(); got != tc.forwards {
+				t.Errorf("Forwards() = %v for action %d, expected %v", got, tc.action, tc.forwards)
+			}
+
+			if got := far.Buffers(); got != tc.buffers {
+				t.Errorf("Buffers() = %v for action %d, expected %v", got, tc.action, tc.buffers)
+			}
+		})
+	}
+}
+
 // A test reads the tables on its own goroutine while the agent programs them from a gRPC
 // handler on another, and the PFCP round trip between the two is a socket -- which is not
 // an ordering the race detector can see. So the read has to take its copy under the same
