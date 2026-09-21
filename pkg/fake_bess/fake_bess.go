@@ -53,7 +53,7 @@ func (b *FakeBESS) Stop() {
 
 func (b *FakeBESS) GetPdrTableEntries() (entries map[uint32][]FakePdr) {
 	entries = make(map[uint32][]FakePdr)
-	msgs := b.service.GetOrAddModule(pdrLookupModuleName).GetState()
+	msgs := b.service.GetModuleState(pdrLookupModuleName)
 	for _, m := range msgs {
 		e, ok := m.(*bess_pb.WildcardMatchCommandAddArg)
 		if !ok {
@@ -68,7 +68,7 @@ func (b *FakeBESS) GetPdrTableEntries() (entries map[uint32][]FakePdr) {
 
 func (b *FakeBESS) GetFarTableEntries() (entries map[uint32]FakeFar) {
 	entries = make(map[uint32]FakeFar)
-	msgs := b.service.GetOrAddModule(farLookupModuleName).GetState()
+	msgs := b.service.GetModuleState(farLookupModuleName)
 	for _, m := range msgs {
 		e, ok := m.(*bess_pb.ExactMatchCommandAddArg)
 		if !ok {
@@ -82,7 +82,7 @@ func (b *FakeBESS) GetFarTableEntries() (entries map[uint32]FakeFar) {
 
 // Session QERs are missing a QerID and are therefore returned as a slice, not map.
 func (b *FakeBESS) GetSessionQerTableEntries() (entries []FakeQer) {
-	msgs := b.service.GetOrAddModule(sessionQerModuleName).GetState()
+	msgs := b.service.GetModuleState(sessionQerModuleName)
 	for _, m := range msgs {
 		e, ok := m.(*bess_pb.QosCommandAddArg)
 		if !ok {
@@ -94,7 +94,7 @@ func (b *FakeBESS) GetSessionQerTableEntries() (entries []FakeQer) {
 }
 
 func (b *FakeBESS) GetAppQerTableEntries() (entries []FakeQer) {
-	msgs := b.service.GetOrAddModule(appQerModuleName).GetState()
+	msgs := b.service.GetModuleState(appQerModuleName)
 	for _, m := range msgs {
 		e, ok := m.(*bess_pb.QosCommandAddArg)
 		if !ok {
