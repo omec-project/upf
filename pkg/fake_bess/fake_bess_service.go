@@ -163,10 +163,28 @@ func newFakeBESSService() *fakeBessService {
 	}
 }
 
-func (b *fakeBessService) GetOrAddModule(name string) module {
+// GetModuleState returns a snapshot of what a module has been programmed with, taken
+// under the lock the gRPC handlers write it under.
+//
+// The messages are cloned rather than handed out: handleAddEntry resets and overwrites a
+// stored message in place when an add matches an entry already there, so returning the
+// stored pointers would leave a reader parsing a message the next add is rewriting. A
+// reader is a test goroutine and a writer is a gRPC handler, and the PFCP round trip
+// between them is a socket, which is not a happens-before edge the race detector can see
+// -- so anything short of a copy taken under the lock is a reportable race waiting for a
+// test to arrange it.
+func (b *fakeBessService) GetModuleState(name string) []proto.Message {
 	b.mtx.Lock()
 	defer b.mtx.Unlock()
-	return b.unsafeGetOrAddModule(name)
+
+	msgs := b.unsafeGetOrAddModule(name).GetState()
+
+	snapshot := make([]proto.Message, 0, len(msgs))
+	for _, m := range msgs {
+		snapshot = append(snapshot, proto.Clone(m))
+	}
+
+	return snapshot
 }
 
 func (b *fakeBessService) unsafeGetOrAddModule(name string) module {
