@@ -66,6 +66,14 @@ func (pr portRange) Width() uint16 {
 	}
 }
 
+// sameMatch reports whether both ranges reach the datapath as the same rule. "Any port"
+// has two spellings -- the zero value, which a PDR carrying no SDF Filter keeps, and
+// newWildcardPortRange(), which every filter path sets -- and asTrivialTernaryMatch
+// compiles both to the same ternary rule.
+func (pr portRange) sameMatch(other portRange) bool {
+	return pr == other || pr.isWildcardMatch() && other.isWildcardMatch()
+}
+
 func (pr portRange) isWildcardMatch() bool {
 	return pr.low == 0 && pr.high == math.MaxUint16 ||
 		pr.low == 0 && pr.high == 0
@@ -321,6 +329,34 @@ func (af applicationFilter) String() string {
 	return fmt.Sprintf("ApplicationFilter(srcIP=%v/%x, dstIP=%v/%x, proto=%v/%x, srcPort=%v, dstPort=%v)",
 		int2ip(af.srcIP), af.srcIPMask, int2ip(af.dstIP), af.dstIPMask, af.proto,
 		af.protoMask, af.srcPortRange, af.dstPortRange)
+}
+
+// occupiesSameEntryAs reports whether both rules would land on the same datapath entry.
+//
+// The fields compared here are the ones delPDR builds its delete key from (bess.go): the
+// source interface, the tunnel it arrives on, and the application filter, each with its
+// mask. Precedence is written as the entry's priority and the PDR ID as one of its
+// values, and neither is part of the key -- so a rule can change either and still occupy
+// the entry it already had. If the delete key ever gains a field, it has to gain one
+// here too.
+//
+// The ports are compared through sameMatch rather than by value, because delPDR keys on
+// what CreatePortRangeCartesianProduct makes of a range, not on the range itself.
+func (p pdr) occupiesSameEntryAs(other pdr) bool {
+	return p.srcIface == other.srcIface &&
+		p.srcIfaceMask == other.srcIfaceMask &&
+		p.tunnelIP4Dst == other.tunnelIP4Dst &&
+		p.tunnelIP4DstMask == other.tunnelIP4DstMask &&
+		p.tunnelTEID == other.tunnelTEID &&
+		p.tunnelTEIDMask == other.tunnelTEIDMask &&
+		p.appFilter.srcIP == other.appFilter.srcIP &&
+		p.appFilter.srcIPMask == other.appFilter.srcIPMask &&
+		p.appFilter.dstIP == other.appFilter.dstIP &&
+		p.appFilter.dstIPMask == other.appFilter.dstIPMask &&
+		p.appFilter.proto == other.appFilter.proto &&
+		p.appFilter.protoMask == other.appFilter.protoMask &&
+		p.appFilter.srcPortRange.sameMatch(other.appFilter.srcPortRange) &&
+		p.appFilter.dstPortRange.sameMatch(other.appFilter.dstPortRange)
 }
 
 func (p pdr) String() string {

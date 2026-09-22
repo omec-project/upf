@@ -777,3 +777,101 @@ func Test_pdr_parsePDI(t *testing.T) {
 		})
 	}
 }
+
+// A rule's datapath entry is chosen by the fields delPDR builds its delete key from, and
+// by nothing else. These walk that key field by field, so a field added to the key
+// without being added to the comparison is a failing test rather than a rule the rollback
+// quietly decides has not moved.
+
+func keyedPDR() pdr {
+	return pdr{
+		srcIface:         core,
+		srcIfaceMask:     0xff,
+		tunnelIP4Dst:     0x0a000001,
+		tunnelIP4DstMask: 0xffffffff,
+		tunnelTEID:       0x10,
+		tunnelTEIDMask:   0xffffffff,
+		appFilter: applicationFilter{
+			srcIP:        0x0a000002,
+			srcIPMask:    0xffffffff,
+			dstIP:        0x0a000003,
+			dstIPMask:    0xffffffff,
+			proto:        17,
+			protoMask:    0xff,
+			srcPortRange: newRangeMatchPortRange(100, 200),
+			dstPortRange: newExactMatchPortRange(80),
+		},
+	}
+}
+
+func TestAPdrMovesWhenAKeyFieldChanges(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		change func(*pdr)
+	}{
+		{"source interface", func(p *pdr) { p.srcIface = access }},
+		{"source interface mask", func(p *pdr) { p.srcIfaceMask = 0 }},
+		{"tunnel destination", func(p *pdr) { p.tunnelIP4Dst++ }},
+		{"tunnel destination mask", func(p *pdr) { p.tunnelIP4DstMask = 0 }},
+		{"tunnel TEID", func(p *pdr) { p.tunnelTEID++ }},
+		{"tunnel TEID mask", func(p *pdr) { p.tunnelTEIDMask = 0 }},
+		{"source address", func(p *pdr) { p.appFilter.srcIP++ }},
+		{"source address mask", func(p *pdr) { p.appFilter.srcIPMask = 0 }},
+		{"destination address", func(p *pdr) { p.appFilter.dstIP++ }},
+		{"destination address mask", func(p *pdr) { p.appFilter.dstIPMask = 0 }},
+		{"protocol", func(p *pdr) { p.appFilter.proto++ }},
+		{"protocol mask", func(p *pdr) { p.appFilter.protoMask = 0 }},
+		{"source port range", func(p *pdr) { p.appFilter.srcPortRange = newRangeMatchPortRange(100, 201) }},
+		{"destination port", func(p *pdr) { p.appFilter.dstPortRange = newExactMatchPortRange(81) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			was, moved := keyedPDR(), keyedPDR()
+			tc.change(&moved)
+
+			if was.occupiesSameEntryAs(moved) {
+				t.Errorf("a rule whose %s changed is reported as occupying the same entry",
+					tc.name)
+			}
+		})
+	}
+}
+
+func TestAPdrStaysWhereItIsWhenSomethingOutsideTheKeyChanges(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		change func(*pdr)
+	}{
+		{"precedence", func(p *pdr) { p.precedence = 42 }},
+		{"PDR ID", func(p *pdr) { p.pdrID = 7 }},
+		{"FAR ID", func(p *pdr) { p.farID = 7 }},
+		{"QER list", func(p *pdr) { p.qerIDList = []uint32{1, 2} }},
+		{"counter ID", func(p *pdr) { p.ctrID = 7 }},
+		{"F-SEID", func(p *pdr) { p.fseID = 7 }},
+		{"outer header removal", func(p *pdr) { p.needDecap = 1 }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			was, still := keyedPDR(), keyedPDR()
+			tc.change(&still)
+
+			if !was.occupiesSameEntryAs(still) {
+				t.Errorf("a rule whose %s changed is reported as having moved; the "+
+					"datapath does not key on it", tc.name)
+			}
+		})
+	}
+}
+
+// TestAPdrStaysWhereItIsWhenItsWildcardIsSpeltDifferently covers the one pair of values
+// that are not equal but are the same entry: a PDR carrying no SDF Filter keeps the zero
+// port range, one carrying a filter that matches any port sets 0-65535, and
+// asTrivialTernaryMatch compiles both to the same ternary rule.
+func TestAPdrStaysWhereItIsWhenItsWildcardIsSpeltDifferently(t *testing.T) {
+	unfiltered, wildcard := keyedPDR(), keyedPDR()
+	unfiltered.appFilter.srcPortRange = portRange{}
+	wildcard.appFilter.srcPortRange = newWildcardPortRange()
+
+	if !unfiltered.occupiesSameEntryAs(wildcard) {
+		t.Errorf("%v and %v are reported as different entries; both compile to the same "+
+			"ternary rule", unfiltered.appFilter.srcPortRange, wildcard.appFilter.srcPortRange)
+	}
+}

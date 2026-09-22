@@ -28,6 +28,28 @@ func (p PacketForwardingRules) String() string {
 	return fmt.Sprintf("PDRs=%v, FARs=%v, QERs=%v", p.pdrs, p.fars, p.qers)
 }
 
+// findPDR returns the rule this set holds under the given ID.
+func (p PacketForwardingRules) findPDR(id uint32) (pdr, bool) {
+	for _, v := range p.pdrs {
+		if v.pdrID == id {
+			return v, true
+		}
+	}
+
+	return pdr{}, false
+}
+
+// findQER returns the rule this set holds under the given ID.
+func (p PacketForwardingRules) findQER(id uint32) (qer, bool) {
+	for _, v := range p.qers {
+		if v.qerID == id {
+			return v, true
+		}
+	}
+
+	return qer{}, false
+}
+
 // Clone returns rules that share no storage with these ones.
 //
 // A PFCPSession read from the store is a struct copy, but its three slices still point

@@ -29,6 +29,16 @@ type qer struct {
 	fseidIP  uint32
 }
 
+// occupiesSameEntryAs reports whether both rules would land on the same datapath entry.
+//
+// A QER's level picks the table delQER removes it from (bess.go): the application and
+// session QERs are separate lookups. The application key is the session and the rule's
+// own ID; the session key is the session alone. An update changes neither, so the level
+// is the only way a QER can move.
+func (q qer) occupiesSameEntryAs(other qer) bool {
+	return q.qosLevel == other.qosLevel
+}
+
 func (q qer) String() string {
 	qosLevel, ok := qosLevelName[q.qosLevel]
 	if !ok {
