@@ -433,3 +433,80 @@ func TestARollbackLeavesAnUpdatedRuleWhoseWildcardIsSpeltDifferently(t *testing.
 			removed.pdrs)
 	}
 }
+
+// TestARollbackRemovesARuleTheMessageCreatedAndThenMoved is the case where the created and
+// updated sets name the same rule. UpdatePDR looks for its ID in the session as the message
+// has built it so far, so an Update following a Create of the same ID replaces the rule
+// the Create just added -- and the write programs both keys. The created rule has no
+// version in before, which is exactly why it has to go at both of them.
+func TestARollbackRemovesARuleTheMessageCreatedAndThenMoved(t *testing.T) {
+	pConn, dp, localSEID := rollbackConn(t)
+	dp.refuseNextWrite = true
+
+	refuseModification(t, pConn, localSEID, ErrWriteToDatapath,
+		corePDR(secondPDRID, secondUEAddress),
+		ie.NewUpdatePDR(
+			ie.NewPDRID(secondPDRID),
+			ie.NewPrecedence(establishedPrecedence),
+			ie.NewPDI(
+				ie.NewSourceInterface(ie.SrcInterfaceCore),
+				ie.NewUEIPAddress(0x2, thirdUEAddress, "", 0, 0),
+			),
+			ie.NewFARID(downlinkFARID),
+		),
+	)
+
+	removed := rollbackDeletion(t, dp)
+
+	at := map[uint32]bool{}
+	for _, p := range removed.pdrs {
+		if p.pdrID == secondPDRID {
+			at[p.appFilter.dstIP] = true
+		}
+	}
+
+	for _, want := range []string{secondUEAddress, thirdUEAddress} {
+		if !at[ip2int(net.ParseIP(want))] {
+			t.Errorf("the rollback did not remove PDR %d at %s; the refused write programmed "+
+				"it there, and no version of it existed before the message: %v",
+				secondPDRID, want, removed.pdrs)
+		}
+	}
+}
+
+// TestARollbackRemovesAQerTheMessageCreatedAndThenMoved is the same case for a QER, where
+// what moves is the table. MarkSessionQer marks the rules the message itself carries, and
+// with a Create and an Update of one ID those are two entries: the larger MBR becomes the
+// session QER and the other stays an application one. So the write puts the same QER in
+// both lookups, and neither version existed before the message.
+func TestARollbackRemovesAQerTheMessageCreatedAndThenMoved(t *testing.T) {
+	dp := &recordingDP{}
+	pConn := establishingConn(t, nil)
+	pConn.upf.datapath = dp
+
+	localSEID := establishStaticSession(t, pConn,
+		corePDR(downlinkPDRID, firstUEAddress, ie.NewQERID(applicationQERID)),
+		downlinkFAR())
+
+	dp.calls = nil
+	dp.refuseNextWrite = true
+
+	refuseModification(t, pConn, localSEID, ErrWriteToDatapath,
+		ie.NewCreateQER(ie.NewQERID(applicationQERID), ie.NewMBR(lowerMBR, lowerMBR)),
+		ie.NewUpdateQER(ie.NewQERID(applicationQERID), ie.NewMBR(highestMBR, highestMBR)))
+
+	removed := rollbackDeletion(t, dp)
+
+	levels := map[QosLevel]bool{}
+	for _, q := range removed.qers {
+		if q.qerID == applicationQERID {
+			levels[q.qosLevel] = true
+		}
+	}
+
+	if !levels[ApplicationQos] || !levels[SessionQos] {
+		t.Fatalf("the rollback removed QER %d from %v; the refused write put it in both the "+
+			"application and the session lookup, and no version of it existed before the "+
+			"message", applicationQERID, removed.qers)
+	}
+}

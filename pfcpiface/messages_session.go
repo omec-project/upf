@@ -461,7 +461,11 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 	rollBack = func() {
 		// What the rollback removes: the rules this message created, and the rules it
 		// updated onto a datapath entry other than the one the session's own version
-		// occupies.
+		// occupies -- or that have no version of their own before the message at all.
+		// UpdatePDR and UpdateQER find their rule in the session as the message has built
+		// it so far, so an Update following a Create of the same ID replaces the rule that
+		// Create just added, and the write programs both. The restore writes nothing for
+		// such a rule, so removing it cannot take out anything the restore puts back.
 		//
 		// The second set is the one nothing else would ever reach. The restore below
 		// re-adds the old key; it does not remove the new one, and the session's later
@@ -482,13 +486,13 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		removeQERs := append([]qer(nil), addQERs[:createdQERs]...)
 
 		for _, p := range addPDRs[createdPDRs:] {
-			if was, ok := before.findPDR(p.pdrID); ok && !p.occupiesSameEntryAs(was) {
+			if was, ok := before.findPDR(p.pdrID); !ok || !p.occupiesSameEntryAs(was) {
 				removePDRs = append(removePDRs, p)
 			}
 		}
 
 		for _, q := range addQERs[createdQERs:] {
-			if was, ok := before.findQER(q.qerID); ok && !q.occupiesSameEntryAs(was) {
+			if was, ok := before.findQER(q.qerID); !ok || !q.occupiesSameEntryAs(was) {
 				removeQERs = append(removeQERs, q)
 			}
 		}
@@ -500,12 +504,15 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 			qers: removeQERs,
 		}
 
-		// A refused removal of a created rule does not mean the datapath kept it. The
-		// only thing that can refuse one today is the same translation or marshal step
-		// that would already have failed the rule's add, and a rule that cannot be
-		// translated was never programmed -- the reasoning the establishment rollback
-		// records. A module that learns to refuse a delete of a rule it holds changes
-		// that, and this line with it.
+		// A refused removal of a created rule does not mean the datapath kept it.
+		// commandOutcome would pass a module's refusal of a delete straight through, and
+		// TestSendMsgToUPFRejectsADeleteTheModuleRefused shows that it does -- but no
+		// module produces one for a rule it holds: the codes the three delete paths
+		// return are ENOENT, which counts as success here, and EINVAL for an argument no
+		// stored rule can make. So what reaches here is a rule that could not be
+		// translated or marshalled, which was never programmed either -- the reasoning
+		// the establishment rollback records. A module that learns to refuse a delete of
+		// a rule it holds changes that, and this line with it.
 		if upf.SendMsgToUPF(upfMsgTypeDel, remove, PacketForwardingRules{}) == ie.CauseRequestRejected {
 			logger.PfcpLog.Warnln("could not translate a rule a refused modification created "+
 				"in order to remove it; it was not programmed either, F-SEID:", localSEID)
