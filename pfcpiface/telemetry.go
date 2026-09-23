@@ -43,6 +43,7 @@ type upfCollector struct {
 
 const (
 	labelDir       = "dir"
+	labelDirection = "direction"
 	labelIPAddress = "ipAddress"
 	labelFSEID     = "fseid"
 	labelIface     = "iface"
@@ -143,27 +144,27 @@ func NewPFCPNodeCollector(node *PFCPNode) *PfcpNodeCollector {
 		node: node,
 		sessionLatency: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "latency_ns"),
 			"Shows the latency of a session in UPF",
-			[]string{labelFSEID, labelPDR, labelUeIP}, nil,
+			[]string{labelFSEID, labelPDR, labelUeIP, labelDirection}, nil,
 		),
 		sessionJitter: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "jitter_ns"),
 			"Shows the jitter of a session in UPF",
-			[]string{labelFSEID, labelPDR, labelUeIP}, nil,
+			[]string{labelFSEID, labelPDR, labelUeIP, labelDirection}, nil,
 		),
 		sessionTxPackets: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "tx_packets"),
 			"Shows the total number of packets sent for a given session in UPF",
-			[]string{labelFSEID, labelPDR, labelUeIP}, nil,
+			[]string{labelFSEID, labelPDR, labelUeIP, labelDirection}, nil,
 		),
 		sessionRxPackets: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "rx_packets"),
 			"Shows the total number of packets received for a given session in UPF",
-			[]string{labelFSEID, labelPDR, labelUeIP}, nil,
+			[]string{labelFSEID, labelPDR, labelUeIP, labelDirection}, nil,
 		),
 		sessionDroppedPackets: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "dropped_packets"),
 			"Shows the number of packets dropped for a given session in UPF",
-			[]string{labelFSEID, labelPDR, labelUeIP}, nil,
+			[]string{labelFSEID, labelPDR, labelUeIP, labelDirection}, nil,
 		),
 		sessionTxBytes: prometheus.NewDesc(prometheus.BuildFQName("upf", "session", "tx_bytes"),
-			"Shows the total number of bytes for a given session in UPF",
-			[]string{labelFSEID, labelPDR, labelUeIP}, nil,
+			"Shows the total number of bytes for a given session in UPF. Downlink bytes include GTP-U encapsulation",
+			[]string{labelFSEID, labelPDR, labelUeIP, labelDirection}, nil,
 		),
 	}
 }
