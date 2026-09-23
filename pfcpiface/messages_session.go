@@ -619,10 +619,15 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 		return nil, errUnmarshal(errMsgUnexpectedType)
 	}
 
+	// Zero until the session is found. A message for a session this UPF does not know is
+	// the case 29.244 clause 7.2.2.4.2 answers with header SEID 0; a refusal after that
+	// is for a session the control plane has an SEID for, and carries it.
+	var remoteSEID uint64
+
 	sendError := func(err error) (message.Message, error) {
 		smres := message.NewSessionDeletionResponse(0, /* MO?? <-- what's this */
 			0,                                    /* FO <-- what's this? */
-			0,                                    /* seid */
+			remoteSEID,                           /* seid */
 			sdreq.SequenceNumber,                 /* seq # */
 			0,                                    /* priority */
 			ie.NewCause(ie.CauseRequestRejected), /* accept it blindly for the time being */
@@ -638,6 +643,8 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 	if !ok {
 		return sendError(ErrNotFoundWithParam("PFCP session", "localSEID", localSEID))
 	}
+
+	remoteSEID = session.remoteSEID
 
 	// This caller needs more than the cause. A batch that ran out of time is answered
 	// accepted, which elsewhere is the answer that destroys nothing -- but here accepted

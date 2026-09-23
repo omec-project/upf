@@ -69,6 +69,17 @@ func deletionCause(t *testing.T, rsp message.Message) uint8 {
 	return cause
 }
 
+// assertDeletionSEID checks the header SEID of a deletion response: the control plane's
+// SEID for the session wherever the session was found, so that a refusal can be matched to
+// it, and zero only where it was not.
+func assertDeletionSEID(t *testing.T, rsp message.Message, want uint64) {
+	t.Helper()
+
+	if got := rsp.SEID(); got != want {
+		t.Fatalf("the deletion response carries header SEID %#x, expected %#x", got, want)
+	}
+}
+
 func TestADeletionTheDatapathDidNotFinishKeepsTheSession(t *testing.T) {
 	pConn, _, localSEID := deletionConn(t)
 
@@ -87,6 +98,8 @@ func TestADeletionTheDatapathDidNotFinishKeepsTheSession(t *testing.T) {
 		t.Fatal("the session was removed although the datapath did not finish removing its " +
 			"rules; nothing names whatever it had not removed, and no later message can")
 	}
+
+	assertDeletionSEID(t, rsp, testRemoteSEID)
 }
 
 // TestADeletionTheDatapathFinishedStillRemovesTheSession is the guard on the other side:
@@ -183,4 +196,20 @@ func TestADeletionTheDatapathRefusedKeepsTheSession(t *testing.T) {
 	if _, held := pConn.store.GetSession(localSEID); !held {
 		t.Fatal("the session was removed although the datapath refused to remove its rules")
 	}
+
+	assertDeletionSEID(t, rsp, testRemoteSEID)
+}
+
+// TestADeletionOfAnUnknownSessionCarriesSEIDZero is the guard on the SEID: with no session
+// there is no control-plane SEID to give, and 29.244 clause 7.2.2.4.2 says zero.
+func TestADeletionOfAnUnknownSessionCarriesSEIDZero(t *testing.T) {
+	pConn, _, localSEID := deletionConn(t)
+
+	rsp, err := pConn.handleSessionDeletionRequest(
+		message.NewSessionDeletionRequest(0, 0, localSEID+1, 3, 0))
+	if err == nil {
+		t.Fatal("a deletion of a session this UPF does not hold was answered as done")
+	}
+
+	assertDeletionSEID(t, rsp, 0)
 }
