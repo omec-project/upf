@@ -459,19 +459,61 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 	// rule this message created is left pointing at nothing until the restore lands one
 	// batch later, and a packet reaching it is dropped for that moment.
 	rollBack = func() {
-		created := PacketForwardingRules{
-			pdrs: addPDRs[:createdPDRs],
-			fars: addFARs[:createdFARs],
-			qers: addQERs[:createdQERs],
+		// What the rollback removes: the rules this message created, and the rules it
+		// updated onto a datapath entry other than the one the session's own version
+		// occupies -- or that have no version of their own before the message at all.
+		// UpdatePDR and UpdateQER find their rule in the session as the message has built
+		// it so far, so an Update following a Create of the same ID replaces the rule that
+		// Create just added, and the write programs both. The restore writes nothing for
+		// such a rule, so removing it cannot take out anything the restore puts back.
+		//
+		// The second set is the one nothing else would ever reach. The restore below
+		// re-adds the old key; it does not remove the new one, and the session's later
+		// deletion names the rules the store describes, which are the old ones -- so a
+		// moved entry would sit there for the life of the process, and with a FAR this
+		// message created it would point at a rule the removal is about to take out.
+		//
+		// Only rules that actually moved may go. One whose key did not move occupies the
+		// very entry the restore is about to write, so removing it would blackhole a flow
+		// this message never changed, for the length of two datapath batches.
+		//
+		// The created rules are copied out rather than appended to in place. They are the
+		// front of addPDRs and addQERs, whose tails are the updates the loops below walk,
+		// so appending would write into the range being read. As the loops stand that is
+		// harmless -- an append never reaches past the element just read -- but the copy
+		// is what makes it so a reader does not have to establish that.
+		removePDRs := append([]pdr(nil), addPDRs[:createdPDRs]...)
+		removeQERs := append([]qer(nil), addQERs[:createdQERs]...)
+
+		for _, p := range addPDRs[createdPDRs:] {
+			if was, ok := before.findPDR(p.pdrID); !ok || !p.occupiesSameEntryAs(was) {
+				removePDRs = append(removePDRs, p)
+			}
 		}
 
-		// A refused removal of a created rule does not mean the datapath kept it. The
-		// only thing that can refuse one today is the same translation or marshal step
-		// that would already have failed the rule's add, and a rule that cannot be
-		// translated was never programmed -- the reasoning the establishment rollback
-		// records. A module that learns to refuse a delete of a rule it holds changes
-		// that, and this line with it.
-		if upf.SendMsgToUPF(upfMsgTypeDel, created, PacketForwardingRules{}) == ie.CauseRequestRejected {
+		for _, q := range addQERs[createdQERs:] {
+			if was, ok := before.findQER(q.qerID); !ok || !q.occupiesSameEntryAs(was) {
+				removeQERs = append(removeQERs, q)
+			}
+		}
+
+		// A FAR is keyed by its own ID and the session's, so an update cannot move one.
+		remove := PacketForwardingRules{
+			pdrs: removePDRs,
+			fars: addFARs[:createdFARs],
+			qers: removeQERs,
+		}
+
+		// A refused removal of a created rule does not mean the datapath kept it.
+		// commandOutcome would pass a module's refusal of a delete straight through, and
+		// TestSendMsgToUPFRejectsADeleteTheModuleRefused shows that it does -- but no
+		// module produces one for a rule it holds: the codes the three delete paths
+		// return are ENOENT, which counts as success here, and EINVAL for an argument no
+		// stored rule can make. So what reaches here is a rule that could not be
+		// translated or marshalled, which was never programmed either -- the reasoning
+		// the establishment rollback records. A module that learns to refuse a delete of
+		// a rule it holds changes that, and this line with it.
+		if upf.SendMsgToUPF(upfMsgTypeDel, remove, PacketForwardingRules{}) == ie.CauseRequestRejected {
 			logger.PfcpLog.Warnln("could not translate a rule a refused modification created "+
 				"in order to remove it; it was not programmed either, F-SEID:", localSEID)
 		}

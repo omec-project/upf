@@ -31,6 +31,7 @@ const (
 	highestMBR            = 300
 	firstUEAddress        = "10.250.0.1"
 	secondUEAddress       = "10.250.0.2"
+	thirdUEAddress        = "10.250.0.3"
 )
 
 // corePDR is a downlink PDR whose UE address the control plane assigned, so nothing in
