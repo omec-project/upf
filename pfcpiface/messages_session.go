@@ -639,8 +639,28 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 		return sendError(ErrNotFoundWithParam("PFCP session", "localSEID", localSEID))
 	}
 
-	cause := upf.SendMsgToUPF(upfMsgTypeDel, session.PacketForwardingRules, PacketForwardingRules{})
-	if cause == ie.CauseRequestRejected {
+	// This caller needs more than the cause. A batch that ran out of time is answered
+	// accepted, which elsewhere is the answer that destroys nothing -- but here accepted
+	// is what releases the address and forgets the session, and the session is the only
+	// thing that still names the rules the batch may not have removed. Once it is gone,
+	// no later message can name them: the control plane has been told it is gone too.
+	//
+	// So an unfinished deletion keeps the session and is refused. That costs the session
+	// rather than the rules: a control plane that retries converges, because a delete of a
+	// rule the datapath no longer holds is answered success, and one that does not leaves
+	// the session here until the association is torn down -- counted, logged, and removed
+	// at teardown with its rules still named. Where this UPF allocates the UE addresses it
+	// also holds the address meanwhile, so that no other UE is given one a surviving rule
+	// still matches; where the control plane allocates them there is no pool here to hold
+	// it in, and the address goes back to the control plane's regardless.
+	//
+	// A modification that removes rules must not do the same. Its session is live and is
+	// kept whatever the answer, and refusing would send it into a rollback whose restore
+	// the late removal could then undo. That is why this is decided here and not in
+	// SendMsgToUPF.
+	cause, finished := upf.SendMsgToUPFWithCompletion(
+		upfMsgTypeDel, session.PacketForwardingRules, PacketForwardingRules{})
+	if cause == ie.CauseRequestRejected || !finished {
 		return sendError(ErrWriteToDatapath)
 	}
 

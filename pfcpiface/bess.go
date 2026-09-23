@@ -158,6 +158,17 @@ func (b *bess) AddSliceInfo(sliceInfo *SliceInfo) error {
 func (b *bess) SendMsgToUPF(
 	method upfMsgType, rules PacketForwardingRules, updated PacketForwardingRules,
 ) uint8 {
+	cause, _ := b.SendMsgToUPFWithCompletion(method, rules, updated)
+
+	return cause
+}
+
+// SendMsgToUPFWithCompletion programs the batch exactly as SendMsgToUPF does, and also
+// reports whether it finished within Timeout. The cause is the same one SendMsgToUPF
+// returns; finished is what that cause cannot say.
+func (b *bess) SendMsgToUPFWithCompletion(
+	method upfMsgType, rules PacketForwardingRules, updated PacketForwardingRules,
+) (uint8, bool) {
 	// create context
 	cause := ie.CauseRequestAccepted
 
@@ -173,7 +184,7 @@ func (b *bess) SendMsgToUPF(
 
 	calls := len(pdrs) + len(fars) + len(qers)
 	if calls == 0 {
-		return cause
+		return cause, true
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
@@ -233,7 +244,7 @@ func (b *bess) SendMsgToUPF(
 		cause = ie.CauseRequestRejected
 	}
 
-	return cause
+	return cause, completed
 }
 
 func (b *bess) Exit() {

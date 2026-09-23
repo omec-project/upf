@@ -288,3 +288,38 @@ func TestAddSliceInfoDoesNotReportABatchThatDidNotComplete(t *testing.T) {
 			"an incomplete batch says nothing about what the datapath did", err)
 	}
 }
+
+// SendMsgToUPFWithCompletion answers a batch that ran out of time with the same cause
+// SendMsgToUPF does -- accepted -- and says that it did not finish, which is the part a
+// caller that forgets a session on acceptance needs and the cause cannot carry.
+func TestSendMsgToUPFWithCompletionReportsABatchThatDidNotFinish(t *testing.T) {
+	release := make(chan struct{})
+	defer close(release)
+
+	b := &bess{client: blockingModuleStub{release: release}}
+	b.readQciQosMap(&Conf{})
+
+	rules := PacketForwardingRules{pdrs: []pdr{{}}}
+
+	cause, finished := b.SendMsgToUPFWithCompletion(upfMsgTypeDel, rules, PacketForwardingRules{})
+
+	if cause != ie.CauseRequestAccepted {
+		t.Errorf("the cause for a batch that timed out is %d, want CauseRequestAccepted (%d); "+
+			"the cause SendMsgToUPF gives is unchanged, and every other caller relies on it",
+			cause, ie.CauseRequestAccepted)
+	}
+
+	if finished {
+		t.Error("a batch that timed out is reported as finished")
+	}
+}
+
+func TestSendMsgToUPFWithCompletionReportsABatchThatFinished(t *testing.T) {
+	b := answeringBess(&pb.CommandResponse{}, nil)
+
+	rules := PacketForwardingRules{pdrs: []pdr{{}}}
+
+	if _, finished := b.SendMsgToUPFWithCompletion(upfMsgTypeDel, rules, PacketForwardingRules{}); !finished {
+		t.Error("a batch the datapath answered is reported as not finished")
+	}
+}

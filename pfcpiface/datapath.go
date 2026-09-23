@@ -54,6 +54,14 @@ type datapath interface {
 	// "newRules" PacketForwardingRules are only used for update messages to UPF.
 	// TODO: we should have better CRUD API, with a single function per message type.
 	SendMsgToUPF(method upfMsgType, all PacketForwardingRules, newRules PacketForwardingRules) uint8
+	// SendMsgToUPFWithCompletion is SendMsgToUPF with the other half of the answer:
+	// whether the batch finished. The cause alone answers a batch that ran out of time as
+	// accepted, which is right for a caller that forgets a session on a rejection and
+	// wrong for one that forgets it on an acceptance; a caller of the second kind needs
+	// to know which it was.
+	SendMsgToUPFWithCompletion(
+		method upfMsgType, all PacketForwardingRules, newRules PacketForwardingRules,
+	) (cause uint8, finished bool)
 	/* check of communication channel to datapath is setup */
 	IsConnected(accessIP *net.IP) bool
 	SummaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric)
