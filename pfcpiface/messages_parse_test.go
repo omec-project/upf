@@ -27,6 +27,13 @@ func (f *fakeDP) SendMsgToUPF(method upfMsgType, all PacketForwardingRules, newR
 	return 1
 }
 
+// SendMsgToUPFWithCompletion does not call SendMsgToUPF, and that is deliberate: a fake that
+// embeds this one and overrides SendMsgToUPF would not have its override reached through
+// here, because embedding does not dispatch. Such a fake has to override this too.
+func (f *fakeDP) SendMsgToUPFWithCompletion(method upfMsgType, all, newRules PacketForwardingRules) (uint8, bool) {
+	return 1, true
+}
+
 func (f *fakeDP) IsConnected(accessIP *net.IP) bool                                     { return true }
 func (f *fakeDP) SummaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric)    {}
 func (f *fakeDP) PortStats(uc *upfCollector, ch chan<- prometheus.Metric)               {}
