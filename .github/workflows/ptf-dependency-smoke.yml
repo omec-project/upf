@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Intel Corporation
+
+name: PTF dependency smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/ptf-dependency-smoke.yml"
+      - "ptf/**"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Build and check PTF dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build PTF image and run dependency smoke check
+        run: make -C ptf dependency-smoke
