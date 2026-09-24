@@ -50,6 +50,28 @@ func (p PacketForwardingRules) findQER(id uint32) (qer, bool) {
 	return qer{}, false
 }
 
+// heldVersions returns the rules of held a message created or updated, as held has them,
+// with the created ones first and their count. held is the session's rules after the
+// message's creates and updates: the rules it had, at their positions and with updates
+// applied in place, followed by what the message created. So everything past kept is
+// created -- in its final version, where an Update replaced it -- and a rule before that
+// is the message's only if an Update named it.
+func heldVersions[R any](held []R, kept int, updated []R, id func(R) uint32) ([]R, int) {
+	rules := append([]R(nil), held[kept:]...)
+	created := len(rules)
+
+	for _, r := range held[:kept] {
+		for _, u := range updated {
+			if id(u) == id(r) {
+				rules = append(rules, r)
+				break
+			}
+		}
+	}
+
+	return rules, created
+}
+
 // Clone returns rules that share no storage with these ones.
 //
 // A PFCPSession read from the store is a struct copy, but its three slices still point

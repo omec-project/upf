@@ -437,8 +437,9 @@ func TestARollbackLeavesAnUpdatedRuleWhoseWildcardIsSpeltDifferently(t *testing.
 // TestARollbackRemovesARuleTheMessageCreatedAndThenMoved is the case where the created and
 // updated sets name the same rule. UpdatePDR looks for its ID in the session as the message
 // has built it so far, so an Update following a Create of the same ID replaces the rule
-// the Create just added -- and the write programs both keys. The created rule has no
-// version in before, which is exactly why it has to go at both of them.
+// the Create just added. The rule has no version in before, so whatever the refused write
+// programmed of it has to go. That the write carries only the final version is pinned in
+// session_modification_versions_test.go; this test holds whichever it carries.
 func TestARollbackRemovesARuleTheMessageCreatedAndThenMoved(t *testing.T) {
 	pConn, dp, localSEID := rollbackConn(t)
 	dp.refuseNextWrite = true
@@ -465,20 +466,36 @@ func TestARollbackRemovesARuleTheMessageCreatedAndThenMoved(t *testing.T) {
 		}
 	}
 
-	for _, want := range []string{secondUEAddress, thirdUEAddress} {
-		if !at[ip2int(net.ParseIP(want))] {
+	written := 0
+
+	for _, p := range dp.calls[0].updated.pdrs {
+		if p.pdrID != secondPDRID {
+			continue
+		}
+
+		written++
+
+		if !at[p.appFilter.dstIP] {
 			t.Errorf("the rollback did not remove PDR %d at %s; the refused write programmed "+
 				"it there, and no version of it existed before the message: %v",
-				secondPDRID, want, removed.pdrs)
+				secondPDRID, int2ip(p.appFilter.dstIP), removed.pdrs)
 		}
+	}
+
+	if written == 0 {
+		t.Fatalf("the refused write programmed no PDR %d, so this test proves nothing", secondPDRID)
+	}
+
+	if !at[ip2int(net.ParseIP(thirdUEAddress))] {
+		t.Errorf("the rollback did not remove PDR %d at %s, the address the Update gave it: %v",
+			secondPDRID, thirdUEAddress, removed.pdrs)
 	}
 }
 
 // TestARollbackRemovesAQerTheMessageCreatedAndThenMoved is the same case for a QER, where
-// what moves is the table. MarkSessionQer marks the rules the message itself carries, and
-// with a Create and an Update of one ID those are two entries: the larger MBR becomes the
-// session QER and the other stays an application one. So the write puts the same QER in
-// both lookups, and neither version existed before the message.
+// the key is the table the QER's level puts it in. No version of it existed before the
+// message, so every table the refused write put it in has to be cleared. What the write
+// carries is pinned in session_modification_versions_test.go.
 func TestARollbackRemovesAQerTheMessageCreatedAndThenMoved(t *testing.T) {
 	dp := &recordingDP{}
 	pConn := establishingConn(t, nil)
@@ -504,9 +521,24 @@ func TestARollbackRemovesAQerTheMessageCreatedAndThenMoved(t *testing.T) {
 		}
 	}
 
-	if !levels[ApplicationQos] || !levels[SessionQos] {
-		t.Fatalf("the rollback removed QER %d from %v; the refused write put it in both the "+
-			"application and the session lookup, and no version of it existed before the "+
-			"message", applicationQERID, removed.qers)
+	written := 0
+
+	for _, q := range dp.calls[0].updated.qers {
+		if q.qerID != applicationQERID {
+			continue
+		}
+
+		written++
+
+		if !levels[q.qosLevel] {
+			t.Errorf("the rollback removed QER %d from %v; the refused write put it in the "+
+				"%s lookup, and no version of it existed before the message",
+				applicationQERID, removed.qers, qosLevelName[q.qosLevel])
+		}
+	}
+
+	if written == 0 {
+		t.Fatalf("the refused write programmed no QER %d, so this test proves nothing",
+			applicationQERID)
 	}
 }
