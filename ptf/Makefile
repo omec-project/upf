@@ -23,13 +23,13 @@ dependency-smoke: image
 		sh -ec 'PYTHONPATH="/upf-tests/lib:/upf-tests/tests/linerate:/upf-tests/tests/unary:$${PYTHONPATH}" exec python3 /upf-tests/dependency-smoke.py'
 
 # Exercises the current upstream TRex client against the image's resolved
-# Python dependencies. TRex dynamically adds its bundled Scapy to sys.path;
-# remove that directory and its bootstrap entry in the disposable container
-# before importing it.
+# Python dependencies. It applies the local compatibility patches and excludes
+# the bundled Scapy from the candidate runtime image.
 trex-upstream-smoke:
 	docker build \
 		--build-arg TREX_REPO=cisco-system-traffic-generator/trex-core \
 		--build-arg TREX_VER=3.06 \
+		--build-arg TREX_APPLY_UPF_PATCHES=1 \
 		--target ptf-runtime-deps \
 		-t bess-upf-ptf-trex-upstream \
 		.
@@ -37,7 +37,7 @@ trex-upstream-smoke:
 		-v "$(CURDIR):/upf-tests:ro" \
 		-w /upf-tests \
 		bess-upf-ptf-trex-upstream \
-		sh -ec 'sed -i "/'"'"'name'"'"': '"'"'scapy'"'"'/d" /trex_python/trex/__init__.py; rm -rf /external_libs/scapy-*; PYTHONPATH="/upf-tests/lib:/upf-tests/tests/linerate:/upf-tests/tests/unary:$${PYTHONPATH}" exec python3 /upf-tests/dependency-smoke.py'
+		sh -ec 'PYTHONPATH="/upf-tests/lib:/upf-tests/tests/linerate:/upf-tests/tests/unary:$${PYTHONPATH}" exec python3 /upf-tests/dependency-smoke.py'
 
 # Removes generated Python protobuf files.
 clean:

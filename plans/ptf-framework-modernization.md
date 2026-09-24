@@ -65,8 +65,9 @@ required by [issue #1220](https://github.com/omec-project/upf/issues/1220).
       fork, and a narrowly maintained patch of the present source.
       Current evidence: Cisco v3.06 is newer than the Stratum fork but still
       bundles Scapy 2.4.3. The `upstream-trex` GitHub Actions job removes that
-      bundled directory and its bootstrap entry in a disposable container,
-      then tests the client with the resolved PTF Scapy 2.7 environment.
+      bundled directory and applies the tracked patches in
+      `ptf/patches/trex/`, then tests the client with the resolved PTF Scapy
+      2.7 environment.
 - [ ] For each candidate, assess Python 3.14 compatibility, compatible Scapy
       versions, API compatibility, release/provenance pinning, and packaging
       needs.

@@ -1,0 +1,23 @@
+From: UPF maintainers <upf@omecproject.org>
+Subject: [PATCH] python: allow a caller-provided Scapy distribution
+
+TRex's Python bootstrap forces its bundled Scapy 2.4.3 onto sys.path.  That
+causes mixed Scapy modules when UPF's PTF environment supplies its locked
+Scapy distribution.  Do not add the bundled Scapy; callers are responsible
+for installing a compatible Scapy distribution.
+
+---
+ scripts/automation/trex_control_plane/interactive/trex/__init__.py | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/scripts/automation/trex_control_plane/interactive/trex/__init__.py b/scripts/automation/trex_control_plane/interactive/trex/__init__.py
+index 8df5bea..4df3464 100644
+--- a/scripts/automation/trex_control_plane/interactive/trex/__init__.py
++++ b/scripts/automation/trex_control_plane/interactive/trex/__init__.py
+@@ -30,7 +30,6 @@ def __load ():
+     ext_libs = [ {'name': 'texttable',    'dir': 'texttable-0.8.4'},
+                  {'name': 'yaml',         'dir': 'pyyaml-3.11', 'py-dep': True},
+-                 {'name': 'scapy',        'dir': 'scapy-2.4.3'},
+                  {'name': 'zmq',          'dir': 'pyzmq-ctypes'},
+                  {'name': 'simpy',        'dir': 'simpy-3.0.10'},
+                  {'name': 'trex_openssl', 'dir': 'trex-openssl'},
