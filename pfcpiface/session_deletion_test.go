@@ -200,15 +200,21 @@ func TestADeletionTheDatapathRefusedKeepsTheSession(t *testing.T) {
 	assertDeletionSEID(t, rsp, testRemoteSEID)
 }
 
-// TestADeletionOfAnUnknownSessionCarriesSEIDZero is the guard on the SEID: with no session
-// there is no control-plane SEID to give, and 29.244 clause 7.2.2.4.2 says zero.
-func TestADeletionOfAnUnknownSessionCarriesSEIDZero(t *testing.T) {
+// TestADeletionOfAnUnknownSessionIsAnsweredContextNotFound: with no session there is no
+// control-plane SEID to give, and 29.244 clause 7.2.2.4.2 answers such a message with
+// "Session context not found" under header SEID 0.
+func TestADeletionOfAnUnknownSessionIsAnsweredContextNotFound(t *testing.T) {
 	pConn, _, localSEID := deletionConn(t)
 
 	rsp, err := pConn.handleSessionDeletionRequest(
 		message.NewSessionDeletionRequest(0, 0, localSEID+1, 3, 0))
 	if err == nil {
 		t.Fatal("a deletion of a session this UPF does not hold was answered as done")
+	}
+
+	if cause := deletionCause(t, rsp); cause != ie.CauseSessionContextNotFound {
+		t.Fatalf("the deletion was answered with cause %d, expected %d",
+			cause, ie.CauseSessionContextNotFound)
 	}
 
 	assertDeletionSEID(t, rsp, 0)
