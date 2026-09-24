@@ -67,7 +67,9 @@ required by [issue #1220](https://github.com/omec-project/upf/issues/1220).
       bundles Scapy 2.4.3. The `upstream-trex` GitHub Actions job removes that
       bundled directory and applies the tracked patches in
       `ptf/patches/trex/`, then tests the client with the resolved PTF Scapy
-      2.7 environment.
+      2.7 environment. The initial patches replace the reachable `imp` use,
+      select the caller-provided Scapy, and remove Python 3.14 regex-literal
+      warnings from the imported UPF client paths.
 - [ ] For each candidate, assess Python 3.14 compatibility, compatible Scapy
       versions, API compatibility, release/provenance pinning, and packaging
       needs.

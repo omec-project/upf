@@ -1,0 +1,119 @@
+From: UPF maintainers <upf@omecproject.org>
+Subject: [PATCH] python: make imported regular-expression literals raw
+
+Python 3.14 warns about unrecognized escapes in string literals, including
+regular-expression escapes such as \d and \w.  Use raw strings in the TRex
+modules reached by UPF's stateless client and daemon-management client.
+
+---
+ scripts/automation/trex_control_plane/interactive/trex/common/trex_subscriber.py | 2 +-
+ scripts/automation/trex_control_plane/interactive/trex/utils/common.py            | 2 +-
+ scripts/automation/trex_control_plane/interactive/trex/utils/parsing_opts.py      | 8 ++++----
+ scripts/automation/trex_control_plane/stf/trex_stf_lib/trex_client.py              | 10 +++++-----
+ 4 files changed, 11 insertions(+), 11 deletions(-)
+
+diff --git a/scripts/automation/trex_control_plane/interactive/trex/utils/common.py b/scripts/automation/trex_control_plane/interactive/trex/utils/common.py
+--- a/scripts/automation/trex_control_plane/interactive/trex/utils/common.py
++++ b/scripts/automation/trex_control_plane/interactive/trex/utils/common.py
+@@ -349,7 +349,7 @@
+ # a2 before a10 in sorting
+ # https://blog.codinghorror.com/sorting-for-humans-natural-sort-order/
+ def natural_sorted_key(val):
+-    return [int(c) if c.isdigit() else c for c in re.split('(\d+)', val)]
++    return [int(c) if c.isdigit() else c for c in re.split(r'(\d+)', val)]
+ 
+ def filter_none(seq):
+     return filter(lambda x: x is not None, seq)
+diff --git a/scripts/automation/trex_control_plane/interactive/trex/utils/parsing_opts.py b/scripts/automation/trex_control_plane/interactive/trex/utils/parsing_opts.py
+--- a/scripts/automation/trex_control_plane/interactive/trex/utils/parsing_opts.py
++++ b/scripts/automation/trex_control_plane/interactive/trex/utils/parsing_opts.py
+@@ -32,7 +32,7 @@
+ 
+ def match_time_unit(val):
+     '''match some val against time shortcut inputs '''
+-    match = re.match("^(\d+(\.\d+)?)([m|h]?)$", val)
++    match = re.match(r"^(\d+(\.\d+)?)([m|h]?)$", val)
+     if match:
+         digit = float(match.group(1))
+         unit = match.group(3)
+@@ -85,7 +85,7 @@
+ def decode_multiplier(val, allow_update = False, divide_count = 1):
+ 
+     factor_table = {None: 1, 'k': 1e3, 'm': 1e6, 'g': 1e9}
+-    pattern = "^(\d+(\.\d+)?)(((k|m|g)?(bpsl1|pps|bps))|%)?"
++    pattern = r"^(\d+(\.\d+)?)(((k|m|g)?(bpsl1|pps|bps))|%)?"
+ 
+     # do we allow updates ?  +/-
+     if not allow_update:
+@@ -93,7 +93,7 @@
+         match = re.match(pattern, val)
+         op = None
+     else:
+-        pattern += "([\+\-])?$"
++        pattern += r"([+\-])?$"
+         match = re.match(pattern, val)
+         if match:
+             op  = match.group(7)
+@@ -380,7 +380,7 @@
+ 
+     # each token is of form X=Y
+     for token in tokens:
+-        m = re.search('(\S+)=(.+)', token)
++        m = re.search(r'(\S+)=(.+)', token)
+         if not m:
+             raise argparse.ArgumentTypeError("bad syntax for tunables: {0}".format(token))
+         val = m.group(2)           # string
+diff --git a/scripts/automation/trex_control_plane/interactive/trex/common/trex_subscriber.py b/scripts/automation/trex_control_plane/interactive/trex/common/trex_subscriber.py
+--- a/scripts/automation/trex_control_plane/interactive/trex/common/trex_subscriber.py
++++ b/scripts/automation/trex_control_plane/interactive/trex/common/trex_subscriber.py
+@@ -110,7 +110,7 @@
+         for key, value in snapshot.items():
+             
+             # match a pattern of ports
+-            m = re.search('(.*)\-([0-8])', key)
++            m = re.search(r'(.*)-([0-8])', key)
+             if m:
+ 
+                 port_id = m.group(2)
+diff --git a/scripts/automation/trex_control_plane/stf/trex_stf_lib/trex_client.py b/scripts/automation/trex_control_plane/stf/trex_stf_lib/trex_client.py
+--- a/scripts/automation/trex_control_plane/stf/trex_stf_lib/trex_client.py
++++ b/scripts/automation/trex_control_plane/stf/trex_stf_lib/trex_client.py
+@@ -1478,7 +1478,7 @@
+ 
+         if not len(self._history):
+             return -1
+-        return len(self.get_last_value('trex-global.data', 'opackets-\d+'))
++        return len(self.get_last_value('trex-global.data', r'opackets-\d+'))
+ 
+ 
+     def update_result_data (self, latest_dump):
+@@ -1502,9 +1502,9 @@
+             # parse important fields and calculate averages and others
+             if self._expected_tx_rate is None:
+                 # get the expected data only once since it doesn't change
+-                self._expected_tx_rate = CTRexResult.__get_value_by_path(latest_dump, "trex-global.data", "m_tx_expected_\w+")
++                self._expected_tx_rate = CTRexResult.__get_value_by_path(latest_dump, "trex-global.data", r"m_tx_expected_\w+")
+ 
+-            self._current_tx_rate = CTRexResult.__get_value_by_path(latest_dump, "trex-global.data", "m_tx_(?!expected_)\w+")
++            self._current_tx_rate = CTRexResult.__get_value_by_path(latest_dump, "trex-global.data", r"m_tx_(?!expected_)\w+")
+             if not self._done_warmup and self._expected_tx_rate is not None:
+                 # check for up to 4% change between expected and actual
+                 if (self._current_tx_rate['m_tx_bps'] > self.warmup_max * self._expected_tx_rate['m_tx_expected_bps']):
+@@ -1595,7 +1595,7 @@
+         all_list = src_avg_dict.values()
+         dest_port_dict['all'].extend(all_list)
+         for key, val in src_avg_dict.items():
+-            reg_res = re.match("avg-(\d+)", key)
++            reg_res = re.match(r"avg-(\d+)", key)
+             if reg_res:
+                 tmp_key = "port"+reg_res.group(1)
+                 if tmp_key in dest_port_dict:
+@@ -1609,7 +1609,7 @@
+         all_list  = src_dict.values()
+         res['all'] = float("%.3f" % (sum(all_list)/float(len(all_list))) )
+         for key, val in src_dict.items():
+-            reg_res = re.match("avg-(\d+)", key)
++            reg_res = re.match(r"avg-(\d+)", key)
+             if reg_res:
+                 tmp_key = "port"+reg_res.group(1)
+                 res[tmp_key] = val  # don't touch original fields values
