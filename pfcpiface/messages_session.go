@@ -437,10 +437,21 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 	}
 
 	session.MarkSessionQer(session.qers)
-	// TODO: since PacketForwardingRules doesn't store pointers,
-	//  we must also mark session QERs in addQERs.
-	//  We need a kind of refactoring to clean it up.
-	session.MarkSessionQer(addQERs)
+
+	// Write what the session now holds of the rules this message touched. That is not
+	// the same as what the loops above parsed: an Update following a Create of the same
+	// ID replaces the rule the Create just added, so both versions are among the parsed
+	// rules -- and written together they race, because one batch programs its rules
+	// concurrently, while the session keeps only the second. And a QER's level is the
+	// one the session's marking gave it: marked on the message's own QERs instead, a
+	// message updating one QER alone, or carrying two versions of one, is written to a
+	// table the session does not record it in.
+	addPDRs, createdPDRs = heldVersions(session.pdrs, len(before.pdrs), addPDRs[createdPDRs:],
+		func(p pdr) uint32 { return p.pdrID })
+	addFARs, createdFARs = heldVersions(session.fars, len(before.fars), addFARs[createdFARs:],
+		func(f far) uint32 { return f.farID })
+	addQERs, createdQERs = heldVersions(session.qers, len(before.qers), addQERs[createdQERs:],
+		func(q qer) uint32 { return q.qerID })
 
 	updated := PacketForwardingRules{
 		pdrs: addPDRs,
@@ -470,8 +481,9 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		// occupies -- or that have no version of their own before the message at all.
 		// UpdatePDR and UpdateQER find their rule in the session as the message has built
 		// it so far, so an Update following a Create of the same ID replaces the rule that
-		// Create just added, and the write programs both. The restore writes nothing for
-		// such a rule, so removing it cannot take out anything the restore puts back.
+		// Create just added, and only that final version is written. The restore writes
+		// nothing for such a rule, so removing it cannot take out anything the restore
+		// puts back.
 		//
 		// The second set is the one nothing else would ever reach. The restore below
 		// re-adds the old key; it does not remove the new one, and the session's later
