@@ -84,3 +84,13 @@ jobs:
 
       - name: Build PTF image and run dependency smoke check
         run: make -C ptf dependency-smoke
+
+  upstream-trex:
+    name: Evaluate upstream TRex client
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Import Cisco TRex v3.06 with the resolved PTF dependencies
+        run: make -C ptf trex-upstream-smoke

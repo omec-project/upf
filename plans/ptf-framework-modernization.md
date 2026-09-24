@@ -58,10 +58,15 @@ required by [issue #1220](https://github.com/omec-project/upf/issues/1220).
 
 ### 2. Select a supported TRex source
 
-- [ ] Inventory the UPF code's use of TRex APIs in `ptf/lib/` and
-      `ptf/tests/`.
+- [x] Inventory the UPF code's use of TRex APIs in `ptf/lib/` and
+      `ptf/tests/`. UPF uses the stateless `STLClient`, stream/profile types,
+      and the legacy daemon-management `CTRexClient`.
 - [ ] Evaluate a current upstream Cisco TRex release, a maintained compatible
       fork, and a narrowly maintained patch of the present source.
+      Current evidence: Cisco v3.06 is newer than the Stratum fork but still
+      bundles Scapy 2.4.3. The `upstream-trex` GitHub Actions job builds only
+      its client modules and tests them with the resolved PTF Scapy 2.7
+      environment, excluding the bundled Scapy.
 - [ ] For each candidate, assess Python 3.14 compatibility, compatible Scapy
       versions, API compatibility, release/provenance pinning, and packaging
       needs.

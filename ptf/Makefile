@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2020-present Open Networking Foundation
 
-.PHONY: build image dependency-smoke clean
+.PHONY: build image dependency-smoke trex-upstream-smoke clean
 
 # Builds the PTF Docker image without generating BESS Python protobuf files.
 image:
@@ -20,6 +20,21 @@ dependency-smoke: image
 		-v "$(CURDIR):/upf-tests:ro" \
 		-w /upf-tests \
 		bess-upf-ptf \
+		sh -ec 'PYTHONPATH="/upf-tests/lib:/upf-tests/tests/linerate:/upf-tests/tests/unary:$${PYTHONPATH}" exec python3 /upf-tests/dependency-smoke.py'
+
+# Exercises the current upstream TRex client against the image's resolved
+# Python dependencies. The Dockerfile does not expose TRex's bundled Scapy.
+trex-upstream-smoke:
+	docker build \
+		--build-arg TREX_REPO=cisco-system-traffic-generator/trex-core \
+		--build-arg TREX_VER=3.06 \
+		--target ptf-runtime-deps \
+		-t bess-upf-ptf-trex-upstream \
+		.
+	docker run --rm \
+		-v "$(CURDIR):/upf-tests:ro" \
+		-w /upf-tests \
+		bess-upf-ptf-trex-upstream \
 		sh -ec 'PYTHONPATH="/upf-tests/lib:/upf-tests/tests/linerate:/upf-tests/tests/unary:$${PYTHONPATH}" exec python3 /upf-tests/dependency-smoke.py'
 
 # Removes generated Python protobuf files.
