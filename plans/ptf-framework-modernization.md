@@ -61,18 +61,20 @@ required by [issue #1220](https://github.com/omec-project/upf/issues/1220).
 - [x] Inventory the UPF code's use of TRex APIs in `ptf/lib/` and
       `ptf/tests/`. UPF uses the stateless `STLClient`, stream/profile types,
       and the legacy daemon-management `CTRexClient`.
-- [ ] Evaluate a current upstream Cisco TRex release, a maintained compatible
-      fork, and a narrowly maintained patch of the present source.
-      Current evidence: Cisco v3.06 is newer than the Stratum fork but still
-      bundles Scapy 2.4.3. The `upstream-trex` GitHub Actions job removes that
-      bundled directory and applies the tracked patches in
-      `ptf/patches/trex/`, then tests the client with the resolved PTF Scapy
-      2.7 environment. The initial patches replace the reachable `imp` use,
-      select the caller-provided Scapy, and remove Python 3.14 regex-literal
-      warnings from the imported UPF client paths.
-- [ ] For each candidate, assess Python 3.14 compatibility, compatible Scapy
-      versions, API compatibility, release/provenance pinning, and packaging
-      needs.
+- [x] Evaluate the Cisco TRex v3.06 client-only candidate with a narrowly
+      maintained UPF patch set. It is newer than the Stratum fork but bundles
+      Scapy 2.4.3. The tracked patches in `ptf/patches/trex/` replace the
+      reachable `imp` use, select the caller-provided Scapy, and remove Python
+      3.14 regex-literal warnings from the imported UPF client paths. The
+      [2026-09-24 upstream-candidate job](https://github.com/andybavier/upf/actions/runs/36070149147/job/107868953740)
+      passes `pip check` and all required PTF/TRex imports with v3.06 and
+      Scapy 2.7.0, with no syntax warnings.
+- [ ] Evaluate any maintained compatible fork only if it offers a materially
+      smaller or better-supported patch set than the Cisco-v3.06 candidate.
+- [x] Assess the Cisco-v3.06 candidate's Python 3.14 compatibility, Scapy
+      compatibility, UPF import/API boundary, and packaging needs. It requires
+      the three local patches and a client-only image assembly; remote TRex
+      daemon/server compatibility remains to be tested on hardware.
 - [ ] Decide the source and exact revision/version in a short design note or
       PR description; obtain maintainer agreement before the migration.
 - [ ] Record the selected source's checksum/revision and license/provenance.
@@ -107,7 +109,9 @@ required by [issue #1220](https://github.com/omec-project/upf/issues/1220).
       origins of `ptf`, `scapy`, `trex.stl.api`, and `trex_stf_lib`.
       (`make dependency-smoke`; it will become required CI once the legacy
       conflict is removed.)
-- [ ] Ensure the existing PR image-build workflow runs those checks.
+- [x] Run baseline and Cisco-TRex-candidate smoke checks in a dedicated
+      pull-request workflow. The final-image smoke check remains expected to
+      fail until the legacy mixed-Scapy image is replaced.
 - [ ] Add focused automated tests where the selected TRex API requires UPF
       compatibility changes.
 
