@@ -48,16 +48,22 @@ jobs:
         run: |
           set -euo pipefail
           set +e
-          docker run --rm bess-upf-ptf sh -ec '
-            python3 -m venv /tmp/resolver-venv
-            /tmp/resolver-venv/bin/python -m pip install --dry-run scapy-helper==0.14.8 pyperclip==1.11.0
-          ' > ptf-dependency-baseline/resolver-conflict.txt 2>&1
+          # Ignore the image's installed packages so pip performs a fresh
+          # resolution; --dry-run guarantees this does not modify the image.
+          docker run --rm bess-upf-ptf \
+            python3 -m pip install --dry-run --ignore-installed \
+              scapy-helper==0.14.8 pyperclip==1.11.0 \
+            > ptf-dependency-baseline/resolver-conflict.txt 2>&1
           resolver_status=$?
           set -e
 
           cat ptf-dependency-baseline/resolver-conflict.txt
           if [ "$resolver_status" -eq 0 ]; then
             echo "Expected scapy-helper and pyperclip resolution to fail" >&2
+            exit 1
+          fi
+          if ! grep -Eq 'scapy-helper.*pyperclip==1\.8\.2' ptf-dependency-baseline/resolver-conflict.txt; then
+            echo "Resolver failed for an unexpected reason" >&2
             exit 1
           fi
 
