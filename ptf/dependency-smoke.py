@@ -34,11 +34,6 @@ def main() -> None:
         "trex.stl.api",
         "trex_stl_lib.api",
         "trex_stf_lib.trex_client",
-        "grpc_test",
-        "check_rules",
-        "baseline",
-        "mbr",
-        "qos_metrics",
     )
     for module in modules:
         importlib.import_module(module)

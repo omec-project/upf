@@ -99,8 +99,8 @@ UPF/TRex testbed, run:
 make dependency-smoke
 ```
 This check runs `pip check`, confirms that Scapy is imported from its installed
-distribution, and imports the PTF, TRex, and checked-in PTF test modules. It
-does not send traffic or connect to a UPF or TRex server.
+distribution, and imports the PTF and TRex Python APIs. It does not generate
+BESS protobuf files, send traffic, or connect to a UPF or TRex server.
 
 4. Run PTF tests using the `run_tests` script:
 ```bash
