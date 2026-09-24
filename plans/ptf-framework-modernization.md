@@ -42,9 +42,10 @@ required by [issue #1220](https://github.com/omec-project/upf/issues/1220).
       before and after the Dockerfile's custom-Scapy installation.
 - [ ] Record import paths and versions for `ptf`, `scapy`, `trex.stl.api`, and
       `trex_stf_lib`.
-- [ ] Run `make dependency-smoke` and capture the current result. This strict
-      check is expected to expose the known legacy Scapy conflict until the
-      migration is complete.
+- [x] Run `make dependency-smoke` and capture the current result. The
+      [2026-09-23 GitHub Actions run](https://github.com/andybavier/upf/actions/runs/35913958681)
+      built successfully on x86_64 and failed as expected at final `pip check`:
+      PTF 0.12.0 requires Scapy >=2.5.0, while the image installs 2.4.5.
 - [ ] Confirm the exact resolver failure from Dependabot PR #1306 (or an
       equivalent local resolution) for `scapy-helper`/`pyperclip`.
 
