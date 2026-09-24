@@ -214,6 +214,11 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 			logger.PfcpLog.Warnln("the rollback of a rejected session did not finish; " +
 				"keeping the session until the association is torn down")
 
+			// Set whether or not the store takes the session. If it refuses -- which it
+			// does only for a local SEID of zero -- nothing names the rules either way,
+			// and letting the cleanup run would hand the address to another UE while a
+			// rule the rollback did not remove may still match it. Holding it is the
+			// cheaper failure.
 			stored = true
 
 			err = pConn.store.PutSession(session)
