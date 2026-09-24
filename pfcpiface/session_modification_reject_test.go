@@ -85,13 +85,12 @@ func establishStaticSession(t *testing.T, pConn *PFCPConn, rules ...*ie.IE) uint
 // refuseModification sends a modification that must be refused at the parse loop the
 // caller names.
 //
-// The Cause says nothing about where the refusal came from: every return in the handler
-// goes through one sendError and answers CauseRequestRejected, the session lookup that
-// never reaches a parse loop included -- and that lookup's error wraps the same
-// errNotFound a Remove of an absent rule does. What separates them is the SEID of the
-// response, which is zero until the session has been found. Both are asserted, because
-// a test whose fixture stopped reaching the loops would otherwise find the store
-// unchanged for the wrong reason and pass.
+// The error alone does not say where the refusal came from: the session lookup's wraps
+// the same errNotFound a Remove of an absent rule does. What separates them is the
+// response -- the lookup answers "Session context not found" under SEID 0, every return
+// after it CauseRequestRejected under the session's SEID. Both are asserted, because a
+// test whose fixture stopped reaching the loops would otherwise find the store unchanged
+// for the wrong reason and pass.
 func refuseModification(t *testing.T, pConn *PFCPConn, localSEID uint64, at error, ies ...*ie.IE) {
 	t.Helper()
 
@@ -128,6 +127,45 @@ func refuseModification(t *testing.T, pConn *PFCPConn, localSEID uint64, at erro
 	if cause != ie.CauseRequestRejected {
 		t.Fatalf("the modification was refused with cause %d, expected %d",
 			cause, ie.CauseRequestRejected)
+	}
+}
+
+// TestAModificationOfAnUnknownSessionIsAnsweredContextNotFound: 29.244 clause 7.2.2.4.2
+// answers a message for a session the node has no context for with "Session context not
+// found" under header SEID 0.
+func TestAModificationOfAnUnknownSessionIsAnsweredContextNotFound(t *testing.T) {
+	pConn := establishingConn(t, nil)
+	localSEID := establishStaticSession(t, pConn,
+		corePDR(downlinkPDRID, firstUEAddress), downlinkFAR())
+
+	rsp, err := pConn.handleSessionModificationRequest(
+		message.NewSessionModificationRequest(0, 0, localSEID+1, 2, 0))
+	if !errors.Is(err, errNotFound) {
+		t.Fatalf("a modification of a session this UPF does not hold was refused with %v, "+
+			"expected a not-found error", err)
+	}
+
+	smres, ok := rsp.(*message.SessionModificationResponse)
+	if !ok {
+		t.Fatalf("expected a Session Modification Response, got %T", rsp)
+	}
+
+	if smres.SEID() != 0 {
+		t.Fatalf("the response carries SEID %#x, expected 0", smres.SEID())
+	}
+
+	if smres.Cause == nil {
+		t.Fatal("the response carries no Cause IE")
+	}
+
+	cause, err := smres.Cause.Cause()
+	if err != nil {
+		t.Fatalf("could not read the Cause of the response: %v", err)
+	}
+
+	if cause != ie.CauseSessionContextNotFound {
+		t.Fatalf("the modification was answered with cause %d, expected %d",
+			cause, ie.CauseSessionContextNotFound)
 	}
 }
 

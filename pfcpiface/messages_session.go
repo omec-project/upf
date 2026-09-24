@@ -296,7 +296,13 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 
 	session, ok := pConn.store.GetSession(localSEID)
 	if !ok {
-		return sendError(ErrNotFoundWithParam("PFCP session", "localSEID", localSEID))
+		// 29.244 clause 7.2.2.4.2: a message for a session this node has no context for
+		// is answered "Session context not found", under header SEID 0.
+		err := ErrNotFoundWithParam("PFCP session", "localSEID", localSEID)
+		logger.PfcpLog.Errorln(err)
+
+		return message.NewSessionModificationResponse(0, 0, 0, smreq.SequenceNumber, 0,
+			ie.NewCause(ie.CauseSessionContextNotFound)), err
 	}
 
 	// Parse into rules of our own. Every loop below can still refuse the message, and a
@@ -619,9 +625,9 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 		return nil, errUnmarshal(errMsgUnexpectedType)
 	}
 
-	// Zero until the session is found. A message for a session this UPF does not know is
-	// the case 29.244 clause 7.2.2.4.2 answers with header SEID 0; a refusal after that
-	// is for a session the control plane has an SEID for, and carries it.
+	// Zero until the session is found. The lookup's own refusal is answered separately
+	// below; every refusal after it is for a session the control plane has an SEID for,
+	// and carries it.
 	var remoteSEID uint64
 
 	sendError := func(err error) (message.Message, error) {
@@ -641,7 +647,12 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 
 	session, ok := pConn.store.GetSession(localSEID)
 	if !ok {
-		return sendError(ErrNotFoundWithParam("PFCP session", "localSEID", localSEID))
+		// 29.244 clause 7.2.2.4.2: a message for a session this node has no context for
+		// is answered "Session context not found", under header SEID 0.
+		err := ErrNotFoundWithParam("PFCP session", "localSEID", localSEID)
+
+		return message.NewSessionDeletionResponse(0, 0, 0, sdreq.SequenceNumber, 0,
+			ie.NewCause(ie.CauseSessionContextNotFound)), err
 	}
 
 	remoteSEID = session.remoteSEID
