@@ -273,3 +273,53 @@ func TestAModificationWritesOnlyTheRulesItTouched(t *testing.T) {
 			"expected only that FAR", len(written.pdrs), len(written.fars), len(written.qers))
 	}
 }
+
+// duplicatedPDRConn is a session holding PDR downlinkPDRID twice -- its own, at the first
+// address, and one an accepted Create of the same ID added at the second. Nothing rejects
+// that Create; CreatePDR appends.
+func duplicatedPDRConn(t *testing.T) (*PFCPConn, *recordingDP, uint64) {
+	t.Helper()
+
+	pConn, dp, localSEID := rollbackConn(t)
+
+	modifySession(t, pConn, localSEID, corePDR(downlinkPDRID, secondUEAddress))
+
+	dp.calls = nil
+
+	return pConn, dp, localSEID
+}
+
+// TestAnUpdateOfADuplicatedIDWritesOnlyTheRuleItReplaced: UpdatePDR replaces the first rule
+// of its ID it finds, so the session's second one is untouched and has no business in
+// the write.
+func TestAnUpdateOfADuplicatedIDWritesOnlyTheRuleItReplaced(t *testing.T) {
+	pConn, dp, localSEID := duplicatedPDRConn(t)
+
+	modifySession(t, pConn, localSEID,
+		updateTheDownlinkPDR(thirdUEAddress, establishedPrecedence))
+
+	at := writtenPDRAddresses(t, dp, downlinkPDRID)
+	if len(at) != 1 || !at[thirdUEAddress] {
+		t.Fatalf("the write carries PDR %d at %v, expected only %s, the rule the Update "+
+			"replaced", downlinkPDRID, at, thirdUEAddress)
+	}
+}
+
+// TestARollbackLeavesTheDuplicateAnUpdateDidNotReplace is where writing the untouched
+// duplicate would do harm: the rollback compares each updated rule with the first rule of
+// its ID before the message, so the duplicate, at another key, reads as moved -- and is
+// removed until the restore puts it back a batch later, a flow dropped for no reason.
+func TestARollbackLeavesTheDuplicateAnUpdateDidNotReplace(t *testing.T) {
+	pConn, dp, localSEID := duplicatedPDRConn(t)
+	dp.refuseNextWrite = true
+
+	refuseModification(t, pConn, localSEID, ErrWriteToDatapath,
+		updateTheDownlinkPDR(thirdUEAddress, establishedPrecedence))
+
+	for _, p := range rollbackDeletion(t, dp).pdrs {
+		if p.appFilter.dstIP == ip2int(net.ParseIP(secondUEAddress)) {
+			t.Fatalf("the rollback removed PDR %d at %s, the rule of that ID the Update did "+
+				"not touch", p.pdrID, secondUEAddress)
+		}
+	}
+}
