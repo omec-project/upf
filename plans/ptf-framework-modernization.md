@@ -37,17 +37,24 @@ required by [issue #1220](https://github.com/omec-project/upf/issues/1220).
 
 ### 1. Capture a reproducible baseline
 
-- [ ] Build the current PTF image from `ptf/`.
-- [ ] Record `pip list`, `pip check`, and the installed Scapy distribution
-      before and after the Dockerfile's custom-Scapy installation.
-- [ ] Record import paths and versions for `ptf`, `scapy`, `trex.stl.api`, and
-      `trex_stf_lib`.
+- [x] Build the current PTF image from `ptf/` on an x86_64 GitHub runner.
+      ([baseline run, 2026-09-24](https://github.com/andybavier/upf/actions/runs/36065717421))
+- [x] Record `pip list`, `pip check`, and the installed Scapy distribution
+      before and after the Dockerfile's custom-Scapy installation. Pre-override
+      Scapy 2.7.0 passes `pip check`; final Scapy 2.4.5 fails because PTF
+      requires Scapy >=2.5.0.
+- [x] Record import paths and versions for `ptf`, `scapy`, `trex.stl.api`, and
+      `trex_stf_lib`. Both stages import packages from the venv; the pre-override
+      TRex STL imports fail on `get_if`, while final Scapy cannot import GTP or
+      the TRex STL API because `scapy.modules.six.moves` is absent.
 - [x] Run `make dependency-smoke` and capture the current result. The
       [2026-09-23 GitHub Actions run](https://github.com/andybavier/upf/actions/runs/35913958681)
       built successfully on x86_64 and failed as expected at final `pip check`:
       PTF 0.12.0 requires Scapy >=2.5.0, while the image installs 2.4.5.
-- [ ] Confirm the exact resolver failure from Dependabot PR #1306 (or an
+- [x] Confirm the exact resolver failure from Dependabot PR #1306 (or an
       equivalent local resolution) for `scapy-helper`/`pyperclip`.
+      `scapy-helper==0.14.8` requires `pyperclip==1.8.2`, conflicting with
+      `pyperclip==1.11.0` (`ResolutionImpossible`).
 
 ### 2. Select a supported TRex source
 
