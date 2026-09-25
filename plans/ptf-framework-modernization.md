@@ -106,12 +106,15 @@ required by [issue #1220](https://github.com/omec-project/upf/issues/1220).
 - [ ] Upgrade or replace `scapy-helper==0.14.8`.
 - [x] Maintain an explicitly pinned, documented UPF patch series for the
       selected upstream source; do not suppress pip resolver errors.
-- [ ] Regenerate `ptf/requirements-ptf.txt` and `ptf/requirements-trex.txt`
-      together, including hashes.
-- [ ] Add the source manifests and/or documented regeneration command needed
-      to reproduce the locked requirements.
-- [ ] Confirm a clean environment resolves both requirement files without
-      `--ignore-installed`, `--no-deps`, or post-install package replacement.
+- [ ] **Deferred:** Regenerate `ptf/requirements-ptf.txt` and
+      `ptf/requirements-trex.txt` together, including hashes, from a
+      source/input manifest rather than updating transitive lock entries
+      independently.
+- [ ] **Deferred:** Add the source manifests and/or documented regeneration
+      command needed to reproduce the locked requirements.
+- [ ] **Deferred:** Confirm a clean environment resolves both requirement
+      files without `--ignore-installed`, `--no-deps`, or post-install package
+      replacement.
 
 ### 5. Make the result continuously verifiable
 
