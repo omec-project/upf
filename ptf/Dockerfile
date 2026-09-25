@@ -55,7 +55,7 @@ RUN apk add --no-cache patch wget unzip && \
     mkdir -p /output/${TREX_LIBS} && \
     cp -r ${TREX_SCRIPT_DIR}/automation/trex_control_plane/interactive/trex /output/${TREX_LIBS} && \
     cp -r ${TREX_SCRIPT_DIR}/automation/trex_control_plane/interactive/trex_stl_lib /output/${TREX_LIBS} && \
-    for trex_ext_lib in dpkt-1.9.1 pyyaml-3.11 pyzmq-ctypes repoze simpy-3.0.10 texttable-0.8.4 trex-openssl; do \
+    for trex_ext_lib in dpkt-1.9.1 jsonrpclib-pelix-0.4.1 pyyaml-3.11 pyzmq-ctypes repoze simpy-3.0.10 simple_enum texttable-0.8.4 trex-openssl; do \
         cp -r ${TREX_SCRIPT_DIR}/external_libs/${trex_ext_lib} /output/${TREX_EXT_LIBS}; \
     done && \
     cp -r ${TREX_SCRIPT_DIR}/automation/trex_control_plane/stf/trex_stf_lib /output/${TREX_LIBS} && \
