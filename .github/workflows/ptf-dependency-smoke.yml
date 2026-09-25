@@ -14,26 +14,18 @@ permissions:
   contents: read
 
 jobs:
-  baseline:
-    name: Capture PTF dependency baseline
+  dependency-report:
+    name: Capture PTF dependency report
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Capture pre-override and final-image dependency state
+      - name: Capture final-image dependency state
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p ptf-dependency-baseline
-
-          docker build --target ptf-runtime-deps -t bess-upf-ptf-pre-scapy ptf
-          docker run --rm \
-            -v "$GITHUB_WORKSPACE/ptf:/upf-tests:ro" \
-            -w /upf-tests \
-            bess-upf-ptf-pre-scapy \
-            sh -ec 'PYTHONPATH="/upf-tests/lib:${PYTHONPATH}" exec python3 /upf-tests/dependency-baseline.py --stage pre-override' \
-            | tee ptf-dependency-baseline/pre-override.txt
 
           docker build -t bess-upf-ptf ptf
           docker run --rm \

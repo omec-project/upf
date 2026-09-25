@@ -13,8 +13,6 @@ build:
 	$(MAKE) image
 
 # Verifies the final image's resolver state and the PTF/TRex import boundary.
-# This is intentionally separate from build while the legacy image has a known
-# Scapy conflict; make it required in CI when #1220's migration lands.
 dependency-smoke: image
 	docker run --rm \
 		-v "$(CURDIR):/upf-tests:ro" \
@@ -22,15 +20,10 @@ dependency-smoke: image
 		bess-upf-ptf \
 		sh -ec 'PYTHONPATH="/upf-tests/lib:/upf-tests/tests/linerate:/upf-tests/tests/unary:$${PYTHONPATH}" exec python3 /upf-tests/dependency-smoke.py'
 
-# Exercises the current upstream TRex client against the image's resolved
-# Python dependencies. It applies the local compatibility patches and excludes
-# the bundled Scapy from the candidate runtime image.
+# Exercises the pinned upstream TRex client in the final image.
 trex-upstream-smoke:
 	docker build \
-		--build-arg TREX_REPO=cisco-system-traffic-generator/trex-core \
-		--build-arg TREX_VER=3.06 \
-		--build-arg TREX_APPLY_UPF_PATCHES=1 \
-		--target ptf-runtime-deps \
+		--target ptf-runtime \
 		-t bess-upf-ptf-trex-upstream \
 		.
 	docker run --rm \

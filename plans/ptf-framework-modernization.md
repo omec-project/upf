@@ -75,9 +75,13 @@ required by [issue #1220](https://github.com/omec-project/upf/issues/1220).
       compatibility, UPF import/API boundary, and packaging needs. It requires
       the three local patches and a client-only image assembly; remote TRex
       daemon/server compatibility remains to be tested on hardware.
-- [ ] Decide the source and exact revision/version in a short design note or
-      PR description; obtain maintainer agreement before the migration.
-- [ ] Record the selected source's checksum/revision and license/provenance.
+- [x] Select Cisco TRex v3.06 for the production client source, with the
+      tracked UPF patch series. The tag resolves to commit
+      `46be64bedbe9d505dfb55099c38119d6e86267ca`.
+- [x] Record the selected source's checksum/revision and license/provenance.
+      The Dockerfile verifies the v3.06 archive SHA-256
+      `869c9120a427c507e023a12716ffd0332232a2c8c13e86b63d46a3e15d02b509`;
+      the upstream project is Apache-2.0 licensed.
 
 ### 3. Remove the mixed-Scapy design
 
