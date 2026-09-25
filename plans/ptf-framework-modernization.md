@@ -103,7 +103,9 @@ required by [issue #1220](https://github.com/omec-project/upf/issues/1220).
 
 ### 4. Modernize and lock Python dependencies
 
-- [ ] Upgrade or replace `scapy-helper==0.14.8`.
+- [ ] **Deferred:** Upgrade or replace `scapy-helper==0.14.8`. Dependabot
+      independently ignores `pyperclip` updates as a temporary guardrail; the
+      underlying PTF dependency relationship remains to be addressed.
 - [x] Maintain an explicitly pinned, documented UPF patch series for the
       selected upstream source; do not suppress pip resolver errors.
 - [ ] **Deferred:** Regenerate `ptf/requirements-ptf.txt` and
