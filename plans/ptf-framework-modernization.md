@@ -12,19 +12,23 @@ required by [issue #1220](https://github.com/omec-project/upf/issues/1220).
 - The PTF requirements pin `scapy==2.7.0` and `scapy-helper==0.14.8`.
 - `scapy-helper==0.14.8` requires `pyperclip==1.8.2`, blocking Dependabot's
   newer `pyperclip` updates.
-- The PTF Docker image downloads the Stratum-derived TRex
-  `2.92-scapy-2.4.5`, makes its external libraries available on `PYTHONPATH`,
-  and then replaces the installed Scapy distribution with its bundled Scapy
-  2.4.5. This creates a mixed Scapy environment.
-- Issue #1163 records the resulting import failure on Python 3.14 and is
-  explicitly superseded by #1220.
+- The production PTF Docker image now uses pinned Cisco TRex v3.06 with the
+  tracked UPF compatibility patches, copies only required client libraries,
+  and uses the PTF venv's Scapy 2.7.0.
+- The prior Stratum-derived `2.92-scapy-2.4.5` image replaced the installed
+  Scapy distribution with bundled Scapy 2.4.5, creating the mixed-Scapy
+  environment captured in the baseline. Issue #1163 records that historical
+  Python 3.14 import failure and is explicitly superseded by #1220.
 
 ## Definition of done
 
-- [ ] PTF/TRex image builds with a fully resolvable, hash-pinned dependency set.
-- [ ] The final runtime environment passes `pip check`.
-- [ ] PTF and TRex import one documented Scapy version from one installed
+- [x] PTF/TRex image builds with a fully resolvable, hash-pinned dependency set.
+      ([production validation, 2026-09-25](https://github.com/andybavier/upf/actions/runs/36168175496))
+- [x] The final runtime environment passes `pip check`.
+      ([production validation, 2026-09-25](https://github.com/andybavier/upf/actions/runs/36168175496))
+- [x] PTF and TRex import one documented Scapy version from one installed
       distribution; no second Scapy package is exposed through `PYTHONPATH`.
+      The production image imports Scapy 2.7.0 from the PTF venv.
 - [ ] `scapy-helper`/`pyperclip` does not create an undocumented resolver
       conflict.
 - [ ] Image smoke checks, PTF smoke tests, and the two-host PTF/TRex traffic
@@ -85,20 +89,23 @@ required by [issue #1220](https://github.com/omec-project/upf/issues/1220).
 
 ### 3. Remove the mixed-Scapy design
 
-- [ ] Update `ptf/Dockerfile` to fetch the selected pinned TRex source.
-- [ ] Copy only the required TRex client modules into the runtime image.
-- [ ] Stop copying or exposing any bundled `scapy` package from TRex through
+- [x] Update `ptf/Dockerfile` to fetch the selected pinned TRex source.
+- [x] Copy only the required TRex client modules into the runtime image,
+      including the stateless API and legacy daemon-management client.
+- [x] Stop copying or exposing any bundled `scapy` package from TRex through
       `PYTHONPATH`.
-- [ ] Remove the custom Scapy wheel build/install override from the Dockerfile.
-- [ ] Install exactly one Scapy distribution that satisfies both PTF and the
+- [x] Remove the custom Scapy wheel build/install override from the Dockerfile.
+- [x] Install exactly one Scapy distribution that satisfies both PTF and the
       selected TRex client.
-- [ ] Verify all Scapy imports resolve to the same installed distribution.
+- [x] Verify all Scapy imports resolve to the same installed distribution.
+      The [2026-09-25 production validation](https://github.com/andybavier/upf/actions/runs/36168175496)
+      passes `pip check` and the PTF/TRex dependency smoke check.
 
 ### 4. Modernize and lock Python dependencies
 
 - [ ] Upgrade or replace `scapy-helper==0.14.8`.
-- [ ] If no upstream release is viable, create an explicitly pinned and
-      documented maintained patch/fork; do not suppress pip resolver errors.
+- [x] Maintain an explicitly pinned, documented UPF patch series for the
+      selected upstream source; do not suppress pip resolver errors.
 - [ ] Regenerate `ptf/requirements-ptf.txt` and `ptf/requirements-trex.txt`
       together, including hashes.
 - [ ] Add the source manifests and/or documented regeneration command needed
@@ -108,14 +115,12 @@ required by [issue #1220](https://github.com/omec-project/upf/issues/1220).
 
 ### 5. Make the result continuously verifiable
 
-- [ ] Run `pip check` after all final runtime packages are installed.
+- [x] Run `pip check` after all final runtime packages are installed.
 - [x] Add a container smoke check for the documented Scapy version and import
       origins of `ptf`, `scapy`, `trex.stl.api`, and `trex_stf_lib`.
-      (`make dependency-smoke`; it will become required CI once the legacy
-      conflict is removed.)
-- [x] Run baseline and Cisco-TRex-candidate smoke checks in a dedicated
-      pull-request workflow. The final-image smoke check remains expected to
-      fail until the legacy mixed-Scapy image is replaced.
+      (`make dependency-smoke`; it now passes in the production CI image.)
+- [x] Run baseline and final-image smoke checks in a dedicated pull-request
+      workflow. The final image now passes its smoke check.
 - [ ] Add focused automated tests where the selected TRex API requires UPF
       compatibility changes.
 
