@@ -48,6 +48,12 @@ updates:
       python-deps:
         patterns:
           - "*"
+    ignore:
+      # pyperclip is transitively required by PTF through scapy-helper, whose
+      # latest release pins pyperclip==1.8.2. Updating it independently makes
+      # ptf/requirements-ptf.txt unsatisfiable; revisit with the PTF lockfile
+      # generation workflow.
+      - dependency-name: "pyperclip"
   - package-ecosystem: "pip"
     directory: "/bess/env"
     schedule:
