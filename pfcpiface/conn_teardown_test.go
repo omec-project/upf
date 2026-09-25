@@ -6,7 +6,10 @@ package pfcpiface
 import (
 	"context"
 	"net"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/omec-project/upf-epc/pfcpiface/metrics"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -142,5 +145,182 @@ func TestLocalDeleteOnContextNotFoundReleasesTheAddress(t *testing.T) {
 			t.Fatalf("allocation %d of 2 after a local delete failed: %v; "+
 				"the session deleted locally did not release its address", i-1, err)
 		}
+	}
+}
+
+// scriptedTeardownDP answers each session's removal batches with the next completion in
+// its script, keyed by the UE address of the session's PDR -- accepted either way, which is
+// how bess answers a batch that ran out of time -- and records how many batches each
+// session was sent. A session with no script finishes. The retry sends its batches
+// concurrently, so the fake is locked.
+type scriptedTeardownDP struct {
+	fakeDP
+
+	mu       sync.Mutex
+	finishes map[uint32][]bool
+	batches  map[uint32]int
+}
+
+func (d *scriptedTeardownDP) SendMsgToUPF(method upfMsgType, all, newRules PacketForwardingRules) uint8 {
+	cause, _ := d.SendMsgToUPFWithCompletion(method, all, newRules)
+	return cause
+}
+
+func (d *scriptedTeardownDP) SendMsgToUPFWithCompletion(
+	_ upfMsgType, all, _ PacketForwardingRules,
+) (uint8, bool) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if d.batches == nil {
+		d.batches = map[uint32]int{}
+	}
+
+	ue := all.pdrs[0].ueAddress
+	n := d.batches[ue]
+	d.batches[ue]++
+
+	finished := true
+	if script := d.finishes[ue]; n < len(script) {
+		finished = script[n]
+	}
+
+	return ie.CauseRequestAccepted, finished
+}
+
+// teardownOfTwo is an association holding two sessions with UPF-allocated addresses, from a
+// pool of exactly those two, so capacity says which came back.
+func teardownOfTwo(t *testing.T) (*PFCPConn, *IPPool, [2]PFCPSession) {
+	t.Helper()
+
+	pool, err := NewIPPool("10.251.0.0/30") // .1 and .2
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sessions := [2]PFCPSession{allocatingSession(t, pool, 1), allocatingSession(t, pool, 2)}
+
+	return teardownConn(t, pool, sessions[0], sessions[1]), pool, sessions
+}
+
+// TestATeardownRemovalThatDidNotFinishIsRetried: both sessions' removals run out of time,
+// so each is retried once. The retries finish, as a late removal would, so both addresses
+// come back.
+func TestATeardownRemovalThatDidNotFinishIsRetried(t *testing.T) {
+	pConn, pool, sessions := teardownOfTwo(t)
+
+	a, b := sessions[0].pdrs[0].ueAddress, sessions[1].pdrs[0].ueAddress
+	dp := &scriptedTeardownDP{finishes: map[uint32][]bool{a: {false, true}, b: {false, true}}}
+	pConn.upf.datapath = dp
+
+	pConn.executeShutdown()
+
+	if dp.batches[a] != 2 || dp.batches[b] != 2 {
+		t.Fatalf("the teardown sent the sessions %d and %d removal batches, expected a "+
+			"removal and one retry each", dp.batches[a], dp.batches[b])
+	}
+
+	for i := uint64(3); i <= 4; i++ {
+		if _, err := pool.LookupOrAllocIP(i); err != nil {
+			t.Fatalf("allocation %d of 2 after the retries finished failed: %v; a session "+
+				"whose rules were removed on the retry did not give its address back", i-2, err)
+		}
+	}
+}
+
+// TestATeardownRemovalThatNeverFinishesHoldsOnlyItsOwnAddress: one session's retry runs out
+// of time too, so its rules may still be in the datapath with nothing left that could
+// remove them, and its address stays held rather than go to a UE a surviving rule would
+// match. The other session's retry finished, and its address must not be held with it.
+func TestATeardownRemovalThatNeverFinishesHoldsOnlyItsOwnAddress(t *testing.T) {
+	pConn, pool, sessions := teardownOfTwo(t)
+
+	stuck, drained := sessions[0].pdrs[0].ueAddress, sessions[1].pdrs[0].ueAddress
+	dp := &scriptedTeardownDP{finishes: map[uint32][]bool{
+		stuck:   {false, false},
+		drained: {false, true},
+	}}
+	pConn.upf.datapath = dp
+
+	pConn.executeShutdown()
+
+	if n := len(pConn.store.GetAllSessions()); n != 0 {
+		t.Fatalf("%d session(s) still stored after the teardown", n)
+	}
+
+	got, err := pool.LookupOrAllocIP(3)
+	if err != nil {
+		t.Fatalf("the pool has no free address at all: %v; the session whose retry "+
+			"finished was held with the one whose retry did not", err)
+	}
+
+	if ip2int(got) != drained {
+		t.Fatalf("the pool gave out %s, expected %s, the address of the session whose "+
+			"rules were removed", got, int2ip(drained))
+	}
+
+	if _, err := pool.LookupOrAllocIP(4); err == nil {
+		t.Fatal("the address of a session whose removal never finished went back to the " +
+			"pool, while a rule it may still have in the datapath matches it")
+	}
+}
+
+// rendezvousTeardownDP lets a session's first removal run out of time and holds each retry
+// until every session's retry has arrived, so a retry that runs sessions one after another
+// never gets past the first.
+type rendezvousTeardownDP struct {
+	fakeDP
+
+	mu      sync.Mutex
+	seen    map[uint32]int
+	arrived sync.WaitGroup
+	apart   atomic.Bool
+}
+
+func (d *rendezvousTeardownDP) SendMsgToUPFWithCompletion(
+	_ upfMsgType, all, _ PacketForwardingRules,
+) (uint8, bool) {
+	d.mu.Lock()
+	ue := all.pdrs[0].ueAddress
+	d.seen[ue]++
+	first := d.seen[ue] == 1
+	d.mu.Unlock()
+
+	if first {
+		return ie.CauseRequestAccepted, false
+	}
+
+	d.arrived.Done()
+
+	done := make(chan struct{})
+
+	go func() {
+		d.arrived.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		d.apart.Store(true)
+	}
+
+	return ie.CauseRequestAccepted, true
+}
+
+// TestTeardownRetriesRunTogether: the retry costs one batch's timeout rather than one per
+// session only if the sessions' retries are in flight at the same time.
+func TestTeardownRetriesRunTogether(t *testing.T) {
+	pConn, _, _ := teardownOfTwo(t)
+
+	dp := &rendezvousTeardownDP{seen: map[uint32]int{}}
+	dp.arrived.Add(2)
+	pConn.upf.datapath = dp
+
+	pConn.executeShutdown()
+
+	if dp.apart.Load() {
+		t.Fatal("a retry waited for the other session's and it never came: the retries ran " +
+			"one after another, and each adds a batch's timeout to the teardown")
 	}
 }
