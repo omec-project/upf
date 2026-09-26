@@ -49,11 +49,13 @@ updates:
         patterns:
           - "*"
     ignore:
-      # pyperclip is transitively required by PTF through scapy-helper, whose
-      # latest release pins pyperclip==1.8.2. Updating it independently makes
+      # pyperclip and tabulate are transitively required by PTF through
+      # scapy-helper, whose latest release pins pyperclip==1.8.2 and
+      # tabulate~=0.8.7. Updating either independently makes
       # ptf/requirements-ptf.txt unsatisfiable; revisit with the PTF lockfile
       # generation workflow.
       - dependency-name: "pyperclip"
+      - dependency-name: "tabulate"
   - package-ecosystem: "pip"
     directory: "/bess/env"
     schedule:
