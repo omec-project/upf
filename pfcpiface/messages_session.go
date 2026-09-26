@@ -113,16 +113,17 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 	// From here the session holds resources before it is known whether it will exist:
 	// NewPFCPSession has counted it, and parsing a CHOOSE PDR allocates the UE address
-	// (parse_pdr.go) as a side effect of reading it. A rejected establishment is never
+	// (parse_pdr.go) as a side effect of reading it. A rejected establishment is not
 	// stored and the control plane is handed no F-SEID for it, so nothing else will
-	// give either back -- not a deletion request, not the association teardown. Every
-	// way out of this function short of an accepted batch is a return, and several of
+	// give either back -- not a deletion request, not the association teardown. The one
+	// rejection that is stored, a rollback that did not finish, is below. Every way out
+	// of this function short of storing the session is a return, and several of
 	// them are inside the parse loops below, so the cleanup is deferred rather than
 	// repeated.
-	accepted := false
+	stored := false
 
 	defer func() {
-		if accepted {
+		if stored {
 			return
 		}
 
@@ -197,12 +198,38 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 	if cause == ie.CauseRequestRejected {
 		// The batch reported a failure, which means it completed and some of its rules
 		// may be programmed. Take them out before forgetting the session: nothing else
-		// will, because the session is never stored on this path and the SMF has no
-		// F-SEID to release. Best effort -- a datapath that just refused a write may
-		// refuse this one too, and there is nothing further to report it to.
-		if delCause := upf.SendMsgToUPF(
-			upfMsgTypeDel, session.PacketForwardingRules, PacketForwardingRules{},
-		); delCause == ie.CauseRequestRejected {
+		// will, because the session is not stored on this path unless this removal fails
+		// to finish, and the SMF has no F-SEID to release. Best effort -- a datapath that
+		// just refused a write may refuse this one too, and there is nothing further to
+		// report it to.
+		delCause, finished := upf.SendMsgToUPFWithCompletion(
+			upfMsgTypeDel, session.PacketForwardingRules, PacketForwardingRules{})
+		if !finished {
+			// A removal that ran out of time may have left any of the rules the refused
+			// batch programmed, and once the session is forgotten nothing names them: the
+			// control plane has no F-SEID to delete. So the session is stored after all,
+			// holding its rules and -- where this UPF allocates it -- its UE address, and
+			// the association teardown removes it like any other. The establishment is
+			// still refused.
+			logger.PfcpLog.Warnln("the rollback of a rejected session did not finish; " +
+				"keeping the session until the association is torn down")
+
+			// Set whether or not the store takes the session. If it refuses -- which it
+			// does only for a local SEID of zero -- nothing names the rules either way,
+			// and letting the cleanup run would hand the address to another UE while a
+			// rule the rollback did not remove may still match it. Holding it is the
+			// cheaper failure.
+			stored = true
+
+			err = pConn.store.PutSession(session)
+			if err != nil {
+				logger.PfcpLog.Errorf("failed to put PFCP session to store: %v", err)
+			}
+
+			return errProcessReply(ErrWriteToDatapath, ie.CauseRequestRejected)
+		}
+
+		if delCause == ie.CauseRequestRejected {
 			// A rule that could not be translated (`CreatePortRangeCartesianProduct`)
 			// or marshalled was never programmed either, so there is nothing to strand,
 			// and that is exactly what happens when the add was refused for the same
@@ -228,7 +255,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 			ie.CauseRequestRejected)
 	}
 
-	accepted = true
+	stored = true
 
 	err = pConn.store.PutSession(session)
 	if err != nil {
