@@ -1,0 +1,101 @@
+diff --git a/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl_packet_builder_scapy.py b/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl_packet_builder_scapy.py
+--- a/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl_packet_builder_scapy.py
++++ b/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl_packet_builder_scapy.py
+@@ -413,6 +413,30 @@
+     def get_list_iter(self):
+         l=list(self.pkt_iter())
+         return l
++
++
++    def pkt_offset_iter(self):
++        """Yield packet layers with their offsets in the serialized packet."""
++        offset = 0
++        for pkt in self.pkt_iter():
++            yield pkt, offset
++            offset += len(pkt) - len(pkt.payload)
++
++    @staticmethod
++    def field_offset(layer_pkt, field_name):
++        """Return a field's byte offset and size within a serialized layer."""
++        raw = bytes(layer_pkt)
++        offset = 0
++        for field in layer_pkt.fields_desc:
++            remaining, _ = field.getfield(layer_pkt, raw)
++            if isinstance(remaining, tuple):
++                remaining = remaining[0]
++            field_size = len(raw) - len(remaining)
++            if field.name == field_name:
++                return offset, field_size
++            offset += field_size
++            raw = remaining
++        raise CTRexPacketBuildException(-11, "No field %s." % field_name)
+ 
+ 
+     def get_pkt_layers(self):
+@@ -428,10 +452,10 @@
+         Return offset of layer. Example: 'IP',1 returns offfset of layer ip:1
+         """
+         save_cnt=cnt
+-        for pkt in self.pkt_iter ():
++        for pkt, offset in self.pkt_offset_iter():
+             if name in (pkt.name, pkt.__class__.__name__):
+                 if cnt==0:
+-                    return (pkt, pkt._offset)
++                    return (pkt, offset)
+                 else:
+                     cnt=cnt -1
+ 
+@@ -443,10 +467,10 @@
+         Return offset of layer. Example: 'IP',1 returns offfset of layer ip:1
+         """
+         save_cnt=cnt
+-        for pkt in self.pkt_iter ():
++        for pkt, offset in self.pkt_offset_iter():
+             if pkt.name == name:
+                 if cnt==0:
+-                    return pkt._offset
++                    return offset
+                 else:
+                     cnt=cnt -1
+ 
+@@ -461,9 +485,8 @@
+         layer_pkt=t[0]
+         #layer_pkt.dump_fields_offsets ()
+ 
+-        for f in layer_pkt.fields_desc:
+-            if f.name == field_name:
+-                return (l_offset+f._offset,f.get_size_bytes ());
++        field_offset, field_size = self.field_offset(layer_pkt, field_name)
++        return (l_offset + field_offset, field_size)
+ 
+         raise CTRexPacketBuildException(-11, "No layer %s-%d." % (field_name, layer_cnt))
+ 
+@@ -480,9 +503,9 @@
+ 
+         # look for layer
+         layer_cnt = {}
+-        for pkt in self.pkt_iter():
++        for pkt, pkt_offset in self.pkt_offset_iter():
+             layer_name = pkt.__class__.__name__
+-            if pkt._offset > offset_int:
++            if pkt_offset > offset_int:
+                 break
+             if layer_name in layer_cnt:
+                 layer_cnt[layer_name] += 1
+@@ -491,11 +514,13 @@
+             last_name = layer_name
+             last_count = layer_cnt[layer_name]
+             last_layer = pkt
++            last_offset = pkt_offset
+ 
+         # look for field inside layer
+-        for f in last_layer.fields_desc:
+-            if last_layer._offset + f._offset == offset_int:
+-                return (last_name, last_count, f.name)
++        for field in last_layer.fields_desc:
++            field_offset, _ = self.field_offset(last_layer, field.name)
++            if last_offset + field_offset == offset_int:
++                return (last_name, last_count, field.name)
+ 
+ 
+     def get_layer_offet_by_str(self, layer_des):
