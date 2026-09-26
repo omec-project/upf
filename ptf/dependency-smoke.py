@@ -57,7 +57,11 @@ def validate_trex_packet_construction() -> None:
         ext_psc_type=0,
         ext_psc_qfi=9,
     )
-    if not STLPktBuilder(pkt=gtpu_packet).to_json()["packet"]:
+    gtpu_stream = STLStream(
+        packet=STLPktBuilder(pkt=gtpu_packet),
+        mode=STLTXCont(pps=1_000),
+    )
+    if "packet" not in gtpu_stream.to_json():
         raise RuntimeError("TRex could not serialize the UPF GTP-U packet")
 
 
