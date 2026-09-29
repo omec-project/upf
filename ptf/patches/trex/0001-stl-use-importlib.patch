@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
 From: UPF maintainers <upf@omecproject.org>
 Subject: [PATCH] stl: replace removed imp module with importlib
 
@@ -19,8 +22,8 @@ index 0e2e2c2..9c3b5c9 100644
  import copy
 -import imp
 +import importlib
- 
- 
+
+
  from ..common.trex_exceptions import *
 @@ -426,7 +426,7 @@
              filename = os.path.basename(tpg_conf_path).split('.')[0]  # remove the file extension
@@ -28,15 +31,15 @@ index 0e2e2c2..9c3b5c9 100644
              module = __import__(filename, globals(), locals(), [], 0)  # import the file
 -            imp.reload(module)  # reload the update
 +            importlib.reload(module)  # reload the update
- 
+
              try:
                  tpg_conf = module.register().get_tpg_conf(**kwargs)
 @@ -1163,7 +1163,7 @@
              file    = os.path.basename(python_file).split('.')[0]
              sys.dont_write_bytecode = True
              module = __import__(file, globals(), locals(), [], 0)
--            imp.reload(module) # reload the update 
-+            importlib.reload(module) # reload the update 
- 
+-            imp.reload(module) # reload the update
++            importlib.reload(module) # reload the update
+
              t = STLProfile.get_module_tunables(module)
              #for arg in kwargs:

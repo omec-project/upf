@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
 From: UPF maintainers <upf@omecproject.org>
 Subject: [PATCH] python: allow a caller-provided Scapy distribution
 

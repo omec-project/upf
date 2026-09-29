@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
 From: UPF maintainers <upf@omecproject.org>
 Subject: [PATCH] python: make imported regular-expression literals raw
 
@@ -21,14 +24,14 @@ diff --git a/scripts/automation/trex_control_plane/interactive/trex/utils/common
  def natural_sorted_key(val):
 -    return [int(c) if c.isdigit() else c for c in re.split('(\d+)', val)]
 +    return [int(c) if c.isdigit() else c for c in re.split(r'(\d+)', val)]
- 
+
  def filter_none(seq):
      return filter(lambda x: x is not None, seq)
 diff --git a/scripts/automation/trex_control_plane/interactive/trex/utils/parsing_opts.py b/scripts/automation/trex_control_plane/interactive/trex/utils/parsing_opts.py
 --- a/scripts/automation/trex_control_plane/interactive/trex/utils/parsing_opts.py
 +++ b/scripts/automation/trex_control_plane/interactive/trex/utils/parsing_opts.py
 @@ -32,7 +32,7 @@
- 
+
  def match_time_unit(val):
      '''match some val against time shortcut inputs '''
 -    match = re.match("^(\d+(\.\d+)?)([m|h]?)$", val)
@@ -38,11 +41,11 @@ diff --git a/scripts/automation/trex_control_plane/interactive/trex/utils/parsin
          unit = match.group(3)
 @@ -85,7 +85,7 @@
  def decode_multiplier(val, allow_update = False, divide_count = 1):
- 
+
      factor_table = {None: 1, 'k': 1e3, 'm': 1e6, 'g': 1e9}
 -    pattern = "^(\d+(\.\d+)?)(((k|m|g)?(bpsl1|pps|bps))|%)?"
 +    pattern = r"^(\d+(\.\d+)?)(((k|m|g)?(bpsl1|pps|bps))|%)?"
- 
+
      # do we allow updates ?  +/-
      if not allow_update:
 @@ -93,7 +93,7 @@
@@ -55,7 +58,7 @@ diff --git a/scripts/automation/trex_control_plane/interactive/trex/utils/parsin
          if match:
              op  = match.group(7)
 @@ -380,7 +380,7 @@
- 
+
      # each token is of form X=Y
      for token in tokens:
 -        m = re.search('(\S+)=(.+)', token)
@@ -68,24 +71,24 @@ diff --git a/scripts/automation/trex_control_plane/interactive/trex/common/trex_
 +++ b/scripts/automation/trex_control_plane/interactive/trex/common/trex_subscriber.py
 @@ -110,7 +110,7 @@
          for key, value in snapshot.items():
-             
+
              # match a pattern of ports
 -            m = re.search('(.*)\-([0-8])', key)
 +            m = re.search(r'(.*)-([0-8])', key)
              if m:
- 
+
                  port_id = m.group(2)
 diff --git a/scripts/automation/trex_control_plane/stf/trex_stf_lib/trex_client.py b/scripts/automation/trex_control_plane/stf/trex_stf_lib/trex_client.py
 --- a/scripts/automation/trex_control_plane/stf/trex_stf_lib/trex_client.py
 +++ b/scripts/automation/trex_control_plane/stf/trex_stf_lib/trex_client.py
 @@ -1478,7 +1478,7 @@
- 
+
          if not len(self._history):
              return -1
 -        return len(self.get_last_value('trex-global.data', 'opackets-\d+'))
 +        return len(self.get_last_value('trex-global.data', r'opackets-\d+'))
- 
- 
+
+
      def update_result_data (self, latest_dump):
 @@ -1502,9 +1502,9 @@
              # parse important fields and calculate averages and others
@@ -93,7 +96,7 @@ diff --git a/scripts/automation/trex_control_plane/stf/trex_stf_lib/trex_client.
                  # get the expected data only once since it doesn't change
 -                self._expected_tx_rate = CTRexResult.__get_value_by_path(latest_dump, "trex-global.data", "m_tx_expected_\w+")
 +                self._expected_tx_rate = CTRexResult.__get_value_by_path(latest_dump, "trex-global.data", r"m_tx_expected_\w+")
- 
+
 -            self._current_tx_rate = CTRexResult.__get_value_by_path(latest_dump, "trex-global.data", "m_tx_(?!expected_)\w+")
 +            self._current_tx_rate = CTRexResult.__get_value_by_path(latest_dump, "trex-global.data", r"m_tx_(?!expected_)\w+")
              if not self._done_warmup and self._expected_tx_rate is not None:

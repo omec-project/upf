@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
 From: UPF maintainers <upf@omecproject.org>
 Subject: [PATCH] stl: calculate packet offsets without Scapy private state
 
@@ -42,8 +45,8 @@ diff --git a/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl
 +            offset += field_size
 +            raw = remaining
 +        raise CTRexPacketBuildException(-11, "No field %s." % field_name)
- 
- 
+
+
      def get_pkt_layers(self):
 @@ -428,10 +452,10 @@
          Return offset of layer. Example: 'IP',1 returns offfset of layer ip:1
@@ -57,7 +60,7 @@ diff --git a/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl
 +                    return (pkt, offset)
                  else:
                      cnt=cnt -1
- 
+
 @@ -443,10 +467,10 @@
          Return offset of layer. Example: 'IP',1 returns offfset of layer ip:1
          """
@@ -70,21 +73,21 @@ diff --git a/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl
 +                    return offset
                  else:
                      cnt=cnt -1
- 
+
 @@ -461,9 +485,8 @@
          layer_pkt=t[0]
          #layer_pkt.dump_fields_offsets ()
- 
+
 -        for f in layer_pkt.fields_desc:
 -            if f.name == field_name:
 -                return (l_offset+f._offset,f.get_size_bytes ());
 +        field_offset, field_size = self.field_offset(layer_pkt, field_name)
 +        return (l_offset + field_offset, field_size)
- 
+
          raise CTRexPacketBuildException(-11, "No layer %s-%d." % (field_name, layer_cnt))
- 
+
 @@ -480,9 +503,9 @@
- 
+
          # look for layer
          layer_cnt = {}
 -        for pkt in self.pkt_iter():
@@ -100,7 +103,7 @@ diff --git a/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl
              last_count = layer_cnt[layer_name]
              last_layer = pkt
 +            last_offset = pkt_offset
- 
+
          # look for field inside layer
 -        for f in last_layer.fields_desc:
 -            if last_layer._offset + f._offset == offset_int:
@@ -109,6 +112,6 @@ diff --git a/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl
 +            field_offset, _ = self.field_offset(last_layer, field.name)
 +            if last_offset + field_offset == offset_int:
 +                return (last_name, last_count, field.name)
- 
- 
+
+
      def get_layer_offet_by_str(self, layer_des):
