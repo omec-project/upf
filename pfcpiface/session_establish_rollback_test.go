@@ -119,8 +119,11 @@ func TestARejectedEstablishmentWhoseRollbackDidNotFinishKeepsTheSession(t *testi
 
 	pool.Release(0xE001)
 
-	// The association teardown is what removes it, rules and address together.
+	// The association teardown is what removes it, rules and address together -- once
+	// its removal finishes, which is when teardown gives an address back. By then the
+	// datapath has caught up.
 	dp.writes = nil
+	dp.delFinishes = true
 
 	pConn.executeShutdown()
 
