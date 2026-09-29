@@ -14,11 +14,11 @@ required by [issue #1220](https://github.com/omec-project/upf/issues/1220).
 ## Background and current state
 
 - The PTF requirements pin `scapy==2.7.0` and `scapy-helper==0.14.8`.
-- `scapy-helper==0.14.8` requires `pyperclip==1.8.2`, blocking Dependabot's
-  newer `pyperclip` updates.
+- `scapy-helper==0.14.8` requires `pyperclip==1.8.2`, blocking newer
+  `pyperclip` updates from Dependabot.
 - The production PTF Docker image now uses pinned Cisco TRex v3.06 with the
   tracked UPF compatibility patches, copies only required client libraries,
-  and uses the PTF venv's Scapy 2.7.0.
+  and uses Scapy 2.7.0 from the PTF venv.
 - The prior Stratum-derived `2.92-scapy-2.4.5` image replaced the installed
   Scapy distribution with bundled Scapy 2.4.5, creating the mixed-Scapy
   environment captured in the baseline. Issue #1163 records that historical
@@ -48,7 +48,7 @@ required by [issue #1220](https://github.com/omec-project/upf/issues/1220).
 - [x] Build the current PTF image from `ptf/` on an x86_64 GitHub runner.
       ([baseline run, 2026-09-24](https://github.com/andybavier/upf/actions/runs/36065717421))
 - [x] Record `pip list`, `pip check`, and the installed Scapy distribution
-      before and after the Dockerfile's custom-Scapy installation. Pre-override
+      before and after custom-Scapy installation by the Dockerfile. Pre-override
       Scapy 2.7.0 passes `pip check`; final Scapy 2.4.5 fails because PTF
       requires Scapy >=2.5.0.
 - [x] Record import paths and versions for `ptf`, `scapy`, `trex.stl.api`, and
