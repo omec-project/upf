@@ -48,7 +48,7 @@ RUN apk add --no-cache patch wget unzip && \
     unzip -qq trex.zip && \
     if [ "${TREX_APPLY_UPF_PATCHES}" = 1 ]; then \
         for trex_patch in /patches/trex/*.patch; do \
-            patch -d /trex-core-${TREX_VER} -p1 < "${trex_patch}"; \
+            patch -d /trex-core-${TREX_VER} -p1 < "${trex_patch}" || exit 1; \
         done; \
     fi && \
     mkdir -p /output/${TREX_EXT_LIBS} && \

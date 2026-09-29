@@ -4,13 +4,14 @@
 From: UPF maintainers <upf@omecproject.org>
 Subject: [PATCH] stl: replace removed imp module with importlib
 
-Python 3.14 removed the deprecated imp module.  UPF only uses the stateless
-TRex client, whose stream loader reloads generated profile modules.  Use the
-supported importlib.reload equivalent.
+Python 3.14 removed the deprecated imp module. UPF only uses the stateless
+TRex client, whose stream loader reloads generated profile modules. Import the
+supported importlib module under the existing local name so every imp.reload
+call resolves to importlib.reload without whitespace-sensitive call-site edits.
 
 ---
- scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl_streams.py | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl_streams.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl_streams.py b/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl_streams.py
 index 0e2e2c2..9c3b5c9 100644
@@ -21,25 +22,7 @@ index 0e2e2c2..9c3b5c9 100644
  import traceback
  import copy
 -import imp
-+import importlib
++import importlib as imp
 
 
  from ..common.trex_exceptions import *
-@@ -426,7 +426,7 @@
-             filename = os.path.basename(tpg_conf_path).split('.')[0]  # remove the file extension
-             sys.dont_write_bytecode = True
-             module = __import__(filename, globals(), locals(), [], 0)  # import the file
--            imp.reload(module)  # reload the update
-+            importlib.reload(module)  # reload the update
-
-             try:
-                 tpg_conf = module.register().get_tpg_conf(**kwargs)
-@@ -1163,7 +1163,7 @@
-             file    = os.path.basename(python_file).split('.')[0]
-             sys.dont_write_bytecode = True
-             module = __import__(file, globals(), locals(), [], 0)
--            imp.reload(module) # reload the update
-+            importlib.reload(module) # reload the update
-
-             t = STLProfile.get_module_tunables(module)
-             #for arg in kwargs:
