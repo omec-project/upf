@@ -682,7 +682,6 @@ CommandResponse WildcardMatch::GetRuntimeConfig(const bess::pb::EmptyArg &) {
   using rule_t = bess::pb::WildcardMatchCommandAddArg;
   const wm_hkey_t *key = 0;
   WmData *data;
-  uint32_t *next = 0;
   resp.set_default_gate(default_gate_);
 
   // Each tuple provides a single mask, which may have many data-matches.
@@ -693,7 +692,11 @@ CommandResponse WildcardMatch::GetRuntimeConfig(const bess::pb::EmptyArg &) {
     // Each entry in the hash table has priority, ogate, and the data
     // (one datum per field, under the mask for this field).
     //  using rte method
-    while ((tuple.ht->Iterate((const void **)&key, (void **)&data, next)) >=
+    //
+    // rte_hash_iterate keeps its position in *next, so it needs a cursor of
+    // its own, starting at 0 for each table -- a null pointer is dereferenced.
+    uint32_t next = 0;
+    while ((tuple.ht->Iterate((const void **)&key, (void **)&data, &next)) >=
            (int)0) {
       entry.first = *key;
       entry.second = *data;
