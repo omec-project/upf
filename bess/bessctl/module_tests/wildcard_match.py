@@ -202,6 +202,55 @@ class BessWildcardMatchTest(BessModuleTestCase):
         #    '\nmut state:', cur_config, 'expecting:', expect_config)
     #    assert arg == iconf and cur_config == expect_config
 
+    # A table has room for 16 distinct masks. A mask whose last rule is deleted
+    # has to give its slot back, or the table fills up for good with masks that
+    # are no longer used. The rules here differ only in the prefix length of the
+    # source address, so each one has a mask of its own.
+    def test_deleting_a_masks_last_rule_frees_its_slot(self):
+        wm = WildcardMatch(fields=[{'offset': 26, 'num_bytes': 4},
+                                   {'offset': 30, 'num_bytes': 4}])
+        wm.set_default_gate(gate=0)
+        sip = int.from_bytes(socket.inet_aton('10.1.2.3'), 'big')
+
+        def bits(prefix):
+            return (0xffffffff << (32 - prefix)) & 0xffffffff
+
+        def mask_for(prefix):
+            return [{'value_bin': bits(prefix).to_bytes(4, 'big')},
+                    {'value_bin': b'\xff\xff\xff\xff'}]
+
+        # A rule's value may not set bits its mask leaves out.
+        def values_for(prefix):
+            return [{'value_bin': (sip & bits(prefix)).to_bytes(4, 'big')},
+                    {'value_bin': socket.inet_aton('20.0.0.%d' % prefix)}]
+
+        def add(prefix):
+            wm.add(gate=1, priority=0, masks=mask_for(prefix),
+                   values=values_for(prefix))
+
+        def matched(prefix):
+            pkt = get_tcp_packet(sip='10.1.2.3', dip='20.0.0.%d' % prefix)
+            return len(self.run_module(wm, 0, [pkt], range(2))[1]) == 1
+
+        for prefix in range(1, 17):
+            add(prefix)
+
+        with self.assertRaises(bess.Error):
+            add(17)
+
+        wm.delete(masks=mask_for(1), values=values_for(1))
+        add(17)
+
+        self.assertTrue(matched(17))
+        self.assertFalse(matched(1))
+        self.assertTrue(matched(5))
+
+        # A released slot that held the same mask is taken back as it is.
+        wm.delete(masks=mask_for(2), values=values_for(2))
+        add(2)
+        self.assertTrue(matched(2))
+        self.assertBessAlive()
+
     # Each field of a rule is assembled by copying its value_bin into a
     # uint64_t. A value longer than that must be refused rather than written
     # past it: Copy() is length-driven and the length comes from the request.
