@@ -536,9 +536,19 @@ int WildcardMatch::FindTuple(wm_hkey_t *mask) {
 }
 
 int WildcardMatch::AddTuple(wm_hkey_t *mask) {
+  // A slot DelEntry released keeps its mask and its (empty) table. One that
+  // held this very mask is taken back as it is: nothing a worker reads changes.
+  for (int i = 0; i < MAX_TUPLES; i++) {
+    if (tuples_[i].occupied == 0 && tuples_[i].ht &&
+        memcmp(&tuples_[i].mask, mask, total_key_size_) == 0) {
+      tuples_[i].occupied = 1;
+      return i;
+    }
+  }
+
   CuckooMap<wm_hkey_t, struct WmData, wm_hash, wm_eq> *temp = nullptr;
   for (int i = 0; i < MAX_TUPLES; i++) {
-    if (tuples_[i].occupied == 0) {
+    if (tuples_[i].occupied == 0 && tuples_[i].ht == nullptr) {
       bess::utils::Copy(&tuples_[i].mask, mask, sizeof(*mask));
       tuples_[i].params.key_len = total_key_size_;
       if (entries_) {
@@ -562,16 +572,37 @@ int WildcardMatch::AddTuple(wm_hkey_t *mask) {
       return i;
     }
   }
+
+  // Every slot has been used. Take a released one for the new mask, keeping its
+  // empty table. Workers read a slot's mask on every lookup, without
+  // synchronisation and concurrently with this command, so it is rewritten
+  // only while they are paused; reusing the table keeps the pause to a copy.
+  // WorkerPauser pauses only the workers that are running and resumes exactly
+  // those, so a controller that had paused them itself finds them paused.
+  for (int i = 0; i < MAX_TUPLES; i++) {
+    if (tuples_[i].occupied == 0 && tuples_[i].ht) {
+      WorkerPauser wp;
+      bess::utils::Copy(&tuples_[i].mask, mask, sizeof(*mask));
+      tuples_[i].occupied = 1;
+      return i;
+    }
+  }
   return -ENOSPC;
 }
 
 bool WildcardMatch::DelEntry(int idx, wm_hkey_t *key) {
   int ret = tuples_[idx].ht->Remove(*key, wm_hash(total_key_size_),
                                     wm_eq(total_key_size_));
+  // A tuple whose last rule went gives its slot back, so that a mask no longer
+  // in use does not hold one of the MAX_TUPLES for good. Its table and mask
+  // stay as they are: a worker in the middle of a lookup may still be reading
+  // them, and an empty table answers a miss, which is right. AddTuple reuses
+  // the slot.
+  if (tuples_[idx].ht->Count() == 0) {
+    tuples_[idx].occupied = 0;
+  }
   if (ret >= 0) {
     return true;
-  }
-  if (tuples_[idx].ht->Count() == 0) {
   }
   return false;
 }
@@ -650,7 +681,8 @@ CommandResponse WildcardMatch::CommandClear(const bess::pb::EmptyArg &) {
 
 void WildcardMatch::Clear() {
   for (auto &tuple : tuples_) {
-    if (tuple.occupied) {
+    // A released slot still owns its table.
+    if (tuple.occupied || tuple.ht) {
       tuple.ht->DeInit();
       delete tuple.ht;
       tuple.ht = nullptr;
