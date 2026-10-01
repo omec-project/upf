@@ -63,6 +63,32 @@ class BessWildcardMatchTest(BessModuleTestCase):
         self.run_for(wm, [0], 3)
         self.assertBessAlive()
 
+    # get_runtime_config walks every occupied tuple's table with
+    # rte_hash_iterate, which needs a cursor of its own; it used to be handed
+    # a null one and took the daemon down as soon as any rule existed.
+    def test_get_runtime_config(self):
+        wm = WildcardMatch(fields=[{'offset': 26, 'num_bytes': 4},
+                                   {'offset': 30, 'num_bytes': 4}])
+        exact = vstring([0xff, 0xff, 0xff, 0xff], [0xff, 0xff, 0xff, 0xff])
+        prefix = vstring([0xff, 0xff, 0xff, 0x00], [0xff, 0xff, 0xff, 0xff])
+        dip = socket.inet_aton('12.34.56.78')
+        wm.add(gate=1, priority=0, masks=exact,
+               values=[{'value_bin': socket.inet_aton('65.43.21.1')},
+                       {'value_bin': dip}])
+        wm.add(gate=2, priority=0, masks=exact,
+               values=[{'value_bin': socket.inet_aton('65.43.21.2')},
+                       {'value_bin': dip}])
+        wm.add(gate=3, priority=1, masks=prefix,
+               values=[{'value_bin': socket.inet_aton('10.0.0.0')},
+                       {'value_bin': dip}])
+        wm.set_default_gate(gate=0)
+
+        config = wm.get_runtime_config()
+
+        self.assertBessAlive()
+        self.assertEqual(config.default_gate, 0)
+        self.assertEqual(sorted(rule.gate for rule in config.rules), [1, 2, 3])
+
     # Output test over fields -- just make sure packets go out right ports
     def test_wildcardmatch(self):
         # Wildcard match for ip src and dst.
