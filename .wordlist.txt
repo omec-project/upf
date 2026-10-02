@@ -7,6 +7,8 @@ aetherproject
 Aether
 allocatable
 AMI
+API
+APIs
 bb
 bess
 bessctl
@@ -24,6 +26,7 @@ datapaths
 DDN
 DDNs
 DDP
+Dependabot
 dev
 devbind
 devlink
@@ -77,6 +80,7 @@ linux
 localhost
 lports
 MAKEFLAGS
+MBR
 md
 memlock
 Microbenchmarks
@@ -107,11 +111,13 @@ protobuf
 PTF
 PWD
 QERs
+QER
 qid
 QoS
 README
 RSS
 runtime
+rebase
 Scapy
 SDF
 setenv
@@ -129,6 +135,9 @@ tcpdump
 td
 TEID
 TRex
+STL
+uplink
+venv
 ulimit
 UDP
 UE

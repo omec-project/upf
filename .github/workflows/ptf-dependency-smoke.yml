@@ -1,0 +1,88 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Intel Corporation
+
+name: PTF dependency smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/ptf-dependency-smoke.yml"
+      - "ptf/**"
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-report:
+    name: Capture PTF dependency report
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Capture final-image dependency state
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ptf-dependency-baseline
+
+          docker build -t bess-upf-ptf ptf
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE/ptf:/upf-tests:ro" \
+            -w /upf-tests \
+            bess-upf-ptf \
+            sh -ec 'PYTHONPATH="/upf-tests/lib:${PYTHONPATH}" exec python3 /upf-tests/dependency-baseline.py --stage final' \
+            | tee ptf-dependency-baseline/final.txt
+
+      - name: Reproduce the scapy-helper and pyperclip resolver conflict
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          # Ignore the image's installed packages so pip performs a fresh
+          # resolution; --dry-run guarantees this does not modify the image.
+          docker run --rm bess-upf-ptf \
+            python3 -m pip install --dry-run --ignore-installed \
+              scapy-helper==0.14.8 pyperclip==1.11.0 \
+            > ptf-dependency-baseline/resolver-conflict.txt 2>&1
+          resolver_status=$?
+          set -e
+
+          cat ptf-dependency-baseline/resolver-conflict.txt
+          if [ "$resolver_status" -eq 0 ]; then
+            echo "Expected scapy-helper and pyperclip resolution to fail" >&2
+            exit 1
+          fi
+          if ! grep -Eq 'scapy-helper.*pyperclip==1\.8\.2' ptf-dependency-baseline/resolver-conflict.txt; then
+            echo "Resolver failed for an unexpected reason" >&2
+            exit 1
+          fi
+
+      - name: Upload dependency baseline
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ptf-dependency-baseline
+          path: ptf-dependency-baseline/
+          if-no-files-found: error
+
+  smoke:
+    name: Build and check PTF dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build PTF image and run dependency smoke check
+        run: make -C ptf dependency-smoke
+
+  upstream-trex:
+    name: Evaluate upstream TRex client
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Import Cisco TRex v3.06 with the resolved PTF dependencies
+        run: make -C ptf trex-upstream-smoke
