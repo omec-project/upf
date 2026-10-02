@@ -301,6 +301,22 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (message.Message, error) {
 	upf := pConn.upf
 
+	// End markers are sent once sessionsMu is released, by a defer registered before it.
+	// A send can block -- bess queues them on a bounded channel whose drain loop may not
+	// be running -- and nothing about them needs the store, so a send that blocks stalls
+	// this association's reader, as it always could, but not its teardown.
+	var endMarkers [][]byte
+
+	defer func() {
+		if len(endMarkers) == 0 {
+			return
+		}
+
+		if err := upf.SendEndMarkers(&endMarkers); err != nil {
+			logger.PfcpLog.Errorln("sending End Markers Failed:", err)
+		}
+	}()
+
 	pConn.sessionsMu.Lock()
 	defer pConn.sessionsMu.Unlock()
 
@@ -338,6 +354,13 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 
 	session, ok := pConn.store.GetSession(localSEID)
 	if !ok {
+		// Teardown removes sessions after releasing sessionsMu, so while the association
+		// is shutting down a miss may be a session it has just removed.
+		if pConn.IsShutdown() {
+			return message.NewSessionModificationResponse(0, 0, 0, smreq.SequenceNumber, 0,
+				ie.NewCause(ie.CauseNoEstablishedPFCPAssociation)), ErrAssocReleasing
+		}
+
 		// 29.244 clause 7.2.2.4.2: a message for a session this node has no context for
 		// is answered "Session context not found", under header SEID 0.
 		err := ErrNotFoundWithParam("PFCP session", "localSEID", localSEID)
@@ -597,10 +620,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 	}
 
 	if upf.enableEndMarker {
-		err := upf.SendEndMarkers(&endMarkerList)
-		if err != nil {
-			logger.PfcpLog.Errorln("sending End Markers Failed:", err)
-		}
+		endMarkers = endMarkerList
 	}
 
 	delPDRs := make([]pdr, 0, MaxItems)
@@ -710,6 +730,13 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 
 	session, ok := pConn.store.GetSession(localSEID)
 	if !ok {
+		// Teardown removes sessions after releasing sessionsMu, so while the association
+		// is shutting down a miss may be a session it has just removed.
+		if pConn.IsShutdown() {
+			return message.NewSessionDeletionResponse(0, 0, 0, sdreq.SequenceNumber, 0,
+				ie.NewCause(ie.CauseNoEstablishedPFCPAssociation)), ErrAssocReleasing
+		}
+
 		// 29.244 clause 7.2.2.4.2: a message for a session this node has no context for
 		// is answered "Session context not found", under header SEID 0.
 		err := ErrNotFoundWithParam("PFCP session", "localSEID", localSEID)
@@ -893,14 +920,15 @@ func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) error {
 	seid := srres.SEID()
 
 	if cause == ie.CauseSessionContextNotFound {
+		// The association's teardown removes this session -- and may already have, since
+		// it removes sessions after releasing sessionsMu, so check before the lookup.
+		if pConn.IsShutdown() {
+			return nil
+		}
+
 		sessItem, ok := pConn.store.GetSession(seid)
 		if !ok {
 			return errProcess(ErrNotFoundWithParam("PFCP session context", "SEID", seid))
-		}
-
-		// The association's teardown removes this session.
-		if pConn.IsShutdown() {
-			return nil
 		}
 
 		logger.PfcpLog.Warnln("context not found, deleting session locally")

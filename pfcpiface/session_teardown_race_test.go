@@ -281,6 +281,32 @@ func TestASessionMessageAfterTeardownBeganChangesNothing(t *testing.T) {
 			cause, ie.CauseNoEstablishedPFCPAssociation)
 	}
 
+	// Teardown removes sessions after releasing the lock, so a message queued behind its
+	// snapshot can find its session already gone. It is still refused as the association
+	// going away, not answered as a session the node never had. A SEID the store does not
+	// hold stands in for one teardown has just removed.
+	rsp, err = pConn.handleSessionModificationRequest(
+		message.NewSessionModificationRequest(0, 0, localSEID+1, 5, 0))
+	assertReleasing("modification of a session teardown has removed", err)
+
+	if cause := causeOf(t, rsp.(*message.SessionModificationResponse).Cause); cause != ie.CauseNoEstablishedPFCPAssociation {
+		t.Errorf("a modification of a removed session was answered with cause %d, expected %d",
+			cause, ie.CauseNoEstablishedPFCPAssociation)
+	}
+
+	rsp, err = pConn.handleSessionDeletionRequest(message.NewSessionDeletionRequest(0, 0, localSEID+1, 6, 0))
+	assertReleasing("deletion of a session teardown has removed", err)
+
+	if cause := causeOf(t, rsp.(*message.SessionDeletionResponse).Cause); cause != ie.CauseNoEstablishedPFCPAssociation {
+		t.Errorf("a deletion of a removed session was answered with cause %d, expected %d",
+			cause, ie.CauseNoEstablishedPFCPAssociation)
+	}
+
+	if err := pConn.handleSessionReportResponse(message.NewSessionReportResponse(0, 0, localSEID+1, 7, 0,
+		ie.NewCause(ie.CauseSessionContextNotFound))); err != nil {
+		t.Errorf("a report response for a removed session was answered with %v, expected nothing", err)
+	}
+
 	if err := pConn.handleSessionReportResponse(message.NewSessionReportResponse(0, 0, localSEID, 4, 0,
 		ie.NewCause(ie.CauseSessionContextNotFound))); err != nil {
 		t.Errorf("the report response was answered with %v, expected nothing", err)
@@ -305,5 +331,56 @@ func TestASessionMessageAfterTeardownBeganChangesNothing(t *testing.T) {
 
 	if _, err := pool.LookupOrAllocIP(0xF002); err == nil {
 		t.Error("a refused message released the session's address")
+	}
+}
+
+// endMarkerDP records whether the association's session lock was free when the handler
+// sent its end markers.
+type endMarkerDP struct {
+	fakeDP
+
+	conn     *PFCPConn
+	sent     bool
+	lockFree bool
+}
+
+func (d *endMarkerDP) SendEndMarkers(*[][]byte) error {
+	d.sent = true
+
+	if d.conn.sessionsMu.TryLock() {
+		d.lockFree = true
+		d.conn.sessionsMu.Unlock()
+	}
+
+	return nil
+}
+
+// TestAModificationSendsItsEndMarkersOutsideTheLock: sending an end marker can block --
+// bess queues them on a bounded channel whose drain loop may not be running -- and
+// teardown waits for the lock, so a send that blocks while holding it would stall the
+// association's teardown and node shutdown behind it.
+func TestAModificationSendsItsEndMarkersOutsideTheLock(t *testing.T) {
+	pConn, _, localSEID := rollbackConn(t)
+	pConn.upf.enableEndMarker = true
+
+	dp := &endMarkerDP{conn: pConn}
+	pConn.upf.datapath = dp
+
+	modifySession(t, pConn, localSEID, ie.NewUpdateFAR(
+		ie.NewFARID(downlinkFARID),
+		ie.NewApplyAction(ActionForward),
+		ie.NewUpdateForwardingParameters(
+			ie.NewDestinationInterface(ie.DstInterfaceAccess),
+			ie.NewPFCPSMReqFlags(0x02), // SNDEM
+		),
+	))
+
+	if !dp.sent {
+		t.Fatal("the modification sent no end markers, so this test proves nothing")
+	}
+
+	if !dp.lockFree {
+		t.Fatal("the end markers were sent while the session lock was held; a send that " +
+			"blocks would hold up the association's teardown")
 	}
 }
