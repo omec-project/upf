@@ -2,7 +2,7 @@
 # Copyright 2021 Intel Corporation
 
 """
-docker run --name pktgen -td --restart unless-stopped \
+docker run --name pktgen_sim -td --restart unless-stopped \
            --cpuset-cpus=2-5 --ulimit memlock=-1 --cap-add IPC_LOCK \
            -v /dev/hugepages:/dev/hugepages -v "$PWD/conf":/opt/bess/bessctl/conf \
            --device=/dev/vfio/vfio --device=/dev/vfio/176 \
