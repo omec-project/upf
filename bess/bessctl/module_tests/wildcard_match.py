@@ -276,6 +276,36 @@ class BessWildcardMatchTest(BessModuleTestCase):
 
         self.assertBessAlive()
 
+    # clear frees every table, and runs while the workers are looking packets
+    # up in them. It has to pause them first, or a lookup reads a table that
+    # has just been freed.
+    def test_clear_while_workers_run(self):
+        wm = WildcardMatch(fields=[{'offset': 26, 'num_bytes': 4},
+                                   {'offset': 30, 'num_bytes': 4}])
+        wm.set_default_gate(gate=0)
+
+        def add():
+            for prefix in (8, 16, 24, 32):
+                bits = (0xffffffff << (32 - prefix)) & 0xffffffff
+                wm.add(gate=1, priority=prefix,
+                       masks=[{'value_bin': bits.to_bytes(4, 'big')},
+                              {'value_bin': b'\x00\x00\x00\x00'}],
+                       values=[{'value_bin': (0x0a000000 & bits).to_bytes(
+                                    4, 'big')},
+                               {'value_bin': b'\x00\x00\x00\x00'}])
+
+        add()
+        pkt = get_tcp_packet(sip='10.1.2.3', dip='20.0.0.1')
+        Source() -> Rewrite(templates=[bytes(pkt)]) -> wm
+
+        bess.resume_all()
+        for _ in range(500):
+            wm.clear()
+            add()
+        bess.pause_all()
+
+        self.assertBessAlive()
+
 
 suite = unittest.TestLoader().loadTestsFromTestCase(BessWildcardMatchTest)
 results = unittest.TextTestRunner(verbosity=2).run(suite)

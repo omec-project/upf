@@ -675,6 +675,10 @@ CommandResponse WildcardMatch::CommandDelete(
 }
 
 CommandResponse WildcardMatch::CommandClear(const bess::pb::EmptyArg &) {
+  // Clear frees every table, and this command runs concurrently with the
+  // workers, which read a slot's table on every lookup, so the workers are
+  // paused while it does.
+  WorkerPauser wp;
   WildcardMatch::Clear();
   return CommandSuccess();
 }
