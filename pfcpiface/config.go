@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"net"
 	"os"
-	"regexp"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -157,10 +157,71 @@ func validateTimeouts(conf Conf) error {
 	return nil
 }
 
-// Remove comments from JSONC file
+// removeComments strips // line comments and /* */ block comments from a JSONC
+// document, leaving comment markers that appear inside string literals alone.
+//
+// That last part is the whole point: a regex sweep for `//.*$` also matches a "//"
+// inside a string value -- the scheme of a URL, or a path with a doubled separator --
+// and drops the rest of the line. The bess-upf chart renders this file on one line
+// (toJson), so the rest of the file goes with it, and the parse fails as "unexpected
+// end of JSON input" with nothing to say which value was to blame.
+//
+// An unterminated block comment is left in place for the parser to report, rather
+// than swallowing the rest of the document.
 func removeComments(jsonc string) string {
-	commentRegex := regexp.MustCompile(`(?m)//.*$|/\*.*?\*/`)
-	return commentRegex.ReplaceAllString(jsonc, "")
+	var b strings.Builder
+
+	b.Grow(len(jsonc))
+
+	inString, escaped := false, false
+
+	for i := 0; i < len(jsonc); i++ {
+		c := jsonc[i]
+
+		if inString {
+			b.WriteByte(c)
+
+			switch {
+			case escaped:
+				escaped = false
+			case c == '\\':
+				escaped = true
+			case c == '"':
+				inString = false
+			}
+
+			continue
+		}
+
+		switch {
+		case c == '"':
+			inString = true
+
+			b.WriteByte(c)
+		case c == '/' && i+1 < len(jsonc) && jsonc[i+1] == '/':
+			// Line comment: drop it up to the newline, which stays, as it did with the regex.
+			for i < len(jsonc) && jsonc[i] != '\n' {
+				i++
+			}
+
+			if i < len(jsonc) {
+				b.WriteByte('\n')
+			}
+		case c == '/' && i+1 < len(jsonc) && jsonc[i+1] == '*':
+			end := strings.Index(jsonc[i+2:], "*/")
+			if end < 0 {
+				b.WriteString(jsonc[i:])
+
+				return b.String()
+			}
+
+			i += 2 + end + 1 // the loop's own i++ steps past the closing '/'
+		default:
+			b.WriteByte(c)
+		}
+	}
+
+	return b.String()
 }
 
 // LoadConfigFile : parse jsonc file and populate corresponding struct
