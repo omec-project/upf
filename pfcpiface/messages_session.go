@@ -147,6 +147,13 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 	addFARs := make([]far, 0, MaxItems)
 	addQERs := make([]qer, 0, MaxItems)
 
+	// The F-TEID allocated for each CHOOSE ID in this request. PDRs that carry the same
+	// CHOOSE ID share one F-TEID; the clauses group by the value alone and set no interface
+	// condition (TS 29.244 clauses 5.5.3 and 8.2.3). The scope is one request, and only
+	// Establishment allocates here. It is how a control plane gives the uplink PDRs of a PDU
+	// session the one TEID it tells the RAN.
+	chosen := make(map[uint8]uint32)
+
 	for _, cPDR := range sereq.CreatePDR {
 		var p pdr
 		if err = p.parsePDR(cPDR, session.localSEID, pConn.appPFDs, upf.ippool); err != nil {
@@ -154,11 +161,22 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 		}
 
 		if p.UPAllocateFteid {
-			var fteid uint32
-			fteid, err = pConn.upf.fteidGenerator.Allocate()
-			if err != nil {
-				return errProcessReply(err, ie.CauseNoResourcesAvailable)
+			fteid, shared := uint32(0), false
+			if p.hasChooseID {
+				fteid, shared = chosen[p.chooseID]
 			}
+
+			if !shared {
+				fteid, err = pConn.upf.fteidGenerator.Allocate()
+				if err != nil {
+					return errProcessReply(err, ie.CauseNoResourcesAvailable)
+				}
+
+				if p.hasChooseID {
+					chosen[p.chooseID] = fteid
+				}
+			}
+
 			p.tunnelTEID = fteid
 			p.tunnelTEIDMask = 0xFFFFFFFF
 			p.tunnelIP4Dst = ip2int(upf.accessIP)
