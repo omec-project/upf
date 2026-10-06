@@ -23,7 +23,9 @@ const (
 )
 
 // chooseUplinkPDR is an uplink PDR asking the UPF to choose its F-TEID, with the given CHOOSE
-// ID when withID is set. The SDF filter makes each PDR its own datapath entry.
+// ID when withID is set. The SDF filter makes each PDR its own datapath entry. With CH set, V4
+// names the address family and no address is carried (TS 29.244 clause 8.2.3), which is what
+// the SD-Core SMF change builds.
 func chooseUplinkPDR(pdrID uint16, chooseID uint8, withID bool, flow string) *ie.IE {
 	flags := uint8(fteidCH | fteidV4)
 	if withID {
@@ -158,5 +160,24 @@ func TestAPDRWithoutAChooseIDDoesNotJoinChooseIDZero(t *testing.T) {
 
 	if teids[5] == teids[6] {
 		t.Errorf("PDR 6 carries no CHOOSE ID and was given CHOOSE ID 0's TEID %#x", teids[6])
+	}
+}
+
+// The same seen from the other side: a PDR without a CHOOSE ID that comes first does not
+// start group 0, so a later pair with CHOOSE ID 0 shares a TEID with each other and not with
+// it.
+func TestAPDRWithoutAChooseIDDoesNotStartGroupZero(t *testing.T) {
+	teids := establishUplink(t,
+		chooseUplinkPDR(5, 0, false, "permit out ip from any to assigned"),
+		chooseUplinkPDR(6, 0, true, "permit out ip from 192.0.2.10 to assigned"),
+		chooseUplinkPDR(7, 0, true, "permit out ip from 192.0.2.11 to assigned"),
+	)
+
+	if teids[6] == teids[5] {
+		t.Errorf("PDR 6 has CHOOSE ID 0 and was given TEID %#x of PDR 5, which has none", teids[6])
+	}
+
+	if teids[6] != teids[7] {
+		t.Errorf("PDRs 6 and 7 share CHOOSE ID 0 but were given TEIDs %#x and %#x", teids[6], teids[7])
 	}
 }
