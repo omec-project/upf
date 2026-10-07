@@ -93,6 +93,20 @@ cd ptf
 make build
 ```
 
+To check the final image's Python resolver state and import boundary without a
+UPF/TRex testbed, run:
+```bash
+make dependency-smoke
+```
+This check runs `pip check`, confirms that Scapy is imported from its installed
+distribution, and imports the PTF and TRex Python APIs. It does not generate
+BESS protobuf files, send traffic, or connect to a UPF or TRex server.
+
+The image uses Cisco TRex v3.06 (commit
+`46be64bedbe9d505dfb55099c38119d6e86267ca`) with the compatibility patches in
+`ptf/patches/trex/`. Its bundled Scapy is not included; PTF and TRex use the
+single Scapy distribution locked in `requirements-ptf.txt`.
+
 4. Run PTF tests using the `run_tests` script:
 ```bash
 ./run_tests -t [test-dir] [optional: filename/filename.test_case]
