@@ -407,32 +407,50 @@ are provided in the [Configuration: Simulation mode](#configuration-simulation-m
 
 ### [Pktgen](../conf/pktgen.bess)
 
-Pktgen allows us to test the upf pipeline with external datapath interfaces.
-This can be done either using a single machine or two machines.
+Pktgen lets us test the UPF pipeline with an external datapath, driving traffic
+from a separate machine (or an extra VF on the same machine) into the UPF under
+test.
 
 > Make sure the mode is not set to sim in scripts/docker_setup.sh and upf.jsonc
 
 ![ubench-pktgen](images/ubench-pktgen.svg)
 
-1. On the same machine using an extra VF or from a different machine run pktgen instance
+1. Customize [conf/pktgen.jsonc](../conf/pktgen.jsonc): set the `access`/`core`
+   interface names, the number of `workers`, and the `dl_rate`/`ul_rate` packet
+   rates in pps (`0` disables generation in that direction). Then set the
+   destination MAC/IP addresses of the UPF ports marked `TODO` in
+   [conf/pktgen.bess](../conf/pktgen.bess).
+
+2. Customize [scripts/pktgen_setup.sh](../scripts/pktgen_setup.sh) to match your
+   deployment: interface names, IP/MAC addresses, routes, and the VFIO
+   `--device` entries.
+
+3. Start pktgen. The script builds the image, sets up the datapath, and runs
+   [conf/pktgen.bess](../conf/pktgen.bess):
 
     ```bash
-    docker run --name pktgen -td --restart unless-stopped \
-            --cpuset-cpus=2-5 --ulimit memlock=-1 --cap-add IPC_LOCK \
-            -v /dev/hugepages:/dev/hugepages -v "$PWD/conf":/opt/bess/bessctl/conf \
-            --device=/dev/vfio/vfio --device=/dev/vfio/176 \
-            upf-bess:"$(<VERSION)" -grpc-url=0.0.0.0:10514
+    ./scripts/pktgen_setup.sh
     ```
 
-2. Customize [conf/pktgen.bess](../conf/pktgen.bess) to match [conf/upf](../conf/upf.jsonc)
-   used in the [Configuration: Simulation mode](#configuration-simulation-mode)
-   section.
+#### Single-machine (loopback) alternative
 
-3. Start pktgen
+To generate traffic on a single machine without external interfaces, use
+[conf/pktgen_sim.bess](../conf/pktgen_sim.bess) instead. Customize it to match
+[conf/upf.jsonc](../conf/upf.jsonc) from the
+[Configuration: Simulation mode](#configuration-simulation-mode) section, then
+run a pktgen instance and load the pipeline:
 
-    ```bash
-    docker exec -it pktgen ./bessctl run pktgen
-    ```
+![ubench-pktgen-sim](images/ubench-pktgen-sim.svg)
+
+```bash
+docker run --name pktgen_sim -td --restart unless-stopped \
+        --cpuset-cpus=2-5 --ulimit memlock=-1 --cap-add IPC_LOCK \
+        -v /dev/hugepages:/dev/hugepages -v "$PWD/conf":/opt/bess/bessctl/conf \
+        --device=/dev/vfio/vfio --device=/dev/vfio/176 \
+        upf-bess:"$(<VERSION)" -grpc-url=0.0.0.0:10514
+
+docker exec -it pktgen_sim ./bessctl run pktgen_sim
+```
 
 ## Troubleshooting
 
