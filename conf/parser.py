@@ -42,6 +42,7 @@ class Parser:
         self.sim_start_n9_teid = None
         self.sim_pkt_size = None
         self.sim_total_flows = None
+        self.sim_qfi = 9
         self.workers = 1
         self.access_ifname = None
         self.core_ifname = None
@@ -156,6 +157,21 @@ class Parser:
             print("Invalid sim mode fields added.")
         except KeyError:
             print("Sim mode not selected.")
+
+        # QFI written into the PDU Session Container for uplink GTP-U
+        # encapsulation (pktgen). Parsed separately so an absent key keeps
+        # the default without discarding the sim block above. The PSC encodes
+        # QFI in 6 bits (see bess/core/utils/gtp.h), so reject anything outside
+        # 0-63: higher values would be silently truncated by GtpuEncap or break
+        # the one-byte SetMetadata module at init.
+        try:
+            qfi = int(self.conf["sim"]["qfi"])
+            if 0 <= qfi <= 63:
+                self.sim_qfi = qfi
+            else:
+                print(f"sim qfi {qfi} out of range (0-63). Using default QFI 9.")
+        except (KeyError, ValueError, TypeError):
+            print("sim qfi not set. Using default QFI 9.")
 
         # Parse workers
         try:

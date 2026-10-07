@@ -432,11 +432,22 @@ test.
     ./scripts/pktgen_setup.sh
     ```
 
-#### Single-machine (loopback) alternative
+   The generator namespaces its containers (`pktgen-pause`, `pktgen-bess`,
+   `pktgen-web`, `pktgen-routectl`), its network namespace (`pktgen`), and its
+   published host ports (BESS gRPC on `10515`, web GUI on `8001`, metrics on
+   `8081`) so it can coexist with a UPF deployment
+   ([scripts/docker_setup.sh](../scripts/docker_setup.sh)) on the same host
+   without tearing down the UPF under test. Observe the pipeline in the GUI at
+   `http://[hostip]:8001`.
 
-To generate traffic on a single machine without external interfaces, use
-[conf/pktgen_sim.bess](../conf/pktgen_sim.bess) instead. Customize it to match
-[conf/upf.jsonc](../conf/upf.jsonc) from the
+#### Single-machine (extra-VF loopback) alternative
+
+To generate traffic on a single machine without a second host, use
+[conf/pktgen_sim.bess](../conf/pktgen_sim.bess) instead. This is not a
+device-free setup: the pipeline still binds a `PMDPort`, so it requires an extra
+NIC virtual function (VF) looped back to the UPF under test (bound to VFIO and
+passed with `--device`, as in the command below). Customize the pipeline to
+match [conf/upf.jsonc](../conf/upf.jsonc) from the
 [Configuration: Simulation mode](#configuration-simulation-mode) section, then
 run a pktgen instance and load the pipeline:
 

@@ -1,12 +1,14 @@
 // SPDX-FileCopyrightText: 2020-present Open Networking Foundation
 // SPDX-License-Identifier: Apache-2.0
 {
-    // UPF support various configuration modes:
-    // "af_packet"` to enable AF_PACKET mode,
-    // "af_xdp" to enable AF_XDP mode,
+    // Driver mode for the pktgen external datapath. Supported values:
     // "dpdk" to enable DPDK mode,
-    // "sim" to generate synthetic traffic from BESS's Source module,
-    // "" when running with UP4
+    // "af_xdp" to enable AF_XDP mode,
+    // "af_packet" to enable AF_PACKET mode.
+    // "sim" is NOT supported here: pktgen.bess exits in sim mode. For
+    // single-machine loopback simulation use conf/pktgen_sim.bess instead.
+    // This value is the single source of truth: scripts/pktgen_setup.sh
+    // reads it to build the matching namespace topology.
     "mode": "dpdk",
 
     // [Optional] Set the log level to one of \"panic\", \"fatal\", \"error\", \"warning\", \"info\", \"debug\", \"trace\"
@@ -25,7 +27,10 @@
         "start_n3_teid": "0x30000000",
         "start_n9_teid": "0x90000000",
         "pkt_size": 128,
-        "total_flows": 5000
+        "total_flows": 5000,
+        // QFI written into the PDU Session Container for uplink traffic
+        // (only used when "gtppsc" is enabled below)
+        "qfi": 9
     },
 
     // DL Data rate for traffic generation (in pps). '0' means dl traffic is disabled

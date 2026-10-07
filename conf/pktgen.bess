@@ -146,7 +146,20 @@ n3RxFastBPF.add(filters=[uplink_filter])
 #       Uplink packet generation
 # ====================================================
 
-n3_pkts = [sim.gen_inet_packet(parser.sim_pkt_size, access_mac, access_dst_mac,
+# GtpuEncap prepends an outer IPv4/UDP/GTP-U header (36 bytes), plus an
+# 8-byte PDU Session Container when gtppsc is enabled (44 bytes total).
+# Build the inner frame smaller by that overhead so the encapsulated uplink
+# frame on the wire matches sim_pkt_size (and the downlink frames).
+gtpu_encap_overhead = 44 if parser.gtppsc else 36
+n3_inner_size = parser.sim_pkt_size - gtpu_encap_overhead
+
+# PDU Session Container metadata consumed by GtpuEncap: the "action"
+# attribute sets the PSC PDU type and "qfi" sets the PSC QFI. Uplink
+# traffic uses PDU type 1 (UL PDU SESSION INFORMATION, 3GPP TS 38.415);
+# QFI is configurable via pktgen.jsonc (sim.qfi).
+ul_pdu_session_type = 1
+
+n3_pkts = [sim.gen_inet_packet(n3_inner_size, access_mac, access_dst_mac,
                                parser.sim_start_ue_ip, parser.sim_n6_app_ip)]
 n3_seq = sim.gen_inet_sequpdate_ul_args(parser.sim_total_flows, parser.sim_start_ue_ip)
 gtpu_seq = sim.gen_gtpu_sequpdate_ul_args(parser.sim_total_flows, parser.sim_start_n3_teid)
@@ -155,7 +168,10 @@ gtpu_seq = sim.gen_gtpu_sequpdate_ul_args(parser.sim_total_flows, parser.sim_sta
 if parser.ul_rate > 0:
     n3TxSrc::Source() -> n3TxGen::Rewrite(templates=n3_pkts) \
         -> n3TxSeq::SequentialUpdate(**n3_seq) -> n3TxL4Cksum::L4Checksum() \
-        -> n3TxIPCksum::IPChecksum() -> gtpuEncap::GtpuEncap(add_psc=parser.gtppsc):1 \
+        -> n3TxIPCksum::IPChecksum() \
+        -> n3TxPscMeta::SetMetadata(attrs=[{'name': 'action', 'size': 1, 'value_int': ul_pdu_session_type}, \
+                                           {'name': 'qfi', 'size': 1, 'value_int': parser.sim_qfi}]) \
+        -> gtpuEncap::GtpuEncap(add_psc=parser.gtppsc):1 \
         -> Update(fields=[{'offset': 26, 'size': 4, 'value': ip2long(parser.sim_start_enb_ip)}, \
                           {'offset': 30, 'size': 4, 'value': ip2long(access_dst_ip)}, \
                           {'offset': 34, 'size': 2, 'value': 2152}, \
