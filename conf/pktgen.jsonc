@@ -1,0 +1,68 @@
+// SPDX-FileCopyrightText: 2020-present Open Networking Foundation
+// SPDX-License-Identifier: Apache-2.0
+{
+    // UPF support various configuration modes:
+    // "af_packet"` to enable AF_PACKET mode,
+    // "af_xdp" to enable AF_XDP mode,
+    // "dpdk" to enable DPDK mode,
+    // "sim" to generate synthetic traffic from BESS's Source module,
+    // "" when running with UP4
+    "mode": "dpdk",
+
+    // [Optional] Set the log level to one of \"panic\", \"fatal\", \"error\", \"warning\", \"info\", \"debug\", \"trace\"
+    "log_level": "info",
+
+    // Use the sim block to enable simulation using either Source module or via il_trafficgen
+    "sim": {
+        // At this point we can simulate either N3/N6 or N3/N9 traffic, so choose n6 or n9 below
+        "core": "n6",
+        "max_sessions": 50000,
+        "start_ue_ip": "16.0.0.1",
+        "start_enb_ip": "11.1.1.129",
+        "start_aupf_ip": "13.1.1.199",
+        "n6_app_ip": "6.6.6.6",
+        "n9_app_ip": "9.9.9.9",
+        "start_n3_teid": "0x30000000",
+        "start_n9_teid": "0x90000000",
+        "pkt_size": 128,
+        "total_flows": 5000
+    },
+
+    // DL Data rate for traffic generation (in pps). '0' means dl traffic is disabled
+    "dl_rate": 0,
+
+    // UL Data rate for traffic generation (in pps). '0' means ul traffic is disabled
+    "ul_rate": 0,
+
+    // Max IP frag table entries (for IPv4 reassembly). Uncomment line below to enable
+    // "max_ip_defrag_flows": "1000",
+
+    // Uncomment line below to enable
+    // "ip_frag_with_eth_mtu": "1518",
+
+    // Enable hardware offload of checksum. Might disable vector PMD
+    "hwcksum": false,
+
+    // Enable PDU Session Container extension
+    "gtppsc": false,
+
+    // Enable Intel Dynamic Device Personalization (DDP)
+    "ddp": false,
+
+    // N3 interface
+    "access": {
+        // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
+        "ifname": "ens785f0"
+    },
+
+    // N6 or N9 interface (depending on the UPF's deployment [PSA-UPF or I-UPF])
+    "core": {
+        // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
+        // Uncomment line below to enable UE IP natting. It could be a single IP or multiple IPs
+        // "ip_masquerade": "18.0.0.1 or 18.0.0.2 or 18.0.0.3",
+        "ifname": "ens785f1"
+    },
+
+    // Number of worker threads. Default: 1
+    "workers": 1
+}

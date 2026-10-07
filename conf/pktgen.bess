@@ -1,78 +1,213 @@
+# vim: syntax=py
+# -*- mode: python -*-
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2021 Intel Corporation
+# Copyright (c) 2023-Present Intel Corporation
 
-"""
-docker run --name pktgen -td --restart unless-stopped \
-           --cpuset-cpus=2-5 --ulimit memlock=-1 --cap-add IPC_LOCK \
-           -v /dev/hugepages:/dev/hugepages -v "$PWD/conf":/opt/bess/bessctl/conf \
-           --device=/dev/vfio/vfio --device=/dev/vfio/176 \
-           upf-bess:"$(<VERSION)" -grpc-url=0.0.0.0:10514
-"""
-
+from conf.parser import *
+import conf.ports as port
 import conf.sim as sim
+import signal
+import sys
 
-pkt_size = 128
-flows = 5000
-workers=[2, 3, 4, 5]
-gtppsc = False
-qfi = 9
-smac = "22:53:7a:15:58:50"
-dmac_access = "9e:b2:d3:34:ab:27"
-dmac_core = "c2:9c:55:d4:8a:f6"
+port.setup_globals()
 
-if gtppsc:
-    # flow create 0 ingress pattern eth / ipv4 / udp / gtpu / gtp_psc / ipv4 / end actions rss types ipv4 l3-src-only end key_len 0 queues end / end
-    n39_pkts = [sim.gen_gtpu_packet(pkt_size, smac, dmac_access, "11.1.1.129", "198.18.0.1", "16.0.0.1", "9.9.9.9", 0x30000000, 1, qfi),]
-    n36_pkts = [sim.gen_gtpu_packet(pkt_size, smac, dmac_access, "11.1.1.129", "198.18.0.1", "16.0.0.1", "6.6.6.6", 0x30000000, 1, qfi),]
 
-    # flow create 1 ingress pattern eth / ipv4 / udp / gtpu / gtp_psc / ipv4 / end actions rss types ipv4 l3-dst-only end key_len 0 queues end / end
-    n9_pkts = [sim.gen_gtpu_packet(pkt_size, smac, dmac_core, "13.1.1.199", "198.19.0.1", "9.9.9.9", "16.0.0.1", 0x90000000, 0, qfi),]
+# ====================================================
+#	Read json config file (START HERE)
+# ====================================================
 
-    n3seq_offset = 70
-    n9seq_offset = 74
+interfaces = ["access", "core"]
+parser = Parser('conf/pktgen.jsonc')
+parser.parse(interfaces)
 
+if parser.mode == 'sim':
+    print('Please update pktgen.jsonc and pktgen_setup.sh accordingly')
+    sys.exit('This file is NOT meant to work in simulation mode')
+
+# Catch core & access MAC/IPv4 addresses
+core_mac = mac_by_interface(parser.core_ifname)
+access_mac = mac_by_interface(parser.access_ifname)
+core_ip = ips_by_interface(parser.core_ifname)
+access_ip = ips_by_interface(parser.access_ifname)
+
+
+# ====================================================
+# TODO: GA: Parameters to (manually) update
+core_dst_mac = "b4:96:91:b4:47:b9" # MAC address for UPF's core port
+access_dst_mac = "b4:96:91:b4:47:b8" # MAC address for UPF's access port
+access_dst_ip = "198.18.0.1" # IP address for UPF's access port
+# ====================================================
+
+
+# ====================================================
+#       Core Setup
+# ====================================================
+
+
+# Initialize workers
+cores = get_process_affinity()
+workers = cores[:parser.workers]
+if len(cores) > parser.workers:
+    nonworkers = cores[parser.workers:]
 else:
-    # flow create 0 ingress pattern eth / ipv4 / udp / gtpu / ipv4 / end actions rss types ipv4 l3-src-only end key_len 0 queues end / end
-    n39_pkts = [sim.gen_gtpu_packet(pkt_size, smac, dmac_access, "11.1.1.129", "198.18.0.1", "16.0.0.1", "9.9.9.9", 0x30000000),]
-    n36_pkts = [sim.gen_gtpu_packet(pkt_size, smac, dmac_access, "11.1.1.129", "198.18.0.1", "16.0.0.1", "6.6.6.6", 0x30000000),]
+    nonworkers = cores
 
-    # flow create 1 ingress pattern eth / ipv4 / udp / gtpu / ipv4 / end actions rss types ipv4 l3-dst-only end key_len 0 queues end / end
-    n9_pkts = [sim.gen_gtpu_packet(pkt_size, smac, dmac_core, "13.1.1.199", "198.19.0.1", "9.9.9.9", "16.0.0.1", 0x90000000),]
-
-    n3seq_offset = 62
-    n9seq_offset = 66
-
-#flow create 1 ingress pattern eth / ipv4 / end actions rss types ipv4 l3-dst-only end key_len 0 queues end / end
-n6_pkts = [sim.gen_inet_packet(pkt_size, smac, dmac_core, "6.6.6.6", "16.0.0.1"),]
-
-for wid in range(len(workers)):
+set_process_affinity_all(nonworkers)
+for wid in range(parser.workers):
     bess.add_worker(wid=wid, core=int(workers[wid % len(workers)]))
 
-num_q = len(workers)
-kwargs = {'size_inc_q': 512,
-          'size_out_q': 512,
-          'num_inc_q': num_q,
-          'num_out_q': num_q}
-p = PMDPort(port_id=0, **kwargs)
 
-n3seq_kwargs = sim.gen_gtpu_sequpdate_args(flows, "16.0.0.1", n3seq_offset, 0x30000000)
-n9seq_kwargs = sim.gen_gtpu_sequpdate_args(flows, "16.0.0.1", n9seq_offset, 0x90000000)
-n6seq_kwargs = sim.gen_inet_sequpdate_args(flows, "16.0.0.1")
+# ====================================================
+#       Port Setup
+# ====================================================
 
-# 25 Gbps each to saturate 100 Gbps
-bess.add_tc('39_limit', wid=0, policy='rate_limit', resource='bit', limit={'bit': 25000000000})
-bess.add_tc('36_limit', wid=0, policy='rate_limit', resource='bit', limit={'bit': 25000000000})
-bess.add_tc('6_limit',  wid=1, policy='rate_limit', resource='bit', limit={'bit': 25000000000})
-bess.add_tc('9_limit',  wid=1, policy='rate_limit', resource='bit', limit={'bit': 25000000000})
+ports = {}
 
-src39::Source(pkt_size=pkt_size) -> Rewrite(templates=n39_pkts) -> n39update::SequentialUpdate(**n3seq_kwargs) -> L4Checksum() -> IPChecksum() -> QueueOut(port=p.name, qid=0)
-src36::Source(pkt_size=pkt_size) -> Rewrite(templates=n36_pkts) -> n36update::SequentialUpdate(**n3seq_kwargs) -> L4Checksum() -> IPChecksum() -> QueueOut(port=p.name, qid=1)
+for idx, iface in enumerate(interfaces):
+    # check if source natting for a given port is required
+    try:
+        ext_addrs = parser.interfaces[iface]["ip_masquerade"]
+    except KeyError:
+        ext_addrs = None
+    except TypeError:
+        ext_addrs = None
 
-src9::Source(pkt_size=pkt_size) -> Rewrite(templates=n9_pkts) -> n9update::SequentialUpdate(**n9seq_kwargs) -> L4Checksum() -> IPChecksum() -> QueueOut(port=p.name, qid=2)
-src6::Source(pkt_size=pkt_size) -> Rewrite(templates=n6_pkts) -> n6update::SequentialUpdate(**n6seq_kwargs) -> L4Checksum() -> IPChecksum() -> QueueOut(port=p.name, qid=3)
+    p = port.Port(parser.interfaces[iface]["ifname"], parser.hwcksum, ext_addrs)
+    if p.name in ports:
+        continue
 
-src39.attach_task(parent='39_limit')
-src36.attach_task(parent='36_limit')
+    if parser.ddp:
+        p.configure_flow_profiles(iface)
 
-src9.attach_task(parent='9_limit')
-src6.attach_task(parent='6_limit')
+    # initialize port with the configured driver
+    p.workers = [i for i in range(len(workers))]
+    p.init_port(idx, parser.mode)
+
+    # setup port module with auxiliary modules
+    p.setup_port(parser.ip_frag_with_eth_mtu, parser.max_ip_defrag_flows, parser.measure_upf)
+
+    # Finally add entry to ports list
+    ports[p.name] = p
+
+
+# ====================================================
+#       Downlink packet generation
+# ====================================================
+
+n6_pkts = [sim.gen_inet_packet(parser.sim_pkt_size, core_mac, core_dst_mac,
+                               parser.sim_n6_app_ip, parser.sim_start_ue_ip)]
+n6_seq = sim.gen_inet_sequpdate_args(parser.sim_total_flows, parser.sim_start_ue_ip)
+
+# dl_rate == 0 disables downlink generation (see pktgen.jsonc)
+if parser.dl_rate > 0:
+    n6TxSrc::Source() -> n6TxGen::Rewrite(templates=n6_pkts) \
+        -> n6TxSeq::SequentialUpdate(**n6_seq) -> n6TxL4Cksum::L4Checksum() \
+        -> n6TxIPCksum::IPChecksum() -> ports[parser.core_ifname].rtr
+    n6TxSrc.set_burst(burst=1)
+
+    bess.add_tc('schedule_limit_dl',
+                policy='rate_limit',
+                resource='count',
+                limit={'count': parser.dl_rate},
+                wid=0)
+    n6TxSrc.attach_task(parent='schedule_limit_dl')
+else:
+    print("dl_rate is 0: downlink traffic generation disabled")
+
+
+# ====================================================
+#       Downlink packet reception
+# ====================================================
+
+n3RxFastBPF = ports[parser.access_ifname].bpf
+GTPUGate = 0
+
+n3RxFastBPF:GTPUGate \
+    -> n3RxIPCksum::IPChecksum(verify=True, hw=parser.hwcksum) \
+    -> n3RxL4Cksum::L4Checksum(verify=True, hw=parser.hwcksum) \
+    -> n3RxSink::Sink()
+
+# Add Access filter rules, i.e.:
+# setting filter to detect gtpu traffic
+# and dst host 11.1.1.1                         # check S/PGWU IP
+# and udp dst port 2152                         # check GTPU port
+check_ip = "ip"
+check_spgwu_ip = " and dst host " + \
+    " or ".join(str(x) for x in access_ip)
+check_gtpu_port = " and udp dst port 2152"
+
+# PDU rule
+uplink_filter = {"priority": -GTPUGate, "filter": check_ip +
+               check_spgwu_ip + check_gtpu_port, "gate": GTPUGate}
+n3RxFastBPF.add(filters=[uplink_filter])
+
+
+# ====================================================
+#       Uplink packet generation
+# ====================================================
+
+n3_pkts = [sim.gen_inet_packet(parser.sim_pkt_size, access_mac, access_dst_mac,
+                               parser.sim_start_ue_ip, parser.sim_n6_app_ip)]
+n3_seq = sim.gen_inet_sequpdate_ul_args(parser.sim_total_flows, parser.sim_start_ue_ip)
+gtpu_seq = sim.gen_gtpu_sequpdate_ul_args(parser.sim_total_flows, parser.sim_start_n3_teid)
+
+# ul_rate == 0 disables uplink generation (see pktgen.jsonc)
+if parser.ul_rate > 0:
+    n3TxSrc::Source() -> n3TxGen::Rewrite(templates=n3_pkts) \
+        -> n3TxSeq::SequentialUpdate(**n3_seq) -> n3TxL4Cksum::L4Checksum() \
+        -> n3TxIPCksum::IPChecksum() -> gtpuEncap::GtpuEncap(add_psc=parser.gtppsc):1 \
+        -> Update(fields=[{'offset': 26, 'size': 4, 'value': ip2long(parser.sim_start_enb_ip)}, \
+                          {'offset': 30, 'size': 4, 'value': ip2long(access_dst_ip)}, \
+                          {'offset': 34, 'size': 2, 'value': 2152}, \
+                          {'offset': 36, 'size': 2, 'value': 2152}]) \
+        -> gtpuTxSeq::SequentialUpdate(**gtpu_seq) -> gtpuL4Cksum::L4Checksum() \
+        -> gtpuIPCksum::IPChecksum() -> ports[parser.access_ifname].rtr
+    n3TxSrc.set_burst(burst=1)
+
+    bess.add_tc('schedule_limit_ul',
+                policy='rate_limit',
+                resource='count',
+                limit={'count': parser.ul_rate},
+                wid=0)
+    n3TxSrc.attach_task(parent='schedule_limit_ul')
+else:
+    print("ul_rate is 0: uplink traffic generation disabled")
+
+
+# ====================================================
+#       Uplink packet reception
+# ====================================================
+
+n6RxFastBPF = ports[parser.core_ifname].bpf
+UEGate = 0
+
+n6RxFastBPF:UEGate \
+    -> n6RxIPCksum::IPChecksum(verify=True, hw=parser.hwcksum) \
+    -> n6RxL4Cksum::L4Checksum(verify=True, hw=parser.hwcksum) \
+    -> n6RxSink::Sink()
+
+# Add Core filter rules, i.e.:
+# setting filter to detect gtpu traffic
+# and dst host x.x.x.x                         # check S/PGWU IP
+# and udp dst port 2152                         # check GTPU port
+check_ip = "ip"
+check_spgwu_ip = " and dst host " + \
+    " or ".join(str(x) for x in core_ip)
+check_gtpu_port = " and udp dst port 2152"
+GTPUGate = 0 #ports[parser.core_ifname].bpf_gate()
+downlink_filter = {"priority": -GTPUGate, "filter": check_ip +
+               check_spgwu_ip + check_gtpu_port, "gate": GTPUGate}
+n6RxFastBPF.add(filters=[downlink_filter])
+
+ports[parser.access_ifname].rtr.delete(prefix='0.0.0.0', prefix_len=0)
+ports[parser.access_ifname].rtr.add(prefix='0.0.0.0', prefix_len=0, gate=0)
+
+
+# ====================================================
+#       Route Control
+# ====================================================
+# Finally send SIGHUP to route_control daemon on reload
+# TODO: behavior is unspecified if route_control.py pid is not found
+route_control_pid = getpythonpid('route_control.py')
+if route_control_pid:
+    os.kill(route_control_pid, signal.SIGHUP)
