@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/libp2p/go-reuseport v0.4.0
-	github.com/omec-project/pfcpsim v1.5.6
+	github.com/omec-project/pfcpsim v1.5.7
 	github.com/prometheus/client_golang v1.24.1
 	github.com/prometheus/client_model v0.6.3
 	github.com/wmnsk/go-pfcp v0.0.24
@@ -24,5 +24,5 @@ require (
 	golang.org/x/net v0.59.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260928230214-8a89bd6388cc // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20261005182115-fad411399dd8 // indirect
 )
