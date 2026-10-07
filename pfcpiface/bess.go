@@ -604,7 +604,7 @@ func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 	// TODO: pick first connection for now
 	var con *PFCPConn
 
-	pc.node.pConns.Range(func(key, value interface{}) bool {
+	pc.node.pConns.Range(func(key, value any) bool {
 		pConn, ok := value.(*PFCPConn)
 		if !ok {
 			return false

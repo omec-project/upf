@@ -23,7 +23,7 @@ func NewInMemoryStore() *InMemoryStore {
 func (i *InMemoryStore) GetAllSessions() []PFCPSession {
 	sessions := make([]PFCPSession, 0)
 
-	i.sessions.Range(func(key, value interface{}) bool {
+	i.sessions.Range(func(key, value any) bool {
 		v := value.(PFCPSession)
 		sessions = append(sessions, v)
 		return true
@@ -55,7 +55,7 @@ func (i *InMemoryStore) DeleteSession(fseid uint64) error {
 }
 
 func (i *InMemoryStore) DeleteAllSessions() bool {
-	i.sessions.Range(func(key, value interface{}) bool {
+	i.sessions.Range(func(key, value any) bool {
 		i.sessions.Delete(key)
 		return true
 	})
