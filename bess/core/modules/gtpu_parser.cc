@@ -42,88 +42,177 @@ void GtpuParser::set_gtp_parsing_attrs(be32_t *sip, be32_t *dip, be16_t *sp,
   set_attr<uint8_t>(this, proto_id, p, *protoid);
 }
 /*----------------------------------------------------------------------------------*/
+/* Whether this is an IPv4 fragment other than the first: a non-zero offset. */
+static inline bool is_later_fragment(const Ipv4 *iph) {
+  return (iph->fragment_offset.value() & 0x1FFF) != 0;
+}
+/*----------------------------------------------------------------------------------*/
 void GtpuParser::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   int cnt = batch->cnt();
-  Tcp *tcph = NULL;
-  Udp *udph = NULL;
-  Gtpv1 *gtph = NULL;
-  Ipv4 *iph = NULL;
-  Ethernet *eth = NULL;
-  static const uint32_t _const_val = 0xFFFFFFFFu;
 
   for (int i = 0; i < cnt; i++) {
     bess::Packet *p = batch->pkts()[i];
-    eth = p->head_data<Ethernet *>();
-    if (eth->ether_type != (be16_t)(Ethernet::kIpv4) &&
-        eth->ether_type != (be16_t)(Ethernet::kArp)) {
-      EmitPacket(ctx, p, DEFAULT_GATE);
-      continue;
+    const char *malformed = nullptr;
+    gate_idx_t gate = Parse(p, &malformed);
+    if (malformed) {
+      drop_log_.Sample(ctx, name(), malformed, p);
     }
-
-    iph = (Ipv4 *)(eth + 1);
-    switch (iph->protocol) {
-      case Ipv4::kTcp:
-        tcph = (Tcp *)((char *)iph + (iph->header_length << 2));
-        set_gtp_parsing_attrs(&iph->src, &iph->dst, &tcph->src_port,
-                              &tcph->dst_port, (be32_t *)&_const_val,
-                              (be32_t *)&_const_val, &iph->protocol, p);
-        break;
-      case Ipv4::kUdp:
-        udph = (Udp *)((char *)iph + (iph->header_length << 2));
-        if (udph->dst_port == (be16_t)(UDP_PORT_GTPU)) {
-          Ipv4 *old_iph = iph;
-          gtph = (Gtpv1 *)(udph + 1);
-          be32_t teid = (be32_t)gtph->teid.value();
-          /* reuse iph, tcph, and udph for innser headers too */
-          iph = (Ipv4 *)((char *)gtph + gtph->header_length());
-          switch (iph->protocol) {
-            case Ipv4::kTcp:
-              tcph = (Tcp *)((char *)iph + (iph->header_length << 2));
-              set_gtp_parsing_attrs(&iph->src, &iph->dst, &tcph->src_port,
-                                    &tcph->dst_port, (be32_t *)&teid,
-                                    &old_iph->dst, &iph->protocol, p);
-              break;
-            case Ipv4::kUdp:
-              udph = (Udp *)((char *)iph + (iph->header_length << 2));
-              set_gtp_parsing_attrs(&iph->src, &iph->dst, &udph->src_port,
-                                    &udph->dst_port, (be32_t *)&teid,
-                                    &old_iph->dst, &iph->protocol, p);
-              break;
-            case Ipv4::kEsp:
-              // ESP has no ports, encrypted payload
-              set_gtp_parsing_attrs(&iph->src, &iph->dst, (be16_t *)&_const_val,
-                                    (be16_t *)&_const_val, (be32_t *)&teid,
-                                    &old_iph->dst, &iph->protocol, p);
-              break;
-            default:
-              set_gtp_parsing_attrs(&iph->src, &iph->dst, (be16_t *)&_const_val,
-                                    (be16_t *)&_const_val, (be32_t *)&teid,
-                                    &old_iph->dst, &iph->protocol, p);
-              break;
-          }
-        } else {
-          set_gtp_parsing_attrs(&iph->src, &iph->dst, &udph->src_port,
-                                &udph->dst_port, (be32_t *)&_const_val,
-                                (be32_t *)&_const_val, &iph->protocol, p);
-        }
-        break;
-      case Ipv4::kIcmp:
-        set_gtp_parsing_attrs(&iph->src, &iph->dst, (be16_t *)&_const_val,
-                              (be16_t *)&_const_val, (be32_t *)&_const_val,
-                              (be32_t *)&_const_val, &iph->protocol, p);
-        break;
-      case Ipv4::kEsp:
-        set_gtp_parsing_attrs(&iph->src, &iph->dst, (be16_t *)&_const_val,
-                              (be16_t *)&_const_val, (be32_t *)&_const_val,
-                              (be32_t *)&_const_val, &iph->protocol, p);
-        break;
-      default:
-        /* nothing here at the moment */
-        break;
-    }
-
-    EmitPacket(ctx, p, FORWARD_GATE);
+    EmitPacket(ctx, p, gate);
   }
+}
+/*----------------------------------------------------------------------------------*/
+/* Sets the attributes pdrLookup matches on and returns FORWARD_GATE, or returns
+ * DEFAULT_GATE for a packet that is not to be classified. Every read is checked
+ * against the bytes the first segment holds before it is made. A packet that
+ * claims more than it holds is reported through `malformed`; one that is
+ * simply not an IPv4 G-PDU, such as an Error Indication or an IPv6 payload, is
+ * dropped without being reported. */
+gate_idx_t GtpuParser::Parse(bess::Packet *p, const char **malformed) {
+  static const uint32_t _const_val = 0xFFFFFFFFu;
+  const size_t len = p->head_len();
+  char *head = p->head_data<char *>();
+
+  if (len < sizeof(Ethernet)) {
+    *malformed = "Ethernet header";
+    return DEFAULT_GATE;
+  }
+  Ethernet *eth = reinterpret_cast<Ethernet *>(head);
+  const bool ipv4 = eth->ether_type == (be16_t)(Ethernet::kIpv4);
+  if (!ipv4 && eth->ether_type != (be16_t)(Ethernet::kArp)) {
+    return DEFAULT_GATE;
+  }
+
+  /* ARP takes the IPv4 path as it always has; only its reads are bounded. Its
+   * first octet gives an IHL of 0, so the IHL is validated for IPv4 alone. */
+  const size_t ip_off = sizeof(Ethernet);
+  if (len < ip_off + sizeof(Ipv4)) {
+    *malformed = "outer IPv4 header";
+    return DEFAULT_GATE;
+  }
+  Ipv4 *iph = reinterpret_cast<Ipv4 *>(head + ip_off);
+  const size_t ihl = iph->header_length << 2;
+  if (ipv4 && (ihl < sizeof(Ipv4) || ip_off + ihl > len)) {
+    *malformed = "outer IPv4 header length";
+    return DEFAULT_GATE;
+  }
+  const size_t l4_off = ip_off + ihl;
+
+  /* A fragment after the first carries no transport header, so there are no
+   * ports to read: it is classified on its addresses, as ICMP is. */
+  if (ipv4 && is_later_fragment(iph)) {
+    set_gtp_parsing_attrs(&iph->src, &iph->dst, (be16_t *)&_const_val,
+                          (be16_t *)&_const_val, (be32_t *)&_const_val,
+                          (be32_t *)&_const_val, &iph->protocol, p);
+    return FORWARD_GATE;
+  }
+
+  switch (iph->protocol) {
+    case Ipv4::kTcp: {
+      if (l4_off + 2 * sizeof(be16_t) > len) {
+        *malformed = "TCP ports";
+        return DEFAULT_GATE;
+      }
+      Tcp *tcph = reinterpret_cast<Tcp *>(head + l4_off);
+      set_gtp_parsing_attrs(&iph->src, &iph->dst, &tcph->src_port,
+                            &tcph->dst_port, (be32_t *)&_const_val,
+                            (be32_t *)&_const_val, &iph->protocol, p);
+      break;
+    }
+    case Ipv4::kUdp: {
+      if (l4_off + sizeof(Udp) > len) {
+        *malformed = "UDP header";
+        return DEFAULT_GATE;
+      }
+      Udp *udph = reinterpret_cast<Udp *>(head + l4_off);
+      if (ipv4 && udph->dst_port == (be16_t)(UDP_PORT_GTPU)) {
+        return ParseGtpu(p, iph, l4_off + sizeof(Udp), malformed);
+      }
+      set_gtp_parsing_attrs(&iph->src, &iph->dst, &udph->src_port,
+                            &udph->dst_port, (be32_t *)&_const_val,
+                            (be32_t *)&_const_val, &iph->protocol, p);
+      break;
+    }
+    case Ipv4::kIcmp:
+      set_gtp_parsing_attrs(&iph->src, &iph->dst, (be16_t *)&_const_val,
+                            (be16_t *)&_const_val, (be32_t *)&_const_val,
+                            (be32_t *)&_const_val, &iph->protocol, p);
+      break;
+    case Ipv4::kEsp:
+      set_gtp_parsing_attrs(&iph->src, &iph->dst, (be16_t *)&_const_val,
+                            (be16_t *)&_const_val, (be32_t *)&_const_val,
+                            (be32_t *)&_const_val, &iph->protocol, p);
+      break;
+    default:
+      /* nothing here at the moment */
+      break;
+  }
+
+  return FORWARD_GATE;
+}
+/*----------------------------------------------------------------------------------*/
+/* The GTP-U part of Parse(), from the GTP-U header at `gtp_off`. */
+gate_idx_t GtpuParser::ParseGtpu(bess::Packet *p, Ipv4 *outer_iph,
+                                 size_t gtp_off, const char **malformed) {
+  static const uint32_t _const_val = 0xFFFFFFFFu;
+  const size_t len = p->head_len();
+  char *head = p->head_data<char *>();
+
+  Gtpv1 *gtph = reinterpret_cast<Gtpv1 *>(head + gtp_off);
+  const size_t gtp_len = gtph->header_length(len - gtp_off);
+  if (gtp_len == 0) {
+    *malformed = "GTP-U header";
+    return DEFAULT_GATE;
+  }
+
+  /* Only a G-PDU carries a packet to classify. Any other message on this path
+   * (an Error Indication, an End Marker) reaches no PDR. */
+  if (gtph->type != GTP_GPDU) {
+    return DEFAULT_GATE;
+  }
+
+  const size_t inner_off = gtp_off + gtp_len;
+  if (inner_off >= len) {
+    *malformed = "inner IPv4 header";
+    return DEFAULT_GATE;
+  }
+  Ipv4 *iph = reinterpret_cast<Ipv4 *>(head + inner_off);
+  if (iph->version != 4) {
+    return DEFAULT_GATE;
+  }
+  const size_t ihl = iph->header_length << 2;
+  if (inner_off + sizeof(Ipv4) > len || ihl < sizeof(Ipv4) ||
+      inner_off + ihl > len) {
+    *malformed = "inner IPv4 header";
+    return DEFAULT_GATE;
+  }
+  const size_t l4_off = inner_off + ihl;
+
+  be32_t teid = (be32_t)gtph->teid.value();
+  /* A fragment after the first carries no transport header (see Parse()). */
+  const uint8_t proto = is_later_fragment(iph) ? 0 : iph->protocol;
+  switch (proto) {
+    case Ipv4::kTcp:
+    case Ipv4::kUdp: {
+      if (l4_off + 2 * sizeof(be16_t) > len) {
+        *malformed = "inner ports";
+        return DEFAULT_GATE;
+      }
+      /* TCP and UDP both start with the source and destination ports. */
+      Udp *ports = reinterpret_cast<Udp *>(head + l4_off);
+      set_gtp_parsing_attrs(&iph->src, &iph->dst, &ports->src_port,
+                            &ports->dst_port, (be32_t *)&teid, &outer_iph->dst,
+                            &iph->protocol, p);
+      break;
+    }
+    default:
+      /* ESP, later fragments and the rest: no ports to classify on. */
+      set_gtp_parsing_attrs(&iph->src, &iph->dst, (be16_t *)&_const_val,
+                            (be16_t *)&_const_val, (be32_t *)&teid,
+                            &outer_iph->dst, &iph->protocol, p);
+      break;
+  }
+
+  return FORWARD_GATE;
 }
 /*----------------------------------------------------------------------------------*/
 CommandResponse GtpuParser::Init(const bess::pb::EmptyArg &) {
