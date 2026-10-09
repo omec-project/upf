@@ -25,18 +25,39 @@ struct [[gnu::packed]] Gtpv1 {
   be32_t teid;   /* Tunnel endpoint identifier */
   /* The options start here. */
 
-  size_t header_length() const {
-    const Gtpv1 *gtph = this;
-    const uint8_t *pktptr = (const uint8_t *)this;
+  /* Length of the header, its optional fields and every extension header,
+   * provided all of it lies within the first `avail` bytes from the start of
+   * this header; 0 otherwise. Nothing beyond `avail` is read.
+   *
+   * TS 29.281 5.1: the optional fields are present if any of E, S or PN is
+   * set. 5.2.1: an extension header is n*4 octets with n positive, its first
+   * octet holds n, and its last octet holds the next extension header type,
+   * 0 ending the chain. A zero n is rejected rather than walked, since the
+   * walk would never advance. */
+  size_t header_length(size_t avail) const {
+    const uint8_t *pktptr = reinterpret_cast<const uint8_t *>(this);
     size_t len = sizeof(Gtpv1);
 
-    if (gtph->seq || gtph->pdn || gtph->ex)
-      len += 4;
-    if (gtph->ex) {
-      /* Probe till the last extension header */
-      /* calculate total len of gtp header (with options) */
-      while (pktptr[len - 1])
-        len += (pktptr[len] << 2);
+    if (avail < len)
+      return 0;
+    if (!(seq || pdn || ex))
+      return len;
+
+    len += 4;
+    if (avail < len)
+      return 0;
+    if (!ex)
+      return len;
+
+    /* pktptr[len - 1] is the next extension header type; pktptr[len] is the
+     * length of the extension header that starts at len. */
+    while (pktptr[len - 1]) {
+      if (len >= avail)
+        return 0;
+      size_t ext_len = static_cast<size_t>(pktptr[len]) << 2;
+      if (ext_len == 0 || ext_len > avail - len)
+        return 0;
+      len += ext_len;
     }
     return len;
   }
