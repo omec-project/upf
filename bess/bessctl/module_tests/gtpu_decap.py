@@ -187,6 +187,34 @@ class GtpuDecapTest(BessModuleTestCase):
             + struct.pack("!I", TEID) + ip4(N3) + b"\x06",
         )
 
+    def test_parser_writes_its_own_attributes_for_every_forwarded_frame(self):
+        # A frame the parser forwards must not be classified on values left in the buffer by an
+        # earlier packet: ARP gets values that match no rule, and an IPv4 protocol without special
+        # handling gets its own addresses. Each probe follows a G-PDU of a session.
+        all_ones = b"\xff" * 4
+        probes = {
+            "arp_request": (
+                bytes(ETH / scapy.ARP(op=1, psrc=GNB, pdst=N3)),
+                all_ones * 2 + b"\xff\xff" * 2 + all_ones * 2 + b"\xff",
+            ),
+            "arp_reply": (
+                ARP_REPLY,
+                all_ones * 2 + b"\xff\xff" * 2 + all_ones * 2 + b"\xff",
+            ),
+            "ipv4_gre": (
+                bytes(ETH / scapy.IP(src=DN, dst=UE, proto=47) / (b"g" * 24)),
+                ip4(DN) + ip4(UE) + b"\xff\xff" * 2 + all_ones * 2 + b"\x2f",
+            ),
+        }
+        for name, (probe, want) in probes.items():
+            with self.subTest(case=name):
+                parser = GtpuParser()
+                encap = GenericEncap(fields=[{"size": s, "attribute": a} for a, s in ATTRS])
+                self.bess.connect_modules(parser.name, encap.name, 1, 0)
+                out = self.run_pipeline(parser, encap, 0, [GOOD["psc_tcp"], probe], [0], proto=bytes)
+                self.assertEqual(len(out[0]), 2, f"{name} did not leave the parser by gate 1")
+                self.assertEqual(out[0][1][:21], want, f"{name} carried attributes it did not write")
+
     def test_parser_drops_malformed(self):
         for name, pkt in MALFORMED.items():
             with self.subTest(case=name):

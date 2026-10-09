@@ -77,13 +77,18 @@ gate_idx_t GtpuParser::Parse(bess::Packet *p, const char **malformed) {
     return DEFAULT_GATE;
   }
   Ethernet *eth = reinterpret_cast<Ethernet *>(head);
-  const bool ipv4 = eth->ether_type == (be16_t)(Ethernet::kIpv4);
-  if (!ipv4 && eth->ether_type != (be16_t)(Ethernet::kArp)) {
+  if (eth->ether_type == (be16_t)(Ethernet::kArp)) {
+    /* ARP is forwarded as before, but with values that match no rule. It used
+     * to be parsed as IPv4, which wrote nothing for most sender MACs, so it was
+     * matched on whatever an earlier packet had left in the buffer -- often a
+     * session's uplink rule, which sent it to decapsulation. */
+    set_unmatchable_attrs(p);
+    return FORWARD_GATE;
+  }
+  if (eth->ether_type != (be16_t)(Ethernet::kIpv4)) {
     return DEFAULT_GATE;
   }
 
-  /* ARP takes the IPv4 path as it always has; only its reads are bounded. Its
-   * first octet gives an IHL of 0, so the IHL is validated for IPv4 alone. */
   const size_t ip_off = sizeof(Ethernet);
   if (len < ip_off + sizeof(Ipv4)) {
     *malformed = "outer IPv4 header";
@@ -91,7 +96,7 @@ gate_idx_t GtpuParser::Parse(bess::Packet *p, const char **malformed) {
   }
   Ipv4 *iph = reinterpret_cast<Ipv4 *>(head + ip_off);
   const size_t ihl = iph->header_length << 2;
-  if (ipv4 && (ihl < sizeof(Ipv4) || ip_off + ihl > len)) {
+  if (ihl < sizeof(Ipv4) || ip_off + ihl > len) {
     *malformed = "outer IPv4 header length";
     return DEFAULT_GATE;
   }
@@ -99,7 +104,7 @@ gate_idx_t GtpuParser::Parse(bess::Packet *p, const char **malformed) {
 
   /* A fragment after the first carries no transport header, so there are no
    * ports to read: it is classified on its addresses, as ICMP is. */
-  if (ipv4 && is_later_fragment(iph)) {
+  if (is_later_fragment(iph)) {
     set_gtp_parsing_attrs(&iph->src, &iph->dst, (be16_t *)&_const_val,
                           (be16_t *)&_const_val, (be32_t *)&_const_val,
                           (be32_t *)&_const_val, &iph->protocol, p);
@@ -124,7 +129,7 @@ gate_idx_t GtpuParser::Parse(bess::Packet *p, const char **malformed) {
         return DEFAULT_GATE;
       }
       Udp *udph = reinterpret_cast<Udp *>(head + l4_off);
-      if (ipv4 && udph->dst_port == (be16_t)(UDP_PORT_GTPU)) {
+      if (udph->dst_port == (be16_t)(UDP_PORT_GTPU)) {
         return ParseGtpu(p, iph, l4_off + sizeof(Udp), malformed);
       }
       set_gtp_parsing_attrs(&iph->src, &iph->dst, &udph->src_port,
@@ -143,11 +148,27 @@ gate_idx_t GtpuParser::Parse(bess::Packet *p, const char **malformed) {
                             (be32_t *)&_const_val, &iph->protocol, p);
       break;
     default:
-      /* nothing here at the moment */
+      /* Classified on its own addresses, as ICMP is, rather than on values an
+       * earlier packet left in the buffer. */
+      set_gtp_parsing_attrs(&iph->src, &iph->dst, (be16_t *)&_const_val,
+                            (be16_t *)&_const_val, (be32_t *)&_const_val,
+                            (be32_t *)&_const_val, &iph->protocol, p);
       break;
   }
 
   return FORWARD_GATE;
+}
+/*----------------------------------------------------------------------------------*/
+/* Attributes no PDR matches: no rule has an all-ones TEID or tunnel
+ * destination on the access side, or an all-ones UE address on the core side.
+ * Protocol 255 is reserved (IANA). */
+void GtpuParser::set_unmatchable_attrs(bess::Packet *p) {
+  static const uint32_t all_ones = 0xFFFFFFFFu;
+  static uint8_t reserved_proto = 0xFF;
+  set_gtp_parsing_attrs((be32_t *)&all_ones, (be32_t *)&all_ones,
+                        (be16_t *)&all_ones, (be16_t *)&all_ones,
+                        (be32_t *)&all_ones, (be32_t *)&all_ones,
+                        &reserved_proto, p);
 }
 /*----------------------------------------------------------------------------------*/
 /* The GTP-U part of Parse(), from the GTP-U header at `gtp_off`. */
