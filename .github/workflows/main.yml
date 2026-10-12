@@ -158,6 +158,7 @@ jobs:
       attestations: write
     uses: omec-project/.github/.github/workflows/static-analysis.yml@4e868da104f24faa67be0699b937f9455b75b3d4 # v0.0.33
     with:
+      staticcheck_version: 'v0.8.1'
       branch_name: ${{ github.ref }}
   lint:
     permissions:
