@@ -16,7 +16,7 @@
 #include "../packet.h"
 #include "../worker.h"
 
-/* Logs a sample of the packets a GTP-U module drops as malformed, so their
+/* Logs a sample of the packets the GTP-U modules drop as malformed, so their
  * source can be found: at most one line a second per worker, carrying the
  * number of drops not logged since that worker's previous line. A flood
  * therefore costs a time comparison and an increment per packet.
@@ -44,8 +44,9 @@ class GtpuDropLog {
       dump.append(octet);
     }
 
-    LOG(WARNING) << module << ": dropped malformed GTP-U packet (" << reason
-                 << "): head_len=" << p->head_len()
+    LOG(WARNING) << module
+                 << ": dropped malformed packet on the GTP-U parsing path ("
+                 << reason << "): head_len=" << p->head_len()
                  << " total_len=" << p->total_len()
                  << " nb_segs=" << p->nb_segs() << " first " << n << " bytes "
                  << dump << " (" << s.suppressed
@@ -57,7 +58,9 @@ class GtpuDropLog {
   static constexpr uint64_t kIntervalNs = 1000000000ull;
   static constexpr int kSampleBytes = 64;
 
-  struct State {
+  /* One cache line each, as gate_hooks/track.h does for its per-worker
+   * counters: a flood increments `suppressed` on every worker at once. */
+  struct alignas(64) State {
     uint64_t next_ns = 0;
     uint64_t suppressed = 0;
   };

@@ -56,6 +56,8 @@ GOOD = {
     "min_icmp": n3(gtpu(0x30, 0xFF, INNER_ICMP_MIN)),
     "ports_exact": n3(gtpu(0x30, 0xFF, INNER_TCP[:24])),
     "last_fragment": n3(gtpu(0x30, 0xFF, INNER_UDP_LAST_FRAGMENT)),
+    # TS 29.281 5.1: the receiver shall not evaluate the spare bit.
+    "spare_bit_set": n3(gtpu(0x38, 0xFF, INNER_UDP)),
 }
 
 
@@ -112,7 +114,13 @@ INNER_MALFORMED = {
 
 UNSTRIPPABLE.update(OUTER_MALFORMED)
 
-MALFORMED = {**UNSTRIPPABLE, **INNER_MALFORMED, "tcp_without_ports": TCP_WITHOUT_PORTS}
+# Not GTPv1-U: version 2, and PT 0 (GTP', TS 32.295), each with an IPv4 body.
+NOT_GTPV1U = {
+    "version_2": n3(gtpu(0x50, 0xFF, INNER_TCP)),
+    "pt_0_gtp_prime": n3(gtpu(0x20, 0xFF, INNER_TCP)),
+}
+
+MALFORMED = {**UNSTRIPPABLE, **INNER_MALFORMED, **NOT_GTPV1U, "tcp_without_ports": TCP_WITHOUT_PORTS}
 
 # Legitimate on N3, but not an IPv4 G-PDU: never classified as user traffic.
 NOT_IPV4_GPDU = {
@@ -210,6 +218,7 @@ class GtpuDecapTest(BessModuleTestCase):
             "plain_udp": INNER_UDP,
             "min_icmp": INNER_ICMP_MIN,
             "last_fragment": INNER_UDP_LAST_FRAGMENT,
+            "spare_bit_set": INNER_UDP,
         }
         for name, inner in inners.items():
             with self.subTest(case=name):
