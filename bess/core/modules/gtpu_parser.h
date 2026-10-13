@@ -6,6 +6,9 @@
 #define BESS_MODULES_GTPUPARSER_H_
 /*----------------------------------------------------------------------------------*/
 #include "../module.h"
+#include "gtpu_drop_log.h"
+/* for the IPv4 header */
+#include "utils/ip.h"
 /* for endian types */
 #include "utils/endian.h"
 using bess::utils::be16_t;
@@ -32,6 +35,11 @@ class GtpuParser final : public Module {
   void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
 
  private:
+  gate_idx_t Parse(bess::Packet *p, const char **malformed);
+  void set_unmatchable_attrs(bess::Packet *p);
+  gate_idx_t ParseGtpu(bess::Packet *p, bess::utils::Ipv4 *outer_iph,
+                       size_t gtp_off, const char **malformed);
+  GtpuDropLog drop_log_;
   /* set attributes */
   void set_gtp_parsing_attrs(be32_t *sip, be32_t *dip, be16_t *sp, be16_t *dp,
                              be32_t *teid, be32_t *tipd, uint8_t *protoid,
