@@ -164,6 +164,14 @@ gate_idx_t GtpuParser::ParseGtpu(bess::Packet *p, Ipv4 *outer_iph,
     return DEFAULT_GATE;
   }
 
+  /* TS 29.281 5.1: version 1, and PT 1 for GTP (0 is GTP'). The spare bit is
+   * deliberately not checked: the receiver shall not evaluate it (NOTE 0 of
+   * Figure 5.1-1). */
+  if (gtph->version != GTPU_VERSION || gtph->pt != GTP_PROTOCOL_TYPE_GTP) {
+    *malformed = "GTP-U version or protocol type";
+    return DEFAULT_GATE;
+  }
+
   /* Only a G-PDU carries a packet to classify. Any other message on this path
    * (an Error Indication, an End Marker) reaches no PDR. */
   if (gtph->type != GTP_GPDU) {
