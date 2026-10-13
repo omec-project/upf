@@ -7,7 +7,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -470,4 +472,59 @@ func TestSetUpfInfoTwiceLeavesNoEndMarkerSender(t *testing.T) {
 	}
 
 	// The cleanup calls Exit again; stopping the End Marker sender twice is safe.
+}
+
+// stopDuringWriteConn closes stop while a marker is being written, as Exit can,
+// and makes the watching read fail before the write returns. When forward gets
+// back to its select, the stop and the lost connection are both ready.
+type stopDuringWriteConn struct {
+	net.Conn
+
+	stop     chan struct{}
+	failRead chan struct{}
+	readDone chan struct{}
+}
+
+func (c *stopDuringWriteConn) Read(b []byte) (int, error) {
+	<-c.failRead
+	close(c.readDone)
+
+	return 0, io.EOF
+}
+
+func (c *stopDuringWriteConn) Write(b []byte) (int, error) {
+	close(c.stop)
+	close(c.failRead)
+	<-c.readDone
+
+	// Give the reading goroutine the moment it needs to report the failure.
+	for range 10 {
+		runtime.Gosched()
+	}
+
+	return len(b), nil
+}
+
+func (c *stopDuringWriteConn) Close() error { return nil }
+
+// A planned stop that lands while a marker is being written must be reported as
+// a stop, not as a lost connection to log and redial. Which of two ready cases
+// a select takes is random, so this runs many times.
+func TestEndMarkerLinkForwardReportsStopNotALostConnection(t *testing.T) {
+	for i := range 200 {
+		conn := &stopDuringWriteConn{
+			stop:     make(chan struct{}),
+			failRead: make(chan struct{}),
+			readDone: make(chan struct{}),
+		}
+
+		markers := make(chan []byte, 1)
+		markers <- []byte("marker")
+
+		l := newEndMarkerLink("/test/pfcpport", nil, markers, conn.stop)
+
+		if l.forward(conn) {
+			t.Fatalf("run %d: a stop during a write was reported as a lost connection", i)
+		}
+	}
 }

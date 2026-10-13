@@ -207,7 +207,14 @@ func (l *endMarkerLink) forward(conn net.Conn) bool {
 		case <-l.stop:
 			return false
 		case err := <-dropped:
+			// Stopping closes the connection too, so the read fails as stop is
+			// closed and both cases can be ready at once.
+			if l.stopping() {
+				return false
+			}
+
 			logger.BessLog.Errorln("end marker socket connection lost, redialing:", err)
+
 			return true
 		case marker := <-l.markers:
 			if _, err := conn.Write(marker); err != nil {
