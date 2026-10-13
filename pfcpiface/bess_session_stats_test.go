@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -14,11 +15,13 @@ import (
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	dto "github.com/prometheus/client_model/go"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
+
+// Matches the variableLabels portion of the string Desc.String() renders.
+var variableLabelsPattern = regexp.MustCompile(`variableLabels: \{([^}]*)\}`)
 
 // The per-session metrics are the only per-subscriber throughput the UPF exports, so a
 // reader has to be able to tell a UE's uplink from its downlink. The collector reads the
@@ -185,21 +188,16 @@ func TestSessionMetricDescriptorsAllDeclareDirection(t *testing.T) {
 	}
 
 	for name, d := range descs {
-		// Bind the descriptor the way SessionStats does, and read back the label names it
-		// was declared with.
-		m, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, 0, "fseid", "pdr", "ue_ip", "direction")
-		if err != nil {
-			t.Errorf("upf_session_%s does not take the %q label: %v", name, labelDirection, err)
-			continue
+		// Desc.String() renders the variable label names the descriptor was built with.
+		s := d.String()
+
+		m := variableLabelsPattern.FindStringSubmatch(s)
+		if m == nil {
+			t.Fatalf("could not read variable labels from upf_session_%s descriptor: %s", name, s)
 		}
 
-		var out dto.Metric
-		if err := m.Write(&out); err != nil {
-			t.Fatal(err)
-		}
-
-		if !slices.ContainsFunc(out.GetLabel(), func(l *dto.LabelPair) bool { return l.GetName() == labelDirection }) {
-			t.Errorf("upf_session_%s does not declare the %q label: %v", name, labelDirection, out.GetLabel())
+		if !slices.Contains(strings.Split(m[1], ","), labelDirection) {
+			t.Errorf("upf_session_%s does not declare the %q label: %s", name, labelDirection, s)
 		}
 	}
 }
