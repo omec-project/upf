@@ -17,6 +17,11 @@ const (
 	// usual cause is an agent that started a moment before bessd created the socket.
 	endMarkerRedialMin = 100 * time.Millisecond
 	endMarkerRedialMax = 2 * time.Second
+
+	// endMarkerWriteTimeout bounds a write to the End Marker socket. A write
+	// blocks only once bessd has stopped reading and the socket is full; past
+	// this the connection is treated as lost.
+	endMarkerWriteTimeout = time.Second
 )
 
 // dialFunc matches net.Dialer.DialContext, so tests can stand in for the datapath.
@@ -39,6 +44,8 @@ type endMarkerLink struct {
 	redialMin time.Duration
 	redialMax time.Duration
 
+	writeTimeout time.Duration
+
 	// wait is the delay before the next dial. It survives a dropped connection
 	// and goes back to redialMin only once a connection has lasted that long.
 	wait      time.Duration
@@ -59,6 +66,8 @@ func newEndMarkerLink(addr string, dial dialFunc, markers <-chan []byte, stop <-
 		stop:      stop,
 		redialMin: endMarkerRedialMin,
 		redialMax: endMarkerRedialMax,
+
+		writeTimeout: endMarkerWriteTimeout,
 	}
 }
 
@@ -217,7 +226,7 @@ func (l *endMarkerLink) forward(conn net.Conn) bool {
 
 			return true
 		case marker := <-l.markers:
-			if _, err := conn.Write(marker); err != nil {
+			if err := l.write(conn, marker); err != nil {
 				if l.stopping() {
 					return false
 				}
@@ -229,6 +238,18 @@ func (l *endMarkerLink) forward(conn net.Conn) bool {
 			}
 		}
 	}
+}
+
+// write sends one marker. A datapath that keeps the connection open but stops
+// reading would otherwise block it for good, and the queue would fill behind it.
+func (l *endMarkerLink) write(conn net.Conn, marker []byte) error {
+	if err := conn.SetWriteDeadline(time.Now().Add(l.writeTimeout)); err != nil {
+		return err
+	}
+
+	_, err := conn.Write(marker)
+
+	return err
 }
 
 func (l *endMarkerLink) stopping() bool {

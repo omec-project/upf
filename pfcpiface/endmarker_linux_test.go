@@ -235,3 +235,74 @@ func TestEndMarkerLinkStopsWhileAWriteIsBlocked(t *testing.T) {
 		t.Fatal("the sender did not stop while its write was blocked on a full socket")
 	}
 }
+
+// A datapath that keeps the connection open but stops reading must not stall
+// the sender for good: the queue would fill behind the blocked write and block
+// SendEndMarkers, and with it the PFCP association's reader, until the agent
+// stops. The sender gives up on the write, drops that connection and dials
+// again.
+func TestEndMarkerLinkRedialsWhenTheDatapathStopsReading(t *testing.T) {
+	fds, err := syscall.Socketpair(syscall.AF_UNIX, syscall.SOCK_SEQPACKET|syscall.SOCK_CLOEXEC, 0)
+	if err != nil {
+		t.Fatalf("socketpair: %v", err)
+	}
+
+	// The datapath's end is held open and never read.
+	datapath := os.NewFile(uintptr(fds[1]), "datapath")
+	defer datapath.Close()
+
+	agentFile := os.NewFile(uintptr(fds[0]), "agent")
+
+	agent, err := net.FileConn(agentFile)
+	agentFile.Close()
+
+	if err != nil {
+		t.Fatalf("file conn: %v", err)
+	}
+
+	// After the first connection the socket is gone, as it would be if bessd
+	// were restarted to clear the stall.
+	redialed := make(chan struct{})
+	dials := 0
+
+	dial := func(ctx context.Context, network, address string) (net.Conn, error) {
+		dials++
+		if dials == 1 {
+			return agent, nil
+		}
+
+		if dials == 2 {
+			close(redialed)
+		}
+
+		return nil, syscall.ENOENT
+	}
+
+	markers, _ := startTestLink(t, dial, func(l *endMarkerLink) {
+		l.writeTimeout = 50 * time.Millisecond
+	})
+
+	// Far more than the socket and the queue hold together.
+	marker := make([]byte, 4096)
+	queued := make(chan struct{})
+
+	go func() {
+		defer close(queued)
+
+		for range 4096 {
+			markers <- marker
+		}
+	}()
+
+	select {
+	case <-queued:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the queue stopped draining: the sender is stuck in a write the datapath never reads")
+	}
+
+	select {
+	case <-redialed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the sender did not dial again after giving up on the stalled connection")
+	}
+}

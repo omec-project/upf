@@ -507,6 +507,8 @@ func (c *stopDuringWriteConn) Write(b []byte) (int, error) {
 
 func (c *stopDuringWriteConn) Close() error { return nil }
 
+func (c *stopDuringWriteConn) SetWriteDeadline(time.Time) error { return nil }
+
 // A planned stop that lands while a marker is being written must be reported as
 // a stop, not as a lost connection to log and redial. Which of two ready cases
 // a select takes is random, so this runs many times.
