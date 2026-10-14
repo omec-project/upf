@@ -36,6 +36,7 @@ class GtpuParser final : public Module {
 
  private:
   gate_idx_t Parse(bess::Packet *p, const char **malformed);
+  void set_unmatchable_attrs(bess::Packet *p);
   gate_idx_t ParseGtpu(bess::Packet *p, bess::utils::Ipv4 *outer_iph,
                        size_t gtp_off, const char **malformed);
   GtpuDropLog drop_log_;
