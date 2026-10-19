@@ -132,6 +132,14 @@ CommandResponse WildcardMatch::AddFieldOne(const bess::pb::Field &field,
 CommandResponse WildcardMatch::Init(const bess::pb::WildcardMatchArg &arg) {
   int size_acc = 0;
 
+  if (arg.max_tuples() > MAX_TUPLES_LIMIT) {
+    return CommandFailure(EINVAL, "max_tuples must be 1-%u (0: %u)",
+                          MAX_TUPLES_LIMIT, MAX_TUPLES);
+  }
+  // Built in place, once: a slot's hash table is named after its address.
+  tuples_ = std::vector<struct WmTuple>(arg.max_tuples() ? arg.max_tuples()
+                                                         : MAX_TUPLES);
+
   for (int i = 0; i < arg.fields_size(); i++) {
     const auto &field = arg.fields(i);
     CommandResponse err;
@@ -526,7 +534,7 @@ CommandResponse WildcardMatch::ExtractValue(const T &arg, wm_hkey_t *keyv) {
 }
 
 int WildcardMatch::FindTuple(wm_hkey_t *mask) {
-  for (auto i = 0; i < MAX_TUPLES; i++) {
+  for (size_t i = 0; i < tuples_.size(); i++) {
     if ((tuples_[i].occupied) &&
         (memcmp(&tuples_[i].mask, mask, total_key_size_) == 0)) {
       return i;
@@ -538,7 +546,7 @@ int WildcardMatch::FindTuple(wm_hkey_t *mask) {
 int WildcardMatch::AddTuple(wm_hkey_t *mask) {
   // A slot DelEntry released keeps its mask and its (empty) table. One that
   // held this very mask is taken back as it is: nothing a worker reads changes.
-  for (int i = 0; i < MAX_TUPLES; i++) {
+  for (size_t i = 0; i < tuples_.size(); i++) {
     if (tuples_[i].occupied == 0 && tuples_[i].ht &&
         memcmp(&tuples_[i].mask, mask, total_key_size_) == 0) {
       tuples_[i].occupied = 1;
@@ -547,7 +555,7 @@ int WildcardMatch::AddTuple(wm_hkey_t *mask) {
   }
 
   CuckooMap<wm_hkey_t, struct WmData, wm_hash, wm_eq> *temp = nullptr;
-  for (int i = 0; i < MAX_TUPLES; i++) {
+  for (size_t i = 0; i < tuples_.size(); i++) {
     if (tuples_[i].occupied == 0 && tuples_[i].ht == nullptr) {
       bess::utils::Copy(&tuples_[i].mask, mask, sizeof(*mask));
       tuples_[i].params.key_len = total_key_size_;
@@ -579,7 +587,7 @@ int WildcardMatch::AddTuple(wm_hkey_t *mask) {
   // only while they are paused; reusing the table keeps the pause to a copy.
   // WorkerPauser pauses only the workers that are running and resumes exactly
   // those, so a controller that had paused them itself finds them paused.
-  for (int i = 0; i < MAX_TUPLES; i++) {
+  for (size_t i = 0; i < tuples_.size(); i++) {
     if (tuples_[i].occupied == 0 && tuples_[i].ht) {
       WorkerPauser wp;
       bess::utils::Copy(&tuples_[i].mask, mask, sizeof(*mask));
@@ -594,7 +602,7 @@ bool WildcardMatch::DelEntry(int idx, wm_hkey_t *key) {
   int ret = tuples_[idx].ht->Remove(*key, wm_hash(total_key_size_),
                                     wm_eq(total_key_size_));
   // A tuple whose last rule went gives its slot back, so that a mask no longer
-  // in use does not hold one of the MAX_TUPLES for good. Its table and mask
+  // in use does not hold one of the table's slots for good. Its table and mask
   // stay as they are: a worker in the middle of a lookup may still be reading
   // them, and an empty table answers a miss, which is right. AddTuple reuses
   // the slot.
@@ -706,6 +714,9 @@ CommandResponse WildcardMatch::GetInitialArg(const bess::pb::EmptyArg &) {
       f->set_offset(field.offset);
     }
     f->set_num_bytes(field.size);
+  }
+  if (tuples_.size() != MAX_TUPLES) {
+    resp.set_max_tuples(tuples_.size());
   }
   return CommandSuccess(resp);
 }
