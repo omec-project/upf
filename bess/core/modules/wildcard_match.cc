@@ -32,6 +32,8 @@
 
 #include "wildcard_match.h"
 
+#include <algorithm>
+#include <atomic>
 #include <string>
 #include <vector>
 
@@ -178,6 +180,58 @@ CommandResponse WildcardMatch::Init(const bess::pb::WildcardMatchArg &arg) {
 
   total_value_size_ = align_ceil(size_acc, sizeof(uint64_t));
 
+  for (const auto &set : arg.index_sets()) {
+    auto is = std::make_unique<WmIndexSet>();
+    is->spec = set;
+    auto set_bytes = [&](wm_hkey_t *m, uint32_t f) {
+      memset(reinterpret_cast<uint8_t *>(m) + fields_[f].pos, 0xff,
+             fields_[f].size);
+    };
+    if (set.fields_size() == 0) {
+      return CommandFailure(EINVAL, "an index set needs at least one field");
+    }
+    for (uint32_t f : set.fields()) {
+      if (f >= fields_.size()) {
+        return CommandFailure(EINVAL, "index set field %u: no such field", f);
+      }
+      set_bytes(&is->mask, f);
+    }
+    if (!set.has_when_field() && set.when_value()) {
+      return CommandFailure(EINVAL, "index set when_value needs a when_field");
+    }
+    if (set.has_when_field()) {
+      uint32_t f = set.when_field();
+      if (f >= fields_.size()) {
+        return CommandFailure(EINVAL, "index set when_field %u: no such field",
+                              f);
+      }
+      uint64_t v = 0;
+      if (!bess::utils::uint64_to_bin(&v, set.when_value(), fields_[f].size,
+                                      true)) {
+        return CommandFailure(EINVAL, "index set when_value: not %d bytes",
+                              fields_[f].size);
+      }
+      is->has_when = true;
+      set_bytes(&is->when_mask, f);
+      memcpy(reinterpret_cast<uint8_t *>(&is->when_key) + fields_[f].pos, &v,
+             fields_[f].size);
+      // The condition's field is part of the key too.
+      set_bytes(&is->mask, f);
+    }
+    is->params.key_len = total_key_size_;
+    if (entries_) {
+      is->params.entries = entries_;
+    }
+    is->ht = new CuckooMap<wm_hkey_t, struct WmData, wm_hash, wm_eq>(
+        0, 0, &is->params);
+    if (is->ht->dpdk_init_failed()) {
+      delete is->ht;
+      is->ht = nullptr;
+      return CommandFailure(ENOMEM, "cannot create an index table");
+    }
+    index_sets_.push_back(std::move(is));
+  }
+
   return CommandSuccess();
 }
 
@@ -264,6 +318,10 @@ inline bool WildcardMatch::LookupBulkEntry(wm_hkey_t *key, gate_idx_t def_gate,
   wm_hkey_t key_masked[cnt];
   WmData *entry[cnt];
   wm_hkey_t **key_ptr[cnt];
+
+  if (!index_sets_.empty()) {
+    IndexLookupBulk(key, cnt, result, &prev_hitmask);
+  }
 
   for (auto tuple = tuples_.begin(); tuple != tuples_.end(); ++tuple) {
     if (tuple->occupied == 0)
@@ -352,6 +410,14 @@ inline bool WildcardMatch::LookupBulkEntry(wm_hkey_t *key, gate_idx_t def_gate,
 }
 
 void WildcardMatch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
+  // The groups this batch reads stay allocated until the worker leaves.
+  WmReader *reader = nullptr;
+  if (!index_sets_.empty()) {
+    reader = &readers_[ctx->wid];
+    reader->epoch.store(epoch_.load(std::memory_order_acquire),
+                        std::memory_order_relaxed);
+    std::atomic_thread_fence(std::memory_order_seq_cst);  // see Reclaim
+  }
   gate_idx_t default_gate;
   wm_hkey_t keys[bess::PacketBatch::kMaxBurst] __ymm_aligned;
   int cnt = batch->cnt();
@@ -403,6 +469,9 @@ void WildcardMatch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
       EmitPacket(ctx, batch->pkts()[j], Outgate[j]);
     }
   }
+  if (reader) {
+    reader->epoch.store(0, std::memory_order_release);
+  }
 }
 
 std::string WildcardMatch::GetDesc() const {
@@ -414,7 +483,9 @@ std::string WildcardMatch::GetDesc() const {
     num_rules += tuple.ht->Count();
   }
 
-  return bess::utils::Format("%zu fields, %d rules", fields_.size(), num_rules);
+  return bess::utils::Format("%zu fields, %d rules (%zu indexed)",
+                             fields_.size(), num_rules + (int)indexed_rules_,
+                             indexed_rules_);
 }
 
 template <typename T>
@@ -615,6 +686,266 @@ bool WildcardMatch::DelEntry(int idx, wm_hkey_t *key) {
   return false;
 }
 
+// The first set whose fields the rule matches exactly and whose condition it
+// carries, or -1: the rule then belongs in a mask table. Decided by the rule's
+// key and mask alone, so a delete finds the rule where its add put it.
+int WildcardMatch::IndexSetOf(const wm_hkey_t &key,
+                              const wm_hkey_t &mask) const {
+  const size_t words = total_key_size_ / 8;
+  for (size_t s = 0; s < index_sets_.size(); s++) {
+    const WmIndexSet &is = *index_sets_[s];
+    bool ok = true;
+    for (size_t w = 0; ok && w < words; w++) {
+      ok = (mask.u64_arr[w] & is.mask.u64_arr[w]) == is.mask.u64_arr[w];
+      if (ok && is.has_when) {
+        ok = (key.u64_arr[w] & is.when_mask.u64_arr[w]) ==
+             is.when_key.u64_arr[w];
+      }
+    }
+    if (ok) {
+      return static_cast<int>(s);
+    }
+  }
+  return -1;
+}
+
+static inline bool same_rule(const wm_hkey_t &k1, const wm_hkey_t &m1,
+                             const wm_hkey_t &k2, const wm_hkey_t &m2,
+                             size_t words) {
+  for (size_t w = 0; w < words; w++) {
+    if (k1.u64_arr[w] != k2.u64_arr[w] || m1.u64_arr[w] != m2.u64_arr[w]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// A group is never changed once published: an edit builds a new one and swaps
+// the table's pointer to it. Workers read the table without waiting for the
+// edit, so the old group is retired, not freed (see Reclaim).
+CommandResponse WildcardMatch::IndexAdd(int s, const wm_hkey_t &key,
+                                        const wm_hkey_t &rmask,
+                                        const WmData &data) {
+  WmIndexSet &is = *index_sets_[s];
+  const size_t words = total_key_size_ / 8;
+  wm_hkey_t ikey = {{0}};
+  mask(ikey, key, is.mask, total_key_size_);
+  Reclaim();
+
+  WmGroup *old = nullptr;
+  if (is.ht->find_dpdk(&ikey, reinterpret_cast<void **>(&old)) < 0) {
+    old = nullptr;
+  }
+  auto *g = old ? new WmGroup(*old) : new WmGroup();
+  bool replaced = false;
+  for (auto &r : g->rules) {
+    if (same_rule(r.key, r.mask, key, rmask, words)) {
+      r.data = data;
+      replaced = true;
+      break;
+    }
+  }
+  if (!replaced) {
+    g->rules.push_back({key, rmask, data});
+  }
+  // Highest priority first, so a scan stops at its first match; ties keep
+  // the order rules were added in.
+  std::stable_sort(g->rules.begin(), g->rules.end(),
+                   [](const WmIdxRule &a, const WmIdxRule &b) {
+                     return a.data.priority > b.data.priority;
+                   });
+  g->Compile(words);
+
+  if (is.ht->insert_dpdk(&ikey, g) < 0) {
+    delete g;
+    return CommandFailure(ENOSPC, "index table full");
+  }
+  if (old) {
+    Retire(old);
+  } else {
+    is.groups.fetch_add(1, std::memory_order_relaxed);
+  }
+  if (!replaced) {
+    indexed_rules_++;
+  }
+  return CommandSuccess();
+}
+
+CommandResponse WildcardMatch::IndexDelete(int s, const wm_hkey_t &key,
+                                           const wm_hkey_t &rmask) {
+  WmIndexSet &is = *index_sets_[s];
+  const size_t words = total_key_size_ / 8;
+  wm_hkey_t ikey = {{0}};
+  mask(ikey, key, is.mask, total_key_size_);
+
+  Reclaim();
+
+  WmGroup *old = nullptr;
+  if (is.ht->find_dpdk(&ikey, reinterpret_cast<void **>(&old)) < 0 || !old) {
+    return CommandFailure(ENOENT, "failed to delete a rule");
+  }
+  auto *g = new WmGroup();
+  for (const auto &r : old->rules) {
+    if (!same_rule(r.key, r.mask, key, rmask, words)) {
+      g->rules.push_back(r);
+    }
+  }
+  if (g->rules.size() == old->rules.size()) {
+    delete g;
+    return CommandFailure(ENOENT, "failed to delete a rule");
+  }
+  g->Compile(words);
+
+  if (g->rules.empty()) {
+    is.ht->Remove(ikey, wm_hash(total_key_size_), wm_eq(total_key_size_));
+    delete g;
+    is.groups.fetch_sub(1, std::memory_order_relaxed);
+  } else if (is.ht->insert_dpdk(&ikey, g) < 0) {
+    delete g;
+    return CommandFailure(ENOMEM, "failed to delete a rule");
+  }
+  Retire(old);
+  indexed_rules_--;
+  return CommandSuccess();
+}
+
+// Called by clear and set_runtime_config, which pause the workers, and by
+// DeInit. Nothing can be scanning a group, retired or not.
+void WildcardMatch::IndexClear() {
+  for (auto &r : retired_) {
+    delete r.group;
+  }
+  retired_.clear();
+  for (auto &is : index_sets_) {
+    if (!is->ht) {
+      continue;
+    }
+    std::vector<wm_hkey_t> keys;
+    const void *k;
+    void *d;
+    uint32_t next = 0;
+    while (is->ht->Iterate(&k, &d, &next) >= 0) {
+      wm_hkey_t key = {{0}};
+      memcpy(&key, k, total_key_size_);  // the table holds key_len bytes
+      keys.push_back(key);
+      delete static_cast<WmGroup *>(d);
+    }
+    for (const auto &key : keys) {
+      is->ht->Remove(key, wm_hash(total_key_size_), wm_eq(total_key_size_));
+    }
+    is->groups.store(0, std::memory_order_relaxed);
+  }
+  indexed_rules_ = 0;
+}
+
+// Workers find groups through the tables without waiting for edits, so a
+// replaced group is retired, tagged with the current epoch, and the epoch
+// advances. When it may be freed is Reclaim's to decide.
+void WildcardMatch::Retire(WmGroup *g) {
+  retired_.push_back({g, epoch_.fetch_add(1, std::memory_order_seq_cst)});
+}
+
+// A group retired at epoch e can be held only by a worker that was in
+// ProcessBatch at that retire, and such a worker's slot is e or less, so the
+// group goes once every non-zero slot is later than e. A slot read as 0 here
+// belongs to a worker that is outside, or entering: each side writes its own
+// location -- the edit the table, the worker its slot -- then has a seq_cst
+// fence, then reads the other's, so if this read misses the worker's slot, the
+// worker's table lookup comes after the fence below and finds the new group
+// (the pointer itself is read under the table's rwlock, RW_CONCURRENCY). A
+// worker's release store of 0 on leaving pairs with the acquire load here, so
+// its reads of a group come before the delete.
+void WildcardMatch::Reclaim() {
+  if (retired_.empty()) {
+    return;
+  }
+  std::atomic_thread_fence(std::memory_order_seq_cst);
+  uint64_t oldest = UINT64_MAX;
+  for (const auto &r : readers_) {
+    uint64_t e = r.epoch.load(std::memory_order_acquire);
+    if (e) {
+      oldest = std::min(oldest, e);
+    }
+  }
+  auto keep = retired_.begin();
+  for (auto &r : retired_) {
+    if (r.epoch < oldest) {
+      delete r.group;
+    } else {
+      *keep++ = r;
+    }
+  }
+  retired_.erase(keep, retired_.end());
+}
+
+// For each set, probe the group of every packet that meets its condition and
+// take the first (highest-priority) rule of the group the packet matches.
+inline void WildcardMatch::IndexLookupBulk(const wm_hkey_t *key, int cnt,
+                                           WmData **result, uint64_t *hitmask) {
+  const size_t words = total_key_size_ / 8;
+  wm_hkey_t ikey[cnt];
+  const void *iptr[cnt];
+  int sel[cnt];
+  WmGroup *grp[cnt];
+
+  for (const auto &isp : index_sets_) {
+    const WmIndexSet &is = *isp;
+    if (is.groups.load(std::memory_order_relaxed) == 0) {
+      continue;
+    }
+    int n = 0;
+    for (int i = 0; i < cnt; i++) {
+      bool ok = true;
+      if (is.has_when) {
+        for (size_t w = 0; ok && w < words; w++) {
+          ok = (key[i].u64_arr[w] & is.when_mask.u64_arr[w]) ==
+               is.when_key.u64_arr[w];
+        }
+      }
+      if (!ok) {
+        continue;
+      }
+      for (size_t w = 0; w < words; w++) {
+        ikey[n].u64_arr[w] = key[i].u64_arr[w] & is.mask.u64_arr[w];
+      }
+      iptr[n] = &ikey[n];
+      sel[n++] = i;
+    }
+    if (n == 0) {
+      continue;
+    }
+    uint64_t hits = 0;
+    if (is.ht->lookup_bulk_data(iptr, n, &hits,
+                                reinterpret_cast<void **>(grp)) <= 0) {
+      continue;
+    }
+    for (int j = 0; j < n; j++) {
+      if (!(hits & (1ULL << j))) {
+        continue;
+      }
+      const int i = sel[j];
+      const WmGroup &g = *grp[j];
+      const uint64_t *km = g.km.data();
+      const size_t nrules = g.act.size();
+      for (size_t r = 0; r < nrules; r++, km += 2 * words) {
+        uint64_t diff = 0;
+        for (size_t w = 0; w < words; w++) {
+          diff |= (key[i].u64_arr[w] & km[words + w]) ^ km[w];
+        }
+        if (diff) {
+          continue;
+        }
+        const uint64_t bit = 1ULL << i;
+        if (!(*hitmask & bit) || g.act[r].priority >= result[i]->priority) {
+          result[i] = const_cast<WmData *>(&g.act[r]);
+        }
+        *hitmask |= bit;
+        break;
+      }
+    }
+  }
+}
+
 CommandResponse WildcardMatch::CommandAdd(
     const bess::pb::WildcardMatchCommandAddArg &arg) {
   gate_idx_t gate = arg.gate();
@@ -638,6 +969,10 @@ CommandResponse WildcardMatch::CommandAdd(
 
   data.priority = priority;
   data.ogate = gate;
+  int s = IndexSetOf(key, mask);
+  if (s >= 0) {
+    return IndexAdd(s, key, mask, data);
+  }
   int idx = FindTuple(&mask);
   if (idx < 0) {
     idx = AddTuple(&mask);
@@ -669,6 +1004,10 @@ CommandResponse WildcardMatch::CommandDelete(
     return err;
   }
 
+  int s = IndexSetOf(key, mask);
+  if (s >= 0) {
+    return IndexDelete(s, key, mask);
+  }
   int idx = FindTuple(&mask);
   if (idx < 0) {
     return CommandFailure(-idx, "failed to delete a rule");
@@ -692,6 +1031,7 @@ CommandResponse WildcardMatch::CommandClear(const bess::pb::EmptyArg &) {
 }
 
 void WildcardMatch::Clear() {
+  IndexClear();
   for (auto &tuple : tuples_) {
     // A released slot still owns its table.
     if (tuple.occupied || tuple.ht) {
@@ -718,6 +1058,9 @@ CommandResponse WildcardMatch::GetInitialArg(const bess::pb::EmptyArg &) {
   if (tuples_.size() != MAX_TUPLES) {
     resp.set_max_tuples(tuples_.size());
   }
+  for (const auto &is : index_sets_) {
+    *resp.add_index_sets() = is->spec;
+  }
   return CommandSuccess(resp);
 }
 
@@ -730,6 +1073,22 @@ CommandResponse WildcardMatch::GetRuntimeConfig(const bess::pb::EmptyArg &) {
   const wm_hkey_t *key = 0;
   WmData *data;
   resp.set_default_gate(default_gate_);
+
+  auto add_rule = [&](const wm_hkey_t &k, const wm_hkey_t &m, const WmData &d) {
+    rule_t *rule = resp.add_rules();
+    rule->set_priority(d.priority);
+    rule->set_gate(d.ogate);
+
+    const uint8_t *entry_data = reinterpret_cast<const uint8_t *>(k.u64_arr);
+    const uint8_t *entry_mask = reinterpret_cast<const uint8_t *>(m.u64_arr);
+    // Then fill in each field
+    for (auto &field : fields_) {
+      bess::pb::FieldData *valuedata = rule->add_values();
+      valuedata->set_value_bin(entry_data + field.pos, field.size);
+      bess::pb::FieldData *maskdata = rule->add_masks();
+      maskdata->set_value_bin(entry_mask + field.pos, field.size);
+    }
+  };
 
   // Each tuple provides a single mask, which may have many data-matches.
   for (auto &tuple : tuples_) {
@@ -747,19 +1106,17 @@ CommandResponse WildcardMatch::GetRuntimeConfig(const bess::pb::EmptyArg &) {
            (int)0) {
       entry.first = *key;
       entry.second = *data;
-      // Create the rule instance
-      rule_t *rule = resp.add_rules();
-      rule->set_priority(entry.second.priority);
-      rule->set_gate(entry.second.ogate);
-
-      uint8_t *entry_data = reinterpret_cast<uint8_t *>(entry.first.u64_arr);
-      uint8_t *entry_mask = reinterpret_cast<uint8_t *>(mask.u64_arr);
-      // Then fill in each field
-      for (auto &field : fields_) {
-        bess::pb::FieldData *valuedata = rule->add_values();
-        valuedata->set_value_bin(entry_data + field.pos, field.size);
-        bess::pb::FieldData *maskdata = rule->add_masks();
-        maskdata->set_value_bin(entry_mask + field.pos, field.size);
+      add_rule(entry.first, mask, entry.second);
+    }
+  }
+  // Rules an index set holds, from every group.
+  for (const auto &is : index_sets_) {
+    const void *k;
+    void *g;
+    uint32_t next = 0;
+    while (is->ht->Iterate(&k, &g, &next) >= 0) {
+      for (const auto &r : static_cast<const WmGroup *>(g)->rules) {
+        add_rule(r.key, r.mask, r.data);
       }
     }
   }
@@ -800,6 +1157,10 @@ CommandResponse WildcardMatch::CommandSetDefaultGate(
 // TODO(torek): consider vetting the entire argument before clobbering state.
 CommandResponse WildcardMatch::SetRuntimeConfig(
     const bess::pb::WildcardMatchConfig &arg) {
+  // Not MT safe, so bessctl refuses it while a worker runs this module -- as
+  // far as active_workers() knows, which a resume without a constraint check
+  // does not update. Clear frees tables and groups, so pause the workers too.
+  WorkerPauser wp;
   WildcardMatch::Clear();
   default_gate_ = arg.default_gate();
   for (int i = 0; i < arg.rules_size(); i++) {
@@ -812,6 +1173,14 @@ CommandResponse WildcardMatch::SetRuntimeConfig(
 }
 
 void WildcardMatch::DeInit() {
+  IndexClear();
+  for (auto &is : index_sets_) {
+    if (is->ht) {
+      is->ht->DeInit();
+      delete is->ht;
+      is->ht = nullptr;
+    }
+  }
   for (auto &tuple : tuples_) {
     if (!tuple.ht)
       continue;
