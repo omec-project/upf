@@ -57,6 +57,7 @@ class Parser:
         self.table_size_app_qer_lookup = 0
         self.table_size_session_qer_lookup = 0
         self.table_size_far_lookup = 0
+        self.pdr_lookup_max_masks = 0
 
     def parse(self, ifaces):
         if self.conf is None:
@@ -242,6 +243,20 @@ class Parser:
                 setattr(self, attr, table_sizes[key])
             elif table_sizes:
                 print(f"No explicit table size for {key}, using default")
+
+        # Distinct rule masks pdrLookup holds, 1-256; 0 keeps the module's default.
+        # WildcardMatch::Init refuses 257 or more, which would stop the pipeline.
+        # Only a JSON integer: int() would read true as 1 and 256.9 as 256.
+        if "pdr_lookup_max_masks" in self.conf:
+            max_masks = self.conf["pdr_lookup_max_masks"]
+            if type(max_masks) is int and 0 <= max_masks <= 256:
+                self.pdr_lookup_max_masks = max_masks
+            else:
+                print(
+                    "pdr_lookup_max_masks must be an integer 0-256 (0: the default), using default"
+                )
+        else:
+            print("No explicit pdrLookup mask limit, using default")
 
         # GTPu Path Monitoring
         try:

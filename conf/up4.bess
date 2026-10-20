@@ -167,7 +167,8 @@ linkMerge::Merge() \
                                         {'attr_name':'ctr_id', 'num_bytes':4}, \
                                         {'attr_name':'qer_id', 'num_bytes':4}, \
                                         {'attr_name':'far_id', 'num_bytes':4}],\
-                                entries=parser.table_size_pdr_lookup):noGTPUDecap
+                                entries=parser.table_size_pdr_lookup, \
+                                max_tuples=parser.pdr_lookup_max_masks):noGTPUDecap
 
 appQERLookup::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
                                  {'attr_name':'qer_id', 'num_bytes':4}, \

@@ -44,7 +44,8 @@
 using bess::utils::CuckooMap;
 using bess::utils::HashResult;
 
-#define MAX_TUPLES 16
+#define MAX_TUPLES 16u        /* distinct masks, unless max_tuples says */
+#define MAX_TUPLES_LIMIT 256u /* the largest max_tuples Init accepts */
 #define MAX_FIELDS 8
 #define MAX_FIELD_SIZE 8
 #define BULK_SIZE 32
@@ -153,7 +154,6 @@ class WildcardMatch final : public Module {
         values_(),
         tuples_() {
     max_allowed_workers_ = Worker::kMaxWorkers;
-    { tuples_.resize(MAX_TUPLES); }
   }
 
   CommandResponse Init(const bess::pb::WildcardMatchArg &arg);
@@ -217,7 +217,7 @@ class WildcardMatch final : public Module {
   // TODO(melvinw): this can be refactored to use ExactMatchTable
   std::vector<struct WmField> fields_;
   std::vector<struct WmField> values_;
-  std::vector<struct WmTuple> tuples_;  //[MAX_TUPLES];
+  std::vector<struct WmTuple> tuples_;  // a slot per mask, sized by Init
   std::vector<struct WmData> data_;
 };
 

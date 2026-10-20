@@ -29,6 +29,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import errno
 import socket
 import sys
 from test_utils import *
@@ -304,6 +305,46 @@ class BessWildcardMatchTest(BessModuleTestCase):
             add()
         bess.pause_all()
 
+        self.assertBessAlive()
+
+    # max_tuples sets how many distinct masks the table holds; past it a rule
+    # needing a new mask is refused, as at the default of 16.
+    def test_max_tuples_sets_the_ceiling(self):
+        wm = WildcardMatch(fields=[{'offset': 26, 'num_bytes': 4},
+                                   {'offset': 30, 'num_bytes': 4}],
+                           max_tuples=20)
+        wm.set_default_gate(gate=0)
+        sip = int.from_bytes(socket.inet_aton('10.1.2.3'), 'big')
+
+        def add(prefix):
+            bits = (0xffffffff << (32 - prefix)) & 0xffffffff
+            wm.add(gate=1, priority=0,
+                   masks=[{'value_bin': bits.to_bytes(4, 'big')},
+                          {'value_bin': b'\xff\xff\xff\xff'}],
+                   values=[{'value_bin': (sip & bits).to_bytes(4, 'big')},
+                           {'value_bin': socket.inet_aton('20.0.0.%d' % prefix)}])
+
+        for prefix in range(1, 21):
+            add(prefix)
+        with self.assertRaises(bess.Error) as refused:
+            add(21)
+        self.assertEqual(refused.exception.code, errno.ENOSPC)
+
+        # The twentieth mask, in a slot past the default's sixteen, matches.
+        pkt = get_tcp_packet(sip='10.1.2.3', dip='20.0.0.20')
+        self.assertEqual(len(self.run_module(wm, 0, [pkt], range(2))[1]), 1)
+
+        arg = wm.get_initial_arg()
+        self.assertEqual(arg.max_tuples, 20)
+        self.assertBessAlive()
+
+    def test_max_tuples_out_of_range_is_refused(self):
+        with self.assertRaises(bess.Error):
+            WildcardMatch(fields=[{'offset': 26, 'num_bytes': 4}],
+                          max_tuples=257)
+        wm = WildcardMatch(fields=[{'offset': 26, 'num_bytes': 4}],
+                           max_tuples=256)
+        self.assertEqual(wm.get_initial_arg().max_tuples, 256)
         self.assertBessAlive()
 
 

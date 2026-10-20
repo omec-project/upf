@@ -1329,6 +1329,11 @@ message WildcardMatchArg {
   repeated Field fields = 1;  /// A list of WildcardMatch fields.
   repeated Field values = 2;  /// A list of WildcardMatch values.
   uint64 entries = 3;
+  /// Distinct masks the table holds at once (1-256; 0 or unset: 16). Each
+  /// mask in use costs one hash lookup per packet; an unused slot is skipped
+  /// on every batch, about 0.1 cycles per packet each. A rule needing a mask
+  /// beyond the limit is refused with ENOSPC.
+  uint32 max_tuples = 4;
 }
 
 /**
