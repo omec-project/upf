@@ -117,7 +117,7 @@ jobs:
             exclude: ''
           - check: bess/sample_plugin/protobuf
             exclude: ''
-    uses: omec-project/.github/.github/workflows/check-clang-format.yml@4e868da104f24faa67be0699b937f9455b75b3d4 # v0.0.33
+    uses: omec-project/.github/.github/workflows/check-clang-format.yml@f920a09dd4b3fca4d6a40f36bb75f3cd2217bd59 # v0.0.34
     with:
       branch_name: ${{ github.ref }}
       clang_format_version: '14'
@@ -131,7 +131,7 @@ jobs:
       security-events: write
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/docker-build.yml@4e868da104f24faa67be0699b937f9455b75b3d4 # v0.0.33
+    uses: omec-project/.github/.github/workflows/docker-build.yml@f920a09dd4b3fca4d6a40f36bb75f3cd2217bd59 # v0.0.34
     with:
       branch_name: ${{ github.ref }}
       run_pre_build: true
@@ -144,7 +144,7 @@ jobs:
       security-events: write
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/docker-build.yml@4e868da104f24faa67be0699b937f9455b75b3d4 # v0.0.33
+    uses: omec-project/.github/.github/workflows/docker-build.yml@f920a09dd4b3fca4d6a40f36bb75f3cd2217bd59 # v0.0.34
     with:
       branch_name: ${{ github.ref }}
       build_directory: "./ptf"
@@ -156,7 +156,7 @@ jobs:
       actions: read
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/static-analysis.yml@4e868da104f24faa67be0699b937f9455b75b3d4 # v0.0.33
+    uses: omec-project/.github/.github/workflows/static-analysis.yml@f920a09dd4b3fca4d6a40f36bb75f3cd2217bd59 # v0.0.34
     with:
       staticcheck_version: 'v0.8.1'
       branch_name: ${{ github.ref }}
@@ -166,7 +166,7 @@ jobs:
       checks: write
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/lint.yml@4e868da104f24faa67be0699b937f9455b75b3d4 # v0.0.33
+    uses: omec-project/.github/.github/workflows/lint.yml@f920a09dd4b3fca4d6a40f36bb75f3cd2217bd59 # v0.0.34
     with:
       golangci_lint_version: 'v2.13.2'
       branch_name: ${{ github.ref }}
@@ -176,7 +176,7 @@ jobs:
       security-events: write
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/hadolint.yml@4e868da104f24faa67be0699b937f9455b75b3d4 # v0.0.33
+    uses: omec-project/.github/.github/workflows/hadolint.yml@f920a09dd4b3fca4d6a40f36bb75f3cd2217bd59 # v0.0.34
     with:
       branch_name: ${{ github.ref }}
   check-spelling:
@@ -185,7 +185,7 @@ jobs:
       checks: write
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/check-spelling.yml@4e868da104f24faa67be0699b937f9455b75b3d4 # v0.0.33
+    uses: omec-project/.github/.github/workflows/check-spelling.yml@f920a09dd4b3fca4d6a40f36bb75f3cd2217bd59 # v0.0.34
     with:
       branch_name: ${{ github.ref }}
   route-control-tests:
@@ -194,7 +194,7 @@ jobs:
       checks: write
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/upf-route-control-tests.yml@4e868da104f24faa67be0699b937f9455b75b3d4 # v0.0.33
+    uses: omec-project/.github/.github/workflows/upf-route-control-tests.yml@f920a09dd4b3fca4d6a40f36bb75f3cd2217bd59 # v0.0.34
     with:
       branch_name: ${{ github.ref }}
   unit-tests-pfcp:
@@ -203,7 +203,7 @@ jobs:
       checks: write
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/unit-test.yml@4e868da104f24faa67be0699b937f9455b75b3d4 # v0.0.33
+    uses: omec-project/.github/.github/workflows/unit-test.yml@f920a09dd4b3fca4d6a40f36bb75f3cd2217bd59 # v0.0.34
     with:
       branch_name: ${{ github.ref }}
       test_flags: "-race -failfast -v"
@@ -214,7 +214,7 @@ jobs:
       checks: write
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/unit-test.yml@4e868da104f24faa67be0699b937f9455b75b3d4 # v0.0.33
+    uses: omec-project/.github/.github/workflows/unit-test.yml@f920a09dd4b3fca4d6a40f36bb75f3cd2217bd59 # v0.0.34
     with:
       branch_name: ${{ github.ref }}
       test_flags: "-race -failfast -v -count=1"
@@ -229,7 +229,7 @@ jobs:
       checks: write
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/e2e-test.yml@4e868da104f24faa67be0699b937f9455b75b3d4 # v0.0.33
+    uses: omec-project/.github/.github/workflows/e2e-test.yml@f920a09dd4b3fca4d6a40f36bb75f3cd2217bd59 # v0.0.34
     with:
       branch_name: ${{ github.ref }}
       image_list: ${{ needs.bess-changes.outputs.e2e_image_list }}
@@ -238,7 +238,7 @@ jobs:
       contents: read
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/license-check.yml@4e868da104f24faa67be0699b937f9455b75b3d4 # v0.0.33
+    uses: omec-project/.github/.github/workflows/license-check.yml@f920a09dd4b3fca4d6a40f36bb75f3cd2217bd59 # v0.0.34
     with:
       branch_name: ${{ github.ref }}
   fossa-scan:
@@ -247,7 +247,7 @@ jobs:
       security-events: write
       id-token: write
       attestations: write
-    uses: omec-project/.github/.github/workflows/fossa-scan.yml@4e868da104f24faa67be0699b937f9455b75b3d4 # v0.0.33
+    uses: omec-project/.github/.github/workflows/fossa-scan.yml@f920a09dd4b3fca4d6a40f36bb75f3cd2217bd59 # v0.0.34
     with:
       branch_name: ${{ github.ref }}
   analysis:
@@ -272,6 +272,6 @@ jobs:
       security-events: write
       statuses: read
       vulnerability-alerts: read
-    uses: omec-project/.github/.github/workflows/scorecard-analysis.yml@4e868da104f24faa67be0699b937f9455b75b3d4 # v0.0.33
+    uses: omec-project/.github/.github/workflows/scorecard-analysis.yml@f920a09dd4b3fca4d6a40f36bb75f3cd2217bd59 # v0.0.34
     with:
       branch_name: ${{ github.ref }}
