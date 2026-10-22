@@ -218,6 +218,15 @@ CommandResponse WildcardMatch::Init(const bess::pb::WildcardMatchArg &arg) {
       // The condition's field is part of the key too.
       set_bytes(&is->mask, f);
     }
+    // Reclaim is correct only if a lookup reads the group pointer under the
+    // table's rwlock; see WmIndexSet's constructor.
+    // Any other flag (RW_CONCURRENCY_LF, NO_FREE_ON_DEL, ...) is refused: the
+    // latter would make IndexDelete/IndexClear leak key slots.
+    if (is->params.extra_flag != RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY) {
+      return CommandFailure(EINVAL,
+                            "index tables need exactly RW_CONCURRENCY as "
+                            "hash extra flags");
+    }
     is->params.key_len = total_key_size_;
     if (entries_) {
       is->params.entries = entries_;
