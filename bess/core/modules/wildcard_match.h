@@ -235,6 +235,10 @@ class WildcardMatch final : public Module {
     struct rte_hash_parameters params;
     std::string hash_name;
     WmIndexSet() : mask(), has_when(false), when_mask(), when_key(), ht() {
+      // Keep RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY, and do not switch to _LF:
+      // WildcardMatch::Reclaim relies on a lookup reading the group pointer
+      // under the table's rwlock, and _LF also implies NO_FREE_ON_DEL, which
+      // would leak slots on delete. Init refuses other flags.
       params = dpdk_params1;
       std::ostringstream address;
       address << this;
