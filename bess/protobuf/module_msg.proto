@@ -1334,6 +1334,20 @@ message WildcardMatchArg {
   /// on every batch, about 0.1 cycles per packet each. A rule needing a mask
   /// beyond the limit is refused with ENOSPC.
   uint32 max_tuples = 4;
+  /**
+   * An index set names fields (by their position in `fields`) that a rule
+   * matches exactly. A rule exact on all of a set's fields -- and, if the set
+   * has a condition, carrying when_value in field when_field -- is kept in a
+   * group per value of those fields, in priority order, instead of in a mask
+   * table. A packet probes each set whose condition it meets once and scans
+   * that group. A rule no set takes stays in a mask table.
+   */
+  message IndexSet {
+    repeated uint32 fields = 1;
+    optional uint32 when_field = 2;
+    uint64 when_value = 3;
+  }
+  repeated IndexSet index_sets = 5;
 }
 
 /**

@@ -30,6 +30,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import errno
+import random
 import socket
 import sys
 from test_utils import *
@@ -345,6 +346,153 @@ class BessWildcardMatchTest(BessModuleTestCase):
         wm = WildcardMatch(fields=[{'offset': 26, 'num_bytes': 4}],
                            max_tuples=256)
         self.assertEqual(wm.get_initial_arg().max_tuples, 256)
+        self.assertBessAlive()
+
+    # Index sets, as pdrLookup uses them: TCP rules exact on the source
+    # address are grouped by it, UDP rules exact on the destination by that.
+    INDEX_FIELDS = [{'offset': 23, 'num_bytes': 1},   # 0 ip_proto
+                    {'offset': 26, 'num_bytes': 4},   # 1 src_ip
+                    {'offset': 30, 'num_bytes': 4},   # 2 dst_ip
+                    {'offset': 36, 'num_bytes': 2}]   # 3 dst_port
+    INDEX_SETS = [{'fields': [1], 'when_field': 0, 'when_value': 6},
+                  {'fields': [2], 'when_field': 0, 'when_value': 17}]
+
+    @staticmethod
+    def _rule(proto, sip, sbits, dip, dbits, dport):
+        def pfx(bits):
+            return (0xffffffff << (32 - bits)) & 0xffffffff if bits else 0
+        s = int.from_bytes(socket.inet_aton(sip), 'big') & pfx(sbits)
+        d = int.from_bytes(socket.inet_aton(dip), 'big') & pfx(dbits)
+        values = [proto, s, d, dport]
+        masks = [0xff if proto else 0, pfx(sbits), pfx(dbits),
+                 0xffff if dport else 0]
+        return ([{'value_int': v} for v in values],
+                [{'value_int': m} for m in masks])
+
+    # A module with index sets must pick the same rule for every packet as
+    # one without. Every rule writes its own id into the packet, so equal
+    # output means equal decisions; rules overlap, have distinct priorities,
+    # and some are not exact on the indexed field and stay in mask tables.
+    def test_index_sets_decide_as_the_mask_tables(self):
+        rng = random.Random(1337)
+        addrs = ['10.0.0.1', '10.0.0.2', '10.0.1.1', '20.0.0.1']
+        value = [{'offset': 56, 'num_bytes': 2}]
+        plain = WildcardMatch(fields=self.INDEX_FIELDS, values=value,
+                              max_tuples=256)
+        indexed = WildcardMatch(fields=self.INDEX_FIELDS, values=value,
+                                max_tuples=256, index_sets=self.INDEX_SETS)
+        # Distinct as the table sees them, after masking: adding the same
+        # rule twice replaces it, and a second delete would find nothing.
+        rules, seen = [], set()
+        while len(rules) < 120:
+            r = (rng.choice((0, 6, 17)), rng.choice(addrs),
+                 rng.choice((32, 32, 24, 0)), rng.choice(addrs),
+                 rng.choice((32, 32, 24, 0)), rng.choice((0, 80, 443)))
+            key = str(self._rule(*r))
+            if key not in seen:
+                seen.add(key)
+                rules.append(r)
+        prios = rng.sample(range(1, 100000), len(rules))
+        for i, r in enumerate(rules):
+            v, m = self._rule(*r)
+            for wm in (plain, indexed):
+                wm.add(gate=1, priority=prios[i], values=v, masks=m,
+                       valuesv=[{'value_int': i + 1}])
+        for wm in (plain, indexed):
+            wm.set_default_gate(gate=0)
+
+        pkts = []
+        for sip in addrs:
+            for dip in addrs:
+                for dport in (80, 443, 8080):
+                    pkts.append(get_tcp_packet(sip=sip, dip=dip, sport=1234,
+                                               dport=dport))
+                    pkts.append(get_udp_packet(sip=sip, dip=dip, sport=1234,
+                                               dport=dport))
+
+        def decisions(wm):
+            out = self.run_module(wm, 0, pkts, range(2))
+            return [[bytes(p) for p in out[g]] for g in range(2)]
+
+        def compare():
+            a, b = decisions(plain), decisions(indexed)
+            self.assertEqual(len(a[0]) + len(a[1]), len(pkts))
+            self.assertGreater(len(a[1]), 0)
+            self.assertEqual(a, b)
+
+        compare()
+        for i in rng.sample(range(len(rules)), len(rules) // 2):
+            v, m = self._rule(*rules[i])
+            for wm in (plain, indexed):
+                wm.delete(values=v, masks=m)
+        compare()
+        self.assertBessAlive()
+
+    # A rule an index set holds takes no mask slot, so the mask limit does not
+    # bound how many shapes indexed rules have. Other rules still count.
+    def test_indexed_rules_take_no_mask_slot(self):
+        wm = WildcardMatch(fields=self.INDEX_FIELDS, max_tuples=1,
+                           index_sets=self.INDEX_SETS)
+        for dbits in range(1, 33):
+            v, m = self._rule(6, '10.0.0.1', 32, '20.0.0.1', dbits, 0)
+            wm.add(gate=1, priority=dbits, values=v, masks=m)
+        v, m = self._rule(6, '10.0.0.1', 24, '20.0.0.1', 32, 0)
+        wm.add(gate=1, priority=0, values=v, masks=m)
+        v, m = self._rule(6, '10.0.0.1', 16, '20.0.0.1', 32, 0)
+        with self.assertRaises(bess.Error):
+            wm.add(gate=1, priority=0, values=v, masks=m)
+
+        config = wm.get_runtime_config()
+        self.assertEqual(len(config.rules), 33)
+        # An indexed rule comes back as it was added.
+        rule = [r for r in config.rules if r.priority == 32][0]
+        self.assertEqual([m.value_bin for m in rule.masks],
+                         [b'\xff', b'\xff' * 4, b'\xff' * 4, b'\x00' * 2])
+        self.assertEqual([v.value_bin for v in rule.values],
+                         [b'\x06', socket.inet_aton('10.0.0.1'),
+                          socket.inet_aton('20.0.0.1'), b'\x00' * 2])
+        arg = wm.get_initial_arg()
+        self.assertEqual(len(arg.index_sets), 2)
+        self.assertEqual(list(arg.index_sets[1].fields), [2])
+        self.assertEqual(arg.index_sets[1].when_value, 17)
+        self.assertBessAlive()
+
+    def test_index_sets_refuse_unknown_fields(self):
+        for sets in ([{'fields': [4]}],
+                     [{'fields': []}],
+                     [{'fields': [1], 'when_field': 9, 'when_value': 6}],
+                     [{'fields': [1], 'when_value': 6}]):
+            with self.assertRaises(bess.Error):
+                WildcardMatch(fields=self.INDEX_FIELDS, index_sets=sets)
+        self.assertBessAlive()
+
+    # An edit replaces a group that a worker may be scanning; the old one is
+    # freed only once no worker that could hold it is still in the module. A
+    # smoke test in a normal build, where a group freed too early is only
+    # recycled memory; in a SANITIZE=1 build, freeing it at the swap instead
+    # takes bessd down here.
+    def test_index_edits_while_workers_run(self):
+        wm = WildcardMatch(fields=self.INDEX_FIELDS,
+                           index_sets=self.INDEX_SETS)
+        wm.set_default_gate(gate=0)
+        pkt = get_tcp_packet(sip='10.0.0.1', dip='20.0.0.1', sport=1234,
+                             dport=80)
+        rw = Rewrite(templates=[bytes(pkt)])
+        Source() -> rw -> wm
+
+        bess.resume_all()
+        for i in range(500):
+            v, m = self._rule(6, '10.0.0.1', 32, '20.0.0.1', i % 33, 0)
+            wm.add(gate=1, priority=i, values=v, masks=m)
+            if i % 3 == 0:
+                wm.delete(values=v, masks=m)
+        bess.pause_all()
+
+        # What is left still decides: 22 of the 33 rules remain, and the
+        # packet matches each of them.
+        bess.disconnect_modules(rw.name, 0)
+        out = self.run_module(wm, 0, [pkt], range(2))
+        self.assertEqual(len(out[1]), 1)
         self.assertBessAlive()
 
 
