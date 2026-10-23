@@ -69,6 +69,8 @@ void GtpuPathMonitoring::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
         newIph->dst = static_cast<be32_t>(it.first);
         EmitPacket(ctx, newPkt);
       }
+      // Only the copies leave; the request they were made from is done with.
+      DropPacket(ctx, pkt);
 
       m_seqNumber++;
 
