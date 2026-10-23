@@ -97,7 +97,10 @@ class BessGtpuPathMonitoringTest(BessModuleTestCase):
         bess.pause_all()
         sent = bess.get_module_info(gpm.name).ogates[0].pkts
         print("echo request copies sent in the burst: %d" % sent, file=sys.stderr)
-        bess.disconnect_modules(flood.name, 0)
+        # Destroyed, not just disconnected: a Source left behind keeps its task,
+        # and its packets would satisfy run_module's wait before the probe has
+        # gone through.
+        bess.destroy_module(flood.name)
 
         out = self.run_module(gpm, 0, [echo(ECHO_REQUEST, N3, "0.0.0.0")], [0])
         self.assertEqual([p[scapy.IP].dst for p in out[0]], [GNB_A])
