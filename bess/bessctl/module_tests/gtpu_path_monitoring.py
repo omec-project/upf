@@ -2,7 +2,8 @@
 # Copyright 2026 Forsway Scandinavia AB
 
 # GtpuPathMonitoring: an echo request copied to every gNB, an echo response
-# timed against it, and the request returned to the pool once it is copied.
+# timed against it, the request returned to the pool once it is copied, and
+# the commands that change the module's tables while a worker runs it.
 
 import ipaddress
 import struct
@@ -105,6 +106,50 @@ class BessGtpuPathMonitoringTest(BessModuleTestCase):
         out = self.run_module(gpm, 0, [echo(ECHO_REQUEST, N3, "0.0.0.0")], [0])
         self.assertEqual([p[scapy.IP].dst for p in out[0]], [GNB_A])
         self.assertBessAlive()
+
+    # pfcpiface adds and deletes gNBs as sessions come and go and reads the
+    # statistics on every scrape, all while a worker runs the module. Without
+    # the module's lock this takes bessd down within seconds, in a normal build
+    # as well as under SANITIZE=1.
+    def test_commands_while_a_worker_runs(self):
+        gpm = GtpuPathMonitoring()
+        gnbs = [ip("10.201.0.%d" % (i + 1)) for i in range(64)]
+        Source() -> Rewrite(templates=[bytes(echo(ECHO_REQUEST, N3, "0.0.0.0"))]) -> gpm -> Sink()
+        # Responses from the gNB addresses, with any sequence number, so some
+        # match a stored request and update the latency table that read walks.
+        # They are logged one by one, so they are kept to a trickle.
+        responses = Source()
+        response = Rewrite(templates=[bytes(echo(ECHO_RESPONSE, "10.201.0.1", N3, 0))])
+        source_and_seq = RandomUpdate(
+            fields=[
+                {"offset": 26, "size": 4, "min": gnbs[0], "max": gnbs[-1]},
+                {"offset": 50, "size": 2, "min": 0, "max": 65535},
+            ]
+        )
+        responses -> response -> source_and_seq -> gpm
+        bess.add_tc("responses", policy="rate_limit", resource="packet", limit={"packet": 200})
+        responses.attach_task(parent="responses")
+
+        start = time.time()
+        samples = 0
+        bess.resume_all()
+        for i in range(500):
+            gpm.add(gnb_ip=gnbs[i % 64])
+            if i >= 16:
+                gpm.delete(gnb_ip=gnbs[(i - 16) % 64])
+            samples += sum(s.count for s in gpm.read(clear=i % 2 == 0).statistics)
+            if i % 250 == 249:
+                gpm.clear()
+        bess.pause_all()
+        print(
+            "500 command rounds under traffic took %.1f s, %d latency samples read"
+            % (time.time() - start, samples),
+            file=sys.stderr,
+        )
+        # The responses did reach the latency table that read walks.
+        self.assertGreater(samples, 0)
+        self.assertBessAlive()
+
 
 suite = unittest.TestLoader().loadTestsFromTestCase(BessGtpuPathMonitoringTest)
 results = unittest.TextTestRunner(verbosity=2).run(suite)

@@ -36,6 +36,7 @@ const Commands GtpuPathMonitoring::cmds = {
 };
 
 void GtpuPathMonitoring::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
+  const std::lock_guard<std::mutex> lock(mutex_);
   int cnt = batch->cnt();
 
   for (int i = 0; i < cnt; i++) {
@@ -128,6 +129,7 @@ void GtpuPathMonitoring::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 
 CommandResponse GtpuPathMonitoring::CommandReadStats(
     const bess::pb::GtpuPathMonitoringCommandReadArg &arg) {
+  const std::lock_guard<std::mutex> lock(mutex_);
   bess::pb::GtpuPathMonitoringCommandReadResponse resp;
   for (auto &element : m_latency) {
     bess::pb::GtpuPathMonitoringCommandReadResponse::Statistic stat;
@@ -157,6 +159,7 @@ CommandResponse GtpuPathMonitoring::Init(const bess::pb::EmptyArg &) {
 
 CommandResponse GtpuPathMonitoring::CommandAdd(
     const bess::pb::GtpuPathMonitoringCommandAddDeleteArg &arg) {
+  const std::lock_guard<std::mutex> lock(mutex_);
   uint32_t dst = arg.gnb_ip();
   auto it = m_dstIp.find(dst);
   if (it == m_dstIp.end()) {
@@ -170,6 +173,7 @@ CommandResponse GtpuPathMonitoring::CommandAdd(
 
 CommandResponse GtpuPathMonitoring::CommandDelete(
     const bess::pb::GtpuPathMonitoringCommandAddDeleteArg &arg) {
+  const std::lock_guard<std::mutex> lock(mutex_);
   uint32_t dst = arg.gnb_ip();
   auto it = m_dstIp.find(dst);
   if (it == m_dstIp.end()) {
@@ -194,9 +198,16 @@ CommandResponse GtpuPathMonitoring::CommandClear(
 }
 
 void GtpuPathMonitoring::Clear() {
-  m_storedData.clear();
-  m_latency.clear();
-  m_dstIp.clear();
+  // The tables are swapped out under the lock and freed once it is released:
+  // the timestamps alone can hold 65536 entries per gNB, and the worker waits
+  // on the lock with all the traffic it carries.
+  decltype(m_storedData) storedData;
+  decltype(m_latency) latency;
+  decltype(m_dstIp) dstIp;
+  const std::lock_guard<std::mutex> lock(mutex_);
+  m_storedData.swap(storedData);
+  m_latency.swap(latency);
+  m_dstIp.swap(dstIp);
   m_seqNumber = 0;
 }
 

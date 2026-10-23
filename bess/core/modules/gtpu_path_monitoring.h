@@ -9,6 +9,7 @@
 #include "../module.h"
 #include "../pb/module_msg.pb.h"
 
+#include <mutex>
 #include <unordered_map>
 #include <vector>
 
@@ -45,6 +46,10 @@ class GtpuPathMonitoring final : public Module {
 
   void Clear();
 
+  // The commands are THREAD_SAFE, so they run on the control thread while a
+  // worker runs ProcessBatch, and both read and change the tables below. Only
+  // GTP-U echo messages reach this module, so a lock per batch is cheap.
+  std::mutex mutex_;
   std::unordered_map<uint32_t, std::unordered_map<uint16_t, uint64_t>>
       m_storedData;  // Store timestamp {dst_IP, {sequence_number, latency}}
   std::unordered_map<uint32_t, Values> m_latency;  // Store latency per dstIp
