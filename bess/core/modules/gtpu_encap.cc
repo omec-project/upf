@@ -85,10 +85,13 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   int cnt = batch->cnt();
 
   /* The outer header leaves DF clear, so the datagram may be fragmented on
-   * the path, and RFC 6864 2.1 then requires its ID to be unique for its
-   * source, destination and protocol: fragments of two datagrams sharing an
-   * ID reassemble into one corrupt packet. Reserve a run of IDs for this
-   * batch and hand the next one to each packet. */
+   * the path, and RFC 6864 2.1 then asks for an ID unique for its source,
+   * destination and protocol: fragments of two datagrams sharing an ID
+   * reassemble into one corrupt packet. A counter cannot hold that for a
+   * whole datagram lifetime at N3 rates -- 16 bits is 65536 packets, and
+   * one counter serves every tunnel -- but it puts collisions that far
+   * apart instead of in every pair of packets. Reserve a run of IDs for
+   * this batch and give each packet the next one. */
   uint16_t ip_id = next_ip_id.fetch_add(cnt, std::memory_order_relaxed);
 
   for (int i = 0; i < cnt; i++) {

@@ -15,6 +15,9 @@ DN = "10.0.0.9"
 TEID = 0x01020304
 QFI = 9
 
+# BESS default batch size
+BATCH_SIZE = 64
+
 ETH = scapy.Ether(src="02:00:00:00:00:01", dst="02:00:00:00:00:02")
 ETH_LEN = len(bytes(ETH))
 IP_ID = slice(ETH_LEN + 4, ETH_LEN + 6)
@@ -45,24 +48,39 @@ TUNNEL = [
 
 
 class GtpuEncapTest(BessModuleTestCase):
-    def encap(self, pkts, add_psc=True):
-        """The frames GtpuEncap forwards for `pkts`, as bytes."""
+    def encap(self, pkts, add_psc=True, batched=False):
+        """The frames GtpuEncap forwards for `pkts`, as bytes. With `batched`, a
+        Buffer in front withholds them until it has a full batch, so the module
+        gets them all in one ProcessBatch call."""
         tunnel = SetMetadata(attrs=TUNNEL)
         encap = GtpuEncap(add_psc=add_psc)
         self.bess.connect_modules(tunnel.name, encap.name, 0, 0)
 
-        out = self.run_pipeline(tunnel, encap, 0, pkts, [1], proto=bytes)
+        first = tunnel
+        if batched:
+            first = Buffer()
+            self.bess.connect_modules(first.name, tunnel.name, 0, 0)
+
+        out = self.run_pipeline(first, encap, 0, pkts, [1], proto=bytes)
         self.assertEqual(len(out[1]), len(pkts), "a packet was not encapsulated")
         return out[1]
+
+    def ids(self, frames):
+        return [struct.unpack("!H", frame[IP_ID])[0] for frame in frames]
 
     def test_each_packet_gets_its_own_outer_ip_id(self):
         # DF is clear, so the ID must be unique per datagram (RFC 6864 2.1):
         # fragments of two datagrams sharing an ID reassemble into one packet.
         for add_psc in (True, False):
             with self.subTest(add_psc=add_psc):
-                out = self.encap([DOWNLINK] * 8, add_psc=add_psc)
-                ids = [struct.unpack("!H", pkt[IP_ID])[0] for pkt in out]
+                ids = self.ids(self.encap([DOWNLINK] * 8, add_psc=add_psc))
                 self.assertEqual(len(set(ids)), len(ids), f"outer IPv4 IDs repeat: {ids}")
+
+    def test_a_full_batch_gets_an_id_for_every_packet(self):
+        # A packet at a time says nothing about a batch: an ID taken once per
+        # ProcessBatch call would pass that and repeat here.
+        ids = self.ids(self.encap([DOWNLINK] * BATCH_SIZE, batched=True))
+        self.assertEqual(len(set(ids)), len(ids), f"outer IPv4 IDs repeat: {ids}")
 
     def test_nothing_else_differs_between_identical_packets(self):
         out = self.encap([DOWNLINK] * 4)
@@ -70,24 +88,32 @@ class GtpuEncapTest(BessModuleTestCase):
         self.assertEqual(len(without_id), 1, "the frames differ beyond the outer IPv4 ID")
 
     def test_the_outer_headers_are_otherwise_unchanged(self):
-        out = self.encap([DOWNLINK])
-        self.assertEqual(out[0][:ETH_LEN], DOWNLINK[:ETH_LEN])
+        # add_psc also picks the size of the header prepended, so each arm
+        # pins the GTP-U flags and the bytes between the header and the
+        # packet carried: an 8-byte PDU Session Container, or nothing.
+        for add_psc, flags, ext_len in ((True, 0x34, 8), (False, 0x30, 0)):
+            with self.subTest(add_psc=add_psc):
+                frame = self.encap([DOWNLINK], add_psc=add_psc)[0]
+                self.assertEqual(frame[:ETH_LEN], DOWNLINK[:ETH_LEN])
 
-        outer = scapy.IP(out[0][ETH_LEN:])
-        self.assertEqual((outer.src, outer.dst), (N3, GNB))
-        self.assertEqual(outer.ttl, 64)
-        self.assertEqual(outer.flags, 0, "DF is set: the ID no longer has to be unique")
-        self.assertEqual(outer.len, len(out[0]) - ETH_LEN)
-        udp = outer[scapy.UDP]
-        self.assertEqual((udp.sport, udp.dport), (2152, 2152))
+                outer = scapy.IP(frame[ETH_LEN:])
+                self.assertEqual((outer.src, outer.dst), (N3, GNB))
+                self.assertEqual(outer.ttl, 64)
+                self.assertEqual(outer.flags, 0, "DF is set: the ID may repeat")
+                self.assertEqual(outer.len, len(frame) - ETH_LEN)
+                udp = outer[scapy.UDP]
+                self.assertEqual((udp.sport, udp.dport), (2152, 2152))
 
-        gtp = out[0][ETH_LEN + 20 + 8 :]
-        flags, mtype, length, teid = struct.unpack("!BBHI", gtp[:8])
-        self.assertEqual(flags, 0x34, "not a GTPv1-U header with an extension")
-        self.assertEqual(mtype, 0xFF, "not a G-PDU")
-        self.assertEqual(length, len(gtp) - 8)
-        self.assertEqual(teid, TEID)
-        self.assertEqual(gtp[-len(INNER) :], INNER, "the inner packet was changed")
+                gtp = frame[ETH_LEN + 20 + 8 :]
+                ghdr, mtype, length, teid = struct.unpack("!BBHI", gtp[:8])
+                self.assertEqual(ghdr, flags, "not a GTPv1-U header")
+                self.assertEqual(mtype, 0xFF, "not a G-PDU")
+                self.assertEqual(teid, TEID)
+                self.assertEqual(length, ext_len + len(INNER))
+                self.assertEqual(gtp[-len(INNER) :], INNER, "the inner packet changed")
+                if add_psc:
+                    # seq, N-PDU, next type PSC; then one unit, DL, QFI, no next
+                    self.assertEqual(gtp[8:16], b"\x00\x00\x00\x85\x01\x00\x09\x00")
 
 
 suite = unittest.TestLoader().loadTestsFromTestCase(GtpuEncapTest)
