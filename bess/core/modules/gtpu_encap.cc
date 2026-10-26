@@ -69,7 +69,7 @@ struct [[gnu::packed]] PacketTemplate {
     iph.header_length = (sizeof(Ipv4) >> 2);
     iph.type_of_service = 0;
     iph.length = (be16_t)0;  // to fill in
-    iph.id = (be16_t)0x513;
+    iph.id = (be16_t)0;      // to fill in
     iph.fragment_offset = (be16_t)0;
     iph.ttl = 64;
     iph.protocol = IPPROTO_UDP;
@@ -83,6 +83,16 @@ static PacketTemplate outer_ip_template;
 /*----------------------------------------------------------------------------------*/
 void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   int cnt = batch->cnt();
+
+  /* The outer header leaves DF clear, so the datagram may be fragmented on
+   * the path, and RFC 6864 2.1 then asks for an ID unique for its source,
+   * destination and protocol: fragments of two datagrams sharing an ID
+   * reassemble into one corrupt packet. A counter cannot hold that for a
+   * whole datagram lifetime at N3 rates -- 16 bits is 65536 packets, and
+   * one counter serves every tunnel -- but it puts collisions that far
+   * apart instead of in every pair of packets. Reserve a run of IDs for
+   * this batch and give each packet the next one. */
+  uint16_t ip_id = next_ip_id.fetch_add(cnt, std::memory_order_relaxed);
 
   for (int i = 0; i < cnt; i++) {
     bess::Packet *p = batch->pkts()[i];
@@ -175,6 +185,7 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 
     /* setting outer IP header */
     iph->length = (be16_t)(iplen);
+    iph->id = (be16_t)(ip_id++);
     iph->src = (be32_t)(at_tout_sip);
     iph->dst = (be32_t)(at_tout_dip);
     iph->type_of_service = type_of_service;

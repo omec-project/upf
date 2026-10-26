@@ -7,6 +7,7 @@
 /*----------------------------------------------------------------------------------*/
 #include "../module.h"
 #include "../pb/module_msg.pb.h"
+#include <atomic>
 #include <rte_hash.h>
 /*----------------------------------------------------------------------------------*/
 class GtpuEncap final : public Module {
@@ -28,6 +29,8 @@ class GtpuEncap final : public Module {
   int tout_dip_attr = -1;
   int tout_teid = -1;
   int tout_uport = -1;
+  /* ID of the next outer IPv4 header; see ProcessBatch() */
+  std::atomic<uint16_t> next_ip_id{0};
 };
 /*----------------------------------------------------------------------------------*/
 #endif  // BESS_MODULES_GTPUENCAP_H_
