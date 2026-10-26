@@ -74,7 +74,7 @@ required by [issue #1220](https://github.com/omec-project/upf/issues/1220).
       Scapy 2.4.3. The tracked patches in `ptf/patches/trex/` replace the
       reachable `imp` use, select the caller-provided Scapy, remove Python
       3.14 regex-literal warnings from the imported UPF client paths, and
-      calculate named-field VM offsets without Scapy's private `_offset`. The
+      calculate named-field VM offsets without the private Scapy `_offset`. The
       [2026-09-24 upstream-candidate job](https://github.com/andybavier/upf/actions/runs/36070149147/job/107868953740)
       passes `pip check` and all required PTF/TRex imports with v3.06 and
       Scapy 2.7.0, with no syntax warnings.
