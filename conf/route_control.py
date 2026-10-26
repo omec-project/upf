@@ -10,7 +10,7 @@ import signal
 import sys
 import time
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from queue import Queue
 from socket import AF_INET, if_indextoname
 from threading import Lock, Thread
@@ -347,11 +347,15 @@ class RouteController:
                 hosts programmed for each.
             _netlink_events (Queue):
                 Netlink events waiting to be handled by the event thread.
+            _programmed_routes (dict[tuple[str, str, int], str]):
+                The next hop of each route added in BESS, by interface,
+                prefix and prefix length.
         """
         self._unresolved_arp_queries_cache: dict[str, RouteEntry] = {}
         self._neighbor_cache: dict[str, NeighborEntry] = {}
         self._module_gate_count_cache: dict[str, int] = defaultdict(lambda: 0)
         self._on_link_networks: OnLinkNetworks = defaultdict(dict)
+        self._programmed_routes: dict[tuple[str, str, int], str] = {}
 
         self._lock = Lock()
 
@@ -367,15 +371,28 @@ class RouteController:
             target=self._handle_netlink_events, daemon=True
         )
 
+    def start(self) -> None:
+        """Starts following the kernel's routes and neighbors.
+
+        The handlers are registered before the routes are read, so that a
+        change made while they are read is not missed; until the event thread
+        starts, those changes are only queued. The event thread then applies
+        them after the routes that were read, in the order they happened, so a
+        route deleted after it was read is deleted again. A change that the
+        read already reflected is applied a second time, which is why adding
+        or deleting a route has no effect when it is already done.
+        """
+        self.register_handlers()
+        self.bootstrap_routes()
+        self.start_handling_netlink_events()
+        self.start_pinging_missing_entries()
+
     def register_handlers(self) -> None:
         """Register handler functions.
 
-        Starts the thread that handles the events first, so that no event is
-        queued without something to take it.
+        Events are queued from then on, and handled once
+        start_handling_netlink_events has been called.
         """
-        if not self._netlink_event_thread.is_alive():
-            self._netlink_event_thread.start()
-            logger.info("Netlink event thread started")
         self._ndb.task_manager.register_handler(
             rtmsg,
             self._netlink_route_handler,
@@ -385,6 +402,12 @@ class RouteController:
             self._netlink_neighbor_handler,
         )
         logger.info("Registered netlink event handlers...")
+
+    def start_handling_netlink_events(self) -> None:
+        """Starts the thread that handles queued netlink events."""
+        if not self._netlink_event_thread.is_alive():
+            self._netlink_event_thread.start()
+            logger.info("Netlink event thread started")
 
     def start_pinging_missing_entries(self) -> None:
         """Starts a new thread for ping missing entries."""
@@ -413,6 +436,11 @@ class RouteController:
             return
 
         if not validate_ipv4(route_entry.next_hop_ip):
+            return
+        if self._programmed_routes.get(route_key(route_entry)) == (
+            route_entry.next_hop_ip
+        ):
+            logger.info("Route entry %s already added in BESS", route_entry)
             return
         if not (next_hop_mac := fetch_mac(self._ndb, route_entry.next_hop_ip)):
             logger.info(
@@ -616,6 +644,11 @@ class RouteController:
                 return False
 
             if route_entry.next_hop_ip is not None:
+                self._programmed_routes[route_key(route_entry)] = (
+                    route_entry.next_hop_ip
+                )
+
+            if route_entry.next_hop_ip is not None:
                 if not self._neighbor_cache.get(route_entry.next_hop_ip):
                     logger.info("Neighbor entry does not exist, creating modules.")
                     update_module_name = get_update_module_name(
@@ -749,11 +782,25 @@ class RouteController:
             return
 
     def delete_route_entry(self, route_entry: RouteEntry) -> None:
-        """Deletes a route entry from BESS and the neighbor cache."""
+        """Deletes a route entry from BESS and the neighbor cache.
+
+        An attached network is not in BESS itself -- the host routes derived
+        from it are -- so it is removed before the ledger is consulted, and
+        each host route it withdraws comes back through here and is found.
+
+        A route that is not in BESS is left alone: deleting it would release
+        its next hop, which other routes may still use.
+        """
         if route_entry.on_link:
             self._delete_on_link_network(route_entry)
             return
 
+        key = route_key(route_entry)
+        if (programmed_next_hop := self._programmed_routes.pop(key, None)) is None:
+            logger.info("Route entry %s is not in BESS", route_entry)
+            return
+        # Release the next hop the route was added with.
+        route_entry = replace(route_entry, next_hop_ip=programmed_next_hop)
         if route_entry.next_hop_ip is not None:
             if next_hop := self._neighbor_cache.get(route_entry.next_hop_ip):
                 try:
@@ -992,6 +1039,7 @@ class RouteController:
             self._neighbor_cache.clear()
             self._module_gate_count_cache.clear()
             self._on_link_networks.clear()
+            self._programmed_routes.clear()
         self.bootstrap_routes()
         signal.pause()
         logger.info("Received: %i reconfigured", number)
@@ -1076,6 +1124,15 @@ class RouteController:
         if route_entry.get(KEY_ROUTE_SCOPE) in ROUTE_SCOPE_HOST:
             return False
         return bool(route_entry.get(KEY_DESTINATION_PREFIX_LENGTH))
+
+
+def route_key(route_entry: RouteEntry) -> tuple[str, str, int]:
+    """Identifies a route in BESS: its interface, prefix and prefix length."""
+    return (
+        str(route_entry.interface),
+        str(route_entry.dest_prefix),
+        int(route_entry.prefix_len),
+    )
 
 
 def get_route_module_name(interface_name: str) -> str:
@@ -1201,9 +1258,7 @@ if __name__ == "__main__":
         ipr=ipr,
         interfaces=interface_arg,
     )
-    route_controller.bootstrap_routes()
-    route_controller.register_handlers()
-    route_controller.start_pinging_missing_entries()
+    route_controller.start()
     register_signal_handlers(controller=route_controller)
     logger.info("Sleep until a signal is received")
     signal.pause()
