@@ -46,8 +46,22 @@ def validate_trex_packet_construction() -> None:
         mode=STLTXCont(pps=1_000),
         flow_stats=STLFlowLatencyStats(pg_id=1),
     )
-    if "packet" not in stream.to_json():
+    stream_json = stream.to_json()
+    if "packet" not in stream_json:
         raise RuntimeError("TRex STL stream serialization omitted the packet")
+
+    # IP.dst is 16 bytes into the IPv4 header, after a 14-byte Ethernet
+    # header.  The IPv4 header begins with bit fields, so this also checks
+    # that the offset calculation carries Scapy's bit cursor between fields.
+    write_offsets = [
+        instruction["pkt_offset"]
+        for instruction in stream_json["vm"]["instructions"]
+        if instruction["type"] == "write_flow_var"
+    ]
+    if write_offsets != [30]:
+        raise RuntimeError(
+            f"TRex compiled the IP.dst rewrite at offsets {write_offsets}, expected [30]"
+        )
 
     gtpu_packet = pkt_add_gtpu(
         packet,

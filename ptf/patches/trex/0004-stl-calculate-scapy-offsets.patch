@@ -11,13 +11,13 @@ and field offsets from serialized packet data instead, preserving named-field
 VM support without depending on Scapy internals.
 
 ---
- scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl_packet_builder_scapy.py | 49 +++++++++++++++-----
- 1 file changed, 37 insertions(+), 12 deletions(-)
+ scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl_packet_builder_scapy.py | 51 +++++++++++++++-----
+ 1 file changed, 39 insertions(+), 12 deletions(-)
 
 diff --git a/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl_packet_builder_scapy.py b/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl_packet_builder_scapy.py
 --- a/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl_packet_builder_scapy.py
 +++ b/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl_packet_builder_scapy.py
-@@ -413,6 +413,30 @@
+@@ -413,8 +413,38 @@
      def get_list_iter(self):
          l=list(self.pkt_iter())
          return l
@@ -29,26 +29,34 @@ diff --git a/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl
 +        for pkt in self.pkt_iter():
 +            yield pkt, offset
 +            offset += len(pkt) - len(pkt.payload)
-+
+
 +    @staticmethod
 +    def field_offset(layer_pkt, field_name):
-+        """Return a field's byte offset and size within a serialized layer."""
++        """Return a field's byte offset and size within a serialized layer.
+
++        Scapy carries bit fields' parser state between fields as a
++        (bytes, bit cursor) tuple, so it is passed on unchanged.  As with the
++        `_offset` TRex's bundled Scapy records while building, a field's
++        offset counts the whole bytes before it, and a bit field's size is 0.
++        """
 +        raw = bytes(layer_pkt)
-+        offset = 0
++        state = raw
 +        for field in layer_pkt.fields_desc:
-+            remaining, _ = field.getfield(layer_pkt, raw)
-+            if isinstance(remaining, tuple):
-+                remaining = remaining[0]
-+            field_size = len(raw) - len(remaining)
++            remaining = state[0] if isinstance(state, tuple) else state
++            offset = len(raw) - len(remaining)
++            state, _ = field.getfield(layer_pkt, state)
 +            if field.name == field_name:
-+                return offset, field_size
-+            offset += field_size
-+            raw = remaining
++                if hasattr(field, 'size'):
++                    return offset, 0
++                consumed = state[0] if isinstance(state, tuple) else state
++                return offset, len(remaining) - len(consumed)
 +        raise CTRexPacketBuildException(-11, "No field %s." % field_name)
-
-
++
++
      def get_pkt_layers(self):
-@@ -428,10 +452,10 @@
+         """
+         Return string 'IP:UDP:TCP'
+@@ -428,10 +458,10 @@
          Return offset of layer. Example: 'IP',1 returns offfset of layer ip:1
          """
          save_cnt=cnt
@@ -61,7 +69,7 @@ diff --git a/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl
                  else:
                      cnt=cnt -1
 
-@@ -443,10 +467,10 @@
+@@ -443,10 +473,10 @@
          Return offset of layer. Example: 'IP',1 returns offfset of layer ip:1
          """
          save_cnt=cnt
@@ -74,7 +82,7 @@ diff --git a/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl
                  else:
                      cnt=cnt -1
 
-@@ -461,9 +485,8 @@
+@@ -461,9 +491,8 @@
          layer_pkt=t[0]
          #layer_pkt.dump_fields_offsets ()
 
@@ -86,7 +94,7 @@ diff --git a/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl
 
          raise CTRexPacketBuildException(-11, "No layer %s-%d." % (field_name, layer_cnt))
 
-@@ -480,9 +503,9 @@
+@@ -480,9 +509,9 @@
 
          # look for layer
          layer_cnt = {}
@@ -98,7 +106,7 @@ diff --git a/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl
                  break
              if layer_name in layer_cnt:
                  layer_cnt[layer_name] += 1
-@@ -491,11 +514,13 @@
+@@ -491,11 +520,13 @@
              last_name = layer_name
              last_count = layer_cnt[layer_name]
              last_layer = pkt
