@@ -457,9 +457,9 @@ class RouteController:
             host_mac (str): The host's MAC address.
 
         Returns:
-            bool: True if this call took responsibility for the host. False
-                if it is on no attached network here, is already recorded, or
-                the network is at its limit.
+            bool: True if the host's route was installed. False if it is on no
+                attached network here, is already recorded, the network is at
+                its limit, or the route could not be installed.
         """
         if not validate_ipv4(host_ip):
             return False
@@ -484,8 +484,11 @@ class RouteController:
             )
             return False
 
-        hosts.add(host_ip)
-        self._add_neighbor(
+        # Recorded only once installed. A host recorded against a route that
+        # never landed is refused as known by every later neighbor event, so
+        # the route would stay missing -- the silent failure this change is
+        # here to remove.
+        if not self._add_neighbor(
             RouteEntry(
                 dest_prefix=host_ip,
                 next_hop_ip=host_ip,
@@ -493,7 +496,16 @@ class RouteController:
                 prefix_len=IPV4_HOST_PREFIX_LEN,
             ),
             host_mac,
-        )
+        ):
+            logger.error(
+                "Could not install the host route for %s on %s; leaving it "
+                "unrecorded so a later neighbor event retries it",
+                host_ip,
+                network,
+            )
+            return False
+
+        hosts.add(host_ip)
         return True
 
     def _on_link_network_for(
@@ -561,7 +573,7 @@ class RouteController:
             logger.error("Could not read the network from route entry %s", route_entry)
             return None
 
-    def _add_neighbor(self, route_entry: RouteEntry, next_hop_mac: str) -> None:
+    def _add_neighbor(self, route_entry: RouteEntry, next_hop_mac: str) -> bool:
         """Adds the route in BESS module.
 
         Creates required BESS modules.
@@ -569,6 +581,9 @@ class RouteController:
         Args:
             route_entry (RouteEntry)
             next_hop_mac (str): The MAC address of the next hop.
+
+        Returns:
+            bool: True if the route was added to the route module.
         """
         if route_entry.interface is not None:
             route_module_name = get_route_module_name(route_entry.interface)
@@ -582,7 +597,7 @@ class RouteController:
 
             except Exception:
                 logger.exception("Error adding route entry to BESS: %s", route_entry)
-                return
+                return False
 
             if route_entry.next_hop_ip is not None:
                 if not self._neighbor_cache.get(route_entry.next_hop_ip):
@@ -613,8 +628,10 @@ class RouteController:
                 self._neighbor_cache[route_entry.next_hop_ip].route_count += 1
             else:
                 logger.warning("next_hop_ip is None, cannot add neighbor")
-        else:
-            logger.warning("interface is None, cannot get route module name")
+            return True
+
+        logger.warning("interface is None, cannot get route module name")
+        return False
 
     def _create_update_module(
         self,
@@ -642,8 +659,8 @@ class RouteController:
         """Handle new neighbor event.
 
         It will add the neighbor if it was in the unresolved ARP queries cache.
-        Failing that, a neighbor on a network attached to a watched interface
-        is reached directly and gets a route of its own.
+        A neighbor on a network attached to a watched interface is reached
+        directly and gets a route of its own as well.
 
         Args:
             netlink_message (dict): The netlink message.
@@ -661,8 +678,11 @@ class RouteController:
                 del self._unresolved_arp_queries_cache[route_entry.next_hop_ip]
             else:
                 logger.warning("next_hop_ip is None, cannot delete from cache")
-            return
 
+        # Both, rather than one or the other: a gateway can itself be a host on
+        # an attached network, and resolving it answers only the route that was
+        # waiting. Its own address still needs a host route, and shares the
+        # gate just resolved for it.
         interface = self._interface_name(netlink_message.get("ifindex"))
         if interface is None:
             return

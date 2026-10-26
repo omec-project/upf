@@ -823,3 +823,80 @@ class TestOnLinkNetworks(unittest.TestCase):
             for call in self.mock_bess_controller.add_route_to_module.call_args_list
         )
         self.assertEqual(added, ["10.122.0.21", "10.122.0.22"])
+
+    @patch("conf.route_control.send_ping")
+    @patch("conf.route_control.fetch_mac")
+    def test_given_unresolved_gateway_on_an_attached_network_when_it_resolves_then_it_is_also_a_host(
+        self, mock_fetch_mac, mock_send_ping
+    ):
+        mock_fetch_mac.return_value = None
+        attached = self.route_controller._parse_route_entry_msg(
+            self.connected_route_msg()
+        )
+        assert attached is not None
+        self.route_controller.add_new_route_entry(attached)
+
+        via_gateway_msg = self.connected_route_msg(dst="10.126.0.0")
+        via_gateway_msg["attrs"].append(("RTA_GATEWAY", "10.122.0.1"))
+        via_gateway = self.route_controller._parse_route_entry_msg(via_gateway_msg)
+        assert via_gateway is not None
+        self.route_controller.add_new_route_entry(via_gateway)
+        self.mock_bess_controller.add_route_to_module.assert_not_called()
+
+        self.route_controller.add_unresolved_new_neighbor(
+            {
+                "ifindex": 2,
+                "attrs": [
+                    ("NDA_DST", "10.122.0.1"),
+                    ("NDA_LLADDR", DEFAULT_MAC_ADDRESS),
+                ],
+            }
+        )
+
+        added = sorted(
+            call.args[0].dest_prefix
+            for call in self.mock_bess_controller.add_route_to_module.call_args_list
+        )
+        self.assertEqual(added, ["10.122.0.1", "10.126.0.0"])
+        gates = {
+            call.kwargs["gate_idx"]
+            for call in self.mock_bess_controller.add_route_to_module.call_args_list
+        }
+        self.assertEqual(len(gates), 1, "the shared next hop should share one gate")
+        self.assertEqual(
+            self.route_controller._neighbor_cache["10.122.0.1"].route_count, 2
+        )
+
+    @patch("conf.route_control.fetch_mac")
+    def test_given_host_route_that_could_not_be_installed_then_it_is_retried(
+        self, mock_fetch_mac
+    ):
+        mock_fetch_mac.return_value = DEFAULT_MAC_ADDRESS
+        entry = self.route_controller._parse_route_entry_msg(self.connected_route_msg())
+        assert entry is not None
+        self.route_controller.add_new_route_entry(entry)
+        network = next(iter(self.route_controller._on_link_networks["access"]))
+        neighbor = {
+            "ifindex": 2,
+            "attrs": [
+                ("NDA_DST", "10.122.0.21"),
+                ("NDA_LLADDR", DEFAULT_MAC_ADDRESS),
+            ],
+        }
+
+        self.mock_bess_controller.add_route_to_module.side_effect = Exception(
+            "BESS is unreachable"
+        )
+        self.route_controller.add_unresolved_new_neighbor(neighbor)
+        self.assertNotIn(
+            "10.122.0.21", self.route_controller._on_link_networks["access"][network]
+        )
+
+        self.mock_bess_controller.add_route_to_module.side_effect = None
+        self.route_controller.add_unresolved_new_neighbor(neighbor)
+        self.assertIn(
+            "10.122.0.21", self.route_controller._on_link_networks["access"][network]
+        )
+        added = self.mock_bess_controller.add_route_to_module.call_args_list[-1].args[0]
+        self.assertEqual(added.dest_prefix, "10.122.0.21")
+        self.assertEqual(added.prefix_len, 32)
