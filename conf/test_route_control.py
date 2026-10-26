@@ -1024,15 +1024,16 @@ class TestNetlinkEventThread(unittest.TestCase):
     def test_given_route_event_when_ndb_handler_runs_then_event_is_only_queued(
         self, mock_handle_route_event
     ):
-        self.route_controller._netlink_events = Mock()
-
-        asyncio.run(
-            self.route_controller._netlink_route_handler(
-                self.ndb, self.new_route_message("192.168.1.0")
+        # Patches put on the queue the worker already waits on, so the worker
+        # keeps waiting on a real queue however the threads are scheduled.
+        with patch.object(self.route_controller._netlink_events, "put") as mock_put:
+            asyncio.run(
+                self.route_controller._netlink_route_handler(
+                    self.ndb, self.new_route_message("192.168.1.0")
+                )
             )
-        )
 
-        self.route_controller._netlink_events.put.assert_called_once()
+        mock_put.assert_called_once()
         mock_handle_route_event.assert_not_called()
         self.assertEqual(self.ndb.query_threads, [])
 
