@@ -12,6 +12,14 @@ SLEEP_S = 2
 # Maximum number of gates per module instance in BESS. Don't change it.
 MAX_GATES = 8192
 
+# Route table sizing. An attached network contributes one route per host
+# (route_control.py), so the table is no longer one entry per gateway and
+# IPLookup's 1024 default is easy to reach. Longest-prefix-match lookup does
+# not slow down with a larger table.
+MAX_ROUTE_RULES = 16384
+# Prefixes shorter than /24 need a tbl8; IPLookup's default is 128.
+MAX_ROUTE_TBL8S = 512
+
 
 # ====================================================
 #       Parameters
