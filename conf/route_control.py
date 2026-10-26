@@ -11,6 +11,7 @@ import sys
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
+from queue import Queue
 from socket import AF_INET, if_indextoname
 from threading import Lock, Thread
 
@@ -344,6 +345,8 @@ class RouteController:
                 A cache for counting module gate occurrences.
             _on_link_networks (OnLinkNetworks): Attached networks and the
                 hosts programmed for each.
+            _netlink_events (Queue):
+                Netlink events waiting to be handled by the event thread.
         """
         self._unresolved_arp_queries_cache: dict[str, RouteEntry] = {}
         self._neighbor_cache: dict[str, NeighborEntry] = {}
@@ -359,9 +362,20 @@ class RouteController:
             target=self._ping_missing_entries, daemon=True
         )
         self._interfaces = interfaces
+        self._netlink_events: Queue = Queue()
+        self._netlink_event_thread = Thread(
+            target=self._handle_netlink_events, daemon=True
+        )
 
     def register_handlers(self) -> None:
-        """Register handler functions."""
+        """Register handler functions.
+
+        Starts the thread that handles the events first, so that no event is
+        queued without something to take it.
+        """
+        if not self._netlink_event_thread.is_alive():
+            self._netlink_event_thread.start()
+            logger.info("Netlink event thread started")
         self._ndb.task_manager.register_handler(
             rtmsg,
             self._netlink_route_handler,
@@ -447,9 +461,10 @@ class RouteController:
         """Programs a host route for an address on an attached network.
 
         The MAC is supplied rather than looked up: both callers already have
-        it, and resolving one here would reach send_ping from the netlink
-        handler, which holds the lock the handler needs to take for the next
-        event. Hosts per network are capped, since one host costs one gate.
+        it, and resolving one here would reach send_ping -- scapy, holding the
+        lock that the next netlink event needs -- and every queued event would
+        wait behind it. Hosts per network are capped, since one host costs one
+        gate.
 
         Args:
             interface (str): The interface the host is attached to.
@@ -553,9 +568,10 @@ class RouteController:
     def _interface_name(interface_index) -> str | None:
         """Resolves an interface index to its name.
 
-        Deliberately not an NDB lookup. This runs on the netlink handler, and
-        NDB answers a query there only once its own event thread is free --
-        which it is not, because that thread is running this handler.
+        Deliberately not an NDB lookup. NDB answers a query only once its own
+        event thread is free, and this used to run on that thread; the netlink
+        event thread handles the event now, but if_indextoname answers from
+        the C library without reaching NDB at all, so it stays.
         """
         try:
             return if_indextoname(int(interface_index))
@@ -878,11 +894,49 @@ class RouteController:
         return self._module_gate_count_cache[module_name]
 
     async def _netlink_neighbor_handler(self, *args, **kwargs) -> None:
-        """Listens for netlink neighbor events and handles them (async for pyroute2 compatibility)."""
+        """Queues a netlink neighbor event (async for pyroute2 compatibility).
+
+        See _netlink_route_handler for why the event is not handled here.
+        """
+        self._queue_netlink_event(self._handle_neighbor_event, "neighbor", args, kwargs)
+
+    async def _netlink_route_handler(self, *args, **kwargs) -> None:
+        """Queues a netlink route event (async for pyroute2 compatibility).
+
+        NDB runs this on its event loop thread, which is also the thread that
+        answers NDB queries. Handling the event here would query NDB from that
+        thread -- the interface name in _parse_route_entry_msg, the neighbor
+        table in fetch_mac -- and such a query waits for the loop to be free,
+        which it never is again: the handler never returns, and NDB delivers
+        no further event. The first route change after startup would then be
+        the only one ever seen, and it would not be programmed either. So the
+        event is queued and handled on the netlink event thread.
+        """
+        self._queue_netlink_event(self._handle_route_event, "route", args, kwargs)
+
+    def _queue_netlink_event(self, handle, kind: str, args, kwargs) -> None:
+        """Queues a netlink message from an NDB handler for handle."""
         netlink_message = args[-1] if len(args) > 0 else kwargs.get("netlink_message")
         if netlink_message is None:
-            logger.error("No netlink message received in neighbor handler.")
+            logger.error("No netlink message received in %s handler.", kind)
             return
+        self._netlink_events.put((handle, netlink_message))
+
+    def _handle_netlink_events(self) -> None:
+        """Handles queued netlink events, one at a time and in order.
+
+        Runs on its own thread, so querying NDB and reaching BESS here holds up
+        neither NDB nor the delivery of later events.
+        """
+        while True:
+            handle, netlink_message = self._netlink_events.get()
+            try:
+                handle(netlink_message)
+            except Exception:
+                logger.exception("Error handling netlink event %s", netlink_message)
+
+    def _handle_neighbor_event(self, netlink_message) -> None:
+        """Handles a netlink neighbor event."""
         try:
             event = netlink_message.get("event")
         except Exception:
@@ -895,12 +949,8 @@ class RouteController:
             with self._lock:
                 self.add_unresolved_new_neighbor(netlink_message)
 
-    async def _netlink_route_handler(self, *args, **kwargs) -> None:
-        """Listens for netlink route events and handles them (async for pyroute2 compatibility)."""
-        netlink_message = args[-1] if len(args) > 0 else kwargs.get("netlink_message")
-        if netlink_message is None:
-            logger.error("No netlink message received in route handler.")
-            return
+    def _handle_route_event(self, netlink_message) -> None:
+        """Handles a netlink route event."""
         try:
             event = netlink_message.get("event")
         except (KeyError, AttributeError, TypeError):
