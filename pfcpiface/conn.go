@@ -69,6 +69,14 @@ type PFCPConn struct {
 
 	shutdownOnce sync.Once
 	isShutdown   atomic.Bool
+
+	// sessionsMu orders the session handlers against teardown's snapshot of the store.
+	// Every session handler holds it for its whole run and refuses the message if the
+	// association is shutting down; executeShutdown holds it only to take the snapshot.
+	// So each handler runs entirely before the snapshot -- its datapath write and its
+	// store write both done, for teardown to reclaim -- or entirely after it, as a
+	// refusal that changes nothing.
+	sessionsMu sync.Mutex
 }
 
 func (pConn *PFCPConn) startHeartBeatMonitor() {
@@ -290,10 +298,15 @@ func (pConn *PFCPConn) executeShutdown() {
 		pConn.hbCtxCancel = nil
 	}
 
-	// Cleanup all sessions in this conn
+	// Cleanup all sessions in this conn. isShutdown is already set, so once the lock is
+	// held no session handler is running and none will change the store again.
+	pConn.sessionsMu.Lock()
+	sessions := pConn.store.GetAllSessions()
+	pConn.sessionsMu.Unlock()
+
 	var unfinished []PFCPSession
 
-	for _, sess := range pConn.store.GetAllSessions() {
+	for _, sess := range sessions {
 		// A removal that ran out of time may have left rules matching the session's
 		// address, and once the session is forgotten nothing names them. So the address
 		// is released only once a removal of its rules has finished; the sessions whose

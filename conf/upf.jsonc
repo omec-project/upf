@@ -23,6 +23,17 @@
         "farLookup": 150000
     },
 
+    // [Optional] Distinct rule masks the PDR table holds at once (1-256, default 16).
+    // Each application filtering rule shape in use -- the remote prefix length, and
+    // whether a protocol and a port are given -- takes two, one per direction, and
+    // each mask in use costs a hash lookup per packet. A rule that matches the UE
+    // address exactly (an SDF filter on "assigned") is indexed and takes no mask;
+    // only the other shapes count. Every mask the table has held
+    // keeps a hash table of table_sizes.pdrLookup entries in hugepage memory, so size
+    // hugepages for the limit, plus two such tables for the UE index. Uncomment to
+    // change it.
+    // "pdr_lookup_max_masks": 16,
+
     // [Optional] Set the log level to one of "panic", "fatal", "error", "warn", "info", "debug"
     "log_level": "info",
 

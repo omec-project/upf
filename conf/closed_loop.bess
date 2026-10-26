@@ -154,6 +154,12 @@ access_rx_l4_verify = ports[parser.access_ifname].mode == 'dpdk'
 #   - tunnel_ip4_dst
 #   - proto_id
 
+# pdrLookup keeps a rule that matches the UE address exactly -- src_ip on access,
+# dst_ip on core, as pfcpiface writes it when the SDF filter names the UE as
+# "assigned" or by its /32 -- in a group per UE, so a packet costs one lookup
+# and a scan of its UE's rules however many shapes of such rules the UPF holds.
+# Any other rule (UE side "any" or a prefix, no UE address) stays in the mask
+# tables and costs what it did.
 linkMerge::Merge() \
     -> pktParse::GtpuParser():1 \
     -> pdrLookup::WildcardMatch(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
@@ -169,7 +175,10 @@ linkMerge::Merge() \
                                         {'attr_name':'ctr_id', 'num_bytes':4}, \
                                         {'attr_name':'qer_id', 'num_bytes':4}, \
                                         {'attr_name':'far_id', 'num_bytes':4}],\
-                                entries=parser.table_size_pdr_lookup):noGTPUDecap
+                                entries=parser.table_size_pdr_lookup, \
+                                max_tuples=parser.pdr_lookup_max_masks, \
+                                index_sets=[{'fields': [0, 3], 'when_field': 0, 'when_value': Access}, \
+                                            {'fields': [0, 4], 'when_field': 0, 'when_value': Core}]):noGTPUDecap
 
 appQERLookup::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
                                  {'attr_name':'qer_id', 'num_bytes':4}, \

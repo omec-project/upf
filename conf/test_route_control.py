@@ -2,7 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2023 Canonical Ltd.
 
+import asyncio
 import sys
+import threading
+import time
 import unittest
 from unittest.mock import MagicMock, Mock, patch
 
@@ -335,7 +338,7 @@ class TestRouteController(unittest.TestCase):
         mock_add_new_route_entry.assert_not_called()
 
     @patch.object(RouteController, "add_new_route_entry")
-    async def test_given_netlink_message_when_rtm_newroute_event_then_add_new_route_entry_is_called(
+    def test_given_netlink_message_when_rtm_newroute_event_then_add_new_route_entry_is_called(
         self, mock_add_new_route_entry
     ):
         self.ndb.interfaces = {2: {"ifname": "core"}}
@@ -359,9 +362,7 @@ class TestRouteController(unittest.TestCase):
             },
             "event": "RTM_NEWROUTE",
         }
-        await self.route_controller._netlink_route_handler(
-            self.ndb, example_route_entry
-        )
+        self.route_controller._handle_route_event(example_route_entry)
         mock_add_new_route_entry.assert_called()
 
     def test_given_existing_neighbor_and_route_count_not_zero_when_delete_route_entry_then_route_entry_deleted_in_bess(
@@ -411,7 +412,7 @@ class TestRouteController(unittest.TestCase):
         self.mock_bess_controller.delete_module.assert_called_once()
 
     @patch.object(RouteController, "delete_route_entry")
-    async def test_given_netlink_message_when_rtm_delroute_event_then_delete_route_entry_is_called(
+    def test_given_netlink_message_when_rtm_delroute_event_then_delete_route_entry_is_called(
         self, mock_delete_route_entry
     ):
         self.ndb.interfaces = {2: {"ifname": "core"}}
@@ -435,9 +436,7 @@ class TestRouteController(unittest.TestCase):
             },
             "event": "RTM_DELROUTE",
         }
-        await self.route_controller._netlink_route_handler(
-            self.ndb, example_route_entry
-        )
+        self.route_controller._handle_route_event(example_route_entry)
         mock_delete_route_entry.assert_called()
 
     @patch("conf.route_control.send_ping")
@@ -466,10 +465,618 @@ class TestRouteController(unittest.TestCase):
         self.mock_bess_controller.add_route_to_module.assert_called_once()
 
     @patch.object(RouteController, "add_unresolved_new_neighbor")
-    async def test_given_netlink_message_when_rtm_newneigh_event_then_add_unresolved_new_neighbor_is_called(
+    def test_given_netlink_message_when_rtm_newneigh_event_then_add_unresolved_new_neighbor_is_called(
         self, mock_add_unresolved_new_neighbor
     ):
-        await self.route_controller._netlink_neighbor_handler(
-            self.ndb, {"event": "RTM_NEWNEIGH"}
-        )
+        self.route_controller._handle_neighbor_event({"event": "RTM_NEWNEIGH"})
         mock_add_unresolved_new_neighbor.assert_called()
+
+
+class TestOnLinkNetworks(unittest.TestCase):
+    """Tests routes for networks attached to a watched interface."""
+
+    def setUp(self):
+        self.mock_bess_controller = Mock(BessControllerMock)
+        self.ndb = Mock()
+        self.ipr = Mock()
+        self.route_controller = RouteController(
+            self.mock_bess_controller,
+            self.ndb,
+            interfaces=["access", "core"],
+            ipr=self.ipr,
+        )
+        self.ndb.interfaces = {2: {"ifname": "access"}}
+        self.ndb.neighbours.dump.return_value = []
+        # _interface_name resolves an index through the C library rather than
+        # NDB, so the index-to-name map is stubbed rather than the NDB mock.
+        names = {2: "access", 3: "core"}
+
+        def ifname(index):
+            try:
+                return names[int(index)]
+            except KeyError:
+                raise OSError("no such interface") from None
+
+        patcher = patch("conf.route_control.if_indextoname", side_effect=ifname)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    @staticmethod
+    def connected_route_msg(dst="10.122.0.0", dst_len=24, oif=2, **extra):
+        msg = {
+            "family": 2,
+            "dst_len": dst_len,
+            "attrs": [("RTA_OIF", oif), ("RTA_DST", dst)],
+            "event": "RTM_NEWROUTE",
+        }
+        msg.update(extra)
+        return msg
+
+    def test_given_route_without_gateway_when_parse_message_then_entry_is_on_link(self):
+        result = self.route_controller._parse_route_entry_msg(
+            self.connected_route_msg()
+        )
+        self.assertIsInstance(result, RouteEntry)
+        assert result is not None
+        self.assertTrue(result.on_link)
+        self.assertIsNone(result.next_hop_ip)
+        self.assertEqual(result.dest_prefix, "10.122.0.0")
+        self.assertEqual(result.prefix_len, 24)
+        self.assertEqual(result.interface, "access")
+
+    def test_given_local_table_route_when_parse_message_then_returns_none(self):
+        for extra in (
+            {"table": 255},
+            {"type": 2},
+            {"type": 3},
+            {"scope": 254},
+            {"scope": "host"},
+        ):
+            with self.subTest(extra=extra):
+                self.assertIsNone(
+                    self.route_controller._parse_route_entry_msg(
+                        self.connected_route_msg(**extra)
+                    )
+                )
+
+    def test_given_gatewayless_default_route_when_parse_message_then_returns_none(self):
+        self.assertIsNone(
+            self.route_controller._parse_route_entry_msg(
+                self.connected_route_msg(dst_len=0)
+            )
+        )
+
+    @patch("conf.route_control.fetch_mac")
+    def test_given_attached_network_when_added_then_a_route_is_added_per_known_host(
+        self, mock_fetch_mac
+    ):
+        mock_fetch_mac.return_value = DEFAULT_MAC_ADDRESS
+        self.ndb.neighbours.dump.return_value = [
+            {"ifindex": 2, "dst": "10.122.0.21", "lladdr": DEFAULT_MAC_ADDRESS},
+            {"ifindex": 2, "dst": "10.122.0.22", "lladdr": DEFAULT_MAC_ADDRESS},
+            # Outside the attached network.
+            {"ifindex": 2, "dst": "10.199.0.9", "lladdr": DEFAULT_MAC_ADDRESS},
+            # A different interface.
+            {"ifindex": 7, "dst": "10.122.0.23", "lladdr": DEFAULT_MAC_ADDRESS},
+            # Not resolved yet, so there is no MAC to stamp.
+            {"ifindex": 2, "dst": "10.122.0.24", "lladdr": None},
+        ]
+        entry = self.route_controller._parse_route_entry_msg(self.connected_route_msg())
+        assert entry is not None
+        self.route_controller.add_new_route_entry(entry)
+
+        added = [
+            call.args[0]
+            for call in self.mock_bess_controller.add_route_to_module.call_args_list
+        ]
+        self.assertEqual(
+            sorted(e.dest_prefix for e in added), ["10.122.0.21", "10.122.0.22"]
+        )
+        for e in added:
+            self.assertEqual(e.prefix_len, 32)
+            self.assertEqual(e.next_hop_ip, e.dest_prefix)
+            self.assertEqual(e.interface, "access")
+
+    @patch("conf.route_control.fetch_mac")
+    def test_given_attached_network_when_host_appears_then_its_route_is_added(
+        self, mock_fetch_mac
+    ):
+        mock_fetch_mac.return_value = DEFAULT_MAC_ADDRESS
+        entry = self.route_controller._parse_route_entry_msg(self.connected_route_msg())
+        assert entry is not None
+        self.route_controller.add_new_route_entry(entry)
+        self.mock_bess_controller.add_route_to_module.reset_mock()
+
+        self.route_controller.add_unresolved_new_neighbor(
+            {
+                "ifindex": 2,
+                "attrs": [
+                    ("NDA_DST", "10.122.0.21"),
+                    ("NDA_LLADDR", DEFAULT_MAC_ADDRESS),
+                ],
+            }
+        )
+
+        self.mock_bess_controller.add_route_to_module.assert_called_once()
+        added = self.mock_bess_controller.add_route_to_module.call_args.args[0]
+        self.assertEqual(added.dest_prefix, "10.122.0.21")
+        self.assertEqual(added.prefix_len, 32)
+
+    @patch("conf.route_control.fetch_mac")
+    def test_given_no_attached_network_when_host_appears_then_no_route_is_added(
+        self, mock_fetch_mac
+    ):
+        mock_fetch_mac.return_value = DEFAULT_MAC_ADDRESS
+        self.route_controller.add_unresolved_new_neighbor(
+            {
+                "ifindex": 2,
+                "attrs": [
+                    ("NDA_DST", "10.122.0.21"),
+                    ("NDA_LLADDR", DEFAULT_MAC_ADDRESS),
+                ],
+            }
+        )
+        self.mock_bess_controller.add_route_to_module.assert_not_called()
+
+    @patch("conf.route_control.fetch_mac")
+    def test_given_host_already_routed_when_it_appears_again_then_it_is_not_re_added(
+        self, mock_fetch_mac
+    ):
+        mock_fetch_mac.return_value = DEFAULT_MAC_ADDRESS
+        entry = self.route_controller._parse_route_entry_msg(self.connected_route_msg())
+        assert entry is not None
+        self.route_controller.add_new_route_entry(entry)
+        neighbor = {
+            "ifindex": 2,
+            "attrs": [
+                ("NDA_DST", "10.122.0.21"),
+                ("NDA_LLADDR", DEFAULT_MAC_ADDRESS),
+            ],
+        }
+        self.route_controller.add_unresolved_new_neighbor(neighbor)
+        self.mock_bess_controller.add_route_to_module.reset_mock()
+
+        self.route_controller.add_unresolved_new_neighbor(neighbor)
+
+        self.mock_bess_controller.add_route_to_module.assert_not_called()
+
+    @patch("conf.route_control.MAX_ON_LINK_NEIGHBORS_PER_NETWORK", 2)
+    @patch("conf.route_control.fetch_mac")
+    def test_given_attached_network_at_its_limit_when_host_appears_then_it_is_refused(
+        self, mock_fetch_mac
+    ):
+        mock_fetch_mac.return_value = DEFAULT_MAC_ADDRESS
+        self.ndb.neighbours.dump.return_value = [
+            {"ifindex": 2, "dst": f"10.122.0.{n}", "lladdr": DEFAULT_MAC_ADDRESS}
+            for n in (21, 22, 23)
+        ]
+        entry = self.route_controller._parse_route_entry_msg(self.connected_route_msg())
+        assert entry is not None
+        with self.assertLogs("conf.route_control", level="ERROR") as logs:
+            self.route_controller.add_new_route_entry(entry)
+        self.assertEqual(self.mock_bess_controller.add_route_to_module.call_count, 2)
+        self.assertTrue(any("10.122.0.23" in line for line in logs.output))
+
+    @patch("conf.route_control.fetch_mac")
+    def test_given_attached_network_when_it_is_removed_then_its_host_routes_go_too(
+        self, mock_fetch_mac
+    ):
+        mock_fetch_mac.return_value = DEFAULT_MAC_ADDRESS
+        self.ndb.neighbours.dump.return_value = [
+            {"ifindex": 2, "dst": "10.122.0.21", "lladdr": DEFAULT_MAC_ADDRESS},
+        ]
+        entry = self.route_controller._parse_route_entry_msg(self.connected_route_msg())
+        assert entry is not None
+        self.route_controller.add_new_route_entry(entry)
+
+        self.route_controller.delete_route_entry(entry)
+
+        self.mock_bess_controller.delete_module_route_entry.assert_called_once()
+        removed = self.mock_bess_controller.delete_module_route_entry.call_args.args[0]
+        self.assertEqual(removed.dest_prefix, "10.122.0.21")
+        self.assertEqual(removed.prefix_len, 32)
+
+    @patch("conf.route_control.fetch_mac")
+    def test_given_host_route_when_the_host_falls_quiet_then_the_route_stays(
+        self, mock_fetch_mac
+    ):
+        mock_fetch_mac.return_value = DEFAULT_MAC_ADDRESS
+        self.ndb.neighbours.dump.return_value = [
+            {"ifindex": 2, "dst": "10.122.0.21", "lladdr": DEFAULT_MAC_ADDRESS},
+        ]
+        entry = self.route_controller._parse_route_entry_msg(self.connected_route_msg())
+        assert entry is not None
+        self.route_controller.add_new_route_entry(entry)
+
+        # The kernel ages the entry out and says so. The event is handled the
+        # way the event thread handles it, so withdrawing the route on it would
+        # fail here: dropping the route is what would discard the next traffic
+        # to this host, and it is the tidy-up this test exists to refuse.
+        self.ndb.neighbours.dump.return_value = []
+        self.route_controller._handle_neighbor_event(
+            {
+                "event": "RTM_DELNEIGH",
+                "ifindex": 2,
+                "attrs": [
+                    ("NDA_DST", "10.122.0.21"),
+                    ("NDA_LLADDR", DEFAULT_MAC_ADDRESS),
+                ],
+            }
+        )
+
+        self.mock_bess_controller.delete_module_route_entry.assert_not_called()
+        network = next(iter(self.route_controller._on_link_networks["access"]))
+        self.assertIn(
+            "10.122.0.21", self.route_controller._on_link_networks["access"][network]
+        )
+
+    @patch("conf.route_control.fetch_mac")
+    def test_given_gateway_route_when_added_then_it_is_unchanged_by_on_link_handling(
+        self, mock_fetch_mac
+    ):
+        mock_fetch_mac.return_value = DEFAULT_MAC_ADDRESS
+        msg = self.connected_route_msg(dst="10.126.0.0")
+        msg["attrs"].append(("RTA_GATEWAY", "10.122.0.1"))
+        entry = self.route_controller._parse_route_entry_msg(msg)
+        assert entry is not None
+        self.assertFalse(entry.on_link)
+        self.assertEqual(entry.next_hop_ip, "10.122.0.1")
+
+        self.route_controller.add_new_route_entry(entry)
+
+        self.mock_bess_controller.add_route_to_module.assert_called_once()
+        added = self.mock_bess_controller.add_route_to_module.call_args.args[0]
+        self.assertEqual(added.dest_prefix, "10.126.0.0")
+        self.assertEqual(added.prefix_len, 24)
+
+    @patch("conf.route_control.fetch_mac")
+    def test_given_attached_network_when_reconfigured_then_host_routes_are_programmed_again(
+        self, mock_fetch_mac
+    ):
+        mock_fetch_mac.return_value = DEFAULT_MAC_ADDRESS
+        self.ndb.neighbours.dump.return_value = [
+            {"ifindex": 2, "dst": "10.122.0.21", "lladdr": DEFAULT_MAC_ADDRESS},
+        ]
+        route_msg = self.connected_route_msg()
+        entry = self.route_controller._parse_route_entry_msg(route_msg)
+        assert entry is not None
+        self.route_controller.add_new_route_entry(entry)
+        self.assertEqual(self.mock_bess_controller.add_route_to_module.call_count, 1)
+
+        self.ipr.get_routes.return_value = [route_msg]
+        self.mock_bess_controller.add_route_to_module.reset_mock()
+        with patch("conf.route_control.signal.pause"):
+            self.route_controller.reconfigure(1)
+
+        self.mock_bess_controller.add_route_to_module.assert_called_once()
+        added = self.mock_bess_controller.add_route_to_module.call_args.args[0]
+        self.assertEqual(added.dest_prefix, "10.122.0.21")
+        self.assertEqual(added.prefix_len, 32)
+
+    @patch("conf.route_control.fetch_mac")
+    def test_given_gateway_on_an_attached_network_when_both_are_added_then_one_gate_is_shared(
+        self, mock_fetch_mac
+    ):
+        mock_fetch_mac.return_value = DEFAULT_MAC_ADDRESS
+        self.ndb.neighbours.dump.return_value = [
+            {"ifindex": 2, "dst": "10.122.0.1", "lladdr": DEFAULT_MAC_ADDRESS},
+        ]
+        attached = self.route_controller._parse_route_entry_msg(
+            self.connected_route_msg()
+        )
+        assert attached is not None
+        self.route_controller.add_new_route_entry(attached)
+
+        via_gateway_msg = self.connected_route_msg(dst="10.126.0.0")
+        via_gateway_msg["attrs"].append(("RTA_GATEWAY", "10.122.0.1"))
+        via_gateway = self.route_controller._parse_route_entry_msg(via_gateway_msg)
+        assert via_gateway is not None
+        self.route_controller.add_new_route_entry(via_gateway)
+
+        gates = {
+            call.kwargs["gate_idx"]
+            for call in self.mock_bess_controller.add_route_to_module.call_args_list
+        }
+        self.assertEqual(len(gates), 1, "the shared next hop should share one gate")
+        self.mock_bess_controller.create_module.assert_called_once()
+        self.assertEqual(
+            self.route_controller._neighbor_cache["10.122.0.1"].route_count, 2
+        )
+
+    @patch("conf.route_control.fetch_mac")
+    def test_given_two_attached_networks_on_one_interface_then_both_are_served(
+        self, mock_fetch_mac
+    ):
+        mock_fetch_mac.return_value = DEFAULT_MAC_ADDRESS
+        self.ndb.neighbours.dump.return_value = [
+            {"ifindex": 2, "dst": "10.122.0.21", "lladdr": DEFAULT_MAC_ADDRESS},
+            {"ifindex": 2, "dst": "10.123.0.30", "lladdr": DEFAULT_MAC_ADDRESS},
+        ]
+        for prefix in ("10.122.0.0", "10.123.0.0"):
+            entry = self.route_controller._parse_route_entry_msg(
+                self.connected_route_msg(dst=prefix)
+            )
+            assert entry is not None
+            self.route_controller.add_new_route_entry(entry)
+
+        added = sorted(
+            call.args[0].dest_prefix
+            for call in self.mock_bess_controller.add_route_to_module.call_args_list
+        )
+        self.assertEqual(added, ["10.122.0.21", "10.123.0.30"])
+        self.assertEqual(len(self.route_controller._on_link_networks["access"]), 2)
+
+    @patch("conf.route_control.send_ping")
+    @patch("conf.route_control.fetch_mac")
+    def test_given_neighbor_event_when_host_is_added_then_nothing_is_probed(
+        self, mock_fetch_mac, mock_send_ping
+    ):
+        mock_fetch_mac.return_value = None
+        self.ndb.neighbours.dump.return_value = [
+            {"ifindex": 2, "dst": "10.122.0.21", "lladdr": DEFAULT_MAC_ADDRESS},
+        ]
+        entry = self.route_controller._parse_route_entry_msg(self.connected_route_msg())
+        assert entry is not None
+        self.route_controller.add_new_route_entry(entry)
+        self.route_controller.add_unresolved_new_neighbor(
+            {
+                "ifindex": 2,
+                "attrs": [
+                    ("NDA_DST", "10.122.0.22"),
+                    ("NDA_LLADDR", DEFAULT_MAC_ADDRESS),
+                ],
+            }
+        )
+
+        mock_send_ping.assert_not_called()
+        mock_fetch_mac.assert_not_called()
+        added = sorted(
+            call.args[0].dest_prefix
+            for call in self.mock_bess_controller.add_route_to_module.call_args_list
+        )
+        self.assertEqual(added, ["10.122.0.21", "10.122.0.22"])
+
+    @patch("conf.route_control.send_ping")
+    @patch("conf.route_control.fetch_mac")
+    def test_given_unresolved_gateway_on_an_attached_network_when_it_resolves_then_it_is_also_a_host(
+        self, mock_fetch_mac, mock_send_ping
+    ):
+        mock_fetch_mac.return_value = None
+        attached = self.route_controller._parse_route_entry_msg(
+            self.connected_route_msg()
+        )
+        assert attached is not None
+        self.route_controller.add_new_route_entry(attached)
+
+        via_gateway_msg = self.connected_route_msg(dst="10.126.0.0")
+        via_gateway_msg["attrs"].append(("RTA_GATEWAY", "10.122.0.1"))
+        via_gateway = self.route_controller._parse_route_entry_msg(via_gateway_msg)
+        assert via_gateway is not None
+        self.route_controller.add_new_route_entry(via_gateway)
+        self.mock_bess_controller.add_route_to_module.assert_not_called()
+
+        self.route_controller.add_unresolved_new_neighbor(
+            {
+                "ifindex": 2,
+                "attrs": [
+                    ("NDA_DST", "10.122.0.1"),
+                    ("NDA_LLADDR", DEFAULT_MAC_ADDRESS),
+                ],
+            }
+        )
+
+        added = sorted(
+            call.args[0].dest_prefix
+            for call in self.mock_bess_controller.add_route_to_module.call_args_list
+        )
+        self.assertEqual(added, ["10.122.0.1", "10.126.0.0"])
+        gates = {
+            call.kwargs["gate_idx"]
+            for call in self.mock_bess_controller.add_route_to_module.call_args_list
+        }
+        self.assertEqual(len(gates), 1, "the shared next hop should share one gate")
+        self.assertEqual(
+            self.route_controller._neighbor_cache["10.122.0.1"].route_count, 2
+        )
+
+    @patch("conf.route_control.fetch_mac")
+    def test_given_host_route_that_could_not_be_installed_then_it_is_retried(
+        self, mock_fetch_mac
+    ):
+        mock_fetch_mac.return_value = DEFAULT_MAC_ADDRESS
+        entry = self.route_controller._parse_route_entry_msg(self.connected_route_msg())
+        assert entry is not None
+        self.route_controller.add_new_route_entry(entry)
+        network = next(iter(self.route_controller._on_link_networks["access"]))
+        neighbor = {
+            "ifindex": 2,
+            "attrs": [
+                ("NDA_DST", "10.122.0.21"),
+                ("NDA_LLADDR", DEFAULT_MAC_ADDRESS),
+            ],
+        }
+
+        self.mock_bess_controller.add_route_to_module.side_effect = Exception(
+            "BESS is unreachable"
+        )
+        self.route_controller.add_unresolved_new_neighbor(neighbor)
+        self.assertNotIn(
+            "10.122.0.21", self.route_controller._on_link_networks["access"][network]
+        )
+
+        self.mock_bess_controller.add_route_to_module.side_effect = None
+        self.route_controller.add_unresolved_new_neighbor(neighbor)
+        self.assertIn(
+            "10.122.0.21", self.route_controller._on_link_networks["access"][network]
+        )
+        added = self.mock_bess_controller.add_route_to_module.call_args_list[-1].args[0]
+        self.assertEqual(added.dest_prefix, "10.122.0.21")
+        self.assertEqual(added.prefix_len, 32)
+
+
+class ThreadRecordingNdb:
+    """Stands in for NDB and records the thread that queries it.
+
+    NDB answers a query only once its event loop thread is free, so a query
+    made on that thread, from inside an event handler, never returns.
+    """
+
+    def __init__(self, ifname: str, neighbors: list[dict]):
+        self.query_threads: list[threading.Thread] = []
+        self.task_manager = Mock()
+        self.interfaces = self._Recording(self, lambda _: {"ifname": ifname})
+        self.neighbours = Mock()
+        self.neighbours.dump.side_effect = lambda: self._record(neighbors)
+
+    def _record(self, value):
+        self.query_threads.append(threading.current_thread())
+        return value
+
+    class _Recording:
+        def __init__(self, ndb, lookup):
+            self._ndb = ndb
+            self._lookup = lookup
+
+        def __getitem__(self, key):
+            return self._ndb._record(self._lookup(key))
+
+
+class TestNetlinkEventThread(unittest.TestCase):
+    """Tests that netlink events are handled off NDB's event loop thread."""
+
+    TIMEOUT_S = 5
+
+    def setUp(self):
+        self.mock_bess_controller = Mock(BessControllerMock)
+        self.ndb = ThreadRecordingNdb(
+            ifname="core",
+            neighbors=[{"dst": "172.31.48.1", "lladdr": DEFAULT_MAC_ADDRESS}],
+        )
+        self.route_controller = RouteController(
+            self.mock_bess_controller,
+            self.ndb,
+            interfaces=["access", "core"],
+            ipr=Mock(),
+        )
+        self.route_controller.register_handlers()
+
+    @staticmethod
+    def new_route_message(dst: str) -> dict:
+        return {
+            "family": 2,
+            "dst_len": 24,
+            "flags": 0,
+            "attrs": [
+                ("RTA_TABLE", 254),
+                ("RTA_GATEWAY", "172.31.48.1"),
+                ("RTA_OIF", 2),
+                ("RTA_DST", dst),
+            ],
+            "event": "RTM_NEWROUTE",
+        }
+
+    def deliver_from_ndb_thread(self, handler, netlink_message) -> threading.Thread:
+        """Runs a handler the way NDB does: awaited on its own loop thread."""
+        ndb_thread = threading.Thread(
+            target=lambda: asyncio.run(handler(self.ndb, netlink_message)),
+            name="ndb-event-loop",
+        )
+        ndb_thread.start()
+        ndb_thread.join(self.TIMEOUT_S)
+        self.assertFalse(ndb_thread.is_alive(), "the NDB handler did not return")
+        return ndb_thread
+
+    def wait_for_routes(self, count: int) -> list[str]:
+        """Waits until count routes reached BESS and returns their prefixes."""
+        deadline = time.monotonic() + self.TIMEOUT_S
+        while time.monotonic() < deadline:
+            calls = self.mock_bess_controller.add_route_to_module.call_args_list
+            if len(calls) >= count:
+                return [call.args[0].dest_prefix for call in calls]
+            time.sleep(0.01)
+        self.fail(f"fewer than {count} routes reached BESS")
+
+    def test_given_new_route_event_when_ndb_delivers_it_then_ndb_is_queried_off_its_event_thread(
+        self,
+    ):
+        ndb_thread = self.deliver_from_ndb_thread(
+            self.route_controller._netlink_route_handler,
+            self.new_route_message("192.168.1.0"),
+        )
+
+        self.assertEqual(self.wait_for_routes(1), ["192.168.1.0"])
+        self.assertTrue(self.ndb.query_threads, "NDB was never queried")
+        self.assertNotIn(ndb_thread, self.ndb.query_threads)
+
+    def test_given_route_events_after_startup_when_ndb_delivers_them_then_every_route_is_added_in_order(
+        self,
+    ):
+        prefixes = ["192.168.1.0", "192.168.2.0", "192.168.3.0"]
+        for prefix in prefixes:
+            self.deliver_from_ndb_thread(
+                self.route_controller._netlink_route_handler,
+                self.new_route_message(prefix),
+            )
+
+        self.assertEqual(self.wait_for_routes(len(prefixes)), prefixes)
+
+    @patch.object(RouteController, "_handle_route_event")
+    def test_given_route_event_when_ndb_handler_runs_then_event_is_only_queued(
+        self, mock_handle_route_event
+    ):
+        # Patches put on the queue the worker already waits on, so the worker
+        # keeps waiting on a real queue however the threads are scheduled.
+        with patch.object(self.route_controller._netlink_events, "put") as mock_put:
+            asyncio.run(
+                self.route_controller._netlink_route_handler(
+                    self.ndb, self.new_route_message("192.168.1.0")
+                )
+            )
+
+        mock_put.assert_called_once()
+        mock_handle_route_event.assert_not_called()
+        self.assertEqual(self.ndb.query_threads, [])
+
+    @patch.object(RouteController, "add_unresolved_new_neighbor")
+    def test_given_neighbor_event_when_ndb_handler_runs_then_it_is_handled_on_the_event_thread(
+        self, mock_add_unresolved_new_neighbor
+    ):
+        handled = threading.Event()
+        handled_on: list[threading.Thread] = []
+
+        def record(_):
+            handled_on.append(threading.current_thread())
+            handled.set()
+
+        mock_add_unresolved_new_neighbor.side_effect = record
+
+        self.deliver_from_ndb_thread(
+            self.route_controller._netlink_neighbor_handler, {"event": "RTM_NEWNEIGH"}
+        )
+
+        self.assertTrue(handled.wait(self.TIMEOUT_S), "the neighbor was not handled")
+        self.assertEqual(handled_on, [self.route_controller._netlink_event_thread])
+
+    def test_given_event_that_fails_when_handled_then_later_events_are_still_handled(
+        self,
+    ):
+        def fail(_):
+            raise RuntimeError("handling failed")
+
+        self.route_controller._netlink_events.put((fail, {}))
+        self.deliver_from_ndb_thread(
+            self.route_controller._netlink_route_handler,
+            self.new_route_message("192.168.1.0"),
+        )
+
+        self.assertEqual(self.wait_for_routes(1), ["192.168.1.0"])
+
+    def test_given_handlers_registered_twice_when_register_handlers_then_one_event_thread(
+        self,
+    ):
+        event_thread = self.route_controller._netlink_event_thread
+
+        self.route_controller.register_handlers()
+
+        self.assertIs(self.route_controller._netlink_event_thread, event_thread)
+        self.assertTrue(event_thread.is_alive())

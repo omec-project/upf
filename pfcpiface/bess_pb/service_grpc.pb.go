@@ -1168,7 +1168,7 @@ func RegisterBESSControlServer(s grpc.ServiceRegistrar, srv BESSControlServer) {
 	s.RegisterService(&BESSControl_ServiceDesc, srv)
 }
 
-func _BESSControl_GetVersion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_GetVersion_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(EmptyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1180,13 +1180,13 @@ func _BESSControl_GetVersion_Handler(srv interface{}, ctx context.Context, dec f
 		Server:     srv,
 		FullMethod: BESSControl_GetVersion_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).GetVersion(ctx, req.(*EmptyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_ResetAll_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_ResetAll_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(EmptyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1198,13 +1198,13 @@ func _BESSControl_ResetAll_Handler(srv interface{}, ctx context.Context, dec fun
 		Server:     srv,
 		FullMethod: BESSControl_ResetAll_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).ResetAll(ctx, req.(*EmptyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_KillBess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_KillBess_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(EmptyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1216,13 +1216,13 @@ func _BESSControl_KillBess_Handler(srv interface{}, ctx context.Context, dec fun
 		Server:     srv,
 		FullMethod: BESSControl_KillBess_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).KillBess(ctx, req.(*EmptyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_ImportPlugin_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_ImportPlugin_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(ImportPluginRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1234,13 +1234,13 @@ func _BESSControl_ImportPlugin_Handler(srv interface{}, ctx context.Context, dec
 		Server:     srv,
 		FullMethod: BESSControl_ImportPlugin_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).ImportPlugin(ctx, req.(*ImportPluginRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_UnloadPlugin_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_UnloadPlugin_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(UnloadPluginRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1252,13 +1252,13 @@ func _BESSControl_UnloadPlugin_Handler(srv interface{}, ctx context.Context, dec
 		Server:     srv,
 		FullMethod: BESSControl_UnloadPlugin_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).UnloadPlugin(ctx, req.(*UnloadPluginRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_ListPlugins_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_ListPlugins_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(EmptyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1270,13 +1270,13 @@ func _BESSControl_ListPlugins_Handler(srv interface{}, ctx context.Context, dec 
 		Server:     srv,
 		FullMethod: BESSControl_ListPlugins_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).ListPlugins(ctx, req.(*EmptyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_PauseAll_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_PauseAll_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(EmptyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1288,13 +1288,13 @@ func _BESSControl_PauseAll_Handler(srv interface{}, ctx context.Context, dec fun
 		Server:     srv,
 		FullMethod: BESSControl_PauseAll_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).PauseAll(ctx, req.(*EmptyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_PauseWorker_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_PauseWorker_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(PauseWorkerRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1306,13 +1306,13 @@ func _BESSControl_PauseWorker_Handler(srv interface{}, ctx context.Context, dec 
 		Server:     srv,
 		FullMethod: BESSControl_PauseWorker_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).PauseWorker(ctx, req.(*PauseWorkerRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_ResumeWorker_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_ResumeWorker_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(ResumeWorkerRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1324,13 +1324,13 @@ func _BESSControl_ResumeWorker_Handler(srv interface{}, ctx context.Context, dec
 		Server:     srv,
 		FullMethod: BESSControl_ResumeWorker_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).ResumeWorker(ctx, req.(*ResumeWorkerRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_ResumeAll_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_ResumeAll_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(EmptyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1342,13 +1342,13 @@ func _BESSControl_ResumeAll_Handler(srv interface{}, ctx context.Context, dec fu
 		Server:     srv,
 		FullMethod: BESSControl_ResumeAll_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).ResumeAll(ctx, req.(*EmptyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_ResetWorkers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_ResetWorkers_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(EmptyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1360,13 +1360,13 @@ func _BESSControl_ResetWorkers_Handler(srv interface{}, ctx context.Context, dec
 		Server:     srv,
 		FullMethod: BESSControl_ResetWorkers_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).ResetWorkers(ctx, req.(*EmptyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_ListWorkers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_ListWorkers_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(EmptyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1378,13 +1378,13 @@ func _BESSControl_ListWorkers_Handler(srv interface{}, ctx context.Context, dec 
 		Server:     srv,
 		FullMethod: BESSControl_ListWorkers_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).ListWorkers(ctx, req.(*EmptyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_AddWorker_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_AddWorker_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(AddWorkerRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1396,13 +1396,13 @@ func _BESSControl_AddWorker_Handler(srv interface{}, ctx context.Context, dec fu
 		Server:     srv,
 		FullMethod: BESSControl_AddWorker_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).AddWorker(ctx, req.(*AddWorkerRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_DestroyWorker_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_DestroyWorker_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(DestroyWorkerRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1414,13 +1414,13 @@ func _BESSControl_DestroyWorker_Handler(srv interface{}, ctx context.Context, de
 		Server:     srv,
 		FullMethod: BESSControl_DestroyWorker_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).DestroyWorker(ctx, req.(*DestroyWorkerRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_ResetTcs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_ResetTcs_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(EmptyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1432,13 +1432,13 @@ func _BESSControl_ResetTcs_Handler(srv interface{}, ctx context.Context, dec fun
 		Server:     srv,
 		FullMethod: BESSControl_ResetTcs_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).ResetTcs(ctx, req.(*EmptyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_ListTcs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_ListTcs_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(ListTcsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1450,13 +1450,13 @@ func _BESSControl_ListTcs_Handler(srv interface{}, ctx context.Context, dec func
 		Server:     srv,
 		FullMethod: BESSControl_ListTcs_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).ListTcs(ctx, req.(*ListTcsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_CheckSchedulingConstraints_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_CheckSchedulingConstraints_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(EmptyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1468,13 +1468,13 @@ func _BESSControl_CheckSchedulingConstraints_Handler(srv interface{}, ctx contex
 		Server:     srv,
 		FullMethod: BESSControl_CheckSchedulingConstraints_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).CheckSchedulingConstraints(ctx, req.(*EmptyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_AddTc_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_AddTc_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(AddTcRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1486,13 +1486,13 @@ func _BESSControl_AddTc_Handler(srv interface{}, ctx context.Context, dec func(i
 		Server:     srv,
 		FullMethod: BESSControl_AddTc_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).AddTc(ctx, req.(*AddTcRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_UpdateTcParams_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_UpdateTcParams_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(UpdateTcParamsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1504,13 +1504,13 @@ func _BESSControl_UpdateTcParams_Handler(srv interface{}, ctx context.Context, d
 		Server:     srv,
 		FullMethod: BESSControl_UpdateTcParams_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).UpdateTcParams(ctx, req.(*UpdateTcParamsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_UpdateTcParent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_UpdateTcParent_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(UpdateTcParentRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1522,13 +1522,13 @@ func _BESSControl_UpdateTcParent_Handler(srv interface{}, ctx context.Context, d
 		Server:     srv,
 		FullMethod: BESSControl_UpdateTcParent_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).UpdateTcParent(ctx, req.(*UpdateTcParentRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_GetTcStats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_GetTcStats_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(GetTcStatsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1540,13 +1540,13 @@ func _BESSControl_GetTcStats_Handler(srv interface{}, ctx context.Context, dec f
 		Server:     srv,
 		FullMethod: BESSControl_GetTcStats_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).GetTcStats(ctx, req.(*GetTcStatsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_ListDrivers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_ListDrivers_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(EmptyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1558,13 +1558,13 @@ func _BESSControl_ListDrivers_Handler(srv interface{}, ctx context.Context, dec 
 		Server:     srv,
 		FullMethod: BESSControl_ListDrivers_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).ListDrivers(ctx, req.(*EmptyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_GetDriverInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_GetDriverInfo_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(GetDriverInfoRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1576,13 +1576,13 @@ func _BESSControl_GetDriverInfo_Handler(srv interface{}, ctx context.Context, de
 		Server:     srv,
 		FullMethod: BESSControl_GetDriverInfo_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).GetDriverInfo(ctx, req.(*GetDriverInfoRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_ResetPorts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_ResetPorts_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(EmptyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1594,13 +1594,13 @@ func _BESSControl_ResetPorts_Handler(srv interface{}, ctx context.Context, dec f
 		Server:     srv,
 		FullMethod: BESSControl_ResetPorts_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).ResetPorts(ctx, req.(*EmptyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_ListPorts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_ListPorts_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(EmptyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1612,13 +1612,13 @@ func _BESSControl_ListPorts_Handler(srv interface{}, ctx context.Context, dec fu
 		Server:     srv,
 		FullMethod: BESSControl_ListPorts_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).ListPorts(ctx, req.(*EmptyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_CreatePort_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_CreatePort_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(CreatePortRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1630,13 +1630,13 @@ func _BESSControl_CreatePort_Handler(srv interface{}, ctx context.Context, dec f
 		Server:     srv,
 		FullMethod: BESSControl_CreatePort_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).CreatePort(ctx, req.(*CreatePortRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_DestroyPort_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_DestroyPort_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(DestroyPortRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1648,13 +1648,13 @@ func _BESSControl_DestroyPort_Handler(srv interface{}, ctx context.Context, dec 
 		Server:     srv,
 		FullMethod: BESSControl_DestroyPort_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).DestroyPort(ctx, req.(*DestroyPortRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_SetPortConf_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_SetPortConf_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(SetPortConfRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1666,13 +1666,13 @@ func _BESSControl_SetPortConf_Handler(srv interface{}, ctx context.Context, dec 
 		Server:     srv,
 		FullMethod: BESSControl_SetPortConf_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).SetPortConf(ctx, req.(*SetPortConfRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_GetPortConf_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_GetPortConf_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(GetPortConfRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1684,13 +1684,13 @@ func _BESSControl_GetPortConf_Handler(srv interface{}, ctx context.Context, dec 
 		Server:     srv,
 		FullMethod: BESSControl_GetPortConf_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).GetPortConf(ctx, req.(*GetPortConfRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_GetPortStats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_GetPortStats_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(GetPortStatsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1702,13 +1702,13 @@ func _BESSControl_GetPortStats_Handler(srv interface{}, ctx context.Context, dec
 		Server:     srv,
 		FullMethod: BESSControl_GetPortStats_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).GetPortStats(ctx, req.(*GetPortStatsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_GetLinkStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_GetLinkStatus_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(GetLinkStatusRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1720,13 +1720,13 @@ func _BESSControl_GetLinkStatus_Handler(srv interface{}, ctx context.Context, de
 		Server:     srv,
 		FullMethod: BESSControl_GetLinkStatus_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).GetLinkStatus(ctx, req.(*GetLinkStatusRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_ListMclass_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_ListMclass_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(EmptyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1738,13 +1738,13 @@ func _BESSControl_ListMclass_Handler(srv interface{}, ctx context.Context, dec f
 		Server:     srv,
 		FullMethod: BESSControl_ListMclass_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).ListMclass(ctx, req.(*EmptyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_GetMclassInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_GetMclassInfo_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(GetMclassInfoRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1756,13 +1756,13 @@ func _BESSControl_GetMclassInfo_Handler(srv interface{}, ctx context.Context, de
 		Server:     srv,
 		FullMethod: BESSControl_GetMclassInfo_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).GetMclassInfo(ctx, req.(*GetMclassInfoRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_ResetModules_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_ResetModules_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(EmptyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1774,13 +1774,13 @@ func _BESSControl_ResetModules_Handler(srv interface{}, ctx context.Context, dec
 		Server:     srv,
 		FullMethod: BESSControl_ResetModules_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).ResetModules(ctx, req.(*EmptyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_ListModules_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_ListModules_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(EmptyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1792,13 +1792,13 @@ func _BESSControl_ListModules_Handler(srv interface{}, ctx context.Context, dec 
 		Server:     srv,
 		FullMethod: BESSControl_ListModules_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).ListModules(ctx, req.(*EmptyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_CreateModule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_CreateModule_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(CreateModuleRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1810,13 +1810,13 @@ func _BESSControl_CreateModule_Handler(srv interface{}, ctx context.Context, dec
 		Server:     srv,
 		FullMethod: BESSControl_CreateModule_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).CreateModule(ctx, req.(*CreateModuleRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_DestroyModule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_DestroyModule_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(DestroyModuleRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1828,13 +1828,13 @@ func _BESSControl_DestroyModule_Handler(srv interface{}, ctx context.Context, de
 		Server:     srv,
 		FullMethod: BESSControl_DestroyModule_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).DestroyModule(ctx, req.(*DestroyModuleRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_GetModuleInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_GetModuleInfo_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(GetModuleInfoRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1846,13 +1846,13 @@ func _BESSControl_GetModuleInfo_Handler(srv interface{}, ctx context.Context, de
 		Server:     srv,
 		FullMethod: BESSControl_GetModuleInfo_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).GetModuleInfo(ctx, req.(*GetModuleInfoRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_ConnectModules_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_ConnectModules_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(ConnectModulesRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1864,13 +1864,13 @@ func _BESSControl_ConnectModules_Handler(srv interface{}, ctx context.Context, d
 		Server:     srv,
 		FullMethod: BESSControl_ConnectModules_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).ConnectModules(ctx, req.(*ConnectModulesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_DisconnectModules_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_DisconnectModules_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(DisconnectModulesRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1882,13 +1882,13 @@ func _BESSControl_DisconnectModules_Handler(srv interface{}, ctx context.Context
 		Server:     srv,
 		FullMethod: BESSControl_DisconnectModules_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).DisconnectModules(ctx, req.(*DisconnectModulesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_DumpMempool_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_DumpMempool_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(DumpMempoolRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1900,13 +1900,13 @@ func _BESSControl_DumpMempool_Handler(srv interface{}, ctx context.Context, dec 
 		Server:     srv,
 		FullMethod: BESSControl_DumpMempool_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).DumpMempool(ctx, req.(*DumpMempoolRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_ModuleCommand_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_ModuleCommand_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(CommandRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1918,13 +1918,13 @@ func _BESSControl_ModuleCommand_Handler(srv interface{}, ctx context.Context, de
 		Server:     srv,
 		FullMethod: BESSControl_ModuleCommand_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).ModuleCommand(ctx, req.(*CommandRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_ListGateHookClass_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_ListGateHookClass_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(EmptyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1936,13 +1936,13 @@ func _BESSControl_ListGateHookClass_Handler(srv interface{}, ctx context.Context
 		Server:     srv,
 		FullMethod: BESSControl_ListGateHookClass_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).ListGateHookClass(ctx, req.(*EmptyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_GetGateHookClassInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_GetGateHookClassInfo_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(GetGateHookClassInfoRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1954,13 +1954,13 @@ func _BESSControl_GetGateHookClassInfo_Handler(srv interface{}, ctx context.Cont
 		Server:     srv,
 		FullMethod: BESSControl_GetGateHookClassInfo_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).GetGateHookClassInfo(ctx, req.(*GetGateHookClassInfoRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_ConfigureGateHook_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_ConfigureGateHook_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(ConfigureGateHookRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1972,13 +1972,13 @@ func _BESSControl_ConfigureGateHook_Handler(srv interface{}, ctx context.Context
 		Server:     srv,
 		FullMethod: BESSControl_ConfigureGateHook_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).ConfigureGateHook(ctx, req.(*ConfigureGateHookRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_ListGateHooks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_ListGateHooks_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(EmptyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -1990,13 +1990,13 @@ func _BESSControl_ListGateHooks_Handler(srv interface{}, ctx context.Context, de
 		Server:     srv,
 		FullMethod: BESSControl_ListGateHooks_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).ListGateHooks(ctx, req.(*EmptyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_GateHookCommand_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_GateHookCommand_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(GateHookCommandRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -2008,13 +2008,13 @@ func _BESSControl_GateHookCommand_Handler(srv interface{}, ctx context.Context, 
 		Server:     srv,
 		FullMethod: BESSControl_GateHookCommand_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).GateHookCommand(ctx, req.(*GateHookCommandRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BESSControl_ConfigureResumeHook_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BESSControl_ConfigureResumeHook_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(ConfigureResumeHookRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -2026,7 +2026,7 @@ func _BESSControl_ConfigureResumeHook_Handler(srv interface{}, ctx context.Conte
 		Server:     srv,
 		FullMethod: BESSControl_ConfigureResumeHook_FullMethodName,
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(BESSControlServer).ConfigureResumeHook(ctx, req.(*ConfigureResumeHookRequest))
 	}
 	return interceptor(ctx, in, info, handler)

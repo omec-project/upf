@@ -41,10 +41,14 @@
 #include "../pb/module_msg.pb.h"
 #include "../utils/cuckoo_map.h"
 
+#include <atomic>
+#include <memory>
+
 using bess::utils::CuckooMap;
 using bess::utils::HashResult;
 
-#define MAX_TUPLES 16
+#define MAX_TUPLES 16u        /* distinct masks, unless max_tuples says */
+#define MAX_TUPLES_LIMIT 256u /* the largest max_tuples Init accepts */
 #define MAX_FIELDS 8
 #define MAX_FIELD_SIZE 8
 #define BULK_SIZE 32
@@ -153,7 +157,6 @@ class WildcardMatch final : public Module {
         values_(),
         tuples_() {
     max_allowed_workers_ = Worker::kMaxWorkers;
-    { tuples_.resize(MAX_TUPLES); }
   }
 
   CommandResponse Init(const bess::pb::WildcardMatchArg &arg);
@@ -190,6 +193,72 @@ class WildcardMatch final : public Module {
     }
   };
 
+  // A rule an index set holds. Its key is already masked.
+  struct WmIdxRule {
+    wm_hkey_t key;
+    wm_hkey_t mask;
+    WmData data;
+  };
+
+  // A set's rules for one value of its fields, highest priority first. Never
+  // changed once published: an edit publishes a new group.
+  struct WmGroup {
+    std::vector<WmIdxRule> rules;  // the control side's copy
+    // What the packet path scans: per rule, its key words then its mask
+    // words, contiguously; act[r] is rule r's data, read only on a match.
+    std::vector<uint64_t> km;
+    std::vector<WmData> act;
+
+    void Compile(size_t words) {
+      km.clear();
+      act.clear();
+      km.reserve(rules.size() * 2 * words);
+      act.reserve(rules.size());
+      for (const auto &r : rules) {
+        km.insert(km.end(), r.key.u64_arr, r.key.u64_arr + words);
+        km.insert(km.end(), r.mask.u64_arr, r.mask.u64_arr + words);
+        act.push_back(r.data);
+      }
+    }
+  };
+
+  struct WmIndexSet {
+    wm_hkey_t mask;       // the bytes of the set's fields
+    bool has_when;        // only rules and packets carrying when_key
+    wm_hkey_t when_mask;  // in when_mask take part
+    wm_hkey_t when_key;
+    // Groups in the table. Workers skip an empty set; a stale count costs at
+    // most one probe of an empty table, or a brief delay before a new group.
+    std::atomic<size_t> groups{0};
+    bess::pb::WildcardMatchArg::IndexSet spec;  // as Init was given it
+    CuckooMap<wm_hkey_t, struct WmData, wm_hash, wm_eq> *ht;  // -> WmGroup*
+    struct rte_hash_parameters params;
+    std::string hash_name;
+    WmIndexSet() : mask(), has_when(false), when_mask(), when_key(), ht() {
+      // Keep exactly RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY, and do not switch to
+      // _LF or add NO_FREE_ON_DEL: WildcardMatch::Reclaim relies on a lookup
+      // reading the group pointer under the table's rwlock, and without
+      // freeing the key position on delete, slots would leak. Init refuses
+      // any other flags.
+      params = dpdk_params1;
+      std::ostringstream address;
+      address << this;
+      hash_name = "WmIdx" + address.str();
+      params.name = hash_name.c_str();
+    }
+  };
+
+  int IndexSetOf(const wm_hkey_t &key, const wm_hkey_t &mask) const;
+  CommandResponse IndexAdd(int s, const wm_hkey_t &key, const wm_hkey_t &rmask,
+                           const WmData &data);
+  CommandResponse IndexDelete(int s, const wm_hkey_t &key,
+                              const wm_hkey_t &rmask);
+  void IndexClear();
+  void Retire(WmGroup *g);
+  void Reclaim();
+  void IndexLookupBulk(const wm_hkey_t *key, int cnt, WmData **result,
+                       uint64_t *hitmask);
+
   gate_idx_t LookupEntry(const wm_hkey_t &key, gate_idx_t def_gate,
                          bess::Packet *pkt);
 
@@ -217,7 +286,26 @@ class WildcardMatch final : public Module {
   // TODO(melvinw): this can be refactored to use ExactMatchTable
   std::vector<struct WmField> fields_;
   std::vector<struct WmField> values_;
-  std::vector<struct WmTuple> tuples_;  //[MAX_TUPLES];
+  std::vector<struct WmTuple> tuples_;  // a slot per mask, sized by Init
+  // Fixed at Init. Held by pointer: a set's table is named after its address.
+  std::vector<std::unique_ptr<WmIndexSet>> index_sets_;
+  size_t indexed_rules_ = 0;
+  // Groups an edit replaced, with the epoch they were retired at; freed by
+  // Reclaim once no worker can still be scanning them. retired_,
+  // indexed_rules_ and the groups counts' read-modify-writes are serialised
+  // by bessctl's command mutex, not here.
+  struct WmRetired {
+    WmGroup *group;
+    uint64_t epoch;
+  };
+  std::vector<WmRetired> retired_;
+  // epoch_ advances on every retire. While a worker is in ProcessBatch, its
+  // slot holds the epoch it entered at; 0 means it is not in this module.
+  struct alignas(64) WmReader {
+    std::atomic<uint64_t> epoch{0};
+  };
+  std::atomic<uint64_t> epoch_{1};
+  WmReader readers_[Worker::kMaxWorkers];
   std::vector<struct WmData> data_;
 };
 

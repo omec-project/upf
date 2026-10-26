@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2019 Intel Corporation
+# Copyright (c) 2019-Present Intel Corporation
 
 # for get_env
 from conf.utils import *
@@ -12,6 +12,14 @@ SLEEP_S = 2
 # Maximum number of gates per module instance in BESS. Don't change it.
 MAX_GATES = 8192
 
+# Route table sizing. An attached network contributes one route per host
+# (route_control.py), so the table is no longer one entry per gateway and
+# IPLookup's 1024 default is easy to reach. Longest-prefix-match lookup does
+# not slow down with a larger table.
+MAX_ROUTE_RULES = 16384
+# Prefixes shorter than /24 need a tbl8; IPLookup's default is 128.
+MAX_ROUTE_TBL8S = 512
+
 
 # ====================================================
 #       Parameters
@@ -22,6 +30,8 @@ class Parser:
     def __init__(self, fname):
         self.name = get_env("CONF_FILE", fname)
         self.conf = get_json_conf(self.name, False)
+        self.dl_rate = 0
+        self.ul_rate = 0
         self.max_ip_defrag_flows = None
         self.ip_frag_with_eth_mtu = None
         self.hwcksum = False
@@ -40,6 +50,7 @@ class Parser:
         self.sim_start_n9_teid = None
         self.sim_pkt_size = None
         self.sim_total_flows = None
+        self.sim_qfi = 9
         self.workers = 1
         self.access_ifname = None
         self.core_ifname = None
@@ -54,10 +65,27 @@ class Parser:
         self.table_size_app_qer_lookup = 0
         self.table_size_session_qer_lookup = 0
         self.table_size_far_lookup = 0
+        self.pdr_lookup_max_masks = 0
 
     def parse(self, ifaces):
         if self.conf is None:
             print("Error loading configuration file.")
+
+        # Number of packets per second to be created in DL
+        try:
+            self.dl_rate = int(self.conf["dl_rate"])
+        except ValueError:
+            print("Invalid value for dl_rate. Disabling traffic generation in DL.")
+        except KeyError:
+            print("dl_rate value not set. Ignoring parameter.")
+
+        # Number of packets per second to be created in UL
+        try:
+            self.ul_rate = int(self.conf["ul_rate"])
+        except ValueError:
+            print("Invalid value for ul_rate. Disabling traffic generation in UL.")
+        except KeyError:
+            print("ul_rate value not set. Ignoring parameter.")
 
         # Maximum number of flows to manage ip4 frags for re-assembly
         try:
@@ -139,6 +167,21 @@ class Parser:
         except KeyError:
             print("Sim mode not selected.")
 
+        # QFI written into the PDU Session Container for uplink GTP-U
+        # encapsulation (pktgen). Parsed separately so an absent key keeps
+        # the default without discarding the sim block above. The PSC encodes
+        # QFI in 6 bits (see bess/core/utils/gtp.h), so reject anything outside
+        # 0-63: higher values would be silently truncated by GtpuEncap or break
+        # the one-byte SetMetadata module at init.
+        try:
+            qfi = int(self.conf["sim"]["qfi"])
+            if 0 <= qfi <= 63:
+                self.sim_qfi = qfi
+            else:
+                print(f"sim qfi {qfi} out of range (0-63). Using default QFI 9.")
+        except (KeyError, ValueError, TypeError):
+            print("sim qfi not set. Using default QFI 9.")
+
         # Parse workers
         try:
             self.workers = int(self.conf["workers"])
@@ -208,6 +251,20 @@ class Parser:
                 setattr(self, attr, table_sizes[key])
             elif table_sizes:
                 print(f"No explicit table size for {key}, using default")
+
+        # Distinct rule masks pdrLookup holds, 1-256; 0 keeps the module's default.
+        # WildcardMatch::Init refuses 257 or more, which would stop the pipeline.
+        # Only a JSON integer: int() would read true as 1 and 256.9 as 256.
+        if "pdr_lookup_max_masks" in self.conf:
+            max_masks = self.conf["pdr_lookup_max_masks"]
+            if type(max_masks) is int and 0 <= max_masks <= 256:
+                self.pdr_lookup_max_masks = max_masks
+            else:
+                print(
+                    "pdr_lookup_max_masks must be an integer 0-256 (0: the default), using default"
+                )
+        else:
+            print("No explicit pdrLookup mask limit, using default")
 
         # GTPu Path Monitoring
         try:

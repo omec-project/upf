@@ -11,7 +11,7 @@ ARG TREX_APPLY_UPF_PATCHES=1
 ARG TREX_EXT_LIBS=/external_libs
 ARG TREX_LIBS=/trex_python
 # Install dependencies for general PTF test definitions
-FROM ubuntu:26.04@sha256:da6fc2be547864451aa253836dd926da33623312df4a9a243e35dc877c378a78 AS ptf-deps
+FROM ubuntu:26.04@sha256:c098726dd9b9733f3e885f8de0ef375206a311b0a317eadc40d347b1115fb944 AS ptf-deps
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -62,7 +62,7 @@ RUN apk add --no-cache patch wget unzip && \
     test ! -e /output/${TREX_EXT_LIBS}/scapy-2.4.3
 
 # Synthesize all dependencies for runtime
-FROM ubuntu:26.04@sha256:da6fc2be547864451aa253836dd926da33623312df4a9a243e35dc877c378a78 AS ptf-runtime-deps
+FROM ubuntu:26.04@sha256:c098726dd9b9733f3e885f8de0ef375206a311b0a317eadc40d347b1115fb944 AS ptf-runtime-deps
 
 ARG TREX_EXT_LIBS
 ARG TREX_LIBS

@@ -108,8 +108,15 @@ class Port:
         self.bpf = BPF(name=f"{name}FastBPF")
         self.bpf.clear()
 
-        # Initialize route module
-        self.rtr = IPLookup(name=f"{name}Routes")
+        # Initialize route module.
+        # max_rules is given explicitly: an attached network is carried as one
+        # route per host (route_control.py), so the table holds far more than
+        # the one entry per gateway it used to, and IPLookup's default is 1024.
+        # Lookup is longest-prefix-match, so a bigger table does not cost
+        # throughput.
+        self.rtr = IPLookup(
+            name=f"{name}Routes", max_rules=MAX_ROUTE_RULES, max_tbl8s=MAX_ROUTE_TBL8S
+        )
 
         # Default route goes to Sink
         self.rtr.add(prefix="0.0.0.0", prefix_len=0, gate=MAX_GATES - 1)

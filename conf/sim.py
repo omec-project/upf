@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2019 Intel Corporation
+# Copyright 2019-Present Intel Corporation
 
 from scapy.all import *
 from scapy.contrib.gtp import *
@@ -33,6 +33,20 @@ def gen_inet_sequpdate_args(max_session, start_ue_ip):
         "fields": [
             {
                 "offset": 30,
+                "size": 4,
+                "min": ip2long(start_ue_ip),
+                "max": ip2long(start_ue_ip) + max_session - 1,
+            }
+        ]
+    }
+    return kwargs
+
+
+def gen_inet_sequpdate_ul_args(max_session, start_ue_ip):
+    kwargs = {
+        "fields": [
+            {
+                "offset": 26,
                 "size": 4,
                 "min": ip2long(start_ue_ip),
                 "max": ip2long(start_ue_ip) + max_session - 1,
@@ -92,6 +106,20 @@ def gen_gtpu_sequpdate_args(max_session, start_ue_ip, ue_ip_offset, start_teid):
                 "min": ip2long(start_ue_ip),
                 "max": ip2long(start_ue_ip) + max_session - 1,
             },
+        ]
+    }
+    return kwargs
+
+
+def gen_gtpu_sequpdate_ul_args(max_session, start_teid):
+    kwargs = {
+        "fields": [
+            {
+                "offset": 46,
+                "size": 4,
+                "min": start_teid,
+                "max": start_teid + max_session - 1,
+            }
         ]
     }
     return kwargs

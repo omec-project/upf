@@ -32,20 +32,55 @@ void GtpuDecap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 
   for (int i = 0; i < cnt; i++) {
     bess::Packet *p = batch->pkts()[i];
-    /* Trim iph->ihl<<2 + sizeof(Udp) + size of Gtpv1 header
-     */
+    const char *malformed = nullptr;
+    /* Trim the outer IPv4, UDP and GTP-U headers, keeping the Ethernet header:
+     * it is copied forward over the last bytes trimmed. The length is checked
+     * against the packet here rather than trusted to the parser, so a packet
+     * that does not hold its headers is dropped instead of being trimmed past
+     * its end. adj() refusing is the last guard: it checks only the bytes it
+     * removes, not the Ethernet header copied after them. */
+    size_t trim = OuterHeaderLength(p, &malformed);
     Ethernet *eth = p->head_data<Ethernet *>();
-    Ipv4 *iph = (Ipv4 *)((uint8_t *)eth + sizeof(*eth));
-    Gtpv1 *gtph =
-        (Gtpv1 *)((uint8_t *)iph + (iph->header_length << 2) + sizeof(Udp));
-    // Don't swap lines 44 with 42, otherwise gtph->header_length()
-    // gets overwritten by ethh!!
-    auto *new_p = batch->pkts()[i]->adj((iph->header_length << 2) +
-                                        sizeof(Udp) + gtph->header_length());
+    void *new_p = malformed ? nullptr : p->adj(static_cast<uint16_t>(trim));
+    if (!new_p) {
+      drop_log_.Sample(ctx, name(), malformed ? malformed : "trim refused", p);
+      DropPacket(ctx, p);
+      continue;
+    }
     memcpy(new_p, eth, sizeof(*eth));
+    EmitPacket(ctx, p, 0);
+  }
+}
+/*----------------------------------------------------------------------------------*/
+/* Length of the outer IPv4, UDP and GTP-U headers (with optional fields and
+ * extension headers), if the first segment holds all of them after the
+ * Ethernet header; otherwise 0, with the header that does not fit named in
+ * `malformed`. */
+size_t GtpuDecap::OuterHeaderLength(bess::Packet *p, const char **malformed) {
+  const size_t len = p->head_len();
+  const char *head = p->head_data<const char *>();
+
+  const size_t ip_off = sizeof(Ethernet);
+  if (len < ip_off + sizeof(Ipv4)) {
+    *malformed = "outer IPv4 header";
+    return 0;
+  }
+  const Ipv4 *iph = reinterpret_cast<const Ipv4 *>(head + ip_off);
+  const size_t ihl = iph->header_length << 2;
+  if (ihl < sizeof(Ipv4) || ip_off + ihl + sizeof(Udp) > len) {
+    *malformed = "outer IPv4 or UDP header";
+    return 0;
   }
 
-  RunNextModule(ctx, batch);
+  const size_t gtp_off = ip_off + ihl + sizeof(Udp);
+  const Gtpv1 *gtph = reinterpret_cast<const Gtpv1 *>(head + gtp_off);
+  const size_t gtp_len = gtph->header_length(len - gtp_off);
+  if (gtp_len == 0) {
+    *malformed = "GTP-U header";
+    return 0;
+  }
+
+  return ihl + sizeof(Udp) + gtp_len;
 }
 /*----------------------------------------------------------------------------------*/
 ADD_MODULE(GtpuDecap, "gtpu_decap", "first version of gtpu decap module")

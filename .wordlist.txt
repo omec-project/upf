@@ -78,12 +78,15 @@ kubernetes
 linerate
 linux
 localhost
+loopback
 lports
 MAKEFLAGS
 MBR
 md
 memlock
 Microbenchmarks
+namespace
+namespaces
 Natting
 natting
 netdev
@@ -107,6 +110,7 @@ pfcp
 pfcpsim
 PFDs
 pktgen
+pps
 protobuf
 PTF
 PWD

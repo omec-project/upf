@@ -127,7 +127,7 @@ func (node *PFCPNode) Serve() {
 			// enough -- and which one answered was a coin toss.
 			reported := false
 
-			node.pConns.Range(func(key, value interface{}) bool {
+			node.pConns.Range(func(key, value any) bool {
 				pConn := value.(*PFCPConn)
 				reported = pConn.handleDigestReport(fseid)
 

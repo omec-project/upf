@@ -15,7 +15,7 @@ var (
 	errUnsupported      = errors.New("unsupported")
 )
 
-func ErrUnsupported(what string, value interface{}) error {
+func ErrUnsupported(what string, value any) error {
 	return fmt.Errorf("%s=%v %w", what, value, errUnsupported)
 }
 
@@ -23,26 +23,26 @@ func ErrNotFound(what string) error {
 	return fmt.Errorf("%s %w", what, errNotFound)
 }
 
-func ErrNotFoundWithParam(what string, paramName string, paramValue interface{}) error {
+func ErrNotFoundWithParam(what string, paramName string, paramValue any) error {
 	return fmt.Errorf("%s %w with %s=%v", what, errNotFound, paramName, paramValue)
 }
 
-func ErrInvalidOperation(operation interface{}) error {
+func ErrInvalidOperation(operation any) error {
 	return fmt.Errorf("%w: %v", errInvalidOperation, operation)
 }
 
-func ErrInvalidArgument(name string, value interface{}) error {
+func ErrInvalidArgument(name string, value any) error {
 	return fmt.Errorf("%w '%s': %v", errInvalidArgument, name, value)
 }
 
-func ErrInvalidArgumentWithReason(name string, value interface{}, reason string) error {
+func ErrInvalidArgumentWithReason(name string, value any, reason string) error {
 	return fmt.Errorf("%w '%s'=%v (%s)", errInvalidArgument, name, value, reason)
 }
 
-func ErrOperationFailedWithReason(operation interface{}, reason string) error {
+func ErrOperationFailedWithReason(operation any, reason string) error {
 	return fmt.Errorf("%v %w due to: : %s", operation, errFailed, reason)
 }
 
-func ErrOperationFailedWithParam(operation interface{}, paramName string, paramValue interface{}) error {
+func ErrOperationFailedWithParam(operation any, paramName string, paramValue any) error {
 	return fmt.Errorf("'%v' %w for %s=%v", operation, errFailed, paramName, paramValue)
 }

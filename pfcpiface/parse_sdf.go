@@ -154,7 +154,7 @@ func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
 	return ipf, nil
 }
 
-func processFlowFields(fields []string, ipf *ipFilterRule, parseLog interface{ Errorln(...interface{}) }, xform func(int)) error {
+func processFlowFields(fields []string, ipf *ipFilterRule, parseLog interface{ Errorln(...any) }, xform func(int)) error {
 	for i := 3; i < len(fields); i++ {
 		switch fields[i] {
 		case "from":
