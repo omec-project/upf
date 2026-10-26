@@ -82,18 +82,28 @@ def validate_trex_packet_construction() -> None:
 def main() -> None:
     subprocess.run([sys.executable, "-m", "pip", "check"], check=True)
 
+    # Compare against the file the Scapy distribution itself installed, not
+    # its site-packages directory, which any stray scapy/ tree would satisfy.
     scapy_distribution = distribution("scapy")
-    distribution_root = Path(scapy_distribution.locate_file("")).resolve()
+    scapy_init = next(
+        (
+            file
+            for file in scapy_distribution.files or ()
+            if file.as_posix() == "scapy/__init__.py"
+        ),
+        None,
+    )
+    if scapy_init is None:
+        raise RuntimeError("The Scapy distribution does not record scapy/__init__.py")
+    expected_path = Path(scapy_init.locate()).resolve()
 
     scapy = importlib.import_module("scapy")
     scapy_path = Path(scapy.__file__).resolve()
-    try:
-        scapy_path.relative_to(distribution_root)
-    except ValueError as error:
+    if scapy_path != expected_path:
         raise RuntimeError(
-            "Scapy was imported outside its installed distribution: "
-            f"{scapy_path} (distribution root: {distribution_root})"
-        ) from error
+            "Scapy was imported from outside its installed distribution: "
+            f"{scapy_path} (distribution installs {expected_path})"
+        )
 
     modules = (
         "ptf",
