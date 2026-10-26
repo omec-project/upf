@@ -6,9 +6,12 @@ Subject: [PATCH] stl: calculate packet offsets without Scapy private state
 
 The historical Stratum TRex fork relies on Scapy's private `_offset` field
 when compiling named packet-field VM instructions.  That field is not
-available with the caller-provided Scapy 2.7.0 distribution.  Calculate layer
-and field offsets from serialized packet data instead, preserving named-field
-VM support without depending on Scapy internals.
+available in the Scapy distribution installed from requirements-ptf.txt.
+Calculate layer and field offsets from serialized packet data instead,
+preserving named-field VM support.  Field offsets come from each field's
+getfield(), which carries a (bytes, bit cursor) tuple across bit fields; the
+PTF dependency smoke check asserts a compiled offset so a Scapy update that
+changes this convention fails CI.
 
 ---
  scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl_packet_builder_scapy.py | 51 +++++++++++++++-----
