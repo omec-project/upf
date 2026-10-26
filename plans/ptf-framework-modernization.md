@@ -72,8 +72,9 @@ required by [issue #1220](https://github.com/omec-project/upf/issues/1220).
 - [x] Evaluate the Cisco TRex v3.06 client-only candidate with a narrowly
       maintained UPF patch set. It is newer than the Stratum fork but bundles
       Scapy 2.4.3. The tracked patches in `ptf/patches/trex/` replace the
-      reachable `imp` use, select the caller-provided Scapy, and remove Python
-      3.14 regex-literal warnings from the imported UPF client paths. The
+      reachable `imp` use, select the caller-provided Scapy, remove Python
+      3.14 regex-literal warnings from the imported UPF client paths, and
+      calculate named-field VM offsets without Scapy's private `_offset`. The
       [2026-09-24 upstream-candidate job](https://github.com/andybavier/upf/actions/runs/36070149147/job/107868953740)
       passes `pip check` and all required PTF/TRex imports with v3.06 and
       Scapy 2.7.0, with no syntax warnings.
@@ -81,7 +82,7 @@ required by [issue #1220](https://github.com/omec-project/upf/issues/1220).
       smaller or better-supported patch set than the Cisco-v3.06 candidate.
 - [x] Assess the Cisco-v3.06 candidate's Python 3.14 compatibility, Scapy
       compatibility, UPF import/API boundary, and packaging needs. It requires
-      the three local patches and a client-only image assembly; remote TRex
+      the four local patches and a client-only image assembly; remote TRex
       daemon/server compatibility remains to be tested on hardware.
 - [x] Select Cisco TRex v3.06 for the production client source, with the
       tracked UPF patch series. The tag resolves to commit
