@@ -4,6 +4,8 @@
 
 import asyncio
 import sys
+import threading
+import time
 import unittest
 from unittest.mock import MagicMock, Mock, patch
 
@@ -336,7 +338,7 @@ class TestRouteController(unittest.TestCase):
         mock_add_new_route_entry.assert_not_called()
 
     @patch.object(RouteController, "add_new_route_entry")
-    async def test_given_netlink_message_when_rtm_newroute_event_then_add_new_route_entry_is_called(
+    def test_given_netlink_message_when_rtm_newroute_event_then_add_new_route_entry_is_called(
         self, mock_add_new_route_entry
     ):
         self.ndb.interfaces = {2: {"ifname": "core"}}
@@ -360,9 +362,7 @@ class TestRouteController(unittest.TestCase):
             },
             "event": "RTM_NEWROUTE",
         }
-        await self.route_controller._netlink_route_handler(
-            self.ndb, example_route_entry
-        )
+        self.route_controller._handle_route_event(example_route_entry)
         mock_add_new_route_entry.assert_called()
 
     def test_given_existing_neighbor_and_route_count_not_zero_when_delete_route_entry_then_route_entry_deleted_in_bess(
@@ -412,7 +412,7 @@ class TestRouteController(unittest.TestCase):
         self.mock_bess_controller.delete_module.assert_called_once()
 
     @patch.object(RouteController, "delete_route_entry")
-    async def test_given_netlink_message_when_rtm_delroute_event_then_delete_route_entry_is_called(
+    def test_given_netlink_message_when_rtm_delroute_event_then_delete_route_entry_is_called(
         self, mock_delete_route_entry
     ):
         self.ndb.interfaces = {2: {"ifname": "core"}}
@@ -436,9 +436,7 @@ class TestRouteController(unittest.TestCase):
             },
             "event": "RTM_DELROUTE",
         }
-        await self.route_controller._netlink_route_handler(
-            self.ndb, example_route_entry
-        )
+        self.route_controller._handle_route_event(example_route_entry)
         mock_delete_route_entry.assert_called()
 
     @patch("conf.route_control.send_ping")
@@ -467,12 +465,10 @@ class TestRouteController(unittest.TestCase):
         self.mock_bess_controller.add_route_to_module.assert_called_once()
 
     @patch.object(RouteController, "add_unresolved_new_neighbor")
-    async def test_given_netlink_message_when_rtm_newneigh_event_then_add_unresolved_new_neighbor_is_called(
+    def test_given_netlink_message_when_rtm_newneigh_event_then_add_unresolved_new_neighbor_is_called(
         self, mock_add_unresolved_new_neighbor
     ):
-        await self.route_controller._netlink_neighbor_handler(
-            self.ndb, {"event": "RTM_NEWNEIGH"}
-        )
+        self.route_controller._handle_neighbor_event({"event": "RTM_NEWNEIGH"})
         mock_add_unresolved_new_neighbor.assert_called()
 
 
@@ -692,23 +688,20 @@ class TestOnLinkNetworks(unittest.TestCase):
         assert entry is not None
         self.route_controller.add_new_route_entry(entry)
 
-        # The kernel ages the entry out and says so. The event is delivered
-        # through the handler and awaited, so withdrawing the route on it would
+        # The kernel ages the entry out and says so. The event is handled the
+        # way the event thread handles it, so withdrawing the route on it would
         # fail here: dropping the route is what would discard the next traffic
         # to this host, and it is the tidy-up this test exists to refuse.
         self.ndb.neighbours.dump.return_value = []
-        asyncio.run(
-            self.route_controller._netlink_neighbor_handler(
-                self.ndb,
-                {
-                    "event": "RTM_DELNEIGH",
-                    "ifindex": 2,
-                    "attrs": [
-                        ("NDA_DST", "10.122.0.21"),
-                        ("NDA_LLADDR", DEFAULT_MAC_ADDRESS),
-                    ],
-                },
-            )
+        self.route_controller._handle_neighbor_event(
+            {
+                "event": "RTM_DELNEIGH",
+                "ifindex": 2,
+                "attrs": [
+                    ("NDA_DST", "10.122.0.21"),
+                    ("NDA_LLADDR", DEFAULT_MAC_ADDRESS),
+                ],
+            }
         )
 
         self.mock_bess_controller.delete_module_route_entry.assert_not_called()
@@ -919,3 +912,171 @@ class TestOnLinkNetworks(unittest.TestCase):
         added = self.mock_bess_controller.add_route_to_module.call_args_list[-1].args[0]
         self.assertEqual(added.dest_prefix, "10.122.0.21")
         self.assertEqual(added.prefix_len, 32)
+
+
+class ThreadRecordingNdb:
+    """Stands in for NDB and records the thread that queries it.
+
+    NDB answers a query only once its event loop thread is free, so a query
+    made on that thread, from inside an event handler, never returns.
+    """
+
+    def __init__(self, ifname: str, neighbors: list[dict]):
+        self.query_threads: list[threading.Thread] = []
+        self.task_manager = Mock()
+        self.interfaces = self._Recording(self, lambda _: {"ifname": ifname})
+        self.neighbours = Mock()
+        self.neighbours.dump.side_effect = lambda: self._record(neighbors)
+
+    def _record(self, value):
+        self.query_threads.append(threading.current_thread())
+        return value
+
+    class _Recording:
+        def __init__(self, ndb, lookup):
+            self._ndb = ndb
+            self._lookup = lookup
+
+        def __getitem__(self, key):
+            return self._ndb._record(self._lookup(key))
+
+
+class TestNetlinkEventThread(unittest.TestCase):
+    """Tests that netlink events are handled off NDB's event loop thread."""
+
+    TIMEOUT_S = 5
+
+    def setUp(self):
+        self.mock_bess_controller = Mock(BessControllerMock)
+        self.ndb = ThreadRecordingNdb(
+            ifname="core",
+            neighbors=[{"dst": "172.31.48.1", "lladdr": DEFAULT_MAC_ADDRESS}],
+        )
+        self.route_controller = RouteController(
+            self.mock_bess_controller,
+            self.ndb,
+            interfaces=["access", "core"],
+            ipr=Mock(),
+        )
+        self.route_controller.register_handlers()
+
+    @staticmethod
+    def new_route_message(dst: str) -> dict:
+        return {
+            "family": 2,
+            "dst_len": 24,
+            "flags": 0,
+            "attrs": [
+                ("RTA_TABLE", 254),
+                ("RTA_GATEWAY", "172.31.48.1"),
+                ("RTA_OIF", 2),
+                ("RTA_DST", dst),
+            ],
+            "event": "RTM_NEWROUTE",
+        }
+
+    def deliver_from_ndb_thread(self, handler, netlink_message) -> threading.Thread:
+        """Runs a handler the way NDB does: awaited on its own loop thread."""
+        ndb_thread = threading.Thread(
+            target=lambda: asyncio.run(handler(self.ndb, netlink_message)),
+            name="ndb-event-loop",
+        )
+        ndb_thread.start()
+        ndb_thread.join(self.TIMEOUT_S)
+        self.assertFalse(ndb_thread.is_alive(), "the NDB handler did not return")
+        return ndb_thread
+
+    def wait_for_routes(self, count: int) -> list[str]:
+        """Waits until count routes reached BESS and returns their prefixes."""
+        deadline = time.monotonic() + self.TIMEOUT_S
+        while time.monotonic() < deadline:
+            calls = self.mock_bess_controller.add_route_to_module.call_args_list
+            if len(calls) >= count:
+                return [call.args[0].dest_prefix for call in calls]
+            time.sleep(0.01)
+        self.fail(f"fewer than {count} routes reached BESS")
+
+    def test_given_new_route_event_when_ndb_delivers_it_then_ndb_is_queried_off_its_event_thread(
+        self,
+    ):
+        ndb_thread = self.deliver_from_ndb_thread(
+            self.route_controller._netlink_route_handler,
+            self.new_route_message("192.168.1.0"),
+        )
+
+        self.assertEqual(self.wait_for_routes(1), ["192.168.1.0"])
+        self.assertTrue(self.ndb.query_threads, "NDB was never queried")
+        self.assertNotIn(ndb_thread, self.ndb.query_threads)
+
+    def test_given_route_events_after_startup_when_ndb_delivers_them_then_every_route_is_added_in_order(
+        self,
+    ):
+        prefixes = ["192.168.1.0", "192.168.2.0", "192.168.3.0"]
+        for prefix in prefixes:
+            self.deliver_from_ndb_thread(
+                self.route_controller._netlink_route_handler,
+                self.new_route_message(prefix),
+            )
+
+        self.assertEqual(self.wait_for_routes(len(prefixes)), prefixes)
+
+    @patch.object(RouteController, "_handle_route_event")
+    def test_given_route_event_when_ndb_handler_runs_then_event_is_only_queued(
+        self, mock_handle_route_event
+    ):
+        # Patches put on the queue the worker already waits on, so the worker
+        # keeps waiting on a real queue however the threads are scheduled.
+        with patch.object(self.route_controller._netlink_events, "put") as mock_put:
+            asyncio.run(
+                self.route_controller._netlink_route_handler(
+                    self.ndb, self.new_route_message("192.168.1.0")
+                )
+            )
+
+        mock_put.assert_called_once()
+        mock_handle_route_event.assert_not_called()
+        self.assertEqual(self.ndb.query_threads, [])
+
+    @patch.object(RouteController, "add_unresolved_new_neighbor")
+    def test_given_neighbor_event_when_ndb_handler_runs_then_it_is_handled_on_the_event_thread(
+        self, mock_add_unresolved_new_neighbor
+    ):
+        handled = threading.Event()
+        handled_on: list[threading.Thread] = []
+
+        def record(_):
+            handled_on.append(threading.current_thread())
+            handled.set()
+
+        mock_add_unresolved_new_neighbor.side_effect = record
+
+        self.deliver_from_ndb_thread(
+            self.route_controller._netlink_neighbor_handler, {"event": "RTM_NEWNEIGH"}
+        )
+
+        self.assertTrue(handled.wait(self.TIMEOUT_S), "the neighbor was not handled")
+        self.assertEqual(handled_on, [self.route_controller._netlink_event_thread])
+
+    def test_given_event_that_fails_when_handled_then_later_events_are_still_handled(
+        self,
+    ):
+        def fail(_):
+            raise RuntimeError("handling failed")
+
+        self.route_controller._netlink_events.put((fail, {}))
+        self.deliver_from_ndb_thread(
+            self.route_controller._netlink_route_handler,
+            self.new_route_message("192.168.1.0"),
+        )
+
+        self.assertEqual(self.wait_for_routes(1), ["192.168.1.0"])
+
+    def test_given_handlers_registered_twice_when_register_handlers_then_one_event_thread(
+        self,
+    ):
+        event_thread = self.route_controller._netlink_event_thread
+
+        self.route_controller.register_handlers()
+
+        self.assertIs(self.route_controller._netlink_event_thread, event_thread)
+        self.assertTrue(event_thread.is_alive())
