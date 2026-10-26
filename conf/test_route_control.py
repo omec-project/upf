@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2023 Canonical Ltd.
 
+import asyncio
 import sys
 import unittest
 from unittest.mock import MagicMock, Mock, patch
@@ -691,7 +692,25 @@ class TestOnLinkNetworks(unittest.TestCase):
         assert entry is not None
         self.route_controller.add_new_route_entry(entry)
 
+        # The kernel ages the entry out and says so. The event is delivered
+        # through the handler and awaited, so withdrawing the route on it would
+        # fail here: dropping the route is what would discard the next traffic
+        # to this host, and it is the tidy-up this test exists to refuse.
         self.ndb.neighbours.dump.return_value = []
+        asyncio.run(
+            self.route_controller._netlink_neighbor_handler(
+                self.ndb,
+                {
+                    "event": "RTM_DELNEIGH",
+                    "ifindex": 2,
+                    "attrs": [
+                        ("NDA_DST", "10.122.0.21"),
+                        ("NDA_LLADDR", DEFAULT_MAC_ADDRESS),
+                    ],
+                },
+            )
+        )
+
         self.mock_bess_controller.delete_module_route_entry.assert_not_called()
         network = next(iter(self.route_controller._on_link_networks["access"]))
         self.assertIn(
