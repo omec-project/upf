@@ -100,6 +100,59 @@ type bess struct {
 	endMarkerChan chan []byte
 	endMarkerDial dialFunc // nil means a net.Dialer; set by tests
 	qciQosMap     map[uint8]*QosConfigVal
+
+	// The gNB address each FAR registered with gtpuPathMonitoring. The module counts
+	// registrations per address, so a FAR must register once while it points at an
+	// address and unregister that same address, however many times it is updated.
+	pathMonitoringMu   sync.Mutex
+	pathMonitoringGnbs map[pathMonitoringKey]uint32
+}
+
+// pathMonitoringKey names a FAR: FAR IDs are unique within a session, F-SEIDs on the UPF.
+type pathMonitoringKey struct {
+	fseID uint64
+	farID uint32
+}
+
+// movePathMonitoring records that the FAR now points at gnb (0 for none: a FAR with no
+// tunnel) and returns the address to unregister and the one to register,
+// 0 meaning nothing to send.
+func (b *bess) movePathMonitoring(key pathMonitoringKey, gnb uint32) (unregister, register uint32) {
+	b.pathMonitoringMu.Lock()
+	defer b.pathMonitoringMu.Unlock()
+
+	old := b.pathMonitoringGnbs[key]
+	if old == gnb {
+		return 0, 0
+	}
+
+	if gnb == 0 {
+		delete(b.pathMonitoringGnbs, key)
+	} else {
+		if b.pathMonitoringGnbs == nil {
+			b.pathMonitoringGnbs = make(map[pathMonitoringKey]uint32)
+		}
+
+		b.pathMonitoringGnbs[key] = gnb
+	}
+
+	return old, gnb
+}
+
+func (b *bess) sendPathMonitoring(ctx context.Context, method upfMsgType, gnb uint32) {
+	if gnb == 0 {
+		return
+	}
+
+	g := &pb.GtpuPathMonitoringCommandAddDeleteArg{GnbIp: gnb}
+
+	arg, err := anypb.New(g)
+	if err != nil {
+		logger.BessLog.Infoln("error marshalling data", g, err)
+		return
+	}
+
+	b.processGtpuPathMonitoring(ctx, arg, method)
 }
 
 func (b *bess) IsConnected(accessIP *net.IP) bool {
@@ -943,6 +996,10 @@ func (b *bess) clearState() {
 		b.processGtpuPathMonitoring(ctx, anyGtpuPathMonitoringClear, upfMsgTypeClear)
 	}
 
+	b.pathMonitoringMu.Lock()
+	b.pathMonitoringGnbs = nil
+	b.pathMonitoringMu.Unlock()
+
 	clearQoSCmd := &pb.QosCommandClearArg{}
 	var anyQoSClear *anypb.Any
 	anyQoSClear, err = anypb.New(clearQoSCmd)
@@ -979,6 +1036,13 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 	}
 
 	b.client = pb.NewBESSControlClient(b.conn)
+
+	// Before clearState, which clears gtpuPathMonitoring only when this is set: a
+	// pfcp-agent that restarted while bessd kept running would otherwise leave the
+	// module monitoring the gNBs of sessions it has just cleared.
+	if conf.EnableGtpuPathMonitoring {
+		enableGtpuPathMonitoring = true
+	}
 
 	// Skip clearing state when in `simulate delete` mode, so previously
 	// created rules remain in BESS and can be individually deleted.
@@ -1017,10 +1081,6 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 	}
 
 	b.setupSliceMeter(conf)
-
-	if conf.EnableGtpuPathMonitoring {
-		enableGtpuPathMonitoring = true
-	}
 }
 
 func (b *bess) startEndMarkerSender(addr string) {
@@ -1578,20 +1638,15 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 		}
 
 		if enableGtpuPathMonitoring {
-			g := &pb.GtpuPathMonitoringCommandAddDeleteArg{
-				GnbIp: far.tunnelIP4Dst,
-			}
-
-			arg, err = anypb.New(g)
-			if err != nil {
-				logger.BessLog.Infoln("error marshalling data", g, err)
-				return
-			}
-
+			// A modification reaches here too, with the FAR's new version, so the
+			// registration moves with the FAR rather than being added again.
 			// Path monitoring is not a forwarding rule: a session is programmed
 			// whether or not monitoring was set up for its gNB, so its result does
 			// not decide the batch.
-			b.processGtpuPathMonitoring(ctx, arg, upfMsgTypeAdd)
+			unregister, register := b.movePathMonitoring(
+				pathMonitoringKey{far.fseID, far.farID}, far.tunnelIP4Dst)
+			b.sendPathMonitoring(ctx, upfMsgTypeDel, unregister)
+			b.sendPathMonitoring(ctx, upfMsgTypeAdd, register)
 		}
 
 		completed = true
@@ -1625,18 +1680,18 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 			return
 		}
 
+		// Reached only once the datapath has removed the FAR: a refused delete keeps the
+		// record, so a retried delete unregisters the gNB exactly once.
 		if enableGtpuPathMonitoring {
-			g := &pb.GtpuPathMonitoringCommandAddDeleteArg{
-				GnbIp: far.tunnelIP4Dst,
+			unregister, _ := b.movePathMonitoring(pathMonitoringKey{far.fseID, far.farID}, 0)
+			if unregister == 0 && simulate.delete() {
+				// A `simulate delete` process keeps what a `simulate create` process
+				// programmed, but not its record, so it unregisters the FAR's own
+				// address. One run deletes each session once.
+				unregister = far.tunnelIP4Dst
 			}
 
-			arg, err = anypb.New(g)
-			if err != nil {
-				logger.BessLog.Infoln("error marshalling data", g, err)
-				return
-			}
-
-			b.processGtpuPathMonitoring(ctx, arg, upfMsgTypeDel)
+			b.sendPathMonitoring(ctx, upfMsgTypeDel, unregister)
 		}
 
 		completed = true
