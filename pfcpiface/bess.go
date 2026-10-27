@@ -980,6 +980,13 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 
 	b.client = pb.NewBESSControlClient(b.conn)
 
+	// Before clearState, which clears gtpuPathMonitoring only when this is set: a
+	// pfcp-agent that restarted while bessd kept running would otherwise leave the
+	// module monitoring the gNBs of sessions it has just cleared.
+	if conf.EnableGtpuPathMonitoring {
+		enableGtpuPathMonitoring = true
+	}
+
 	// Skip clearing state when in `simulate delete` mode, so previously
 	// created rules remain in BESS and can be individually deleted.
 	if !simulate.delete() {
@@ -1017,10 +1024,6 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 	}
 
 	b.setupSliceMeter(conf)
-
-	if conf.EnableGtpuPathMonitoring {
-		enableGtpuPathMonitoring = true
-	}
 }
 
 func (b *bess) startEndMarkerSender(addr string) {
