@@ -1684,6 +1684,13 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 		// record, so a retried delete unregisters the gNB exactly once.
 		if enableGtpuPathMonitoring {
 			unregister, _ := b.movePathMonitoring(pathMonitoringKey{far.fseID, far.farID}, 0)
+			if unregister == 0 && simulate.delete() {
+				// A `simulate delete` process keeps what a `simulate create` process
+				// programmed, but not its record, so it unregisters the FAR's own
+				// address. One run deletes each session once.
+				unregister = far.tunnelIP4Dst
+			}
+
 			b.sendPathMonitoring(ctx, upfMsgTypeDel, unregister)
 		}
 

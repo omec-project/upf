@@ -259,6 +259,20 @@ func TestPathMonitoringKeepsAGnbWhileAnySessionUsesIt(t *testing.T) {
 	expectMonitored(t, r, "after the second release", map[string]int{})
 }
 
+// A release that reaches the datapath twice, as a retry after a timed-out batch can,
+// unregisters the gNB once: another session still uses it.
+func TestPathMonitoringUnregistersOnceWhenAReleaseRepeats(t *testing.T) {
+	b, r := newPathMonitoringBess(t)
+	s1, s2 := newSessionFARs(t, 7), newSessionFARs(t, 8)
+	dl1, dl2 := s1.dlTo(gnbA), s2.dlTo(gnbA)
+
+	establish(b, s1.ul, dl1)
+	establish(b, s2.ul, dl2)
+	release(b, s1.ul, dl1)
+	release(b, s1.ul, dl1)
+	expectMonitored(t, r, "after the repeated release", map[string]int{gnbA: 1})
+}
+
 // A refused modification is undone by writing the session's previous rules again
 // (handleSessionModificationRequest). That must not register an unchanged FAR's gNB a
 // second time, and a FAR the refused modification had moved must move back.
@@ -303,4 +317,38 @@ func TestPathMonitoringStartsAgainAfterAClear(t *testing.T) {
 
 	establish(b, s.ul, dl)
 	expectMonitored(t, r, "after a clear and a new session", map[string]int{gnbA: 1})
+}
+
+// `simulate create` and `simulate delete` run as separate processes against one bessd,
+// so the deleting process has no record of what the creating one registered.
+func TestPathMonitoringSimulateDeleteUndoesSimulateCreate(t *testing.T) {
+	creating, r := newPathMonitoringBess(t)
+	info := &SimModeInfo{
+		MaxSessions: 3,
+		StartUEIP:   net.ParseIP("16.0.0.1"),
+		StartENBIP:  net.ParseIP("11.1.1.129"),
+		StartAUPFIP: net.ParseIP("13.1.1.199"),
+		N9AppIP:     net.ParseIP("9.9.9.9"),
+		StartN3TEID: "0x30000000",
+		StartN9TEID: "0x90000000",
+	}
+	simUPF := func(b *bess) *upf {
+		b.readQciQosMap(&Conf{}) // the simulator's sessions carry QERs
+
+		return &upf{datapath: b, accessIP: net.ParseIP("192.168.0.1"), coreIP: net.ParseIP("10.0.10.1")}
+	}
+
+	simUPF(creating).sim(simModeCreate, info)
+
+	if len(r.monitored()) == 0 {
+		t.Fatalf("simulate create registered nothing; commands %v", r.sent())
+	}
+
+	saved := simulate
+	simulate = simModeDelete
+
+	t.Cleanup(func() { simulate = saved })
+
+	simUPF(&bess{client: r}).sim(simModeDelete, info)
+	expectMonitored(t, r, "after simulate delete", map[string]int{})
 }
