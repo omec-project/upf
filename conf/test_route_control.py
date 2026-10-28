@@ -16,6 +16,7 @@ from conf.route_control import (
     RouteController,
     RouteEntry,
     fetch_mac,
+    route_key,
     mac_to_hex,
     mac_to_int,
     validate_ipv4,
@@ -1260,3 +1261,79 @@ class TestStartupOverlap(unittest.TestCase):
 
         self.assertEqual(self.mock_bess_controller.add_route_to_module.call_count, 2)
         self.assertEqual(self.neighbor().route_count, 1)
+
+    def test_given_route_waiting_for_arp_when_installed_then_neighbor_event_does_not_install_it_again(
+        self,
+    ):
+        """A next hop resolving must not install a route that is already in BESS.
+
+        add_unresolved_new_neighbor installs the waiting route itself, so the
+        ledger has to be consulted there too: installing it twice counted it
+        twice against its next hop, and one delete then left the next hop's
+        Update module and gate behind.
+        """
+        route_entry = RouteEntry(
+            next_hop_ip=self.GATEWAY,
+            interface="core",
+            dest_prefix=self.ROUTE,
+            prefix_len=24,
+        )
+        # the state _probe_addr leaves behind while the next hop is unresolved
+        self.route_controller._unresolved_arp_queries_cache[self.GATEWAY] = route_entry
+
+        # the next hop resolves and the route is installed through the route path
+        self.route_controller.add_new_route_entry(route_entry)
+        self.mock_bess_controller.add_route_to_module.assert_called_once()
+
+        # the neighbor event for that next hop must find the route already there
+        self.route_controller.add_unresolved_new_neighbor(
+            {
+                "attrs": {
+                    "NDA_DST": self.GATEWAY,
+                    "NDA_LLADDR": DEFAULT_MAC_ADDRESS,
+                },
+            }
+        )
+
+        self.mock_bess_controller.add_route_to_module.assert_called_once()
+        self.assertEqual(self.neighbor().route_count, 1)
+
+        # and one delete is enough to release the next hop
+        self.route_controller.delete_route_entry(route_entry)
+        self.mock_bess_controller.delete_module.assert_called_once()
+        self.assertIsNone(self.neighbor())
+
+    def test_given_bess_refuses_a_delete_when_deleted_again_then_bess_is_asked_again(
+        self,
+    ):
+        """A route BESS refused to drop stays in the ledger, so a later delete
+        retries it instead of reporting a route that was never there."""
+        route_entry = RouteEntry(
+            next_hop_ip=self.GATEWAY,
+            interface="core",
+            dest_prefix=self.ROUTE,
+            prefix_len=24,
+        )
+        self.route_controller.add_new_route_entry(route_entry)
+
+        self.mock_bess_controller.delete_module_route_entry.side_effect = Exception(
+            "BESS refused the delete"
+        )
+        self.route_controller.delete_route_entry(route_entry)
+
+        self.assertEqual(
+            self.mock_bess_controller.delete_module_route_entry.call_count, 1
+        )
+        self.assertIn(route_key(route_entry), self.route_controller._programmed_routes)
+        self.assertEqual(self.neighbor().route_count, 1)
+
+        self.mock_bess_controller.delete_module_route_entry.side_effect = None
+        self.route_controller.delete_route_entry(route_entry)
+
+        self.assertEqual(
+            self.mock_bess_controller.delete_module_route_entry.call_count, 2
+        )
+        self.assertNotIn(
+            route_key(route_entry), self.route_controller._programmed_routes
+        )
+        self.assertIsNone(self.neighbor())

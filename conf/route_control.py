@@ -437,6 +437,8 @@ class RouteController:
 
         if not validate_ipv4(route_entry.next_hop_ip):
             return
+        # Short-circuit so an already programmed route is not probed for;
+        # _add_neighbor holds the guard that keeps the install itself unique.
         if self._programmed_routes.get(route_key(route_entry)) == (
             route_entry.next_hop_ip
         ):
@@ -627,8 +629,20 @@ class RouteController:
             next_hop_mac (str): The MAC address of the next hop.
 
         Returns:
-            bool: True if the route was added to the route module.
+            bool: True if the route is in the route module, whether this call
+                put it there or found it already recorded.
         """
+        # Every path that installs a route comes through here, including a next
+        # hop resolving under add_unresolved_new_neighbor, so the ledger is
+        # checked here rather than only in add_new_route_entry. Installing a
+        # route twice would count it twice against its next hop, and one
+        # delete would then leave the next hop's Update module and gate.
+        if self._programmed_routes.get(route_key(route_entry)) == (
+            route_entry.next_hop_ip
+        ):
+            logger.info("Route entry %s already added in BESS", route_entry)
+            return True
+
         if route_entry.interface is not None:
             route_module_name = get_route_module_name(route_entry.interface)
             gate_idx = self._get_gate_idx(route_entry, route_module_name)
@@ -789,14 +803,15 @@ class RouteController:
         each host route it withdraws comes back through here and is found.
 
         A route that is not in BESS is left alone: deleting it would release
-        its next hop, which other routes may still use.
+        its next hop, which other routes may still use. A route BESS refuses
+        to drop stays in the ledger so the next delete tries again.
         """
         if route_entry.on_link:
             self._delete_on_link_network(route_entry)
             return
 
         key = route_key(route_entry)
-        if (programmed_next_hop := self._programmed_routes.pop(key, None)) is None:
+        if (programmed_next_hop := self._programmed_routes.get(key)) is None:
             logger.info("Route entry %s is not in BESS", route_entry)
             return
         # Release the next hop the route was added with.
@@ -809,6 +824,10 @@ class RouteController:
                     logger.exception("Error deleting route entry %s", route_entry)
                     return
 
+                # Dropped from the ledger only once BESS has dropped the
+                # route, so a delete that failed is retried rather than
+                # reported as a route that was never there.
+                del self._programmed_routes[key]
                 next_hop.route_count -= 1
 
                 if next_hop.route_count == 0:
