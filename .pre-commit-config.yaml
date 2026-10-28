@@ -60,6 +60,12 @@ repos:
     rev: v0.21.0
     hooks:
       - id: yamlfmt
+  - repo: https://github.com/lycheeverse/lychee
+    rev: lychee-v0.24.2
+    hooks:
+      - id: lychee
+        files: \.md$
+        args: [-vv, --exclude, 'aether5g-project\.slack\.com', --exclude, 'trex-tgn\.cisco\.com']
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:

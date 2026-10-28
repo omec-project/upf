@@ -371,7 +371,7 @@ To display the ASCII pipeline, do:
 docker exec bess ./bessctl show pipeline > pipeline.txt
 ```
 
-To observe the pipeline in GUI visit [http://[hostip]:8000](http://[hostip]:8000)
+To observe the pipeline in GUI visit `http://[hostip]:8000`
 
 To drop into BESS shell
 
