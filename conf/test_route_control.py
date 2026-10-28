@@ -1337,3 +1337,35 @@ class TestStartupOverlap(unittest.TestCase):
             route_key(route_entry), self.route_controller._programmed_routes
         )
         self.assertIsNone(self.neighbor())
+
+    def test_given_route_deleted_while_waiting_then_resolving_its_next_hop_does_not_install_it(
+        self,
+    ):
+        """A delete must cancel a route that is still waiting for its next hop.
+
+        start() replays the events from the route read, so a delete can follow
+        an add of a route whose next hop is unresolved. Without the delete
+        taking it off the queue, the next hop resolving installs a route the
+        kernel no longer has.
+        """
+        route_entry = RouteEntry(
+            next_hop_ip=self.GATEWAY,
+            interface="core",
+            dest_prefix=self.ROUTE,
+            prefix_len=24,
+        )
+        # the state _probe_addr leaves behind while the next hop is unresolved
+        self.route_controller._unresolved_arp_queries_cache[self.GATEWAY] = route_entry
+
+        self.route_controller.delete_route_entry(route_entry)
+        self.route_controller.add_unresolved_new_neighbor(
+            {
+                "attrs": {
+                    "NDA_DST": self.GATEWAY,
+                    "NDA_LLADDR": DEFAULT_MAC_ADDRESS,
+                },
+            }
+        )
+
+        self.mock_bess_controller.add_route_to_module.assert_not_called()
+        self.assertEqual(self.route_controller._unresolved_arp_queries_cache, {})

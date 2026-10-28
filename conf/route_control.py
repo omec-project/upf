@@ -804,13 +804,26 @@ class RouteController:
 
         A route that is not in BESS is left alone: deleting it would release
         its next hop, which other routes may still use. A route BESS refuses
-        to drop stays in the ledger so the next delete tries again.
+        to drop stays in the ledger so the next delete tries again, and a
+        route still waiting for its next hop is taken off that queue.
         """
         if route_entry.on_link:
             self._delete_on_link_network(route_entry)
             return
 
         key = route_key(route_entry)
+        # A route deleted while it waits for its next hop's MAC must not be
+        # installed when that next hop resolves. start() replays the events
+        # from the route read, so a delete can now follow an add of a route
+        # whose next hop is unresolved, which was unreachable while the routes
+        # were read before the handlers were registered.
+        for next_hop, waiting in list(self._unresolved_arp_queries_cache.items()):
+            if route_key(waiting) == key:
+                del self._unresolved_arp_queries_cache[next_hop]
+                logger.info(
+                    "Route entry %s deleted while waiting for its next hop",
+                    route_entry,
+                )
         if (programmed_next_hop := self._programmed_routes.get(key)) is None:
             logger.info("Route entry %s is not in BESS", route_entry)
             return
