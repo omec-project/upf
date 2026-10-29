@@ -16,9 +16,9 @@ from conf.route_control import (
     RouteController,
     RouteEntry,
     fetch_mac,
-    route_key,
     mac_to_hex,
     mac_to_int,
+    route_key,
     validate_ipv4,
 )
 
@@ -1390,9 +1390,7 @@ class TestStartupOverlap(unittest.TestCase):
         )
 
         self.mock_bess_controller.delete_module_route_entry.assert_not_called()
-        self.assertIn(
-            route_key(ipv4_default), self.route_controller._programmed_routes
-        )
+        self.assertIn(route_key(ipv4_default), self.route_controller._programmed_routes)
         self.assertEqual(self.neighbor().route_count, 1)
 
     def test_given_route_moved_to_another_next_hop_then_the_old_one_is_released(self):
@@ -1424,3 +1422,74 @@ class TestStartupOverlap(unittest.TestCase):
             self.route_controller._programmed_routes[route_key(via_first)],
             other_gateway,
         )
+
+    def test_given_waiting_route_moved_off_programmed_next_hop_when_it_resolves_then_installed_without_error(
+        self,
+    ):
+        """Resolving the next hop of a moved route must not raise.
+
+        The route is in BESS via the first gateway and waits for the second.
+        Installing it releases the first, which must not cancel the waiting
+        entry being resolved, or removing that entry afterwards raises.
+        """
+        other_gateway = "172.31.48.2"
+        via_first = RouteEntry(
+            next_hop_ip=self.GATEWAY,
+            interface="core",
+            dest_prefix=self.ROUTE,
+            prefix_len=24,
+        )
+        via_second = replace(via_first, next_hop_ip=other_gateway)
+        self.route_controller.add_new_route_entry(via_first)
+        # the state _probe_addr leaves behind while the next hop is unresolved
+        self.route_controller._unresolved_arp_queries_cache[other_gateway] = via_second
+
+        self.route_controller.add_unresolved_new_neighbor(
+            {
+                "attrs": {
+                    "NDA_DST": other_gateway,
+                    "NDA_LLADDR": DEFAULT_MAC_ADDRESS,
+                },
+            }
+        )
+
+        self.assertEqual(self.route_controller._unresolved_arp_queries_cache, {})
+        self.assertIsNone(self.neighbor())
+        self.assertEqual(
+            self.route_controller._programmed_routes[route_key(via_first)],
+            other_gateway,
+        )
+
+    def test_given_bess_refuses_the_release_when_route_moves_then_ledger_and_next_hop_are_kept(
+        self,
+    ):
+        """A move whose release BESS refuses must not install the new next hop.
+
+        Installing over the old route would overwrite the ledger entry and
+        leave the first next hop counted for a route it no longer carries.
+        """
+        other_gateway = "172.31.48.2"
+        via_first = RouteEntry(
+            next_hop_ip=self.GATEWAY,
+            interface="core",
+            dest_prefix=self.ROUTE,
+            prefix_len=24,
+        )
+        via_second = replace(via_first, next_hop_ip=other_gateway)
+        self.route_controller.add_new_route_entry(via_first)
+        self.mock_bess_controller.add_route_to_module.reset_mock()
+
+        self.mock_bess_controller.delete_module_route_entry.side_effect = Exception(
+            "BESS refused the delete"
+        )
+        self.assertFalse(
+            self.route_controller._add_neighbor(via_second, DEFAULT_MAC_ADDRESS)
+        )
+
+        self.mock_bess_controller.add_route_to_module.assert_not_called()
+        self.assertEqual(
+            self.route_controller._programmed_routes[route_key(via_first)],
+            self.GATEWAY,
+        )
+        self.assertEqual(self.neighbor().route_count, 1)
+        self.assertNotIn(other_gateway, self.route_controller._neighbor_cache)

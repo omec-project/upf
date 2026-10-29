@@ -652,7 +652,18 @@ class RouteController:
                 "Route entry %s moved next hop; releasing the previous one",
                 route_entry,
             )
-            self.delete_route_entry(route_entry)
+            self._release_programmed_route(route_entry)
+            # A delete BESS refused leaves the route in the ledger. Installing
+            # over it would overwrite the entry and leave the old next hop
+            # counted for a route it no longer carries, so stop and let the
+            # next event try again.
+            if route_key(route_entry) in self._programmed_routes:
+                logger.error(
+                    "Could not release the previous next hop of %s; "
+                    "not moving the route",
+                    route_entry,
+                )
+                return False
 
         if route_entry.interface is not None:
             route_module_name = get_route_module_name(route_entry.interface)
@@ -749,7 +760,9 @@ class RouteController:
         if route_entry:
             self._add_neighbor(route_entry, gateway_mac)
             if route_entry.next_hop_ip is not None:
-                del self._unresolved_arp_queries_cache[route_entry.next_hop_ip]
+                # pop: a route moving off its programmed next hop is released
+                # by delete_route_entry, which already cancelled this entry.
+                self._unresolved_arp_queries_cache.pop(route_entry.next_hop_ip, None)
             else:
                 logger.warning("next_hop_ip is None, cannot delete from cache")
 
@@ -841,6 +854,16 @@ class RouteController:
                     "Route entry %s deleted while waiting for its next hop",
                     route_entry,
                 )
+        self._release_programmed_route(route_entry)
+
+    def _release_programmed_route(self, route_entry: RouteEntry) -> None:
+        """Deletes a route from BESS and releases the next hop it was added with.
+
+        Kept apart from delete_route_entry so a route moving to another next hop
+        can release the old one without cancelling the route waiting to replace
+        it, which is the entry being resolved.
+        """
+        key = route_key(route_entry)
         if (programmed_next_hop := self._programmed_routes.get(key)) is None:
             logger.info("Route entry %s is not in BESS", route_entry)
             return
