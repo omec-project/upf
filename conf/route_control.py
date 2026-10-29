@@ -643,6 +643,17 @@ class RouteController:
             logger.info("Route entry %s already added in BESS", route_entry)
             return True
 
+        # The route is in BESS through a different next hop: an `ip route
+        # replace`, or a move among the events replayed from the route read.
+        # The old next hop has to be released before the new one takes the
+        # key, or its reference is never given back.
+        if route_key(route_entry) in self._programmed_routes:
+            logger.info(
+                "Route entry %s moved next hop; releasing the previous one",
+                route_entry,
+            )
+            self.delete_route_entry(route_entry)
+
         if route_entry.interface is not None:
             route_module_name = get_route_module_name(route_entry.interface)
             gate_idx = self._get_gate_idx(route_entry, route_module_name)
@@ -809,6 +820,12 @@ class RouteController:
         """
         if route_entry.on_link:
             self._delete_on_link_network(route_entry)
+            return
+
+        # A default route has no RTA_DST, so an IPv6 one parses to 0.0.0.0/0
+        # and shares the IPv4 default's key. Neither cache may be reached with
+        # it: the key would match and the recorded next hop be substituted.
+        if not validate_ipv4(route_entry.next_hop_ip):
             return
 
         key = route_key(route_entry)

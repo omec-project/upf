@@ -1369,3 +1369,58 @@ class TestStartupOverlap(unittest.TestCase):
 
         self.mock_bess_controller.add_route_to_module.assert_not_called()
         self.assertEqual(self.route_controller._unresolved_arp_queries_cache, {})
+
+    def test_given_ipv6_default_route_deleted_then_the_ipv4_default_is_left_alone(self):
+        """An IPv6 default route shares the IPv4 default's key.
+
+        It carries no RTA_DST, so it parses to 0.0.0.0/0. Looking that key up
+        and substituting the recorded next hop would delete the IPv4 default.
+        """
+        ipv4_default = RouteEntry(
+            next_hop_ip=self.GATEWAY,
+            interface="core",
+            dest_prefix="0.0.0.0",
+            prefix_len=0,
+        )
+        self.route_controller.add_new_route_entry(ipv4_default)
+        self.mock_bess_controller.add_route_to_module.assert_called_once()
+
+        self.route_controller.delete_route_entry(
+            replace(ipv4_default, next_hop_ip="fe80::1")
+        )
+
+        self.mock_bess_controller.delete_module_route_entry.assert_not_called()
+        self.assertIn(
+            route_key(ipv4_default), self.route_controller._programmed_routes
+        )
+        self.assertEqual(self.neighbor().route_count, 1)
+
+    def test_given_route_moved_to_another_next_hop_then_the_old_one_is_released(self):
+        """A route changing next hop must give the old next hop's reference back.
+
+        Reachable without `ip route replace`: the dump returns a prefix via B
+        while the queue holds NEW via A, DEL via A, NEW via B, and replaying
+        those used to leave B counted twice for one installed route.
+        """
+        other_gateway = "172.31.48.2"
+        via_first = RouteEntry(
+            next_hop_ip=self.GATEWAY,
+            interface="core",
+            dest_prefix=self.ROUTE,
+            prefix_len=24,
+        )
+        via_second = replace(via_first, next_hop_ip=other_gateway)
+
+        self.route_controller.add_new_route_entry(via_first)
+        self.assertEqual(self.neighbor().route_count, 1)
+
+        self.route_controller.add_new_route_entry(via_second)
+
+        self.assertIsNone(self.neighbor())
+        self.assertEqual(
+            self.route_controller._neighbor_cache[other_gateway].route_count, 1
+        )
+        self.assertEqual(
+            self.route_controller._programmed_routes[route_key(via_first)],
+            other_gateway,
+        )
