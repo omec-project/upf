@@ -7,6 +7,7 @@ import sys
 import threading
 import time
 import unittest
+from dataclasses import replace
 from unittest.mock import MagicMock, Mock, patch
 
 sys.modules["pybess.bess"] = MagicMock()
@@ -15,6 +16,7 @@ from conf.route_control import (
     RouteController,
     RouteEntry,
     fetch_mac,
+    route_key,
     mac_to_hex,
     mac_to_int,
     validate_ipv4,
@@ -959,6 +961,7 @@ class TestNetlinkEventThread(unittest.TestCase):
             ipr=Mock(),
         )
         self.route_controller.register_handlers()
+        self.route_controller.start_handling_netlink_events()
 
     @staticmethod
     def new_route_message(dst: str) -> dict:
@@ -1071,12 +1074,353 @@ class TestNetlinkEventThread(unittest.TestCase):
 
         self.assertEqual(self.wait_for_routes(1), ["192.168.1.0"])
 
-    def test_given_handlers_registered_twice_when_register_handlers_then_one_event_thread(
+    def test_given_event_thread_started_when_started_again_then_one_event_thread(
         self,
     ):
         event_thread = self.route_controller._netlink_event_thread
 
-        self.route_controller.register_handlers()
+        self.route_controller.start_handling_netlink_events()
 
         self.assertIs(self.route_controller._netlink_event_thread, event_thread)
         self.assertTrue(event_thread.is_alive())
+
+
+def route_message(event: str, dst: str, gateway: str = "172.31.48.1") -> dict:
+    """A netlink route message for a /24 via gateway on interface 2."""
+    return {
+        "family": 2,
+        "dst_len": 24,
+        "flags": 0,
+        "attrs": [
+            ("RTA_TABLE", 254),
+            ("RTA_GATEWAY", gateway),
+            ("RTA_OIF", 2),
+            ("RTA_DST", dst),
+        ],
+        "event": event,
+    }
+
+
+@patch("conf.route_control.send_ping", Mock())
+@patch("conf.route_control.fetch_mac", Mock(return_value=DEFAULT_MAC_ADDRESS))
+class TestStartupOverlap(unittest.TestCase):
+    """Tests route changes made while route_control reads the routes at start.
+
+    The handlers are registered before the routes are read, so a change made
+    in between is both in what is read and in the queued events.
+    """
+
+    TIMEOUT_S = 5
+    ROUTE = "192.168.1.0"
+    GATEWAY = "172.31.48.1"
+
+    def setUp(self):
+        self.mock_bess_controller = Mock(BessControllerMock)
+        self.ndb = Mock()
+        self.ndb.interfaces = {2: {"ifname": "core"}}
+        self.ipr = Mock()
+        self.ipr.get_routes.return_value = []
+        self.route_controller = RouteController(
+            self.mock_bess_controller,
+            self.ndb,
+            interfaces=["access", "core"],
+            ipr=self.ipr,
+        )
+
+    def deliver(self, *netlink_messages: dict) -> None:
+        """Delivers route events through the NDB handler, as NDB does."""
+        for netlink_message in netlink_messages:
+            asyncio.run(
+                self.route_controller._netlink_route_handler(self.ndb, netlink_message)
+            )
+
+    def start_with(self, routes_read: list[dict], events: list[dict]) -> None:
+        """Starts the controller with events that arrive while routes_read
+        are being read, and waits until every event has been handled."""
+
+        def read_routes(family):
+            self.deliver(*events)
+            return routes_read
+
+        self.ipr.get_routes.side_effect = read_routes
+        self.route_controller.start()
+        self.wait_for_queued_events()
+
+    def wait_for_queued_events(self) -> None:
+        handled = threading.Event()
+        self.route_controller._netlink_events.put((lambda _: handled.set(), None))
+        self.assertTrue(
+            handled.wait(self.TIMEOUT_S), "the queued events were not handled"
+        )
+
+    def neighbor(self):
+        return self.route_controller._neighbor_cache.get(self.GATEWAY)
+
+    def test_given_handlers_when_start_then_registered_before_routes_are_read(self):
+        order = Mock()
+        controller = self.route_controller
+        with (
+            patch.object(controller, "register_handlers", order.register_handlers),
+            patch.object(controller, "bootstrap_routes", order.bootstrap_routes),
+            patch.object(
+                controller,
+                "start_handling_netlink_events",
+                order.start_handling_netlink_events,
+            ),
+            patch.object(
+                controller,
+                "start_pinging_missing_entries",
+                order.start_pinging_missing_entries,
+            ),
+        ):
+            controller.start()
+
+        self.assertEqual(
+            [name for name, _, _ in order.mock_calls],
+            [
+                "register_handlers",
+                "bootstrap_routes",
+                "start_handling_netlink_events",
+                "start_pinging_missing_entries",
+            ],
+        )
+
+    def test_given_route_added_while_routes_are_read_when_start_then_added_once(self):
+        self.start_with(
+            routes_read=[route_message("RTM_NEWROUTE", self.ROUTE)],
+            events=[route_message("RTM_NEWROUTE", self.ROUTE)],
+        )
+
+        self.mock_bess_controller.add_route_to_module.assert_called_once()
+        self.assertEqual(self.neighbor().route_count, 1)
+
+    def test_given_route_deleted_after_it_was_read_when_start_then_route_deleted(
+        self,
+    ):
+        self.start_with(
+            routes_read=[route_message("RTM_NEWROUTE", self.ROUTE)],
+            events=[route_message("RTM_DELROUTE", self.ROUTE)],
+        )
+
+        self.mock_bess_controller.delete_module_route_entry.assert_called_once()
+        self.mock_bess_controller.delete_module.assert_called_once()
+        self.assertIsNone(self.neighbor())
+
+    def test_given_route_added_and_deleted_before_it_was_read_when_start_then_not_left_in_bess(
+        self,
+    ):
+        self.start_with(
+            routes_read=[],
+            events=[
+                route_message("RTM_NEWROUTE", self.ROUTE),
+                route_message("RTM_DELROUTE", self.ROUTE),
+            ],
+        )
+
+        self.mock_bess_controller.delete_module_route_entry.assert_called_once()
+        self.assertIsNone(self.neighbor())
+
+    def test_given_route_added_twice_when_deleted_once_then_next_hop_released(self):
+        route_entry = RouteEntry(
+            next_hop_ip=self.GATEWAY,
+            interface="core",
+            dest_prefix=self.ROUTE,
+            prefix_len=24,
+        )
+
+        self.route_controller.add_new_route_entry(route_entry)
+        self.route_controller.add_new_route_entry(route_entry)
+        self.route_controller.delete_route_entry(route_entry)
+
+        self.mock_bess_controller.add_route_to_module.assert_called_once()
+        self.mock_bess_controller.delete_module.assert_called_once()
+        self.assertIsNone(self.neighbor())
+
+    def test_given_route_not_in_bess_when_deleted_then_shared_next_hop_kept(self):
+        in_bess = RouteEntry(
+            next_hop_ip=self.GATEWAY,
+            interface="core",
+            dest_prefix=self.ROUTE,
+            prefix_len=24,
+        )
+        never_added = replace(in_bess, dest_prefix="192.168.2.0")
+
+        self.route_controller.add_new_route_entry(in_bess)
+        self.route_controller.delete_route_entry(never_added)
+
+        self.mock_bess_controller.delete_module_route_entry.assert_not_called()
+        self.mock_bess_controller.delete_module.assert_not_called()
+        self.assertEqual(self.neighbor().route_count, 1)
+
+    @patch("conf.route_control.signal.pause", Mock())
+    def test_given_route_in_bess_when_reconfigure_then_route_added_again(self):
+        self.ipr.get_routes.return_value = [route_message("RTM_NEWROUTE", self.ROUTE)]
+        self.route_controller.bootstrap_routes()
+
+        self.route_controller.reconfigure(1)
+
+        self.assertEqual(self.mock_bess_controller.add_route_to_module.call_count, 2)
+        self.assertEqual(self.neighbor().route_count, 1)
+
+    def test_given_route_waiting_for_arp_when_installed_then_neighbor_event_does_not_install_it_again(
+        self,
+    ):
+        """A next hop resolving must not install a route that is already in BESS.
+
+        add_unresolved_new_neighbor installs the waiting route itself, so the
+        ledger has to be consulted there too: installing it twice counted it
+        twice against its next hop, and one delete then left the next hop's
+        Update module and gate behind.
+        """
+        route_entry = RouteEntry(
+            next_hop_ip=self.GATEWAY,
+            interface="core",
+            dest_prefix=self.ROUTE,
+            prefix_len=24,
+        )
+        # the state _probe_addr leaves behind while the next hop is unresolved
+        self.route_controller._unresolved_arp_queries_cache[self.GATEWAY] = route_entry
+
+        # the next hop resolves and the route is installed through the route path
+        self.route_controller.add_new_route_entry(route_entry)
+        self.mock_bess_controller.add_route_to_module.assert_called_once()
+
+        # the neighbor event for that next hop must find the route already there
+        self.route_controller.add_unresolved_new_neighbor(
+            {
+                "attrs": {
+                    "NDA_DST": self.GATEWAY,
+                    "NDA_LLADDR": DEFAULT_MAC_ADDRESS,
+                },
+            }
+        )
+
+        self.mock_bess_controller.add_route_to_module.assert_called_once()
+        self.assertEqual(self.neighbor().route_count, 1)
+
+        # and one delete is enough to release the next hop
+        self.route_controller.delete_route_entry(route_entry)
+        self.mock_bess_controller.delete_module.assert_called_once()
+        self.assertIsNone(self.neighbor())
+
+    def test_given_bess_refuses_a_delete_when_deleted_again_then_bess_is_asked_again(
+        self,
+    ):
+        """A route BESS refused to drop stays in the ledger, so a later delete
+        retries it instead of reporting a route that was never there."""
+        route_entry = RouteEntry(
+            next_hop_ip=self.GATEWAY,
+            interface="core",
+            dest_prefix=self.ROUTE,
+            prefix_len=24,
+        )
+        self.route_controller.add_new_route_entry(route_entry)
+
+        self.mock_bess_controller.delete_module_route_entry.side_effect = Exception(
+            "BESS refused the delete"
+        )
+        self.route_controller.delete_route_entry(route_entry)
+
+        self.assertEqual(
+            self.mock_bess_controller.delete_module_route_entry.call_count, 1
+        )
+        self.assertIn(route_key(route_entry), self.route_controller._programmed_routes)
+        self.assertEqual(self.neighbor().route_count, 1)
+
+        self.mock_bess_controller.delete_module_route_entry.side_effect = None
+        self.route_controller.delete_route_entry(route_entry)
+
+        self.assertEqual(
+            self.mock_bess_controller.delete_module_route_entry.call_count, 2
+        )
+        self.assertNotIn(
+            route_key(route_entry), self.route_controller._programmed_routes
+        )
+        self.assertIsNone(self.neighbor())
+
+    def test_given_route_deleted_while_waiting_then_resolving_its_next_hop_does_not_install_it(
+        self,
+    ):
+        """A delete must cancel a route that is still waiting for its next hop.
+
+        start() replays the events from the route read, so a delete can follow
+        an add of a route whose next hop is unresolved. Without the delete
+        taking it off the queue, the next hop resolving installs a route the
+        kernel no longer has.
+        """
+        route_entry = RouteEntry(
+            next_hop_ip=self.GATEWAY,
+            interface="core",
+            dest_prefix=self.ROUTE,
+            prefix_len=24,
+        )
+        # the state _probe_addr leaves behind while the next hop is unresolved
+        self.route_controller._unresolved_arp_queries_cache[self.GATEWAY] = route_entry
+
+        self.route_controller.delete_route_entry(route_entry)
+        self.route_controller.add_unresolved_new_neighbor(
+            {
+                "attrs": {
+                    "NDA_DST": self.GATEWAY,
+                    "NDA_LLADDR": DEFAULT_MAC_ADDRESS,
+                },
+            }
+        )
+
+        self.mock_bess_controller.add_route_to_module.assert_not_called()
+        self.assertEqual(self.route_controller._unresolved_arp_queries_cache, {})
+
+    def test_given_ipv6_default_route_deleted_then_the_ipv4_default_is_left_alone(self):
+        """An IPv6 default route shares the IPv4 default's key.
+
+        It carries no RTA_DST, so it parses to 0.0.0.0/0. Looking that key up
+        and substituting the recorded next hop would delete the IPv4 default.
+        """
+        ipv4_default = RouteEntry(
+            next_hop_ip=self.GATEWAY,
+            interface="core",
+            dest_prefix="0.0.0.0",
+            prefix_len=0,
+        )
+        self.route_controller.add_new_route_entry(ipv4_default)
+        self.mock_bess_controller.add_route_to_module.assert_called_once()
+
+        self.route_controller.delete_route_entry(
+            replace(ipv4_default, next_hop_ip="fe80::1")
+        )
+
+        self.mock_bess_controller.delete_module_route_entry.assert_not_called()
+        self.assertIn(
+            route_key(ipv4_default), self.route_controller._programmed_routes
+        )
+        self.assertEqual(self.neighbor().route_count, 1)
+
+    def test_given_route_moved_to_another_next_hop_then_the_old_one_is_released(self):
+        """A route changing next hop must give the old next hop's reference back.
+
+        Reachable without `ip route replace`: the dump returns a prefix via B
+        while the queue holds NEW via A, DEL via A, NEW via B, and replaying
+        those used to leave B counted twice for one installed route.
+        """
+        other_gateway = "172.31.48.2"
+        via_first = RouteEntry(
+            next_hop_ip=self.GATEWAY,
+            interface="core",
+            dest_prefix=self.ROUTE,
+            prefix_len=24,
+        )
+        via_second = replace(via_first, next_hop_ip=other_gateway)
+
+        self.route_controller.add_new_route_entry(via_first)
+        self.assertEqual(self.neighbor().route_count, 1)
+
+        self.route_controller.add_new_route_entry(via_second)
+
+        self.assertIsNone(self.neighbor())
+        self.assertEqual(
+            self.route_controller._neighbor_cache[other_gateway].route_count, 1
+        )
+        self.assertEqual(
+            self.route_controller._programmed_routes[route_key(via_first)],
+            other_gateway,
+        )
