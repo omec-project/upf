@@ -8,6 +8,20 @@ import (
 	"time"
 )
 
+// fakeClock is a manually advanced clock for notifier tests.
+type fakeClock struct{ t time.Time }
+
+func (c *fakeClock) now() time.Time          { return c.t }
+func (c *fakeClock) advance(d time.Duration) { c.t = c.t.Add(d) }
+
+func newTestNotifier(ch chan<- uint64, interval time.Duration) (*downlinkDataNotifier, *fakeClock) {
+	clock := &fakeClock{t: time.Unix(0, 0)}
+	n := NewDownlinkDataNotifier(ch, interval)
+	n.now = clock.now
+
+	return n, clock
+}
+
 func Test_downlinkDataNotifier_Notify(t *testing.T) {
 	ch := make(chan<- uint64, 1024)
 	n := NewDownlinkDataNotifier(ch, 5*time.Second)
@@ -28,26 +42,26 @@ func Test_downlinkDataNotifier_Notify(t *testing.T) {
 func Test_downlinkDataNotifier_shouldNotify(t *testing.T) {
 	t.Run("single F-SEID check rate limiting", func(t *testing.T) {
 		ch := make(chan<- uint64, 1024)
-		n := NewDownlinkDataNotifier(ch, 5*time.Second)
+		n, clock := newTestNotifier(ch, 5*time.Second)
 		testFSEID := uint64(0x1)
 
 		got := n.shouldNotify(testFSEID)
 		if !got {
 			t.Fatal("expected shouldNotify to return true")
 		}
-		<-time.After(3 * time.Second)
+		clock.advance(3 * time.Second)
 
 		got = n.shouldNotify(testFSEID)
 		if got {
 			t.Fatal("expected shouldNotify to return false")
 		}
-		<-time.After(1 * time.Second)
+		clock.advance(1 * time.Second)
 
 		got = n.shouldNotify(testFSEID)
 		if got {
 			t.Fatal("expected shouldNotify to return false")
 		}
-		<-time.After(2 * time.Second)
+		clock.advance(2 * time.Second)
 
 		// after ~6 seconds
 		got = n.shouldNotify(testFSEID)
@@ -59,12 +73,11 @@ func Test_downlinkDataNotifier_shouldNotify(t *testing.T) {
 		if got {
 			t.Fatal("expected shouldNotify to return false")
 		}
-		<-time.After(1 * time.Second)
 	})
 
 	t.Run("multiple F-SEIDs check rate limiting", func(t *testing.T) {
 		ch := make(chan<- uint64, 1024)
-		n := NewDownlinkDataNotifier(ch, 5*time.Second)
+		n, clock := newTestNotifier(ch, 5*time.Second)
 
 		// generate 100k unique F-SEIDs
 		testFSEIDs := make([]uint64, 0)
@@ -79,7 +92,7 @@ func Test_downlinkDataNotifier_shouldNotify(t *testing.T) {
 			}
 		}
 
-		<-time.After(3 * time.Second)
+		clock.advance(3 * time.Second)
 
 		for _, fseid := range testFSEIDs {
 			got := n.shouldNotify(fseid)
@@ -88,7 +101,7 @@ func Test_downlinkDataNotifier_shouldNotify(t *testing.T) {
 			}
 		}
 
-		<-time.After(3 * time.Second)
+		clock.advance(3 * time.Second)
 
 		for _, fseid := range testFSEIDs {
 			got := n.shouldNotify(fseid)
@@ -97,7 +110,7 @@ func Test_downlinkDataNotifier_shouldNotify(t *testing.T) {
 			}
 		}
 
-		<-time.After(1 * time.Second)
+		clock.advance(1 * time.Second)
 
 		for _, fseid := range testFSEIDs {
 			got := n.shouldNotify(fseid)
