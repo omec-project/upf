@@ -30,9 +30,6 @@ const (
 	DefaultBurstSize = 32 * 1514
 	// SockAddr : Unix Socket path to read bess notification from.
 	SockAddr = "/tmp/notifycp"
-	// notifyRedialInterval is how long to wait before reconnecting to the
-	// datapath's notification socket after a dial or read failure.
-	notifyRedialInterval = 2 * time.Second
 	// PfcpAddr : Unix Socket path to send end marker packet.
 	PfcpAddr = "/tmp/pfcpport"
 	// AppQerLookup: Application Qos table Name.
@@ -57,6 +54,11 @@ const (
 	MB = 1000000
 	GB = 1000000000
 )
+
+// notifyRedialInterval is how long to wait before reconnecting to the
+// datapath's notification socket after a dial or read failure. It is a variable
+// so that tests can shorten it.
+var notifyRedialInterval = 2 * time.Second
 
 const (
 	// Internal gates for QER.

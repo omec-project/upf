@@ -6,6 +6,7 @@ package pfcpiface
 import (
 	"context"
 	"testing"
+	"time"
 
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -92,6 +93,17 @@ func TestSendMsgToUPFAcceptsAnEmptyBatch(t *testing.T) {
 	}
 }
 
+// shortTimeout shortens the datapath call Timeout for the rest of the test, so a test
+// that waits for it to expire does not take a full second.
+func shortTimeout(t *testing.T) {
+	t.Helper()
+
+	prev := Timeout
+	Timeout = 50 * time.Millisecond
+
+	t.Cleanup(func() { Timeout = prev })
+}
+
 // blockingModuleStub holds every datapath call until it is released, so a batch cannot
 // complete within Timeout. The rule goroutines report once released, which the buffered
 // done channel absorbs after the join has already given up.
@@ -115,6 +127,8 @@ func (s blockingModuleStub) ModuleCommand(
 // installed and forwarding. Accepted is not a claim that the rules landed; it is the
 // answer that does not destroy state we cannot see.
 func TestSendMsgToUPFDoesNotRejectABatchThatDidNotComplete(t *testing.T) {
+	shortTimeout(t)
+
 	release := make(chan struct{})
 	defer close(release)
 
@@ -277,6 +291,8 @@ func TestAddSliceInfoReportsAMeterTheDatapathRefused(t *testing.T) {
 }
 
 func TestAddSliceInfoDoesNotReportABatchThatDidNotComplete(t *testing.T) {
+	shortTimeout(t)
+
 	release := make(chan struct{})
 	defer close(release)
 
@@ -293,6 +309,8 @@ func TestAddSliceInfoDoesNotReportABatchThatDidNotComplete(t *testing.T) {
 // SendMsgToUPF does -- accepted -- and says that it did not finish, which is the part a
 // caller that forgets a session on acceptance needs and the cause cannot carry.
 func TestSendMsgToUPFWithCompletionReportsABatchThatDidNotFinish(t *testing.T) {
+	shortTimeout(t)
+
 	release := make(chan struct{})
 	defer close(release)
 
