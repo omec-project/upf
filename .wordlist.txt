@@ -52,6 +52,7 @@ gNB
 gRPC
 GTP
 GTPu
+hashicorp
 html
 http
 https
@@ -118,6 +119,7 @@ RSS
 runtime
 Scapy
 SDF
+SemVer
 setenv
 SMF
 SPGW

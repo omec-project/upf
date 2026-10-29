@@ -15,7 +15,7 @@ laptop or server.
 
 You can launch a fully configured VM on which you can build and test BESS at your
 fingertips. We don't provide a binary VM image though. Instead, We provide a
-Vagrant (https://vagrantup.com) script that automatically generates a VM based
+Vagrant (https://developer.hashicorp.com/vagrant) script that automatically generates a VM based
 on Ubuntu 24.04. You can install Vagrant not only on Linux, but also on Windows
 or macOS. Once you have `vagrant` installed, in the current (env/) directory,
 you can simply run:
