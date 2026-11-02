@@ -50,7 +50,7 @@ class Pcapng final : public bess::GateHook {
  public:
   Pcapng();
 
-  virtual ~Pcapng(){};
+  virtual ~Pcapng() {};
 
   CommandResponse Init(const bess::Gate *, const bess::pb::PcapngArg &);
 

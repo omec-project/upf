@@ -158,12 +158,15 @@ typedef std::vector<std::vector<uint8_t>> ExactMatchRuleFields;
 template <typename T>
 class ExactMatchTable {
  public:
-  struct rte_hash_parameters dpdk_params {
-    .name = "test1", .entries = 1 << 15, .reserved = 0,
-    .key_len = sizeof(ExactMatchKey), .hash_func = rte_hash_crc,
-    .hash_func_init_val = 0, .socket_id = (int)rte_socket_id(),
-    .extra_flag = RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY
-  };
+  struct rte_hash_parameters dpdk_params{
+      .name = "test1",
+      .entries = 1 << 15,
+      .reserved = 0,
+      .key_len = sizeof(ExactMatchKey),
+      .hash_func = rte_hash_crc,
+      .hash_func_init_val = 0,
+      .socket_id = (int)rte_socket_id(),
+      .extra_flag = RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY};
 
   using EmTable =
       CuckooMap<ExactMatchKey, T, ExactMatchKeyHash, ExactMatchKeyEq>;

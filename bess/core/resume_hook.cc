@@ -42,8 +42,8 @@ namespace bess {
 std::set<std::unique_ptr<ResumeHook>, ResumeHook::UniquePtrLess>
     global_resume_hooks;
 
-std::map<std::string, ResumeHookBuilder>
-    &ResumeHookBuilder::all_resume_hook_builders_holder() {
+std::map<std::string, ResumeHookBuilder> &
+ResumeHookBuilder::all_resume_hook_builders_holder() {
   // Maps from hook names to hook builders. Tracks all hooks (via their
   // ResumeHookBuilders).
   static std::map<std::string, ResumeHookBuilder> all_resume_hook_builders;
@@ -51,8 +51,8 @@ std::map<std::string, ResumeHookBuilder>
   return all_resume_hook_builders;
 }
 
-const std::map<std::string, ResumeHookBuilder>
-    &ResumeHookBuilder::all_resume_hook_builders() {
+const std::map<std::string, ResumeHookBuilder> &
+ResumeHookBuilder::all_resume_hook_builders() {
   return all_resume_hook_builders_holder();
 }
 
