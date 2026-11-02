@@ -433,14 +433,21 @@ class RouteController:
         Args:
             route_entry (RouteEntry): The route entry.
         """
+        # This route replaces any version of it still waiting for a next hop,
+        # an attached network included: if the old next hop resolved later, the
+        # route would be installed through it although the kernel no longer has
+        # it. A gateway route is checked for IPv4 first, since an IPv6 default
+        # route parses to the IPv4 default's key. An attached network is never
+        # a default route, so its key cannot be shared that way.
+        if route_entry.on_link or validate_ipv4(route_entry.next_hop_ip):
+            self._unresolved_arp_queries_cache.pop(route_key(route_entry), None)
+
         if route_entry.on_link:
             self._add_on_link_network(route_entry)
             return
 
         if not validate_ipv4(route_entry.next_hop_ip):
             return
-        # This route replaces any version of it still waiting for a next hop.
-        self._unresolved_arp_queries_cache.pop(route_key(route_entry), None)
         # Short-circuit so an already programmed route is not probed for;
         # _add_neighbor holds the guard that keeps the install itself unique.
         if self._programmed_routes.get(route_key(route_entry)) == (

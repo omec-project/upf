@@ -1500,6 +1500,7 @@ class TestStartupOverlap(unittest.TestCase):
         self.assertEqual(self.neighbor().route_count, 1)
         self.assertNotIn(other_gateway, self.route_controller._neighbor_cache)
 
+
 class StopPinging(Exception):
     """Ends _ping_missing_entries' loop in a test."""
 
@@ -1577,6 +1578,26 @@ class TestPendingRoutes(unittest.TestCase):
         self.resolve()
 
         self.assertEqual(self.added_routes(), [("10.34.0.0", "10.0.0.1")])
+
+    def test_given_pending_route_replaced_by_attached_network_when_old_next_hop_resolves_then_not_added(
+        self, _
+    ):
+        self.route_controller.add_new_route_entry(self.route("10.35.0.0"))
+        self.route_controller._ndb.neighbours.dump.return_value = []
+        self.route_controller.add_new_route_entry(
+            RouteEntry(
+                next_hop_ip=None,
+                interface="access",
+                dest_prefix="10.35.0.0",
+                prefix_len=24,
+                on_link=True,
+            )
+        )
+
+        self.resolve()
+
+        self.mock_bess_controller.add_route_to_module.assert_not_called()
+        self.assertEqual(self.route_controller._unresolved_arp_queries_cache, {})
 
     def test_given_neighbor_event_without_mac_when_handled_then_route_keeps_waiting(
         self, _
