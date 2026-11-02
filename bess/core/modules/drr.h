@@ -107,9 +107,9 @@ class DRR final : public Module {
     FlowId id;                  // allows the flow to remove itself from the map
     struct llring *queue;       // queue to store current packets for flow
     bess::Packet *next_packet;  // buffer to store next packet from the queue.
-    Flow() : deficit(0), timer(0), id(), next_packet(nullptr){};
+    Flow() : deficit(0), timer(0), id(), next_packet(nullptr) {};
     Flow(FlowId new_id)
-        : deficit(0), timer(0), id(new_id), next_packet(nullptr){};
+        : deficit(0), timer(0), id(new_id), next_packet(nullptr) {};
     ~Flow() {
       if (queue) {
         bess::Packet *pkt;

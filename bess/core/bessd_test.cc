@@ -305,12 +305,13 @@ TEST(CheckUniqueInstance, NotHeld) {
 TEST(CheckUniqueInstance, Held) {
   ::testing::FLAGS_gtest_death_test_style = "fast";
   TmpFileName t;
-  DO_MULTI_PROCESS_TEST({ CheckUniqueInstance(t.filename()); },
-                        {
-                          EXPECT_DEATH(CheckUniqueInstance(t.filename()), "");
-                          unlink(t.filename());
-                        },
-                        0);
+  DO_MULTI_PROCESS_TEST(
+      { CheckUniqueInstance(t.filename()); },
+      {
+        EXPECT_DEATH(CheckUniqueInstance(t.filename()), "");
+        unlink(t.filename());
+      },
+      0);
 }
 
 // Checks that the combined routine to check for a unique instance attempts to

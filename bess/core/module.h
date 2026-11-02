@@ -53,7 +53,7 @@
 
 using bess::gate_idx_t;
 
-#define INVALID_TASK_ID ((task_id_t)-1)
+#define INVALID_TASK_ID ((task_id_t) - 1)
 #define MAX_NUMA_NODE 16
 #define MAX_TASKS_PER_MODULE 32
 #define UNCONSTRAINED_SOCKET ((0x1ull << MAX_NUMA_NODE) - 1)
@@ -690,7 +690,9 @@ static inline void set_attr(Module *m, int attr_id, bess::Packet *pkt, T val) {
           _NAME_TEMPLATE, _HELP, _MOD::kNumIGates, _MOD::kNumOGates,     \
           _MOD::cmds, MODULE_INIT_FUNC(&_MOD::Init));                    \
     }                                                                    \
-    ~_MOD##_class() { ModuleBuilder::DeregisterModuleClass(#_MOD); }     \
+    ~_MOD##_class() {                                                    \
+      ModuleBuilder::DeregisterModuleClass(#_MOD);                       \
+    }                                                                    \
   };
 
 #define ADD_MODULE(_MOD, _NAME_TEMPLATE, _HELP) \
