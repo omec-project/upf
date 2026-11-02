@@ -120,7 +120,7 @@ jobs:
     uses: omec-project/.github/.github/workflows/check-clang-format.yml@31eaa229af3f5e73c45cc7f165f614716f6b96f6 # v0.1.2
     with:
       branch_name: ${{ github.ref }}
-      clang_format_version: '21'
+      clang_format_version: '20'
       check_path: ${{ matrix.path.check }}
       exclude_regex: ${{ matrix.path.exclude }}
   build:
