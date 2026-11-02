@@ -1279,7 +1279,9 @@ class TestStartupOverlap(unittest.TestCase):
             prefix_len=24,
         )
         # the state _probe_addr leaves behind while the next hop is unresolved
-        self.route_controller._unresolved_arp_queries_cache[self.GATEWAY] = route_entry
+        self.route_controller._unresolved_arp_queries_cache[route_key(route_entry)] = (
+            route_entry
+        )
 
         # the next hop resolves and the route is installed through the route path
         self.route_controller.add_new_route_entry(route_entry)
@@ -1355,7 +1357,9 @@ class TestStartupOverlap(unittest.TestCase):
             prefix_len=24,
         )
         # the state _probe_addr leaves behind while the next hop is unresolved
-        self.route_controller._unresolved_arp_queries_cache[self.GATEWAY] = route_entry
+        self.route_controller._unresolved_arp_queries_cache[route_key(route_entry)] = (
+            route_entry
+        )
 
         self.route_controller.delete_route_entry(route_entry)
         self.route_controller.add_unresolved_new_neighbor(
@@ -1442,7 +1446,9 @@ class TestStartupOverlap(unittest.TestCase):
         via_second = replace(via_first, next_hop_ip=other_gateway)
         self.route_controller.add_new_route_entry(via_first)
         # the state _probe_addr leaves behind while the next hop is unresolved
-        self.route_controller._unresolved_arp_queries_cache[other_gateway] = via_second
+        self.route_controller._unresolved_arp_queries_cache[route_key(via_second)] = (
+            via_second
+        )
 
         self.route_controller.add_unresolved_new_neighbor(
             {
@@ -1493,3 +1499,128 @@ class TestStartupOverlap(unittest.TestCase):
         )
         self.assertEqual(self.neighbor().route_count, 1)
         self.assertNotIn(other_gateway, self.route_controller._neighbor_cache)
+
+
+class StopPinging(Exception):
+    """Ends _ping_missing_entries' loop in a test."""
+
+
+@patch("conf.route_control.send_ping")
+@patch("conf.route_control.fetch_mac", Mock(return_value=None))
+class TestPendingRoutes(unittest.TestCase):
+    """Tests routes waiting for their next hop's MAC address."""
+
+    NEXT_HOP = "10.0.0.7"
+    NEXT_HOP_MAC = "00:16:3e:00:00:07"
+
+    def setUp(self):
+        self.mock_bess_controller = Mock(BessControllerMock)
+        self.route_controller = RouteController(
+            self.mock_bess_controller,
+            Mock(),
+            interfaces=["access", "core"],
+            ipr=Mock(),
+        )
+
+    def route(self, dest_prefix: str, next_hop_ip: str = NEXT_HOP) -> RouteEntry:
+        return RouteEntry(
+            next_hop_ip=next_hop_ip,
+            interface="access",
+            dest_prefix=dest_prefix,
+            prefix_len=24,
+        )
+
+    def resolve(self, neighbor_ip: str = NEXT_HOP, mac: str | None = NEXT_HOP_MAC):
+        attrs = {"NDA_DST": neighbor_ip}
+        if mac is not None:
+            attrs["NDA_LLADDR"] = mac
+        self.route_controller.add_unresolved_new_neighbor({"attrs": attrs})
+
+    def added_routes(self) -> list[tuple[str, str]]:
+        return [
+            (call.args[0].dest_prefix, call.args[0].next_hop_ip)
+            for call in self.mock_bess_controller.add_route_to_module.call_args_list
+        ]
+
+    def test_given_routes_sharing_a_pending_next_hop_when_it_resolves_then_all_added(
+        self, _
+    ):
+        self.route_controller.add_new_route_entry(self.route("10.31.0.0"))
+        self.route_controller.add_new_route_entry(self.route("10.32.0.0"))
+
+        self.resolve()
+
+        self.assertEqual(
+            self.added_routes(),
+            [("10.31.0.0", self.NEXT_HOP), ("10.32.0.0", self.NEXT_HOP)],
+        )
+        self.assertEqual(
+            self.route_controller._neighbor_cache[self.NEXT_HOP].route_count, 2
+        )
+
+    def test_given_pending_route_deleted_when_next_hop_resolves_then_not_added(self, _):
+        self.route_controller.add_new_route_entry(self.route("10.33.0.0"))
+        self.route_controller.delete_route_entry(self.route("10.33.0.0"))
+
+        self.resolve()
+
+        self.mock_bess_controller.add_route_to_module.assert_not_called()
+
+    def test_given_pending_route_replaced_when_old_next_hop_resolves_then_new_next_hop_kept(
+        self, _
+    ):
+        self.route_controller.add_new_route_entry(self.route("10.34.0.0"))
+        with patch("conf.route_control.fetch_mac", return_value=DEFAULT_MAC_ADDRESS):
+            self.route_controller.add_new_route_entry(
+                self.route("10.34.0.0", next_hop_ip="10.0.0.1")
+            )
+
+        self.resolve()
+
+        self.assertEqual(self.added_routes(), [("10.34.0.0", "10.0.0.1")])
+
+    def test_given_pending_route_replaced_by_attached_network_when_old_next_hop_resolves_then_not_added(
+        self, _
+    ):
+        self.route_controller.add_new_route_entry(self.route("10.35.0.0"))
+        self.route_controller._ndb.neighbours.dump.return_value = []
+        self.route_controller.add_new_route_entry(
+            RouteEntry(
+                next_hop_ip=None,
+                interface="access",
+                dest_prefix="10.35.0.0",
+                prefix_len=24,
+                on_link=True,
+            )
+        )
+
+        self.resolve()
+
+        self.mock_bess_controller.add_route_to_module.assert_not_called()
+        self.assertEqual(self.route_controller._unresolved_arp_queries_cache, {})
+
+    def test_given_neighbor_event_without_mac_when_handled_then_route_keeps_waiting(
+        self, _
+    ):
+        self.route_controller.add_new_route_entry(self.route("10.31.0.0"))
+
+        self.resolve(mac=None)
+        self.mock_bess_controller.add_route_to_module.assert_not_called()
+
+        self.resolve()
+        self.assertEqual(self.added_routes(), [("10.31.0.0", self.NEXT_HOP)])
+
+    def test_given_routes_sharing_a_pending_next_hop_when_pinging_missing_entries_then_pinged_once(
+        self, mock_send_ping
+    ):
+        self.route_controller.add_new_route_entry(self.route("10.31.0.0"))
+        self.route_controller.add_new_route_entry(self.route("10.32.0.0"))
+        mock_send_ping.reset_mock()
+
+        with (
+            patch("conf.route_control.time.sleep", side_effect=StopPinging),
+            self.assertRaises(StopPinging),
+        ):
+            self.route_controller._ping_missing_entries()
+
+        mock_send_ping.assert_called_once_with(self.NEXT_HOP)
