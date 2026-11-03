@@ -4,6 +4,12 @@
   port_limit: 2
   interfaces: ['86:00.0', '86:00.1']
   port_bandwidth_gb: 10
+  # TRex v3.05+ (DPDK 24.03) selects an i40e AVX2 receive function that it
+  # builds as a stub, so X710/XXV710 ports stop receiving once their RX ring
+  # fills. Limiting DPDK to 128-bit SIMD selects the working SSE path; drop
+  # this once TRex fixes it. See
+  # https://github.com/cisco-system-traffic-generator/trex-core/issues/1182
+  ext_dpdk_opt: ["--force-max-simd-bitwidth=128"]
   c: 2
   port_info:
     - src_mac: 40:a6:b7:20:c8:24

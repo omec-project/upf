@@ -78,7 +78,9 @@ To install TRex onto your server, please refer to the
 1. Update the following files accordingly to route traffic to the UPF and vice versa.
 * `ptf/.env` file updated with `UPF_ADDR` and `TREX_ADDR` parameters
 * `ptf/config/trex-cfg-for-ptf.yaml` file updated with proper values for
-  `interfaces`, `port_info`, and `platform` parameters
+  `interfaces`, `port_info`, and `platform` parameters. Keep its
+  `ext_dpdk_opt` line: without it, TRex v3.05 and later stop receiving on Intel
+  i40e NICs (X710, XXV710) after one RX ring of packets.
 * `ptf/tests/linerate/common.py` file updated with proper MAC address values for
   `TREX_SRC_MAC`, `UPF_CORE_MAC`, and `UPF_ACCESS_MAC`
 
