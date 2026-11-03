@@ -39,6 +39,34 @@ data plane testing framework written in Python
 * [TRex](https://github.com/cisco-system-traffic-generator/trex-core): a
 high-speed traffic generator built on top of DPDK, containing a Python API
 
+### TRex and Scapy versions
+The PTF image carries the TRex *client* libraries, and the TRex *server* runs
+on the traffic-generator host:
+
+* **Client:** Cisco TRex v3.06 (commit
+  `46be64bedbe9d505dfb55099c38119d6e86267ca`), downloaded and checked against
+  `TREX_ARCHIVE_SHA256` in `ptf/Dockerfile`. Only the stateless (STL) client and
+  the daemon client (`trex_stf_lib`) are copied into the image. TRex's bundled
+  Scapy is not; PTF and TRex share the single Scapy distribution locked in
+  `requirements-ptf.txt` (Scapy 2.8.0).
+* **Server:** use a TRex v3.08 release. The client has been run against v3.06
+  and v3.08 servers, but the v3.06 server's daemon (`trex_daemon_server`),
+  which `ptf_runner.py` uses, fails to start under Python 3.12 or later. Servers from v3.05 on need the
+  `ext_dpdk_opt` line in `config/trex-cfg-for-ptf.yaml` on Intel i40e NICs (see
+  [Testbed requirements](#testbed-requirements)).
+
+The client is patched at image build time with `ptf/patches/trex/`:
+
+| Patch | Why |
+|---|---|
+| `0001-stl-use-importlib.patch` | Python 3.14 removed `imp`; the STL stream loader uses `importlib.reload` instead. |
+| `0002-use-system-scapy.patch` | Stops TRex putting its bundled Scapy 2.4.3 on `sys.path`, so only the locked Scapy is imported. |
+| `0003-use-raw-regex-literals.patch` | Makes regular-expression literals raw, which Python 3.14 otherwise warns about. |
+| `0004-stl-calculate-scapy-offsets.patch` | Computes named-field offsets for the field engine (`STLVM`) from serialized packet data instead of the private Scapy field `_offset`, which the locked Scapy doesn't provide. |
+
+`make dependency-smoke` (below) checks the result, including the field offsets
+that patch 0004 computes.
+
 ## Directory Structure
 ### config
 This directory contains YAML config file definition for TRex along with
@@ -74,13 +102,44 @@ in the `conf/upf.jsonc` file: `"measure_flow": true`, N3 interface set to
 To install TRex onto your server, please refer to the
 [TRex installation guide](https://trex-tgn.cisco.com/trex/doc/trex_manual.html#_download_and_installation)
 
+### Testbed requirements
+* **Two hosts with DPDK-capable NICs**, each with two ports, linked so that
+  TRex port 0 connects to the UPF's access (N3) port and TRex port 1 to its
+  core (N6) port. Back-to-back cables are simplest. Through a switch, the
+  switch's own frames (such as periodic multicast) also reach the TRex
+  ports, so tests must count their own streams rather than port totals, as
+  the linerate tests do.
+* **On both hosts:** IOMMU enabled (`intel_iommu=on iommu=pt`), the test ports
+  bound to `vfio-pci`, and hugepages reserved.
+* **UPF host:** the UPF in DPDK mode, set up as in
+  [`scripts/docker_setup.sh`](../scripts/docker_setup.sh) with the
+  `conf/upf.jsonc` changes above. The tests assume `docker_setup.sh`'s addresses:
+  N3 `198.18.0.1/30` and N6 `198.19.0.1/30`, with the TRex ports as the next
+  hops. BESS's gRPC port (10514) must be reachable from the TRex host.
+* **TRex host:** a TRex v3.08 server with its daemon running
+  (`./trex_daemon_server start` in the TRex directory), and Docker for the PTF
+  image. `ptf_runner.py` pushes `config/trex-cfg-for-ptf.yaml` to the daemon
+  and starts TRex in software mode (`--software --no-hw-flow-stat`) unless
+  `--trex-hw-mode` is given.
+* **Intel i40e NICs (X710, XXV710):** keep the `ext_dpdk_opt` line in
+  `config/trex-cfg-for-ptf.yaml`. From v3.05, TRex selects an i40e AVX2
+  receive function that it builds as a stub, so each port stops receiving once
+  its RX ring fills (about 4,000 packets, then `rx_missed_errors`). Limiting
+  DPDK to 128-bit SIMD selects the working path. See
+  [TRex issue 1182](https://github.com/cisco-system-traffic-generator/trex-core/issues/1182).
+* **`baseline` latency:** run it on a freshly started UPF. Its tail-latency
+  check can fail once the same UPF instance has served
+  earlier runs ([#1392](https://github.com/omec-project/upf/issues/1392)).
+
+For an example of a scripted two-host setup, see this
+[CloudLab testbed](https://github.com/andybavier/upf-testbed).
+
 ### Steps
 1. Update the following files accordingly to route traffic to the UPF and vice versa.
 * `ptf/.env` file updated with `UPF_ADDR` and `TREX_ADDR` parameters
 * `ptf/config/trex-cfg-for-ptf.yaml` file updated with proper values for
   `interfaces`, `port_info`, and `platform` parameters. Keep its
-  `ext_dpdk_opt` line: without it, TRex v3.05 and later stop receiving on Intel
-  i40e NICs (X710, XXV710) after one RX ring of packets.
+  `ext_dpdk_opt` line (see [Testbed requirements](#testbed-requirements)).
 * `ptf/tests/linerate/common.py` file updated with proper MAC address values for
   `TREX_SRC_MAC`, `UPF_CORE_MAC`, and `UPF_ACCESS_MAC`
 
@@ -101,13 +160,9 @@ UPF/TRex testbed, run:
 make dependency-smoke
 ```
 This check runs `pip check`, confirms that Scapy is imported from its installed
-distribution, and imports the PTF and TRex Python APIs. It does not generate
-BESS protobuf files, send traffic, or connect to a UPF or TRex server.
-
-The image uses Cisco TRex v3.06 (commit
-`46be64bedbe9d505dfb55099c38119d6e86267ca`) with the compatibility patches in
-`ptf/patches/trex/`. Its bundled Scapy is not included; PTF and TRex use the
-single Scapy distribution locked in `requirements-ptf.txt`.
+distribution, imports the PTF and TRex Python APIs, and compiles representative
+TRex streams. It does not generate BESS protobuf files, send traffic, or
+connect to a UPF or TRex server.
 
 4. Run PTF tests using the `run_tests` script:
 ```bash
