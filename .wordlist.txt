@@ -55,6 +55,7 @@ gNB
 gRPC
 GTP
 GTPu
+hashicorp
 html
 http
 https
@@ -124,6 +125,7 @@ runtime
 rebase
 Scapy
 SDF
+SemVer
 setenv
 SMF
 SPGW

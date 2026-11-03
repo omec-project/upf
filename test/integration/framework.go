@@ -123,6 +123,10 @@ func init() {
 	logger.SetLogLevel(zap.DebugLevel)
 }
 
+// pollInterval is how often setup checks whether the BESS fake and the PFCP Agent are ready.
+// A ticker fires first after one full interval, so this is also the minimum wait of each check.
+const pollInterval = 20 * time.Millisecond
+
 func IsConnectionOpen(network string, host string, port string) bool {
 	target := net.JoinHostPort(host, port)
 
@@ -152,7 +156,7 @@ func IsConnectionOpen(network string, host string, port string) bool {
 
 func waitForPortOpen(net string, host string, port string) error {
 	timeout := time.After(5 * time.Second)
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(pollInterval)
 
 	// Keep trying until we're timed out or get a result/error
 	for {
@@ -168,10 +172,11 @@ func waitForPortOpen(net string, host string, port string) error {
 }
 
 // waitForPFCPAssociationSetup checks if PFCP Agent is started by trying to create PFCP association.
-// It retries every 1.5 seconds (0.5 seconds of interval between tries + 1 seconds that PFCP Client waits for response).
+// It retries every ~1 second while the agent is down (the 1 second that PFCP Client waits for a response
+// plus pollInterval between tries).
 func waitForPFCPAssociationSetup(pfcpClient *pfcpsim.PFCPClient) error {
 	timeout := time.After(30 * time.Second)
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(pollInterval)
 
 	// Decrease timeout to wait for PFCP responses.
 	// This decreases time to wait for PFCP Agent to start.

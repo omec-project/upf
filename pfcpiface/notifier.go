@@ -13,6 +13,9 @@ type downlinkDataNotifier struct {
 
 	notificationInterval time.Duration
 
+	// now returns the current time; tests replace it to avoid sleeping.
+	now func() time.Time
+
 	// state keeps track of F-SEIDs and corresponding notification time in future
 	state sync.Map
 }
@@ -21,6 +24,7 @@ func NewDownlinkDataNotifier(notifyChan chan<- uint64, notificationInterval time
 	return &downlinkDataNotifier{
 		notifyChan:           notifyChan,
 		notificationInterval: notificationInterval,
+		now:                  time.Now,
 	}
 }
 
@@ -40,15 +44,15 @@ func (n *downlinkDataNotifier) Notify(fseid uint64) {
 func (n *downlinkDataNotifier) shouldNotify(fseid uint64) bool {
 	entry, ok := n.state.Load(fseid)
 	if !ok {
-		n.state.Store(fseid, time.Now())
+		n.state.Store(fseid, n.now())
 		// TODO: add goroutine that will remove stale entries
 		return true
 	}
 
 	lastTimestamp := entry.(time.Time)
 
-	if time.Since(lastTimestamp) >= n.notificationInterval {
-		n.state.Store(fseid, time.Now())
+	if n.now().Sub(lastTimestamp) >= n.notificationInterval {
+		n.state.Store(fseid, n.now())
 		return true
 	}
 

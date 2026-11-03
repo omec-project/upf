@@ -74,7 +74,7 @@ class IPLookup final : public Module {
   struct rte_lpm *lpm_;
 #else
   struct rte_fib *lpm_;
-  struct rte_fib_conf conf {};
+  struct rte_fib_conf conf{};
 #endif
   gate_idx_t default_gate_;
   ParsedPrefix ParseIpv4Prefix(const std::string &prefix, uint64_t prefix_len);

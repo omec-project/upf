@@ -140,12 +140,18 @@ func TestPFCPHeartbeats(t *testing.T) {
 	setup(t, ConfigDefault)
 	defer teardown(t)
 
-	time.Sleep(time.Second * 10)
+	// The PFCP client does not answer heartbeat requests from the agent, so the
+	// client drives the exchange: each round trip must be answered by the agent.
+	for i := 0; i < 5; i++ {
+		if err := pfcpClient.SendAndRecvHeartbeat(); err != nil {
+			t.Fatalf("heartbeat %d was not answered: %v", i, err)
+		}
 
-	// Heartbeats interval is 5 seconds by default.
-	// If the association is alive after 10 seconds it means that PFCP Agent handles heartbeats properly.
+		time.Sleep(200 * time.Millisecond)
+	}
+
 	if !pfcpClient.IsAssociationAlive() {
-		t.Fatal("Expected PFCP association to be alive after 10 seconds")
+		t.Fatal("Expected PFCP association to be alive after heartbeats")
 	}
 }
 

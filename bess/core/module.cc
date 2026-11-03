@@ -86,8 +86,8 @@ std::map<std::string, ModuleBuilder> &ModuleBuilder::all_module_builders_holder(
   return all_module_builders;
 }
 
-const std::map<std::string, ModuleBuilder>
-    &ModuleBuilder::all_module_builders() {
+const std::map<std::string, ModuleBuilder> &
+ModuleBuilder::all_module_builders() {
   return all_module_builders_holder();
 }
 

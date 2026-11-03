@@ -58,8 +58,8 @@ bool GateHookBuilder::RegisterGateHook(GateHook::constructor_t constructor,
       .second;
 }
 
-std::map<std::string, GateHookBuilder>
-    &GateHookBuilder::all_gate_hook_builders_holder(bool reset) {
+std::map<std::string, GateHookBuilder> &
+GateHookBuilder::all_gate_hook_builders_holder(bool reset) {
   // Maps from hook names to hook builders. Tracks all hooks (via their
   // GateHookBuilders).
   static std::map<std::string, GateHookBuilder> all_gate_hook_builders;
@@ -71,8 +71,8 @@ std::map<std::string, GateHookBuilder>
   return all_gate_hook_builders;
 }
 
-const std::map<std::string, GateHookBuilder>
-    &GateHookBuilder::all_gate_hook_builders() {
+const std::map<std::string, GateHookBuilder> &
+GateHookBuilder::all_gate_hook_builders() {
   return all_gate_hook_builders_holder();
 }
 

@@ -68,7 +68,7 @@ The following environment variables are shared for both VM and container.
 * `FWD_MODE`: testpmd forwarding mode. Default: "macswap retry"
   * With "io retry", packet payload won't be touched by guests.
   * If you skip "retry", guests will discard received packets if TXQ is full.
-  * See [DPDK User guide](http://dpdk.org/doc/guides/testpmd_app_ug/index.html)
+  * See [DPDK User guide](http://doc.dpdk.org/guides/testpmd_app_ug/index.html)
 * `BESS_PORTS`: # of virtio ports per VM. Default: 2
 * `BESS_QUEUES`: # of RX/TX queue pairs per port. Default: 1
 * `BESS_QSIZE`: the size of each RX/TX queue. Old QEMU versions may have a limit

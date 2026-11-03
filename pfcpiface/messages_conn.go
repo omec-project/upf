@@ -133,6 +133,10 @@ func (pConn *PFCPConn) associationIEs() []*ie.IE {
 	return ies
 }
 
+// psrei is the PSREI (PFCP Session Retained Indication) bit of the PFCP Association Setup Response
+// Flags IE, TS 29.244 clause 8.2.134 (bit 1 of octet 5).
+const psrei = 0x01
+
 func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (message.Message, error) {
 	addr := pConn.RemoteAddr().String()
 	upf := pConn.upf
@@ -175,6 +179,17 @@ func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (messa
 	if !upf.isConnected() {
 		asres.Cause = ie.NewCause(ie.CauseRequestRejected)
 		return asres, errProcess(errDatapathDown)
+	}
+
+	// TS 29.244 clause 6.2.6.2.2: a request for a node ID that already has an association replaces
+	// it, and the UP function deletes that association's sessions unless the request asks for them
+	// to be retained. This UPF does not delete a connection's sessions when that connection
+	// re-associates; they go only when the connection is torn down. So where they were asked for,
+	// it says so with PSREI, and a CP function that has to assume otherwise can act on sessions it
+	// established before the request. The remote node ID is set only by an association, so
+	// matching it is what says one already exists for this node ID.
+	if asreq.PFCPSessionRetentionInformation != nil && pConn.nodeID.remote == nodeID {
+		asres.PFCPASRspFlags = ie.NewPFCPASRspFlags(psrei)
 	}
 
 	if pConn.ts.remote.IsZero() {

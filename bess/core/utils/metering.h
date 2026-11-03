@@ -100,12 +100,15 @@ class MeteringKeyHash {
 template <typename T>
 class Metering {
  public:
-  struct rte_hash_parameters dpdk_params {
-    .name = "Metering", .entries = 1 << 15, .reserved = 0,
-    .key_len = sizeof(MeteringKey), .hash_func = rte_hash_crc,
-    .hash_func_init_val = 0, .socket_id = (int)rte_socket_id(),
-    .extra_flag = RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY
-  };
+  struct rte_hash_parameters dpdk_params{
+      .name = "Metering",
+      .entries = 1 << 15,
+      .reserved = 0,
+      .key_len = sizeof(MeteringKey),
+      .hash_func = rte_hash_crc,
+      .hash_func_init_val = 0,
+      .socket_id = (int)rte_socket_id(),
+      .extra_flag = RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY};
 
   using EmTable = CuckooMap<MeteringKey, T, MeteringKeyHash, MeteringKeyEq>;
   Metering() : total_key_size_(0), num_fields_(0) {}

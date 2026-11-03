@@ -549,9 +549,7 @@ class RateLimitTrafficClass final : public TrafficClass {
   }
 
   // Convert resource units to work units
-  static uint64_t to_work_units(uint64_t x) {
-    return x << kUsageAmplifierPow;
-  }
+  static uint64_t to_work_units(uint64_t x) { return x << kUsageAmplifierPow; }
 
  private:
   friend class Scheduler;

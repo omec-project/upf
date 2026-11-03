@@ -106,11 +106,11 @@ class ResumeHookBuilder {
 
   const std::string &hook_name() const { return hook_name_; }
 
-  static std::map<std::string, ResumeHookBuilder>
-      &all_resume_hook_builders_holder();
+  static std::map<std::string, ResumeHookBuilder> &
+  all_resume_hook_builders_holder();
 
-  static const std::map<std::string, ResumeHookBuilder>
-      &all_resume_hook_builders();
+  static const std::map<std::string, ResumeHookBuilder> &
+  all_resume_hook_builders();
 
   std::unique_ptr<ResumeHook> CreateResumeHook() const {
     return std::unique_ptr<ResumeHook>(hook_constructor_());

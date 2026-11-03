@@ -23,6 +23,11 @@ import (
 //
 // unixpacket is Linux-only, hence the build tag.
 func TestNotifyListenReconnectsAfterSocketLoss(t *testing.T) {
+	prev := notifyRedialInterval
+	notifyRedialInterval = 50 * time.Millisecond
+
+	t.Cleanup(func() { notifyRedialInterval = prev })
+
 	// Kept in /tmp rather than t.TempDir(): a unix socket path has a hard length
 	// limit that the default temp directory can exceed.
 	dir, err := os.MkdirTemp("/tmp", "ddn-notify")
@@ -46,9 +51,26 @@ func TestNotifyListenReconnectsAfterSocketLoss(t *testing.T) {
 	notifications := make(chan uint64, 8)
 
 	b := &bess{notifyStop: make(chan struct{})}
-	defer close(b.notifyStop)
 
-	go b.notifyListen(notifications, sockAddr)
+	listenerDone := make(chan struct{})
+
+	// The listener reads notifyRedialInterval, so it must have returned before the
+	// cleanup above restores the interval.
+	defer func() {
+		close(b.notifyStop)
+
+		select {
+		case <-listenerDone:
+		case <-time.After(5 * time.Second):
+			t.Error("the notification listener did not stop")
+		}
+	}()
+
+	go func() {
+		defer close(listenerDone)
+
+		b.notifyListen(notifications, sockAddr)
+	}()
 
 	// sendThenDrop accepts the listener's connection, delivers one notification,
 	// and closes the connection underneath it.

@@ -101,7 +101,7 @@ class FifoOpenerThread final : public bess::utils::SyscallThreadAny {
 class FifoOpener {
  public:
   static constexpr int32_t kNotOpen = -1;
-  FifoOpener() : FifoOpener(std::string(""), false){};
+  FifoOpener() : FifoOpener(std::string(""), false) {};
   FifoOpener(const std::string &path, bool reconnect)
       : path_(path),
         reconnect_(reconnect),

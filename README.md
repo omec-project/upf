@@ -6,6 +6,8 @@ Copyright 2019 Intel Corporation
 # UPF
 
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/omec-project/upf/badge)](https://scorecard.dev/viewer/?uri=github.com/omec-project/upf)
+[![GitHub latest release (SemVer)](https://img.shields.io/github/v/release/omec-project/upf?sort=semver)](https://github.com/omec-project/upf/releases)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://spdx.org/licenses/Apache-2.0.html)
 
 This project implements a 4G/5G User Plane Function (UPF) compliant with 3GPP
 TS23.501. It follows the 3GPP Control and User Plane Separation (CUPS)
