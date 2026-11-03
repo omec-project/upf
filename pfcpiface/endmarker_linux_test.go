@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"syscall"
 	"testing"
@@ -63,16 +64,19 @@ func TestSetUpfInfoWithEndMarkerSocketAbsentAtStart(t *testing.T) {
 		},
 	}
 
-	setUpfInfoWithoutDatapath(t, b, &Conf{
-		EnableEndMarker:          true,
-		EndMarkerSockAddr:        sockAddr,
-		EnableGtpuPathMonitoring: true,
-	})
+	rec := startRecordingBESS(t)
 
-	// The last step of SetUpfInfo stands in for everything after the End Marker
-	// setup, slice meters included.
-	if !enableGtpuPathMonitoring {
-		t.Error("SetUpfInfo skipped the setup after the End Marker dial failed")
+	b.SetUpfInfo(&upf{}, &Conf{
+		EnableEndMarker:   true,
+		EndMarkerSockAddr: sockAddr,
+		SliceMeterConfig:  SliceMeterConfig{N6RateBps: 1000000, N6BurstBytes: 10000},
+	})
+	t.Cleanup(b.Exit)
+
+	// The slice meter is set up last, after the End Marker setup, so reaching the
+	// datapath shows the rest of SetUpfInfo ran after the dial failed.
+	if sent := rec.sent(); !slices.Contains(sent, "sliceMeter add") {
+		t.Errorf("SetUpfInfo skipped the setup after the End Marker dial failed; module commands sent: %v", sent)
 	}
 
 	select {

@@ -63,8 +63,13 @@ void GtpuPathMonitoring::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
       speh->seqnum = static_cast<be16_t>(m_seqNumber);
 
       for (auto it : m_dstIp) {
-        m_storedData[it.first][m_seqNumber] = tsc_to_ns(rdtsc());
         bess::Packet *newPkt = bess::Packet::copy(pkt);
+        if (!newPkt) {
+          // The pool is empty: this gNB misses one request, and no timestamp
+          // is kept for a request that was never sent.
+          continue;
+        }
+        m_storedData[it.first][m_seqNumber] = tsc_to_ns(rdtsc());
         Ethernet *newEth = newPkt->head_data<Ethernet *>();
         Ipv4 *newIph = (Ipv4 *)((unsigned char *)newEth + sizeof(Ethernet));
         newIph->dst = static_cast<be32_t>(it.first);

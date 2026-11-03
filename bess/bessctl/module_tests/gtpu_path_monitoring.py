@@ -150,6 +150,36 @@ class BessGtpuPathMonitoringTest(BessModuleTestCase):
         self.assertGreater(samples, 0)
         self.assertBessAlive()
 
+    # Packet::copy returns null when the pool is empty. Seventeen full queues of
+    # echo requests hold more than the whole pool (262 144 buffers by default,
+    # bessd --buffers), and they drain slowly into the module, so after the
+    # first few each request it copies meets an empty pool.
+    def test_echo_request_survives_an_empty_pool(self):
+        gpm = GtpuPathMonitoring()
+        gpm.add(gnb_ip=ip(GNB_A))
+        gpm -> Sink()
+        bess.add_tc("drain", policy="rate_limit", resource="packet", limit={"packet": 1000})
+        bess.add_tc("queues", policy="round_robin", parent="drain")
+        fill = RoundRobin(gates=list(range(17)))
+        Source() -> Rewrite(templates=[bytes(echo(ECHO_REQUEST, N3, "0.0.0.0"))]) -> fill
+        for i in range(17):
+            q = Queue(size=16384)
+            bess.connect_modules(fill.name, q.name, i, 0)
+            bess.connect_modules(q.name, gpm.name, 0, 0)
+            q.attach_task(parent="queues")
+
+        bess.resume_all()
+        time.sleep(3)
+        bess.pause_all()
+        self.assertBessAlive()
+        # Each request is dropped once its copies are made, so the dead ends
+        # count the requests; with one gNB, fewer copies than that means some
+        # copies failed.
+        info = bess.get_module_info(gpm.name)
+        requests, copies = info.deadends, info.ogates[0].pkts
+        print("requests %d, copies %d" % (requests, copies), file=sys.stderr)
+        self.assertGreater(requests, copies)
+
 
 suite = unittest.TestLoader().loadTestsFromTestCase(BessGtpuPathMonitoringTest)
 results = unittest.TextTestRunner(verbosity=2).run(suite)

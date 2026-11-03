@@ -18,10 +18,9 @@ import (
 var errSocketMissing = errors.New("connect: no such file or directory")
 
 // setUpfInfoWithoutDatapath runs SetUpfInfo against a BESS address nothing
-// listens on, so its datapath calls fail fast, with GTP-U path monitoring
-// cleared first so the test can see whether SetUpfInfo set it. Exit runs when
-// the test ends and waits for the End Marker sender; the globals are put back
-// after that.
+// listens on, so its datapath calls fail fast, with GTP-U path monitoring off as
+// in a freshly started agent. Exit runs when the test ends and waits for the End
+// Marker sender; the globals are put back after that.
 //
 // The tests that use it write the globals *bessIP and enableGtpuPathMonitoring,
 // so they must not run in parallel.
