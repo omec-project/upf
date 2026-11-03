@@ -6,10 +6,23 @@ import time
 from common import *
 from grpc_test import *
 from pkt_utils import GTPU_PORT
-from trex_stl_lib.api import STLVM, STLPktBuilder, STLStream, STLTXCont
+from trex_stl_lib.api import (
+    STLVM,
+    STLFlowLatencyStats,
+    STLPktBuilder,
+    STLStream,
+    STLTXCont,
+)
 from trex_test import TrexTest
+from trex_utils import get_flow_stats
 
 from ptf import testutils
+
+# Counts this test's stream only: port totals also count frames the network
+# sends the TRex ports, such as a switch's periodic multicast. Latency stats
+# tag the payload, which survives the UPF's GTP-U encapsulation; plain flow
+# stats tag the IP header, which doesn't.
+PG_ID = 0
 
 
 class PerFlowQosMetricsTest(TrexTest, GrpcTest):
@@ -91,6 +104,7 @@ class PerFlowQosMetricsTest(TrexTest, GrpcTest):
         stream = STLStream(
             packet=STLPktBuilder(pkt=pkt, vm=vm),
             mode=STLTXCont(pps=RATE),
+            flow_stats=STLFlowLatencyStats(pg_id=PG_ID),
         )
         self.trex_client.add_streams(stream, ports=[UPF_CORE_PORT])
 
@@ -109,8 +123,9 @@ class PerFlowQosMetricsTest(TrexTest, GrpcTest):
         print(f"Duration was {time.time() - s_time}")
         trex_stats = self.trex_client.get_stats()
 
-        sent_packets = trex_stats["total"]["opackets"]
-        recv_packets = trex_stats["total"]["ipackets"]
+        flow_stats = get_flow_stats(PG_ID, trex_stats)
+        sent_packets = flow_stats.tx_packets
+        recv_packets = flow_stats.rx_packets
 
         # 0% packet loss
         self.assertEqual(
