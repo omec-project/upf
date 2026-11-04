@@ -36,6 +36,9 @@ repos:
         entry: gci write
         language: golang
         types: [go]
+        # Generated code stays as the generator wrote it (see #1227); the
+        # same files are excluded from golangci-lint's formatters.
+        exclude: \.pb\.go$
         additional_dependencies:
           - github.com/daixiang0/gci@v0.14.0
       - id: staticcheck
