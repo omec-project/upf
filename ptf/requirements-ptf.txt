@@ -479,6 +479,12 @@ pynng==0.9.0 \
 packaging==26.3 \
     --hash=sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79 \
     --hash=sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c
+# pyperclip and tabulate are held at the versions scapy-helper 0.14.8 (2022,
+# its latest release) requires: pyperclip==1.8.2 and tabulate~=0.8.7. ptf
+# requires scapy-helper, though only ptf's bf_pktpy backend imports it and the
+# UPF doesn't use that backend. Dependabot ignores both packages for this
+# reason (.github/dependabot.yml). Remove the holds when ptf no longer requires
+# scapy-helper, or when scapy-helper relaxes its pins. See #1220.
 pyperclip==1.8.2 \
     --hash=sha256:105254a8b04934f0bc84e9c24eb360a591aaf6535c9def5f29d92af107a9bf57
 scapy==2.8.0 \
@@ -487,7 +493,10 @@ scapy==2.8.0 \
 scapy-helper==0.14.8 \
     --hash=sha256:ebb277bd84170ce7091eaa82eef677ea726f483b2d7c2c816d2c8659ecf8ba4e \
     --hash=sha256:e9d3b57451142f42032c42a0bb6fca4683360d18bb7a3effe28e87b56275e160
-# Required to build TRex's custom Scapy wheel without using Ubuntu's packages.
+# Provides distutils, which Python 3.12 removed, for the TRex v3.06 client:
+# trex_stf_lib/trex_client.py imports distutils.util.strtobool. TRex master
+# dropped that import in 8d133ac90; remove this pin once ptf/Dockerfile uses a
+# TRex release that includes it.
 setuptools==84.2.1 \
     --hash=sha256:3ff8b3b5492a0aa66960f4419365a86b84e013070d4313e4d4a6894f5d64d6bc \
     --hash=sha256:ca140b45d5325a9478f880e351484f62fef15f336462e449ca0c03c873d589c2
@@ -497,6 +506,7 @@ six==1.17.0 \
 sniffio==1.3.1 \
     --hash=sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2 \
     --hash=sha256:f4324edc670a0f49750a81b895f35c3adb843cca46f0530f79fc1babb23789dc
+# Held for scapy-helper; see pyperclip above.
 tabulate==0.8.10 \
     --hash=sha256:0ba055423dbaa164b9e456abe7920c5e8ed33fcc16f6d1b2f2d152c8e1e8b4fc \
     --hash=sha256:6c57f3f3dd7ac2782770155f3adb2db0b1a269637e42f27599925e64b114f519
