@@ -46,13 +46,12 @@
 package bess_pb
 
 import (
-	reflect "reflect"
-	sync "sync"
-	unsafe "unsafe"
-
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	anypb "google.golang.org/protobuf/types/known/anypb"
+	reflect "reflect"
+	sync "sync"
+	unsafe "unsafe"
 )
 
 const (
@@ -101,8 +100,8 @@ func (*EmptyRequest) Descriptor() ([]byte, []int) {
 
 type EmptyResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// / Contains a non-zero error code and a non-empty message if and only if
-	// / there has been an error
+	/// Contains a non-zero error code and a non-empty message if and only if
+	/// there has been an error
 	Error         *Error `protobuf:"bytes,1,opt,name=error,proto3" json:"error,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -506,26 +505,26 @@ type TrafficClass struct {
 	Parent  string                 `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`    /// Name of parent TC
 	Name    string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`        /// Name of TC
 	Blocked bool                   `protobuf:"varint,3,opt,name=blocked,proto3" json:"blocked,omitempty"` /// Is it running or ready to run at the moment?
-	// / One of "priority", "weighted_fair", "round_robin", "rate_limit", "leaf"
+	/// One of "priority", "weighted_fair", "round_robin", "rate_limit", "leaf"
 	Policy string `protobuf:"bytes,4,opt,name=policy,proto3" json:"policy,omitempty"`
-	// / Type of resource to regulate. Only used for traffic classes of
-	// / weighted_fair and rate_limit types.
-	// / Should be one of resource types: "count", "cycle", "packet", "bit"
+	/// Type of resource to regulate. Only used for traffic classes of
+	/// weighted_fair and rate_limit types.
+	/// Should be one of resource types: "count", "cycle", "packet", "bit"
 	Resource string `protobuf:"bytes,5,opt,name=resource,proto3" json:"resource,omitempty"`
 	// Types that are valid to be assigned to Arg:
 	//
 	//	*TrafficClass_Priority
 	//	*TrafficClass_Share
 	Arg isTrafficClass_Arg `protobuf_oneof:"arg"`
-	// / Worker ID that this TC belongs to. If -1, the TC will be assigned
-	// / to an arbitrary worker.
+	/// Worker ID that this TC belongs to. If -1, the TC will be assigned
+	/// to an arbitrary worker.
 	Wid int64 `protobuf:"varint,8,opt,name=wid,proto3" json:"wid,omitempty"`
-	// / Long-term average of resource limit, in cycles/s, packets/s, ...
+	/// Long-term average of resource limit, in cycles/s, packets/s, ...
 	Limit map[string]int64 `protobuf:"bytes,9,rep,name=limit,proto3" json:"limit,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
-	// / Burst allowance of resource limit, in cycles, packets, bits, ...
-	// / If set to 0, no extra tokens will be saved.
+	/// Burst allowance of resource limit, in cycles, packets, bits, ...
+	/// If set to 0, no extra tokens will be saved.
 	MaxBurst map[string]int64 `protobuf:"bytes,10,rep,name=max_burst,json=maxBurst,proto3" json:"max_burst,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
-	// / Only for "leaf": the task executed by this class.
+	/// Only for "leaf": the task executed by this class.
 	LeafModuleName   string `protobuf:"bytes,11,opt,name=leaf_module_name,json=leafModuleName,proto3" json:"leaf_module_name,omitempty"`
 	LeafModuleTaskid uint64 `protobuf:"varint,12,opt,name=leaf_module_taskid,json=leafModuleTaskid,proto3" json:"leaf_module_taskid,omitempty"`
 	unknownFields    protoimpl.UnknownFields
@@ -663,17 +662,16 @@ type isTrafficClass_Arg interface {
 }
 
 type TrafficClass_Priority struct {
-	// / Used by "priority". Lower number == high priority.
-	//
-	//	FIXME: should be higher number == higher priority, to be consistent
-	//	       other uses of "priority" in BESS
+	/// Used by "priority". Lower number == high priority.
+	//  FIXME: should be higher number == higher priority, to be consistent
+	//         other uses of "priority" in BESS
 	Priority int64 `protobuf:"varint,6,opt,name=priority,proto3,oneof"`
 }
 
 type TrafficClass_Share struct {
-	// / Relative weight (share), used by "weighted_fair".
-	// / 1 <= share <= 1024 is recommended. Higher number will result in
-	// / lower scheduling accuracy.
+	/// Relative weight (share), used by "weighted_fair".
+	/// 1 <= share <= 1024 is recommended. Higher number will result in
+	/// lower scheduling accuracy.
 	Share int64 `protobuf:"varint,7,opt,name=share,proto3,oneof"`
 }
 
@@ -685,8 +683,8 @@ func (*TrafficClass_Share) isTrafficClass_Arg() {}
 
 type ListTcsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// / Specify a worker thread to fetch traffic classes.
-	// / To include all traffic classes on every worker, specify -1.
+	/// Specify a worker thread to fetch traffic classes.
+	/// To include all traffic classes on every worker, specify -1.
 	Wid           int64 `protobuf:"varint,1,opt,name=wid,proto3" json:"wid,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1036,8 +1034,8 @@ type GetTcStatsResponse struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	Error     *Error                 `protobuf:"bytes,1,opt,name=error,proto3" json:"error,omitempty"`
 	Timestamp float64                `protobuf:"fixed64,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"` /// The time that stat counters were read
-	// / THe following counters represent the total amount of accumulated resource
-	// / usage of a module since its creation.
+	/// THe following counters represent the total amount of accumulated resource
+	/// usage of a module since its creation.
 	Count         uint64 `protobuf:"varint,3,opt,name=count,proto3" json:"count,omitempty"`     /// # of scheduled times
 	Cycles        uint64 `protobuf:"varint,4,opt,name=cycles,proto3" json:"cycles,omitempty"`   /// CPU cycles
 	Packets       uint64 `protobuf:"varint,5,opt,name=packets,proto3" json:"packets,omitempty"` /// # of packets
@@ -1341,23 +1339,23 @@ func (x *ListPortsResponse) GetPorts() []*ListPortsResponse_Port {
 
 type CreatePortRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// / Name of the port to create. Every port must have a unique name.
-	// / If not specified, a default name will be assigned
-	// / (returned via CreatePortResponse for future reference).
+	/// Name of the port to create. Every port must have a unique name.
+	/// If not specified, a default name will be assigned
+	/// (returned via CreatePortResponse for future reference).
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// / Name of port driver. Must be specified.
+	/// Name of port driver. Must be specified.
 	Driver string `protobuf:"bytes,2,opt,name=driver,proto3" json:"driver,omitempty"`
-	// / Number of incoming/RX queues (Ext -> BESS). Default is 1
+	/// Number of incoming/RX queues (Ext -> BESS). Default is 1
 	NumIncQ uint64 `protobuf:"varint,3,opt,name=num_inc_q,json=numIncQ,proto3" json:"num_inc_q,omitempty"`
-	// / Number of outgoind/TX queues (BESS -> Ext). Default is 1
+	/// Number of outgoind/TX queues (BESS -> Ext). Default is 1
 	NumOutQ uint64 `protobuf:"varint,4,opt,name=num_out_q,json=numOutQ,proto3" json:"num_out_q,omitempty"`
-	// / Size of each incoming queue (# of packets).
-	// / If not set (0), a driver-specific default value will be used.
+	/// Size of each incoming queue (# of packets).
+	/// If not set (0), a driver-specific default value will be used.
 	SizeIncQ uint64 `protobuf:"varint,5,opt,name=size_inc_q,json=sizeIncQ,proto3" json:"size_inc_q,omitempty"`
-	// / Size of each incoming queue (# of packets).
-	// / If not set (0), a driver-specific default value will be used.
+	/// Size of each incoming queue (# of packets).
+	/// If not set (0), a driver-specific default value will be used.
 	SizeOutQ uint64 `protobuf:"varint,6,opt,name=size_out_q,json=sizeOutQ,proto3" json:"size_out_q,omitempty"`
-	// / Driver specific argument for port initialization. See port_msg.proto
+	/// Driver specific argument for port initialization. See port_msg.proto
 	Arg           *anypb.Any `protobuf:"bytes,7,opt,name=arg,proto3" json:"arg,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1446,13 +1444,13 @@ func (x *CreatePortRequest) GetArg() *anypb.Any {
 // / All configuration parameters updatable at runtime
 type PortConf struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// / MAC address for the new port. Should be "xx:xx:xx:xx:xx:xx" format.
-	// / Set to '00:00:00:00:00:00' to use the default/current MAC address
+	/// MAC address for the new port. Should be "xx:xx:xx:xx:xx:xx" format.
+	/// Set to '00:00:00:00:00:00' to use the default/current MAC address
 	MacAddr string `protobuf:"bytes,1,opt,name=mac_addr,json=macAddr,proto3" json:"mac_addr,omitempty"`
-	// / Port MTU. Set to 0 to accept the default port MTU
+	/// Port MTU. Set to 0 to accept the default port MTU
 	Mtu uint32 `protobuf:"varint,2,opt,name=mtu,proto3" json:"mtu,omitempty"`
-	// / Enable or disable the port.
-	// / Both admin and link (operational) states must be up to function
+	/// Enable or disable the port.
+	/// Both admin and link (operational) states must be up to function
 	AdminUp       bool `protobuf:"varint,3,opt,name=admin_up,json=adminUp,proto3" json:"admin_up,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2233,14 +2231,14 @@ func (x *ListModulesResponse) GetModules() []*ListModulesResponse_Module {
 
 type CreateModuleRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// / Name of the module to create. Every module must have a unique name.
-	// / If not specified, a default name will be assigned
-	// / (returned via CreateModuleResponse for future reference).
+	/// Name of the module to create. Every module must have a unique name.
+	/// If not specified, a default name will be assigned
+	/// (returned via CreateModuleResponse for future reference).
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// / Name of module type. Must be specified.
+	/// Name of module type. Must be specified.
 	Mclass string `protobuf:"bytes,2,opt,name=mclass,proto3" json:"mclass,omitempty"`
-	// / Protobuf message to be used for module initialization.
-	// / See module_msg.proto for the argument message types.
+	/// Protobuf message to be used for module initialization.
+	/// See module_msg.proto for the argument message types.
 	Arg           *anypb.Any `protobuf:"bytes,3,opt,name=arg,proto3" json:"arg,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2548,8 +2546,8 @@ type ConnectModulesRequest struct {
 	M2    string                 `protobuf:"bytes,2,opt,name=m2,proto3" json:"m2,omitempty"`        /// name of "next" module name
 	Ogate uint64                 `protobuf:"varint,3,opt,name=ogate,proto3" json:"ogate,omitempty"` /// m1's output gate ID
 	Igate uint64                 `protobuf:"varint,4,opt,name=igate,proto3" json:"igate,omitempty"` /// m2's input gate ID
-	// / If true do not attach default hooks at the input/output gate.
-	// / (Currently, the only default hook is the "Track" hook at the ogate)
+	/// If true do not attach default hooks at the input/output gate.
+	/// (Currently, the only default hook is the "Track" hook at the ogate)
 	SkipDefaultHooks bool `protobuf:"varint,5,opt,name=skip_default_hooks,json=skipDefaultHooks,proto3" json:"skip_default_hooks,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
@@ -3864,11 +3862,11 @@ type ListWorkersResponse_WorkerStatus struct {
 	Wid     int64                  `protobuf:"varint,1,opt,name=wid,proto3" json:"wid,omitempty"`         /// Worker ID, starting from 0
 	Core    int64                  `protobuf:"varint,2,opt,name=core,proto3" json:"core,omitempty"`       /// CPU core ID on which the worker is pinned
 	Running bool                   `protobuf:"varint,3,opt,name=running,proto3" json:"running,omitempty"` /// True if running, otherwise False.
-	// / Number of traffic classes running on the worker
+	/// Number of traffic classes running on the worker
 	NumTcs int64 `protobuf:"varint,4,opt,name=num_tcs,json=numTcs,proto3" json:"num_tcs,omitempty"`
-	// / Total number of packets that have been silently dropped on the worker.
-	// / Silent drops happen when a module transmit packets via disconnected
-	// / output gates.
+	/// Total number of packets that have been silently dropped on the worker.
+	/// Silent drops happen when a module transmit packets via disconnected
+	/// output gates.
 	SilentDrops   int64 `protobuf:"varint,5,opt,name=silent_drops,json=silentDrops,proto3" json:"silent_drops,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -4112,16 +4110,16 @@ type ListPortsResponse_Port struct {
 	Name    string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`                      /// Name of port
 	Driver  string                 `protobuf:"bytes,2,opt,name=driver,proto3" json:"driver,omitempty"`                  /// Name of port driver.
 	MacAddr string                 `protobuf:"bytes,3,opt,name=mac_addr,json=macAddr,proto3" json:"mac_addr,omitempty"` /// MAC address of the port
-	// / Number of incoming/RX queues (Ext -> BESS).
+	/// Number of incoming/RX queues (Ext -> BESS).
 	NumIncQ uint64 `protobuf:"varint,4,opt,name=num_inc_q,json=numIncQ,proto3" json:"num_inc_q,omitempty"`
-	// / Number of outgoind/TX queues (BESS -> Ext).
+	/// Number of outgoind/TX queues (BESS -> Ext).
 	NumOutQ uint64 `protobuf:"varint,5,opt,name=num_out_q,json=numOutQ,proto3" json:"num_out_q,omitempty"`
-	// / Size of each incoming queue (# of packets).
+	/// Size of each incoming queue (# of packets).
 	SizeIncQ uint64 `protobuf:"varint,6,opt,name=size_inc_q,json=sizeIncQ,proto3" json:"size_inc_q,omitempty"`
-	// / Size of each incoming queue (# of packets).
+	/// Size of each incoming queue (# of packets).
 	SizeOutQ uint64 `protobuf:"varint,7,opt,name=size_out_q,json=sizeOutQ,proto3" json:"size_out_q,omitempty"`
-	// / Driver specific argument that was used for port initialization. See
-	// / port_msg.proto
+	/// Driver specific argument that was used for port initialization. See
+	/// port_msg.proto
 	DriverArg     *anypb.Any `protobuf:"bytes,8,opt,name=driver_arg,json=driverArg,proto3" json:"driver_arg,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -4216,16 +4214,16 @@ func (x *ListPortsResponse_Port) GetDriverArg() *anypb.Any {
 
 type GetPortStatsResponse_Stat struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// / Number of objects that have been successfully sent/received.
-	// / All counters shows the accumulated value since port initialization.
+	/// Number of objects that have been successfully sent/received.
+	/// All counters shows the accumulated value since port initialization.
 	Packets uint64 `protobuf:"varint,1,opt,name=packets,proto3" json:"packets,omitempty"`
-	// / Number of dropped packets.
-	// / For incoming direction, it implies BESS is not picking up fast enough.
-	// / For outgoing direction, non-zero drop counter indicates that the "peer"
-	// / of this port is the performance bottleneck: namely, VMs/containers/apps
-	// / for virtual ports, or PCIe/NIC/link for physical port.
+	/// Number of dropped packets.
+	/// For incoming direction, it implies BESS is not picking up fast enough.
+	/// For outgoing direction, non-zero drop counter indicates that the "peer"
+	/// of this port is the performance bottleneck: namely, VMs/containers/apps
+	/// for virtual ports, or PCIe/NIC/link for physical port.
 	Dropped uint64 `protobuf:"varint,2,opt,name=dropped,proto3" json:"dropped,omitempty"`
-	// / Total number of bytes, not including Frame CRC or Ethernet overheads
+	/// Total number of bytes, not including Frame CRC or Ethernet overheads
 	Bytes uint64 `protobuf:"varint,3,opt,name=bytes,proto3" json:"bytes,omitempty"`
 	// Histogram of how many times a given number of packets in a batch was
 	// requested.
@@ -5083,90 +5081,88 @@ func file_bess_msg_proto_rawDescGZIP() []byte {
 	return file_bess_msg_proto_rawDescData
 }
 
-var (
-	file_bess_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 77)
-	file_bess_msg_proto_goTypes  = []any{
-		(*EmptyRequest)(nil),                                       // 0: bess.pb.EmptyRequest
-		(*EmptyResponse)(nil),                                      // 1: bess.pb.EmptyResponse
-		(*VersionResponse)(nil),                                    // 2: bess.pb.VersionResponse
-		(*ImportPluginRequest)(nil),                                // 3: bess.pb.ImportPluginRequest
-		(*UnloadPluginRequest)(nil),                                // 4: bess.pb.UnloadPluginRequest
-		(*ListPluginsResponse)(nil),                                // 5: bess.pb.ListPluginsResponse
-		(*ListWorkersResponse)(nil),                                // 6: bess.pb.ListWorkersResponse
-		(*AddWorkerRequest)(nil),                                   // 7: bess.pb.AddWorkerRequest
-		(*DestroyWorkerRequest)(nil),                               // 8: bess.pb.DestroyWorkerRequest
-		(*TrafficClass)(nil),                                       // 9: bess.pb.TrafficClass
-		(*ListTcsRequest)(nil),                                     // 10: bess.pb.ListTcsRequest
-		(*ListTcsResponse)(nil),                                    // 11: bess.pb.ListTcsResponse
-		(*CheckSchedulingConstraintsResponse)(nil),                 // 12: bess.pb.CheckSchedulingConstraintsResponse
-		(*AddTcRequest)(nil),                                       // 13: bess.pb.AddTcRequest
-		(*UpdateTcParamsRequest)(nil),                              // 14: bess.pb.UpdateTcParamsRequest
-		(*UpdateTcParentRequest)(nil),                              // 15: bess.pb.UpdateTcParentRequest
-		(*GetTcStatsRequest)(nil),                                  // 16: bess.pb.GetTcStatsRequest
-		(*GetTcStatsResponse)(nil),                                 // 17: bess.pb.GetTcStatsResponse
-		(*ListDriversResponse)(nil),                                // 18: bess.pb.ListDriversResponse
-		(*GetDriverInfoRequest)(nil),                               // 19: bess.pb.GetDriverInfoRequest
-		(*GetDriverInfoResponse)(nil),                              // 20: bess.pb.GetDriverInfoResponse
-		(*ListPortsResponse)(nil),                                  // 21: bess.pb.ListPortsResponse
-		(*CreatePortRequest)(nil),                                  // 22: bess.pb.CreatePortRequest
-		(*PortConf)(nil),                                           // 23: bess.pb.PortConf
-		(*SetPortConfRequest)(nil),                                 // 24: bess.pb.SetPortConfRequest
-		(*GetPortConfRequest)(nil),                                 // 25: bess.pb.GetPortConfRequest
-		(*GetPortConfResponse)(nil),                                // 26: bess.pb.GetPortConfResponse
-		(*CreatePortResponse)(nil),                                 // 27: bess.pb.CreatePortResponse
-		(*DestroyPortRequest)(nil),                                 // 28: bess.pb.DestroyPortRequest
-		(*GetPortStatsRequest)(nil),                                // 29: bess.pb.GetPortStatsRequest
-		(*GetPortStatsResponse)(nil),                               // 30: bess.pb.GetPortStatsResponse
-		(*GetLinkStatusRequest)(nil),                               // 31: bess.pb.GetLinkStatusRequest
-		(*GetLinkStatusResponse)(nil),                              // 32: bess.pb.GetLinkStatusResponse
-		(*ListMclassResponse)(nil),                                 // 33: bess.pb.ListMclassResponse
-		(*GetMclassInfoRequest)(nil),                               // 34: bess.pb.GetMclassInfoRequest
-		(*GetMclassInfoResponse)(nil),                              // 35: bess.pb.GetMclassInfoResponse
-		(*ListModulesResponse)(nil),                                // 36: bess.pb.ListModulesResponse
-		(*CreateModuleRequest)(nil),                                // 37: bess.pb.CreateModuleRequest
-		(*CreateModuleResponse)(nil),                               // 38: bess.pb.CreateModuleResponse
-		(*DestroyModuleRequest)(nil),                               // 39: bess.pb.DestroyModuleRequest
-		(*GetModuleInfoRequest)(nil),                               // 40: bess.pb.GetModuleInfoRequest
-		(*GetModuleInfoResponse)(nil),                              // 41: bess.pb.GetModuleInfoResponse
-		(*ConnectModulesRequest)(nil),                              // 42: bess.pb.ConnectModulesRequest
-		(*DisconnectModulesRequest)(nil),                           // 43: bess.pb.DisconnectModulesRequest
-		(*MempoolDump)(nil),                                        // 44: bess.pb.MempoolDump
-		(*DumpMempoolRequest)(nil),                                 // 45: bess.pb.DumpMempoolRequest
-		(*DumpMempoolResponse)(nil),                                // 46: bess.pb.DumpMempoolResponse
-		(*CommandRequest)(nil),                                     // 47: bess.pb.CommandRequest
-		(*CommandResponse)(nil),                                    // 48: bess.pb.CommandResponse
-		(*ListGateHookClassResponse)(nil),                          // 49: bess.pb.ListGateHookClassResponse
-		(*GetGateHookClassInfoRequest)(nil),                        // 50: bess.pb.GetGateHookClassInfoRequest
-		(*GetGateHookClassInfoResponse)(nil),                       // 51: bess.pb.GetGateHookClassInfoResponse
-		(*TrackArg)(nil),                                           // 52: bess.pb.TrackArg
-		(*TcpdumpArg)(nil),                                         // 53: bess.pb.TcpdumpArg
-		(*PcapngArg)(nil),                                          // 54: bess.pb.PcapngArg
-		(*GateHookInfo)(nil),                                       // 55: bess.pb.GateHookInfo
-		(*ConfigureGateHookRequest)(nil),                           // 56: bess.pb.ConfigureGateHookRequest
-		(*ConfigureGateHookResponse)(nil),                          // 57: bess.pb.ConfigureGateHookResponse
-		(*ListGateHooksResponse)(nil),                              // 58: bess.pb.ListGateHooksResponse
-		(*GateHookCommandRequest)(nil),                             // 59: bess.pb.GateHookCommandRequest
-		(*ConfigureResumeHookRequest)(nil),                         // 60: bess.pb.ConfigureResumeHookRequest
-		(*PauseWorkerRequest)(nil),                                 // 61: bess.pb.PauseWorkerRequest
-		(*ResumeWorkerRequest)(nil),                                // 62: bess.pb.ResumeWorkerRequest
-		(*ListWorkersResponse_WorkerStatus)(nil),                   // 63: bess.pb.ListWorkersResponse.WorkerStatus
-		nil,                                                        // 64: bess.pb.TrafficClass.LimitEntry
-		nil,                                                        // 65: bess.pb.TrafficClass.MaxBurstEntry
-		(*ListTcsResponse_TrafficClassStatus)(nil),                 // 66: bess.pb.ListTcsResponse.TrafficClassStatus
-		(*CheckSchedulingConstraintsResponse_ViolatingClass)(nil),  // 67: bess.pb.CheckSchedulingConstraintsResponse.ViolatingClass
-		(*CheckSchedulingConstraintsResponse_ViolatingModule)(nil), // 68: bess.pb.CheckSchedulingConstraintsResponse.ViolatingModule
-		(*ListPortsResponse_Port)(nil),                             // 69: bess.pb.ListPortsResponse.Port
-		(*GetPortStatsResponse_Stat)(nil),                          // 70: bess.pb.GetPortStatsResponse.Stat
-		(*ListModulesResponse_Module)(nil),                         // 71: bess.pb.ListModulesResponse.Module
-		(*GetModuleInfoResponse_GateHook)(nil),                     // 72: bess.pb.GetModuleInfoResponse.GateHook
-		(*GetModuleInfoResponse_IGate)(nil),                        // 73: bess.pb.GetModuleInfoResponse.IGate
-		(*GetModuleInfoResponse_OGate)(nil),                        // 74: bess.pb.GetModuleInfoResponse.OGate
-		(*GetModuleInfoResponse_Attribute)(nil),                    // 75: bess.pb.GetModuleInfoResponse.Attribute
-		(*GetModuleInfoResponse_IGate_OGate)(nil),                  // 76: bess.pb.GetModuleInfoResponse.IGate.OGate
-		(*Error)(nil),                                              // 77: bess.pb.Error
-		(*anypb.Any)(nil),                                          // 78: google.protobuf.Any
-	}
-)
+var file_bess_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 77)
+var file_bess_msg_proto_goTypes = []any{
+	(*EmptyRequest)(nil),                                       // 0: bess.pb.EmptyRequest
+	(*EmptyResponse)(nil),                                      // 1: bess.pb.EmptyResponse
+	(*VersionResponse)(nil),                                    // 2: bess.pb.VersionResponse
+	(*ImportPluginRequest)(nil),                                // 3: bess.pb.ImportPluginRequest
+	(*UnloadPluginRequest)(nil),                                // 4: bess.pb.UnloadPluginRequest
+	(*ListPluginsResponse)(nil),                                // 5: bess.pb.ListPluginsResponse
+	(*ListWorkersResponse)(nil),                                // 6: bess.pb.ListWorkersResponse
+	(*AddWorkerRequest)(nil),                                   // 7: bess.pb.AddWorkerRequest
+	(*DestroyWorkerRequest)(nil),                               // 8: bess.pb.DestroyWorkerRequest
+	(*TrafficClass)(nil),                                       // 9: bess.pb.TrafficClass
+	(*ListTcsRequest)(nil),                                     // 10: bess.pb.ListTcsRequest
+	(*ListTcsResponse)(nil),                                    // 11: bess.pb.ListTcsResponse
+	(*CheckSchedulingConstraintsResponse)(nil),                 // 12: bess.pb.CheckSchedulingConstraintsResponse
+	(*AddTcRequest)(nil),                                       // 13: bess.pb.AddTcRequest
+	(*UpdateTcParamsRequest)(nil),                              // 14: bess.pb.UpdateTcParamsRequest
+	(*UpdateTcParentRequest)(nil),                              // 15: bess.pb.UpdateTcParentRequest
+	(*GetTcStatsRequest)(nil),                                  // 16: bess.pb.GetTcStatsRequest
+	(*GetTcStatsResponse)(nil),                                 // 17: bess.pb.GetTcStatsResponse
+	(*ListDriversResponse)(nil),                                // 18: bess.pb.ListDriversResponse
+	(*GetDriverInfoRequest)(nil),                               // 19: bess.pb.GetDriverInfoRequest
+	(*GetDriverInfoResponse)(nil),                              // 20: bess.pb.GetDriverInfoResponse
+	(*ListPortsResponse)(nil),                                  // 21: bess.pb.ListPortsResponse
+	(*CreatePortRequest)(nil),                                  // 22: bess.pb.CreatePortRequest
+	(*PortConf)(nil),                                           // 23: bess.pb.PortConf
+	(*SetPortConfRequest)(nil),                                 // 24: bess.pb.SetPortConfRequest
+	(*GetPortConfRequest)(nil),                                 // 25: bess.pb.GetPortConfRequest
+	(*GetPortConfResponse)(nil),                                // 26: bess.pb.GetPortConfResponse
+	(*CreatePortResponse)(nil),                                 // 27: bess.pb.CreatePortResponse
+	(*DestroyPortRequest)(nil),                                 // 28: bess.pb.DestroyPortRequest
+	(*GetPortStatsRequest)(nil),                                // 29: bess.pb.GetPortStatsRequest
+	(*GetPortStatsResponse)(nil),                               // 30: bess.pb.GetPortStatsResponse
+	(*GetLinkStatusRequest)(nil),                               // 31: bess.pb.GetLinkStatusRequest
+	(*GetLinkStatusResponse)(nil),                              // 32: bess.pb.GetLinkStatusResponse
+	(*ListMclassResponse)(nil),                                 // 33: bess.pb.ListMclassResponse
+	(*GetMclassInfoRequest)(nil),                               // 34: bess.pb.GetMclassInfoRequest
+	(*GetMclassInfoResponse)(nil),                              // 35: bess.pb.GetMclassInfoResponse
+	(*ListModulesResponse)(nil),                                // 36: bess.pb.ListModulesResponse
+	(*CreateModuleRequest)(nil),                                // 37: bess.pb.CreateModuleRequest
+	(*CreateModuleResponse)(nil),                               // 38: bess.pb.CreateModuleResponse
+	(*DestroyModuleRequest)(nil),                               // 39: bess.pb.DestroyModuleRequest
+	(*GetModuleInfoRequest)(nil),                               // 40: bess.pb.GetModuleInfoRequest
+	(*GetModuleInfoResponse)(nil),                              // 41: bess.pb.GetModuleInfoResponse
+	(*ConnectModulesRequest)(nil),                              // 42: bess.pb.ConnectModulesRequest
+	(*DisconnectModulesRequest)(nil),                           // 43: bess.pb.DisconnectModulesRequest
+	(*MempoolDump)(nil),                                        // 44: bess.pb.MempoolDump
+	(*DumpMempoolRequest)(nil),                                 // 45: bess.pb.DumpMempoolRequest
+	(*DumpMempoolResponse)(nil),                                // 46: bess.pb.DumpMempoolResponse
+	(*CommandRequest)(nil),                                     // 47: bess.pb.CommandRequest
+	(*CommandResponse)(nil),                                    // 48: bess.pb.CommandResponse
+	(*ListGateHookClassResponse)(nil),                          // 49: bess.pb.ListGateHookClassResponse
+	(*GetGateHookClassInfoRequest)(nil),                        // 50: bess.pb.GetGateHookClassInfoRequest
+	(*GetGateHookClassInfoResponse)(nil),                       // 51: bess.pb.GetGateHookClassInfoResponse
+	(*TrackArg)(nil),                                           // 52: bess.pb.TrackArg
+	(*TcpdumpArg)(nil),                                         // 53: bess.pb.TcpdumpArg
+	(*PcapngArg)(nil),                                          // 54: bess.pb.PcapngArg
+	(*GateHookInfo)(nil),                                       // 55: bess.pb.GateHookInfo
+	(*ConfigureGateHookRequest)(nil),                           // 56: bess.pb.ConfigureGateHookRequest
+	(*ConfigureGateHookResponse)(nil),                          // 57: bess.pb.ConfigureGateHookResponse
+	(*ListGateHooksResponse)(nil),                              // 58: bess.pb.ListGateHooksResponse
+	(*GateHookCommandRequest)(nil),                             // 59: bess.pb.GateHookCommandRequest
+	(*ConfigureResumeHookRequest)(nil),                         // 60: bess.pb.ConfigureResumeHookRequest
+	(*PauseWorkerRequest)(nil),                                 // 61: bess.pb.PauseWorkerRequest
+	(*ResumeWorkerRequest)(nil),                                // 62: bess.pb.ResumeWorkerRequest
+	(*ListWorkersResponse_WorkerStatus)(nil),                   // 63: bess.pb.ListWorkersResponse.WorkerStatus
+	nil,                                                        // 64: bess.pb.TrafficClass.LimitEntry
+	nil,                                                        // 65: bess.pb.TrafficClass.MaxBurstEntry
+	(*ListTcsResponse_TrafficClassStatus)(nil),                 // 66: bess.pb.ListTcsResponse.TrafficClassStatus
+	(*CheckSchedulingConstraintsResponse_ViolatingClass)(nil),  // 67: bess.pb.CheckSchedulingConstraintsResponse.ViolatingClass
+	(*CheckSchedulingConstraintsResponse_ViolatingModule)(nil), // 68: bess.pb.CheckSchedulingConstraintsResponse.ViolatingModule
+	(*ListPortsResponse_Port)(nil),                             // 69: bess.pb.ListPortsResponse.Port
+	(*GetPortStatsResponse_Stat)(nil),                          // 70: bess.pb.GetPortStatsResponse.Stat
+	(*ListModulesResponse_Module)(nil),                         // 71: bess.pb.ListModulesResponse.Module
+	(*GetModuleInfoResponse_GateHook)(nil),                     // 72: bess.pb.GetModuleInfoResponse.GateHook
+	(*GetModuleInfoResponse_IGate)(nil),                        // 73: bess.pb.GetModuleInfoResponse.IGate
+	(*GetModuleInfoResponse_OGate)(nil),                        // 74: bess.pb.GetModuleInfoResponse.OGate
+	(*GetModuleInfoResponse_Attribute)(nil),                    // 75: bess.pb.GetModuleInfoResponse.Attribute
+	(*GetModuleInfoResponse_IGate_OGate)(nil),                  // 76: bess.pb.GetModuleInfoResponse.IGate.OGate
+	(*Error)(nil),                                              // 77: bess.pb.Error
+	(*anypb.Any)(nil),                                          // 78: google.protobuf.Any
+}
 var file_bess_msg_proto_depIdxs = []int32{
 	77, // 0: bess.pb.EmptyResponse.error:type_name -> bess.pb.Error
 	77, // 1: bess.pb.VersionResponse.error:type_name -> bess.pb.Error

@@ -39,12 +39,11 @@
 package bess_pb
 
 import (
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
-
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -395,7 +394,7 @@ func (x *FlowGenCommandSetBurstArg) GetBurst() uint64 {
 type HashLBCommandSetModeArg struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Mode  string                 `protobuf:"bytes,1,opt,name=mode,proto3" json:"mode,omitempty"` /// What fields to hash over, `'l2'`, `'l3'`, and `'l4'` are
-	// / only valid values.
+	/// only valid values.
 	Fields        []*Field `protobuf:"bytes,2,rep,name=fields,proto3" json:"fields,omitempty"` /// A list of fields that define a custom tuple.
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1733,10 +1732,10 @@ type WildcardMatchCommandAddArg struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	Gate     uint64                 `protobuf:"varint,1,opt,name=gate,proto3" json:"gate,omitempty"`         /// Traffic matching this new rule will be sent to this gate.
 	Priority int64                  `protobuf:"varint,2,opt,name=priority,proto3" json:"priority,omitempty"` /// If a packet matches multiple rules, the rule with higher priority
-	// / will be applied. If priorities are equal behavior is undefined.
+	/// will be applied. If priorities are equal behavior is undefined.
 	Values []*FieldData `protobuf:"bytes,3,rep,name=values,proto3" json:"values,omitempty"` /// The values to check for in each field.
 	Masks  []*FieldData `protobuf:"bytes,4,rep,name=masks,proto3" json:"masks,omitempty"`   /// The bitmask for each field -- set `0x0` to
-	// / ignore the field altogether.
+	/// ignore the field altogether.
 	Valuesv       []*FieldData `protobuf:"bytes,5,rep,name=valuesv,proto3" json:"valuesv,omitempty"` /// The values to check for in each fieldv.
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2428,27 +2427,27 @@ func (x *ExactMatchConfig) GetRules() []*ExactMatchCommandAddArg {
 type FlowGenArg struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	Template []byte                 `protobuf:"bytes,1,opt,name=template,proto3" json:"template,omitempty"` /// The packet "template". All data packets are derived
-	// / from this template and contain the same payload.
+	/// from this template and contain the same payload.
 	Pps      float64 `protobuf:"fixed64,2,opt,name=pps,proto3" json:"pps,omitempty"`                           /// The total number of packets per second to generate.
 	FlowRate float64 `protobuf:"fixed64,3,opt,name=flow_rate,json=flowRate,proto3" json:"flow_rate,omitempty"` /// The number of new flows to create every second.
-	// / flow_rate must be <= pps.
+	/// flow_rate must be <= pps.
 	FlowDuration float64 `protobuf:"fixed64,4,opt,name=flow_duration,json=flowDuration,proto3" json:"flow_duration,omitempty"` /// The lifetime of a flow in seconds.
 	Arrival      string  `protobuf:"bytes,5,opt,name=arrival,proto3" json:"arrival,omitempty"`                                 /// The packet arrival distribution -- must be either
-	// / "uniform" or "exponential"
+	/// "uniform" or "exponential"
 	Duration string `protobuf:"bytes,6,opt,name=duration,proto3" json:"duration,omitempty"` /// The flow duration distribution -- must be either
-	// / "uniform" or "pareto"
+	/// "uniform" or "pareto"
 	QuickRampup bool `protobuf:"varint,7,opt,name=quick_rampup,json=quickRampup,proto3" json:"quick_rampup,omitempty"` /// Whether or not to populate the flowgenerator with initial flows
-	// / (start generating full pps rate immediately) or to wait for new
-	// / flows to be generated naturally (all flows have a SYN packet).
+	/// (start generating full pps rate immediately) or to wait for new
+	/// flows to be generated naturally (all flows have a SYN packet).
 	IpSrcRange uint32 `protobuf:"varint,8,opt,name=ip_src_range,json=ipSrcRange,proto3" json:"ip_src_range,omitempty"` /// When generating new flows, FlowGen modifies the template packet by
-	// / changing the IP src, incrementing it by at most ip_src_range
-	// / (e.g., if the base packet is 10.0.0.1 and range is 5, it will
-	// / generate packets with IPs 10.0.0.1-10.0.0.6).
+	/// changing the IP src, incrementing it by at most ip_src_range
+	/// (e.g., if the base packet is 10.0.0.1 and range is 5, it will
+	/// generate packets with IPs 10.0.0.1-10.0.0.6).
 	IpDstRange uint32 `protobuf:"varint,9,opt,name=ip_dst_range,json=ipDstRange,proto3" json:"ip_dst_range,omitempty"` /// When generating new flows, FlowGen modifies the template packet by
-	// / changing the IP dst, incrementing it by at most ip_dst_range.
+	/// changing the IP dst, incrementing it by at most ip_dst_range.
 	PortSrcRange uint32 `protobuf:"varint,10,opt,name=port_src_range,json=portSrcRange,proto3" json:"port_src_range,omitempty"` /// When generating new flows, FlowGen modifies
-	// / the template packet by changing the TCP port,
-	// / incrementing it by at most port_src_range.
+	/// the template packet by changing the TCP port,
+	/// incrementing it by at most port_src_range.
 	PortDstRange  uint32 `protobuf:"varint,11,opt,name=port_dst_range,json=portDstRange,proto3" json:"port_dst_range,omitempty"` /// When generating new flows, FlowGen modifies the template packet
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2861,7 +2860,7 @@ func (x *IPLookupArg) GetMaxTbl8S() uint32 {
 type L2ForwardArg struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Size  int64                  `protobuf:"varint,1,opt,name=size,proto3" json:"size,omitempty"` /// Configures the forwarding hash table -- total number of
-	// / hash table entries.
+	/// hash table entries.
 	Bucket        int64 `protobuf:"varint,2,opt,name=bucket,proto3" json:"bucket,omitempty"` /// Configures the forwarding hash table -- total number of
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2976,7 +2975,7 @@ type MeasureArg struct {
 	//	*MeasureArg_AttrName
 	Type             isMeasureArg_Type `protobuf_oneof:"type"`
 	JitterSampleProb float64           `protobuf:"fixed64,3,opt,name=jitter_sample_prob,json=jitterSampleProb,proto3" json:"jitter_sample_prob,omitempty"` /// How often the module should sample packets for inter-packet
-	// / arrival measurements (to measure jitter).
+	/// arrival measurements (to measure jitter).
 	LatencyNsMax        uint64 `protobuf:"varint,4,opt,name=latency_ns_max,json=latencyNsMax,proto3" json:"latency_ns_max,omitempty"`                      /// maximum latency expected, in ns (default 0.1 s)
 	LatencyNsResolution uint32 `protobuf:"varint,5,opt,name=latency_ns_resolution,json=latencyNsResolution,proto3" json:"latency_ns_resolution,omitempty"` /// resolution, in ns (default 100)
 	unknownFields       protoimpl.UnknownFields
@@ -3069,7 +3068,7 @@ type MeasureArg_Offset struct {
 }
 
 type MeasureArg_AttrName struct {
-	// / offset in bytes.
+	/// offset in bytes.
 	AttrName string `protobuf:"bytes,6,opt,name=attr_name,json=attrName,proto3,oneof"` /// Where to store the current time as attribute
 }
 
@@ -3601,8 +3600,8 @@ type QueueArg struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	Size     uint64                 `protobuf:"varint,1,opt,name=size,proto3" json:"size,omitempty"`         /// The maximum number of packets to store in the queue.
 	Prefetch bool                   `protobuf:"varint,2,opt,name=prefetch,proto3" json:"prefetch,omitempty"` /// When prefetch is enabled, the module will perform CPU
-	// / prefetch on the first 64B of each packet onto CPU L1
-	// / cache. Default value is false.
+	/// prefetch on the first 64B of each packet onto CPU L1
+	/// cache. Default value is false.
 	Backpressure  bool `protobuf:"varint,3,opt,name=backpressure,proto3" json:"backpressure,omitempty"` // When backpressure is enabled, the module will
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -4806,7 +4805,7 @@ type CounterArg struct {
 	state      protoimpl.MessageState `protogen:"open.v1"`
 	NameId     string                 `protobuf:"bytes,1,opt,name=name_id,json=nameId,proto3" json:"name_id,omitempty"`              /// Name of the counter_id
 	CheckExist bool                   `protobuf:"varint,2,opt,name=check_exist,json=checkExist,proto3" json:"check_exist,omitempty"` /// verify each counter pre-exists before any operation
-	// / (default = False)
+	/// (default = False)
 	Total         uint32 `protobuf:"varint,3,opt,name=total,proto3" json:"total,omitempty"` /// Total number of entries it can support
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -5500,10 +5499,16 @@ func (x *VXLANEncapArg) GetDstport() uint64 {
 // __Input Gates__: 1
 // __Output Gates__: many (configurable)
 type WildcardMatchArg struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Fields        []*Field               `protobuf:"bytes,1,rep,name=fields,proto3" json:"fields,omitempty"` /// A list of WildcardMatch fields.
-	Values        []*Field               `protobuf:"bytes,2,rep,name=values,proto3" json:"values,omitempty"` /// A list of WildcardMatch values.
-	Entries       uint64                 `protobuf:"varint,3,opt,name=entries,proto3" json:"entries,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Fields  []*Field               `protobuf:"bytes,1,rep,name=fields,proto3" json:"fields,omitempty"` /// A list of WildcardMatch fields.
+	Values  []*Field               `protobuf:"bytes,2,rep,name=values,proto3" json:"values,omitempty"` /// A list of WildcardMatch values.
+	Entries uint64                 `protobuf:"varint,3,opt,name=entries,proto3" json:"entries,omitempty"`
+	/// Distinct masks the table holds at once (1-256; 0 or unset: 16). Each
+	/// mask in use costs one hash lookup per packet; an unused slot is skipped
+	/// on every batch, about 0.1 cycles per packet each. A rule needing a mask
+	/// beyond the limit is refused with ENOSPC.
+	MaxTuples     uint32                       `protobuf:"varint,4,opt,name=max_tuples,json=maxTuples,proto3" json:"max_tuples,omitempty"`
+	IndexSets     []*WildcardMatchArg_IndexSet `protobuf:"bytes,5,rep,name=index_sets,json=indexSets,proto3" json:"index_sets,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -5558,6 +5563,20 @@ func (x *WildcardMatchArg) GetEntries() uint64 {
 		return x.Entries
 	}
 	return 0
+}
+
+func (x *WildcardMatchArg) GetMaxTuples() uint32 {
+	if x != nil {
+		return x.MaxTuples
+	}
+	return 0
+}
+
+func (x *WildcardMatchArg) GetIndexSets() []*WildcardMatchArg_IndexSet {
+	if x != nil {
+		return x.IndexSets
+	}
+	return nil
 }
 
 // *
@@ -6812,9 +6831,9 @@ func (x *ACLArg_Rule) GetDrop() bool {
 type BPFArg_Filter struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	Priority int64                  `protobuf:"varint,1,opt,name=priority,proto3" json:"priority,omitempty"` /// The priority level for this rule. If a packet matches multiple
-	// / rules, it will be forwarded out the gate with the highest
-	// / priority. If a packet matches multiple rules with the same
-	// / priority, the behavior is undefined.
+	/// rules, it will be forwarded out the gate with the highest
+	/// priority. If a packet matches multiple rules with the same
+	/// priority, the behavior is undefined.
 	Filter        string `protobuf:"bytes,2,opt,name=filter,proto3" json:"filter,omitempty"` /// The actual BPF string.
 	Gate          int64  `protobuf:"varint,3,opt,name=gate,proto3" json:"gate,omitempty"`    /// What gate to forward packets that match this BPF to.
 	unknownFields protoimpl.UnknownFields
@@ -7275,10 +7294,10 @@ type SetMetadataArg_Attribute struct {
 	//	*SetMetadataArg_Attribute_ValueBin
 	Value  isSetMetadataArg_Attribute_Value `protobuf_oneof:"value"`
 	Offset int32                            `protobuf:"varint,5,opt,name=offset,proto3" json:"offset,omitempty"` /// An index in the packet data to store copy into the
-	// / metadata attribute.
+	/// metadata attribute.
 	Mask []byte `protobuf:"bytes,6,opt,name=mask,proto3" json:"mask,omitempty"` /// An array of bit masks to apply to each of the bytes
-	// / copied starting from `offset`. If empty, the mask
-	// / `[0xFF,....,0xFF]` will be used.
+	/// copied starting from `offset`. If empty, the mask
+	/// `[0xFF,....,0xFF]` will be used.
 	RshiftBits    int32 `protobuf:"varint,7,opt,name=rshift_bits,json=rshiftBits,proto3" json:"rshift_bits,omitempty"` /// The number of bits to shift the value at `offset` by before
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -7512,6 +7531,74 @@ func (x *UrlFilterArg_Url) GetPath() string {
 	return ""
 }
 
+// *
+// An index set names fields (by their position in `fields`) that a rule
+// matches exactly. A rule exact on all of a set's fields -- and, if the set
+// has a condition, carrying when_value in field when_field -- is kept in a
+// group per value of those fields, in priority order, instead of in a mask
+// table. A packet probes each set whose condition it meets once and scans
+// that group. A rule no set takes stays in a mask table.
+type WildcardMatchArg_IndexSet struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Fields        []uint32               `protobuf:"varint,1,rep,packed,name=fields,proto3" json:"fields,omitempty"`
+	WhenField     *uint32                `protobuf:"varint,2,opt,name=when_field,json=whenField,proto3,oneof" json:"when_field,omitempty"`
+	WhenValue     uint64                 `protobuf:"varint,3,opt,name=when_value,json=whenValue,proto3" json:"when_value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WildcardMatchArg_IndexSet) Reset() {
+	*x = WildcardMatchArg_IndexSet{}
+	mi := &file_module_msg_proto_msgTypes[132]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WildcardMatchArg_IndexSet) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+// SONARQB: Empty protobuf generated method is safe to ignore
+func (*WildcardMatchArg_IndexSet) ProtoMessage() {}
+
+func (x *WildcardMatchArg_IndexSet) ProtoReflect() protoreflect.Message {
+	mi := &file_module_msg_proto_msgTypes[132]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WildcardMatchArg_IndexSet.ProtoReflect.Descriptor instead.
+func (*WildcardMatchArg_IndexSet) Descriptor() ([]byte, []int) {
+	return file_module_msg_proto_rawDescGZIP(), []int{97, 0}
+}
+
+func (x *WildcardMatchArg_IndexSet) GetFields() []uint32 {
+	if x != nil {
+		return x.Fields
+	}
+	return nil
+}
+
+func (x *WildcardMatchArg_IndexSet) GetWhenField() uint32 {
+	if x != nil && x.WhenField != nil {
+		return *x.WhenField
+	}
+	return 0
+}
+
+func (x *WildcardMatchArg_IndexSet) GetWhenValue() uint64 {
+	if x != nil {
+		return x.WhenValue
+	}
+	return 0
+}
+
 type FlowMeasureReadResponse_Statistic struct {
 	state         protoimpl.MessageState                       `protogen:"open.v1"`
 	Fseid         uint64                                       `protobuf:"varint,1,opt,name=fseid,proto3" json:"fseid,omitempty"`
@@ -7526,7 +7613,7 @@ type FlowMeasureReadResponse_Statistic struct {
 
 func (x *FlowMeasureReadResponse_Statistic) Reset() {
 	*x = FlowMeasureReadResponse_Statistic{}
-	mi := &file_module_msg_proto_msgTypes[133]
+	mi := &file_module_msg_proto_msgTypes[134]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7539,7 +7626,7 @@ func (x *FlowMeasureReadResponse_Statistic) String() string {
 func (*FlowMeasureReadResponse_Statistic) ProtoMessage() {}
 
 func (x *FlowMeasureReadResponse_Statistic) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[133]
+	mi := &file_module_msg_proto_msgTypes[134]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7613,7 +7700,7 @@ type FlowMeasureReadResponse_Statistic_Histogram struct {
 
 func (x *FlowMeasureReadResponse_Statistic_Histogram) Reset() {
 	*x = FlowMeasureReadResponse_Statistic_Histogram{}
-	mi := &file_module_msg_proto_msgTypes[134]
+	mi := &file_module_msg_proto_msgTypes[135]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7626,7 +7713,7 @@ func (x *FlowMeasureReadResponse_Statistic_Histogram) String() string {
 func (*FlowMeasureReadResponse_Statistic_Histogram) ProtoMessage() {}
 
 func (x *FlowMeasureReadResponse_Statistic_Histogram) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[134]
+	mi := &file_module_msg_proto_msgTypes[135]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7711,7 +7798,7 @@ type GtpuPathMonitoringCommandReadResponse_Statistic struct {
 
 func (x *GtpuPathMonitoringCommandReadResponse_Statistic) Reset() {
 	*x = GtpuPathMonitoringCommandReadResponse_Statistic{}
-	mi := &file_module_msg_proto_msgTypes[135]
+	mi := &file_module_msg_proto_msgTypes[136]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7724,7 +7811,7 @@ func (x *GtpuPathMonitoringCommandReadResponse_Statistic) String() string {
 func (*GtpuPathMonitoringCommandReadResponse_Statistic) ProtoMessage() {}
 
 func (x *GtpuPathMonitoringCommandReadResponse_Statistic) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[135]
+	mi := &file_module_msg_proto_msgTypes[136]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8120,11 +8207,22 @@ const file_module_msg_proto_rawDesc = "" +
 	"\fVLANSplitArg\"\x0f\n" +
 	"\rVXLANDecapArg\")\n" +
 	"\rVXLANEncapArg\x12\x18\n" +
-	"\adstport\x18\x01 \x01(\x04R\adstport\"|\n" +
+	"\adstport\x18\x01 \x01(\x04R\adstport\"\xd4\x02\n" +
 	"\x10WildcardMatchArg\x12&\n" +
 	"\x06fields\x18\x01 \x03(\v2\x0e.bess.pb.FieldR\x06fields\x12&\n" +
 	"\x06values\x18\x02 \x03(\v2\x0e.bess.pb.FieldR\x06values\x12\x18\n" +
-	"\aentries\x18\x03 \x01(\x04R\aentries\"s\n" +
+	"\aentries\x18\x03 \x01(\x04R\aentries\x12\x1d\n" +
+	"\n" +
+	"max_tuples\x18\x04 \x01(\rR\tmaxTuples\x12A\n" +
+	"\n" +
+	"index_sets\x18\x05 \x03(\v2\".bess.pb.WildcardMatchArg.IndexSetR\tindexSets\x1at\n" +
+	"\bIndexSet\x12\x16\n" +
+	"\x06fields\x18\x01 \x03(\rR\x06fields\x12\"\n" +
+	"\n" +
+	"when_field\x18\x02 \x01(\rH\x00R\twhenField\x88\x01\x01\x12\x1d\n" +
+	"\n" +
+	"when_value\x18\x03 \x01(\x04R\twhenValueB\r\n" +
+	"\v_when_field\"s\n" +
 	"\x13WildcardMatchConfig\x12!\n" +
 	"\fdefault_gate\x18\x01 \x01(\x04R\vdefaultGate\x129\n" +
 	"\x05rules\x18\x02 \x03(\v2#.bess.pb.WildcardMatchCommandAddArgR\x05rules\"<\n" +
@@ -8226,171 +8324,170 @@ func file_module_msg_proto_rawDescGZIP() []byte {
 	return file_module_msg_proto_rawDescData
 }
 
-var (
-	file_module_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 136)
-	file_module_msg_proto_goTypes  = []any{
-		(*EmptyArg)(nil),                                        // 0: bess.pb.EmptyArg
-		(*BPFCommandClearArg)(nil),                              // 1: bess.pb.BPFCommandClearArg
-		(*ExactMatchCommandAddArg)(nil),                         // 2: bess.pb.ExactMatchCommandAddArg
-		(*ExactMatchCommandDeleteArg)(nil),                      // 3: bess.pb.ExactMatchCommandDeleteArg
-		(*ExactMatchCommandClearArg)(nil),                       // 4: bess.pb.ExactMatchCommandClearArg
-		(*ExactMatchCommandSetDefaultGateArg)(nil),              // 5: bess.pb.ExactMatchCommandSetDefaultGateArg
-		(*FlowGenCommandSetBurstArg)(nil),                       // 6: bess.pb.FlowGenCommandSetBurstArg
-		(*HashLBCommandSetModeArg)(nil),                         // 7: bess.pb.HashLBCommandSetModeArg
-		(*HashLBCommandSetGatesArg)(nil),                        // 8: bess.pb.HashLBCommandSetGatesArg
-		(*IPLookupCommandAddArg)(nil),                           // 9: bess.pb.IPLookupCommandAddArg
-		(*IPLookupCommandDeleteArg)(nil),                        // 10: bess.pb.IPLookupCommandDeleteArg
-		(*IPLookupCommandClearArg)(nil),                         // 11: bess.pb.IPLookupCommandClearArg
-		(*L2ForwardCommandAddArg)(nil),                          // 12: bess.pb.L2ForwardCommandAddArg
-		(*L2ForwardCommandDeleteArg)(nil),                       // 13: bess.pb.L2ForwardCommandDeleteArg
-		(*L2ForwardCommandSetDefaultGateArg)(nil),               // 14: bess.pb.L2ForwardCommandSetDefaultGateArg
-		(*L2ForwardCommandLookupArg)(nil),                       // 15: bess.pb.L2ForwardCommandLookupArg
-		(*L2ForwardCommandLookupResponse)(nil),                  // 16: bess.pb.L2ForwardCommandLookupResponse
-		(*L2ForwardCommandPopulateArg)(nil),                     // 17: bess.pb.L2ForwardCommandPopulateArg
-		(*MeasureCommandGetSummaryArg)(nil),                     // 18: bess.pb.MeasureCommandGetSummaryArg
-		(*MeasureCommandGetSummaryResponse)(nil),                // 19: bess.pb.MeasureCommandGetSummaryResponse
-		(*DRRArg)(nil),                                          // 20: bess.pb.DRRArg
-		(*DRRQuantumArg)(nil),                                   // 21: bess.pb.DRRQuantumArg
-		(*DRRMaxFlowQueueSizeArg)(nil),                          // 22: bess.pb.DRRMaxFlowQueueSizeArg
-		(*PortIncCommandSetBurstArg)(nil),                       // 23: bess.pb.PortIncCommandSetBurstArg
-		(*QueueIncCommandSetBurstArg)(nil),                      // 24: bess.pb.QueueIncCommandSetBurstArg
-		(*QueueCommandSetBurstArg)(nil),                         // 25: bess.pb.QueueCommandSetBurstArg
-		(*QueueCommandSetSizeArg)(nil),                          // 26: bess.pb.QueueCommandSetSizeArg
-		(*QueueCommandGetStatusArg)(nil),                        // 27: bess.pb.QueueCommandGetStatusArg
-		(*QueueCommandGetStatusResponse)(nil),                   // 28: bess.pb.QueueCommandGetStatusResponse
-		(*RandomUpdateCommandClearArg)(nil),                     // 29: bess.pb.RandomUpdateCommandClearArg
-		(*RewriteCommandClearArg)(nil),                          // 30: bess.pb.RewriteCommandClearArg
-		(*UpdateCommandClearArg)(nil),                           // 31: bess.pb.UpdateCommandClearArg
-		(*WildcardMatchCommandAddArg)(nil),                      // 32: bess.pb.WildcardMatchCommandAddArg
-		(*WildcardMatchCommandDeleteArg)(nil),                   // 33: bess.pb.WildcardMatchCommandDeleteArg
-		(*WildcardMatchCommandClearArg)(nil),                    // 34: bess.pb.WildcardMatchCommandClearArg
-		(*WildcardMatchCommandSetDefaultGateArg)(nil),           // 35: bess.pb.WildcardMatchCommandSetDefaultGateArg
-		(*ACLArg)(nil),                                          // 36: bess.pb.ACLArg
-		(*BPFArg)(nil),                                          // 37: bess.pb.BPFArg
-		(*BufferArg)(nil),                                       // 38: bess.pb.BufferArg
-		(*BypassArg)(nil),                                       // 39: bess.pb.BypassArg
-		(*DumpArg)(nil),                                         // 40: bess.pb.DumpArg
-		(*EtherEncapArg)(nil),                                   // 41: bess.pb.EtherEncapArg
-		(*ExactMatchArg)(nil),                                   // 42: bess.pb.ExactMatchArg
-		(*ExactMatchConfig)(nil),                                // 43: bess.pb.ExactMatchConfig
-		(*FlowGenArg)(nil),                                      // 44: bess.pb.FlowGenArg
-		(*GenericDecapArg)(nil),                                 // 45: bess.pb.GenericDecapArg
-		(*GenericEncapArg)(nil),                                 // 46: bess.pb.GenericEncapArg
-		(*HashLBArg)(nil),                                       // 47: bess.pb.HashLBArg
-		(*IPEncapArg)(nil),                                      // 48: bess.pb.IPEncapArg
-		(*IPLookupArg)(nil),                                     // 49: bess.pb.IPLookupArg
-		(*L2ForwardArg)(nil),                                    // 50: bess.pb.L2ForwardArg
-		(*MACSwapArg)(nil),                                      // 51: bess.pb.MACSwapArg
-		(*MeasureArg)(nil),                                      // 52: bess.pb.MeasureArg
-		(*MergeArg)(nil),                                        // 53: bess.pb.MergeArg
-		(*MetadataTestArg)(nil),                                 // 54: bess.pb.MetadataTestArg
-		(*NATArg)(nil),                                          // 55: bess.pb.NATArg
-		(*StaticNATArg)(nil),                                    // 56: bess.pb.StaticNATArg
-		(*NoOpArg)(nil),                                         // 57: bess.pb.NoOpArg
-		(*PortIncArg)(nil),                                      // 58: bess.pb.PortIncArg
-		(*PortOutArg)(nil),                                      // 59: bess.pb.PortOutArg
-		(*QueueIncArg)(nil),                                     // 60: bess.pb.QueueIncArg
-		(*QueueOutArg)(nil),                                     // 61: bess.pb.QueueOutArg
-		(*QueueArg)(nil),                                        // 62: bess.pb.QueueArg
-		(*RandomSplitArg)(nil),                                  // 63: bess.pb.RandomSplitArg
-		(*RandomSplitCommandSetDroprateArg)(nil),                // 64: bess.pb.RandomSplitCommandSetDroprateArg
-		(*RandomSplitCommandSetGatesArg)(nil),                   // 65: bess.pb.RandomSplitCommandSetGatesArg
-		(*RandomUpdateArg)(nil),                                 // 66: bess.pb.RandomUpdateArg
-		(*RewriteArg)(nil),                                      // 67: bess.pb.RewriteArg
-		(*RoundRobinCommandSetGatesArg)(nil),                    // 68: bess.pb.RoundRobinCommandSetGatesArg
-		(*RoundRobinCommandSetModeArg)(nil),                     // 69: bess.pb.RoundRobinCommandSetModeArg
-		(*RoundRobinArg)(nil),                                   // 70: bess.pb.RoundRobinArg
-		(*ReplicateArg)(nil),                                    // 71: bess.pb.ReplicateArg
-		(*ReplicateCommandSetGatesArg)(nil),                     // 72: bess.pb.ReplicateCommandSetGatesArg
-		(*SetMetadataArg)(nil),                                  // 73: bess.pb.SetMetadataArg
-		(*SinkArg)(nil),                                         // 74: bess.pb.SinkArg
-		(*SourceCommandSetBurstArg)(nil),                        // 75: bess.pb.SourceCommandSetBurstArg
-		(*SourceCommandSetPktSizeArg)(nil),                      // 76: bess.pb.SourceCommandSetPktSizeArg
-		(*SourceArg)(nil),                                       // 77: bess.pb.SourceArg
-		(*IPChecksumArg)(nil),                                   // 78: bess.pb.IPChecksumArg
-		(*L4ChecksumArg)(nil),                                   // 79: bess.pb.L4ChecksumArg
-		(*GtpuEchoArg)(nil),                                     // 80: bess.pb.GtpuEchoArg
-		(*IPDefragArg)(nil),                                     // 81: bess.pb.IPDefragArg
-		(*IPFragArg)(nil),                                       // 82: bess.pb.IPFragArg
-		(*CounterAddArg)(nil),                                   // 83: bess.pb.CounterAddArg
-		(*CounterRemoveArg)(nil),                                // 84: bess.pb.CounterRemoveArg
-		(*CounterArg)(nil),                                      // 85: bess.pb.CounterArg
-		(*GtpuEncapArg)(nil),                                    // 86: bess.pb.GtpuEncapArg
-		(*SplitArg)(nil),                                        // 87: bess.pb.SplitArg
-		(*TimestampArg)(nil),                                    // 88: bess.pb.TimestampArg
-		(*UpdateArg)(nil),                                       // 89: bess.pb.UpdateArg
-		(*UrlFilterArg)(nil),                                    // 90: bess.pb.UrlFilterArg
-		(*UrlFilterConfig)(nil),                                 // 91: bess.pb.UrlFilterConfig
-		(*VLANPopArg)(nil),                                      // 92: bess.pb.VLANPopArg
-		(*VLANPushArg)(nil),                                     // 93: bess.pb.VLANPushArg
-		(*VLANSplitArg)(nil),                                    // 94: bess.pb.VLANSplitArg
-		(*VXLANDecapArg)(nil),                                   // 95: bess.pb.VXLANDecapArg
-		(*VXLANEncapArg)(nil),                                   // 96: bess.pb.VXLANEncapArg
-		(*WildcardMatchArg)(nil),                                // 97: bess.pb.WildcardMatchArg
-		(*WildcardMatchConfig)(nil),                             // 98: bess.pb.WildcardMatchConfig
-		(*ArpResponderArg)(nil),                                 // 99: bess.pb.ArpResponderArg
-		(*MplsPopArg)(nil),                                      // 100: bess.pb.MplsPopArg
-		(*WorkerSplitArg)(nil),                                  // 101: bess.pb.WorkerSplitArg
-		(*QosArg)(nil),                                          // 102: bess.pb.QosArg
-		(*QosCommandAddArg)(nil),                                // 103: bess.pb.QosCommandAddArg
-		(*QosCommandDeleteArg)(nil),                             // 104: bess.pb.QosCommandDeleteArg
-		(*QosCommandClearArg)(nil),                              // 105: bess.pb.QosCommandClearArg
-		(*QosCommandSetDefaultGateArg)(nil),                     // 106: bess.pb.QosCommandSetDefaultGateArg
-		(*FlowMeasureArg)(nil),                                  // 107: bess.pb.FlowMeasureArg
-		(*FlowMeasureCommandReadArg)(nil),                       // 108: bess.pb.FlowMeasureCommandReadArg
-		(*FlowMeasureReadResponse)(nil),                         // 109: bess.pb.FlowMeasureReadResponse
-		(*FlowMeasureCommandFlipArg)(nil),                       // 110: bess.pb.FlowMeasureCommandFlipArg
-		(*FlowMeasureFlipResponse)(nil),                         // 111: bess.pb.FlowMeasureFlipResponse
-		(*GtpuPathMonitoringCommandAddDeleteArg)(nil),           // 112: bess.pb.GtpuPathMonitoringCommandAddDeleteArg
-		(*GtpuPathMonitoringCommandClearArg)(nil),               // 113: bess.pb.GtpuPathMonitoringCommandClearArg
-		(*GtpuPathMonitoringCommandReadArg)(nil),                // 114: bess.pb.GtpuPathMonitoringCommandReadArg
-		(*GtpuPathMonitoringCommandReadResponse)(nil),           // 115: bess.pb.GtpuPathMonitoringCommandReadResponse
-		(*L2ForwardCommandAddArg_Entry)(nil),                    // 116: bess.pb.L2ForwardCommandAddArg.Entry
-		(*MeasureCommandGetSummaryResponse_Histogram)(nil),      // 117: bess.pb.MeasureCommandGetSummaryResponse.Histogram
-		(*ACLArg_Rule)(nil),                                     // 118: bess.pb.ACLArg.Rule
-		(*BPFArg_Filter)(nil),                                   // 119: bess.pb.BPFArg.Filter
-		(*GenericEncapArg_EncapField)(nil),                      // 120: bess.pb.GenericEncapArg.EncapField
-		nil,                                                     // 121: bess.pb.MetadataTestArg.ReadEntry
-		nil,                                                     // 122: bess.pb.MetadataTestArg.WriteEntry
-		nil,                                                     // 123: bess.pb.MetadataTestArg.UpdateEntry
-		(*NATArg_PortRange)(nil),                                // 124: bess.pb.NATArg.PortRange
-		(*NATArg_ExternalAddress)(nil),                          // 125: bess.pb.NATArg.ExternalAddress
-		(*StaticNATArg_AddressRange)(nil),                       // 126: bess.pb.StaticNATArg.AddressRange
-		(*StaticNATArg_AddressRangePair)(nil),                   // 127: bess.pb.StaticNATArg.AddressRangePair
-		(*RandomUpdateArg_Field)(nil),                           // 128: bess.pb.RandomUpdateArg.Field
-		(*SetMetadataArg_Attribute)(nil),                        // 129: bess.pb.SetMetadataArg.Attribute
-		(*UpdateArg_Field)(nil),                                 // 130: bess.pb.UpdateArg.Field
-		(*UrlFilterArg_Url)(nil),                                // 131: bess.pb.UrlFilterArg.Url
-		nil,                                                     // 132: bess.pb.WorkerSplitArg.WorkerGatesEntry
-		(*FlowMeasureReadResponse_Statistic)(nil),               // 133: bess.pb.FlowMeasureReadResponse.Statistic
-		(*FlowMeasureReadResponse_Statistic_Histogram)(nil),     // 134: bess.pb.FlowMeasureReadResponse.Statistic.Histogram
-		(*GtpuPathMonitoringCommandReadResponse_Statistic)(nil), // 135: bess.pb.GtpuPathMonitoringCommandReadResponse.Statistic
-		(*FieldData)(nil),                                       // 136: bess.pb.FieldData
-		(*Field)(nil),                                           // 137: bess.pb.Field
-	}
-)
+var file_module_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 137)
+var file_module_msg_proto_goTypes = []any{
+	(*EmptyArg)(nil),                                        // 0: bess.pb.EmptyArg
+	(*BPFCommandClearArg)(nil),                              // 1: bess.pb.BPFCommandClearArg
+	(*ExactMatchCommandAddArg)(nil),                         // 2: bess.pb.ExactMatchCommandAddArg
+	(*ExactMatchCommandDeleteArg)(nil),                      // 3: bess.pb.ExactMatchCommandDeleteArg
+	(*ExactMatchCommandClearArg)(nil),                       // 4: bess.pb.ExactMatchCommandClearArg
+	(*ExactMatchCommandSetDefaultGateArg)(nil),              // 5: bess.pb.ExactMatchCommandSetDefaultGateArg
+	(*FlowGenCommandSetBurstArg)(nil),                       // 6: bess.pb.FlowGenCommandSetBurstArg
+	(*HashLBCommandSetModeArg)(nil),                         // 7: bess.pb.HashLBCommandSetModeArg
+	(*HashLBCommandSetGatesArg)(nil),                        // 8: bess.pb.HashLBCommandSetGatesArg
+	(*IPLookupCommandAddArg)(nil),                           // 9: bess.pb.IPLookupCommandAddArg
+	(*IPLookupCommandDeleteArg)(nil),                        // 10: bess.pb.IPLookupCommandDeleteArg
+	(*IPLookupCommandClearArg)(nil),                         // 11: bess.pb.IPLookupCommandClearArg
+	(*L2ForwardCommandAddArg)(nil),                          // 12: bess.pb.L2ForwardCommandAddArg
+	(*L2ForwardCommandDeleteArg)(nil),                       // 13: bess.pb.L2ForwardCommandDeleteArg
+	(*L2ForwardCommandSetDefaultGateArg)(nil),               // 14: bess.pb.L2ForwardCommandSetDefaultGateArg
+	(*L2ForwardCommandLookupArg)(nil),                       // 15: bess.pb.L2ForwardCommandLookupArg
+	(*L2ForwardCommandLookupResponse)(nil),                  // 16: bess.pb.L2ForwardCommandLookupResponse
+	(*L2ForwardCommandPopulateArg)(nil),                     // 17: bess.pb.L2ForwardCommandPopulateArg
+	(*MeasureCommandGetSummaryArg)(nil),                     // 18: bess.pb.MeasureCommandGetSummaryArg
+	(*MeasureCommandGetSummaryResponse)(nil),                // 19: bess.pb.MeasureCommandGetSummaryResponse
+	(*DRRArg)(nil),                                          // 20: bess.pb.DRRArg
+	(*DRRQuantumArg)(nil),                                   // 21: bess.pb.DRRQuantumArg
+	(*DRRMaxFlowQueueSizeArg)(nil),                          // 22: bess.pb.DRRMaxFlowQueueSizeArg
+	(*PortIncCommandSetBurstArg)(nil),                       // 23: bess.pb.PortIncCommandSetBurstArg
+	(*QueueIncCommandSetBurstArg)(nil),                      // 24: bess.pb.QueueIncCommandSetBurstArg
+	(*QueueCommandSetBurstArg)(nil),                         // 25: bess.pb.QueueCommandSetBurstArg
+	(*QueueCommandSetSizeArg)(nil),                          // 26: bess.pb.QueueCommandSetSizeArg
+	(*QueueCommandGetStatusArg)(nil),                        // 27: bess.pb.QueueCommandGetStatusArg
+	(*QueueCommandGetStatusResponse)(nil),                   // 28: bess.pb.QueueCommandGetStatusResponse
+	(*RandomUpdateCommandClearArg)(nil),                     // 29: bess.pb.RandomUpdateCommandClearArg
+	(*RewriteCommandClearArg)(nil),                          // 30: bess.pb.RewriteCommandClearArg
+	(*UpdateCommandClearArg)(nil),                           // 31: bess.pb.UpdateCommandClearArg
+	(*WildcardMatchCommandAddArg)(nil),                      // 32: bess.pb.WildcardMatchCommandAddArg
+	(*WildcardMatchCommandDeleteArg)(nil),                   // 33: bess.pb.WildcardMatchCommandDeleteArg
+	(*WildcardMatchCommandClearArg)(nil),                    // 34: bess.pb.WildcardMatchCommandClearArg
+	(*WildcardMatchCommandSetDefaultGateArg)(nil),           // 35: bess.pb.WildcardMatchCommandSetDefaultGateArg
+	(*ACLArg)(nil),                                          // 36: bess.pb.ACLArg
+	(*BPFArg)(nil),                                          // 37: bess.pb.BPFArg
+	(*BufferArg)(nil),                                       // 38: bess.pb.BufferArg
+	(*BypassArg)(nil),                                       // 39: bess.pb.BypassArg
+	(*DumpArg)(nil),                                         // 40: bess.pb.DumpArg
+	(*EtherEncapArg)(nil),                                   // 41: bess.pb.EtherEncapArg
+	(*ExactMatchArg)(nil),                                   // 42: bess.pb.ExactMatchArg
+	(*ExactMatchConfig)(nil),                                // 43: bess.pb.ExactMatchConfig
+	(*FlowGenArg)(nil),                                      // 44: bess.pb.FlowGenArg
+	(*GenericDecapArg)(nil),                                 // 45: bess.pb.GenericDecapArg
+	(*GenericEncapArg)(nil),                                 // 46: bess.pb.GenericEncapArg
+	(*HashLBArg)(nil),                                       // 47: bess.pb.HashLBArg
+	(*IPEncapArg)(nil),                                      // 48: bess.pb.IPEncapArg
+	(*IPLookupArg)(nil),                                     // 49: bess.pb.IPLookupArg
+	(*L2ForwardArg)(nil),                                    // 50: bess.pb.L2ForwardArg
+	(*MACSwapArg)(nil),                                      // 51: bess.pb.MACSwapArg
+	(*MeasureArg)(nil),                                      // 52: bess.pb.MeasureArg
+	(*MergeArg)(nil),                                        // 53: bess.pb.MergeArg
+	(*MetadataTestArg)(nil),                                 // 54: bess.pb.MetadataTestArg
+	(*NATArg)(nil),                                          // 55: bess.pb.NATArg
+	(*StaticNATArg)(nil),                                    // 56: bess.pb.StaticNATArg
+	(*NoOpArg)(nil),                                         // 57: bess.pb.NoOpArg
+	(*PortIncArg)(nil),                                      // 58: bess.pb.PortIncArg
+	(*PortOutArg)(nil),                                      // 59: bess.pb.PortOutArg
+	(*QueueIncArg)(nil),                                     // 60: bess.pb.QueueIncArg
+	(*QueueOutArg)(nil),                                     // 61: bess.pb.QueueOutArg
+	(*QueueArg)(nil),                                        // 62: bess.pb.QueueArg
+	(*RandomSplitArg)(nil),                                  // 63: bess.pb.RandomSplitArg
+	(*RandomSplitCommandSetDroprateArg)(nil),                // 64: bess.pb.RandomSplitCommandSetDroprateArg
+	(*RandomSplitCommandSetGatesArg)(nil),                   // 65: bess.pb.RandomSplitCommandSetGatesArg
+	(*RandomUpdateArg)(nil),                                 // 66: bess.pb.RandomUpdateArg
+	(*RewriteArg)(nil),                                      // 67: bess.pb.RewriteArg
+	(*RoundRobinCommandSetGatesArg)(nil),                    // 68: bess.pb.RoundRobinCommandSetGatesArg
+	(*RoundRobinCommandSetModeArg)(nil),                     // 69: bess.pb.RoundRobinCommandSetModeArg
+	(*RoundRobinArg)(nil),                                   // 70: bess.pb.RoundRobinArg
+	(*ReplicateArg)(nil),                                    // 71: bess.pb.ReplicateArg
+	(*ReplicateCommandSetGatesArg)(nil),                     // 72: bess.pb.ReplicateCommandSetGatesArg
+	(*SetMetadataArg)(nil),                                  // 73: bess.pb.SetMetadataArg
+	(*SinkArg)(nil),                                         // 74: bess.pb.SinkArg
+	(*SourceCommandSetBurstArg)(nil),                        // 75: bess.pb.SourceCommandSetBurstArg
+	(*SourceCommandSetPktSizeArg)(nil),                      // 76: bess.pb.SourceCommandSetPktSizeArg
+	(*SourceArg)(nil),                                       // 77: bess.pb.SourceArg
+	(*IPChecksumArg)(nil),                                   // 78: bess.pb.IPChecksumArg
+	(*L4ChecksumArg)(nil),                                   // 79: bess.pb.L4ChecksumArg
+	(*GtpuEchoArg)(nil),                                     // 80: bess.pb.GtpuEchoArg
+	(*IPDefragArg)(nil),                                     // 81: bess.pb.IPDefragArg
+	(*IPFragArg)(nil),                                       // 82: bess.pb.IPFragArg
+	(*CounterAddArg)(nil),                                   // 83: bess.pb.CounterAddArg
+	(*CounterRemoveArg)(nil),                                // 84: bess.pb.CounterRemoveArg
+	(*CounterArg)(nil),                                      // 85: bess.pb.CounterArg
+	(*GtpuEncapArg)(nil),                                    // 86: bess.pb.GtpuEncapArg
+	(*SplitArg)(nil),                                        // 87: bess.pb.SplitArg
+	(*TimestampArg)(nil),                                    // 88: bess.pb.TimestampArg
+	(*UpdateArg)(nil),                                       // 89: bess.pb.UpdateArg
+	(*UrlFilterArg)(nil),                                    // 90: bess.pb.UrlFilterArg
+	(*UrlFilterConfig)(nil),                                 // 91: bess.pb.UrlFilterConfig
+	(*VLANPopArg)(nil),                                      // 92: bess.pb.VLANPopArg
+	(*VLANPushArg)(nil),                                     // 93: bess.pb.VLANPushArg
+	(*VLANSplitArg)(nil),                                    // 94: bess.pb.VLANSplitArg
+	(*VXLANDecapArg)(nil),                                   // 95: bess.pb.VXLANDecapArg
+	(*VXLANEncapArg)(nil),                                   // 96: bess.pb.VXLANEncapArg
+	(*WildcardMatchArg)(nil),                                // 97: bess.pb.WildcardMatchArg
+	(*WildcardMatchConfig)(nil),                             // 98: bess.pb.WildcardMatchConfig
+	(*ArpResponderArg)(nil),                                 // 99: bess.pb.ArpResponderArg
+	(*MplsPopArg)(nil),                                      // 100: bess.pb.MplsPopArg
+	(*WorkerSplitArg)(nil),                                  // 101: bess.pb.WorkerSplitArg
+	(*QosArg)(nil),                                          // 102: bess.pb.QosArg
+	(*QosCommandAddArg)(nil),                                // 103: bess.pb.QosCommandAddArg
+	(*QosCommandDeleteArg)(nil),                             // 104: bess.pb.QosCommandDeleteArg
+	(*QosCommandClearArg)(nil),                              // 105: bess.pb.QosCommandClearArg
+	(*QosCommandSetDefaultGateArg)(nil),                     // 106: bess.pb.QosCommandSetDefaultGateArg
+	(*FlowMeasureArg)(nil),                                  // 107: bess.pb.FlowMeasureArg
+	(*FlowMeasureCommandReadArg)(nil),                       // 108: bess.pb.FlowMeasureCommandReadArg
+	(*FlowMeasureReadResponse)(nil),                         // 109: bess.pb.FlowMeasureReadResponse
+	(*FlowMeasureCommandFlipArg)(nil),                       // 110: bess.pb.FlowMeasureCommandFlipArg
+	(*FlowMeasureFlipResponse)(nil),                         // 111: bess.pb.FlowMeasureFlipResponse
+	(*GtpuPathMonitoringCommandAddDeleteArg)(nil),           // 112: bess.pb.GtpuPathMonitoringCommandAddDeleteArg
+	(*GtpuPathMonitoringCommandClearArg)(nil),               // 113: bess.pb.GtpuPathMonitoringCommandClearArg
+	(*GtpuPathMonitoringCommandReadArg)(nil),                // 114: bess.pb.GtpuPathMonitoringCommandReadArg
+	(*GtpuPathMonitoringCommandReadResponse)(nil),           // 115: bess.pb.GtpuPathMonitoringCommandReadResponse
+	(*L2ForwardCommandAddArg_Entry)(nil),                    // 116: bess.pb.L2ForwardCommandAddArg.Entry
+	(*MeasureCommandGetSummaryResponse_Histogram)(nil),      // 117: bess.pb.MeasureCommandGetSummaryResponse.Histogram
+	(*ACLArg_Rule)(nil),                                     // 118: bess.pb.ACLArg.Rule
+	(*BPFArg_Filter)(nil),                                   // 119: bess.pb.BPFArg.Filter
+	(*GenericEncapArg_EncapField)(nil),                      // 120: bess.pb.GenericEncapArg.EncapField
+	nil,                                                     // 121: bess.pb.MetadataTestArg.ReadEntry
+	nil,                                                     // 122: bess.pb.MetadataTestArg.WriteEntry
+	nil,                                                     // 123: bess.pb.MetadataTestArg.UpdateEntry
+	(*NATArg_PortRange)(nil),                                // 124: bess.pb.NATArg.PortRange
+	(*NATArg_ExternalAddress)(nil),                          // 125: bess.pb.NATArg.ExternalAddress
+	(*StaticNATArg_AddressRange)(nil),                       // 126: bess.pb.StaticNATArg.AddressRange
+	(*StaticNATArg_AddressRangePair)(nil),                   // 127: bess.pb.StaticNATArg.AddressRangePair
+	(*RandomUpdateArg_Field)(nil),                           // 128: bess.pb.RandomUpdateArg.Field
+	(*SetMetadataArg_Attribute)(nil),                        // 129: bess.pb.SetMetadataArg.Attribute
+	(*UpdateArg_Field)(nil),                                 // 130: bess.pb.UpdateArg.Field
+	(*UrlFilterArg_Url)(nil),                                // 131: bess.pb.UrlFilterArg.Url
+	(*WildcardMatchArg_IndexSet)(nil),                       // 132: bess.pb.WildcardMatchArg.IndexSet
+	nil,                                                     // 133: bess.pb.WorkerSplitArg.WorkerGatesEntry
+	(*FlowMeasureReadResponse_Statistic)(nil),               // 134: bess.pb.FlowMeasureReadResponse.Statistic
+	(*FlowMeasureReadResponse_Statistic_Histogram)(nil),     // 135: bess.pb.FlowMeasureReadResponse.Statistic.Histogram
+	(*GtpuPathMonitoringCommandReadResponse_Statistic)(nil), // 136: bess.pb.GtpuPathMonitoringCommandReadResponse.Statistic
+	(*FieldData)(nil),                                       // 137: bess.pb.FieldData
+	(*Field)(nil),                                           // 138: bess.pb.Field
+}
 var file_module_msg_proto_depIdxs = []int32{
-	136, // 0: bess.pb.ExactMatchCommandAddArg.fields:type_name -> bess.pb.FieldData
-	136, // 1: bess.pb.ExactMatchCommandAddArg.values:type_name -> bess.pb.FieldData
-	136, // 2: bess.pb.ExactMatchCommandDeleteArg.fields:type_name -> bess.pb.FieldData
-	137, // 3: bess.pb.HashLBCommandSetModeArg.fields:type_name -> bess.pb.Field
+	137, // 0: bess.pb.ExactMatchCommandAddArg.fields:type_name -> bess.pb.FieldData
+	137, // 1: bess.pb.ExactMatchCommandAddArg.values:type_name -> bess.pb.FieldData
+	137, // 2: bess.pb.ExactMatchCommandDeleteArg.fields:type_name -> bess.pb.FieldData
+	138, // 3: bess.pb.HashLBCommandSetModeArg.fields:type_name -> bess.pb.Field
 	116, // 4: bess.pb.L2ForwardCommandAddArg.entries:type_name -> bess.pb.L2ForwardCommandAddArg.Entry
 	117, // 5: bess.pb.MeasureCommandGetSummaryResponse.latency:type_name -> bess.pb.MeasureCommandGetSummaryResponse.Histogram
 	117, // 6: bess.pb.MeasureCommandGetSummaryResponse.jitter:type_name -> bess.pb.MeasureCommandGetSummaryResponse.Histogram
-	136, // 7: bess.pb.WildcardMatchCommandAddArg.values:type_name -> bess.pb.FieldData
-	136, // 8: bess.pb.WildcardMatchCommandAddArg.masks:type_name -> bess.pb.FieldData
-	136, // 9: bess.pb.WildcardMatchCommandAddArg.valuesv:type_name -> bess.pb.FieldData
-	136, // 10: bess.pb.WildcardMatchCommandDeleteArg.values:type_name -> bess.pb.FieldData
-	136, // 11: bess.pb.WildcardMatchCommandDeleteArg.masks:type_name -> bess.pb.FieldData
+	137, // 7: bess.pb.WildcardMatchCommandAddArg.values:type_name -> bess.pb.FieldData
+	137, // 8: bess.pb.WildcardMatchCommandAddArg.masks:type_name -> bess.pb.FieldData
+	137, // 9: bess.pb.WildcardMatchCommandAddArg.valuesv:type_name -> bess.pb.FieldData
+	137, // 10: bess.pb.WildcardMatchCommandDeleteArg.values:type_name -> bess.pb.FieldData
+	137, // 11: bess.pb.WildcardMatchCommandDeleteArg.masks:type_name -> bess.pb.FieldData
 	118, // 12: bess.pb.ACLArg.rules:type_name -> bess.pb.ACLArg.Rule
 	119, // 13: bess.pb.BPFArg.filters:type_name -> bess.pb.BPFArg.Filter
-	137, // 14: bess.pb.ExactMatchArg.fields:type_name -> bess.pb.Field
-	136, // 15: bess.pb.ExactMatchArg.masks:type_name -> bess.pb.FieldData
-	137, // 16: bess.pb.ExactMatchArg.values:type_name -> bess.pb.Field
-	136, // 17: bess.pb.ExactMatchArg.masksv:type_name -> bess.pb.FieldData
+	138, // 14: bess.pb.ExactMatchArg.fields:type_name -> bess.pb.Field
+	137, // 15: bess.pb.ExactMatchArg.masks:type_name -> bess.pb.FieldData
+	138, // 16: bess.pb.ExactMatchArg.values:type_name -> bess.pb.Field
+	137, // 17: bess.pb.ExactMatchArg.masksv:type_name -> bess.pb.FieldData
 	2,   // 18: bess.pb.ExactMatchConfig.rules:type_name -> bess.pb.ExactMatchCommandAddArg
 	120, // 19: bess.pb.GenericEncapArg.fields:type_name -> bess.pb.GenericEncapArg.EncapField
-	137, // 20: bess.pb.HashLBArg.fields:type_name -> bess.pb.Field
+	138, // 20: bess.pb.HashLBArg.fields:type_name -> bess.pb.Field
 	121, // 21: bess.pb.MetadataTestArg.read:type_name -> bess.pb.MetadataTestArg.ReadEntry
 	122, // 22: bess.pb.MetadataTestArg.write:type_name -> bess.pb.MetadataTestArg.WriteEntry
 	123, // 23: bess.pb.MetadataTestArg.update:type_name -> bess.pb.MetadataTestArg.UpdateEntry
@@ -8401,28 +8498,29 @@ var file_module_msg_proto_depIdxs = []int32{
 	130, // 28: bess.pb.UpdateArg.fields:type_name -> bess.pb.UpdateArg.Field
 	131, // 29: bess.pb.UrlFilterArg.blacklist:type_name -> bess.pb.UrlFilterArg.Url
 	131, // 30: bess.pb.UrlFilterConfig.blacklist:type_name -> bess.pb.UrlFilterArg.Url
-	137, // 31: bess.pb.WildcardMatchArg.fields:type_name -> bess.pb.Field
-	137, // 32: bess.pb.WildcardMatchArg.values:type_name -> bess.pb.Field
-	32,  // 33: bess.pb.WildcardMatchConfig.rules:type_name -> bess.pb.WildcardMatchCommandAddArg
-	132, // 34: bess.pb.WorkerSplitArg.worker_gates:type_name -> bess.pb.WorkerSplitArg.WorkerGatesEntry
-	137, // 35: bess.pb.QosArg.fields:type_name -> bess.pb.Field
-	137, // 36: bess.pb.QosArg.values:type_name -> bess.pb.Field
-	136, // 37: bess.pb.QosCommandAddArg.fields:type_name -> bess.pb.FieldData
-	136, // 38: bess.pb.QosCommandAddArg.values:type_name -> bess.pb.FieldData
-	136, // 39: bess.pb.QosCommandDeleteArg.fields:type_name -> bess.pb.FieldData
-	133, // 40: bess.pb.FlowMeasureReadResponse.statistics:type_name -> bess.pb.FlowMeasureReadResponse.Statistic
-	135, // 41: bess.pb.GtpuPathMonitoringCommandReadResponse.statistics:type_name -> bess.pb.GtpuPathMonitoringCommandReadResponse.Statistic
-	136, // 42: bess.pb.GenericEncapArg.EncapField.value:type_name -> bess.pb.FieldData
-	124, // 43: bess.pb.NATArg.ExternalAddress.port_ranges:type_name -> bess.pb.NATArg.PortRange
-	126, // 44: bess.pb.StaticNATArg.AddressRangePair.int_range:type_name -> bess.pb.StaticNATArg.AddressRange
-	126, // 45: bess.pb.StaticNATArg.AddressRangePair.ext_range:type_name -> bess.pb.StaticNATArg.AddressRange
-	134, // 46: bess.pb.FlowMeasureReadResponse.Statistic.latency:type_name -> bess.pb.FlowMeasureReadResponse.Statistic.Histogram
-	134, // 47: bess.pb.FlowMeasureReadResponse.Statistic.jitter:type_name -> bess.pb.FlowMeasureReadResponse.Statistic.Histogram
-	48,  // [48:48] is the sub-list for method output_type
-	48,  // [48:48] is the sub-list for method input_type
-	48,  // [48:48] is the sub-list for extension type_name
-	48,  // [48:48] is the sub-list for extension extendee
-	0,   // [0:48] is the sub-list for field type_name
+	138, // 31: bess.pb.WildcardMatchArg.fields:type_name -> bess.pb.Field
+	138, // 32: bess.pb.WildcardMatchArg.values:type_name -> bess.pb.Field
+	132, // 33: bess.pb.WildcardMatchArg.index_sets:type_name -> bess.pb.WildcardMatchArg.IndexSet
+	32,  // 34: bess.pb.WildcardMatchConfig.rules:type_name -> bess.pb.WildcardMatchCommandAddArg
+	133, // 35: bess.pb.WorkerSplitArg.worker_gates:type_name -> bess.pb.WorkerSplitArg.WorkerGatesEntry
+	138, // 36: bess.pb.QosArg.fields:type_name -> bess.pb.Field
+	138, // 37: bess.pb.QosArg.values:type_name -> bess.pb.Field
+	137, // 38: bess.pb.QosCommandAddArg.fields:type_name -> bess.pb.FieldData
+	137, // 39: bess.pb.QosCommandAddArg.values:type_name -> bess.pb.FieldData
+	137, // 40: bess.pb.QosCommandDeleteArg.fields:type_name -> bess.pb.FieldData
+	134, // 41: bess.pb.FlowMeasureReadResponse.statistics:type_name -> bess.pb.FlowMeasureReadResponse.Statistic
+	136, // 42: bess.pb.GtpuPathMonitoringCommandReadResponse.statistics:type_name -> bess.pb.GtpuPathMonitoringCommandReadResponse.Statistic
+	137, // 43: bess.pb.GenericEncapArg.EncapField.value:type_name -> bess.pb.FieldData
+	124, // 44: bess.pb.NATArg.ExternalAddress.port_ranges:type_name -> bess.pb.NATArg.PortRange
+	126, // 45: bess.pb.StaticNATArg.AddressRangePair.int_range:type_name -> bess.pb.StaticNATArg.AddressRange
+	126, // 46: bess.pb.StaticNATArg.AddressRangePair.ext_range:type_name -> bess.pb.StaticNATArg.AddressRange
+	135, // 47: bess.pb.FlowMeasureReadResponse.Statistic.latency:type_name -> bess.pb.FlowMeasureReadResponse.Statistic.Histogram
+	135, // 48: bess.pb.FlowMeasureReadResponse.Statistic.jitter:type_name -> bess.pb.FlowMeasureReadResponse.Statistic.Histogram
+	49,  // [49:49] is the sub-list for method output_type
+	49,  // [49:49] is the sub-list for method input_type
+	49,  // [49:49] is the sub-list for extension type_name
+	49,  // [49:49] is the sub-list for extension extendee
+	0,   // [0:49] is the sub-list for field type_name
 }
 
 func init() { file_module_msg_proto_init() }
@@ -8454,13 +8552,14 @@ func file_module_msg_proto_init() {
 		(*SetMetadataArg_Attribute_ValueInt)(nil),
 		(*SetMetadataArg_Attribute_ValueBin)(nil),
 	}
+	file_module_msg_proto_msgTypes[132].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_module_msg_proto_rawDesc), len(file_module_msg_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   136,
+			NumMessages:   137,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
