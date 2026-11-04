@@ -45,6 +45,14 @@ updates:
       time: "21:00"
       timezone: "America/Los_Angeles"
     groups:
+      # Scapy gets its own PR: the TRex client patch
+      # ptf/patches/trex/0004-stl-calculate-scapy-offsets.patch relies on how
+      # Scapy parses fields, and the PTF dependency smoke check tests it.
+      # Dependabot puts a dependency in the first group it matches, and the
+      # exact pattern leaves scapy-helper in python-deps.
+      scapy:
+        patterns:
+          - "scapy"
       python-deps:
         patterns:
           - "*"
