@@ -14,8 +14,11 @@ required by [issue #1220](https://github.com/omec-project/upf/issues/1220).
 ## Background and current state
 
 - The PTF requirements pin `scapy==2.8.0` and `scapy-helper==0.14.8`.
-- `scapy-helper==0.14.8` requires `pyperclip==1.8.2`, blocking newer
-  `pyperclip` updates from Dependabot.
+- `ptf==0.12.0` requires `scapy-helper`, whose latest release (0.14.8, 2022)
+  requires `pyperclip==1.8.2` and `tabulate~=0.8.7`. Within `ptf`, only the
+  `bf_pktpy` packet library imports `scapy_helper`, and the UPF doesn't use it. Both pins are
+  kept as a documented exception: see the comments in
+  `ptf/requirements-ptf.txt` and `.github/dependabot.yml`.
 - The production PTF Docker image now uses pinned Cisco TRex v3.06 with the
   tracked UPF compatibility patches, copies only required client libraries,
   and uses Scapy 2.8.0 from the PTF venv.
@@ -33,13 +36,17 @@ required by [issue #1220](https://github.com/omec-project/upf/issues/1220).
 - [x] PTF and TRex import one documented Scapy version from one installed
       distribution; no second Scapy package is exposed through `PYTHONPATH`.
       The production image imports Scapy 2.8.0 from the PTF venv.
-- [ ] `scapy-helper`/`pyperclip` does not create an undocumented resolver
-      conflict.
-- [ ] Image smoke checks, PTF smoke tests, and the two-host PTF/TRex traffic
-      validation pass.
-- [ ] The source/version choices and dependency-regeneration procedure are
-      documented.
-- [ ] A current Dependabot-style Python dependency update resolves and builds.
+- [x] `scapy-helper`/`pyperclip` does not create an undocumented resolver
+      conflict. Dependabot ignores `pyperclip` and `tabulate`, and both files
+      say why and when to remove the holds.
+- [x] Image smoke checks, PTF smoke tests, and the two-host PTF/TRex traffic
+      validation pass. See the test record in #1331 and
+      [the testbed results](https://github.com/andybavier/upf-testbed/blob/main/docs/phase2.md#results).
+- [x] The source/version choices are documented in `ptf/README.md`. The
+      dependency-regeneration procedure is deferred (section 4).
+- [x] A current Dependabot-style Python dependency update resolves and builds:
+      #1388 updated both PTF requirement files, its PTF image build passed, and
+      the hardware-validated commit includes it.
 
 ## Work checklist
 
@@ -108,9 +115,10 @@ required by [issue #1220](https://github.com/omec-project/upf/issues/1220).
 
 ### 4. Modernize and lock Python dependencies
 
-- [ ] **Deferred:** Upgrade or replace `scapy-helper==0.14.8`. Dependabot
-      independently ignores `pyperclip` updates as a temporary guardrail; the
-      underlying PTF dependency relationship remains to be addressed.
+- [ ] **Deferred:** Upgrade or replace `scapy-helper==0.14.8`. It can't be
+      dropped while `ptf` requires it; the likely fix is upstream, making
+      `scapy_helper` an optional dependency for `bf_pktpy` in `ptf`. Until
+      then `pyperclip` and `tabulate` stay held, as documented.
 - [x] Maintain an explicitly pinned, documented UPF patch series for the
       selected upstream source; do not suppress pip resolver errors.
 - [ ] **Deferred:** Regenerate `ptf/requirements-ptf.txt` and
@@ -136,21 +144,29 @@ required by [issue #1220](https://github.com/omec-project/upf/issues/1220).
 
 ### 6. Validate end-to-end behavior
 
-- [ ] Run unary PTF tests in the image.
-- [ ] Run a representative linerate/baseline PTF test against a two-host
-      UPF/TRex testbed.
-- [ ] Run representative uplink/downlink, QER, and MBR traffic coverage.
-- [ ] Capture commands, image digest, TRex version, Scapy version, testbed
-      details, and results in the PR or linked test report.
-- [ ] Recreate or rebase a Dependabot-style Python dependency update and
-      verify it resolves and builds.
+All runs were on two CloudLab c220g5 hosts (Intel X710), 2026-11-03, with the
+UPF and PTF images built from the #1331 branch at `7a94d6fae`.
+
+- [x] Run unary PTF tests in the image: 5/5 pass.
+- [x] Run a representative linerate/baseline PTF test against a two-host
+      UPF/TRex testbed: `baseline` passes on a freshly started UPF. Its tail
+      latency degrades as one UPF serves repeated runs (#1392).
+- [x] Run representative uplink/downlink, QER, and MBR traffic coverage:
+      `mbr` 4/4 and `qos_metrics` pass.
+- [x] Capture commands, TRex version, Scapy version, testbed details, and
+      results in the PR or linked test report (the test record in #1331).
+      Image digests aren't recorded: locally built images don't reproduce
+      them, and the commits and pinned base images do.
+- [x] Recreate or rebase a Dependabot-style Python dependency update and
+      verify it resolves and builds (#1388, above).
 
 ### 7. Document and close out
 
-- [ ] Update `ptf/README.md` with the selected TRex and Scapy versions,
+- [x] Update `ptf/README.md` with the selected TRex and Scapy versions,
       supported environment, and validation instructions.
-- [ ] Document any intentional dependency exception with its owner and removal
-      path.
+- [x] Document any intentional dependency exception with its owner and removal
+      path: the `pyperclip`/`tabulate` holds and the `setuptools` pin, in
+      `ptf/requirements-ptf.txt`.
 - [ ] Link the implementation PR(s) and validation evidence to #1220.
 - [ ] Close #1163 as resolved by #1220 once the mixed-Scapy failure is fixed.
 - [ ] Close #1220 only after every definition-of-done item is complete.
