@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 The Linux Foundation
+name: Go protobuf drift
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/go-pb-drift.yml"
+      - ".pre-commit-config.yaml"
+      - "bess/protobuf/**"
+      - "Dockerfile"
+      - "Makefile"
+      - "pfcpiface/bess_pb/**"
+      - "pfcpiface/tools/fix_sonar_pb.go"
+permissions:
+  contents: read
+jobs:
+  go-pb-drift:
+    name: Check generated Go BESS bindings
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # `make pb` runs pfcpiface/tools/fix_sonar_pb.go on the host.
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Regenerate the bindings
+        run: make pb
+      - name: Fail if the committed bindings differ
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "$(git status --porcelain -- pfcpiface/bess_pb)" ]]; then
+            git status --short -- pfcpiface/bess_pb
+            git diff -- pfcpiface/bess_pb
+            echo "::error::pfcpiface/bess_pb differs from \`make pb\` output. Run \`make pb\` and commit the result."
+            exit 1
+          fi
+          echo "pfcpiface/bess_pb matches \`make pb\` output."

@@ -38,6 +38,16 @@ make pb
 make py-pb
 ```
 
+`make pb` writes the Go bindings in `pfcpiface/bess_pb`, which are committed.
+It uses the pinned `protoc`, `protoc-gen-go` and `protoc-gen-go-grpc` versions
+in the `protoc-go` and `protoc-gen` stages of the `Dockerfile`, and only needs
+the `.proto` files, so it doesn't build BESS. Commit its output unchanged:
+`golangci-lint` and the pre-commit hooks leave `*.pb.go` files alone, and CI
+fails if the committed bindings differ from what `make pb` produces. After
+changing a pinned version, run `make pb` and commit the result. `make py-pb`
+writes the Python bindings that the PTF tests use into `ptf/lib`; they aren't
+committed.
+
 Run the UPF test suites as appropriate:
 
 ```bash

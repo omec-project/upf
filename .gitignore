@@ -8,6 +8,7 @@
 *.swp
 *.log
 output
+build-output/
 dpdk-devbind.py
 dpdk-hugepages.py
 dictionary.dic

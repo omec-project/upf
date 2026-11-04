@@ -38,12 +38,11 @@
 package bess_pb
 
 import (
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
-
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -264,13 +263,11 @@ func file_util_msg_proto_rawDescGZIP() []byte {
 	return file_util_msg_proto_rawDescData
 }
 
-var (
-	file_util_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
-	file_util_msg_proto_goTypes  = []any{
-		(*Field)(nil),     // 0: bess.pb.Field
-		(*FieldData)(nil), // 1: bess.pb.FieldData
-	}
-)
+var file_util_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_util_msg_proto_goTypes = []any{
+	(*Field)(nil),     // 0: bess.pb.Field
+	(*FieldData)(nil), // 1: bess.pb.FieldData
+}
 var file_util_msg_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
 	0, // [0:0] is the sub-list for method input_type

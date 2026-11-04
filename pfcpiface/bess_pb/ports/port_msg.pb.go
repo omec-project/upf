@@ -39,12 +39,11 @@
 package bess_pb
 
 import (
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
-
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -293,16 +292,16 @@ func (*PMDPortArg_SocketId) isPMDPortArg_Socket() {}
 
 type UnixSocketPortArg struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// / Set the first character to "@" in place of \0 for abstract path
-	// / See manpage for unix(7).
+	/// Set the first character to "@" in place of \0 for abstract path
+	/// See manpage for unix(7).
 	Path string `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
-	// / Minimum RX polling interval for system calls, when *idle*.
-	// / Use a negative number for unthrottled polling. If unspecified or 0,
-	// / it is set to 50,000 (50 microseconds, or 20k polls per second)
+	/// Minimum RX polling interval for system calls, when *idle*.
+	/// Use a negative number for unthrottled polling. If unspecified or 0,
+	/// it is set to 50,000 (50 microseconds, or 20k polls per second)
 	MinRxIntervalNs int64 `protobuf:"varint,2,opt,name=min_rx_interval_ns,json=minRxIntervalNs,proto3" json:"min_rx_interval_ns,omitempty"`
-	// / If set, the port driver will send a confirmation once
-	// / the port is connected.  This lets pybess avoid a race during
-	// / testing.  See bessctl/test_utils.py for details.
+	/// If set, the port driver will send a confirmation once
+	/// the port is connected.  This lets pybess avoid a race during
+	/// testing.  See bessctl/test_utils.py for details.
 	ConfirmConnect bool `protobuf:"varint,3,opt,name=confirm_connect,json=confirmConnect,proto3" json:"confirm_connect,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
@@ -562,15 +561,13 @@ func file_ports_port_msg_proto_rawDescGZIP() []byte {
 	return file_ports_port_msg_proto_rawDescData
 }
 
-var (
-	file_ports_port_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
-	file_ports_port_msg_proto_goTypes  = []any{
-		(*PCAPPortArg)(nil),       // 0: bess.pb.PCAPPortArg
-		(*PMDPortArg)(nil),        // 1: bess.pb.PMDPortArg
-		(*UnixSocketPortArg)(nil), // 2: bess.pb.UnixSocketPortArg
-		(*VPortArg)(nil),          // 3: bess.pb.VPortArg
-	}
-)
+var file_ports_port_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_ports_port_msg_proto_goTypes = []any{
+	(*PCAPPortArg)(nil),       // 0: bess.pb.PCAPPortArg
+	(*PMDPortArg)(nil),        // 1: bess.pb.PMDPortArg
+	(*UnixSocketPortArg)(nil), // 2: bess.pb.UnixSocketPortArg
+	(*VPortArg)(nil),          // 3: bess.pb.VPortArg
+}
 var file_ports_port_msg_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
 	0, // [0:0] is the sub-list for method input_type
