@@ -183,33 +183,49 @@ ENV PYTHONPATH="/opt/bess"
 WORKDIR /opt/bess/bessctl
 ENTRYPOINT ["bessd", "-f"]
 
+# Go BESS bindings (`make pb`, committed in pfcpiface/bess_pb) come from a
+# pinned toolchain: protoc from the protoc-go stage, and protoc-gen-go and
+# protoc-gen-go-grpc from the protoc-gen stage. Changing any of these
+# versions changes the generated code; regenerate with `make pb` and commit
+# the result. CI (.github/workflows/go-pb-drift.yml) fails if the committed
+# bindings differ from what `make pb` produces.
+
 # Stage protoc-go: pinned Protocol Buffers compiler for Go binding generation.
 # BESS itself continues to build with Ubuntu's system protoc from bess-build.
 FROM ubuntu:26.04@sha256:f3d28607ddd78734bb7f71f117f3c6706c666b8b76cbff7c9ff6e5718d46ff64 AS protoc-go
+ARG TARGETARCH
 ARG PROTOC_RELEASE=33.0
 ARG PROTOC_CLI_VERSION=33.0
-ARG PROTOC_SHA256=d99c011b799e9e412064244f0be417e5d76c9b6ace13a2ac735330fa7d57ad8f
-RUN apt-get update && \
+ARG PROTOC_SHA256_AMD64=d99c011b799e9e412064244f0be417e5d76c9b6ace13a2ac735330fa7d57ad8f
+ARG PROTOC_SHA256_ARM64=4b96bc91f8b54d829b8c3ca2207ff1ceb774843321e4fa5a68502faece584272
+# The generated code doesn't depend on the build host's architecture, so arm64
+# hosts can run `make pb` natively with protoc's aarch_64 release.
+RUN case "${TARGETARCH:-amd64}" in \
+        amd64) protoc_arch=x86_64 protoc_sha256="${PROTOC_SHA256_AMD64}" ;; \
+        arm64) protoc_arch=aarch_64 protoc_sha256="${PROTOC_SHA256_ARM64}" ;; \
+        *) echo "unsupported architecture: ${TARGETARCH}" >&2 && exit 1 ;; \
+    esac && \
+    apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates curl unzip && \
     curl --fail --location --silent --show-error \
         --output /tmp/protoc.zip \
-        "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_RELEASE}/protoc-${PROTOC_RELEASE}-linux-x86_64.zip" && \
-    printf '%s  %s\n' "${PROTOC_SHA256}" /tmp/protoc.zip > /tmp/protoc.sha256 && \
+        "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_RELEASE}/protoc-${PROTOC_RELEASE}-linux-${protoc_arch}.zip" && \
+    printf '%s  %s\n' "${protoc_sha256}" /tmp/protoc.zip > /tmp/protoc.sha256 && \
     sha256sum --check --strict /tmp/protoc.sha256 && \
     unzip -q /tmp/protoc.zip -d /opt/protoc && \
     test "$(/opt/protoc/bin/protoc --version)" = "libprotoc ${PROTOC_CLI_VERSION}" && \
     rm -rf /var/lib/apt/lists/* /tmp/protoc.zip /tmp/protoc.sha256
 
-# Stage protoc-gen: Go protobuf plugins. See #1227 for generated binding
-# refresh and drift-check coverage.
+# Stage protoc-gen: pinned Go protobuf plugins.
 FROM golang:1.27.3-bookworm@sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9 AS protoc-gen
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10 && \
     go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
 
-FROM bess-build AS go-pb
+# Stage go-pb: Go bindings for the BESS protobufs. It needs only the .proto
+# files, not a BESS build, so `make pb` and the CI drift check stay fast.
+FROM protoc-gen AS go-pb
 COPY --from=protoc-go /opt/protoc /opt/protoc
-COPY --from=protoc-gen /go/bin/protoc-gen-go /bin
-COPY --from=protoc-gen /go/bin/protoc-gen-go-grpc /bin
+COPY bess/protobuf /protobuf
 
 RUN mkdir /bess_pb && \
     /opt/protoc/bin/protoc -I /opt/protoc/include -I /protobuf/ \
@@ -275,7 +291,7 @@ ENTRYPOINT [ "/bin/pfcpiface" ]
 
 # Stage pb: dummy stage for collecting protobufs
 FROM scratch AS pb
-COPY --from=bess-build /protobuf /protobuf
+COPY --from=go-pb /protobuf /protobuf
 COPY --from=go-pb /bess_pb /bess_pb
 
 # Stage ptf-pb: dummy stage for collecting python protobufs

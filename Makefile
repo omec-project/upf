@@ -108,10 +108,12 @@ output: $(BUILD_OUTPUT_DIR) ## Extract build artifacts
 
 pb: $(BUILD_OUTPUT_DIR) ## Generate Go protobuf files
 	@echo "Generating Go protobuf files..."
+	@rm -rf $(BUILD_OUTPUT_DIR)/bess_pb
 	@DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) $(DOCKER_EXTRA_BUILD_ARGS) \
 		--target pb \
 		--output $(BUILD_OUTPUT_DIR) \
 		.
+	@rm -rf $(BESS_PB_DIR)/bess_pb
 	@cp -a $(BUILD_OUTPUT_DIR)/bess_pb $(BESS_PB_DIR)
 	@echo "Fixing SonarQube issues in generated protobuf files..."
 	@go run pfcpiface/tools/fix_sonar_pb.go $(BESS_PB_DIR)/bess_pb
