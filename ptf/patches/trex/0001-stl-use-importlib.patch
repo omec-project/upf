@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+From: UPF maintainers <upf@omecproject.org>
+Subject: [PATCH] stl: replace removed imp module with importlib
+
+Python 3.14 removed the deprecated imp module. UPF only uses the stateless
+TRex client, whose stream loader reloads generated profile modules. Import the
+supported importlib module under the existing local name so every imp.reload
+call resolves to importlib.reload without whitespace-sensitive call-site edits.
+
+---
+ scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl_streams.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl_streams.py b/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl_streams.py
+index 0e2e2c2..9c3b5c9 100644
+--- a/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl_streams.py
++++ b/scripts/automation/trex_control_plane/interactive/trex/stl/trex_stl_streams.py
+@@ -9,7 +9,7 @@
+ import string
+ import traceback
+ import copy
+-import imp
++import importlib as imp
+
+
+ from ..common.trex_exceptions import *
