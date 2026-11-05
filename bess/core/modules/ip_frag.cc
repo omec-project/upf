@@ -83,11 +83,7 @@ bess::Packet *IPFrag::FragmentPkt(Context *ctx, bess::Packet *p) {
         if (ethh == NULL)
           rte_panic("No headroom in mbuf.\n");
         /* remove chained mbufs (as they are not needed) */
-        struct rte_mbuf *del_mbuf = m->next;
-        while (del_mbuf != NULL) {
-          rte_pktmbuf_free_seg(del_mbuf);
-          del_mbuf = del_mbuf->next;
-        }
+        rte_pktmbuf_free(m->next);
 
         /* setting mbuf metadata */
         m->l2_len = sizeof(struct rte_ether_hdr);
