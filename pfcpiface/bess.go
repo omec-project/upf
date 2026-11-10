@@ -560,7 +560,7 @@ func (b *bess) readFlowMeasurement(
 	arg, err := anypb.New(req)
 	if err != nil {
 		logger.BessLog.Errorln(errMarshalRequest, req, err)
-		return nil, err
+		return nil, fmt.Errorf("%s: %w", module, err)
 	}
 
 	resp, err := b.client.ModuleCommand(
@@ -572,7 +572,7 @@ func (b *bess) readFlowMeasurement(
 	)
 	if err != nil {
 		logger.BessLog.Errorln(module, errReadFailed, err)
-		return nil, err
+		return nil, fmt.Errorf("%s: %w", module, err)
 	}
 
 	if resp.GetError() != nil {
@@ -584,7 +584,7 @@ func (b *bess) readFlowMeasurement(
 
 	if err = resp.Data.UnmarshalTo(stats); err != nil {
 		logger.BessLog.Errorln(err, resp)
-		return nil, err
+		return nil, fmt.Errorf("%s: %w", module, err)
 	}
 
 	return stats, nil
@@ -649,24 +649,12 @@ func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 
 	q := []float64{50, 90, 99}
 
-	// Read stats from the now inactive side, and clear if needed.
-	qosStatsInResp, err := b.readFlowMeasurement(ctx, PreQosFlowMeasure, flip.OldFlag, true, q)
-	if err != nil {
-		logger.BessLog.Errorln(PreQosFlowMeasure, errReadFailed, err)
-		return err
-	}
-
-	postDlQosStatsResp, err := b.readFlowMeasurement(ctx, PostDlQosFlowMeasure, flip.OldFlag, true, q)
-	if err != nil {
-		logger.BessLog.Errorln(PostDlQosFlowMeasure, errReadFailed, err)
-		return err
-	}
-
-	postUlQosStatsResp, err := b.readFlowMeasurement(ctx, PostUlQosFlowMeasure, flip.OldFlag, true, q)
-	if err != nil {
-		logger.BessLog.Errorln(PostUlQosFlowMeasure, errReadFailed, err)
-		return err
-	}
+	// Read stats from the now inactive side, and clear them. Read every module even if one
+	// fails: returning early would drop the series of the modules already read and cleared,
+	// and leave the ones after it unread, so their bytes would surface in a later collection.
+	qosStatsInResp, preErr := b.readFlowMeasurement(ctx, PreQosFlowMeasure, flip.OldFlag, true, q)
+	postDlQosStatsResp, dlErr := b.readFlowMeasurement(ctx, PostDlQosFlowMeasure, flip.OldFlag, true, q)
+	postUlQosStatsResp, ulErr := b.readFlowMeasurement(ctx, PostUlQosFlowMeasure, flip.OldFlag, true, q)
 
 	// TODO: pick first connection for now
 	var con *PFCPConn
@@ -771,10 +759,18 @@ func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) 
 		}
 	}
 
-	createStats(qosStatsInResp, postUlQosStatsResp, "uplink")
-	createStats(qosStatsInResp, postDlQosStatsResp, "downlink")
+	// A direction needs both its post-QoS read and the pre-QoS one, which carries rx_packets.
+	if preErr == nil {
+		if ulErr == nil {
+			createStats(qosStatsInResp, postUlQosStatsResp, "uplink")
+		}
 
-	return err
+		if dlErr == nil {
+			createStats(qosStatsInResp, postDlQosStatsResp, "downlink")
+		}
+	}
+
+	return errors.Join(preErr, dlErr, ulErr)
 }
 
 func resolveUEIP(

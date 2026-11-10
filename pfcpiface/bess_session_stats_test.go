@@ -6,9 +6,11 @@ package pfcpiface
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
@@ -36,8 +38,15 @@ const (
 
 // flowMeasureStub answers the flip and read commands SessionStats sends to the three
 // flow-measure modules, returning one uplink and one downlink rule for a single session.
+// A read of a module in failRead fails the way bessd refuses one, a response carrying an
+// error, or, with failTransport, as a call that never got a response. reads, if set,
+// counts the reads of each module. The stub does not model the buffer flags: it only
+// checks that every read asks for the side the flip retired, and clears it.
 type flowMeasureStub struct {
 	pb.BESSControlClient
+	failRead      []string
+	failTransport bool
+	reads         map[string]int
 }
 
 func statsTestStatistic(pdrID, packets, bytes uint64) *pb.FlowMeasureReadResponse_Statistic {
@@ -55,9 +64,35 @@ func statsTestStatistic(pdrID, packets, bytes uint64) *pb.FlowMeasureReadRespons
 	}
 }
 
-func (flowMeasureStub) ModuleCommand(
+func (s flowMeasureStub) ModuleCommand(
 	_ context.Context, req *pb.CommandRequest, _ ...grpc.CallOption,
 ) (*pb.CommandResponse, error) {
+	if req.Cmd == "read" {
+		var arg pb.FlowMeasureCommandReadArg
+		if err := req.Arg.UnmarshalTo(&arg); err != nil {
+			return nil, err
+		}
+
+		if arg.FlagToRead != 1 || !arg.Clear {
+			return nil, fmt.Errorf("read of %q asks for flag %d, clear %t; want the retired flag 1, cleared",
+				req.Name, arg.FlagToRead, arg.Clear)
+		}
+
+		if s.reads != nil {
+			s.reads[req.Name]++
+		}
+
+		if slices.Contains(s.failRead, req.Name) {
+			if s.failTransport {
+				return nil, context.DeadlineExceeded
+			}
+
+			return &pb.CommandResponse{Error: &pb.Error{
+				Code: int32(syscall.EINVAL), Errmsg: "refusing to read active buffer",
+			}}, nil
+		}
+	}
+
 	var stats []*pb.FlowMeasureReadResponse_Statistic
 
 	switch req.Name {
@@ -91,9 +126,9 @@ func (flowMeasureStub) ModuleCommand(
 	return &pb.CommandResponse{Data: data}, nil
 }
 
-// newSessionStatsNode builds a node whose datapath answers with flowMeasureStub, and whose
-// one association knows the session, so the UE address resolves from its uplink rule.
-func newSessionStatsNode(t *testing.T) *PFCPNode {
+// newSessionStatsNode builds a node whose datapath answers with stub, and whose one
+// association knows the session, so the UE address resolves from its uplink rule.
+func newSessionStatsNode(t *testing.T, stub flowMeasureStub) *PFCPNode {
 	t.Helper()
 
 	store := NewInMemoryStore()
@@ -109,7 +144,7 @@ func newSessionStatsNode(t *testing.T) *PFCPNode {
 		t.Fatal(err)
 	}
 
-	node := &PFCPNode{upf: &upf{enableFlowMeasure: true, datapath: &bess{client: flowMeasureStub{}}}}
+	node := &PFCPNode{upf: &upf{enableFlowMeasure: true, datapath: &bess{client: stub}}}
 	node.pConns.Store("smf", &PFCPConn{store: store})
 
 	return node
@@ -161,11 +196,87 @@ upf_session_jitter_ns_sum{` + dl + `} 0
 upf_session_jitter_ns_count{` + dl + `} 8
 `
 
-	collector := NewPFCPNodeCollector(newSessionStatsNode(t))
+	collector := NewPFCPNodeCollector(newSessionStatsNode(t, flowMeasureStub{}))
 
 	if err := testutil.CollectAndCompare(collector, strings.NewReader(want)); err != nil {
 		t.Errorf("session metrics do not name the direction each series was read from "+
 			"(the downlink rule has the lower PDR ID, so rule order must not decide it):\n%v", err)
+	}
+}
+
+// A module whose read fails must not take the other modules' series with it. bessd refuses
+// a post-QoS module that saw no packet since the flip, so with one-way traffic the idle
+// direction's read fails while the active direction's has data to report. The modules are
+// read and cleared in turn: an early return drops what was already read, and leaves the
+// modules after the failure unread, so their bytes surface in a later collection.
+func TestSessionStatsEmitsTheDirectionsThatWereRead(t *testing.T) {
+	ul := fmt.Sprintf(`direction="uplink",fseid="%d",pdr="%d",ue_ip="%s"`, statsTestFSEID, statsTestULPDR, statsTestUEIP)
+	dl := fmt.Sprintf(`direction="downlink",fseid="%d",pdr="%d",ue_ip="%s"`, statsTestFSEID, statsTestDLPDR, statsTestUEIP)
+
+	tests := []struct {
+		failRead      []string
+		failTransport bool
+		want          []string // the label sets of the series that must still be emitted
+	}{
+		{failRead: []string{PostDlQosFlowMeasure}, want: []string{ul}},
+		{failRead: []string{PostUlQosFlowMeasure}, want: []string{dl}},
+		// rx_packets comes from the pre-QoS read, so no direction can be reported without it.
+		// This case passed before the fix too; it pins that the pairing does not read nil.
+		{failRead: []string{PreQosFlowMeasure}, want: nil},
+		{failRead: []string{PostDlQosFlowMeasure, PostUlQosFlowMeasure}, want: nil},
+		// A gRPC error does not name the module by itself; the collection error still must.
+		{failRead: []string{PostDlQosFlowMeasure}, failTransport: true, want: []string{ul}},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%s/transport=%t", strings.Join(tt.failRead, "+"), tt.failTransport), func(t *testing.T) {
+			reads := map[string]int{}
+			node := newSessionStatsNode(t, flowMeasureStub{failRead: tt.failRead, failTransport: tt.failTransport, reads: reads})
+			col := NewPFCPNodeCollector(node)
+			ch := make(chan prometheus.Metric, 64)
+
+			err := node.upf.SessionStats(col, ch)
+			close(ch)
+
+			for _, module := range tt.failRead {
+				if err == nil || !strings.Contains(err.Error(), module) {
+					t.Errorf("SessionStats error = %v, want one naming %s", err, module)
+				}
+			}
+
+			// Every module is read once, failure or not: a module left unread keeps its
+			// bytes for a later collection.
+			wantReads := map[string]int{PreQosFlowMeasure: 1, PostDlQosFlowMeasure: 1, PostUlQosFlowMeasure: 1}
+			if !maps.Equal(reads, wantReads) {
+				t.Errorf("reads per module = %v, want %v", reads, wantReads)
+			}
+
+			got := map[string]int{}
+
+			for m := range ch {
+				var out dto.Metric
+				if err := m.Write(&out); err != nil {
+					t.Fatal(err)
+				}
+
+				labels := make([]string, 0, len(out.GetLabel()))
+				for _, l := range out.GetLabel() {
+					labels = append(labels, fmt.Sprintf("%s=%q", l.GetName(), l.GetValue()))
+				}
+
+				got[strings.Join(labels, ",")]++
+			}
+
+			// Five metrics per rule: tx/rx packets, tx bytes, latency and jitter.
+			want := map[string]int{}
+			for _, w := range tt.want {
+				want[w] = 5
+			}
+
+			if !maps.Equal(got, want) {
+				t.Errorf("with %v failing, series per label set = %v, want %v", tt.failRead, got, want)
+			}
+		})
 	}
 }
 
