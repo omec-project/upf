@@ -54,7 +54,9 @@ type Request struct {
 }
 
 func newRequest(msg message.Message) *Request {
-	return &Request{msg: msg, reply: make(chan message.Message)}
+	// Buffered: a response can arrive after its sender gave up but before it stopped
+	// awaiting one, and the association's reader, which delivers it, must not block.
+	return &Request{msg: msg, reply: make(chan message.Message, 1)}
 }
 
 func (r *Request) GetResponse(done <-chan struct{}, respDuration time.Duration) (message.Message, bool) {
@@ -188,6 +190,8 @@ func (pConn *PFCPConn) SendPFCPMsg(msg message.Message) {
 
 func (pConn *PFCPConn) sendPFCPRequestMessage(r *Request) (message.Message, bool) {
 	pConn.pendingReqs.Store(r.msg.Sequence(), r)
+	// Once this returns nobody awaits a response, whether one came or not.
+	defer pConn.pendingReqs.Delete(r.msg.Sequence())
 
 	pConn.SendPFCPMsg(r.msg)
 	retriesLeft := pConn.upf.maxReqRetries
