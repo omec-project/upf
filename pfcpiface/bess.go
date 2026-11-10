@@ -108,6 +108,11 @@ type bess struct {
 	// address and unregister that same address, however many times it is updated.
 	pathMonitoringMu   sync.Mutex
 	pathMonitoringGnbs map[pathMonitoringKey]uint32
+
+	// Held for a whole SessionStats: its flip of the flow-measure leader and its reads of
+	// the side that flip retired. Prometheus can run two scrapes at once, and a second
+	// flip in between would turn the retired side back into the one traffic is writing.
+	sessionStatsMu sync.Mutex
 }
 
 // pathMonitoringKey names a FAR: FAR IDs are unique within a session, F-SEIDs on the UPF.
@@ -628,6 +633,9 @@ func (b *bess) readGtpuPathMonitoringStats(
 }
 
 func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) (err error) {
+	b.sessionStatsMu.Lock()
+	defer b.sessionStatsMu.Unlock()
+
 	// Clearing table data with large tables is slow, let's wait for a little longer since this is
 	// non-blocking for the dataplane anyway.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
