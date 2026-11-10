@@ -187,7 +187,7 @@ CommandResponse FlowMeasure::CommandReadStats(
   VLOG(1) << name() << ": " << (leader_ ? "leader" : "follower")
           << " last saw buffer flag " << Flag_Name(cached_current_flag)
           << ", now reading from " << Flag_Name(flag_to_read);
-  VLOG_IF(1, cached_current_flag == flag_to_read)
+  VLOG_IF(1, leader_ && cached_current_flag == flag_to_read)
       << name()
       << ": requested to read active buffer flag. Either there is no "
          "traffic or the controller is performing invalid requests.";
@@ -220,7 +220,20 @@ CommandResponse FlowMeasure::CommandReadStats(
   // time it touches this table. Using a lock per table (rather than one
   // shared with the other side) avoids blocking the dataplane while it is
   // processing the other, still-active buffer.
-  if (cached_current_flag == flag_to_read) {
+  //
+  // Only the leader's flag says which buffer is active. A follower learns
+  // the flag from the packets that pass through it, so one that has seen no
+  // packet since the leader's flip still holds the retired flag. The
+  // controller only asks for the buffer the leader has just retired, after
+  // CommandFlipFlag() has waited for packets carrying the old flag to drain,
+  // and any later packet carries the new flag and writes the other table.
+  // A follower's flag equal to flag_to_read therefore means "no packet since
+  // the flip", not "this table is in use": refusing it would leave the counts
+  // in the table until traffic moves the follower's flag, and a later read
+  // would report them in the wrong interval. So a follower is not guarded by
+  // flag: that controller contract keeps it off its active table, and the
+  // try_lock below only catches a packet that holds the lock at that instant.
+  if (leader_ && cached_current_flag == flag_to_read) {
     // Reading the still-active buffer would hold the table lock across
     // rte_hash_iterate() (and rte_hash_reset(), if arg.clear()) while
     // ProcessBatch() is still writing to this same table: fail fast instead
@@ -228,7 +241,7 @@ CommandResponse FlowMeasure::CommandReadStats(
     return CommandFailure(EINVAL, "refusing to read active buffer");
   }
   // current_flag_value_ can still change (concurrent CommandFlipFlag(), or a
-  // follower catching up to new packets) between the check above and here,
+  // follower catching up to new packets) after it was cached above,
   // so try_lock instead of blocking: contention on a table that is supposed
   // to be inactive means it may have just become active, and we would rather
   // fail fast than stall the dataplane waiting for/holding that lock.
@@ -236,7 +249,7 @@ CommandResponse FlowMeasure::CommandReadStats(
   if (!table_lock.owns_lock()) {
     return CommandFailure(EBUSY, "table busy (possible concurrent flip/read)");
   }
-  {
+  if (leader_) {
     // Re-check under flag_mutex_: now that we hold table_lock, confirm the
     // table we are about to iterate/reset still is not the active one.
     const std::lock_guard<std::mutex> lock(flag_mutex_);
