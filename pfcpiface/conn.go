@@ -401,10 +401,16 @@ func (pConn *PFCPConn) IsShutdown() bool {
 	return pConn.isShutdown.Load()
 }
 
+// maxSeqNum is the largest PFCP sequence number: the header carries it in 3 octets
+// (TS 29.244 clauses 7.2.2.2 and 7.2.2.3).
+const maxSeqNum = 1<<24 - 1
+
+// getSeqNum returns the sequence number of the next request. It wraps within 24 bits, so
+// that a request is awaited under the number its response comes back with.
 func (pConn *PFCPConn) getSeqNum() uint32 {
 	pConn.seqNum.mux.Lock()
 	defer pConn.seqNum.mux.Unlock()
-	pConn.seqNum.seq++
+	pConn.seqNum.seq = (pConn.seqNum.seq + 1) & maxSeqNum
 
 	return pConn.seqNum.seq
 }
