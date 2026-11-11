@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/omec-project/upf-epc/logger"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -726,6 +727,15 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 		return nil, errUnmarshal(errMsgUnexpectedType)
 	}
 
+	// A retransmission of a request this association answered: the session is gone.
+	deletion := deletionKey{localSEID: sdreq.SEID(), seq: sdreq.SequenceNumber}
+	if rsp, answered := pConn.deletions.get(deletion, time.Now()); answered {
+		logger.PfcpLog.Debugln("answering a retransmitted Session Deletion Request for session",
+			deletion.localSEID, "with its response")
+
+		return rsp, nil
+	}
+
 	// Zero until the session is found. The lookup's own refusal is answered separately
 	// below; every refusal after it is for a session the control plane has an SEID for,
 	// and carries it.
@@ -810,6 +820,8 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 		0,                                    /* priority */
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 	)
+
+	pConn.deletions.put(deletion, smres, time.Now())
 
 	return smres, nil
 }

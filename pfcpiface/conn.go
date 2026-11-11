@@ -77,6 +77,10 @@ type PFCPConn struct {
 	// store write both done, for teardown to reclaim -- or entirely after it, as a
 	// refusal that changes nothing.
 	sessionsMu sync.Mutex
+
+	// deletions answers a retransmitted Session Deletion Request. Under sessionsMu; it
+	// lasts as long as the connection, across re-associations.
+	deletions deletionResponses
 }
 
 func (pConn *PFCPConn) startHeartBeatMonitor() {
