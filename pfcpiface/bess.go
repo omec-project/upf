@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"math"
 	"net"
-	"strconv"
 	"sync"
 	"time"
 
@@ -109,9 +108,13 @@ type bess struct {
 	pathMonitoringMu   sync.Mutex
 	pathMonitoringGnbs map[pathMonitoringKey]uint32
 
-	// Held for a whole SessionStats: its flip of the flow-measure leader and its reads of
-	// the side that flip retired. Prometheus can run two scrapes at once, and a second
-	// flip in between would turn the retired side back into the one traffic is writing.
+	// gtppsc says the GTP-U encapsulation adds the PDU Session Container extension
+	// header, which the downlink flow-measure module counts.
+	gtppsc bool
+
+	// Held for a whole ReadUsage: its flip of the flow-measure leader and its reads of the
+	// side that flip retired. Prometheus can run two scrapes at once, and a second flip in
+	// between would turn the retired side back into the one traffic is writing.
 	sessionStatsMu sync.Mutex
 }
 
@@ -632,145 +635,75 @@ func (b *bess) readGtpuPathMonitoringStats(
 	return &res
 }
 
-func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) (err error) {
-	b.sessionStatsMu.Lock()
-	defer b.sessionStatsMu.Unlock()
-
+func (b *bess) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) error {
 	// Clearing table data with large tables is slow, let's wait for a little longer since this is
 	// non-blocking for the dataplane anyway.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
+
+	counts, err := b.ReadUsage(ctx)
+
+	emitSessionStats(pc, ch, counts)
+
+	return err
+}
+
+// Header sizes the post-QoS flow-measure modules count (conf/up4.bess,
+// bess/core/modules/gtpu_encap.cc).
+const (
+	ethernetHeaderLen = 14
+	// gtpuEncapLen is the outer IPv4, UDP and GTP-U headers GtpuEncap adds, and
+	// gtpuPSCLen the sequence-number extension and PDU Session Container it adds with
+	// gtppsc.
+	gtpuEncapLen = 20 + 8 + 8
+	gtpuPSCLen   = 4 + 4
+)
+
+// frameOverhead is what the post-QoS modules count besides the user's packet. They count
+// whole frames, Ethernet header included. The uplink module sits after GtpuDecap, so
+// that is all it adds; the downlink one sits after GtpuEncap, and counts the tunnel's
+// headers too.
+func (b *bess) frameOverhead() frameOverhead {
+	downlink := uint64(ethernetHeaderLen + gtpuEncapLen)
+	if b.gtppsc {
+		downlink += gtpuPSCLen
+	}
+
+	return frameOverhead{uplink: ethernetHeaderLen, downlink: downlink}
+}
+
+// ReadUsage flips the flow-measure leader, then reads and clears the side the flip retired
+// from all three modules. A module that was read has been cleared, so its counts exist
+// nowhere else: a failed read of one module does not discard the others, which are
+// returned alongside the error.
+func (b *bess) ReadUsage(ctx context.Context) (flowMeasureCounts, error) {
+	b.sessionStatsMu.Lock()
+	defer b.sessionStatsMu.Unlock()
+
 	// Flips the buffer flag, automatically waits for in-flight packets to drain.
 	flip, err := b.flipFlowMeasurementBufferFlag(ctx, PreQosFlowMeasure)
 	if err != nil {
 		logger.BessLog.Errorln(PreQosFlowMeasure, errReadFailed, err)
-		return err
+		return flowMeasureCounts{}, err
 	}
 
-	q := []float64{50, 90, 99}
+	q := sessionStatsQuantiles
 
 	// Read stats from the now inactive side, and clear them. Read every module even if one
-	// fails: returning early would drop the series of the modules already read and cleared,
-	// and leave the ones after it unread, so their bytes would surface in a later collection.
-	qosStatsInResp, preErr := b.readFlowMeasurement(ctx, PreQosFlowMeasure, flip.OldFlag, true, q)
-	postDlQosStatsResp, dlErr := b.readFlowMeasurement(ctx, PostDlQosFlowMeasure, flip.OldFlag, true, q)
-	postUlQosStatsResp, ulErr := b.readFlowMeasurement(ctx, PostUlQosFlowMeasure, flip.OldFlag, true, q)
+	// fails: returning early would drop the counts of the modules already read and cleared,
+	// and leave the ones after it unread, so their bytes would surface in a later read.
+	preQos, preErr := b.readFlowMeasurement(ctx, PreQosFlowMeasure, flip.OldFlag, true, q)
+	postDL, dlErr := b.readFlowMeasurement(ctx, PostDlQosFlowMeasure, flip.OldFlag, true, q)
+	postUL, ulErr := b.readFlowMeasurement(ctx, PostUlQosFlowMeasure, flip.OldFlag, true, q)
 
-	// TODO: pick first connection for now
-	var con *PFCPConn
-
-	pc.node.pConns.Range(func(key, value any) bool {
-		pConn, ok := value.(*PFCPConn)
-		if !ok {
-			return false
-		}
-
-		con = pConn
-		return false
-	})
-
-	if con == nil {
-		logger.BessLog.Warnln("no active PFCP connection, UE IP lookup disabled")
+	counts := flowMeasureCounts{
+		preQos:  newFlowMeasureTable(preQos),
+		postUL:  newFlowMeasureTable(postUL),
+		postDL:  newFlowMeasureTable(postDL),
+		framing: b.frameOverhead(),
 	}
 
-	// Prepare session stats.
-	createStats := func(preResp, postResp *pb.FlowMeasureReadResponse, direction string) {
-		for i := 0; i < len(postResp.Statistics); i++ {
-			var pre *pb.FlowMeasureReadResponse_Statistic
-
-			post := postResp.Statistics[i]
-			// Find preQos values.
-			for _, v := range preResp.Statistics {
-				if post.Pdr == v.Pdr && post.Fseid == v.Fseid {
-					pre = v
-					break
-				}
-			}
-
-			if pre == nil {
-				logger.BessLog.Infof("found no pre QoS statistics for PDR %v FSEID %v", post.Pdr, post.Fseid)
-				continue
-			}
-
-			fseidString := strconv.FormatUint(pre.Fseid, 10)
-			pdrString := strconv.FormatUint(pre.Pdr, 10)
-			ueIpString := UnknownString
-
-			ueIpString, ok := resolveUEIP(con, pre, ueIpString)
-			if !ok {
-				continue
-			}
-
-			ch <- prometheus.MustNewConstMetric(
-				pc.sessionTxPackets,
-				prometheus.GaugeValue,
-				float64(post.TotalPackets),
-				fseidString,
-				pdrString,
-				ueIpString,
-				direction,
-			)
-			ch <- prometheus.MustNewConstMetric(
-				pc.sessionRxPackets,
-				prometheus.GaugeValue,
-				float64(pre.TotalPackets),
-				fseidString,
-				pdrString,
-				ueIpString,
-				direction,
-			)
-			ch <- prometheus.MustNewConstMetric(
-				pc.sessionTxBytes,
-				prometheus.GaugeValue,
-				float64(post.TotalBytes),
-				fseidString,
-				pdrString,
-				ueIpString,
-				direction,
-			)
-			ch <- prometheus.MustNewConstSummary(
-				pc.sessionLatency,
-				post.TotalPackets,
-				0,
-				map[float64]float64{
-					q[0]: float64(post.Latency.PercentileValuesNs[0]),
-					q[1]: float64(post.Latency.PercentileValuesNs[1]),
-					q[2]: float64(post.Latency.PercentileValuesNs[2]),
-				},
-				fseidString,
-				pdrString,
-				ueIpString,
-				direction,
-			)
-			ch <- prometheus.MustNewConstSummary(
-				pc.sessionJitter,
-				post.TotalPackets,
-				0,
-				map[float64]float64{
-					q[0]: float64(post.Jitter.PercentileValuesNs[0]),
-					q[1]: float64(post.Jitter.PercentileValuesNs[1]),
-					q[2]: float64(post.Jitter.PercentileValuesNs[2]),
-				},
-				fseidString,
-				pdrString,
-				ueIpString,
-				direction,
-			)
-		}
-	}
-
-	// A direction needs both its post-QoS read and the pre-QoS one, which carries rx_packets.
-	if preErr == nil {
-		if ulErr == nil {
-			createStats(qosStatsInResp, postUlQosStatsResp, "uplink")
-		}
-
-		if dlErr == nil {
-			createStats(qosStatsInResp, postDlQosStatsResp, "downlink")
-		}
-	}
-
-	return errors.Join(preErr, dlErr, ulErr)
+	return counts, errors.Join(preErr, dlErr, ulErr)
 }
 
 func resolveUEIP(
@@ -1031,6 +964,7 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 	logger.BessLog.Errorln("SetUpfInfo bess")
 
 	b.readQciQosMap(conf)
+	b.gtppsc = conf.GtpPsc
 	// get bess grpc client
 	logger.BessLog.Errorln("bessIP", *bessIP)
 

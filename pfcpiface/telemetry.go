@@ -175,6 +175,14 @@ func (col PfcpNodeCollector) Describe(ch chan<- *prometheus.Desc) {
 
 func (col PfcpNodeCollector) Collect(ch chan<- prometheus.Metric) {
 	if col.node.upf.enableFlowMeasure {
+		// With usage reporting on, the URR poller is the counters' only reader: a read
+		// clears them, and a scrape that read them would take bytes from the usage it
+		// bills. The series come from its last poll instead.
+		if col.node.usage != nil {
+			col.node.usage.collectSessionStats(&col, ch)
+			return
+		}
+
 		err := col.node.upf.SessionStats(&col, ch)
 		if err != nil {
 			logger.PfcpLog.Errorf("failed to collect session stats: %v", err)

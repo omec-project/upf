@@ -1,0 +1,166 @@
+// SPDX-FileCopyrightText: 2026 Forsway Scandinavia AB
+// SPDX-License-Identifier: Apache-2.0
+
+package pfcpiface
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
+	"github.com/prometheus/client_golang/prometheus/testutil"
+	"google.golang.org/grpc"
+)
+
+// With usage reporting on, the URR poller is the only reader of the flow-measure counters:
+// a read clears them, so a scrape that read them would take bytes from the usage the
+// poller bills. Scrapes are served from the poller's last completed window instead.
+
+// countingStub is a flowMeasureStub that counts every command sent to the datapath.
+type countingStub struct {
+	flowMeasureStub
+	commands *atomic.Int32
+}
+
+func (s countingStub) ModuleCommand(
+	ctx context.Context, req *pb.CommandRequest, opts ...grpc.CallOption,
+) (*pb.CommandResponse, error) {
+	s.commands.Add(1)
+
+	return s.flowMeasureStub.ModuleCommand(ctx, req, opts...)
+}
+
+// monitoredNode is a session-stats node whose UPF reports usage, polled by the monitor it
+// returns, and a count of the commands its datapath has been sent.
+func monitoredNode(t *testing.T, interval time.Duration) (*PFCPNode, *usageMonitor, *atomic.Int32) {
+	t.Helper()
+
+	commands := &atomic.Int32{}
+	node := newSessionStatsNode(t, flowMeasureStub{})
+	node.ctx = context.Background()
+	node.upf.datapath = &bess{client: countingStub{commands: commands}}
+	node.upf.enableUsageReporting = true
+
+	reader, ok := node.upf.datapath.(usageReader)
+	if !ok {
+		t.Fatal("the bess datapath does not read usage counters")
+	}
+
+	node.usage = newUsageMonitor(node, reader, interval)
+
+	return node, node.usage, commands
+}
+
+func TestAScrapeServesTheLastPollWithoutReadingTheDatapath(t *testing.T) {
+	node, m, commands := monitoredNode(t, time.Minute)
+	collector := NewPFCPNodeCollector(node)
+
+	if n := testutil.CollectAndCount(collector); n != 0 {
+		t.Fatalf("a scrape before the first poll served %d series, expected none", n)
+	}
+
+	m.poll(time.Now())
+
+	afterPoll := commands.Load()
+	if afterPoll != 4 {
+		t.Fatalf("the poll sent %d commands, expected a flip and three reads", afterPoll)
+	}
+
+	ul := fmt.Sprintf(`direction="uplink",fseid="%d",pdr="%d",ue_ip="%s"`, statsTestFSEID, statsTestULPDR, statsTestUEIP)
+	dl := fmt.Sprintf(`direction="downlink",fseid="%d",pdr="%d",ue_ip="%s"`, statsTestFSEID, statsTestDLPDR, statsTestUEIP)
+	want := `
+# HELP upf_session_tx_bytes Shows the total number of bytes for a given session in UPF. Downlink bytes include GTP-U encapsulation
+# TYPE upf_session_tx_bytes gauge
+upf_session_tx_bytes{` + ul + `} 11000
+upf_session_tx_bytes{` + dl + `} 8400
+`
+
+	for range 2 {
+		err := testutil.CollectAndCompare(collector, strings.NewReader(want), "upf_session_tx_bytes")
+		if err != nil {
+			t.Fatalf("the scrape did not serve the poll's counts:\n%v", err)
+		}
+	}
+
+	if n := commands.Load(); n != afterPoll {
+		t.Fatalf("the scrapes sent %d commands to the datapath, expected none", n-afterPoll)
+	}
+}
+
+func TestAStalledPollerServesNoSeries(t *testing.T) {
+	const interval = time.Minute
+
+	node, m, _ := monitoredNode(t, interval)
+
+	m.poll(time.Now().Add(-2*interval - time.Second))
+
+	if n := testutil.CollectAndCount(NewPFCPNodeCollector(node)); n != 0 {
+		t.Fatalf("a snapshot older than two poll intervals served %d series, expected none", n)
+	}
+}
+
+// signallingReader tells of each read made of it.
+type signallingReader struct{ reads chan struct{} }
+
+func (r signallingReader) ReadUsage(context.Context) (flowMeasureCounts, error) {
+	select {
+	case r.reads <- struct{}{}:
+	default:
+	}
+
+	return flowMeasureCounts{preQos: flowMeasureTable{}, postUL: flowMeasureTable{}, postDL: flowMeasureTable{}}, nil
+}
+
+// The poller reads the datapath every interval until the node stops.
+func TestThePollerReadsEachIntervalUntilTheNodeStops(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	reader := signallingReader{reads: make(chan struct{})}
+	m := newUsageMonitor(&PFCPNode{ctx: ctx}, reader, 10*time.Millisecond)
+
+	stopped := make(chan struct{})
+
+	go func() {
+		m.run()
+		close(stopped)
+	}()
+
+	for i := range 2 {
+		select {
+		case <-reader.reads:
+		case <-time.After(5 * time.Second):
+			t.Fatalf("the poller made %d reads, expected one each interval", i)
+		}
+	}
+
+	cancel()
+
+	select {
+	case <-stopped:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the poller did not stop with the node")
+	}
+}
+
+func TestTheNodeReadsUsageOnlyWhenItCan(t *testing.T) {
+	off := &PFCPNode{upf: &upf{datapath: &bess{}}}
+	if usageMonitorFor(off) != nil {
+		t.Fatal("a usage monitor was created with usage reporting off")
+	}
+
+	on := &PFCPNode{upf: &upf{datapath: &bess{}, enableUsageReporting: true, urrPollInterval: time.Second}}
+	if m := usageMonitorFor(on); m == nil || m.interval != time.Second {
+		t.Fatal("no usage monitor polling every urr_poll_interval was created for a datapath that reads usage")
+	}
+
+	// URRs accepted on a datapath that cannot read their usage would never be reported.
+	cannot := &PFCPNode{upf: &upf{datapath: &fakeDP{}, enableUsageReporting: true, urrPollInterval: time.Second}}
+	if usageMonitorFor(cannot) != nil || cannot.upf.enableUsageReporting {
+		t.Fatal("usage reporting stayed on for a datapath that cannot read the usage counters")
+	}
+}

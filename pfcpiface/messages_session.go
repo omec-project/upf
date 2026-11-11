@@ -211,6 +211,21 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 		addQERs = append(addQERs, q)
 	}
 
+	// URRs are measured and reported by this agent, not written to the datapath. A
+	// UPF that does not report usage ignores them, as it always has.
+	if upf.enableUsageReporting {
+		now := time.Now()
+
+		for _, cURR := range sereq.CreateURR {
+			var u urr
+			if u, _, err = parseURR(cURR, true); err != nil {
+				return errProcessReply(err, ie.CauseRequestRejected)
+			}
+
+			session.CreateURR(u, now)
+		}
+	}
+
 	session.MarkSessionQer(session.qers)
 	// TODO: since PacketForwardingRules doesn't store pointers,
 	//  we must also mark session QERs in addQERs.
@@ -251,6 +266,10 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 			// rule the rollback did not remove may still match it. Holding it is the
 			// cheaper failure.
 			stored = true
+
+			// It is kept for its rules, and holds no URRs: the establishment was refused,
+			// so no usage is reported for it.
+			session.urrs = nil
 
 			err = pConn.store.PutSession(session)
 			if err != nil {
@@ -457,6 +476,31 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 
 		session.CreateQER(q)
 		addQERs = append(addQERs, q)
+	}
+
+	now := time.Now()
+
+	if upf.enableUsageReporting {
+		for _, cURR := range smreq.CreateURR {
+			u, _, err := parseURR(cURR, true)
+			if err != nil {
+				return sendError(err)
+			}
+
+			session.CreateURR(u, now)
+		}
+
+		for _, uURR := range smreq.UpdateURR {
+			u, has, err := parseURR(uURR, false)
+			if err != nil {
+				return sendError(err)
+			}
+
+			if err = session.UpdateURR(u, has, now); err != nil {
+				logger.PfcpLog.Errorln("session URR update failed", err)
+				continue
+			}
+		}
 	}
 
 	// Everything appended so far was created by this message and did not exist before
@@ -686,6 +730,19 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		}
 
 		delQERs = append(delQERs, *q)
+	}
+
+	if upf.enableUsageReporting {
+		for _, rURR := range smreq.RemoveURR {
+			urrID, err := rURR.URRID()
+			if err != nil {
+				return sendError(err)
+			}
+
+			if _, err = session.RemoveURR(urrID); err != nil {
+				return sendError(err)
+			}
+		}
 	}
 
 	deleted := PacketForwardingRules{

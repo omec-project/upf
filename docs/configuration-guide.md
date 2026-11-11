@@ -34,6 +34,8 @@ These are configurations commonly shared between P4-UPF and BESS-UPF.
 | ------ | ------------- | --------- | -------- |
 | `measure_upf` | false | No | Enable per port metrics |
 | `measure_flow` | false | No | Enable per flow metrics |
+| `enable_usage_reporting` | false | No | Measure and report the usage of the URRs the control plane provisions. Needs `measure_flow`. When off, URRs are ignored |
+| `urr_poll_interval` | 5s | No | How often URR usage is read from the datapath, at least 1s |
 | `access.ifname` | - | Yes | Access-facing network interface name |
 | `core.ifname` | - | Yes | Core-facing network interface name |
 | `enable_notify_bess` | false | No | Whether to enable Notify feature for DDNs |

@@ -212,3 +212,34 @@ func TestLoadConfigFileRefusesAnUnterminatedBlockComment(t *testing.T) {
 		t.Error("a config ending in an unterminated block comment loaded")
 	}
 }
+
+// Usage reporting measures with the flow-measure modules, so it is refused without them.
+func TestLoadConfigFileChecksUsageReporting(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		extra string
+		valid bool
+	}{
+		{"with measure_flow", `"measure_flow": true, "enable_usage_reporting": true`, true},
+		{"with a poll interval", `"measure_flow": true, "enable_usage_reporting": true, "urr_poll_interval": "2s"`, true},
+		{"without measure_flow", `"enable_usage_reporting": true`, false},
+		{"with an invalid poll interval", `"measure_flow": true, "enable_usage_reporting": true, "urr_poll_interval": "soon"`, false},
+		{"with a zero poll interval", `"measure_flow": true, "enable_usage_reporting": true, "urr_poll_interval": "0s"`, false},
+		{"with a poll interval under a second", `"measure_flow": true, "enable_usage_reporting": true, "urr_poll_interval": "500ms"`, false},
+		{"off, with an invalid poll interval", `"urr_poll_interval": "soon"`, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			confPath := t.TempDir() + "/conf.jsonc"
+			mustWriteStringToDisk(`{"mode": "dpdk", `+tc.extra+`}`, confPath)
+
+			_, err := LoadConfigFile(confPath)
+			if tc.valid && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if !tc.valid && err == nil {
+				t.Fatal("the configuration was accepted")
+			}
+		})
+	}
+}

@@ -20,6 +20,11 @@ const (
 	respTimeoutDefault   = 2 * time.Second
 	hbIntervalDefault    = 5 * time.Second
 	readTimeoutDefault   = 15 * time.Second
+
+	urrPollIntervalDefault = 5 * time.Second
+	// urrPollIntervalMin leaves a read of the counters, which must end before the next
+	// poll, the time it needs.
+	urrPollIntervalMin = time.Second
 )
 
 // Conf : Json conf struct.
@@ -30,6 +35,9 @@ type Conf struct {
 	CPIface                  CPIfaceInfo      `json:"cpiface"`
 	EnableGtpuPathMonitoring bool             `json:"enable_gtpu_path_monitoring"`
 	EnableFlowMeasure        bool             `json:"measure_flow"`
+	EnableUsageReporting     bool             `json:"enable_usage_reporting"`
+	GtpPsc                   bool             `json:"gtppsc"`
+	URRPollInterval          string           `json:"urr_poll_interval"`
 	SimInfo                  SimModeInfo      `json:"sim"`
 	ConnTimeout              uint32           `json:"conn_timeout"` // TODO(max): unused, remove
 	ReadTimeout              uint32           `json:"read_timeout"` // TODO(max): convert to duration string
@@ -114,6 +122,35 @@ func validateConf(conf Conf) error {
 	}
 	if err := validateTimeouts(conf); err != nil {
 		return err
+	}
+
+	return validateUsageReporting(conf)
+}
+
+// validateUsageReporting checks the settings of URR usage reporting, which measures
+// usage with the flow-measure modules and so needs them enabled.
+func validateUsageReporting(conf Conf) error {
+	if !conf.EnableUsageReporting {
+		return nil
+	}
+
+	if !conf.EnableFlowMeasure {
+		return ErrInvalidArgumentWithReason("conf.EnableUsageReporting", conf.EnableUsageReporting,
+			"usage reporting needs measure_flow")
+	}
+
+	if conf.URRPollInterval == "" {
+		return nil
+	}
+
+	d, err := time.ParseDuration(conf.URRPollInterval)
+	if err != nil {
+		return ErrInvalidArgumentWithReason("conf.URRPollInterval", conf.URRPollInterval, "invalid duration")
+	}
+
+	if d < urrPollIntervalMin {
+		return ErrInvalidArgumentWithReason("conf.URRPollInterval", conf.URRPollInterval,
+			"shorter than "+urrPollIntervalMin.String())
 	}
 
 	return nil

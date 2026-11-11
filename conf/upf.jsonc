@@ -80,6 +80,15 @@
     // [Optional] Whether to enable flow-level measurements
     "measure_flow": false,
 
+    // [Optional] Whether to measure and report the usage of the URRs the control plane
+    // provisions (TS 29.244 clause 5.2.2). Needs measure_flow. When off, URRs are ignored.
+    // When on, the usage poller is the only reader of the flow-measure counters, and the
+    // per-session metrics show the traffic of its last poll interval.
+    "enable_usage_reporting": false,
+
+    // [Optional] How often URR usage is read from the datapath, at least "1s". Default: "5s"
+    // "urr_poll_interval": "5s",
+
     // N3 interface
     "access": {
         "ifname": "ens803f2"

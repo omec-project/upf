@@ -45,7 +45,12 @@ func (s *PFCPSession) CreatePDR(p pdr) {
 func (s *PFCPSession) UpdatePDR(p pdr) error {
 	for idx, v := range s.pdrs {
 		if v.pdrID == p.pdrID {
+			if !p.hasURRIDs {
+				p.urrIDList = v.urrIDList
+			}
+
 			s.pdrs[idx] = p
+
 			return nil
 		}
 	}

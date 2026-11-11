@@ -132,6 +132,8 @@ func (pConn *PFCPConn) HandlePFCPMsg(buf []byte) {
 		reply, err = pConn.handleSessionDeletionRequest(msg)
 	case message.MsgTypeSessionReportResponse:
 		err = pConn.handleSessionReportResponse(msg)
+		// A usage report's sender waits for its response; a downlink data report's does not.
+		pConn.handleIncomingResponse(msg)
 
 	// Incoming response messages
 	// TODO: Session Report Request
