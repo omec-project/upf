@@ -549,3 +549,60 @@ func TestASessionsReportsBeyondOneRequestGoInAnother(t *testing.T) {
 			maxReportsPerRequest+1, sizes, maxReportsPerRequest)
 	}
 }
+
+// A request is addressed to the session's CP SEID as it is sent, not as its reports were
+// queued: a Session Modification may have changed the CP F-SEID meanwhile.
+func TestAReportGoesToTheCPSEIDAModificationSetAfterItWasQueued(t *testing.T) {
+	rs := newIdleReportingSetup(t)
+
+	rs.reader.set(downlinkCounts(rs.localSEID, 1500))
+	rs.monitor.poll(time.Now())
+
+	b := <-rs.monitor.batches // queued for a sender
+
+	const movedSEID = testRemoteSEID + 1
+
+	if _, err := rs.pConn.handleSessionModificationRequest(
+		message.NewSessionModificationRequest(0, 0, rs.localSEID, 2, 0,
+			ie.NewFSEID(movedSEID, net.ParseIP("127.0.0.1"), nil))); err != nil {
+		t.Fatalf("modification refused: %v", err)
+	}
+
+	go func() { rs.monitor.settle(b, rs.monitor.send(b)) }()
+
+	srreq, _ := rs.receive(t)
+	if srreq.SEID() != movedSEID {
+		t.Fatalf("the request is addressed to SEID %#x, expected the modified %#x", srreq.SEID(), uint64(movedSEID))
+	}
+
+	rs.answer(t, srreq, ie.CauseRequestAccepted)
+	rs.settled(t)
+}
+
+// The reports of a session deleted before they were sent are not sent: the control plane
+// has no session to take them.
+func TestTheReportsOfASessionDeletedBeforeTheyAreSentAreNotSent(t *testing.T) {
+	rs := newIdleReportingSetup(t)
+
+	rs.reader.set(downlinkCounts(rs.localSEID, 1500))
+	rs.monitor.poll(time.Now())
+
+	b := <-rs.monitor.batches // queued for a sender
+
+	if _, err := rs.pConn.handleSessionDeletionRequest(
+		message.NewSessionDeletionRequest(0, 0, rs.localSEID, 2, 0)); err != nil {
+		t.Fatalf("deletion refused: %v", err)
+	}
+
+	if outcome := rs.monitor.send(b); outcome != reportUndelivered {
+		t.Fatalf("the reports of the deleted session settled as %v, expected undelivered", outcome)
+	}
+
+	if err := rs.peer.SetReadDeadline(time.Now().Add(100 * time.Millisecond)); err != nil {
+		t.Fatal(err)
+	}
+
+	if n, _, err := rs.peer.ReadFromUDP(make([]byte, 4096)); err == nil {
+		t.Fatalf("a %d-byte request was sent for the deleted session", n)
+	}
+}

@@ -4,6 +4,7 @@
 package pfcpiface
 
 import (
+	"slices"
 	"testing"
 	"time"
 )
@@ -986,5 +987,70 @@ func TestARepeatedCreateURRKeepsTheRunningPeriod(t *testing.T) {
 
 	if r := poll(s, downlink(1), testEpoch.Add(time.Minute)); len(r) != 1 || r[0].trigger != triggerPERIO {
 		t.Fatalf("expected the periodic report when the running period ends, got %+v", r)
+	}
+}
+
+// A period set while a report is outstanding starts at the next poll, not once the report
+// has settled.
+func TestAPeriodSetWhileAReportIsOutstandingStartsAtTheNextPoll(t *testing.T) {
+	s := measuredSession(urr{
+		urrID:             testURRID,
+		measureVolume:     true,
+		triggers:          urrTriggers{periodic: true},
+		measurementPeriod: 10 * time.Second,
+	})
+
+	poll(s, someUplink(), testEpoch) // arms the 10 s period
+
+	sent := s.dueReports(testEpoch.Add(10 * time.Second))
+	if len(sent) != 1 {
+		t.Fatalf("expected the periodic report at 10 s, got %+v", sent)
+	}
+
+	if err := s.UpdateURR(urr{urrID: testURRID, measurementPeriod: 30 * time.Second},
+		urrIEs{measurementPeriod: true}, testEpoch.Add(11*time.Second)); err != nil {
+		t.Fatalf("UpdateURR: %v", err)
+	}
+
+	s.dueReports(testEpoch.Add(12 * time.Second)) // the report is still being sent
+	s.settleReports(sent, reportDelivered)
+
+	var fired []time.Duration
+
+	for _, at := range []time.Duration{13, 41, 42} {
+		if r := poll(s, someUplink(), testEpoch.Add(at*time.Second)); len(r) > 0 {
+			fired = append(fired, at)
+		}
+	}
+
+	if len(fired) != 1 || fired[0] != 42 {
+		t.Fatalf("periodic reports at %v s, expected one at 42 s: 30 s from the poll after the update", fired)
+	}
+}
+
+// A poll a day late sends one report, and the next falls where the schedule puts it. The
+// advance is one step, which this checks only by its result.
+func TestAPollManyPeriodsLateKeepsTheSchedule(t *testing.T) {
+	s := measuredSession(urr{
+		urrID:             testURRID,
+		measureVolume:     true,
+		triggers:          urrTriggers{periodic: true},
+		measurementPeriod: time.Second,
+	})
+
+	poll(s, someUplink(), testEpoch) // arms the 1 s period
+
+	day := 24 * time.Hour
+
+	var fired []time.Duration
+
+	for _, at := range []time.Duration{day + 500*time.Millisecond, day + 900*time.Millisecond, day + time.Second} {
+		if r := poll(s, someUplink(), testEpoch.Add(at)); len(r) > 0 {
+			fired = append(fired, at)
+		}
+	}
+
+	if want := []time.Duration{day + 500*time.Millisecond, day + time.Second}; !slices.Equal(fired, want) {
+		t.Fatalf("periodic reports at %v, expected %v", fired, want)
 	}
 }

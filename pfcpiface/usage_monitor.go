@@ -60,10 +60,9 @@ type usageMonitor struct {
 // reportBatch is up to maxReportsPerRequest reports of one session, sent in one Session
 // Report Request.
 type reportBatch struct {
-	pConn      *PFCPConn
-	localSEID  uint64
-	remoteSEID uint64
-	reports    []*usageReport
+	pConn     *PFCPConn
+	localSEID uint64
+	reports   []*usageReport
 }
 
 func newUsageMonitor(node *PFCPNode, reader usageReader, interval time.Duration) *usageMonitor {
@@ -233,7 +232,7 @@ func (m *usageMonitor) applyToConn(pConn *PFCPConn, usage map[uint64][]pdrUsage)
 
 			for len(reports) > 0 {
 				n := min(len(reports), maxReportsPerRequest)
-				batches = append(batches, reportBatch{pConn, s.localSEID, s.remoteSEID, reports[:n:n]})
+				batches = append(batches, reportBatch{pConn, s.localSEID, reports[:n:n]})
 				reports = reports[n:]
 			}
 		}
@@ -268,7 +267,12 @@ func (m *usageMonitor) sendReports() {
 // retransmitting it unchanged as the association's request settings allow (TS 29.244
 // clause 6.4).
 func (m *usageMonitor) send(b reportBatch) reportOutcome {
-	srreq := message.NewSessionReportRequest(0, 0, b.remoteSEID, b.pConn.getSeqNum(), 0,
+	remoteSEID, ok := b.remoteSEID()
+	if !ok {
+		return reportUndelivered // the session is gone, and its settlement changes nothing
+	}
+
+	srreq := message.NewSessionReportRequest(0, 0, remoteSEID, b.pConn.getSeqNum(), 0,
 		ie.NewReportType(0, 0, 1, 0)) // USAR
 
 	for _, r := range b.reports {
@@ -301,6 +305,17 @@ func (m *usageMonitor) send(b reportBatch) reportOutcome {
 	}
 
 	return reportDelivered
+}
+
+// remoteSEID is the batch's session's CP SEID as the request is built, not as the batch
+// was queued: a Session Modification may since have changed the CP F-SEID.
+func (b reportBatch) remoteSEID() (uint64, bool) {
+	b.pConn.sessionsMu.Lock()
+	defer b.pConn.sessionsMu.Unlock()
+
+	s, ok := b.pConn.store.GetSession(b.localSEID)
+
+	return s.remoteSEID, ok
 }
 
 // settle records what became of a batch in its session.

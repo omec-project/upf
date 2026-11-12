@@ -212,6 +212,8 @@ func (s *PFCPSession) dueReports(now time.Time) []*usageReport {
 		u := &s.urrs[i]
 
 		if r := u.usage.outstanding; r != nil {
+			u.startPeriod(now)
+
 			if !u.usage.inFlight {
 				u.usage.inFlight = true
 				reports = append(reports, r)
@@ -247,20 +249,27 @@ func (u *urr) due(now time.Time) reportTrigger {
 		t |= triggerTIMTH
 	}
 
-	if u.triggers.periodic && u.measurementPeriod > 0 {
-		if us.nextPeriod.IsZero() {
-			us.nextPeriod = now.Add(u.measurementPeriod)
-		} else if !now.Before(us.nextPeriod) {
-			t |= triggerPERIO
+	u.startPeriod(now)
 
-			// One report for the periods a stalled poll let pass, not one for each.
-			for !now.Before(us.nextPeriod) {
-				us.nextPeriod = us.nextPeriod.Add(u.measurementPeriod)
-			}
-		}
+	if u.triggers.periodic && u.measurementPeriod > 0 && !now.Before(us.nextPeriod) {
+		t |= triggerPERIO
+
+		// One report for the periods a stalled poll let pass, not one for each, and the
+		// next period where the schedule puts it.
+		missed := now.Sub(us.nextPeriod) / u.measurementPeriod
+		us.nextPeriod = us.nextPeriod.Add((missed + 1) * u.measurementPeriod)
 	}
 
 	return t
+}
+
+// startPeriod starts the URR's periodic reporting, if it is on and not yet running: at the
+// first poll after the provisioning that set or changed its period, whether or not a
+// report is outstanding then.
+func (u *urr) startPeriod(now time.Time) {
+	if u.triggers.periodic && u.measurementPeriod > 0 && u.usage.nextPeriod.IsZero() {
+		u.usage.nextPeriod = now.Add(u.measurementPeriod)
+	}
 }
 
 // report generates the URR's next usage report and resets the measurement it reports
