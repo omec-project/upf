@@ -30,6 +30,8 @@ type PFCPNode struct {
 	upf *upf
 	// metrics for PFCP messages and sessions
 	metrics metrics.InstrumentPFCP
+	// usage reads the URR usage counters; nil when usage reporting is off.
+	usage *usageMonitor
 }
 
 // NewPFCPNode create a new PFCPNode listening on local address.
@@ -47,7 +49,7 @@ func NewPFCPNode(upf *upf) *PFCPNode {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	return &PFCPNode{
+	node := &PFCPNode{
 		ctx:        ctx,
 		cancel:     cancel,
 		PacketConn: conn,
@@ -55,6 +57,10 @@ func NewPFCPNode(upf *upf) *PFCPNode {
 		upf:        upf,
 		metrics:    metrics,
 	}
+
+	node.usage = usageMonitorFor(node)
+
+	return node
 }
 
 func (node *PFCPNode) tryConnectToN4Peers(lAddrStr string) {
@@ -111,6 +117,10 @@ func (node *PFCPNode) handleNewPeers() {
 
 // Serve listens for the first packet from a new PFCP peer and creates PFCPConn.
 func (node *PFCPNode) Serve() {
+	if node.usage != nil {
+		go node.usage.run()
+	}
+
 	go node.handleNewPeers()
 
 	shutdown := false

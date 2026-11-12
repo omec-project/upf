@@ -160,6 +160,8 @@ unencapsulated
 upf
 UPF
 UPF's
+URR
+URRs
 vendoring
 vfio
 VPC

@@ -14,6 +14,7 @@ type PacketForwardingRules struct {
 	pdrs []pdr
 	fars []far
 	qers []qer
+	urrs []urr
 }
 
 // PFCPSession implements one PFCP session.
@@ -25,7 +26,7 @@ type PFCPSession struct {
 }
 
 func (p PacketForwardingRules) String() string {
-	return fmt.Sprintf("PDRs=%v, FARs=%v, QERs=%v", p.pdrs, p.fars, p.qers)
+	return fmt.Sprintf("PDRs=%v, FARs=%v, QERs=%v, URRs=%v", p.pdrs, p.fars, p.qers, p.urrs)
 }
 
 // findPDR returns the rule this set holds under the given ID.
@@ -94,12 +95,14 @@ func (p PacketForwardingRules) Clone() PacketForwardingRules {
 		pdrs: append(make([]pdr, 0, cap(p.pdrs)), p.pdrs...),
 		fars: append(make([]far, 0, cap(p.fars)), p.fars...),
 		qers: append(make([]qer, 0, cap(p.qers)), p.qers...),
+		urrs: append(make([]urr, 0, cap(p.urrs)), p.urrs...),
 	}
 
-	// qerIDList is the one field of a rule that is a slice of its own, and
-	// MarkSessionQer rewrites it in place.
+	// qerIDList and urrIDList are the fields of a rule that are slices of their own, and
+	// MarkSessionQer rewrites the first in place.
 	for i := range c.pdrs {
 		c.pdrs[i].qerIDList = append(make([]uint32, 0, cap(p.pdrs[i].qerIDList)), p.pdrs[i].qerIDList...)
+		c.pdrs[i].urrIDList = append([]uint32(nil), p.pdrs[i].urrIDList...)
 	}
 
 	return c

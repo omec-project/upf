@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"slices"
 
 	"github.com/omec-project/upf-epc/logger"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -316,6 +317,12 @@ type pdr struct {
 	needDecap   uint8
 	allocIPFlag bool
 
+	// urrIDList is the URRs that measure this PDR's traffic. hasURRIDs says whether the
+	// message the PDR was parsed from carried any: an Update PDR carries the list only
+	// when it changes (TS 29.244 Table 7.5.4.2-1).
+	urrIDList []uint32
+	hasURRIDs bool
+
 	// chooseID groups the PDRs of one message that are to share the F-TEID allocated for
 	// them, when hasChooseID says the control plane sent one (TS 29.244 clause 5.5.3).
 	chooseID    uint8
@@ -367,10 +374,10 @@ func (p pdr) occupiesSameEntryAs(other pdr) bool {
 func (p pdr) String() string {
 	return fmt.Sprintf("PDR(id=%v, F-SEID=%v, srcIface=%v, tunnelIPv4Dst=%v/%x, "+
 		"tunnelTEID=%v/%x, ueAddress=%v, applicationFilter=%v, precedence=%v, F-SEID IP=%v, "+
-		"counterID=%v, farID=%v, qerIDs=%v, needDecap=%v, allocIPFlag=%v)",
+		"counterID=%v, farID=%v, qerIDs=%v, urrIDs=%v, needDecap=%v, allocIPFlag=%v)",
 		p.pdrID, p.fseID, p.srcIface, int2ip(p.tunnelIP4Dst), p.tunnelIP4DstMask,
 		p.tunnelTEID, p.tunnelTEIDMask, int2ip(p.ueAddress), p.appFilter, p.precedence,
-		p.fseidIP, p.ctrID, p.farID, p.qerIDList, p.needDecap, p.allocIPFlag)
+		p.fseidIP, p.ctrID, p.farID, p.qerIDList, p.urrIDList, p.needDecap, p.allocIPFlag)
 }
 
 func (p pdr) IsAppFilterEmpty() bool {
@@ -679,6 +686,24 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, ippoo
 			} else {
 				p.qerIDList = append(p.qerIDList, qerID)
 			}
+		}
+
+		if x.Type == ie.URRID {
+			urrID, errRead := x.URRID()
+			if errRead != nil {
+				return fmt.Errorf("PDR URR ID: %w", errRead)
+			}
+
+			// The URR IDs are the list of URRs associated with the PDR (Tables 7.5.2.2-1
+			// and 7.5.4.2-1); a URR listed twice is associated once, or the PDR's usage
+			// would be credited to it twice.
+			if slices.Contains(p.urrIDList, urrID) {
+				logger.PfcpLog.Errorf("PDR %d lists URR %d more than once; it is associated once", pdrID, urrID)
+				continue
+			}
+
+			p.urrIDList = append(p.urrIDList, urrID)
+			p.hasURRIDs = true
 		}
 	}
 	/*qerID, err := ie1.QERID()

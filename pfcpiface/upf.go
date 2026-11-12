@@ -61,6 +61,11 @@ type upf struct {
 	respTimeout   time.Duration
 	enableHBTimer bool
 	hbInterval    time.Duration
+
+	// enableUsageReporting turns on URR usage measurement and reporting, polled every
+	// urrPollInterval.
+	enableUsageReporting bool
+	urrPollInterval      time.Duration
 }
 
 // to be replaced with go-pfcp structs
@@ -170,6 +175,9 @@ func NewUPF(conf *Conf, fp datapath) *upf {
 		readTimeout:       time.Second * time.Duration(conf.ReadTimeout),
 		fteidGenerator:    NewFTEIDGenerator(),
 		n4addr:            conf.N4Addr,
+
+		enableUsageReporting: conf.EnableUsageReporting,
+		urrPollInterval:      urrPollIntervalDefault,
 	}
 
 	if !setupPeersAndInterfaces(u, conf) {
@@ -221,6 +229,13 @@ func initTimersAndIPPool(u *upf, conf *Conf) {
 			if err != nil {
 				logger.PfcpLog.Fatalf("unable to parse heart_beat_interval %q: %v", conf.HeartBeatInterval, err)
 			}
+		}
+	}
+
+	if conf.EnableUsageReporting && conf.URRPollInterval != "" {
+		u.urrPollInterval, err = time.ParseDuration(conf.URRPollInterval)
+		if err != nil {
+			logger.PfcpLog.Fatalf("unable to parse urr_poll_interval %q: %v", conf.URRPollInterval, err)
 		}
 	}
 
