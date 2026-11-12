@@ -256,3 +256,78 @@ func TestARejectedEstablishmentKeptForItsRollbackHoldsNoURRs(t *testing.T) {
 			"refused establishment", sessions[0].urrs)
 	}
 }
+
+// URR provisioning this UPF would accept and not act on refuses the establishment with
+// "Service not supported" (clause 8.2.1).
+func TestEstablishmentRefusesAURRThisUPFDoesNotActOn(t *testing.T) {
+	pConn := reportingConn(t)
+
+	rsp, err := pConn.handleSessionEstablishmentRequest(message.NewSessionEstablishmentRequest(0, 0, 0, 1, 0,
+		ie.NewNodeID("", "", testRemoteNodeID),
+		ie.NewFSEID(testRemoteSEID, nil, nil),
+		corePDR(downlinkPDRID, firstUEAddress), downlinkFAR(),
+		ie.NewCreateURR(ie.NewURRID(testURRID), ie.NewMeasurementMethod(0, 1, 0),
+			ie.NewReportingTriggers(0, triggerOctet6VOLQU), ie.NewVolumeQuota(volumeTOVOL, 1000, 0, 0)),
+	))
+	if err == nil {
+		t.Fatal("the establishment was accepted")
+	}
+
+	if cause := causeOf(t, rsp.(*message.SessionEstablishmentResponse).Cause); cause != ie.CauseServiceNotSupported {
+		t.Fatalf("the establishment was answered with cause %d, expected %d", cause, ie.CauseServiceNotSupported)
+	}
+
+	if n := len(pConn.store.GetAllSessions()); n != 0 {
+		t.Fatalf("the refused establishment left %d session(s) in the store", n)
+	}
+}
+
+// A modification that asks for what this UPF does not do is refused with "Service not
+// supported" and changes nothing: an Update URR it cannot act on, or a query for usage
+// reports in the response, which it does not send.
+func TestModificationRefusesWhatThisUPFDoesNotActOn(t *testing.T) {
+	for name, ies := range map[string][]*ie.IE{
+		"Update URR with a Time Quota": {ie.NewUpdateURR(ie.NewURRID(testURRID), ie.NewTimeQuota(time.Minute))},
+		"Create URR with a Time Quota": {ie.NewCreateURR(ie.NewURRID(testURRID+1), ie.NewMeasurementMethod(0, 1, 0),
+			ie.NewReportingTriggers(triggerOctet5VOLTH, 0), ie.NewTimeQuota(time.Minute))},
+		"Query URR": {ie.NewQueryURR(ie.NewURRID(testURRID))},
+		"QAURR":     {ie.NewPFCPSMReqFlags(0x04)},
+	} {
+		t.Run(name, func(t *testing.T) {
+			pConn := reportingConn(t)
+			localSEID := establishStaticSession(t, pConn,
+				corePDR(downlinkPDRID, firstUEAddress), downlinkFAR(), volumeURR(testURRID))
+
+			// An update the message would apply before the refusal, which must not reach the store.
+			ies = append([]*ie.IE{ie.NewUpdateURR(ie.NewURRID(testURRID), ie.NewVolumeThreshold(volumeTOVOL, 5000, 0, 0))}, ies...)
+
+			rsp, err := pConn.handleSessionModificationRequest(
+				message.NewSessionModificationRequest(0, 0, localSEID, 2, 0, ies...))
+			if err == nil {
+				t.Fatal("the modification was accepted")
+			}
+
+			if cause := causeOf(t, rsp.(*message.SessionModificationResponse).Cause); cause != ie.CauseServiceNotSupported {
+				t.Fatalf("the modification was answered with cause %d, expected %d", cause, ie.CauseServiceNotSupported)
+			}
+
+			if s := storedSession(t, pConn, localSEID); len(s.urrs) != 1 || s.urrs[0].volumeThreshold.total != 1000 {
+				t.Fatalf("the refused modification changed the stored URRs: %v", s.urrs)
+			}
+		})
+	}
+}
+
+// A UPF that does not report usage ignores a query as it ignores URRs.
+func TestModificationIgnoresAQueryWhenUsageReportingIsOff(t *testing.T) {
+	pConn := establishingConn(t, nil)
+	localSEID := establishStaticSession(t, pConn, corePDR(downlinkPDRID, firstUEAddress), downlinkFAR())
+
+	rsp, err := pConn.handleSessionModificationRequest(message.NewSessionModificationRequest(0, 0, localSEID, 2, 0,
+		ie.NewQueryURR(ie.NewURRID(testURRID)), ie.NewPFCPSMReqFlags(0x04)))
+	if err != nil {
+		t.Fatalf("modification refused: %v", err)
+	}
+
+	assertAccepted(t, rsp.(*message.SessionModificationResponse).Cause, "modification")
+}

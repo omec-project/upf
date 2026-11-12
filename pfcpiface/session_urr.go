@@ -121,10 +121,6 @@ func (s *PFCPSession) UpdateURR(u urr, has urrIEs, now time.Time) error {
 		held.usage.timeThresholdSent = true
 	}
 
-	if has.volumeQuota {
-		held.volumeQuota = u.volumeQuota
-	}
-
 	return nil
 }
 

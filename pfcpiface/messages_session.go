@@ -5,6 +5,7 @@ package pfcpiface
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 	"time"
@@ -219,7 +220,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 		for _, cURR := range sereq.CreateURR {
 			var u urr
 			if u, _, err = parseURR(cURR, true); err != nil {
-				return errProcessReply(err, ie.CauseRequestRejected)
+				return errProcessReply(err, refusalCause(err))
 			}
 
 			session.CreateURR(u, now)
@@ -378,11 +379,11 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		logger.PfcpLog.Errorln(err)
 
 		smres := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */
-			0,                                    /* FO <-- what's this? */
-			remoteSEID,                           /* seid */
-			smreq.SequenceNumber,                 /* seq # */
-			0,                                    /* priority */
-			ie.NewCause(ie.CauseRequestRejected), /* accept it blindly for the time being */
+			0,                    /* FO <-- what's this? */
+			remoteSEID,           /* seid */
+			smreq.SequenceNumber, /* seq # */
+			0,                    /* priority */
+			ie.NewCause(refusalCause(err)),
 		)
 
 		return smres, err
@@ -434,6 +435,13 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 	if pConn.IsShutdown() {
 		return message.NewSessionModificationResponse(0, 0, remoteSEID, smreq.SequenceNumber, 0,
 			ie.NewCause(ie.CauseNoEstablishedPFCPAssociation)), ErrAssocReleasing
+	}
+
+	// A query asks for usage reports in the response (clause 5.2.2.3.1), which this UPF
+	// does not send.
+	if upf.enableUsageReporting &&
+		(len(smreq.QueryURR) > 0 || smreq.PFCPSMReqFlags != nil && smreq.PFCPSMReqFlags.HasQAURR()) {
+		return sendError(fmt.Errorf("query URR: %w", errURRNotSupported))
 	}
 
 	addPDRs := make([]pdr, 0, MaxItems)
@@ -1040,4 +1048,15 @@ func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) error {
 	}
 
 	return nil
+}
+
+// refusalCause is the cause a refused session message is answered with: "Service not
+// supported" for URR provisioning this UPF does not act on (clause 8.2.1), "Request
+// rejected" otherwise.
+func refusalCause(err error) uint8 {
+	if errors.Is(err, errURRNotSupported) {
+		return ie.CauseServiceNotSupported
+	}
+
+	return ie.CauseRequestRejected
 }
