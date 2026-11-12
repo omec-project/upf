@@ -372,6 +372,39 @@ func TestModificationRefusesWhatThisUPFDoesNotActOn(t *testing.T) {
 	}
 }
 
+// A PFCPSMReq-Flags IE that cannot be read is not taken as asking for no query: the
+// modification is refused before anything in it is applied.
+func TestModificationRefusesPFCPSMReqFlagsItCannotRead(t *testing.T) {
+	pConn := reportingConn(t)
+	localSEID := establishStaticSession(t, pConn,
+		corePDR(downlinkPDRID, firstUEAddress), downlinkFAR(), volumeURR(testURRID))
+
+	// As the control plane would send it, so the empty IE survives parsing.
+	b, err := message.NewSessionModificationRequest(0, 0, localSEID, 2, 0,
+		ie.NewUpdateURR(ie.NewURRID(testURRID), ie.NewVolumeThreshold(volumeTOVOL, 5000, 0, 0)),
+		ie.New(ie.PFCPSMReqFlags, nil)).Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	smreq, err := message.ParseSessionModificationRequest(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rsp, err := pConn.handleSessionModificationRequest(smreq)
+	if err == nil {
+		t.Fatal("the modification was accepted")
+	}
+
+	smres := rsp.(*message.SessionModificationResponse)
+	assertRefusal(t, smres.Cause, smres.FailedRuleID, ie.CauseRequestRejected, 0)
+
+	if s := storedSession(t, pConn, localSEID); len(s.urrs) != 1 || s.urrs[0].volumeThreshold.total != 1000 {
+		t.Fatalf("the refused modification changed the stored URRs: %v", s.urrs)
+	}
+}
+
 // A UPF that does not report usage ignores a query as it ignores URRs.
 func TestModificationIgnoresAQueryWhenUsageReportingIsOff(t *testing.T) {
 	pConn := establishingConn(t, nil)
@@ -379,6 +412,21 @@ func TestModificationIgnoresAQueryWhenUsageReportingIsOff(t *testing.T) {
 
 	rsp, err := pConn.handleSessionModificationRequest(message.NewSessionModificationRequest(0, 0, localSEID, 2, 0,
 		ie.NewQueryURR(ie.NewURRID(testURRID)), ie.NewPFCPSMReqFlags(0x04)))
+	if err != nil {
+		t.Fatalf("modification refused: %v", err)
+	}
+
+	assertAccepted(t, rsp.(*message.SessionModificationResponse).Cause, "modification")
+}
+
+// A UPF that does not report usage does not read PFCPSMReq-Flags, so an empty one is
+// accepted as it was before usage reporting.
+func TestModificationIgnoresEmptyPFCPSMReqFlagsWhenUsageReportingIsOff(t *testing.T) {
+	pConn := establishingConn(t, nil)
+	localSEID := establishStaticSession(t, pConn, corePDR(downlinkPDRID, firstUEAddress), downlinkFAR())
+
+	rsp, err := pConn.handleSessionModificationRequest(message.NewSessionModificationRequest(0, 0, localSEID, 2, 0,
+		ie.New(ie.PFCPSMReqFlags, nil)))
 	if err != nil {
 		t.Fatalf("modification refused: %v", err)
 	}

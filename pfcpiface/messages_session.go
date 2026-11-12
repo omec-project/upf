@@ -5,6 +5,7 @@ package pfcpiface
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 	"time"
@@ -439,10 +440,17 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 	}
 
 	// A query asks for usage reports in the response (clause 5.2.2.3.1), which this UPF
-	// does not send.
-	if upf.enableUsageReporting &&
-		(len(smreq.QueryURR) > 0 || smreq.PFCPSMReqFlags != nil && smreq.PFCPSMReqFlags.HasQAURR()) {
-		return sendError(errQueryNotSupported)
+	// does not send. HasQAURR reads flags it cannot read as unset, so they are read first.
+	if upf.enableUsageReporting {
+		if smreq.PFCPSMReqFlags != nil {
+			if _, err := smreq.PFCPSMReqFlags.PFCPSMReqFlags(); err != nil {
+				return sendError(fmt.Errorf("could not read PFCPSMReq-Flags: %w", err))
+			}
+		}
+
+		if len(smreq.QueryURR) > 0 || smreq.PFCPSMReqFlags != nil && smreq.PFCPSMReqFlags.HasQAURR() {
+			return sendError(errQueryNotSupported)
+		}
 	}
 
 	addPDRs := make([]pdr, 0, MaxItems)
