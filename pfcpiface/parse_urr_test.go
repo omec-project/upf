@@ -190,3 +190,121 @@ func TestParsePDRReadsItsURRIDs(t *testing.T) {
 			testURRID, testURRID+1, p.urrIDList, p.hasURRIDs)
 	}
 }
+
+// Of an IE a URR carries once, only the first is handled and a repetition is ignored
+// (clause 7.6.10), so a repeated Measurement Method cannot turn off the measurement the
+// first asked for.
+func TestParseURRHandlesOnlyTheFirstOfARepeatedIE(t *testing.T) {
+	for _, create := range []bool{true, false} {
+		ies := []*ie.IE{
+			ie.NewURRID(testURRID),
+			ie.NewMeasurementMethod(0, 1, 0), ie.NewMeasurementMethod(0, 0, 1),
+			ie.NewReportingTriggers(triggerOctet5VOLTH, 0), ie.NewReportingTriggers(triggerOctet5PERIO, 0),
+			ie.NewMeasurementPeriod(time.Minute), ie.NewMeasurementPeriod(time.Hour),
+			ie.NewVolumeThreshold(volumeTOVOL, 1000, 0, 0), ie.NewVolumeThreshold(volumeTOVOL, 5000, 0, 0),
+			ie.NewTimeThreshold(time.Minute), ie.NewTimeThreshold(time.Hour),
+		}
+
+		urrIE := ie.NewUpdateURR(ies...)
+		if create {
+			urrIE = ie.NewCreateURR(ies...)
+		}
+
+		u, _, err := parseURR(urrIE, create)
+		if err != nil {
+			t.Fatalf("parseURR (create %v): %v", create, err)
+		}
+
+		if !u.measureVolume || u.measureDuration ||
+			u.triggers != (urrTriggers{volumeThreshold: true}) ||
+			u.measurementPeriod != time.Minute || u.volumeThreshold.total != 1000 ||
+			u.timeThreshold != time.Minute {
+			t.Fatalf("a repetition was handled (create %v): %+v", create, u)
+		}
+	}
+}
+
+// A PDR that lists a URR twice associates it once (Tables 7.5.2.2-1 and 7.5.4.2-1), so
+// its traffic is credited to the URR once.
+func TestParsePDRAssociatesARepeatedURRIDOnce(t *testing.T) {
+	var p pdr
+
+	err := p.parsePDR(corePDR(downlinkPDRID, firstUEAddress,
+		ie.NewURRID(testURRID), ie.NewURRID(testURRID+1), ie.NewURRID(testURRID)), 1, nil, nil)
+	if err != nil {
+		t.Fatalf("parsePDR: %v", err)
+	}
+
+	if len(p.urrIDList) != 2 || p.urrIDList[0] != testURRID || p.urrIDList[1] != testURRID+1 {
+		t.Fatalf("expected URR IDs [%d %d], got %v", testURRID, testURRID+1, p.urrIDList)
+	}
+
+	s := &PFCPSession{}
+	s.CreatePDR(p)
+	s.CreateURR(urr{urrID: testURRID, measureVolume: true}, testEpoch)
+	s.addUsage(downlinkPDRID, downlink(1000), testEpoch)
+
+	if got := s.urrs[0].usage.unreported.total; got != 1000 {
+		t.Fatalf("1000 bytes were credited to the URR as %d", got)
+	}
+}
+
+// A later copy of an IE is not read, so it refuses nothing: a Measurement Method that would
+// be refused is ignored after a valid one, and refuses the URR only as the first copy.
+func TestARepeatedIERefusesTheURROnlyAsItsFirstCopy(t *testing.T) {
+	volum, event, none := ie.NewMeasurementMethod(0, 1, 0), ie.NewMeasurementMethod(1, 0, 0),
+		ie.NewMeasurementMethod(0, 0, 0)
+
+	for _, tc := range []struct {
+		name    string
+		methods []*ie.IE
+		refused bool
+	}{
+		{"VOLUM then EVENT", []*ie.IE{volum, event}, false},
+		{"VOLUM then no flag", []*ie.IE{volum, none}, false},
+		{"EVENT then VOLUM", []*ie.IE{event, volum}, true},
+		{"no flag then VOLUM", []*ie.IE{none, volum}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ies := append([]*ie.IE{ie.NewURRID(testURRID)}, tc.methods...)
+			ies = append(ies, ie.NewReportingTriggers(triggerOctet5VOLTH, 0))
+
+			u, _, err := parseURR(ie.NewCreateURR(ies...), true)
+			if tc.refused {
+				if err == nil {
+					t.Fatal("the URR was accepted")
+				}
+
+				return
+			}
+
+			if err != nil || !u.measureVolume {
+				t.Fatalf("expected the URR accepted measuring volume, got %+v, %v", u, err)
+			}
+		})
+	}
+}
+
+// An Update PDR lists the URR IDs to associate as a Create PDR does, and a URR it lists
+// twice is associated once.
+func TestParsePDRAssociatesAURRAnUpdatePDRRepeatsOnce(t *testing.T) {
+	var p pdr
+
+	err := p.parsePDR(ie.NewUpdatePDR(
+		ie.NewPDRID(downlinkPDRID),
+		ie.NewPrecedence(establishedPrecedence),
+		ie.NewPDI(
+			ie.NewSourceInterface(ie.SrcInterfaceCore),
+			ie.NewUEIPAddress(0x2, firstUEAddress, "", 0, 0),
+		),
+		ie.NewFARID(downlinkFARID),
+		ie.NewURRID(testURRID), ie.NewURRID(testURRID), ie.NewURRID(testURRID+1),
+	), 1, nil, nil)
+	if err != nil {
+		t.Fatalf("parsePDR: %v", err)
+	}
+
+	if !p.hasURRIDs || len(p.urrIDList) != 2 || p.urrIDList[0] != testURRID || p.urrIDList[1] != testURRID+1 {
+		t.Fatalf("expected URR IDs [%d %d], got %v", testURRID, testURRID+1, p.urrIDList)
+	}
+}

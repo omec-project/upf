@@ -151,7 +151,21 @@ func parseURR(urrIE *ie.IE, create bool) (urr, urrIEs, error) {
 		return u, has, fmt.Errorf("URR %d: %w", id, err)
 	}
 
+	// Clause 7.6.10: of an IE repeated where no repetition is specified, only the first is
+	// handled; a later copy is ignored unread, so it neither changes nor refuses the URR.
+	// Every IE handled here is a singleton. The IEs a URR may repeat (Linked URR ID,
+	// Aggregated URRs, Additional Monitoring Time, Application ID, SDF Filter) are refused
+	// at their first copy; whoever comes to act on one must exempt it from this.
+	seen := make(map[uint16]bool, len(children))
+
 	for _, x := range children {
+		if seen[x.Type] {
+			logger.PfcpLog.Errorf("URR %d repeats an IE of type %d; the repetition is ignored", id, x.Type)
+			continue
+		}
+
+		seen[x.Type] = true
+
 		switch x.Type {
 		// The IEs' flag accessors read an IE that does not parse as no flag set, which
 		// would turn measuring or reporting off; such an IE refuses the URR instead.

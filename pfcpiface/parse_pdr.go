@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"slices"
 
 	"github.com/omec-project/upf-epc/logger"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -691,6 +692,14 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, ippoo
 			urrID, errRead := x.URRID()
 			if errRead != nil {
 				return fmt.Errorf("PDR URR ID: %w", errRead)
+			}
+
+			// The URR IDs are the list of URRs associated with the PDR (Tables 7.5.2.2-1
+			// and 7.5.4.2-1); a URR listed twice is associated once, or the PDR's usage
+			// would be credited to it twice.
+			if slices.Contains(p.urrIDList, urrID) {
+				logger.PfcpLog.Errorf("PDR %d lists URR %d more than once; it is associated once", pdrID, urrID)
+				continue
 			}
 
 			p.urrIDList = append(p.urrIDList, urrID)
