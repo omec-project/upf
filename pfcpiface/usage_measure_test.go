@@ -759,6 +759,43 @@ func TestTimeIsNotMeteredWhileDurationMeasurementIsOff(t *testing.T) {
 	}
 }
 
+// No time is metered while no PDR measures a URR, so its Time Threshold does not fire on
+// it. The time metered before goes in its next report, and metering starts again at the
+// first traffic a PDR credits to it.
+func TestTimeIsNotMeteredWhileNoPDRMeasuresTheURR(t *testing.T) {
+	s := measuredSession(urr{
+		urrID:             testURRID,
+		measureDuration:   true,
+		triggers:          urrTriggers{periodic: true, timeThreshold: true},
+		measurementPeriod: 100 * time.Second,
+		timeThreshold:     50 * time.Second,
+	})
+
+	poll(s, someUplink(), testEpoch) // metering starts, and the period
+
+	if _, err := s.RemovePDR(downlinkPDRID); err != nil {
+		t.Fatal(err)
+	}
+
+	s.stopUnfedMetering(testEpoch.Add(10 * time.Second))
+
+	if r := poll(s, volumeCounts{}, testEpoch.Add(60*time.Second)); len(r) != 0 {
+		t.Fatalf("expected no report while no PDR measures the URR, got %+v", r)
+	}
+
+	if r := poll(s, volumeCounts{}, testEpoch.Add(100*time.Second)); len(r) != 1 || r[0].duration != 10*time.Second {
+		t.Fatalf("expected a report of the 10 s metered before, got %+v", r)
+	}
+
+	s.CreatePDR(pdr{pdrID: downlinkPDRID, urrIDList: []uint32{testURRID}, hasURRIDs: true})
+	poll(s, volumeCounts{}, testEpoch.Add(150*time.Second))
+	poll(s, someUplink(), testEpoch.Add(160*time.Second))
+
+	if r := poll(s, volumeCounts{}, testEpoch.Add(200*time.Second)); len(r) != 1 || r[0].duration != 40*time.Second {
+		t.Fatalf("expected a report of the 40 s since traffic resumed, got %+v", r)
+	}
+}
+
 // Time metered before duration measurement is turned off goes into the next report
 // that measures duration, past a report that does not.
 func TestTimeMeteredBeforeDurationMeasurementIsTurnedOffIsKept(t *testing.T) {

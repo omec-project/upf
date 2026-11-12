@@ -760,6 +760,8 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 				return sendError(err)
 			}
 		}
+
+		session.stopUnfedMetering(now)
 	}
 
 	deleted := PacketForwardingRules{

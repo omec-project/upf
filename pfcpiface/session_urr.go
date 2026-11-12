@@ -193,9 +193,41 @@ func (us *urrUsage) meter(now time.Time) {
 // duration; the time it is off is not metered.
 func (us *urrUsage) setMeteringDuration(was, is bool, now time.Time) {
 	if was && !is {
-		us.meter(now)
-		us.meteredTo = time.Time{}
+		us.stopMetering(now)
 	}
+}
+
+// stopMetering meters the time up to now and stops. Metering starts again at the next
+// traffic credited to the URR while it measures duration.
+func (us *urrUsage) stopMetering(now time.Time) {
+	us.meter(now)
+	us.meteredTo = time.Time{}
+}
+
+// stopUnfedMetering stops the time metering of each URR that no PDR of the session
+// measures any more, after a modification removed or updated its last one: no traffic can
+// reach it, and clause 5.2.2.3.1 has its measurement stop. What it measured is kept for its
+// next report.
+func (s *PFCPSession) stopUnfedMetering(now time.Time) {
+	for i := range s.urrs {
+		u := &s.urrs[i]
+		if !u.usage.meteredTo.IsZero() && !s.measures(u.urrID) {
+			u.usage.stopMetering(now)
+		}
+	}
+}
+
+// measures says whether a PDR of the session measures URR id.
+func (s *PFCPSession) measures(id uint32) bool {
+	for _, p := range s.pdrs {
+		for _, u := range p.urrIDList {
+			if u == id {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // dueReports returns the reports the session's URRs are to send now: each outstanding

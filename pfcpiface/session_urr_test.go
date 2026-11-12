@@ -5,6 +5,7 @@ package pfcpiface
 
 import (
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -369,6 +370,123 @@ func TestModificationRefusesWhatThisUPFDoesNotActOn(t *testing.T) {
 				t.Fatalf("the refused modification changed the stored URRs: %v", s.urrs)
 			}
 		})
+	}
+}
+
+// A modification after which no PDR measures a URR leaves it no traffic: its time
+// metering stops there, and what it metered is kept (clause 5.2.2.3.1). A URR a PDR still
+// measures meters on.
+func TestAModificationThatLeavesAURRWithoutAPDRStopsItsMetering(t *testing.T) {
+	updatePDR := func(urrIDs ...*ie.IE) *ie.IE {
+		return ie.NewUpdatePDR(append([]*ie.IE{
+			ie.NewPDRID(downlinkPDRID),
+			ie.NewPrecedence(establishedPrecedence),
+			ie.NewPDI(
+				ie.NewSourceInterface(ie.SrcInterfaceCore),
+				ie.NewUEIPAddress(0x2, firstUEAddress, "", 0, 0),
+			),
+			ie.NewFARID(downlinkFARID),
+		}, urrIDs...)...)
+	}
+
+	for _, tc := range []struct {
+		name  string
+		ies   []*ie.IE
+		stops bool
+	}{
+		{"Remove PDR", []*ie.IE{ie.NewRemovePDR(ie.NewPDRID(downlinkPDRID))}, true},
+		{"Update PDR to another URR", []*ie.IE{volumeURR(testURRID + 1), updatePDR(ie.NewURRID(testURRID + 1))}, true},
+		{"Update PDR without URR IDs", []*ie.IE{updatePDR()}, false},
+		// Measured only by the second PDR, and there by its second URR ID.
+		{"Update PDR while another PDR measures it", []*ie.IE{
+			volumeURR(testURRID + 1),
+			updatePDR(ie.NewURRID(testURRID + 1)),
+			corePDR(secondPDRID, secondUEAddress, ie.NewURRID(testURRID+1), ie.NewURRID(testURRID)),
+		}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pConn := reportingConn(t)
+			localSEID := establishStaticSession(t, pConn,
+				corePDR(downlinkPDRID, firstUEAddress, ie.NewURRID(testURRID)), downlinkFAR(),
+				ie.NewCreateURR(ie.NewURRID(testURRID), ie.NewMeasurementMethod(0, 0, 1),
+					ie.NewReportingTriggers(triggerOctet5PERIO, 0), ie.NewMeasurementPeriod(time.Hour)))
+
+			// Traffic started the metering a minute ago.
+			started := time.Now().Add(-time.Minute)
+			s := storedSession(t, pConn, localSEID)
+			s.urrs = slices.Clone(s.urrs)
+			s.urrs[0].usage.meteredTo = started
+
+			if err := pConn.store.PutSession(s); err != nil {
+				t.Fatal(err)
+			}
+
+			modifySession(t, pConn, localSEID, tc.ies...)
+
+			stored := storedSession(t, pConn, localSEID)
+			u := stored.findURR(testURRID)
+			if !tc.stops {
+				if !u.usage.meteredTo.Equal(started) {
+					t.Fatalf("the metering of a URR a PDR still measures changed: from %v to %v",
+						started, u.usage.meteredTo)
+				}
+
+				return
+			}
+
+			if !u.usage.meteredTo.IsZero() {
+				t.Fatalf("time is still metered for a URR no PDR measures, from %v", u.usage.meteredTo)
+			}
+
+			if u.usage.metered < time.Minute {
+				t.Fatalf("the time metered before was not kept: %v", u.usage.metered)
+			}
+		})
+	}
+}
+
+// refuseNthWriteDP refuses the nth datapath write and accepts every other.
+type refuseNthWriteDP struct {
+	fakeDP
+
+	n, writes int
+}
+
+func (d *refuseNthWriteDP) SendMsgToUPF(_ upfMsgType, _, _ PacketForwardingRules) uint8 {
+	d.writes++
+	if d.writes == d.n {
+		return ie.CauseRequestRejected
+	}
+
+	return ie.CauseRequestAccepted
+}
+
+// A modification refused after it stopped a URR's metering, at the write of what it
+// removes, leaves the stored URR metering as before.
+func TestARefusedModificationKeepsTheMeteringItWouldHaveStopped(t *testing.T) {
+	pConn := reportingConn(t)
+	localSEID := establishStaticSession(t, pConn,
+		corePDR(downlinkPDRID, firstUEAddress, ie.NewURRID(testURRID)), downlinkFAR(),
+		ie.NewCreateURR(ie.NewURRID(testURRID), ie.NewMeasurementMethod(0, 0, 1),
+			ie.NewReportingTriggers(triggerOctet5PERIO, 0), ie.NewMeasurementPeriod(time.Hour)))
+
+	started := time.Now().Add(-time.Minute)
+	s := storedSession(t, pConn, localSEID)
+	s.urrs = slices.Clone(s.urrs)
+	s.urrs[0].usage.meteredTo = started
+
+	if err := pConn.store.PutSession(s); err != nil {
+		t.Fatal(err)
+	}
+
+	// The modification's second write is the removal.
+	pConn.upf.datapath = &refuseNthWriteDP{n: 2}
+	refuseModification(t, pConn, localSEID, ErrWriteToDatapath, ie.NewRemovePDR(ie.NewPDRID(downlinkPDRID)))
+
+	stored := storedSession(t, pConn, localSEID)
+	if u := stored.findURR(testURRID); !u.usage.meteredTo.Equal(started) || u.usage.metered != 0 {
+		t.Fatalf("the refused modification changed the stored metering: from %v, %v metered",
+			u.usage.meteredTo, u.usage.metered)
 	}
 }
 
