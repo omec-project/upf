@@ -89,10 +89,24 @@ var (
 	errURRReportingTriggersMissing = errors.New("create URR without the mandatory Reporting Triggers IE")
 	errURRNoFlagSet                = errors.New("no flag set, where at least one shall be")
 
-	// errURRNotSupported refuses provisioning this UPF would accept and not act on, with
-	// "Service not supported" (clause 8.2.1).
+	// errURRNotSupported is provisioning this UPF would accept and not act on. A URR that
+	// asks for it cannot be stored and applied as provisioned (urrNotActedOn).
 	errURRNotSupported = errors.New("not supported by this UPF")
 )
+
+// urrNotActedOn is a URR that asks for what this UPF does not do. The message is refused
+// with "Rule creation/modification Failure" and the URR as the Failed Rule ID (clauses
+// 6.3.2.3 and 6.3.3.3).
+type urrNotActedOn struct {
+	urrID uint32
+	what  string
+}
+
+func (e *urrNotActedOn) Error() string {
+	return fmt.Sprintf("URR %d %s: %v", e.urrID, e.what, errURRNotSupported)
+}
+
+func (e *urrNotActedOn) Unwrap() error { return errURRNotSupported }
 
 const (
 	// The flags of Measurement Method (clause 8.2.40) and Volume Threshold (clause 8.2.13),
@@ -110,8 +124,8 @@ const (
 
 // parseURR reads a Create URR or Update URR IE. A Create URR must carry a Measurement
 // Method and Reporting Triggers (Table 7.5.2.4-1); an Update URR may leave out any IE but
-// the URR ID. Either is refused if it carries an IE, a trigger or a measurement method
-// this UPF does not act on (errURRNotSupported).
+// the URR ID. Either is refused with a *urrNotActedOn if it carries an IE, a trigger or a
+// measurement method this UPF does not act on.
 func parseURR(urrIE *ie.IE, create bool) (urr, urrIEs, error) {
 	var (
 		u   urr
@@ -152,7 +166,7 @@ func parseURR(urrIE *ie.IE, create bool) (urr, urrIEs, error) {
 			}
 
 			if m&measurementMethodEVENT != 0 {
-				return u, has, fmt.Errorf("URR %d Measurement Method EVENT: %w", id, errURRNotSupported)
+				return u, has, &urrNotActedOn{id, "Measurement Method EVENT"}
 			}
 
 			has.measurementMethod = true
@@ -177,7 +191,7 @@ func parseURR(urrIE *ie.IE, create bool) (urr, urrIEs, error) {
 			}
 
 			if octets[0]&^reportingTriggersActedOn != 0 || octets[1] != 0 || octet7 != 0 {
-				return u, has, fmt.Errorf("URR %d Reporting Triggers %x: %w", id, octets, errURRNotSupported)
+				return u, has, &urrNotActedOn{id, fmt.Sprintf("Reporting Triggers %x", octets)}
 			}
 
 			has.reportingTriggers = true
@@ -229,7 +243,7 @@ func parseURR(urrIE *ie.IE, create bool) (urr, urrIEs, error) {
 				return u, has, fmt.Errorf("URR %d Measurement Information: %w", id, errURRNoFlagSet)
 			}
 
-			return u, has, fmt.Errorf("URR %d Measurement Information %#x: %w", id, mi, errURRNotSupported)
+			return u, has, &urrNotActedOn{id, fmt.Sprintf("Measurement Information %#x", mi)}
 
 		// The other IEs of a Create or Update URR (Tables 7.5.2.4-1 and 7.5.4.4-1); FAR ID,
 		// Application ID and SDF Filter are those of the Quota Action.
@@ -240,7 +254,7 @@ func parseURR(urrIE *ie.IE, create bool) (urr, urrIEs, error) {
 			ie.InactivityDetectionTime, ie.LinkedURRID, ie.TimeQuotaMechanism, ie.AggregatedURRs,
 			ie.FARID, ie.EthernetInactivityTimer, ie.AdditionalMonitoringTime, ie.NumberOfReports,
 			ie.ApplicationID, ie.SDFFilter, ie.UserPlaneInactivityTimer:
-			return u, has, fmt.Errorf("URR %d IE type %d: %w", id, x.Type, errURRNotSupported)
+			return u, has, &urrNotActedOn{id, fmt.Sprintf("IE type %d", x.Type)}
 
 		case ie.URRID: // read above
 

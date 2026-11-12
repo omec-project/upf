@@ -171,14 +171,8 @@ func TestEstablishmentRefusesACreateURRWithoutAMeasurementMethod(t *testing.T) {
 		t.Fatalf("expected a Session Establishment Response, got %T", rsp)
 	}
 
-	cause, err := seres.Cause.Cause()
-	if err != nil {
-		t.Fatalf("could not read the Cause: %v", err)
-	}
-
-	if cause != ie.CauseRequestRejected {
-		t.Fatalf("the establishment was answered with cause %d, expected %d", cause, ie.CauseRequestRejected)
-	}
+	// A malformed URR is no rule that failed to be applied, and names none.
+	assertRefusal(t, seres.Cause, seres.FailedRuleID, ie.CauseRequestRejected, 0)
 
 	if n := len(pConn.store.GetAllSessions()); n != 0 {
 		t.Fatalf("the refused establishment left %d session(s) in the store", n)
@@ -257,8 +251,55 @@ func TestARejectedEstablishmentKeptForItsRollbackHoldsNoURRs(t *testing.T) {
 	}
 }
 
-// URR provisioning this UPF would accept and not act on refuses the establishment with
-// "Service not supported" (clause 8.2.1).
+// assertRefusal checks a refused session message's Cause, and that it names failedURR as
+// its Failed Rule ID, or no rule if failedURR is 0.
+func assertRefusal(t *testing.T, cause, failed *ie.IE, wantCause uint8, failedURR uint32) {
+	t.Helper()
+
+	if got := causeOf(t, cause); got != wantCause {
+		t.Fatalf("the message was answered with cause %d, expected %d", got, wantCause)
+	}
+
+	if failedURR == 0 {
+		if failed != nil {
+			t.Fatalf("the refusal names a Failed Rule ID: %v", failed)
+		}
+
+		return
+	}
+
+	if failed == nil {
+		t.Fatalf("the refusal names no Failed Rule ID, expected URR %d", failedURR)
+	}
+
+	// As the control plane reads it.
+	b, err := failed.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if failed, err = ie.Parse(b); err != nil {
+		t.Fatal(err)
+	}
+
+	typ, err := failed.RuleIDType()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	id, err := failed.FailedRuleID()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if typ != ie.RuleIDTypeURR || id != failedURR {
+		t.Fatalf("the Failed Rule ID is rule %d of type %d, expected URR %d", id, typ, failedURR)
+	}
+}
+
+// A URR that asks for what this UPF does not do cannot be stored and applied as
+// provisioned: the establishment is refused with "Rule creation/modification Failure" and
+// the URR as the Failed Rule ID (clause 6.3.2.3).
 func TestEstablishmentRefusesAURRThisUPFDoesNotActOn(t *testing.T) {
 	pConn := reportingConn(t)
 
@@ -273,33 +314,47 @@ func TestEstablishmentRefusesAURRThisUPFDoesNotActOn(t *testing.T) {
 		t.Fatal("the establishment was accepted")
 	}
 
-	if cause := causeOf(t, rsp.(*message.SessionEstablishmentResponse).Cause); cause != ie.CauseServiceNotSupported {
-		t.Fatalf("the establishment was answered with cause %d, expected %d", cause, ie.CauseServiceNotSupported)
-	}
+	seres := rsp.(*message.SessionEstablishmentResponse)
+	assertRefusal(t, seres.Cause, seres.FailedRuleID, ie.CauseRuleCreationModificationFailure, testURRID)
 
 	if n := len(pConn.store.GetAllSessions()); n != 0 {
 		t.Fatalf("the refused establishment left %d session(s) in the store", n)
 	}
 }
 
-// A modification that asks for what this UPF does not do is refused with "Service not
-// supported" and changes nothing: an Update URR it cannot act on, or a query for usage
-// reports in the response, which it does not send.
+// A modification that asks for what this UPF does not do is refused and changes nothing
+// (clause 6.3.3.3). A URR it cannot act on is a rule that failed, named in the response; a
+// query for usage reports in the response, which it does not send, is "Service not
+// supported".
 func TestModificationRefusesWhatThisUPFDoesNotActOn(t *testing.T) {
-	for name, ies := range map[string][]*ie.IE{
-		"Update URR with a Time Quota": {ie.NewUpdateURR(ie.NewURRID(testURRID), ie.NewTimeQuota(time.Minute))},
-		"Create URR with a Time Quota": {ie.NewCreateURR(ie.NewURRID(testURRID+1), ie.NewMeasurementMethod(0, 1, 0),
-			ie.NewReportingTriggers(triggerOctet5VOLTH, 0), ie.NewTimeQuota(time.Minute))},
-		"Query URR": {ie.NewQueryURR(ie.NewURRID(testURRID))},
-		"QAURR":     {ie.NewPFCPSMReqFlags(0x04)},
+	for _, tc := range []struct {
+		name      string
+		ies       []*ie.IE
+		cause     uint8
+		failedURR uint32
+	}{
+		{
+			"Update URR with a Time Quota",
+			[]*ie.IE{ie.NewUpdateURR(ie.NewURRID(testURRID), ie.NewTimeQuota(time.Minute))},
+			ie.CauseRuleCreationModificationFailure, testURRID,
+		},
+		{
+			"Create URR with a Time Quota",
+			[]*ie.IE{ie.NewCreateURR(ie.NewURRID(testURRID+1), ie.NewMeasurementMethod(0, 1, 0),
+				ie.NewReportingTriggers(triggerOctet5VOLTH, 0), ie.NewTimeQuota(time.Minute))},
+			ie.CauseRuleCreationModificationFailure, testURRID + 1,
+		},
+		{"Query URR", []*ie.IE{ie.NewQueryURR(ie.NewURRID(testURRID))}, ie.CauseServiceNotSupported, 0},
+		{"QAURR", []*ie.IE{ie.NewPFCPSMReqFlags(0x04)}, ie.CauseServiceNotSupported, 0},
 	} {
-		t.Run(name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			pConn := reportingConn(t)
 			localSEID := establishStaticSession(t, pConn,
 				corePDR(downlinkPDRID, firstUEAddress), downlinkFAR(), volumeURR(testURRID))
 
 			// An update the message would apply before the refusal, which must not reach the store.
-			ies = append([]*ie.IE{ie.NewUpdateURR(ie.NewURRID(testURRID), ie.NewVolumeThreshold(volumeTOVOL, 5000, 0, 0))}, ies...)
+			ies := append([]*ie.IE{ie.NewUpdateURR(ie.NewURRID(testURRID), ie.NewVolumeThreshold(volumeTOVOL, 5000, 0, 0))},
+				tc.ies...)
 
 			rsp, err := pConn.handleSessionModificationRequest(
 				message.NewSessionModificationRequest(0, 0, localSEID, 2, 0, ies...))
@@ -307,9 +362,8 @@ func TestModificationRefusesWhatThisUPFDoesNotActOn(t *testing.T) {
 				t.Fatal("the modification was accepted")
 			}
 
-			if cause := causeOf(t, rsp.(*message.SessionModificationResponse).Cause); cause != ie.CauseServiceNotSupported {
-				t.Fatalf("the modification was answered with cause %d, expected %d", cause, ie.CauseServiceNotSupported)
-			}
+			smres := rsp.(*message.SessionModificationResponse)
+			assertRefusal(t, smres.Cause, smres.FailedRuleID, tc.cause, tc.failedURR)
 
 			if s := storedSession(t, pConn, localSEID); len(s.urrs) != 1 || s.urrs[0].volumeThreshold.total != 1000 {
 				t.Fatalf("the refused modification changed the stored URRs: %v", s.urrs)

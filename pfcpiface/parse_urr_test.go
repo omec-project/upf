@@ -147,8 +147,11 @@ func TestParseURRRefusesWhatThisUPFDoesNotActOn(t *testing.T) {
 		"Number of Reports":           ie.NewNumberOfReports(1),
 		"Measurement Information":     ie.NewMeasurementInformation(0x02), // INAM
 	} {
-		if _, _, err := parseURR(ie.NewUpdateURR(ie.NewURRID(testURRID), x), false); !errors.Is(err, errURRNotSupported) {
-			t.Errorf("an Update URR with %s returned %v, expected %v", name, err, errURRNotSupported)
+		var refused *urrNotActedOn
+
+		_, _, err := parseURR(ie.NewUpdateURR(ie.NewURRID(testURRID), x), false)
+		if !errors.As(err, &refused) || refused.urrID != testURRID {
+			t.Errorf("an Update URR with %s returned %v, expected URR %d refused as not acted on", name, err, testURRID)
 		}
 	}
 }

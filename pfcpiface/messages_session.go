@@ -5,7 +5,6 @@ package pfcpiface
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"strings"
 	"time"
@@ -103,6 +102,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 			pConn.nodeID.localIE,
 			ie.NewCause(cause),
 		)
+		seres.FailedRuleID = failedRuleID(err)
 
 		return seres, errProcess(err)
 	}
@@ -385,6 +385,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 			0,                    /* priority */
 			ie.NewCause(refusalCause(err)),
 		)
+		smres.FailedRuleID = failedRuleID(err)
 
 		return smres, err
 	}
@@ -441,7 +442,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 	// does not send.
 	if upf.enableUsageReporting &&
 		(len(smreq.QueryURR) > 0 || smreq.PFCPSMReqFlags != nil && smreq.PFCPSMReqFlags.HasQAURR()) {
-		return sendError(fmt.Errorf("query URR: %w", errURRNotSupported))
+		return sendError(errQueryNotSupported)
 	}
 
 	addPDRs := make([]pdr, 0, MaxItems)
@@ -1050,13 +1051,35 @@ func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) error {
 	return nil
 }
 
-// refusalCause is the cause a refused session message is answered with: "Service not
-// supported" for URR provisioning this UPF does not act on (clause 8.2.1), "Request
-// rejected" otherwise.
+// errQueryNotSupported is a query for usage reports in the Session Modification Response,
+// which this UPF does not send.
+var errQueryNotSupported = errors.New("query URR not supported by this UPF")
+
+// refusalCause is the cause a refused session message is answered with: "Rule
+// creation/modification Failure" for a URR this UPF cannot store and apply as provisioned
+// (clauses 6.3.2.3 and 6.3.3.3), "Service not supported" for a query for usage reports
+// (clause 8.2.1), "Request rejected" otherwise.
 func refusalCause(err error) uint8 {
-	if errors.Is(err, errURRNotSupported) {
+	var urr *urrNotActedOn
+
+	switch {
+	case errors.As(err, &urr):
+		return ie.CauseRuleCreationModificationFailure
+	case errors.Is(err, errQueryNotSupported):
 		return ie.CauseServiceNotSupported
+	default:
+		return ie.CauseRequestRejected
+	}
+}
+
+// failedRuleID names the rule a refusal with "Rule creation/modification Failure" failed
+// on, which the response then carries (Tables 7.5.3.1-1 and 7.5.5.1-1); nil for any other
+// refusal.
+func failedRuleID(err error) *ie.IE {
+	var urr *urrNotActedOn
+	if errors.As(err, &urr) {
+		return ie.NewFailedRuleID(ie.RuleIDTypeURR, urr.urrID)
 	}
 
-	return ie.CauseRequestRejected
+	return nil
 }
