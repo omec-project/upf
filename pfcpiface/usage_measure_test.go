@@ -1091,3 +1091,81 @@ func TestAPollManyPeriodsLateKeepsTheSchedule(t *testing.T) {
 		t.Fatalf("periodic reports at %v, expected %v", fired, want)
 	}
 }
+
+// Usage a URR counted before its last PDR left does not fire a threshold: with a report
+// outstanding the threshold is not evaluated, and once it is delivered the detached usage
+// would otherwise be reported as though it were new. It is kept for the next report.
+func TestDetachedUsageDoesNotFireAThresholdAfterAReportIsDelivered(t *testing.T) {
+	u := volumeThresholdURR(100)
+	u.triggers.periodic = true
+	u.measurementPeriod = 10 * time.Second
+
+	s := measuredSession(u)
+
+	poll(s, downlink(10), testEpoch) // the period starts
+
+	// The period ends and its report is outstanding; 150 B then reach the threshold, which
+	// is not evaluated while the report is outstanding.
+	s.addUsage(downlinkPDRID, downlink(5), testEpoch.Add(10*time.Second))
+	sent := s.dueReports(testEpoch.Add(10 * time.Second))
+	s.addUsage(downlinkPDRID, downlink(150), testEpoch.Add(11*time.Second))
+
+	if len(s.dueReports(testEpoch.Add(11*time.Second))) != 0 {
+		t.Fatal("expected no new report while one is outstanding")
+	}
+
+	if _, err := s.RemovePDR(downlinkPDRID); err != nil {
+		t.Fatal(err)
+	}
+
+	s.settleReports(sent, reportDelivered)
+
+	if r := poll(s, volumeCounts{}, testEpoch.Add(12*time.Second)); len(r) != 0 {
+		t.Fatalf("expected no threshold report for usage no PDR measures, got %+v", r)
+	}
+
+	r := poll(s, volumeCounts{}, testEpoch.Add(21*time.Second))
+	if len(r) != 1 || r[0].trigger != triggerPERIO || r[0].volume.total != 150 {
+		t.Fatalf("expected the kept 150 B in the next periodic report, got %+v", r)
+	}
+}
+
+// The same for the Time Threshold: time metered up to the last PDR's removal reaches it
+// while a report is outstanding, and is not reported as a threshold once that report is
+// delivered. It is kept for the next report.
+func TestDetachedTimeDoesNotFireAThresholdAfterAReportIsDelivered(t *testing.T) {
+	s := measuredSession(urr{
+		urrID:             testURRID,
+		measureDuration:   true,
+		triggers:          urrTriggers{periodic: true, timeThreshold: true},
+		measurementPeriod: 100 * time.Second,
+		timeThreshold:     120 * time.Second,
+	})
+
+	poll(s, someUplink(), testEpoch) // metering starts, and the period
+
+	// The period ends and its report is outstanding, the time threshold not evaluated.
+	sent := s.dueReports(testEpoch.Add(100 * time.Second))
+	if len(sent) != 1 || sent[0].trigger != triggerPERIO {
+		t.Fatalf("expected the periodic report, got %+v", sent)
+	}
+
+	// 50 s more are metered, past the threshold, before the last PDR leaves.
+	s.addUsage(downlinkPDRID, someUplink(), testEpoch.Add(150*time.Second))
+
+	if _, err := s.RemovePDR(downlinkPDRID); err != nil {
+		t.Fatal(err)
+	}
+
+	s.stopUnfedMetering(testEpoch.Add(150 * time.Second))
+	s.settleReports(sent, reportDelivered)
+
+	if r := poll(s, volumeCounts{}, testEpoch.Add(160*time.Second)); len(r) != 0 {
+		t.Fatalf("expected no threshold report for time no PDR measures, got %+v", r)
+	}
+
+	r := poll(s, volumeCounts{}, testEpoch.Add(200*time.Second))
+	if len(r) != 1 || r[0].trigger != triggerPERIO || r[0].duration != 50*time.Second {
+		t.Fatalf("expected the kept 50 s in the next periodic report, got %+v", r)
+	}
+}

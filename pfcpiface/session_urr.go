@@ -250,7 +250,17 @@ func (s *PFCPSession) dueReports(now time.Time) []*usageReport {
 			continue
 		}
 
-		if t := u.due(now); t != 0 {
+		t := u.due(now)
+
+		// A URR no PDR measures is credited no traffic. What it counted before the last PDR
+		// left is kept for its next report, and does not fire a threshold: a threshold
+		// reached while a report was outstanding would otherwise report that usage, as
+		// though it had just been measured, once the report is delivered.
+		if t&(triggerVOLTH|triggerTIMTH) != 0 && !s.measures(u.urrID) {
+			t &^= triggerVOLTH | triggerTIMTH
+		}
+
+		if t != 0 {
 			r := u.report(t, now)
 			u.usage.outstanding, u.usage.inFlight = &r, true
 			reports = append(reports, &r)
