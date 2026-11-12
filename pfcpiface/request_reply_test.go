@@ -140,3 +140,47 @@ func TestAnAnsweredRequestIsNoLongerAwaited(t *testing.T) {
 
 	deliverHeartbeatResponse(t, pConn, seq) // the duplicate
 }
+
+// The PFCP header carries the sequence number in 3 octets. A request numbered past them
+// would go out under the low 24 bits, and its response, which comes back under those,
+// would match no awaited request: every request from then on would time out.
+func TestRequestsAreAnsweredAcrossTheSequenceNumberWrap(t *testing.T) {
+	pConn := requestConn(t)
+	pConn.upf.respTimeout = time.Second
+	pConn.seqNum.seq = maxSeqNum - 1
+
+	for i := range 3 { // numbered up to the largest sequence number, and past it
+		r := pConn.getHeartBeatRequest()
+		seq := r.msg.Sequence()
+
+		done := make(chan bool, 1)
+
+		go func() {
+			_, timeout := pConn.sendPFCPRequestMessage(r)
+			done <- timeout
+		}()
+
+		for deadline := time.Now().Add(5 * time.Second); ; {
+			if _, ok := pConn.pendingReqs.Load(seq); ok {
+				break
+			}
+
+			if time.Now().After(deadline) {
+				t.Fatalf("request %d was never registered", i)
+			}
+
+			time.Sleep(time.Millisecond)
+		}
+
+		deliverHeartbeatResponse(t, pConn, seq)
+
+		select {
+		case timeout := <-done:
+			if timeout {
+				t.Fatalf("request %d, sequence number %#x, timed out although its response came", i, seq)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatalf("request %d did not return", i)
+		}
+	}
+}
