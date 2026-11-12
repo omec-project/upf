@@ -103,6 +103,41 @@ func TestParseURRAcceptsAnUpdateURRThatChangesNothing(t *testing.T) {
 	}
 }
 
+// Measurement Method, Reporting Triggers, Volume Threshold and Volume Quota each set at
+// least one flag (clauses 8.2.40, 8.2.19, 8.2.13 and 8.2.50). One that does not parse, or
+// sets none, would turn measuring or reporting off, so the URR is refused instead.
+func TestParseURRRefusesAFlagIEThatSetsNoFlag(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		x    *ie.IE
+		want error // nil: any error
+	}{
+		{"empty Measurement Method", ie.New(ie.MeasurementMethod, nil), nil},
+		{"Measurement Method without a flag", ie.New(ie.MeasurementMethod, []byte{0}), errURRNoFlagSet},
+		{"Measurement Method with only spare bits", ie.New(ie.MeasurementMethod, []byte{0xf8}), errURRNoFlagSet},
+		{"one-octet Reporting Triggers", ie.New(ie.ReportingTriggers, []byte{triggerOctet5PERIO}), nil},
+		{"Reporting Triggers without a trigger", ie.New(ie.ReportingTriggers, []byte{0, 0}), errURRNoFlagSet},
+		{"Reporting Triggers with only spare bits", ie.New(ie.ReportingTriggers, []byte{0, 0, 0xfc}), errURRNoFlagSet},
+		{"Volume Threshold without a flag", ie.New(ie.VolumeThreshold, []byte{0, 0}), errURRNoFlagSet},
+		{"Volume Quota without a flag", ie.New(ie.VolumeQuota, []byte{0, 0}), errURRNoFlagSet},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, err := parseURR(ie.NewUpdateURR(ie.NewURRID(testURRID), tc.x), false)
+			if err == nil || tc.want != nil && !errors.Is(err, tc.want) {
+				t.Fatalf("parseURR returned %v, expected %v", err, tc.want)
+			}
+		})
+	}
+}
+
+// A trigger in Reporting Triggers' third octet is a trigger, though not one this UPF acts on.
+func TestParseURRAcceptsATriggerInTheThirdOctet(t *testing.T) {
+	if _, has, err := parseURR(ie.NewUpdateURR(ie.NewURRID(testURRID),
+		ie.New(ie.ReportingTriggers, []byte{0, 0, 0x02})), false); err != nil || !has.reportingTriggers { // UPINT
+		t.Fatalf("parseURR returned %v with %+v present, expected Reporting Triggers accepted", err, has)
+	}
+}
+
 // A URR whose threshold, quota or period cannot be read would be measured against limits
 // the control plane did not set, so the message is refused instead.
 func TestParseURRRefusesAMalformedLimit(t *testing.T) {

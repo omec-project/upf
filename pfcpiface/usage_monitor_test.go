@@ -11,8 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/omec-project/upf-epc/logger"
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 )
 
@@ -162,5 +164,42 @@ func TestTheNodeReadsUsageOnlyWhenItCan(t *testing.T) {
 	cannot := &PFCPNode{upf: &upf{datapath: &fakeDP{}, enableUsageReporting: true, urrPollInterval: time.Second}}
 	if usageMonitorFor(cannot) != nil || cannot.upf.enableUsageReporting {
 		t.Fatal("usage reporting stayed on for a datapath that cannot read the usage counters")
+	}
+}
+
+// Each poll gets and puts every session with URRs under the association's session lock,
+// so the store must not format a session for a debug line that is not logged.
+func TestTheStoreFormatsNoSessionForADebugLineThatIsOff(t *testing.T) {
+	if logger.PfcpLog.Desugar().Core().Enabled(zapcore.DebugLevel) {
+		t.Skip("debug logging is on")
+	}
+
+	s := PFCPSession{localSEID: 1}
+	for id := range uint32(8) {
+		s.CreatePDR(pdr{pdrID: id + 1, urrIDList: []uint32{testURRID}, hasURRIDs: true})
+	}
+
+	s.CreateURR(volumeThresholdURR(1000), testEpoch)
+
+	store := NewInMemoryStore()
+
+	// Formatting the session takes some 200 allocations; boxing its log arguments a few.
+	const most = 8
+
+	for _, op := range []struct {
+		name string
+		run  func()
+	}{
+		{"PutSession", func() {
+			if err := store.PutSession(s); err != nil {
+				t.Error(err)
+			}
+		}},
+		{"GetSession", func() { store.GetSession(s.localSEID) }},
+		{"GetAllSessions", func() { store.GetAllSessions() }},
+	} {
+		if got := testing.AllocsPerRun(100, op.run); got > most {
+			t.Errorf("%s allocates %v times with debug logging off, expected at most %d", op.name, got, most)
+		}
 	}
 }

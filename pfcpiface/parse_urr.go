@@ -90,6 +90,14 @@ type urrIEs struct {
 var (
 	errURRMeasurementMethodMissing = errors.New("create URR without the mandatory Measurement Method IE")
 	errURRReportingTriggersMissing = errors.New("create URR without the mandatory Reporting Triggers IE")
+	errURRNoFlagSet                = errors.New("no flag set, where at least one shall be")
+)
+
+// The flags of Measurement Method (clause 8.2.40), and of Volume Threshold and Volume
+// Quota (clauses 8.2.13 and 8.2.50), of which at least one shall be set.
+const (
+	measurementMethodFlags = 0x07 // DURAT, VOLUM, EVENT
+	volumeFlags            = 0x07 // TOVOL, ULVOL, DLVOL
 )
 
 // parseURR reads a Create URR or Update URR IE. A Create URR must carry a Measurement
@@ -122,12 +130,34 @@ func parseURR(urrIE *ie.IE, create bool) (urr, urrIEs, error) {
 
 	for _, x := range children {
 		switch x.Type {
+		// The IEs' flag accessors read an IE that does not parse as no flag set, which
+		// would turn measuring or reporting off; such an IE refuses the URR instead.
 		case ie.MeasurementMethod:
+			var m uint8
+			if m, err = x.MeasurementMethod(); err != nil {
+				return u, has, fmt.Errorf("URR %d Measurement Method: %w", id, err)
+			}
+
+			if m&measurementMethodFlags == 0 {
+				return u, has, fmt.Errorf("URR %d Measurement Method: %w", id, errURRNoFlagSet)
+			}
+
 			has.measurementMethod = true
 			u.measureVolume = x.HasVOLUM()
 			u.measureDuration = x.HasDURAT()
 
 		case ie.ReportingTriggers:
+			var octets []byte
+			if octets, err = x.ReportingTriggers(); err != nil {
+				return u, has, fmt.Errorf("URR %d Reporting Triggers: %w", id, err)
+			}
+
+			// Clause 8.2.19: at least one trigger is set. ReportingTriggers ensures two
+			// octets; a third, if present, has two triggers and spare bits.
+			if octets[0] == 0 && octets[1] == 0 && (len(octets) < 3 || octets[2]&0x03 == 0) {
+				return u, has, fmt.Errorf("URR %d Reporting Triggers: %w", id, errURRNoFlagSet)
+			}
+
 			has.reportingTriggers = true
 			u.triggers = urrTriggers{
 				periodic:        x.HasPERIO(),
@@ -149,6 +179,10 @@ func parseURR(urrIE *ie.IE, create bool) (urr, urrIEs, error) {
 				return u, has, fmt.Errorf("URR %d Volume Threshold: %w", id, err)
 			}
 
+			if f.Flags&volumeFlags == 0 {
+				return u, has, fmt.Errorf("URR %d Volume Threshold: %w", id, errURRNoFlagSet)
+			}
+
 			has.volumeThreshold = true
 			u.volumeThreshold = volumeLimit{
 				total: f.TotalVolume, uplink: f.UplinkVolume, downlink: f.DownlinkVolume,
@@ -166,6 +200,10 @@ func parseURR(urrIE *ie.IE, create bool) (urr, urrIEs, error) {
 			var f *ie.VolumeQuotaFields
 			if f, err = x.VolumeQuota(); err != nil {
 				return u, has, fmt.Errorf("URR %d Volume Quota: %w", id, err)
+			}
+
+			if f.Flags&volumeFlags == 0 {
+				return u, has, fmt.Errorf("URR %d Volume Quota: %w", id, errURRNoFlagSet)
 			}
 
 			has.volumeQuota = true

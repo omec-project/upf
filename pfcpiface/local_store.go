@@ -29,7 +29,7 @@ func (i *InMemoryStore) GetAllSessions() []PFCPSession {
 		return true
 	})
 
-	logger.PfcpLog.With("sessions", sessions).Debugln("got all PFCP sessions from local store")
+	logger.PfcpLog.Debugw("got all PFCP sessions from local store", "sessions", sessions)
 
 	return sessions
 }
@@ -41,7 +41,7 @@ func (i *InMemoryStore) PutSession(session PFCPSession) error {
 
 	i.sessions.Store(session.localSEID, session)
 
-	logger.PfcpLog.With("session", session).Debugln("saved PFCP sessions to local store")
+	logger.PfcpLog.Debugw("saved PFCP sessions to local store", "session", session)
 
 	return nil
 }
@@ -76,7 +76,7 @@ func (i *InMemoryStore) GetSession(fseid uint64) (PFCPSession, bool) {
 		return PFCPSession{}, false
 	}
 
-	logger.PfcpLog.With("session", session).Debugln("Got PFCP session from local store")
+	logger.PfcpLog.Debugw("Got PFCP session from local store", "session", session)
 
 	return session, ok
 }
