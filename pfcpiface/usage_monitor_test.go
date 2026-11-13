@@ -138,7 +138,7 @@ func TestMergeFlowMeasureTablesAddsCountsAndKeepsTheBusierReadsPercentiles(t *te
 	busy := statsTestStatistic(statsTestULPDR, 10, 1000)
 	busy.Latency = &pb.FlowMeasureReadResponse_Statistic_Histogram{PercentileValuesNs: []uint64{1, 2, 3}}
 
-	merged := mergeFlowMeasureTables(flowMeasureTable{key: quiet}, flowMeasureTable{key: busy})[key]
+	merged := mergeFlowMeasureTables(flowMeasureTable{key: quiet}, flowMeasureTable{key: busy}, map[flowMeasureKey]uint64{})[key]
 
 	if merged.TotalPackets != 12 || merged.TotalBytes != 1200 {
 		t.Fatalf("merged to %d packets and %d bytes, expected 12 and 1200", merged.TotalPackets, merged.TotalBytes)
@@ -148,18 +148,52 @@ func TestMergeFlowMeasureTablesAddsCountsAndKeepsTheBusierReadsPercentiles(t *te
 		t.Fatal("the merged row does not keep the percentiles of the read with more packets")
 	}
 
-	if mergeFlowMeasureTables(nil, nil) != nil {
+	if mergeFlowMeasureTables(nil, nil, map[flowMeasureKey]uint64{}) != nil {
 		t.Fatal("two failed reads merged into a table that reads as read")
 	}
 
 	other := flowMeasureKey{statsTestFSEID, statsTestULPDR + 1}
 
-	if got := mergeFlowMeasureTables(nil, flowMeasureTable{key: quiet}); got[key] != quiet {
+	if got := mergeFlowMeasureTables(nil, flowMeasureTable{key: quiet}, map[flowMeasureKey]uint64{}); got[key] != quiet {
 		t.Fatal("a read merged after a failed one was not kept")
 	}
 
-	if got := mergeFlowMeasureTables(flowMeasureTable{key: busy}, flowMeasureTable{other: quiet}); got[other] != quiet {
+	if got := mergeFlowMeasureTables(flowMeasureTable{key: busy}, flowMeasureTable{other: quiet}, map[flowMeasureKey]uint64{}); got[other] != quiet {
 		t.Fatal("a row only the second read saw was not kept")
+	}
+}
+
+// Over several reads, a row keeps the percentiles of the read that saw the most of its
+// packets, not of a read that saw more than the reads before it together.
+func TestMergeFlowMeasureTablesKeepsTheBusiestOfSeveralReadsPercentiles(t *testing.T) {
+	key := flowMeasureKey{statsTestFSEID, statsTestULPDR}
+
+	read := func(packets, latency uint64) flowMeasureTable {
+		s := statsTestStatistic(statsTestULPDR, packets, packets*100)
+		s.Latency = &pb.FlowMeasureReadResponse_Statistic_Histogram{PercentileValuesNs: []uint64{latency}}
+
+		return flowMeasureTable{key: s}
+	}
+
+	for _, tc := range []struct {
+		name    string
+		packets [3]uint64
+		latency uint64
+	}{
+		{"the last read is the busiest", [3]uint64{60, 40, 70}, 2},
+		{"the first read is the busiest", [3]uint64{60, 40, 50}, 0},
+		{"the second read is the busiest", [3]uint64{40, 60, 50}, 1},
+	} {
+		picked := map[flowMeasureKey]uint64{}
+
+		var window flowMeasureTable
+		for i, packets := range tc.packets {
+			window = mergeFlowMeasureTables(window, read(packets, uint64(i)), picked)
+		}
+
+		if got := window[key].Latency.PercentileValuesNs[0]; got != tc.latency {
+			t.Errorf("%s: kept the percentiles of read %d, expected read %d", tc.name, got, tc.latency)
+		}
 	}
 }
 

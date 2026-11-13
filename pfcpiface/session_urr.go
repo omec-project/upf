@@ -53,6 +53,10 @@ type urrUsage struct {
 	// receive it, and lost only its answer, counts it once.
 	outstanding *usageReport
 	inFlight    bool
+	// outstandingReset says the URR was reset, on losing its last PDR, while its
+	// outstanding report was held. Its thresholds count afresh from the reset, so a
+	// refusal gives back to them only the usage that report carried.
+	outstandingReset bool
 }
 
 // CreateURR adds a URR to the session. A Create URR naming a URR the session already
@@ -272,6 +276,7 @@ func (us *urrUsage) reset(now time.Time) {
 	us.unreported, us.toThreshold = volumeCounts{}, volumeCounts{}
 	us.metered, us.toTimeThreshold, us.durationCarry = 0, 0, 0
 	us.volumeThresholdSent, us.timeThresholdSent = false, false
+	us.outstandingReset = us.outstanding != nil
 }
 
 // dueReports returns the reports the session's URRs are to send now: each outstanding
@@ -306,7 +311,7 @@ func (s *PFCPSession) dueReports(now time.Time) []*usageReport {
 
 		if t != 0 {
 			r := u.report(t, now)
-			u.usage.outstanding, u.usage.inFlight = &r, true
+			u.usage.outstanding, u.usage.inFlight, u.usage.outstandingReset = &r, true, false
 			reports = append(reports, &r)
 		}
 	}
@@ -431,13 +436,18 @@ func (s *PFCPSession) settleReports(sent []*usageReport, outcome reportOutcome) 
 			// Refused, so not counted: the next report carries its usage instead, from its
 			// Start Time, with the carry it took. A threshold report had re-applied the
 			// thresholds; they count on from where they were. A threshold sent since the
-			// report is counted from the report before it (clause 5.2.2.3.1 NOTE 1).
+			// report is counted from the report before it (clause 5.2.2.3.1 NOTE 1). After
+			// a reset the thresholds count afresh, so only the report's own usage goes back
+			// to them.
 			us.unreported.add(r.volume)
 			us.metered += r.metered
 			us.since = r.start
 			us.durationCarry = r.durationCarry
 
 			p := r.reapplied
+			if us.outstandingReset {
+				p = &thresholdState{r.volume, r.metered}
+			}
 
 			switch {
 			case us.volumeThresholdSent:

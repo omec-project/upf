@@ -58,8 +58,10 @@ type usageMonitor struct {
 	// a drain that finds a read under way waits for its counts to be applied.
 	readMu sync.Mutex
 	// window is the counts read since the last periodic poll, and lastRead when the last
-	// read began. Under readMu.
+	// read began. picked is, for each of the window's tables in turn, the packets of the
+	// read each row merged from several reads keeps the percentiles of. Under readMu.
 	window   flowMeasureCounts
+	picked   [3]map[flowMeasureKey]uint64
 	lastRead time.Time
 
 	snapshotMu sync.Mutex
@@ -142,7 +144,7 @@ func (m *usageMonitor) poll(now time.Time) {
 	m.snapshot, m.snapshotAt = m.window, now
 	m.snapshotMu.Unlock()
 
-	m.window = flowMeasureCounts{}
+	m.window, m.picked = flowMeasureCounts{}, [3]map[flowMeasureKey]uint64{}
 }
 
 // drain brings every URR up to date with what the datapath has counted, so that a URR
@@ -180,10 +182,14 @@ func (m *usageMonitor) read() {
 		m.lastRead = started
 	}
 
+	if m.picked[0] == nil {
+		m.picked = [3]map[flowMeasureKey]uint64{{}, {}, {}}
+	}
+
 	m.window = flowMeasureCounts{
-		preQos: mergeFlowMeasureTables(m.window.preQos, counts.preQos),
-		postUL: mergeFlowMeasureTables(m.window.postUL, counts.postUL),
-		postDL: mergeFlowMeasureTables(m.window.postDL, counts.postDL),
+		preQos: mergeFlowMeasureTables(m.window.preQos, counts.preQos, m.picked[0]),
+		postUL: mergeFlowMeasureTables(m.window.postUL, counts.postUL, m.picked[1]),
+		postDL: mergeFlowMeasureTables(m.window.postDL, counts.postDL, m.picked[2]),
 	}
 	m.apply(counts)
 }
@@ -401,11 +407,12 @@ func (m *usageMonitor) collectSessionStats(pc *PfcpNodeCollector, ch chan<- prom
 	emitSessionStats(pc, ch, snapshot)
 }
 
-// mergeFlowMeasureTables adds two reads of one module. Bytes and packets add; latency
-// and jitter percentiles cannot, so a row keeps those of the read that saw more of its
-// packets. Either table may be nil, meaning that read failed; the result is nil only if
-// both did.
-func mergeFlowMeasureTables(a, b flowMeasureTable) flowMeasureTable {
+// mergeFlowMeasureTables adds read b of one module into a, the reads before it. Bytes and
+// packets add; latency and jitter percentiles cannot, so a row keeps those of the read
+// that saw the most of its packets. picked holds that read's packets for each row merged
+// from several reads; a row from one read has its own. Either table may be nil, meaning
+// that read failed; the result is nil only if both did.
+func mergeFlowMeasureTables(a, b flowMeasureTable, picked map[flowMeasureKey]uint64) flowMeasureTable {
 	switch {
 	case a == nil:
 		return b
@@ -429,9 +436,16 @@ func mergeFlowMeasureTables(a, b flowMeasureTable) flowMeasureTable {
 			TotalPackets: held.TotalPackets + s.TotalPackets,
 		}
 
-		if s.TotalPackets > held.TotalPackets {
-			merged.Latency, merged.Jitter = s.Latency, s.Jitter
+		most, ok := picked[key]
+		if !ok {
+			most = held.TotalPackets
 		}
+
+		if s.TotalPackets > most {
+			merged.Latency, merged.Jitter, most = s.Latency, s.Jitter, s.TotalPackets
+		}
+
+		picked[key] = most
 
 		a[key] = merged
 	}
