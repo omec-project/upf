@@ -760,8 +760,8 @@ func TestTimeIsNotMeteredWhileDurationMeasurementIsOff(t *testing.T) {
 }
 
 // No time is metered while no PDR measures a URR, so its Time Threshold does not fire on
-// it. The time metered before goes in its next report, and metering starts again at the
-// first traffic a PDR credits to it.
+// it. The time metered before goes in its termination report, and metering starts again at
+// the first traffic a PDR credits to it.
 func TestTimeIsNotMeteredWhileNoPDRMeasuresTheURR(t *testing.T) {
 	s := measuredSession(urr{
 		urrID:             testURRID,
@@ -770,6 +770,7 @@ func TestTimeIsNotMeteredWhileNoPDRMeasuresTheURR(t *testing.T) {
 		measurementPeriod: 100 * time.Second,
 		timeThreshold:     50 * time.Second,
 	})
+	before := slices.Clone(s.pdrs)
 
 	poll(s, someUplink(), testEpoch) // metering starts, and the period
 
@@ -777,14 +778,16 @@ func TestTimeIsNotMeteredWhileNoPDRMeasuresTheURR(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s.stopUnfedMetering(testEpoch.Add(10 * time.Second))
+	if r := s.reportDissociated(before, testEpoch.Add(10*time.Second)); len(r) != 1 || r[0].duration != 10*time.Second {
+		t.Fatalf("expected a termination report of the 10 s metered before, got %+v", r)
+	}
 
 	if r := poll(s, volumeCounts{}, testEpoch.Add(60*time.Second)); len(r) != 0 {
 		t.Fatalf("expected no report while no PDR measures the URR, got %+v", r)
 	}
 
-	if r := poll(s, volumeCounts{}, testEpoch.Add(100*time.Second)); len(r) != 1 || r[0].duration != 10*time.Second {
-		t.Fatalf("expected a report of the 10 s metered before, got %+v", r)
+	if r := poll(s, volumeCounts{}, testEpoch.Add(100*time.Second)); len(r) != 1 || r[0].duration != 0 {
+		t.Fatalf("expected a periodic report with no time metered, got %+v", r)
 	}
 
 	s.CreatePDR(pdr{pdrID: downlinkPDRID, urrIDList: []uint32{testURRID}, hasURRIDs: true})
@@ -1092,80 +1095,188 @@ func TestAPollManyPeriodsLateKeepsTheSchedule(t *testing.T) {
 	}
 }
 
-// Usage a URR counted before its last PDR left does not fire a threshold: with a report
-// outstanding the threshold is not evaluated, and once it is delivered the detached usage
-// would otherwise be reported as though it were new. It is kept for the next report.
-func TestDetachedUsageDoesNotFireAThresholdAfterAReportIsDelivered(t *testing.T) {
+// A URR that loses its last PDR reports and is reset, but a report it had outstanding may
+// still be refused, which gives its usage back. That usage does not fire a threshold while
+// no PDR measures the URR: it would be reported as though it had just been measured. It
+// goes in the next report.
+func TestGivenBackUsageDoesNotFireAThresholdWhileNoPDRMeasuresTheURR(t *testing.T) {
 	u := volumeThresholdURR(100)
 	u.triggers.periodic = true
 	u.measurementPeriod = 10 * time.Second
 
 	s := measuredSession(u)
+	before := slices.Clone(s.pdrs)
 
 	poll(s, downlink(10), testEpoch) // the period starts
 
-	// The period ends and its report is outstanding; 150 B then reach the threshold, which
-	// is not evaluated while the report is outstanding.
-	s.addUsage(downlinkPDRID, downlink(5), testEpoch.Add(10*time.Second))
+	// The period ends past the threshold: a report of 160 B is outstanding.
+	s.addUsage(downlinkPDRID, downlink(150), testEpoch.Add(10*time.Second))
 	sent := s.dueReports(testEpoch.Add(10 * time.Second))
-	s.addUsage(downlinkPDRID, downlink(150), testEpoch.Add(11*time.Second))
-
-	if len(s.dueReports(testEpoch.Add(11*time.Second))) != 0 {
-		t.Fatal("expected no new report while one is outstanding")
-	}
 
 	if _, err := s.RemovePDR(downlinkPDRID); err != nil {
 		t.Fatal(err)
 	}
 
-	s.settleReports(sent, reportDelivered)
+	s.reportDissociated(before, testEpoch.Add(11*time.Second))
+	s.settleReports(sent, reportRejected)
 
 	if r := poll(s, volumeCounts{}, testEpoch.Add(12*time.Second)); len(r) != 0 {
 		t.Fatalf("expected no threshold report for usage no PDR measures, got %+v", r)
 	}
 
 	r := poll(s, volumeCounts{}, testEpoch.Add(21*time.Second))
-	if len(r) != 1 || r[0].trigger != triggerPERIO || r[0].volume.total != 150 {
-		t.Fatalf("expected the kept 150 B in the next periodic report, got %+v", r)
+	if len(r) != 1 || r[0].trigger != triggerPERIO || r[0].volume.total != 160 {
+		t.Fatalf("expected the given-back 160 B in the next periodic report, got %+v", r)
 	}
 }
 
-// The same for the Time Threshold: time metered up to the last PDR's removal reaches it
-// while a report is outstanding, and is not reported as a threshold once that report is
-// delivered. It is kept for the next report.
-func TestDetachedTimeDoesNotFireAThresholdAfterAReportIsDelivered(t *testing.T) {
+// The same for the Time Threshold: the time of a refused report, given back after the
+// URR lost its last PDR, does not fire it.
+func TestGivenBackTimeDoesNotFireAThresholdWhileNoPDRMeasuresTheURR(t *testing.T) {
 	s := measuredSession(urr{
 		urrID:             testURRID,
 		measureDuration:   true,
 		triggers:          urrTriggers{periodic: true, timeThreshold: true},
 		measurementPeriod: 100 * time.Second,
-		timeThreshold:     120 * time.Second,
+		timeThreshold:     50 * time.Second,
 	})
+	before := slices.Clone(s.pdrs)
 
 	poll(s, someUplink(), testEpoch) // metering starts, and the period
 
-	// The period ends and its report is outstanding, the time threshold not evaluated.
+	// The period ends past the threshold: a report of 100 s is outstanding.
 	sent := s.dueReports(testEpoch.Add(100 * time.Second))
-	if len(sent) != 1 || sent[0].trigger != triggerPERIO {
-		t.Fatalf("expected the periodic report, got %+v", sent)
+	if len(sent) != 1 || sent[0].trigger != triggerPERIO|triggerTIMTH {
+		t.Fatalf("expected a periodic and threshold report, got %+v", sent)
 	}
-
-	// 50 s more are metered, past the threshold, before the last PDR leaves.
-	s.addUsage(downlinkPDRID, someUplink(), testEpoch.Add(150*time.Second))
 
 	if _, err := s.RemovePDR(downlinkPDRID); err != nil {
 		t.Fatal(err)
 	}
 
-	s.stopUnfedMetering(testEpoch.Add(150 * time.Second))
-	s.settleReports(sent, reportDelivered)
+	s.reportDissociated(before, testEpoch.Add(110*time.Second))
+	s.settleReports(sent, reportRejected)
 
-	if r := poll(s, volumeCounts{}, testEpoch.Add(160*time.Second)); len(r) != 0 {
+	if r := poll(s, volumeCounts{}, testEpoch.Add(120*time.Second)); len(r) != 0 {
 		t.Fatalf("expected no threshold report for time no PDR measures, got %+v", r)
 	}
 
 	r := poll(s, volumeCounts{}, testEpoch.Add(200*time.Second))
-	if len(r) != 1 || r[0].trigger != triggerPERIO || r[0].duration != 50*time.Second {
-		t.Fatalf("expected the kept 50 s in the next periodic report, got %+v", r)
+	if len(r) != 1 || r[0].trigger != triggerPERIO || r[0].duration != 100*time.Second {
+		t.Fatalf("expected the given-back 100 s in the next periodic report, got %+v", r)
+	}
+}
+
+// A URR that loses its last PDR counts its thresholds afresh once a PDR measures it again:
+// its measurement was reset (clause 5.2.2.3.1 NOTE 5).
+func TestADissociatedURRCountsItsThresholdsAfresh(t *testing.T) {
+	s := measuredSession(urr{
+		urrID:           testURRID,
+		measureVolume:   true,
+		measureDuration: true,
+		triggers:        urrTriggers{volumeThreshold: true, timeThreshold: true},
+		volumeThreshold: volumeLimit{total: 1000, hasTotal: true},
+		timeThreshold:   100 * time.Second,
+	})
+	before := slices.Clone(s.pdrs)
+
+	poll(s, downlink(600), testEpoch) // metering starts
+	s.addUsage(downlinkPDRID, someUplink(), testEpoch.Add(60*time.Second))
+
+	if _, err := s.RemovePDR(downlinkPDRID); err != nil {
+		t.Fatal(err)
+	}
+
+	r := s.reportDissociated(before, testEpoch.Add(60*time.Second))
+	if len(r) != 1 || r[0].trigger != triggerTERMR || r[0].volume.total != 601 || r[0].duration != 60*time.Second {
+		t.Fatalf("expected a termination report of 601 B and 60 s, got %+v", r)
+	}
+
+	s.CreatePDR(pdr{pdrID: downlinkPDRID, urrIDList: []uint32{testURRID}, hasURRIDs: true})
+
+	if r := poll(s, downlink(600), testEpoch.Add(70*time.Second)); len(r) != 0 {
+		t.Fatalf("expected no threshold report for 600 B and no time since the reset, got %+v", r)
+	}
+
+	if r := poll(s, volumeCounts{}, testEpoch.Add(130*time.Second)); len(r) != 0 {
+		t.Fatalf("expected no threshold report for 60 s since the reset, got %+v", r)
+	}
+}
+
+// A URR that loses its last PDR with a report outstanding sends it again ahead of its
+// termination report of what it measured since, so the control plane sees them in order.
+// The outstanding report stays to be settled.
+func TestADissociatedURRSendsItsOutstandingReportFirst(t *testing.T) {
+	s := measuredSession(volumeThresholdURR(100))
+	before := slices.Clone(s.pdrs)
+
+	s.addUsage(downlinkPDRID, downlink(150), testEpoch)
+	sent := s.dueReports(testEpoch)
+	s.addUsage(downlinkPDRID, downlink(30), testEpoch.Add(time.Second))
+
+	if _, err := s.RemovePDR(downlinkPDRID); err != nil {
+		t.Fatal(err)
+	}
+
+	r := s.reportDissociated(before, testEpoch.Add(time.Second))
+	if len(r) != 2 || r[0].seq != 0 || r[0].volume.total != 150 ||
+		r[1].seq != 1 || r[1].trigger != triggerTERMR || r[1].volume.total != 30 {
+		t.Fatalf("expected the outstanding 150 B with UR-SEQN 0, then a termination report of "+
+			"the 30 B since with UR-SEQN 1, got %+v", r)
+	}
+
+	if u := s.findURR(testURRID); u.usage.outstanding != sent[0] {
+		t.Fatal("the outstanding report was dropped")
+	}
+}
+
+// A URR measuring only duration reports the time it metered when it loses its last PDR.
+func TestADissociatedURRReportsItsDuration(t *testing.T) {
+	s := measuredSession(urr{urrID: testURRID, measureDuration: true})
+	before := slices.Clone(s.pdrs)
+
+	poll(s, someUplink(), testEpoch) // metering starts
+
+	if _, err := s.RemovePDR(downlinkPDRID); err != nil {
+		t.Fatal(err)
+	}
+
+	r := s.reportDissociated(before, testEpoch.Add(60*time.Second))
+	if len(r) != 1 || r[0].trigger != triggerTERMR || r[0].duration != 60*time.Second {
+		t.Fatalf("expected a termination report of 60 s, got %+v", r)
+	}
+}
+
+// A URR that loses its last PDR is reset even when it has nothing to report: the volume it
+// kept while volume measurement is off, the part of a second it metered, and its counts
+// toward its thresholds are discarded, and its next report starts now.
+func TestADissociatedURRIsResetWhenItDoesNotReport(t *testing.T) {
+	s := measuredSession(urr{urrID: testURRID, measureDuration: true})
+	before := slices.Clone(s.pdrs)
+
+	s.urrs[0].usage = urrUsage{
+		since:               testEpoch,
+		unreported:          downlink(500), // kept from when volume was measured
+		toThreshold:         downlink(500),
+		metered:             500 * time.Millisecond,
+		toTimeThreshold:     500 * time.Millisecond,
+		durationCarry:       300 * time.Millisecond,
+		volumeThresholdSent: true,
+		timeThresholdSent:   true,
+		nextSeq:             3,
+	}
+
+	if _, err := s.RemovePDR(downlinkPDRID); err != nil {
+		t.Fatal(err)
+	}
+
+	now := testEpoch.Add(time.Minute)
+	if r := s.reportDissociated(before, now); len(r) != 0 {
+		t.Fatalf("expected no report of less than a second, got %+v", r)
+	}
+
+	want := urrUsage{since: now, nextSeq: 3}
+	if got := s.urrs[0].usage; got != want {
+		t.Fatalf("the URR was left with %+v, expected %+v", got, want)
 	}
 }

@@ -17,6 +17,12 @@ import (
 )
 
 const (
+	// drainCoalesce is how recent a read a drain accepts as its own. A deletion storm
+	// would otherwise read the whole datapath once per deletion, on the reader goroutine
+	// of the association sending it. The traffic a session forwards in the meantime,
+	// before its rules are removed, goes unreported.
+	drainCoalesce = 200 * time.Millisecond
+
 	// reportSenders is how many Session Report Requests are in flight at once. Each waits
 	// for its response, through the retransmissions max_req_retries allows.
 	reportSenders = 16
@@ -48,8 +54,16 @@ type usageMonitor struct {
 	reader   usageReader
 	interval time.Duration
 
+	// readMu is held across a read of the datapath and the use of what it read, so that
+	// a drain that finds a read under way waits for its counts to be applied.
+	readMu sync.Mutex
+	// window is the counts read since the last periodic poll, and lastRead when the last
+	// read began. Under readMu.
+	window   flowMeasureCounts
+	lastRead time.Time
+
 	snapshotMu sync.Mutex
-	// snapshot is the counts the last poll read, and snapshotAt when.
+	// snapshot is the window the last periodic poll closed, and snapshotAt when.
 	snapshot   flowMeasureCounts
 	snapshotAt time.Time
 
@@ -117,17 +131,40 @@ func (m *usageMonitor) run() {
 	}
 }
 
-// poll reads the counters, credits them, and publishes them as the metrics snapshot.
+// poll reads the counters and publishes the window they close as the metrics snapshot.
 func (m *usageMonitor) poll(now time.Time) {
-	counts := m.read()
+	m.readMu.Lock()
+	defer m.readMu.Unlock()
+
+	m.read()
 
 	m.snapshotMu.Lock()
-	m.snapshot, m.snapshotAt = counts, now
+	m.snapshot, m.snapshotAt = m.window, now
 	m.snapshotMu.Unlock()
+
+	m.window = flowMeasureCounts{}
 }
 
-// read reads the counters and credits them.
-func (m *usageMonitor) read() flowMeasureCounts {
+// drain brings every URR up to date with what the datapath has counted, so that a URR
+// leaving its session can report all of its usage. A read that began under drainCoalesce
+// before the call will do; the drain waits for its counts to be applied.
+func (m *usageMonitor) drain() {
+	asked := time.Now()
+
+	m.readMu.Lock()
+	defer m.readMu.Unlock()
+
+	if asked.Sub(m.lastRead) < drainCoalesce {
+		return
+	}
+
+	m.read()
+}
+
+// read reads the counters into the window, and credits them. Under readMu.
+func (m *usageMonitor) read() {
+	started := time.Now()
+
 	// Bounded below the interval, so that a slow read is given up before the next poll.
 	ctx, cancel := context.WithTimeout(m.node.ctx, m.interval*4/5)
 	defer cancel()
@@ -137,9 +174,18 @@ func (m *usageMonitor) read() flowMeasureCounts {
 		logger.PfcpLog.Warnln("usage counter read failed; using the modules that were read:", err)
 	}
 
-	m.apply(counts)
+	// Only a read of both post-QoS modules stands in for a drain's own: a session's usage
+	// in the module that was not read would otherwise be lost with the session.
+	if counts.postUL != nil && counts.postDL != nil {
+		m.lastRead = started
+	}
 
-	return counts
+	m.window = flowMeasureCounts{
+		preQos: mergeFlowMeasureTables(m.window.preQos, counts.preQos),
+		postUL: mergeFlowMeasureTables(m.window.postUL, counts.postUL),
+		postDL: mergeFlowMeasureTables(m.window.postDL, counts.postDL),
+	}
+	m.apply(counts)
 }
 
 // pdrUsage is the volume the datapath counted for one PDR.
@@ -186,7 +232,7 @@ func userBytes(st *pb.FlowMeasureReadResponse_Statistic, overhead uint64) uint64
 }
 
 // apply credits a read's counts to the URRs of every association's sessions, and queues
-// the reports that fall due.
+// the reports that fall due. Under readMu.
 func (m *usageMonitor) apply(counts flowMeasureCounts) {
 	usage := usageBySession(counts)
 
@@ -353,4 +399,51 @@ func (m *usageMonitor) collectSessionStats(pc *PfcpNodeCollector, ch chan<- prom
 	}
 
 	emitSessionStats(pc, ch, snapshot)
+}
+
+// mergeFlowMeasureTables adds two reads of one module. Bytes and packets add; latency
+// and jitter percentiles cannot, so a row keeps those of the read that saw more of its
+// packets. Either table may be nil, meaning that read failed; the result is nil only if
+// both did.
+func mergeFlowMeasureTables(a, b flowMeasureTable) flowMeasureTable {
+	switch {
+	case a == nil:
+		return b
+	case b == nil:
+		return a
+	}
+
+	for key, s := range b {
+		held, ok := a[key]
+		if !ok {
+			a[key] = s
+			continue
+		}
+
+		merged := &pb.FlowMeasureReadResponse_Statistic{
+			Fseid:        held.Fseid,
+			Pdr:          held.Pdr,
+			Latency:      held.Latency,
+			Jitter:       held.Jitter,
+			TotalBytes:   held.TotalBytes + s.TotalBytes,
+			TotalPackets: held.TotalPackets + s.TotalPackets,
+		}
+
+		if s.TotalPackets > held.TotalPackets {
+			merged.Latency, merged.Jitter = s.Latency, s.Jitter
+		}
+
+		a[key] = merged
+	}
+
+	return a
+}
+
+// drainUsage brings the URRs of the association's sessions up to date with what the
+// datapath has counted, when usage is reported. A session handler calls it before taking
+// sessionsMu, which the drain takes to credit the counts.
+func (pConn *PFCPConn) drainUsage() {
+	if pConn.node != nil && pConn.node.usage != nil {
+		pConn.node.usage.drain()
+	}
 }
