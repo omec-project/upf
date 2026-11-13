@@ -57,6 +57,11 @@ type urrUsage struct {
 	// outstanding report was held. Its thresholds count afresh from the reset, so a
 	// refusal gives back to them only the usage that report carried.
 	outstandingReset bool
+	// outstandingReplayed says the outstanding report went out again in a Session
+	// Modification Response, ahead of a termination report. The control plane may have
+	// counted that copy, which it cannot refuse, so a later refusal of the report is not
+	// taken as not counted.
+	outstandingReplayed bool
 }
 
 // CreateURR adds a URR to the session. A Create URR naming a URR the session already
@@ -231,8 +236,9 @@ func measuredBy(pdrs []pdr, id uint32) bool {
 // its PDRs measures now. Such a URR is kept, and its measurement is stopped and reset; it
 // reports what it measured since its last report if that is not null (TS 29.244 clauses
 // 5.2.2.3.1 and 8.2.41). A report it has outstanding goes ahead of that one, with its
-// UR-SEQN, so that the control plane sees them in order; it stays outstanding, to be
-// settled as before.
+// UR-SEQN, so that the control plane sees them in order. It stays outstanding, to be sent
+// again until the control plane answers it, and a refusal of it gives nothing back: the
+// control plane may have counted the copy in the response.
 func (s *PFCPSession) reportDissociated(before []pdr, now time.Time) []usageReport {
 	var reports []usageReport
 
@@ -247,6 +253,7 @@ func (s *PFCPSession) reportDissociated(before []pdr, now time.Time) []usageRepo
 		if u.hasMeasurement() {
 			if r := u.usage.outstanding; r != nil {
 				reports = append(reports, *r)
+				u.usage.outstandingReplayed = true
 			}
 
 			reports = append(reports, u.report(triggerTERMR, now))
@@ -311,7 +318,8 @@ func (s *PFCPSession) dueReports(now time.Time) []*usageReport {
 
 		if t != 0 {
 			r := u.report(t, now)
-			u.usage.outstanding, u.usage.inFlight, u.usage.outstandingReset = &r, true, false
+			u.usage.outstanding, u.usage.inFlight = &r, true
+			u.usage.outstandingReset, u.usage.outstandingReplayed = false, false
 			reports = append(reports, &r)
 		}
 	}
@@ -409,7 +417,8 @@ type reportOutcome int
 const (
 	// reportDelivered: the control plane accepted it.
 	reportDelivered reportOutcome = iota
-	// reportRejected: the control plane answered and refused it, so it counted none of it.
+	// reportRejected: the control plane answered and refused it, so it counted none of it,
+	// unless a Session Modification Response also carried it.
 	reportRejected
 	// reportUndelivered: no answer, or the report could not be sent. The control plane
 	// may have counted it.
@@ -429,7 +438,14 @@ func (s *PFCPSession) settleReports(sent []*usageReport, outcome reportOutcome) 
 
 		us := &u.usage
 
-		switch outcome {
+		// A refusal of a report the control plane also had in a response is not taken as
+		// not counted: giving its usage back would bill it again, under a new UR-SEQN.
+		o := outcome
+		if o == reportRejected && us.outstandingReplayed {
+			o = reportDelivered
+		}
+
+		switch o {
 		case reportDelivered:
 			us.outstanding, us.inFlight = nil, false
 		case reportRejected:
@@ -440,8 +456,8 @@ func (s *PFCPSession) settleReports(sent []*usageReport, outcome reportOutcome) 
 			//
 			// After a reset only the report's own usage goes back, the thresholds counting
 			// afresh, and of its time only the whole seconds it reported: the part of a
-			// second it left was spent by the termination report, or dropped with the reset
-			// as it is when the report is delivered.
+			// second it left was dropped with the reset, as it is when the report is
+			// delivered.
 			us.unreported.add(r.volume)
 			us.since = r.start
 
