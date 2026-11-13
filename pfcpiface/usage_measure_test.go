@@ -1331,6 +1331,97 @@ func TestARefusedPeriodicReportAfterADissociationCountsTowardTheThresholds(t *te
 	}
 }
 
+// A refused report gives back, after a reset, only the whole seconds it reported. The part
+// of a second it left was spent by the termination report, and the part it took from the
+// report before it is in those whole seconds: given back too, either would be billed
+// twice.
+func TestARefusalAfterADissociationGivesBackOnlyTheReportsWholeSeconds(t *testing.T) {
+	s := measuredSession(urr{
+		urrID:             testURRID,
+		measureDuration:   true,
+		triggers:          urrTriggers{periodic: true},
+		measurementPeriod: 1300 * time.Millisecond,
+	})
+	before := slices.Clone(s.pdrs)
+
+	poll(s, someUplink(), testEpoch) // metering starts, and the period
+
+	if r := poll(s, volumeCounts{}, testEpoch.Add(1300*time.Millisecond)); len(r) != 1 || r[0].duration != time.Second {
+		t.Fatalf("expected a periodic report of 1 s, leaving 0.3 s, got %+v", r)
+	}
+
+	sent := s.dueReports(testEpoch.Add(2600 * time.Millisecond))
+	if len(sent) != 1 || sent[0].duration != time.Second {
+		t.Fatalf("expected a periodic report of 1 s, taking 0.3 s and leaving 0.6 s, got %+v", sent)
+	}
+
+	if _, err := s.RemovePDR(downlinkPDRID); err != nil {
+		t.Fatal(err)
+	}
+
+	r := s.reportDissociated(before, testEpoch.Add(3*time.Second))
+	if len(r) != 2 || r[1].trigger != triggerTERMR || r[1].duration != time.Second {
+		t.Fatalf("expected a termination report of the 0.6 s left and 0.4 s since, got %+v", r)
+	}
+
+	s.settleReports(sent, reportRejected)
+	s.CreatePDR(pdr{pdrID: downlinkPDRID, urrIDList: []uint32{testURRID}, hasURRIDs: true})
+
+	// Metering starts again with the traffic at 3 s: 3.5 s are measured in all, 2 s of
+	// them billed.
+	s.addUsage(downlinkPDRID, someUplink(), testEpoch.Add(3*time.Second))
+	s.addUsage(downlinkPDRID, someUplink(), testEpoch.Add(3500*time.Millisecond))
+
+	u := s.findURR(testURRID)
+	if got := u.report(triggerPERIO, testEpoch.Add(3500*time.Millisecond)); got.duration != time.Second {
+		t.Fatalf("expected the 1 s given back to be reported with the 0.5 s since, as 1 s, got %v", got.duration)
+	}
+
+	if u.usage.durationCarry != 500*time.Millisecond {
+		t.Fatalf("expected 0.5 s carried, got %v", u.usage.durationCarry)
+	}
+}
+
+// The same whole seconds, and no more, go back to the Time Threshold.
+func TestARefusalAfterADissociationGivesTheTimeThresholdOnlyWholeSeconds(t *testing.T) {
+	s := measuredSession(urr{
+		urrID:             testURRID,
+		measureDuration:   true,
+		triggers:          urrTriggers{periodic: true, timeThreshold: true},
+		measurementPeriod: 1500 * time.Millisecond,
+		timeThreshold:     3 * time.Second,
+	})
+	before := slices.Clone(s.pdrs)
+
+	poll(s, someUplink(), testEpoch) // metering starts, and the period
+
+	sent := s.dueReports(testEpoch.Add(1500 * time.Millisecond))
+	if len(sent) != 1 || sent[0].duration != time.Second {
+		t.Fatalf("expected a periodic report of 1 s, leaving 0.5 s, got %+v", sent)
+	}
+
+	if _, err := s.RemovePDR(downlinkPDRID); err != nil {
+		t.Fatal(err)
+	}
+
+	s.reportDissociated(before, testEpoch.Add(2*time.Second))
+	s.settleReports(sent, reportRejected)
+	s.CreatePDR(pdr{pdrID: downlinkPDRID, urrIDList: []uint32{testURRID}, hasURRIDs: true})
+
+	timeThresholdReport := func(r *usageReport) bool { return r.trigger&triggerTIMTH != 0 }
+
+	// Metering starts again with the traffic at 3 s.
+	s.addUsage(downlinkPDRID, someUplink(), testEpoch.Add(3*time.Second))
+
+	if r := poll(s, volumeCounts{}, testEpoch.Add(4900*time.Millisecond)); slices.ContainsFunc(r, timeThresholdReport) {
+		t.Fatalf("expected no threshold report for the 1 s given back and 1.9 s since, got %+v", r)
+	}
+
+	if r := poll(s, volumeCounts{}, testEpoch.Add(5*time.Second)); !slices.ContainsFunc(r, timeThresholdReport) {
+		t.Fatalf("expected a threshold report for the 1 s given back and 2 s since, got %+v", r)
+	}
+}
+
 // Once the report outstanding at the reset is settled, a later refused threshold report
 // restores what the thresholds counted, as it does for a URR never reset: the mark the
 // reset left ends with the report it was made for.
