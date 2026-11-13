@@ -204,22 +204,14 @@ func (us *urrUsage) stopMetering(now time.Time) {
 	us.meteredTo = time.Time{}
 }
 
-// stopUnfedMetering stops the time metering of each URR that no PDR of the session
-// measures any more, after a modification removed or updated its last one: no traffic can
-// reach it, and clause 5.2.2.3.1 has its measurement stop. What it measured is kept for its
-// next report.
-func (s *PFCPSession) stopUnfedMetering(now time.Time) {
-	for i := range s.urrs {
-		u := &s.urrs[i]
-		if !u.usage.meteredTo.IsZero() && !s.measures(u.urrID) {
-			u.usage.stopMetering(now)
-		}
-	}
-}
-
 // measures says whether a PDR of the session measures URR id.
 func (s *PFCPSession) measures(id uint32) bool {
-	for _, p := range s.pdrs {
+	return measuredBy(s.pdrs, id)
+}
+
+// measuredBy says whether one of pdrs measures URR id.
+func measuredBy(pdrs []pdr, id uint32) bool {
+	for _, p := range pdrs {
 		for _, u := range p.urrIDList {
 			if u == id {
 				return true
@@ -228,6 +220,58 @@ func (s *PFCPSession) measures(id uint32) bool {
 	}
 
 	return false
+}
+
+// reportDissociated returns the termination reports of the URRs a modification left
+// without a PDR: each URR one of the PDRs the session had before measured, and none of
+// its PDRs measures now. Such a URR is kept, and its measurement is stopped and reset; it
+// reports what it measured since its last report if that is not null (TS 29.244 clauses
+// 5.2.2.3.1 and 8.2.41). A report it has outstanding goes ahead of that one, with its
+// UR-SEQN, so that the control plane sees them in order; it stays outstanding, to be
+// settled as before.
+func (s *PFCPSession) reportDissociated(before []pdr, now time.Time) []usageReport {
+	var reports []usageReport
+
+	for i := range s.urrs {
+		u := &s.urrs[i]
+		if !measuredBy(before, u.urrID) || s.measures(u.urrID) {
+			continue
+		}
+
+		u.usage.stopMetering(now)
+
+		if u.hasMeasurement() {
+			if r := u.usage.outstanding; r != nil {
+				reports = append(reports, *r)
+			}
+
+			reports = append(reports, u.report(triggerTERMR, now))
+		}
+
+		u.usage.reset(now)
+	}
+
+	return reports
+}
+
+// hasMeasurement says whether the URR's next report would carry a measurement that is
+// not null: volume, or at least a whole second, of a measurement that is on.
+func (u *urr) hasMeasurement() bool {
+	us := &u.usage
+
+	return u.measureVolume && !us.unreported.isZero() ||
+		u.measureDuration && us.metered+us.durationCarry >= time.Second
+}
+
+// reset discards what the URR measured. Clause 5.2.2.3.1 has the UP function "reset any
+// measurement for the URR" when its last PDR is removed; this includes the counts toward
+// its thresholds and usage kept while a measurement is off. Its UR-SEQN, period and
+// outstanding report run on.
+func (us *urrUsage) reset(now time.Time) {
+	us.since = now
+	us.unreported, us.toThreshold = volumeCounts{}, volumeCounts{}
+	us.metered, us.toTimeThreshold, us.durationCarry = 0, 0, 0
+	us.volumeThresholdSent, us.timeThresholdSent = false, false
 }
 
 // dueReports returns the reports the session's URRs are to send now: each outstanding
@@ -252,10 +296,10 @@ func (s *PFCPSession) dueReports(now time.Time) []*usageReport {
 
 		t := u.due(now)
 
-		// A URR no PDR measures is credited no traffic. What it counted before the last PDR
-		// left is kept for its next report, and does not fire a threshold: a threshold
-		// reached while a report was outstanding would otherwise report that usage, as
-		// though it had just been measured, once the report is delivered.
+		// A URR no PDR measures is credited no traffic. What it holds -- usage a refused
+		// report gave back after its last PDR left -- is kept for its next report, and does
+		// not fire a threshold: that would report the usage as though it had just been
+		// measured.
 		if t&(triggerVOLTH|triggerTIMTH) != 0 && !s.measures(u.urrID) {
 			t &^= triggerVOLTH | triggerTIMTH
 		}
@@ -414,4 +458,18 @@ func (s *PFCPSession) settleReports(sent []*usageReport, outcome reportOutcome) 
 			us.inFlight = false
 		}
 	}
+}
+
+// finalReports are the reports of a URR leaving its session: its outstanding report, if
+// it has one, and a termination report of what it measured since (TS 29.244 clauses
+// 5.2.2.3.1 and 8.2.41). The outstanding one may have reached the control plane already;
+// it is sent again with its UR-SEQN, so it is counted once.
+func (u *urr) finalReports(now time.Time) []usageReport {
+	var reports []usageReport
+
+	if r := u.usage.outstanding; r != nil {
+		reports = append(reports, *r)
+	}
+
+	return append(reports, u.report(triggerTERMR, now))
 }

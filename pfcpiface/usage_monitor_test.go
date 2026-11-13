@@ -105,6 +105,64 @@ func TestAStalledPollerServesNoSeries(t *testing.T) {
 	}
 }
 
+// Every read adds into the poll's window, so a read between two polls does not take its
+// counts out of the next snapshot.
+func TestAReadBetweenPollsStaysInTheNextSnapshot(t *testing.T) {
+	node, m, _ := monitoredNode(t, time.Minute)
+
+	m.readMu.Lock()
+	m.read()
+	m.readMu.Unlock()
+
+	m.poll(time.Now())
+
+	ul := fmt.Sprintf(`direction="uplink",fseid="%d",pdr="%d",ue_ip="%s"`, statsTestFSEID, statsTestULPDR, statsTestUEIP)
+	dl := fmt.Sprintf(`direction="downlink",fseid="%d",pdr="%d",ue_ip="%s"`, statsTestFSEID, statsTestDLPDR, statsTestUEIP)
+	want := `
+# HELP upf_session_tx_bytes Shows the total number of bytes for a given session in UPF. Downlink bytes include GTP-U encapsulation
+# TYPE upf_session_tx_bytes gauge
+upf_session_tx_bytes{` + ul + `} 22000
+upf_session_tx_bytes{` + dl + `} 16800
+`
+
+	err := testutil.CollectAndCompare(NewPFCPNodeCollector(node), strings.NewReader(want), "upf_session_tx_bytes")
+	if err != nil {
+		t.Fatalf("the snapshot does not hold both reads of its window:\n%v", err)
+	}
+}
+
+func TestMergeFlowMeasureTablesAddsCountsAndKeepsTheBusierReadsPercentiles(t *testing.T) {
+	key := flowMeasureKey{statsTestFSEID, statsTestULPDR}
+
+	quiet := statsTestStatistic(statsTestULPDR, 2, 200)
+	busy := statsTestStatistic(statsTestULPDR, 10, 1000)
+	busy.Latency = &pb.FlowMeasureReadResponse_Statistic_Histogram{PercentileValuesNs: []uint64{1, 2, 3}}
+
+	merged := mergeFlowMeasureTables(flowMeasureTable{key: quiet}, flowMeasureTable{key: busy})[key]
+
+	if merged.TotalPackets != 12 || merged.TotalBytes != 1200 {
+		t.Fatalf("merged to %d packets and %d bytes, expected 12 and 1200", merged.TotalPackets, merged.TotalBytes)
+	}
+
+	if merged.Latency != busy.Latency {
+		t.Fatal("the merged row does not keep the percentiles of the read with more packets")
+	}
+
+	if mergeFlowMeasureTables(nil, nil) != nil {
+		t.Fatal("two failed reads merged into a table that reads as read")
+	}
+
+	other := flowMeasureKey{statsTestFSEID, statsTestULPDR + 1}
+
+	if got := mergeFlowMeasureTables(nil, flowMeasureTable{key: quiet}); got[key] != quiet {
+		t.Fatal("a read merged after a failed one was not kept")
+	}
+
+	if got := mergeFlowMeasureTables(flowMeasureTable{key: busy}, flowMeasureTable{other: quiet}); got[other] != quiet {
+		t.Fatal("a row only the second read saw was not kept")
+	}
+}
+
 // signallingReader tells of each read made of it.
 type signallingReader struct{ reads chan struct{} }
 

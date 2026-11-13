@@ -106,6 +106,7 @@ func newIdleReportingSetup(t *testing.T) *reportingSetup {
 
 	node := &PFCPNode{ctx: ctx, upf: pConn.upf}
 	node.pConns.Store("smf", pConn)
+	pConn.node = node
 
 	reader := &scriptedReader{}
 	node.usage = newUsageMonitor(node, reader, time.Hour)
