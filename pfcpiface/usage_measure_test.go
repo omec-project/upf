@@ -1203,6 +1203,176 @@ func TestADissociatedURRCountsItsThresholdsAfresh(t *testing.T) {
 	}
 }
 
+// A threshold report re-applies the thresholds with what they counted, which may include
+// usage an earlier periodic report carried. If the URR loses its last PDR and is reset
+// while that report is outstanding, and the report is then refused, only the usage the
+// report carried goes back to the thresholds: what they counted before it was reset.
+func TestARefusalAfterADissociationGivesTheThresholdOnlyTheReportsVolume(t *testing.T) {
+	u := volumeThresholdURR(1000)
+	u.triggers.periodic = true
+	u.measurementPeriod = time.Minute
+
+	s := measuredSession(u)
+	before := slices.Clone(s.pdrs)
+
+	poll(s, downlink(0), testEpoch) // arms the period
+
+	if r := poll(s, downlink(600), testEpoch.Add(time.Minute)); len(r) != 1 || r[0].trigger != triggerPERIO {
+		t.Fatalf("expected a periodic report, got %+v", r)
+	}
+
+	s.addUsage(downlinkPDRID, downlink(400), testEpoch.Add(61*time.Second))
+
+	sent := s.dueReports(testEpoch.Add(61 * time.Second))
+	if len(sent) != 1 || sent[0].trigger != triggerVOLTH || sent[0].volume.total != 400 {
+		t.Fatalf("expected a volume threshold report of the 400 B since the periodic one, got %+v", sent)
+	}
+
+	if _, err := s.RemovePDR(downlinkPDRID); err != nil {
+		t.Fatal(err)
+	}
+
+	s.reportDissociated(before, testEpoch.Add(62*time.Second))
+	s.settleReports(sent, reportRejected)
+	s.CreatePDR(pdr{pdrID: downlinkPDRID, urrIDList: []uint32{testURRID}, hasURRIDs: true})
+
+	if r := poll(s, downlink(599), testEpoch.Add(63*time.Second)); len(r) != 0 {
+		t.Fatalf("expected no threshold report for the 400 B given back and 599 B since, got %+v", r)
+	}
+
+	r := poll(s, downlink(1), testEpoch.Add(64*time.Second))
+	if len(r) != 1 || r[0].trigger != triggerVOLTH || r[0].volume.total != 1000 {
+		t.Fatalf("expected a threshold report of the 400 B given back and 600 B since, got %+v", r)
+	}
+}
+
+// The same for the Time Threshold.
+func TestARefusalAfterADissociationGivesTheThresholdOnlyTheReportsTime(t *testing.T) {
+	s := measuredSession(urr{
+		urrID:             testURRID,
+		measureDuration:   true,
+		triggers:          urrTriggers{periodic: true, timeThreshold: true},
+		measurementPeriod: time.Minute,
+		timeThreshold:     100 * time.Second,
+	})
+	before := slices.Clone(s.pdrs)
+
+	poll(s, someUplink(), testEpoch) // metering starts, and the period
+
+	if r := poll(s, volumeCounts{}, testEpoch.Add(time.Minute)); len(r) != 1 || r[0].trigger != triggerPERIO {
+		t.Fatalf("expected a periodic report, got %+v", r)
+	}
+
+	sent := s.dueReports(testEpoch.Add(100 * time.Second))
+	if len(sent) != 1 || sent[0].trigger != triggerTIMTH || sent[0].duration != 40*time.Second {
+		t.Fatalf("expected a time threshold report of the 40 s since the periodic one, got %+v", sent)
+	}
+
+	if _, err := s.RemovePDR(downlinkPDRID); err != nil {
+		t.Fatal(err)
+	}
+
+	s.reportDissociated(before, testEpoch.Add(100*time.Second))
+	s.settleReports(sent, reportRejected)
+	s.CreatePDR(pdr{pdrID: downlinkPDRID, urrIDList: []uint32{testURRID}, hasURRIDs: true})
+
+	timeThresholdReport := func(r *usageReport) bool { return r.trigger&triggerTIMTH != 0 }
+
+	// Metering starts again with the traffic at 110 s.
+	if r := poll(s, someUplink(), testEpoch.Add(110*time.Second)); slices.ContainsFunc(r, timeThresholdReport) {
+		t.Fatalf("expected no threshold report for the 40 s given back, got %+v", r)
+	}
+
+	if r := poll(s, volumeCounts{}, testEpoch.Add(169*time.Second)); slices.ContainsFunc(r, timeThresholdReport) {
+		t.Fatalf("expected no threshold report for the 40 s given back and 59 s since, got %+v", r)
+	}
+
+	if r := poll(s, volumeCounts{}, testEpoch.Add(170*time.Second)); !slices.ContainsFunc(r, timeThresholdReport) {
+		t.Fatalf("expected a threshold report for the 40 s given back and 60 s since, got %+v", r)
+	}
+}
+
+// A refused report of another trigger gives its usage back to the thresholds too. Without
+// a reset that usage never left them; the reset discards it, and the refusal gives it back
+// with the report's usage, so the next threshold report carries all the control plane has
+// not counted.
+func TestARefusedPeriodicReportAfterADissociationCountsTowardTheThresholds(t *testing.T) {
+	u := volumeThresholdURR(1000)
+	u.triggers.periodic = true
+	u.measurementPeriod = time.Minute
+
+	s := measuredSession(u)
+	before := slices.Clone(s.pdrs)
+
+	poll(s, downlink(0), testEpoch) // arms the period
+
+	s.addUsage(downlinkPDRID, downlink(600), testEpoch.Add(time.Minute))
+
+	sent := s.dueReports(testEpoch.Add(time.Minute))
+	if len(sent) != 1 || sent[0].trigger != triggerPERIO {
+		t.Fatalf("expected a periodic report, got %+v", sent)
+	}
+
+	if _, err := s.RemovePDR(downlinkPDRID); err != nil {
+		t.Fatal(err)
+	}
+
+	s.reportDissociated(before, testEpoch.Add(61*time.Second))
+	s.settleReports(sent, reportRejected)
+	s.CreatePDR(pdr{pdrID: downlinkPDRID, urrIDList: []uint32{testURRID}, hasURRIDs: true})
+
+	if r := poll(s, downlink(399), testEpoch.Add(62*time.Second)); len(r) != 0 {
+		t.Fatalf("expected no report for the 600 B given back and 399 B since, got %+v", r)
+	}
+
+	r := poll(s, downlink(1), testEpoch.Add(63*time.Second))
+	if len(r) != 1 || r[0].trigger != triggerVOLTH || r[0].volume.total != 1000 {
+		t.Fatalf("expected a threshold report of the 600 B given back and 400 B since, got %+v", r)
+	}
+}
+
+// Once the report outstanding at the reset is settled, a later refused threshold report
+// restores what the thresholds counted, as it does for a URR never reset: the mark the
+// reset left ends with the report it was made for.
+func TestARefusalAfterTheResetReportIsSettledRestoresTheThresholds(t *testing.T) {
+	u := volumeThresholdURR(1000)
+	u.triggers.periodic = true
+	u.measurementPeriod = time.Minute
+
+	s := measuredSession(u)
+	before := slices.Clone(s.pdrs)
+
+	s.addUsage(downlinkPDRID, downlink(1000), testEpoch)
+	sent := s.dueReports(testEpoch)
+
+	if _, err := s.RemovePDR(downlinkPDRID); err != nil {
+		t.Fatal(err)
+	}
+
+	s.reportDissociated(before, testEpoch)
+	s.settleReports(sent, reportDelivered)
+	s.CreatePDR(pdr{pdrID: downlinkPDRID, urrIDList: []uint32{testURRID}, hasURRIDs: true})
+
+	poll(s, downlink(0), testEpoch.Add(time.Second)) // arms the period
+
+	if r := poll(s, downlink(600), testEpoch.Add(61*time.Second)); len(r) != 1 || r[0].trigger != triggerPERIO {
+		t.Fatalf("expected a periodic report, got %+v", r)
+	}
+
+	s.addUsage(downlinkPDRID, downlink(400), testEpoch.Add(62*time.Second))
+
+	sent = s.dueReports(testEpoch.Add(62 * time.Second))
+	if len(sent) != 1 || sent[0].trigger != triggerVOLTH {
+		t.Fatalf("expected a volume threshold report, got %+v", sent)
+	}
+
+	s.settleReports(sent, reportRejected)
+
+	if r := poll(s, volumeCounts{}, testEpoch.Add(63*time.Second)); len(r) != 1 || r[0].trigger != triggerVOLTH {
+		t.Fatalf("expected the volume threshold report to be due again, got %+v", r)
+	}
+}
+
 // A URR that loses its last PDR with a report outstanding sends it again ahead of its
 // termination report of what it measured since, so the control plane sees them in order.
 // The outstanding report stays to be settled.
