@@ -351,7 +351,8 @@ func (m *usageMonitor) send(b reportBatch) reportOutcome {
 
 	if cause != ie.CauseRequestAccepted {
 		logger.PfcpLog.Warnln("the usage reports of session", b.localSEID,
-			"were refused with cause", cause, "; their usage goes in the next report")
+			"were refused with cause", cause, "; their usage goes in the next report, "+
+				"unless a modification response carried them")
 
 		return reportRejected
 	}

@@ -1154,7 +1154,11 @@ func TestGivenBackTimeDoesNotFireAThresholdWhileNoPDRMeasuresTheURR(t *testing.T
 		t.Fatal(err)
 	}
 
-	s.reportDissociated(before, testEpoch.Add(110*time.Second))
+	// Nothing was metered since the report, so no termination report carries it again.
+	if r := s.reportDissociated(before, testEpoch.Add(100*time.Second)); len(r) != 0 {
+		t.Fatalf("expected no termination report, got %+v", r)
+	}
+
 	s.settleReports(sent, reportRejected)
 
 	if r := poll(s, volumeCounts{}, testEpoch.Add(120*time.Second)); len(r) != 0 {
@@ -1331,10 +1335,10 @@ func TestARefusedPeriodicReportAfterADissociationCountsTowardTheThresholds(t *te
 	}
 }
 
-// A refused report gives back, after a reset, only the whole seconds it reported. The part
-// of a second it left was spent by the termination report, and the part it took from the
-// report before it is in those whole seconds: given back too, either would be billed
-// twice.
+// A report refused after a reset, which no termination report carried again, gives back
+// only the whole seconds it reported. The part of a second it left was dropped with the
+// reset, as it is when the report is delivered, and the part it took from the report
+// before it is in those whole seconds.
 func TestARefusalAfterADissociationGivesBackOnlyTheReportsWholeSeconds(t *testing.T) {
 	s := measuredSession(urr{
 		urrID:             testURRID,
@@ -1359,16 +1363,14 @@ func TestARefusalAfterADissociationGivesBackOnlyTheReportsWholeSeconds(t *testin
 		t.Fatal(err)
 	}
 
-	r := s.reportDissociated(before, testEpoch.Add(3*time.Second))
-	if len(r) != 2 || r[1].trigger != triggerTERMR || r[1].duration != time.Second {
-		t.Fatalf("expected a termination report of the 0.6 s left and 0.4 s since, got %+v", r)
+	if r := s.reportDissociated(before, testEpoch.Add(2900*time.Millisecond)); len(r) != 0 {
+		t.Fatalf("expected no termination report for the 0.6 s left and 0.3 s since, got %+v", r)
 	}
 
 	s.settleReports(sent, reportRejected)
 	s.CreatePDR(pdr{pdrID: downlinkPDRID, urrIDList: []uint32{testURRID}, hasURRIDs: true})
 
-	// Metering starts again with the traffic at 3 s: 3.5 s are measured in all, 2 s of
-	// them billed.
+	// Metering starts again with the traffic at 3 s.
 	s.addUsage(downlinkPDRID, someUplink(), testEpoch.Add(3*time.Second))
 	s.addUsage(downlinkPDRID, someUplink(), testEpoch.Add(3500*time.Millisecond))
 
@@ -1404,7 +1406,10 @@ func TestARefusalAfterADissociationGivesTheTimeThresholdOnlyWholeSeconds(t *test
 		t.Fatal(err)
 	}
 
-	s.reportDissociated(before, testEpoch.Add(2*time.Second))
+	if r := s.reportDissociated(before, testEpoch.Add(1600*time.Millisecond)); len(r) != 0 {
+		t.Fatalf("expected no termination report for the 0.5 s left and 0.1 s since, got %+v", r)
+	}
+
 	s.settleReports(sent, reportRejected)
 	s.CreatePDR(pdr{pdrID: downlinkPDRID, urrIDList: []uint32{testURRID}, hasURRIDs: true})
 
@@ -1419,6 +1424,56 @@ func TestARefusalAfterADissociationGivesTheTimeThresholdOnlyWholeSeconds(t *test
 
 	if r := poll(s, volumeCounts{}, testEpoch.Add(5*time.Second)); !slices.ContainsFunc(r, timeThresholdReport) {
 		t.Fatalf("expected a threshold report for the 1 s given back and 2 s since, got %+v", r)
+	}
+}
+
+// A report the URR had outstanding when it lost its last PDR goes out again in the
+// modification response, with its UR-SEQN, ahead of the termination report. The control
+// plane may have counted that copy, so a later refusal of the Session Report Request
+// that carried it gives nothing back: the usage would be billed again under a new
+// UR-SEQN. A report the URR generates later is settled as before.
+func TestARefusalOfAReportReplayedInAResponseGivesNothingBack(t *testing.T) {
+	s := measuredSession(volumeThresholdURR(100))
+	before := slices.Clone(s.pdrs)
+
+	s.addUsage(downlinkPDRID, downlink(150), testEpoch)
+	sent := s.dueReports(testEpoch)
+	s.addUsage(downlinkPDRID, downlink(30), testEpoch.Add(time.Second))
+
+	if _, err := s.RemovePDR(downlinkPDRID); err != nil {
+		t.Fatal(err)
+	}
+
+	r := s.reportDissociated(before, testEpoch.Add(time.Second))
+	if len(r) != 2 || r[0].volume.total != 150 || r[1].volume.total != 30 {
+		t.Fatalf("expected the outstanding 150 B, then a termination report of 30 B, got %+v", r)
+	}
+
+	// Unanswered, it is still sent again with its UR-SEQN until the control plane answers.
+	s.settleReports(sent, reportUndelivered)
+
+	if u := s.findURR(testURRID); u.usage.outstanding != sent[0] {
+		t.Fatal("an unanswered report the response carried was dropped")
+	}
+
+	s.settleReports(sent, reportRejected)
+	s.CreatePDR(pdr{pdrID: downlinkPDRID, urrIDList: []uint32{testURRID}, hasURRIDs: true})
+
+	if r := poll(s, downlink(99), testEpoch.Add(2*time.Second)); len(r) != 0 {
+		t.Fatalf("expected no report: the refused 150 B were in the response, got %+v", r)
+	}
+
+	s.addUsage(downlinkPDRID, downlink(1), testEpoch.Add(3*time.Second))
+
+	sent = s.dueReports(testEpoch.Add(3 * time.Second))
+	if len(sent) != 1 || sent[0].seq != 2 || sent[0].volume.total != 100 {
+		t.Fatalf("expected a threshold report of the 100 B since, with UR-SEQN 2, got %+v", sent)
+	}
+
+	s.settleReports(sent, reportRejected)
+
+	if r := poll(s, volumeCounts{}, testEpoch.Add(4*time.Second)); len(r) != 1 || r[0].volume.total != 100 {
+		t.Fatalf("expected the refused 100 B, which no response carried, in the next report, got %+v", r)
 	}
 }
 
