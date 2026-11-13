@@ -436,17 +436,22 @@ func (s *PFCPSession) settleReports(sent []*usageReport, outcome reportOutcome) 
 			// Refused, so not counted: the next report carries its usage instead, from its
 			// Start Time, with the carry it took. A threshold report had re-applied the
 			// thresholds; they count on from where they were. A threshold sent since the
-			// report is counted from the report before it (clause 5.2.2.3.1 NOTE 1). After
-			// a reset the thresholds count afresh, so only the report's own usage goes back
-			// to them.
+			// report is counted from the report before it (clause 5.2.2.3.1 NOTE 1).
+			//
+			// After a reset only the report's own usage goes back, the thresholds counting
+			// afresh, and of its time only the whole seconds it reported: the part of a
+			// second it left was spent by the termination report, or dropped with the reset
+			// as it is when the report is delivered.
 			us.unreported.add(r.volume)
-			us.metered += r.metered
 			us.since = r.start
-			us.durationCarry = r.durationCarry
 
 			p := r.reapplied
 			if us.outstandingReset {
-				p = &thresholdState{r.volume, r.metered}
+				us.metered += r.duration
+				p = &thresholdState{r.volume, r.duration}
+			} else {
+				us.metered += r.metered
+				us.durationCarry = r.durationCarry
 			}
 
 			switch {
