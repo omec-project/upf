@@ -6,21 +6,32 @@
 from __future__ import annotations
 
 import argparse
-import importlib
+import os
 import subprocess
 import sys
 from importlib.metadata import PackageNotFoundError, distribution, version
 from pathlib import Path
 
+IMPORT_PROBE = "import importlib, sys; print(getattr(importlib.import_module(sys.argv[1]), '__file__', None))"
+
 
 def report_module(module_name: str) -> None:
-    try:
-        module = importlib.import_module(module_name)
-    except Exception as error:  # Baseline reports failures rather than stopping.
-        print(f"IMPORT {module_name}: FAILED: {error!r}")
+    # A child process turns any import failure into an exit status instead of an exception.
+    result = subprocess.run(
+        [sys.executable, "-P", "-c", IMPORT_PROBE, module_name],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={**os.environ, "PYTHONPATH": os.pathsep.join(sys.path)},
+    )
+    if result.returncode != 0:
+        stderr_lines = result.stderr.strip().splitlines()
+        error = stderr_lines[-1] if stderr_lines else f"exit status {result.returncode}"
+        print(f"IMPORT {module_name}: FAILED: {error}")
         return
 
-    print(f"IMPORT {module_name}: {getattr(module, '__file__', None)}")
+    stdout_lines = result.stdout.strip().splitlines()
+    print(f"IMPORT {module_name}: {stdout_lines[-1] if stdout_lines else None}")
 
 
 def report_scapy_distribution() -> None:
@@ -31,7 +42,9 @@ def report_scapy_distribution() -> None:
         return
 
     print(f"SCAPY DISTRIBUTION VERSION: {version('scapy')}")
-    print(f"SCAPY DISTRIBUTION ROOT: {Path(scapy_distribution.locate_file('')).resolve()}")
+    print(
+        f"SCAPY DISTRIBUTION ROOT: {Path(scapy_distribution.locate_file('')).resolve()}"
+    )
 
 
 def main() -> None:
