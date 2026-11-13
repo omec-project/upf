@@ -24,7 +24,7 @@ repos:
             bess/bin/dpdk-devbind\.py
           )
   - repo: https://github.com/pre-commit/mirrors-clang-format
-    rev: v14.0.0
+    rev: v20.1.8
     hooks:
       - id: clang-format
         types_or: [c, c++, proto]
