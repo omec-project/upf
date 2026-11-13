@@ -438,8 +438,9 @@ func TestAModificationThatLeavesAURRWithoutAPDRStopsItsMetering(t *testing.T) {
 				t.Fatalf("time is still metered for a URR no PDR measures, from %v", u.usage.meteredTo)
 			}
 
-			if u.usage.metered < time.Minute {
-				t.Fatalf("the time metered before was not kept: %v", u.usage.metered)
+			// The time metered before went in the response's termination report.
+			if u.usage.metered != 0 {
+				t.Fatalf("the URR's measurement was not reset: %v metered", u.usage.metered)
 			}
 		})
 	}

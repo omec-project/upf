@@ -14,9 +14,10 @@ import (
 type reportTrigger uint16
 
 const (
-	triggerPERIO reportTrigger = 1 << 0 // periodic, octet 5 bit 1
-	triggerVOLTH reportTrigger = 1 << 1 // volume threshold, octet 5 bit 2
-	triggerTIMTH reportTrigger = 1 << 2 // time threshold, octet 5 bit 3
+	triggerPERIO reportTrigger = 1 << 0  // periodic, octet 5 bit 1
+	triggerVOLTH reportTrigger = 1 << 1  // volume threshold, octet 5 bit 2
+	triggerTIMTH reportTrigger = 1 << 2  // time threshold, octet 5 bit 3
+	triggerTERMR reportTrigger = 1 << 11 // termination report, octet 6 bit 4
 )
 
 // Volume Measurement flags, clause 8.2.44: the volume counters it carries.
@@ -81,4 +82,12 @@ func (r usageReport) ies() []*ie.IE {
 
 func (r usageReport) inSessionReportRequest() *ie.IE {
 	return ie.NewUsageReportWithinSessionReportRequest(r.ies()...)
+}
+
+func (r usageReport) inSessionModificationResponse() *ie.IE {
+	return ie.NewUsageReportWithinSessionModificationResponse(r.ies()...)
+}
+
+func (r usageReport) inSessionDeletionResponse() *ie.IE {
+	return ie.NewUsageReportWithinSessionDeletionResponse(r.ies()...)
 }
