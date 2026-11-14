@@ -42,6 +42,8 @@ ENV TREX_SCRIPT_DIR=/trex-core-${TREX_VER}/scripts
 
 COPY patches/ /patches/
 
+SHELL ["/bin/ash", "-o", "pipefail", "-c"]
+
 RUN apk add --no-cache patch wget unzip && \
     wget -q -O trex.zip https://github.com/${TREX_REPO}/archive/v${TREX_VER}.zip && \
     echo "${TREX_ARCHIVE_SHA256}  trex.zip" | sha256sum -c - && \

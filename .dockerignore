@@ -5,3 +5,11 @@ build-output
 .coverage
 .DS_Store
 repos
+.git
+.github
+deployments
+docs
+plans
+ptf
+scripts
+test

@@ -139,14 +139,6 @@ RUN python3 -m venv /opt/bess/venv && \
     /opt/bess/venv/bin/pip check
 RUN ln -s /opt/bess/bessctl/bessctl /bin
 
-# UPF-specific runtime dependencies. BESS runtime packages are installed from
-# bess/env/runtime-deps.yml above, which is also used by BESS host installs.
-RUN apt-get update && apt-get install -y \
-    --no-install-recommends \
-    build-essential \
-    pkg-config && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
 # NOTE: Copy the entire directory rather than individual library files because:
 # - BESS and DPDK install their runtime libraries into /usr/local/lib/x86_64-linux-gnu/
 # - The exact set of required shared objects may change between DPDK/BESS releases
@@ -253,21 +245,37 @@ FROM golang:1.27.3-bookworm@sha256:dc0963f32053e4bc451d24d87e3892d42d01021b61f09
 ARG GOFLAGS
 WORKDIR /pfcpiface
 
-COPY go.mod /pfcpiface/go.mod
-COPY go.sum /pfcpiface/go.sum
+COPY go.mod go.sum ./
+# Vendor mode (GOFLAGS=-mod=vendor, see docs/developer-guide.md) builds from the
+# vendor tree and may use local `replace` paths that don't exist in the image,
+# so modules must not be downloaded.
+RUN --mount=type=cache,target=/go/pkg/mod \
+    case "$GOFLAGS" in \
+      *-mod=vendor*) ;; \
+      *) go mod download ;; \
+    esac
 
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN if echo "$GOFLAGS" | grep -Eq "-mod=vendor"; then go mod download; fi
-
-COPY . /pfcpiface
-RUN go mod tidy && \
-    CGO_ENABLED=0 go build $GOFLAGS -o /bin/pfcpiface ./cmd/pfcpiface
+# Only the packages cmd/pfcpiface imports, so unrelated changes (bess/, docs/,
+# tests) don't invalidate the build cache. The wildcard makes vendor/ optional.
+COPY vendor* vendor/
+COPY cmd/ cmd/
+COPY logger/ logger/
+COPY pfcpiface/ pfcpiface/
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" $GOFLAGS -o /bin/pfcpiface ./cmd/pfcpiface
 
 # Stage pfcp: runtime image of pfcp agent towards SMF
 FROM alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS pfcp
 
+# Unprivileged user (uid 1000) available for deployments that opt in with
+# runAsUser. The image defaults to root because pfcpiface connects to unix
+# sockets that bessd (root) creates in a shared volume; those sockets are not
+# writable by other users, so the whole pod must switch users together.
+RUN addgroup -S -g 1000 aether && adduser -S -u 1000 -G aether aether
+
 COPY conf /opt/bess/bessctl/conf
-COPY --from=pfcp-build /bin/pfcpiface /bin
+COPY --chmod=755 --from=pfcp-build /bin/pfcpiface /bin
 
 # Build arguments for dynamic labels
 ARG VERSION=dev
