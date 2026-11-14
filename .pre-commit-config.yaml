@@ -78,6 +78,11 @@ repos:
       - id: trailing-whitespace
         args:
           - --markdown-linebreak-ext=md
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.15.1
+    hooks:
+      - id: hadolint
+        args: [--ignore, DL3008, --ignore, DL3018]
   - repo: https://codeberg.org/fsfe/reuse-tool
     rev: v6.2.0
     hooks:

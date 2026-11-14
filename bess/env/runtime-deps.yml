@@ -27,6 +27,7 @@
           - libgflags2.2
           - libgoogle-glog0v6
           - libgrpc++1.51t64
+          - libjansson4
           - libjson-c5
           - libmlx5-1
           - libnl-3-200

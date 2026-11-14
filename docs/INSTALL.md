@@ -21,7 +21,8 @@ Copyright 2019 Intel Corporation
 
 You need the following dependencies.
 
-* Docker CE >= 19.03
+* Docker CE >= 20.10 with BuildKit (the Makefile enables it by default via
+  `DOCKER_BUILDKIT=1`)
   - [Here](https://docs.docker.com/engine/install/ubuntu/) are the installation
     instructions on Ubuntu, or find the installation instructions for the Linux
     flavor you are using

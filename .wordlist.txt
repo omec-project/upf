@@ -15,6 +15,7 @@ bess
 bessctl
 busypoll
 BUIDKIT
+BuildKit
 CloudLab
 CNI
 config
@@ -83,6 +84,7 @@ linux
 localhost
 loopback
 lports
+Makefile
 MAKEFLAGS
 MBR
 md
