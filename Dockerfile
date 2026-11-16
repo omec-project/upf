@@ -266,7 +266,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" $GOFLAGS -o /bin/pfcpiface ./cmd/pfcpiface
 
 # Stage pfcp: runtime image of pfcp agent towards SMF
-FROM alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS pfcp
+FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS pfcp
 
 # Unprivileged user (uid 1000) available for deployments that opt in with
 # runAsUser. The image defaults to root because pfcpiface connects to unix
