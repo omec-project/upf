@@ -30,7 +30,7 @@ RUN python3 -m venv /opt/ptf-venv && \
     /opt/ptf-venv/bin/pip check
 
 # Install TRex traffic gen and library for TRex API
-FROM alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS trex-builder
+FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS trex-builder
 ARG TREX_VER
 ARG TREX_REPO
 ARG TREX_ARCHIVE_SHA256
