@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"slices"
 	"strings"
 	"time"
 
@@ -356,6 +357,21 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 			logger.PfcpLog.Errorln("sending End Markers Failed:", err)
 		}
 	}()
+
+	// Usage is credited to URRs through the PDRs that measure them. A message that
+	// removes a URR, or leaves one without a PDR, reports its usage in the response, and
+	// one that removes or updates a PDR changes which URR the PDR's traffic is credited
+	// to, so the counts the datapath holds are credited first, under the rules they were
+	// counted under. The read credits
+	// every session, under each association's sessionsMu, so it is done before this
+	// one's is taken. The session is looked up without the lock only to skip the read when
+	// it has no URRs.
+	if r, ok := msg.(*message.SessionModificationRequest); ok && upf.enableUsageReporting &&
+		len(r.RemoveURR)+len(r.RemovePDR)+len(r.UpdatePDR) > 0 {
+		if s, held := pConn.store.GetSession(r.SEID()); held && len(s.urrs) > 0 {
+			pConn.drainUsage()
+		}
+	}
 
 	pConn.sessionsMu.Lock()
 	defer pConn.sessionsMu.Unlock()
@@ -749,6 +765,11 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		delQERs = append(delQERs, *q)
 	}
 
+	// The final reports of the URRs this message removes, or leaves without a PDR (clause
+	// 5.2.2.3.1). They are built from the session's copy, so a refusal below leaves the
+	// URRs and their usage in the store for the control plane's retry.
+	var finalReports []usageReport
+
 	if upf.enableUsageReporting {
 		for _, rURR := range smreq.RemoveURR {
 			urrID, err := rURR.URRID()
@@ -756,12 +777,15 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 				return sendError(err)
 			}
 
-			if _, err = session.RemoveURR(urrID); err != nil {
+			removed, err := session.RemoveURR(urrID)
+			if err != nil {
 				return sendError(err)
 			}
+
+			finalReports = append(finalReports, removed.finalReports(now)...)
 		}
 
-		session.stopUnfedMetering(now)
+		finalReports = append(finalReports, session.reportDissociated(before.pdrs, now)...)
 	}
 
 	deleted := PacketForwardingRules{
@@ -789,11 +813,25 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 	)
 
+	for _, r := range finalReports {
+		smres.UsageReport = append(smres.UsageReport, r.inSessionModificationResponse())
+	}
+
 	return smres, nil
 }
 
 func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (message.Message, error) {
 	upf := pConn.upf
+
+	// The session's URRs report their usage in the response, so the counts the datapath
+	// holds for them are read first, before sessionsMu: the read credits every session,
+	// under each association's. The session is looked up without the lock only to skip
+	// the read when it has no URRs.
+	if r, ok := msg.(*message.SessionDeletionRequest); ok && upf.enableUsageReporting {
+		if s, held := pConn.store.GetSession(r.SEID()); held && len(s.urrs) > 0 {
+			pConn.drainUsage()
+		}
+	}
 
 	pConn.sessionsMu.Lock()
 	defer pConn.sessionsMu.Unlock()
@@ -858,6 +896,19 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 			ie.NewCause(ie.CauseNoEstablishedPFCPAssociation)), ErrAssocReleasing
 	}
 
+	// Every URR reports what it measured since its last report, zero or not (clause
+	// 5.2.2.3.1). The reports come from a copy of the URRs: a refused deletion keeps the
+	// session, and its usage is still there for the control plane's retry.
+	var finalReports []usageReport
+
+	if upf.enableUsageReporting {
+		now := time.Now()
+
+		for _, u := range slices.Clone(session.urrs) {
+			finalReports = append(finalReports, u.finalReports(now)...)
+		}
+	}
+
 	// This caller needs more than the cause. A batch that ran out of time is answered
 	// accepted, which elsewhere is the answer that destroys nothing -- but here accepted
 	// is what releases the address and forgets the session, and the session is the only
@@ -896,6 +947,10 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 		0,                                    /* priority */
 		ie.NewCause(ie.CauseRequestAccepted), /* accept it blindly for the time being */
 	)
+
+	for _, r := range finalReports {
+		smres.UsageReport = append(smres.UsageReport, r.inSessionDeletionResponse())
+	}
 
 	pConn.deletions.put(deletion, smres, time.Now())
 
