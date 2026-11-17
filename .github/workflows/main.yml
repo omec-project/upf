@@ -158,7 +158,7 @@ jobs:
       attestations: write
     uses: omec-project/.github/.github/workflows/static-analysis.yml@31eaa229af3f5e73c45cc7f165f614716f6b96f6 # v0.1.2
     with:
-      staticcheck_version: 'v0.8.1'
+      staticcheck_version: 'v0.8.2'
       branch_name: ${{ github.ref }}
   lint:
     permissions:
@@ -168,7 +168,7 @@ jobs:
       attestations: write
     uses: omec-project/.github/.github/workflows/lint.yml@31eaa229af3f5e73c45cc7f165f614716f6b96f6 # v0.1.2
     with:
-      golangci_lint_version: 'v2.13.2'
+      golangci_lint_version: 'v2.15.0'
       branch_name: ${{ github.ref }}
   hadolint:
     permissions:
@@ -186,6 +186,23 @@ jobs:
       id-token: write
       attestations: write
     uses: omec-project/.github/.github/workflows/check-spelling.yml@31eaa229af3f5e73c45cc7f165f614716f6b96f6 # v0.1.2
+    with:
+      branch_name: ${{ github.ref }}
+  license-check:
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/license-check.yml@31eaa229af3f5e73c45cc7f165f614716f6b96f6 # v0.1.2
+    with:
+      branch_name: ${{ github.ref }}
+  fossa-scan:
+    permissions:
+      contents: read
+      security-events: write
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/fossa-scan.yml@31eaa229af3f5e73c45cc7f165f614716f6b96f6 # v0.1.2
     with:
       branch_name: ${{ github.ref }}
   route-control-tests:
@@ -220,36 +237,6 @@ jobs:
       test_flags: "-race -failfast -v -count=1"
       test_directory: "./test/integration/..."
       env_vars: "MODE=native DATAPATH=bess"
-  e2e-tests:
-    if: github.event_name == 'pull_request'
-    needs: bess-changes
-    permissions:
-      contents: read
-      pull-requests: write
-      checks: write
-      id-token: write
-      attestations: write
-    uses: omec-project/.github/.github/workflows/e2e-test.yml@31eaa229af3f5e73c45cc7f165f614716f6b96f6 # v0.1.2
-    with:
-      branch_name: ${{ github.ref }}
-      image_list: ${{ needs.bess-changes.outputs.e2e_image_list }}
-  license-check:
-    permissions:
-      contents: read
-      id-token: write
-      attestations: write
-    uses: omec-project/.github/.github/workflows/license-check.yml@31eaa229af3f5e73c45cc7f165f614716f6b96f6 # v0.1.2
-    with:
-      branch_name: ${{ github.ref }}
-  fossa-scan:
-    permissions:
-      contents: read
-      security-events: write
-      id-token: write
-      attestations: write
-    uses: omec-project/.github/.github/workflows/fossa-scan.yml@31eaa229af3f5e73c45cc7f165f614716f6b96f6 # v0.1.2
-    with:
-      branch_name: ${{ github.ref }}
   analysis:
     if: github.repository_owner == 'omec-project'
     permissions:
@@ -275,3 +262,16 @@ jobs:
     uses: omec-project/.github/.github/workflows/scorecard-analysis.yml@31eaa229af3f5e73c45cc7f165f614716f6b96f6 # v0.1.2
     with:
       branch_name: ${{ github.ref }}
+  e2e-tests:
+    if: github.event_name == 'pull_request'
+    needs: bess-changes
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/e2e-test.yml@31eaa229af3f5e73c45cc7f165f614716f6b96f6 # v0.1.2
+    with:
+      branch_name: ${{ github.ref }}
+      image_list: ${{ needs.bess-changes.outputs.e2e_image_list }}

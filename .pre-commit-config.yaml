@@ -47,7 +47,15 @@ repos:
         language: golang
         types: [go]
         additional_dependencies:
-          - honnef.co/go/tools/cmd/staticcheck@v0.8.1
+          - honnef.co/go/tools/cmd/staticcheck@v0.8.2
+        pass_filenames: false
+      - id: govulncheck
+        name: govulncheck
+        entry: govulncheck ./...
+        language: golang
+        files: (^go\.(mod|sum)$|\.go$)
+        additional_dependencies:
+          - golang.org/x/vuln/cmd/govulncheck@v1.9.0
         pass_filenames: false
       - id: go-test-race
         name: go test -race
@@ -56,7 +64,7 @@ repos:
         types: [go]
         pass_filenames: false
   - repo: https://github.com/golangci/golangci-lint
-    rev: v2.13.2
+    rev: v2.15.0
     hooks:
       - id: golangci-lint-full
   - repo: https://github.com/google/yamlfmt
