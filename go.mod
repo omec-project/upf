@@ -1,10 +1,10 @@
 module github.com/omec-project/upf-epc
 
-go 1.27.0
+go 1.27.4
 
 require (
 	github.com/libp2p/go-reuseport v0.4.0
-	github.com/omec-project/pfcpsim v1.5.9
+	github.com/omec-project/pfcpsim v1.5.10
 	github.com/prometheus/client_golang v1.25.0
 	github.com/prometheus/client_model v0.6.3
 	github.com/wmnsk/go-pfcp v0.0.24
