@@ -5,6 +5,7 @@ package pfcpiface
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/omec-project/upf-epc/logger"
 	"github.com/omec-project/upf-epc/pfcpiface/metrics"
@@ -49,6 +50,64 @@ func (p PacketForwardingRules) findQER(id uint32) (qer, bool) {
 	}
 
 	return qer{}, false
+}
+
+// holdsQEREntry reports whether a QER of q's ID in this set occupies q's datapath entry.
+func (p PacketForwardingRules) holdsQEREntry(q qer) bool {
+	return slices.ContainsFunc(p.qers, func(v qer) bool {
+		return v.qerID == q.qerID && q.occupiesSameEntryAs(v)
+	})
+}
+
+// holdsPDREntry reports whether a PDR of p's ID in this set occupies p's datapath entry.
+func (p PacketForwardingRules) holdsPDREntry(r pdr) bool {
+	return slices.ContainsFunc(p.pdrs, func(v pdr) bool {
+		return v.pdrID == r.pdrID && r.occupiesSameEntryAs(v)
+	})
+}
+
+// remarked returns what the session QER marking changed among the rules before held, as
+// this set holds them now: the PDRs whose first QER, the one BESS looks their traffic up
+// by, is not the one they were written with, and the QERs whose level is not the one they
+// were written at. A QER that changed level keeps the entry it had, since a PDR that
+// names only the session QER still reaches the datapath through its application entry;
+// if a quota had closed that entry and no QER this set holds takes it over, it is
+// returned too, open. This set's rules below the length of before's are before's, at
+// their positions, with a message's updates applied in place.
+func (p PacketForwardingRules) remarked(before PacketForwardingRules) ([]pdr, []qer) {
+	var pdrs []pdr
+
+	for i, was := range before.pdrs {
+		if firstQERID(p.pdrs[i]) != firstQERID(was) {
+			pdrs = append(pdrs, p.pdrs[i])
+		}
+	}
+
+	var qers []qer
+
+	for i, was := range before.qers {
+		if p.qers[i].qosLevel == was.qosLevel {
+			continue
+		}
+
+		qers = append(qers, p.qers[i])
+
+		if was.quotaClosed && !slices.ContainsFunc(p.qers, was.sharesEntryWith) {
+			was.quotaClosed = false
+			qers = append(qers, was)
+		}
+	}
+
+	return pdrs, qers
+}
+
+// firstQERID is the QER ID addPDR writes into a PDR's entry: the first of its list, or 0.
+func firstQERID(p pdr) uint32 {
+	if len(p.qerIDList) == 0 {
+		return 0
+	}
+
+	return p.qerIDList[0]
 }
 
 // heldVersions returns the rules a message created or updated, as the session holds them,

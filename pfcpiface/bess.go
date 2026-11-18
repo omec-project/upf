@@ -64,6 +64,11 @@ const (
 	qerGateMeter      uint64 = 0
 	qerGateStatusDrop uint64 = 5
 	qerGateUnmeter    uint64 = 6
+	// qerGateQuotaDrop drops the traffic of a QER whose URR's quota is exhausted.
+	// It is not the status-drop gate: the closed-loop pipeline passes on what the
+	// application QER's status-drop gate drops, and a quota must stop the traffic
+	// in every pipeline.
+	qerGateQuotaDrop uint64 = 7
 )
 
 const (
@@ -310,6 +315,22 @@ func (b *bess) SendMsgToUPFWithCompletion(
 	}
 
 	return cause, completed
+}
+
+// WriteQERGates writes the gates of qers, one direction and one QER after the other, and
+// reports whether the datapath took every write. It stops at the first write it did not
+// take, leaving those before it in place.
+func (b *bess) WriteQERGates(qers []qer) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel()
+
+	for _, q := range qers {
+		if b.handleUplinkQER(ctx, q) != nil || b.handleDownlinkQER(ctx, q) != nil {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (b *bess) Exit() {
@@ -1160,12 +1181,7 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 			err error
 		)
 
-		var qerID uint32
-
-		for _, qer := range p.qerIDList {
-			qerID = qer
-			break
-		}
+		qerID := firstQERID(p)
 
 		// Translate port ranges into ternary rule(s) and insert them one-by-one.
 		portRules, err := CreatePortRangeCartesianProduct(p.appFilter.srcPortRange, p.appFilter.dstPortRange)
@@ -1317,7 +1333,9 @@ func (b *bess) handleUplinkQER(ctx context.Context, qer qer) error {
 	ebs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 	pbs = maxUint64(calcBurstSizeFromRate(qer.ulMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 
-	if qer.ulStatus != ie.GateStatusOpen {
+	if qer.quotaClosed {
+		gate = qerGateQuotaDrop
+	} else if qer.ulStatus != ie.GateStatusOpen {
 		gate = qerGateStatusDrop
 	} else if qer.ulMbr != 0 || qer.ulGbr != 0 {
 		/* MBR/GBR is received in Kilobits/sec.
@@ -1358,7 +1376,9 @@ func (b *bess) handleDownlinkQER(ctx context.Context, qer qer) error {
 	ebs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 	pbs = maxUint64(calcBurstSizeFromRate(qer.dlMbr, uint64(qosVal.burstDurationMs)), uint64(qosVal.ebs))
 
-	if qer.dlStatus != ie.GateStatusOpen {
+	if qer.quotaClosed {
+		gate = qerGateQuotaDrop
+	} else if qer.dlStatus != ie.GateStatusOpen {
 		gate = qerGateStatusDrop
 	} else if qer.dlMbr != 0 || qer.dlGbr != 0 {
 		/* MBR/GBR is received in Kilobits/sec.

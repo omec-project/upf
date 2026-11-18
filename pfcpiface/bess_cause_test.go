@@ -341,3 +341,59 @@ func TestSendMsgToUPFWithCompletionReportsABatchThatFinished(t *testing.T) {
 		t.Error("a batch the datapath answered is reported as not finished")
 	}
 }
+
+// A gate write whose RPC failed may not be in place, and a session message answers it as
+// accepted and finished. WriteQERGates, which the usage monitor writes a quota gate with,
+// must not: the monitor would record the gate closed and never write it again, and the
+// traffic would run on past its quota.
+func TestWriteQERGatesTakesOnlyWhatTheDatapathTook(t *testing.T) {
+	q := qer{qerID: 1, qosLevel: ApplicationQos, quotaClosed: true}
+
+	for _, tc := range []struct {
+		name string
+		resp *pb.CommandResponse
+		err  error
+		took bool
+	}{
+		{"taken", &pb.CommandResponse{}, nil, true},
+		{"refusal", &pb.CommandResponse{Error: &pb.Error{Code: errnoNoSpace, Errmsg: msgTableFull}}, nil, false},
+		{"RPC failed", nil, status.Error(codes.Unavailable, "connection refused"), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if took := answeringBess(tc.resp, tc.err).WriteQERGates([]qer{q}); took != tc.took {
+				t.Errorf("WriteQERGates() = %v, want %v", took, tc.took)
+			}
+		})
+	}
+
+	cause, finished := answeringBess(nil, status.Error(codes.Unavailable, "connection refused")).
+		SendMsgToUPFWithCompletion(upfMsgTypeMod, PacketForwardingRules{}, PacketForwardingRules{qers: []qer{q}})
+	if cause != ie.CauseRequestAccepted || !finished {
+		t.Errorf("a session message's QER write whose RPC failed is answered (%d, %v), "+
+			"want accepted and finished, as before", cause, finished)
+	}
+}
+
+// deadlineModuleStub answers no command, and ends each when its context does, as a gRPC
+// client does.
+type deadlineModuleStub struct{ pb.BESSControlClient }
+
+func (deadlineModuleStub) ModuleCommand(
+	ctx context.Context, _ *pb.CommandRequest, _ ...grpc.CallOption,
+) (*pb.CommandResponse, error) {
+	<-ctx.Done()
+
+	return nil, status.FromContextError(ctx.Err()).Err()
+}
+
+// A write that does not finish in time is not taken either.
+func TestWriteQERGatesDoesNotTakeAWriteThatTimedOut(t *testing.T) {
+	shortTimeout(t)
+
+	b := &bess{client: deadlineModuleStub{}}
+	b.readQciQosMap(&Conf{})
+
+	if b.WriteQERGates([]qer{{qerID: 1, qosLevel: ApplicationQos, quotaClosed: true}}) {
+		t.Error("a gate write that timed out is reported as taken")
+	}
+}

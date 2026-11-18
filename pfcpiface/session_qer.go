@@ -91,7 +91,9 @@ func (s *PFCPSession) MarkSessionQer(qers []qer) {
 			return
 		}
 
-		copy(sessQerIDList, sList)
+		// The intersection replaces the list: a copy into it would keep its tail, a QER
+		// some PDR does not apply, as a candidate.
+		sessQerIDList = sList
 	}
 
 	// Loop through qer list and mark qer which matches
@@ -106,6 +108,7 @@ func (s *PFCPSession) MarkSessionQer(qers []qer) {
 		sessionIdx int
 		sessionMbr uint64
 		sessQerID  uint32
+		found      bool
 	)
 
 	if len(sessQerIDList) > 3 {
@@ -123,11 +126,28 @@ func (s *PFCPSession) MarkSessionQer(qers []qer) {
 				sessionIdx = idx
 				sessQerID = qer.qerID
 				sessionMbr = qer.ulMbr
+				found = true
 			}
 		}
 	}
 
+	// With every candidate carrying a GBR none is selected. Marking the QER at index 0
+	// regardless would make a QER the PDRs need not share the session QER, and the move
+	// back below would take the real session QER out of the session entry.
+	if !found {
+		logger.PfcpLog.Infoln("no QER without a GBR common to every PDR; session QER unchanged")
+		return
+	}
+
 	logger.PfcpLog.Infoln("session QER found. QER ID:", sessQerID)
+
+	// BESS holds one session QER per session, keyed by the session alone, so a QER marked
+	// earlier is the session QER no longer: the new one is written over its entry.
+	for i := range qers {
+		if i != sessionIdx && qers[i].qosLevel == SessionQos {
+			qers[i].qosLevel = ApplicationQos
+		}
+	}
 
 	qers[sessionIdx].qosLevel = SessionQos
 
