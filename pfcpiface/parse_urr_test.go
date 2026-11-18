@@ -19,6 +19,7 @@ const (
 	triggerOctet5VOLTH = 0x02
 	triggerOctet5TIMTH = 0x04
 	triggerOctet6VOLQU = 0x01
+	triggerOctet6TIMQU = 0x02
 
 	// Volume flags, clauses 8.2.13 and 8.2.50.
 	volumeTOVOL = 0x01
@@ -30,10 +31,11 @@ func TestParseURRReadsWhatACreateURRProvisions(t *testing.T) {
 	u, has, err := parseURR(ie.NewCreateURR(
 		ie.NewURRID(testURRID),
 		ie.NewMeasurementMethod(0, 1, 1),
-		ie.NewReportingTriggers(triggerOctet5PERIO|triggerOctet5VOLTH|triggerOctet5TIMTH, 0),
+		ie.NewReportingTriggers(triggerOctet5PERIO|triggerOctet5VOLTH|triggerOctet5TIMTH, triggerOctet6VOLQU),
 		ie.NewMeasurementPeriod(30*time.Second),
 		ie.NewVolumeThreshold(volumeTOVOL|volumeDLVOL, 8000, 0, 6000),
 		ie.NewTimeThreshold(time.Minute),
+		ie.NewVolumeQuota(volumeTOVOL|volumeULVOL, 10000, 4000, 0),
 		ie.New(9999, []byte{1}), // a type unknown to this release, discarded
 	), true)
 	if err != nil {
@@ -45,18 +47,19 @@ func TestParseURRReadsWhatACreateURRProvisions(t *testing.T) {
 		measureVolume:   true,
 		measureDuration: true,
 		triggers: urrTriggers{
-			periodic: true, volumeThreshold: true, timeThreshold: true,
+			periodic: true, volumeThreshold: true, timeThreshold: true, volumeQuota: true,
 		},
 		measurementPeriod: 30 * time.Second,
 		volumeThreshold:   volumeLimit{total: 8000, downlink: 6000, hasTotal: true, hasDownlink: true},
 		timeThreshold:     time.Minute,
+		volumeQuota:       volumeLimit{total: 10000, uplink: 4000, hasTotal: true, hasUplink: true},
 	}
 
 	if u != want {
 		t.Fatalf("parsed\n%v\nexpected\n%v", u, want)
 	}
 
-	if has != (urrIEs{true, true, true, true, true}) {
+	if has != (urrIEs{true, true, true, true, true, true}) {
 		t.Fatalf("expected every IE to be recorded as present, got %+v", has)
 	}
 }
@@ -118,6 +121,7 @@ func TestParseURRRefusesAFlagIEThatSetsNoFlag(t *testing.T) {
 		{"Reporting Triggers without a trigger", ie.New(ie.ReportingTriggers, []byte{0, 0}), errURRNoFlagSet},
 		{"Reporting Triggers with only spare bits", ie.New(ie.ReportingTriggers, []byte{0, 0, 0xfc}), errURRNoFlagSet},
 		{"Volume Threshold without a flag", ie.New(ie.VolumeThreshold, []byte{0, 0}), errURRNoFlagSet},
+		{"Volume Quota without a flag", ie.New(ie.VolumeQuota, []byte{0, 0}), errURRNoFlagSet},
 		{"Measurement Information without a flag", ie.NewMeasurementInformation(0), errURRNoFlagSet},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -134,9 +138,8 @@ func TestParseURRRefusesWhatThisUPFDoesNotActOn(t *testing.T) {
 	for name, x := range map[string]*ie.IE{
 		"EVENT":                       ie.NewMeasurementMethod(1, 1, 0),
 		"START":                       ie.NewReportingTriggers(triggerOctet5PERIO|0x10, 0),
-		"VOLQU":                       ie.NewReportingTriggers(0, triggerOctet6VOLQU),
+		"TIMQU":                       ie.NewReportingTriggers(0, triggerOctet6VOLQU|triggerOctet6TIMQU),
 		"UPINT":                       ie.New(ie.ReportingTriggers, []byte{0, 0, 0x02}),
-		"Volume Quota":                ie.NewVolumeQuota(volumeTOVOL, 1000, 0, 0),
 		"Time Quota":                  ie.NewTimeQuota(time.Minute),
 		"Quota Holding Time":          ie.NewQuotaHoldingTime(time.Minute),
 		"Event Threshold":             ie.NewEventThreshold(10),
@@ -161,6 +164,7 @@ func TestParseURRRefusesWhatThisUPFDoesNotActOn(t *testing.T) {
 func TestParseURRRefusesAMalformedLimit(t *testing.T) {
 	for name, limit := range map[string]*ie.IE{
 		"Volume Threshold":   ie.New(ie.VolumeThreshold, []byte{volumeTOVOL}), // flags but no volume
+		"Volume Quota":       ie.New(ie.VolumeQuota, []byte{volumeTOVOL}),     // flags but no volume
 		"Time Threshold":     ie.New(ie.TimeThreshold, []byte{0, 0}),          // two of its four octets
 		"Measurement Period": ie.New(ie.MeasurementPeriod, []byte{0, 0}),
 	} {

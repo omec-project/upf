@@ -36,6 +36,7 @@ qerRedGate = 3
 qerFailGate = 4
 qerStatusDropGate = 5
 qerUnmeteredGate = 6
+qerQuotaDropGate = 7
 interfaces = ["access", "core"]
 parser = Parser('conf/upf.jsonc')
 parser.parse(interfaces)
@@ -248,6 +249,7 @@ sessionQERLookup:qerYellowGate -> farLookup
 sessionQERLookup:qerRedGate -> sessionQERMeterRed::Sink()
 sessionQERLookup:qerStatusDropGate -> sessionQERStatusDrop::Sink()
 sessionQERLookup:qerUnmeteredGate -> farLookup
+sessionQERLookup:qerQuotaDropGate -> sessionQERQuotaDrop::Sink()
 sessionQERLookup:qerFailGate -> farLookup
 sessionQERLookup.set_default_gate(gate=qerFailGate)
 
@@ -270,6 +272,7 @@ appQERLookup:qerYellowGate -> sessionQERLookup
 appQERLookup:qerRedGate -> appQERMeterRed::Sink()
 appQERLookup:qerStatusDropGate -> packetReplica::Replicate(gates=[0,1])
 appQERLookup:qerUnmeteredGate -> sessionQERLookup
+appQERLookup:qerQuotaDropGate -> appQERQuotaDrop::Sink()
 pdrLookup:pdrFailGate -> pdrLookupFail::Sink()
 farLookup:farFailGate -> farLookupFail::Sink()
 appQERLookup:qerFailGate -> appQERLookupFail::Sink()

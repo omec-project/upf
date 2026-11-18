@@ -235,6 +235,12 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 	//  We need a kind of refactoring to clean it up.
 	session.MarkSessionQer(addQERs)
 
+	// A URR provisioned with a zero quota stops its traffic from the start (TS 29.244
+	// clause 5.2.2.3.1 NOTE 3). The establishment writes the session's own QERs.
+	if upf.enableUsageReporting {
+		session.applyQuotaGates()
+	}
+
 	// session.PacketForwardingRules stores all PFCP rules that has been installed so far,
 	// while 'updated' stores only the PFCP rules that have been provided in this particular message.
 	updated := PacketForwardingRules{
@@ -536,6 +542,27 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		}
 	}
 
+	// The final reports of the URRs this message removes, or leaves without a PDR (clause
+	// 5.2.2.3.1). They are built from the session's copy, so a refusal below leaves the
+	// URRs and their usage in the store for the control plane's retry.
+	var finalReports []usageReport
+
+	if upf.enableUsageReporting {
+		for _, rURR := range smreq.RemoveURR {
+			urrID, err := rURR.URRID()
+			if err != nil {
+				return sendError(err)
+			}
+
+			removed, err := session.RemoveURR(urrID)
+			if err != nil {
+				return sendError(err)
+			}
+
+			finalReports = append(finalReports, removed.finalReports(now)...)
+		}
+	}
+
 	// Everything appended so far was created by this message and did not exist before
 	// it; everything the update loops append replaces a rule that did.
 	createdPDRs, createdFARs, createdQERs := len(addPDRs), len(addFARs), len(addQERs)
@@ -605,6 +632,21 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 
 	session.MarkSessionQer(session.qers)
 
+	// A quota gate follows the URRs: a new quota reopens it, a zero one closes it, and an
+	// Update QER, which replaces the rule, keeps it as the URRs say. The QERs whose gate
+	// changed are written with the message's updates, after the selection below.
+	var gated []qer
+	if upf.enableUsageReporting {
+		gated = session.applyQuotaGates()
+	}
+
+	// The marking can make another QER the session QER. That moves it and the QER it
+	// replaces between the application and the session table, and changes the first QER of
+	// the PDRs that name it. BESS keeps what it was last given, a PDR's first QER and a
+	// QER's level included, so those rules are written too, whether the message named them
+	// or not.
+	remarkedPDRs, remarkedQERs := session.remarked(before)
+
 	// Write what the session now holds of the rules this message touched. That is not
 	// the same as what the loops above parsed: an Update following a Create of the same
 	// ID replaces the rule the Create just added, so both versions are among the parsed
@@ -619,6 +661,8 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		func(f far) uint32 { return f.farID })
 	addQERs, createdQERs = heldVersions(session.qers, len(before.qers), addQERs[createdQERs:],
 		func(q qer) uint32 { return q.qerID })
+	addPDRs = withPDRs(addPDRs, remarkedPDRs)
+	addQERs = withQERs(withQERs(addQERs, gated), remarkedQERs)
 
 	updated := PacketForwardingRules{
 		pdrs: addPDRs,
@@ -660,7 +704,10 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		//
 		// Only rules that actually moved may go. One whose key did not move occupies the
 		// very entry the restore is about to write, so removing it would blackhole a flow
-		// this message never changed, for the length of two datapath batches.
+		// this message never changed, for the length of two datapath batches. A rule is
+		// compared with every rule of its ID the session had, not with the first alone: a
+		// quota gate or the session QER marking writes the rule it changed, and two rules
+		// of one ID can sit on different entries.
 		//
 		// The created rules are copied out rather than appended to in place. They are the
 		// front of addPDRs and addQERs, whose tails are the updates the loops below walk,
@@ -671,13 +718,13 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		removeQERs := append([]qer(nil), addQERs[:createdQERs]...)
 
 		for _, p := range addPDRs[createdPDRs:] {
-			if was, ok := before.findPDR(p.pdrID); !ok || !p.occupiesSameEntryAs(was) {
+			if !before.holdsPDREntry(p) {
 				removePDRs = append(removePDRs, p)
 			}
 		}
 
 		for _, q := range addQERs[createdQERs:] {
-			if was, ok := before.findQER(q.qerID); !ok || !q.occupiesSameEntryAs(was) {
+			if !before.holdsQEREntry(q) {
 				removeQERs = append(removeQERs, q)
 			}
 		}
@@ -765,26 +812,9 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		delQERs = append(delQERs, *q)
 	}
 
-	// The final reports of the URRs this message removes, or leaves without a PDR (clause
-	// 5.2.2.3.1). They are built from the session's copy, so a refusal below leaves the
-	// URRs and their usage in the store for the control plane's retry.
-	var finalReports []usageReport
-
+	// URR removal is done above, before the quota gates are applied; a URR left without a
+	// PDR is known only once the PDRs are removed.
 	if upf.enableUsageReporting {
-		for _, rURR := range smreq.RemoveURR {
-			urrID, err := rURR.URRID()
-			if err != nil {
-				return sendError(err)
-			}
-
-			removed, err := session.RemoveURR(urrID)
-			if err != nil {
-				return sendError(err)
-			}
-
-			finalReports = append(finalReports, removed.finalReports(now)...)
-		}
-
 		finalReports = append(finalReports, session.reportDissociated(before.pdrs, now)...)
 	}
 

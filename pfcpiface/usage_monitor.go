@@ -277,6 +277,9 @@ func (m *usageMonitor) applyToConn(pConn *PFCPConn, usage map[uint64][]pdrUsage)
 
 			reports := s.dueReports(now)
 
+			s.qers = slices.Clone(s.qers)
+			m.applyQuotaGates(pConn, &s)
+
 			if err := pConn.store.PutSession(s); err != nil {
 				logger.PfcpLog.Errorf("failed to put PFCP session to store: %v", err)
 				continue
@@ -299,6 +302,35 @@ func (m *usageMonitor) applyToConn(pConn *PFCPConn, usage map[uint64][]pdrUsage)
 			logger.PfcpLog.Warnln("usage report queue full; the reports of session",
 				b.localSEID, "are sent at the next poll")
 			m.settle(b, reportUndelivered)
+		}
+	}
+}
+
+// applyQuotaGates writes the QERs whose quota gate changed. Under the association's
+// sessionsMu, like every other write of the session's rules. Unless the datapath took
+// every write -- it refused one, an RPC failed, or the writes did not finish in time --
+// the gates are put back, to be written again at the next poll: nothing else would write
+// them, and a gate left open lets the traffic run on past its quota. Writing a gate the
+// datapath did take again changes nothing.
+func (m *usageMonitor) applyQuotaGates(pConn *PFCPConn, s *PFCPSession) {
+	changed := s.applyQuotaGates()
+	if len(changed) == 0 {
+		return
+	}
+
+	if pConn.upf.WriteQERGates(changed) {
+		logger.PfcpLog.Infoln("quota gates of session", s.localSEID, "changed:", len(changed), "QER(s)")
+		return
+	}
+
+	logger.PfcpLog.Warnln("the datapath did not take the quota gates of session",
+		s.localSEID, "; they are written again at the next poll")
+
+	for _, c := range changed {
+		for i := range s.qers {
+			if s.qers[i].qerID == c.qerID && s.qers[i].qosLevel == c.qosLevel {
+				s.qers[i].quotaClosed = !c.quotaClosed
+			}
 		}
 	}
 }

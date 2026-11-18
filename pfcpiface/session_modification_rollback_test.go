@@ -343,9 +343,8 @@ func TestARollbackRemovesAQerTheWriteMovedBetweenTables(t *testing.T) {
 	dp.refuseNextWrite = true
 
 	// Raising the first QER's MBR above the second's swaps which of them is the session
-	// QER, so both change tables. Both have to be in the message: MarkSessionQer only
-	// marks the rules the message itself carries, and it does nothing at all below two
-	// of them.
+	// QER, so both change tables. Both are in the message, though naming one would do:
+	// the modification also writes a QER the marking moves.
 	refuseModification(t, pConn, localSEID, ErrWriteToDatapath,
 		ie.NewUpdateQER(ie.NewQERID(applicationQERID), ie.NewMBR(highestMBR, highestMBR)),
 		ie.NewUpdateQER(ie.NewQERID(sessionQERID), ie.NewMBR(higherMBR, higherMBR)))
@@ -368,6 +367,62 @@ func TestARollbackRemovesAQerTheWriteMovedBetweenTables(t *testing.T) {
 		t.Fatalf("the rollback removed QER %d as %v and QER %d as %v; expected the levels "+
 			"the refused write programmed them at, which are the other way round",
 			applicationQERID, levels[applicationQERID], sessionQERID, levels[sessionQERID])
+	}
+}
+
+// TestARollbackLeavesADuplicateTheMarkingRewrote: a modification that makes another QER
+// the session QER writes every PDR whose first QER that changes, a second PDR of one ID
+// too, also when the message updates the first. The restore writes that PDR back at the
+// entry it occupies, so the rollback must not remove it, as it would if it compared it
+// with the first PDR of its ID alone.
+func TestARollbackLeavesADuplicateTheMarkingRewrote(t *testing.T) {
+	qerIDs := []*ie.IE{ie.NewQERID(applicationQERID), ie.NewQERID(sessionQERID)}
+	// Raising the first QER's MBR above the second's makes it the session QER, so it
+	// moves to the end of both PDRs' lists.
+	raise := ie.NewUpdateQER(ie.NewQERID(applicationQERID), ie.NewMBR(highestMBR, highestMBR))
+	updateFirst := ie.NewUpdatePDR(append([]*ie.IE{
+		ie.NewPDRID(downlinkPDRID),
+		ie.NewPrecedence(establishedPrecedence),
+		ie.NewPDI(
+			ie.NewSourceInterface(ie.SrcInterfaceCore),
+			ie.NewUEIPAddress(0x2, firstUEAddress, "", 0, 0),
+		),
+		ie.NewFARID(downlinkFARID),
+	}, qerIDs...)...)
+
+	for name, ies := range map[string][]*ie.IE{
+		"an Update QER": {raise},
+		"an Update QER and the first's Update PDR": {raise, updateFirst},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dp := &recordingDP{}
+			pConn := establishingConn(t, nil)
+			pConn.upf.datapath = dp
+
+			localSEID := establishStaticSession(t, pConn,
+				corePDR(downlinkPDRID, firstUEAddress, qerIDs...),
+				downlinkFAR(),
+				ie.NewCreateQER(ie.NewQERID(applicationQERID), ie.NewMBR(lowerMBR, lowerMBR)),
+				ie.NewCreateQER(ie.NewQERID(sessionQERID), ie.NewMBR(higherMBR, higherMBR)),
+			)
+
+			// Nothing rejects a Create of an ID the session holds; CreatePDR appends.
+			modifySession(t, pConn, localSEID, corePDR(downlinkPDRID, secondUEAddress, qerIDs...))
+
+			dp.calls = nil
+			dp.refuseNextWrite = true
+
+			refuseModification(t, pConn, localSEID, ErrWriteToDatapath, ies...)
+
+			if written := dp.calls[0].updated.pdrs; len(written) != 2 {
+				t.Fatalf("the refused write carried PDRs %v, expected both versions of PDR %d",
+					written, downlinkPDRID)
+			}
+
+			if removed := rollbackDeletion(t, dp).pdrs; len(removed) != 0 {
+				t.Fatalf("the rollback removed %v, which the restore writes again", removed)
+			}
+		})
 	}
 }
 
