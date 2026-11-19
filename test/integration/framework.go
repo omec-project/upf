@@ -34,6 +34,9 @@ const (
 	ActionDrop    uint8 = 0x1
 	ActionBuffer  uint8 = 0x4
 	ActionNotify  uint8 = 0x8
+	// ActionDuplicate is the PFCP DUPL apply-action: copy the session's traffic
+	// to the LI Function (lawful interception content of communication).
+	ActionDuplicate uint8 = 0x10
 
 	localhostAltIP = "127.0.0.8"
 	localhostIP    = "127.0.0.1"

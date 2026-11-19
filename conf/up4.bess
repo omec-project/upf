@@ -8,6 +8,7 @@ from conf.gtp_echo import *
 import conf.ports as port
 import conf.sim as sim
 import signal
+import os
 
 port.setup_globals()
 
@@ -27,6 +28,19 @@ farForwardUAction = 1
 farDropAction = 2
 farBufferAction = 3
 farNotifyCPAction = 4
+# Lawful Intercept: forward the subscriber's packet AND duplicate a copy to the
+# X3 egress. A downlink and an uplink variant preserve the forwarding direction
+# of the subscriber's own copy.
+farForwardDAndDuplicateAction = 5
+farForwardUAndDuplicateAction = 6
+# The uplink variant for a FAR that creates an outer header toward another UPF
+# over N9. GtpuEncap runs before executeFAR, so its copy is the GTP-U packet
+# rather than the target's own; this value, carried in the tag, tells the X3
+# shipper so. It shares the uplink tee with 6. The pfcp-agent writes it, so the
+# agent and this pipeline ship together: BESS drops a packet sent to an
+# unconnected gate, so an agent writing 7 on a pipeline without this gate would
+# drop a target's N9 uplink.
+farForwardUEncapAndDuplicateAction = 7
 pdrFailGate = 2
 farFailGate = 2
 qerGreenGate = 1
@@ -199,7 +213,15 @@ else:
         -> gtpuDecap::GtpuDecap() \
         -> appQERLookup
 
-executeFAR::Split(size=1, attribute='action')
+# Split on fwd_action, NOT action. GtpuEncap reuses the 'action' attribute as the
+# GTP-U PDU Session Container PDU Type (core/modules/gtpu_encap.cc:
+# AddMetadataAttr("action", ...) -> psch->pdu_type), which works for the stock
+# values only because farForwardDAction=0 and farForwardUAction=1 happen to equal
+# the two valid PDU types. Routing duplication through that same attribute would
+# put 5 and 6 on the wire, and a GTP-U PDU type that does not exist reaches the
+# RAN. 'action' therefore keeps the stock 0-4 values that GtpuEncap
+# needs, and duplication is signalled out of band on 'fwd_action'.
+executeFAR::Split(size=1, attribute='fwd_action')
 _in = executeFAR
 if parser.enable_slice_metering:
     # sliceMeter enforces a per slice, per direction meter rate limit
@@ -230,7 +252,8 @@ farLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
                               {'attr_name':'tunnel_out_src_ip4addr', 'num_bytes':4}, \
                               {'attr_name':'tunnel_out_dst_ip4addr', 'num_bytes':4}, \
                               {'attr_name':'tunnel_out_teid', 'num_bytes':4}, \
-                              {'attr_name':'tunnel_out_udp_port', 'num_bytes':2}],\
+                              {'attr_name':'tunnel_out_udp_port', 'num_bytes':2}, \
+                              {'attr_name':'fwd_action', 'num_bytes':1}],\
                       entries=parser.table_size_far_lookup):noGTPUEncap \
     -> farMerge::Merge() \
     -> _in
@@ -274,6 +297,91 @@ executeFAR:farDropAction -> farDrop::Sink()
 executeFAR:farBufferAction -> farBuffer::Sink()
 gtpuEncap:0 -> gtpuEncapFail::Sink()
 
+# ====================================================
+#       Lawful Intercept content egress (X3)
+# ====================================================
+# A target session's FAR carries the PFCP DUPL apply-action; the PFCP agent marks
+# that session's packets with a forward-and-duplicate action instead of a plain
+# forward. Each packet is teed: copy 0 continues to the subscriber (uplink/downlink
+# preserved), copy 1 is tagged with the F-SEID and the forwarding action and pushed to a
+# userspace socket where the Go LI X3 shipper frames it per ETSI TS 103 221-2 and
+# delivers it to the MDF3. Built entirely from stock BESS modules (Replicate /
+# GenericEncap / UnixSocketPort) — no datapath C++ changes.
+#
+# The tee sits at the forwarding stage, downstream of QER policing
+# (appQERLookup/sessionQERLookup run earlier), so the subscriber's traffic is
+# metered exactly once and the duplicate is not double-counted. Copy 0 is wired in
+# the downlink/uplink sections below, where it joins the very same forward tail as
+# the plain forward action — including the post-QoS FlowMeasure when flow-based
+# volume measurement is enabled — so a tasked subscriber's usage is measured
+# exactly as an untasked one's is.
+li_x3_path = os.getenv('LI_X3_SOCKET_PATH', '/tmp/li_x3')
+# Depth of the in-datapath buffer in front of the egress socket. Packets, not
+# bytes. Overridable so a deployment expecting heavy targets can raise it.
+LI_EGRESS_QUEUE_PACKETS = int(os.getenv('LI_EGRESS_QUEUE_PACKETS', '16384'))
+liX3 = UnixSocketPort(name='liX3', path=li_x3_path)
+# Prepend the F-SEID (correlation) and the forwarding action (fwd_action) to each
+# LI copy. The action byte lets the Go X3 shipper tell the downlink copy (teed
+# after GTP-U encap, so a GTP-U packet toward the target) from the uplink copy
+# (decapsulated inner packet from the target, or a GTP-U packet toward another
+# UPF for action 7) and set the X3 payload format and direction accordingly.
+# Field order is [fseid(8)][fwd_action(1)], then the packet.
+#
+# These sizes are named once and used by the encap, the subscriber-side decap and
+# nothing else, so the tag cannot come off at a different width than it went on.
+# The Go shipper's fseidTagLen/liTagLen (pfcpiface/lawfulintercept.go) must agree
+# with them: it reads the same bytes off the socket, and no build step checks that
+# it does, because the pipeline and the agent ship in separate images.
+LI_TAG_FSEID_BYTES = 8
+LI_TAG_ACTION_BYTES = 1
+LI_TAG_BYTES = LI_TAG_FSEID_BYTES + LI_TAG_ACTION_BYTES
+#
+# The tag is applied BEFORE the tee, and taken off again on the subscriber's
+# branch, which looks roundabout but is the point: Replicate emits the original
+# packet on gate 0 and a bess::Packet::copy() on the others, and that copy
+# duplicates only the packet data — the per-packet metadata area is not carried
+# over. A GenericEncap reading 'fseid'/'fwd_action' downstream of the tee therefore
+# reads an uninitialised metadata area and tags every copy with a zero
+# correlation, which is silent: interception keeps running and its product is
+# simply not joinable to the signalling. Encapping first puts the
+# correlation in packet *data*, which copy() does duplicate.
+#
+# The subscriber keeps gate 0 — the original packet, metadata intact — because the
+# forward tail still needs it: FlowMeasure keys its per-session volume off those
+# attributes, so handing the subscriber the metadata-less copy instead would stop
+# a tasked subscriber's usage being measured correctly.
+#
+# Buffer the duplicated copies inside the datapath before handing them to the
+# userspace shipper.
+#
+# Without this the egress is a hard cliff rather than a queue: the pipeline writes
+# packet batches of up to 32 to an AF_UNIX SEQPACKET socket whose receive queue
+# holds net.unix.max_dgram_qlen datagrams — 10 by default — and no reader can be
+# scheduled part-way through a batch, so any batch arriving on a non-empty queue
+# loses packets by arithmetic. What is lost is intercept product, and nothing
+# downstream can recover or even see it.
+#
+# A Queue turns that into elastic buffering with its own drain task, and counts its
+# overflow, as the port counts a failed socket write. Sized for a burst rather
+# than for sustained overload: if the shipper cannot keep up on average, no queue
+# depth saves it and the fault is reported instead.
+liQueue::Queue(size=LI_EGRESS_QUEUE_PACKETS)
+liMerge::Merge() -> liQueue -> liX3out::PortOut(port='liX3')
+# The Queue is drained by its own task, so it needs a worker to run on. Worker 0
+# always exists; the LI egress is low-rate next to the forwarding path.
+liQueue.attach_task(wid=0)
+
+executeFAR:farForwardDAndDuplicateAction \
+    -> liEncapD::GenericEncap(fields=[{'size': LI_TAG_FSEID_BYTES, 'attribute': 'fseid'}, {'size': LI_TAG_ACTION_BYTES, 'attribute': 'fwd_action'}]) \
+    -> liReplicaD::Replicate(gates=[0, 1])
+liReplicaD:1 -> liMerge
+
+executeFAR:farForwardUAndDuplicateAction \
+    -> liEncapU::GenericEncap(fields=[{'size': LI_TAG_FSEID_BYTES, 'attribute': 'fseid'}, {'size': LI_TAG_ACTION_BYTES, 'attribute': 'fwd_action'}]) \
+    -> liReplicaU::Replicate(gates=[0, 1])
+liReplicaU:1 -> liMerge
+executeFAR:farForwardUEncapAndDuplicateAction -> liEncapU
+
 # Set default gates for relevant modules
 pdrLookup.set_default_gate(gate=pdrFailGate)
 farLookup.set_default_gate(gate=farFailGate)
@@ -316,14 +424,24 @@ _in:gate \
 
 # 3. Complete the last part of the DL pipeline
 if not parser.measure_flow:
+    dlForwardTail = ports[parser.access_ifname].rtr
     executeFAR:farForwardDAction \
-        -> ports[parser.access_ifname].rtr
+        -> dlForwardTail
 else:
     executeFAR:farForwardDAction \
         -> postDLQosFlowMeasure::FlowMeasure(leader=False,
                                              flag_attr_name="buffer_flag",
                                              entries=parser.table_size_flow_measure) \
         -> ports[parser.access_ifname].rtr
+    dlForwardTail = postDLQosFlowMeasure
+
+# Lawful Intercept: the subscriber's copy of a duplicated packet takes the same
+# tail as a plain forwarded one, so its volume is measured identically. It is
+# stripped of the 9-byte correlation tag first — the tag is applied before the tee
+# so that the LI copy carries it as packet data (see the egress section), which
+# means the subscriber's packet must have it removed to leave the wire format
+# byte-for-byte what an untasked subscriber's would be.
+liReplicaD:0 -> liStripD::GenericDecap(bytes=LI_TAG_BYTES) -> dlForwardTail
 
 # Drop unknown packets
 coreRxIPCksum:1 -> coreRxIPCksumFail::Sink()
@@ -381,14 +499,20 @@ _in:gate \
 
 # 3. Complete the last part of the UL pipeline
 if not parser.measure_flow:
+    ulForwardTail = ports[parser.core_ifname].rtr
     executeFAR:farForwardUAction \
-        -> ports[parser.core_ifname].rtr
+        -> ulForwardTail
 else:
     executeFAR:farForwardUAction \
         -> postULQosFlowMeasure::FlowMeasure(leader=False,
                                              flag_attr_name="buffer_flag",
                                              entries=parser.table_size_flow_measure) \
         -> ports[parser.core_ifname].rtr
+    ulForwardTail = postULQosFlowMeasure
+
+# Lawful Intercept: as for the downlink, the subscriber's copy shares the plain
+# forward tail so a tasked session is metered exactly like an untasked one.
+liReplicaU:0 -> liStripU::GenericDecap(bytes=LI_TAG_BYTES) -> ulForwardTail
 
 # 4. GTP Echo response pipeline
 accessFastBPF:GTPUEchoGate \

@@ -146,4 +146,9 @@ func (pConn *PFCPConn) RemoveSession(session PFCPSession) {
 	if err := pConn.store.DeleteSession(session.localSEID); err != nil {
 		logger.PfcpLog.Errorf("failed to delete PFCP session from store: %v", err)
 	}
+
+	// Lawful Interception CC-POI: the duplication record for this session's FARs
+	// describes a session that no longer exists. Silent no-op unless LI is
+	// configured.
+	pConn.upf.ccEnabler.sessionForgotten(&session)
 }

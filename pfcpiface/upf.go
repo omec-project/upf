@@ -57,6 +57,12 @@ type upf struct {
 	fteidGenerator    *FTEIDGenerator
 
 	datapath
+	// ccEnabler is the Lawful Interception CC-POI's duplication control, non-nil
+	// only when LI is configured. It is consulted where PFCP rules change, so that
+	// duplication the tasking requires is (re-)applied and duplication it no longer
+	// requires is withdrawn.
+	ccEnabler *ccEnabler
+
 	maxReqRetries uint8
 	respTimeout   time.Duration
 	enableHBTimer bool

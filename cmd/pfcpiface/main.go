@@ -31,7 +31,14 @@ func main() {
 	logger.InitLog.Infoln("setting log level to:", lvl)
 	logger.SetLogLevel(lvl)
 
-	logger.InitLog.Infof("%+v", conf)
+	// Log the configuration, but never whether lawful interception is provisioned.
+	// The Li field is a pointer, so printing it renders an address on a tasked node
+	// and <nil> on any other, telling anyone with access to the general operator log
+	// that this network element is an interception point. Interception must be
+	// undetectable, so redact the field and leave it indistinguishable.
+	redactedConf := conf
+	redactedConf.Li = nil
+	logger.InitLog.Infof("%+v", redactedConf)
 
 	pfcpi := pfcpiface.NewPFCPIface(conf)
 

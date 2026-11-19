@@ -174,6 +174,27 @@ func TestRemoveCommentsKeepsStringContents(t *testing.T) {
 	}
 }
 
+// TestLoadConfigFileWithURL is the end-to-end form: a config carrying a URL must
+// parse. This is what the deployed UPF failed on.
+func TestLoadConfigFileWithURL(t *testing.T) {
+	dir := t.TempDir()
+	path := dir + "/upf.jsonc"
+	body := `{"mode":"af_packet","log_level":"info","max_req_retries":5,"resp_timeout":"2s","read_timeout":15,` +
+		`"li":{"x3_sockaddr":"/pod-share/li_x3","cert":"/c","key":"/k","ca_cert":"/ca",` +
+		`"ne_id":"upf-1","admf_url":"https://10.0.0.1:9443/X1/ADMF","admf_id":"admf-id",` +
+		`"x1_listen":"0.0.0.0:8443","tf_id":"smf-1"}}`
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	conf, err := LoadConfigFile(path)
+	if err != nil {
+		t.Fatalf("LoadConfigFile: %v", err)
+	}
+	if conf.Li == nil || conf.Li.AdmfURL != "https://10.0.0.1:9443/X1/ADMF" {
+		t.Errorf("admf_url not parsed: %+v", conf.Li)
+	}
+}
+
 // TestLoadConfigFileWithDoubleSlashInAString is the end-to-end form: a setting whose value
 // holds "//" -- here a socket path with a doubled separator, which the kernel accepts -- must
 // load as written, on one line or several.

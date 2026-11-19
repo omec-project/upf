@@ -19,10 +19,11 @@ const (
 )
 
 const (
-	ActionForward = 0x2
-	ActionDrop    = 0x1
-	ActionBuffer  = 0x4
-	ActionNotify  = 0x8
+	ActionForward   = 0x2
+	ActionDrop      = 0x1
+	ActionBuffer    = 0x4
+	ActionNotify    = 0x8
+	ActionDuplicate = 0x10 // DUPL: Lawful Interception content-of-communication copy
 )
 
 const (
@@ -43,6 +44,21 @@ type far struct {
 	tunnelIP4Dst  uint32
 	tunnelTEID    uint32
 	tunnelPort    uint16
+
+	// liDuplicate is duplication this element enabled itself, for Lawful
+	// Interception tasking whose detection criteria select traffic forwarded through
+	// this FAR. It is deliberately *not* the DUPL bit of applyAction, which is the
+	// SMF's own instruction:
+	//
+	//   - An SMF session modification carries the SMF's view of applyAction, which
+	//     knows nothing of this tasking. Folding the two together would let a
+	//     modification clear the interception silently, mid-session, with nothing logged and the
+	//     triggering function never told.
+	//   - Withdrawing the tasking must not clear duplication the SMF still wants.
+	//
+	// Kept as state rather than recomputed per packet: the datapath acts on the
+	// action value pushed to it, not on a task list.
+	liDuplicate bool
 }
 
 func (f far) String() string {
@@ -63,6 +79,14 @@ func (f *far) Buffers() bool {
 
 func (f *far) Forwards() bool {
 	return f.applyAction&ActionForward != 0
+}
+
+// Duplicates reports whether this FAR's user-plane traffic must be copied to the
+// LI Function (content of communication) — because the SMF asked for it with the
+// DUPL apply-action, or because Lawful Interception tasking this element holds
+// selects that traffic. Either is sufficient, and neither overrides the other.
+func (f *far) Duplicates() bool {
+	return f.applyAction&ActionDuplicate != 0 || f.liDuplicate
 }
 
 func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error {

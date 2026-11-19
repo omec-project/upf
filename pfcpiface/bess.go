@@ -18,6 +18,7 @@ import (
 	pb "github.com/omec-project/upf-epc/pfcpiface/bess_pb"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/wmnsk/go-pfcp/ie"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
@@ -48,6 +49,23 @@ const (
 	farForwardU = 0x1
 	farDrop     = 0x2
 	farNotify   = 0x4
+	// Lawful Interception forward-and-duplicate actions: forward the subscriber's
+	// packet as usual AND tee a copy to the LI X3 egress. They are written to the
+	// FAR's fwd_action value, on which the BESS pipeline's executeFAR Split routes
+	// them to the LI Replicate tee (see conf). Downlink and uplink are distinct so
+	// the subscriber copy keeps its direction.
+	farForwardDAndDuplicate = 0x5
+	farForwardUAndDuplicate = 0x6
+	// farForwardUEncapAndDuplicate is the uplink variant for a FAR with outer header
+	// creation, toward another UPF over N9. GtpuEncap runs before executeFAR, so its
+	// copy is the GTP-U packet rather than the target's own, which the X3 shipper must
+	// know to read the target's packet and label the payload. The pipeline routes it
+	// to the same uplink tee as 6.
+	//
+	// **The pfcp-agent and the bess image ship together.** A pipeline older than this
+	// value has no executeFAR gate 7, and BESS drops a packet sent to an unconnected
+	// gate, so a new agent on an old pipeline would drop a target's N9 uplink.
+	farForwardUEncapAndDuplicate = 0x7
 	// Bit Rates.
 	KB = 1000
 	MB = 1000000
@@ -223,7 +241,7 @@ func (b *bess) AddSliceInfo(sliceInfo *SliceInfo) error {
 func (b *bess) SendMsgToUPF(
 	method upfMsgType, rules PacketForwardingRules, updated PacketForwardingRules,
 ) uint8 {
-	cause, _ := b.SendMsgToUPFWithCompletion(method, rules, updated)
+	cause, _, _ := b.sendMsgToUPFBatch(method, rules, updated)
 
 	return cause
 }
@@ -234,6 +252,56 @@ func (b *bess) SendMsgToUPF(
 func (b *bess) SendMsgToUPFWithCompletion(
 	method upfMsgType, rules PacketForwardingRules, updated PacketForwardingRules,
 ) (uint8, bool) {
+	cause, completed, _ := b.sendMsgToUPFBatch(method, rules, updated)
+
+	return cause, completed
+}
+
+// sendMsgToUPFConfirmed is SendMsgToUPF, and additionally answers whether the batch's FAR
+// writes were acknowledged by the datapath.
+//
+// **Confirmation covers FARs only.** Only the FAR workers note an RPC that did not complete;
+// a PDR or QER write that fails without a refusal is not reflected here. That is the scope the
+// interception plane needs: what it re-derives and re-pushes is duplication FARs, so a
+// FAR is the only write whose confirmation it can act on.
+//
+// **The two answers are not the same question, and lawful interception is why they cannot
+// be collapsed.** The cause is what the SMF is told, and an uncertain result must not
+// reject a session: the context these calls carry is created before GRPCJoin's timer, so
+// a slow datapath expires it first and every worker sees DeadlineExceeded while the join
+// itself never times out. Rejecting on that would have the caller tear down a session the
+// datapath may still be forwarding for.
+//
+// The interception record cannot inherit that leniency. A duplication FAR recorded as
+// programmed drops out of every later re-derivation, so nothing retries it and an accepted
+// warrant produces nothing while this element reports itself healthy. ETSI TS 103 221-1
+// clause 5.3 makes that a fault rather than a warning -- "any issue which loses traffic is
+// categorized as a fault" -- and clause 6.5.2.2 gives it the category it belongs in,
+// "currently unable to collect traffic but not terminating".
+//
+// So the confirmation travels beside the join rather than through it: GRPCJoin, the
+// workers' done contract and the cause logic keep the contract every other caller relies on.
+func (b *bess) sendMsgToUPFConfirmed(
+	method upfMsgType, rules PacketForwardingRules, updated PacketForwardingRules,
+) (uint8, bool) {
+	cause, _, confirmed := b.sendMsgToUPFBatch(method, rules, updated)
+
+	return cause, confirmed
+}
+
+// sendMsgToUPFRemoval deletes a session's rules and gives all three answers: the cause and
+// completion SendMsgToUPFWithCompletion gives, and whether the FAR deletes were confirmed. See
+// removingDatapath.
+func (b *bess) sendMsgToUPFRemoval(all PacketForwardingRules) (uint8, bool, bool) {
+	return b.sendMsgToUPFBatch(upfMsgTypeDel, all, PacketForwardingRules{})
+}
+
+// sendMsgToUPFBatch programs the batch and gives every answer the three functions above
+// take their part of: the cause, whether the batch completed, and whether its FAR writes
+// were confirmed.
+func (b *bess) sendMsgToUPFBatch(
+	method upfMsgType, rules PacketForwardingRules, updated PacketForwardingRules,
+) (uint8, bool, bool) {
 	// create context
 	cause := ie.CauseRequestAccepted
 
@@ -249,11 +317,14 @@ func (b *bess) SendMsgToUPFWithCompletion(
 
 	calls := len(pdrs) + len(fars) + len(qers)
 	if calls == 0 {
-		return cause, true
+		// Nothing was asked of the datapath, so there is nothing left unconfirmed.
+		return cause, true, true
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
+
+	ctx, batch := withBatchConfirmation(ctx)
 
 	done := make(chan bool, calls)
 
@@ -296,7 +367,12 @@ func (b *bess) SendMsgToUPFWithCompletion(
 		}
 	}
 
+	writeStart := time.Now()
 	completed, succeeded := b.GRPCJoin(calls, Timeout, done)
+	// Observed whatever the outcome: a batch that succeeded just inside the deadline is
+	// the interesting measurement, not only one that missed it.
+	datapathWriteDuration.WithLabelValues(method.String()).Observe(time.Since(writeStart).Seconds())
+
 	if !completed || !succeeded {
 		logger.BessLog.Errorln(errGRPCCallFailed)
 	}
@@ -309,7 +385,11 @@ func (b *bess) SendMsgToUPFWithCompletion(
 		cause = ie.CauseRequestRejected
 	}
 
-	return cause, completed
+	// Confirmed means the batch finished, nothing reported a refusal, and no FAR worker had
+	// an RPC that did not complete. The last of those is the one the cause deliberately
+	// forgives. A PDR or QER write that fails without a refusal is not reflected: the
+	// interception plane re-derives FARs only.
+	return cause, completed, completed && succeeded && !batch.unconfirmed.Load()
 }
 
 func (b *bess) Exit() {
@@ -1020,7 +1100,30 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 		b.startEndMarkerSender(pfcpCommAddr)
 	}
 
+	// Lawful Interception CC-POI: start the X3 shipper only when the opt-in Li
+	// config is present; silent otherwise.
+	if conf.Li != nil {
+		// The shipper owns its own goroutines and socket for the life of the process,
+		// so nothing here needs to hold on to it.
+		if err := startLIShipper(conf.Li, b.client, u); err != nil {
+			// Do not name the subsystem or echo err (which carries LI-identifying
+			// text) on the general BESS log: that would reveal to an unauthorized
+			// operator that this NE is LI-provisioned, which network-element-level
+			// undetectability forbids. No X1 channel exists yet at datapath init, so
+			// pending a restricted LI log sink this is surfaced only non-attributably.
+			declineOptionalSubsystem()
+		}
+	}
+
 	b.setupSliceMeter(conf)
+}
+
+// declineOptionalSubsystem logs that an optional datapath subsystem did not start, and
+// nothing that says which. The message names none, and the line is written without the
+// caller field the logger otherwise records, so the log line itself carries no file and
+// line.
+func declineOptionalSubsystem() {
+	logger.BessLog.WithOptions(zap.WithCaller(false)).Errorln("an optional datapath subsystem failed to initialise")
 }
 
 func (b *bess) startEndMarkerSender(addr string) {
@@ -1520,6 +1623,17 @@ func (b *bess) processGtpuPathMonitoring(ctx context.Context, arg *anypb.Any, me
 	}
 }
 
+// setActionValue returns the value written to the datapath's "action" attribute.
+//
+// This is NOT only a routing value: BESS's GtpuEncap reuses the same attribute as
+// the GTP-U PDU Session Container PDU Type (core/modules/gtpu_encap.cc registers
+// AddMetadataAttr("action", ...) and assigns it to psch->pdu_type). The stock
+// values are safe there purely because farForwardD == 0 and farForwardU == 1 are
+// also the only two valid PDU types, downlink and uplink. Anything else reaches
+// the RAN as a PDU type that does not exist.
+//
+// So this function must keep returning stock values only. The duplication signal
+// lives in setFwdActionValue instead.
 func (b *bess) setActionValue(f far) uint8 {
 	if (f.applyAction & ActionForward) != 0 {
 		switch f.dstIntf {
@@ -1540,6 +1654,28 @@ func (b *bess) setActionValue(f far) uint8 {
 	return farDrop
 }
 
+// setFwdActionValue returns the value the pipeline's executeFAR splits on. It is
+// the action value plus the two Lawful Interception variants, which route a
+// forwarding packet through the content-duplication tee as well as onward to the
+// subscriber. Kept separate from setActionValue because that attribute is also
+// the GTP-U PDU Session Container PDU Type and cannot carry these values.
+func (b *bess) setFwdActionValue(f far) uint8 {
+	if (f.applyAction&ActionForward) != 0 && f.Duplicates() {
+		switch f.dstIntf {
+		case ie.DstInterfaceAccess:
+			return farForwardDAndDuplicate
+		case ie.DstInterfaceCore, ie.DstInterfaceSGiLANN6LAN:
+			if f.tunnelType != 0 {
+				return farForwardUEncapAndDuplicate
+			}
+
+			return farForwardUAndDuplicate
+		}
+	}
+
+	return b.setActionValue(f)
+}
+
 func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 	go func() {
 		completed := false
@@ -1551,6 +1687,7 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 		)
 
 		action := b.setActionValue(far)
+		fwdAction := b.setFwdActionValue(far)
 		f := &pb.ExactMatchCommandAddArg{
 			Gate: uint64(far.tunnelType),
 			Fields: []*pb.FieldData{
@@ -1564,6 +1701,7 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 				intEnc(uint64(far.tunnelIP4Dst)), /* enb ip */
 				intEnc(uint64(far.tunnelTEID)),   /* enb teid */
 				intEnc(uint64(far.tunnelPort)),   /* udp gtpu port */
+				intEnc(uint64(fwdAction)),        /* fwd_action */
 			},
 		}
 
@@ -1573,8 +1711,17 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 			return
 		}
 
-		if refused(b.processFAR(ctx, arg, upfMsgTypeAdd)) {
-			return
+		// An RPC that did not complete is not a refusal, and the join deliberately
+		// reports the rule as programmed so that an uncertain result cannot reject the
+		// batch. The interception record must not inherit that -- see
+		// lawfulintercept_confirmation.go -- so it is noted beside the join, leaving what
+		// this worker tells GRPCJoin exactly as it was.
+		if err = b.processFAR(ctx, arg, upfMsgTypeAdd); err != nil {
+			if refused(err) {
+				return
+			}
+
+			noteUnconfirmed(ctx)
 		}
 
 		if enableGtpuPathMonitoring {
@@ -1616,8 +1763,14 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 			return
 		}
 
-		if refused(b.processFAR(ctx, arg, upfMsgTypeDel)) {
-			return
+		// As in addFAR: a delete this element cannot confirm must not be recorded as
+		// done either -- the duplication may still be running.
+		if err = b.processFAR(ctx, arg, upfMsgTypeDel); err != nil {
+			if refused(err) {
+				return
+			}
+
+			noteUnconfirmed(ctx)
 		}
 
 		// Reached only once the datapath has removed the FAR: a refused delete keeps the
