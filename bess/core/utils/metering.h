@@ -113,8 +113,11 @@ class Metering {
   using EmTable = CuckooMap<MeteringKey, T, MeteringKeyHash, MeteringKeyEq>;
   Metering() : total_key_size_(0), num_fields_(0) {}
 
+  // Add stores val for key, replacing the value of a rule the table already
+  // holds for it. The replaced value is retired, not freed (see FreeRetired).
   Error Add(const T &val, const MeteringKey &key) {
     const void *Key_t = (const void *)&key;
+    T *old = Lookup(key);
     T *val_t = new T(val);
     // insert_dpdk() forwards rte_hash_add_key_data(), which returns 0 on
     // success and a negative errno on failure (-ENOSPC for a full table).
@@ -126,22 +129,59 @@ class Metering {
       return MakeError(-ret, "Dpdk Insert Failed");
     }
 
+    if (old) {
+      retired_.push_back(old);
+    }
+
     return MakeError(0);
   }
 
+  // Delete removes key's rule. Its value is retired, not freed.
   Error Delete(const MeteringKey &key) {
-    Error err;
+    T *old = Lookup(key);
     bool ret = table_->Remove(key, MeteringKeyHash(total_key_size_),
                               MeteringKeyEq(total_key_size_));
     if (!ret) {
       return MakeError(ENOENT, "rule doesn't exist");
     }
+
+    if (old) {
+      retired_.push_back(old);
+    }
+
     return MakeError(0);
   }
 
-  void Clear() { table_->Clear(); }
+  // Clear removes every rule. Their values are retired, not freed.
+  void Clear() {
+    RetireAll();
+    table_->Clear();
+  }
+
   size_t Count() const { return table_->Count(); }
-  void DeInit() { table_->DeInit(); }
+
+  // Retired is the number of values that Add replaced or Delete and Clear
+  // removed and that FreeRetired has not freed yet.
+  size_t Retired() const { return retired_.size(); }
+
+  // FreeRetired frees the retired values. A worker that looked a rule up uses
+  // its value, by pointer, until it has processed its batch, so a value taken
+  // out of the table cannot be freed at once. The caller frees them only when
+  // no worker runs the table's module, as under a WorkerPauser.
+  void FreeRetired() {
+    for (T *v : retired_) {
+      delete v;
+    }
+    retired_.clear();
+  }
+
+  // DeInit frees the table and every value, held or retired. A module is torn
+  // down only once no worker runs it.
+  void DeInit() {
+    RetireAll();
+    FreeRetired();
+    table_->DeInit();
+  }
 
   // Find an entry in the table.
   // Returns the value if `key` matches a rule, otherwise `default_value`.
@@ -198,11 +238,33 @@ class Metering {
     return std::make_pair(code, msg);
   }
 
+  // Lookup returns the value the table holds for key, or nullptr.
+  T *Lookup(const MeteringKey &key) const {
+    void *data = nullptr;
+    if (table_->find_dpdk(&key, &data) < 0) {
+      return nullptr;
+    }
+    return static_cast<T *>(data);
+  }
+
+  // RetireAll retires the value of every rule the table holds.
+  void RetireAll() {
+    const void *key = nullptr;
+    void *data = nullptr;
+    uint32_t next = 0;
+    while (table_->Iterate(&key, &data, &next) >= 0) {
+      if (data) {
+        retired_.push_back(static_cast<T *>(data));
+      }
+    }
+  }
+
   // aligned total key size
   size_t total_key_size_;
   size_t num_fields_;
   std::unique_ptr<CuckooMap<MeteringKey, T, MeteringKeyHash, MeteringKeyEq>>
       table_;
+  std::vector<T *> retired_;
 };
 
 }  // namespace utils

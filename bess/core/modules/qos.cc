@@ -397,6 +397,7 @@ CommandResponse Qos::CommandAdd(const bess::pb::QosCommandAddArg &arg) {
                           err_add.second.c_str());
   }
 
+  FreeRetired(kMaxRetired);
   return CommandSuccess();
 }
 
@@ -409,12 +410,30 @@ CommandResponse Qos::CommandDelete(const bess::pb::QosCommandDeleteArg &arg) {
   }
 
   table_.Delete(key);
+  FreeRetired(kMaxRetired);
   return CommandSuccess();
 }
 
 CommandResponse Qos::CommandClear(const bess::pb::EmptyArg &) {
+  // The workers look rules up concurrently with this command, so they are
+  // paused while the table is reset.
+  WorkerPauser wp;
   Qos::Clear();
+  table_.FreeRetired();
   return CommandSuccess();
+}
+
+// FreeRetired frees the values the table replaced or removed once at least
+// threshold of them wait. A worker may hold one until it finishes its batch, so
+// they are freed with the workers paused, and in batches, since a pause stalls
+// forwarding.
+void Qos::FreeRetired(size_t threshold) {
+  if (table_.Retired() < threshold) {
+    return;
+  }
+
+  WorkerPauser wp;
+  table_.FreeRetired();
 }
 
 void Qos::Clear() {
