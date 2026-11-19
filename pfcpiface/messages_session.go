@@ -127,6 +127,12 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 			ie.CauseNoResourcesAvailable)
 	}
 
+	// Lawful Interception: the session's stripe, from before the first datapath write until
+	// this handler returns -- after the cleanup below on a refusal, which runs first because
+	// it is deferred later. See ccEnabler.sessionLocks.
+	unlockSession := upf.ccEnabler.lockSession(session.localSEID)
+	defer unlockSession()
+
 	// From here the session holds resources before it is known whether it will exist:
 	// NewPFCPSession has counted it, and parsing a CHOOSE PDR allocates the UE address
 	// (parse_pdr.go) as a side effect of reading it. A rejected establishment is not
@@ -243,16 +249,27 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 		qers: addQERs,
 	}
 
-	cause := upf.SendMsgToUPF(upfMsgTypeAdd, session.PacketForwardingRules, updated)
+	// Lawful Interception: a criterion may identify traffic in a session that did not
+	// exist when the task was activated, so the tasking is resolved against every new
+	// session as it is established rather than only at tasking time. Without this,
+	// coverage would depend on the triggering function noticing each new session — and
+	// a missed one is an interception silently producing nothing.
+	upf.ccEnabler.applyTasking(&session, &updated)
+
+	cause, confirmed := upf.sendDuplicationWrite(upfMsgTypeAdd, session.PacketForwardingRules, updated)
 	if cause == ie.CauseRequestRejected {
 		// The batch reported a failure, which means it completed and some of its rules
 		// may be programmed. Take them out before forgetting the session: nothing else
 		// will, because the session is not stored on this path unless this removal fails
 		// to finish, and the SMF has no F-SEID to release. Best effort -- a datapath that
-		// just refused a write may refuse this one too, and there is nothing further to
-		// report it to.
-		delCause, finished := upf.SendMsgToUPFWithCompletion(
-			upfMsgTypeDel, session.PacketForwardingRules, PacketForwardingRules{})
+		// just refused a write may refuse this one too.
+		//
+		// Where the session is not stored, recording the abandonment is no remedy: no
+		// re-derivation will ever walk it and no record written here could be read again.
+		// Where the datapath will not take the delete either, the ADMF is told instead,
+		// because a subscriber's traffic may then be copied with nothing in this element
+		// able to stop it.
+		delCause, finished, delConfirmed := upf.sendRemoval(session.PacketForwardingRules)
 		if !finished {
 			// A removal that ran out of time may have left any of the rules the refused
 			// batch programmed, and once the session is forgotten nothing names them: the
@@ -279,6 +296,12 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 				logger.PfcpLog.Errorf("failed to put PFCP session to store: %v", err)
 			}
 
+			// Lawful Interception: stored, this session is now one a re-derivation walks,
+			// so its rules are recorded -- as attempted, because neither the refused add
+			// nor the unfinished removal says what the datapath holds. Recorded after the
+			// store, for the reason sessionProgrammed is below. See farsAttempted.
+			upf.ccEnabler.farsAttempted(session.localSEID, session.fars)
+
 			return errProcessReply(ErrWriteToDatapath, ie.CauseRequestRejected)
 		}
 
@@ -302,6 +325,12 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 			// hold the allocation back here.
 			logger.PfcpLog.Warnln("the rollback of a rejected session reported a failure; " +
 				"no rule the datapath holds is known to be stranded")
+
+			upf.ccEnabler.abandonedDuplication(session.localSEID, session.fars, "a refused session establishment")
+		} else if !delConfirmed {
+			// Accepted and finished, but a FAR delete was not answered: the session is
+			// forgotten all the same, so a duplication rule it leaves behind is reported.
+			upf.ccEnabler.removalUnconfirmed(session.localSEID, session.fars, "a refused session establishment")
 		}
 
 		return errProcessReply(ErrWriteToDatapath,
@@ -314,6 +343,17 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 	if err != nil {
 		logger.PfcpLog.Errorf("failed to put PFCP session to store: %v", err)
 	}
+
+	// Lawful Interception: record what was programmed only now the session is
+	// visible to a re-derivation. Recorded before the store, it would say a
+	// session's traffic is being duplicated while GetAllSessions still did not
+	// return the session — and a re-derivation running in that interval publishes a
+	// conclusion drawn without it, leaving duplication nothing will turn off.
+	//
+	// All of the session's FARs, because for a new session that is what was pushed: the
+	// SendMsgToUPF above carries session.PacketForwardingRules, and a session being
+	// established has no rules older than this message.
+	upf.ccEnabler.sessionProgrammed(&session, session.fars, confirmed)
 
 	var localFSEID *ie.IE
 
@@ -432,6 +472,11 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 	// the rules that did parse have already been written through the slices this copy
 	// shares with the store. The PutSession at the end is what publishes them, and
 	// before keeps what the session had for the rollback.
+	//
+	// Lawful Interception: the copy is also what keeps this handler's in-place writes --
+	// UpdateFAR, RemoveFAR, applyTasking setting liDuplicate -- off the arrays the
+	// interception plane reads concurrently: ccEnabler.transact on the enabler's worker,
+	// and resolveCovering from a framing worker.
 	before := session.PacketForwardingRules
 	session.PacketForwardingRules = before.Clone()
 
@@ -698,11 +743,25 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		// translated or marshalled, which was never programmed either -- the reasoning
 		// the establishment rollback records. A module that learns to refuse a delete of
 		// a rule it holds changes that, and this line with it.
-		if upf.SendMsgToUPF(upfMsgTypeDel, remove, PacketForwardingRules{}) == ie.CauseRequestRejected {
+		removeCause, removeConfirmed := upf.sendRulesRemoval(remove)
+		if removeCause == ie.CauseRequestRejected {
 			logger.PfcpLog.Warnln("could not translate a rule a refused modification created "+
 				"in order to remove it; it was not programmed either, F-SEID:", localSEID)
+		} else if !removeConfirmed {
+			// Lawful Interception: a created FAR whose delete was not answered may still be in
+			// the datapath, and the session the store keeps does not hold it, so no
+			// re-derivation will walk it again. recordRolledBack has run, so a created FAR that
+			// was to duplicate counts as possibly duplicating.
+			upf.ccEnabler.removalUnconfirmed(localSEID, remove.fars, "a refused session modification")
 		}
 
+		// Lawful Interception: the restore is a write, answered by its cause alone, and needs no
+		// confirmation here. recordRolledBack has already recorded every FAR it writes as
+		// attempted -- not duplicating -- and the session stays in the store with those FARs,
+		// so whatever the restore left, the record claims no duplication, a FAR the tasking
+		// wants duplicating disagrees with it, and a FAR this element ever turned on is pushed
+		// again by the next pass whatever the record says (everDuplicated). Nothing is forgotten
+		// that a removal report would be the only remedy for.
 		if upf.SendMsgToUPF(upfMsgTypeMod, before, before) == ie.CauseRequestRejected {
 			logger.PfcpLog.Warnln("datapath refused to restore the rules of a refused "+
 				"modification; it may be missing rules this session describes, or holding "+
@@ -710,9 +769,59 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		}
 	}
 
-	cause := upf.SendMsgToUPF(upfMsgTypeMod, session.PacketForwardingRules, updated)
+	// Lawful Interception: the SMF's FARs above carry the SMF's view of each apply
+	// action, which knows nothing of interception tasking. Re-deriving here is what
+	// stops a routine modification from ending an interception mid-session — silently,
+	// with the triggering function still believing it is running.
+	//
+	// The session's stripe is held from here, before the first datapath write, until this
+	// handler returns, so a tasking pass pushing this session's FARs either sees whatever
+	// stamp the handler made -- sessionProgrammed, farsRemoved or farsAttempted -- and leaves
+	// them alone, or has pushed before this handler's writes reach the datapath. See
+	// ccEnabler.sessionLocks.
+	unlockSession := upf.ccEnabler.lockSession(localSEID)
+	defer unlockSession()
+
+	upf.ccEnabler.applyTasking(&session, &updated)
+
+	// Lawful Interception: every refusal below runs sendError, and with it the rollback, which
+	// re-writes every FAR the session held before this message as the store describes it. A
+	// re-derivation records duplication without writing the store, so that copy can turn
+	// duplication off on FARs this message never named. Both sets are recorded as *attempted*:
+	// the pushed FARs, whose outcome is unknown, and the restored ones, which the rollback may
+	// have turned off. A record claiming either still duplicates would agree with the tasking,
+	// and a later pass would skip it. See farsAttempted.
+	recordRolledBack := func() {
+		upf.ccEnabler.farsAttempted(localSEID, updated.fars)
+		upf.ccEnabler.farsAttempted(localSEID, before.fars)
+	}
+
+	cause, confirmed := upf.sendDuplicationWrite(upfMsgTypeMod, session.PacketForwardingRules, updated)
 	if cause == ie.CauseRequestRejected {
+		// **A refusal does not mean the datapath is untouched**, so the rules this element was
+		// told to push are recorded whatever the answer was. The same reasoning the deletion
+		// stage below already carries, on the branch that reaches the datapath first: this
+		// return is before PutSession, so sessionProgrammed — the only other thing that records
+		// a push — never runs, and without this the datapath duplicates with nothing in this
+		// element able to say so.
+		//
+		// Unlike the establishment branch, recording is the right remedy here: the session is in
+		// the store, so the next re-derivation walks it and finds the entry.
+		//
+		// Recorded as *attempted*, not pushed. The outcome is unknown on this path, and a
+		// record claiming the rules are duplicating would agree with the tasking — which is
+		// what makes a later pass skip them, permanently, leaving an accepted warrant
+		// producing nothing. See recordRolledBack.
+		recordRolledBack()
+
 		return sendError(ErrWriteToDatapath)
+	}
+
+	// Every refusal from here on runs the rollback after the push above. See recordRolledBack.
+	failAfterPush := func(err error) (message.Message, error) {
+		recordRolledBack()
+
+		return sendError(err)
 	}
 
 	if upf.enableEndMarker {
@@ -726,12 +835,12 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 	for _, rPDR := range smreq.RemovePDR {
 		pdrID, err := rPDR.PDRID()
 		if err != nil {
-			return sendError(err)
+			return failAfterPush(err)
 		}
 
 		p, err := session.RemovePDR(uint32(pdrID))
 		if err != nil {
-			return sendError(err)
+			return failAfterPush(err)
 		}
 
 		delPDRs = append(delPDRs, *p)
@@ -740,12 +849,12 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 	for _, dFAR := range smreq.RemoveFAR {
 		farID, err := dFAR.FARID()
 		if err != nil {
-			return sendError(err)
+			return failAfterPush(err)
 		}
 
 		f, err := session.RemoveFAR(farID)
 		if err != nil {
-			return sendError(err)
+			return failAfterPush(err)
 		}
 
 		delFARs = append(delFARs, *f)
@@ -754,12 +863,12 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 	for _, dQER := range smreq.RemoveQER {
 		qerID, err := dQER.QERID()
 		if err != nil {
-			return sendError(err)
+			return failAfterPush(err)
 		}
 
 		q, err := session.RemoveQER(qerID)
 		if err != nil {
-			return sendError(err)
+			return failAfterPush(err)
 		}
 
 		delQERs = append(delQERs, *q)
@@ -774,12 +883,12 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		for _, rURR := range smreq.RemoveURR {
 			urrID, err := rURR.URRID()
 			if err != nil {
-				return sendError(err)
+				return failAfterPush(err)
 			}
 
 			removed, err := session.RemoveURR(urrID)
 			if err != nil {
-				return sendError(err)
+				return failAfterPush(err)
 			}
 
 			finalReports = append(finalReports, removed.finalReports(now)...)
@@ -794,15 +903,54 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		qers: delQERs,
 	}
 
-	cause = upf.SendMsgToUPF(upfMsgTypeDel, deleted, PacketForwardingRules{})
+	cause, removalConfirmed := upf.sendRulesRemoval(deleted)
 	if cause == ie.CauseRequestRejected {
+		// Lawful Interception: the created and updated rules above were pushed to the
+		// datapath before this stage ran, and this return is before PutSession — so
+		// sessionProgrammed, the only thing that records a push, never happens. Record it
+		// here or the datapath duplicates with nothing in this element able to say so, and
+		// nothing able to turn it off.
+		//
+		// Recorded as *attempted* even when the push was confirmed: sendError runs the
+		// rollback, which removes what this message created and restores the session's own
+		// rules, so the datapath no longer holds what was pushed -- and the restore is
+		// itself unconfirmed. Recording the push would claim duplication the rollback may
+		// have turned off, and a claim that agrees with the tasking is one every later pass
+		// skips. See recordRolledBack.
+		recordRolledBack()
+
 		return sendError(ErrWriteToDatapath)
 	}
+
+	// Lawful Interception: a Remove FAR whose delete was not answered is accepted all the same,
+	// as before, and farsRemoved below drops the only record that it may be duplicating. So the
+	// ADMF is told first, as on the deletion path.
+	if !removalConfirmed {
+		upf.ccEnabler.removalUnconfirmed(localSEID, delFARs, "a session modification")
+	}
+
+	// Lawful Interception: the removed FARs are gone from the session, so nothing that walks
+	// it will ever reclaim what this element recorded about them — and a FAR re-created under
+	// the same identifier would inherit the stale claim and never be programmed. See
+	// farsRemoved.
+	upf.ccEnabler.farsRemoved(localSEID, delFARs)
 
 	err := pConn.store.PutSession(session)
 	if err != nil {
 		logger.PfcpLog.Errorf("failed to put PFCP session to store: %v", err)
 	}
+
+	// Lawful Interception: as in the establishment handler, and for the sharper
+	// reason. Recorded before the store, a modification that brings a session within
+	// a criterion hands a re-derivation still holding the pre-modification copy a
+	// newer value to compare against — and that pass then pushes the FAR off, ending
+	// an interception the tasking still requires.
+	//
+	// Only the updated FARs, because only those were pushed. The session's other rules are
+	// whatever the datapath was told about them earlier, which is what the record already
+	// says; restating them from this element's intent would replace an account of the
+	// datapath with a copy of our own wishes for every rule this message did not touch.
+	upf.ccEnabler.sessionProgrammed(&session, updated.fars, confirmed)
 
 	// Build response message
 	smres := message.NewSessionModificationResponse(0, /* MO?? <-- what's this */
@@ -928,10 +1076,23 @@ func (pConn *PFCPConn) handleSessionDeletionRequest(msg message.Message) (messag
 	// kept whatever the answer, and refusing would send it into a rollback whose restore
 	// the late removal could then undo. That is why this is decided here and not in
 	// SendMsgToUPF.
-	cause, finished := upf.SendMsgToUPFWithCompletion(
-		upfMsgTypeDel, session.PacketForwardingRules, PacketForwardingRules{})
+	//
+	// Lawful Interception: the session's stripe, from before the datapath delete until this
+	// handler returns, so a tasking pass cannot push one of these FARs back after the delete.
+	// See ccEnabler.sessionLocks.
+	unlockSession := upf.ccEnabler.lockSession(localSEID)
+	defer unlockSession()
+
+	cause, finished, confirmed := upf.sendRemoval(session.PacketForwardingRules)
 	if cause == ie.CauseRequestRejected || !finished {
 		return sendError(ErrWriteToDatapath)
+	}
+
+	// Lawful Interception: a FAR delete whose RPC did not complete leaves the batch accepted
+	// and finished, so the session is deleted as before. Where that FAR may be duplicating,
+	// RemoveSession below drops the only record of it, so the ADMF is told first.
+	if !confirmed {
+		upf.ccEnabler.removalUnconfirmed(session.localSEID, session.fars, "a session deletion")
 	}
 
 	upf.ippool.Release(session.localSEID)
@@ -1094,21 +1255,35 @@ func (pConn *PFCPConn) handleSessionReportResponse(msg message.Message) error {
 
 		logger.PfcpLog.Warnln("context not found, deleting session locally")
 
-		// The address goes back to the pool before the session is forgotten, because
-		// nothing can return it afterwards. This site already forgets the session before
-		// deleting its rules, so unlike the deletion path the release precedes the
-		// delete; the free queue is FIFO, so the address is not handed out again while
-		// the delete runs unless every other free address is already taken.
-		upf.ippool.Release(seid)
+		// The datapath first, and the record only once it answered. Dropping the record before
+		// the delete is confirmed leaves the rules in place with nothing describing them: the
+		// entries go with the session, so a refused delete would strand duplication that no
+		// later re-derivation can find, because it walks the sessions this element holds.
+		//
+		// Under the session's stripe from before the delete until this handler returns, as in
+		// the deletion handler.
+		unlockSession := upf.ccEnabler.lockSession(seid)
+		defer unlockSession()
 
-		pConn.RemoveSession(sessItem)
-
-		cause := upf.SendMsgToUPF(
-			upfMsgTypeDel, sessItem.PacketForwardingRules, PacketForwardingRules{})
+		cause, _, confirmed := upf.sendRemoval(sessItem.PacketForwardingRules)
 		if cause == ie.CauseRequestRejected {
 			return errProcess(
 				ErrOperationFailedWithParam("delete session from datapath", "seid", seid))
 		}
+
+		// As in the deletion handler: the session is forgotten below, so an unconfirmed
+		// removal of a rule that may be duplicating is reported before its record goes.
+		if !confirmed {
+			upf.ccEnabler.removalUnconfirmed(seid, sessItem.fars, "a local session deletion")
+		}
+
+		// The address goes back only once the datapath has answered the delete, the same
+		// order the deletion path uses, so a refused delete does not reissue an address a
+		// PDR still matches. A delete that timed out is answered as accepted (see
+		// SendMsgToUPF), so it releases the address too.
+		upf.ippool.Release(seid)
+
+		pConn.RemoveSession(sessItem)
 
 		return nil
 	}

@@ -307,6 +307,10 @@ type pdr struct {
 
 	appFilter applicationFilter
 
+	// networkInstance is the PDI's Network Instance as its raw octets, empty when
+	// the PDI carried none. Unused by the datapath; see parsePDI.
+	networkInstance string
+
 	precedence  uint32
 	pdrID       uint32
 	fseID       uint64
@@ -374,10 +378,10 @@ func (p pdr) occupiesSameEntryAs(other pdr) bool {
 func (p pdr) String() string {
 	return fmt.Sprintf("PDR(id=%v, F-SEID=%v, srcIface=%v, tunnelIPv4Dst=%v/%x, "+
 		"tunnelTEID=%v/%x, ueAddress=%v, applicationFilter=%v, precedence=%v, F-SEID IP=%v, "+
-		"counterID=%v, farID=%v, qerIDs=%v, urrIDs=%v, needDecap=%v, allocIPFlag=%v)",
+		"counterID=%v, farID=%v, qerIDs=%v, urrIDs=%v, needDecap=%v, allocIPFlag=%v, networkInstance=%x)",
 		p.pdrID, p.fseID, p.srcIface, int2ip(p.tunnelIP4Dst), p.tunnelIP4DstMask,
 		p.tunnelTEID, p.tunnelTEIDMask, int2ip(p.ueAddress), p.appFilter, p.precedence,
-		p.fseidIP, p.ctrID, p.farID, p.qerIDList, p.urrIDList, p.needDecap, p.allocIPFlag)
+		p.fseidIP, p.ctrID, p.farID, p.qerIDList, p.urrIDList, p.needDecap, p.allocIPFlag, p.networkInstance)
 }
 
 func (p pdr) IsAppFilterEmpty() bool {
@@ -641,6 +645,13 @@ func (p *pdr) processBasicPDI(pdiIEs []*ie.IE, ippool *IPPool) error {
 				logger.PfcpLog.Errorf("failed to parse F-TEID IE: %v", err)
 				return err
 			}
+		case ie.NetworkInstance:
+			// Retained, not acted on: the datapath does not match on it, but it is a
+			// Lawful Interception detection criterion (3GPP TS 33.128 table 6.2.3-7),
+			// where it is an xs:hexBinary of these octets. Held as the payload bytes
+			// so the comparison is against what was on the wire rather than a decoded
+			// name — the encoding is length-prefixed FQDN labels as often as not.
+			p.networkInstance = string(pdiIE.Payload)
 		}
 	}
 	return nil

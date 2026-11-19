@@ -27,7 +27,9 @@ def getpid(process_name):
 
 def getpythonpid(process_name):
     for proc in psutil.process_iter(attrs=["pid", "cmdline"]):
-        if len(proc.info["cmdline"]) < 2:
+        # cmdline is None for a process whose arguments cannot be read, such
+        # as a zombie.
+        if not proc.info["cmdline"] or len(proc.info["cmdline"]) < 2:
             continue
         if (
             process_name in proc.info["cmdline"][1]
