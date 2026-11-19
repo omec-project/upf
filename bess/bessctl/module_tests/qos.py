@@ -29,6 +29,55 @@ class BessQosTest(BessModuleTestCase):
 
         self.assertBessAlive()
 
+    # pfcpiface rewrites a QER with add, and removes it with delete and clear,
+    # while a worker runs the module. Each replaced or removed value is freed
+    # with the workers paused, once 1024 wait, and clear always pauses them.
+    # The rule is rewritten often enough to free twice under traffic, and the
+    # workers must forward again after each pause.
+    def test_rules_change_while_a_worker_runs(self):
+        qos = Qos(fields=[{"offset": 23, "num_bytes": 1}])
+        # Source leaves packet data as it finds it, so every packet is
+        # rewritten to one whose byte 23, the IPv4 protocol, is TCP.
+        pkt = get_tcp_packet(sip="10.1.2.3", dip="20.0.0.1")
+        Source() -> Rewrite(templates=[bytes(pkt)]) -> qos
+        qos:7 -> Sink()
+        qos:8 -> Sink()
+        rule = [{"value_bin": b"\x06"}]
+
+        def pkts():
+            return {g.ogate: g.pkts for g in bess.get_module_info(qos.name).ogates}
+
+        # Traffic first, so that the rewrites run under it.
+        qos.add(gate=7, fields=rule)
+        bess.resume_all()
+        deadline = time.time() + 5
+        while pkts()[7] == 0 and time.time() < deadline:
+            time.sleep(0.05)
+        self.assertGreater(pkts()[7], 0, "no traffic before the rewrites")
+
+        # 2999 replacements: the retired values are freed at 1024 and 2048.
+        for i in range(1, 3000):
+            qos.add(gate=7 + i % 2, fields=rule)
+        time.sleep(0.2)
+        before = pkts()
+        time.sleep(0.2)
+        after = pkts()
+        # The last add sent the rule to gate 8.
+        self.assertGreater(after[8], before[8], "the workers did not resume")
+
+        qos.delete(fields=rule)
+        qos.add(gate=7, fields=rule)
+        time.sleep(0.2)
+        self.assertGreater(pkts()[7], after[7])
+
+        qos.clear()
+        cleared = pkts()
+        time.sleep(0.2)
+        self.assertEqual(pkts(), cleared, "a cleared rule still matched")
+        bess.pause_all()
+
+        self.assertBessAlive()
+
 
 suite = unittest.TestLoader().loadTestsFromTestCase(BessQosTest)
 results = unittest.TextTestRunner(verbosity=2).run(suite)

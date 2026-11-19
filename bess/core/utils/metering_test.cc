@@ -86,4 +86,140 @@ TEST_F(MeteringTest, AddReportsFailureWhenTheTableIsFull) {
   table.DeInit();
 }
 
+// Counted counts its live instances, so that a test can tell whether the table
+// freed the values it took copies of.
+struct Counted {
+  static int live;
+
+  uint16_t v;
+
+  explicit Counted(uint16_t value = 0) : v(value) { live++; }
+  Counted(const Counted &o) : v(o.v) { live++; }
+  Counted &operator=(const Counted &) = default;
+  ~Counted() { live--; }
+};
+
+int Counted::live = 0;
+
+// A rule added again for the same key replaces its value. The old one may still
+// be in a worker's hands, so it is retired, and freed only by FreeRetired.
+TEST_F(MeteringTest, AddRetiresTheValueItReplaces) {
+  Metering<Counted> table;
+  table.Init(sizeof(uint64_t), 1 << 6);
+  const int base = Counted::live;
+
+  EXPECT_EQ(0, table.Add(Counted(1), KeyOf(7)).first);
+  EXPECT_EQ(0u, table.Retired()) << "a new rule replaced nothing";
+
+  EXPECT_EQ(0, table.Add(Counted(2), KeyOf(7)).first);
+  EXPECT_EQ(1u, table.Retired());
+  EXPECT_EQ(2, table.Find(KeyOf(7), Counted(0)).v);
+  EXPECT_EQ(base + 2, Counted::live) << "the replaced value was freed at once";
+
+  table.FreeRetired();
+  EXPECT_EQ(0u, table.Retired());
+  EXPECT_EQ(base + 1, Counted::live) << "FreeRetired did not free the value";
+
+  table.DeInit();
+  EXPECT_EQ(base, Counted::live) << "DeInit leaked the value the table held";
+}
+
+TEST_F(MeteringTest, DeleteRetiresTheValueItRemoves) {
+  Metering<Counted> table;
+  table.Init(sizeof(uint64_t), 1 << 6);
+  const int base = Counted::live;
+
+  EXPECT_EQ(0, table.Add(Counted(1), KeyOf(7)).first);
+  EXPECT_EQ(0, table.Delete(KeyOf(7)).first);
+  EXPECT_EQ(1u, table.Retired());
+  EXPECT_EQ(base + 1, Counted::live);
+
+  EXPECT_EQ(ENOENT, table.Delete(KeyOf(7)).first);
+  EXPECT_EQ(1u, table.Retired()) << "deleting a missing rule retired a value";
+
+  table.FreeRetired();
+  EXPECT_EQ(base, Counted::live);
+
+  table.DeInit();
+}
+
+TEST_F(MeteringTest, ClearRetiresEveryValue) {
+  Metering<Counted> table;
+  table.Init(sizeof(uint64_t), 1 << 6);
+  const int base = Counted::live;
+
+  for (uint16_t i = 1; i <= 3; i++) {
+    EXPECT_EQ(0, table.Add(Counted(i), KeyOf(i)).first);
+  }
+
+  table.Clear();
+  EXPECT_EQ(0u, table.Count());
+  EXPECT_EQ(3u, table.Retired());
+
+  table.FreeRetired();
+  EXPECT_EQ(base, Counted::live);
+
+  table.DeInit();
+}
+
+// DeInit frees the values still waiting to be freed as well as those the
+// table holds, each once.
+TEST_F(MeteringTest, DeInitFreesTheRetiredValues) {
+  Metering<Counted> table;
+  table.Init(sizeof(uint64_t), 1 << 6);
+  const int base = Counted::live;
+
+  EXPECT_EQ(0, table.Add(Counted(1), KeyOf(7)).first);
+  EXPECT_EQ(0, table.Add(Counted(2), KeyOf(7)).first);
+  EXPECT_EQ(0, table.Add(Counted(3), KeyOf(8)).first);
+  EXPECT_EQ(0, table.Delete(KeyOf(8)).first);
+  EXPECT_EQ(2u, table.Retired());
+
+  table.DeInit();
+  EXPECT_EQ(base, Counted::live);
+}
+
+// A key removed and added again holds only its new value, and the old one is
+// retired once.
+TEST_F(MeteringTest, AKeyAddedAgainAfterItsRemovalHoldsOnlyItsNewValue) {
+  Metering<Counted> table;
+  table.Init(sizeof(uint64_t), 1 << 6);
+  const int base = Counted::live;
+
+  EXPECT_EQ(0, table.Add(Counted(1), KeyOf(7)).first);
+  EXPECT_EQ(0, table.Delete(KeyOf(7)).first);
+  EXPECT_EQ(0, table.Add(Counted(2), KeyOf(7)).first);
+  table.Clear();
+  EXPECT_EQ(0, table.Add(Counted(3), KeyOf(7)).first);
+
+  EXPECT_EQ(2u, table.Retired());
+  EXPECT_EQ(3, table.Find(KeyOf(7), Counted(0)).v);
+  table.FreeRetired();
+  EXPECT_EQ(base + 1, Counted::live);
+
+  table.DeInit();
+  EXPECT_EQ(base, Counted::live);
+}
+
+// A rule the table refused leaves nothing behind.
+TEST_F(MeteringTest, ARefusedAddRetiresNothing) {
+  const int entries = 1 << 6;
+
+  Metering<Counted> table;
+  table.Init(sizeof(uint64_t), entries);
+  const int base = Counted::live;
+
+  int i = 0;
+  while (i < entries * 8 && table.Add(Counted(1), KeyOf(i + 1)).first == 0) {
+    i++;
+  }
+
+  EXPECT_EQ(0u, table.Retired());
+  EXPECT_EQ(base + static_cast<int>(table.Count()), Counted::live)
+      << "a refused value was not freed";
+
+  table.DeInit();
+  EXPECT_EQ(base, Counted::live);
+}
+
 }  // namespace

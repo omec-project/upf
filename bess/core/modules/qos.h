@@ -75,8 +75,13 @@ class Qos final : public Module {
   std::string GetDesc() const override;
 
  private:
+  // At most this many replaced or removed values wait to be freed: about 160
+  // bytes each, and one pause of the workers per batch.
+  static const size_t kMaxRetired = 1024;
+
   int DelEntry(MeteringKey *key);
   void Clear();
+  void FreeRetired(size_t threshold);
   gate_idx_t default_gate_;
   size_t total_key_size_; /* a multiple of sizeof(uint64_t) */
   size_t total_value_size_;
