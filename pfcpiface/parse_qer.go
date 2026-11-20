@@ -27,6 +27,12 @@ type qer struct {
 	dlGbr    uint64 // in kilobits/sec
 	fseID    uint64
 	fseidIP  uint32
+
+	// quotaClosed closes both gates for as long as a URR whose traffic the QER applies to
+	// has exhausted its Volume Quota. It is this UPF's, not the control plane's: the
+	// gate statuses above stay as the control plane set them, and the datapath drops the
+	// traffic when either says so.
+	quotaClosed bool
 }
 
 // occupiesSameEntryAs reports whether both rules would land on the same datapath entry.
@@ -37,6 +43,12 @@ type qer struct {
 // is the only way a QER can move.
 func (q qer) occupiesSameEntryAs(other qer) bool {
 	return q.qosLevel == other.qosLevel
+}
+
+// sharesEntryWith reports whether two QERs of one session land on the same datapath
+// entry: an application QER is keyed by its ID, and the session QER by the session alone.
+func (q qer) sharesEntryWith(other qer) bool {
+	return q.qosLevel == other.qosLevel && (q.qosLevel == SessionQos || q.qerID == other.qerID)
 }
 
 func (q qer) String() string {

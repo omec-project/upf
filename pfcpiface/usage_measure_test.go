@@ -548,6 +548,35 @@ func TestAnUpdatedTimeThresholdIsCountedFromTheLastReport(t *testing.T) {
 	}
 }
 
+// A Create URR that replaces a URR brings new thresholds, counted from the URR's last
+// report (clause 5.2.2.3.1 NOTE 1), as an Update URR's are.
+func TestAReplacingCreateURRCountsItsThresholdsFromTheLastReport(t *testing.T) {
+	u := bothThresholdsURR()
+	u.timeThreshold = time.Hour
+	u.triggers.periodic = true
+	u.measurementPeriod = time.Minute
+
+	s := measuredSession(u)
+
+	poll(s, someUplink(), testEpoch) // metering starts, and the period
+
+	if r := poll(s, downlink(6*mb), testEpoch.Add(time.Minute)); len(r) != 1 || r[0].trigger != triggerPERIO {
+		t.Fatalf("expected a periodic report, got %+v", r)
+	}
+
+	replacement := bothThresholdsURR()
+	replacement.timeThreshold = 30 * time.Second
+	s.CreateURR(replacement, testEpoch.Add(70*time.Second))
+
+	if r := poll(s, downlink(9*mb), testEpoch.Add(89*time.Second)); len(r) != 0 {
+		t.Fatalf("a replacing URR's thresholds were counted from before the last report: %+v", r)
+	}
+
+	if r := poll(s, volumeCounts{}, testEpoch.Add(90*time.Second)); len(r) != 1 || r[0].trigger != triggerTIMTH {
+		t.Fatalf("expected a time threshold report 30 s after the last report, got %+v", r)
+	}
+}
+
 // A report that may not have arrived is sent again as it was, with its UR-SEQN, so a
 // control plane that lost only the answer counts it once; until it is delivered the URR
 // starts no other report, and its usage goes into the one after.

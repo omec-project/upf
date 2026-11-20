@@ -17,6 +17,7 @@ const (
 	triggerPERIO reportTrigger = 1 << 0  // periodic, octet 5 bit 1
 	triggerVOLTH reportTrigger = 1 << 1  // volume threshold, octet 5 bit 2
 	triggerTIMTH reportTrigger = 1 << 2  // time threshold, octet 5 bit 3
+	triggerVOLQU reportTrigger = 1 << 8  // volume quota, octet 6 bit 1
 	triggerTERMR reportTrigger = 1 << 11 // termination report, octet 6 bit 4
 )
 
