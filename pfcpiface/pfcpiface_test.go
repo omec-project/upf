@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/omec-project/upf-epc/pfcpiface/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -406,5 +407,66 @@ func TestFirstAddressIPWithoutAddresses(t *testing.T) {
 	_, err := firstAddressIP("eth9", nil)
 	if err == nil || !strings.Contains(err.Error(), "eth9 has no addresses") {
 		t.Fatalf("firstAddressIP error = %v, want one saying eth9 has no addresses", err)
+	}
+}
+
+// startAgent starts an agent on a free port and waits until it serves.
+func startAgent(t *testing.T) (*PFCPIface, <-chan error) {
+	t.Helper()
+
+	port := freePort(t)
+	p := runnableAgent(t, port, &fakeDP{})
+	done := runAgent(p)
+
+	waitForHTTP(t, port)
+
+	return p, done
+}
+
+// Run used to return as soon as Stop had cancelled the node, while Stop was
+// still unregistering the agent's collectors.
+func TestRunWaitsForStopToFinish(t *testing.T) {
+	useTestRegistry(t)
+
+	p, done := startAgent(t)
+
+	go p.Stop()
+
+	if err := waitForRun(t, done); err != nil {
+		t.Fatalf("Run returned %v after Stop, want nil", err)
+	}
+
+	if prometheus.Unregister(newUpfCollector(p.upf)) {
+		t.Error("Run returned with the agent's UPF collector still registered")
+	}
+}
+
+// Another Stop on a stopped agent used to unregister the metrics of the agent
+// that replaced it, since Prometheus matches them by name.
+func TestStopAgainLeavesReplacementMetrics(t *testing.T) {
+	useTestRegistry(t)
+
+	a, aDone := startAgent(t)
+	a.Stop()
+
+	if err := waitForRun(t, aDone); err != nil {
+		t.Fatalf("A's Run returned %v, want nil", err)
+	}
+
+	b, bDone := startAgent(t)
+
+	a.Stop()
+
+	// B's PFCP metrics are still registered if a second service can't be.
+	if s, err := metrics.NewPrometheusService(); err == nil {
+		_ = s.Stop()
+
+		t.Error("stopping A again unregistered B's PFCP metrics")
+	}
+
+	b.Stop()
+
+	if err := waitForRun(t, bDone); err != nil {
+		t.Fatalf("B's Run returned %v, want nil", err)
 	}
 }

@@ -37,7 +37,11 @@ type PFCPIface struct {
 	uc *upfCollector
 	nc *PfcpNodeCollector
 
-	mu sync.Mutex
+	mu      sync.Mutex
+	stopped bool // Stop has shut the agent down; protected by mu
+
+	// stopDone is closed when Stop has finished. Set up by setUp.
+	stopDone chan struct{}
 }
 
 // NewPFCPIface returns a PFCP agent that programs BESS.
@@ -99,6 +103,7 @@ func (p *PFCPIface) setUp() error {
 	// because ReadHeaderTimeout is not configured in the http.Server (gosec)"),
 	// the ReadHeaderTimeout is set to the same value as in nginx (client_header_timeout)
 	p.httpSrv = &http.Server{Addr: p.httpEndpoint, Handler: httpMux, ReadHeaderTimeout: 60 * time.Second}
+	p.stopDone = make(chan struct{})
 
 	return nil
 }
@@ -157,13 +162,31 @@ func (p *PFCPIface) Run() error {
 	// blocking
 	p.node.Serve()
 
-	return <-httpErr
+	err := <-httpErr
+
+	// Serve returns once Stop has cancelled the node, and the server once Stop
+	// has shut it down, both before Stop has finished cleaning up. Wait for
+	// it, so a caller can start another agent as soon as Run returns.
+	<-p.stopDone
+
+	return err
 }
 
 // Stop sends cancellation signal to main Go routine and waits for shutdown to complete.
 func (p *PFCPIface) Stop() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
+	// Stop runs once. A second call, from a signal and from a failed HTTP
+	// server, or by a caller after starting a replacement, would unregister
+	// the replacement's metrics: Prometheus matches them by name, not by
+	// instance. Nothing to stop unless Run set the agent up.
+	if p.stopped || p.stopDone == nil {
+		return
+	}
+
+	p.stopped = true
+	defer close(p.stopDone)
 
 	ctxHttpShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer func() {
@@ -180,9 +203,5 @@ func (p *PFCPIface) Stop() {
 	p.node.Done()
 
 	// Unregister the collectors, so another agent in this process can start.
-	// Stop can run twice, from a signal and from a failed HTTP server.
-	if p.uc != nil {
-		clearProm(p.uc, p.nc)
-		p.uc, p.nc = nil, nil
-	}
+	clearProm(p.uc, p.nc)
 }
