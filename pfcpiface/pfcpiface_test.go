@@ -459,9 +459,11 @@ func TestStopAgainLeavesReplacementMetrics(t *testing.T) {
 
 	// B's PFCP metrics are still registered if a second service can't be.
 	if s, err := metrics.NewPrometheusService(); err == nil {
-		_ = s.Stop()
-
 		t.Error("stopping A again unregistered B's PFCP metrics")
+
+		if err := s.Stop(); err != nil {
+			t.Errorf("stopping the second service: %v", err)
+		}
 	}
 
 	b.Stop()
