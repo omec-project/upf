@@ -6,6 +6,7 @@ package pfcpiface
 
 import (
 	"encoding/binary"
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -124,6 +125,15 @@ func GetUnicastAddressFromInterface(interfaceName string) (net.IP, error) {
 	addresses, err := iface.Addrs()
 	if err != nil {
 		return nil, err
+	}
+
+	return firstAddressIP(interfaceName, addresses)
+}
+
+// firstAddressIP returns the IP of an interface's first address.
+func firstAddressIP(interfaceName string, addresses []net.Addr) (net.IP, error) {
+	if len(addresses) == 0 {
+		return nil, fmt.Errorf("interface %s has no addresses", interfaceName)
 	}
 
 	ip, _, err := net.ParseCIDR(addresses[0].String())

@@ -38,7 +38,9 @@ func setUpfInfoWithoutDatapath(t *testing.T, b *bess, conf *Conf) {
 	*bessIP = "127.0.0.1:1"
 	enableGtpuPathMonitoring = false
 
-	b.SetUpfInfo(&upf{}, conf)
+	if err := b.SetUpfInfo(&upf{}, conf); err != nil {
+		t.Fatalf("SetUpfInfo: %v", err)
+	}
 
 	t.Cleanup(b.Exit)
 }
@@ -452,7 +454,9 @@ func TestSetUpfInfoTwiceLeavesNoEndMarkerSender(t *testing.T) {
 
 	first := b.endMarkerDone
 
-	b.SetUpfInfo(&upf{}, conf)
+	if err := b.SetUpfInfo(&upf{}, conf); err != nil {
+		t.Fatalf("SetUpfInfo: %v", err)
+	}
 
 	second := b.endMarkerDone
 

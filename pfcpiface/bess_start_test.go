@@ -93,7 +93,9 @@ func TestSetUpfInfoClearsPathMonitoringOnStart(t *testing.T) {
 	enableGtpuPathMonitoring = false // a freshly started agent
 
 	b := &bess{}
-	b.SetUpfInfo(&upf{}, &Conf{EnableGtpuPathMonitoring: true})
+	if err := b.SetUpfInfo(&upf{}, &Conf{EnableGtpuPathMonitoring: true}); err != nil {
+		t.Fatalf("SetUpfInfo: %v", err)
+	}
 	t.Cleanup(b.Exit)
 
 	if sent := rec.sent(); !slices.Contains(sent, "gtpuPathMonitoring clear") {
@@ -111,7 +113,9 @@ func TestSetUpfInfoLeavesPathMonitoringAloneWhenDisabled(t *testing.T) {
 	enableGtpuPathMonitoring = false
 
 	b := &bess{}
-	b.SetUpfInfo(&upf{}, &Conf{})
+	if err := b.SetUpfInfo(&upf{}, &Conf{}); err != nil {
+		t.Fatalf("SetUpfInfo: %v", err)
+	}
 	t.Cleanup(b.Exit)
 
 	sent := rec.sent()

@@ -5,6 +5,7 @@ package pfcpiface
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"strings"
@@ -132,29 +133,72 @@ func fqdnHostname() (string, error) {
 	return hostname, nil // fallback to short hostname
 }
 
-func NewUPF(conf *Conf, fp datapath) *upf {
-	var (
-		err    error
-		nodeID string
-		hosts  []string
-	)
+// hostResolver is the part of net.Resolver that NewUPF uses, so tests can
+// replace it.
+type hostResolver interface {
+	LookupHost(ctx context.Context, host string) ([]string, error)
+}
 
-	nodeID = conf.CPIface.NodeID
+// The node ID lookup is retried because a single failed DNS lookup at start,
+// common while a pod's network comes up, used to exit the agent and put it in
+// a restart loop. Variables so tests can shorten them.
+var (
+	nodeIDResolver     hostResolver = net.DefaultResolver
+	nodeIDLookupTries               = 10
+	nodeIDLookupPeriod              = 3 * time.Second
+)
+
+// resolveNodeID resolves the node ID to an address, retrying a failed lookup
+// up to nodeIDLookupTries times, nodeIDLookupPeriod apart.
+func resolveNodeID(ctx context.Context, nodeID string) (string, error) {
+	var err error
+
+	for try := 1; ; try++ {
+		var hosts []string
+
+		hosts, err = nodeIDResolver.LookupHost(ctx, nodeID)
+		if err == nil && len(hosts) > 0 {
+			return hosts[0], nil
+		}
+
+		if err == nil {
+			err = fmt.Errorf("no addresses for %s", nodeID)
+		}
+
+		if try >= nodeIDLookupTries {
+			break
+		}
+
+		logger.PfcpLog.Warnf("resolving node ID %s (try %d of %d): %v; retrying in %v",
+			nodeID, try, nodeIDLookupTries, err, nodeIDLookupPeriod)
+
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case <-time.After(nodeIDLookupPeriod):
+		}
+	}
+
+	return "", fmt.Errorf("resolving node ID %s: %w", nodeID, err)
+}
+
+func NewUPF(conf *Conf, fp datapath) (*upf, error) {
+	var err error
+
+	nodeID := conf.CPIface.NodeID
 	if conf.CPIface.UseFQDN && nodeID == "" {
 		nodeID, err = fqdnHostname()
 		if err != nil {
-			logger.PfcpLog.Fatalln("unable to get hostname", err)
+			return nil, fmt.Errorf("getting hostname: %w", err)
 		}
 	}
 
 	// TODO: Delete this once CI config is fixed
 	if nodeID != "" {
-		hosts, err = net.DefaultResolver.LookupHost(context.Background(), nodeID)
+		nodeID, err = resolveNodeID(context.Background(), nodeID)
 		if err != nil {
-			logger.PfcpLog.Fatalln("unable to resolve hostname", nodeID, err)
+			return nil, err
 		}
-
-		nodeID = hosts[0]
 	}
 
 	u := &upf{
@@ -180,18 +224,22 @@ func NewUPF(conf *Conf, fp datapath) *upf {
 		urrPollInterval:      urrPollIntervalDefault,
 	}
 
-	if !setupPeersAndInterfaces(u, conf) {
-		return nil
+	if err := setupPeersAndInterfaces(u, conf); err != nil {
+		return nil, err
 	}
 
-	initTimersAndIPPool(u, conf)
+	if err := initTimersAndIPPool(u, conf); err != nil {
+		return nil, err
+	}
 
-	u.SetUpfInfo(u, conf)
+	if err := u.SetUpfInfo(u, conf); err != nil {
+		return nil, fmt.Errorf("setting up the datapath: %w", err)
+	}
 
-	return u
+	return u, nil
 }
 
-func setupPeersAndInterfaces(u *upf, conf *Conf) bool {
+func setupPeersAndInterfaces(u *upf, conf *Conf) error {
 	var err error
 	if len(conf.CPIface.Peers) > 0 {
 		u.peers = make([]string, len(conf.CPIface.Peers))
@@ -204,30 +252,30 @@ func setupPeersAndInterfaces(u *upf, conf *Conf) bool {
 
 	u.accessIP, err = GetUnicastAddressFromInterface(conf.AccessIface.IfName)
 	if err != nil {
-		logger.PfcpLog.Errorf("failed to get unicast address for access interface %q: %v", conf.AccessIface.IfName, err)
-		return false
+		return fmt.Errorf("getting unicast address for access interface %q: %w", conf.AccessIface.IfName, err)
 	}
 
 	u.coreIP, err = GetUnicastAddressFromInterface(conf.CoreIface.IfName)
 	if err != nil {
-		logger.PfcpLog.Errorf("failed to get unicast address for core interface %q: %v", conf.CoreIface.IfName, err)
-		return false
+		return fmt.Errorf("getting unicast address for core interface %q: %w", conf.CoreIface.IfName, err)
 	}
-	return true
+
+	return nil
 }
 
-func initTimersAndIPPool(u *upf, conf *Conf) {
+func initTimersAndIPPool(u *upf, conf *Conf) error {
 	var err error
+
 	u.respTimeout, err = time.ParseDuration(conf.RespTimeout)
 	if err != nil {
-		logger.PfcpLog.Fatalf("unable to parse resp_timeout %q: %v", conf.RespTimeout, err)
+		return fmt.Errorf("parsing resp_timeout %q: %w", conf.RespTimeout, err)
 	}
 
 	if u.enableHBTimer {
 		if conf.HeartBeatInterval != "" {
 			u.hbInterval, err = time.ParseDuration(conf.HeartBeatInterval)
 			if err != nil {
-				logger.PfcpLog.Fatalf("unable to parse heart_beat_interval %q: %v", conf.HeartBeatInterval, err)
+				return fmt.Errorf("parsing heart_beat_interval %q: %w", conf.HeartBeatInterval, err)
 			}
 		}
 	}
@@ -235,14 +283,16 @@ func initTimersAndIPPool(u *upf, conf *Conf) {
 	if conf.EnableUsageReporting && conf.URRPollInterval != "" {
 		u.urrPollInterval, err = time.ParseDuration(conf.URRPollInterval)
 		if err != nil {
-			logger.PfcpLog.Fatalf("unable to parse urr_poll_interval %q: %v", conf.URRPollInterval, err)
+			return fmt.Errorf("parsing urr_poll_interval %q: %w", conf.URRPollInterval, err)
 		}
 	}
 
 	if u.enableUeIPAlloc {
 		u.ippool, err = NewIPPool(u.ippoolCidr)
 		if err != nil {
-			logger.PfcpLog.Fatalf("ip pool init failed for CIDR %q: %v", u.ippoolCidr, err)
+			return fmt.Errorf("initializing the IP pool for CIDR %q: %w", u.ippoolCidr, err)
 		}
 	}
+
+	return nil
 }

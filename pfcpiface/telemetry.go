@@ -199,6 +199,8 @@ func setupProm(mux *http.ServeMux, upf *upf, node *PFCPNode) (*upfCollector, *Pf
 
 	nc := NewPFCPNodeCollector(node)
 	if err := prometheus.Register(nc); err != nil {
+		prometheus.Unregister(uc)
+
 		return nil, nil, err
 	}
 

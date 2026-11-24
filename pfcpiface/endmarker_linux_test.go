@@ -66,11 +66,14 @@ func TestSetUpfInfoWithEndMarkerSocketAbsentAtStart(t *testing.T) {
 
 	rec := startRecordingBESS(t)
 
-	b.SetUpfInfo(&upf{}, &Conf{
+	err := b.SetUpfInfo(&upf{}, &Conf{
 		EnableEndMarker:   true,
 		EndMarkerSockAddr: sockAddr,
 		SliceMeterConfig:  SliceMeterConfig{N6RateBps: 1000000, N6BurstBytes: 10000},
 	})
+	if err != nil {
+		t.Fatalf("SetUpfInfo: %v", err)
+	}
 	t.Cleanup(b.Exit)
 
 	// The slice meter is set up last, after the End Marker setup, so reaching the

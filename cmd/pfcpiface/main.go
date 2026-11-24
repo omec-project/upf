@@ -33,8 +33,13 @@ func main() {
 
 	logger.InitLog.Infof("%+v", conf)
 
-	pfcpi := pfcpiface.NewPFCPIface(conf)
+	pfcpi, err := pfcpiface.NewPFCPIface(conf)
+	if err != nil {
+		logger.InitLog.Fatalln("starting the PFCP agent:", err)
+	}
 
 	// blocking
-	pfcpi.Run()
+	if err := pfcpi.Run(); err != nil {
+		logger.InitLog.Fatalln("PFCP agent:", err)
+	}
 }
