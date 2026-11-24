@@ -62,6 +62,12 @@ type datapath interface {
 	SendMsgToUPFWithCompletion(
 		method upfMsgType, all PacketForwardingRules, newRules PacketForwardingRules,
 	) (cause uint8, finished bool)
+	// WriteQERGates writes qers and reports whether the datapath took every write. A
+	// write it refused, one whose RPC failed and one that did not finish in time all
+	// count as not taken: the gate may not be in place. SendMsgToUPF answers the last two
+	// as accepted, as a session message needs, so a caller that must know a gate is in
+	// place uses this instead.
+	WriteQERGates(qers []qer) bool
 	/* check of communication channel to datapath is setup */
 	IsConnected(accessIP *net.IP) bool
 	SummaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric)

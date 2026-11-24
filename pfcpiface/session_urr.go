@@ -3,7 +3,10 @@
 
 package pfcpiface
 
-import "time"
+import (
+	"slices"
+	"time"
+)
 
 // urrUsage is what this UPF has measured for a URR, and when.
 type urrUsage struct {
@@ -42,6 +45,22 @@ type urrUsage struct {
 	// period.
 	nextPeriod time.Time
 
+	// toQuota is the volume counted against the Volume Quota: since it was granted,
+	// together with what was measured since the last report before that (clause
+	// 5.2.2.3.1 NOTE 1). Reports do not reset it.
+	toQuota volumeCounts
+	// quotaExhausted holds once the quota is reached, until a Volume Quota IE grants a new
+	// one. quotaReportDue says a VOLQU report of it is yet to be generated.
+	// quotaAwaitingUsage says a quota of zero was exhausted with VOLQU set and no usage to
+	// report: the first usage credited after it is reported. Turning VOLQU off clears both
+	// at once, and turning it on again does not set them.
+	quotaExhausted     bool
+	quotaReportDue     bool
+	quotaAwaitingUsage bool
+	// quotaSent says a Volume Quota was granted since the last report: like a threshold
+	// sent then, it is counted from the report before it if that report is refused.
+	quotaSent bool
+
 	// nextSeq is the UR-SEQN of the next report: 0 for the first, then one more for each
 	// (clause 5.2.2.3.1).
 	nextSeq uint32
@@ -78,6 +97,8 @@ func (s *PFCPSession) CreateURR(u urr, now time.Time) {
 				u.usage.nextPeriod = time.Time{}
 			}
 
+			u.applyNewLimits(u.volumeThreshold.isSet(), u.timeThreshold > 0, u.volumeQuota.isSet())
+
 			s.urrs[i] = u
 
 			return
@@ -85,6 +106,7 @@ func (s *PFCPSession) CreateURR(u urr, now time.Time) {
 	}
 
 	u.usage = urrUsage{since: now}
+	u.checkQuota()
 	s.urrs = append(s.urrs, u)
 }
 
@@ -108,6 +130,7 @@ func (s *PFCPSession) UpdateURR(u urr, has urrIEs, now time.Time) error {
 		}
 
 		held.triggers = u.triggers
+		held.dropQuotaReportWithoutVOLQU()
 	}
 
 	if has.measurementPeriod {
@@ -116,19 +139,19 @@ func (s *PFCPSession) UpdateURR(u urr, has urrIEs, now time.Time) error {
 		held.usage.nextPeriod = time.Time{}
 	}
 
-	// A threshold is new whatever its value, and is counted from the URR's last report:
-	// the traffic and time since then are deducted from it (clause 5.2.2.3.1 NOTE 1).
 	if has.volumeThreshold {
 		held.volumeThreshold = u.volumeThreshold
-		held.usage.toThreshold = held.usage.unreported
-		held.usage.volumeThresholdSent = true
 	}
 
 	if has.timeThreshold {
 		held.timeThreshold = u.timeThreshold
-		held.usage.toTimeThreshold = held.usage.metered
-		held.usage.timeThresholdSent = true
 	}
+
+	if has.volumeQuota {
+		held.volumeQuota = u.volumeQuota
+	}
+
+	held.applyNewLimits(has.volumeThreshold, has.timeThreshold, has.volumeQuota)
 
 	return nil
 }
@@ -181,6 +204,7 @@ func (u *urr) addVolume(v volumeCounts, at time.Time) {
 	if u.measureVolume {
 		u.usage.unreported.add(v)
 		u.usage.toThreshold.add(v)
+		u.usage.toQuota.add(v)
 	}
 }
 
@@ -260,6 +284,7 @@ func (s *PFCPSession) reportDissociated(before []pdr, now time.Time) []usageRepo
 		}
 
 		u.usage.reset(now)
+		u.checkQuota() // a quota of zero is exhausted again, as on arrival
 	}
 
 	return reports
@@ -276,14 +301,83 @@ func (u *urr) hasMeasurement() bool {
 
 // reset discards what the URR measured. Clause 5.2.2.3.1 has the UP function "reset any
 // measurement for the URR" when its last PDR is removed; this includes the counts toward
-// its thresholds and usage kept while a measurement is off. Its UR-SEQN, period and
-// outstanding report run on.
+// its thresholds and usage kept while a measurement is off. Its quota counts afresh too:
+// the UP function "will not remember any remaining quota" (NOTE 5). Its UR-SEQN, period
+// and outstanding report run on.
 func (us *urrUsage) reset(now time.Time) {
 	us.since = now
-	us.unreported, us.toThreshold = volumeCounts{}, volumeCounts{}
+	us.unreported, us.toThreshold, us.toQuota = volumeCounts{}, volumeCounts{}, volumeCounts{}
 	us.metered, us.toTimeThreshold, us.durationCarry = 0, 0, 0
-	us.volumeThresholdSent, us.timeThresholdSent = false, false
+	us.volumeThresholdSent, us.timeThresholdSent, us.quotaSent = false, false, false
+	us.quotaExhausted, us.quotaReportDue, us.quotaAwaitingUsage = false, false, false
 	us.outstandingReset = us.outstanding != nil
+}
+
+// applyNewLimits applies a Volume or Time Threshold or a Volume Quota the control plane
+// has just sent. Each is new whatever its value: a fixed-size grant repeats the last one.
+// Each is counted from the URR's last report, so the traffic and time since then are
+// deducted from it (clause 5.2.2.3.1 NOTE 1), and forwarding stopped by the old quota
+// resumes. A URR left with no quota at all has none to be exhausted.
+func (u *urr) applyNewLimits(volumeThreshold, timeThreshold, quota bool) {
+	us := &u.usage
+
+	if volumeThreshold {
+		us.toThreshold = us.unreported
+		us.volumeThresholdSent = true
+	}
+
+	if timeThreshold {
+		us.toTimeThreshold = us.metered
+		us.timeThresholdSent = true
+	}
+
+	if quota || !u.volumeQuota.isSet() {
+		us.toQuota = us.unreported
+		us.quotaExhausted, us.quotaReportDue, us.quotaAwaitingUsage = false, false, false
+		us.quotaSent = quota
+	}
+
+	u.checkQuota()
+}
+
+// checkQuota records an exhausted Volume Quota. A quota of zero is exhausted on arrival;
+// it is reported only if there is usage to report (clause 5.2.2.3.1), so a control plane
+// that stops a rating group with one is not answered with a report. Usage the datapath
+// counted before the quota arrived may be credited only at a later poll, since an Update
+// URR does not read the counts: it is reported then, once.
+func (u *urr) checkQuota() {
+	us := &u.usage
+
+	if us.quotaExhausted {
+		if us.quotaAwaitingUsage && !us.unreported.isZero() {
+			us.quotaAwaitingUsage, us.quotaReportDue = false, true
+		}
+
+		return
+	}
+
+	if !u.volumeQuota.isSet() {
+		return
+	}
+
+	reached := u.volumeQuota.reachedBy(us.toQuota)
+	if !reached && !u.volumeQuota.hasZero() {
+		return
+	}
+
+	us.quotaExhausted = true
+	awaiting := !reached && us.unreported.isZero()
+	us.quotaAwaitingUsage = u.triggers.volumeQuota && awaiting
+	us.quotaReportDue = u.triggers.volumeQuota && !awaiting
+}
+
+// dropQuotaReportWithoutVOLQU drops the VOLQU report of a URR whose Reporting Triggers no
+// longer set VOLQU, due or waiting for usage, when the triggers change rather than at the
+// next poll: VOLQU set again before that poll does not bring the report back.
+func (u *urr) dropQuotaReportWithoutVOLQU() {
+	if !u.triggers.volumeQuota {
+		u.usage.quotaReportDue, u.usage.quotaAwaitingUsage = false, false
+	}
 }
 
 // dueReports returns the reports the session's URRs are to send now: each outstanding
@@ -294,6 +388,10 @@ func (s *PFCPSession) dueReports(now time.Time) []*usageReport {
 
 	for i := range s.urrs {
 		u := &s.urrs[i]
+
+		// Whether or not a report is outstanding: the quota stops the traffic, whatever
+		// becomes of the report that says so.
+		u.checkQuota()
 
 		if r := u.usage.outstanding; r != nil {
 			u.startPeriod(now)
@@ -310,10 +408,11 @@ func (s *PFCPSession) dueReports(now time.Time) []*usageReport {
 
 		// A URR no PDR measures is credited no traffic. What it holds -- usage a refused
 		// report gave back after its last PDR left -- is kept for its next report, and does
-		// not fire a threshold: that would report the usage as though it had just been
-		// measured.
-		if t&(triggerVOLTH|triggerTIMTH) != 0 && !s.measures(u.urrID) {
-			t &^= triggerVOLTH | triggerTIMTH
+		// not fire a threshold or report an exhausted quota: that would report the usage as
+		// though it had just been measured. A VOLQU report stays due, and goes once a PDR
+		// measures the URR again.
+		if t&(triggerVOLTH|triggerTIMTH|triggerVOLQU) != 0 && !s.measures(u.urrID) {
+			t &^= triggerVOLTH | triggerTIMTH | triggerVOLQU
 		}
 
 		if t != 0 {
@@ -333,6 +432,10 @@ func (u *urr) due(now time.Time) reportTrigger {
 
 	us := &u.usage
 	us.meter(now)
+
+	if us.quotaReportDue {
+		t |= triggerVOLQU
+	}
 
 	// A threshold fires only while its measurement is on, so that its report carries it.
 	if u.triggers.volumeThreshold && u.measureVolume && u.volumeThreshold.reachedBy(us.toThreshold) {
@@ -399,7 +502,7 @@ func (u *urr) report(t reportTrigger, now time.Time) usageReport {
 	}
 
 	us.since = now
-	us.volumeThresholdSent, us.timeThresholdSent = false, false
+	us.volumeThresholdSent, us.timeThresholdSent, us.quotaSent = false, false, false
 
 	// A threshold report re-applies all of the URR's thresholds; a report for another
 	// trigger leaves them counting on (clause 5.2.2.3.1).
@@ -408,7 +511,94 @@ func (u *urr) report(t reportTrigger, now time.Time) usageReport {
 		us.toThreshold, us.toTimeThreshold = volumeCounts{}, 0
 	}
 
+	if t&triggerVOLQU != 0 {
+		us.quotaReportDue = false
+	}
+
 	return r
+}
+
+// applyQuotaGates closes the gates of the QERs that stop the traffic of a URR whose quota
+// is exhausted, and opens the rest, and returns the QERs whose gate changed, as the
+// session now holds them. BESS looks a PDR's traffic up at one application QER, the first
+// in its QER ID list, and passes it on to the session QER, which carries every rating
+// group, so that application QER is the one closed. A PDR whose first QER the session
+// holds only as its session QER is stopped there, and the session's other rating groups
+// with it: the QER can still have the application entry it had before it was marked,
+// which the PDR would pass. A PDR whose first QER the session does not hold is left as it
+// is: its application lookup misses, and both pipelines sink that lookup's default gate.
+func (s *PFCPSession) applyQuotaGates() []qer {
+	closed := map[QosLevel]map[uint32]bool{ApplicationQos: {}, SessionQos: {}}
+
+	for _, p := range s.pdrs {
+		if !s.anyQuotaExhausted(p.urrIDList) {
+			continue
+		}
+
+		// A PDR without a QER is looked up as QER 0, which a session can hold.
+		id, level := firstQERID(p), SessionQos
+		if slices.ContainsFunc(s.qers, func(q qer) bool {
+			return q.qerID == id && q.qosLevel == ApplicationQos
+		}) {
+			level = ApplicationQos
+		}
+
+		closed[level][id] = true
+	}
+
+	var changed []qer
+
+	for i := range s.qers {
+		q := &s.qers[i]
+
+		if want := closed[q.qosLevel][q.qerID]; q.quotaClosed != want {
+			q.quotaClosed = want
+			changed = append(changed, *q)
+		}
+	}
+
+	return changed
+}
+
+// withQERs adds to a modification's QER writes the QERs it changed without naming them:
+// those whose quota gate changed, and those the session QER marking moved. They do not go
+// through heldVersions, which picks the first QER of an updated ID, as an Update QER does:
+// two QERs of one ID can sit at different levels, which are different datapath entries,
+// and the first can be the session QER while the change is at the application QER. A QER
+// is left out only when the writes already hold one on its entry, so each entry is
+// written once.
+func withQERs(writes, extra []qer) []qer {
+	for _, e := range extra {
+		if !slices.ContainsFunc(writes, e.sharesEntryWith) {
+			writes = append(writes, e)
+		}
+	}
+
+	return writes
+}
+
+// withPDRs adds to a modification's PDR writes the PDRs the session QER marking changed
+// the first QER of, unless the writes already hold one of its ID on its entry.
+func withPDRs(writes, extra []pdr) []pdr {
+	for _, e := range extra {
+		if !slices.ContainsFunc(writes, func(w pdr) bool {
+			return w.pdrID == e.pdrID && w.occupiesSameEntryAs(e)
+		}) {
+			writes = append(writes, e)
+		}
+	}
+
+	return writes
+}
+
+func (s *PFCPSession) anyQuotaExhausted(urrIDs []uint32) bool {
+	for _, id := range urrIDs {
+		if u := s.findURR(id); u != nil && u.usage.quotaExhausted {
+			return true
+		}
+	}
+
+	return false
 }
 
 // reportOutcome is what became of a report that was sent.
@@ -482,6 +672,16 @@ func (s *PFCPSession) settleReports(sent []*usageReport, outcome reportOutcome) 
 				us.toTimeThreshold = us.metered
 			case p != nil:
 				us.toTimeThreshold += p.toTimeThreshold
+			}
+
+			if us.quotaSent {
+				us.toQuota = us.unreported
+			}
+
+			// The quota is still exhausted and its traffic stopped, so nothing else may
+			// ever trigger a report: the VOLQU report is due again, if VOLQU is still set.
+			if r.trigger&triggerVOLQU != 0 && us.quotaExhausted && u.triggers.volumeQuota {
+				us.quotaReportDue = true
 			}
 
 			us.outstanding, us.inFlight = nil, false

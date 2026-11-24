@@ -28,8 +28,8 @@ func (c volumeCounts) isZero() bool {
 	return c == volumeCounts{}
 }
 
-// volumeLimit is a Volume Threshold (clause 8.2.13): a limit for each counter the control
-// plane set.
+// volumeLimit is a Volume Threshold or a Volume Quota (clauses 8.2.13 and 8.2.50): a
+// limit for each counter the control plane set.
 type volumeLimit struct {
 	total, uplink, downlink          uint64
 	hasTotal, hasUplink, hasDownlink bool
@@ -43,12 +43,23 @@ func (l volumeLimit) reachedBy(c volumeCounts) bool {
 		l.hasDownlink && l.downlink > 0 && c.downlink >= l.downlink
 }
 
+func (l volumeLimit) isSet() bool {
+	return l.hasTotal || l.hasUplink || l.hasDownlink
+}
+
+// hasZero says whether any limit that is set is zero. A Volume Quota of zero stops the
+// traffic at once (clause 5.2.2.3.1).
+func (l volumeLimit) hasZero() bool {
+	return l.hasTotal && l.total == 0 || l.hasUplink && l.uplink == 0 || l.hasDownlink && l.downlink == 0
+}
+
 // urrTriggers are the reporting triggers (clause 8.2.19) this UPF acts on. A URR that sets
 // another is refused.
 type urrTriggers struct {
 	periodic        bool // PERIO
 	volumeThreshold bool // VOLTH
 	timeThreshold   bool // TIMTH
+	volumeQuota     bool // VOLQU
 }
 
 // urr is one Usage Reporting Rule: what the control plane provisioned, and what this UPF
@@ -63,25 +74,28 @@ type urr struct {
 	measurementPeriod time.Duration
 	volumeThreshold   volumeLimit
 	timeThreshold     time.Duration
+	volumeQuota       volumeLimit
 
 	usage urrUsage
 }
 
 func (u urr) String() string {
 	return fmt.Sprintf("URR(id=%d, volume=%v, duration=%v, triggers=%+v, period=%v, "+
-		"volumeThreshold=%+v, timeThreshold=%v)",
+		"volumeThreshold=%+v, timeThreshold=%v, volumeQuota=%+v)",
 		u.urrID, u.measureVolume, u.measureDuration, u.triggers, u.measurementPeriod,
-		u.volumeThreshold, u.timeThreshold)
+		u.volumeThreshold, u.timeThreshold, u.volumeQuota)
 }
 
 // urrIEs records which of a URR's optional IEs a Create or Update URR carried. An Update
-// URR changes only what it carries (clause 7.5.4.4).
+// URR changes only what it carries (clause 7.5.4.4), and a Volume Quota IE in one is a
+// new quota whatever its value (clause 5.2.2.3.1).
 type urrIEs struct {
 	measurementMethod bool
 	reportingTriggers bool
 	measurementPeriod bool
 	volumeThreshold   bool
 	timeThreshold     bool
+	volumeQuota       bool
 }
 
 var (
@@ -109,17 +123,18 @@ func (e *urrNotActedOn) Error() string {
 func (e *urrNotActedOn) Unwrap() error { return errURRNotSupported }
 
 const (
-	// The flags of Measurement Method (clause 8.2.40) and Volume Threshold (clause 8.2.13),
-	// of which at least one shall be set.
+	// The flags of Measurement Method (clause 8.2.40), and of Volume Threshold and Volume
+	// Quota (clauses 8.2.13 and 8.2.50), of which at least one shall be set.
 	measurementMethodFlags = 0x07 // DURAT, VOLUM, EVENT
 	volumeFlags            = 0x07 // TOVOL, ULVOL, DLVOL
 
 	measurementMethodEVENT = 0x04
 
-	// The Reporting Triggers this UPF acts on: PERIO, VOLTH and TIMTH, in octet 5
-	// (clause 8.2.19). Octet 7 has two triggers and spare bits.
-	reportingTriggersActedOn = 0x07
-	reportingTriggersOctet7  = 0x03
+	// The Reporting Triggers this UPF acts on: PERIO, VOLTH and TIMTH in octet 5, and
+	// VOLQU in octet 6 (clause 8.2.19). Octet 7 has two triggers and spare bits.
+	reportingTriggersActedOn       = 0x07
+	reportingTriggersOctet6ActedOn = 0x01
+	reportingTriggersOctet7        = 0x03
 )
 
 // parseURR reads a Create URR or Update URR IE. A Create URR must carry a Measurement
@@ -204,7 +219,8 @@ func parseURR(urrIE *ie.IE, create bool) (urr, urrIEs, error) {
 				return u, has, fmt.Errorf("URR %d Reporting Triggers: %w", id, errURRNoFlagSet)
 			}
 
-			if octets[0]&^reportingTriggersActedOn != 0 || octets[1] != 0 || octet7 != 0 {
+			if octets[0]&^reportingTriggersActedOn != 0 || octets[1]&^reportingTriggersOctet6ActedOn != 0 ||
+				octet7 != 0 {
 				return u, has, &urrNotActedOn{id, fmt.Sprintf("Reporting Triggers %x", octets)}
 			}
 
@@ -213,6 +229,7 @@ func parseURR(urrIE *ie.IE, create bool) (urr, urrIEs, error) {
 				periodic:        x.HasPERIO(),
 				volumeThreshold: x.HasVOLTH(),
 				timeThreshold:   x.HasTIMTH(),
+				volumeQuota:     x.HasVOLQU(),
 			}
 
 		case ie.MeasurementPeriod:
@@ -245,6 +262,22 @@ func parseURR(urrIE *ie.IE, create bool) (urr, urrIEs, error) {
 
 			has.timeThreshold = true
 
+		case ie.VolumeQuota:
+			var f *ie.VolumeQuotaFields
+			if f, err = x.VolumeQuota(); err != nil {
+				return u, has, fmt.Errorf("URR %d Volume Quota: %w", id, err)
+			}
+
+			if f.Flags&volumeFlags == 0 {
+				return u, has, fmt.Errorf("URR %d Volume Quota: %w", id, errURRNoFlagSet)
+			}
+
+			has.volumeQuota = true
+			u.volumeQuota = volumeLimit{
+				total: f.TotalVolume, uplink: f.UplinkVolume, downlink: f.DownlinkVolume,
+				hasTotal: f.HasTOVOL(), hasUplink: f.HasULVOL(), hasDownlink: f.HasDLVOL(),
+			}
+
 		// Each of its flags asks for what this UPF does not do (clause 8.2.68), and it
 		// sets at least one.
 		case ie.MeasurementInformation:
@@ -261,7 +294,7 @@ func parseURR(urrIE *ie.IE, create bool) (urr, urrIEs, error) {
 
 		// The other IEs of a Create or Update URR (Tables 7.5.2.4-1 and 7.5.4.4-1); FAR ID,
 		// Application ID and SDF Filter are those of the Quota Action.
-		case ie.VolumeQuota, ie.EventThreshold, ie.EventQuota, ie.TimeQuota, ie.QuotaHoldingTime,
+		case ie.EventThreshold, ie.EventQuota, ie.TimeQuota, ie.QuotaHoldingTime,
 			ie.DroppedDLTrafficThreshold, ie.QuotaValidityTime, ie.MonitoringTime,
 			ie.SubsequentVolumeThreshold, ie.SubsequentTimeThreshold, ie.SubsequentVolumeQuota,
 			ie.SubsequentTimeQuota, ie.SubsequentEventThreshold, ie.SubsequentEventQuota,

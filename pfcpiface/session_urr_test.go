@@ -309,7 +309,7 @@ func TestEstablishmentRefusesAURRThisUPFDoesNotActOn(t *testing.T) {
 		ie.NewFSEID(testRemoteSEID, nil, nil),
 		corePDR(downlinkPDRID, firstUEAddress), downlinkFAR(),
 		ie.NewCreateURR(ie.NewURRID(testURRID), ie.NewMeasurementMethod(0, 1, 0),
-			ie.NewReportingTriggers(0, triggerOctet6VOLQU), ie.NewVolumeQuota(volumeTOVOL, 1000, 0, 0)),
+			ie.NewReportingTriggers(0, triggerOctet6TIMQU), ie.NewTimeQuota(time.Minute)),
 	))
 	if err == nil {
 		t.Fatal("the establishment was accepted")

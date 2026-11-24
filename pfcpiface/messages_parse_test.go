@@ -34,6 +34,8 @@ func (f *fakeDP) SendMsgToUPFWithCompletion(method upfMsgType, all, newRules Pac
 	return 1, true
 }
 
+func (f *fakeDP) WriteQERGates(qers []qer) bool { return true }
+
 func (f *fakeDP) IsConnected(accessIP *net.IP) bool                                     { return true }
 func (f *fakeDP) SummaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric)    {}
 func (f *fakeDP) PortStats(uc *upfCollector, ch chan<- prometheus.Metric)               {}
