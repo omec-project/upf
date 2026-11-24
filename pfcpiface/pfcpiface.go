@@ -39,12 +39,18 @@ type PFCPIface struct {
 	mu sync.Mutex
 }
 
+// NewPFCPIface returns a PFCP agent that programs BESS.
 func NewPFCPIface(conf Conf) *PFCPIface {
+	return newPFCPIface(conf, &bess{})
+}
+
+// newPFCPIface returns a PFCP agent that programs fp, so tests can run the
+// agent against a fake datapath.
+func newPFCPIface(conf Conf, fp datapath) *PFCPIface {
 	pfcpIface := &PFCPIface{
 		conf: conf,
+		fp:   fp,
 	}
-
-	pfcpIface.fp = &bess{}
 
 	httpPort := "8080"
 	if conf.CPIface.HTTPPort != "" {
