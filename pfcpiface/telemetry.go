@@ -110,22 +110,14 @@ func (uc *upfCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect writes all metrics to prometheus metric channel.
 func (uc *upfCollector) Collect(ch chan<- prometheus.Metric) {
-	uc.summaryLatencyJitter(ch)
-	uc.portStats(ch)
-	uc.summaryGtpuLatency(ch)
-}
+	m, ok := uc.upf.datapath.(upfMetricsReader)
+	if !ok {
+		return
+	}
 
-func (uc *upfCollector) portStats(ch chan<- prometheus.Metric) {
-	// When operating in sim mode there are no BESS ports
-	uc.upf.PortStats(uc, ch)
-}
-
-func (uc *upfCollector) summaryLatencyJitter(ch chan<- prometheus.Metric) {
-	uc.upf.SummaryLatencyJitter(uc, ch)
-}
-
-func (uc *upfCollector) summaryGtpuLatency(ch chan<- prometheus.Metric) {
-	uc.upf.SummaryGtpuLatency(uc, ch)
+	m.SummaryLatencyJitter(uc, ch)
+	m.PortStats(uc, ch)
+	m.SummaryGtpuLatency(uc, ch)
 }
 
 // PfcpNodeCollector makes a PFCPNode Prometheus observable.
@@ -183,7 +175,12 @@ func (col PfcpNodeCollector) Collect(ch chan<- prometheus.Metric) {
 			return
 		}
 
-		err := col.node.upf.SessionStats(&col, ch)
+		reader, ok := col.node.upf.datapath.(sessionStatsReader)
+		if !ok {
+			return
+		}
+
+		err := reader.SessionStats(&col, ch)
 		if err != nil {
 			logger.PfcpLog.Errorf("failed to collect session stats: %v", err)
 			return

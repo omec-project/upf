@@ -90,6 +90,13 @@ var bessIP = flag.String("bess", "localhost:10514", "BESS IP/port combo")
 
 var enableGtpuPathMonitoring = false
 
+// The collectors find these by type assertion, so a bess that stopped
+// implementing one would silently report no metrics instead of failing to build.
+var (
+	_ upfMetricsReader   = (*bess)(nil)
+	_ sessionStatsReader = (*bess)(nil)
+)
+
 type bess struct {
 	client        pb.BESSControlClient
 	conn          *grpc.ClientConn

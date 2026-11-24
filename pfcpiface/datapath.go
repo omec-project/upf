@@ -64,8 +64,20 @@ type datapath interface {
 	) (cause uint8, finished bool)
 	/* check of communication channel to datapath is setup */
 	IsConnected(accessIP *net.IP) bool
+}
+
+// upfMetricsReader is the part of a datapath that reports its ports' traffic,
+// their latency and jitter, and GTP-U path monitoring, for upfCollector. A
+// datapath without it reports none of these metrics.
+type upfMetricsReader interface {
 	SummaryLatencyJitter(uc *upfCollector, ch chan<- prometheus.Metric)
 	PortStats(uc *upfCollector, ch chan<- prometheus.Metric)
 	SummaryGtpuLatency(uc *upfCollector, ch chan<- prometheus.Metric)
+}
+
+// sessionStatsReader is the part of a datapath that reports per-session
+// traffic, for PfcpNodeCollector. A read can reset what it reads: BESS flips
+// its FlowMeasure buffers. A datapath without it reports no session metrics.
+type sessionStatsReader interface {
 	SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) error
 }

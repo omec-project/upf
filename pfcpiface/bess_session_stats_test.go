@@ -235,7 +235,7 @@ func TestSessionStatsEmitsTheDirectionsThatWereRead(t *testing.T) {
 			col := NewPFCPNodeCollector(node)
 			ch := make(chan prometheus.Metric, 64)
 
-			err := node.upf.SessionStats(col, ch)
+			err := node.upf.datapath.(*bess).SessionStats(col, ch)
 			close(ch)
 
 			for _, module := range tt.failRead {
