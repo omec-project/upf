@@ -213,22 +213,48 @@ func TestResolveNodeIDStopsWhenCancelled(t *testing.T) {
 	}
 }
 
-// runnableAgent returns an agent on a fake datapath that Run can start: PFCP
-// on the loopback and HTTP on port. Its collectors go in a registry of their
-// own, not the default one the other tests use.
-func runnableAgent(t *testing.T, port string) *PFCPIface {
+// useTestRegistry gives the agent's globally registered collectors a registry
+// of their own for the rest of the test, not the default one the other tests
+// use.
+func useTestRegistry(t *testing.T) {
 	t.Helper()
 
 	oldRegisterer := prometheus.DefaultRegisterer
 	prometheus.DefaultRegisterer = prometheus.NewRegistry()
 
 	t.Cleanup(func() { prometheus.DefaultRegisterer = oldRegisterer })
+}
+
+// freePort returns a TCP port nothing is listening on.
+func freePort(t *testing.T) string {
+	t.Helper()
+
+	var lc net.ListenConfig
+
+	free, err := lc.Listen(context.Background(), "tcp", ":0")
+	if err != nil {
+		t.Fatalf("finding a port: %v", err)
+	}
+	defer free.Close()
+
+	_, port, err := net.SplitHostPort(free.Addr().String())
+	if err != nil {
+		t.Fatalf("parsing %s: %v", free.Addr(), err)
+	}
+
+	return port
+}
+
+// runnableAgent returns an agent on dp that Run can start: PFCP on the
+// loopback and HTTP on port.
+func runnableAgent(t *testing.T, port string, dp datapath) *PFCPIface {
+	t.Helper()
 
 	conf := loopbackConf(t)
 	conf.N4Addr = "127.0.0.1"
 	conf.CPIface.HTTPPort = port
 
-	p, err := newPFCPIface(conf, &fakeDP{})
+	p, err := newPFCPIface(conf, dp)
 	if err != nil {
 		t.Fatalf("newPFCPIface: %v", err)
 	}
@@ -236,9 +262,67 @@ func runnableAgent(t *testing.T, port string) *PFCPIface {
 	return p
 }
 
+// runAgent starts Run and returns the channel its result arrives on.
+func runAgent(p *PFCPIface) <-chan error {
+	done := make(chan error, 1)
+
+	go func() { done <- p.Run() }()
+
+	return done
+}
+
+// waitForRun returns Run's result, failing the test if it takes too long.
+func waitForRun(t *testing.T, done <-chan error) error {
+	t.Helper()
+
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(15 * time.Second):
+		t.Fatal("Run did not return")
+
+		return nil
+	}
+}
+
+// waitForHTTP waits until the agent's HTTP server answers on port.
+func waitForHTTP(t *testing.T, port string) {
+	t.Helper()
+
+	var d net.Dialer
+
+	deadline := time.Now().Add(10 * time.Second)
+
+	for {
+		conn, err := d.DialContext(context.Background(), "tcp", "127.0.0.1:"+port)
+		if err == nil {
+			conn.Close()
+
+			return
+		}
+
+		if time.Now().After(deadline) {
+			t.Fatalf("the agent's HTTP server didn't start: %v", err)
+		}
+
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// exitDP is a fakeDP that records whether the agent released it.
+type exitDP struct {
+	fakeDP
+	exited bool
+}
+
+func (d *exitDP) Exit() { d.exited = true }
+
 // An HTTP server that can't start used to exit the agent from its goroutine.
-// Now it stops the agent, and Run returns the error.
+// Now it stops the agent, and Run returns the error. The agent must also have
+// released what it registered and set up, so another can start in its place.
 func TestRunReturnsHTTPServerError(t *testing.T) {
+	useTestRegistry(t)
+
 	// Hold a port on every address, so the agent's HTTP server can't bind it.
 	var lc net.ListenConfig
 
@@ -253,73 +337,74 @@ func TestRunReturnsHTTPServerError(t *testing.T) {
 		t.Fatalf("parsing %s: %v", busy.Addr(), err)
 	}
 
-	p := runnableAgent(t, port)
+	dp := &exitDP{}
 
-	done := make(chan error, 1)
+	err = waitForRun(t, runAgent(runnableAgent(t, port, dp)))
+	if err == nil || !strings.Contains(err.Error(), "http server") {
+		t.Fatalf("Run returned %v, want the HTTP server's error", err)
+	}
 
-	go func() { done <- p.Run() }()
+	if !dp.exited {
+		t.Error("the agent didn't release its datapath")
+	}
 
-	select {
-	case err := <-done:
-		if err == nil || !strings.Contains(err.Error(), "http server") {
-			t.Fatalf("Run returned %v, want the HTTP server's error", err)
-		}
-	case <-time.After(15 * time.Second):
-		t.Fatal("Run did not return after its HTTP server failed")
+	// A replacement, in the same registry, starts and stops cleanly.
+	port = freePort(t)
+	p := runnableAgent(t, port, &fakeDP{})
+	done := runAgent(p)
+
+	waitForHTTP(t, port)
+	p.Stop()
+
+	if err := waitForRun(t, done); err != nil {
+		t.Fatalf("the replacement agent's Run returned %v, want nil", err)
 	}
 }
 
 // Run waits for the HTTP server's result, so check that Stop still ends it.
 func TestRunReturnsNilAfterStop(t *testing.T) {
-	// Find a free port for the HTTP server.
-	var lc net.ListenConfig
+	useTestRegistry(t)
 
-	free, err := lc.Listen(context.Background(), "tcp", ":0")
-	if err != nil {
-		t.Fatalf("finding a port: %v", err)
-	}
-
-	_, port, err := net.SplitHostPort(free.Addr().String())
-	if err != nil {
-		t.Fatalf("parsing %s: %v", free.Addr(), err)
-	}
-
-	free.Close()
-
-	p := runnableAgent(t, port)
-
-	done := make(chan error, 1)
-
-	go func() { done <- p.Run() }()
+	port := freePort(t)
+	p := runnableAgent(t, port, &fakeDP{})
+	done := runAgent(p)
 
 	// Stop needs the agent set up; wait until its HTTP server answers.
-	var d net.Dialer
-
-	deadline := time.Now().Add(10 * time.Second)
-
-	for {
-		conn, err := d.DialContext(context.Background(), "tcp", "127.0.0.1:"+port)
-		if err == nil {
-			conn.Close()
-
-			break
-		}
-
-		if time.Now().After(deadline) {
-			t.Fatalf("the agent's HTTP server didn't start: %v", err)
-		}
-
-		time.Sleep(10 * time.Millisecond)
-	}
-
+	waitForHTTP(t, port)
 	p.Stop()
 
-	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatalf("Run returned %v after Stop, want nil", err)
-		}
-	case <-time.After(15 * time.Second):
-		t.Fatal("Run did not return after Stop")
+	if err := waitForRun(t, done); err != nil {
+		t.Fatalf("Run returned %v after Stop, want nil", err)
+	}
+}
+
+// When setup fails after NewUPF, Serve never runs to release the datapath, so
+// Run has to.
+func TestRunReleasesDatapathWhenSetupFails(t *testing.T) {
+	useTestRegistry(t)
+
+	conf := loopbackConf(t)
+	conf.N4Addr = "not an address"
+
+	dp := &exitDP{}
+
+	p, err := newPFCPIface(conf, dp)
+	if err != nil {
+		t.Fatalf("newPFCPIface: %v", err)
+	}
+
+	if err := p.Run(); err == nil {
+		t.Fatal("Run succeeded with a PFCP address it can't listen on")
+	}
+
+	if !dp.exited {
+		t.Error("the agent didn't release its datapath")
+	}
+}
+
+func TestFirstAddressIPWithoutAddresses(t *testing.T) {
+	_, err := firstAddressIP("eth9", nil)
+	if err == nil || !strings.Contains(err.Error(), "eth9 has no addresses") {
+		t.Fatalf("firstAddressIP error = %v, want one saying eth9 has no addresses", err)
 	}
 }

@@ -20,12 +20,30 @@ type Service struct {
 const labelNodeID = "node_id"
 
 func NewPrometheusService() (*Service, error) {
+	// Registers a collector, or, if that fails, unregisters the ones before it,
+	// so a failed start leaves nothing registered and can be tried again.
+	var registered []prometheus.Collector
+
+	register := func(c prometheus.Collector) error {
+		if err := prometheus.Register(c); err != nil {
+			for _, r := range registered {
+				prometheus.Unregister(r)
+			}
+
+			return err
+		}
+
+		registered = append(registered, c)
+
+		return nil
+	}
+
 	msgCount := prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "pfcp_messages_total",
 		Help: "Counter for incoming and outgoing PFCP messages",
 	}, []string{labelNodeID, "message_type", "direction", "result"})
 
-	if err := prometheus.Register(msgCount); err != nil {
+	if err := register(msgCount); err != nil {
 		return nil, err
 	}
 
@@ -35,7 +53,7 @@ func NewPrometheusService() (*Service, error) {
 		Buckets: []float64{1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 1e1},
 	}, []string{labelNodeID, "message_type", "direction"})
 
-	if err := prometheus.Register(msgDuration); err != nil {
+	if err := register(msgDuration); err != nil {
 		return nil, err
 	}
 
@@ -44,7 +62,7 @@ func NewPrometheusService() (*Service, error) {
 		Help: "Number of PFCP sessions currently in the UPF",
 	}, []string{labelNodeID})
 
-	if err := prometheus.Register(sessions); err != nil {
+	if err := register(sessions); err != nil {
 		return nil, err
 	}
 
@@ -66,7 +84,7 @@ func NewPrometheusService() (*Service, error) {
 		},
 	}, []string{labelNodeID})
 
-	if err := prometheus.Register(sessionDuration); err != nil {
+	if err := register(sessionDuration); err != nil {
 		return nil, err
 	}
 

@@ -87,6 +87,9 @@ func (p *PFCPIface) setUp() error {
 
 	p.uc, p.nc, err = setupProm(httpMux, p.upf, p.node)
 	if err != nil {
+		// Serve hasn't started, so stop the node, which unregisters its
+		// metrics, without waiting for Serve to finish.
+		p.node.Stop()
 		p.node.Close()
 
 		return fmt.Errorf("setting up Prometheus metrics: %w", err)
@@ -113,6 +116,10 @@ func (p *PFCPIface) Run() error {
 	}
 
 	if err := p.setUp(); err != nil {
+		// Serve releases the datapath when it stops; it won't run, so release
+		// the datapath NewUPF set up here.
+		p.upf.Exit()
+
 		return err
 	}
 
@@ -171,4 +178,11 @@ func (p *PFCPIface) Stop() {
 
 	// Wait for PFCP node shutdown
 	p.node.Done()
+
+	// Unregister the collectors, so another agent in this process can start.
+	// Stop can run twice, from a signal and from a failed HTTP server.
+	if p.uc != nil {
+		clearProm(p.uc, p.nc)
+		p.uc, p.nc = nil, nil
+	}
 }
