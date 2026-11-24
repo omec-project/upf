@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -470,5 +471,47 @@ func TestStopAgainLeavesReplacementMetrics(t *testing.T) {
 
 	if err := waitForRun(t, bDone); err != nil {
 		t.Fatalf("B's Run returned %v, want nil", err)
+	}
+}
+
+// statsDP counts the session stats reads, each of which flips the BESS
+// FlowMeasure buffers.
+type statsDP struct {
+	fakeDP
+	reads atomic.Int32
+}
+
+func (d *statsDP) SessionStats(pc *PfcpNodeCollector, ch chan<- prometheus.Metric) error {
+	d.reads.Add(1)
+	return nil
+}
+
+func TestStopDoesNotReadSessionStats(t *testing.T) {
+	useTestRegistry(t)
+
+	port := freePort(t)
+	dp := &statsDP{}
+
+	p := runnableAgent(t, port, dp)
+	p.upf.enableFlowMeasure = true
+
+	done := runAgent(p)
+	waitForHTTP(t, port)
+
+	// Registering the node collector reads the stats once, which the PTF
+	// linerate tests rely on until they flip the buffers themselves.
+	before := dp.reads.Load()
+	if before == 0 {
+		t.Fatal("starting the agent didn't read the session stats")
+	}
+
+	p.Stop()
+
+	if err := waitForRun(t, done); err != nil {
+		t.Fatalf("Run returned %v, want nil", err)
+	}
+
+	if after := dp.reads.Load(); after != before {
+		t.Errorf("stopping the agent read the session stats %d times, want 0", after-before)
 	}
 }

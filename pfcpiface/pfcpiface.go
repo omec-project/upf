@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/omec-project/upf-epc/logger"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var simulate = simModeDisable
@@ -209,6 +210,13 @@ func (p *PFCPIface) Stop() {
 	// Wait for PFCP node shutdown
 	p.node.Done()
 
-	// Unregister the collectors, so another agent in this process can start.
-	clearProm(p.uc, p.nc)
+	// Unregister the UPF collector, so another agent in this process can start.
+	// The PFCP node collector stays registered: it describes itself by
+	// collecting, so unregistering it would read the session stats, flipping
+	// the FlowMeasure buffers at shutdown, and Prometheus can't unregister it
+	// anyway when that read returns nothing. It registers again without
+	// conflict for the same reason.
+	if !prometheus.Unregister(p.uc) {
+		logger.PfcpLog.Warnln("failed to unregister upfCollector")
+	}
 }
