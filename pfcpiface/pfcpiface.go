@@ -153,10 +153,17 @@ func (p *PFCPIface) Run() error {
 	signal.Notify(sig, os.Interrupt)
 	signal.Notify(sig, syscall.SIGTERM)
 
+	// Run can return without a signal, so stop listening for one when it
+	// does, rather than leave the subscription and this goroutine behind.
+	defer signal.Stop(sig)
+
 	go func() {
-		oscall := <-sig
-		logger.PfcpLog.Infof("system call received: %+v", oscall)
-		p.Stop()
+		select {
+		case oscall := <-sig:
+			logger.PfcpLog.Infof("system call received: %+v", oscall)
+			p.Stop()
+		case <-p.stopDone:
+		}
 	}()
 
 	// blocking
