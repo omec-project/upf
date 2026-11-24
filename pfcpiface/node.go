@@ -6,6 +6,7 @@ package pfcpiface
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"sync"
 
@@ -35,16 +36,18 @@ type PFCPNode struct {
 }
 
 // NewPFCPNode create a new PFCPNode listening on local address.
-func NewPFCPNode(upf *upf) *PFCPNode {
+func NewPFCPNode(upf *upf) (*PFCPNode, error) {
 	conn, err := reuse.ListenPacket("udp",
 		upf.n4addr+":"+PFCPPort)
 	if err != nil {
-		logger.PfcpLog.Fatalln("listen UDP failed", err)
+		return nil, fmt.Errorf("listening for PFCP on UDP: %w", err)
 	}
 
 	metrics, err := metrics.NewPrometheusService()
 	if err != nil {
-		logger.PfcpLog.Fatalln("prom metrics service init failed", err)
+		conn.Close()
+
+		return nil, fmt.Errorf("initializing the PFCP metrics service: %w", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -60,7 +63,7 @@ func NewPFCPNode(upf *upf) *PFCPNode {
 
 	node.usage = usageMonitorFor(node)
 
-	return node
+	return node, nil
 }
 
 func (node *PFCPNode) tryConnectToN4Peers(lAddrStr string) {

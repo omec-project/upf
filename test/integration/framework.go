@@ -218,8 +218,16 @@ func setup(t *testing.T, configType uint32) {
 
 	upfConf := GetConfig(configType)
 	upfConf.N4Addr = localhostAltIP
-	pfcpAgent = pfcpiface.NewPFCPIface(upfConf)
-	go pfcpAgent.Run()
+	pfcpAgent, err = pfcpiface.NewPFCPIface(upfConf)
+	if err != nil {
+		t.Fatalf("failed to create the PFCP agent: %v", err)
+	}
+
+	go func() {
+		if runErr := pfcpAgent.Run(); runErr != nil {
+			t.Errorf("PFCP agent: %v", runErr)
+		}
+	}()
 
 	pfcpClient = pfcpsim.NewPFCPClient(localhostIP)
 	errConn := pfcpClient.ConnectN4(localhostAltIP)

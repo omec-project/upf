@@ -20,7 +20,7 @@ import (
 type fakeDP struct{}
 
 func (f *fakeDP) Exit()                                        {}
-func (f *fakeDP) SetUpfInfo(u *upf, conf *Conf)                {}
+func (f *fakeDP) SetUpfInfo(u *upf, conf *Conf) error          { return nil }
 func (f *fakeDP) AddSliceInfo(sliceInfo *SliceInfo) error      { return nil }
 func (f *fakeDP) SendEndMarkers(endMarkerList *[][]byte) error { return nil }
 func (f *fakeDP) SendMsgToUPF(method upfMsgType, all PacketForwardingRules, newRules PacketForwardingRules) uint8 {

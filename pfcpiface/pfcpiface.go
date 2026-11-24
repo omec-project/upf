@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -40,13 +41,13 @@ type PFCPIface struct {
 }
 
 // NewPFCPIface returns a PFCP agent that programs BESS.
-func NewPFCPIface(conf Conf) *PFCPIface {
+func NewPFCPIface(conf Conf) (*PFCPIface, error) {
 	return newPFCPIface(conf, &bess{})
 }
 
 // newPFCPIface returns a PFCP agent that programs fp, so tests can run the
 // agent against a fake datapath.
-func newPFCPIface(conf Conf, fp datapath) *PFCPIface {
+func newPFCPIface(conf Conf, fp datapath) (*PFCPIface, error) {
 	pfcpIface := &PFCPIface{
 		conf: conf,
 		fp:   fp,
@@ -59,50 +60,81 @@ func newPFCPIface(conf Conf, fp datapath) *PFCPIface {
 
 	pfcpIface.httpEndpoint = ":" + httpPort
 
-	pfcpIface.upf = NewUPF(&conf, pfcpIface.fp)
+	upf, err := NewUPF(&conf, pfcpIface.fp)
+	if err != nil {
+		return nil, err
+	}
 
-	return pfcpIface
+	pfcpIface.upf = upf
+
+	return pfcpIface, nil
 }
 
-func (p *PFCPIface) mustInit() {
+func (p *PFCPIface) setUp() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	p.node = NewPFCPNode(p.upf)
+	var err error
+
+	p.node, err = NewPFCPNode(p.upf)
+	if err != nil {
+		return err
+	}
+
 	httpMux := http.NewServeMux()
 
 	setupConfigHandler(httpMux, p.upf)
 
-	var err error
-
 	p.uc, p.nc, err = setupProm(httpMux, p.upf, p.node)
 	if err != nil {
-		logger.PfcpLog.Fatalln("setupProm failed", err)
+		p.node.Close()
+
+		return fmt.Errorf("setting up Prometheus metrics: %w", err)
 	}
 
 	// Note: due to error with golangci-lint ("Error: G112: Potential Slowloris Attack
 	// because ReadHeaderTimeout is not configured in the http.Server (gosec)"),
 	// the ReadHeaderTimeout is set to the same value as in nginx (client_header_timeout)
 	p.httpSrv = &http.Server{Addr: p.httpEndpoint, Handler: httpMux, ReadHeaderTimeout: 60 * time.Second}
+
+	return nil
 }
 
-func (p *PFCPIface) Run() {
+// Run serves PFCP until the agent is stopped, by a signal or by Stop. It
+// returns an error if the agent couldn't start, or if its HTTP server failed,
+// which stops the agent.
+func (p *PFCPIface) Run() error {
 	if simulate.enable() {
 		p.upf.sim(simulate, &p.conf.SimInfo)
 
 		if !simulate.keepGoing() {
-			return
+			return nil
 		}
 	}
 
-	p.mustInit()
+	if err := p.setUp(); err != nil {
+		return err
+	}
+
+	// The HTTP server's result. Every way Serve returns, through Stop, also ends
+	// the server: Stop shuts it down, or it failed and called Stop itself. So
+	// this always gets a value, sent after any Stop the failure called has
+	// finished.
+	httpErr := make(chan error, 1)
 
 	go func() {
 		if err := p.httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.PfcpLog.Fatalln("http server failed", err)
+			logger.PfcpLog.Errorln("http server failed", err)
+			p.Stop()
+
+			httpErr <- fmt.Errorf("http server: %w", err)
+
+			return
 		}
 
 		logger.PfcpLog.Infoln("http server closed")
+
+		httpErr <- nil
 	}()
 
 	sig := make(chan os.Signal, 1)
@@ -117,6 +149,8 @@ func (p *PFCPIface) Run() {
 
 	// blocking
 	p.node.Serve()
+
+	return <-httpErr
 }
 
 // Stop sends cancellation signal to main Go routine and waits for shutdown to complete.

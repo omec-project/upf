@@ -44,7 +44,7 @@ type datapath interface {
 	/* Close any pending sessions */
 	Exit()
 	/* setup internal parameters and channel with datapath */
-	SetUpfInfo(u *upf, conf *Conf)
+	SetUpfInfo(u *upf, conf *Conf) error
 	/* set up slice info */
 	AddSliceInfo(sliceInfo *SliceInfo) error
 	/* write endMarker to datapath */
