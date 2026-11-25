@@ -73,7 +73,7 @@ func TestSessionStatsCollectionsDoNotInterleave(t *testing.T) {
 	for range 8 {
 		wg.Go(func() {
 			ch := make(chan prometheus.Metric, 64)
-			if err := node.upf.SessionStats(col, ch); err != nil {
+			if err := node.upf.datapath.(*bess).SessionStats(col, ch); err != nil {
 				t.Errorf("SessionStats: %v", err)
 			}
 		})

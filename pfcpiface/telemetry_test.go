@@ -108,3 +108,23 @@ func Test_setupProm(t *testing.T) {
 		}
 	})
 }
+
+// A datapath without the metric readers reports no metrics, rather than
+// failing to collect.
+func TestCollectorsWithoutMetricReaders(t *testing.T) {
+	u := &upf{enableFlowMeasure: true, enableGtpuMonitor: true, datapath: &fakeDP{}}
+	node := &PFCPNode{upf: u}
+
+	for name, c := range map[string]prometheus.Collector{
+		"upfCollector":      newUpfCollector(u),
+		"PfcpNodeCollector": NewPFCPNodeCollector(node),
+	} {
+		ch := make(chan prometheus.Metric, 64)
+		c.Collect(ch)
+		close(ch)
+
+		if n := len(ch); n != 0 {
+			t.Errorf("%s collected %d metrics, want 0", name, n)
+		}
+	}
+}
