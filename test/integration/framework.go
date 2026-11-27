@@ -37,6 +37,9 @@ const (
 
 	localhostAltIP = "127.0.0.8"
 	localhostIP    = "127.0.0.1"
+	// pfcpSimIP is where the simulated SMF binds the PFCP port. Not 127.0.0.1: the agent tests in
+	// pfcpiface listen on 127.0.0.1:8805, and go test ./... runs both packages at once.
+	pfcpSimIP      = "127.0.0.9"
 	anyIPv4Address = "0.0.0.0"
 )
 
@@ -229,7 +232,7 @@ func setup(t *testing.T, configType uint32) {
 		}
 	}()
 
-	pfcpClient = pfcpsim.NewPFCPClient(localhostIP)
+	pfcpClient = pfcpsim.NewPFCPClient(pfcpSimIP)
 	errConn := pfcpClient.ConnectN4(localhostAltIP)
 	if errConn != nil {
 		t.Fatalf("failed to connect to UPF: %v", errConn)
