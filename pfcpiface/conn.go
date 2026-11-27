@@ -168,6 +168,11 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 
 	p.setLocalNodeID(node.upf.nodeID)
 
+	// Lawful Interception tasking is held per element but resolved against sessions,
+	// which live per association. Registering the store is what lets tasking already
+	// in place apply to this association's sessions.
+	node.upf.ccEnabler.addSource(p.store)
+
 	if buf != nil {
 		// TODO: Check if the first msg is Association Setup Request
 		p.HandlePFCPMsg(buf)
@@ -311,14 +316,45 @@ func (pConn *PFCPConn) executeShutdown() {
 	var unfinished []PFCPSession
 
 	for _, sess := range sessions {
+		// Lawful Interception: the session's stripe until RemoveSession has stamped the
+		// deletion, so a tasking pass cannot push one of these FARs back after the delete.
+		// See ccEnabler.sessionLocks. A session whose removal did not finish is released
+		// unstamped and retried below under its stripe again; that retry removes anything
+		// a pass pushed in between.
+		unlockSession := pConn.upf.ccEnabler.lockSession(sess.localSEID)
+
 		// A removal that ran out of time may have left rules matching the session's
 		// address, and once the session is forgotten nothing names them. So the address
 		// is released only once a removal of its rules has finished; the sessions whose
 		// removal did not are retried together below.
-		if _, finished := pConn.upf.SendMsgToUPFWithCompletion(
-			upfMsgTypeDel, sess.PacketForwardingRules, PacketForwardingRules{},
-		); !finished {
+		cause, finished, confirmed := pConn.upf.sendRemoval(sess.PacketForwardingRules)
+
+		// The datapath's answer, consulted rather than discarded. This path deletes every
+		// session of an association at once, so it storms the datapath with one batch per
+		// session — which makes it the likeliest of all the delete paths to be refused, and a
+		// refused delete leaves the rules in place. Where those rules were duplicating, the
+		// copies continue with no session, no record and no tasking to account for them:
+		// removeSource below drops this store, so no re-derivation can ever walk them again.
+		//
+		// A refused removal is not retried — the retry below is for removals that did not
+		// finish, and the association is going away — so the remedy is to say so.
+		if cause == ie.CauseRequestRejected {
+			pConn.upf.ccEnabler.abandonedDuplication(sess.localSEID, sess.fars, "an association teardown")
+		}
+
+		// Lawful Interception: a removal that finished with a FAR delete the datapath did not
+		// answer is retried with the unfinished ones when that FAR may be duplicating. The
+		// batch is answered accepted and finished, so without this the session would be
+		// forgotten here with nothing left that could stop the copies. Only then, so that a
+		// UPF without LI tears down exactly as before.
+		retryUnconfirmed := finished && cause != ie.CauseRequestRejected && !confirmed &&
+			pConn.upf.ccEnabler.removalMayLeaveDuplication(sess.localSEID, sess.fars)
+
+		if !finished || retryUnconfirmed {
 			unfinished = append(unfinished, sess)
+
+			unlockSession()
+
 			continue
 		}
 
@@ -329,9 +365,13 @@ func (pConn *PFCPConn) executeShutdown() {
 		pConn.upf.ippool.Release(sess.localSEID)
 
 		pConn.RemoveSession(sess)
+
+		unlockSession()
 	}
 
 	pConn.retryUnfinishedRemovals(unfinished)
+
+	pConn.upf.ccEnabler.removeSource(pConn.store)
 
 	rAddr := pConn.RemoteAddr().String()
 
@@ -345,7 +385,8 @@ func (pConn *PFCPConn) executeShutdown() {
 }
 
 // retryUnfinishedRemovals makes one more attempt at removing the rules of the sessions
-// whose removal ran out of time at teardown. Each session is retried in a batch of its
+// whose removal ran out of time at teardown, and of those whose FAR delete for a rule that
+// may be duplicating was not answered. Each session is retried in a batch of its
 // own and all of them at once, so the retry adds one batch's timeout to the teardown
 // rather than one per session, and a session whose rules drained is not held back by
 // another's that did not. A rule the late removal already took out is answered ENOENT,
@@ -361,7 +402,22 @@ func (pConn *PFCPConn) executeShutdown() {
 // its shape that the rule's own add would have met first -- so it was never programmed,
 // and holding its address would lose it for nothing.
 func (pConn *PFCPConn) retryUnfinishedRemovals(sessions []PFCPSession) {
+	causes := make([]uint8, len(sessions))
 	finished := make([]bool, len(sessions))
+	confirmed := make([]bool, len(sessions))
+
+	// Lawful Interception: every retried session's stripe, from before its removal until
+	// this function returns, after RemoveSession below has stamped the deletion, so a
+	// tasking pass cannot push one of their FARs back in between. Taken together because
+	// the removals run concurrently and two sessions may share a stripe. See
+	// ccEnabler.sessionLocks.
+	seids := make([]uint64, len(sessions))
+	for i, s := range sessions {
+		seids[i] = s.localSEID
+	}
+
+	unlockSessions := pConn.upf.ccEnabler.lockSessions(seids)
+	defer unlockSessions()
 
 	var wg sync.WaitGroup
 
@@ -371,8 +427,7 @@ func (pConn *PFCPConn) retryUnfinishedRemovals(sessions []PFCPSession) {
 		go func() {
 			defer wg.Done()
 
-			_, finished[i] = pConn.upf.SendMsgToUPFWithCompletion(
-				upfMsgTypeDel, s.PacketForwardingRules, PacketForwardingRules{})
+			causes[i], finished[i], confirmed[i] = pConn.upf.sendRemoval(s.PacketForwardingRules)
 		}()
 	}
 
@@ -381,6 +436,19 @@ func (pConn *PFCPConn) retryUnfinishedRemovals(sessions []PFCPSession) {
 	held := 0
 
 	for i, s := range sessions {
+		// As on the first pass: a refused removal of a duplicating rule is reported, because
+		// once the session is forgotten nothing can stop the copies. So is one the datapath
+		// has not confirmed twice, for the same reason -- a batch that did not finish, whose
+		// rules are as likely to have survived as its address is to be matched, which is why
+		// that address is held below, or a FAR delete whose RPC did not complete. Both before
+		// RemoveSession, which drops the record the reports read.
+		switch {
+		case causes[i] == ie.CauseRequestRejected:
+			pConn.upf.ccEnabler.abandonedDuplication(s.localSEID, s.fars, "an association teardown")
+		case !confirmed[i]:
+			pConn.upf.ccEnabler.removalUnconfirmed(s.localSEID, s.fars, "an association teardown")
+		}
+
 		if finished[i] {
 			pConn.upf.ippool.Release(s.localSEID)
 		} else {

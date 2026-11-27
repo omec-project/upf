@@ -188,15 +188,45 @@ func (col PfcpNodeCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
+// datapathWriteDuration measures how long a batch of rule writes takes to be
+// confirmed by the datapath, from the start of the batch's RPC deadline, before its
+// rules are dispatched, to the join. The join's own one-second wait starts after
+// dispatch, so a batch that times out there reads above the deadline by its
+// dispatch time.
+//
+// A batch that exceeds that deadline leaves this element unable to say whether its
+// rules were applied, and this records how close ordinary batches come to it, so
+// the exposure can be measured rather than argued about.
+//
+// Carries no session, rule or subscriber identity, only the PFCP procedure that
+// issued the batch. That is deliberate: this is a general operator metric, and one
+// that could be correlated to a particular subscriber would disclose more than a
+// general metric may.
+var datapathWriteDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+	Name: "upf_datapath_write_duration_seconds",
+	Help: "Time for a batch of datapath rule writes to be confirmed, by PFCP procedure",
+	// Resolved around the 1s batch deadline rather than spread evenly: what is
+	// wanted is how close the tail comes to it, so the buckets crowd the top end.
+	Buckets: []float64{1e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 0.25, 0.5, 0.75, 0.9, 1.0, 2.0},
+}, []string{"method"})
+
 func setupProm(mux *http.ServeMux, upf *upf, node *PFCPNode) (*upfCollector, *PfcpNodeCollector, error) {
+	// First, so that a failure below can take it back like the UPF collector.
+	if err := prometheus.Register(datapathWriteDuration); err != nil {
+		return nil, nil, err
+	}
+
 	uc := newUpfCollector(upf)
 	if err := prometheus.Register(uc); err != nil {
+		prometheus.Unregister(datapathWriteDuration)
+
 		return nil, nil, err
 	}
 
 	nc := NewPFCPNodeCollector(node)
 	if err := prometheus.Register(nc); err != nil {
 		prometheus.Unregister(uc)
+		prometheus.Unregister(datapathWriteDuration)
 
 		return nil, nil, err
 	}
@@ -209,6 +239,10 @@ func setupProm(mux *http.ServeMux, upf *upf, node *PFCPNode) (*upfCollector, *Pf
 func clearProm(uc *upfCollector, nc *PfcpNodeCollector) {
 	if ok := prometheus.Unregister(uc); !ok {
 		logger.PfcpLog.Warnln("failed to unregister upfCollector")
+	}
+
+	if ok := prometheus.Unregister(datapathWriteDuration); !ok {
+		logger.PfcpLog.Warnln("failed to unregister datapathWriteDuration")
 	}
 
 	if ok := prometheus.Unregister(nc); !ok {

@@ -477,6 +477,9 @@ class GrpcTest(BaseTest):
                 util_msg.FieldData(value_int=far.tunnelIP4Dst),
                 util_msg.FieldData(value_int=far.tunnelTEID),
                 util_msg.FieldData(value_int=far.tunnelPort),
+                # fwd_action, which executeFAR splits on. These FARs never
+                # duplicate, so it equals the action.
+                util_msg.FieldData(value_int=action),
             ],
         )
 

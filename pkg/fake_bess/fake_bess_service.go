@@ -102,6 +102,7 @@ type FakeFar struct {
 	dstIntf       uint8
 	sendEndMarker bool
 	action        uint8
+	fwdAction     uint8
 	tunnelType    uint8
 	tunnelIP4Src  uint32
 	tunnelIP4Dst  uint32
@@ -126,6 +127,24 @@ const (
 	farDrop     uint8 = 2
 	farNotify   uint8 = 4
 )
+
+// ActionValue returns the datapath action the PFCP agent installed for this FAR:
+// the BESS-side value (farForwardD/farForwardU/farDrop/...), not the PFCP
+// apply-action bitmap. Note this is the value GtpuEncap also consumes as the
+// GTP-U PDU Session Container PDU Type, so it never carries a duplication
+// variant — see ForwardActionValue.
+func (f *FakeFar) ActionValue() uint8 {
+	return f.action
+}
+
+// ForwardActionValue returns the value the pipeline's executeFAR splits on, which
+// is where content duplication is signalled (farForwardDAndDuplicate,
+// farForwardUAndDuplicate, and farForwardUEncapAndDuplicate for an uplink FAR
+// that creates an outer header toward another UPF). Assert on this, not
+// ActionValue, when checking that interception reached the datapath.
+func (f *FakeFar) ForwardActionValue() uint8 {
+	return f.fwdAction
+}
 
 func (f *FakeFar) Drops() bool {
 	return f.action == farDrop
@@ -202,13 +221,13 @@ func (b *fakeBessService) unsafeGetOrAddModule(name string) module {
 		switch name {
 		case pdrLookupModuleName:
 			b.modules[name] = &wildcardModule{
-				baseModule{name: name},
-				nil,
+				baseModule: baseModule{name: name},
+				entries:    nil,
 			}
 		case farLookupModuleName:
 			b.modules[name] = &exactMatchModule{
-				baseModule{name: name},
-				nil,
+				baseModule: baseModule{name: name},
+				entries:    nil,
 			}
 		case appQerModuleName, sessionQerModuleName:
 			b.modules[name] = &qosModule{
@@ -306,6 +325,7 @@ func UnmarshalFar(em *bess_pb.ExactMatchCommandAddArg) (f FakeFar) {
 	f.tunnelIP4Dst = uint32(em.Values[3].GetValueInt())
 	f.tunnelTEID = uint32(em.Values[4].GetValueInt())
 	f.tunnelPort = uint16(em.Values[5].GetValueInt())
+	f.fwdAction = uint8(em.Values[6].GetValueInt())
 
 	return f
 }
@@ -354,18 +374,25 @@ func (b *baseModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
 }
 
 type wildcardModule struct {
+	mutex sync.Mutex
 	baseModule
 	entries []*bess_pb.WildcardMatchCommandAddArg
 }
 
+// GetState returns copies of the entries: a caller reads them after the lock is
+// released, while HandleRequest updates matching entries in place.
 func (w *wildcardModule) GetState() (msgs []proto.Message) {
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
 	for _, e := range w.entries {
-		msgs = append(msgs, e)
+		msgs = append(msgs, proto.Clone(e))
 	}
 	return msgs
 }
 
 func (w *wildcardModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
 	if err = w.baseModule.HandleRequest(cmd, arg); err != nil {
 		return err
 	}
@@ -439,18 +466,25 @@ func (w *wildcardModule) handleAddEntry(arg *anypb.Any) error {
 }
 
 type exactMatchModule struct {
+	mutex sync.Mutex
 	baseModule
 	entries []*bess_pb.ExactMatchCommandAddArg
 }
 
+// GetState returns copies of the entries: a caller reads them after the lock is
+// released, while HandleRequest updates matching entries in place.
 func (e *exactMatchModule) GetState() (msgs []proto.Message) {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
 	for _, em := range e.entries {
-		msgs = append(msgs, em)
+		msgs = append(msgs, proto.Clone(em))
 	}
 	return msgs
 }
 
 func (e *exactMatchModule) HandleRequest(cmd string, arg *anypb.Any) (err error) {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
 	if err = e.baseModule.HandleRequest(cmd, arg); err != nil {
 		return err
 	}
@@ -493,12 +527,25 @@ func (e *exactMatchModule) HandleRequest(cmd string, arg *anypb.Any) (err error)
 	return nil
 }
 
+// farLookupValues is the number of values farLookup declares in conf/up4.bess and
+// conf/closed_loop.bess: action, tunnel type, the tunnel's source and destination addresses,
+// its TEID and port, and fwd_action.
+const farLookupValues = 7
+
 func (e *exactMatchModule) handleAddEntry(arg *anypb.Any) error {
 	log := logger.BessLog.With("module", e.Name(), "cmd", addCmd)
 
 	em := &bess_pb.ExactMatchCommandAddArg{}
 	if err := arg.UnmarshalTo(em); err != nil {
 		return err
+	}
+
+	// BESS's ExactMatch refuses a rule whose value count is not the table's, so an agent
+	// and a pipeline that disagree on the FAR layout fail every insertion. The fake does
+	// the same, rather than storing a rule UnmarshalFar cannot read.
+	if e.Name() == farLookupModuleName && len(em.GetValues()) != farLookupValues {
+		return status.Errorf(codes.InvalidArgument,
+			"rule has incorrect number of values. Need %d, has %d", farLookupValues, len(em.GetValues()))
 	}
 
 	var existing *bess_pb.ExactMatchCommandAddArg
@@ -531,7 +578,7 @@ func (q *qosModule) GetState() (msgs []proto.Message) {
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
 	for _, em := range q.entries {
-		msgs = append(msgs, em)
+		msgs = append(msgs, proto.Clone(em))
 	}
 	return msgs
 }
