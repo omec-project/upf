@@ -4,6 +4,7 @@
 package pfcpiface
 
 import (
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -135,5 +136,83 @@ func TestAPDRThatCannotBeExpandedStillReportsItsResult(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("addPDR reported nothing for a rule it abandoned; the batch cannot complete")
+	}
+}
+
+// TestASecondBatchCannotBeOvertakenByTheFirst is the ordering half, which lawful interception
+// depends on.
+//
+// A tasking pass and the session path both push the same FAR. They are ordered against each other
+// by the element, and that ordering only means anything if a batch's writes have actually landed
+// when SendMsgToUPF returns. While GRPCJoin returned on the first failure with the rest of the
+// batch still in flight, an earlier push could be overtaken by a later one: the element records
+// the value it pushed second, and the datapath holds the value that arrived second — which is the
+// first. The record and the datapath then disagree, silently, which is the whole subject of this
+// change.
+//
+// Asserted at the join, because that is where the guarantee lives: after it returns, no worker of
+// that batch may still write.
+func TestASecondBatchCannotBeOvertakenByTheFirst(t *testing.T) {
+	t.Parallel()
+
+	b := &bess{}
+
+	var (
+		mu      sync.Mutex
+		arrived []string
+	)
+
+	record := func(what string) {
+		mu.Lock()
+		arrived = append(arrived, what)
+		mu.Unlock()
+	}
+
+	// The first batch: one worker fails immediately, two more are slow. Before the fix the join
+	// returned on the failure and the slow two landed later — after the second batch.
+	first := make(chan bool, 3)
+
+	go func() { record("first"); first <- false }()
+
+	for range 2 {
+		go func() {
+			time.Sleep(20 * time.Millisecond)
+			record("first")
+			first <- true
+		}()
+	}
+
+	b.GRPCJoin(3, time.Second, first)
+
+	// The second batch is issued only now, as the element issues its next push.
+	second := make(chan bool, 1)
+
+	go func() { record("second"); second <- true }()
+
+	b.GRPCJoin(1, time.Second, second)
+
+	// Long enough for any straggler from the first batch to have landed. With the join draining
+	// its batch there are none — that is the property. Without it the two slow workers arrive
+	// here, after the second batch, and the assertion below sees them; a test that read the
+	// record immediately would return before they arrived and pass against the defect.
+	time.Sleep(200 * time.Millisecond)
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	var seenSecond bool
+
+	for i, what := range arrived {
+		if what == "second" {
+			seenSecond = true
+
+			continue
+		}
+
+		if seenSecond {
+			t.Fatalf("a write from the first batch arrived at position %d, after the second "+
+				"batch's: the element pushed one value and the datapath kept the other, and "+
+				"nothing on either side can see the disagreement. Order: %v", i, arrived)
+		}
 	}
 }

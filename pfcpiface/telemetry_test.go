@@ -107,6 +107,39 @@ func Test_setupProm(t *testing.T) {
 			t.Fatal("expected an error, but got nil")
 		}
 	})
+
+	// A setup that fails part way takes back what it registered, so the agent can be
+	// set up again once the collision is gone. The histogram and the UPF collector each
+	// collide in turn with one registered first. The node collector is left out: it
+	// describes itself by collecting, and without flow measurement it collects nothing,
+	// so a second one registers unchecked and cannot collide.
+	for name, holder := range map[string]func(*upf) prometheus.Collector{
+		"datapath write histogram": func(*upf) prometheus.Collector { return datapathWriteDuration },
+		"UPF collector":            func(u *upf) prometheus.Collector { return newUpfCollector(u) },
+	} {
+		t.Run("a setup failing on the "+name+" leaves nothing registered", func(t *testing.T) {
+			saveReg()
+			defer restoreReg()
+
+			upf := &upf{}
+			node := newTestPFCPNode(t, upf)
+
+			held := holder(upf)
+			if err := prometheus.Register(held); err != nil {
+				t.Fatalf("registering the colliding collector: %v", err)
+			}
+
+			if _, _, err := setupProm(http.NewServeMux(), upf, node); err == nil {
+				t.Fatal("setupProm succeeded alongside a collector of its own")
+			}
+
+			prometheus.Unregister(held)
+
+			if _, _, err := setupProm(http.NewServeMux(), upf, node); err != nil {
+				t.Fatalf("setupProm after the failed one: %v", err)
+			}
+		})
+	}
 }
 
 // A datapath without the metric readers reports no metrics, rather than

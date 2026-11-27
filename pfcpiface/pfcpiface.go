@@ -219,4 +219,10 @@ func (p *PFCPIface) Stop() {
 	if !prometheus.Unregister(p.uc) {
 		logger.PfcpLog.Warnln("failed to unregister upfCollector")
 	}
+
+	// The datapath write histogram is registered with the UPF collector and goes
+	// with it.
+	if !prometheus.Unregister(datapathWriteDuration) {
+		logger.PfcpLog.Warnln("failed to unregister datapathWriteDuration")
+	}
 }

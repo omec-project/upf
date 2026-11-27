@@ -114,6 +114,39 @@ func Test_parsePDR(t *testing.T) {
 			},
 			description: "Valid downlink Create PDR input",
 		},
+		{
+			// The Network Instance is retained for Lawful Interception, which lists it
+			// as a detection criterion (3GPP TS 33.128 table 6.2.3-7). It is held as
+			// the wire octets, so an FQDN-encoded instance keeps its label lengths.
+			input: ie.NewCreatePDR(
+				ie.NewPDRID(pdrID),
+				ie.NewPrecedence(precedence),
+				ie.NewPDI(
+					ie.NewSourceInterface(ie.SrcInterfaceAccess),
+					ie.NewNetworkInstance(testNetInstance()),
+					ie.NewFTEID(0x01, teid, N3Address, nil, 0),
+				),
+				ie.NewOuterHeaderRemoval(0, 0),
+				ie.NewFARID(farID),
+				ie.NewQERID(qerID),
+			),
+			expected: &pdr{
+				pdrID:            uint32(pdrID),
+				precedence:       precedence,
+				tunnelIP4Dst:     ip2int(N3Address),
+				tunnelIP4DstMask: 0xffffffff,
+				srcIface:         access,
+				srcIfaceMask:     0xff,
+				fseID:            FSEID,
+				tunnelTEID:       teid,
+				tunnelTEIDMask:   0xffffffff,
+				farID:            farID,
+				qerIDList:        []uint32{qerID},
+				needDecap:        0x1,
+				networkInstance:  testNetInstance(),
+			},
+			description: "Create PDR carrying a Network Instance",
+		},
 	} {
 		t.Run(scenario.description, func(t *testing.T) {
 			mockMapPFD := make(map[string]appPFD)
